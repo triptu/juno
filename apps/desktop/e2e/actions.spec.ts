@@ -120,59 +120,61 @@ test('Rename from a row edits the row, from the header edits the header, and cle
   await juno.topic.expectTitle('Postgres 16 migration')
 })
 
-test('Ignore hides the channel’s topics, and Undo shows them again', async ({ juno }) => {
+// Each step undoes what it did. Marks go first, while Rina's thread still has its 2 unread.
+test('Mark as read and unread, Ignore, and the Slack links, each from the menu', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
-  // A bot channel: the Automated view holds it.
-  await juno.sidebar.selectView('Automated')
-  const alerts = juno.sidebar.row(ALERTS_MAIN)
-  const { labels } = await alerts.chooseInMenu('ignore-channel')
-  expect(labels).toContain('Ignore #alerts-prod')
-  await alerts.expectAbsent()
-  await juno.expectToast('Ignoring #alerts-prod')
-  await juno.undo()
-  await alerts.expectVisible()
-})
 
-test('Mark as read and Mark as unread from the menu, each undone', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const rina = juno.sidebar.row(RINA)
-  await rina.expectUnread(2)
+  await test.step('Mark as read and Mark as unread from the menu, each undone', async () => {
+    const rina = juno.sidebar.row(RINA)
+    await rina.expectUnread(2)
 
-  await rina.chooseInMenu('mark-read')
-  await juno.expectToast(`Marked as read · ${RINA}`)
-  await rina.expectRead()
-  await juno.undoFromToast()
-  await rina.expectUnread(2)
+    await rina.chooseInMenu('mark-read')
+    await juno.expectToast(`Marked as read · ${RINA}`)
+    await rina.expectRead()
+    await juno.undoFromToast()
+    await rina.expectUnread(2)
 
-  const postgres = juno.sidebar.row(POSTGRES)
-  await postgres.expectRead()
-  await postgres.chooseInMenu('mark-unread')
-  await juno.expectToast(`Marked as unread · ${POSTGRES}`)
-  await postgres.expectUnread(1)
-  await juno.undo()
-  await postgres.expectRead()
-})
+    const postgres = juno.sidebar.row(POSTGRES)
+    await postgres.expectRead()
+    await postgres.chooseInMenu('mark-unread')
+    await juno.expectToast(`Marked as unread · ${POSTGRES}`)
+    await postgres.expectUnread(1)
+    await juno.undo()
+    await postgres.expectRead()
+  })
 
-test('Copy Slack link and Open in Slack from a row and from a message', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const postgres = juno.sidebar.row(POSTGRES)
+  await test.step('Ignore hides the channel’s topics, and Undo shows them again', async () => {
+    // A bot channel: the Automated view holds it.
+    await juno.sidebar.selectView('Automated')
+    const alerts = juno.sidebar.row(ALERTS_MAIN)
+    const { labels } = await alerts.chooseInMenu('ignore-channel')
+    expect(labels).toContain('Ignore #alerts-prod')
+    await alerts.expectAbsent()
+    await juno.expectToast('Ignoring #alerts-prod')
+    await juno.undo()
+    await alerts.expectVisible()
+  })
 
-  await postgres.chooseInMenu('copy-link')
-  await expect.poll(() => juno.clipboard()).toMatch(/\/archives\/C0ENG\/p\d+$/)
-  await postgres.chooseInMenu('open-in-slack')
-  await expect.poll(() => juno.slackLinks()).toEqual([expect.stringMatching(/^slack:\/\/channel\?team=T0JUNO&id=C0ENG$/)])
+  await test.step('Copy Slack link and Open in Slack from a row and from a message', async () => {
+    // Back from the Automated view the step above chose.
+    await juno.sidebar.filter('All')
+    const postgres = juno.sidebar.row(POSTGRES)
 
-  // A reply's link carries its thread.
-  await postgres.open()
-  const reply = juno.topic.message('Booked 2–4pm')
-  await juno.topic.expectMessage('Booked 2–4pm')
-  await juno.chooseNextMenuItem('copy-link')
-  await reply.click({ button: 'right' })
-  await expect.poll(() => juno.clipboard()).toMatch(/\/archives\/C0ENG\/p\d+\?thread_ts=\d+\.\d+&cid=C0ENG$/)
-  await juno.chooseNextMenuItem('open-in-slack')
-  await reply.click({ button: 'right' })
-  await expect.poll(async () => (await juno.slackLinks()).length).toBe(2)
+    await postgres.chooseInMenu('copy-link')
+    await expect.poll(() => juno.clipboard()).toMatch(/\/archives\/C0ENG\/p\d+$/)
+    await postgres.chooseInMenu('open-in-slack')
+    await expect.poll(() => juno.slackLinks()).toEqual([expect.stringMatching(/^slack:\/\/channel\?team=T0JUNO&id=C0ENG$/)])
+
+    // A reply's link carries its thread.
+    await postgres.open()
+    const reply = juno.topic.message('Booked 2–4pm')
+    await juno.topic.expectMessage('Booked 2–4pm')
+    await juno.chooseNextMenuItem('copy-link')
+    await reply.click({ button: 'right' })
+    await expect.poll(() => juno.clipboard()).toMatch(/\/archives\/C0ENG\/p\d+\?thread_ts=\d+\.\d+&cid=C0ENG$/)
+    await juno.chooseNextMenuItem('open-in-slack')
+    await reply.click({ button: 'right' })
+    await expect.poll(async () => (await juno.slackLinks()).length).toBe(2)
+  })
 })

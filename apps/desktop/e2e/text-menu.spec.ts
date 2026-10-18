@@ -2,6 +2,7 @@
 // Copy, Paste and spelling on fields and selected text that no Juno menu took.
 import type { Locator } from '@playwright/test'
 import { expect, test } from './fixtures'
+import type { Juno } from './driver/juno'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -19,10 +20,18 @@ const EDIT_ITEMS = ['Cut', 'Copy', 'Paste', 'Paste and Match Style', 'Select All
 /** A menu's labels whether on or off: the test seam writes an off item as "(label)". */
 const names = (labels: ReadonlyArray<string>): string[] => labels.map((label) => label.replace(/^\((.*)\)$/, '$1'))
 
-test('the composer has Cut, Copy and Paste, and Paste pastes', async ({ juno }) => {
+// One topic for the three menus. Each step starts with an empty composer; the last counts menus from its own baseline.
+test('the text menu on the composer and selected text in #eng', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.sidebar.row('#eng').open()
+
+  await test.step('the composer has Cut, Copy and Paste, and Paste pastes', () => pasteFromTheMenu(juno))
+  await test.step('a misspelled word offers guesses, and picking one replaces it', () => pickASpellingGuess(juno))
+  await test.step("Juno's own menus win over the text menu, with text selected", () => junoMenusWin(juno))
+})
+
+async function pasteFromTheMenu(juno: Juno): Promise<void> {
   const composer = juno.topic.composer
   await composer.fill('Hello ')
   await juno.topic.caretToEnd()
@@ -40,13 +49,11 @@ test('the composer has Cut, Copy and Paste, and Paste pastes', async ({ juno }) 
   expect(Math.abs(menu.at!.x - (box!.x + point.x))).toBeLessThanOrEqual(1)
   expect(Math.abs(menu.at!.y - (box!.y + point.y))).toBeLessThanOrEqual(1)
   await expect(composer).toHaveValue('Hello from the menu')
-})
+}
 
-test('a misspelled word offers guesses, and picking one replaces it', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.sidebar.row('#eng').open()
+async function pickASpellingGuess(juno: Juno): Promise<void> {
   const composer = juno.topic.composer
+  await composer.fill('')
   await composer.click()
   await composer.pressSequentially('teh fix ')
   const word = await firstWord(composer)
@@ -73,12 +80,11 @@ test('a misspelled word offers guesses, and picking one replaces it', async ({ j
   await composer.click({ button: 'right', position: word })
   await juno.lastMenu()
   await expect(composer).toHaveValue('the fix ')
-})
+}
 
-test("Juno's own menus win over the text menu, with text selected", async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.sidebar.row('#eng').open()
+async function junoMenusWin(juno: Juno): Promise<void> {
+  const composer = juno.topic.composer
+  await composer.fill('')
   const text = 'Words to select in a message'
   await juno.topic.send(text)
   await juno.topic.expectSent(text)
@@ -110,4 +116,4 @@ test("Juno's own menus win over the text menu, with text selected", async ({ jun
   await juno.topic.composer.click({ button: 'right' })
   expect(names((await juno.lastMenu()).labels)).toEqual(EDIT_ITEMS)
   expect((await juno.menusAsked()) - asked).toBe(4)
-})
+}

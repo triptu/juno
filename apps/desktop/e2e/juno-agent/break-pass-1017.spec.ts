@@ -46,33 +46,31 @@ test('an About chip from Ask Juno in one tab does not follow to the panel of ano
   await expect(juno.win.locator('[data-about-chip="person"]')).toHaveText('About Leo')
 })
 
-test('the panel keeps its draft and focus across the cover breakpoint', async ({ juno }) => {
+test('the panel keeps its draft across the cover breakpoint and a tab switch', async ({ juno }) => {
   await ready(juno)
   await setWindowWidth(juno, 1400)
   await juno.sidebar.row(POSTGRES).open()
   await juno.tabs.menu('juno')
   const panel = JunoChatPane.panel(juno.win)
-  await expect(panel.composer).toBeFocused()
-  await panel.composer.fill('Half written question')
-  for (const width of [1100, 1400, 900, 1600]) {
-    await setWindowWidth(juno, width)
-    await expect.poll(() => juno.win.evaluate(() => innerWidth)).toBeLessThanOrEqual(width)
-    await expect(panel.composer).toHaveValue('Half written question')
+  await test.step('the panel keeps its draft and focus across the cover breakpoint', async () => {
     await expect(panel.composer).toBeFocused()
-  }
-})
-
-test('the panel draft is kept when the tab is switched away and back', async ({ juno }) => {
-  await ready(juno)
-  await setWindowWidth(juno, 1400)
-  await juno.sidebar.row(POSTGRES).open()
-  await juno.tabs.menu('juno')
-  const panel = JunoChatPane.panel(juno.win)
-  await panel.composer.fill('Kept while away')
-  await juno.sidebar.row(RINA).openInNewTab()
-  await juno.topic.expectTitle(RINA)
-  await juno.tabs.select(POSTGRES)
-  await expect(panel.composer).toHaveValue('Kept while away')
+    await panel.composer.fill('Half written question')
+    for (const width of [1100, 1400, 900, 1600]) {
+      await setWindowWidth(juno, width)
+      await expect.poll(() => juno.win.evaluate(() => innerWidth)).toBeLessThanOrEqual(width)
+      await expect(panel.composer).toHaveValue('Half written question')
+      await expect(panel.composer).toBeFocused()
+    }
+  })
+  await test.step('the panel draft is kept when the tab is switched away and back', async () => {
+    await setWindowWidth(juno, 1400)
+    await expect.poll(() => juno.win.evaluate(() => innerWidth)).toBeLessThanOrEqual(1400)
+    await panel.composer.fill('Kept while away')
+    await juno.sidebar.row(RINA).openInNewTab()
+    await juno.topic.expectTitle(RINA)
+    await juno.tabs.select(POSTGRES)
+    await expect(panel.composer).toHaveValue('Kept while away')
+  })
 })
 
 test('two tabs on one topic with the panel open in one: send, react and edit stay in step', async ({ juno, fake }) => {

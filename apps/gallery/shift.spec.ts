@@ -97,9 +97,9 @@ async function touch(page: Page, element: Locator): Promise<string[]> {
   await check('focus from the keyboard', async () => {
     // A key first, so the browser is in keyboard mode and :focus-visible matches.
     await page.keyboard.press('Shift')
-    await element.evaluate((node) => (node as HTMLElement).focus())
+    await element.evaluate((node) => (node as HTMLElement).focus(), undefined, { timeout: 5_000 })
   })
-  await check('blur', () => element.evaluate((node) => (node as HTMLElement).blur()))
+  await check('blur', () => element.evaluate((node) => (node as HTMLElement).blur(), undefined, { timeout: 5_000 }))
   await check('press', () => page.mouse.down())
   await check('release', () => page.mouse.up())
   await check('leave', () => page.mouse.move(2, 2))

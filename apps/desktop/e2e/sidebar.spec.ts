@@ -102,72 +102,70 @@ test('the stack shows who wrote the unread replies, and nobody once the topic is
   await expect(postgres.root.getByRole('img', { name: /Maya|Leo/ })).toHaveCount(0)
 })
 
-test('the quick filters narrow the list, DM rows show no people, and the Unread toggle hides read rows', async ({ juno }) => {
+test('the quick filters and the Unread toggle narrow the list, and an empty result offers to clear them', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { sidebar } = juno
-  await sidebar.row(POSTGRES).expectVisible()
-  await sidebar.row(OFFSITE).expectVisible()
+  await test.step('the quick filters narrow the list, DM rows show no people, and the Unread toggle hides read rows', async () => {
+    await sidebar.row(POSTGRES).expectVisible()
+    await sidebar.row(OFFSITE).expectVisible()
 
-  await sidebar.filter('Channels')
-  await sidebar.row(OFFSITE).expectAbsent()
-  await sidebar.row(POSTGRES).expectVisible()
-  // The dot only marks the group that is not being viewed.
-  await sidebar.expectFilterDot('Channels', false)
-  await sidebar.expectFilterDot('DMs', true)
+    await sidebar.filter('Channels')
+    await sidebar.row(OFFSITE).expectAbsent()
+    await sidebar.row(POSTGRES).expectVisible()
+    // The dot only marks the group that is not being viewed.
+    await sidebar.expectFilterDot('Channels', false)
+    await sidebar.expectFilterDot('DMs', true)
 
-  await sidebar.filter('DMs')
-  await sidebar.row(POSTGRES).expectAbsent()
-  await sidebar.row(OFFSITE).expectVisible()
-  // A thread in the DM with Maya, the DM's Main and the group DM's Main: the
-  // title or the channel already names the people, so no row has a people stack.
-  for (const row of [sidebar.row(OFFSITE).root, juno.win.locator('[data-topic-id="m:D0MAYA"]'), juno.win.locator('[data-topic-id="m:G0MAYALEO"]')]) {
-    await expect(row).toBeVisible()
-    await expect(row.getByRole('img')).toHaveCount(0)
-  }
-  await sidebar.expectFilterDot('Channels', true)
-  await sidebar.expectFilterDot('DMs', false)
-
-  await sidebar.filter('All')
-  await sidebar.row(POSTGRES).expectVisible()
-
-  await sidebar.toggleUnread()
-  await sidebar.row(POSTGRES).expectAbsent()
-  await sidebar.row(RINA).expectVisible()
-  await sidebar.row(OFFSITE).expectVisible()
-
-  await sidebar.toggleUnread()
-  await sidebar.row(POSTGRES).expectVisible()
-})
-
-test('the empty state offers to clear the filters, and shows at once when it was just on screen', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { sidebar } = juno
-  await sidebar.row(OFFSITE).expectVisible()
-
-  // Reading the DM threads from another client leaves nothing unread in DMs.
-  for (const channel of ['D0MAYA', 'D0SAM', 'G0MAYALEO']) {
-    const last = fake.messages(channel).at(-1)!
-    fake.markRead({ channel, ts: last.ts })
-    for (const root of fake.messages(channel).filter((message) => message.reply_count !== undefined && message.reply_count > 0)) {
-      fake.markThreadRead({ channel, threadTs: root.ts, ts: last.ts })
+    await sidebar.filter('DMs')
+    await sidebar.row(POSTGRES).expectAbsent()
+    await sidebar.row(OFFSITE).expectVisible()
+    // A thread in the DM with Maya, the DM's Main and the group DM's Main: the
+    // title or the channel already names the people, so no row has a people stack.
+    for (const row of [sidebar.row(OFFSITE).root, juno.win.locator('[data-topic-id="m:D0MAYA"]'), juno.win.locator('[data-topic-id="m:G0MAYALEO"]')]) {
+      await expect(row).toBeVisible()
+      await expect(row.getByRole('img')).toHaveCount(0)
     }
-  }
-  await sidebar.filter('DMs')
-  await sidebar.toggleUnread()
-  await sidebar.expectEmpty("You're all caught up")
+    await sidebar.expectFilterDot('Channels', true)
+    await sidebar.expectFilterDot('DMs', false)
 
-  // Toggled off and on again within a second, it shows without its entrance (friendly-layer 5).
-  await sidebar.toggleUnread()
-  await sidebar.row(OFFSITE).expectVisible()
-  await sidebar.toggleUnread()
-  const title = sidebar.list.getByText("You're all caught up", { exact: true })
-  await expect(title).toBeVisible()
-  expect(await title.evaluate((node) => node.getAnimations().length)).toBe(0)
+    await sidebar.filter('All')
+    await sidebar.row(POSTGRES).expectVisible()
 
-  await sidebar.clearFilters()
-  await sidebar.row(POSTGRES).expectVisible()
+    await sidebar.toggleUnread()
+    await sidebar.row(POSTGRES).expectAbsent()
+    await sidebar.row(RINA).expectVisible()
+    await sidebar.row(OFFSITE).expectVisible()
+
+    await sidebar.toggleUnread()
+    await sidebar.row(POSTGRES).expectVisible()
+  })
+  await test.step('the empty state offers to clear the filters, and shows at once when it was just on screen', async () => {
+    await sidebar.row(OFFSITE).expectVisible()
+
+    // Reading the DM threads from another client leaves nothing unread in DMs.
+    for (const channel of ['D0MAYA', 'D0SAM', 'G0MAYALEO']) {
+      const last = fake.messages(channel).at(-1)!
+      fake.markRead({ channel, ts: last.ts })
+      for (const root of fake.messages(channel).filter((message) => message.reply_count !== undefined && message.reply_count > 0)) {
+        fake.markThreadRead({ channel, threadTs: root.ts, ts: last.ts })
+      }
+    }
+    await sidebar.filter('DMs')
+    await sidebar.toggleUnread()
+    await sidebar.expectEmpty("You're all caught up")
+
+    // Toggled off and on again within a second, it shows without its entrance (friendly-layer 5).
+    await sidebar.toggleUnread()
+    await sidebar.row(OFFSITE).expectVisible()
+    await sidebar.toggleUnread()
+    const title = sidebar.list.getByText("You're all caught up", { exact: true })
+    await expect(title).toBeVisible()
+    expect(await title.evaluate((node) => node.getAnimations().length)).toBe(0)
+
+    await sidebar.clearFilters()
+    await sidebar.row(POSTGRES).expectVisible()
+  })
 })
 
 test('during the first sync the list says Juno is getting the topics, then shows rows before history lands', async ({ juno, fake }) => {
@@ -237,10 +235,22 @@ test('rows that scroll under a still pointer are not warmed; moving onto a row w
   await sidebar.hoverList()
   const before = await juno.lastMark('juno.prefetch')
 
-  await win.mouse.wheel(0, 300)
+  type Watched = HTMLElement & { scrollEnded?: Promise<void> }
+  /** Turns the wheel over the list and waits for its scroll to end. The listener is in place before the wheel turns. */
+  const wheel = async () => {
+    const room = await list.evaluate((node: Watched) => {
+      node.scrollEnded = new Promise((resolve) => node.addEventListener('scrollend', () => resolve(), { once: true }))
+      return node.scrollHeight - node.clientHeight - node.scrollTop
+    })
+    await win.mouse.wheel(0, 300)
+    // At the end of the list the wheel scrolls nothing, and no scrollend comes.
+    if (room >= 1) await list.evaluate((node: Watched) => node.scrollEnded)
+  }
+  await wheel()
   await expect.poll(() => list.evaluate((node) => node.scrollTop)).toBeGreaterThan(0)
-  await win.mouse.wheel(0, 300)
-  await win.waitForTimeout(300)
+  await wheel()
+  // The hover moves to the row now under the pointer on a frame after the scroll.
+  await win.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
   expect(await juno.lastMark('juno.prefetch')).toBe(before)
 
   // A real move onto another row warms it, as before.
@@ -249,62 +259,63 @@ test('rows that scroll under a still pointer are not warmed; moving onto a row w
   await expect.poll(() => juno.lastMark('juno.prefetch')).not.toBe(before)
 })
 
-test('pressing a row selects it, and the keyboard moves the selection', async ({ juno, win }) => {
+test("pressing a row selects it, the keyboard moves the selection, and Tab reaches the arrowed row's Resolve", async ({ juno, win, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { sidebar } = juno
-  const titles = await sidebar.titles('Recent')
-  const first = sidebar.row(titles[0]!)
-  const second = sidebar.row(titles[1]!)
-  const third = sidebar.row(titles[2]!)
+  await test.step('pressing a row selects it, and the keyboard moves the selection', async () => {
+    const titles = await sidebar.titles('Recent')
+    const first = sidebar.row(titles[0]!)
+    const second = sidebar.row(titles[1]!)
+    const third = sidebar.row(titles[2]!)
 
-  await second.select()
-  await second.expectSelected()
-  await first.expectSelected(false)
+    await second.select()
+    await second.expectSelected()
+    await first.expectSelected(false)
 
-  // Arrows move focus between rows; Enter makes the focused row the selection.
-  await second.focus()
-  await win.keyboard.press('ArrowDown')
-  await third.expectFocused()
-  await win.keyboard.press('Enter')
-  await third.expectSelected()
-  await second.expectSelected(false)
+    // Arrows move focus between rows; Enter makes the focused row the selection.
+    await second.focus()
+    await win.keyboard.press('ArrowDown')
+    await third.expectFocused()
+    await win.keyboard.press('Enter')
+    await third.expectSelected()
+    await second.expectSelected(false)
 
-  await win.keyboard.press('ArrowUp')
-  await win.keyboard.press('ArrowUp')
-  await first.expectFocused()
-  await win.keyboard.press('End')
-  await sidebar.row(titles[titles.length - 1]!).expectFocused()
-  await win.keyboard.press('Home')
-  await first.expectFocused()
-  // One row is in the Tab order: the one focused last, so Tab leaves the list and Shift-Tab comes back to it.
-  await expect(first.root).toHaveAttribute('tabindex', '0')
-  await expect(third.root).toHaveAttribute('tabindex', '-1')
-})
+    await win.keyboard.press('ArrowUp')
+    await win.keyboard.press('ArrowUp')
+    await first.expectFocused()
+    await win.keyboard.press('End')
+    await sidebar.row(titles[titles.length - 1]!).expectFocused()
+    await win.keyboard.press('Home')
+    await first.expectFocused()
+    // One row is in the Tab order: the one focused last, so Tab leaves the list and Shift-Tab comes back to it.
+    await expect(first.root).toHaveAttribute('tabindex', '0')
+    await expect(third.root).toHaveAttribute('tabindex', '-1')
+  })
+  // Let go of the list, pointer and focus, so it no longer holds its order and the next row can move to the top.
+  await win.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
+  await sidebar.leave()
+  await test.step("after arrowing to a row, Tab reaches that row\\'s Resolve", async () => {
+    await postAbovePostgres(juno, fake)
+    const titles = await sidebar.titles('Recent')
+    const first = sidebar.row(titles[0]!)
+    const postgres = sidebar.row(POSTGRES)
+    const steps = titles.findIndex((title) => title.startsWith(POSTGRES))
+    expect(steps).toBeGreaterThan(0)
 
-test('after arrowing to a row, Tab reaches that row\'s Resolve', async ({ juno, win, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { sidebar } = juno
-  await postAbovePostgres(juno, fake)
-  const titles = await sidebar.titles('Recent')
-  const first = sidebar.row(titles[0]!)
-  const postgres = sidebar.row(POSTGRES)
-  const steps = titles.findIndex((title) => title.startsWith(POSTGRES))
-  expect(steps).toBeGreaterThan(0)
+    // The first row is selected; the Postgres thread is reached with the keyboard only.
+    await first.select()
+    await first.expectSelected()
+    for (let i = 0; i < steps; i++) await win.keyboard.press('ArrowDown')
+    await postgres.expectFocused()
+    await postgres.expectSelected(false)
 
-  // The first row is selected; the Postgres thread is reached with the keyboard only.
-  await first.select()
-  await first.expectSelected()
-  for (let i = 0; i < steps; i++) await win.keyboard.press('ArrowDown')
-  await postgres.expectFocused()
-  await postgres.expectSelected(false)
-
-  await win.keyboard.press('Tab')
-  await expect(postgres.resolveButton).toBeFocused()
-  // And Shift-Tab goes back to its row.
-  await win.keyboard.press('Shift+Tab')
-  await postgres.expectFocused()
+    await win.keyboard.press('Tab')
+    await expect(postgres.resolveButton).toBeFocused()
+    // And Shift-Tab goes back to its row.
+    await win.keyboard.press('Shift+Tab')
+    await postgres.expectFocused()
+  })
 })
 
 test('zooming in from the View menu keeps the whole sidebar inside the window', async ({ juno, app, win }) => {

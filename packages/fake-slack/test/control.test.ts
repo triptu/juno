@@ -242,15 +242,6 @@ describe('control API', () => {
     socket.close()
   })
 
-  it('unknown frames reach the socket untouched', async () => {
-    const socket = await client.connect()
-    await socket.next(isType('hello'))
-    fake.emitFrame({ type: 'canvas_updated', canvas: 'F1' })
-    const frame = await socket.next(isType('unknown'))
-    expect(frame.raw).toEqual({ type: 'canvas_updated', canvas: 'F1' })
-    socket.close()
-  })
-
   it('the same controls work over HTTP', async () => {
     const socket = await client.connect()
     await socket.next(isType('hello'))

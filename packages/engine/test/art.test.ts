@@ -40,6 +40,10 @@ const drawnRows = (engine: RunningEngine) =>
     })
   }, 'every drawable row drawn')
 
+/** How many drawings the model was asked for. */
+const artCalls = (engine: RunningEngine) =>
+  readDb(engine, 'user.db', (db) => (db.prepare("SELECT coalesce(sum(repeats), 0) AS n FROM ai_calls WHERE feature = 'topicArt'").get() as { n: number }).n)
+
 const setPref = (engine: RunningEngine, key: string, value: unknown) => runCommand(engine.registry, prefsSet, { key, value: value as never })
 
 /** A thread posted now in #eng, with a reply from the signed-in user, so Slack follows it and it enters the sidebar. */
@@ -105,10 +109,12 @@ describe('topic art', () => {
     expect(hasArt(back.find((row) => row.id === thread.id)!)).toBe(true)
   })
 
-  it('Redraw replaces a drawing with a different one, in the rows and in the store', async () => {
+  it('Redraw replaces a drawing with a different one, and Undo after a Redraw puts the previous one back', async () => {
     const engine = await bootedEngine()
     const rows = await drawnRows(engine)
     const target = rows.find((row) => row.kind === 'thread' && hasArt(row))!
+
+    // Redraw replaces a drawing with a different one, in the rows and in the store.
     expect(await redrawTopic(engine.registry, target.id, { text: 'Redrawn' })).toBeUndefined()
     const after = await engine.rowsUntil((next) => {
       const row = next.find((candidate) => candidate.id === target.id)
@@ -119,17 +125,13 @@ describe('topic art', () => {
     expect(storedArt(engine).find((row) => row.topic_id === target.id)).toMatchObject({ source: 'redraw', status: 'ok', recipe: redrawn.art })
     // Every other row kept its drawing and its object.
     for (const row of rows) if (row.id !== target.id) expect(after.find((candidate) => candidate.id === row.id)).toBe(row)
-  })
 
-  it('Undo after Redraw puts the previous drawing back, in the rows and in the store', async () => {
-    const engine = await bootedEngine()
-    const rows = await drawnRows(engine)
-    const target = rows.find((row) => row.kind === 'thread' && hasArt(row))!
+    // Undo after Redraw puts the previous drawing back, in the rows and in the store.
     const before = storedArt(engine).find((row) => row.topic_id === target.id)
     expect(await runAction(engine.registry, artRedraw, { id: target.id }, { text: 'Redrawn' })).toBe(true)
-    await engine.rowsUntil((next) => next.some((row) => row.id === target.id && hasArt(row) && row.art !== target.art), 'the redrawn row')
+    await engine.rowsUntil((next) => next.some((row) => row.id === target.id && hasArt(row) && row.art !== redrawn.art), 'the row redrawn again')
     expect(await undoLast(engine.registry)).toBe(true)
-    await engine.rowsUntil((next) => next.some((row) => row.id === target.id && row.art === target.art), 'the previous drawing back')
+    await engine.rowsUntil((next) => next.some((row) => row.id === target.id && row.art === redrawn.art), 'the previous drawing back')
     expect(storedArt(engine).find((row) => row.topic_id === target.id)).toEqual(before)
   })
 
@@ -140,7 +142,11 @@ describe('topic art', () => {
     expect(stored).toMatchObject({ status: 'failed', recipe: '' })
     const rows = await drawnRows(engine)
     expect(rows.find((row) => row.id === thread.id)!.art).toBeUndefined()
-    await new Promise((resolve) => setTimeout(resolve, 2_000))
+    const asked = artCalls(engine)
+    // A later pass draws a new thread and does not ask about the failed one again.
+    const next = liveThread(engine, 'Postgres replica lag after the failed drawing')
+    await engine.rowsUntil((later) => later.some((row) => row.id === next.id && hasArt(row)), 'the next thread drawn')
+    expect(artCalls(engine)).toBe(asked + 1)
     const again = engine.registry.get(engine.topicsAtom())
     expect(again._tag === 'Success' ? again.value.rows.get(thread.id)?.art : 'no rows').toBeUndefined()
   })

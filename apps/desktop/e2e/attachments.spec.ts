@@ -212,37 +212,34 @@ test('Home keeps its files through a change of destination and sends them to the
   await expect(briefChip).toHaveCount(0)
 })
 
-test('an image opens in the viewer, and Esc closes it', async ({ juno }) => {
+test("a stored message's image opens in the viewer and its file downloads into Downloads", async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { topic } = juno
   await juno.sidebar.row(PROPOSAL).open()
-  const open = topic.list.getByRole('button', { name: /^Open early-access-flow\.png$|^Open Early access flow$/ })
-  await open.scrollIntoViewIfNeeded()
-  await open.click()
-  const viewer = juno.win.getByRole('dialog')
-  await expect(viewer).toBeVisible()
-  await expect.poll(() => viewer.locator('img[src*="/full?"]').evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0)
-  await expect(viewer.getByRole('button', { name: 'Close' })).toBeFocused()
-  await juno.win.keyboard.press('Escape')
-  await expect(viewer).toHaveCount(0)
-  await expect(open).toBeFocused()
-})
-
-test('Download saves the file into Downloads', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { topic } = juno
-  await juno.sidebar.row(PROPOSAL).open()
-  const download = topic.list.getByRole('button', { name: /^Download (q4-plan\.pdf|Q4 plan)$/ })
-  await download.scrollIntoViewIfNeeded()
-  await download.click()
-  const saved = await expect
-    .poll(() => juno.app.evaluate(() => (globalThis as unknown as { junoTest: { downloads: string[] } }).junoTest.downloads.slice()), { timeout: 15_000 })
-    .toHaveLength(1)
-    .then(() => juno.app.evaluate(() => (globalThis as unknown as { junoTest: { downloads: string[] } }).junoTest.downloads[0]!))
-  expect(saved).toMatch(/Downloads\/q4-plan\.pdf$/)
-  expect((await readFile(saved)).subarray(0, 5).toString('latin1')).toBe('%PDF-')
+  await test.step('an image opens in the viewer, and Esc closes it', async () => {
+    const open = topic.list.getByRole('button', { name: /^Open early-access-flow\.png$|^Open Early access flow$/ })
+    await open.scrollIntoViewIfNeeded()
+    await open.click()
+    const viewer = juno.win.getByRole('dialog')
+    await expect(viewer).toBeVisible()
+    await expect.poll(() => viewer.locator('img[src*="/full?"]').evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0)
+    await expect(viewer.getByRole('button', { name: 'Close' })).toBeFocused()
+    await juno.win.keyboard.press('Escape')
+    await expect(viewer).toHaveCount(0)
+    await expect(open).toBeFocused()
+  })
+  await test.step('Download saves the file into Downloads', async () => {
+    const download = topic.list.getByRole('button', { name: /^Download (q4-plan\.pdf|Q4 plan)$/ })
+    await download.scrollIntoViewIfNeeded()
+    await download.click()
+    const saved = await expect
+      .poll(() => juno.app.evaluate(() => (globalThis as unknown as { junoTest: { downloads: string[] } }).junoTest.downloads.slice()), { timeout: 15_000 })
+      .toHaveLength(1)
+      .then(() => juno.app.evaluate(() => (globalThis as unknown as { junoTest: { downloads: string[] } }).junoTest.downloads[0]!))
+    expect(saved).toMatch(/Downloads\/q4-plan\.pdf$/)
+    expect((await readFile(saved)).subarray(0, 5).toString('latin1')).toBe('%PDF-')
+  })
 })
 
 

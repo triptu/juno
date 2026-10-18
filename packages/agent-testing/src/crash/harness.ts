@@ -40,7 +40,9 @@ export function runAgent(options: RunOptions): Promise<AgentRun> {
   if (options.crashAt !== undefined && !((options.crashAt.split(':')[0] ?? '') in CRASH_POINTS)) {
     return Promise.reject(new Error(`unknown crash point ${options.crashAt}`))
   }
-  const env = { ...process.env, ...options.env, ...(options.crashAt ? { [CRASH_ENV]: options.crashAt } : {}) }
+  // Each run loads the agent from source. Node's compile cache, shared by every run and checked against each file's
+  // content, saves about a third of that start-up.
+  const env = { NODE_COMPILE_CACHE: join(tmpdir(), 'juno-cache', 'node-compile'), ...process.env, ...options.env, ...(options.crashAt ? { [CRASH_ENV]: options.crashAt } : {}) }
   if (!options.crashAt) delete env[CRASH_ENV]
   return new Promise((resolve, reject) => {
     const child = spawn(options.command ?? process.execPath, [...options.args], { env, cwd: options.cwd, stdio: ['ignore', 'pipe', 'pipe'] })

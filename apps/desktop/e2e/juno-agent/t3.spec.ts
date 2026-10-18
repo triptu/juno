@@ -98,19 +98,33 @@ async function startTask(juno: Juno, t3: FakeT3) {
   return { pane, task, threadId: thread.threadId }
 }
 
-test('a one-tap Start card starts a T3 Code session, and its Task card follows it to Done', async ({ juno, t3 }) => {
+test('a one-tap Start card starts a T3 Code session, and its Task card follows it to Done with a pull request', async ({ juno, t3 }) => {
   await ready(juno)
   await connectT3(juno, t3.loopbackUrl)
   const { task, threadId } = await startTask(juno, t3)
-  await expect(task.getByRole('button', { name: 'Stop' })).toBeVisible()
-  expect(t3.calls.filter((call) => call.name === 't3_thread_launch')).toHaveLength(1)
+  const started = 'a one-tap Start card starts a T3 Code session, and its Task card follows it to Done'
+  const opened = 'the Task card opens the session, and Done links the pull request'
+  await test.step(started, async () => {
+    await expect(task.getByRole('button', { name: 'Stop' })).toBeVisible()
+    expect(t3.calls.filter((call) => call.name === 't3_thread_launch')).toHaveLength(1)
+  })
+  await test.step(opened, async () => {
+    // Open shows only while the task runs.
+    await expect(task.getByRole('button', { name: 'Open' })).toBeVisible()
+  })
 
-  t3.advance(threadId, { status: 'completed', reply: 'The sidebar test waits for sync now.' })
-  await expect(task.locator('[data-task-phase]')).toHaveAttribute('data-task-phase', 'done', { timeout: POLL })
-  await expect(task).toContainText('Done')
-  await expect(task.getByRole('button', { name: 'Stop' })).toHaveCount(0)
-  // Start launched once; watching never launches again.
-  expect(t3.calls.filter((call) => call.name === 't3_thread_launch')).toHaveLength(1)
+  // One completion carries both the reply and the pull request.
+  t3.advance(threadId, { status: 'completed', reply: 'Opened PR 412.', pullRequest: { number: 412, url: 'https://github.com/example/juno/pull/412' } })
+  await test.step(started, async () => {
+    await expect(task.locator('[data-task-phase]')).toHaveAttribute('data-task-phase', 'done', { timeout: POLL })
+    await expect(task).toContainText('Done')
+    await expect(task.getByRole('button', { name: 'Stop' })).toHaveCount(0)
+    // Start launched once; watching never launches again.
+    expect(t3.calls.filter((call) => call.name === 't3_thread_launch')).toHaveLength(1)
+  })
+  await test.step(opened, async () => {
+    await expect(task).toContainText('Done · Open PR 412', { timeout: POLL })
+  })
 })
 
 test('Stop on the Task card interrupts the session', async ({ juno, t3 }) => {
@@ -142,15 +156,6 @@ test('T3 Code asks a question on a card and the chosen answer reaches T3 Code', 
   await expect(task.locator('[data-task-phase]')).toHaveAttribute('data-task-phase', 'running', { timeout: POLL })
 })
 
-test('the Task card opens the session, and Done links the pull request', async ({ juno, t3 }) => {
-  await ready(juno)
-  await connectT3(juno, t3.loopbackUrl)
-  const { task, threadId } = await startTask(juno, t3)
-  await expect(task.getByRole('button', { name: 'Open' })).toBeVisible()
-  t3.advance(threadId, { status: 'completed', reply: 'Opened PR 412.', pullRequest: { number: 412, url: 'https://github.com/example/juno/pull/412' } })
-  await expect(task).toContainText('Done · Open PR 412', { timeout: POLL })
-})
-
 test.fixme('the sidebar sparkle shows while the session runs, and Done sends a notification', async ({ juno, t3 }) => {
   // The agent host refuses notification delivery.
   await ready(juno)
@@ -163,24 +168,21 @@ test.fixme('the sidebar sparkle shows while the session runs, and Done sends a n
   await expect.poll(() => hooks(juno.app, 'notifications'), { timeout: POLL }).toContainEqual(expect.objectContaining({ body: expect.stringContaining(TITLE) }))
 })
 
-test('a key in a brief is blocked: no card, and nothing reaches T3 Code', async ({ juno, t3, model }) => {
+test('a key in a brief is blocked: no card, nothing reaches T3 Code, and the chat says so', async ({ juno, t3, model }) => {
   await ready(juno)
   await connectT3(juno, t3.loopbackUrl)
   const pane = await openChat(juno)
   await pane.send('Deploy it')
-  await pane.expectJuno('I did not start it.')
-  expect(model.requests.find((request) => request.toolResult !== undefined)?.toolResult).toContain('Juno blocked a key or token')
-  await expect(card(pane, 'proposedTask')).toHaveCount(0)
-  expect(t3.threads()).toHaveLength(0)
-  expect(t3.calls.map((call) => call.name)).not.toContain('t3_thread_launch')
-})
-
-test('a key in a brief shows the fixed blocked line in the chat', async ({ juno, t3 }) => {
-  await ready(juno)
-  await connectT3(juno, t3.loopbackUrl)
-  const pane = await openChat(juno)
-  await pane.send('Deploy it')
-  await expect(pane.root.getByText('Juno stopped a tool call that held a key or a token. Nothing was sent.')).toBeVisible({ timeout: 15_000 })
+  await test.step('a key in a brief is blocked: no card, and nothing reaches T3 Code', async () => {
+    await pane.expectJuno('I did not start it.')
+    expect(model.requests.find((request) => request.toolResult !== undefined)?.toolResult).toContain('Juno blocked a key or token')
+    await expect(card(pane, 'proposedTask')).toHaveCount(0)
+    expect(t3.threads()).toHaveLength(0)
+    expect(t3.calls.map((call) => call.name)).not.toContain('t3_thread_launch')
+  })
+  await test.step('a key in a brief shows the fixed blocked line in the chat', async () => {
+    await expect(pane.root.getByText('Juno stopped a tool call that held a key or a token. Nothing was sent.')).toBeVisible({ timeout: 15_000 })
+  })
 })
 
 test('T3 Code on loopback is used before the LAN address', async ({ juno, t3 }) => {

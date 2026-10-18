@@ -2,6 +2,8 @@
 // together, the way a busy day uses them. Findings are in
 // docs/reviews/2026-10-17-break-pass.md.
 import { SELF_ID } from '@juno/fake-slack'
+import { DatabaseSync } from 'node:sqlite'
+import { join } from 'node:path'
 import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
 
@@ -12,6 +14,26 @@ test.use({ sendTrace: true })
 const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
 const ROADMAP = 'Proposal: cut offline mode and public'
+
+interface SavedTab {
+  readonly id: string
+  readonly place?: { readonly kind: string; readonly topicId?: string }
+  readonly homeDraft?: { readonly draft?: string; readonly conversation?: unknown }
+}
+
+/** The tabs and topic drafts user.db holds (drafts by text), read while the app runs: what a relaunch reads back. */
+function saved(userData: string, teamId: string): { readonly tabs: ReadonlyArray<SavedTab>; readonly active: SavedTab | undefined; readonly drafts: ReadonlyMap<string, string> } {
+  const db = new DatabaseSync(join(userData, 'workspaces', teamId, 'user.db'), { readOnly: true })
+  try {
+    const row = db.prepare("SELECT value_json FROM prefs WHERE key = 'tabs'").get() as { value_json: string } | undefined
+    const value = row === undefined ? undefined : (JSON.parse(row.value_json) as { readonly tabs: ReadonlyArray<SavedTab>; readonly active: string | null })
+    const drafts = new Map(db.prepare('SELECT topic_id, text FROM drafts').all().map((draft) => [String(draft['text']), String(draft['topic_id'])]))
+    const tabs = value?.tabs ?? []
+    return { tabs, active: tabs.find((tab) => tab.id === value?.active), drafts }
+  } finally {
+    db.close()
+  }
+}
 
 async function menu(juno: Juno, id: string): Promise<void> {
   await juno.app.evaluate(({ Menu, BrowserWindow }, itemId) => {
@@ -151,7 +173,14 @@ test('a relaunch keeps many tabs and their drafts', async ({ juno, running, user
   await juno.tabs.expectCount(6)
   const before = await juno.tabs.titles()
   await juno.tabs.select('Rina')
-  await juno.win.waitForTimeout(800)
+  // The six tabs, with Rina's active, and the three topic drafts are in user.db before the quit.
+  await expect
+    .poll(() => {
+      const state = saved(userData, fake.teamId)
+      const rina = state.drafts.get('Draft two')
+      return state.tabs.length === 6 && rina !== undefined && state.active?.place?.topicId === rina && state.drafts.has('Draft one') && state.drafts.has('Draft in Main')
+    })
+    .toBe(true)
   await running.close()
 
   const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
@@ -204,7 +233,8 @@ test('a send while the socket and network drop goes once when they are back', as
   await juno.topic.composer.fill('Sent offline')
   await juno.topic.composer.press('Enter')
   await juno.topic.expectMessage('Sent offline')
-  await juno.win.waitForTimeout(1500)
+  // Juno has seen the drop before the network comes back.
+  await juno.sidebar.expectSyncStatus("You're offline")
   fake.goOnline()
   await juno.topic.expectSent('Sent offline')
   await juno.win.waitForTimeout(3000)
@@ -279,7 +309,14 @@ test('⌘T twice gives two Home tabs with their own drafts and destinations, and
   await juno.tabs.selectAt('Home', 0)
   await expect(juno.write.composer).toHaveValue('First note for Juno')
   await juno.write.expectDestination('Juno')
-  await juno.win.waitForTimeout(800)
+  // The three tabs, with the first Home active, and both Home drafts are in user.db before the quit.
+  await expect
+    .poll(() => {
+      const state = saved(userData, fake.teamId)
+      const second = state.tabs.find((tab) => tab.homeDraft?.draft === 'Second, for product')
+      return state.tabs.length === 3 && state.active?.homeDraft?.draft === 'First note for Juno' && second?.homeDraft?.conversation !== undefined
+    })
+    .toBe(true)
   await running.close()
 
   const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })

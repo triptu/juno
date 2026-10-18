@@ -35,8 +35,19 @@ describe('reader connection', () => {
     }).pipe(Effect.provide(freshStore)),
   )
 
-  it.effect('one transaction can write to both databases', () =>
+  it.effect('one transaction writes to both databases, or to neither', () =>
     Effect.gen(function* () {
+      const failed = yield* transaction(
+        Effect.gen(function* () {
+          yield* prefs.set('theme', 'light')
+          yield* syncState.set('cursor', { C1: '0.000001' })
+          return yield* Effect.fail('after both writes')
+        }),
+      ).pipe(Effect.result)
+      assert.isTrue(failed._tag === 'Failure')
+      assert.isUndefined(yield* prefs.get('theme'))
+      assert.isUndefined(yield* syncState.get('cursor'))
+
       yield* transaction(
         Effect.gen(function* () {
           yield* prefs.set('theme', 'dark')
@@ -45,7 +56,6 @@ describe('reader connection', () => {
       )
       assert.strictEqual(yield* prefs.get<string>('theme'), 'dark')
       assert.deepStrictEqual(yield* syncState.get('cursor'), { C1: '1.000001' })
-      assert.isUndefined(yield* prefs.get('missing'))
     }).pipe(Effect.provide(freshStore)),
   )
 

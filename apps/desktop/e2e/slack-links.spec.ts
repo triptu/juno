@@ -119,28 +119,27 @@ test('a reply link opens its thread; a message Juno never stored is fetched; a t
   await expect(topic.message('preview environments never shut down')).toBeInViewport({ timeout: 15_000 })
 })
 
-test('⌘-click on a message link opens the tab behind the current one, at the message', async ({ juno, fake }) => {
+// The browser links first: they open no tab, so the ⌘-click step still starts with one.
+test('links that open in the browser open no tab, and ⌘-click opens the tab behind the current one', async ({ juno, fake }) => {
   seedLinks(fake)
   const link = await openLinks(juno)
-  const { topic, tabs } = juno
+  await test.step('a conversation Juno cannot reach, and another workspace, open in the browser', async () => {
+    await link('a closed room').click()
+    await juno.expectToast('Juno cannot reach that conversation · Opened in the browser')
+    await expect.poll(() => juno.browserLinks()).toContain(`${fake.url}/archives/C0NOWHERE/p${NOWHERE_TS.replace('.', '')}`)
 
-  await link('the preview note').click({ modifiers: ['Meta'] })
-  await tabs.expectCount(2)
-  await tabs.expectActive(POSTGRES)
-  await tabs.select(ENG)
-  await expect(topic.message('preview environments never shut down')).toBeInViewport({ timeout: 15_000 })
-})
+    // Another workspace's link is any web link: ⌘-click opens it in the browser, with no toast.
+    await link('elsewhere').click({ modifiers: ['Meta'] })
+    await expect.poll(() => juno.browserLinks()).toContain(OTHER)
+    await juno.tabs.expectCount(1)
+  })
+  await test.step('⌘-click on a message link opens the tab behind the current one, at the message', async () => {
+    const { topic, tabs } = juno
 
-test('a conversation Juno cannot reach, and another workspace, open in the browser', async ({ juno, fake }) => {
-  seedLinks(fake)
-  const link = await openLinks(juno)
-
-  await link('a closed room').click()
-  await juno.expectToast('Juno cannot reach that conversation · Opened in the browser')
-  await expect.poll(() => juno.browserLinks()).toContain(`${fake.url}/archives/C0NOWHERE/p${NOWHERE_TS.replace('.', '')}`)
-
-  // Another workspace's link is any web link: ⌘-click opens it in the browser, with no toast.
-  await link('elsewhere').click({ modifiers: ['Meta'] })
-  await expect.poll(() => juno.browserLinks()).toContain(OTHER)
-  await juno.tabs.expectCount(1)
+    await link('the preview note').click({ modifiers: ['Meta'] })
+    await tabs.expectCount(2)
+    await tabs.expectActive(POSTGRES)
+    await tabs.select(ENG)
+    await expect(topic.message('preview environments never shut down')).toBeInViewport({ timeout: 15_000 })
+  })
 })

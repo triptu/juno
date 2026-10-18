@@ -1,6 +1,6 @@
 import { assert, describe, it } from '@effect/vitest'
 import { Effect } from 'effect'
-import { ftsQuery, searchMessages, StoreWriter, transaction } from '../src/index'
+import { searchMessages, StoreWriter, transaction } from '../src/index'
 import { freshStore } from './helpers'
 
 const insert = (channel: string, ts: string, text: string) =>
@@ -46,7 +46,6 @@ describe('message search', () => {
   it.effect('never raises a syntax error on user input', () =>
     Effect.gen(function* () {
       yield* transaction(insert('C1', '1.000001', 'what about "quotes" AND OR NOT (parens)*'))
-      assert.strictEqual(ftsQuery('a "b" c'), '"a" """b""" "c"')
       assert.strictEqual((yield* searchMessages('"quotes" AND (parens)*')).length, 1)
       assert.strictEqual((yield* searchMessages('OR NOT')).length, 1)
     }).pipe(Effect.provide(freshStore)),

@@ -2,8 +2,9 @@
  * Notifications from the owner's side (SPEC 14): Notify me on a channel,
  * thread or person, the OS notification and its click (also on a topic
  * already open in a tab), why a message did or did not notify, the
- * Notifications and Ignored sections of Settings, and Set yourself
- * away or active, and the test notification and macOS permission line.
+ * Notifications and Ignored sections of Settings, and the test
+ * notification and macOS permission line. Set yourself away and active
+ * is in presence.spec.ts.
  * Main records OS notifications instead of showing them
  * (`junoTest.notifications`) and fakes macOS's permission
  * (`junoTest.notificationPermission`).
@@ -11,6 +12,7 @@
 import { seedWorkspace, startFakeSlack, topic300Seed } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 import { watchFlashes } from './driver/flashes'
+import type { Juno } from './driver/juno'
 
 const ALERTS_MAIN = '#alerts-prod'
 const RINA = 'Rina finished the onsite'
@@ -111,9 +113,17 @@ test('a topic on screen in a focused window does not notify, and unread mentions
   await expect.poll(async () => (await juno.osNotifications()).map((notification) => notification.body), { timeout: 15_000 }).toContain('Disk at 95% on db-2')
 })
 
-test('Settings › Notifications saves hours and what matters, and Appearance changes the density', async ({ juno }) => {
+// The defaults are read first, before any step changes a setting.
+test('Settings: Notifications and Appearance save, the test notification and permission line, and Ignored', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
+
+  await test.step('Settings › Notifications saves hours and what matters, and Appearance changes the density', () => notificationsAndAppearance(juno))
+  await test.step('Send test notification posts one notification, and a line shows when macOS does not let Juno notify', () => testNotificationAndPermission(juno))
+  await test.step('Settings › Ignored lists an ignored channel, and Stop ignoring has Undo', () => ignoredChannels(juno))
+})
+
+async function notificationsAndAppearance(juno: Juno): Promise<void> {
   await juno.openNotifications()
   const page = juno.notifications
 
@@ -142,11 +152,9 @@ test('Settings › Notifications saves hours and what matters, and Appearance ch
   await expect.poll(() => juno.win.evaluate(() => document.documentElement.dataset['density'])).toBe('comfortable')
   await juno.settings.show('Notifications')
   await expect(page.matters).toHaveValue('The launch and hiring.')
-})
+}
 
-test('Send test notification posts one notification, and a line shows when macOS does not let Juno notify', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+async function testNotificationAndPermission(juno: Juno): Promise<void> {
   await juno.openNotifications()
   const page = juno.notifications
   const line = page.root.getByRole('status', { name: 'Notification permission' })
@@ -176,31 +184,9 @@ test('Send test notification posts one notification, and a line shows when macOS
   await line.getByRole('button', { name: 'Allow notifications' }).click()
   await expect(line).toHaveCount(0)
   expect(await juno.notificationSettingsOpened()).toBe(1)
-})
+}
 
-test('Set yourself away and active from the avatar menu sets Slack presence', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.accountMenu.open()
-  // The schedule applied at launch decides where it starts.
-  const away = juno.accountMenu.item('Set yourself away')
-  const startsActive = (await away.count()) > 0
-  slack.resetCalls()
-  await juno.accountMenu.item(startsActive ? 'Set yourself away' : 'Set yourself active').click()
-  await slack.expectPresenceSet(startsActive ? 'away' : 'active')
-  await juno.accountMenu.open()
-  await expect(juno.accountMenu.item(startsActive ? 'Set yourself active' : 'Set yourself away')).toBeVisible()
-  await juno.accountMenu.expectPresence(startsActive ? /^Away/ : /^Active/)
-
-  // And back.
-  slack.resetCalls()
-  await juno.accountMenu.item(startsActive ? 'Set yourself active' : 'Set yourself away').click()
-  await slack.expectPresenceSet(startsActive ? 'active' : 'away')
-})
-
-test('Settings › Ignored lists an ignored channel, and Stop ignoring has Undo', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+async function ignoredChannels(juno: Juno): Promise<void> {
   await juno.openSettings('Ignored')
   const settings = juno.settings
   await expect(settings.root.getByText('Nothing ignored.')).toBeVisible()
@@ -217,7 +203,7 @@ test('Settings › Ignored lists an ignored channel, and Stop ignoring has Undo'
   await juno.undoFromToast()
   await expect(settings.ignored('alerts-prod')).toBeVisible()
   await expect(settings.root.getByText('Nothing ignored.')).toHaveCount(0)
-})
+}
 
 const longThread = test.extend({
   // oxlint-disable-next-line no-empty-pattern

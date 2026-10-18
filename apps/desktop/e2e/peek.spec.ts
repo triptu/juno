@@ -63,26 +63,25 @@ test('holding ⌥ over a row peeks at the topic without marking it, opening it o
   await slack.expectNoMarks()
 })
 
-test('moving off the rows closes the peek', async ({ juno }) => {
+test('a peek closes when the pointer leaves the rows, and ⌥ peeks while a text field keeps focus', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await juno.sidebar.row(RINA).peek()
-  await juno.peek.expectShowing(RINA)
-  await juno.win.mouse.move(900, 400, { steps: 4 })
-  await juno.peek.expectClosed()
-  await juno.peek.release()
-  await juno.expectNothingOpen()
-})
-
-test('⌥ peeks while a text field has focus, and the field keeps it', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const field = await focusTextField(juno.win)
-  await juno.sidebar.row(RINA).peek()
-  await juno.peek.expectShowing(RINA)
-  await expect(field).toBeFocused()
-  await juno.peek.release()
-  await juno.peek.expectClosed()
+  await test.step('moving off the rows closes the peek', async () => {
+    await juno.sidebar.row(RINA).peek()
+    await juno.peek.expectShowing(RINA)
+    await juno.win.mouse.move(900, 400, { steps: 4 })
+    await juno.peek.expectClosed()
+    await juno.peek.release()
+    await juno.expectNothingOpen()
+  })
+  await test.step('⌥ peeks while a text field has focus, and the field keeps it', async () => {
+    const field = await focusTextField(juno.win)
+    await juno.sidebar.row(RINA).peek()
+    await juno.peek.expectShowing(RINA)
+    await expect(field).toBeFocused()
+    await juno.peek.release()
+    await juno.peek.expectClosed()
+  })
 })
 
 test('with Space as the peek key, Space peeks, ⌥ does not, and Space in a text field types a space', async ({ juno, slack }) => {
@@ -141,7 +140,13 @@ test('holding ⌥ over a thread in a Main peeks at its replies without opening i
   // The peek paints whole: it waits for the full replies rather than growing when they land.
   const first = await peek.root.boundingBox()
   await peek.expectMessage('Booked 2–4pm')
-  await juno.win.waitForTimeout(300)
+  // Compare once the peek's page of replies has come back (a root lookup asks for one message) and two
+  // frames have drawn whatever it changed.
+  const root = slack.root(POSTGRES)
+  const repliesPage = (call: { readonly method: string; readonly args: Readonly<Record<string, string>> }) =>
+    call.method === 'conversations.replies' && call.args['channel'] === root.channel && call.args['ts'] === root.ts && call.args['limit'] !== '1'
+  await expect.poll(() => slack.fake.calls.some(repliesPage)).toBe(true)
+  await juno.win.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
   expect(await peek.root.boundingBox()).toEqual(first)
   await topic.expectTitle('Main')
   await tabs.expectCount(1)

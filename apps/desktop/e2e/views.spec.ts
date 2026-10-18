@@ -5,6 +5,8 @@
 // many views that scrolls sideways without moving the list. The built-in
 // Automated view is deleted first where a test needs the bot channels in All
 // or only its own views (automated.spec.ts covers Automated itself).
+import { DatabaseSync } from 'node:sqlite'
+import { join } from 'node:path'
 import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
 
@@ -16,6 +18,16 @@ test.describe.configure({ timeout: 90_000 })
 const ALERTS_MAIN = '#alerts-prod'
 const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
+
+/** The colour user.db holds for the view named `name`, read while the app runs. */
+function storedColor(userData: string, teamId: string, name: string): string | null {
+  const db = new DatabaseSync(join(userData, 'workspaces', teamId, 'user.db'), { readOnly: true })
+  try {
+    return (db.prepare('SELECT color FROM sidebar_views WHERE name = ?').get(name) as { color: string | null } | undefined)?.color ?? null
+  } finally {
+    db.close()
+  }
+}
 
 /** Signs in, waits for the sync and deletes Automated, which holds #alerts-prod and #deploys after the first sync. */
 async function withoutAutomated(juno: Juno): Promise<void> {
@@ -73,7 +85,8 @@ test('a view icon keeps the colour picked for it, on the selected pill and acros
   const selected = await tint.evaluate((el) => getComputedStyle(el).color)
   await sidebar.selectView('Work')
   expect(await tint.evaluate((el) => getComputedStyle(el).color)).toBe(selected)
-  await juno.win.waitForTimeout(500)
+  // The colour is in user.db before the quit.
+  await expect.poll(() => storedColor(userData, fake.teamId, 'Bots')).toBe('teal')
   await running.close()
 
   const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
@@ -135,15 +148,48 @@ test('a view with no icon shows its name; edit it, reorder by menu and drag, and
   await sidebar.row(RINA).expectVisible()
 })
 
-test('a view with no conversations says so, and Edit view opens its sheet', async ({ juno }) => {
+test('an empty view says so and opens its sheet, and many views scroll the pill row sideways', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { sidebar } = juno
-  await sidebar.createView({ name: 'Later' })
-  await sidebar.expectEmpty('No conversations in this view')
-  await sidebar.list.getByRole('button', { name: 'Edit view' }).click()
-  await expect(sidebar.viewSheet).toBeVisible()
-  await expect(sidebar.viewSheet.getByPlaceholder('Name')).toHaveValue('Later')
+  await test.step('a view with no conversations says so, and Edit view opens its sheet', async () => {
+    await sidebar.createView({ name: 'Later' })
+    await sidebar.expectEmpty('No conversations in this view')
+    await sidebar.list.getByRole('button', { name: 'Edit view' }).click()
+    await expect(sidebar.viewSheet).toBeVisible()
+    await expect(sidebar.viewSheet.getByPlaceholder('Name')).toHaveValue('Later')
+  })
+  // Close the sheet and show All again, as at launch, so the next step measures the row and list as they were.
+  await sidebar.viewSheet.getByRole('button', { name: 'Cancel' }).click()
+  await expect(sidebar.viewSheet).toHaveCount(0)
+  await sidebar.filter('All')
+  await test.step('many views scroll the pill row sideways with the wheel, and the row and the list stay where they are', async () => {
+    const filters = sidebar.root.getByRole('group', { name: 'Quick filters' })
+    const before = { filters: await filters.boundingBox(), list: await sidebar.list.boundingBox() }
+
+    for (const name of ['Bots', 'Design crit', 'Leadership', 'Customer escalations', 'Friends', 'Launch', 'Infra']) await sidebar.createView({ name })
+    await sidebar.filter('All')
+    const row = sidebar.pillRow
+    const geometry = () => row.evaluate((node) => ({ scrollLeft: node.scrollLeft, overflow: node.scrollWidth - node.clientWidth }))
+    expect((await geometry()).overflow).toBeGreaterThan(100)
+    // The row did not grow and the list did not move.
+    expect(await filters.boundingBox()).toEqual(before.filters)
+    expect(await sidebar.list.boundingBox()).toEqual(before.list)
+
+    // A vertical wheel over the pills scrolls them sideways; the list keeps its scroll.
+    const listTop = await sidebar.list.evaluate((node) => node.scrollTop)
+    await row.hover()
+    await juno.win.mouse.wheel(0, 400)
+    await expect.poll(async () => (await geometry()).scrollLeft).toBeGreaterThan(0)
+    expect(await sidebar.list.evaluate((node) => node.scrollTop)).toBe(listTop)
+    // At the end, New view is in reach, and further wheeling stays in the row.
+    await juno.win.mouse.wheel(0, 2000)
+    await expect.poll(async () => { const g = await geometry(); return g.overflow - g.scrollLeft }).toBeLessThan(1)
+    await expect(sidebar.root.getByRole('button', { name: 'New view', exact: true })).toBeInViewport()
+    expect(await sidebar.list.evaluate((node) => node.scrollTop)).toBe(listTop)
+    // Unread stays where it was, at the right.
+    await expect(sidebar.unreadToggle).toBeInViewport()
+  })
 })
 
 test('Add to view on a channel’s menu adds and removes it, with Undo, and New view… starts with it', async ({ juno }) => {
@@ -186,35 +232,4 @@ test('Add to view on a channel’s menu adds and removes it, with Undo, and New 
   await expect(sidebar.viewSheet.getByText('1 conversation')).toBeVisible()
   await sidebar.viewSheet.getByRole('button', { name: 'Cancel' }).click()
   await expect(sidebar.viewSheet).toHaveCount(0)
-})
-
-test('many views scroll the pill row sideways with the wheel, and the row and the list stay where they are', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { sidebar } = juno
-  const filters = sidebar.root.getByRole('group', { name: 'Quick filters' })
-  const before = { filters: await filters.boundingBox(), list: await sidebar.list.boundingBox() }
-
-  for (const name of ['Bots', 'Design crit', 'Leadership', 'Customer escalations', 'Friends', 'Launch', 'Infra']) await sidebar.createView({ name })
-  await sidebar.filter('All')
-  const row = sidebar.pillRow
-  const geometry = () => row.evaluate((node) => ({ scrollLeft: node.scrollLeft, overflow: node.scrollWidth - node.clientWidth }))
-  expect((await geometry()).overflow).toBeGreaterThan(100)
-  // The row did not grow and the list did not move.
-  expect(await filters.boundingBox()).toEqual(before.filters)
-  expect(await sidebar.list.boundingBox()).toEqual(before.list)
-
-  // A vertical wheel over the pills scrolls them sideways; the list keeps its scroll.
-  const listTop = await sidebar.list.evaluate((node) => node.scrollTop)
-  await row.hover()
-  await juno.win.mouse.wheel(0, 400)
-  await expect.poll(async () => (await geometry()).scrollLeft).toBeGreaterThan(0)
-  expect(await sidebar.list.evaluate((node) => node.scrollTop)).toBe(listTop)
-  // At the end, New view is in reach, and further wheeling stays in the row.
-  await juno.win.mouse.wheel(0, 2000)
-  await expect.poll(async () => { const g = await geometry(); return g.overflow - g.scrollLeft }).toBeLessThan(1)
-  await expect(sidebar.root.getByRole('button', { name: 'New view', exact: true })).toBeInViewport()
-  expect(await sidebar.list.evaluate((node) => node.scrollTop)).toBe(listTop)
-  // Unread stays where it was, at the right.
-  await expect(sidebar.unreadToggle).toBeInViewport()
 })

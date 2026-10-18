@@ -214,28 +214,31 @@ test('with a $0 daily cap a message brings the Budget card', async ({ juno, mode
   expect(model.inputs()).toEqual([])
 })
 
-test('offline, the chat shows the chip and its composer still works, and the chip goes once back', async ({ juno, fake }) => {
+test('offline, the chat shows the chip, a message waits for the network, and both clear once back', async ({ juno, fake }) => {
+  const chipShows = 'offline, the chat shows the chip and its composer still works, and the chip goes once back'
+  const messageWaits = 'offline, a message waits for the network and runs once back'
   await ready(juno)
   const chat = await openChat(juno)
   fake.goOffline()
   const chip = chat.root.locator('[data-banner="offline"]')
-  await expect(chip).toHaveText(chatCopy.banner.offline.chip, { timeout: 30_000 })
-  await expect(chat.composer).toBeEnabled()
+  await test.step(chipShows, async () => {
+    await expect(chip).toHaveText(chatCopy.banner.offline.chip, { timeout: 30_000 })
+    await expect(chat.composer).toBeEnabled()
+  })
+  await test.step(messageWaits, async () => {
+    await expect(chip).toBeVisible({ timeout: 30_000 })
+    await chat.send('what did I miss?')
+    await expect(chat.ownerBubble('what did I miss?').locator('[data-delivery="waiting"]')).toHaveText(chatCopy.delivery.waiting.network)
+    await expect(chat.junoBubble('You said: what did I miss?')).toHaveCount(0)
+  })
 
   fake.goOnline()
-  await expect(chip).toHaveCount(0, { timeout: 30_000 })
-})
-
-test('offline, a message waits for the network and runs once back', async ({ juno, fake }) => {
-  await ready(juno)
-  const chat = await openChat(juno)
-  fake.goOffline()
-  await expect(chat.root.locator('[data-banner="offline"]')).toBeVisible({ timeout: 30_000 })
-  await chat.send('what did I miss?')
-  await expect(chat.ownerBubble('what did I miss?').locator('[data-delivery="waiting"]')).toHaveText(chatCopy.delivery.waiting.network)
-  await expect(chat.junoBubble('You said: what did I miss?')).toHaveCount(0)
-  fake.goOnline()
-  await chat.expectJuno('You said: what did I miss?')
+  await test.step(chipShows, async () => {
+    await expect(chip).toHaveCount(0, { timeout: 30_000 })
+  })
+  await test.step(messageWaits, async () => {
+    await chat.expectJuno('You said: what did I miss?')
+  })
 })
 
 test('records newer than this build show Update needed and disable the composer', async ({ juno, fake, slackApp, userData, running, model }) => {

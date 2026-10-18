@@ -36,8 +36,9 @@ const channelsOf = (rows: ReadonlyArray<{ readonly channel: { readonly id: strin
 
 const RELEASES = 'C0RELEASES'
 
-/** The job takes changes in 3 second windows: after this, a pass has looked at what changed. */
-const afterAPass = () => sleep(4000)
+/** The job takes changes in windows (3 s in the app, shorter here): after this, a pass has looked at what changed. */
+const WINDOW_MILLIS = 300
+const afterAPass = () => sleep(WINDOW_MILLIS + 1_000)
 
 /** More top-level posts from the deploy bot than from people, but not nearly all: the rules cannot tell, nor can the fake AI. */
 function addReleases(fake: FakeSlack): void {
@@ -60,7 +61,7 @@ const withReleases = { initial: (fake: FakeSlack) => (addReleases(fake), fake.si
 
 describe('the Automated view', () => {
   it('holds the bot channels when the first sync is live, and keeps them out of All', async () => {
-    const engine = await bootedEngine(engines, { aiJobs: true })
+    const engine = await bootedEngine(engines, { aiJobs: true, automatedWindowMillis: WINDOW_MILLIS })
     const views = await viewsUntil(engine, (list) => automatedOf(list) !== undefined, 'the Automated view')
     expect(automatedOf(views)).toMatchObject({ name: 'Automated', icon: 'robot', keepOutOfAll: true })
     expect(automatedOf(views)!.channels.map((c) => c.id).toSorted()).toEqual(['C0ALERTSPROD', 'C0DEPLOYS'])
@@ -74,7 +75,7 @@ describe('the Automated view', () => {
   })
 
   it('asks about an ambiguous channel on Home; Move and Keep in All stick, and each undoes', async () => {
-    const engine = await bootedEngine(engines, { ...withReleases, aiJobs: true })
+    const engine = await bootedEngine(engines, { ...withReleases, aiJobs: true, automatedWindowMillis: WINDOW_MILLIS })
     const home = await homeUntil(engine, (view) => view.items.some((item) => item.kind === 'automated'), 'the question on Home')
     const question = home.items.find((item) => item.kind === 'automated')!
     // The reason is Juno's, from the fake AI.
@@ -102,7 +103,7 @@ describe('the Automated view', () => {
   })
 
   it('never moves back a channel the user took out, and stays deleted once deleted', async () => {
-    const engine = await bootedEngine(engines, { aiJobs: true })
+    const engine = await bootedEngine(engines, { aiJobs: true, automatedWindowMillis: WINDOW_MILLIS })
     await viewsUntil(engine, (list) => holds(list, 'C0ALERTSPROD'), 'alerts in Automated')
     valueOf(await runCommand(engine.registry, viewsRemoveChannel, { id: 'automated', channel: 'C0ALERTSPROD' }))
     const views = await viewsUntil(engine, (list) => !holds(list, 'C0ALERTSPROD'), 'alerts taken out')
@@ -124,7 +125,7 @@ describe('the Automated view', () => {
 
 describe("Automated's record", () => {
   it('sorts a channel the user joins later, once its bot has written a few messages', async () => {
-    const engine = await bootedEngine(engines, { aiJobs: true })
+    const engine = await bootedEngine(engines, { aiJobs: true, automatedWindowMillis: WINDOW_MILLIS })
     const now = engine.fake.now()
     engine.fake.workspace.addConversation({ id: 'C0BUILDS', name: 'builds', kind: 'public', members: new Set(['U0DEPLOYBOT']), created: now, topic: '', purpose: '', isOpen: true, archived: false })
     engine.fake.joinChannel({ channel: 'C0BUILDS' })
@@ -153,7 +154,7 @@ describe("Automated's record", () => {
   })
 
   it('takes a channel back out once people start most conversations there, and the record says so', async () => {
-    const engine = await bootedEngine(engines, { aiJobs: true })
+    const engine = await bootedEngine(engines, { aiJobs: true, automatedWindowMillis: WINDOW_MILLIS })
     await viewsUntil(engine, (list) => holds(list, 'C0ALERTSPROD'), 'alerts in Automated')
     // The first sync's own sorting is not news.
     expect((await homeUntil(engine, () => true, 'home')).items.some((item) => item.kind === 'automatedMoves')).toBe(false)

@@ -13,229 +13,241 @@ const RINA = 'Rina finished the onsite'
 const CHECKOUT = 'checkout.spec failed again on main.'
 const ENG_MAIN = '#eng'
 
-test('a topic with unread messages opens at the "N new" divider and is marked read', async ({ juno, slack }) => {
+// The hover goes first, while the topic has never been opened.
+test('a read topic warms on hover, opens from the cache, and opens at the bottom', async ({ juno, slack }) => {
   await juno.signIn()
   await juno.waitForSync()
-  const rina = juno.sidebar.row(RINA)
-  await rina.expectUnread(2)
 
-  await rina.open()
-  await juno.topic.expectTitle(RINA)
-  await juno.topic.expectDividerBefore('Strong systems design')
-  await juno.topic.expectNew(2)
-  await rina.expectRead()
-  // The divider stays where the pointer was when the topic opened.
-  await juno.topic.expectNew(2)
-  // The thread is followed, so the mark reaches Slack.
-  await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.mark'), { timeout: 10_000 }).toBe(true)
+  await test.step('hovering a row warms the topic without asking Slack', async () => {
+    slack.resetCalls()
+    await juno.sidebar.row(POSTGRES).hover()
+    await expect.poll(() => juno.lastMark('juno.prefetch')).toBeDefined()
+    // Anything the warm-up would ask Slack has had time to arrive.
+    await juno.win.waitForTimeout(500)
+    expect(slack.fake.calls.map((call) => call.method)).toEqual([])
+    // The open is a cache hit: the tab paints with its rows.
+    await juno.sidebar.row(POSTGRES).open()
+    await juno.topic.expectMessage('Booked 2–4pm')
+    await expect.poll(() => juno.measure('juno.topic-open')).toBeLessThan(250)
+  })
+
+  await test.step('a read topic opens at the bottom with no divider', async () => {
+    await juno.sidebar.row(POSTGRES).open()
+    await juno.topic.expectMessage('Booked 2–4pm')
+    await juno.topic.expectNoDivider()
+    await juno.topic.expectAtBottom()
+  })
 })
 
-test('a read topic opens at the bottom with no divider', async ({ juno }) => {
+// Rina’s thread opens first, while it still has its 2 unread.
+test('Rina’s thread opens at the "N new" divider, and its ⋯ menu unfollows and follows it', async ({ juno, slack }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await juno.sidebar.row(POSTGRES).open()
-  await juno.topic.expectMessage('Booked 2–4pm')
-  await juno.topic.expectNoDivider()
-  await juno.topic.expectAtBottom()
+
+  await test.step('a topic with unread messages opens at the "N new" divider and is marked read', async () => {
+    const rina = juno.sidebar.row(RINA)
+    await rina.expectUnread(2)
+
+    await rina.open()
+    await juno.topic.expectTitle(RINA)
+    await juno.topic.expectDividerBefore('Strong systems design')
+    await juno.topic.expectNew(2)
+    await rina.expectRead()
+    // The divider stays where the pointer was when the topic opened.
+    await juno.topic.expectNew(2)
+    // The thread is followed, so the mark reaches Slack.
+    await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.mark'), { timeout: 10_000 }).toBe(true)
+  })
+
+  await test.step('⋯ opens the topic menu under the right island, as a right-click on the title does, and Notify me follows and unfollows the thread', async () => {
+    const rina = juno.sidebar.row(RINA)
+    await rina.open()
+    await juno.topic.expectTitle(RINA)
+    await expect(juno.topic.titleButton).toHaveAttribute('aria-haspopup', 'dialog')
+    await expect(juno.topic.moreButton).toHaveAttribute('aria-haspopup', 'menu')
+
+    // Never unfollows the thread in Slack, so it leaves the sidebar. The tab stays open on it.
+    const never = await juno.topic.chooseInMenu('notify-never')
+    expect(never.labels).toEqual([
+      'Open in new tab',
+      '-',
+      'Rename',
+      'Redraw art',
+      'Mark as unread',
+      'Pin',
+      'Resolve',
+      '-',
+      'Copy Slack link',
+      'Open in Slack',
+      'Notify me',
+      '> Every message',
+      '> When it matters ✓',
+      '> Never',
+      'Ignore #hiring',
+    ])
+    // At ⋯'s left edge, 6px under the right island.
+    const island = (await juno.topic.header.locator('[data-island="right"]').boundingBox())!
+    const more = (await juno.topic.moreButton.boundingBox())!
+    expect(never.at).not.toBeNull()
+    expect(Math.round(never.at!.x)).toBe(Math.round(more.x))
+    expect(Math.round(never.at!.y - (island.y + island.height))).toBe(6)
+    await rina.expectAbsent()
+    await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.remove'), { timeout: 10_000 }).toBe(true)
+
+    // Every message follows it again, and it comes back; a right-click on the title shows the same menu, under the left island at the title's left edge.
+    const every = await juno.topic.chooseInTitleMenu('notify-every')
+    expect(every.labels.slice(0, 7)).toEqual(never.labels.slice(0, 7))
+    const title = (await juno.topic.titleButton.boundingBox())!
+    expect(Math.round(every.at!.x)).toBe(Math.round(title.x))
+    expect(every.labels).toContain('> Never ✓')
+    await rina.expectVisible()
+    await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.add'), { timeout: 10_000 }).toBe(true)
+  })
 })
 
-test('Main shows thread links; a link opens the thread in the tab, and the title switches to another thread', async ({ juno }) => {
+// The switcher step ends on Main, where the header step starts.
+test('Main’s thread links, its title switcher, its Notify me and its header order', async ({ juno, win }) => {
   await juno.signIn()
   await juno.waitForSync()
-  const main = juno.sidebar.row(ENG_MAIN)
-  await main.expectNewThreads(1)
-  await main.open()
-  await juno.topic.expectTitle('Main')
-  await expect(juno.topic.contextPill).toHaveAccessibleName('eng, public channel. Show in sidebar.')
-  await expect(juno.topic.threadLink(/^6 replies: Draft plan/).root).toBeVisible()
 
-  await juno.topic.threadLink(/^6 replies: Draft plan/).open()
-  await juno.topic.expectTitle(POSTGRES)
-  await juno.tabs.expectCount(1)
+  await test.step('Main shows thread links; a link opens the thread in the tab, and the title switches to another thread', async () => {
+    const main = juno.sidebar.row(ENG_MAIN)
+    await main.expectNewThreads(1)
+    await main.open()
+    await juno.topic.expectTitle('Main')
+    await expect(juno.topic.contextPill).toHaveAccessibleName('eng, public channel. Show in sidebar.')
+    await expect(juno.topic.threadLink(/^6 replies: Draft plan/).root).toBeVisible()
 
-  // The switcher: Main first and marked from Main, then the threads; opening an unfollowed thread does not add it to the sidebar.
-  await main.open()
-  let switcher = await juno.topic.openSwitcher()
-  await expect(switcher.row('Main')).toHaveAttribute('aria-selected', 'true')
-  await expect(switcher.search).toBeFocused()
-  await switcher.open(CHECKOUT)
-  await juno.topic.expectTitle(CHECKOUT)
-  await juno.tabs.expectCount(1)
-  await juno.sidebar.row(CHECKOUT).expectAbsent()
+    await juno.topic.threadLink(/^6 replies: Draft plan/).open()
+    await juno.topic.expectTitle(POSTGRES)
+    await juno.tabs.expectCount(1)
 
-  // From a thread, back to Main and to a sibling thread; the current one is marked.
-  switcher = await juno.topic.openSwitcher()
-  await expect(switcher.row(CHECKOUT)).toHaveAttribute('aria-selected', 'true')
-  await switcher.open(POSTGRES)
-  await juno.topic.expectTitle(POSTGRES)
+    // The switcher: Main first and marked from Main, then the threads; opening an unfollowed thread does not add it to the sidebar.
+    await main.open()
+    let switcher = await juno.topic.openSwitcher()
+    await expect(switcher.row('Main')).toHaveAttribute('aria-selected', 'true')
+    await expect(switcher.search).toBeFocused()
+    await switcher.open(CHECKOUT)
+    await juno.topic.expectTitle(CHECKOUT)
+    await juno.tabs.expectCount(1)
+    await juno.sidebar.row(CHECKOUT).expectAbsent()
 
-  // From the keyboard: Enter on the title opens it with the search focused and the current topic highlighted,
-  // Home moves to Main, Enter opens, Escape returns to the title.
-  switcher = await juno.topic.openSwitcherWithKeyboard()
-  await expect(switcher.search).toBeFocused()
-  await expect(switcher.search).toHaveAttribute('aria-activedescendant', (await switcher.row(POSTGRES).getAttribute('id'))!)
-  await juno.win.keyboard.press('Escape')
-  await expect(switcher.root).toHaveCount(0)
-  await expect(juno.topic.titleButton).toBeFocused()
-  switcher = await juno.topic.openSwitcherWithKeyboard()
-  await juno.win.keyboard.press('Home')
-  await juno.win.keyboard.press('Enter')
-  await juno.topic.expectTitle('Main')
-  await juno.tabs.expectCount(1)
+    // From a thread, back to Main and to a sibling thread; the current one is marked.
+    switcher = await juno.topic.openSwitcher()
+    await expect(switcher.row(CHECKOUT)).toHaveAttribute('aria-selected', 'true')
+    await switcher.open(POSTGRES)
+    await juno.topic.expectTitle(POSTGRES)
+
+    // From the keyboard: Enter on the title opens it with the search focused and the current topic highlighted,
+    // Home moves to Main, Enter opens, Escape returns to the title.
+    switcher = await juno.topic.openSwitcherWithKeyboard()
+    await expect(switcher.search).toBeFocused()
+    await expect(switcher.search).toHaveAttribute('aria-activedescendant', (await switcher.row(POSTGRES).getAttribute('id'))!)
+    await juno.win.keyboard.press('Escape')
+    await expect(switcher.root).toHaveCount(0)
+    await expect(juno.topic.titleButton).toBeFocused()
+    switcher = await juno.topic.openSwitcherWithKeyboard()
+    await juno.win.keyboard.press('Home')
+    await juno.win.keyboard.press('Enter')
+    await juno.topic.expectTitle('Main')
+    await juno.tabs.expectCount(1)
+  })
+
+  await test.step('Main’s Notify me is its channel’s, and the header is reached pill, title, ⋯, Juno', async () => {
+    await juno.sidebar.row(ENG_MAIN).open()
+    await juno.topic.expectTitle('Main')
+    const { labels } = await juno.topic.chooseInMenu('copy-link')
+    expect(labels).toContain('Notify me')
+    expect(labels).toContain('> When it matters ✓')
+    expect(labels).not.toContain('Rename')
+
+    await juno.topic.contextPill.focus()
+    const order: string[] = []
+    for (let i = 0; i < 4; i++) {
+      order.push(await win.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.textContent ?? ''))
+      await win.keyboard.press('Tab')
+    }
+    expect(order).toEqual(['eng, public channel. Show in sidebar.', 'Main', 'More', 'Juno ⌘J'])
+    // Juno is on unless AI assist is off, so the header has its button.
+    await expect(juno.topic.header.getByRole('button', { name: 'Juno ⌘J' })).toBeVisible()
+  })
 })
 
-test('⋯ opens the topic menu under the right island, as a right-click on the title does, and Notify me follows and unfollows the thread', async ({ juno, slack }) => {
+// The Follow step ends with ⌘Z, so the thread is unfollowed again for the Notify me step.
+test('Follow on an unfollowed thread from Main, then Notify me after it', async ({ juno, slack }) => {
   await juno.signIn()
   await juno.waitForSync()
-  const rina = juno.sidebar.row(RINA)
-  await rina.open()
-  await juno.topic.expectTitle(RINA)
-  await expect(juno.topic.titleButton).toHaveAttribute('aria-haspopup', 'dialog')
-  await expect(juno.topic.moreButton).toHaveAttribute('aria-haspopup', 'menu')
 
-  // Never unfollows the thread in Slack, so it leaves the sidebar. The tab stays open on it.
-  const never = await juno.topic.chooseInMenu('notify-never')
-  expect(never.labels).toEqual([
-    'Open in new tab',
-    '-',
-    'Rename',
-    'Redraw art',
-    'Mark as unread',
-    'Pin',
-    'Resolve',
-    '-',
-    'Copy Slack link',
-    'Open in Slack',
-    'Notify me',
-    '> Every message',
-    '> When it matters ✓',
-    '> Never',
-    'Ignore #hiring',
-  ])
-  // At ⋯'s left edge, 6px under the right island.
-  const island = (await juno.topic.header.locator('[data-island="right"]').boundingBox())!
-  const more = (await juno.topic.moreButton.boundingBox())!
-  expect(never.at).not.toBeNull()
-  expect(Math.round(never.at!.x)).toBe(Math.round(more.x))
-  expect(Math.round(never.at!.y - (island.y + island.height))).toBe(6)
-  await rina.expectAbsent()
-  await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.remove'), { timeout: 10_000 }).toBe(true)
+  await test.step('an unfollowed thread opened from Main shows Follow in Resolve’s place; a click follows it with When it matters, no menu, and ⌘Z undoes it', async () => {
+    await juno.sidebar.row(ENG_MAIN).open()
+    await juno.topic.threadLink(/checkout\.spec failed/).open()
+    await juno.topic.expectTitle(CHECKOUT)
+    const header = juno.topic.header
+    const resolve = header.getByRole('button', { name: 'Resolve', exact: true })
+    const checkout = juno.sidebar.row(CHECKOUT)
+    await expect(juno.topic.followButton).toBeVisible()
+    await expect(juno.topic.followButton).not.toHaveAttribute('aria-haspopup')
+    await expect(resolve).toHaveCount(0)
+    await checkout.expectAbsent()
+    const follow = (await juno.topic.followButton.boundingBox())!
+    const title = (await juno.topic.titleButton.boundingBox())!
 
-  // Every message follows it again, and it comes back; a right-click on the title shows the same menu, under the left island at the title's left edge.
-  const every = await juno.topic.chooseInTitleMenu('notify-every')
-  expect(every.labels.slice(0, 7)).toEqual(never.labels.slice(0, 7))
-  const title = (await juno.topic.titleButton.boundingBox())!
-  expect(Math.round(every.at!.x)).toBe(Math.round(title.x))
-  expect(every.labels).toContain('> Never ✓')
-  await rina.expectVisible()
-  await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.add'), { timeout: 10_000 }).toBe(true)
+    // One click follows it, with no menu: When it matters, as Notify me sets it.
+    const { menuOpened } = await juno.topic.follow()
+    expect(menuOpened).toBe(false)
+    await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.add' && call.args['channel'] === 'C0ENG'), { timeout: 10_000 }).toBe(true)
+    await juno.expectToast('When it matters')
+    await checkout.expectVisible()
+    await expect(resolve).toBeVisible()
+    // Resolve took Follow's place at Follow's width; the title did not move.
+    const swapped = (await resolve.boundingBox())!
+    expect(Math.round(swapped.x)).toBe(Math.round(follow.x))
+    expect(Math.round(swapped.width)).toBe(Math.round(follow.width))
+    expect(await juno.topic.titleButton.boundingBox()).toEqual(title)
+
+    // ⌘Z unfollows it again: it leaves the sidebar and the header shows Follow.
+    await juno.undo()
+    await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.remove'), { timeout: 10_000 }).toBe(true)
+    await checkout.expectAbsent()
+    await expect(juno.topic.followButton).toBeVisible()
+    await expect(resolve).toHaveCount(0)
+  })
+
+  await test.step('after Follow, Notify me in ⋯ shows When it matters and changes it', async () => {
+    await juno.sidebar.row(ENG_MAIN).open()
+    await juno.topic.threadLink(/checkout\.spec failed/).open()
+    await juno.topic.expectTitle(CHECKOUT)
+    expect((await juno.topic.follow()).menuOpened).toBe(false)
+    await juno.expectToast('When it matters')
+
+    // ⋯ › Notify me has When it matters checked; Every message replaces it, and the thread stays followed.
+    const every = await juno.topic.chooseInMenu('notify-every')
+    expect(every.labels).toContain('> When it matters ✓')
+    await juno.expectToast('Every message')
+    const after = await juno.topic.chooseInMenu('copy-link')
+    expect(after.labels).toContain('> Every message ✓')
+    await juno.sidebar.row(CHECKOUT).expectVisible()
+    await expect(juno.topic.header.getByRole('button', { name: 'Resolve', exact: true })).toBeVisible()
+  })
 })
 
-test('an unfollowed thread opened from Main shows Follow in Resolve’s place; a click follows it with When it matters, no menu, and ⌘Z undoes it', async ({ juno, slack }) => {
+// The chip step moves the scope from #eng, where the pill step left it, to #platform.
+test('the context pill and a #channel chip scope the sidebar', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await juno.sidebar.row(ENG_MAIN).open()
-  await juno.topic.threadLink(/checkout\.spec failed/).open()
-  await juno.topic.expectTitle(CHECKOUT)
-  const header = juno.topic.header
-  const resolve = header.getByRole('button', { name: 'Resolve', exact: true })
-  const checkout = juno.sidebar.row(CHECKOUT)
-  await expect(juno.topic.followButton).toBeVisible()
-  await expect(juno.topic.followButton).not.toHaveAttribute('aria-haspopup')
-  await expect(resolve).toHaveCount(0)
-  await checkout.expectAbsent()
-  const follow = (await juno.topic.followButton.boundingBox())!
-  const title = (await juno.topic.titleButton.boundingBox())!
 
-  // One click follows it, with no menu: When it matters, as Notify me sets it.
-  const { menuOpened } = await juno.topic.follow()
-  expect(menuOpened).toBe(false)
-  await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.add' && call.args['channel'] === 'C0ENG'), { timeout: 10_000 }).toBe(true)
-  await juno.expectToast('When it matters')
-  await checkout.expectVisible()
-  await expect(resolve).toBeVisible()
-  // Resolve took Follow's place at Follow's width; the title did not move.
-  const swapped = (await resolve.boundingBox())!
-  expect(Math.round(swapped.x)).toBe(Math.round(follow.x))
-  expect(Math.round(swapped.width)).toBe(Math.round(follow.width))
-  expect(await juno.topic.titleButton.boundingBox()).toEqual(title)
+  await test.step('the context pill scopes the sidebar to its channel', async () => {
+    await juno.sidebar.row(POSTGRES).open()
+    await juno.topic.contextPill.click()
+    await juno.sidebar.expectScope('eng')
+  })
 
-  // ⌘Z unfollows it again: it leaves the sidebar and the header shows Follow.
-  await juno.undo()
-  await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.remove'), { timeout: 10_000 }).toBe(true)
-  await checkout.expectAbsent()
-  await expect(juno.topic.followButton).toBeVisible()
-  await expect(resolve).toHaveCount(0)
-})
-
-test('after Follow, Notify me in ⋯ shows When it matters and changes it', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.sidebar.row(ENG_MAIN).open()
-  await juno.topic.threadLink(/checkout\.spec failed/).open()
-  await juno.topic.expectTitle(CHECKOUT)
-  expect((await juno.topic.follow()).menuOpened).toBe(false)
-  await juno.expectToast('When it matters')
-
-  // ⋯ › Notify me has When it matters checked; Every message replaces it, and the thread stays followed.
-  const every = await juno.topic.chooseInMenu('notify-every')
-  expect(every.labels).toContain('> When it matters ✓')
-  await juno.expectToast('Every message')
-  const after = await juno.topic.chooseInMenu('copy-link')
-  expect(after.labels).toContain('> Every message ✓')
-  await juno.sidebar.row(CHECKOUT).expectVisible()
-  await expect(juno.topic.header.getByRole('button', { name: 'Resolve', exact: true })).toBeVisible()
-})
-
-test('Main’s Notify me is its channel’s, and the header is reached pill, title, ⋯, Juno', async ({ juno, win }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.sidebar.row(ENG_MAIN).open()
-  await juno.topic.expectTitle('Main')
-  const { labels } = await juno.topic.chooseInMenu('copy-link')
-  expect(labels).toContain('Notify me')
-  expect(labels).toContain('> When it matters ✓')
-  expect(labels).not.toContain('Rename')
-
-  await juno.topic.contextPill.focus()
-  const order: string[] = []
-  for (let i = 0; i < 4; i++) {
-    order.push(await win.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.textContent ?? ''))
-    await win.keyboard.press('Tab')
-  }
-  expect(order).toEqual(['eng, public channel. Show in sidebar.', 'Main', 'More', 'Juno ⌘J'])
-  // Juno is on unless AI assist is off, so the header has its button.
-  await expect(juno.topic.header.getByRole('button', { name: 'Juno ⌘J' })).toBeVisible()
-})
-
-test('the context pill scopes the sidebar to its channel', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.sidebar.row(POSTGRES).open()
-  await juno.topic.contextPill.click()
-  await juno.sidebar.expectScope('eng')
-})
-
-test('a #channel chip scopes the sidebar to that channel', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.sidebar.row(POSTGRES).open()
-  await juno.topic.clickChannel('platform')
-  await juno.sidebar.expectScope('platform')
-  await juno.sidebar.row(POSTGRES).expectAbsent()
-})
-
-test('hovering a row warms the topic without asking Slack', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  slack.resetCalls()
-  await juno.sidebar.row(POSTGRES).hover()
-  await juno.win.waitForTimeout(500)
-  expect(slack.fake.calls.map((call) => call.method)).toEqual([])
-  // The open is a cache hit: the tab paints with its rows.
-  await juno.sidebar.row(POSTGRES).open()
-  await juno.topic.expectMessage('Booked 2–4pm')
-  await expect.poll(() => juno.measure('juno.topic-open')).toBeLessThan(250)
+  await test.step('a #channel chip scopes the sidebar to that channel', async () => {
+    await juno.sidebar.row(POSTGRES).open()
+    await juno.topic.clickChannel('platform')
+    await juno.sidebar.expectScope('platform')
+    await juno.sidebar.row(POSTGRES).expectAbsent()
+  })
 })
 
 test.describe('a long thread', () => {
@@ -318,7 +330,8 @@ test('every control in the header answers hover and press', async ({ juno, win }
   const away = () => win.mouse.move(5, 300)
 
   for (const control of controls) {
-    if ((await control.count()) === 0) continue
+    // Every control is there: a removed one fails.
+    await expect(control).toBeVisible()
     const name = (await control.getAttribute('aria-label')) ?? (await control.textContent())
     await away()
     const rest = await look(control)
@@ -359,15 +372,4 @@ test('the switcher searches the channel’s topics, and ⌘ opens one in a new t
   await again.open(POSTGRES, { newTab: true })
   await juno.tabs.expectCount(3)
   await expect(juno.tabs.tab(POSTGRES)).toHaveCount(2)
-})
-
-test('⋯ runs Rename: the title becomes a field, and Enter saves the new title', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.sidebar.row(RINA).open()
-  await juno.topic.expectTitle(RINA)
-  await juno.topic.chooseInMenu('rename')
-  await juno.rename('Onsite debrief')
-  await juno.topic.expectTitle('Onsite debrief')
-  await juno.sidebar.row('Onsite debrief').expectVisible()
 })

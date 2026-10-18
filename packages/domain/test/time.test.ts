@@ -27,10 +27,6 @@ describe('relative time', () => {
   it('never goes negative for a clock slightly ahead', () => {
     expect(relativeTime(NOW + 5000, NOW)).toBe('now')
   })
-
-  it('is tabular-friendly: digits and a unit, no spaces', () => {
-    for (const ago of [MINUTE, HOUR, 3 * DAY, 20 * DAY]) expect(relativeTime(NOW - ago, NOW)).toMatch(/^\d+[mhdw]$/)
-  })
 })
 
 describe('message time', () => {

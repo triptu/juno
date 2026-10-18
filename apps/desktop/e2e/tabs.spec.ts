@@ -9,6 +9,7 @@ import { startFakeSlack, topic300Seed } from '@juno/fake-slack'
 import { expectNoLayoutShift } from '@juno/testing/layout-shift'
 import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
+import { readUserDb, savedTabs, threadId } from './driver/userDb'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -17,11 +18,19 @@ const RINA = 'Rina finished the onsite'
 const ROADMAP = 'Proposal: cut offline mode and public'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
 
-test('opening, ⌘-click, focusing an open topic and closing to the neighbour', async ({ juno }) => {
+// Each step but the last ends with Home in the only tab, as a fresh launch shows it.
+test('tabs open, focus and close from the sidebar, the keyboard and the app menu, and the last one closed leaves Home', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
-  const { sidebar, tabs } = juno
 
+  await test.step('opening, ⌘-click, focusing an open topic and closing to the neighbour', () => openFocusAndClose(juno))
+  await test.step('closing a tab from the keyboard leaves focus in the strip', () => closeFromKeyboard(juno))
+  await test.step('closing the last tab leaves Home; ⌘T and "+" open Home in a new tab, ready to write', () => newTabsOpenHome(juno))
+  await test.step('the app menu closes the tab and moves between tabs', () => appMenuMovesBetweenTabs(juno))
+})
+
+async function openFocusAndClose(juno: Juno): Promise<void> {
+  const { sidebar, tabs } = juno
   await sidebar.row(POSTGRES).open()
   await tabs.expectActive(POSTGRES)
   await sidebar.row(RINA).open()
@@ -53,11 +62,9 @@ test('opening, ⌘-click, focusing an open topic and closing to the neighbour', 
   // Closing the last tab leaves Home, never no tab.
   await tabs.close(RINA)
   await juno.expectNothingOpen()
-})
+}
 
-test('closing a tab from the keyboard leaves focus in the strip', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+async function closeFromKeyboard(juno: Juno): Promise<void> {
   const { sidebar, tabs } = juno
   await sidebar.row(POSTGRES).open()
   await sidebar.row(RINA).openInNewTab()
@@ -78,11 +85,35 @@ test('closing a tab from the keyboard leaves focus in the strip', async ({ juno 
   await tabs.closeWithKeyboard(POSTGRES)
   await juno.expectNothingOpen()
   await expect(juno.write.composer).toBeFocused()
-})
+}
 
-test('the app menu closes the tab and moves between tabs', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+async function newTabsOpenHome(juno: Juno): Promise<void> {
+  const { sidebar, tabs } = juno
+  await sidebar.row(POSTGRES).open()
+  await tabs.expectCount(1)
+  await tabs.close(POSTGRES)
+  await juno.expectNothingOpen()
+
+  await sidebar.row(POSTGRES).open()
+  await tabs.menu('new-tab')
+  await tabs.expectCount(2)
+  await tabs.expectActive('Home')
+  await juno.home.expectShown()
+  await expect(juno.write.composer).toBeFocused()
+  await expect(tabs.newTabButton).toHaveAccessibleName('New tab ⌘T')
+
+  const homes = await tabs.tab('Home').count()
+  await tabs.newTabButton.click()
+  await expect(tabs.tab('Home')).toHaveCount(homes + 1)
+  await juno.home.expectShown()
+  await expect(juno.write.composer).toBeFocused()
+
+  // Closing every tab leaves one Home.
+  await tabs.contextMenu(POSTGRES, 'close-all')
+  await juno.expectNothingOpen()
+}
+
+async function appMenuMovesBetweenTabs(juno: Juno): Promise<void> {
   const { sidebar, tabs } = juno
   await sidebar.row(POSTGRES).open()
   await sidebar.row(RINA).openInNewTab()
@@ -98,9 +129,9 @@ test('the app menu closes the tab and moves between tabs', async ({ juno }) => {
   await tabs.menu('close-tab')
   await tabs.expectCount(2)
   await tabs.expectActive(ROADMAP)
-})
+}
 
-test('⌘W held down closes a tab per press, even when the tabs it lands on were put away', async ({ juno, running, userData, fake, slackApp }) => {
+test('⌘W held down closes a tab per press, even when the tabs it lands on were put away', async ({ juno, running, userData, fake, slackApp, slack }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { sidebar, tabs } = juno
@@ -109,8 +140,8 @@ test('⌘W held down closes a tab per press, even when the tabs it lands on were
   for (const title of topics.slice(1)) await sidebar.row(title).openInNewTab()
   await tabs.menu('tab-1')
   await tabs.expectActive(POSTGRES)
-  // Let the save reach the engine.
-  await juno.win.waitForTimeout(500)
+  // The save has reached the engine.
+  await expect.poll(() => savedTabs(userData, fake.teamId)).toEqual({ tabs: topics.map((title) => ({ place: threadId(slack, title), pinned: false })), active: 0 })
   await running.close()
 
   // After a relaunch only the active tab has its topic loaded, so showing any other one waits for the engine.
@@ -133,7 +164,7 @@ test('⌘W held down closes a tab per press, even when the tabs it lands on were
   }
 })
 
-test('tabs survive a restart', async ({ juno, running, userData, fake, slackApp }) => {
+test('tabs survive a restart', async ({ juno, running, userData, fake, slackApp, slack }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { sidebar, tabs } = juno
@@ -142,8 +173,8 @@ test('tabs survive a restart', async ({ juno, running, userData, fake, slackApp 
   await sidebar.row(ROADMAP).openInNewTab()
   await sidebar.row(OFFSITE).openInNewTabFromMenu()
   await tabs.expectActive(OFFSITE)
-  // Let the save reach the engine.
-  await juno.win.waitForTimeout(500)
+  // The save has reached the engine.
+  await expect.poll(() => savedTabs(userData, fake.teamId)).toEqual({ tabs: [POSTGRES, RINA, ROADMAP, OFFSITE].map((title) => ({ place: threadId(slack, title), pinned: false })), active: 3 })
   await running.close()
 
   const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
@@ -158,7 +189,7 @@ test('tabs survive a restart', async ({ juno, running, userData, fake, slackApp 
   }
 })
 
-test('tabs drag to a new place, move with ⌃⇧← and ⌃⇧→, and keep their order after a restart', async ({ juno, running, userData, fake, slackApp }) => {
+test('tabs drag to a new place, move with ⌃⇧← and ⌃⇧→, and keep their order after a restart', async ({ juno, running, userData, fake, slackApp, slack }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { sidebar, tabs } = juno
@@ -196,8 +227,8 @@ test('tabs drag to a new place, move with ⌃⇧← and ⌃⇧→, and keep thei
   await juno.win.mouse.up()
   await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Proposal/), expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/)])
 
-  // Let the save reach the engine.
-  await juno.win.waitForTimeout(500)
+  // The order has reached the engine.
+  await expect.poll(() => savedTabs(userData, fake.teamId)?.tabs.map((tab) => tab.place)).toEqual([ROADMAP, POSTGRES, RINA].map((title) => threadId(slack, title)))
   await running.close()
   const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
   try {
@@ -230,7 +261,7 @@ test('a topic tab shows its art and a DM tab the person\'s photo', async ({ juno
   await expect(tabs.tile('Maya')).toHaveAttribute('src', rowPhoto ?? '')
 })
 
-test('a tab not viewed for a day closes by itself, ⌘⇧T brings it back, and a tab with a draft stays', async ({ juno, win }) => {
+test('a tab not viewed for a day closes by itself, ⌘⇧T brings it back, and a tab with a draft stays', async ({ juno, win, userData, fake, slack }) => {
   // The sweep runs hourly on the page's clock, so install the fake one before any tab is viewed.
   await win.clock.install()
   await juno.signIn()
@@ -239,8 +270,8 @@ test('a tab not viewed for a day closes by itself, ⌘⇧T brings it back, and a
   await sidebar.row(POSTGRES).open()
   await sidebar.row(RINA).openInNewTab()
   await topic.composer.fill('Half a thought about the onsite')
-  // Let the draft save.
-  await win.waitForTimeout(800)
+  // The draft is saved.
+  await expect.poll(() => readUserDb(userData, fake.teamId, (db) => db.prepare('SELECT text FROM drafts WHERE topic_id = ?').get(threadId(slack, RINA)))).toEqual({ text: 'Half a thought about the onsite' })
   await sidebar.row(ROADMAP).openInNewTab()
   await tabs.expectActive(ROADMAP)
 
@@ -297,35 +328,6 @@ test.describe('one topic in two tabs', () => {
     await topic.expectAtBottom()
     await expect(tabs.tab(THREAD)).toHaveCount(2)
   })
-})
-
-test('closing the last tab leaves Home; ⌘T and "+" open Home in a new tab, ready to write', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { sidebar, tabs } = juno
-
-  await sidebar.row(POSTGRES).open()
-  await tabs.expectCount(1)
-  await tabs.close(POSTGRES)
-  await juno.expectNothingOpen()
-
-  await sidebar.row(POSTGRES).open()
-  await tabs.menu('new-tab')
-  await tabs.expectCount(2)
-  await tabs.expectActive('Home')
-  await juno.home.expectShown()
-  await expect(juno.write.composer).toBeFocused()
-  await expect(tabs.newTabButton).toHaveAccessibleName('New tab ⌘T')
-
-  const homes = await tabs.tab('Home').count()
-  await tabs.newTabButton.click()
-  await expect(tabs.tab('Home')).toHaveCount(homes + 1)
-  await juno.home.expectShown()
-  await expect(juno.write.composer).toBeFocused()
-
-  // Closing every tab leaves one Home.
-  await tabs.contextMenu(POSTGRES, 'close-all')
-  await juno.expectNothingOpen()
 })
 
 test('"+" sits one tab gap after the last tab, level with the tabs, and stays at the end of the strip when the tabs scroll', async ({ juno, app }) => {

@@ -1,8 +1,11 @@
 // Browser-like navigation (spec sections 4 and 6): each tab's Back and
 // Forward, the reopen stack, pinned tabs and the tab menu, the tab keys,
 // the unread dot, and the sidebar's resize and hide.
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
+import { savedTabs, threadId } from './driver/userDb'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -101,7 +104,7 @@ test('⌘⇧T reopens closed tabs, the last closed first, each with its history'
   await tabs.expectCount(3)
 })
 
-test('the tab menu pins, unpins and closes, and pins survive a restart', async ({ juno, running, userData, fake, slackApp }) => {
+test('the tab menu pins, unpins and closes, and pins survive a restart', async ({ juno, running, userData, fake, slackApp, slack }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { sidebar, tabs } = juno
@@ -139,8 +142,8 @@ test('the tab menu pins, unpins and closes, and pins survive a restart', async (
   const opened = await juno.app.evaluate(() => [...(globalThis as unknown as { junoTest: { slackLinks: string[] } }).junoTest.slackLinks])
   expect(opened).toEqual([expect.stringMatching(/^slack:\/\/channel\?team=T0JUNO&id=C[A-Z0-9]+$/)])
 
-  // Let the save reach the engine.
-  await juno.win.waitForTimeout(500)
+  // The pin and the closes have reached the engine.
+  await expect.poll(() => savedTabs(userData, fake.teamId)?.tabs).toEqual([{ place: threadId(slack, ROADMAP), pinned: true }, { place: threadId(slack, POSTGRES), pinned: false }])
   await running.close()
   const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
   try {
@@ -216,8 +219,16 @@ test('the sidebar resizes by its edge, resets on double-click, and hides', { tag
   await frame.drag(-250)
   await frame.expectHidden()
 
-  // Width and hidden state come back after a restart.
-  await juno.win.waitForTimeout(500)
+  // Width and hidden state come back after a restart, once main has written them.
+  await expect
+    .poll(async () => {
+      try {
+        return (JSON.parse(await readFile(join(userData, 'launch.json'), 'utf8')) as { sidebar?: unknown }).sidebar
+      } catch {
+        return undefined
+      }
+    })
+    .toEqual({ width: 344, collapsed: true })
   await running.close()
   const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
   try {

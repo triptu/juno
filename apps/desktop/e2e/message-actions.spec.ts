@@ -28,125 +28,121 @@ async function sendOwn(juno: Juno, fake: FakeSlack, text: string): Promise<strin
 
 const slackText = (fake: FakeSlack, ts: string) => fake.messages('C0ENG').find((m) => m.ts === ts)?.text
 
-test('the keyboard: ↑ selects the newest message, E edits it in place, Enter saves', async ({ juno, fake }) => {
+// One Main: each step sends its own message, so ↑ from the composer selects the newest one.
+test('the keyboard: ↑ selects, E edits, Delete asks once, and E and Delete do nothing on others’ messages', async ({ juno, fake }) => {
   await openMain(juno)
   const { topic } = juno
-  const ts = await sendOwn(juno, fake, 'Shiping the fix today')
+  await test.step('the keyboard: ↑ selects the newest message, E edits it in place, Enter saves', async () => {
+    const ts = await sendOwn(juno, fake, 'Shiping the fix today')
 
-  await topic.composer.press('ArrowUp')
-  const row = topic.message('Shiping the fix today')
-  await expect(row).toBeFocused()
-  await row.press('e')
-  // The field replaces the body, so the row is found by the field from here on.
-  const field = topic.list.getByRole('textbox', { name: 'Edit message' })
-  await expect(field).toBeFocused()
-  await expect(field).toHaveValue('Shiping the fix today')
-  await field.fill('Shipping the fix today')
-  await field.press('Enter')
+    await topic.composer.press('ArrowUp')
+    const row = topic.message('Shiping the fix today')
+    await expect(row).toBeFocused()
+    await row.press('e')
+    // The field replaces the body, so the row is found by the field from here on.
+    const field = topic.list.getByRole('textbox', { name: 'Edit message' })
+    await expect(field).toBeFocused()
+    await expect(field).toHaveValue('Shiping the fix today')
+    await field.fill('Shipping the fix today')
+    await field.press('Enter')
 
-  // The new text shows at once, marked edited, and the composer has focus again.
-  await expect(topic.message('Shipping the fix today')).toContainText('edited')
-  await expect(field).toHaveCount(0)
-  await expect(topic.composer).toBeFocused()
-  await expect.poll(() => slackText(fake, ts)).toBe('Shipping the fix today')
-  const updates = fake.calls.filter((call) => call.method === 'chat.update')
-  expect(updates).toHaveLength(1)
-  expect(updates[0]!.args['ts']).toBe(ts)
+    // The new text shows at once, marked edited, and the composer has focus again.
+    await expect(topic.message('Shipping the fix today')).toContainText('edited')
+    await expect(field).toHaveCount(0)
+    await expect(topic.composer).toBeFocused()
+    await expect.poll(() => slackText(fake, ts)).toBe('Shipping the fix today')
+    const updates = fake.calls.filter((call) => call.method === 'chat.update')
+    expect(updates).toHaveLength(1)
+    expect(updates[0]!.args['ts']).toBe(ts)
+  })
+  await test.step('the keyboard: Delete asks once in the toolbar; Esc keeps the message, Enter deletes it', async () => {
+    const ts = await sendOwn(juno, fake, 'Posted in the wrong channel')
+
+    await topic.composer.press('ArrowUp')
+    const row = topic.message('Posted in the wrong channel')
+    await expect(row).toBeFocused()
+    await row.press('Delete')
+    const confirm = row.locator('[data-delete-confirm]')
+    await expect(confirm).toContainText('Delete this message?')
+    await expect(confirm).toBeVisible()
+    await row.press('Escape')
+    await expect(confirm).toHaveCount(0)
+    await expect(row).toBeFocused()
+
+    await row.press('Backspace')
+    await expect(confirm).toBeVisible()
+    await row.press('Enter')
+    await expect(topic.message('Posted in the wrong channel')).toHaveCount(0)
+    await expect(topic.composer).toBeFocused()
+    await expect.poll(() => fake.messages('C0ENG').some((m) => m.ts === ts)).toBe(false)
+    expect(fake.calls.filter((call) => call.method === 'chat.delete')).toHaveLength(1)
+  })
+  await test.step('the keyboard: ↑ and ↓ move the selection, Esc goes back to the composer, and E does nothing on others’ messages', async () => {
+    fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Can someone look at the replica lag?' })
+    await topic.expectMessage('Can someone look at the replica lag?')
+    await sendOwn(juno, fake, 'Looking now')
+
+    await topic.composer.press('ArrowUp')
+    await expect(topic.message('Looking now')).toBeFocused()
+    await juno.win.keyboard.press('ArrowUp')
+    const theirs = topic.message('Can someone look at the replica lag?')
+    await expect(theirs).toBeFocused()
+    await juno.win.keyboard.press('e')
+    await expect(theirs.getByRole('textbox', { name: 'Edit message' })).toHaveCount(0)
+    await juno.win.keyboard.press('Delete')
+    await expect(theirs.locator('[data-delete-confirm]')).toHaveCount(0)
+    await juno.win.keyboard.press('ArrowDown')
+    await expect(topic.message('Looking now')).toBeFocused()
+    await juno.win.keyboard.press('Escape')
+    await expect(topic.composer).toBeFocused()
+    // ↑ only selects from an empty composer; with text it moves the caret.
+    await topic.composer.fill('half a thought')
+    await topic.composer.press('ArrowUp')
+    await expect(topic.composer).toBeFocused()
+  })
 })
 
-test('the keyboard: Delete asks once in the toolbar; Esc keeps the message, Enter deletes it', async ({ juno, fake }) => {
+test('Edit and Delete from the menus, and Edit after the message changed elsewhere', async ({ juno, fake }) => {
   await openMain(juno)
   const { topic } = juno
-  const ts = await sendOwn(juno, fake, 'Posted in the wrong channel')
+  await test.step('Edit and Delete from the toolbar’s More menu and from a right-click', async () => {
+    const ts = await sendOwn(juno, fake, 'Retro at 3')
 
-  await topic.composer.press('ArrowUp')
-  const row = topic.message('Posted in the wrong channel')
-  await expect(row).toBeFocused()
-  await row.press('Delete')
-  const confirm = row.locator('[data-delete-confirm]')
-  await expect(confirm).toContainText('Delete this message?')
-  await expect(confirm).toBeVisible()
-  await row.press('Escape')
-  await expect(confirm).toHaveCount(0)
-  await expect(row).toBeFocused()
+    const row = topic.message('Retro at 3')
+    await row.hover()
+    await juno.chooseNextMenuItem('edit', { hold: true })
+    await row.getByRole('button', { name: 'More', exact: true }).click()
+    await juno.win.mouse.move(0, 0)
+    await expect(row).toHaveAttribute('data-popover-active', '')
+    await expect(row.getByRole('toolbar')).toBeVisible()
+    await juno.releaseMenu()
+    const editing = topic.list.locator('[data-editing]')
+    const field = editing.getByRole('textbox', { name: 'Edit message' })
+    await field.fill('Retro at 4')
+    await editing.getByRole('button', { name: 'Save' }).click()
+    await expect(topic.message('Retro at 4')).toContainText('edited')
+    await expect.poll(() => slackText(fake, ts)).toBe('Retro at 4')
 
-  await row.press('Backspace')
-  await expect(confirm).toBeVisible()
-  await row.press('Enter')
-  await expect(topic.message('Posted in the wrong channel')).toHaveCount(0)
-  await expect(topic.composer).toBeFocused()
-  await expect.poll(() => fake.messages('C0ENG').some((m) => m.ts === ts)).toBe(false)
-  expect(fake.calls.filter((call) => call.method === 'chat.delete')).toHaveLength(1)
-})
+    await juno.chooseNextMenuItem('delete')
+    await topic.message('Retro at 4').click({ button: 'right' })
+    const confirm = topic.message('Retro at 4').locator('[data-delete-confirm]')
+    await expect(confirm).toBeVisible()
+    await confirm.getByRole('button', { name: 'Delete' }).click()
+    await expect(topic.message('Retro at 4')).toHaveCount(0)
+    await expect.poll(() => fake.messages('C0ENG').some((m) => m.ts === ts)).toBe(false)
+  })
+  await test.step('a message edited elsewhere while its menu is open: Edit starts from the new text', async () => {
+    const ts = await sendOwn(juno, fake, 'Standup at 10')
 
-test('the keyboard: ↑ and ↓ move the selection, Esc goes back to the composer, and E does nothing on others’ messages', async ({ juno, fake }) => {
-  await openMain(juno)
-  const { topic } = juno
-  fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Can someone look at the replica lag?' })
-  await topic.expectMessage('Can someone look at the replica lag?')
-  await sendOwn(juno, fake, 'Looking now')
+    await juno.chooseNextMenuItem('edit', { hold: true })
+    await topic.message('Standup at 10').click({ button: 'right' })
+    fake.editMessage({ channel: 'C0ENG', ts, text: 'Standup at 11' })
+    await expect(topic.message('Standup at 11')).toBeVisible()
+    await juno.releaseMenu()
 
-  await topic.composer.press('ArrowUp')
-  await expect(topic.message('Looking now')).toBeFocused()
-  await juno.win.keyboard.press('ArrowUp')
-  const theirs = topic.message('Can someone look at the replica lag?')
-  await expect(theirs).toBeFocused()
-  await juno.win.keyboard.press('e')
-  await expect(theirs.getByRole('textbox', { name: 'Edit message' })).toHaveCount(0)
-  await juno.win.keyboard.press('Delete')
-  await expect(theirs.locator('[data-delete-confirm]')).toHaveCount(0)
-  await juno.win.keyboard.press('ArrowDown')
-  await expect(topic.message('Looking now')).toBeFocused()
-  await juno.win.keyboard.press('Escape')
-  await expect(topic.composer).toBeFocused()
-  // ↑ only selects from an empty composer; with text it moves the caret.
-  await topic.composer.fill('half a thought')
-  await topic.composer.press('ArrowUp')
-  await expect(topic.composer).toBeFocused()
-})
-
-test('Edit and Delete from the toolbar’s More menu and from a right-click', async ({ juno, fake }) => {
-  await openMain(juno)
-  const { topic } = juno
-  const ts = await sendOwn(juno, fake, 'Retro at 3')
-
-  const row = topic.message('Retro at 3')
-  await row.hover()
-  await juno.chooseNextMenuItem('edit', { hold: true })
-  await row.getByRole('button', { name: 'More', exact: true }).click()
-  await juno.win.mouse.move(0, 0)
-  await expect(row).toHaveAttribute('data-popover-active', '')
-  await expect(row.getByRole('toolbar')).toBeVisible()
-  await juno.releaseMenu()
-  const editing = topic.list.locator('[data-editing]')
-  const field = editing.getByRole('textbox', { name: 'Edit message' })
-  await field.fill('Retro at 4')
-  await editing.getByRole('button', { name: 'Save' }).click()
-  await expect(topic.message('Retro at 4')).toContainText('edited')
-  await expect.poll(() => slackText(fake, ts)).toBe('Retro at 4')
-
-  await juno.chooseNextMenuItem('delete')
-  await topic.message('Retro at 4').click({ button: 'right' })
-  const confirm = topic.message('Retro at 4').locator('[data-delete-confirm]')
-  await expect(confirm).toBeVisible()
-  await confirm.getByRole('button', { name: 'Delete' }).click()
-  await expect(topic.message('Retro at 4')).toHaveCount(0)
-  await expect.poll(() => fake.messages('C0ENG').some((m) => m.ts === ts)).toBe(false)
-})
-
-test('a message edited elsewhere while its menu is open: Edit starts from the new text', async ({ juno, fake }) => {
-  await openMain(juno)
-  const { topic } = juno
-  const ts = await sendOwn(juno, fake, 'Standup at 10')
-
-  await juno.chooseNextMenuItem('edit', { hold: true })
-  await topic.message('Standup at 10').click({ button: 'right' })
-  fake.editMessage({ channel: 'C0ENG', ts, text: 'Standup at 11' })
-  await expect(topic.message('Standup at 11')).toBeVisible()
-  await juno.releaseMenu()
-
-  const field = topic.list.getByRole('textbox', { name: 'Edit message' })
-  await expect(field).toHaveValue('Standup at 11')
+    const field = topic.list.getByRole('textbox', { name: 'Edit message' })
+    await expect(field).toHaveValue('Standup at 11')
+  })
 })
 
 test('an edit started while the message is sending stays open, with what was typed, when Slack takes the message', async ({ juno, fake }) => {
@@ -272,26 +268,28 @@ test('Quote puts the message in the composer as "> " lines; a selection quotes o
   await expect(quote).toHaveCount(0)
 })
 
-test('Open thread from Main opens the message’s thread with its composer', async ({ juno }) => {
+test('Open thread and Start thread from Main open the message’s thread', async ({ juno, fake }) => {
   await openMain(juno)
   const { topic } = juno
-  const root = topic.message(POSTGRES)
-  await root.hover()
-  await root.getByRole('button', { name: 'Open thread' }).click()
-  await topic.expectTitle(/Postgres|Draft plan/)
-  await expect(topic.composer).toHaveAttribute('aria-label', 'Reply')
-})
-
-test('Start thread from Main opens a new topic for the message', async ({ juno, fake }) => {
-  await openMain(juno)
-  const { topic } = juno
-  const ts = await sendOwn(juno, fake, 'A new topic from Main')
-  const root = topic.message('A new topic from Main')
-  await root.hover()
-  await root.getByRole('button', { name: 'Start thread' }).click()
-  await topic.expectTitle(/A new topic from Main/)
-  await expect(topic.composer).toHaveAttribute('aria-label', 'Reply')
-  expect(fake.messages('C0ENG').find((message) => message.ts === ts)?.reply_count ?? 0).toBe(0)
+  await test.step('Open thread from Main opens the message’s thread with its composer', async () => {
+    const root = topic.message(POSTGRES)
+    await root.hover()
+    await root.getByRole('button', { name: 'Open thread' }).click()
+    await topic.expectTitle(/Postgres|Draft plan/)
+    await expect(topic.composer).toHaveAttribute('aria-label', 'Reply')
+  })
+  // Back to Main for the next message.
+  await juno.sidebar.row(ENG_MAIN).open()
+  await topic.expectTitle('Main')
+  await test.step('Start thread from Main opens a new topic for the message', async () => {
+    const ts = await sendOwn(juno, fake, 'A new topic from Main')
+    const root = topic.message('A new topic from Main')
+    await root.hover()
+    await root.getByRole('button', { name: 'Start thread' }).click()
+    await topic.expectTitle(/A new topic from Main/)
+    await expect(topic.composer).toHaveAttribute('aria-label', 'Reply')
+    expect(fake.messages('C0ENG').find((message) => message.ts === ts)?.reply_count ?? 0).toBe(0)
+  })
 })
 
 test('⌘-click Start thread opens the thread in a background tab; this tab, its scroll and its focus stay', async ({ juno, fake }) => {

@@ -75,19 +75,31 @@ test('a reply typed into Main is offered to its thread, and Post in thread posts
   expect(posts(fake)[0]!.args['text']).toBe(BILL_REPLY)
 })
 
-test('Send to Main sends it where it was typed', async ({ juno, fake, userData }) => {
+// Send to Main goes first: the amber step's drafts start wrong-place checks of their own, and one asked
+// after the next draft was typed would pass for its answer.
+test("Send to Main sends a checked draft where it was typed, and hiring details in #eng's Main show the amber line", async ({ juno, fake, userData }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
-  await typeAndPause(topic, userData, fake.teamId, BILL_REPLY)
-  await topic.composer.press('Enter')
-  await topic.checkBar.choose('Send to Main')
-  await topic.expectSent(BILL_REPLY)
-  expect(posts(fake)).toHaveLength(1)
-  expect(posts(fake)[0]!.args['thread_ts']).toBeUndefined()
-  await expect(topic.composer).toBeFocused()
+  await test.step('Send to Main sends it where it was typed', async () => {
+    await typeAndPause(topic, userData, fake.teamId, BILL_REPLY)
+    await topic.composer.press('Enter')
+    await topic.checkBar.choose('Send to Main')
+    await topic.expectSent(BILL_REPLY)
+    expect(posts(fake)).toHaveLength(1)
+    expect(posts(fake)[0]!.args['thread_ts']).toBeUndefined()
+    await expect(topic.composer).toBeFocused()
+  })
+  await test.step('hiring and people details in a public channel show the amber line while typing', async () => {
+    await topic.composer.fill('The offer for the new backend hire goes out Friday')
+    await expect(topic.audienceWarning).toHaveText('This reads like hiring or people detail. eng is a public channel.')
+    // It goes as soon as the draft stops matching.
+    await topic.composer.fill('The release goes out Friday')
+    await expect(topic.audienceWarning).toHaveCount(0)
+    // Private channels and DMs never warn: audienceCheck in packages/domain/test/checks.test.ts, and Home below.
+  })
 })
 
 test('local fixes send first and Review opens a draft without changing the sent message', async ({ juno, fake }) => {
@@ -145,20 +157,6 @@ test('a doubled word is offered as a fix after sending', async ({ juno, fake }) 
   await suggestion.getByRole('button', { name: 'Review', exact: true }).click()
   await expect(juno.topic.list.getByRole('textbox', { name: 'Edit message' })).toHaveValue('I think the build is green')
   expect(posts(fake).map((call) => call.args['text'])).toEqual([DOUBLED])
-})
-
-test('hiring and people details in a public channel show the amber line while typing', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { topic } = juno
-  await juno.sidebar.row(ENG_MAIN).open()
-  await topic.expectTitle('Main')
-  await topic.composer.fill('The offer for the new backend hire goes out Friday')
-  await expect(topic.audienceWarning).toHaveText('This reads like hiring or people detail. eng is a public channel.')
-  // It goes as soon as the draft stops matching.
-  await topic.composer.fill('The release goes out Friday')
-  await expect(topic.audienceWarning).toHaveCount(0)
-  // Private channels and DMs never warn: audienceCheck in packages/domain/test/checks.test.ts, and Home below.
 })
 
 test.describe('with a model slower than the typing pause', () => {
@@ -232,21 +230,32 @@ test('with AI assist off, local checks still work and models stay off', async ({
   }
 })
 
-test('Home checks a channel draft and can post in the suggested thread', async ({ juno, fake, userData }) => {
+// The thread suggestion goes first, for the same reason: the audience step's drafts start wrong-place checks.
+test('Home checks a channel draft, posts in the suggested thread, and warns about the audience of the chosen channel', async ({ juno, fake, userData }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await juno.tabs.newTabButton.click()
-  await juno.write.pickConversation('eng', 'eng')
-  const since = Date.now()
-  await juno.write.write(BILL_REPLY)
-  await routeAnswered(userData, fake.teamId, since)
-  await juno.write.send()
-  await expect(juno.write.root.getByText('Looks like a reply to', { exact: false })).toBeVisible()
-  expect(posts(fake)).toHaveLength(0)
-  await juno.write.send()
-  await expect.poll(() => posts(fake).length).toBe(1)
-  expect(posts(fake)[0]!.args['thread_ts']).toBeDefined()
-  expect(posts(fake)[0]!.args['text']).toBe(BILL_REPLY)
+  await test.step('Home checks a channel draft and can post in the suggested thread', async () => {
+    await juno.tabs.newTabButton.click()
+    await juno.write.pickConversation('eng', 'eng')
+    const since = Date.now()
+    await juno.write.write(BILL_REPLY)
+    await routeAnswered(userData, fake.teamId, since)
+    await juno.write.send()
+    await expect(juno.write.root.getByText('Looks like a reply to', { exact: false })).toBeVisible()
+    expect(posts(fake)).toHaveLength(0)
+    await juno.write.send()
+    await expect.poll(() => posts(fake).length).toBe(1)
+    expect(posts(fake)[0]!.args['thread_ts']).toBeDefined()
+    expect(posts(fake)[0]!.args['text']).toBe(BILL_REPLY)
+  })
+  await test.step('Home warns about the audience of the chosen channel', async () => {
+    await juno.tabs.newTabButton.click()
+    await juno.write.pickConversation('eng', 'eng')
+    await juno.write.write('The salary offer goes out Friday')
+    await expect(juno.write.root.getByText('This reads like hiring or people detail.', { exact: false })).toBeVisible()
+    await juno.write.pickConversation('hiring', 'hiring')
+    await expect(juno.write.root.getByText('This reads like hiring or people detail.', { exact: false })).toHaveCount(0)
+  })
 })
 
 test('a message with a mention gets its fix line, and Review opens it as the field showed it', async ({ juno, fake }) => {
@@ -281,17 +290,6 @@ test('Home sends local mistakes unchanged; the fix line waits on the message in 
   await juno.sidebar.row(ENG_MAIN).open()
   await juno.topic.expectSent(TYPOS)
   await expect(juno.win.locator('[data-send-suggestion]')).toContainText('recieve → receive')
-})
-
-test('Home warns about the audience of the chosen channel', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.tabs.newTabButton.click()
-  await juno.write.pickConversation('eng', 'eng')
-  await juno.write.write('The salary offer goes out Friday')
-  await expect(juno.write.root.getByText('This reads like hiring or people detail.', { exact: false })).toBeVisible()
-  await juno.write.pickConversation('hiring', 'hiring')
-  await expect(juno.write.root.getByText('This reads like hiring or people detail.', { exact: false })).toHaveCount(0)
 })
 
 
@@ -356,15 +354,16 @@ test.describe('with a grammar model that takes 5 seconds', () => {
     expect(posts(fake).map((call) => call.args['text'])).toEqual([text])
   })
 
-  test('a slow grammar answer shows its fix line after leaving the topic and coming back', async ({ juno }) => {
+  test('a slow grammar answer shows its fix line after leaving the topic and coming back', async ({ juno, fake, userData }) => {
     await juno.signIn()
     await juno.waitForSync()
     await juno.sidebar.row(POSTGRES).open()
+    const since = Date.now()
     await juno.topic.send('its broken')
     await juno.topic.expectSent('its broken')
     await juno.sidebar.row(RINA).open()
     // The answer comes while another topic shows: nothing appears there.
-    await juno.win.waitForTimeout(6_000)
+    await routeAnswered(userData, fake.teamId, since, 'grammarCheck')
     await expect(juno.win.locator('[data-send-suggestion]')).toHaveCount(0)
     await juno.sidebar.row(POSTGRES).open()
     await expect(juno.win.locator('[data-send-suggestion]')).toContainText("its → it's")
