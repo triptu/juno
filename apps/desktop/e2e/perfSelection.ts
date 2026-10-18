@@ -14,15 +14,22 @@ export interface DragReading {
   readonly dropped: number
   /** The page's `selectionchange` listeners: how many events, their time in all and the longest, ms. */
   readonly handlers: { readonly count: number; readonly total: number; readonly longest: number }
+  /** The page's animation frame callbacks, where work a listener puts off to the next frame runs: their time in all and the longest, ms. */
+  readonly frameCallbacks: { readonly total: number; readonly longest: number }
 }
 
-/** The `selectionchange` events the trace dispatched, with the time their listeners took. */
-function selectionChangeTime(json: string): DragReading['handlers'] {
-  const parsed = JSON.parse(json) as { readonly traceEvents: ReadonlyArray<{ name: string; ph: string; dur?: number; args?: { data?: { type?: string } } }> }
-  const start = parsed.traceEvents.find((e) => e.name === 'perf.sample.start')
-  const events = parsed.traceEvents.filter((e) => e.name === 'EventDispatch' && e.ph === 'X' && e.args?.data?.type === 'selectionchange')
-  const times = events.map((e) => (e.dur ?? 0) / 1000)
-  return start === undefined ? { count: 0, total: 0, longest: 0 } : { count: times.length, total: times.reduce((a, b) => a + b, 0), longest: Math.max(0, ...times) }
+type Event = { readonly name: string; readonly ph: string; readonly dur?: number; readonly args?: { readonly data?: { readonly type?: string } } }
+
+/** The `selectionchange` events the trace dispatched, with the time their listeners took, and the time in animation frame callbacks. */
+function listenerTime(json: string): Pick<DragReading, 'handlers' | 'frameCallbacks'> {
+  const events = (JSON.parse(json) as { readonly traceEvents: ReadonlyArray<Event> }).traceEvents
+  const ms = (list: ReadonlyArray<Event>) => list.map((e) => (e.dur ?? 0) / 1000)
+  const times = ms(events.filter((e) => e.name === 'EventDispatch' && e.ph === 'X' && e.args?.data?.type === 'selectionchange'))
+  const frames = ms(events.filter((e) => e.name === 'FireAnimationFrame' && e.ph === 'X'))
+  return {
+    handlers: { count: times.length, total: times.reduce((a, b) => a + b, 0), longest: Math.max(0, ...times) },
+    frameCallbacks: { total: frames.reduce((a, b) => a + b, 0), longest: Math.max(0, ...frames) },
+  }
 }
 
 /**
@@ -94,9 +101,9 @@ export async function selectionDragReading(win: Page, scroller: Locator, name: s
     sample = await win.evaluate(() => (window as unknown as { __dragSample: () => { frames: number[]; loaf: number } }).__dragSample())
   })
   const trace = frameWork(json)
-  const handlers = selectionChangeTime(json)
+  const { handlers, frameCallbacks } = listenerTime(json)
   const dropped = sample.frames.filter((f) => f > interval * 1.5).length / Math.max(1, sample.frames.length)
-  const reading = { work: trace.work, p95: percentile(trace.work, 0.95), loaf: sample.loaf, dropped, handlers }
-  console.log(`${name}: frame work p95 ${reading.p95.toFixed(1)} ms, median ${percentile(trace.work, 0.5).toFixed(1)} ms, max ${Math.max(0, ...trace.work).toFixed(1)} ms, n=${trace.work.length}, load ${loadavg()[0]!.toFixed(1)}${contention()}, dropped ${(dropped * 100).toFixed(1)} %, LoAF ${sample.loaf}; selectionchange: ${handlers.count} events, ${handlers.total.toFixed(1)} ms in all, longest ${handlers.longest.toFixed(2)} ms`)
+  const reading = { work: trace.work, p95: percentile(trace.work, 0.95), loaf: sample.loaf, dropped, handlers, frameCallbacks }
+  console.log(`${name}: frame work p95 ${reading.p95.toFixed(1)} ms, median ${percentile(trace.work, 0.5).toFixed(1)} ms, max ${Math.max(0, ...trace.work).toFixed(1)} ms, ${trace.work.reduce((a, b) => a + b, 0).toFixed(0)} ms in all, n=${trace.work.length}, load ${loadavg()[0]!.toFixed(1)}${contention()}, dropped ${(dropped * 100).toFixed(1)} %, LoAF ${sample.loaf}; selectionchange: ${handlers.count} events, ${handlers.total.toFixed(1)} ms in all, longest ${handlers.longest.toFixed(2)} ms; frame callbacks ${frameCallbacks.total.toFixed(1)} ms in all, longest ${frameCallbacks.longest.toFixed(2)} ms`)
   return reading
 }
