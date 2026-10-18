@@ -115,7 +115,7 @@ test('Topics and Tabs are in Tidy up; General keeps its remaining settings', asy
   await open(page, 'SettingsPage', 'sections/general')
   const general = await page.locator('[data-fixture-frame] section h2').allTextContents()
   expect(general).toEqual(['Peek', 'Links', 'Read status', 'Screen sharing', 'Message checks', 'AI assist'])
-  await open(page, 'SettingsPage', 'sections/tidy-up')
+  await open(page, 'SettingsPage', 'states/tidy-up')
   const tidyUp = await page.locator('[data-fixture-frame] section h2').allTextContents()
   expect(tidyUp.slice(0, 4)).toEqual(['Topics', 'Tabs', 'What Resolve does', 'Suggestions'])
   await expect(page.getByText('Show topics active in the last')).toBeVisible()
