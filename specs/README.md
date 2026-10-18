@@ -548,3 +548,54 @@ Validation on 2026-10-14 after the WP8 and WP9 alignment: the full root `pnpm sp
 `requestqueue.qnt` models per-method background clocks (a 1,500 ms method like history and a 6,000 ms one like search), the total background ceiling (500 ms, 120/minute), the interactive bucket (20 tokens, 2/second), and unpaced sends. Each tick is 125 ms; four credits make one interactive token. Retry-After doubles a method interval once per pause window up to 60 s; five quiet minutes halve it down to that method's base. `methodSpacingStep` starts one method again at once while the other waits: the other goes after the ceiling, the first only after its own spacing (`methodSpaced`); `methodSpacingBugStep` checks only the ceiling and must break it. Admission follows the lane wait. `invariants` checks pauses, background deadlines, token bounds and interval bounds. The simulation does not model HTTP latency, lane fairness or Slack's actual limits; fake-server tests check the dispatch timestamps. Existing follow/read/catch-up models already permit reordered HTTP responses and make no fixed-spacing assumption.
 
 `discovery.qnt` describes a partial search page with a root and reply, or a reply alone. Applying root metadata first avoids a lookup only in the first case. Search leaves reaction and follow state unchanged. The cold boot's preview search (`searchPreviews`) applies its pages the same way, so the same rules hold for it. A reply a search page stored is partial (no reactions, files or blocks): opening its thread does not count it as stored, so the open fetches the replies page that brings it in full (`openedHasFull`; `partialOpenBugStep` counts the match as stored and must produce a counterexample). `lateIndexedStep` models a reply that Slack indexes after Juno advances its local cursor, with a timestamp three units before it. The five-unit overlap retains the reply; the exact-cursor bug drops it. The model abstracts the counters and lookup success; it does not prove search completeness or replace the merge tests.
+
+## Huddle lifecycle
+
+`huddle.qnt` specifies the future `Huddle` service in `@juno/huddle`, for one user, two channels/rooms and three fresh attendee IDs. Its queue holds at most two room frames. Start and Join both call `rooms.join`; successful answers carry a channel, call and attendee identity. A switch waits for the old leave to be sent and media to stop before issuing the next join. A leave during a request cancels its intent, not its response handler: a successful late answer still needs cleanup.
+
+The independent actors are the user, Slack HTTP, renderer/Chime, and socket delivery. The model includes quit, crash and restart; join errors; unawaited leave answers (`ok` or `feature_not_enabled`); delayed renderer stop reports; Chime eviction (`AudioJoinedFromAnotherDevice`) and connection loss; late, duplicate and unrelated `sh_room_join`, `sh_room_leave` and `sh_room_update`; reconnect; `Overflowed`; and `huddles/info` request snapshots, failures and stale answers. `pending` is durable. Intent, in-flight HTTP and queued socket frames are volatile. `received`, `sent`, `stopped`, `handed` and `cancelled` are checker history, not proposed database columns.
+
+### States and service events
+
+| Model | Future service |
+| --- | --- |
+| `idle`, `choose`, `requestJoin` | Accept Start/Join, remember its channel, and issue one request after cleanup. |
+| `joining`, `answerJoin`, `joinError`, `startMedia` | Await Slack, durably record the returned identity, then hand credentials to media. Receiving credentials and starting media are separate steps. |
+| `joined`, `forcedStop`, `reportStop` | Own one session; accept renderer reports tagged with its attendee/call identity. A report from a previous session does nothing. |
+| `leaving`, `leave`, `quit`, `sendLeave`, `stopMedia`, `clearLeave` | Cancel intent, send the leave, confirm stopped media, then delete the pending record. Never wait for the HTTP answer. |
+| `crash`, `restart` | Lose process state and stop local media, replay durable records before joining again. A send before a crash can be sent again. |
+| `roomFrame`, `disconnect`, `reconnect`, `overflow` | Invalidate the running list. Room frames never end local media. |
+| `fetchInfo`, `answerInfo`, `infoError` | Fetch a snapshot; discard answers invalidated by a later socket gap or frame, and refetch. |
+
+`phase` is the UI-facing lifecycle. During cancellation it can say leaving while the original join request is still outstanding. `current` is the engine's active identity; `media` also includes a session that has not yet acknowledged stop. Checking both prevents a switch from hiding overlapping sessions behind an idle UI.
+
+### Properties and checks
+
+| Requirement | Safety predicate and directed trace |
+| --- | --- |
+| No ghost | `noGhost`: every received identity has a pending record or a sent leave; handed-out media remains covered until stopped; drained work is cleaned. `ghostStep` crashes live media; `crashBeforeMediaStep` and `crashAfterLeaveStep` cover the two sides of handoff and a repeated leave on restart. |
+| One call | `oneCall`: at most one media session, no join request overlaps one, and a request starts only after pending cleanup. `oneCallStep` switches channels. |
+| Leave during join | `leaveDuringJoin`: a cancelled response never becomes current or gets credentials; after drain its leave was sent. `cancelStep` leaves before the success answer. |
+| No stale leave | `noStaleLeave`: room delivery preserves current identity. `staleStep` switches, delivers an old-room leave, then an earlier-attendee leave in the current room twice. The attendee field is checker provenance, not a field claimed to exist on Slack's frames. |
+| Matching state | `matchingState`: a valid snapshot matches Slack if Slack has not changed since capture; after quiet recovery, the running lists agree. `overflowStep` loses a queued change; `reconnectStep` discards a response from before a disconnect. |
+| Other device | `otherDevice`: after the engine receives the eviction report it has no current call, requested join or queued join intent. `otherDeviceStep` reconnects the socket after eviction without joining again. Only a new user Start/Join clears this condition. |
+
+`quitStep` covers a benign leave error before media stops; `connectionLostStep` covers a terminal Chime connection loss; `refusedStep` covers a failed join. Each corrected schedule must witness `reachedAgreement`. Six guarded `BugStep` schedules disable one rule apiece (durable recording, switch serialization, cancellation, frame isolation, overflow refresh, eviction handling), and the runner requires their named invariant to fail. These are deliberate mutation checks; normal transitions use the corrected rules.
+
+`pnpm remote specs:check --huddle` selects this model. The normal suite includes it. The runner typechecks it, samples 1,000 random traces of at most 96 steps, and runs 12 corrected schedules plus six expected counterexamples. `--traces` reduces random sampling to 100. No Apalache job is added. This is sampled safety with a bounded recovery check, not exhaustive verification. The `seal` action stops new input/failures, asks to leave and assumes subsequent successful delivery. The real cleanup and fetch actions must finish within 32 steps. `eventualCleanup` and `eventualAgreement` state the corresponding fair-recovery temporal properties and are typechecked only, as in the other sync models.
+
+### Limits and plan clarifications
+
+- Cleanup liveness requires the user eventually leave (or quit/crash), the app eventually restart, and HTTP/media completion eventually make progress. A permanently live call is allowed; the model cannot promise cleanup while the user stays in it forever. A whole-app crash stops local renderer media immediately; the independent Slack list may still contain the attendee until Chime expires it. That server timeout is inferred, unmeasured and outside the checked cleanup bound. A leave send is not proof that Slack removed an attendee; on arch v2 Chime does that.
+- Successful response reception and the pending-record transaction are one model step. No local protocol can durably preserve an attendee ID if power fails between receiving the bytes and committing that ID. The guarantee therefore starts at durable receipt. IDs Slack created but Juno never durably learned are outside it. Before media handoff, a failed record write must keep credentials private and attempt cleanup. The plan's literal “every attendee received” is stronger than this implementable guarantee.
+- The live frames identify a user and room, not an attendee. The model conservatively refetches on all room frames and never treats a self-leave or absent member as authority to stop current media. Production can merge participants with separately validated ordering rules; those rules are outside this lifecycle model. The call-id/room-id relationship remains an unknown in the research.
+- Matching Slack immediately on every info answer is impossible under concurrent changes or a lagging endpoint. Snapshots are assumed authoritative at capture; equality is conditional on quiet Slack and a current recovery generation. A reconnect/overflow during a request invalidates it. Missing future events require another resync; this model does not claim completeness of Slack delivery or a polling interval.
+- Media codecs, permissions, devices, audio quality, screen share, participant merge, profile renewal, request encoding, workspace switching, credentials, storage failure and unknown HTTP join outcomes are excluded. A whole-app crash and a terminal media connection loss are modeled; independent renderer process recovery is not. Running huddles are a set of channels, so participant details and multiple call generations in that list are abstracted.
+
+### Implementation notes
+
+- Commit the channel, call and attendee pending-leave record before handing credentials to media. Keep the join response handler alive after cancellation and during orderly quit.
+- Serialize switches through leave send and confirmed media stop. Tag start/stop messages with session identity; reject stale starts and stop reports.
+- Send `rooms.leave` without awaiting its answer; stop media even on `feature_not_enabled`. Clear the record only after send and confirmed stop. Replay records before allowing a new join after restart; repeat sends are expected.
+- On `AudioJoinedFromAnotherDevice`, clear current and queued join intent and wait for a new user command. A socket reconnect must never restart media.
+- Subscribe to `SocketEvents` in the session scope. Treat `Overflowed` exactly as a recovery trigger; refetch after reconnect and discard an info response invalidated while in flight. Room frames alone cannot identify the current attendee.

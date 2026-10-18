@@ -18,6 +18,7 @@ const recoveryOnly = process.argv.includes('--recovery')
 const actionsOnly = process.argv.includes('--actions')
 const memoryOnly = process.argv.includes('--memory')
 const boundedOnly = process.argv.includes('--bounded')
+const huddleOnly = process.argv.includes('--huddle')
 const outboxOnly = process.argv.includes('--outbox')
 const backend = process.env.QUINT_SIMULATOR ?? 'rust'
 const seed = '20261013'
@@ -332,12 +333,12 @@ const regressions = [
 // Specs whose corrected runs must reach their drained agreement.
 const drained = new Set(['outbox', 'catchup', 'metadata'])
 
-const selectedSpec = actionsOnly ? 'agent-actions.qnt' : recoveryOnly ? 'agent-recovery.qnt' : memoryOnly ? 'agent-memory.qnt' : outboxOnly ? 'outbox.qnt' : undefined
+const selectedSpec = huddleOnly ? 'huddle.qnt' : actionsOnly ? 'agent-actions.qnt' : recoveryOnly ? 'agent-recovery.qnt' : memoryOnly ? 'agent-memory.qnt' : outboxOnly ? 'outbox.qnt' : undefined
 for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith('.qnt') && (!selectedSpec || name === selectedSpec || (recoveryOnly && name === 'agent-recovery-replay.qnt'))).toSorted()) {
   quint(['typecheck', `specs/${file}`])
 }
 
-if (!memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
+if (!huddleOnly && !memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
   for (const file of (outboxOnly ? ['outbox'] : ['follow', 'readstate', 'outbox', 'catchup', 'requestqueue', 'discovery', 'metadata', 'quietwindow'])) {
     simulate(file, 'simulationStep', 'invariants', `${file}.itf.json`, false, true,
       drained.has(file) ? { witnesses: ['reachedAgreement'] } : {})
@@ -368,8 +369,24 @@ if (!memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
   }
 }
 
+if (!outboxOnly && !memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
+  simulate('huddle', 'simulationStep', 'invariants', 'huddle.itf.json', false, true,
+    { samples: tracesOnly ? 100 : 1000, steps: 96, witnesses: ['reachedAgreement'] })
+  const pairs = [
+    ['ghost', 'noGhost'], ['oneCall', 'oneCall'], ['cancel', 'leaveDuringJoin'],
+    ['stale', 'noStaleLeave'], ['overflow', 'matchingState'], ['otherDevice', 'otherDevice'],
+  ]
+  for (const [schedule, invariant] of pairs) {
+    simulate('huddle', `${schedule}BugStep`, invariant, `huddle-${schedule}-bug.itf.json`, true)
+  }
+  for (const schedule of [...pairs.map(([name]) => name), 'quit', 'reconnect', 'connectionLost', 'refused', 'crashBeforeMedia', 'crashAfterLeave']) {
+    simulate('huddle', `${schedule}Step`, 'invariants', `huddle-${schedule}.itf.json`, false, false,
+      { samples: 1, steps: 48, witnesses: ['reachedAgreement'], requireCompletion: true })
+  }
+}
+
 // WP2 uses real transactions for both random runs and directed failure pairs.
-if (!outboxOnly && !boundedOnly && !actionsOnly && !recoveryOnly) {
+if (!huddleOnly && !outboxOnly && !boundedOnly && !actionsOnly && !recoveryOnly) {
   const memoryOptions = { main: 'agent_memory' }
   simulate('agent-memory', 'simulationStep', 'invariants', 'agent-memory.itf.json', false, true,
     { ...memoryOptions, samples: tracesOnly ? 100 : 1000, steps: 140 })
@@ -414,7 +431,7 @@ if (!outboxOnly && !boundedOnly && !actionsOnly && !recoveryOnly) {
   }
 }
 
-if (!outboxOnly && !boundedOnly && !memoryOnly && !recoveryOnly) {
+if (!huddleOnly && !outboxOnly && !boundedOnly && !memoryOnly && !recoveryOnly) {
   simulate('agent-actions', 'step', 'undoSurvivesRedelivery', 'resolve-corrected.itf.json', false, false, { main: 'agent_resolve', samples: 1, steps: 4 })
   simulate('agent-actions', 'bugStep', 'undoSurvivesRedelivery', 'resolve-bug.itf.json', true, false, { main: 'agent_resolve', samples: 1, steps: 4 })
   const gate = { main: 'agent_host_gate', samples: 200, steps: 12 }
@@ -446,7 +463,7 @@ if (!outboxOnly && !boundedOnly && !memoryOnly && !recoveryOnly) {
   simulate('agent-actions', 'overReportStep', 'strictCap', 'actions-overReport-strictCap.itf.json', true, false, options)
 }
 
-if (!outboxOnly && !boundedOnly && !memoryOnly && !actionsOnly) {
+if (!huddleOnly && !outboxOnly && !boundedOnly && !memoryOnly && !actionsOnly) {
   simulate('agent-recovery-replay', 'suiteStep', 'safety', 'recovery-replay-corrected.itf.json', false, true,
     { init: 'suiteInit', samples: 64, steps: 40,
       witnesses: ['reachedAgreement', 'case0', 'case1', 'case2', 'case3'], requireCompletion: true })
@@ -474,7 +491,7 @@ if (!outboxOnly && !boundedOnly && !memoryOnly && !actionsOnly) {
   }
 }
 
-if (!tracesOnly && !outboxOnly) {
+if (!huddleOnly && !tracesOnly && !outboxOnly) {
   // Find a working Java: PATH first, then JAVA_HOME, then Homebrew's keg-only JDKs.
   // macOS ships a /usr/bin/java stub that fails when no JDK is installed.
   const javaCandidates = [
