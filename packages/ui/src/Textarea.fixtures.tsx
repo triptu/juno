@@ -35,6 +35,15 @@ export default defineFixtures(
     Card: {
       card: fixture({ variant: 'card', defaultValue: 'The Wednesday slot works for eng.', label: 'Message' }),
     },
+    Field: {
+      field: fixture({ variant: 'field', defaultValue: 'Works from Lisbon, usually 9:30 to 18:00.', label: 'Note' }),
+      'field-long': fixture({
+        variant: 'field',
+        defaultValue: 'Maya Chen: owns the Postgres 16 migration plan and the cutover runbook; reviews backfill PRs the same day.\nPrefers a short summary of the risk at the top.',
+        label: 'Note',
+      }),
+      'field-focused': fixture({ variant: 'field', defaultValue: 'Works from Lisbon, usually 9:30 to 18:00.', label: 'Note' }, { width: 360, focus: 'textarea' }),
+    },
     Composer: {
       composer: scene(() => <Composer dimmed />),
       'composer-grown': scene(() => (

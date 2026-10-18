@@ -34,6 +34,11 @@ export const cell = stylex.create({
   wrap: {
     textWrap: 'pretty',
   },
+  // A note or pin keeps the line breaks typed with Shift+Return.
+  note: {
+    textWrap: 'pretty',
+    whiteSpaceCollapse: 'preserve-breaks',
+  },
   // A chip that ends a row, in a card whose other rows end with xs ghost
   // buttons, ends where their text ends: their 8px padding and 1px border in from the
   // row's 15px inset, 24px from the card's edge.

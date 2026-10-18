@@ -1,8 +1,9 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import { chatCopy, type MemoryChange, type MemoryDoc, type MemoryDocsPage as MemoryDocsPageModel, type MemoryEntryId, type MemoryEntryRow, type MemorySource } from '@juno/agent-contract'
-import { Button, ListRow, Page, PageHeader, Section, Surface, Text, TextField, tooltip } from '@juno/ui'
+import { Button, ListRow, Page, PageHeader, Section, Surface, Text, tooltip } from '@juno/ui'
 import { cell } from './cell'
+import { NoteField } from './NoteField'
 import { fullTime, messageTime } from '../time'
 
 /** The note under edit, or the new one being added to a doc, with its draft. The draft is the renderer's. */
@@ -132,7 +133,7 @@ function EntryRow({ entry, now, last, onEditStart, onDelete }: { readonly entry:
       }
     >
       <span {...stylex.props(cell.lines)}>
-        <Text variant="body" selectable dir="auto" sx={cell.wrap}>
+        <Text variant="body" selectable dir="auto" sx={cell.note}>
           {entry.text}
         </Text>
         <Text variant="meta" tone="muted" truncate>
@@ -149,7 +150,7 @@ function EditRow({ label, editing, onDraftChange, onSave, onCancel, last = false
   return (
     <ListRow role="listitem" data-memory-entry-editing="" divider={!last}>
       <span {...stylex.props(cell.field)}>
-        <TextField size={32} label={label} value={editing.draft} onChange={(event) => onDraftChange(event.currentTarget.value)} dir="auto" />
+        <NoteField label={label} draft={editing.draft} onDraftChange={onDraftChange} onSave={onSave} onCancel={onCancel} />
         {editing.error === undefined ? null : (
           <Text variant="meta" tone="muted" data-memory-error="">
             {editing.error}

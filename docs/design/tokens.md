@@ -536,6 +536,8 @@ Two-line picker row (the topic switcher, New chat's pickers): 44px, a 20px title
 
 Single line 40px; grows to `max-height` then scrolls inside. Prototype max is 184px (7.5 lines of 22px plus 18px padding). SPEC says "about 8 lines"; [proposed] `--composer-max-height: 194px` (9 + 8×22 + 9). Juno input max 160px.
 
+A field Textarea (a note or pin under edit on What Juno remembers) grows the same way to 176px, a constant in `Textarea.tsx`: 8 lines of ui text (13.5 × 1.5) plus its 6px insets and 1px border.
+
 ## 6. Shadows and rings
 
 | Token | Light | Dark | Source | Use |
