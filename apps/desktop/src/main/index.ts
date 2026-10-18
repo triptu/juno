@@ -394,10 +394,7 @@ if (e2e) {
         screenClockForTests += ms
       },
       flushCoverage: () => flushAllCoverage(),
-      // A stray rejected promise in main, which must be logged and leave the app running (processLog.ts).
-      rejectInMain: () => {
-        void Promise.reject(new Error('rejected for a test'))
-      },
+      rejectInMain: () => void Promise.reject(new Error('rejected for a test')),
     },
   })
 }
