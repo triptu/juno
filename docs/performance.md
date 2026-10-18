@@ -1564,32 +1564,51 @@ counts and 2,317 cursor reads. The pass also opened and committed 3,462
 transactions. Unchanged views still rewrote merge, reaction, read, follow,
 cursor and index rows.
 
-The revised pass compares each ten-row page with six batched store reads.
-An unchanged page advances only an in-memory follow observation fence. It
-does not rename users, rewrite rows or invalidate queries. A changed or
-uncertain view still uses the normal merge path, including the request-time
-guard that stops an older page from undoing a realtime follow change. The
-history part of the sweep compares `client.counts` with all stored channel
-ranges in one query and skips channels whose latest timestamp did not move.
-The periodic cursor remains in memory instead of rewriting the boot record.
+The revised follow pass compares the fetched pages with six batched store
+reads; its hourly full-window scan takes one store snapshot instead of six
+reads per page. An unchanged view advances only an in-memory follow
+observation fence. It does not rename users, rewrite rows or invalidate
+queries. A changed or uncertain view still uses the normal merge path,
+including the request-time guard that stops an older page from undoing a
+realtime follow change. The history part of the sweep compares
+`client.counts` with all stored channel ranges in one query and skips
+channels whose latest timestamp did not move. The periodic cursor remains
+in memory instead of rewriting the boot record.
 
-A counter-only replay of the same 114-page pass ran 1,792 statements, 33.7
-times fewer than the baseline and below the 12,000-statement budget. It
-opened 150 transactions. The later removal of user-name lookups from
-certified pages reduces this further; the reported result keeps the measured
-1,792 count. A fake-server behavior test observes SQLite from a second
-connection: a sweep with no server change leaves `PRAGMA data_version`
-unchanged, then a silently posted reply is present after the next sweep.
-This tests no writes and missed-event repair without fixing a statement count
-in the test.
+A counter-only replay of the same 114-page full follow pass ran 1,792
+statements, 33.7 times fewer than the baseline, and opened 150 transactions.
+That pass is hourly in production. The fake-server desktop had instead
+forced it into every ten-minute catch-up, which made the large-seed idle gate
+measure hourly repair work as an ordinary sweep. The fake now keeps the
+production cadence; focused sync tests still set `followPassMillis: 0` when
+they need every cycle to reconcile follows.
+
+The ordinary ten-minute sweep uses incremental counts, history only for a
+conversation whose latest timestamp moved, and newest-first discovery. It
+does not also scan followed threads; the hourly pass keeps repair of missed
+follow and thread-read events. Search accepts only a date, so it can return
+messages before the exact sync cursor. Those older matches are now discarded
+before merge work. A counter interval containing exactly one unchanged
+large-seed sweep ran 67 statements in total, including unrelated scheduled
+engine reads: 901 times fewer than 60,388. It made one counts read and one
+search read, and no `getView` call. The final minified Mac desktop run made
+the same sweep plus one history and four reply reads for its open tabs. Its
+engine used 0.2% of one core over the 60-second sweep window, down from the
+3.0% unprofiled baseline; the following minimized and hidden windows used
+0.2% and 0.1%. The focused Mac test passed with exit 0.
+
+A fake-server behavior test observes SQLite from a second connection: a
+sweep with no server change leaves `PRAGMA data_version` unchanged, then a
+silently posted reply is present after the next sweep. This tests no writes
+and missed-event repair without fixing a statement count in the test.
 
 The statement counter records every SQLite statement by normalized SQL text.
 It was installed only for the measured minute and removed afterwards. The
 baseline evidence is `/Volumes/AgentWork/engine-idle-evidence/activity.json`.
 An earlier full-desktop revised trace is
-`/Volumes/AgentWork/sync-sweep-after/activity.json`; the isolated 1,792-count
-probe printed its result and was then removed. These are single runs, not a
-timing distribution.
+`/Volumes/AgentWork/sync-sweep-after/activity.json`; the isolated 1,792- and
+67-statement probes printed their results and were then removed. These are
+single runs, not a timing distribution.
 
 **Seeing it next time.** Settings › About › Diagnostics lists each process with Juno's name and Electron's type, its CPU over the last few seconds and its memory, and **Copy diagnostics** puts a plain-text report on the clipboard (SPEC 14). Main samples every 15 s and logs one line when a process stays above 30 % of a core for 2 minutes while the window has no input and no sync runs, with the window's state and the view; the report repeats the last such line.
 

@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-18 21:29 · sync-sweep-cadence · Keep the fake server on the production hourly follow-pass cadence; ten-minute sweeps repair moved messages from counts and discovery, while focused tests may force a follow pass on every cycle.
 - 10-18 20:01 · sync-sweep-noop · Certify unchanged `getView` rows from batched store reads, keep their follow observation clock in the workspace session, and use the existing merge path for changed or uncertain rows.
 - 10-18 18:23 · idle-sweep-window · Keep the 3% idle engine budget; print a window containing a successful scheduled discovery sweep and replace it once with a settled window containing no Slack calls, so scheduled sync work is not mistaken for an idle loop.
 - 10-18 18:12 · idle-log-flush · Flush process logs 250 ms after a line arrives and leave no timer for an empty buffer; the minimized-engine profile counted 239 empty-buffer interval wakes in one minute.
