@@ -11,9 +11,70 @@ wait for runner capacity without a deadline.
 Use an amd64 host with enough RAM for the configured jobs. An 8-core limit with
 16 GB available to Linux is a reasonable starting point. The host's
 `~/.config/juno-runner/cores` file is the total capacity across all clients.
-Use the same Linux account from every client. Jobs reserve the cores in their
-requested machine shape and release their reservation after Docker stops. Each job has its own container
+Use the same Linux account from every client. Small jobs reserve 2 cores:
+`test` (including named files), `test:agent*`, `specs:check`, and any
+`test:plan` without an app step. App jobs reserve 4 cores: `test:desktop`,
+`test:gallery`, `test:e2e`, and plans containing any of them. Other scripts
+keep the 8-core default. `--machine` or `JUNO_REMOTE_MACHINE` overrides the
+reservation. Defaults shrink to fit a smaller host; explicit sizes fail if
+they exceed its capacity. Namespace, including fallback, keeps its 8x16
+default and its existing pool.
+
+Jobs release their reservation after Docker stops. Each job has its own container
 and output directory. A host lock protects reservations. Jobs stop after 3 hours.
+
+Workers use the reservation in `JUNO_RUNNER_JOB_CORES`, since `nproc` can see
+all host threads despite Docker's CPU limit. A standalone 2-core `test` job uses
+two vitest workers and one package at a time. A standalone 4-core app job uses
+two desktop workers or three gallery workers and shift parts. Quint uses
+one simulation per two cores and one Apalache checker per four, at least one
+each. In a plan with several lanes, 4 cores give the app two desktop or three
+gallery workers, the unit lane one worker in one package, and the spec lane
+one simulation plus one checker. Step environment settings still win.
+
+## Laptop measurements
+
+Measured on 2026-10-19 on the owner's Linux x86_64 laptop with 24 threads and
+30 GiB RAM. One successful run per size, sequentially, with the image already
+present. Script time excludes setup, workspace linking and report download,
+but includes each app build. CPU busy is the two-second cgroup average divided
+by reserved cores. Peak memory is cgroup v2 `memory.peak` for the container's
+lifetime, including file cache, reported as GiB here.
+
+| Work | 8 cores: script / CPU busy / peak GiB | New size: script / CPU busy / peak GiB |
+| --- | --- | --- |
+| App plan: 54 unit tests and 21 desktop tests | 72 s / 41% / 4.07 | 4 cores: 86 s / 72% / 2.76 |
+| Unit files: 54 tests | 46 s / 11% / 1.25 | 2 cores: 46 s / 44% / 1.21 |
+| Gallery shift slice | 33 s / 36% / 2.65 | 4 cores: 38 s / 57% / 1.85 |
+
+The app plan used two desktop workers at 4 cores and four configured at 8
+(three active, one per selected spec). Its unit lane used one and two workers,
+respectively. Standalone unit runs used two and eight configured vitest workers,
+with one package at a time. The gallery used three workers and shift parts at
+4 cores, six at 8. `GALLERY_SHIFT_ONLY=Chip` limited the shift guard; the other
+41 tests in `shift.spec.ts` also ran, giving 44 and 47 passing tests. All tests
+passed without test retries. These slices establish a sizing baseline, not concurrent
+full-suite throughput.
+
+Reproduce the small sizes:
+
+```sh
+JUNO_REMOTE_MAX_VCPU=0 pnpm remote test:plan test --passWithNoTests test/messages.test.ts test/reads.test.ts + test:desktop e2e/app.spec.ts e2e/topic.spec.ts e2e/send.spec.ts
+JUNO_REMOTE_MAX_VCPU=0 pnpm remote test --passWithNoTests test/messages.test.ts test/reads.test.ts
+JUNO_REMOTE_MAX_VCPU=0 pnpm remote --env GALLERY_SHIFT_ONLY=Chip test:gallery shift.spec.ts
+```
+
+Run each command separately. Insert `--machine linux/amd64:8x16` immediately
+after `remote` for the 8-core comparison. These commands forbid Namespace
+fallback during measurement.
+
+The laptop now lends 20 cores in `~/.config/juno-runner/cores`, leaving four
+hardware threads for the owner's desktop. Five 4-core app jobs at the measured
+2.76 GiB peak use about 13.8 GiB; ten 2-core unit jobs at 1.21 GiB use about
+12.1 GiB. Both are below the roughly 24 GB job budget, leaving memory for Linux
+and the desktop. Admission allows five app jobs, ten small jobs, or mixtures
+with `4 * app + 2 * small <= 20`. This is a capacity estimate from sequential
+slices. Recheck memory on larger plans before raising the limit.
 
 ## Install Ubuntu on Windows
 
