@@ -16,13 +16,13 @@ const busy = atRest.map((row) => (row.name === 'Engine' ? { ...row, cpu: '101 %'
 
 export default defineFixtures(ProcessesView, {
   Data: {
-    'at-rest': fixture({ rows: atRest, onCopy }),
-    'engine-busy': fixture({ rows: busy, onCopy }),
+    'at-rest': fixture({ rows: atRest, onShowLogs: onCopy, onCopy }),
+    'engine-busy': fixture({ rows: busy, onShowLogs: onCopy, onCopy }),
     // Before main's first answer.
-    loading: fixture({ rows: [], onCopy }),
+    loading: fixture({ rows: [], onShowLogs: onCopy, onCopy }),
   },
   Copy: {
-    copied: fixture({ rows: atRest, copied: 'Copied', onCopy }),
-    failed: fixture({ rows: atRest, copied: 'Could not copy', onCopy }),
+    copied: fixture({ rows: atRest, copied: 'Copied', onShowLogs: onCopy, onCopy }),
+    failed: fixture({ rows: atRest, copied: 'Could not copy', onShowLogs: onCopy, onCopy }),
   },
 })

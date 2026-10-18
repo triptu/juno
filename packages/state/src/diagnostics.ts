@@ -7,8 +7,11 @@
  */
 import { Effect, Schema } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
-import { AppState, Diagnostics, type AppInfo, type ProcessReading } from '@juno/contract'
+import { AppState, Diagnostics, LogDiagnostics, engineOutbox, type AppInfo, type ProcessReading } from '@juno/contract'
 import type { JunoBridge } from '@juno/contract/channels'
+import { command } from './atoms'
+import * as AtomRegistry from 'effect/reactivity/AtomRegistry'
+import { registry } from './client'
 import { engineStatusAtom } from './engine'
 import { junoPanelViewAtom } from './junoPanel'
 import { activeTab, currentPlace, tabsAtom, type Place, type Tabs } from './tabs'
@@ -64,6 +67,28 @@ export const readDiagnostics = Effect.tryPromise({
   try: () => window.juno.app.diagnostics(),
   catch: (cause) => new Error('app.diagnostics failed', { cause }),
 }).pipe(Effect.flatMap(Schema.decodeUnknownEffect(Diagnostics)))
+
+async function readOutbox() {
+  const atom = command(engineOutbox)
+  const unmount = registry.mount(atom)
+  registry.set(atom, undefined)
+  return Effect.runPromiseExit(AtomRegistry.getResult(registry, atom, { suspendOnWaiting: true }).pipe(Effect.timeout(2_000))).finally(unmount)
+}
+
+export async function diagnosticDetails(): Promise<string> {
+  const [logs, outbox] = await Promise.all([
+    window.juno.app.logDiagnostics().then(Schema.decodeUnknownSync(LogDiagnostics)),
+    readOutbox(),
+  ])
+  return [
+    logs.osVersion,
+    'Outbox counts by kind and state:',
+    ...(outbox._tag === 'Failure' || outbox.value === null ? ['  Unavailable'] : outbox.value.length === 0 ? ['  Empty'] : outbox.value.map((row) => `  ${row.kind} ${row.state}: ${row.count}`)),
+    ...logs.logs.flatMap((log) => ['', `${log.process}: last 50 warnings and errors`, ...(log.lines.length ? log.lines : ['  None'])]),
+  ].join('\n')
+}
+
+export async function showLogs(): Promise<void> { await window.juno.app.showLogs() }
 
 /** "12.3 %" with one decimal under 10 and none above. */
 export const formatCpu = (cpu: number): string => `${cpu < 10 ? cpu.toFixed(1) : cpu.toFixed(0)} %`

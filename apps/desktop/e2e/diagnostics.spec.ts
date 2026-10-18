@@ -1,0 +1,66 @@
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { CONVERSATIONS } from '@juno/fake-slack'
+import { Juno } from './driver/juno'
+import { expect, launchApp, test } from './fixtures'
+
+const LOG_LIMIT = 5 * 1024 * 1024
+const processes = ['Main', 'Window', 'Engine', 'Juno agent', 'Graphics', 'Network']
+
+test('About shows every process, copies content-free diagnostics and rotates each process log', async ({ fake, slackApp, userData }, testInfo) => {
+  test.setTimeout(120_000)
+  const folder = join(userData, 'logs')
+  await mkdir(folder, { recursive: true })
+  for (const name of ['main', 'engine', 'agent']) {
+    // A full previous log makes the real process writer rotate on its first append.
+    const warning = `2026-10-18T00:00:00.000Z WARN ${name} outbox row failed rowId=42\n`
+    await writeFile(join(folder, `${name}.log`), ' '.repeat(LOG_LIMIT - warning.length - 1) + '\n' + warning)
+  }
+  const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, agent: true })
+  try {
+    const { app, win } = running
+    const juno = new Juno(app, win)
+    await juno.signIn()
+    await juno.waitForSync()
+    await juno.sidebar.row('Draft plan is in the doc').open()
+    fake.forceError({ method: 'chat.postMessage', error: 'restricted_action' })
+    await juno.topic.send('Diagnostics private draft must never be logged')
+    await expect(juno.topic.failed('Diagnostics private draft must never be logged').row).toContainText('Not sent.')
+    await juno.openSettings('About')
+    const table = win.getByRole('region', { name: 'Processes' })
+    for (const name of processes) await expect(table.locator(`[data-process="${name}"]`)).toBeVisible()
+    await win.getByRole('button', { name: 'Copy diagnostics', exact: true }).click()
+    await expect(win.getByText('Copied', { exact: true })).toBeVisible()
+    const report = await app.evaluate(({ clipboard }) => clipboard.readText())
+    expect(report).toContain('Juno diagnostics')
+    expect(report).toContain('Outbox counts by kind and state:')
+    expect(report).toContain('post failed: 1')
+    expect(report).not.toContain('Diagnostics private draft must never be logged')
+    expect(report).toMatch(/macOS|linux|win32/)
+    for (const name of processes) expect(report).toContain(name)
+    for (const name of ['main', 'engine', 'agent']) {
+      expect(report).toContain(`${name}: last 50 warnings and errors`)
+      expect(report).toContain(`WARN ${name} outbox row failed rowId=42`)
+      await expect.poll(async () => (await stat(join(folder, `${name}.log`))).size).toBeGreaterThan(0)
+      expect((await stat(join(folder, `${name}.log`))).size).toBeLessThan(LOG_LIMIT)
+      expect((await stat(join(folder, `${name}.log.1`))).size).toBe(LOG_LIMIT)
+      const log = await readFile(join(folder, `${name}.log`), 'utf8')
+      expect(log).toContain('INFO')
+      for (const conversation of CONVERSATIONS) {
+        for (const message of conversation.messages) {
+          if (message.text.length > 15) { expect(report).not.toContain(message.text); expect(log).not.toContain(message.text) }
+        }
+      }
+    }
+    await win.getByRole('button', { name: 'Show logs in Finder' }).click()
+    await expect.poll(() => app.evaluate(() => (globalThis as unknown as { junoTest: { logsOpened: () => number } }).junoTest.logsOpened())).toBe(1)
+    for (const theme of ['light', 'dark'] as const) {
+      await juno.settings.show('Appearance')
+      await juno.settings.themeRadio(theme === 'light' ? 'Light' : 'Dark').click()
+      await juno.settings.show('About')
+      await table.scrollIntoViewIfNeeded()
+      await win.screenshot({ path: testInfo.outputPath(`about-${theme}.png`) })
+      await testInfo.attach(`about-${theme}`, { path: testInfo.outputPath(`about-${theme}.png`), contentType: 'image/png' })
+    }
+  } finally { await running.close() }
+})
