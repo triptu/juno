@@ -26,6 +26,10 @@ export function App() {
   const state = entry ? findState(entry, location.state) : undefined
   // Compact is the app's default density, so the gallery draws it unless the address or the state asks for Comfortable.
   const density = location.density ?? state?.frame.density ?? 'compact'
+  const titleLines = state?.frame.topicTitleLines ?? 'one'
+  useLayoutEffect(() => {
+    document.documentElement.style.setProperty('--topic-title-lines', titleLines === 'two' ? '2' : '1')
+  }, [titleLines])
   useLayoutEffect(() => applyTheme(location.theme, location.accent, density), [location.theme, location.accent, density])
 
   useEffect(() => {

@@ -28,6 +28,17 @@ const state = (row: TopicRowProps['row'], extra: Partial<TopicRowProps> = {}, fr
     frame,
   )
 
+const titleColumn = (lines: '1' | '2') => ({ ...column, '--topic-title-lines': lines })
+
+const titleScene = (lines: '1' | '2', density: 'compact' | 'comfortable') => scene<TopicRowProps>(() => (
+  <div style={titleColumn(lines)}>
+    <TopicRow {...one({ ...rows.postgres, title: 'Plan' })} />
+    <TopicRow {...one({ ...rows.postgres, id: 'fits', title: 'Plan the next release together this week' })} />
+    <TopicRow {...one(rows.long)} />
+    <TopicRow {...one(rows.mayaMain)} />
+  </div>
+), { density })
+
 const ROW = '[data-topic-row]'
 
 /** A DM's Main whose latest message is yours: the preview keeps "You:". */
@@ -59,6 +70,12 @@ export default defineFixtures(
       // Rename from the row's menu: the title is a field, preselected; no Resolve.
       renaming: state(rows.postgres, { renaming: true, onRename: noop, onRenameCancel: noop }),
       'renaming-selected': state(rows.roadmap, { renaming: true, selected: true, onRename: noop, onRenameCancel: noop }),
+    },
+    Titles: {
+      'one-line-compact': titleScene('1', 'compact'),
+      'two-lines-compact': titleScene('2', 'compact'),
+      'one-line-comfortable': titleScene('1', 'comfortable'),
+      'two-lines-comfortable': titleScene('2', 'comfortable'),
     },
     Tile: {
       art: state(rows.postgres),

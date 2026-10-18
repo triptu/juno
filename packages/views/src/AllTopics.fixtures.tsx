@@ -1,4 +1,4 @@
-import { defineFixtures, scene } from '@juno/ui'
+import { defineFixtures, scene, type FixtureFrame } from '@juno/ui'
 import { PrivacyOn } from './fixtures/privacy'
 import type { AllTopicsCounts, PickConversations, TopicRow } from '@juno/contract'
 import { AllTopics, AllTopicsPlaceholderRow, AllTopicsRow, type AllTopicsFilterState, type AllTopicsProps } from './AllTopics'
@@ -83,12 +83,16 @@ const props = (overrides: Partial<AllTopicsProps> & { readonly list?: ReadonlyAr
 
 const resolvedOnly = table.filter((row) => row.status === 'resolved')
 
-const page = (overrides?: Parameters<typeof props>[0], frame = { width: 1000, height: 640 }) =>
+const page = (overrides?: Parameters<typeof props>[0], frame: FixtureFrame = { width: 1000, height: 640 }) =>
   scene<AllTopicsProps>(() => <AllTopics {...props(overrides)} />, { ...frame, padded: false })
 
 export default defineFixtures(
   AllTopics,
   {
+    Titles: {
+      'one-line': page({ list: [rows.long, { ...rows.postgres, title: 'Plan' }, ...table] }, { width: 664, height: 640, topicTitleLines: 'one' }),
+      'two-lines': page({ list: [rows.long, { ...rows.postgres, title: 'Plan' }, ...table] }, { width: 664, height: 640, topicTitleLines: 'two' }),
+    },
     State: {
       default: page(),
       // Shot 40b: the Resolved chip.

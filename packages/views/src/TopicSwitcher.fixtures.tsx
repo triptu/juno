@@ -49,6 +49,10 @@ const styles = stylex.create({
 export default defineFixtures(
   TopicSwitcher,
   {
+    Titles: {
+      'one-line': fixture({ ...base, threads: [long, ...base.threads!] }, { ...frame, topicTitleLines: 'one' }),
+      'two-lines': fixture({ ...base, threads: [long, ...base.threads!] }, { ...frame, topicTitleLines: 'two' }),
+    },
     List: {
       thread: fixture(base, frame),
       main: fixture({ ...base, currentId: 'C0ENG:main' }, frame),

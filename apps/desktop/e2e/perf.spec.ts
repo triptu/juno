@@ -586,6 +586,12 @@ test.describe('large workspace', () => {
       await juno.signIn()
       await juno.sidebar.expectRows()
       await juno.expectEngineLive(600_000)
+      if (process.env['JUNO_PERF_TOPIC_TITLES'] === 'two') {
+        await juno.openSettings('Appearance')
+        await running.win.getByRole('radio', { name: 'Two lines', exact: true }).click()
+        await expect(running.win.locator('html')).toHaveAttribute('data-topic-title-lines', 'two')
+        await juno.home.open()
+      }
     } finally {
       await running.close()
     }
@@ -595,6 +601,35 @@ test.describe('large workspace', () => {
     await fake?.close()
     await rm(userData, { recursive: true, force: true })
     await rm(slackDir, { recursive: true, force: true })
+  })
+
+  test('launch warm start: show the hidden sidebar', async () => {
+    const running = await launch()
+    try {
+      const juno = new Juno(running.app, running.win)
+      const { win } = running
+      await juno.sidebar.expectRows()
+      await juno.expectEngineLive(120_000)
+      const samples: number[] = []
+      for (let i = 0; i < 8; i++) {
+        await juno.frame.toggleWithButton()
+        const show = win.getByRole('button', { name: /^Show sidebar/ }).locator('visible=true')
+        await show.evaluate((node) => {
+          const state = window as unknown as { sidebarReveal?: Promise<number> }
+          state.sidebarReveal = new Promise((resolve) => {
+            node.addEventListener('click', (event) => {
+              requestAnimationFrame(() => setTimeout(() => resolve(performance.now() - event.timeStamp), 0))
+            }, { once: true })
+          })
+        })
+        await show.click()
+        samples.push(await win.evaluate(() => (window as unknown as { sidebarReveal: Promise<number> }).sidebarReveal))
+        await juno.sidebar.expectRows()
+      }
+      within('show sidebar, p95', stats('show sidebar, click to frame presented', samples).p95, oneFrameBudget(await refreshInterval(win)))
+    } finally {
+      await running.close()
+    }
   })
 
   test('launch warm start: main process to shell and rows, snapshot to rows, the longest frame', async () => {
