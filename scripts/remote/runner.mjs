@@ -4,7 +4,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
-import { imageContext, imageTag } from './image.mjs'
+import { imageContext, toolchainTag } from './image.mjs'
 import { parsePlan } from '../plan.mjs'
 
 export const quote = (value) => `'${String(value).replaceAll("'", "'\\''")}'`
@@ -44,7 +44,7 @@ export function runnerConfig(env = process.env) {
     args.push('-p', String(port))
   }
   if (env.JUNO_RUNNER_IMAGE && !/^[\w.:/@-]+$/.test(env.JUNO_RUNNER_IMAGE)) throw new Error('JUNO_RUNNER_IMAGE must be a Docker image reference')
-  return { host, args: [...args, host], image: env.JUNO_RUNNER_IMAGE || `juno-remote:${imageTag()}`, build: !env.JUNO_RUNNER_IMAGE }
+  return { host, args: [...args, host], image: env.JUNO_RUNNER_IMAGE || `juno-toolchain:${toolchainTag()}`, build: !env.JUNO_RUNNER_IMAGE }
 }
 
 // Health checks fall back only when the transport cannot reach the host.
@@ -65,6 +65,12 @@ export function runnerCommand(cores, runId, command, env = process.env) {
   return `bash -c ${quote(script)} -- ${cores} ${quote(runId)} ${quote(command)} ${Number(env.JUNO_REMOTE_MAX_VCPU ?? 48) === 0 ? -1 : 60}`
 }
 
+export function runnerCache() {
+  return `cache="$HOME/.cache/juno-runner"; mkdir -p "$cache/pnpm-store" "$cache/runtime" "$HOME/.cache/electron" || exit 70; for path in "$cache/pnpm-store" "$cache/runtime" "$HOME/.cache/electron"; do [ "$(stat -c %u "$path")" = "$(id -u)" ] || { echo "runner: cache must belong to the SSH user: $path" >&2; exit 70; }; done; chmod 700 "$cache/runtime" || exit 70`
+}
+
+export const runnerMounts = '--user "$(id -u):$(id -g)" -e HOME=/tmp/juno-home -e JUNO_REMOTE_INSTALL=1 -e PNPM_CONFIG_STORE_DIR=/cache/pnpm-store -e PNPM_CONFIG_CACHE_DIR=/cache/pnpm-store/metadata -e XDG_RUNTIME_DIR=/cache/runtime -e electron_config_cache=/cache/electron -v "$HOME/.cache/juno-runner/pnpm-store:/cache/pnpm-store" -v "$HOME/.cache/juno-runner/runtime:/cache/runtime" -v "$HOME/.cache/electron:/cache/electron"'
+
 // The host lock covers both the presence check and build, across every client.
 const imageLock = 'mkdir -p "$HOME/.cache/juno-runner"; exec 9>"$HOME/.cache/juno-runner/image-build.lock"; flock -x 9'
 export async function ensureRunnerImage(config, log = console.error) {
@@ -72,12 +78,12 @@ export async function ensureRunnerImage(config, log = console.error) {
   const present = spawnSync('ssh', [...config.args, `docker image inspect ${quote(config.image)} >/dev/null 2>&1`], { encoding: 'utf8', timeout: 15_000 })
   if (present.error || present.status === 255) throw new Error(`runner image check failed: ${present.error?.message ?? present.stderr.trim()}`)
   if (present.status === 0) return config.image
-  const context = imageContext()
+  const context = imageContext(true)
   const started = Date.now()
   log(`remote: building ${config.image} on SSH runner (or waiting for another build)`)
   try {
     const tar = spawn('tar', ['-czf', '-', '--no-xattrs', '-C', context, '.'], { env: { ...process.env, COPYFILE_DISABLE: '1' }, stdio: ['ignore', 'pipe', 'pipe'] })
-    const ssh = spawn('ssh', [...config.args, `set -eu; ${imageLock}; if docker image inspect ${quote(config.image)} >/dev/null 2>&1; then cat >/dev/null; else docker build --progress=plain --platform linux/amd64 -t ${quote(config.image)} -; fi`], { stdio: ['pipe', 'pipe', 'pipe'] })
+    const ssh = spawn('ssh', [...config.args, `set -eu; ${imageLock}; if docker image inspect ${quote(config.image)} >/dev/null 2>&1; then cat >/dev/null; else docker build --target toolchain --progress=plain --platform linux/amd64 -t ${quote(config.image)} -; fi`], { stdio: ['pipe', 'pipe', 'pipe'] })
     let errors = ''
     const done = (child) => new Promise((resolvePromise, reject) => { child.on('error', reject); child.on('close', resolvePromise) })
     const tarDone = done(tar), sshDone = done(ssh)
@@ -105,7 +111,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   console.log(`runner: ${config.host} ready, ${health.cores} cores`)
   if (process.argv[2] === '--prune') {
     // Keep the current image and all images used by containers. Never force removal.
-    const command = `set -eu; ${imageLock}; images=$(docker image ls --format '{{.Repository}}:{{.Tag}}' juno-remote); for image in $images; do [ "$image" = ${quote(config.image)} ] || docker image rm "$image"; done; docker builder prune -f`
+    const command = `set -eu; ${imageLock}; images=$(docker image ls --format '{{.Repository}}:{{.Tag}}' --filter 'reference=juno-remote:*' --filter 'reference=juno-toolchain:*'); for image in $images; do [ "$image" = ${quote(config.image)} ] || docker image rm "$image"; done; docker builder prune -f`
     const pruned = spawnSync('ssh', [...config.args, command], { stdio: 'inherit' })
     if (pruned.status !== 0) throw new Error('runner image prune failed')
   } else {

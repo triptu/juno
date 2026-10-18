@@ -215,27 +215,35 @@ warm pool or its daemon. Namespace fallback still needs `nsc` on the Mac.
 
 ## Build and prune images on the runner
 
-The SSH backend uses `juno-remote:<tag>`, with the same Dockerfile, lockfile, and
-workspace hash as Namespace. When the tag is missing, the Mac streams the shared
-build context over SSH to `docker build`. The context contains the Dockerfile,
-lockfile, workspace file, package manifests, and `.npmrc` when present. The
-runner needs network access to the public base image and tool downloads, but
-needs neither `nsc` nor Namespace registry access.
+The SSH backend uses `juno-toolchain:<tag>`, built from
+`scripts/remote/Dockerfile.toolchain`. Its tag hashes the Dockerfile and the pinned Quint
+version from the root manifest. Lockfile and workspace changes do not rebuild it.
+The image holds Playwright, Node, pnpm, Java 21 and Quint's warm downloads.
+The build context contains only the Dockerfile and Quint's version.
+
+Each job installs its unpacked workspace with
+`pnpm install --frozen-lockfile --prefer-offline`, then checks Bun's pinned
+version. Missing packages download on a cold store. The log reports
+`remote: workspace installed in N s`. The host keeps pnpm's store at
+`~/.cache/juno-runner/pnpm-store` and Electron's downloads at `~/.cache/electron`.
+Jobs run as the SSH user's uid and reject cache directories owned by another
+user. They share `~/.cache/juno-runner/runtime` for pnpm's store locks.
+Each container keeps its own workspace and home directory.
 
 A host lock allows one build at a time. Another client waits, checks for the tag
 again, and reuses the completed image. Build step summaries and elapsed time
 appear in the run log. The 60-second capacity wait starts after the image is
 ready. Builds can take several minutes on first use.
 
-Run `pnpm runner:prune` on the Mac to remove old `juno-remote:*` tags and unused
+Run `pnpm runner:prune` on the Mac to remove old `juno-remote:*` and `juno-toolchain:*` tags and unused
 Docker build cache from the runner. It keeps the current tag and never forces
 removal of images referenced by containers. Stop old jobs before pruning if
-Docker reports an image is in use. The prune command shares the build lock.
+Docker reports an image is in use. The prune command shares the build lock and leaves the pnpm store and Electron cache alone.
 
 ## Use a prebuilt image instead
 
 `JUNO_RUNNER_IMAGE` optionally selects an image already present on the runner.
-It disables automatic building. A missing override image is an error.
+It disables automatic building and the per-run install. The full image must already contain the workspace dependencies; the job only links them offline. A missing override image is an error.
 Transfer a `docker save` archive and run `docker load < juno-remote.tar`, or pull
 an image from a registry. For Namespace's private registry, install `nsc` on the
 laptop, run `nsc login` and `nsc docker login` interactively, then run:

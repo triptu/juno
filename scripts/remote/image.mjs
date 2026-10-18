@@ -9,6 +9,14 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 /** The image is named by what goes into it: the Dockerfile, the lockfile and the workspace file. */
 const imageInputs = ['scripts/remote/Dockerfile', 'pnpm-lock.yaml', 'pnpm-workspace.yaml']
+export function toolchainVersions(directory = root) {
+  return { quint: JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8')).devDependencies['@informalsystems/quint'] }
+}
+
+export function toolchainTag(directory = root) {
+  return createHash('sha256').update(readFileSync(join(directory, 'scripts/remote/Dockerfile.toolchain'))).update(JSON.stringify(toolchainVersions(directory))).digest('hex').slice(0, 16)
+}
+
 export function imageTag() {
   const hash = createHash('sha256')
   for (const file of imageInputs) hash.update(file).update('\0').update(readFileSync(join(root, file)))
@@ -41,16 +49,17 @@ export async function retry(what, attempt) {
 }
 
 /** The same small build context is used by Docker on either backend. */
-export function imageContext() {
+export function imageContext(toolchain = false) {
   const context = mkdtempSync(join(existsSync('/Volumes/AgentWork') ? '/Volumes/AgentWork' : tmpdir(), 'juno-remote-image-'))
+  writeFileSync(join(context, 'toolchain.json'), JSON.stringify(toolchainVersions()))
   const manifests = spawnSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '--', '*package.json'], { cwd: root, encoding: 'utf8' })
     .stdout.split('\n')
     .filter(Boolean)
-  for (const file of [...imageInputs.slice(1), ...manifests, '.npmrc'].filter((name) => existsSync(join(root, name)))) {
+  for (const file of (toolchain ? [] : [...imageInputs.slice(1), ...manifests, '.npmrc']).filter((name) => existsSync(join(root, name)))) {
     mkdirSync(dirname(join(context, file)), { recursive: true })
     writeFileSync(join(context, file), readFileSync(join(root, file)))
   }
-  writeFileSync(join(context, 'Dockerfile'), readFileSync(join(root, 'scripts/remote/Dockerfile')))
+  writeFileSync(join(context, 'Dockerfile'), readFileSync(join(root, toolchain ? 'scripts/remote/Dockerfile.toolchain' : 'scripts/remote/Dockerfile')))
   return context
 }
 

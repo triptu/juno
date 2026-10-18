@@ -4,8 +4,8 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSyn
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { test } from 'node:test'
-import { runnerConfig, runnerCommand } from './runner.mjs'
-import { imageTag } from './image.mjs'
+import { runnerConfig, runnerCommand, runnerCache } from './runner.mjs'
+import { toolchainTag, imageContext } from './image.mjs'
 import { sideBySide } from '../plan.mjs'
 import { parseRun } from './usage.mjs'
 
@@ -20,7 +20,7 @@ test('runner settings load from the machine file, with environment values taking
     const config = runnerConfig(env)
     assert.equal(config.host, 'file-runner')
     assert.deepEqual(config.args.slice(-7), ['-i', join(home, '.ssh/file-key'), '-o', 'IdentitiesOnly=yes', '-p', '2222', 'file-runner'])
-    assert.equal(config.image, `juno-remote:${imageTag()}`)
+    assert.equal(config.image, `juno-toolchain:${toolchainTag()}`)
     assert.equal(config.build, true)
     const override = runnerConfig({ ...env, JUNO_RUNNER_HOST: 'env-runner', JUNO_RUNNER_PORT: '2200', JUNO_RUNNER_KEY: '/env key', JUNO_RUNNER_IMAGE: 'registry/image:tag' })
     assert.equal(override.host, 'env-runner')
@@ -83,6 +83,7 @@ if (command.includes('docker build')) {
 } else if (command.includes('__juno_remote_exit_')) {
  fs.appendFileSync(process.env.TEST_CALLS, 'reservation ' + command.match(/ -- (\\d+) '/)[1] + ' cpus ' + command.match(/--cpus (\\d+)/)[1] + ' job-cores ' + command.match(/JUNO_RUNNER_JOB_CORES=(\\d+)/)[1] + '\\n');
  if (process.env.TEST_MODE === 'busy') { console.log('__juno_remote_started\\n__juno_remote_busy\\n__juno_remote_released'); process.exit(75); }
+ fs.appendFileSync(process.env.TEST_CALLS, (command.includes('JUNO_REMOTE_INSTALL=1') && command.includes('PNPM_CONFIG_STORE_DIR=/cache/pnpm-store') && command.includes('--user') ? 'install with cache' : 'full image') + '\\n');
  const marker = command.match(/__juno_remote_exit_[\\w-]+=/)[0];
  let bytes = 0; process.stdin.on('data', chunk => { bytes += chunk.length });
  process.stdin.on('end', () => {
@@ -186,6 +187,8 @@ test('SSH runs stream the workspace and failures never allocate Namespace', () =
     assert.doesNotMatch(called, /nsc/)
     assert.match(called, /workspace [1-9]\d*/)
     assert.match(called, /build [1-9]\d*/)
+    assert.match(called, /install with cache/)
+    assert.match(called, /full image/)
     mkdirSync(join(dir, '.config/juno'), { recursive: true })
     writeFileSync(join(dir, '.config/juno/runner.json'), JSON.stringify({ host: 'file-runner', port: 2222, key: '~/.ssh/test' }))
     const fileEnv = { ...env, TEST_MODE: 'healthy' }
@@ -283,8 +286,8 @@ await ensureRunnerImage({ args: ['host'], image: 'juno-remote:test', build: true
     await Promise.all([run(), run()])
     assert.equal(readFileSync(join(dir, 'builds'), 'utf8'), 'build\n')
     const files = readFileSync(join(dir, 'context'), 'utf8')
-    for (const file of ['Dockerfile', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', 'packages/agent-contract/package.json']) assert(files.includes(file), file)
-    assert.doesNotMatch(files, /runner\.mjs|node_modules|\.env/)
+    for (const file of ['Dockerfile', 'toolchain.json']) assert(files.includes(file), file)
+    assert.doesNotMatch(files, /runner\.mjs|node_modules|package\.json|pnpm-lock|pnpm-workspace|\.env/)
     await run()
     assert.equal(readFileSync(join(dir, 'builds'), 'utf8'), 'build\n')
   } finally { rmSync(dir, { recursive: true, force: true }) }
@@ -317,7 +320,7 @@ test('prune removes old local tags and build cache while keeping the selected ta
     writeFileSync(join(dir, '.config/juno-runner/cores'), '1')
     writeFileSync(join(dir, 'ssh'), '#!/bin/sh\nfor command; do :; done\nexec bash -c "$command"\n')
     writeFileSync(join(dir, 'docker'), `#!/bin/sh
-if [ "$1 $2" = 'image ls' ]; then printf 'juno-remote:current\njuno-remote:old\n'
+if [ "$1 $2" = 'image ls' ]; then printf 'juno-remote:current\njuno-remote:old\njuno-toolchain:old\n'
 elif [ "$1 $2" = 'image rm' ]; then printf '%s\n' "$3" >> "$HOME/removed"
 elif [ "$1 $2" = 'builder prune' ]; then touch "$HOME/cache-pruned"
 elif [ "$1" != info ]; then exit 2
@@ -328,7 +331,74 @@ fi
       env: { ...process.env, HOME: dir, PATH: `${dir}:${process.env.PATH}`, JUNO_RUNNER_HOST: 'host', JUNO_RUNNER_IMAGE: 'juno-remote:current' }, encoding: 'utf8', timeout: 5000,
     })
     assert.equal(result.status, 0, result.stderr)
-    assert.equal(readFileSync(join(dir, 'removed'), 'utf8'), 'juno-remote:old\n')
+    assert.equal(readFileSync(join(dir, 'removed'), 'utf8'), 'juno-remote:old\njuno-toolchain:old\n')
     assert(existsSync(join(dir, 'cache-pruned')))
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test('toolchain tags track only the Dockerfile and Quint pin, and the context contains no workspace', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'juno-toolchain-tag-'))
+  let context
+  try {
+    mkdirSync(join(dir, 'scripts/remote'), { recursive: true })
+    writeFileSync(join(dir, 'scripts/remote/Dockerfile.toolchain'), 'FROM toolchain')
+    const manifest = { devDependencies: { '@informalsystems/quint': '0.33.0', bun: '1.4.3' } }
+    writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
+    const tag = toolchainTag(dir)
+    writeFileSync(join(dir, 'pnpm-lock.yaml'), 'changed lockfile')
+    writeFileSync(join(dir, 'pnpm-workspace.yaml'), 'changed workspace')
+    manifest.devDependencies.bun = '1.4.4'
+    writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
+    assert.equal(toolchainTag(dir), tag)
+    manifest.devDependencies['@informalsystems/quint'] = '0.34.0'
+    writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
+    assert.notEqual(toolchainTag(dir), tag)
+    context = imageContext(true)
+    assert.deepEqual(readdirSync(context).sort(), ['Dockerfile', 'toolchain.json'])
+  } finally {
+    if (context) rmSync(context, { recursive: true, force: true })
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('workspace install uses the persistent store, validates Bun, and keeps full-image linking offline', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'juno-toolchain-install-'))
+  try {
+    mkdirSync(join(dir, 'node_modules/bun'), { recursive: true })
+    writeFileSync(join(dir, 'node_modules/bun/package.json'), JSON.stringify({ version: '1.4.3' }))
+    writeFileSync(join(dir, 'pnpm'), `#!/bin/sh
+if [ "$1" = exec ]; then echo "\${TEST_BUN_VERSION:-1.4.3}"
+else echo "$* store=\${PNPM_CONFIG_STORE_DIR:-}" >> "$HOME/calls"; exit "\${TEST_INSTALL_CODE:-0}"
+fi
+`)
+    chmodSync(join(dir, 'pnpm'), 0o755)
+    const run = (overrides) => spawnSync('bash', ['-uc', 'source "$1"', '_', resolve('scripts/remote/install.sh')], {
+      cwd: dir, env: { ...process.env, HOME: dir, PATH: `${dir}:${process.env.PATH}`, JUNO_REMOTE_INSTALL: '1', PNPM_CONFIG_STORE_DIR: '/cache/pnpm-store', ...overrides }, encoding: 'utf8',
+    })
+    const cold = run({})
+    assert.equal(cold.status, 0, cold.stderr)
+    assert.match(cold.stderr, /remote: workspace installed in \d+ s/)
+    assert.match(readFileSync(join(dir, 'calls'), 'utf8'), /install --frozen-lockfile --prefer-offline.*store=\/cache\/pnpm-store/)
+    assert.equal(run({ TEST_BUN_VERSION: 'wrong' }).status, 70)
+    assert.equal(run({ TEST_INSTALL_CODE: '1' }).status, 70)
+    assert.equal(run({ JUNO_REMOTE_INSTALL: '' }).status, 0)
+    assert.match(readFileSync(join(dir, 'calls'), 'utf8'), /install --frozen-lockfile --offline --reporter=silent/)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+
+test('Linux caches belong to the SSH uid and reject a different owner', { skip: process.platform !== 'linux' }, () => {
+  const dir = mkdtempSync(join(tmpdir(), 'juno-cache-owner-'))
+  try {
+    const run = () => spawnSync('bash', ['-c', `${runnerCache()}; echo ready`], { env: { ...process.env, HOME: dir, PATH: `${dir}:${process.env.PATH}` }, encoding: 'utf8' })
+    const valid = run()
+    assert.equal(valid.status, 0, valid.stderr)
+    assert.match(valid.stdout, /ready/)
+    writeFileSync(join(dir, 'stat'), '#!/bin/sh\necho 4294967294\n')
+    chmodSync(join(dir, 'stat'), 0o755)
+    const mismatch = run()
+    assert.equal(mismatch.status, 70)
+    assert.match(mismatch.stderr, /cache must belong to the SSH user/)
+    assert.doesNotMatch(mismatch.stdout, /ready/)
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })

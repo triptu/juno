@@ -962,13 +962,19 @@ to prefer an SSH runner for every agent, including `pnpm affected` and
 `JUNO_RUNNER_KEY` override file values. An empty `JUNO_RUNNER_HOST` selects
 Namespace. The real host and user belong only in the machine-local file.
 
-The runner uses `juno-remote:<imageTag()>`. A missing tag is built on the runner
-from the shared Docker build context streamed over SSH, under a host build lock.
-No `nsc` or Namespace registry access is needed on the runner.
-`JUNO_RUNNER_IMAGE` remains an optional preloaded-image override.
+The SSH runner uses `juno-toolchain:<tag>`. The tag hashes `Dockerfile.toolchain`
+and the root manifest's Quint pin, so changing the lockfile does not rebuild it.
+A missing tag is built on the runner under a host build lock. No `nsc` or
+Namespace registry access is needed on the runner. Each run installs with
+`--frozen-lockfile --prefer-offline` against `~/.cache/juno-runner/pnpm-store`,
+checks Bun's version and reports `remote: workspace installed in N s`.
+Electron downloads use `~/.cache/electron`. Containers use the host uid and
+share pnpm's runtime locks. Cache ownership must match that uid.
+`JUNO_RUNNER_IMAGE` selects a full preloaded image and skips the install.
 `pnpm runner:check` reports a missing local tag without failing, and
-`pnpm runner:prune` removes old tags and unused build cache while keeping the
-current image. Docker refuses removal of images referenced by containers.
+`pnpm runner:prune` removes old full-image and toolchain tags and unused build
+cache while keeping the selected image. It leaves dependency caches alone.
+Docker refuses removal of images referenced by containers.
 
 An unreachable runner falls back to Namespace. After the image is ready, a job
 waits at most 60 seconds for runner cores before falling back. With
