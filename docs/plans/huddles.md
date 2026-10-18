@@ -54,7 +54,7 @@ All new logic lives in three new packages. Existing code changes only at the reg
 
 | Package | Job | Depends on |
 | --- | --- | --- |
-| `@juno/huddle` | Engine side. The `Huddle` service: a state machine for the call (idle, joining, joined, leaving), `rooms.join` and `rooms.leave`, the leave that must happen, participants from room frames, running huddles per channel, status renewal every 4 minutes or so. Exports its handler layer. Decodes its own frames from the socket. | `slack`, `slack-schema`, `contract`, `domain` |
+| `@juno/huddle` | Engine side. The `Huddle` service: a state machine for the call (idle, joining, joined, leaving), `rooms.join` and `rooms.leave`, the leave that must happen, participants from room frames, running huddles per channel, status renewal every 4 minutes or so. Decodes its own frames from the socket. Its route handlers and its attachment to `SocketEvents` are in `engine/src/huddle/`, since they use the engine's serve helpers and store. | `slack`, `slack-schema`, `contract` |
 | `@juno/huddle-media` | Renderer side. A `MediaSession` interface with two versions: Chime and a fake for e2e tests. Join with meeting and attendee, mute, devices, active speaker, volume, remote content share, local content share. A plain store (`subscribe`, `getSnapshot`), no Atom and no React. Loaded as a lazy chunk on join. | `amazon-chime-sdk-js`, `contract` (types only) |
 | `@juno/huddle-views` | Dumb views with fixtures: `HuddleBar`, `HuddlePage`, the participant row, the shared-screen stage, the channel header button, the channel dot. | `ui`, `tokens` |
 
@@ -126,6 +126,9 @@ Four parallel tracks, then one integration task:
 
 - **A. Schemas and fakes.** `slack-schema/src/huddles.ts`, the fake-slack huddle module and its controls.
 - **B. Engine.** `@juno/huddle`, `contract/src/routes/huddle.ts`, `specs/huddle.qnt`, and unit tests for the pure rules (participant merge, the leave that must happen).
+  - The pending leave is stored in the workspace's user.db as the pref `huddle.pendingLeaves`.
+  - The renderer reports its media session with `huddle.media`, tagged with the attendee id: `started`, `ended` with a reason, `muted`, and `idle` when no session runs (at start, and when the engine connection comes back). A stored leave from an earlier process is cleared only after `idle` or an `ended` for its attendee, so a new join never overlaps a session the renderer may still run.
+  - TODO: the "In a huddle" status (`users.profile.set` with `huddle_state` and its expiry, renewed about every 4 minutes). It writes to the user's Slack profile, and the owner has not decided on it yet, so the engine does not call it.
 - **C. Media.** `@juno/huddle-media` with Chime and the fake. Region lookup, mute, devices, active speaker, Voice Focus.
 - **D. Views.** Finish the phase 1 views against the final routes.
 - **E. Integration.**

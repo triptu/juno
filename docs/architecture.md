@@ -128,6 +128,8 @@ flowchart TD
   notifications --> store & domain & ai
   files --> slack & store & sync
   engine --> contract & sync & store & domain & richtext & assistant & notifications & files & slack & ai & topic_art
+  huddle --> contract & slack & slack_schema
+  engine --> huddle
   fake_slack[fake-slack] --> slack_schema
   tokens
   ui --> tokens & topic_art
@@ -168,6 +170,7 @@ The bottom block is Juno Agent (section 10, ADR 0012). Its one edge outside the 
 | `@juno/tokens` | design values | `defineVars` with `--` keys, `createTheme` for dark and accents | |
 | `@juno/ui` | primitives | the 18 primitives from `primitives.md` plus `Icon` | import contract, state, data |
 | `@juno/views` | dumb UI | feature components, each with `*.fixtures.tsx`; the `applyTheme` entry point for apps | import `@juno/state`, `effect`, `window.juno` |
+| `@juno/huddle` | one call at a time | the `Huddle` service (specs/huddle.qnt): the call's lifecycle, `rooms.join` and `rooms.leave`, the stored leave that must happen, running huddles from room frames (decoded here) and `huddles/info`; the engine attaches it to each sync and stores its leaves | import `store`, the engine or UI; call Chime |
 | `@juno/huddle-views` | dumb UI for huddles | the huddle views (SPEC 20), on `ui` and `tokens` only: the sidebar bar, the huddle tab, the header control, the row glyph, the device menu and the screen share sheet, each with `*.fixtures.tsx`; its view models are its own | import `@juno/views`, `@juno/contract`, `@juno/state`, `effect`, `window.juno` |
 | `@juno/state` | the bridge | engine client, `liveQuery`/`command` helpers, atoms, undo stack, toasts, tabs, drafts, clock; `@juno/state/react` re-exports the atom hooks | JSX |
 | `apps/desktop` | wiring | `src/main`, `src/preload`, `src/engine` and `src/agent` (utility entries), `src/renderer` with containers, `e2e/` | |
@@ -270,6 +273,7 @@ juno_chat       (id PK, role, content_json, created_at)
 drafts          (topic_id PK, text, updated_at)
 outbox          (id PK AUTOINCREMENT, kind, target_key, payload_json, depends_on, created_at, attempts, next_at, last_error)
 prefs           (key PK, value_json)
+prefs[huddle.pendingLeaves] ([{ channelId, callId, attendeeId }])  -- leaves that must be sent (specs/huddle.qnt), never credentials
 topic_art       (topic_id PK, recipe, recipe_hash, input_hash, model, status 'ok'|'unsure'|'failed', hue,
                  title_source, source 'ai'|'redraw', created_at)
 agent_attempts  (authorization_id PK, attempt_id UNIQUE, action_id, channel, thread_ts, text,
