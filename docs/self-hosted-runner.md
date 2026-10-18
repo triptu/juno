@@ -2,7 +2,7 @@
 
 Configure the runner on each Mac in `~/.config/juno/runner.json`. Every agent
 then tries it before Namespace, without setting environment variables.
-An unreachable host falls back to Namespace. A reachable host with broken
+An unreachable host falls back to Namespace. For `.local` hosts, SSH tries IPv4 first and falls back to dual stack if the transport cannot connect. The successful family is reused for the job. This avoids a five-second stall on the laptop's advertised but unreachable IPv6 address. Authentication and connected-host failures still stop the run. A reachable host with broken
 Docker, an SSH key error, an image-build failure, or failing tests returns an
 error without fallback. A job waits up to 60 seconds for free cores before
 falling back. Set `JUNO_REMOTE_MAX_VCPU=0` to forbid Namespace allocation and

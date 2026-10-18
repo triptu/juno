@@ -1,3 +1,4 @@
+import './runner-health.test.mjs'
 import './workspace.test.mjs'
 import './namespace.test.mjs'
 import assert from 'node:assert/strict'

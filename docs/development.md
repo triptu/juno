@@ -978,7 +978,7 @@ share pnpm's runtime locks. Cache ownership must match that uid.
 cache while keeping the selected image. It leaves dependency caches alone.
 Docker refuses removal of images referenced by containers.
 
-An unreachable runner falls back to Namespace. After the image is ready, a job
+An unreachable runner falls back to Namespace. For `.local` hosts, SSH tries IPv4 first and falls back to dual stack if the transport cannot connect. The successful family is reused for the job. This avoids a five-second stall on the laptop's advertised but unreachable IPv6 address. Authentication and connected-host failures still stop the run. After the image is ready, a job
 waits at most 60 seconds for runner cores before falling back. With
 `JUNO_REMOTE_MAX_VCPU=0`, it waits without a deadline and never allocates
 Namespace machines. SSH authentication errors, broken Docker, failed builds,
