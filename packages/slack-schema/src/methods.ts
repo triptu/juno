@@ -29,6 +29,8 @@ import {
 } from './chat.ts'
 import { ErrorResponse, okResponse } from './common.ts'
 import {
+  ConversationsCreateArgs,
+  ConversationsCreateFields,
   ConversationsHistoryArgs,
   ConversationsHistoryFields,
   ConversationsMarkArgs,
@@ -54,6 +56,7 @@ import {
   FilesInfoArgs,
   FilesInfoFields,
 } from './files.ts'
+import { RoomsJoinArgs, RoomsJoinFields, RoomsLeaveArgs, RoomsLeaveFields } from './huddles.ts'
 import { SearchMessagesArgs, SearchMessagesFields } from './search.ts'
 import { AuthTestArgs, AuthTestFields, UsergroupsListArgs, UsergroupsListFields } from './users.ts'
 import {
@@ -90,6 +93,7 @@ export const Methods = {
   'conversations.info': method(ConversationsInfoArgs, ConversationsInfoFields),
   'conversations.mark': method(ConversationsMarkArgs, ConversationsMarkFields),
   'conversations.open': method(ConversationsOpenArgs, ConversationsOpenFields),
+  'conversations.create': method(ConversationsCreateArgs, ConversationsCreateFields),
   'subscriptions.thread.getView': method(ThreadGetViewArgs, ThreadGetViewFields),
   'subscriptions.thread.mark': method(ThreadMarkArgs, ThreadMarkFields),
   'subscriptions.thread.add': method(ThreadSubscribeArgs, ThreadSubscribeFields),
@@ -107,6 +111,8 @@ export const Methods = {
   'files.share': method(FilesShareArgs, FilesShareFields),
   'usergroups.list': method(UsergroupsListArgs, UsergroupsListFields),
   'files.info': method(FilesInfoArgs, FilesInfoFields),
+  'rooms.join': method(RoomsJoinArgs, RoomsJoinFields),
+  'rooms.leave': method(RoomsLeaveArgs, RoomsLeaveFields),
 } as const
 
 export type Methods = typeof Methods
