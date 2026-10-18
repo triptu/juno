@@ -1,0 +1,1 @@
+- 10-19 00:15 · huddles-design-approved · The huddle design (SPEC section 20 and `@juno/huddle-views`) is approved. The sidebar bar is a card in the accent colour, with green only for speaking and live. A shared window shows a preview in your own tab; a shared full screen does not.

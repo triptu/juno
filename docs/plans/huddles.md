@@ -90,6 +90,9 @@ Four tasks, one per seam, in parallel once the hot files are free. Existing e2e 
 
 ### Phase 1: design
 
+Done and approved on 2026-10-19.
+
+
 A design engineer agent writes the huddle section of SPEC.md, replacing "Not designed yet: calls and huddles" at line 787, with matching entries in `inventory.md`, `tokens.md` and `primitives.md`. It builds the views in `@juno/huddle-views` with gallery fixtures for every state:
 
 - the bar (alone, two people, five people, someone speaking, muted, someone sharing, reconnecting)
