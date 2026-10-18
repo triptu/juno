@@ -1,0 +1,1 @@
+- 10-18 08:05 · outcome-joins-run · Owner: when an approved connection call or sign-in settles while Juno is still in a run, its outcome goes into that run as any new input does, and no click run starts. The run sees the outcome, which is what is wanted (SPEC 13.3).
