@@ -111,12 +111,12 @@ describe('SlackApi.call', () => {
       fake.force429({ method: 'conversations.history', retryAfter: 30, times: 1 })
       const program = Effect.gen(function* () {
         const api = yield* SlackApi
-        const queue = yield* RequestQueue
         yield* api.call('conversations.history', { channel: CHANNEL }).pipe(Effect.ignore)
-        assert.isDefined(yield* queue.pausedUntil('conversations.history'))
-        assert.isUndefined(yield* queue.pausedUntil('client.counts'))
         const counts = yield* api.call('client.counts', {})
         assert.isTrue(counts.ok)
+        const again = yield* api.call('conversations.history', { channel: CHANNEL }).pipe(Effect.flip)
+        assert.strictEqual(again._tag, 'SlackRateLimited')
+        assert.strictEqual(fake.callCount('conversations.history'), 1)
       })
       yield* program.pipe(Effect.provide(clientLayer(fake)))
     }),

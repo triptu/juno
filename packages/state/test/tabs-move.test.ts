@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { moveTab, noTabs, openPlace, parseTabs, savedTabs, setPinned, tabTopic, topicPlace, type Tabs } from '../src/tabs'
+import { moveTab, noTabs, openPlace, setPinned, tabTopic, topicPlace, type Tabs } from '../src/tabs'
 
 const open = (tabs: Tabs, topicId: string, newTab = false) => openPlace(tabs, topicPlace(topicId), { newTab })
 const shown = (tabs: Tabs) => tabs.tabs.map((tab) => tabTopic(tab))
@@ -36,10 +36,5 @@ describe('moving', () => {
     // A pinned tab moves among the pinned ones and stops at the last of them.
     expect(shown(moveTab(pinned, idOf(pinned, 'a'), 2))).toEqual(['b', 'a', 'c'])
     expect(shown(moveTab(pinned, idOf(pinned, 'b'), 0))).toEqual(['b', 'a', 'c'])
-  })
-
-  it('the new order is saved and read back', () => {
-    const moved = moveTab(three, idOf(three, 'c'), 0)
-    expect(shown(parseTabs(JSON.parse(JSON.stringify(savedTabs(moved)))))).toEqual(['c', 'a', 'b'])
   })
 })

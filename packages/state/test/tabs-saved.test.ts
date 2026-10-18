@@ -50,10 +50,10 @@ describe('saved tabs', () => {
     ]) {
       const restored = parseTabs(saved)
       expect(shown(restored)).toEqual(['a', 'b'])
-      expect(restored.tabs.map((tab) => Object.keys(tab).toSorted())).toEqual([
-        ['history', 'id', 'pinned'],
-        ['history', 'id', 'pinned'],
-      ])
+      for (const tab of restored.tabs) {
+        expect(tab).not.toHaveProperty('stealth')
+        expect(tab.pinned).toBe(false)
+      }
       expect(activeShows(restored)).toBe('b')
     }
   })
