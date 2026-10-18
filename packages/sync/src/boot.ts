@@ -29,10 +29,10 @@
  * derived from it), history since the synced range for conversations whose
  * `latest` moved, `getView` back to the window, the discovery sweep for
  * the gap, users. Reconnect refreshes workspace and full membership on the
- * background lane; a periodic sweep uses incremental counts. Both read
- * `getView` back to the last moment the store was in step. `followPass` reads the followed
- * threads over the window and checks the follows it left out; `runSync`
- * schedules it.
+ * background lane, and reads `getView` back to the last moment the store
+ * was in step. A periodic sweep uses incremental counts. `followPass` reads
+ * the followed threads over the window and checks the follows it left out;
+ * `runSync` schedules it at most hourly.
  */
 import { compareTs, maxTs, millisToTs, type Me, type Ts, type UsergroupId } from '@juno/domain'
 import { SlackApi, SlackEdge, SlackSession, type SlackApiError, type SlackAuthRequired } from '@juno/slack'
@@ -181,6 +181,18 @@ const applyThreadView = (ctx: SyncContext, view: ThreadView, requestedAt: Ts, la
     yield* transaction(Effect.andThen(markRepliesComplete(channel, root.ts, replies >= root.reply_count, syncedAt, completeFrom), reindexTopics([topic], reindexOptions(ctx))))
   })
 
+const applyThreadViewObservations = (
+  ctx: SyncContext,
+  observations: ReadonlyArray<{ readonly view: ThreadView; readonly requestedAt: Ts }>,
+  lane: 'interactive' | 'background',
+): Effect.Effect<void, BootError, BootServices> =>
+  Effect.gen(function* () {
+    const unchanged = yield* transaction(threadViewPageUnchanged(ctx, observations))
+    const changed = observations.filter((_, index) => unchanged[index] !== true)
+    yield* nameFirst(ctx, changed.flatMap(({ view }) => [view.root_msg, ...(view.latest_replies ?? []), ...(view.unread_replies ?? [])]), lane)
+    for (const { view, requestedAt } of changed) yield* applyThreadView(ctx, view, requestedAt, lane)
+  })
+
 /**
  * Followed threads from `subscriptions.thread.getView`, newest activity
  * first, 10 per page live whatever `limit` says (research section 10),
@@ -201,6 +213,8 @@ const loadThreadViews = (
     readonly until: Ts
     readonly probe: boolean
     readonly lane: 'interactive' | 'background'
+    /** A background follow pass can certify all fetched pages with one store snapshot. */
+    readonly batchPages?: boolean
     /** Runs once, after the first page is stored: the cold boot's quick start ends here. */
     readonly afterFirstPage?: Effect.Effect<void, BootError, BootServices>
   },
@@ -210,6 +224,7 @@ const loadThreadViews = (
     const listed = new Set<string>()
     let firstRequestedAt: Ts | undefined
     let current: Ts | undefined
+    const batched: Array<{ readonly view: ThreadView; readonly requestedAt: Ts }> = []
     // `until` when the pages stopped there; undefined when they reached the end of the list.
     let coveredFrom: Ts | undefined = options.until
     while (true) {
@@ -222,13 +237,8 @@ const loadThreadViews = (
       )
       for (const view of page.threads) listed.add(`${view.root_msg.channel}:${view.root_msg.ts}`)
       const observations = page.threads.map((view) => ({ view, requestedAt }))
-      const unchanged = yield* transaction(threadViewPageUnchanged(ctx, observations))
-      const changed = page.threads.filter((_, index) => unchanged[index] !== true)
-      // Everyone on a changed page in one lookup, not one per thread, so new rows land named without a call each.
-      yield* nameFirst(ctx, changed.flatMap((view) => [view.root_msg, ...(view.latest_replies ?? []), ...(view.unread_replies ?? [])]), options.lane)
-      for (const [index, view] of page.threads.entries()) {
-        if (unchanged[index] !== true) yield* applyThreadView(ctx, view, requestedAt, options.lane)
-      }
+      if (options.batchPages === true) batched.push(...observations)
+      else yield* applyThreadViewObservations(ctx, observations, options.lane)
       if (current === undefined && options.afterFirstPage !== undefined) yield* options.afterFirstPage
       const last = page.threads.at(-1)
       const lastActivity = last?.root_msg.latest_reply ?? last?.root_msg.ts
@@ -246,6 +256,7 @@ const loadThreadViews = (
       current = lastActivity
       yield* Effect.yieldNow
     }
+    if (batched.length > 0) yield* applyThreadViewObservations(ctx, batched, options.lane)
     if (options.probe) yield* probeUnlisted(ctx, listed, coveredFrom, firstRequestedAt)
   })
 
@@ -258,7 +269,7 @@ const loadThreadViews = (
 export const followPass = (ctx: SyncContext): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
     const windowStart = millisToTs(yield* windowStartMillis(ctx))
-    yield* loadThreadViews(ctx, { until: windowStart, probe: true, lane: 'background' })
+    yield* loadThreadViews(ctx, { until: windowStart, probe: true, lane: 'background', batchPages: true })
   })
 
 /**

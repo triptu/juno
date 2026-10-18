@@ -66,7 +66,7 @@ const makeCatchUpRetry = (runtime: SyncRuntime, reconcile: Effect.Effect<void, S
 }
 
 /** Rechecks a captured socket gap; a failure restores it without losing a later drop. */
-const catchUpAfterGap = (runtime: SyncRuntime) => Effect.gen(function* () {
+const catchUpAfterGap = (runtime: SyncRuntime, refreshThreads: boolean) => Effect.gen(function* () {
   const { state, ctx, options, reportBoot } = runtime
   const openNow = options.openTopics ?? Effect.succeed([])
   const previous = state.lastBoot ?? (yield* bootState())
@@ -77,7 +77,7 @@ const catchUpAfterGap = (runtime: SyncRuntime) => Effect.gen(function* () {
   const next = yield* catchUp(ctx, previous, reportBoot, {
     refreshWorkspace: false,
     refreshMetadata: droppedAt !== undefined,
-    refreshThreads: true,
+    refreshThreads,
     persistState: droppedAt !== undefined,
     ...(recheck === undefined ? {} : { recheck }),
   }).pipe(
@@ -91,14 +91,16 @@ const catchUpAfterGap = (runtime: SyncRuntime) => Effect.gen(function* () {
   yield* refreshOpenTopics(runtime)
 })
 
-export const makeReconcile = (runtime: SyncRuntime) => {
+export const makeReconcile = (runtime: SyncRuntime, refreshThreads: boolean) => {
   const { cycle, work, settle } = runtime
   /**
    * The catch-up after a reconnect or a sweep, under the work permit, then
-   * the follow pass if it is due. After a drop it rechecks the gap; a drop
-   * during it is rechecked by the next one, and a failure keeps the gap.
+   * the follow pass if it is due. Reconnects refresh the incremental thread
+   * window; scheduled sweeps leave that work to the hourly full pass. After
+   * a drop it rechecks the gap; a drop during it is rechecked by the next
+   * one, and a failure keeps the gap.
    */
-  const reconcile: Effect.Effect<void, SlackAuthRequired, SyncServices | Scope.Scope> = cycle(catchUpAfterGap(runtime).pipe(
+  const reconcile: Effect.Effect<void, SlackAuthRequired, SyncServices | Scope.Scope> = cycle(catchUpAfterGap(runtime, refreshThreads).pipe(
     work.withPermit,
     Effect.tapError((error) => Effect.logWarning('sync: catch-up failed', { tag: error._tag })),
     Effect.andThen(settle),
