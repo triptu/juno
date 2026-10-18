@@ -252,7 +252,7 @@ let finalized = false
 function finishLog(result) {
   if (finalized) return
   finalized = true
-  appendFileSync(runLog, `remote: exited with ${result}\nremote: summary ${JSON.stringify({ code: result, infraFailure, outage: outageFailure, backend, warm, readySeconds, startupSeconds, machineSeconds, wallSeconds: (Date.now() - started) / 1000 })}\n`)
+  appendFileSync(runLog, `remote: exited with ${result}\nremote: summary ${JSON.stringify({ code: result, infraFailure, outage: outageFailure, backend, cores: backend === 'ssh' ? cores : Number(/:(\d+)x/.exec(options.machine)?.[1]), warm, readySeconds, startupSeconds, machineSeconds, wallSeconds: (Date.now() - started) / 1000 })}\n`)
 }
 try {
   runner = runnerConfig()

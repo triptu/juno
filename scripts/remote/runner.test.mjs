@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path'
 import { test } from 'node:test'
 import { runnerConfig, runnerCommand } from './runner.mjs'
 import { imageTag } from './image.mjs'
+import { parseRun } from './usage.mjs'
 
 test('runner settings load from the machine file, with environment values taking precedence', () => {
   const home = mkdtempSync(join(tmpdir(), 'juno-runner-config-'))
@@ -131,6 +132,7 @@ test('SSH job sizes follow scripts and plan steps, with explicit sizes taking pr
       assert.equal(child.status, 7, child.stderr)
       assert.match(child.stderr, new RegExp(`SSH runner \\(${cores} cores\\)`))
       assert.match(readFileSync(calls, 'utf8'), new RegExp(`reservation ${cores} cpus ${cores} job-cores ${cores}\\n`))
+      assert.equal(parseRun(readFileSync(join(path, 'run.log'), 'utf8')).cores, cores)
     }
     const dryRun = spawnSync(process.execPath, ['scripts/remote.mjs', '--dry-run', 'test'], {
       env: { ...env, JUNO_RUNNER_HOST: '', JUNO_REMOTE_MACHINE: undefined }, encoding: 'utf8', timeout: 30_000,
