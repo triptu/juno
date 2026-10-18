@@ -44,3 +44,22 @@ it('returns unchanged ids, changed bodies and deletions with independent mutatio
   expect(rest.unchanged_messages).toContain(reacted.ts)
   expect(rest.has_more).toBe(false)
 })
+
+it('keeps updated fixed for a new Main message and returns changed markers in incremental counts', async () => {
+  const fake = await startFakeSlack()
+  fakes.push(fake)
+  const client = new TestClient(fake)
+  const channel = 'C0ENG'
+  const before = await client.ok('client.counts', {})
+  const marker = before.channels.find((c) => c.id === channel)!.updated
+  fake.advanceClock({ millis: 2_000 })
+  const root = fake.injectMessage({ channel, text: 'New Main message.' })
+  const posted = await client.ok('client.counts', { counts_last_fetched: before.counts_last_fetched! })
+  expect(posted.channels.find((c) => c.id === channel)).toMatchObject({ latest: root.ts, updated: marker })
+  fake.advanceClock({ millis: 2_000 })
+  fake.injectMessage({ channel, threadTs: root.ts, text: 'Reply changes the root.' })
+  const replied = await client.ok('client.counts', { counts_last_fetched: posted.counts_last_fetched! })
+  const changed = replied.channels.find((c) => c.id === channel)!
+  expect(changed.updated).not.toBe(marker)
+  expect(changed.history_invalid).toBe(before.channels.find((c) => c.id === channel)!.history_invalid)
+})

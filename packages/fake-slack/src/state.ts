@@ -337,7 +337,7 @@ export class Workspace {
       has_unreads: unread.length > 0,
       mention_count: mentions,
       ...(this.mutationMarkers ? {
-        updated: this.mutationUpdated.get(c.id) ?? latest?.ts ?? lastRead,
+        updated: this.mutationUpdated.get(c.id) ?? NEVER_READ,
         history_invalid: this.historyInvalid.get(c.id) ?? NEVER_READ,
       } : {}),
     }
@@ -451,7 +451,6 @@ export class Workspace {
 
     if (root !== undefined) this.#touchRoot(input.channel, root.ts)
     this.#touchConversation(input.channel, input.at)
-    this.mutationUpdated.set(input.channel, this.eventTs())
 
     if (input.silent === true) return message
 

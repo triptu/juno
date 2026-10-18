@@ -44,8 +44,9 @@ await fake.close()
 `unfurlFixtures(base)` supplies invented X image/text posts, failed images, YouTube, GitHub, Google Docs and generic previews. Avatar responses require the fake session cookie, so desktop tests exercise the authenticated image path.
 
 Mutation recovery (`docs/research/slack-catchup.md`): counts expose independent
-`updated` and `history_invalid` markers. The fake advances `updated` for posts,
-edits and reactions, and `history_invalid` for deletion. History and replies
+`updated` and `history_invalid` markers. The fake advances `updated` for thread replies,
+edits and reactions; a new Main message changes only `latest`.
+Deletion advances `history_invalid`. History and replies
 accept `cached_latest_updates`, return changed bodies with `latest_updates`,
 unchanged ids in `unchanged_messages`, and an empty `deleted` list, as the
 controlled self-DM deletion test returned. Versions live in a separate map, not
@@ -57,4 +58,5 @@ marker/version maps to model backwards or unchanged values, and `retainedSince`
 omits older messages while marking history and replies `is_limited`.
 
 In-process tests can set `workspace.mutationMarkers = false` to model counts that
-omit both markers. Outbox conformance uses this for an uncovered fallback range.
+omit both markers. Outbox conformance keeps markers enabled: only the fallback
+writes the coverage required to delete a duplicate send.
