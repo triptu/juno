@@ -61,7 +61,7 @@ async function idleCpu(running: RunningApp, ms: number): Promise<ReadonlyArray<R
 }
 
 /** Measures `state`, prints one line for it, and holds each process to its budget. */
-async function expectIdle(running: RunningApp, state: string, gate: Gate): Promise<void> {
+async function expectIdle(running: RunningApp, state: string, gate: Gate, fake?: FakeSlack): Promise<void> {
   // Navigation leaves load cleanup, including deferred V8 collections. Let
   // it settle, then average a full minute as the original measurements did.
   await new Promise((resolve) => setTimeout(resolve, SETTLE_MS))
@@ -70,7 +70,24 @@ async function expectIdle(running: RunningApp, state: string, gate: Gate): Promi
     const active = document.activeElement
     return active instanceof HTMLElement && (active.isContentEditable || active.matches('textarea:read-write, input:read-write'))
   })
-  const readings = await idleCpu(running, IDLE_WINDOW_MS)
+  const callsBefore = fake?.calls.length ?? 0
+  let readings = await idleCpu(running, IDLE_WINDOW_MS)
+  const calls = fake?.calls.slice(callsBefore) ?? []
+  if (fake !== undefined && calls.length > 0) {
+    // The full sequence reaches the normal ten-minute discovery sweep near
+    // minimizing. Keep that busy sample visible, then measure actual idle.
+    const busy = readings.map((r) => `${r.name} ${r.cpu.toFixed(1)}`).join(', ')
+    const methods = [...new Set(calls.map((call) => call.method))].join(', ')
+    console.log(`idle cpu, ${state}, busy sample (${methods}): ${busy}`)
+    test.info().annotations.push({ type: 'busy cpu', description: `${state}: ${methods}; ${busy}` })
+    expect(calls.some((call) => call.method === 'client.counts'), `${state}: only a discovery sweep may replace an idle window`).toBe(true)
+    expect(calls.filter((call) => !call.ok), `${state}: Slack work must succeed`).toHaveLength(0)
+    await new Juno(running.app, running.win).expectEngineLive()
+    await new Promise((resolve) => setTimeout(resolve, SETTLE_MS))
+    const retryCalls = fake.calls.length
+    readings = await idleCpu(running, IDLE_WINDOW_MS)
+    expect(fake.calls.slice(retryCalls).map((call) => call.method), `${state}: Slack must stay quiet throughout the replacement window`).toHaveLength(0)
+  }
   const line = readings.map((r) => `${r.name} ${r.cpu.toFixed(1)}`).join(', ')
   console.log(`idle cpu, ${state} (${IDLE_WINDOW_MS / 1000} s, ${focusedTextField ? 'focused text field' : 'no focused text field'}): ${line}`)
   test.info().annotations.push({ type: 'idle cpu', description: `${state}: ${line}` })
@@ -101,7 +118,7 @@ async function switchTo(win: Page, where: 'aside[data-juno-panel]' | 'main', lab
 }
 
 /** The Juno panel beside a topic with a long chat, Activity in it, then the Juno tab and its Activity, each after the last reply. */
-async function junoStates(running: RunningApp, gate: Gate): Promise<void> {
+async function junoStates(running: RunningApp, gate: Gate, fake: FakeSlack): Promise<void> {
   const { win } = running
   const juno = new Juno(running.app, win)
   await juno.tabs.menu('juno')
@@ -111,11 +128,11 @@ async function junoStates(running: RunningApp, gate: Gate): Promise<void> {
     await panel.expectJuno(`You said: question ${i} about the rollout`)
   }
   await win.mouse.move(400, 400)
-  await expectIdle(running, 'the Juno panel, after a reply, 20 turns', gate)
+  await expectIdle(running, 'the Juno panel, after a reply, 20 turns', gate, fake)
 
   await switchTo(win, 'aside[data-juno-panel]', 'Activity')
   await expect(win.locator('aside[data-juno-panel] [data-juno-header="activity"]')).toBeVisible()
-  await expectIdle(running, 'Activity in the panel', gate)
+  await expectIdle(running, 'Activity in the panel', gate, fake)
   await juno.tabs.menu('juno')
 
   await win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
@@ -123,14 +140,14 @@ async function junoStates(running: RunningApp, gate: Gate): Promise<void> {
   await tab.composer.waitFor()
   await tab.send('one more question')
   await tab.expectJuno('You said: one more question')
-  await expectIdle(running, 'the Juno tab, after a reply', gate)
+  await expectIdle(running, 'the Juno tab, after a reply', gate, fake)
 
   await switchTo(win, 'main', 'Activity')
-  await expectIdle(running, 'Activity in a tab', gate)
+  await expectIdle(running, 'Activity in a tab', gate, fake)
 }
 
 /** Four more topics, each in a tab of its own; then the window minimized, and hidden. */
-async function tabAndWindowStates(running: RunningApp, gate: Gate): Promise<void> {
+async function tabAndWindowStates(running: RunningApp, gate: Gate, fake: FakeSlack): Promise<void> {
   const { app, win } = running
   const juno = new Juno(app, win)
   for (let i = 1; i <= 4; i++) {
@@ -139,16 +156,16 @@ async function tabAndWindowStates(running: RunningApp, gate: Gate): Promise<void
     await expect(win.locator('[data-topic-view]').filter({ visible: true })).toBeVisible({ timeout: 15_000 })
   }
   await win.mouse.move(900, 400)
-  await expectIdle(running, 'several tabs', gate)
+  await expectIdle(running, 'several tabs', gate, fake)
 
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.minimize())
-  await expectIdle(running, 'window minimized', gate)
+  await expectIdle(running, 'window minimized', gate, fake)
   await app.evaluate(({ BrowserWindow }) => {
     const window = BrowserWindow.getAllWindows()[0]!
     window.restore()
     window.hide()
   })
-  await expectIdle(running, 'window hidden', gate)
+  await expectIdle(running, 'window hidden', gate, fake)
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.show())
 }
 
@@ -196,19 +213,19 @@ for (const gate of ['portable', 'mac'] as const) {
         await expect.poll(() => hooks(app, 'agentState'), { timeout: 15_000 }).toBe('ready')
         await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1400, 900))
         await win.mouse.move(900, 400)
-        await expectIdle(running, 'Home', gate)
+        await expectIdle(running, 'Home', gate, fake)
 
         await juno.sidebar.rows.nth(0).click()
         await expect(win.locator('[data-topic-view]').filter({ visible: true })).toBeVisible({ timeout: 15_000 })
         await win.mouse.move(900, 400)
-        await expectIdle(running, 'a topic', gate)
+        await expectIdle(running, 'a topic', gate, fake)
 
         await juno.topic.composer.focus()
         await expect(juno.topic.composer).toBeFocused()
-        await expectIdle(running, 'a topic with its composer focused', gate)
+        await expectIdle(running, 'a topic with its composer focused', gate, fake)
 
-        await junoStates(running, gate)
-        await tabAndWindowStates(running, gate)
+        await junoStates(running, gate, fake)
+        await tabAndWindowStates(running, gate, fake)
       } finally {
         await running?.close()
         await fake.close()
