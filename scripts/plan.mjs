@@ -6,7 +6,7 @@
 // Steps are separated by `+`. `KEY=VALUE` words before a step's script set its
 // environment. The app suites (test:desktop, test:gallery, test:e2e) run one
 // after another, each with the whole machine's workers. The other suites (unit
-// tests, spec checks) run one after another beside them, at a lower CPU
+// tests and spec checks) run in separate lanes beside them, at a lower CPU
 // priority, so the app suites keep their timing. JUNO_PLAN_SERIAL=1 runs every
 // step one after another instead.
 //
@@ -46,20 +46,22 @@ const appSuites = ['test:desktop', 'test:gallery', 'test:e2e']
 export function lanes(steps, serial) {
   if (serial) return [steps]
   const app = steps.filter((step) => appSuites.includes(step.script))
-  const rest = steps.filter((step) => !appSuites.includes(step.script))
-  return [app, rest].filter((lane) => lane.length > 0)
+  const specs = steps.filter((step) => step.script === 'specs:check')
+  const rest = steps.filter((step) => !appSuites.includes(step.script) && step.script !== 'specs:check')
+  return [app, rest, specs].filter((lane) => lane.length > 0)
 }
 
 /**
- * Worker counts for lanes that run side by side, so together they fit the machine. With the defaults (8 desktop
- * workers, 3 gallery workers per core, the unit and spec lane at full width beside them) an 8-core plan ran 4 to 7
- * runnable tasks per core and tests waited for a core most of the time; with these it ran 1.6 at the median, about
- * 6% slower (docs/development.md, "Machine shapes"). A step's own KEY=VALUE words still win.
+ * Worker counts for the three lanes on an 8-core machine: four app workers,
+ * two unit workers, and one simulation beside one Apalache checker. Gallery
+ * has six workers because its checks spend time waiting for the browser.
+ * A step's own KEY=VALUE words still win.
  */
 export function sideBySide(cores) {
   return {
-    app: { JUNO_E2E_WORKERS: String(Math.max(2, Math.floor((cores * 5) / 8))), GALLERY_WORKERS: String(cores) },
-    rest: { JUNO_VITEST_WORKERS: String(Math.max(2, Math.floor(cores / 2))), JUNO_TEST_PACKAGE_JOBS: '1', SPECS_JOBS: String(Math.max(1, Math.floor(cores / 4))), SPECS_APALACHE: '1' },
+    app: { JUNO_E2E_WORKERS: String(Math.max(2, Math.floor(cores / 2))), GALLERY_WORKERS: String(Math.max(2, Math.floor((cores * 3) / 4))) },
+    rest: { JUNO_VITEST_WORKERS: String(Math.max(1, Math.floor(cores / 4))), JUNO_TEST_PACKAGE_JOBS: '1' },
+    specs: { SPECS_JOBS: String(Math.max(1, Math.floor(cores / 8))), SPECS_APALACHE: '1' },
   }
 }
 
@@ -82,7 +84,8 @@ if (import.meta.main) {
     new Promise((resolvePromise) => {
       const started = Date.now()
       const command = low ? ['nice', ['-n', '10', 'pnpm', step.script, ...step.args]] : ['pnpm', [step.script, ...step.args]]
-      const child = spawn(command[0], command[1], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...(shared === undefined ? {} : appSuites.includes(step.script) ? shared.app : shared.rest), ...step.env, JUNO_HEAVY_HELD: '1' } })
+      const laneEnv = appSuites.includes(step.script) ? shared?.app : step.script === 'specs:check' ? shared?.specs : shared?.rest
+      const child = spawn(command[0], command[1], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...laneEnv, ...step.env, JUNO_HEAVY_HELD: '1' } })
       children.add(child)
       const prefix = `[${step.script}] `
       for (const [stream, out] of [[child.stdout, process.stdout], [child.stderr, process.stderr]]) createInterface({ input: stream }).on('line', (line) => out.write(prefix + line + '\n'))
@@ -97,7 +100,7 @@ if (import.meta.main) {
   console.log(`plan: ${steps.length} step(s) in ${planned.length} lane(s): ${planned.map((lane) => lane.map((step) => step.script).join(', ')).join(' | ')}`)
   const codes = (await Promise.all(planned.map(async (lane, index) => {
     const results = []
-    // Only the second lane runs beside the app suites, so only it gives way.
+    // The unit and spec lanes give priority to the app lane.
     for (const step of lane) results.push(await run(step, index > 0 && planned.length > 1))
     return results
   }))).flat()
