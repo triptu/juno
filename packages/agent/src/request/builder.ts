@@ -24,6 +24,11 @@
  * to the tail as the provider cached it. A change costs the tail, which a
  * new run sends again anyway. It is counted with the system text.
  *
+ * The files of the people a run involves (`<people-now>`) come after the
+ * tail, at the end of the memory message: past everything the provider
+ * cached from the last run, so an update to a file never costs the cached
+ * prefix. They too are read once per run and counted with the system text.
+ *
  * The builder sees each archive entry as one active entry. An assistant
  * message with several tool calls is counted as one call (its first) and
  * the other results as notes, because the memory rules pair one call id
@@ -77,20 +82,21 @@ export function createRequestBuilder(options: {
   readonly systemAndTools: () => ReadonlyArray<string>
   /** The outline of Juno's memory of the owner now, or none. */
   readonly outline?: () => string
+  /** The files of the people the run with history cutoff `h` involves, or ''. */
+  readonly people?: (h: number) => string
 }): RequestBuilder {
   const { store, guard } = options
-  let frozen: { readonly h: number; readonly text: string } | undefined
-  const outlineFor = (h: number): string => {
-    if (options.outline === undefined) return ''
-    if (frozen?.h !== h) frozen = { h, text: options.outline() }
-    return frozen.text
+  let frozen: { readonly h: number; readonly text: string; readonly people: string } | undefined
+  const memoryFor = (h: number) => {
+    if (frozen?.h !== h) frozen = { h, text: options.outline?.() ?? '', people: options.people?.(h) ?? '' }
+    return frozen
   }
   return {
     chat: (request) => {
       const snapshot = read(store, request.h)
-      const about = outlineFor(request.h)
+      const { text: about, people } = memoryFor(request.h)
       const systemAndTools = options.systemAndTools()
-      const counted = about === '' ? systemAndTools : [...systemAndTools, about]
+      const counted = [...systemAndTools, ...(about === '' ? [] : [about]), ...(people === '' ? [] : [people])]
       const built = buildRequest({
         ...snapshot, h: request.h, systemAndTools: counted, parents: [], contextWindow: request.model.contextWindow,
         multiplier: multiplier(store, request.model.provider),
@@ -107,7 +113,7 @@ export function createRequestBuilder(options: {
       })
       const memoryMessage = {
         role: 'user', timestamp: 0,
-        content: ['<remembered>', pins, '</remembered>', '<memory>', memory, '</memory>', ...(about === '' ? [] : [about]), '<recent>', ...tail, '</recent>'].join('\n'),
+        content: ['<remembered>', pins, '</remembered>', '<memory>', memory, '</memory>', ...(about === '' ? [] : [about]), '<recent>', ...tail, '</recent>', ...(people === '' ? [] : [people])].join('\n'),
       } as WireMessage
       const system = request.messages.filter((m) => role(m) === 'system')
       const run = request.messages.filter((m) => role(m) !== 'system').map((m) => {

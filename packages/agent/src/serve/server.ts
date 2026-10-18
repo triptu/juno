@@ -62,6 +62,7 @@ import { activityPage, emptyRemembers, memoryPage, remembersPage, reviewPage } f
 import { askLines, askViews, docNotes, docsPage } from '../memory-docs/views'
 import { entryId, ownerAdd, ownerDelete, ownerEdit, undoRun, type WriteResult } from '../memory-docs/store'
 import { dismiss } from '../memory-docs/asks'
+import { deletePerson, setRelationship } from '../memory-docs/people'
 import { runnerPlatform, type RendererTransport } from './runner'
 
 export interface ChatHost {
@@ -279,6 +280,13 @@ const docAnswer = (opId: OpId, result: WriteResult) => {
     case 'full':
     case 'docFull':
       return Effect.fail(new AgentCommandError({ reason: 'invalid', message: copy.full }))
+    case 'sectionFull':
+    case 'fileFull':
+      return Effect.fail(new AgentCommandError({ reason: 'invalid', message: copy.fileFull }))
+    // The owner's own words are never refused as sensitive; a file that went is a change under the page.
+    case 'sensitive':
+    case 'unknownPerson':
+      return Effect.fail(new AgentCommandError({ reason: 'stale', message: copy.stale }))
   }
 }
 
@@ -492,8 +500,17 @@ export function agentHandlers(host: ChatHost) {
               }),
             ),
           ),
-        'agent.docs.page': () => (state.turns === undefined ? Stream.make({ page: { docs: [], changes: [] }, revisions: [] }) : live(state.changes, () => docsPage(state.turns!.store))),
-        'agent.docs.add': ({ opId, doc, text }) => Effect.flatMap(local(state, host), (turns) => changed(Effect.suspend(() => docAnswer(opId, ownerAdd(turns.store, { opId, doc, text }))))),
+        'agent.docs.page': () => (state.turns === undefined ? Stream.make({ page: { docs: [], people: [], changes: [] }, revisions: [] }) : live(state.changes, () => docsPage(state.turns!.store))),
+        'agent.docs.add': ({ opId, doc, text, person, section }) =>
+          Effect.flatMap(local(state, host), (turns) => changed(Effect.suspend(() => docAnswer(opId, ownerAdd(turns.store, { opId, doc, text, ...(person === undefined ? {} : { person, ...(section === undefined ? {} : { section }) }) }))))),
+        'agent.docs.relationship': ({ opId, person, revision, relationship }) =>
+          Effect.flatMap(local(state, host), (turns) => changed(Effect.suspend(() =>
+            setRelationship(turns.store, { person, relationship, by: 'owner', expected: revision })._tag === 'set'
+              ? Effect.succeed({ opId })
+              : Effect.fail(new AgentCommandError({ reason: 'stale', message: chatCopy.docs.refused.stale }))))),
+        'agent.docs.deletePerson': ({ opId, person }) =>
+          Effect.flatMap(local(state, host), (turns) => changed(Effect.suspend(() =>
+            deletePerson(turns.store, { person }) ? Effect.succeed({ opId }) : Effect.fail(new AgentCommandError({ reason: 'stale', message: chatCopy.docs.refused.stale }))))),
         'agent.docs.edit': ({ opId, id, revision, text }) =>
           Effect.flatMap(local(state, host), (turns) => changed(Effect.suspend(() => docAnswer(opId, ownerEdit(turns.store, { opId, entry: entryId(id) ?? -1, version: revision, text }))))),
         'agent.docs.delete': ({ opId, id, revision }) =>

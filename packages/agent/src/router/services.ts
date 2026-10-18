@@ -6,9 +6,10 @@ import { delegateTool } from '../jobs/delegate'
 import { createJobs, type Jobs } from '../jobs/jobs'
 import { subagentDriver } from '../jobs/subagent'
 import { rememberTool } from '../memory-tools/remember'
-import { outlineNow } from '../memory-docs/store'
 import { memoryDocsTools } from '../memory-docs/tools'
-import { createLearning } from '../memory-docs/learn'
+import { createLearning, lookupName } from '../memory-docs/learn'
+import { createContacts, outlineWithPeople, peopleNow, type Contacts } from '../memory-docs/people'
+import { createPeopleRefresh } from '../memory-docs/refresh'
 import { createOwnership } from '../ownership/service'
 import type { ProviderGuardApi } from '../providers'
 import { createRedaction, removeExecutor, removeTool } from '../redaction'
@@ -56,7 +57,8 @@ export function createTurnServices(setup: Setup) {
       ...registered.filter((r) => r.callers?.includes('model') ?? true).map(declaration),
     ]
   }
-  const builder = createRequestBuilder({ store, guard, systemAndTools, outline: () => outlineNow(store) })
+  const contacts = createContacts()
+  const builder = createRequestBuilder({ store, guard, systemAndTools, outline: () => outlineWithPeople(store), people: (h) => peopleNow(store, h) })
   const router = createRouter({
     store, session, builder, model: models.running, tools,
     rotate: session.rotate,
@@ -77,7 +79,7 @@ export function createTurnServices(setup: Setup) {
     ...(options.onReport ? { onReport: options.onReport } : {}),
   })
   const { scheduler, viewSettings, actions, redaction } = createActionServices({ ...setup, router, jobs, subagentModel })
-  const ownTools = createTools({ ...setup, router, jobs, scheduler, viewSettings, actions, subagentModel })
+  const ownTools = createTools({ ...setup, router, jobs, scheduler, viewSettings, actions, subagentModel, contacts })
   const registeredTools = scripting ? () => [...ownTools(), scripting.tool] : ownTools
   // §5.4: a run the daily cap blocked brings the Budget card, one per day and raise.
   router.subscribe((event) => {
@@ -92,11 +94,22 @@ export function createTurnServices(setup: Setup) {
     model: () => (models.running().provider === 'openai-codex' ? subagentModel : models.running()),
     ...(options.host ? { host: options.host } : {}),
     ...(options.connections ? { connections: options.connections } : {}),
+    contacts,
     written: (runId, doc) => router.emit({ _tag: 'memoryUpdated', runId, doc }),
     changed: () => router.emit({ _tag: 'asked' }),
     ...(options.onReport ? { onReport: options.onReport } : {}),
   })
-  return { router, jobs, scheduler, actions, redaction, ownership, learning, tools, section, scripts: scripting?.scripts }
+  const refresh = typeof options.peopleRefresh === 'object' ? options.peopleRefresh : {}
+  const people = createPeopleRefresh({
+    store, guard, host: options.host, contacts,
+    // Background work uses the cheaper model when there is one.
+    model: () => subagentModel ?? models.running(),
+    enabled: () => options.aiEnabled?.() === true,
+    changed: () => router.emit({ _tag: 'asked' }),
+    ...(options.onReport ? { onReport: options.onReport } : {}),
+    ...(refresh.intervalMs === undefined ? {} : { limits: { intervalMs: refresh.intervalMs } }),
+  })
+  return { router, jobs, scheduler, actions, redaction, ownership, learning, people, tools, section, scripts: scripting?.scripts }
 }
 
 type Router = ReturnType<typeof createRouter>
@@ -149,14 +162,17 @@ function createActionServices({ store, options, session, backup, poke, router, j
   return { scheduler, viewSettings, actions, redaction }
 }
 
-function createTools({ store, options, guard, router, jobs, scheduler, viewSettings, actions, subagentModel }: Pick<ActionSetup, 'store' | 'options' | 'guard' | 'router' | 'jobs' | 'subagentModel'> & Pick<ReturnType<typeof createActionServices>, 'scheduler' | 'viewSettings' | 'actions'>) {
+function createTools({ store, options, guard, router, jobs, scheduler, viewSettings, actions, subagentModel, contacts }: Pick<ActionSetup, 'store' | 'options' | 'guard' | 'router' | 'jobs' | 'subagentModel'> & Pick<ReturnType<typeof createActionServices>, 'scheduler' | 'viewSettings' | 'actions'> & { readonly contacts: Contacts }) {
   const memoryTools = [
     rememberTool({
       store,
       current: () => router.toolRun(),
       remembered: (runId, pin) => router.emit({ _tag: 'remembered', runId, pinId: pin.id, version: pin.version, text: pin.text }),
     }),
-    ...memoryDocsTools({ store, current: () => router.toolRun(), written: (runId, doc) => router.emit({ _tag: 'memoryUpdated', runId, doc }) }),
+    ...memoryDocsTools({
+      store, current: () => router.toolRun(), written: (runId, doc) => router.emit({ _tag: 'memoryUpdated', runId, doc }), contacts,
+      ...(options.host ? { lookup: lookupName(options.host) } : {}),
+    }),
   ]
   const redactionTools = [removeTool({ store, current: () => router.toolRun(), propose: actions.propose })]
   const scheduleContext = { store, scheduler, current: () => router.toolRun(), propose: actions.propose }
