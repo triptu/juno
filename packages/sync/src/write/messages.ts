@@ -54,11 +54,25 @@ export const replaceReactions = (message: ReactionTarget, reactions: ReadonlyArr
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     const { channel, ts } = message
-    yield* sql`DELETE FROM reactions WHERE channel = ${channel} AND ts = ${ts}`
-    for (const reaction of reactions) {
+    const next = reactions.map((reaction) => {
       const users = reaction.users ?? []
+      return {
+        name: reaction.name,
+        count: reaction.count ?? users.length,
+        user_ids_json: JSON.stringify(users),
+        me: users.includes(selfId) ? 1 : 0,
+      }
+    })
+    const stored = yield* sql<{ name: string; count: number; user_ids_json: string; me: number }>`
+      SELECT name, count, user_ids_json, me FROM reactions WHERE channel = ${channel} AND ts = ${ts} ORDER BY rowid`
+    if (stored.length === next.length && stored.every((row, index) => {
+      const expected = next[index]
+      return expected !== undefined && row.name === expected.name && row.count === expected.count && row.user_ids_json === expected.user_ids_json && row.me === expected.me
+    })) return
+    yield* sql`DELETE FROM reactions WHERE channel = ${channel} AND ts = ${ts}`
+    for (const reaction of next) {
       yield* sql`INSERT INTO reactions (channel, ts, name, count, user_ids_json, me)
-        VALUES (${channel}, ${ts}, ${reaction.name}, ${reaction.count ?? users.length}, ${JSON.stringify(users)}, ${users.includes(selfId) ? 1 : 0})`
+        VALUES (${channel}, ${ts}, ${reaction.name}, ${reaction.count}, ${reaction.user_ids_json}, ${reaction.me})`
     }
     yield* invalidate(syncKeys.messagesOf(message))
   })

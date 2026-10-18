@@ -74,14 +74,20 @@ const catchUpAfterGap = (runtime: SyncRuntime) => Effect.gen(function* () {
   const droppedAt = state.droppedAt
   state.droppedAt = undefined
   const recheck = droppedAt === undefined ? undefined : { since: droppedAt, first: yield* openNow }
-  yield* catchUp(ctx, previous, reportBoot, { refreshWorkspace: false, refreshMetadata: droppedAt !== undefined, refreshThreads: true, ...(recheck === undefined ? {} : { recheck }) }).pipe(
+  const next = yield* catchUp(ctx, previous, reportBoot, {
+    refreshWorkspace: false,
+    refreshMetadata: droppedAt !== undefined,
+    refreshThreads: true,
+    persistState: droppedAt !== undefined,
+    ...(recheck === undefined ? {} : { recheck }),
+  }).pipe(
     Effect.tapError(() =>
       Effect.sync(() => {
         if (droppedAt !== undefined) state.droppedAt = Math.min(droppedAt, state.droppedAt ?? droppedAt)
       }),
     ),
   )
-  state.lastBoot = yield* bootState()
+  state.lastBoot = next
   yield* refreshOpenTopics(runtime)
 })
 
