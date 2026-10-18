@@ -52,7 +52,7 @@ export default defineFixtures(HuddleHeaderButton, {
           <TooltipLayer />
         </>
       ),
-      { ...wide, height: 100, tooltip: '[aria-label^="Leave the huddle"]' },
+      { ...wide, height: 100, tooltip: '[aria-label^="Switch to the huddle"]' },
     ),
   },
 })

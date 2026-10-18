@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import type { KeyboardEvent } from 'react'
 import { accent, colors, layout, motion, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { Button, Icon, moveFocus, ringRoom, Surface, Text } from '@juno/ui'
+import { Button, focusRing, Icon, moveFocus, ringRoom, Surface, Text } from '@juno/ui'
 
 export interface ScreenSource {
   readonly id: string
@@ -152,14 +152,14 @@ function SourceTile({ source, checked, onChoose, onShare }: SourceTileProps) {
       onClick={onChoose}
       onDoubleClick={onShare}
       autoFocus={checked}
-      {...stylex.props(stylex.defaultMarker(), styles.tile)}
+      {...stylex.props(stylex.defaultMarker(), styles.tile, focusRing.outside)}
     >
       <span {...stylex.props(styles.thumb, checked && styles.thumbChecked)}>
         {source.thumbnailUrl === undefined ? null : <img alt="" src={source.thumbnailUrl} draggable={false} {...stylex.props(styles.image)} />}
       </span>
       <span {...stylex.props(styles.name)}>
         {source.appIconUrl === undefined ? null : <img alt="" src={source.appIconUrl} draggable={false} {...stylex.props(styles.appIcon)} />}
-        <Text variant="meta" tone={checked ? 'default' : 'subtle'} weight={checked ? 'medium' : undefined} truncate dir="auto">
+        <Text variant="meta" tone={checked ? 'default' : 'subtle'} weight={checked ? 'medium' : undefined} truncate tooltipWhenTruncated dir="auto">
           {source.name}
         </Text>
       </span>
@@ -219,10 +219,8 @@ const styles = stylex.create({
     gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
     gap: spacing['--space-3'],
   },
-  // No ring of its own: the ring on its picture shows focus and the choice (thumbChecked).
   tile: {
     appearance: 'none',
-    outlineStyle: 'none',
     display: 'flex',
     flexDirection: 'column',
     gap: spacing['--space-1-5'],
@@ -255,12 +253,9 @@ const styles = stylex.create({
       [stylex.when.ancestor(':hover')]: { default: null, '@media (hover: hover)': colors['--border-strongest'] },
     },
   },
-  // The chosen one, and the one with keyboard focus (the arrows choose as they move, so they are one tile): the ring on its picture.
+  // The chosen one: the accent ring on its picture. Keyboard focus is the usual ring around the whole tile.
   thumbChecked: {
-    outlineColor: {
-      default: accent['--hl'],
-      [stylex.when.ancestor(':focus-visible')]: accent['--focus-ring'],
-    },
+    outlineColor: accent['--hl'],
   },
   image: {
     width: '100%',

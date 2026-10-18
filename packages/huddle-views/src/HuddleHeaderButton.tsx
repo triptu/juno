@@ -40,15 +40,18 @@ export function HuddleHeaderButton({ mode, people = [], current, place, onClick 
     return <IconButton icon={Headphones} label="Start huddle" size={28} iconSize={16} radius="full" variant="island" onClick={onClick} />
   }
   const label = mode === 'join' ? 'Join' : mode === 'switch' ? 'Switch' : 'In huddle'
-  const hint =
-    mode === 'join'
-      ? `Join the huddle in ${place}`
-      : mode === 'switch'
-        ? `Leave the huddle in ${current ?? 'the other channel'} and join this one`
-        : 'Open huddle'
+  // The name starts with the visible word, so Voice Control's "click Switch" works; the tooltip says what it does.
+  const name = mode === 'join' ? `Join the huddle in ${place}` : mode === 'switch' ? `Switch to the huddle in ${place}` : 'In huddle, open it'
+  const hint = mode === 'join' ? name : mode === 'switch' ? `Leave the huddle in ${current ?? 'the other channel'} and join this one` : 'Open huddle'
   const faces = mode !== 'joined' && people.length > 0
   return (
-    <button type="button" aria-label={hint} {...tooltip(hint)} onClick={onClick} {...stylex.props(styles.button, faces && styles.withFaces, focusRing.outside)}>
+    <button
+      type="button"
+      aria-label={name}
+      {...tooltip(hint)}
+      onClick={onClick}
+      {...stylex.props(styles.button, faces && styles.withFaces, mode === 'joined' && styles.joined, focusRing.outside)}
+    >
       <span {...stylex.props(styles.icon)}>
         <Icon icon={Headphones} size={14} weight="fill" />
       </span>
@@ -102,6 +105,14 @@ const styles = stylex.create({
   icon: {
     display: 'inline-flex',
     color: colors['--huddle-live'],
+  },
+  // In this huddle: the island's pressed fill, so the narrow icon tells In huddle from Join.
+  joined: {
+    backgroundColor: {
+      default: colors['--secondary-hover'],
+      ':hover': { default: null, [HOVER]: colors['--secondary-active'] },
+      ':active': { default: colors['--secondary-active'], [HOVER]: colors['--secondary-active'] },
+    },
   },
   // The faces end as far from the pill's end as they are from its top and bottom: (28 - 18) / 2.
   withFaces: {

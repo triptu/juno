@@ -25,6 +25,8 @@ export interface HuddleBarProps extends HuddleControlsState, HuddleControlsActio
   readonly onOpen: (event: ActivateEvent) => void
   /** The device menu's content, shown while `devicesOpen`. */
   readonly devices?: ReactNode
+  /** Said once to a screen reader: "Maya joined", "Muted". The status line's notices are said too; the duration never is. */
+  readonly announcement?: string
 }
 
 /**
@@ -34,8 +36,10 @@ export interface HuddleBarProps extends HuddleControlsState, HuddleControlsActio
  * Microphone and speaker, and Leave. Every state is the same height, so a
  * change in the huddle moves nothing in the sidebar.
  */
-export function HuddleBar({ place, connection, duration, people, sharers = [], onOpen, devices, ...controls }: HuddleBarProps) {
+export function HuddleBar({ place, connection, duration, people, sharers = [], onOpen, devices, announcement, ...controls }: HuddleBarProps) {
   const status = statusLine({ connection, micBlocked: controls.micBlocked ?? false, sharers, sharing: controls.sharing, duration })
+  // A notice keeps its share of the room; the duration gives way first.
+  const notice = status !== duration
   return (
     <section aria-label="Huddle" data-huddle-bar="" {...stylex.props(styles.root)}>
       <div {...stylex.props(styles.card)}>
@@ -43,10 +47,10 @@ export function HuddleBar({ place, connection, duration, people, sharers = [], o
           <span {...stylex.props(styles.placeIcon)}>
             <Icon icon={placeIcons[place.kind]} size={16} />
           </span>
-          <Text variant="ui" weight="medium" tone="default" truncate dir="auto" sx={styles.name}>
+          <Text variant="ui" weight="medium" tone="default" truncate tooltipWhenTruncated dir="auto" sx={styles.name}>
             {place.name}
           </Text>
-          <Text variant="meta" tone="muted" numeric truncate role="status" sx={styles.status}>
+          <Text variant="meta" tone="muted" numeric truncate tooltipWhenTruncated sx={[styles.status, notice && styles.keeping]}>
             {status}
           </Text>
           <span {...stylex.props(styles.spacer)} />
@@ -55,6 +59,9 @@ export function HuddleBar({ place, connection, duration, people, sharers = [], o
             <Icon icon={CaretRight} size={12} weight="bold" />
           </span>
         </button>
+        <span role="status" {...stylex.props(styles.announce)}>
+          {notice ? status : (announcement ?? '')}
+        </span>
         <div role="group" aria-label="Huddle controls" {...stylex.props(styles.controls)}>
           <HuddleControls shape="bar" devices={devices} {...controls} />
         </div>
@@ -133,6 +140,18 @@ const styles = stylex.create({
     flexGrow: 0,
     flexShrink: 4,
     minWidth: 0,
+  },
+  // While the status line is a notice (Reconnecting…, Microphone blocked, who shares), it shortens with the name, by their widths.
+  keeping: { flexShrink: 1 },
+  // Heard, not seen: what changed, never the ticking duration.
+  announce: {
+    position: 'absolute',
+    width: '1px', // tokens-allow: the visually hidden pattern
+    height: '1px', // tokens-allow: the visually hidden pattern
+    margin: 0,
+    overflow: 'hidden',
+    clipPath: 'inset(50%)',
+    whiteSpace: 'nowrap',
   },
   spacer: {
     flexGrow: 1,

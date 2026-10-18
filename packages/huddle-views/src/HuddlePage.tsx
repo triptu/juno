@@ -27,6 +27,8 @@ export interface HuddleInState extends HuddleControlsState, HuddleControlsAction
   readonly duration: ReactNode
   /** What the user shares ("Entire screen", a window's name), while `sharing`. */
   readonly sharingSource?: string
+  /** Said once to a screen reader: "Maya joined", "Muted". The status line's notices are said too; the duration never is. */
+  readonly announcement?: string
 }
 
 /** The huddle runs and the user is not in it. `switching`: they are in another, so Join leaves it. */
@@ -45,9 +47,10 @@ export interface HuddleEndedState {
 
 export interface HuddleFailedState {
   readonly kind: 'failed'
-  /** One sentence: "This huddle is full." */
+  /** One or two sentences: "This huddle is full." */
   readonly reason: string
-  readonly onRetry: () => void
+  /** Absent when trying again cannot work (huddles are turned off in the workspace). */
+  readonly onRetry?: () => void
 }
 
 export type HuddlePageState = HuddleInState | HuddleOutState | HuddleEndedState | HuddleFailedState
@@ -95,6 +98,9 @@ export function HuddlePage({ place, state, people, shares = [], renderShare, exp
       : state.kind === 'out'
         ? statusLine({ connection: 'live', sharers: shares.map((share) => share.ownerName), duration: state.duration })
         : undefined
+  const duration = state.kind === 'in' || state.kind === 'out' ? state.duration : undefined
+  const notice = status !== duration ? status : undefined
+  const announcement = state.kind === 'in' ? state.announcement : undefined
   const expanded = shares.find((share) => share.id === expandedShare)
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== 'Escape' || expanded === undefined) return
@@ -118,10 +124,13 @@ export function HuddlePage({ place, state, people, shares = [], renderShare, exp
             />
             <h1 {...stylex.props(styles.title)}>Huddle</h1>
             {status === undefined ? null : (
-              <Text variant="meta" tone="muted" numeric truncate role="status" sx={styles.status}>
+              <Text variant="meta" tone="muted" numeric truncate sx={styles.status}>
                 {status}
               </Text>
             )}
+            <span role="status" {...stylex.props(styles.announce)}>
+              {notice ?? announcement ?? ''}
+            </span>
           </Surface>
           {onOpenThread === undefined ? null : (
             <Surface kind="island" data-island="right" sx={styles.right}>
@@ -142,7 +151,7 @@ export function HuddlePage({ place, state, people, shares = [], renderShare, exp
         </div>
       ) : state.kind === 'failed' ? (
         <div {...stylex.props(styles.empty)}>
-          <EmptyState variant="workspace" title="Couldn't join the huddle" body={state.reason} action={<Button onClick={state.onRetry}>Try again</Button>} />
+          <EmptyState variant="workspace" title="Couldn't join the huddle" body={state.reason} action={state.onRetry === undefined ? undefined : <Button onClick={state.onRetry}>Try again</Button>} />
         </div>
       ) : shares.length > 0 ? (
         <div {...stylex.props(styles.stageArea)}>
@@ -238,7 +247,7 @@ function PeopleStrip({ people, dim }: { readonly people: ReadonlyArray<HuddlePer
       })}
       {rest > 0 ? (
         <li {...stylex.props(styles.chip, styles.chipMore)}>
-          <Text variant="meta" tone="muted" numeric>
+          <Text variant="meta" tone="subtle" numeric>
             +{rest}
           </Text>
         </li>
@@ -261,7 +270,7 @@ function ShareBox({ share, content, expandable, expanded, onExpand }: ShareBoxPr
   return (
     <section aria-label={label} data-share={share.id} {...stylex.props(stylex.defaultMarker(), styles.share)}>
       {share.loading === true ? (
-        <Text variant="meta" tone="muted">
+        <Text variant="meta" tone="subtle">
           Loading {label}
         </Text>
       ) : (
@@ -273,7 +282,7 @@ function ShareBox({ share, content, expandable, expanded, onExpand }: ShareBoxPr
       {expandable ? (
         <button
           type="button"
-          aria-label={expanded ? 'Shrink' : 'Expand'}
+          aria-label={`${expanded ? 'Shrink' : 'Expand'} ${label}`}
           {...tooltip(expanded ? 'Shrink' : 'Expand', expanded ? 'esc' : undefined)}
           onClick={onExpand}
           {...stylex.props(styles.expand, focusRing.outside)}
@@ -342,6 +351,16 @@ const styles = stylex.create({
   },
   status: {
     minWidth: 0,
+  },
+  // Heard, not seen: what changed, never the ticking duration.
+  announce: {
+    position: 'absolute',
+    width: '1px', // tokens-allow: the visually hidden pattern
+    height: '1px', // tokens-allow: the visually hidden pattern
+    margin: 0,
+    overflow: 'hidden',
+    clipPath: 'inset(50%)',
+    whiteSpace: 'nowrap',
   },
   empty: {
     flexGrow: 1,
@@ -441,12 +460,11 @@ const styles = stylex.create({
     backgroundColor: colors['--secondary-default'],
   },
   // A size container, so the container's video (or a fixture's picture) can fit itself with `contain`.
+  // A block, so the video's 100% width and height resolve to the box and `object-fit: contain` fits it whole.
   video: {
     position: 'absolute',
     inset: 0,
-    display: 'grid',
-    placeItems: 'center',
-    containerType: 'size',
+    display: 'block',
   },
   shareLabel: {
     position: 'absolute',
@@ -491,13 +509,13 @@ const styles = stylex.create({
     transitionDuration: { default: motion['--duration-fast'], '@media (prefers-reduced-motion: reduce)': '0ms' },
     scale: { default: '1', ':active': motion['--press-scale'] },
   },
+  // Wraps to a second line rather than hide anyone; the stage gives up the room.
   strip: {
     display: 'flex',
     flexWrap: 'wrap',
     justifyContent: 'center',
     gap: spacing['--space-1'],
-    height: sizes['--control-28'],
-    overflow: 'hidden',
+    minHeight: sizes['--control-28'],
     margin: 0,
     padding: 0,
     listStyle: 'none',

@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { spacing } from '@juno/tokens/tokens.stylex'
-import { OptionGroupLabel, OptionList, OptionRow, OptionSeparator, useMenuActive } from '@juno/ui'
+import { OptionGroupLabel, OptionList, OptionRow, OptionSeparator, Text, useMenuActive } from '@juno/ui'
 import type { HuddleDevice } from './model'
 
 /** The "Same as system" choice; a device's own id otherwise. */
@@ -55,16 +55,25 @@ export function HuddleDeviceMenu({
       <OptionList role="menu" label="Microphone and speaker" {...menu.list}>
         <OptionGroupLabel>Microphone</OptionGroupLabel>
         {mics.map((device) => (
-          <OptionRow key={device.id} {...menu.row(`mic:${device.id}`)} label={device.name} selected={device.id === microphone} onSelect={() => onMicrophone(device.id)} />
+          <OptionRow key={device.id} {...menu.row(`mic:${device.id}`)} label={<Name name={device.name} />} selected={device.id === microphone} onSelect={() => onMicrophone(device.id)} />
         ))}
         <OptionGroupLabel>Speaker</OptionGroupLabel>
         {outs.map((device) => (
-          <OptionRow key={device.id} {...menu.row(`out:${device.id}`)} label={device.name} selected={device.id === speaker} onSelect={() => onSpeaker(device.id)} />
+          <OptionRow key={device.id} {...menu.row(`out:${device.id}`)} label={<Name name={device.name} />} selected={device.id === speaker} onSelect={() => onSpeaker(device.id)} />
         ))}
         <OptionSeparator />
         <OptionRow {...menu.row('noise')} label="Reduce background noise" selected={noiseReduction} onSelect={() => onNoiseReduction(!noiseReduction)} />
       </OptionList>
     </div>
+  )
+}
+
+/** A device's name, in full on hover while the menu cuts it. */
+function Name({ name }: { readonly name: string }) {
+  return (
+    <Text variant="inherit" truncate tooltipWhenTruncated dir="auto">
+      {name}
+    </Text>
   )
 }
 

@@ -82,7 +82,7 @@ export default defineFixtures(
     },
     Failure: {
       full: fixture(page({ people: others(3), state: { kind: 'failed', reason: 'This huddle is full.', onRetry: noop } })),
-      'turned off': fixture(page({ people: [], onOpenThread: undefined, state: { kind: 'failed', reason: 'Huddles are turned off in this workspace.', onRetry: noop } })),
+      'turned off': fixture(page({ people: [], onOpenThread: undefined, state: { kind: 'failed', reason: 'Huddles are turned off in this workspace. A workspace admin can turn them on.' } })),
       'no answer': fixture(page({ people: [], state: { kind: 'failed', reason: "Slack didn't answer. Try again in a moment.", onRetry: noop } })),
     },
   },
