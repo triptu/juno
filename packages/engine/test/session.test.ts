@@ -50,6 +50,8 @@ describe('session', () => {
     expect(ready).toMatchObject({ teamName: 'Juno Fake' })
     expect(sentTags(e)).not.toContain('signIn')
     expect(sentTags(e)).not.toContain('storeSecrets')
+    // Main keeps the verified session, without secrets, so the next launch opens on the shell.
+    expect(e.main.host.fromEngine.find((m) => m._tag === 'sessionReady')).toMatchObject({ session: { teamName: 'Juno Fake' } })
   })
 
   it('imports through main the same way and records the enterprise on Grid', async () => {

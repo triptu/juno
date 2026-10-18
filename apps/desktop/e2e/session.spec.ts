@@ -3,6 +3,7 @@
 // the session expiring under the app.
 import { readFile, access, readdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import type { Page } from '@playwright/test'
 import { expect, launchApp, test, writeSlackApp } from './fixtures'
 import { Juno } from './driver/juno'
 
@@ -56,6 +57,87 @@ test('comes back signed in after a relaunch', async ({ juno, fake, userData, run
   }
 })
 
+/** Resolves once main has saved the verified session for the next launch's first frame (`launch.json`). */
+async function sessionSaved(userData: string, teamId: string): Promise<void> {
+  await expect.poll(async () => {
+    try {
+      const launch = JSON.parse(await readFile(join(userData, 'launch.json'), 'utf8')) as { session?: { teamId?: string } }
+      return launch.session?.teamId
+    } catch {
+      return undefined
+    }
+  }).toBe(teamId)
+}
+
+/**
+ * Samples every frame from now on: whether the sign-in page or the sidebar is on screen.
+ * Playwright attaches only after the first page has started, so the test also holds
+ * Slack's `auth.test` to keep the engine checking the session while it watches.
+ */
+async function watchSignInFrames(win: Page): Promise<() => Promise<{ readonly frames: number; readonly signIn: number; readonly shell: number }>> {
+  await win.evaluate(() => {
+    const state = { signIn: 0, shell: 0, frames: 0, on: true }
+    Object.assign(window, { __signInFrames: state })
+    const tick = () => {
+      state.frames += 1
+      if (document.getElementById('sign-in-title') !== null) state.signIn += 1
+      if (document.querySelector('[role="complementary"][aria-label="Sidebar"]') !== null) state.shell += 1
+      if (state.on) requestAnimationFrame(tick)
+    }
+    tick()
+  })
+  return () =>
+    win.evaluate(() => {
+      const state = (window as unknown as { __signInFrames: { signIn: number; shell: number; frames: number; on: boolean } }).__signInFrames
+      state.on = false
+      return { frames: state.frames, signIn: state.signIn, shell: state.shell }
+    })
+}
+
+test('a relaunch opens on the shell and never paints the sign-in page while Slack checks the session', async ({ juno, fake, userData, running }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await sessionSaved(userData, fake.teamId)
+  await running.close()
+
+  // Slack is slow to answer: the engine stays `starting` until the test lets auth.test through.
+  fake.holdNext({ method: 'auth.test' })
+  const again = await launchApp(userData, { fakeSlackUrl: fake.url })
+  try {
+    const stop = await watchSignInFrames(again.win)
+    const restarted = new Juno(again.app, again.win)
+    await expect.poll(() => fake.heldCount({ method: 'auth.test' }), { timeout: 15_000 }).toBe(1)
+    // The shell and the cached rows, from before Slack has answered.
+    await restarted.sidebar.row('Draft plan is in the doc').expectVisible()
+    await again.win.waitForTimeout(500)
+    fake.release({ method: 'auth.test' })
+    await restarted.expectSignedIn('Juno Fake')
+    const frames = await stop()
+    expect(frames.frames).toBeGreaterThan(10)
+    expect(frames.signIn, 'frames with the sign-in page').toBe(0)
+    expect(frames.shell, 'frames with the sidebar').toBe(frames.frames)
+  } finally {
+    await again.close()
+  }
+})
+
+test('a relaunch whose session Slack no longer accepts shows "Slack signed you out", then opens on it', async ({ juno, fake, userData, running }) => {
+  await juno.signIn()
+  await juno.expectSignedIn('Juno Fake')
+  await sessionSaved(userData, fake.teamId)
+  await running.close()
+  fake.expireSession()
+
+  const again = await launchApp(userData, { fakeSlackUrl: fake.url })
+  try {
+    await new Juno(again.app, again.win).expectSessionExpired()
+    // The saved session is dropped, so the next launch does not open on the shell first.
+    await expect.poll(async () => (JSON.parse(await readFile(join(userData, 'launch.json'), 'utf8')) as { session?: unknown }).session).toBeUndefined()
+  } finally {
+    await again.close()
+  }
+})
+
 test('comes back signed in when the local cache is damaged, and syncs it again', async ({ juno, fake, userData, running, slackApp }) => {
   await juno.signIn()
   await juno.waitForSync()
@@ -88,6 +170,8 @@ test('signs out: the secrets, the cookies and the session are gone', async ({ ju
 
   await juno.expectSignedOut()
   await expect(access(join(userData, 'secrets.bin'))).rejects.toThrow()
+  // Nor the saved session, so the next launch does not open on the shell.
+  await expect.poll(async () => (JSON.parse(await readFile(join(userData, 'launch.json'), 'utf8')) as { session?: unknown }).session).toBeUndefined()
   await expect.poll(() => fake.socketCount(), { timeout: 10_000 }).toBe(0)
   // A relaunch would find nothing: the next sign-in starts from the sign-in page again.
   await juno.signIn()
