@@ -142,7 +142,7 @@ export class ActionWorker extends Context.Service<
                 Effect.flatMap((answer) =>
                   Effect.map(Clock.currentTimeMillis, (now) => {
                     // Slack's answer carries the message; when it does not, it is what Juno sent. Either way it is edited now.
-                    const sent: Message = answer.message ?? ({ type: 'message', ts: ts as Ts, user: selfId, text, ...(blocks === undefined ? {} : { blocks }) } as Message)
+                    const sent: Message = { type: 'message', user: selfId, text: answer.text ?? text, ...(blocks === undefined ? {} : { blocks }), ...answer.message, ts: ts as Ts }
                     const message: Message = { ...sent, ts: ts as Ts, edited: sent.edited ?? { user: selfId, ts: millisToTs(now) } }
                     return { kind: 'edited', channel, message } as const
                   }),

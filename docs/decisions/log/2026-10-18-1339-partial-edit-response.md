@@ -1,0 +1,1 @@
+- 10-18 13:39 · partial-edit-response · chat.update’s nested message may contain only text and user, with ts on the response envelope. Decode it as a partial message and fill omitted edit content from the request before settlement. The fake now returns this documented response rather than a full history message, so ordinary edit tests cover the decoding defect.
