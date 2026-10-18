@@ -443,6 +443,12 @@ for (const { kind, query } of [{ kind: 'mention', query: '@ma' }, { kind: 'emoji
     const presented = stats(`${kind} typing, input timestamp to character presented`, result.presented)
     stats(`${kind} typing, input to animation frame callback`, result.frame)
     stats(`${kind} typing, animation frame callback to presentation`, result.afterFrame)
+    // By key: which part of the query is slow to show (the trigger that opens the list, a letter that narrows it, the space that closes it).
+    const keys = [...`${query} `]
+    console.log(`${kind} typing by key, input to character presented, median / max: ${keys.map((key, at) => {
+      const own = result.presented.filter((_, i) => i % keys.length === at).toSorted((a, b) => a - b)
+      return `"${key}" ${own[Math.floor(own.length / 2)]!.toFixed(1)} / ${own.at(-1)!.toFixed(1)}`
+    }).join(', ')}`)
     expect.soft(presented.p95, `${kind} typing: input to character presented, within one frame of the bare input`).toBeLessThanOrEqual(budget)
   })
 }
