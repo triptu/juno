@@ -109,6 +109,9 @@ export const colors = stylex.defineVars({
   // The active presence dot: a clear green, 3:1 against the menu it sits in.
   // --success is too deep for a 6px dot (it reads grey, 1.8:1 in dark).
   '--presence-active': '#1F9D66',
+  // Live in a huddle: the speaking ring and the green headphones. A step deeper than the
+  // presence dot so it holds 3:1 on the tiles' secondary fill too (3.36:1; 3.76:1 on a card).
+  '--huddle-live': '#1C935F',
   '--warning': '#E0A500',
   '--info': '#008AB3',
 
@@ -904,6 +907,11 @@ export const layout = stylex.defineVars({
   // gutter and the 1px border on each side.
   '--emoji-picker-width': '314px',
   '--emoji-picker-height': '360px',
+  // A huddle tab's participant tile: a 44px photo and a name of about 18 characters. Rows of them wrap and centre.
+  '--huddle-tile-width': '160px',
+  // The screen share sheet: three thumbnails a row at 16:10, and its list's one height in every state (it scrolls past it).
+  '--source-picker-width': '600px',
+  '--source-picker-list-height': '420px',
   '--toast-max-width': '352px',
   '--toast-inset': '16px',
   '--scrollbar-size': '10px',
@@ -961,6 +969,8 @@ export const sizes = stylex.defineVars({
   '--avatar-11': '11px',
   '--avatar-stack-overlap': '-4px',
   '--avatar-ring': '1.5px',
+  // The green ring around a huddle participant who is speaking (avatar or tile).
+  '--speaking-ring': '2px',
 
   '--initials-44': '14px',
   '--initials-36': '14px',

@@ -212,7 +212,8 @@ Used by: page header context pill, Juno send-card pill. Icons: `hash` (public), 
 | --- | --- | --- | --- |
 | `--danger` | #C41E3A light, #F8767E dark | css / redesign | Sign-in error line. 5.64:1 on paper, 6.59:1 on ink |
 | `--success` | #00674F | css | Resolved check icon in rows; Resolved status chip tint |
-| `--presence-active` | #1F9D66 light (3.34:1 on the menu), #34C77B dark (5.59:1 on `--surface-raised`) | friendly layer | The active presence dot. `--success` read grey at 6px (1.78:1 in dark) |
+| `--presence-active` | #1F9D66 light (3.34:1 on the menu), #34C77B dark (5.59:1 on `--surface-raised`) | friendly layer | The active presence dot. `--success` read grey at 6px (1.78:1 in dark). |
+| `--huddle-live` | #1C935F light, #34C77B dark (the presence green) | huddles 10-18 | Live in a huddle (SPEC 20): the speaking ring, and the headphones on a running huddle's row and on Join. The same green idea as presence, a step deeper in light: `--presence-active` is 2.98:1 on the tiles' `--secondary-default`, this is 3.36:1 there and 3.76:1 on a card (dark: 6.12:1 and 7.1:1). A graphic, never text |
 | `--warning` | #E0A500 | css | Only ever mixed (private tint, audience guard). As text it is 2.13:1, never use raw |
 | `--info` | #008AB3 | css | Only mixed (DM tint). 3.85:1 as text |
 | Resolved chip | bg `color-mix(in oklch, var(--success) 12%, var(--background))`, fg `color-mix(in oklch, var(--success) 70%, var(--foreground-default))` light, `52%` dark | proto / redesign | Light #DCE9E4 / #165240 (7.27:1); dark #18231F / #7AA696 (5.94:1; 70% was 4.27:1 on the new palette) |
@@ -471,6 +472,9 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--thumb-tile-height` | 117px. A tile of that grid when it has two rows: two rows and the gap fill `--thumb-max-height`. |
 | `--filmstrip-thumb` | 56px. A square picture in the media viewer's filmstrip. |
 | `--viewer-bar-width` | 560px. The media viewer's header bar: one width for every item, so moving between items never moves its buttons. |
+| `--huddle-tile-width` | 160px. A huddle tab's participant tile (inventory 22.2): a 44px face and a name of about 18 characters at 13.5px. Fixed, so a row of tiles wraps and centres instead of stretching; the people line's chips stop at the same width. New because no existing width fits a tile |
+| `--source-picker-width` | 600px. The screen share sheet (inventory 22.6): three 16:10 thumbnails a row at about 180px, the size macOS's own picker shows them at. Wider than `--palette-width` (560), which fits two |
+| `--source-picker-list-height` | 420px. The sheet's list area, one height in every state (the permission steps, the wait, the grid), so the sheet never changes size when the thumbnails arrive; the grid scrolls past it. Two rows of tiles and a heading fit |
 
 ### Controls
 
@@ -530,6 +534,10 @@ Sidebar row heights per density (Settings › Appearance; rows include the tile;
 [built M10] The `density` group in `tokens.stylex.ts` holds what changes, and `compact` in `themes.stylex.ts` overrides it on `<html>`: `--density-row-padding-block` 11px / 8px, `--density-row-line-gap` (line three's margin) 2px / 0px, `--density-row-tile-zoom` 1 / 0.8182 (the 44px tile drawn at 36px), `--density-row-estimate` (the row's content height and off-screen estimate) `--row-topic-estimate` / 64px, `--density-row-two-line-estimate` (the same for any Main, which has no meta line) `--row-topic-two-line-estimate` 42px / 42px, so those rows are 64px / 58px, `--density-message-padding-block` 4px / 2px, `--density-message-group-gap` 12px / 6px. The title size does not change yet.
 
 Two-line picker row (the topic switcher, New chat's pickers): 44px, a 20px title line (`--text-option-title-leading`) over a 16px meta line (`--text-option-meta-leading`), 4px above and below. Gap between rows: 2px. All topics table row: min 52px. Notification rule row: min 48px. Today log row: min 44px. Palette result: 55px. Menu item: 30px (context) / 32px (other menus). Message group spacing (margin above a new sender): Compact 6px, Comfortable 12px. Message padding: 2 8 / 4 8.
+
+### Huddles
+
+`--speaking-ring` 2px (`sizes` group): the green ring around a participant who is speaking, an outline 1.5px (`--avatar-ring`) outside a face in the bar, the header control and the people line, and inside the edge of a tab's tile. An outline, so it never changes the layout; its colour fades over `--duration-fast`. 2px, not the 1.5px avatar ring, because it has to read at 18px from across the room. The bar reuses the islands' look (`--surface-default`, `--card-ring`, radius 12 = 8 + 4) and shares sit on `--secondary-default` with the media viewer's `--media-scrim` labels. Nothing else is new.
 
 ### Privacy mode
 
