@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode, type Ref } from 'react'
+import { useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type Ref } from 'react'
 import type { FileView, MessageView, Person } from '@juno/contract'
 import { layout, sizes, spacing, z } from '@juno/tokens/tokens.stylex'
 import { EmptyState, hueForId, ScrollArea, Text, type ActivateEvent, type HueName } from '@juno/ui'
@@ -113,6 +113,44 @@ const THREAD_ROW = '[data-thread]'
 const SHOWS_TOOLBAR = `${ROW}:is(:hover, :focus-within)`
 
 /** Arrow keys move focus between rows; the row that takes focus becomes the tabbable one. Other keys on a row go to `onRowKey`. */
+/** How far a press on the list moves before it is a drag selection, px. */
+const DRAG_SELECTION = 4
+
+/**
+ * A press with the primary button that moves is a drag selection: until the
+ * button is up the list carries `data-selecting` and `--row-hover-toolbar:
+ * none`, so no row shows or places its hover toolbar, as native apps keep
+ * hover controls out of the way of a selection. On release the row under
+ * the pointer places its toolbar and shows it again. Nothing re-renders, and
+ * focus and the keyboard are untouched: a focused row still shows its toolbar.
+ */
+function watchSelectionDrag(event: PointerEvent<HTMLDivElement>): void {
+  if (event.button !== 0 || event.pointerType !== 'mouse' || !(event.target instanceof Element) || event.target.closest('button, a, input, textarea, [role="toolbar"]') !== null) return
+  const list = event.currentTarget.closest<HTMLElement>('[data-scroll-area]')
+  if (list === null) return
+  const from = { x: event.clientX, y: event.clientY }
+  let dragging = false
+  const move = (next: globalThis.PointerEvent) => {
+    if (dragging || Math.hypot(next.clientX - from.x, next.clientY - from.y) < DRAG_SELECTION) return
+    dragging = true
+    list.toggleAttribute('data-selecting', true)
+    list.style.setProperty('--row-hover-toolbar', 'none')
+  }
+  const end = (last: globalThis.PointerEvent) => {
+    window.removeEventListener('pointermove', move, true)
+    window.removeEventListener('pointerup', end, true)
+    window.removeEventListener('pointercancel', end, true)
+    if (!dragging) return
+    list.removeAttribute('data-selecting')
+    list.style.removeProperty('--row-hover-toolbar')
+    const row = document.elementFromPoint(last.clientX, last.clientY)?.closest<HTMLElement>(ROW)
+    if (row != null && list.contains(row)) placeToolbar(row)
+  }
+  window.addEventListener('pointermove', move, true)
+  window.addEventListener('pointerup', end, true)
+  window.addEventListener('pointercancel', end, true)
+}
+
 function onKeyDown(event: KeyboardEvent<HTMLDivElement>, onRowKey: MessageListProps['onRowKey']) {
   const target = event.target
   if (!(target instanceof HTMLElement) || !target.matches(ROW)) return
@@ -224,7 +262,7 @@ export function MessageList({
       ref={scrollRef}
       data-scroll=""
       // A row that scrolled under a still pointer, or under the band with focus, places its toolbar again once the list stops.
-      onScrollEnd={actions === undefined ? undefined : (event) => event.currentTarget.querySelectorAll<HTMLElement>(SHOWS_TOOLBAR).forEach(placeToolbar)}
+      onScrollEnd={actions === undefined ? undefined : (event) => event.currentTarget.closest('[data-selecting]') === null && event.currentTarget.querySelectorAll<HTMLElement>(SHOWS_TOOLBAR).forEach(placeToolbar)}
       sx={styles.scroller}
     >
       <div
@@ -232,6 +270,7 @@ export function MessageList({
         aria-label="Messages"
         aria-busy={status === 'loading' || status === 'pending'}
         onKeyDown={(event) => onKeyDown(event, onRowKey)}
+        onPointerDown={actions === undefined ? undefined : watchSelectionDrag}
         onPointerOver={
           onPrefetchThread === undefined
             ? undefined
