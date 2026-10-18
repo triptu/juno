@@ -425,7 +425,8 @@ body transfer, but no byte percentage or live latency improvement was measured.
 
 The owner authorized writes in their self-DM. The probe verified the authenticated
 user against the DM member, created one root and one reply, and mutated only those
-two messages. Both were deleted afterwards. Credentials stayed in memory; output
+two messages. The sequence ran twice with matching results; all four test messages were
+deleted afterwards. Credentials stayed in memory; output
 contained booleans, field types and the labels `root` and `reply`, with no real ids
 or message content. Calls were spaced by at least 1.5 seconds. Each stage read full
 counts, then full and conditional history and replies using the previous stage's
@@ -438,7 +439,7 @@ counts, then full and conditional history and replies using the previous stage's
 | Add reaction to both | Changed | Same | Both versions changed | Root / root and reply |
 | Remove reaction from both | Changed | Same | Both versions changed | Root / root and reply |
 | Delete reply | Changed | Changed | Root changed; reply absent | Root / root; `deleted` empty |
-| Delete remaining root | Same | Changed | Empty history version map | Empty history; `deleted` empty; replies not queried |
+| Delete remaining root | Same | Changed | Empty history version map | Empty history; `deleted` empty; replies: `thread_not_found` |
 
 `latest` stayed fixed through edits, reactions and reply deletion, then changed on
 root deletion. No message-level `version` field was observed. The fake therefore
