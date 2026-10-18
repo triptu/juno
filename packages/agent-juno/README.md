@@ -16,6 +16,7 @@ Juno as the agent's host. It runs inside the engine and serves the whole AgentHo
 | `host.outbox.send` | A Slack send through the composer's outbox, only on the owner's click (below). Fails with `unsupported` while writes are disabled, the default for embedders such as the live scripts. The desktop app enables them |
 | `host.outbox.cancel` | Before any send: records the authorization as cancelled, and a later send fails with reason `cancelled`. Queued: `cancel-requested`. Settled: the recorded result |
 | `host.outbox.reconcileSend` | Asks Slack for the send. `found` only on positive evidence; otherwise `unknown` |
+| `host.outbox.states` | A stream: each send of the last 30 days (200 at most) as its outbox row has it now (`sending`, `done` with the receipt, `failed` with Slack's code or `discarded`, `unknown`), again whenever a row or a message in those channels changes. A send the outbox posts after the host settled it (the owner's Retry in the topic) is recorded `done` too |
 | `host.topics.resolve` | Tier 3 approved local resolve, only on the owner's click as a send is, through the user's topic command. One transaction stores the batch and its Undo; repeated dispatch returns the original result, even after Undo |
 | `host.topics.undoResolve` | Restores the recorded topic overlays and unread state once, for the signed-in account |
 | `host.notification.deliver` | `unsupported`: Juno has no OS notifier for the agent yet |

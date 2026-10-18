@@ -11,7 +11,7 @@
  * it does not take): a definite rejection. Any other failure, a lost port
  * included, may have reached Slack, so it is `unknown`.
  */
-import { Effect } from 'effect'
+import { Effect, type Stream } from 'effect'
 import { AccountId, ActionId, AttemptId, digestJson, SLACK_SEND_TOOL, type ExecutableIdentity } from '@juno/agent-cards'
 import {
   AgentHostError,
@@ -20,6 +20,7 @@ import {
   type HostDispatch,
   type HostDispatchResult,
   type HostMessage,
+  type HostSendState,
   type Place,
   type TopicLink,
 } from '@juno/agent-contract'
@@ -45,6 +46,8 @@ export interface ActionHost {
     readonly actionId: string
     readonly attemptId: string
   }) => Promise<{ readonly _tag: 'found'; readonly message: typeof HostMessage.Type } | { readonly _tag: 'unknown' }>
+  /** Each recent send as its outbox row has it, then on every change. The agent follows it while it runs (`start.ts`). */
+  readonly sendStates?: Stream.Stream<ReadonlyArray<typeof HostSendState.Type>, unknown>
 }
 
 /** The Slack connection's id in an executable identity: Slack has one, the signed-in account. */
@@ -83,6 +86,7 @@ export const bindActionHost = (presence: () => Presence | undefined) =>
             attemptId: AttemptId.make(input.attemptId),
           }),
         ),
+      sendStates: client['host.outbox.states'](),
     } satisfies ActionHost
   })
 

@@ -12,12 +12,13 @@ import type { JournalPosition, Mode } from '../store/ledger'
 import type { Store } from '../store/store'
 import type { ChildBinding } from '../policy/policy'
 import {
-  cardRow, cardViews, carriesData, carryOutcomes, dismiss, editMessage, prepareChoice, proposeCard, quoteOf, recordClick,
+  cardRow, cardViews, carriesData, carryOutcomes, dismiss, editMessage, prepareChoice, proposeCard, quoteOf, recordClick, settleCardOutcome,
   type CardView, type Choice, type Proposal,
 } from './cards'
 import { createDispatcher } from './dispatcher'
 import type { Executor } from './executor'
 import { hostExecutors, type ActionHost } from './host'
+import { followOutbox } from './outbox'
 import { localExecutors } from './proposals'
 
 export { resolveTool } from './resolve'
@@ -139,6 +140,10 @@ export function createActions(options: ActionsOptions & {
      */
     kick: () => {
       void dispatcher.kick()
+    },
+    /** What the host's outbox says of each recent send now (`host.outbox.states`). A Send card's rows follow it. */
+    outboxStates: (states: Parameters<typeof followOutbox>[1]) => {
+      if (followOutbox(store, states, (cardId) => settleCardOutcome(store, cardId))) changed()
     },
     /** A job's Stop revokes its grant. */
     jobStopped: (jobId: string) => revokeGrant(store, 'job', jobId, 'stop'),

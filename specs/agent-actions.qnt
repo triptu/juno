@@ -258,6 +258,17 @@ module actionsProtocol {
       s' = { ...s, failed: s.failed.union(Set(t.auth)), unknown: s.unknown.exclude(Set(t.auth)), label: "reject", target: k }
     }
   }
+  // The owner's Retry in the topic on a send Slack refused (decision of 10-18): Juno's outbox row goes
+  // again, as the owner's own send, and lands. The agent makes no attempt; its card follows the row, so a
+  // receipt can follow a rejection. `twice` is the bug of a destination that takes the same post again.
+  action ownerRetryWith(k: int, twice: bool): bool = {
+    val ts = s.attempts.select(t => t.child == k and (twice or (s.failed.contains(t.auth) and not(s.accepted.contains(t.id)))))
+    if (ts.length() == 0) idle else {
+      val t = ts.head()
+      s' = { ...s, accepted: s.accepted.union(Set(t.id)), effects: s.effects.set(k, s.effects.get(k) + 1),
+        failed: s.failed.exclude(Set(t.auth)), label: "ownerRetry", target: k }
+    }
+  }
   action lose(k: int): bool = s' = { ...s,
     unknown: s.unknown.union(s.auths.filter(a => a.intent.id == k and not(evidenced(a.id)) and not(s.failed.contains(a.id))).map(a => a.id)),
     label: "lose", target: k }
@@ -492,6 +503,8 @@ module actionsProtocol {
       g.opClass == 1 and g.rev == before.scheduleRev and g.source == before.gen))
   val batchEffectsIndependent = newAuths.forall(a => not(before.receipts.exists(r => r.child == a.intent.id)))
   val outcomeEvidenceStable = before.receipts.subseteq(s.receipts) and before.auths.subseteq(s.auths)
+  // A send lands at most once per attempt Juno made, also when the owner retried it from the topic.
+  val effectsWithinAttempts = ids.forall(k => s.effects.get(k) <= s.attempts.select(t => t.child == k).length())
   val beforeMayAuthorize = before.active and before.epoch == before.localEpoch and not(before.paused or before.off or before.crashed)
   val scheduleFromOwnerAuthority = not(s.schedule) or s.scheduleAuthority == "clean" or
     (s.scheduleAuthority == "click" and (s.label != "scheduleClick" or
@@ -520,7 +533,7 @@ module actionsProtocol {
     currentOwnerAuthorizes and pauseBlocksAuthorization and quietHoursHoldNotifications and scheduleGrantValid and
     occurrenceAdmissionOnce and cancelWinsBeforeAdmission and batchEffectsIndependent and outcomeEvidenceStable and
     scheduleFromOwnerAuthority and cleanRunForNoClick and capHard and oneRaisePerClick and pauseRevokesGrants and
-    redactionRevokesExposed and redactionKeepsUnrelated and reviewGated and untrustedNeverAuthorizes and scriptNeverAuthorizes
+    redactionRevokesExposed and redactionKeepsUnrelated and reviewGated and untrustedNeverAuthorizes and scriptNeverAuthorizes and effectsWithinAttempts
 
   val pendingApproved = ids.filter(k => not(done(k)) and currentIntent(k).exists(i => valid(i) and
     s.approvals.exists(p => p.child == k and p.rev == i.rev and p.digest == i.payload and
@@ -605,6 +618,8 @@ module actionsProtocol {
     val k = cmd.k
     val op = cmd.op
     if (reviewOps.contains(op)) executeReview(k, op, bug) else
+    if (op == "reject") reject(k) else
+    if (op == "ownerRetry") ownerRetryWith(k, bug == "retryTwice") else
     if (op == "propose") propose(k, 3, false) else
     if (op == "deduped") propose(k, 3, true) else
     if (op == "tier2") propose(k, 2, false) else
@@ -774,6 +789,10 @@ module actionsProtocol {
   pure val engineBackground = List(c("reserve", 3), c("reserve", 3), c("reserve", 2))
   action engineBackgroundStep = script(engineBackground, "")
   action engineBackgroundBugStep = script(engineBackground, "backgroundUncapped")
+  // Slack refused the send; the owner retries it from the topic; the card follows the row to Sent.
+  pure val retryRefused = List(c("propose", 0), c("click", 0), c("authorize", 0), c("send", 0), c("reject", 0), c("ownerRetry", 0), c("ownerRetry", 0), c("receipt", 0))
+  action retryRefusedStep = script(retryRefused, "")
+  action retryRefusedBugStep = script(retryRefused, "retryTwice")
   // WP9: a settled compaction counts its actual cost, not its reservation.
   pure val compactionSettle = List(c("reserve", 1), c("settle", 1), c("reserve", 1))
   action compactionSettleStep = script(compactionSettle, "")
@@ -885,10 +904,10 @@ module actionsProtocol {
   pure val scriptWrite = List(c("scriptChild", 0), c("scriptReview", 0), c("scriptAuthorize", 0))
   action scriptWriteStep = script(scriptWrite, "")
   action scriptWriteBugStep = script(scriptWrite, "scriptWrite")
-  action suiteInit = { nondet which = 0.to(62).oneOf(); all { s' = initial, before' = initial, pc' = 0, remaining' = drainLimit, scenario' = which } }
+  action suiteInit = { nondet which = 0.to(63).oneOf(); all { s' = initial, before' = initial, pc' = 0, remaining' = drainLimit, scenario' = which } }
   val suiteCommands = List(negativeLookup, unknownRetry, hiddenRetry, approvalEdit, schemaRace, accountRace, connectionRace, preconditionRace, expireRace, redactRace, consumeBeforeSend, approvalReuse, startupAttempt, payloadBinding, receiptBinding, scopedGrant, reportGrant, reportLaunch, reportSchedule, wakeSchedule, destructive, ownerRace, pauseRace, offRace, quietNotification, cancelWake, cancelQueuedWake, duplicateWake, lateCancel, partialBatch, dedupeKey, dedupeAccept, parallelBudget, unknownSpend, compactionBudget, unknownDrain, approvedDrain, wakeDrain, pauseDrain, attemptEvidence, batchOrderRace, clickedSchedule,
     compactionSettle, refusedSpend, dailyReset, raiseClick, overReportCap, capReached, menuSchedule, resumeGrant, redactExposed, redactUnrelated,
-    untrustedIntent, neverTaint, reviewFailure, alwaysAsk, hintTainted, hintAlways, freshNever, ruleDuringReview, scriptWrite, engineBudget, engineBackground).nth(scenario)
+    untrustedIntent, neverTaint, reviewFailure, alwaysAsk, hintTainted, hintAlways, freshNever, ruleDuringReview, scriptWrite, engineBudget, engineBackground, retryRefused).nth(scenario)
   action suiteStep = script(suiteCommands, "")
   val case0 = scenario == 0 and reachedAgreement and (s.unknown == Set(1) and s.explained == Set(1))
   val case1 = scenario == 1 and reachedAgreement and (s.auths.size() == 1)
@@ -956,6 +975,7 @@ module actionsProtocol {
   val case60 = scenario == 60 and reachedAgreement and s.auths == Set() and s.intents == Set()
   val case61 = scenario == 61 and reachedAgreement and engineOn(0) == 4 and totalOn(0) == 8
   val case62 = scenario == 62 and reachedAgreement and engineOn(0) == 4 and backgroundOn(0) == 2
+  val case63 = scenario == 63 and reachedAgreement and s.receipts.size() == 1 and s.effects.get(0) == 1 and s.attempts.length() == 1
   // An explicit, reversible call the owner asked for runs once with no click, under Auto and under Never ask.
   action reviewedRunWitnessStep = script(List(c("conn", 0), c("reviewExplicit", 0), c("authorize", 0)), "")
   val reviewedRunSent = reachedAgreement and s.auths.size() == 1 and s.auths.forall(a => a.review) and s.receipts.size() == 1

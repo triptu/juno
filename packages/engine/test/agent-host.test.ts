@@ -10,11 +10,11 @@ import { MessageChannel, type MessagePort } from 'node:worker_threads'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Effect, Exit, Layer, Schema, Scope, Stream } from 'effect'
 import { RpcClient, type RpcClientError, type RpcGroup } from 'effect/rpc'
-import { actionDigest, AgentHostRpcs, HostDispatch, HostPresence, HostTopicId } from '@juno/agent-contract'
+import { actionDigest, AgentHostRpcs, HostDispatch, HostPresence, HostTopicId, type HostSendState } from '@juno/agent-contract'
 import { hostProtocol, startAgent, type HostConnection, type HostPort } from '@juno/agent'
 import { forgedSendReceipt, hostileMessages, HOSTILE_USER } from '@juno/agent-testing'
 import { SELF_ID } from '@juno/fake-slack'
-import { agentWritesApprove, prefsSet } from '@juno/contract'
+import { agentWritesApprove, messagesRetry, prefsSet } from '@juno/contract'
 import { runCommand, topicAtom } from '@juno/state'
 import { memoryTransport, type MessagePortLike } from '../src/protocol/transport'
 import { startTestEngine, waitFor, type RunningEngine } from './harness'
@@ -377,6 +377,26 @@ describe('the AgentHost port', () => {
     expect(await ok(agent.client['host.outbox.send'](dispatch))).toEqual({ _tag: 'failed', attemptId: dispatch.attemptId, reason: 'not_in_channel' })
     expect(posted(engine, dispatch.actionId)).toEqual([])
     expect(engine.fake.callCount('chat.postMessage')).toBe(1)
+  })
+
+  it('follows a refused send to its outbox row: the owner retries it from the topic, and its state turns done', async () => {
+    const { engine, agent, account } = await hostWithAgent('enabled')
+    const dispatch = send(account, 'Refused, then retried')
+    await approve(engine, dispatch)
+    engine.fake.forceError({ method: 'chat.postMessage', error: 'not_in_channel' })
+    expect(await ok(agent.client['host.outbox.send'](dispatch))).toMatchObject({ _tag: 'failed', reason: 'not_in_channel' })
+    const stateOf = (until: (state: typeof HostSendState.Type | undefined) => boolean) =>
+      ok(agent.client['host.outbox.states']().pipe(
+        Stream.map((states) => states.find((state) => state.attemptId === dispatch.attemptId)),
+        Stream.filter(until), Stream.take(1), Stream.runHead,
+      ))
+    expect(await stateOf((state) => state?.state === 'failed')).toMatchObject({ _tag: 'Some', value: { state: 'failed', reason: 'not_in_channel' } })
+    expect((await runCommand(engine.registry, messagesRetry, { clientMsgId: dispatch.actionId }))._tag).toBe('Success')
+    const [message] = await waitFor(() => (posted(engine, dispatch.actionId).length === 1 ? posted(engine, dispatch.actionId) : undefined), 15_000, 'the retried post')
+    expect(await stateOf((state) => state?.state === 'done')).toMatchObject({ _tag: 'Some', value: { state: 'done', receipt: { channelId: CHANNEL, ts: message!.ts } } })
+    // The record follows too: a repeat of the authorization now answers done, and nothing is posted again.
+    expect(await ok(agent.client['host.outbox.send'](dispatch))).toMatchObject({ _tag: 'done', attemptId: dispatch.attemptId })
+    expect(engine.fake.callCount('chat.postMessage')).toBe(2)
   })
 
   it('waits out a lost connection and sends when it is back', async () => {

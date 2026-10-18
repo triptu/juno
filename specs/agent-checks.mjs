@@ -63,6 +63,7 @@ export const actionCases = [
   ['scriptWrite', 'scriptNeverAuthorizes'],
   ['engineBudget', 'capHard'],
   ['engineBackground', 'capHard'],
+  ['retryRefused', 'effectsWithinAttempts'],
 ]
 
 export const recoveryCases = [

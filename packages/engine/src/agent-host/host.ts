@@ -16,8 +16,8 @@
  *   (`@juno/notifications` settings), and the topic last shown.
  */
 import { Clock, Context, Effect, Layer, Option, Result, Stream, SubscriptionRef } from 'effect'
-import { AgentHostError, type Place } from '@juno/agent-contract'
-import { JunoHost, type Account, type AccountId, type Attempt, type Message, type PostOutcome, type Presence } from '@juno/agent-juno'
+import { AgentHostError, type HostSendState, type Place } from '@juno/agent-contract'
+import { JunoHost, type Account, type AccountId, type Attempt, type AttemptRecord, type Message, type PostOutcome, type Presence } from '@juno/agent-juno'
 import type { EnginePhase } from '@juno/contract'
 import { defaultNotificationSettings, inHours, type NotificationSettings, type Ts } from '@juno/domain'
 import { readSettings } from '@juno/notifications'
@@ -37,6 +37,8 @@ import * as views from './views'
 import * as attempts from './attempts'
 import * as reads from './reads'
 import { watchSnapshot, watchHours, watchChanges } from './schedule'
+
+type SendState = typeof HostSendState.Type
 
 /** The engine phase, which lives in the status feature; the composition layer provides it. */
 export class PhaseSource extends Context.Service<PhaseSource, Stream.Stream<EnginePhase>>()('juno/engine/agent-host/PhaseSource') {}
@@ -205,6 +207,56 @@ export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | Syn
       Stream.changesWith((a, b) => JSON.stringify(a) === JSON.stringify(b)),
     )
 
+    // Bumped when the host records a send, so the outbox states take it in.
+    const recorded = yield* SubscriptionRef.make(0)
+
+    /** One send as its outbox row has it now (`HostSendState`). */
+    const stateOf = (record: AttemptRecord, outcome: PostOutcome | undefined): SendState => {
+      const ids = { attemptId: record.attemptId, actionId: record.actionId }
+      if (outcome === undefined) return { ...ids, state: 'sending' }
+      switch (outcome._tag) {
+        case 'posted':
+          return { ...ids, state: 'done', receipt: { channelId: record.channelId, ts: outcome.ts } }
+        case 'refused':
+          return { ...ids, state: 'failed', reason: outcome.reason }
+        case 'lost':
+          return { ...ids, state: 'unknown' }
+      }
+    }
+
+    /**
+     * Each recent send as its outbox row has it, again whenever a row or a
+     * message in those channels changes: a refused send the owner retries
+     * from the topic goes back to `sending`, then `done`. A send the outbox
+     * posted after the host settled it otherwise is recorded `done` too.
+     */
+    const sendStates: Stream.Stream<ReadonlyArray<SendState>> = workspace.changes.pipe(
+      Stream.switchMap((open) => {
+        if (open === undefined) return Stream.succeed<ReadonlyArray<SendState>>([])
+        return SubscriptionRef.changes(recorded).pipe(
+          Stream.mapEffect(() => attempts.recent.pipe(Effect.provide(open.context), Effect.orDie)),
+          Stream.switchMap((records) => {
+            if (records.length === 0) return Stream.succeed<ReadonlyArray<SendState>>([])
+            const channels = [...new Set(records.map((record) => `channel:${record.channelId}`))]
+            const read = Effect.forEach(records, (record) => Effect.map(postState(record), (outcome) => ({ record, state: stateOf(record, outcome) })))
+            return liveQuery({ messages: channels }, read).pipe(
+              Stream.filterMap((result) => (Result.isSuccess(result) ? Result.succeed(result.success) : Result.failVoid)),
+              Stream.tap((pairs) =>
+                Effect.forEach(
+                  pairs.filter(({ record, state }) => state.state === 'done' && record.state._tag !== 'done'),
+                  ({ record, state }) => attempts.settle(record.authorizationId, { _tag: 'done', receipt: state.receipt! }),
+                  { discard: true },
+                ).pipe(Effect.provide(open.context), Effect.orDie),
+              ),
+              Stream.map((pairs) => pairs.map(({ state }) => state)),
+              Stream.provide(open.context),
+            )
+          }),
+        )
+      }),
+      Stream.changesWith((a, b) => JSON.stringify(a) === JSON.stringify(b)),
+    )
+
     return JunoHost.of({
       account,
       channels: (pattern, cursor, limit) => inStore(reads.channels(pattern, cursor, limit)),
@@ -258,12 +310,14 @@ export const JunoHostLive: Layer.Layer<JunoHost, never, Workspace | Outbox | Syn
         }),
       },
       attempts: {
-        claim: (attempt, digest) => inStore(transaction(attempts.claim(attempt, digest))).pipe(Effect.tap(() => postQueue.wake)),
+        claim: (attempt, digest) =>
+          inStore(transaction(attempts.claim(attempt, digest))).pipe(Effect.tap(() => Effect.andThen(postQueue.wake, SubscriptionRef.update(recorded, (n) => n + 1)))),
         cancel: (authorizationId, attemptId) => inStore(attempts.cancel(authorizationId, attemptId)),
         settle: (authorizationId, state) => inStore(attempts.settle(authorizationId, state)),
         byAttempt: (attemptId) => inStore(attempts.byAttempt(attemptId)),
       },
       posted,
+      sendStates,
       sent,
     })
   }),

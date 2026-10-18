@@ -136,4 +136,12 @@ export const ACTIONS_MIGRATIONS: MigrationSet = { name: 'actions', steps: [actio
     line TEXT
   ) STRICT`],
   // The result as a person reads it, trimmed, for the card's "Show result".
-  ['ALTER TABLE action_outputs ADD COLUMN shown TEXT']] }
+  ['ALTER TABLE action_outputs ADD COLUMN shown TEXT'],
+  // What the host's outbox says of each send now (`outbox.ts`): `sending`, `done`, `failed` with Slack's
+  // code in `reason`, or `unknown`. A Send card's row follows it.
+  [`CREATE TABLE send_states (
+    attempt_id TEXT PRIMARY KEY REFERENCES attempts (id),
+    state TEXT NOT NULL CHECK (state IN ('sending', 'done', 'failed', 'unknown')),
+    reason TEXT,
+    at INTEGER NOT NULL
+  ) STRICT`]] }

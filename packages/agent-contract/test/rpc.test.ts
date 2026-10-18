@@ -77,6 +77,7 @@ const cases: Record<string, readonly [unknown, unknown]> = {
   'host.topics.undoResolve': [{ accountId: 'account', actionId: dispatch.actionId }, undefined],
   'host.outbox.cancel': [{ authorizationId: 'authorization', attemptId: 'attempt' }, { _tag: 'cancel-requested' }],
   'host.outbox.reconcileSend': [{ accountId: 'account', channelId: 'channel', actionId: 'action', attemptId: 'attempt' }, { _tag: 'unknown' }],
+  'host.outbox.states': [null, [{ attemptId: 'attempt', actionId: 'action', state: 'done', receipt: { channelId: 'channel', ts: '1.0' } }, { attemptId: 'other', actionId: 'other', state: 'failed', reason: 'not_in_channel' }]],
   'host.schedule.check': [{ accountId: 'account', conversation: { channelId: 'C', ts: '100' }, refresh: true }, { owner: 'U', ownMessage: true, messages: [] }],
   'host.schedule.hours': [{ accountId: 'account' }, { timeZone: 'UTC', weekdays: [1], start: 540, end: 1020 }],
   'host.schedule.changes': [null, undefined],

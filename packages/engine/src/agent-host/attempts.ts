@@ -101,13 +101,17 @@ export const claim = (attempt: Attempt, digest: string) =>
 export const cancel = (authorizationId: string, attemptId: string) =>
   insert({ authorizationId, attemptId, actionId: '', channelId: '', threadTs: null, text: '', state: 'cancelled' })
 
-/** Settles a `submitted` row, or turns an `unknown` one `done`. A settled result is never replaced otherwise. */
+/**
+ * Settles a `submitted` row, or turns an `unknown` or `failed` one `done`: the
+ * outbox row went on to post it (a lookup found it, or the owner retried it
+ * from the topic). A done result is never replaced.
+ */
 export const settle = (authorizationId: string, state: Settled) =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     const at = yield* now
     const result = state._tag === 'done' ? { receipt: state.receipt } : state._tag === 'failed' ? { reason: state.reason } : null
-    const from = state._tag === 'done' ? ['submitted', 'unknown'] : ['submitted']
+    const from = state._tag === 'done' ? ['submitted', 'unknown', 'failed'] : ['submitted']
     yield* sql`UPDATE agent_attempts SET state = ${state._tag}, result_json = ${result === null ? null : JSON.stringify(result)}, settled_at = ${at}
       WHERE authorization_id = ${authorizationId} AND state IN ${sql.in(from)}`
   })
@@ -118,3 +122,15 @@ export const byAttempt = (attemptId: string) =>
     const [row] = yield* sql<Row>`SELECT * FROM agent_attempts WHERE attempt_id = ${attemptId}`
     return row === undefined ? undefined : recordOf(row)
   })
+
+/** How far back the outbox states follow sends, and how many at most. */
+const RECENT_MILLIS = 30 * 24 * 60 * 60_000
+const RECENT_LIMIT = 200
+
+/** The sends of the last 30 days, newest first, at most 200. A cancelled authorization sent nothing. */
+export const recent = Effect.gen(function* () {
+  const sql = yield* StoreReader
+  const since = new Date((yield* Clock.currentTimeMillis) - RECENT_MILLIS).toISOString()
+  const rows = yield* sql<Row>`SELECT * FROM agent_attempts WHERE state != 'cancelled' AND created_at >= ${since} ORDER BY created_at DESC LIMIT ${RECENT_LIMIT}`
+  return rows.map(recordOf)
+})

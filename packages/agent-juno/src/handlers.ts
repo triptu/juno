@@ -79,6 +79,7 @@ export const agentHostHandlers = (options: HandlerOptions) =>
         'host.outbox.cancel': ({ authorizationId, attemptId }) => dispatcher.cancel(authorizationId, attemptId),
         'host.outbox.reconcileSend': ({ accountId, channelId, actionId, attemptId }) =>
           Effect.flatMap(accountFor(accountId), (account) => dispatcher.reconcile(attemptId, channelId, actionId, account.userId)),
+        'host.outbox.states': () => host.sendStates ?? Stream.never,
         'host.topics.resolve': (dispatch) =>
           digestMatches(dispatch)
             ? asAccount(dispatch.payload.account_id, host.resolve?.(dispatch) ?? unsupported('Resolve is unavailable.'))
