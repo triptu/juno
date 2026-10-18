@@ -15,7 +15,7 @@ Merge rules, applied by one function in `@juno/sync`:
 - An edit applies only if its `edited_ts` is newer.
 - Reaction state from a page applies only if the message's `last_event_ts` is older than the page's request start.
 - Socket events never move `synced_ranges`; ranges are explicit and only pages extend them.
-- Warm boot and reconnect send `cached_latest_updates` for the visible window and apply `latest_updates`, `unchanged_messages` and `deleted`. The format of `latest_updates` is Unknown until the live smoke confirms it; the fallback is to re-fetch the visible window and merge.
+- Warm boot and reconnect send `cached_latest_updates` for cached ranges selected by counts mutation markers and apply `latest_updates`, `unchanged_messages` and `deleted`. The 10-18 live probe confirmed timestamp versions and unchanged-body suppression; the 10-19 implementation retains a bounded ten-topic fallback for unproved marker coverage (`docs/research/slack-catchup.md`).
 - A reply for an unknown root creates a stub root and the thread topic, and queues a fetch of the root.
 - Known event types with unexpected shapes are logged (redacted ring buffer) and skipped.
 
@@ -28,4 +28,4 @@ A seeded, randomised engine test interleaves events, pages, drops and sends and 
 - Correctness does not depend on arrival order, which the socket, the queue and the user's actions cannot guarantee.
 - Messages need `last_event_ts` and `version` columns, and the store needs `synced_ranges` instead of a single cursor.
 - The convergence test is the main sync test; the 24-hour soak becomes an occasional check.
-- `latest_updates` handling is a tracked unknown with a working fallback.
+- Server versions are stored separately from local row versions; a repair acknowledges counts markers only after all cached ranges in the conversation complete.

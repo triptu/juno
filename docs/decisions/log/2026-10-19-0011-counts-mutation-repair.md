@@ -1,0 +1,1 @@
+- 10-19 00:11 · Sync · Repair cached Main and thread ranges selected by counts mutation markers on boot and reconnect, acknowledge markers only after complete repair, and retain the bounded fallback until live coverage is established.

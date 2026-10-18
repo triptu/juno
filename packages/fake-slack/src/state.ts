@@ -97,6 +97,10 @@ export class Workspace {
   /** Self's `last_read` per conversation. */
   readonly reads = new Map<string, Ts>()
   /** When a conversation last changed for self (a message, a read mark, membership), in ms. An incremental `client.counts` lists only these. */
+  /** Some server responses omit mutation markers; the bounded fallback must still work. */
+  mutationMarkers = true
+  readonly mutationUpdated = new Map<string, Ts>()
+  readonly historyInvalid = new Map<string, Ts>()
   readonly changedAt = new Map<string, number>()
   readonly subscriptions = new Map<string, Subscription>()
   readonly files = new Map<string, StoredFile>()
@@ -172,14 +176,14 @@ export class Workspace {
     if (at !== undefined && at < Number(this.#lastTs.split('.')[0]) * 1000 - 1000) {
       while (this.#backdated.has(ts)) {
         const [seconds, fraction] = ts.split('.') as [string, string]
-        ts = Ts.make(`${seconds}.${String(Number(fraction) + 1).padStart(6, '0')}`)
+        ts = Ts.make(`${Number(seconds) + Math.floor((Number(fraction) + 1) / 1_000_000)}.${String((Number(fraction) + 1) % 1_000_000).padStart(6, '0')}`)
       }
       this.#backdated.add(ts)
       return ts
     }
     if (compareTs(ts, this.#lastTs) <= 0) {
       const [seconds, fraction] = this.#lastTs.split('.') as [string, string]
-      ts = Ts.make(`${seconds}.${String(Number(fraction) + 1).padStart(6, '0')}`)
+      ts = Ts.make(`${Number(seconds) + Math.floor((Number(fraction) + 1) / 1_000_000)}.${String((Number(fraction) + 1) % 1_000_000).padStart(6, '0')}`)
     }
     this.#lastTs = ts
     return ts
@@ -329,8 +333,8 @@ export class Workspace {
       latest: latest?.ts ?? null,
       has_unreads: unread.length > 0,
       mention_count: mentions,
-      updated: latest?.ts ?? lastRead,
-      history_invalid: NEVER_READ,
+      updated: this.mutationMarkers ? this.mutationUpdated.get(c.id) ?? latest?.ts ?? lastRead : undefined,
+      history_invalid: this.mutationMarkers ? this.historyInvalid.get(c.id) ?? NEVER_READ : undefined,
     }
   }
 
@@ -442,6 +446,7 @@ export class Workspace {
 
     if (root !== undefined) this.#touchRoot(input.channel, root.ts)
     this.#touchConversation(input.channel, input.at)
+    this.mutationUpdated.set(input.channel, this.eventTs())
 
     if (input.silent === true) return message
 
@@ -461,26 +466,7 @@ export class Workspace {
 
     this.emit({ ...message, ...(input.eventFiles === undefined ? {} : { files: input.eventFiles }), type: 'message', channel: input.channel, event_ts: ts })
     if (followed !== undefined) this.emit({ type: 'thread_subscribed', subscription: this.subscriptionObject(followed), event_ts: this.eventTs() })
-    if (root !== undefined) {
-      const updated = this.withThreadFields({ ...this.find(input.channel, root.ts)!, channel: input.channel })
-      this.emit({
-        type: 'message',
-        subtype: 'message_replied',
-        channel: input.channel,
-        ts: this.eventTs(),
-        event_ts: ts,
-        hidden: true,
-        message: {
-          ts: updated.ts,
-          thread_ts: updated.ts,
-          ...(updated.user === undefined ? {} : { user: updated.user }),
-          reply_count: updated.reply_count ?? 0,
-          reply_users: updated.reply_users ?? [],
-          reply_users_count: updated.reply_users_count ?? 0,
-          latest_reply: updated.latest_reply ?? updated.ts,
-        },
-      })
-    }
+    if (root !== undefined) this.#emitReply(input.channel, root.ts, ts)
     this.#notify(conversation, message)
     return message
   }
@@ -497,8 +483,10 @@ export class Workspace {
       text: mrkdwn ? escapeText(text) : toMrkdwn(text),
       blocks: textToBlocks(mrkdwn ? unescapeText(escapeText(text)) : text),
       edited: { user: editor, ts: editTs },
+      version: editTs,
     }
     list[index] = message
+    this.mutationUpdated.set(channel, editTs)
     this.#touchConversation(channel)
     this.emit({
       type: 'message',
@@ -527,6 +515,8 @@ export class Workspace {
       this.subscriptions.delete(`${channel}:${ts}`)
     }
     const eventTs = this.eventTs()
+    this.historyInvalid.set(channel, eventTs)
+    this.mutationUpdated.set(channel, eventTs)
     if (isReply(previous) && previous.thread_ts !== undefined) this.#touchRoot(channel, previous.thread_ts)
     this.#touchConversation(channel)
     this.emit({
@@ -610,7 +600,10 @@ export class Workspace {
     const updated: Reaction = { name, users, count: users.length }
     const reactions: Reaction[] =
       existing === undefined ? [...current, updated] : current.map((r) => (r.name === name ? updated : r)).filter((r) => (r.count ?? 0) > 0)
-    list[index] = reactions.length === 0 ? omitReactions(message) : { ...message, reactions }
+    const version = this.eventTs()
+    list[index] = { ...(reactions.length === 0 ? omitReactions(message) : { ...message, reactions }), version }
+    this.mutationUpdated.set(channel, version)
+    this.#touchConversation(channel)
     this.emit({
       type: add ? 'reaction_added' : 'reaction_removed',
       user,
@@ -723,6 +716,27 @@ export class Workspace {
   }
 
   /** Recomputes a root's reply counters after a reply was added or removed. */
+  #emitReply(channel: string, rootTs: Ts, eventTs: Ts): void {
+    const updated = this.withThreadFields({ ...this.find(channel, rootTs)!, channel: channel })
+    this.emit({
+      type: 'message',
+      subtype: 'message_replied',
+      channel: channel,
+      ts: this.eventTs(),
+      event_ts: eventTs,
+      hidden: true,
+      message: {
+        ts: updated.ts,
+        thread_ts: updated.ts,
+        ...(updated.user === undefined ? {} : { user: updated.user }),
+        reply_count: updated.reply_count ?? 0,
+        reply_users: updated.reply_users ?? [],
+        reply_users_count: updated.reply_users_count ?? 0,
+        latest_reply: updated.latest_reply ?? updated.ts,
+      },
+    })
+  }
+
   #touchRoot(channel: string, rootTs: Ts): void {
     const list = this.all(channel)
     const index = list.findIndex((m) => m.ts === rootTs)
@@ -730,12 +744,14 @@ export class Workspace {
     if (root === undefined) return
     const replies = this.replies(channel, rootTs)
     const users = [...new Set(replies.map((r) => r.user).filter((u): u is string => u !== undefined))]
+    this.mutationUpdated.set(channel, this.eventTs())
     const { reply_count: _c, reply_users: _u, reply_users_count: _n, latest_reply: _l, thread_ts: _t, ...rest } = root
     list[index] =
       replies.length === 0
-        ? rest
+        ? { ...rest, version: this.eventTs() }
         : {
             ...rest,
+            version: this.eventTs(),
             thread_ts: rootTs,
             reply_count: replies.length,
             reply_users: users,

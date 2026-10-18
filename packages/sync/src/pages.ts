@@ -42,6 +42,13 @@ export const mergeOne = (
       }
     }
     if (merged.applyReactions) yield* replaceReactions(merged.row, message.reactions ?? [], ctx.me.userId)
+    // Only certify a full body whose reactions were accepted. Partial search
+    // results cannot safely suppress a later history body.
+    if (source.kind === 'page' && (merged.applyReactions || existing === undefined) && message.version !== undefined) {
+      const sql = yield* StoreWriter
+      yield* sql`INSERT INTO message_updates (channel, ts, server_version) VALUES (${channel}, ${message.ts}, ${message.version})
+        ON CONFLICT (channel, ts) DO UPDATE SET server_version = excluded.server_version`
+    }
     // A reaction event came before this message was stored; a page requested before it does not have it.
     if (source.kind !== 'event') {
       const key = `${channel}:${message.ts}`

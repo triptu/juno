@@ -125,7 +125,7 @@ Each `<name>Step` checks `invariants` and must finish its drain. Each `<name>Bug
 | `keptDeleted` | Slack holds the post and its copy; the copy's delete waits, and the user deletes the kept message on another device. The check keeps the copy and makes it the message. The bug, deciding only at store time, deletes it too. | `keepsRealSends` |
 | `copyReply` | Someone replies to the copy while its delete waits. The check keeps the copy. The bug deletes it. | `repliesKeepRoot` |
 | `ownDelete` | The user deletes the message in Juno before Juno has stored its copy. When the copy arrives it is hidden and deleted too. The bug takes the user's delete for one made elsewhere and keeps the copy as the message. | `ownDeleteHolds` |
-| `uncoveredRecheck` | As `deletedOffline`, but the recheck does not read the post's topic, so the store never learns the kept message is gone. The guarded delete needs the topic read and keeps the copy. The bug waits for the catch-up only and deletes the copy. | `keepsRealSends` |
+| `uncoveredRecheck` | As `deletedOffline`, but the server provides no mutation markers and the fallback does not read the post's topic, so the store never learns the kept message is gone. The guarded delete needs the topic read and keeps the copy. The bug waits for the catch-up only and deletes the copy. | `keepsRealSends` |
 | `deletedOffline` | The socket drops while the copy's delete waits, and the user deletes the kept message meanwhile. The guarded delete waits for the catch-up, whose recheck stores the deletion, then keeps the copy. The bug checks the store at once on the reconnect and deletes the copy. | `keepsRealSends` |
 
 The corrected `echoKeepsRow` and `answerAfterEcho` schedules cover echo before answer. Corrected `blindRetry` covers a lost answer followed by a found lookup. Six additional corrected schedules cover `answerBeforeEcho`, `lostLookupAbsent`, `reconnectPage`, `dependentDelete`, `actionRetry` and `uploadRetry`. The absent case drops the first call, loses its answer, confirms absence, and posts once. `reconnectPage` accepts, loses the answer, disconnects, then reconnects and holds a lookup answer. A catch-up page reconciles first, the catch-up flushes, and the lookup answer safely writes the message again. The seven post schedules cover all five delivery and recovery orderings. `dependentDelete` queues a delete while the post is sending; the post is refused and the delete discards the failed row. `actionRetry` edits a stored message; Slack applies it, a newer edit arrives while the call is out, and the answer is lost. The worker sends again and the row ends. `uploadRetry` refuses a post's upload, retries it, and shares the post with an answer that has no message, so the lookup stores it.
@@ -248,6 +248,27 @@ The first runs found these. A real bug has a test marked `it.fails` while it is 
 | `olderPage` | An opened topic's page is requested, the socket drops and the message is deleted. The guarded recheck waits for that page, then finds the message gone. The bug asks at once; the older page lands last and brings the deleted message back. | `quietAgreement` |
 
 The random simulation (10,000 traces of at most 160 transitions) found two forms of the `olderPage` race before the wait was added: an opened topic's page, and an earlier recheck's page, landing after a later recheck. Four seeds of 10,000 traces each pass with it. `pnpm specs:check` runs the random traces and the three pairs with the other protocols.
+
+## Mutation-marker repair
+
+`mutation-repair.qnt` adds counts selection and conditional bodies to the existing
+`catchup.qnt` page/event ordering rules. Its conversation has two cached topics,
+one outside the bounded fallback. An edit or reaction advances `updated`; deletion
+advances `history_invalid`. These are assumptions supported by client source and
+modelled by the fake, not a proof of live Slack completeness. Missing markers
+still rely on the existing bounded fallback.
+
+The model separates bodies from unchanged ids, captures markers before repair,
+and acknowledges them only after all cached ranges complete. A failure retains
+the durable baseline; mutations after the counts snapshot remain dirty. It checks
+`noFalseDelete`, `quietAgreement`, and a 32-transition quiet drain. Three broken /
+corrected schedules cover a topic outside the fallback, unchanged bodies mistaken
+for deletion, and acknowledging a failed repair. Random simulation runs 10,000
+traces. One response abstracts completion of all selected cached ranges; actual
+cursor paging, partial counts decoding, and the large-seed call budget are covered
+by fake-server and engine tests. The old catch-up model still checks event races
+and waiting for older requests. Neither model claims recovery of uncached history
+or unbounded liveness.
 
 ## Conversation metadata
 

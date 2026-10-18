@@ -335,7 +335,7 @@ function own(world: World, prevState: TraceState, nextState: TraceState): boolea
 
 export const outboxSpec: Spec<World, View> = {
   start: async (trace: Trace) => {
-    // A catch-up that reads no topic again needs a recheck that reads none.
+    // An uncovered catch-up has neither usable mutation markers nor fallback topics.
     const covers = trace.states.every((state) => sOf(state).label !== 'catchUp' || sOf(state).rechecked.size > 0)
     const options: EngineOptions = covers ? {} : { recheckTopics: 0 }
     const world: World = {
@@ -360,6 +360,7 @@ export const outboxSpec: Spec<World, View> = {
         }
       }, 10),
     }
+    if (!covers) world.engine.fake.workspace.mutationMarkers = false
     await quiet(world.engine)
     gate(world)
     return world

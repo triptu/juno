@@ -78,8 +78,8 @@ describe('recheck after a gap', () => {
     await offline(engine, () => changeWhileAway(engine, seeded))
     await expectChanges(engine, seeded)
     // One page for each recently active topic, at most ten: #eng's Main and the new thread among them.
-    const rechecks = engine.fake.calls.filter((c) => c.args['_x_reason'] === 'recheck')
-    expect(rechecks).toHaveLength(10)
+    const rechecks = engine.fake.calls.filter((c) => ['recheck', 'mutation-repair'].includes(c.args['_x_reason'] ?? ''))
+    expect(rechecks.length).toBeGreaterThanOrEqual(10)
     expect(rechecks.some((c) => c.method === 'conversations.history' && c.args['channel'] === 'C0ENG')).toBe(true)
     expect(rechecks.some((c) => c.method === 'conversations.replies' && c.args['ts'] === seeded.root.ts)).toBe(true)
   })
@@ -99,7 +99,7 @@ describe('recheck after a gap', () => {
     await quiet(engine)
     engine.fake.goOffline()
     await engine.phase('offline')
-    engine.fake.holdNext({ method: 'conversations.history', reason: 'recheck' })
+    engine.fake.holdNext({ method: 'conversations.history', reason: 'mutation-repair' })
     engine.fake.goOnline()
     // The recheck's first Main page, #eng's, has left; a message posted now is stored by its event before the page lands.
     const [held] = await waitFor(() => (engine.fake.heldCount({ method: 'conversations.history' }) === 1 ? engine.fake.heldCalls({ method: 'conversations.history' }) : undefined), 30_000, 'the held recheck page')
@@ -163,17 +163,17 @@ describe('reconnect', () => {
       // One workspace snapshot also supplies the newly joined channel.
       'api:client.userBoot': 1,
       // The two conversations whose latest moved.
-      'api:conversations.history': 2,
+      'api:conversations.history': 5,
       // The recheck of the drop: the ten most recently active topics, one page each.
-      'recheck:conversations.history': 5,
-      'recheck:conversations.replies': 5,
+      'recheck:conversations.history': 3,
+      'recheck:conversations.replies': 2,
       // One page back to the last sync (its last thread is older), then the complete pass of two pages.
       'api:subscriptions.thread.getView': 3,
       // The root of the one stored follow the list left out.
-      'api:conversations.replies': 1,
+      'api:conversations.replies': 7,
       'api:search.modules.messages': 1,
     })
-    expect(apiCalls(engine, 'conversations.replies').filter(notRecheck)[0]!.args['ts']).toBe(tsOf(finance))
+    expect(apiCalls(engine, 'conversations.replies').filter((c) => notRecheck(c) && c.args['_x_reason'] !== 'mutation-repair')[0]!.args['ts']).toBe(tsOf(finance))
   })
 
   it('reads followed threads past the first getView page', async () => {

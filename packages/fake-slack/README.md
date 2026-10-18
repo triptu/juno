@@ -42,3 +42,15 @@ await fake.close()
 `holdNext`, `heldCount` and `release` also cover edge methods using the `edge:` prefix, for example `edge:users/info`. This lets desktop tests delay sender resolution independently of history. Use `file:bytes` to hold thumbnail or download bytes until the test explicitly releases them.
 
 `unfurlFixtures(base)` supplies invented X image/text posts, failed images, YouTube, GitHub, Google Docs and generic previews. Avatar responses require the fake session cookie, so desktop tests exercise the authenticated image path.
+
+Mutation recovery (`docs/research/slack-catchup.md`): counts expose independent
+`updated` and `history_invalid` markers. The fake advances `updated` for posts,
+edits and reactions, and `history_invalid` for deletion. History and replies
+accept `cached_latest_updates`, return changed bodies with `latest_updates`,
+unchanged ids in `unchanged_messages`, and deleted cached ids in `deleted`.
+Paging counts unchanged messages too. These mutation-to-marker rules are the
+protocol assumption tested by Juno, not a claim that live Slack coverage has
+been proved for every mutation.
+
+In-process tests can set `workspace.mutationMarkers = false` to model counts that
+omit both markers. Outbox conformance uses this for an uncovered fallback range.

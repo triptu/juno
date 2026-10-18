@@ -8,7 +8,7 @@ Slack into the store. Cold and warm boot, thread discovery, the merge rules, soc
 permit; `run/boot.ts`, `run/reconcile.ts` and `run/socket.ts` handle boot, catch-up
 and socket events. `run/fetcher.ts` exposes topic fetches and `run/lookups.ts` runs
 root and read lookups. `counts.ts` reads counts through the metadata fence;
-`recheck.ts` still owns gap-page reconciliation.
+`mutationRepair.ts` repairs dirty cached ranges after a gap; `recheck.ts` retains the bounded fallback.
 
 `write.ts` re-exports the table writers in `write/`: messages, users, conversations,
 team, channel reads, subscriptions, coverage, read state, overlays and sync state.
@@ -108,7 +108,7 @@ Known limits: thread marks made elsewhere while the socket was down reach Juno a
 
 ## Known gaps
 
-- Edits, deletes and reactions made during a disconnect or while the app was closed are recovered by the recheck (below) for the topics on screen and the 10 most recently active ones, back to 24 hours before the gap. Older messages and other topics wait until the topic is opened, and then only for messages newer than the stored ones. ADR 0011's `cached_latest_updates` path waits on the live smoke.
+- Edits, deletes and reactions made during a disconnect or while the app was closed are repaired across cached ranges of conversations selected by counts mutation markers (below). The bounded ten-topic recheck remains a fallback for unavailable marker coverage. Conditional history/replies keep unchanged bodies out of repair responses. Uncached ranges are outside this repair.
 - Search requests extra thread metadata and applies roots before replies within each page, avoiding a lookup when the root counters are present. Missing roots still need a lookup. Search fields remain partial: missing reactions never clear stored ones.
 - A follow changed elsewhere during a drop, on a thread with no activity since the last sync, waits for the next window pass (at most an hour). A follow older than the window waits for its thread's next reply.
 - The sweep reads at most 150 matches per gap; a longer outage in a busy workspace misses older thread activity until the next sweep or open.
@@ -130,3 +130,25 @@ Known limits: thread marks made elsewhere while the socket was down reach Juno a
 ## Quiet-window preference
 
 `quietDays` is read before sync starts and observed by `run/window.ts`. An increase runs `window.ts` under the work permit, paging missing history on the background lane, then refreshing follows and discovery. A decrease cancels that pass and retains stored messages. Each page commits with its coverage; retries and restarts reuse it. `specs/quietwindow.qnt` models the coverage rule.
+
+## Mutation repair after a gap
+
+Full counts on reconnect and warm boot select cached conversations whose
+`updated` or `history_invalid` exceeds the last repaired snapshot. Every cached
+Main and thread range in those conversations is read with conditional versions;
+unchanged ids count as present. Ranges are paged to completion before absence
+can imply deletion. The captured markers are durable only after all the
+conversation's ranges succeed. Failed or truncated ranges keep the old markers.
+Cold boot establishes the initial baseline. An upgraded cache with no markers
+repairs its cached conversations once before it has a baseline.
+
+The existing ten-topic, 24-hour recheck remains for missing or incomplete marker
+coverage. Topics fully covered by mutation repair are skipped in that fallback.
+Markers select conversations, not individual threads, and cannot repair uncached
+history. `latest` still selects new-message history; the ten-minute discovery
+sweep and five-minute overlap, and hourly follow repair, are unchanged.
+
+Incremental counts rows update only supplied fields. `{ id, last_read }` updates
+the read pointer without clearing `latest`, `has_unreads` or `mention_count`.
+Before this fix those rows failed decoding and aborted the sync cycle before
+any counts could be merged; the retry kept using the old cursor.

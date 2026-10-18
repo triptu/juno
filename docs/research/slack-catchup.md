@@ -365,3 +365,58 @@ whose mutation markers changed, then use conditional versions to reduce bytes.
 changed, with nothing to run. `git diff --check` and the generated decision-log
 check passed. Live probes established the results above; no product test suite
 or sync-protocol verification is claimed for this documentation-only branch.
+
+## Implemented recovery and call comparison (2026-10-19)
+
+`mutationRepair.ts` now compares full counts with durable repaired markers on
+reconnect and warm boot. It repairs every cached Main and thread range of dirty
+member conversations, using conditional versions. It does not scan unchanged
+conversations. The ten-topic fallback remains, skipping a topic already repaired.
+Counts select conversations, not threads; a changed conversation may need several
+reply calls. A populated cache upgraded without markers needs one baseline repair.
+
+An incremental `{ id, last_read }` row previously caused `SlackDecodeError` before
+`loadCounts` could merge any entries. The failed cycle kept the old cursor and
+retried. Optional unread fields now decode, and the writer preserves omitted
+`latest`, unread flags and mention counts. The fake returns the observed partial
+shape, and the engine test checks that a sweep keeps the existing unread state.
+
+The fake explicitly assumes edits and reactions advance `updated`, and deletion
+advances `history_invalid`. Its conditional pages retain unchanged ids in paging,
+return new versions with changed bodies, and identify deleted cached ids. Tests
+prove Juno under these assumptions. The live research still does not establish
+complete marker coverage or internal rate limits. The fallback remains for that
+reason. Uncached history and unknown threads are outside mutation repair; ordinary
+history and discovery still find new messages.
+
+Call comparison uses the default `largeSeed()` (300 conversations, 5,000 threads,
+100,000 messages, 2,000 users). The engine boots, caches a followed thread outside
+the top ten, goes offline, and another client edits one cached reply, deletes a
+second and removes a reaction from a third. No topic is opened. Calls are reset
+before reconnect and counted until the sync cycle finishes. The before run uses `872f6355`; one run per side completed without request
+failures. The hourly follow
+pass is not due; periodic sweeps are disabled. Socket URL calls are excluded
+because reconnect backoff changes their count. Background pacing is disabled as
+in other fake-engine tests; these are request counts, not a latency benchmark.
+
+| Request | Before | After |
+| --- | ---: | ---: |
+| `client.userBoot` | 1 | 1 |
+| `client.counts` | 1 | 1 |
+| `conversations.history` | 0 | 1 |
+| `conversations.replies` | 10 | 15 |
+| `subscriptions.thread.getView` | 1 | 1 |
+| `search.modules.messages` | 2 | 2 |
+| Total, excluding socket URL | 15 | 21 |
+
+Before, all three changes remain stale. After, all three are stored without an
+open: six conditional repair calls cover the dirty conversation, and ten fallback
+calls remain. A subsequent unchanged warm boot makes no mutation-repair calls.
+The conditional endpoint test separately verifies zero bodies for an unchanged
+page and correct cursor progression through unchanged ids.
+
+This scenario costs six more calls (40%), with broader coverage. It does **not**
+confirm the earlier hypothetical 70% call saving: that estimate assumed replacing
+the fallback, which this change deliberately retains. Messages with no saved server version need a full body once to establish it.
+Conditional versions reduce
+body transfer, but no byte percentage or live latency improvement was measured.

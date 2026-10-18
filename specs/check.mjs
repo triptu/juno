@@ -238,7 +238,7 @@ function simulate(file, step, invariant, output, violation = false, randomized =
   quint(['run', `specs/${file}.qnt`, '--step', step, '--invariant', invariant,
     '--backend', backend, '--n-threads', '2', '--seed', seed, '--max-samples', String(options.samples ?? (randomized ? samples : 1)),
     '--max-steps', String(options.steps ?? (randomized ? steps : 80)), '--verbosity', '1',
-    ...(options.main ? ['--main', options.main] : []), ...(options.init ? ['--init', options.init] : []),
+    ...(options.main ? ['--main', options.main] : file === 'mutation-repair' ? ['--main', 'mutationRepair'] : []), ...(options.init ? ['--init', options.init] : []),
     '--out-itf', path, '--mbt', ...(options.witnesses ? ['--witnesses', ...options.witnesses] : randomized ? ['--witnesses', 'reachedAgreement'] : [])], {
     violation,
     trace: path,
@@ -322,6 +322,9 @@ const regressions = [
   ['catchup', 'newerThanPage', 'noFalseDelete', 'catchup-newer-than-page'],
   ['catchup', 'dropChanges', 'quietAgreement', 'catchup-drop-changes'],
   ['catchup', 'olderPage', 'quietAgreement', 'catchup-older-page'],
+  ['mutation-repair', 'outsideFallback', 'quietAgreement', 'mutation-outside-fallback'],
+  ['mutation-repair', 'unchanged', 'noFalseDelete', 'mutation-unchanged'],
+  ['mutation-repair', 'failedRepair', 'quietAgreement', 'mutation-failed-repair'],
   ['metadata', 'staleRename', 'eventWins', 'metadata-stale-rename'],
   ['metadata', 'staleMembership', 'eventWins', 'metadata-stale-membership'],
   ['metadata', 'staleArchive', 'eventWins', 'metadata-stale-archive'],
@@ -330,7 +333,7 @@ const regressions = [
   ['metadata', 'missedRename', 'quietAgreement', 'metadata-missed-rename'],
 ]
 // Specs whose corrected runs must reach their drained agreement.
-const drained = new Set(['outbox', 'catchup', 'metadata'])
+const drained = new Set(['outbox', 'catchup', 'metadata', 'mutation-repair'])
 
 const selectedSpec = actionsOnly ? 'agent-actions.qnt' : recoveryOnly ? 'agent-recovery.qnt' : memoryOnly ? 'agent-memory.qnt' : outboxOnly ? 'outbox.qnt' : undefined
 for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith('.qnt') && (!selectedSpec || name === selectedSpec || (recoveryOnly && name === 'agent-recovery-replay.qnt'))).toSorted()) {
@@ -338,7 +341,7 @@ for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith
 }
 
 if (!memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
-  for (const file of (outboxOnly ? ['outbox'] : ['follow', 'readstate', 'outbox', 'catchup', 'requestqueue', 'discovery', 'metadata', 'quietwindow'])) {
+  for (const file of (outboxOnly ? ['outbox'] : ['follow', 'readstate', 'outbox', 'catchup', 'mutation-repair', 'requestqueue', 'discovery', 'metadata', 'quietwindow'])) {
     simulate(file, 'simulationStep', 'invariants', `${file}.itf.json`, false, true,
       drained.has(file) ? { witnesses: ['reachedAgreement'] } : {})
   }

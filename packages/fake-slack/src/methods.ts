@@ -4,7 +4,7 @@
  * result through the method's schema.
  */
 import type { CountEntry, Message, MethodArgs, MethodName, MethodOk, SearchMatch, ThreadView } from '@juno/slack-schema'
-import { compareTs, isReply, permalinkPath } from '@juno/slack-schema'
+import { compareTs, isReply, permalinkPath, Ts } from '@juno/slack-schema'
 import { isKnownReaction } from './emojiNames.ts'
 import { fileObject } from './files.ts'
 import { blocksToText } from './richtext.ts'
@@ -68,7 +68,20 @@ function requireConversation(ctx: MethodContext, channel: string, needMember = f
 }
 
 function withChannel(ws: Workspace, channel: string, message: Message): Message {
-  return ws.withThreadFields({ ...message, channel })
+  return ws.withThreadFields({ ...message, channel, version: message.version ?? message.ts })
+}
+
+/** Conditional pages keep paging over all messages, even when their bodies are omitted. */
+function conditionalPage(messages: Message[], cached: Readonly<Record<string, Ts>> | undefined, exists: (ts: string) => boolean) {
+  if (cached === undefined) return { messages }
+  const unchanged = messages.filter((m) => cached[m.ts] === (m.version ?? m.ts))
+  const bodies = messages.filter((m) => cached[m.ts] !== (m.version ?? m.ts))
+  return {
+    messages: bodies,
+    unchanged_messages: unchanged.map((m) => m.ts),
+    latest_updates: Object.fromEntries(bodies.map((m) => [m.ts, m.version ?? m.ts])),
+    deleted: Object.keys(cached).filter((ts) => !exists(ts)).map((ts) => Ts.make(ts)),
+  }
 }
 
 export const handlers: Handlers = {
@@ -212,8 +225,9 @@ export const handlers: Handlers = {
     const hasMore = window.length > limit
     const last = page.at(-1)
     return {
-      messages: page.map((m) => withChannel(ws, args.channel, m)),
+      ...conditionalPage(page.map((m) => withChannel(ws, args.channel, m)), args.cached_latest_updates, (ts) => ws.find(args.channel, ts) !== undefined),
       has_more: hasMore,
+      ...(args.include_mutation_timestamps === true ? { mutation_timestamps: { updated: ws.countEntry(conversation).updated, history_invalid: ws.countEntry(conversation).history_invalid } } : {}),
       is_limited: false,
       pin_count: 0,
       channel_actions_count: 0,
@@ -238,7 +252,7 @@ export const handlers: Handlers = {
     const hasMore = thread.length > limit
     const last = page.at(-1)
     return {
-      messages: page.map((m) => withChannel(ws, args.channel, m)),
+      ...conditionalPage(page.map((m) => withChannel(ws, args.channel, m)), args.cached_latest_updates, (ts) => ws.find(args.channel, ts) !== undefined),
       has_more: hasMore,
       response_metadata: hasMore && last !== undefined ? { next_cursor: cursorFor(last.ts) } : { next_cursor: '' },
     }
