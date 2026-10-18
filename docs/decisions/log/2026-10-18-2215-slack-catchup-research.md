@@ -1,0 +1,1 @@
+- 10-18 22:15 · Research · Recommend mutation-aware client.counts and conditional history reads for catch-up; retain bounded rechecks until mutation coverage is validated. Activity and the available event log do not establish complete message recovery. No sync behavior changed.
