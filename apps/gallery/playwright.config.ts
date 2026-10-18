@@ -29,6 +29,7 @@ export default defineConfig({
   workers: Number(process.env.GALLERY_WORKERS ?? (process.env.CI ? 2 : 3)),
   fullyParallel: true,
   retries: process.env.CI || process.env.JUNO_REMOTE_CONTAINER ? 1 : 0,
+  grepInvert: process.env.JUNO_INCLUDE_FLAKY === '1' ? undefined : /@flaky/,
   reporter: [[process.env.CI ? 'github' : 'list'], ['../../scripts/test-results-reporter.mjs']],
   use: {
     baseURL: `http://localhost:${port}`,

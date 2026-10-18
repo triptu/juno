@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { assessRecord, compatible, git, readRecords, readWaivers, releaseGate } from './release-gate.mjs'
+import { writeRecord } from './verify-records.mjs'
 import { scratchFolder } from './worktree-folder.mjs'
 
 export const green = (commit) => ({ commit, finishedAt: '2026-10-18T10:00:00Z', passed: true, suites: ['test', 'specs:check', 'test:gallery', 'test:desktop'].map((suite) => ({ suite, code: 0 })) })
@@ -55,6 +56,8 @@ test('reads archived results as well as the latest result and validates waivers'
   writeFileSync(join(archived, 'run.json'), JSON.stringify(green('a'.repeat(40))))
   writeFileSync(join(root, 'verify-main.json'), JSON.stringify(green('b'.repeat(40))))
   assert.equal(readRecords(root).length, 2)
+  writeRecord(root, 'next-run', green('c'.repeat(40)))
+  assert.equal(readRecords(root).length, 3)
   assert.deepEqual(readWaivers(root), [])
   writeFileSync(join(root, 'release-waivers.json'), '[{"id":"x"}]')
   assert.throws(() => readWaivers(root), /reason/)

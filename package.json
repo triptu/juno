@@ -32,7 +32,7 @@
     "test:plan": "node scripts/plan.mjs",
     "package": "node scripts/heavy.mjs --exclusive --priority release node scripts/package.mjs",
     "release:version": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/release-version.ts",
-    "release:scheduled": "node scripts/release-scheduled.mjs",
+    "release:scheduled": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/release-scheduled.mjs",
     "release:publish": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/release-publish.ts",
     "gallery": "pnpm --filter @juno/gallery dev",
     "gallery:shots": "node scripts/heavy.mjs --electron pnpm --filter @juno/gallery shots",

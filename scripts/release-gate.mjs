@@ -10,9 +10,10 @@ export function readRecords(status) {
   const folder = join(status, 'verify-main', 'commits')
   const files = existsSync(folder) ? readdirSync(folder, { recursive: true }).filter((file) => file.endsWith('.json')).map((file) => join(folder, file)) : []
   if (existsSync(join(status, 'verify-main.json'))) files.push(join(status, 'verify-main.json'))
-  return files.map((file) => JSON.parse(readFileSync(file, 'utf8')))
+  const records = files.map((file) => JSON.parse(readFileSync(file, 'utf8')))
     .filter((record) => /^[a-f0-9]{40}$/.test(record.commit) && Array.isArray(record.suites))
-    .sort((a, b) => b.finishedAt.localeCompare(a.finishedAt))
+    .toSorted((a, b) => b.finishedAt.localeCompare(a.finishedAt))
+  return [...new Map(records.map((record) => [`${record.commit}:${record.finishedAt}`, record])).values()]
 }
 
 export function readWaivers(status) {
