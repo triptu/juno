@@ -171,7 +171,8 @@ async function checkStateWithin(route: Route, check: () => Promise<void>): Promi
 
 for (let part = 0; part < shards; part++) {
   // The states come from the built gallery, so the list can only be read once a page is open.
-  test(`no interaction shifts the layout, in any state of any component (part ${part + 1} of ${shards})`, async ({ browser }) => {
+  // Over every component the walk is @heavy (scripts/test-areas.mjs); limited with GALLERY_SHIFT_ONLY it is not.
+  test(`no interaction shifts the layout, in any state of any component (part ${part + 1} of ${shards})`, { tag: only ? [] : ['@heavy', '@heavy-gallery'] }, async ({ browser }) => {
     // A part walks states until the queue is empty, at up to eight elements and six touches per state.
     test.setTimeout(15 * 60_000)
     const pages = await walkPages(browser)

@@ -30,3 +30,7 @@ A test that sends from Home and then misses the message in a tab needs to say wh
 - **When a test fails:** the `running` fixture adds the fake's `chat.postMessage`, `conversations.open`, `chat.update` and `chat.delete` calls (`posts`: time, method, channel, answer) and attaches the whole as `send-trace`, and prints it on one line, `send trace (<test>): {...}`, so a remote run's `run.log` has it.
 
 Reading it: no `posts` entry for the channel means the send never left the engine. A `window` for the tab's view whose `sent` stays at `pending` while `posts` shows an answer points at the engine's reconcile. No `window` for the tab's view after the send means its subscription did not run again. A `tabs dropped` or no `tabs applied` with the tab active after `switch` means the tab never showed.
+
+## Heavy tests
+
+A test that is slow because of what it checks, and whose code rarely changes, is tagged `@heavy` and its area's tag: `test('...', { tag: ['@heavy', '@heavy-sync'] }, async () => ...)`. `HEAVY_AREAS` in `scripts/test-areas.mjs` lists the areas and the files each covers; add a file there when a heavy test starts to cover it. `pnpm affected` skips an area's heavy tests unless the change is in that area, by setting `JUNO_SKIP_TAGS`; the scheduled full run and a run by hand keep them. See `docs/development.md`, "Affected tests".
