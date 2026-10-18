@@ -19,6 +19,7 @@ export interface ProcessesViewProps {
   /** "Copied" for a moment after a copy, or "Could not copy". */
   readonly copied?: string
   readonly onCopy: () => void
+  readonly onShowLogs: () => void
 }
 
 /**
@@ -26,7 +27,7 @@ export interface ProcessesViewProps {
  * would read them in Activity Monitor under "Juno Helper", with Juno's own
  * names, and Copy diagnostics for a plain-text report.
  */
-export function ProcessesView({ rows, copied, onCopy }: ProcessesViewProps) {
+export function ProcessesView({ rows, copied, onCopy, onShowLogs }: ProcessesViewProps) {
   return (
     <section {...stylex.props(styles.section)} aria-label="Processes">
       <table {...stylex.props(styles.table)}>
@@ -62,6 +63,7 @@ export function ProcessesView({ rows, copied, onCopy }: ProcessesViewProps) {
       </table>
       <div {...stylex.props(styles.row)}>
         <Button onClick={onCopy}>Copy diagnostics</Button>
+        <Button onClick={onShowLogs}>Show logs in Finder</Button>
         {copied === undefined ? null : (
           <Text variant="meta" tone="muted" role="status">
             {copied}
@@ -101,6 +103,7 @@ const styles = stylex.create({
   row: {
     display: 'flex',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: spacing['--space-2'],
   },
 })

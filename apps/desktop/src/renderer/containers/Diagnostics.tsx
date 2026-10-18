@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Effect } from 'effect'
 import type { Diagnostics as Reading } from '@juno/contract'
-import { appInfoAtom, appStateAtom, copyText, describeTabs, diagnosticsReport, formatCpu, readDiagnostics, tabsAtom } from '@juno/state'
+import { appInfoAtom, appStateAtom, writeClipboardText, diagnosticDetails, showLogs, describeTabs, diagnosticsReport, formatCpu, readDiagnostics, tabsAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { ProcessesView, type ProcessRow } from '@juno/views'
 import { EngineStatus, useEngineLine } from './EngineStatus'
@@ -39,22 +39,21 @@ export function Diagnostics() {
   }, [])
 
   const copy = () => {
-    void Effect.runPromise(readDiagnostics).then(
-      (fresh) => {
-        setReading(fresh)
-        copyText(diagnosticsReport({ app: app._tag === 'Success' ? app.value : undefined, diagnostics: fresh, engineLine: line, view, tabs, at: new Date() }))
-        setCopied('Copied')
-      },
-      () => setCopied('Could not copy'),
-    )
     clearTimeout(cleared.current)
-    cleared.current = setTimeout(() => setCopied(undefined), 2_000)
+    void Effect.runPromise(readDiagnostics).then(async (fresh) => {
+      setReading(fresh)
+      const details = await diagnosticDetails()
+      await writeClipboardText(`${diagnosticsReport({ app: app._tag === 'Success' ? app.value : undefined, diagnostics: fresh, engineLine: line, view, tabs, at: new Date() })}\n${details}`)
+      setCopied('Copied')
+    }).catch(() => setCopied('Could not copy')).finally(() => {
+      cleared.current = setTimeout(() => setCopied(undefined), 2_000)
+    })
   }
 
   return (
     <>
       <EngineStatus />
-      <ProcessesView rows={reading?.processes.map(rowOf) ?? []} copied={copied} onCopy={copy} />
+      <ProcessesView rows={reading?.processes.map(rowOf) ?? []} copied={copied} onCopy={copy} onShowLogs={() => { void showLogs().catch(() => setCopied('Could not open logs')) }} />
     </>
   )
 }

@@ -96,7 +96,7 @@ const about = (
             { name: 'Graphics', detail: 'GPU, pid 4122', cpu: '0.5 %', memory: '96 MB' },
             { name: 'Network', detail: 'Utility, pid 4123', cpu: '0.3 %', memory: '22 MB' },
           ]}
-          onCopy={noop}
+          onCopy={noop} onShowLogs={noop}
         />
       </>
     }
