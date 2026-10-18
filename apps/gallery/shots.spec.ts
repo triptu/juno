@@ -8,6 +8,8 @@ const themes = ['light', 'dark'] as const
 
 /** To shoot a few components: GALLERY_SHOTS_ONLY=Message,MessageList pnpm gallery:shots. Keeps the other shots. */
 const only = process.env.GALLERY_SHOTS_ONLY?.split(',').map((name) => name.trim())
+/** To see another accent: GALLERY_SHOTS_ACCENT=teal writes <state>-<theme>-teal.png next to the default accent's shots. */
+const accent = process.env.GALLERY_SHOTS_ACCENT
 
 /** Puts the state into the look its frame asks for; returns the cleanup. */
 async function arrange(page: Page, route: Route): Promise<() => Promise<void>> {
@@ -72,19 +74,20 @@ test('screenshots every state in light and dark', async ({ page }) => {
   const routes = (await readRoutes(page)).filter((route) => !only || only.includes(route.component))
   await page.evaluate(() => document.fonts.ready)
 
-  if (only) {
+  // Another accent's shots go beside the default accent's, so nothing is removed for them.
+  if (accent === undefined && only) {
     for (const component of new Set(routes.map((route) => route.component))) {
       await rm(join(shotsDir, component), { recursive: true, force: true })
     }
-  } else {
+  } else if (accent === undefined) {
     await rm(shotsDir, { recursive: true, force: true })
   }
 
   for (const route of routes) {
     for (const theme of themes) {
-      const path = join(shotsDir, `${route.route}-${theme}.png`)
+      const path = join(shotsDir, `${route.route}-${theme}${accent === undefined ? '' : `-${accent}`}.png`)
       await mkdir(dirname(path), { recursive: true })
-      await openState(page, route, theme)
+      await openState(page, route, theme, accent)
       const release = await arrange(page, route)
       await page.locator(`[data-fixture-frame="${route.route}"]`).screenshot({ path, animations: 'disabled' })
       await release()
