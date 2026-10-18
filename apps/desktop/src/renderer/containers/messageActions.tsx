@@ -57,7 +57,6 @@ export interface MessageActionsOutput {
   readonly onRowKey: (ts: string, event: KeyboardEvent<HTMLElement>) => void
   readonly onToggleReaction: (ts: string, name: string) => void
   /** Retry (`on` as asked) or Dismiss (the opposite) on a reaction Slack refused. */
-  readonly onSetReaction: (ts: string, name: string, on: boolean) => void
   /** A right-click on a row, or on its sender's name or avatar. */
   readonly onMessageMenu: (ts: string, at: { readonly clientX: number; readonly clientY: number }, onSender: boolean) => void
   /** ↑ in an empty composer. */

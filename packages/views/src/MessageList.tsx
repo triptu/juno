@@ -86,8 +86,6 @@ export interface MessageListProps {
   /** Which links open inside Juno, and where they go (`MessageBody`). */
   readonly linkInfo?: LinkInfo
   readonly onToggleReaction?: (ts: string, name: string) => void
-  /** Retry or Dismiss on a reaction Slack refused: the change to ask for. */
-  readonly onSetReaction?: (ts: string, name: string, on: boolean) => void
   /** Retry on a failed send. */
   readonly onRetry?: (clientMsgId: string) => void
   /** Delete draft on a failed send. */
@@ -236,7 +234,6 @@ export function MessageList({
   onLink,
   linkInfo,
   onToggleReaction,
-  onSetReaction,
   onRetry,
   onDiscard,
   onOpenMedia,
@@ -327,7 +324,6 @@ export function MessageList({
                 onLink={onLink}
                 linkInfo={linkInfo}
                 onToggleReaction={onToggleReaction}
-                onSetReaction={onSetReaction}
                 onRetry={onRetry}
                 onDiscard={onDiscard}
                 onOpenMedia={onOpenMedia}
