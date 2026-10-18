@@ -17,12 +17,10 @@
  */
 import { BrowserWindow, session as electronSession } from 'electron'
 import type { EngineToMain, MainToEngine, ReadySession, SessionSecrets } from '@juno/contract'
-import { installProcessLog } from '../processLog'
+import { mainLog as log } from './logging'
 import type { SecretsStore } from './secrets'
 import { forgetSlackKeychain, importFromSlackApp, type ImportOptions } from './slackImport'
 import { openSignInWindow, SLACK_PARTITION, type SignInWindowOptions } from './signInWindow'
-
-const log = installProcessLog('main')
 
 const SOCKET_ORIGIN = 'https://app.slack.com'
 

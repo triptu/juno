@@ -82,7 +82,7 @@ export function recordWindowCoverage(app: App): void {
     } catch {
       return
     }
-    // A window closed before these answer rejects them, and main exits on an unhandled rejection (processLog.ts).
+    // A window closed before these answer rejects them; main would log that as an unhandled rejection (processLog.ts).
     void contents.debugger.sendCommand('Profiler.enable').catch(() => undefined)
     void contents.debugger.sendCommand('Profiler.startPreciseCoverage', { callCount: false, detailed: false }).catch(() => undefined)
     const flush = async () => {

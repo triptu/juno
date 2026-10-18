@@ -4,11 +4,11 @@
  * what the renderer reports. Input to the window and a sync running reset
  * the idle time the self-check waits for.
  */
-import { installProcessLog } from '../processLog'
 import { app, type BrowserWindow } from 'electron'
 import type { AppState, Diagnostics } from '@juno/contract'
 import type { AgentSupervisor } from './agent'
 import type { EngineSupervisor } from './engine'
+import { mainLog } from './logging'
 import { createProcessMonitor, readings, SAMPLE_MS, type Sample } from './processes'
 
 export interface ProcessWatchDeps {
@@ -34,7 +34,7 @@ export function createProcessWatch({ supervisor, agent, window }: ProcessWatchDe
     context: () => `${windowState()}, view ${rendererState.view}, engine ${supervisor.currentState}, agent ${agent.currentState}`,
     log: (line) => {
       const match = /^main: (Main|Window|Engine|Juno agent|Graphics|Network|Other) \([^,]+, pid (\d+)\) used (\d+)/.exec(line)
-      installProcessLog('main').log('WARN', 'busy while idle', { process: match?.[1], pid: Number(match?.[2]), cpu: Number(match?.[3]), view: ['starting', 'topic', 'Home', 'All topics', 'Settings', 'Juno', 'no tab'].find((view) => rendererState.view.startsWith(view)) })
+      mainLog.log('WARN', 'busy while idle', { process: match?.[1], pid: Number(match?.[2]), cpu: Number(match?.[3]), view: ['starting', 'topic', 'Home', 'All topics', 'Settings', 'Juno', 'no tab'].find((view) => rendererState.view.startsWith(view)) })
     },
   })
   return {
