@@ -15,6 +15,7 @@ import { watchFlashes } from './driver/flashes'
 import type { Juno } from './driver/juno'
 
 const ALERTS_MAIN = '#alerts-prod'
+const ROADMAP = 'Proposal: cut offline mode and public'
 const RINA = 'Rina finished the onsite'
 const LONG_THREAD = 'Review the rollout checklist 1.'
 
@@ -121,6 +122,7 @@ test('Settings: Notifications and Appearance save, the test notification and per
   await test.step('Settings › Notifications saves hours and what matters, and Appearance changes the density', () => notificationsAndAppearance(juno))
   await test.step('Send test notification posts one notification, and a line shows when macOS does not let Juno notify', () => testNotificationAndPermission(juno))
   await test.step('Settings › Ignored lists an ignored channel, and Stop ignoring has Undo', () => ignoredChannels(juno))
+  await test.step('Settings › Ignored ignores a channel picked by keyboard, as its menu does, with Undo', () => ignoreFromSettings(juno))
 })
 
 async function notificationsAndAppearance(juno: Juno): Promise<void> {
@@ -203,6 +205,39 @@ async function ignoredChannels(juno: Juno): Promise<void> {
   await juno.undoFromToast()
   await expect(settings.ignored('alerts-prod')).toBeVisible()
   await expect(settings.root.getByText('Nothing ignored.')).toHaveCount(0)
+}
+
+async function ignoreFromSettings(juno: Juno): Promise<void> {
+  await juno.sidebar.filter('All')
+  const roadmap = juno.sidebar.row(ROADMAP)
+  await roadmap.expectVisible()
+  await juno.tabs.select('Settings')
+  const settings = juno.settings
+  await expect(settings.ignoreButton).toBeDisabled()
+
+  // A key typed on the closed select opens its list with that text; the ignored #alerts-prod is not offered.
+  await settings.ignoreSelect.focus()
+  await juno.win.keyboard.type('p')
+  await expect(settings.ignoreOptions).toHaveText(['platform', 'product'])
+  await juno.win.keyboard.press('ArrowDown')
+  await juno.win.keyboard.press('Enter')
+  await expect(settings.ignoreOptions).toHaveCount(0)
+  await expect(settings.ignoreSelect).toBeFocused()
+  await expect(settings.ignoreSelect).toHaveAccessibleName('Channel to ignore: product')
+
+  await settings.ignoreButton.click()
+  await juno.expectToast('Ignoring #product')
+  await expect(settings.ignored('product')).toBeVisible()
+  await roadmap.expectAbsent()
+  await expect(settings.ignoreButton).toBeDisabled()
+  await settings.ignoreSelect.click()
+  await juno.win.keyboard.type('product')
+  await expect(juno.win.getByText('No match.')).toBeVisible()
+  await juno.win.keyboard.press('Escape')
+
+  await juno.undoFromToast()
+  await expect(settings.ignored('product')).toHaveCount(0)
+  await roadmap.expectVisible()
 }
 
 const longThread = test.extend({
