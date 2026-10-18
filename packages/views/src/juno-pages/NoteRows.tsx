@@ -24,7 +24,7 @@ export interface NoteActions {
 const copy = chatCopy.docs
 
 /** "Your words", "Slack", "Littlebird". */
-export const sourceLabel = (source: MemorySource): string => (source._tag === 'connection' ? source.name : copy.source[source._tag])
+const sourceLabel = (source: MemorySource): string => (source._tag === 'connection' ? source.name : copy.source[source._tag])
 
 /**
  * Where a note came from. One written after reading outside content says so

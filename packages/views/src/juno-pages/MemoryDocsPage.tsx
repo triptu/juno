@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
-import { chatCopy, type MemoryChange, type MemoryDoc, type MemoryDocsPage as MemoryDocsPageModel, type MemoryPersonId, type MemorySection, type PersonRelationship } from '@juno/agent-contract'
+import { chatCopy, type MemoryChange, type MemoryDoc, type MemoryDocSection, type MemoryDocsPage as MemoryDocsPageModel, type MemoryPerson, type MemoryPersonId, type MemorySection, type PersonRelationship } from '@juno/agent-contract'
 import { Button, ListRow, Page, PageHeader, Section, Surface, Text } from '@juno/ui'
 import { spacing } from '@juno/tokens/tokens.stylex'
 import { cell } from './cell'
@@ -8,7 +8,7 @@ import { NoteList, Source, type DocEditing, type NoteActions } from './NoteRows'
 import { PeopleList, PersonFilePage, type PersonFaces } from './PersonFile'
 import { fullTime, messageTime } from '../time'
 
-export { sourceLabel, type DocEditing } from './NoteRows'
+export type { DocEditing } from './NoteRows'
 
 export interface MemoryDocsPageProps extends NoteActions {
   readonly page: MemoryDocsPageModel
@@ -83,36 +83,9 @@ export function MemoryDocsPage({
   return (
     <Page>
       <PageHeader title={copy.title} subtitle={copy.subtitle} />
-      {page.docs.map((section) => {
-        const adding = editing?._tag === 'add' && editing.doc === section.doc && editing.person === undefined ? editing : undefined
-        const title = copy.titles[section.doc]
-        const add = (
-          <Button variant="ghost" size="xs" tone="subtle" aria-label={copy.addLabel(title)} data-memory-add={section.doc} onClick={() => onAddStart(section.doc)}>
-            {copy.add}
-          </Button>
-        )
-        const notes = (label: string) => (
-          <Surface kind="group" role="list" aria-label={label} data-memory-doc={section.doc}>
-            <NoteList entries={section.entries} now={now} editing={editing} adding={adding} addLabel={copy.addLabel(title)} {...actions} />
-          </Surface>
-        )
-        if (section.doc !== 'people') {
-          return (
-            <Section key={section.doc} heading={title} sub={copy.hints[section.doc]} action={add}>
-              {notes(title)}
-            </Section>
-          )
-        }
-        // People: the files, then the general notes, which show only when there are some or one is being added.
-        return (
-          <div key={section.doc} {...stylex.props(styles.people)}>
-            <Section heading={title} sub={copy.hints.people} action={add}>
-              <PeopleList people={page.people} faces={faces} onOpenPerson={onOpenPerson} />
-            </Section>
-            {section.entries.length === 0 && adding === undefined ? null : <Section heading={copy.people.general}>{notes(copy.people.general)}</Section>}
-          </div>
-        )
-      })}
+      {page.docs.map((section) => (
+        <DocSection key={section.doc} section={section} people={page.people} faces={faces} now={now} editing={editing} onAddStart={onAddStart} onOpenPerson={onOpenPerson} {...actions} />
+      ))}
       {pinned === undefined ? null : (
         <Section heading={copy.pinned} sub={copy.pinnedSub}>
           {pinned}
@@ -128,6 +101,50 @@ export function MemoryDocsPage({
         </Section>
       )}
     </Page>
+  )
+}
+
+/**
+ * One doc: its notes under its heading with Add. People is the person rows,
+ * then the general notes as Other notes, which show only when there are
+ * some or one is being added.
+ */
+function DocSection({
+  section,
+  people,
+  faces,
+  now,
+  editing,
+  onAddStart,
+  onOpenPerson,
+  ...actions
+}: { readonly section: MemoryDocSection; readonly people: ReadonlyArray<MemoryPerson>; readonly faces: PersonFaces | undefined } & Pick<MemoryDocsPageProps, 'now' | 'editing' | 'onAddStart' | 'onOpenPerson'> & NoteActions) {
+  const adding = editing?._tag === 'add' && editing.doc === section.doc && editing.person === undefined ? editing : undefined
+  const title = copy.titles[section.doc]
+  const add = (
+    <Button variant="ghost" size="xs" tone="subtle" aria-label={copy.addLabel(title)} data-memory-add={section.doc} onClick={() => onAddStart(section.doc)}>
+      {copy.add}
+    </Button>
+  )
+  const notes = (label: string) => (
+    <Surface kind="group" role="list" aria-label={label} data-memory-doc={section.doc}>
+      <NoteList entries={section.entries} now={now} editing={editing} adding={adding} addLabel={copy.addLabel(title)} {...actions} />
+    </Surface>
+  )
+  if (section.doc !== 'people') {
+    return (
+      <Section heading={title} sub={copy.hints[section.doc]} action={add}>
+        {notes(title)}
+      </Section>
+    )
+  }
+  return (
+    <div {...stylex.props(styles.people)}>
+      <Section heading={title} sub={copy.hints.people} action={add}>
+        <PeopleList people={people} faces={faces} onOpenPerson={onOpenPerson} />
+      </Section>
+      {section.entries.length === 0 && adding === undefined ? null : <Section heading={copy.people.general}>{notes(copy.people.general)}</Section>}
+    </div>
   )
 }
 

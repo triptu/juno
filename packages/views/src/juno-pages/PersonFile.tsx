@@ -114,9 +114,53 @@ export function PersonFilePage({
   onDeleteFile,
   ...actions
 }: PersonFilePageProps) {
-  const hint = person.relationshipBy === 'owner' ? copy.setByYou : person.relationship === undefined ? undefined : copy.guessed
   return (
     <Page>
+      <FileHead person={person} onClose={onClose} onRelationship={onRelationship} confirmingDelete={confirmingDelete} onDeleteStart={onDeleteStart} onDeleteCancel={onDeleteCancel} onDeleteFile={onDeleteFile} />
+      {SECTIONS.map((section) => {
+        const title = copy.sections[section]
+        const adding = editing?._tag === 'add' && editing.person === person.id && editing.section === section ? editing : undefined
+        return (
+          <Section
+            key={section}
+            heading={title}
+            action={
+              <Button variant="ghost" size="xs" tone="subtle" aria-label={chatCopy.docs.addLabel(title)} data-memory-add={section} onClick={() => onAddStart(section)}>
+                {chatCopy.docs.add}
+              </Button>
+            }
+          >
+            <Surface kind="group" role="list" aria-label={title} data-memory-section={section}>
+              <NoteList
+                entries={person.entries.filter((entry) => entry.section === section)}
+                now={now}
+                editing={editing}
+                adding={adding}
+                addLabel={chatCopy.docs.addLabel(title)}
+                sensitive
+                {...actions}
+              />
+            </Surface>
+          </Section>
+        )
+      })}
+    </Page>
+  )
+}
+
+/** Back to People, the name, the relationship and Delete file, and Delete file's question once it is asked. */
+function FileHead({
+  person,
+  onClose,
+  onRelationship,
+  confirmingDelete,
+  onDeleteStart,
+  onDeleteCancel,
+  onDeleteFile,
+}: Pick<PersonFilePageProps, 'person' | 'onClose' | 'onRelationship' | 'onDeleteStart' | 'onDeleteCancel' | 'onDeleteFile'> & { readonly confirmingDelete: boolean }) {
+  const hint = person.relationshipBy === 'owner' ? copy.setByYou : person.relationship === undefined ? undefined : copy.guessed
+  return (
+    <>
       <div {...stylex.props(styles.head)} data-memory-file={person.id}>
         <span {...stylex.props(styles.back)}>
           <Button variant="ghost" size="sm" tone="subtle" iconStart={CaretLeft} onClick={onClose} data-memory-back="">
@@ -165,34 +209,7 @@ export function PersonFilePage({
           </ListRow>
         </Surface>
       ) : null}
-      {SECTIONS.map((section) => {
-        const title = copy.sections[section]
-        const adding = editing?._tag === 'add' && editing.person === person.id && editing.section === section ? editing : undefined
-        return (
-          <Section
-            key={section}
-            heading={title}
-            action={
-              <Button variant="ghost" size="xs" tone="subtle" aria-label={chatCopy.docs.addLabel(title)} data-memory-add={section} onClick={() => onAddStart(section)}>
-                {chatCopy.docs.add}
-              </Button>
-            }
-          >
-            <Surface kind="group" role="list" aria-label={title} data-memory-section={section}>
-              <NoteList
-                entries={person.entries.filter((entry) => entry.section === section)}
-                now={now}
-                editing={editing}
-                adding={adding}
-                addLabel={chatCopy.docs.addLabel(title)}
-                sensitive
-                {...actions}
-              />
-            </Surface>
-          </Section>
-        )
-      })}
-    </Page>
+    </>
   )
 }
 
