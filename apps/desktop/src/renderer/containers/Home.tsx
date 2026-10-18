@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { viewsSortChannel, type HomeItem } from '@juno/contract'
-import { closeWelcome, fillHome, freezeHome, homeGreeting, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, markMovesSeen, markMovesShown, peekKeyAtom, registry, resolveAllTopics, runAction, showHome, showToast, syncProgressAtom, welcomeAtom, type Welcome } from '@juno/state'
+import { closeWelcome, fillHome, fillThought, freezeHome, homeGreeting, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, markMovesSeen, markMovesShown, peekKeyAtom, prepareThought, registry, resolveAllTopics, runAction, showHome, showToast, syncProgressAtom, welcomeAtom, type Welcome } from '@juno/state'
 import { homeAsksAtom, junoPageActions } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
 import { chatCopy } from '@juno/agent-contract'
@@ -139,6 +139,20 @@ function useWelcome(appearedAt: number | undefined) {
   return <WelcomeCard done={last.done} peekKey={peekKey} onClose={closeCard} hidden={welcome === undefined || !welcome.ready} />
 }
 
+/**
+ * Home's thought (SPEC 12): loads the list when idle after Home paints, so the next Home has its thought
+ * in its first frame, and fills in a thought that waited for the list.
+ */
+function useThought(key: string, pending: boolean): void {
+  useEffect(() => {
+    const idle = requestIdleCallback(() => void prepareThought(), { timeout: 5_000 })
+    return () => cancelIdleCallback(idle)
+  }, [])
+  useEffect(() => {
+    if (pending) void fillThought(registry, key)
+  }, [key, pending])
+}
+
 /** The syncing line with the first sync's count. Its own component, so a new count redraws the line and not Home. */
 function SyncLine({ line }: { readonly line: string }) {
   return <HomeSyncLine line={line} progress={useAtomValue(syncProgressAtom)} />
@@ -165,6 +179,7 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
   const shown = useAtomValue(homeShownAtom(key))
   const welcome = useWelcome(shown?.now)
   useMovesShown(shown?.view.items, shown?.now)
+  useThought(key, shown?.thought === 'pending')
 
   const asks = useAtomValue(homeAsksAtom)
   // Nothing yet, not ready, ready while history still lands, or done: Home is taken again at each step.
@@ -203,6 +218,7 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
       onAsk={ask}
       composer={<HomeComposer tabId={tabId} />}
       welcome={welcome}
+      {...(shown.thought === undefined || shown.thought === 'pending' ? {} : { thought: shown.thought })}
     />
     {reviewing === undefined || !reviewReady ? null : (
       <Suspense fallback={null}>

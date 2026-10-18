@@ -230,6 +230,7 @@ export {
 export { closeWebPanel, followWebPanel, openWebPanel, setWebPanelOn, webPanelAtom, webPanelOnAtom, webPanelStateAtom } from './webPanel'
 export {
   fillHome,
+  fillThought,
   freezeHome,
   homeShownAtom,
   homeViewAtom,
@@ -249,6 +250,7 @@ export {
   tidyUpPrefsAtom,
 } from './home'
 export { homeGreeting } from './homeScene'
+export { homeThoughtsOnAtom, prepareThought, setHomeThoughtsOn } from './homeThoughts'
 export { actOnSuggested } from './suggested'
 export {
   appendUnseen,

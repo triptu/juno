@@ -2457,6 +2457,11 @@ export class HomePane {
     return this.root.getByRole('heading', { level: 2 })
   }
 
+  /** The quote or fact under the greeting when Home has no rows (SPEC 12). */
+  get thought(): Locator {
+    return this.root.locator('[data-home-thought]')
+  }
+
   async expectShown(): Promise<void> {
     await expect(this.greeting).toBeVisible()
   }

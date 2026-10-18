@@ -669,6 +669,13 @@ export const text = stylex.defineVars({
   '--text-greeting-leading': '1.15',
   '--text-greeting-tracking': '0',
 
+  // Home's thought under the greeting, when nothing waits: a quote or a fact.
+  '--text-thought-family': fonts['--font-serif'],
+  '--text-thought-size': '18px',
+  '--text-thought-weight': '400',
+  '--text-thought-leading': '1.45',
+  '--text-thought-tracking': '0',
+
   // "Nothing open"
   '--text-empty-title-family': fonts['--font-serif'],
   '--text-empty-title-size': '30px',

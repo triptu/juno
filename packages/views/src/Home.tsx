@@ -9,6 +9,12 @@ import { metaOf, opensReview, rowButtons, TILE_ICONS, type HomeAskAnswer } from 
 import { PlaceTile } from './PlaceTile'
 import { tileOf } from './tileModel'
 
+/** Home's thought (SPEC 12, "A thought"): a quote with who said it, or a fact. */
+export interface HomeThoughtView {
+  readonly text: string
+  readonly by?: string
+}
+
 export interface HomeProps {
   readonly scene: HomeSceneName
   /** "Morning, Tushar.", or "All caught up." */
@@ -46,6 +52,11 @@ export interface HomeProps {
   readonly waiting?: boolean
   /** The welcome card (`WelcomeCard`, SPEC 4) under the rows; on a short window the scene and greeting give it their room. */
   readonly welcome?: ReactNode
+  /**
+   * A quote or fact under the greeting, shown while there are no rows. With reserved slots it sits
+   * over them and goes when a row lands, so the greeting never moves.
+   */
+  readonly thought?: HomeThoughtView
 }
 
 /**
@@ -55,10 +66,11 @@ export interface HomeProps {
  * under the chosen line limit. The column scrolls on its own, so the
  * composer never moves.
  */
-export function Home({ scene, title, line, items, done, now, enter = true, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, onDismiss, onAsk, loading = false, reservedItems = 0, composer, waiting = false, welcome }: HomeProps) {
+export function Home({ scene, title, line, items, done, now, enter = true, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, onDismiss, onAsk, loading = false, reservedItems = 0, composer, waiting = false, welcome, thought }: HomeProps) {
   const headingId = useId()
   let step = 0
   const part = () => (enter ? [styles.rise, styles.delay(step++)] : [])
+  const shownThought = thought === undefined || items.length > 0 || loading ? undefined : thought
   return (
     <div data-home="" data-home-waiting={waiting ? '' : undefined} data-home-loading={loading ? '' : undefined} aria-busy={loading || undefined} {...stylex.props(styles.root)}>
       <div {...stylex.props(styles.scroll)}>
@@ -76,6 +88,14 @@ export function Home({ scene, title, line, items, done, now, enter = true, onOpe
               </Text>
             )}
           </div>
+          {shownThought === undefined ? null : reservedItems > 0 ? (
+            // Over the reserved slots, out of the flow: a row that lands takes its place and nothing moves.
+            <div {...stylex.props(styles.thoughtAnchor)}>
+              <HomeThought thought={shownThought} sx={[styles.thoughtOver, ...part()]} />
+            </div>
+          ) : (
+            <HomeThought thought={shownThought} sx={part()} />
+          )}
           {items.length === 0 && reservedItems === 0 ? null : (
             <ul aria-labelledby={headingId} {...stylex.props(styles.items, welcome !== undefined && styles.itemsWelcome, reservedItems > 0 && styles.itemSlots(reservedItems), ...part())}>
               {items.map((item) => (
@@ -100,6 +120,16 @@ export function Home({ scene, title, line, items, done, now, enter = true, onOpe
         </div>}
       </div>
       {composer}
+    </div>
+  )
+}
+
+/** The thought: plain text after the greeting, the attribution a quieter line under it. */
+function HomeThought({ thought, sx }: { readonly thought: HomeThoughtView; readonly sx: stylex.StyleXStyles | ReadonlyArray<stylex.StyleXStyles> }) {
+  return (
+    <div data-home-thought="" {...stylex.props(styles.thought, sx)}>
+      <p {...stylex.props(styles.thoughtText)}>{thought.text}</p>
+      {thought.by === undefined ? null : <p {...stylex.props(styles.thoughtBy)}>— {thought.by}</p>}
     </div>
   )
 }
@@ -273,6 +303,38 @@ const styles = stylex.create({
     insetInline: 0,
     margin: 0,
     whiteSpace: 'nowrap',
+  },
+  // The thought sits under the greeting by the gap the greeting sits under the scene.
+  thought: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: spacing['--space-1-5'],
+    width: '100%',
+    maxWidth: layout['--home-width'],
+    marginTop: spacing['--space-3-5'],
+    textAlign: 'center',
+    userSelect: 'text',
+  },
+  // In the flow with no height, so the thought over the reserved slots changes no layout.
+  thoughtAnchor: { position: 'relative', width: '100%', maxWidth: layout['--home-width'], height: 0 },
+  thoughtOver: { position: 'absolute', top: 0, insetInline: 0 },
+  thoughtText: {
+    margin: 0,
+    fontFamily: text['--text-thought-family'],
+    fontSize: text['--text-thought-size'],
+    fontWeight: text['--text-thought-weight'],
+    lineHeight: text['--text-thought-leading'],
+    letterSpacing: text['--text-thought-tracking'],
+    color: colors['--foreground-subtle'],
+    textWrap: 'balance',
+  },
+  thoughtBy: {
+    margin: 0,
+    fontFamily: text['--text-meta-family'],
+    fontSize: text['--text-meta-size'],
+    lineHeight: text['--text-meta-leading'],
+    color: colors['--foreground-muted'],
   },
   itemSlots: (count: number) => ({ minHeight: `calc(${count} * (${sizes['--row-52']} + ${spacing['--space-0-5']}) - ${spacing['--space-0-5']})` }),
   items: {

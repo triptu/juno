@@ -344,6 +344,7 @@ Sizes are the Figtree values; the prototype's Inter value is half a pixel smalle
 | Page title | serif 34px (32 All topics) | 400 | 1.1–1.15 | 0 | default | Settings sections, All topics |
 | Display | serif 38px | 400 | 1.1 | 0 | default | "What do you need?" |
 | Greeting | serif 36px | 400 | 1.15 | 0 | default | Home's first line, "Morning, Tushar." (`--text-greeting-*`) |
+| Thought | serif 18px | 400 | 1.45 | 0 | subtle; the attribution is meta in muted | Home's quote or fact under the greeting when nothing waits (`--text-thought-*`) |
 | Empty title | serif 30px | 400 | | | subtle | "Nothing open" |
 | Kbd / confidence | mono 10–11px | 400 | | | subtle / muted | esc, ⌘J, ⌘Z, ↵, "95%" |
 | Prompt block | mono 12.5px | 400 | 1.6 | | default | Code in Juno cards |

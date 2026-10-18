@@ -1,6 +1,6 @@
 import { memo, Suspense, useEffect, useState } from 'react'
 import { prefsGet, prefsSet, MIRROR_READS_PREF, readsCatchUp, type SendCheckPref, type SettingsSection, type SharingSetting } from '@juno/contract'
-import { tidyUpPrefsAtom, setTidyUpPrefs, aiActivityAtom, copyText, nowAtom, getSharingSetting, setSharingSetting, quietDaysAtom, setQuietDays, sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, topicTitleLinesAtom, persistTopicTitleLines, type TopicTitleLines, ignoredChannelsAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setPeekKey, setTabExpiry, setWebPanelOn, tabExpiryAtom, themeAtom, webPanelOnAtom, type Accent, type Density, type Theme } from '@juno/state'
+import { tidyUpPrefsAtom, setTidyUpPrefs, aiActivityAtom, copyText, nowAtom, getSharingSetting, setSharingSetting, quietDaysAtom, setQuietDays, sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, homeThoughtsOnAtom, setHomeThoughtsOn, topicTitleLinesAtom, persistTopicTitleLines, type TopicTitleLines, ignoredChannelsAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setPeekKey, setTabExpiry, setWebPanelOn, tabExpiryAtom, themeAtom, webPanelOnAtom, type Accent, type Density, type Theme } from '@juno/state'
 import { junoPageActions, junoSettingsAtom } from '@juno/state/agent'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { AiActivityPage, SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored, SettingsPage, SettingsTidyUp } from '@juno/views'
@@ -107,11 +107,12 @@ function General() {
     })
   }
   const [sharing, setSharing] = useSharingSetting()
+  const homeThoughts = useAtomValue(homeThoughtsOnAtom)
   return <SettingsGeneral hideWhileSharing={sharing.hide} sharingDetection={sharing.detection} onHideWhileSharingChange={setSharing} quietDays={quietDays} onQuietDaysChange={(days) => setQuietDays(registry, days)} mirrorReads={shown ?? served} onMirrorReadsChange={changeMirror}
     catchUp={catchUp._tag === 'Success' ? catchUp.value : undefined}
     onCatchUp={() => void runCommand(registry, readsCatchUp, undefined)}
     checks={checks} grammarUnavailable={grammarUnavailable} onCheckChange={changeCheck}
-    tabExpiry={tabExpiry} onTabExpiryChange={(expiry) => setTabExpiry(registry, expiry)} peekKey={peekKey} onPeekKeyChange={(key) => setPeekKey(registry, key)} webPanel={shownWebPanel ?? servedWebPanel} onWebPanelChange={changeWebPanel} classifier={classifier} onClassifierChange={changeClassifier} />
+    tabExpiry={tabExpiry} onTabExpiryChange={(expiry) => setTabExpiry(registry, expiry)} peekKey={peekKey} onPeekKeyChange={(key) => setPeekKey(registry, key)} homeThoughts={homeThoughts} onHomeThoughtsChange={(on) => setHomeThoughtsOn(registry, on)} webPanel={shownWebPanel ?? servedWebPanel} onWebPanelChange={changeWebPanel} classifier={classifier} onClassifierChange={changeClassifier} />
 }
 
 /**

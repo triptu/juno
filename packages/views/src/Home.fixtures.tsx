@@ -93,6 +93,11 @@ const base: HomeProps = {
 }
 
 const two = [homeItems.waiting, homeItems.resume]
+
+/** Home's thoughts (SPEC 12): a short quote, and a fact near the longest the list allows. */
+const quote = { text: 'How we spend our days is, of course, how we spend our lives.', by: 'Annie Dillard' }
+const longQuote = { text: 'The first principle is that you must not fool yourself—and you are the easiest person to fool.', by: 'Richard Feynman' }
+const fact = { text: 'In 1885 Hermann Ebbinghaus published pioneering experiments on memory, with himself as the only subject. Most of what he forgot, he lost within the first day.' }
 const narrow: FixtureFrame = { width: 560, height: 720, padded: false }
 
 const card = (done: ReadonlyArray<WelcomeHintName> = [], hidden = false) => <WelcomeCard done={done} peekKey="option" onClose={noop} hidden={hidden} />
@@ -199,6 +204,14 @@ export default defineFixtures(
       // Recent still keeps its room until the sync ends.
       'ready-filling': state({ items: [homeItems.waiting], reservedItems: 3, composer: write({ syncing: true }) }),
       'nothing-waiting': state({ scene: 'night', title: 'Still up, Tushar.', items: [] }),
+      // A thought under the greeting when nothing waits: a quote with who said it, and a fact.
+      'thought-quote': state({ scene: 'caughtUp', title: 'All caught up.', items: [], thought: quote }),
+      'thought-fact': state({ scene: 'midday', title: 'Hello, Tushar.', items: [], thought: fact }),
+      'thought-narrow': state({ scene: 'caughtUp', title: 'All caught up.', items: [], thought: longQuote }, narrow),
+      'thought-minimum-window': state({ scene: 'caughtUp', title: 'All caught up.', items: [], thought: fact }, minimum),
+      // Ready while history lands with nothing yet: the thought sits over the reserved slots, and a row that lands takes its place.
+      'thought-filling': state({ scene: 'midday', title: 'Hello, Tushar.', items: [], reservedItems: 3, thought: fact, composer: write({ syncing: true }) }),
+      'thought-gives-way': state({ scene: 'midday', title: 'Hello, Tushar.', items: [homeItems.waiting], reservedItems: 3, thought: fact, composer: write({ syncing: true }) }),
       'no-name': state({ scene: 'midday', title: 'Hello.', items: [homeItems.waiting] }),
     },
     // The chip keeps its hover fill from hover through press to open, so opening changes no colour (gallery trigger-open spec).
