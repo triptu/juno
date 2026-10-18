@@ -3,6 +3,8 @@ import type { TidyUpPrefs, TidyUpQuiet } from '@juno/contract'
 import { colors, spacing } from '@juno/tokens/tokens.stylex'
 import { Checkbox, Page, PageHeader, Section, Segmented, Surface, Text } from '@juno/ui'
 import { settledCopy } from './settled'
+import { QuietWindowSetting } from './QuietWindowSetting'
+import { TabExpirySetting, type TabExpiryName } from './TabExpirySetting'
 
 const quietOptions: ReadonlyArray<{ readonly value: TidyUpQuiet; readonly label: string }> = [
   { value: '1h', label: '1 hour' },
@@ -12,6 +14,10 @@ const quietOptions: ReadonlyArray<{ readonly value: TidyUpQuiet; readonly label:
 ]
 
 export interface SettingsTidyUpProps {
+  readonly quietDays: number
+  readonly onQuietDaysChange: (days: number) => void
+  readonly tabExpiry: TabExpiryName
+  readonly onTabExpiryChange: (expiry: TabExpiryName) => void
   readonly prefs: TidyUpPrefs
   readonly onChange: (prefs: TidyUpPrefs) => void
   /** Tidy up needs AI assist: off, the settings stay and say why nothing is suggested. */
@@ -19,16 +25,27 @@ export interface SettingsTidyUpProps {
 }
 
 /**
- * Settings › Tidy up (SPEC 14): what Resolve does, in the same words as the
- * review's info, then when Juno suggests a topic: how quiet it must be, and
+ * Settings › Tidy up (SPEC 14): topic visibility and tab expiry, then what
+ * Resolve does, in the same words as the review's info, and when Juno suggests
+ * a topic: how quiet it must be, and
  * which kinds. The rule that never suggests a topic waiting on you is
  * stated, not a switch. Then the other review cards, each with a switch:
  * follow-ups that look done, and old drafts.
  */
-export function SettingsTidyUp({ prefs, onChange, aiAssist }: SettingsTidyUpProps) {
+export function SettingsTidyUp({ quietDays, onQuietDaysChange, tabExpiry, onTabExpiryChange, prefs, onChange, aiAssist }: SettingsTidyUpProps) {
   return (
     <Page width="settings">
-      <PageHeader title="Tidy up" subtitle="Juno suggests resolving topics that look finished, so the sidebar shows only what is still going on. Home lists them under Tidy up." />
+      <PageHeader title="Tidy up" subtitle="Keep topics and tabs under control, and review suggestions for finished topics on Home." />
+      <Section heading="Topics" sub="Pinned and unread topics, and topics open in a tab, always show.">
+        <Surface kind="group" padding="md" sx={styles.card}>
+          <QuietWindowSetting value={quietDays} onChange={onQuietDaysChange} />
+        </Surface>
+      </Section>
+      <Section heading="Tabs" sub="Tabs you have not looked at close by themselves. Tabs with a draft stay; ⌘⇧T reopens one.">
+        <Surface kind="group" padding="md" sx={[styles.card, styles.rows]}>
+          <TabExpirySetting value={tabExpiry} onChange={onTabExpiryChange} />
+        </Surface>
+      </Section>
       <Section heading={settledCopy.about}>
         <Surface kind="group" padding="md" sx={styles.card}>
           <ul {...stylex.props(styles.points)} data-tidy-explain="">

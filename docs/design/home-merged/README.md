@@ -67,7 +67,7 @@ What A needs before building: the destination row is a radio group (one Tab stop
 Not implemented yet. For the chosen direction:
 
 - **The sidebar's New button** (the `NotePencil` IconButton "New chat" in `Sidebar.tsx`, `onNewChat`). Home is one click away in the navigation, and ⌘N stays.
-- **Settings › General › Tabs "New tabs open"** (`NewTabSetting`, `state/newTabPage.ts`, the `newTabPage` preference). There is only one new-tab page, Home. "Close tabs not viewed in" stays in that group.
+- "Close tabs not viewed in" stays in Settings › Tidy up.
 - **New chat as a page and tab type** (`newChat` place in `state/tabs.ts`, `containers/NewChat.tsx`, `views/NewChat.tsx`, the New chat tab icon and title rules, the preview). Home takes its draft: the text, destination and files are saved with the Home tab and survive a restart; a Home tab with a draft never closes by itself; closing it shows "Draft closed · Undo". The engine's `newchat` routes (picks, Frequent, conversation search) stay; Home calls them.
 - **⌘T and "+"** open Home in a new tab. Closing the last tab opens Home.
 - **⌘N** focuses the composer of the Home in the current tab, or of a Home tab that shows one, with the conversation list open; if that Home has a draft, it opens a new Home tab. ⌘K's "New chat" page row becomes "New message"; a person never messaged opens Home addressed to them.

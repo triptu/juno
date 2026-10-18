@@ -49,6 +49,21 @@ test('"settings" lists every Settings section, and Enter on one opens Settings t
   await expect(settings.section('Notifications')).toHaveAttribute('aria-current', 'page')
 })
 
+test('"topics" and "tabs" find Settings: Tidy up', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { palette, settings } = juno
+
+  for (const term of ['topics', 'tabs']) {
+    await palette.open()
+    await palette.type(term)
+    await palette.expectActive(/Settings: Tidy up/)
+    await palette.press('Enter')
+    await palette.expectClosed()
+    await expect(settings.section('Tidy up')).toHaveAttribute('aria-current', 'page')
+  }
+})
+
 test('"scheduled" then Enter opens the Scheduled page', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()

@@ -58,7 +58,7 @@ function Section({ section }: { readonly section: SettingsSection }) {
   }
 }
 
-/** What a new tab opens, the peek key, and the fast classifier, saved in the `aiModels` preference as an empty classifier slug when off. */
+/** The peek key and fast classifier, saved in the `aiModels` preference as an empty classifier slug when off. */
 function General() {
   const servedChecks = useAtomValue(sendCheckPrefsAtom)
   // Each check moves on the click too, until its saved value agrees or the save fails.
@@ -94,9 +94,7 @@ function General() {
     const value = Object.fromEntries(Object.entries(modelPrefs).filter(([key]) => key !== 'classifier'))
     void runCommand(registry, prefsSet, { key: 'aiModels', value: enabled ? value : { ...value, classifier: '' } })
   }
-  const quietDays = useAtomValue(quietDaysAtom)
   const peekKey = useAtomValue(peekKeyAtom)
-  const tabExpiry = useAtomValue(tabExpiryAtom)
   const servedWebPanel = useAtomValue(webPanelOnAtom)
   const [shownWebPanel, setShownWebPanel] = useState<boolean | undefined>(undefined)
   if (shownWebPanel !== undefined && shownWebPanel === servedWebPanel) setShownWebPanel(undefined)
@@ -107,11 +105,11 @@ function General() {
     })
   }
   const [sharing, setSharing] = useSharingSetting()
-  return <SettingsGeneral hideWhileSharing={sharing.hide} sharingDetection={sharing.detection} onHideWhileSharingChange={setSharing} quietDays={quietDays} onQuietDaysChange={(days) => setQuietDays(registry, days)} mirrorReads={shown ?? served} onMirrorReadsChange={changeMirror}
+  return <SettingsGeneral hideWhileSharing={sharing.hide} sharingDetection={sharing.detection} onHideWhileSharingChange={setSharing} mirrorReads={shown ?? served} onMirrorReadsChange={changeMirror}
     catchUp={catchUp._tag === 'Success' ? catchUp.value : undefined}
     onCatchUp={() => void runCommand(registry, readsCatchUp, undefined)}
     checks={checks} grammarUnavailable={grammarUnavailable} onCheckChange={changeCheck}
-    tabExpiry={tabExpiry} onTabExpiryChange={(expiry) => setTabExpiry(registry, expiry)} peekKey={peekKey} onPeekKeyChange={(key) => setPeekKey(registry, key)} webPanel={shownWebPanel ?? servedWebPanel} onWebPanelChange={changeWebPanel} classifier={classifier} onClassifierChange={changeClassifier} />
+    peekKey={peekKey} onPeekKeyChange={(key) => setPeekKey(registry, key)} webPanel={shownWebPanel ?? servedWebPanel} onWebPanelChange={changeWebPanel} classifier={classifier} onClassifierChange={changeClassifier} />
 }
 
 /**
@@ -157,11 +155,13 @@ function Ignored() {
   return <SettingsIgnored ignored={ignored} onStopIgnoring={(channel) => void stopIgnoring(registry, channel)} />
 }
 
-/** Tidy up: what Resolve does, and when Juno suggests a topic. */
+/** Tidy up: topic visibility, tab expiry, what Resolve does, and when Juno suggests a topic. */
 function TidyUp() {
   const prefs = useAtomValue(tidyUpPrefsAtom)
   const aiAssist = useAtomValue(aiAssistOnAtom)
-  return <SettingsTidyUp prefs={prefs} aiAssist={aiAssist} onChange={(next) => setTidyUpPrefs(registry, next)} />
+  const quietDays = useAtomValue(quietDaysAtom)
+  const tabExpiry = useAtomValue(tabExpiryAtom)
+  return <SettingsTidyUp quietDays={quietDays} onQuietDaysChange={(days) => setQuietDays(registry, days)} tabExpiry={tabExpiry} onTabExpiryChange={(expiry) => setTabExpiry(registry, expiry)} prefs={prefs} aiAssist={aiAssist} onChange={(next) => setTidyUpPrefs(registry, next)} />
 }
 
 /**
