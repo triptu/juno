@@ -1,5 +1,15 @@
 # Unit suite timing
 
+## After merging main
+
+After merging main `3b1d5198b2` on 2026-10-19, the single requested `pnpm remote test` ran on the SSH laptop (`tushar-host.local`), with a two-CPU container limit. Script time was 401 s (409 s including preparation); engine time was 222.47 s. This is a different backend and CPU allocation from the Namespace measurements below.
+
+The run had one failure: the half-open socket repair test raced two real 500 ms sweeps against a 1.5 s pong deadline and disconnected before its assertion. That test now uses TestClock, completing both sweeps before advancing the production pong deadline. The full suite was not repeated. The log is `.remote/20261018T231000-92519-5fa5c2a0/run.log`.
+
+The single `pnpm affected` run passed local Bun typechecking, all eleven lint checks, selected unit tests (including the repaired half-open test), all 80 conformance tests with twelve existing skips, and all 37 selected desktop tests, including the full idle CPU walk. It used the SSH laptop with a four-CPU limit for the combined plan. Results are in `.remote/20261018T231805-96441-3bd5c867/run.log` and `.remote/timing/merge-affected.log`.
+
+The test socket barrier now registers as a scoped `SocketEvents` subscriber. `SyncRunner` keeps main's shared publisher; the barrier observes sync write attempts, while other subscribers drain independently.
+
 ## Current round: scheduling and completion
 
 Measured on 2026-10-19 against main `270407c8c`, on Namespace Linux 8x16 with the same eight Vitest workers and two package jobs. The requested SSH laptop run could not connect; it ran no tests. The comparisons below use script time, excluding machine preparation and uploads. These are single runs, not a distribution.
@@ -42,6 +52,7 @@ An intermediate full run passed but took 152 s; agent tests alone took 46.85 s v
 ### Tests retaining production timing
 
 - `reads.test.ts`: the exact 400 ms coalescing boundary, advanced with Effect TestClock.
+- `mutation-repair-socket.test.ts`: the production pong deadline, advanced with TestClock after the sweeps complete.
 - `slack-schedule.test.ts`: a real one-second notification-hours debounce, explicitly named `[production timing]`.
 - `actions.test.ts`: real idle CPU observation with production retry delays and action deadline. `idle.test.ts` and both `outbox-idle.test.ts` cases retain the production timing profile, apart from disabled periodic sweeps. All are explicitly named `[production timing]`.
 - `packages/engine/test/boot-retry.test.ts`: the existing production retry boundary with TestClock; unchanged.

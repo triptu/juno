@@ -1,0 +1,1 @@
+- 10-19 04:52 · half-open-test-clock · Advance the half-open socket repair test with TestClock after each completed sweep; the laptop run exposed a race between sweep work and the fast real pong deadline, so the test now advances the production deadline explicitly.
