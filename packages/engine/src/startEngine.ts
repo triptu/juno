@@ -24,6 +24,7 @@ import { HostLink, silentHost, type Host } from './protocol/host'
 import { hostNotificationHost, NotificationControl, NotificationHost } from './notificationRuntime'
 import type { Presence } from '@juno/domain'
 import { Outbox } from './outbox'
+import { SocketEvents } from './socketEvents'
 import { AgentHost, Handlers, Services } from './layer'
 import { protocolServer } from './protocol/server'
 import type { Transport } from './protocol/transport'
@@ -87,6 +88,13 @@ export function startEngine(transport: Transport, config: Config, options: Engin
       )
       // A failed build must not leak what was already acquired.
       const context = yield* Layer.buildWithScope(app, scope).pipe(Effect.provideService(Clock.Clock, options.clock ?? (yield* Clock.Clock)), Effect.onError(() => Scope.close(scope, Exit.void)))
+      const onEvent = options.sync?.onEvent
+      if (onEvent !== undefined) {
+        // Register before returning so the harness can observe every subsequent barrier frame.
+        yield* Context.get(context, SocketEvents).subscribe('test-barrier', Effect.succeed((input) =>
+          input._tag === 'Overflowed' ? Effect.void : Effect.sync(() => onEvent(input)),
+        )).pipe(Effect.provideService(Scope.Scope, scope))
+      }
       const notifications = Context.get(context, NotificationControl)
       const outbox = Context.get(context, Outbox)
       return {

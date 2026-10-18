@@ -14,7 +14,7 @@ export class EngineConfig extends Context.Service<EngineConfig, Config>()('juno/
 /** Host controls for observing sync cycles and the socket, and overriding their schedule. */
 export interface SyncControlOptions {
   readonly config?: Partial<Omit<SyncConfigShape, 'bootRetryMillis' | 'usersBatchMillis' | 'sweepIntervalMillis' | 'followPassMillis'>>
-  /** Called after the sync consumer applies a socket event. */
+  /** Observes socket events through a subscriber after the sync write attempt. */
   readonly onEvent?: (event: SocketEvent) => void
   readonly onCycle?: (event: 'started' | 'finished') => void
   /** Called when the outbox workers learn that the socket is up or down (`SyncLink.online`). */

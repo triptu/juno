@@ -7,29 +7,22 @@
 //   pnpm remote --shards 2 specs:check     one script split across machines
 //   pnpm remote --status | --drain
 //
-// Each run has a machine to itself: a warm one from the pool in
-// scripts/remote/pool.mjs, or a new one when none is free, so agents never
-// share a lock (the pool caps the total, JUNO_REMOTE_MAX_VCPU). The machine runs
-// the image from scripts/remote/Dockerfile, which holds the toolchain and the
-// installed dependencies; it is built with `nsc build` the first time the
-// lockfile or the Dockerfile changes. The worktree is streamed in as the files
-// git sees, tracked or new, with ignored files left out (.env, node_modules,
-// out/, test output). Reports come back into .remote/<run>/. After a clean run
-// the machine goes back to the pool and is destroyed after the configured idle window;
-// after a failure or Ctrl-C it is destroyed at once. `--status` lists the pool
-// and `--drain` destroys its idle machines.
-//
-// Configure ~/.config/juno/runner.json to prefer SSH. Namespace fallback needs
-// `nsc login`. See docs/self-hosted-runner.md and ADR 0013.
+// Both backends install each workspace against a persistent dependency cache.
+// Namespace machines return to the pool after clean runs, and are destroyed
+// after failure or the idle window. See docs/development.md, "Remote runs".
+// Configure ~/.config/juno/runner.json to prefer SSH; an empty JUNO_RUNNER_HOST
+// forces Namespace. Namespace needs `nsc login`.
 
 import { randomUUID } from 'node:crypto'
 import { spawn, spawnSync } from 'node:child_process'
-import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
-import { runnerConfig, checkRunner, runnerCommand, runnerJobSize, ensureRunnerImage } from './remote/runner.mjs'
+import { runnerConfig, checkRunner, runnerCommand, runnerJobSize, ensureRunnerImage, runnerCache } from './remote/runner.mjs'
+import { snapshot } from './remote/workspace.mjs'
+import { createWithStore, namespaceCache, namespaceStoreVolume, workspaceMounts } from './remote/namespace.mjs'
 import { imageTag, ensureImage, nsc, retry, quote, sleep } from './remote/image.mjs'
 import { runShards } from './remote/shards.mjs'
 import { acquire, destroy, idleMinutes, keep, reap, release, status } from './remote/pool.mjs'
@@ -65,31 +58,6 @@ function parse(argv) {
   options.explicitMachine = Boolean(options.machine ?? process.env.JUNO_REMOTE_MACHINE)
   options.machine ??= process.env.JUNO_REMOTE_MACHINE ?? `linux/amd64:${standardShape}`
   return { ...options, script, args }
-}
-
-/** Paths that must never leave the Mac, even if someone forgot to ignore them. */
-const secretPath = /(^|\/)(\.env(\.(?!example$)[^/]*)?|.*\.(pem|key|p12|keychain-db)|id_(rsa|ed25519)[^/]*|nsc-token[^/]*|token\.json)$/
-/** A real Slack token (digits after the prefix) or session cookie in file contents. Test stand-ins like xoxc-fresh-0000 do not match. */
-const secretText = /xox[abcdeprs]-\d{6,}-\d{6,}|xoxd-[A-Za-z0-9%]{40,}/
-
-/** The worktree as git sees it, checked for secrets. */
-function snapshot() {
-  const listed = spawnSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
-  if (listed.status !== 0) throw new Error(`git ls-files failed: ${listed.stderr}`)
-  // Design images and prototypes under docs/ are not test inputs and are most of the bytes.
-  const files = listed.stdout
-    .split('\0')
-    .filter((file) => file && !(file.startsWith('docs/') && !file.endsWith('.md')) && existsSync(join(root, file)) && statSync(join(root, file)).isFile())
-  const problems = []
-  let bytes = 0
-  for (const file of files) {
-    if (secretPath.test(file)) problems.push(`${file}: looks like a secret file`)
-    const size = statSync(join(root, file)).size
-    bytes += size
-    if (size < 4 * 1024 * 1024 && secretText.test(readFileSync(join(root, file), 'latin1'))) problems.push(`${file}: contains what looks like a Slack token`)
-  }
-  if (problems.length > 0) throw new Error(`Not sending this worktree:\n  ${problems.join('\n  ')}`)
-  return { files, bytes }
 }
 
 const self = fileURLToPath(import.meta.url)
@@ -128,7 +96,7 @@ let options
 let snapshotted
 try {
   options = parse(process.argv.slice(2))
-  snapshotted = snapshot()
+  snapshotted = snapshot(root)
 } catch (error) {
   console.error(`remote: ${error.message}`)
   process.exit(2)
@@ -158,9 +126,14 @@ let runner
 let cpuLimit
 let cores = Number(/:(\d+)x/.exec(options.machine)?.[1])
 const transport = (command) => backend === 'ssh' ? ['ssh', [...runner.args, command]] : ['nsc', ['ssh', '-T', id, command]]
-const container = (image) =>
-  `echo __juno_remote_started; rm -rf ${outputDir} && mkdir -p ${outputDir} && chmod 777 ${outputDir} && s=$(date +%s) && ${backend === 'ssh' ? `docker image inspect ${image} >/dev/null` : `docker pull -q ${image} >/dev/null`} && echo "remote: image pulled in $(( $(date +%s) - s )) s" >&2 && echo __juno_remote_ready && docker run --name juno-${runId} --rm -i --init --ipc=host ${backend === 'ssh' ? `--cpus ${cpuLimit} -e JUNO_RUNNER_JOB_CORES=${cpuLimit}` : ''} -v ${outputDir}:/out ${options.env.map((pair) => `-e ${quote(pair)}`).join(' ')} ${image} ` +
-  `bash -c 'tar -xzf - -C /work && exec bash scripts/remote/run.sh "$@"' _ ${scriptArgs}; code=$?; [ -s ${outputDir}/reports.tgz ] && echo __juno_remote_reports; echo "${exitMarker}$code"`
+const container = (image) => {
+  const install = backend === 'namespace' || runner.build
+  const cache = install ? `${backend === 'ssh' ? runnerCache() : namespaceCache()}; ` : ''
+  const cpu = backend === 'ssh' ? `--cpus ${cpuLimit} -e JUNO_RUNNER_JOB_CORES=${cpuLimit}` : ''
+  const user = backend === 'ssh' && install ? '--user "$(id -u):$(id -g)"' : ''
+  return `echo __juno_remote_started; ${cache}rm -rf ${outputDir} && mkdir -p ${outputDir} && chmod 777 ${outputDir} && s=$(date +%s) && ${backend === 'ssh' ? `docker image inspect ${image} >/dev/null` : `docker pull -q ${image} >/dev/null`} && echo "remote: image pulled in $(( $(date +%s) - s )) s" >&2 && echo __juno_remote_ready && docker run --name juno-${runId} --rm -i --init --ipc=host ${cpu} ${user} ${install ? workspaceMounts : ''} -v ${outputDir}:/out ${options.env.map((pair) => `-e ${quote(pair)}`).join(' ')} ${image} ` +
+    `bash -c 'tar -xzf - -C /work && exec bash scripts/remote/run.sh "$@"' _ ${scriptArgs}; code=$?; [ -s ${outputDir}/reports.tgz ] && echo __juno_remote_reports; echo "${exitMarker}$code"`
+}
 const create = (duration) => ['create', '--bare', '--machine_type', options.machine, '--duration', duration, '--label', 'juno-remote=1', '--purpose', 'juno remote', ...(process.env.JUNO_REMOTE_IMAGE_CACHE === 'on' ? ['--experimental', JSON.stringify({ container_cache: { tag: 'juno-remote-images-v1', size_mb: 8192 } })] : [])]
 
 console.error(`remote: ${files.length} files (${(bytes / 1024 / 1024).toFixed(1)} MB before compression), no secrets found`)
@@ -168,8 +141,8 @@ if (options.dryRun) {
   console.log('remote: dry run; these steps would run:')
   const config = runnerConfig()
   if (config) console.log(`  try SSH runner image ${config.image}${config.build ? ' (built on the runner if missing)' : ''}; Namespace steps apply if unreachable or full for 60 s`)
-  console.log(`  image nscr.io/<workspace>/juno-remote:${imageTag()} (nsc build --push if the registry lacks it)`)
-  console.log(`  a warm ${options.machine} machine from the pool, or nsc ${create('3h').map(quote).join(' ')} --cidfile <tmp>/id`)
+  console.log(`  image nscr.io/<workspace>/juno-toolchain:${imageTag()} (nsc build --push if the registry lacks it)`)
+  console.log(`  a warm ${options.machine} machine from the pool, or nsc ${[...create('3h'), ...namespaceStoreVolume()].map(quote).join(' ')} --cidfile <tmp>/id`)
   console.log(`  git ls-files ... | tar -czf - --null -T - | nsc ssh -T <id> ${quote(container('<image>'))}`)
   console.log(`  nsc ssh -T <id> 'cat ${outputDir}/reports.tgz' | tar -xzf - -C .remote/${runId}`)
   console.log(`  back to the pool after a clean run (destroyed when idle for ${idleMinutes} minutes), else nsc destroy <id> --force${options.keep ? '   (--keep: tracked until its 3-hour expiry)' : ''}`)
@@ -222,7 +195,7 @@ async function prepareNamespace() {
   const registryFile = join(tmpdir(), 'juno-remote-pool', 'registry')
   if (!existsSync(registryFile)) writeFileSync(registryFile, JSON.parse(await retry('reading the workspace', () => nsc(['workspace', 'describe', '-o', 'json']))).registry_url)
   const registry = readFileSync(registryFile, 'utf8')
-  image = await ensureImage(registry, imageTag())
+  image = await ensureImage(registry, imageTag(), (message) => { console.error(message); appendFileSync(runLog, `${message}\n`) })
   const claimed = await acquire(
     options.machine,
     async (duration, labels) => {
@@ -230,7 +203,7 @@ async function prepareNamespace() {
       acquiredAt = Date.now()
       rmSync(cidfile, { force: true })
       // A create normally takes about 20 s; a hung one is ended and reconciled by its label.
-      try { nsc([...create(duration), ...Object.entries(labels).flatMap(([key, value]) => ['--label', `${key}=${value}`]), '--cidfile', cidfile], { timeout: 10 * 60_000 }) } catch (error) {
+      try { createWithStore([...create(duration), ...Object.entries(labels).flatMap(([key, value]) => ['--label', `${key}=${value}`]), '--cidfile', cidfile], cidfile, (message) => { console.error(`remote: ${message}`); appendFileSync(runLog, `remote: ${message}\n`) }) } catch (error) {
         if (existsSync(cidfile)) error.instanceId = readFileSync(cidfile, 'utf8').trim()
         throw error
       }

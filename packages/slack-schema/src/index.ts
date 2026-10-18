@@ -21,6 +21,7 @@ export * from './chat.ts'
 export * from './search.ts'
 export * from './files.ts'
 export * from './rtm.ts'
+export * from './huddles.ts'
 export * from './methods.ts'
 
 export * from './emoji.ts'

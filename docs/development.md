@@ -63,11 +63,12 @@ Run these from the repo root.
 | `JUNO_LIVE=1 node --import ./scripts/ts-resolve-hooks.mjs scripts/idle-live.ts` | The live idle check: the whole engine on the cached session, read-only as the timeline below, synced into `--dir` (kept, so a second run is a relaunch on the same cache) or a temporary folder, then left alone. Once no call has been made for 30 s it prints the share of one core every 10 s over `--idle` seconds (180 by default), the calls and the SQL statements run meanwhile (Juno's SQL text, never a value); `--profile DIR` writes a CPU profile of that window, `--fake-ai` runs the AI jobs on the engine's fake model, `--fake` uses the large fake seed. See performance.md 8.12. |
 | `JUNO_LIVE=1 pnpm sync:timeline` | The first sync timeline (`scripts/first-sync-live.ts`): the whole engine signed in from an empty data folder on the cached session, read-only (every write refused before it leaves, no AI key). Prints when the sidebar, Home and every conversation first show, when unread counts settle (all, and those of unread DMs and mentions), where each kind of conversation fell in the history order, history ends and the sync ends; Slack calls by method with retries, 429s and `Retry-After`; CPU and SQLite time. `--out FILE` writes the timeline as JSON (method names, counts and times only). `-- --fake` runs it on the large fake seed with the app's pacing, `--fake --small` on 16 conversations. See performance.md, "First sync timeline". |
 | `JUNO_LIVE=1 pnpm react:live` | The live reaction check: the whole engine on the cached session, reacting in your self-DM through the outbox, then removing and cleaning up. Writes only reactions and two test posts in the self-DM. `-- --probe-get` instead asks `reactions.get` (read-only) for stored messages of every kind. Shapes and codes only (research section 10, "Live reactions"). |
+| `JUNO_LIVE=1 pnpm huddle:live` | The huddle spike (`docs/plans/huddles.md`, phase 2): joins a huddle in the private test channel `juno-huddle-test` on the cached session with `rooms.join`, runs the answer through the Chime SDK in a local Chromium page with a fake microphone, prints a status line every 10 s for `--minutes N` (default 5), and always sends `rooms.leave`. `--create-only` finds or creates the channel and exits; `--socket` also prints room frames from the socket; `--headed` shows the window so you can hear the huddle. Writes only that channel's create, join and leave. Field names, codes and counts only. `-- --fake` stops after `rooms.join`. |
 | `JUNO_LIVE=1 node --import ./scripts/ts-resolve-hooks.mjs scripts/dnd-live.ts` | Reads Slack's notification schedule (the `dnd_*` prefs) on the cached session and prints it. `--apply` writes Juno's notification hours into it once (`--days 1,2,3,4,5 --from 540 --to 1140`, defaults otherwise) and reads them back; `--restore '<json>'` writes a printed schedule back. Calls only `users.prefs.get` and `users.prefs.set`, and writes only schedule prefs. Your own account only (research section 7, "Live write"). |
 | `pnpm ai:eval` | Runs every AI task on invented examples with the fake provider and prints the outputs. `JUNO_AI=live pnpm ai:eval` uses OpenRouter through pi-ai with `OPENROUTER_API_KEY` (environment or `.env`) and prints outputs, latency and cost; without a key it says so and exits. `pnpm ai:eval routeCheck` runs one task. See `packages/ai/README.md`. |
 | `pnpm agent:eval` | Runs the Juno Agent eval cases on the real turn engine with the scripted model and prints the report (CI runs the same through `pnpm test`). `pnpm agent:eval --live` uses OpenRouter with `OPENROUTER_API_KEY` (environment or `.env`), costs money, and saves the report under `packages/agent/eval/reports/`; `--model haiku` picks another family, `--case <id>` one case. See `packages/agent/eval/README.md`. |
 
-`GALLERY_SHOTS_ONLY=Sidebar,Workspace pnpm gallery:shots` refreshes only those components and leaves other shots untouched.
+`GALLERY_SHOTS_ONLY=Sidebar,Workspace pnpm gallery:shots` refreshes only those components and leaves other shots untouched. Add `GALLERY_SHOTS_ACCENT=teal` to shoot them in another accent as `<state>-<theme>-teal.png`, beside the default accent's shots.
 
 The switcher, key and index tests use `GalleryTestComponent`, declared in `apps/gallery/src/testFixtures.tsx`. It is registered only when the page is opened as `/?test-fixtures#/...`, so it never shows in the normal gallery or the screenshots. The tests serve the built gallery on a port derived from the worktree's path, so two worktrees never share a server; a run reuses a server only if one is already up on its own port. Set `GALLERY_PORT` to choose the port.
 
@@ -879,7 +880,9 @@ Namespace, including fallback, uses the standard shape, 8x16 (see "Machine shape
 
 - **Plans.** `pnpm remote test:plan <step> + <step> ...` runs several root scripts on one machine (`scripts/plan.mjs`); `KEY=VALUE` words before a step's script set its environment, for example `pnpm remote test:plan test --passWithNoTests a.test.ts + GALLERY_SHIFT_ONLY=Chip test:gallery + test:desktop`. The app suites (`test:desktop`, `test:gallery`, `test:e2e`) run one after another. Unit tests and spec checks each have their own lane beside them under `nice`; `JUNO_PLAN_SERIAL=1` runs every step in turn. Lane workers scale with the Docker CPU limit, rounded down and at least one: desktop gets half, gallery three quarters, and unit tests and Quint simulations a quarter each. At 3 cores the gallery keeps three workers and shift parts. At 4 cores this gives two desktop or three gallery workers, one unit worker in one package, and one simulation. At 8 cores it gives four desktop or six gallery workers, two unit workers, and two simulations. An uncached bounded check adds one Apalache checker. Gallery shift parts match its workers. Explicit step environment settings still win. Inside the container `scripts/build-cached.mjs` reuses a build made earlier in the run, so the desktop app is built once. Each line of output starts with `[<script>]`, and a line `plan: step <i> <script> exited with <code> after <s> s` gives each step's result; `pnpm affected` and `pnpm verify:main` read those lines.
 - **What is sent.** The files git sees in the worktree (tracked or new, not ignored), so uncommitted work is tested; `.env`, `node_modules`, build output and design images under `docs/` are not. The script stops if a file looks like a key or token file or holds what looks like a real Slack token.
-- **Where it runs.** In the image from `scripts/remote/Dockerfile` (Playwright's Ubuntu image with Node 26, pnpm, Java 21, the installed workspace, pinned Bun and Quint's downloads). Its tag is a hash of the Dockerfile, `pnpm-lock.yaml` and `pnpm-workspace.yaml`. On Namespace, when the registry lacks it, the first run builds it with `nsc build` (about two minutes) while others on the same Mac wait. Inside, `scripts/remote/run.sh` links the workspace offline and runs the script under xvfb with more workers than the Mac uses.
+- **Where it runs.** Both backends use the toolchain in `scripts/remote/Dockerfile`: Playwright's Ubuntu image, Node 26, pnpm, Java 21 and Quint's Rust evaluator and Apalache. Its tag hashes only the Dockerfile and the root manifest's Quint pin. Namespace builds and pushes a missing `juno-toolchain:<tag>` with `nsc build`; SSH builds the same image locally. Each container unpacks a fresh workspace, installs with `pnpm install --frozen-lockfile --prefer-offline`, checks Bun's version, and runs the script under xvfb. Electron and Bun download through their approved install scripts. The log reports `remote: workspace installed in N s`.
+- **Dependency cache.** SSH mounts its persistent pnpm store and metadata, pnpm runtime locks, and Electron downloads. Namespace requests `--volume cache:juno-workspace-v1:/var/cache/juno-runner:4gb` on new machines and mounts the same directories from that machine into each container. A warm pool machine reuses its disk. `JUNO_REMOTE_STORE_CACHE=off` disables the volume request; `JUNO_REMOTE_STORE_TAG` selects another tag for measurements. If the plan rejects cache volumes before allocating a machine, the run logs the fallback and creates a machine without the volume. New machines then install cold. Registry, transport and capacity failures retain their existing recovery. [Namespace's cache lifecycle](https://namespace.so/docs/architecture/storage/cache-volumes) permits cache misses and commits only clean instance completions, so every install can fetch missing packages. `JUNO_RUNNER_HOST= pnpm remote ...` forces Namespace for a comparison.
+
 - **Results.** Output streams live and is saved as `.remote/<run>/run.log`, including failing test names even if downloading the reports fails. Reports (spec traces, Playwright results and any generated HTML report) land in the same directory. The exit code is the script's own.
 - **Memory.** The remote runner samples `MemTotal - MemAvailable` every two seconds and prints the peak used and available memory after each script. These are machine-wide values. SSH also prints cgroup v2 `memory.peak`, including file cache, for the job container; use that peak to size shared host capacity. SSH CPU busy uses cgroup CPU time divided by the Docker CPU limit, rather than all host threads.
 - **Warm pool.** After a clean run the machine goes back to a pool kept in the system temp folder (`scripts/remote/pool.mjs`); the next run on this Mac claims it with the image already pulled, which takes a small suite from about 190 s to 19 s. A machine runs one job at a time. The pool keeps at most `JUNO_REMOTE_IDLE_PER_SHAPE` (default 2) idle machines of each shape; a detached pool daemon destroys one after `JUNO_REMOTE_IDLE_MINUTES` (default 8) idle minutes (the cost is in "Current cost controls"), every machine ends after 3 hours, and after a failure or Ctrl-C the machine is destroyed at once. `pnpm remote --status` lists the pool; `pnpm remote --drain` destroys the idle machines.
@@ -906,6 +909,80 @@ Namespace, including fallback, uses the standard shape, 8x16 (see "Machine shape
 - **Spec cache.** A remote spec check takes the Mac's cache of passing Quint runs along (staged in `.remote/`) and brings back what it adds, so a check that passed anywhere is not run again.
 - **Dials.** About one dial in four to Namespace's SSH gateway fails from this network and nsc takes 16 s to give up. The remote command prints a start line first; with none after 8 s, the run dials again (up to six times).
 - **`--dry-run`** prints the steps without creating anything.
+
+### Toolchain and store measurements
+
+Measured on 2026-10-19 from `9f3c80b04` and this change. Each reported workload
+ran once per state, sequentially, with 23 unit tests and, for the app plan,
+four desktop tests. All passed without test retries. SSH uses its default
+1-core reservation with a 2-core limit for the unit run, and 4 cores for the
+app plan. Namespace uses 8x16. These observations include network variation;
+they are not established speedups. Builds below had a missing tag but reused
+the common base and Node layers.
+
+| Measure, seconds | SSH full image | SSH toolchain | Namespace full image | Namespace toolchain |
+| --- | --- | --- | --- | --- |
+| Missing-tag build | 113–185, earlier owner measurements | 63.5 | About 120, earlier measurements | 53.3, including push |
+| Cold install | Baked into image | 55 | Baked into image | 26 for the unit run, 3 for the app plan |
+| Warm install or offline linking | 0–1 | 0–1 | 0–1 | 0–1 on both a fresh cache hit and a warm machine |
+| Install after a lockfile change | Rebuilds the image | 5, same image tag | Rebuilds the image | Not measured; the shared tag test covers both backends |
+| Unit run, wall | 91, image present | 220 with the first build, 52 warm, 55 after the lockfile change | 58 fresh, 56 warm | 143 with the first build, 67 fresh with cached store, 42 warm |
+| App plan, wall | 105, image present | 78 warm | 77 fresh, 62 warm | 85 fresh with cold store, 67 fresh with cached store, 46 warm |
+
+The SSH wall times above precede the IPv4 transport fix. After that fix, the
+same warm unit run took 32 seconds. Three fresh-shell `runner:check` calls
+passed in 0.67–1.68 seconds and still reported 16 cores. DNS lookup took
+10–1,209 ms. Raw SSH tried an unreachable advertised IPv6 address for five
+seconds before IPv4, while IPv4-only probes passed in 0.17–0.42 seconds.
+The new fresh cached Namespace unit run, the new warm unit run and the old
+warm unit run each had a gateway retry before the command started. The new
+warm unit observation includes that retry.
+
+Five alternating warm installs per flag gave a median of 214 ms for
+`--prefer-offline` (204–282 ms) and 220 ms for `--offline` (198–275 ms).
+The ranges overlap. Keep `--prefer-offline` so cold stores and new packages
+work. The first SSH install's policy metadata was copied into the persistent
+cache after timing exposed it outside the store; later runs mount that
+metadata directly. The temporary lockfile commit added `is-number@7.0.0` to
+one package, then was removed. No image build occurred for that change.
+
+Two concurrent SSH containers installed against the same pnpm store and runtime
+lock directory. Both checked that their uid matched the store owner. The image
+contained no workspace manifest or node_modules.
+The same uid check initially exposed Quint's warmed downloads behind the base
+image's private `/home/pwuser` directory. The toolchain makes that directory
+readable and searchable by other job uids. Timings above precede this permission
+fix. After rebuilding, the Rust evaluator and Apalache both passed a one-step
+model check as the laptop's uid 1000, using the warmed downloads.
+The final Namespace image also passed the app plan. That fresh machine had a
+cold store: install took 70 seconds, including a 67-second registry request
+while checking supply-chain policies. Total wall time was 203 seconds, including
+the 42.6-second image build and push. The laptop's permission-fix rebuild took
+46.4 seconds. These follow-up checks show why the initial timings are observations,
+not a reliable estimate for every cold run.
+
+Namespace saved a 1,666 MB cache generation. Its first follow-up fresh machine
+missed the cache and installed in 15 seconds; a later fresh machine restored
+it and installed in one second. Cache misses during distribution are expected,
+as described in [Namespace's cache lifecycle](https://namespace.so/docs/architecture/storage/cache-volumes).
+The two measurement cache tags were released. The common toolchain remains the
+default: warm installs cost at most one reported second, and these app plans
+show no clear Namespace regression that would justify a separate full image.
+
+Reproduce the workloads, one command at a time:
+
+```sh
+JUNO_REMOTE_MAX_VCPU=0 pnpm remote test --passWithNoTests test/messages.test.ts
+JUNO_REMOTE_MAX_VCPU=0 pnpm remote test:plan test --passWithNoTests test/messages.test.ts + test:desktop e2e/app.spec.ts
+JUNO_RUNNER_HOST= pnpm remote --fresh test --passWithNoTests test/messages.test.ts
+JUNO_RUNNER_HOST= pnpm remote test:plan test --passWithNoTests test/messages.test.ts + test:desktop e2e/app.spec.ts
+```
+
+For Namespace, use a new `JUNO_REMOTE_STORE_TAG` for a cold store, reuse that tag
+on a fresh machine for a cache hit, and omit `--fresh` for a warm pool machine.
+`JUNO_REMOTE_IDLE_MINUTES=0` destroys a measurement machine after its run.
+`JUNO_REMOTE_STORE_CACHE=off` on a new machine measures the machine-disk fallback. Cache hits are
+best effort; check pnpm's reused and downloaded counts before calling a run warm.
 
 ## Current cost controls
 
@@ -964,15 +1041,21 @@ to prefer an SSH runner for every agent, including `pnpm affected` and
 `JUNO_RUNNER_KEY` override file values. An empty `JUNO_RUNNER_HOST` selects
 Namespace. The real host and user belong only in the machine-local file.
 
-The runner uses `juno-remote:<imageTag()>`. A missing tag is built on the runner
-from the shared Docker build context streamed over SSH, under a host build lock.
-No `nsc` or Namespace registry access is needed on the runner.
-`JUNO_RUNNER_IMAGE` remains an optional preloaded-image override.
+The SSH runner uses `juno-toolchain:<tag>`. The tag hashes `scripts/remote/Dockerfile`
+and the root manifest's Quint pin, so changing the lockfile does not rebuild it.
+A missing tag is built on the runner under a host build lock. No `nsc` or
+Namespace registry access is needed on the runner. Each run installs with
+`--frozen-lockfile --prefer-offline` against `~/.cache/juno-runner/pnpm-store` (including pnpm metadata),
+checks Bun's version and reports `remote: workspace installed in N s`.
+Electron downloads use `~/.cache/electron`. Containers use the host uid and
+share pnpm's runtime locks. Cache ownership must match that uid.
+`JUNO_RUNNER_IMAGE` selects a full preloaded image and skips the install.
 `pnpm runner:check` reports a missing local tag without failing, and
-`pnpm runner:prune` removes old tags and unused build cache while keeping the
-current image. Docker refuses removal of images referenced by containers.
+`pnpm runner:prune` removes old full-image and toolchain tags and unused build
+cache while keeping the selected image. It leaves dependency caches alone.
+Docker refuses removal of images referenced by containers.
 
-An unreachable runner falls back to Namespace. After the image is ready, a job
+An unreachable runner falls back to Namespace. For `.local` hosts, SSH tries IPv4 first and falls back to dual stack if the transport cannot connect. The successful family is reused for the job. This avoids a five-second stall on the laptop's advertised but unreachable IPv6 address. Authentication and connected-host failures still stop the run. After the image is ready, a job
 waits at most 60 seconds for runner cores before falling back. With
 `JUNO_REMOTE_MAX_VCPU=0`, it waits without a deadline and never allocates
 Namespace machines. SSH authentication errors, broken Docker, failed builds,
@@ -1070,6 +1153,8 @@ Causes found so far (2026-10-15):
 - **A card button pressed while Juno still answered.** The remove card shows with the status bubble (40 px) under it, and Juno's "Done." (56 px) takes that bubble's place about 70 to 100 ms later, so the chat, held at the bottom, scrolls 15 px. `click()` had measured the button before the scroll and pressed its old centre after it, 0.06 px below the button's new bottom edge: `pointerdown` went to the card's inner `div`, and `onCard` never ran (`memory.spec.ts`, 1 of 20, then 2, 5 and 3 of 40 at 16 workers; a log in the page showed the event's target was the `div` while `elementFromPoint` at the same point still named the button). This is a chat taking a reply under the pointer, as SPEC 13.2 asks, not a lost click. The test now waits for the second "Done." and for the status bubble to go before it presses Remove (0 of 40). To press a button in the chat, wait until the run that drew it has ended. A target that `pointerdown` names and `elementFromPoint` does not means the point was measured before a move.
 
 ## Machine shapes
+
+Both backends now use the same toolchain and install per run. The [toolchain and store measurements](#toolchain-and-store-measurements) compare fresh and warm runs with the earlier full image. Worker counts and machine reservations are unchanged. Namespace requests a 4 GB dependency cache, with 1,666 MB used in these slices.
 
 SSH reserves 1 core for unit-only jobs (CPU limit 2), 3 for gallery jobs without desktop or e2e steps, and 4 for jobs with desktop or e2e steps, as described under "Remote runs". Both `--machine` and `JUNO_REMOTE_MACHINE` override the reservation and limit.
 

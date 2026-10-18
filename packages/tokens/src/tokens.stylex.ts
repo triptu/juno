@@ -95,7 +95,7 @@ export const colors = stylex.defineVars({
   '--overlay-viewer': 'hsla(48, 50%, 98%, 0.94)',
   // Over a picture: the "+N" on the last tile of a message's images, and a
   // video's play badge. The same in both themes, since it sits on the picture.
-  '--media-scrim': 'rgba(20, 19, 16, 0.5)',
+  '--media-scrim': 'rgba(20, 19, 16, 0.65)',
   '--media-scrim-foreground': 'hsla(48, 20%, 98%, 1)',
   // Mixed with the text colour where they are used, so one value serves
   // every theme and every accent: a link's underline, a quote's fill.
@@ -109,6 +109,21 @@ export const colors = stylex.defineVars({
   // The active presence dot: a clear green, 3:1 against the menu it sits in.
   // --success is too deep for a 6px dot (it reads grey, 1.8:1 in dark).
   '--presence-active': '#1F9D66',
+  // Live in a huddle: the speaking ring and the green headphones. A step deeper than the
+  // presence dot so it holds 3:1 on the tiles' secondary fill too (3.36:1; 3.76:1 on a card).
+  '--huddle-live': '#1C935F',
+  // The sidebar's huddle bar, a frosted card in the accent. Each step keeps the
+  // accent's hue and part of its chroma at a fixed lightness, so it follows
+  // every accent and the text on it keeps one contrast: --foreground-subtle is
+  // 4.78:1 or more on the fill and on hover for all eight accents. Written
+  // with var() because a group cannot refer to another group defined after it.
+  '--huddle-bar': 'oklch(from var(--hl) 0.93 calc(c * 0.28) h)',
+  '--huddle-bar-edge': 'oklch(from var(--hl) 0.78 calc(c * 0.5) h)',
+  '--huddle-bar-hover': 'oklch(from var(--hl) 0.9 calc(c * 0.28) h)',
+  '--huddle-bar-pressed': 'oklch(from var(--hl) 0.865 calc(c * 0.28) h)',
+  '--huddle-bar-pressed-hover': 'oklch(from var(--hl) 0.835 calc(c * 0.28) h)',
+  // The frost: a sheen of white from the top, as on a macOS material.
+  '--huddle-bar-sheen': 'linear-gradient(oklch(1 0 0 / 0.35), oklch(1 0 0 / 0) 70%)',
   '--warning': '#E0A500',
   '--info': '#008AB3',
 
@@ -406,6 +421,8 @@ export const shadows = stylex.defineVars({
   '--shadow-card': '0 0 12px 0 rgba(27, 28, 21, 0.12)',
   '--shadow-lg': '0 8px 24px 0 rgba(27, 28, 21, 0.10)',
   '--card-ring': '0 1px 2px 0 oklch(0 0 0 / 0.03), 0 6px 20px -4px oklch(0 0 0 / 0.07)',
+  // The huddle bar: a hairline highlight inside its top edge, as glass catches light, over the card's shadow.
+  '--huddle-bar-shadow': 'inset 0 1px 0 0 oklch(1 0 0 / 0.7), 0 1px 2px 0 oklch(0 0 0 / 0.03), 0 6px 20px -4px oklch(0 0 0 / 0.07)',
   '--peek-shadow': '0 0 0 1px oklch(0 0 0 / 0.12), 0 2px 6px -1px oklch(0 0 0 / 0.08), 0 14px 36px -8px oklch(0 0 0 / 0.18)',
   '--pop-shadow': '0 2px 6px -1px oklch(0 0 0 / 0.05), 0 14px 36px -8px oklch(0 0 0 / 0.13)',
   // The Juno panel floating over the page: a hairline ring, a tight contact
@@ -904,6 +921,11 @@ export const layout = stylex.defineVars({
   // gutter and the 1px border on each side.
   '--emoji-picker-width': '314px',
   '--emoji-picker-height': '360px',
+  // A huddle tab's participant tile: a 44px photo and a name of about 18 characters. Rows of them wrap and centre.
+  '--huddle-tile-width': '160px',
+  // The screen share sheet: three thumbnails a row at 16:10, and its list's one height in every state (it scrolls past it).
+  '--source-picker-width': '600px',
+  '--source-picker-list-height': '420px',
   '--toast-max-width': '352px',
   '--toast-inset': '16px',
   '--scrollbar-size': '10px',
@@ -961,6 +983,8 @@ export const sizes = stylex.defineVars({
   '--avatar-11': '11px',
   '--avatar-stack-overlap': '-4px',
   '--avatar-ring': '1.5px',
+  // The green ring around a huddle participant who is speaking (avatar or tile).
+  '--speaking-ring': '2px',
 
   '--initials-44': '14px',
   '--initials-36': '14px',

@@ -69,6 +69,15 @@ export const darkColors = stylex.createTheme(colors, {
   '--danger': '#F8767E',
   // 5.6:1 on the raised surface; the light green is 3.5:1 there.
   '--presence-active': '#34C77B',
+  // 6.12:1 on the dark secondary fill, 7.1:1 on a card.
+  '--huddle-live': '#34C77B',
+  // The bar's accent steps at dark lightness: --foreground-subtle 6.24:1 or more on the fill.
+  '--huddle-bar': 'oklch(from var(--hl) 0.31 calc(c * 0.3) h)',
+  '--huddle-bar-edge': 'oklch(from var(--hl) 0.47 calc(c * 0.5) h)',
+  '--huddle-bar-hover': 'oklch(from var(--hl) 0.355 calc(c * 0.3) h)',
+  '--huddle-bar-pressed': 'oklch(from var(--hl) 0.405 calc(c * 0.3) h)',
+  '--huddle-bar-pressed-hover': 'oklch(from var(--hl) 0.445 calc(c * 0.3) h)',
+  '--huddle-bar-sheen': 'linear-gradient(oklch(1 0 0 / 0.05), oklch(1 0 0 / 0) 70%)',
 
   '--warm-soft': 'color-mix(in oklch, #E39A3B 22%, var(--background))',
   // The dark toast is paper on ink, so the check takes more of the green.
@@ -81,6 +90,7 @@ export const darkShadows = stylex.createTheme(shadows, {
   '--shadow-card': '0 0 12px 0 rgba(0, 0, 0, 0.45)',
   '--shadow-lg': '0 8px 24px 0 rgba(0, 0, 0, 0.50)',
   '--card-ring': '0 1px 2px 0 oklch(0 0 0 / 0.3), 0 6px 20px -4px oklch(0 0 0 / 0.35)',
+  '--huddle-bar-shadow': 'inset 0 1px 0 0 oklch(1 0 0 / 0.08), 0 1px 2px 0 oklch(0 0 0 / 0.3), 0 6px 20px -4px oklch(0 0 0 / 0.35)',
   '--peek-shadow': '0 2px 6px -1px oklch(0 0 0 / 0.3), 0 14px 36px -8px oklch(0 0 0 / 0.5)',
   '--pop-shadow': '0 2px 6px -1px oklch(0 0 0 / 0.3), 0 14px 36px -8px oklch(0 0 0 / 0.5)',
   // On ink a dark ring cannot separate; a faint light edge inside does, as on macOS.

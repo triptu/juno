@@ -3,7 +3,7 @@ import { BellSlash } from '@phosphor-icons/react/dist/icons/BellSlash'
 import { Check } from '@phosphor-icons/react/dist/icons/Check'
 import { CheckCircle } from '@phosphor-icons/react/dist/icons/CheckCircle'
 import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
-import { memo, useId, type FocusEvent, type MouseEvent, type PointerEvent } from 'react'
+import { memo, useId, type FocusEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
 import type { TopicRow as TopicRowModel } from '@juno/contract'
 import { colors, density, opacity, radii, sizes, spacing, tints } from '@juno/tokens/tokens.stylex'
 import {
@@ -49,6 +49,15 @@ export interface TopicRowProps {
   readonly onRenameCancel?: (id: string) => void
   /** Main rows only: threads started in the channel since its Main was last read. Hidden at 0. */
   readonly newThreads?: number
+  /**
+   * Main rows only: a feature's mark after the title, beside the thread
+   * count, such as the huddle glyph. It takes only its own width. Pass a
+   * node whose identity holds while it does not change, so the row stays
+   * memoized.
+   */
+  readonly accessory?: ReactNode
+  /** What `accessory` says, added to the row's description ("huddle with 3 people"). */
+  readonly accessoryLabel?: string
 }
 
 const HOVER = '@media (hover: hover)'
@@ -67,10 +76,10 @@ const PRIVATE_TITLE = 'Private channel'
  * title, the preview one step down, and the meta line and time a step below
  * that. A Main (a channel's, a DM's or a group DM's) has no meta line and no
  * Main tag: Main is the default and its title already names the place, so
- * the row is two lines and shorter, and a Reopened tag or the new-thread
- * count follows the title. The Resolve check overlays the end of the last
- * line on hover or keyboard focus and takes no space, so nothing ever
- * moves. The row activates on mouse down; Resolve on click.
+ * the row is two lines and shorter, and its `accessory`, a Reopened tag or
+ * the new-thread count follows the title. The Resolve check overlays the
+ * end of the last line on hover or keyboard focus and takes no space, so
+ * nothing ever moves. The row activates on mouse down; Resolve on click.
  *
  * The row is a focusable list item, not a button: a button's children are
  * presentational, so the Resolve button inside it would be flattened away.
@@ -89,6 +98,8 @@ export const TopicRow = memo(function TopicRow({
   onRename,
   onRenameCancel,
   newThreads = 0,
+  accessory,
+  accessoryLabel,
 }: TopicRowProps) {
   const titleId = useId()
   const previewId = useId()
@@ -104,7 +115,8 @@ export const TopicRow = memo(function TopicRow({
   const threads = main && newThreads > 0 ? newThreads : 0
   const threadsLabel = threads === 1 ? '1 new thread' : `${threads} new threads`
   const unreadLabel = row.unreadExact ? `${row.unreadCount} unread` : `${row.unreadCount} or more unread`
-  const state = rowState(row, unreadLabel, threads > 0 ? threadsLabel : undefined)
+  const mark = main && accessory !== undefined && accessory !== null
+  const state = rowState(row, unreadLabel, threads > 0 ? threadsLabel : undefined, main ? accessoryLabel : undefined)
   const people: ReadonlyArray<AvatarStackPerson> = row.participants.map((person) => stackPerson(person))
   const hasPeople = people.length > 0
   const resolvable = row.canResolveOnHover && !renaming
@@ -245,7 +257,12 @@ export const TopicRow = memo(function TopicRow({
               {row.title}
             </Text>
           )}
-          {twoLine && (reopened || threads > 0) ? <span {...stylex.props(styles.titleTags)}>{tags}</span> : null}
+          {twoLine && (mark || reopened || threads > 0) ? (
+            <span {...stylex.props(styles.titleTags)}>
+              {mark ? accessory : null}
+              {tags}
+            </span>
+          ) : null}
           {row.tags.includes('unsubscribed') ? (
             <span {...stylex.props(styles.mutedIcon)}>
               <Icon icon={BellSlash} size={13} label="Unsubscribed" />
@@ -329,11 +346,12 @@ function isTwoLine(row: Pick<TopicRowModel, 'kind'>): boolean {
 }
 
 /** What the tags and icons say, for the row's description: "2 unread, mentions you." */
-function rowState(row: TopicRowModel, unreadLabel: string, threadsLabel: string | undefined): string | undefined {
+function rowState(row: TopicRowModel, unreadLabel: string, threadsLabel: string | undefined, accessoryLabel: string | undefined): string | undefined {
   const parts = [
     row.unreadCount > 0 ? unreadLabel : undefined,
     row.mentionsMe ? 'mentions you' : undefined,
     threadsLabel,
+    accessoryLabel,
     row.resolved ? 'resolved' : undefined,
     row.status === 'unsubscribed' ? 'unsubscribed' : undefined,
   ].filter((part) => part !== undefined)
@@ -442,7 +460,7 @@ const styles = stylex.create({
     flexBasis: 'auto',
     minWidth: 0,
   },
-  // A two-line row's Reopened tag and thread count, after the title.
+  // A two-line row's accessory, Reopened tag and thread count, after the title.
   titleTags: {
     display: 'inline-flex',
     alignItems: 'center',

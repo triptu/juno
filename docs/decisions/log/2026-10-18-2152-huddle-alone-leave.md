@@ -1,0 +1,1 @@
+- 10-18 21:52 · huddle-alone-leave · After 10 minutes alone in a huddle, Juno leaves it and says so in a toast; after 30 seconds of lost connection it leaves too, with Rejoin.

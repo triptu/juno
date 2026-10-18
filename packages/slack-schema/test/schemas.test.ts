@@ -159,6 +159,17 @@ describe('form arguments', () => {
     expect(Schema.decodeUnknownSync(args)({ files: 'F01', channel: 'C0ENG', client_msg_id: 'uuid-1' }).files).toEqual(['F01'])
   })
 
+  it('keeps every key of the Chime meeting and attendee in rooms.join, and other call fields', () => {
+    const decode = Schema.decodeUnknownSync(Methods['rooms.join'].response)
+    const meeting = { MeetingId: 'm', MediaPlacement: { SignalingUrl: 'wss://example.invalid' }, MeetingFeatures: { Audio: { EchoReduction: 'AVAILABLE' } } }
+    const attendee = { AttendeeId: 'a', ExternalUserId: 'U1#s', JoinToken: 't', Capabilities: { Audio: 'SendReceive' } }
+    const answer = decode({ ok: true, call: { call_id: 'R1', free_willy: { meeting, attendee }, survey: { id: 1 } } })
+    if (!answer.ok) throw new Error('expected ok')
+    expect(answer.call.free_willy).toEqual({ meeting, attendee })
+    expect(answer.call['survey']).toEqual({ id: 1 })
+    expect(Schema.encodeSync(Methods['rooms.join'].args)({ channel_id: 'C1', regions: ['us-east-1'] })).toEqual({ channel_id: 'C1', regions: 'us-east-1' })
+  })
+
   it('decodes an ok and an error response of the same method', () => {
     const decode = Schema.decodeUnknownSync(Methods['conversations.mark'].response)
     expect(decode({ ok: true })).toEqual({ ok: true })

@@ -1,0 +1,1 @@
+- 10-18 21:55 · huddle-views-package · `@juno/huddle-views` depends on `ui` and `tokens` only, with its own view models; `check-deps` and `check-tokens` treat any `*-views/` directory as views.

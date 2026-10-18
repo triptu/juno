@@ -1,0 +1,1 @@
+- 10-19 02:45 · huddles-other-device · Joining the same huddle on another device moves you there. Chime stops Juno's session with `AudioJoinedFromAnotherDevice`, seen in the spike. Juno treats this as a leave, does not reconnect, and offers Join here.

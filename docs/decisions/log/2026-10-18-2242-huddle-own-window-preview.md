@@ -1,0 +1,1 @@
+- 10-18 22:42 · huddle-own-window-preview · A window you share now shows in your own huddle tab as "Your window" with Stop sharing, so a wrong window is caught at once; beside someone else's share it takes a third of the room. A whole screen still never shows, and the status line names what you share in the bar and the tab. Replaces "your own share is never drawn" from 21:47.

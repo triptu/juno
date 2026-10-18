@@ -1,0 +1,1 @@
+- 10-18 21:01 · huddles-request-shape · Huddle methods (`rooms.join`, `rooms.leave` and the rest) go out with the same query parameters, form fields and `_x_reason` as the official desktop client, copied from a recorded request. We match Slack's client rather than test which fields the server checks.

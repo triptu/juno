@@ -27,7 +27,7 @@ const warnings = []
 // from the root 'effect' module, as used today by domain/ids.ts).
 const schemaOnlyEffect = new Set(['@juno/domain', '@juno/richtext', '@juno/agent-memory', '@juno/agent-cards'])
 // Packages whose src must not import effect at all.
-// (@juno/views is covered by the `views` directory rule below.)
+// (@juno/views and @juno/huddle-views are covered by the `views` directory rule below.)
 const noEffect = new Set(['@juno/ui', '@juno/tokens', '@juno/domain', '@juno/richtext', '@juno/agent-memory', '@juno/agent-cards'])
 // Packages whose src must not import @juno/state.
 const noState = new Set(['@juno/ui', '@juno/notifications'])
@@ -91,7 +91,7 @@ const dirRules = [
       'The preload may import only electron and @juno/contract/channels (names and types, no runtime imports) so it stays small.',
   },
   {
-    match: /(^|\/)views\//,
+    match: /(^|\/)([a-z]+-)?views\//,
     ban: ['@juno/state', '@juno/engine', '@juno/store', 'electron', NODE_BUILTIN, EFFECT_ANY],
     reason: 'Views are dumb: props in, callbacks out. No state, Effect, IPC or Electron (docs/architecture.md sections 1 and 8).',
   },
@@ -103,7 +103,7 @@ const textRules = [
   {
     re: /\b(?:window|globalThis)\.juno\b/,
     reason: 'Views and ui do not reach the shell bridge. Containers pass callbacks.',
-    only: (rel) => /(^|\/)views\//.test(rel) || rel.startsWith('packages/ui/'),
+    only: (rel) => /(^|\/)([a-z]+-)?views\//.test(rel) || rel.startsWith('packages/ui/'),
   },
 ]
 

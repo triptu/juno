@@ -206,6 +206,16 @@ export type ConversationsMarkArgs = typeof ConversationsMarkArgs.Type
 
 export const ConversationsMarkFields = {} as const
 
+// conversations.create
+
+export const ConversationsCreateArgs = S.Struct({
+  name: S.String,
+  is_private: opt(FormBoolean),
+})
+export type ConversationsCreateArgs = typeof ConversationsCreateArgs.Type
+
+export const ConversationsCreateFields = { channel: Channel } as const
+
 // conversations.open
 
 export const ConversationsOpenArgs = S.Struct({

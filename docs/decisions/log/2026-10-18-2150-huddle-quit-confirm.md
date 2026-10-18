@@ -1,0 +1,1 @@
+- 10-18 21:50 · huddle-quit-confirm · Quitting (and Restart to update) while in a huddle asks "Leave the huddle and quit?", since a stray ⌘Q cannot be undone. Closing the window or the huddle tab never leaves the huddle.

@@ -849,6 +849,7 @@ Stored as user preferences. Nothing else from the prototype's design panel (`dat
 | ⌃Tab, ⌃⇧Tab, ⌘⇧], ⌘⇧[ | anywhere | Next / previous tab |
 | ⌘[ / ⌘] | anywhere (not while a text field has a selection to indent; none do in v1) | Back / forward in the tab's history |
 | ⌃⌘S | anywhere | Hide or show the sidebar |
+| ⌘⇧Space | while in a huddle | Mute or unmute (§22) |
 | ⌘Z | anywhere, unless focus is in a non-empty input | Undo last reversible action |
 | ⌘, | anywhere | Settings, at General (shown in the avatar menu) |
 | Esc | anywhere | Close palette, picker, menus, popovers; dismiss send check; cancel rename; close the Juno panel from its empty composer |
@@ -883,3 +884,67 @@ Show less, a ghost button whose text starts at the body's edge. Images reserve t
 caps; missing dimensions reserve a 3:2 box. Integration event summaries use
 the attachment or header title for the topic fallback. Previews and search
 include structured content, under the existing preview privacy treatment.
+
+## 22. Huddles
+
+**Shows:** gallery `HuddleBar`, `HuddleInSidebar` (the bar in the real sidebar), `HuddlePage`, `HuddleHeaderButton`, `HuddleIndicator`, `HuddleDeviceMenu`, `ScreenSourcePicker`. SPEC section 20 decides behaviour. Views: `@juno/huddle-views`. [designed 10-18, not wired]
+
+### 22.1 Sidebar bar (`HuddleBar`)
+
+- **Place:** the sidebar's top slot, between the title bar and the nav. The block has the sidebar inset (10) at the sides and 4 above and below; with the nav's own 4 it sits 8 over Juno. Only what is below it moves, by its height (68 + 8), in one frame. [needs the `top` slot, plan seam 2]
+- **Card:** a frosted accent material: `--huddle-bar` (the accent's hue at a fixed lightness, so it follows the accent) under `--huddle-bar-sheen`, a 1px `--huddle-bar-edge` border and `--huddle-bar-shadow` (a 1px inner highlight at the top, then the card's shadow); no backdrop blur. Radius 12 (`--radius-xl`: the 8 of its controls + the 4 around them), padding 4, two 28px rows 2 apart (the gap between the controls). 66px tall in every state. `no-drag`.
+- **Row 1** (one `button`, "Open huddle in #eng"): 28 tall, radius 8, padding 0 8 0 6, gap 8. The place glyph 16 (`hash`, `lock`, `user`, `users`) in `--foreground-subtle`, 6 in so it sits over Mute's glyph; the name (ui 13.5/500, ellipsis); the status line (meta 12.5 subtle, tabular, ellipsis; the duration shortens four times faster than the name; a notice shortens with the name by their widths, so "Reconnecting…" always shows); a flexible gap; the faces (18px, overlap −4, 1.5px ring in the fill under them (the row sets `--background`, which the ring takes, to the bar's fill; the faces' own fills stay true), at most 4, then "+N" meta; the row sets `--foreground-muted` to subtle, 4.5:1 on the tint); `caret-right` 12 bold, the same. Opens on mouse down (`activateHandlers`), ⌘ for a new tab. Hover and press `--huddle-bar-hover`, the press scale.
+- **Row 2** (`role="group"`, "Huddle controls"), `space-between`: Mute (`microphone` / `microphone-slash`, a toggle, "Mute ⌘⇧Space"), Share screen (`monitor-arrow-up`, a toggle; "Stop sharing" while pressed; dimmed "Two people are sharing already"; absent until phase 4, with no room kept), Microphone and speaker (`sliders-horizontal`, `aria-haspopup="menu"`, opens the device menu under it): `IconButton` 28, icon 16, radius 8, `variant="island"`, 2 apart. Then Leave: 28px text button, `phone-x` 14 subtle + "Leave" meta 12.5/500, padding 0 10, radius 8, the same fills. In the bar the island fills are steps of its accent tint: hover `--huddle-bar-hover`, pressed (muted, sharing) `--huddle-bar-pressed`, pressed and hovered `--huddle-bar-pressed-hover`, set around each control so the device menu keeps its own.
+- **Status line** (not a live region: a visually hidden `role="status"` beside it says only the notices and the container's `announcement`, "Maya joined", never the duration), first that applies: "Joining…", "Reconnecting…", "Microphone blocked", "Maya is sharing" / "Maya and Leo are sharing" / "You're sharing Built-in display" (the name of what you share, also while others share; the tab adds " · Maya is sharing"), the duration ("4:05", "1:02:33", from the huddle's start). The duration is a leaf the container ticks once a second.
+- **Speaking:** a 2px `--huddle-live` outline (`--speaking-ring`) 1.5px outside the face, over its neighbours; fades over `--duration-fast`. Nothing reorders.
+- **Reconnecting:** the faces at `--opacity-dim`. **Mic blocked:** Mute is the slashed microphone named "Allow the microphone in System Settings" and opens them.
+- Width: at 312 the name gives way to "customer-escalati…", the faces and "+1" stay whole.
+
+### 22.2 Huddle tab (`HuddlePage`)
+
+- **Tab:** "eng · Huddle", "Maya Chen · Huddle"; glyph `headphones` 15 at 0.75 (`HuddleTabIcon`), as the pages' glyphs. One per channel.
+- **Header:** `HeaderBand` and two `Surface kind="island"`s, at 8 from the top and 24 from the tab's edges (not the reading column, so they line up with the shares). Left island: `ContextPill` 24 (click narrows the sidebar), the title "Huddle" (14/600, padding 0 8, an `h1`), then the status line (meta muted, ellipsis), 12 from the island's end. Right island: Thread (`chats-circle` 14 + "Thread", 28px pill text button) while the thread is known.
+- **Audio only:** tiles centred in the room between the band (68) and the controls, wrapping, 12 apart, at most `--page-width` wide, scrolling when there are many. Tile: 160 (`--huddle-tile-width`), padding 16 12, radius 16, `--secondary-default`; a 44 face, 8, the name (ui 13.5/500, ellipsis; "You" for the user). Muted: `microphone-slash` 14 subtle, 10 from the top and the end. Speaking: the tile's 2px `--huddle-live` ring inside its edge (the face has none). `aria-label` "Maya Chen, muted".
+- **Shares:** the stage fills the room under the band, 24 from the edges, 12 over the people line. A share: radius 12, `--secondary-default`, the container's video centred with `object-fit: contain` in `[data-huddle-video]` (a size container). Label "Maya's screen" bottom-left at 8: meta 12.5/500 on `--media-scrim` in `--media-scrim-foreground`, pill, padding 2 8. Loading: "Loading Maya's screen" meta muted in the box. Two: side by side, 12 apart; one above the other under 720 (`@container huddle`). Expand (named "Expand Maya's screen"; `corners-out` / `corners-in` 16, 28 round on the scrim, at 8 from the top and the end): shown on the share's hover and keyboard focus, always without a hover pointer; Esc shrinks.
+- **Your window** (`data-share="own"`, named "Your window, Q4 roadmap — Docs"): while you share a window, a share box after the others' with the container's preview, labelled "Your window" bottom-left as above, and Stop sharing at 8 from the top and the end, always shown: 28 pill on the scrim, padding 0 10, gap 6, `stop-circle` 14 + "Stop sharing" meta 12.5/500. Alone it fills the stage; beside one other share it takes a third (`flex-grow` 1 to their 2), side by side or under it below 720. No Expand; expanding the other share hides it. A shared screen gets no box.
+- **People line** (under a share): chips 28 tall, padding 0 10 0 4, pill, `--secondary-default`, 4 apart, centred, wrapping to a second line when they do not fit (the stage gives up the room): a 20 face, 6, the first name (meta, "You"), `microphone-slash` 12 when muted; at most 8, then "+N". Speaking: the face's ring.
+- **Controls:** a `Surface kind="island"` centred, 12 under the content and 16 above the tab's bottom: Mute, Share screen and Microphone and speaker as 28 round island buttons, 2 apart, then Leave (28 pill) 8 apart. The device menu opens upward.
+- **Not in it:** in place of the controls, "Join huddle" or "Switch to this huddle" (`Button primary lg`, `headphones`). **Ended / failed:** `EmptyState variant="workspace"` centred: "The huddle ended" / "It lasted 24 minutes." / Open thread; "Couldn't join the huddle" / the reason / Try again.
+
+### 22.3 Header control (`HuddleHeaderButton`)
+
+First in a channel's or DM's Main right island. Start: `IconButton` 28 round island, `headphones` 16, "Start huddle". Join, Switch, In huddle: a 28 pill text button with the island fills (In huddle keeps the island's pressed fill, `--secondary-hover`, so its narrow icon reads apart from Join), padding 0 10 (0 4 with faces), gap 6: `headphones` 14 fill in `--huddle-live`, the word (meta 12.5/500), then up to three 18px faces. Names start with the visible word: "Join the huddle in #eng", "Switch to the huddle in #eng" (tooltip "Leave the huddle in #design and join this one"), "In huddle, open it" (tooltip "Open huddle"). Under 480 (the header's container query) the word and faces go and the 28px icon stays.
+
+### 22.4 Running huddle on a row (`HuddleIndicator`)
+
+`headphones` 12 fill in `--huddle-live` after a Main row's title, beside the thread count, taking only its width. `role="img"`, name and tooltip "Huddle with 3 people". [needs a slot after TopicRow's title]
+
+### 22.5 Device menu (`HuddleDeviceMenu`)
+
+A `Popover` (`browse` 300, `role="menu"`) from Microphone and speaker: `OptionGroupLabel` "Microphone", "Same as system (MacBook Pro Microphone)", then each device; "Speaker" the same; `OptionSeparator`; "Reduce background noise". The current choice is the `selected` row: accent text and a check, no fill. A cut-off device name shows in full on hover. One active row by pointer or arrows (`useMenuActive`).
+
+### 22.6 Screen share sheet (`ScreenSourcePicker`)
+
+A `Surface kind="popover"` dialog in a `SheetLayer`, at most 600 wide (`--source-picker-width`), padding 16 20, gap 12. Title (heading). A list area of one height in every state (`--source-picker-list-height` 420): the grid, or a centred explanation on `--secondary-default` (radius 12). Grid: "Screens" then "Windows" (section labels), three columns 12 apart; a tile is a 16:10 picture box (radius 8, `--secondary-default`, the snapshot contained) over its name (meta, ellipsis; a window's 16px app icon first). Only the picture is ever outlined, never the name. The chosen picture has a 2px `--hl` edge inside its own edge, over the snapshot (a hovered one `--border-strongest`), and its name turns default and 500; keyboard focus is the usual 2px `--focus-ring` 2 outside the picture, so a gap separates focus from the choice and they read apart. A cut-off name shows in full on hover. One radio group: the arrows move and choose, Enter shares, double-click shares. Footer: "Message text is hidden while you share." (`eye-slash` 14, meta subtle) when Hide message text while sharing is on, then Cancel (secondary md) and Share (primary md).
+
+| State | Title | List | Default button |
+| --- | --- | --- | --- |
+| Not asked | Allow screen recording | macOS asks once. Juno shares only the screen or window you pick. | Continue |
+| Off | Screen recording is off for Juno | Turn on Juno in System Settings, Privacy & Security, Screen & System Audio Recording. macOS may ask you to quit and reopen Juno. | Open System Settings |
+| Reading | Share your screen | Getting your screens and windows… | Share (dimmed until one is chosen) |
+| Ready | Share your screen | the grid | Share |
+
+### 22.7 Copy
+
+| Where | Copy |
+| --- | --- |
+| Header control | Start huddle · Join · Switch · In huddle |
+| Bar and tab controls | Mute · Share screen · Stop sharing · Two people are sharing already · Microphone and speaker · Allow the microphone in System Settings · Leave |
+| Status line | Joining… · Reconnecting… · Microphone blocked · Maya is sharing · You're sharing Built-in display (then "· Maya is sharing" while Maya shares too) · You're the only one here · 4:05 |
+| Tab | eng · Huddle · Huddle · Thread · Join huddle · Switch to this huddle · Maya's screen · Loading Maya's screen · Your window · Stop sharing · Expand · Shrink |
+| Tab, ended and failed | The huddle ended · It lasted 24 minutes. · Open thread · Couldn't join the huddle · This huddle is full. · Huddles are turned off in this workspace. A workspace admin can turn them on. (no Try again) · Slack didn't answer. Try again in a moment. · Try again |
+| Toasts | Couldn't join the huddle · Try again / Lost the connection to the huddle · Rejoin / The huddle ended / Left the huddle in #design / Left the huddle. Nobody else was in it. / Stopped sharing. The window closed. |
+| Quit dialog | Leave the huddle and quit? · You're in a huddle in #eng. · Quit · Cancel |
+| Menu bar | Huddle › Show Huddle · Mute Microphone / Unmute Microphone ⌘⇧Space · Share Screen… · Leave Huddle |
+| ⌘K | Mute · Unmute · Leave huddle · Show huddle · Start huddle · Join huddle |
+| Screen reader | Muted · Unmuted · Maya joined · Maya left · Huddle with 3 people |

@@ -1,0 +1,1 @@
+- 10-19 03:39 · Remote entry point · Move workspace file selection and secret checks into scripts/remote/workspace.mjs. Keep the remote entry point focused on dispatch, transport and results, below the 400-line health limit. Why: the last runner changes pushed main over the limit; extracting the workspace boundary leaves room for the backend code without compressing it.

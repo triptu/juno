@@ -2,7 +2,7 @@
 
 Configure the runner on each Mac in `~/.config/juno/runner.json`. Every agent
 then tries it before Namespace, without setting environment variables.
-An unreachable host falls back to Namespace. A reachable host with broken
+An unreachable host falls back to Namespace. For `.local` hosts, SSH tries IPv4 first and falls back to dual stack if the transport cannot connect. The successful family is reused for the job. This avoids a five-second stall on the laptop's advertised but unreachable IPv6 address. Authentication and connected-host failures still stop the run. A reachable host with broken
 Docker, an SSH key error, an image-build failure, or failing tests returns an
 error without fallback. A job waits up to 60 seconds for free cores before
 falling back. Set `JUNO_REMOTE_MAX_VCPU=0` to forbid Namespace allocation and
@@ -83,6 +83,8 @@ use about 11.04 GiB, five gallery jobs 9.25 GiB, and sixteen unit jobs
 16 is the owner's choice, not a limit derived from these measurements. These
 are sequential slices, not concurrent full-suite throughput. Recheck memory
 on larger plans before raising the limit.
+
+The [toolchain and store measurements](development.md#toolchain-and-store-measurements) compare cold installs, warm installs, lockfile changes and complete runs on both backends. The IPv4 fix and its fresh-shell checks are recorded there too.
 
 ## Install Ubuntu on Windows
 
@@ -215,29 +217,37 @@ warm pool or its daemon. Namespace fallback still needs `nsc` on the Mac.
 
 ## Build and prune images on the runner
 
-The SSH backend uses `juno-remote:<tag>`, with the same Dockerfile, lockfile, and
-workspace hash as Namespace. When the tag is missing, the Mac streams the shared
-build context over SSH to `docker build`. The context contains the Dockerfile,
-lockfile, workspace file, package manifests, and `.npmrc` when present. The
-runner needs network access to the public base image and tool downloads, but
-needs neither `nsc` nor Namespace registry access.
+The SSH backend uses `juno-toolchain:<tag>`, built from
+`scripts/remote/Dockerfile`. Its tag hashes the Dockerfile and the pinned Quint
+version from the root manifest. Lockfile and workspace changes do not rebuild it.
+Both backends use this toolchain. The image holds Playwright, Node, pnpm, Java 21 and Quint's warm downloads.
+The build context contains only the Dockerfile and Quint's version.
+
+Each job installs its unpacked workspace with
+`pnpm install --frozen-lockfile --prefer-offline`, then checks Bun's pinned
+version. Missing packages download on a cold store. The log reports
+`remote: workspace installed in N s`. The host keeps pnpm's store at
+`~/.cache/juno-runner/pnpm-store`, including registry policy metadata, and Electron's downloads at `~/.cache/electron`.
+Jobs run as the SSH user's uid and reject cache directories owned by another
+user. They share `~/.cache/juno-runner/runtime` for pnpm's store locks.
+Each container keeps its own workspace and home directory.
 
 A host lock allows one build at a time. Another client waits, checks for the tag
 again, and reuses the completed image. Build step summaries and elapsed time
 appear in the run log. The 60-second capacity wait starts after the image is
 ready. Builds can take several minutes on first use.
 
-Run `pnpm runner:prune` on the Mac to remove old `juno-remote:*` tags and unused
+Run `pnpm runner:prune` on the Mac to remove old `juno-remote:*` and `juno-toolchain:*` tags and unused
 Docker build cache from the runner. It keeps the current tag and never forces
 removal of images referenced by containers. Stop old jobs before pruning if
-Docker reports an image is in use. The prune command shares the build lock.
+Docker reports an image is in use. The prune command shares the build lock and leaves the pnpm store and Electron cache alone.
 
 ## Use a prebuilt image instead
 
 `JUNO_RUNNER_IMAGE` optionally selects an image already present on the runner.
-It disables automatic building. A missing override image is an error.
+It disables automatic building and the per-run install. The full image must already contain the workspace dependencies; the job only links them offline. A missing override image is an error.
 Transfer a `docker save` archive and run `docker load < juno-remote.tar`, or pull
-an image from a registry. For Namespace's private registry, install `nsc` on the
+an image from a registry. For a legacy full image in Namespace's private registry, install `nsc` on the
 laptop, run `nsc login` and `nsc docker login` interactively, then run:
 
 ```sh
@@ -330,7 +340,7 @@ My optional prebuilt runner image is:
    tailscale ip -4
    ss -ltn '( sport = :2222 )'
    ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
-   docker image ls --format '{{.Repository}}:{{.Tag}}' | grep 'juno-remote' || true
+   docker image ls --format '{{.Repository}}:{{.Tag}}' | grep -E 'juno-(remote|toolchain)' || true
    Run it as the runner user, through a fresh login so the Docker group applies.
    Give me this PowerShell command to rerun and paste its output back:
    wsl -d Ubuntu-24.04 -u <linux-user> --exec bash -lc '~/juno-runner-check.sh'

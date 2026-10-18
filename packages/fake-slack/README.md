@@ -29,6 +29,12 @@ await fake.close()
 - Boot shapes follow what the live smoke recorded (`packages/slack-schema/test/fixtures/recorded/`): `client.userBoot.channels` is metadata only for every channel, member or not (no `is_member`, `last_read`, `latest`, `unread_count`); `client.counts` lists the user's own conversations with their read state. `conversations.*` and the `channel_joined` family return the fuller channel object with `is_member`. The socket sends `hello` with `start: true`, then a complete `reconnect_url` after 200 ms and every 30 s.
 - `pnpm --filter @juno/fake-slack start` runs it on its own.
 
+## Features
+
+Add a module in `src/features/` and one entry to the `features` list in `src/features/index.ts`. Each module exports `{ methods, controls } satisfies FakeFeature` (from `src/features/registry.ts`). Methods use the existing `Handlers` type, keyed by `MethodName` from `@juno/slack-schema`; the merged map must cover every method. Controls take `(fake, input)` and return their result. Control inputs keep the existing HTTP boundary cast.
+
+Startup merges both maps before opening a port and throws on a duplicate method or control name. `reactions.ts` is the small example: `reactions.add`, `reactions.remove`, `addReaction` and `removeReaction`. The remaining methods stay in `methods.ts`, registered by `core.ts` alongside the remaining controls. Public in-process controls stay on `FakeSlack`.
+
 ## Must not
 
 - Import the engine, the client (`@juno/slack`) or any UI package. It depends on `@juno/slack-schema` only, and encodes its responses with those schemas so it cannot drift from the client.

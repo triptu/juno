@@ -33,6 +33,7 @@ import { openJunoTab } from './juno/actions'
 import { openAllTopics, openHome, openSettings, warmHome } from './navigation'
 import { openPalette } from './paletteActions'
 import { setPrivacy } from './privacy'
+import { sidebarTop } from './sidebarTop'
 import { TitlebarNav } from './TitlebarNav'
 import { TopicList } from './TopicList'
 import { closeViewSheet, moveView, newView, selectKind, selectView, showViewPillMenu } from './viewActions'
@@ -146,6 +147,7 @@ export function Sidebar() {
     <SidebarView
       titlebarLeading={<TitlebarNav />}
       fullScreen={fullScreen}
+      top={sidebarTop}
       account={{ ...account, ...(presence === undefined ? {} : { presence: presence.active ? 'active' : 'away' }) }}
       filter={{ kind: filter.kind, unreadOnly: filter.unreadOnly, view: filter.view }}
       dots={dots}

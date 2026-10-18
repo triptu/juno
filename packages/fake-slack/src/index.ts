@@ -6,6 +6,9 @@
  * for tests that drive a built app.
  */
 import type { Message, RtmFrame } from '@juno/slack-schema'
+import { features } from './features/index.ts'
+import { mergeFeatures, type FakeControls } from './features/registry.ts'
+import type { Handlers } from './methods.ts'
 import { Clock } from './clock.ts'
 import { seedWorkspace, SELF_ID, TEAM } from './fixtures.ts'
 import { FakeServer, type CallRecord, type ReceivedFrame, type GatedCall, type GateDecision, type Session } from './server.ts'
@@ -55,11 +58,13 @@ export class FakeSlack {
   readonly workspace: Workspace
   readonly server: FakeServer
   readonly url: string
+  readonly #controls: FakeControls
   readonly #session: Session
   /** Every frame the workspace emitted since start or `resetCalls()`, whether or not a socket was open. */
   readonly frames: RtmFrame[] = []
 
-  private constructor(workspace: Workspace, server: FakeServer, url: string) {
+  private constructor(workspace: Workspace, server: FakeServer, url: string, controls: FakeControls) {
+    this.#controls = controls
     this.workspace = workspace
     this.server = server
     this.url = url
@@ -68,6 +73,8 @@ export class FakeSlack {
   }
 
   static async start(options: FakeSlackOptions = {}): Promise<FakeSlack> {
+    const registry = mergeFeatures(features)
+    const handlers = registry.methods satisfies Handlers
     const clock = new Clock(options.now)
     const team = options.enterpriseId === undefined ? TEAM : { ...TEAM, enterprise_id: options.enterpriseId, enterprise_name: 'Juno Fake Org' }
     const workspace = new Workspace(clock, SELF_ID, team)
@@ -75,11 +82,11 @@ export class FakeSlack {
     const server = new FakeServer(workspace, (name, input) => {
       if (fake === undefined) throw new Error('not started')
       return fake.control(name, input)
-    })
+    }, handlers)
     const url = await server.listen(options.port ?? 0, options.host ?? '127.0.0.1')
     ;(options.seed ?? seedWorkspace)(workspace, `${url}/avatars`)
     if (options.latencyMillis !== undefined) server.setLatency(options.latencyMillis)
-    fake = new FakeSlack(workspace, server, url)
+    fake = new FakeSlack(workspace, server, url, registry.controls)
     return fake
   }
 
@@ -492,61 +499,9 @@ export class FakeSlack {
   }
 
   control(name: string, input: Record<string, unknown>): unknown {
-    const table: Record<string, (input: never) => unknown> = {
-      injectMessage: (i) => this.injectMessage(i),
-      editMessage: (i) => this.editMessage(i),
-      deleteMessage: (i) => this.deleteMessage(i),
-      markRead: (i) => this.markRead(i),
-      markThreadRead: (i) => this.markThreadRead(i),
-      addReaction: (i) => this.addReaction(i),
-      removeReaction: (i) => this.removeReaction(i),
-      addChannel: (i) => this.addChannel(i),
-      joinChannel: (i) => this.joinChannel(i),
-      leaveChannel: (i) => this.leaveChannel(i),
-      renameChannel: (i) => this.renameChannel(i),
-      followThread: (i) => this.followThread(i),
-      unfollowThread: (i) => this.unfollowThread(i),
-      setSelfUsergroups: (i) => this.setSelfUsergroups(i),
-      putUsergroup: (i) => this.putUsergroup(i),
-      typing: (i) => this.typing(i),
-      emitFrame: (i) => this.emitFrame(i),
-      dropSocket: () => this.dropSocket(),
-      goOffline: () => this.goOffline(),
-      goOnline: () => this.goOnline(),
-      force429: (i) => this.force429(i),
-      clear429: (i) => this.clear429(i),
-      forceError: (i) => this.forceError(i),
-      clearError: (i) => this.clearError(i),
-      holdNext: (i) => this.holdNext(i),
-      release: (i) => this.release(i),
-      heldCount: (i) => this.heldCount(i),
-      heldCalls: (i) => this.heldCalls(i),
-      loseResponse: (i) => this.loseResponse(i),
-      holdFrames: (i) => this.holdFrames(i),
-      delayFiles: (i) => this.delayFiles(i),
-      setLatency: (i) => this.setLatency(i),
-      failUploads: (i) => this.failUploads(i),
-      setFilesInfoSupported: (i) => this.setFilesInfoSupported(i),
-      holdThumbnails: () => this.holdThumbnails(),
-      releaseThumbnails: (i) => this.releaseThumbnails(i),
-      injectMedia: (i) => this.injectMedia(i),
-      releaseFrames: (i) => this.releaseFrames(i),
-      heldFrames: () => this.heldFrames(),
-      expireSession: () => this.expireSession(),
-      advanceClock: (i) => this.advanceClock(i),
-      setNow: (i) => this.setNow(i),
-      resetCalls: () => this.resetCalls(),
-      calls: () => this.calls,
-      received: () => this.received,
-      selfPresence: () => this.selfPresence(),
-      credentials: () => this.credentials(),
-      signIn: () => this.signIn(),
-      messages: (i: { channel: string }) => this.messages(i.channel),
-      now: () => this.now(),
-    }
-    const handler = table[name]
+    const handler = this.#controls[name]
     if (handler === undefined) throw new Error(`unknown control ${name}`)
-    return handler(input as never)
+    return handler(this, input as never)
   }
 
   async close(): Promise<void> {

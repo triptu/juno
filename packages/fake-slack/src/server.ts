@@ -15,7 +15,7 @@ import type { MethodName, RtmFrame } from '@juno/slack-schema'
 import { EdgeEmojisListOk, EdgeUsersInfoArgs, EdgeUsersInfoOk, encodeRtmFrame, isMethodName, Methods } from '@juno/slack-schema'
 import { parseCookies, parseFields, parseJson, parseMultipartParts, readBody, type FormFields } from './body.ts'
 import { mimetypeOf } from './files.ts'
-import { ApiError, handlers, type MethodContext } from './methods.ts'
+import { ApiError, type Handlers, type MethodContext } from './methods.ts'
 import { clientPage, signInPage } from './signin.ts'
 import { edgeUserObject, type Workspace } from './state.ts'
 
@@ -129,12 +129,14 @@ export class FakeServer {
   readonly #heldFrames: RtmFrame[] = []
   readonly workspace: Workspace
   readonly #control: (name: string, input: Record<string, unknown>) => unknown
+  readonly #handlers: Handlers
   readonly #http: Server
   readonly #wss = new WebSocketServer({ noServer: true })
   #baseUrl = ''
   #socketSerial = 0
 
-  constructor(workspace: Workspace, control: (name: string, input: Record<string, unknown>) => unknown) {
+  constructor(workspace: Workspace, control: (name: string, input: Record<string, unknown>) => unknown, handlers: Handlers) {
+    this.#handlers = handlers
     this.workspace = workspace
     this.#control = control
     this.#http = createServer((request, response) => {
@@ -596,7 +598,7 @@ export class FakeServer {
     } catch {
       return new ApiError('invalid_arguments')
     }
-    const handler = handlers[method] as (ctx: MethodContext, args: unknown) => Record<string, unknown> | ApiError
+    const handler = this.#handlers[method] as (ctx: MethodContext, args: unknown) => Record<string, unknown> | ApiError
     const result = handler(this.#context(), args)
     if (result instanceof ApiError) return result
     // Encoding through the schema is what keeps the fake honest: a field the

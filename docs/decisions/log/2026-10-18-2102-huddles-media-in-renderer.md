@@ -1,0 +1,1 @@
+- 10-18 21:02 · huddles-media-in-renderer · The Chime media session runs in the main renderer, as a service outside React started at the app root. This is an exception to "the renderer is UI only": WebRTC and the elements that play the stream must share one page. All Slack I/O and the call's state stay in the engine.
