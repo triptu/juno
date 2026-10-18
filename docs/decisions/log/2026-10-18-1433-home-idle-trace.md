@@ -1,0 +1,1 @@
+- 10-18 14:33 · home-idle · Keep the idle CPU gate unchanged: Home's trace shows two deferred V8 memory-reducer collections, with no application timer or animation loop; record the reproduced 2.3% miss without claiming a fix.
