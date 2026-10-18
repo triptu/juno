@@ -64,8 +64,8 @@ export function printHuddles(answer: unknown, self: string) {
 export type HuddleEvent =
   | { readonly kind: 'lifecycle'; readonly name: string; readonly detail?: string }
   | { readonly kind: 'presence'; readonly attendeeId: string; readonly present: boolean; readonly externalUserId: string; readonly dropped: boolean }
-  /** Chime's active speaker detection counts this attendee as speaking. */
-  | { readonly kind: 'speaking'; readonly attendeeId: string }
+  /** Chime's active speaker detection started or stopped counting this attendee as speaking. */
+  | { readonly kind: 'speaking'; readonly attendeeId: string; readonly speaking: boolean }
   | { readonly kind: 'error'; readonly where: string; readonly name: string }
 
 export interface RoomFrameCounts {
@@ -82,6 +82,8 @@ export class MediaReport {
   readonly #onStop: () => void
   readonly #present = new Map<string, string>()
   readonly #shapes = new Set<string>()
+  /** Who speaks now. A steady tone stays in here, so the status line reads it as well as the starts. */
+  readonly #speakingNow = new Set<string>()
   /** Spoke since the last status line. */
   #remoteSpoke = false
   #ownSpoke = false
@@ -107,6 +109,11 @@ export class MediaReport {
       case 'presence':
         return this.#presence(event)
       case 'speaking':
+        if (!event.speaking) {
+          this.#speakingNow.delete(event.attendeeId)
+          return
+        }
+        this.#speakingNow.add(event.attendeeId)
         if (event.attendeeId === this.#self) {
           this.#ownSpoke = true
           this.#everSent = true
@@ -143,8 +150,8 @@ export class MediaReport {
     const line =
       `  [${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}] connected ${this.started && !this.stopped ? 'yes' : 'no'}` +
       ` | remote attendees ${this.#remoteCount()}` +
-      ` | remote speaking ${this.#remoteSpoke ? 'yes' : 'no'}` +
-      ` | own audio at Chime ${this.#ownSpoke ? 'yes' : 'no'}` +
+      ` | remote speaking ${this.#remoteSpoke || [...this.#speakingNow].some((id) => id !== this.#self) ? 'yes' : 'no'}` +
+      ` | own audio at Chime ${this.#ownSpoke || this.#speakingNow.has(this.#self) ? 'yes' : 'no'}` +
       ` | room frames ${socket === undefined ? 'socket off' : `${socket.aboutThisRoom} for this room, ${socket.roomFrames} in all`}`
     this.#remoteSpoke = false
     this.#ownSpoke = false

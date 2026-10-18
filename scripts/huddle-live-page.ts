@@ -43,8 +43,8 @@ function changed(next: MediaSnapshot) {
   const after = new Map(next.remotes.map((r) => [r.attendeeId, r]))
   for (const r of next.remotes) if (!before.has(r.attendeeId)) report({ kind: 'presence', attendeeId: r.attendeeId, present: true, externalUserId: r.externalUserId, dropped: false })
   for (const r of prev.remotes) if (!after.has(r.attendeeId)) report({ kind: 'presence', attendeeId: r.attendeeId, present: false, externalUserId: r.externalUserId, dropped: false })
-  for (const r of next.remotes) if (r.speaking && before.get(r.attendeeId)?.speaking !== true) report({ kind: 'speaking', attendeeId: r.attendeeId })
-  if (next.local.speaking && !prev.local.speaking && next.local.attendeeId !== undefined) report({ kind: 'speaking', attendeeId: next.local.attendeeId })
+  for (const r of next.remotes) if (r.speaking !== (before.get(r.attendeeId)?.speaking ?? false)) report({ kind: 'speaking', attendeeId: r.attendeeId, speaking: r.speaking })
+  if (next.local.speaking !== prev.local.speaking && next.local.attendeeId !== undefined) report({ kind: 'speaking', attendeeId: next.local.attendeeId, speaking: next.local.speaking })
 }
 session.subscribe(() => changed(session.getSnapshot()))
 
