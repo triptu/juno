@@ -19,7 +19,7 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - Sidebar times should use domain `relativeTime` (needs a `desktop → domain` edge decision).
 - Topic art track: placeholder is a library of free-form Tide-style shapes picked per topic, no container (owner decision 10-13).
 - Juno Agent turns, not built in WP11: a `zoom` tool (paged results and the tail placeholder tell the model to zoom), coalescing reports that arrive within 30 s, a proactive run waiting while Juno has an open question, emergency merges before a request is blocked as too large, and applying a chat model change without reopening the engine.
-- Juno Agent actions: reconcile runs once per start, so an unknown send found later stays Failed until next start; Slack writes remain disabled until the owner turns them on.
+- Juno Agent actions: reconcile runs once per start, so an unknown send found later stays Failed until next start.
 - Juno Agent tests: a request built before a redaction must be refused at the guard. Add when the redaction API exists (WP16).
 - Sign-out: one loaded baseline run stalled after sync stopped, with Sign out disabled and the session still signed in. It did not recur in 40 loaded runs after the driver fix. Capture teardown stages if it returns.
 - Feel pass: compare stored filmstrips across CI runs; reaction and Juno chat feel scenarios and CI execution are in place.
