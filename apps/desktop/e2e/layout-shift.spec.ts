@@ -199,7 +199,7 @@ test('delayed image bytes keep the reserved thumbnail box', async ({ juno, win, 
 // does (decision 10-16 16:56, sidebar.spec.ts "during the first sync"): #alerts-prod and #deploys were in 2 of 20
 // first paints at 16 workers, and left 150 to 330 ms later. Once they have left, the rest of the sync fills in the
 // remaining topics below and the card at the foot goes, and no row on screen moves.
-test('sidebar rows stay fixed while sync fills the remaining topics', async ({ juno, win, fake }) => {
+test('sidebar rows stay fixed while sync fills the remaining topics', { tag: ['@heavy', '@heavy-sync'] }, async ({ juno, win, fake }) => {
   fake.holdNext({ method: 'subscriptions.thread.getView' })
   await juno.signIn()
   await expect.poll(() => fake.heldCount({ method: 'subscriptions.thread.getView' })).toBe(1)
@@ -218,7 +218,7 @@ test('sidebar rows stay fixed while sync fills the remaining topics', async ({ j
 })
 
 for (const destination of ['Home', 'All topics'] as const) {
-  test(`cold sync fills ${destination} without moving painted rows`, async ({ juno, win, fake }) => {
+  test(`cold sync fills ${destination} without moving painted rows`, { tag: ['@heavy', '@heavy-sync'] }, async ({ juno, win, fake }) => {
     fake.holdNext({ method: 'subscriptions.thread.getView' })
     await juno.signIn()
     await expect.poll(() => fake.heldCount({ method: 'subscriptions.thread.getView' })).toBe(1)
@@ -236,7 +236,7 @@ for (const destination of ['Home', 'All topics'] as const) {
   })
 }
 
-test('Home rows painted during the first sync stay fixed as later history pages land', async ({ juno, win, fake }) => {
+test('Home rows painted during the first sync stay fixed as later history pages land', { tag: ['@heavy', '@heavy-sync'] }, async ({ juno, win, fake }) => {
   const method = 'conversations.history'
   fake.holdNext({ method })
   await juno.signIn()

@@ -7,6 +7,7 @@ delete process.env.ELECTRON_RUN_AS_NODE
 const excludedTags = [
   ...(process.platform === 'darwin' ? [] : ['@mac']),
   ...(process.env.JUNO_INCLUDE_FLAKY === '1' ? [] : ['@flaky']),
+  ...(process.env.JUNO_SKIP_TAGS ?? '').split(',').filter(Boolean),
 ]
 
 export default defineConfig({
@@ -23,7 +24,7 @@ export default defineConfig({
   retries: process.env.CI || process.env.JUNO_REMOTE_CONTAINER ? 1 : 0,
   // Tests tagged @mac depend on macOS behaviour. pnpm remote runs on Linux and
   // skips them. Scheduled runs include quarantined tests; selective runs skip them.
-  grepInvert: excludedTags.length ? new RegExp(excludedTags.join('|')) : undefined,
+  grepInvert: excludedTags.length ? new RegExp(excludedTags.map((tag) => `${tag}\\b`).join('|')) : undefined,
   reporter: [[process.env.CI ? 'github' : 'list'], ['../../scripts/test-results-reporter.mjs']],
   use: {
     trace: 'retain-on-failure',

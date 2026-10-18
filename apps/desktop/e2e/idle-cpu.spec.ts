@@ -177,7 +177,7 @@ for (const gate of ['portable', 'mac'] as const) {
 
     // The large seed with Juno on a fake model: each state is reached in turn
     // in one launch, as a person moves through the app.
-    test('every process at rest on the large seed: Home, a topic, the Juno panel and tab, Activity, several tabs, minimized and hidden', async () => {
+    test('every process at rest on the large seed: Home, a topic, the Juno panel and tab, Activity, several tabs, minimized and hidden', { tag: ['@heavy', '@heavy-idle'] }, async () => {
       test.setTimeout(20 * IDLE_WINDOW_MS + 600_000)
       const fake = await startFakeSlack({ seed: largeSeed() })
       const model = await startFakeOpenRouter({ answer })

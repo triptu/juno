@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { test } from 'node:test'
+import { fileURLToPath } from 'node:url'
 import { decodeMappings, formatMap, mergePartials, sourceAt } from './coverage-map.mjs'
-import { changedMembers, driverSpecs, galleryComponents, mapProblem, MAX_MAP_AGE_DAYS, selectSpecs } from './affected-select.mjs'
+import { changedMembers, driverSpecs, galleryComponents, mapProblem, MAX_MAP_AGE_DAYS, rankSpecs, reachSpecs, selectSpecs } from './affected-select.mjs'
+import { HEAVY_AREAS, heavyAreasChanged, inPaths, PERF_INTERACTIONS, perfInteractionsChanged, PROTOCOL_PATHS } from './test-areas.mjs'
+
+const repo = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 const TOPIC = 'apps/desktop/e2e/topic.spec.ts'
 const SIDEBAR = 'apps/desktop/e2e/sidebar.spec.ts'
@@ -223,4 +230,143 @@ test('a driver change runs only the specs it reaches, and one outside a member r
   const narrowed = selectSpecs({ ...base, changed: [driverFile], driver: () => new Map([[TOPIC, "it uses the driver's TopicPane.send, which changed or uses what changed"]]) })
   assert.deepEqual(picked(narrowed), { [TOPIC]: ["it uses the driver's TopicPane.send, which changed or uses what changed"] })
   assert.match(selectSpecs({ ...base, changed: [driverFile] }).all, /outside a named driver member/)
+})
+
+// Narrow selection (the default plan since 10-18; --wide keeps the rules above).
+
+const COMMON = 'apps/desktop/e2e/common.spec.ts'
+const wideMap = {
+  ...map,
+  specs: [SIDEBAR, TOPIC, COMMON],
+  files: { ...map.files, 'packages/engine/src/boot.ts': [0, 1, 2], 'packages/views/src/Topic.tsx': [1] },
+}
+const narrowSelect = ({ changed, reach, imports = {}, specs = [SIDEBAR, TOPIC, COMMON] }) => {
+  const importerMap = new Map()
+  for (const [from, targets] of Object.entries(imports)) for (const target of targets) importerMap.set(target, [...(importerMap.get(target) ?? []), from])
+  return selectSpecs({
+    specs,
+    changed,
+    map: wideMap,
+    support: new Set(['apps/desktop/e2e/fixtures.ts', 'packages/fake-slack/src/server.ts']),
+    own: (spec) => new Set(spec === AGENT ? [AGENT, 'apps/desktop/e2e/juno-agent/agent.ts'] : [spec]),
+    app: new Set([...Object.keys(wideMap.files), ...map.moduleOnly, 'packages/ui/src/fonts.css']),
+    isNew: () => false,
+    drift: new Set(changed),
+    importers: (file) => importerMap.get(file) ?? [],
+    narrow: true,
+    reach,
+  })
+}
+
+test('a file few specs ran counts more than one every spec runs', () => {
+  const result = narrowSelect({ changed: ['packages/engine/src/boot.ts', 'packages/views/src/Topic.tsx'] })
+  assert.equal(result.scores.get(TOPIC) > result.scores.get(SIDEBAR), true)
+  assert.equal(result.scores.get(SIDEBAR), 0)
+  // The strongest reason comes first, with how many specs ran the file.
+  assert.equal(result.specs.get(TOPIC)[0], 'ran packages/views/src/Topic.tsx (run by 1 of 3 specs)')
+})
+
+test('a narrow selection never runs everything for support, a style sheet or an unplaced file', () => {
+  const reached = narrowSelect({ changed: ['packages/fake-slack/src/server.ts'], reach: () => new Map([[TOPIC, { reason: 'it uses FakeSlack.react, which changed or uses what changed', depth: 0 }], [SIDEBAR, { reason: 'it uses test, which changed or uses what changed', depth: 3 }]]) })
+  assert.equal(reached.all, undefined)
+  assert.equal(reached.scores.get(TOPIC) > reached.scores.get(SIDEBAR), true)
+  const unplaced = narrowSelect({ changed: ['apps/desktop/e2e/fixtures.ts'], reach: () => undefined })
+  assert.deepEqual([...unplaced.specs.keys()], [SIDEBAR, TOPIC, COMMON])
+  assert.match(unplaced.notes[0], /no spec can be told apart/)
+  const css = narrowSelect({ changed: ['packages/ui/src/fonts.css'] })
+  assert.equal(css.specs.size, 0)
+  assert.match(css.notes[0], /outside the JavaScript bundles/)
+  const orphan = narrowSelect({ changed: ['packages/contract/src/schema.ts'] })
+  assert.equal(orphan.specs.size, 0)
+  assert.match(orphan.notes[0], /nothing that imports it ran/)
+})
+
+test('a changed spec is required; specs importing a changed helper are ranked, not required', () => {
+  const result = narrowSelect({ changed: [TOPIC, 'apps/desktop/e2e/juno-agent/agent.ts'], specs: [SIDEBAR, TOPIC, AGENT] })
+  assert.deepEqual([...result.required], [TOPIC])
+  assert.equal(result.scores.get(AGENT) > 1, true)
+})
+
+test('the ranked plan keeps required specs, then at most max others by score, then the smaller spec', () => {
+  const specs = new Map([['a', ['x']], ['b', ['x']], ['c', ['x']], ['d', ['x']]])
+  const scores = new Map([['a', 0], ['b', 2], ['c', 0], ['d', 1]])
+  const sizes = { a: 50, c: 10 }
+  const ranked = rankSpecs({ specs, scores, required: new Set(['a']), max: 2, size: (spec) => sizes[spec] ?? 0 })
+  assert.deepEqual([...ranked.specs.keys()], ['a', 'b', 'd'])
+  assert.deepEqual(ranked.dropped, ['c'])
+  // A tie goes to the spec that ran fewer files.
+  assert.deepEqual([...rankSpecs({ specs, scores: new Map(), required: new Set(), max: 1, size: (spec) => sizes[spec] ?? 99 }).specs.keys()], ['c'])
+})
+
+const FAKE_SERVER = `export class FakeServer {
+  constructor(workspace: Workspace) {
+    this.http = createServer((request, response) => this.#handle(request, response))
+  }
+
+  async #handle(request: Request, response: Response) {
+    if (path === '/health') return json(response, 200)
+  }
+}
+
+export const methods = {
+  'conversations.history': history,
+}
+`
+const FAKE_INDEX = `export class FakeSlack {
+  static async start() {
+    const server = new FakeServer(workspace)
+  }
+
+  react(name: string) {
+    return name
+  }
+}
+
+export function startFakeSlack() {
+  return FakeSlack.start()
+}
+`
+const fakeLine = (text) => FAKE_SERVER.split('\n').findIndex((line) => line.includes(text)) + 1
+
+test('a fake Slack change reaches the specs that use it, nearest first, through a constructor', () => {
+  const specTexts = new Map([
+    ['start.spec.ts', 'const fake = await startFakeSlack()'],
+    ['react.spec.ts', 'fake.react("eyes")'],
+    ['history.spec.ts', "fake.holdNext({ method: 'conversations.history' })"],
+  ])
+  const reached = reachSpecs({ changed: [{ text: FAKE_SERVER, lines: [fakeLine("'/health'")] }], corpus: [FAKE_SERVER, FAKE_INDEX], specTexts })
+  // #handle -> the constructor (FakeServer) -> FakeSlack.start -> startFakeSlack.
+  assert.deepEqual([...reached.keys()], ['start.spec.ts'])
+  assert.equal(reached.get('start.spec.ts').depth, 3)
+  // A Slack method a changed line names reaches the specs that name it, at depth 0.
+  const method = reachSpecs({ changed: [{ text: FAKE_SERVER, lines: [fakeLine("'conversations.history'")] }], corpus: [FAKE_SERVER, FAKE_INDEX], specTexts })
+  assert.deepEqual(method.get('history.spec.ts'), { reason: "it uses the fake Slack's conversations.history, which changed", depth: 0 })
+})
+
+test('a support change outside every part counts as a change to what the file exports', () => {
+  // A class's own line is outside every part (what it extends reaches every use).
+  const text = 'export class Seeds extends Base {\n  grow() {}\n}\nexport function seed() {}\n'
+  const reached = reachSpecs({ changed: [{ text, lines: [1] }], corpus: [text], specTexts: new Map([['seeded.spec.ts', 'seed()'], ['other.spec.ts', 'run()']]) })
+  assert.deepEqual([...reached.keys()], ['seeded.spec.ts'])
+  assert.equal(driverSpecs({ changed: [{ text, lines: [1] }], driverTexts: [text], specTexts: new Map() }), undefined)
+})
+
+test('heavy areas, protocol paths and perf interactions name files that exist, and each heavy tag is used', () => {
+  const tracked = new Set(spawnSync('git', ['ls-files'], { cwd: repo, encoding: 'utf8' }).stdout.split('\n'))
+  const strings = [...HEAVY_AREAS.flatMap((area) => [...area.paths, ...area.whole]), ...PROTOCOL_PATHS, ...PERF_INTERACTIONS.flatMap((entry) => entry.paths)].filter((path) => typeof path === 'string')
+  for (const path of strings) assert.ok(path.endsWith('/') ? [...tracked].some((file) => file.startsWith(path)) : tracked.has(path), `${path} is not in the repository`)
+  const specs = [...tracked].filter((file) => file.endsWith('.spec.ts')).map((file) => readFileSync(join(repo, file), 'utf8')).join('\n')
+  for (const area of HEAVY_AREAS) assert.match(specs, new RegExp(`'${area.tag}'`), `no test is tagged ${area.tag}`)
+  for (const entry of PERF_INTERACTIONS) if (entry.feel) assert.ok(tracked.has(`apps/desktop/e2e/feel/${entry.feel}`), entry.feel)
+})
+
+test('a change is in a heavy area, the protocol or an interaction by its own files only', () => {
+  assert.deepEqual(heavyAreasChanged(['packages/sync/src/boot.ts']), ['sync'])
+  assert.deepEqual(heavyAreasChanged(['apps/gallery/src/main.tsx', 'apps/gallery/geometry.spec.ts']), ['gallery'])
+  assert.deepEqual(heavyAreasChanged(['apps/gallery/geometry.spec.ts', 'packages/views/src/Home.tsx']), [])
+  assert.equal(inPaths(PROTOCOL_PATHS, 'specs/outbox.qnt'), true)
+  assert.equal(inPaths(PROTOCOL_PATHS, 'specs/README.md'), false)
+  assert.equal(inPaths(PROTOCOL_PATHS, 'packages/engine/src/home/rows.ts'), false)
+  assert.deepEqual(perfInteractionsChanged(['packages/views/src/PeekView.tsx', 'docs/performance.md']).map((entry) => entry.interaction), ['peek'])
+  assert.deepEqual(perfInteractionsChanged(['packages/views/src/SettingsPage.tsx']), [])
 })

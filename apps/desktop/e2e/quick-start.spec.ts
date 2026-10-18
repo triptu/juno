@@ -49,7 +49,7 @@ const medium = signInOn(MEDIUM)
 /** The same seed with no pacing and short calls: the history order matters here, not the time it takes. */
 const mediumQuick = signInOn(MEDIUM, { latency: 50, paced: false })
 
-medium('first sign-in shows threads and DMs before history is read, channels once sorted, then fills in without a reload', async ({ juno }) => {
+medium('first sign-in shows threads and DMs before history is read, channels once sorted, then fills in without a reload', { tag: ['@heavy', '@heavy-sync'] }, async ({ juno }) => {
   test.setTimeout(180_000)
   await juno.signIn({ skipSetUp: false })
   const signedIn = Date.now()
@@ -78,7 +78,7 @@ medium('first sign-in shows threads and DMs before history is read, channels onc
   await expect.poll(withPreview, { timeout: 120_000 }).toBeGreaterThan(previewsAtStart)
 })
 
-medium('the busiest channels show a preview seconds after sign-in, before their history is read', async ({ juno, fake }) => {
+medium('the busiest channels show a preview seconds after sign-in, before their history is read', { tag: ['@heavy', '@heavy-sync'] }, async ({ juno, fake }) => {
   test.setTimeout(120_000)
   // History waits: any channel preview now comes from the preview search after the quick start.
   fake.holdNext({ method: 'conversations.history', times: 1_000, before: true, reason: 'history' })
@@ -104,7 +104,7 @@ medium('the busiest channels show a preview seconds after sign-in, before their 
   fake.release({ method: 'conversations.history' })
 })
 
-mediumQuick('Home is ready once DMs, mentions and unread threads have history, before the last history page', async ({ juno, fake, win }) => {
+mediumQuick('Home is ready once DMs, mentions and unread threads have history, before the last history page', { tag: ['@heavy', '@heavy-sync'] }, async ({ juno, fake, win }) => {
   test.setTimeout(120_000)
   // What Home is made of (SPEC 12, owner 10-18): DMs and group DMs, conversations with an unread mention, and those
   // with unread replies in a followed thread. History reads them first, one conversation at a time.

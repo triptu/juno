@@ -44,7 +44,7 @@ test('an edit, a delete and a reaction made while the socket is down show once i
 })
 
 // The header notice also takes the same slot each time, so the pages below it never move.
-test('a 429 storm: the line says Slack asked us to slow down, every method waits out Retry-After, and the gap still arrives', async ({ juno, fake, slack }) => {
+test('a 429 storm: the line says Slack asked us to slow down, every method waits out Retry-After, and the gap still arrives', { tag: ['@heavy', '@heavy-sync'] }, async ({ juno, fake, slack }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { sidebar } = juno

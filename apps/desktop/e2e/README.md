@@ -36,3 +36,7 @@ Reading it: no `posts` entry for the channel means the send never left the engin
 The relaunch check in `session.spec.ts` attaches `relaunch-frames` JSON before its assertions. It records the total frames, sidebar and sign-in counts, and each frame without a sidebar. Each missing frame includes its index, time since navigation, root child count, whether an earlier sample had the sidebar, and whether the bundle and shell-paint marks exist. `hadShell: false` with an empty root identifies a gap before the first shell. `hadShell: true` identifies a later disappearance. The test still requires the sidebar in every sampled frame and no sign-in frame.
 
 Check the failing run's commit before diagnosing a new startup regression. Worktrees created before `fd8ae4f7` can still run the old delayed initial render after that fix lands on main.
+
+## Heavy tests
+
+A test that is slow because of what it checks, and whose code rarely changes, is tagged `@heavy` and its area's tag: `test('...', { tag: ['@heavy', '@heavy-sync'] }, async () => ...)`. `HEAVY_AREAS` in `scripts/test-areas.mjs` lists the areas and the files each covers; add a file there when a heavy test starts to cover it. `pnpm affected` skips an area's heavy tests unless the change is in that area, by setting `JUNO_SKIP_TAGS`; the scheduled full run and a run by hand keep them. See `docs/development.md`, "Affected tests".
