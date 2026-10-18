@@ -402,7 +402,8 @@ describe('plainText and inlinesOf', () => {
 
   it('flattens every inline including list items', () => {
     const body = bodyFromMrkdwn('<@U0ME> hi', lookups)
-    expect(inlinesOf(body).map((i) => i.kind)).toEqual(['user', 'text'])
+    const list = { kind: 'list', style: 'bullet', indent: 0, items: [[{ kind: 'text', text: 'one' }], [{ kind: 'text', text: 'two' }]] } as const
+    expect(inlinesOf({ blocks: [...body.blocks, list] }).map((i) => (i.kind === 'text' ? i.text.trim() : i.kind))).toEqual(['user', 'hi', 'one', 'two'])
   })
 })
 

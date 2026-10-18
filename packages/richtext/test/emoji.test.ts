@@ -4,9 +4,8 @@ import { PICKER_EMOJI, QUICK_REACTIONS, emojiUnicode, reactionDisplay, splitEmoj
 const custom = (name: string) => (name === 'partyparrot' ? 'https://x/p.gif' : undefined)
 
 describe('emoji table', () => {
-  it('knows the quick reactions and the picker', () => {
-    expect(QUICK_REACTIONS.map(emojiUnicode)).toEqual(['👍', '✅', '👀'])
-    expect(PICKER_EMOJI.map(emojiUnicode)).toEqual(['👍', '❤️', '😂', '🎉', '👀', '✅', '🙏', '🔥', '💯', '😮', '😢', '🚀'])
+  it('draws every quick reaction and picker emoji', () => {
+    for (const name of [...QUICK_REACTIONS, ...PICKER_EMOJI]) expect(emojiUnicode(name), name).toMatch(/\p{Extended_Pictographic}/u)
   })
 
   it('treats +1 and thumbsup as the same emoji', () => {

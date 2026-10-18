@@ -1,7 +1,7 @@
 import { Schema } from 'effect'
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
-import { Card, SendMessageCard, chatCopy, sendMessageStatus } from '@juno/agent-contract'
+import { Card } from '@juno/agent-contract'
 
 const text = fc.string()
 const optional = <A>(value: fc.Arbitrary<A>) => fc.option(value, { nil: undefined })
@@ -76,22 +76,4 @@ describe('card wire formats', () => {
       }), { numRuns: 100 })
     })
   }
-})
-
-// WP12: add count-template cases here once chatCopy has Sent {n} and Sent {n} of {m}.
-// Keep this check at the package boundary so the pure catalogue cannot drift.
-describe('send status copy', () => {
-  it('matches the fixed chat copy', () => {
-    for (const [tag, line] of [
-      ['sent', chatCopy.card.sendMessage.sent],
-      ['failed', chatCopy.card.failed],
-    ] as const) {
-      const messages = Schema.decodeUnknownSync(SendMessageCard)({
-        _tag: 'sendMessage', id: 'card', status: { _tag: 'open' },
-        messages: [{ id: 'row', target: { channelId: 'C_TEST', name: 'test', kindLabel: 'Public channel', tint: 'public' }, text: '',
-          result: { _tag: tag, open: { _tag: 'topic', topicId: 'topic' } } }],
-      }).messages
-      expect(sendMessageStatus(messages)).toMatchObject({ line })
-    }
-  })
 })

@@ -103,18 +103,9 @@ describe('what shows up (spec section 5)', () => {
 })
 
 describe('sidebar placement', () => {
-  it('shows open topics in Recent', () => {
-    expect(sidebarPlacement(topic(), ctx)).toBe('recent')
-  })
-
-  it('hides quiet, resolved and unsubscribed topics', () => {
-    expect(sidebarPlacement(topic({ ago: 9 * DAY }), ctx)).toBe('hidden')
+  // Open, quiet, unread-again and unfollowed topics are in the table above.
+  it('hides a resolved topic', () => {
     expect(sidebarPlacement(topic({ overlay: { resolvedAt: NOW, resolvedActivityTs: ts(NOW - HOUR) } }), ctx)).toBe('hidden')
-    expect(sidebarPlacement(topic({ subscribed: false }), ctx)).toBe('hidden')
-  })
-
-  it('brings a quiet topic back when it is marked unread', () => {
-    expect(sidebarPlacement(topic({ ago: 9 * DAY, unread: 1 }), ctx)).toBe('recent')
   })
 
   it('keeps every pinned topic in Pinned, even quiet or resolved', () => {
