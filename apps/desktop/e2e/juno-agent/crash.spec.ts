@@ -204,8 +204,7 @@ test('a removal cut off after its deletion record leaves the message, and removi
     await expect(chat.ownerBubble('the offsite is on Friday')).toHaveCount(1)
     await expect(chat.root.getByText('Removed', { exact: true })).toHaveCount(0)
     await chat.send('forget my first message again')
-    // The first run's reply and card are still in the chat, and that card may still show its
-    // buttons while its cut-off click settles, so wait for the second card itself.
+    // The first run's reply and card are still in the chat, so wait for the second card itself.
     await expect(chat.junoBubble('Ready to remove it.')).toHaveCount(2, { timeout: 15_000 })
     await expect(card(chat, 'remove')).toHaveCount(2)
     const again = card(chat, 'remove').nth(1)
