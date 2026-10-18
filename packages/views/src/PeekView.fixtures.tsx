@@ -117,6 +117,10 @@ export default defineFixtures(
       loading: peek({ detail: details.postgres, items: [], status: 'loading' }, overRow(rows.postgres.id)),
       empty: peek({ detail: details.offsite, items: [] }, overRow(rows.offsite.id)),
     },
+    'Over topic': {
+      default: scene<PeekViewProps>(() => <SignedIn page={<EngMain />} peek={<PeekOf detail={staging} items={stagingThread} />} />),
+      narrow: scene<PeekViewProps>(() => <SignedIn width={280} page={<EngMain />} peek={<PeekOf detail={staging} items={stagingThread} />} />, { width: 720, height: 480 }),
+    },
     Window: {
       'minimum-window': peek({ detail: details.postgres, items: thread, width: 280 }, { width: 720, height: 480, ...overRow(rows.postgres.id) }),
       'widest-sidebar': peek({ detail: details.postgres, items: thread, width: 480 }, { width: 1000, height: 720, ...overRow(rows.postgres.id) }),
