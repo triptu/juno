@@ -5,7 +5,7 @@ import { MonitorArrowUp } from '@phosphor-icons/react/dist/icons/MonitorArrowUp'
 import { PhoneX } from '@phosphor-icons/react/dist/icons/PhoneX'
 import { SlidersHorizontal } from '@phosphor-icons/react/dist/icons/SlidersHorizontal'
 import type { ReactNode } from 'react'
-import { radii, spacing } from '@juno/tokens/tokens.stylex'
+import { colors, radii, spacing } from '@juno/tokens/tokens.stylex'
 import { focusRing, Icon, IconButton, Popover, type PhosphorIcon } from '@juno/ui'
 import { islandText } from './islandText'
 import type { HuddleControlsActions, HuddleControlsState } from './model'
@@ -50,18 +50,20 @@ export function HuddleControls({
   return (
     <>
       <span {...stylex.props(styles.group)}>
-        {micBlocked ? (
-          <IconButton icon={MicrophoneSlash} label="Allow the microphone in System Settings" size={28} iconSize={16} radius={radius} variant="island" onClick={onOpenMicSettings} />
-        ) : (
-          <IconButton icon={muted ? MicrophoneSlash : Microphone} label="Mute" shortcut={muteShortcut} size={28} iconSize={16} radius={radius} variant="island" pressed={muted} onClick={onMute} />
-        )}
-        {canShare ? (
-          shareFull && !sharing ? (
-            <IconButton icon={MonitorArrowUp} label="Two people are sharing already" size={28} iconSize={16} radius={radius} variant="island" dimmed />
+        <Fills shape={shape}>
+          {micBlocked ? (
+            <IconButton icon={MicrophoneSlash} label="Allow the microphone in System Settings" size={28} iconSize={16} radius={radius} variant="island" onClick={onOpenMicSettings} />
           ) : (
-            <IconButton icon={MonitorArrowUp} label={sharing ? 'Stop sharing' : 'Share screen'} size={28} iconSize={16} radius={radius} variant="island" pressed={sharing} onClick={onShare} />
-          )
-        ) : null}
+            <IconButton icon={muted ? MicrophoneSlash : Microphone} label="Mute" shortcut={muteShortcut} size={28} iconSize={16} radius={radius} variant="island" pressed={muted} onClick={onMute} />
+          )}
+          {canShare ? (
+            shareFull && !sharing ? (
+              <IconButton icon={MonitorArrowUp} label="Two people are sharing already" size={28} iconSize={16} radius={radius} variant="island" dimmed />
+            ) : (
+              <IconButton icon={MonitorArrowUp} label={sharing ? 'Stop sharing' : 'Share screen'} size={28} iconSize={16} radius={radius} variant="island" pressed={sharing} onClick={onShare} />
+            )
+          ) : null}
+        </Fills>
         <Popover
           open={devicesOpen && devices !== undefined}
           onClose={() => onDevices(false)}
@@ -70,25 +72,38 @@ export function HuddleControls({
           role="menu"
           label="Microphone and speaker"
           anchor={
-            <IconButton
-              icon={SlidersHorizontal}
-              label="Microphone and speaker"
-              size={28}
-              iconSize={16}
-              radius={radius}
-              variant="island"
-              aria-haspopup="menu"
-              expanded={devicesOpen}
-              onClick={() => onDevices(!devicesOpen)}
-            />
+            <Fills shape={shape}>
+              <IconButton
+                icon={SlidersHorizontal}
+                label="Microphone and speaker"
+                size={28}
+                iconSize={16}
+                radius={radius}
+                variant="island"
+                aria-haspopup="menu"
+                expanded={devicesOpen}
+                onClick={() => onDevices(!devicesOpen)}
+              />
+            </Fills>
           }
         >
           {devices}
         </Popover>
       </span>
-      <LeaveButton shape={shape} onLeave={onLeave} />
+      <Fills shape={shape}>
+        <LeaveButton shape={shape} onLeave={onLeave} />
+      </Fills>
     </>
   )
+}
+
+/**
+ * In the bar, the controls' hover and pressed fills are steps of the bar's
+ * green. Set around each control, not the row, so the device menu that
+ * opens inside the row keeps its own fills.
+ */
+function Fills({ shape, children }: { readonly shape: ControlsShape; readonly children: ReactNode }) {
+  return shape === 'bar' ? <span {...stylex.props(styles.barFills)}>{children}</span> : children
 }
 
 interface TextControlProps {
@@ -119,6 +134,12 @@ const styles = stylex.create({
     display: 'inline-flex',
     alignItems: 'center',
     gap: spacing['--space-0-5'],
+  },
+  barFills: {
+    display: 'contents',
+    '--secondary-default': colors['--huddle-bar-hover'],
+    '--secondary-hover': colors['--huddle-bar-pressed'],
+    '--secondary-active': colors['--huddle-bar-pressed-hover'],
   },
   textBar: { borderRadius: radii['--radius-lg'] },
   textIsland: { borderRadius: radii['--radius-pill'] },

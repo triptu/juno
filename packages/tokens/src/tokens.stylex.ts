@@ -112,6 +112,14 @@ export const colors = stylex.defineVars({
   // Live in a huddle: the speaking ring and the green headphones. A step deeper than the
   // presence dot so it holds 3:1 on the tiles' secondary fill too (3.36:1; 3.76:1 on a card).
   '--huddle-live': '#1C935F',
+  // The sidebar's huddle bar: a pale green card with a green edge, so it stands
+  // apart from the sidebar at a glance. Its controls' hover and pressed fills are
+  // steps of the same green. --foreground-subtle is 5.41:1 on the fill.
+  '--huddle-bar': '#D3F1DE',
+  '--huddle-bar-edge': '#88C09F',
+  '--huddle-bar-hover': '#C9E7D4',
+  '--huddle-bar-pressed': '#BCD9C7',
+  '--huddle-bar-pressed-hover': '#B3D0BE',
   '--warning': '#E0A500',
   '--info': '#008AB3',
 

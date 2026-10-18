@@ -50,7 +50,7 @@ export function HuddleBar({ place, connection, duration, people, sharers = [], o
           <Text variant="ui" weight="medium" tone="default" truncate tooltipWhenTruncated dir="auto" sx={styles.name}>
             {place.name}
           </Text>
-          <Text variant="meta" tone="muted" numeric truncate tooltipWhenTruncated sx={[styles.status, notice && styles.keeping]}>
+          <Text variant="meta" tone="subtle" numeric truncate tooltipWhenTruncated sx={[styles.status, notice && styles.keeping]}>
             {status}
           </Text>
           <span {...stylex.props(styles.spacer)} />
@@ -81,7 +81,8 @@ const styles = stylex.create({
     paddingBlock: spacing['--space-1'],
     userSelect: 'none',
   },
-  // A raised card, as the header islands are: 4px around two 28px rows, 2px between them, as between the controls.
+  // A raised card in the huddle's green with a green edge, so it stands apart from the sidebar at a glance
+  // and you can find the call quickly. 4px around two 28px rows, 2px between them, as between the controls.
   // 12 = the controls' 8 + the 4 around them.
   card: {
     display: 'flex',
@@ -90,14 +91,17 @@ const styles = stylex.create({
     padding: spacing['--space-1'],
     borderWidth: '1px',
     borderStyle: 'solid',
-    borderColor: 'transparent',
+    borderColor: colors['--huddle-bar-edge'],
     borderRadius: radii['--radius-xl'],
-    backgroundColor: colors['--surface-default'],
+    backgroundColor: colors['--huddle-bar'],
     boxShadow: shadows['--card-ring'],
     WebkitAppRegion: 'no-drag',
   },
   // Its glyph sits 6px in, over the Mute glyph's 6px inside its 28px button.
+  // The faces' ring takes the fill under them, so it cuts their overlap in the bar's green.
+  // Muted is 4.2:1 on the light green, so "+N" and the caret take subtle (5.4:1).
   open: {
+    '--foreground-muted': colors['--foreground-subtle'],
     appearance: 'none',
     display: 'flex',
     alignItems: 'center',
@@ -117,8 +121,13 @@ const styles = stylex.create({
     cursor: 'default',
     backgroundColor: {
       default: 'transparent',
-      ':hover': { default: null, [HOVER]: colors['--secondary-default'] },
-      ':active': { default: colors['--secondary-default'], [HOVER]: colors['--secondary-default'] },
+      ':hover': { default: null, [HOVER]: colors['--huddle-bar-hover'] },
+      ':active': { default: colors['--huddle-bar-hover'], [HOVER]: colors['--huddle-bar-hover'] },
+    },
+    '--surface-default': {
+      default: colors['--huddle-bar'],
+      ':hover': { default: null, [HOVER]: colors['--huddle-bar-hover'] },
+      ':active': { default: colors['--huddle-bar-hover'], [HOVER]: colors['--huddle-bar-hover'] },
     },
     transitionProperty: 'scale, background-color',
     transitionDuration: { default: motion['--duration-fast'], '@media (prefers-reduced-motion: reduce)': '0ms' },

@@ -1,0 +1,1 @@
+- 10-18 22:40 · huddle-bar-green · The sidebar's huddle bar is a pale green card with a green edge (deep green in dark), and its controls' fills step down the same green, because the light card merged into the light sidebar and the owner lost track of the call. No motion and no saturated block; text keeps 5.4:1 or more on the fill.

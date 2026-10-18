@@ -71,6 +71,12 @@ export const darkColors = stylex.createTheme(colors, {
   '--presence-active': '#34C77B',
   // 6.12:1 on the dark secondary fill, 7.1:1 on a card.
   '--huddle-live': '#34C77B',
+  // A deep green card: --foreground-subtle 7.4:1, --foreground-muted 4.83:1 on it.
+  '--huddle-bar': '#1B3727',
+  '--huddle-bar-edge': '#2E6849',
+  '--huddle-bar-hover': '#274333',
+  '--huddle-bar-pressed': '#355241',
+  '--huddle-bar-pressed-hover': '#405D4C',
 
   '--warm-soft': 'color-mix(in oklch, #E39A3B 22%, var(--background))',
   // The dark toast is paper on ink, so the check takes more of the green.

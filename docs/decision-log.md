@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-18 22:40 · huddle-bar-green · The sidebar's huddle bar is a pale green card with a green edge (deep green in dark), and its controls' fills step down the same green, because the light card merged into the light sidebar and the owner lost track of the call. No motion and no saturated block; text keeps 5.4:1 or more on the fill.
 - 10-18 21:55 · huddle-views-package · `@juno/huddle-views` depends on `ui` and `tokens` only, with its own view models; `check-deps` and `check-tokens` treat any `*-views/` directory as views.
 - 10-18 21:54 · huddle-live-green · Live in a huddle is green (`--huddle-live`, a step deeper than the presence dot so it holds 3:1 on the tiles): the speaking ring and the headphones on a running huddle's Main row and on Join. A glyph, not a dot, since a dot already means unread.
 - 10-18 21:53 · huddle-mute-key · ⌘⇧Space mutes and unmutes while Juno is active, as in Slack; a Huddle menu in the menu bar holds Show Huddle, Mute Microphone, Share Screen… and Leave Huddle.
