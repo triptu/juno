@@ -1,7 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
 import { chatCopy, type PinId, type PinRow, type RemembersPage as RemembersPageModel } from '@juno/agent-contract'
-import { Button, ListRow, Surface, Text, TextField } from '@juno/ui'
+import { Button, ListRow, Surface, Text } from '@juno/ui'
 import { cell } from './cell'
+import { NoteField } from './NoteField'
 import { fullTime, messageTime } from '../time'
 
 export interface PinListProps {
@@ -67,7 +68,7 @@ function Row({
     return (
       <ListRow role="listitem" data-pin="editing" divider={!last}>
         <span {...stylex.props(cell.field)}>
-          <TextField size={32} label={copy.label} value={editing} onChange={(event) => onDraftChange(event.currentTarget.value)} dir="auto" />
+          <NoteField label={copy.label} draft={editing} onDraftChange={onDraftChange} onSave={onSave} onCancel={onCancel} />
           {pin.changed ? (
             <Text variant="meta" tone="muted" data-pin-changed="">
               {copy.changed}
@@ -103,7 +104,7 @@ function Row({
       }
     >
       <span {...stylex.props(cell.lines)}>
-        <Text variant="body" selectable dir="auto" sx={cell.wrap}>
+        <Text variant="body" selectable dir="auto" sx={cell.note}>
           {pin.text}
         </Text>
         <Text variant="meta" tone="muted" truncate>
