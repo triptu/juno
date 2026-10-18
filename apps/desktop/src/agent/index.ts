@@ -141,6 +141,7 @@ parent.on('message', (event) => {
             turns: {
               ...providerTurns(connection, picker),
               ...(config.codemode === true ? { codemode: codemodeRunner } : {}),
+              peopleRefresh: config.peopleRefresh ?? !config.e2e,
               backup: {
                 keychain: secrets.keychain,
                 deviceName: config.deviceName ?? computerName(),
