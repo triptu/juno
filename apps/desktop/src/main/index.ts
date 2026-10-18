@@ -14,7 +14,7 @@ import { copiedForTests, copyImage, downloadFile, downloadsForTests, openedForTe
 import { browserLinksForTests, contextMenuForTests, folderForTests, registerIpc, slackLinksForTests, webPanelForTests } from './ipc'
 import { CUSTOM_ITEM, macKeychain, memoryKeychain, OPENROUTER_ITEM } from './keychain'
 import { ProviderStore } from './providers'
-import { launchWriter, readLaunch, type Launch } from './launch'
+import { launchWriter, readLaunch, withSession, type Launch } from './launch'
 import { registerAppScheme, serveAppScheme } from './scheme'
 import { SecretsStore } from './secrets'
 import { SessionHost } from './session'
@@ -227,10 +227,8 @@ const sessionHost = new SessionHost({
   send: (message) => supervisor.send(message),
   signInWindow:
     fakeSlackUrl === undefined ? {} : { startUrl: `${fakeSlackUrl}/signin`, extraHosts: [new URL(fakeSlackUrl).hostname] },
-  importOptions: {
-    ...(slackAppDir === undefined ? {} : { slackDir: slackAppDir }),
-    ...(keychainPassword === undefined ? {} : { keychainPassword }),
-  },
+  importOptions: { ...(slackAppDir === undefined ? {} : { slackDir: slackAppDir }), ...(keychainPassword === undefined ? {} : { keychainPassword }) },
+  saveSession: (session) => void (launch = withSession(launch, session, launchFile)),
 })
 
 app.whenReady().then(() => {

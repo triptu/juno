@@ -1,9 +1,11 @@
 /** Atoms for the session feature. */
-import { Option } from 'effect'
+import { Option, Schema } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
-import { sessionImportFromSlackApp, sessionSignIn, sessionSignOut, sessionProfile, sessionStatus, type SessionStatus } from '@juno/contract'
+import { ReadySession, sessionImportFromSlackApp, sessionSignIn, sessionSignOut, sessionProfile, sessionStatus } from '@juno/contract'
 import { command, liveQuery } from './atoms'
-import { connectionStateAtom } from './client'
+import { launchParam } from './shell'
+
+export type { ReadySession } from '@juno/contract'
 
 export const sessionProfileAtom = liveQuery(sessionProfile)(undefined)
 
@@ -13,44 +15,57 @@ export const signInCommand = command(sessionSignIn)
 export const importFromSlackAppCommand = command(sessionImportFromSlackApp)
 export const signOutCommand = command(sessionSignOut)
 
-export type ReadySession = Extract<SessionStatus, { readonly _tag: 'ready' }>
+const decodeSaved = Schema.decodeUnknownOption(Schema.fromJsonString(ReadySession))
+
+/**
+ * The session main saved when it was last verified, from the page's
+ * `?session=` (no secrets). With it the first render is the shell, not the
+ * sign-in page, while the engine reads and checks the stored session.
+ */
+function savedSession(): ReadySession | undefined {
+  const param = launchParam('session')
+  return param === undefined ? undefined : Option.getOrUndefined(decodeSaved(decodeURIComponent(param.replaceAll('+', ' '))))
+}
 
 interface HeldSession {
   readonly session: ReadySession | undefined
-  /** The port was lost; the next engine's opening `signedOut` is its start, not a sign-out. */
-  readonly restarting: boolean
+  /** Whether the page knows which to show: the shell or the sign-in page. */
+  readonly known: boolean
 }
 
 /**
- * Every engine instance starts as `signedOut` and asks main for the stored
- * secrets before it is `ready`, so a restart would show the sign-in page for
- * a moment and unmount the shell. This keeps the last ready session through
- * that window: from the connection dropping until the new engine reports
- * anything other than `signedOut`. A sign-out by the user, a session that
- * Slack rejected (`authRequired`) and a sign-in in progress all come through
- * as they are.
+ * The session the page is built around. It starts from the saved session,
+ * and an engine that is `starting` (at launch, or after a restart) or not
+ * answering yet changes nothing: the shell stays, and the sign-in page does
+ * not show before the engine has said there is no session. A sign-out, a
+ * session Slack rejected (`authRequired`) and a sign-in in progress come
+ * through as they are.
  */
 const heldSessionAtom = Atom.make((get): HeldSession => {
-  const previous = Option.getOrElse(get.self<HeldSession>(), () => ({ session: undefined, restarting: false }))
-  const connection = get(connectionStateAtom)
+  const previous = Option.getOrElse(get.self<HeldSession>(), () => {
+    const saved = savedSession()
+    return { session: saved, known: saved !== undefined }
+  })
   const status = get(sessionStatusAtom)
-  const restarting = connection === 'reconnecting' || previous.restarting
-  if (status._tag !== 'Success') return { session: previous.session, restarting }
+  if (status._tag !== 'Success') return previous
   switch (status.value._tag) {
+    case 'starting':
+      return previous
     case 'ready':
-      // The same object is the old engine's answer still in the atom; a new one ends the restart.
-      return { session: status.value, restarting: status.value === previous.session && restarting }
-    case 'authRequired':
-      return { session: undefined, restarting: false }
+      return { session: status.value, known: true }
     case 'signingIn':
-      return { session: previous.session, restarting: false }
+      return { session: previous.session, known: true }
+    case 'authRequired':
     case 'signedOut':
-      return { session: restarting ? previous.session : undefined, restarting }
+      return { session: undefined, known: true }
   }
 }).pipe(Atom.keepAlive)
 
 /** The session the shell is built around, or undefined when the sign-in page should show. */
 export const signedInAtom = Atom.make((get): ReadySession | undefined => get(heldSessionAtom).session)
+
+/** True until the page knows whether to show the shell or the sign-in page: a launch with no saved session, before the engine answers. */
+export const sessionUnknownAtom = Atom.make((get) => !get(heldSessionAtom).known)
 
 /**
  * The "Set up Juno" step (SPEC section 13.10, "Set up Juno"): true from a

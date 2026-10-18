@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useLayoutEffect } from 'react'
-import { accentAtom, closeSidebarSheet, densityAtom, junoSetupPendingAtom, openSidebarSheet, persistAccent, persistTheme, privacyAtom, registry, resolvedThemeAtom, signedInAtom, themeAtom, type Accent, type Density, type ResolvedTheme, type Theme } from '@juno/state'
+import { accentAtom, closeSidebarSheet, densityAtom, junoSetupPendingAtom, openSidebarSheet, persistAccent, persistTheme, privacyAtom, registry, resolvedThemeAtom, sessionUnknownAtom, signedInAtom, themeAtom, type Accent, type Density, type ResolvedTheme, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { AppearanceSettings, applyPrivacy, applyTheme, SheetOpenContext, Shell, type AccentName, type DensityName, type ThemeName, type ThemePreference } from '@juno/views'
 import { chunk } from './containers/chunks'
@@ -45,6 +45,7 @@ export function App() {
   const [accent, setAccent] = useAtom(accentAtom)
   const density = useAtomValue(densityAtom)
   const signedIn = useAtomValue(signedInAtom)
+  const sessionUnknown = useAtomValue(sessionUnknownAtom)
   const setUpPending = useAtomValue(junoSetupPendingAtom)
 
   useEffect(followFullScreen, [])
@@ -72,7 +73,8 @@ export function App() {
   // Signed in: the sidebar and the workspace; Settings holds the
   // appearance settings. Right after a first sign-in with no model set up,
   // "Set up Juno" on the same page first. Otherwise the sign-in page is the
-  // whole page, with the appearance block under it.
+  // whole page, with the appearance block under it. A relaunch with a
+  // saved session starts on the shell (signedInAtom), never on this page.
   if (signedIn !== undefined && setUpPending) {
     return (
       <Shell>
@@ -92,6 +94,8 @@ export function App() {
       </SheetOpenContext.Provider>
     )
   }
+  // A launch with no saved session paints only the window's background until the engine says whether one is stored.
+  if (sessionUnknown) return null
   return (
     <Shell>
       <Session />

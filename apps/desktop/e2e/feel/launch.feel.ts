@@ -1,7 +1,7 @@
 import { launchApp, expect } from '../fixtures'
 import { Juno } from '../driver/juno'
 import { Feel, test } from './feel'
-import { landsAndStays } from './checks'
+import { landsAndStays, shotsOf } from './checks'
 
 test('launch shows Home with its composer', async ({ juno, running, userData, fake, slackApp, studio }) => {
   await juno.signIn()
@@ -26,6 +26,35 @@ test('launch shows Home with its composer', async ({ juno, running, userData, fa
       await expect(again.write.composer).toBeVisible()
       await expect(again.write.composer).toBeFocused()
       await expect(again.write.recent.getByRole('button').first()).toBeVisible()
+    })
+  } finally { await next.close() }
+})
+
+test('relaunch while Slack checks the session never shows the sign-in page', async ({ juno, running, userData, fake, slackApp, studio }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await running.close()
+  // The engine stays `starting` until auth.test answers, as on a slow network.
+  fake.holdNext({ method: 'auth.test' })
+  const next = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
+  try {
+    const again = new Juno(next.app, next.win)
+    await new Feel(next.win, studio, 'relaunch').run({
+      name: 'relaunch-checking', title: 'Relaunch while Slack checks the session',
+      probes: [
+        { kind: 'box', name: 'signIn', selector: '#sign-in-title' },
+        { kind: 'box', name: 'sidebar', selector: 'aside[aria-label="Sidebar"]' },
+      ],
+      checks: [(evidence) => {
+        const { frames } = evidence.recording
+        const wrong = frames.filter(frame => frame.values['signIn'] !== null || frame.values['sidebar'] === null)
+        return { name: 'The shell shows in every frame, the sign-in page in none', status: wrong.length === 0 ? 'pass' : 'fail', detail: `${wrong.length} of ${frames.length} frames without the shell or with the sign-in page`, shots: shotsOf(evidence, wrong) }
+      }],
+    }, async () => {
+      await expect.poll(() => fake.heldCount({ method: 'auth.test' }), { timeout: 15_000 }).toBe(1)
+      await again.sidebar.row('Draft plan is in the doc').expectVisible()
+      fake.release({ method: 'auth.test' })
+      await again.expectSignedIn('Juno Fake')
     })
   } finally { await next.close() }
 })

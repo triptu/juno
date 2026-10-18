@@ -12,7 +12,7 @@ import { rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Schema } from 'effect'
 import { nativeTheme } from 'electron'
-import { AccentSchema, DEFAULT_THEME, DensitySchema, SidebarLayout, ThemeSchema, type Theme } from '@juno/contract'
+import { AccentSchema, DEFAULT_THEME, DensitySchema, ReadySession, SidebarLayout, ThemeSchema, type Theme } from '@juno/contract'
 
 export const Launch = Schema.Struct({
   theme: ThemeSchema,
@@ -27,6 +27,9 @@ export const Launch = Schema.Struct({
   hideWhileSharing: Schema.optionalKey(Schema.Boolean),
   sidebar: Schema.optionalKey(SidebarLayout),
   bounds: Schema.optionalKey(Schema.Struct({ x: Schema.Int, y: Schema.Int, width: Schema.Int, height: Schema.Int })),
+  // The session the engine last verified, with no secrets, so a relaunch paints the shell first and never the
+  // sign-in page. Removed on sign-out and when Slack rejects the session.
+  session: Schema.optionalKey(ReadySession),
 })
 export type Launch = typeof Launch.Type
 
@@ -72,6 +75,15 @@ export function readLaunch(userData: string): Launch {
     }
   }
   return launch
+}
+
+/** `launch` with the verified session for the next launch's first frame, or without one. Writes it only when it changed. */
+export function withSession(launch: Launch, session: ReadySession | undefined, writer: LaunchWriter): Launch {
+  if (JSON.stringify(session) === JSON.stringify(launch.session)) return launch
+  const { session: _previous, ...rest } = launch
+  const next = session === undefined ? rest : { ...rest, session }
+  writer.write(next)
+  return next
 }
 
 export interface LaunchWriter {
