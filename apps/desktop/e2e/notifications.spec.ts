@@ -56,7 +56,7 @@ test('a DM set to Every message notifies, the click opens it at the message, and
   await juno.sidebar.row('Maya', { exact: true }).open()
   await juno.topic.expectMessage('Can you look at the hiring plan today?')
   const person = await juno.topic.chooseInMessageMenu('Can you look at the hiring plan today?', 'notify-every', { onSender: true })
-  expect(person.labels).toEqual(['Notify me about Maya', '> Every message', '> When it matters ✓', '> Never', '-', 'Ask Juno'])
+  expect(person.labels).toEqual(['Notify me about Maya', '> Every message', '> When it matters ✓', '> Never', '-', 'Ask Juno', 'What Juno knows about Maya'])
   await juno.expectToast('Maya: Every message')
 
   // Away from the DM, a new message from Maya notifies. Clicking it opens the DM at the message.
