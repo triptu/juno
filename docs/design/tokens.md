@@ -52,7 +52,7 @@ Warm paper. HSL values are the source of truth; hex is the sRGB result for desig
 | `--tab-hover` | `hsla(48, 24%, 90.5%, 1)` | #EDEAE1 | redesign 10-16 | A hovered inactive tab, and the strip's ghost buttons. 1.08:1 over the strip; label `--foreground-subtle` 5.4:1 on it |
 | `--tab-divider` | `hsla(48, 14%, 80%, 1)` | #D3D0C5 | redesign 10-16 | The 1px divider between two inactive tabs, 1.38:1 on the strip |
 | `--overlay-viewer` | `hsla(48, 50%, 98%, 0.94)` | | redesign | Behind the media viewer: the page at 94%, so only the picture reads |
-| `--media-scrim` | `rgba(20, 19, 16, 0.5)` | | media viewer 10-16 | Over a picture: the "+N" on the last tile of a message's grid, and a video's play badge. Not themed: it sits on the picture |
+| `--media-scrim` | `rgba(20, 19, 16, 0.65)` | | media viewer 10-16; 0.65 since 10-18 | Over a picture: the "+N" on the last tile of a message's grid, a video's play badge, and a huddle share's "Maya's screen" label. Not themed: it sits on the picture. At 0.5 the 12.5px label was 3.37:1 over a white screen; at 0.65 it is 5.56:1 |
 | `--media-scrim-foreground` | `hsla(48, 20%, 98%, 1)` | | media viewer 10-16 | The "+N" and the play glyph on `--media-scrim` |
 | `--link-underline` | `color-mix(in oklch, currentColor 35%, transparent)` | | review 10-17 | A link's underline in message text and the composer, from the link's own colour. Not themed |
 | `--quote-fill` | `color-mix(in oklch, currentColor 6%, transparent)` | | review 10-17 | A quote's fill in message text, from the text colour. Not themed |

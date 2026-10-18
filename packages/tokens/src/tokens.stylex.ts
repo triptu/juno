@@ -95,7 +95,7 @@ export const colors = stylex.defineVars({
   '--overlay-viewer': 'hsla(48, 50%, 98%, 0.94)',
   // Over a picture: the "+N" on the last tile of a message's images, and a
   // video's play badge. The same in both themes, since it sits on the picture.
-  '--media-scrim': 'rgba(20, 19, 16, 0.5)',
+  '--media-scrim': 'rgba(20, 19, 16, 0.65)',
   '--media-scrim-foreground': 'hsla(48, 20%, 98%, 1)',
   // Mixed with the text colour where they are used, so one value serves
   // every theme and every accent: a link's underline, a quote's fill.
