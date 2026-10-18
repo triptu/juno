@@ -28,7 +28,7 @@ for (const destination of ['self-DM', 'channel'] as const) {
     const editor = juno.topic.list.getByRole('textbox', { name: 'Edit message' })
     await expect(editor).toHaveValue(fixed)
     expect(fake.calls.filter((call) => call.method === 'chat.update')).toHaveLength(0)
-    await juno.topic.list.getByRole('button', { name: 'Save', exact: true }).click()
+    await juno.topic.list.getByRole('button', { name: /^Save/ }).click()
     await expect.poll(() => fake.messages(channel).some((message) => message.text === fixed)).toBe(true)
     expect(fake.calls.filter((call) => call.method === 'chat.update')).toHaveLength(1)
     await expect(suggestion).toHaveCount(0)
