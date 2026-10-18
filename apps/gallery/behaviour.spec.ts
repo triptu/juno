@@ -50,6 +50,35 @@ test.describe('mouse-down activation', () => {
     await page.keyboard.press('Enter')
     await expect(log(page)).toHaveText('row:keyboard')
   })
+
+  test('activates once when Enter is held', async ({ page }) => {
+    await page.getByRole('button', { name: /Postgres 16 migration plan/ }).focus()
+    // A second down without an up is sent with `repeat`, like auto-repeat.
+    await page.keyboard.down('Enter')
+    await page.keyboard.down('Enter')
+    await page.keyboard.down('Enter')
+    await page.keyboard.up('Enter')
+    await expect(log(page)).toHaveText('row:keyboard')
+  })
+
+  test('leaves a press inside data-no-activate alone', async ({ page }) => {
+    const row = page.getByRole('button', { name: /Postgres 16 migration plan/ })
+    const title = page.getByText('Postgres 16 migration plan')
+    await title.evaluate((node) => node.setAttribute('data-no-activate', ''))
+    await title.click()
+    // Enter afterwards shows the log is live: its entry is the only one.
+    await row.press('Enter')
+    await expect(log(page)).toHaveText('row:keyboard')
+  })
+
+  test('ignores a pointer that is not the primary one', async ({ page }) => {
+    const row = page.getByRole('button', { name: /Postgres 16 migration plan/ })
+    await row.evaluate((node) => {
+      node.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'pen', isPrimary: false }))
+    })
+    await row.press('Enter')
+    await expect(log(page)).toHaveText('row:keyboard')
+  })
 })
 
 test('message links use the hand cursor only when they open outside Juno', async ({ page }) => {
