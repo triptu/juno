@@ -93,7 +93,7 @@ export interface SlackSocketShape {
 type Incoming =
   | { readonly kind: 'upgraded'; readonly status: number }
   | { readonly kind: 'open' }
-  | { readonly kind: 'message'; readonly data: string }
+  | { readonly kind: 'message'; readonly data: string; readonly receivedAt: number }
   | { readonly kind: 'close'; readonly code: number; readonly reason: string }
   | { readonly kind: 'error'; readonly message: string }
   | { readonly kind: 'rejected'; readonly status: number }
@@ -122,6 +122,7 @@ export class SlackSocket extends Context.Service<SlackSocket, SlackSocketShape>(
     SlackSocket,
     Effect.gen(function* () {
       const config = yield* SlackConfig
+      const clock = yield* Clock.Clock
       const session = yield* SlackSession
       const api = yield* SlackApi
       const handshake = yield* SocketHandshake
@@ -174,7 +175,7 @@ export class SlackSocket extends Context.Service<SlackSocket, SlackSocketShape>(
           const headers = yield* handshake.headers(url)
           const agent = yield* handshake.agent(url)
           const socket = yield* Effect.acquireRelease(
-            Effect.sync(() => open(url, headers, agent, config.socket.helloTimeoutMillis, incoming)),
+            Effect.sync(() => open(url, headers, agent, config.socket.helloTimeoutMillis, incoming, () => clock.currentTimeMillisUnsafe())),
             (ws) =>
               Effect.gen(function* () {
                 yield* Ref.update(state, (s) => (s.current?.socket === ws ? { ...s, current: undefined } : s))
@@ -190,9 +191,6 @@ export class SlackSocket extends Context.Service<SlackSocket, SlackSocketShape>(
           let id = FIRST_FRAME_ID
           const nextId = () => id++
           let lastPong = yield* Clock.currentTimeMillis
-          const forward = (frame: RtmFrame) => Clock.currentTimeMillis.pipe(
-            Effect.flatMap((receivedAt) => Queue.offer(out, { _tag: 'Frame', frame, receivedAt })),
-          )
 
           /** Reads frames until one ends the connection. `untilHello` stops at `hello`. */
           const pump = (untilHello: boolean): Effect.Effect<Outcome | undefined, SlackAuthRequired> =>
@@ -226,8 +224,8 @@ export class SlackSocket extends Context.Service<SlackSocket, SlackSocketShape>(
                       yield* Effect.logWarning('socket frame skipped', { type: frameType(item.data) })
                       break
                     }
-                    if (frame.type === 'pong') lastPong = yield* Clock.currentTimeMillis
-                    yield* forward(frame)
+                    if (frame.type === 'pong') lastPong = item.receivedAt
+                    yield* Queue.offer(out, { _tag: 'Frame', frame, receivedAt: item.receivedAt })
                     switch (frame.type) {
                       case 'hello':
                         if (untilHello) return undefined
@@ -337,13 +335,14 @@ function open(
   agent: Agent | undefined,
   handshakeTimeout: number,
   incoming: Queue.Queue<Incoming>,
+  currentTimeMillis: () => number,
 ): WebSocket {
   const socket = new WebSocket(url, { headers, ...(agent === undefined ? {} : { agent }), followRedirects: false, handshakeTimeout })
   const push = (item: Incoming) => {
     Queue.offerUnsafe(incoming, item)
   }
   socket.on('open', () => push({ kind: 'open' }))
-  socket.on('message', (data) => push({ kind: 'message', data: String(data) }))
+  socket.on('message', (data) => push({ kind: 'message', data: String(data), receivedAt: currentTimeMillis() }))
   // The reason is the server's short close text (never a payload); it is kept for the reconnect log.
   socket.on('close', (code, reason) => push({ kind: 'close', code, reason: reason.toString('utf8').slice(0, 120) }))
   socket.on('error', (error) => push({ kind: 'error', message: error.message }))
