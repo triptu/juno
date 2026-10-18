@@ -16,6 +16,7 @@ const checks = [
   ['tokens', node('check-tokens.mjs')],
   ['dependencies', node('check-deps.mjs')],
   ['fixtures redacted', node('check-fixtures-redacted.mjs')],
+  ['lfs', node('check-lfs.mjs')],
   ['health', node('health.mjs', '--check')],
 ]
 
