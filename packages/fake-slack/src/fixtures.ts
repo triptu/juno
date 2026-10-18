@@ -74,6 +74,7 @@ export interface SeedFile {
   readonly title: string
   readonly mimetype: string
   readonly bytes: () => Buffer
+  readonly poster?: { readonly bytes: () => Buffer; readonly width: number; readonly height: number }
 }
 
 /** An image and a PDF in the product thread "Proposal: cut offline mode…", for attachment tests. */
@@ -104,6 +105,17 @@ export const Q4_PLAN_PDF: SeedFile = {
       'Design partners get an early access flow for v3.',
       'Review on Thursday.',
     ]),
+}
+
+const DEMO_VIDEO: SeedFile = {
+  id: 'F0SEEDVIDEO', name: 'walkthrough.mp4', title: 'Walkthrough', mimetype: 'video/mp4',
+  bytes: () => Buffer.from('invented video fixture'),
+  poster: { bytes: () => samplePng(1280, 720), width: 1280, height: 720 },
+}
+
+const DEMO_SNIPPET: SeedFile = {
+  id: 'F0SEEDNOTE', name: 'handoff.md', title: 'Handoff note', mimetype: 'text/markdown',
+  bytes: () => Buffer.from('A short invented project note.\n'),
 }
 
 const DAY = 1440
@@ -190,7 +202,7 @@ export const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
           { from: 'U0TUSHAR', text: "Eng view: cutting both frees about three engineers for sync. I'm for it.", ago: 75 },
           { from: 'U0MAYA', text: "Great. I'll write it up for Thursday's review.", ago: 64, reactions: [['pray', 'U0PRIYA']] },
           { from: 'U0PRIYA', text: "I'll mock an early access flow for the partners so v3 doesn't feel dropped.", ago: 57, files: [EARLY_ACCESS_PNG] },
-          { from: 'U0MAYA', text: 'Draft is up. Cross-posting to <#C0LEADERSHIP|leadership> once <@U0TUSHAR> has looked.', ago: 25, files: [Q4_PLAN_PDF] },
+          { from: 'U0MAYA', text: 'Draft is up. Cross-posting to <#C0LEADERSHIP|leadership> once <@U0TUSHAR> has looked.', ago: 25, files: [Q4_PLAN_PDF, DEMO_VIDEO, DEMO_SNIPPET] },
         ],
       },
       {
@@ -542,7 +554,7 @@ export function seedWorkspace(workspace: Workspace, avatarBase: string): void {
     const parentTs = entry.parent === undefined ? undefined : tsOf.get(entry.parent)
     const files = entry.seed.files?.map((file) => {
       const bytes = file.bytes()
-      const stored = { id: file.id, name: file.name, title: file.title, length: bytes.length, user: entry.seed.from, created: at(entry.seed.ago), bytes, mimetype: file.mimetype }
+      const stored = { id: file.id, name: file.name, title: file.title, length: bytes.length, user: entry.seed.from, created: at(entry.seed.ago), bytes, mimetype: file.mimetype, ...(file.poster === undefined ? {} : { poster: { ...file.poster, bytes: file.poster.bytes() } }) }
       workspace.files.set(file.id, stored)
       return fileObject(baseUrl, stored, workspace.conversation(entry.channel)?.kind === 'public')
     })

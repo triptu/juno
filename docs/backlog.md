@@ -2,6 +2,7 @@
 
 Small items noticed during work that are not yet assigned to a milestone. Remove an item when it is done.
 
+- Image-row report: late thumbnails now try `files.info` with bounded exact-message reads as the fallback when it fails or is incomplete. The 10-18 cached live check found a processed self-DM image and successful cookie-authenticated downloads, but `files.info` also succeeded there. Confirm the owner's reported image in the running app after this fix; the cause on that live session is still unproven.
 - Identity-provider sign-in (Google, Okta) leaves slack.com and is blocked by the sign-in window allow-list. The Slack-app import covers it for now.
 - `pnpm smoke:live` always imports from the Slack app; it cannot reuse `secrets.bin` outside Electron.
 - After the body-sniff sign-in fallback, `secrets.bin` keeps `userId: ''` until a later sign-in.
@@ -37,6 +38,5 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - New chat (built ahead of M6): a failed send says nothing (the draft stays). The outbox and send checks are built. M5's toasts bring "Draft closed · Undo" and the send error.
 - Home: Ask Juno does nothing until the renderer has a Juno tab (`askJuno` in `containers/Home.tsx`; the Juno Agent wiring opens it there, and ⌘J); the field does not show `jobLine` yet.
 - Home: "muted" in SPEC 12 is read as a thread set to Never (not followed); a DM whose Notify me is Never can still show. Use the notification levels once they are in the store.
-- Fake Slack: file objects lack live fields (the video fields `mp4`, `hls`, `thumb_video`, `duration_ms`, the snippet fields `preview`, `lines`), and file downloads need no auth. Live, a file URL without the `d` cookie answers 302 to sign-in, and a bearer `xoxc` token is not accepted (research section 10, "Live probe" 6). `files.info` answers `unknown_method`.
 - Fake Slack: search supports thread metadata with `extra_message_data`, but still lacks `files`, `reactions`, `bot_profile`, `extracts`, `blocks_extracts` and `blocks_extracts_typed`. It sends `total` and `response_metadata.next_cursor`, which live does not; live paging is by `page` only. It does match live in returning no highlight markers.
 - Search (M9): Slack returns no highlight markers and empty `extracts` with `highlight=1` and `extracts=1`, sorted by time or not, so ⌘K marks the query terms itself. Results are paged by `page` (`pagination.page_count`, `total_count`); each item holds one message with its `channel` object.

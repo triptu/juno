@@ -6,8 +6,8 @@
  * the file's id alone, and nothing changes the message itself. A video's
  * poster (`thumb_video` and its size) can come late the same way. A socket
  * message can also carry a partial file, `file_access: "check_file_info"`
- * with little more than its id. So the sync asks `files.info` for such a
- * file and writes the answer into every stored message that carries it
+ * with little more than its id. So the sync tries `files.info`, then re-reads the message if it fails or
+ * is not ready, and writes the processed copy into every stored message that carries it
  * (`run/files.ts`, `write/files.ts`).
  *
  * What a message shows only ever gets fuller: a later copy without a file's
@@ -60,7 +60,7 @@ export const parseFiles = (json: string | null): ReadonlyArray<FileJson> | undef
   }
 }
 
-/** The ids of a message's files that are not ready to show and that `files.info` may fill in. */
+/** The ids of a message's files that are not ready to show and that a message re-read may fill in. */
 export function filesToFetch(filesJson: string | null): ReadonlyArray<string> {
   return (parseFiles(filesJson) ?? []).filter((file) => mayFillIn(file) && !isReady(file)).map((file) => file['id'] as string)
 }

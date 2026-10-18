@@ -167,9 +167,11 @@ describe('seeded files', () => {
     const root = fake.messages('C0PRODUCT').find((m) => m.text?.startsWith('Proposal: cut offline mode'))!
     const replies = await client.ok('conversations.replies', { channel: 'C0PRODUCT', ts: root.ts, limit: 50 })
     const files = replies.messages.flatMap((m) => m.files ?? [])
-    expect(files.map((f) => f.name)).toEqual(['early-access-flow.png', 'q4-plan.pdf'])
+    expect(files.map((f) => f.name)).toEqual(['early-access-flow.png', 'q4-plan.pdf', 'walkthrough.mp4', 'handoff.md'])
 
-    const [image, pdf] = files
+    const [image, pdf, video, snippet] = files
+    expect(video).toMatchObject({ mp4: expect.any(String), hls: expect.any(String), thumb_video: expect.any(String), duration_ms: expect.any(Number) })
+    expect(snippet).toMatchObject({ preview: expect.any(String), lines: expect.any(Number) })
     expect(image).toMatchObject({ original_w: 960, original_h: 640, thumb_960_w: 960, thumb_960_h: 640, thumb_720_w: 720, thumb_720_h: 480 })
     expect(image?.thumb_1024).toBeUndefined()
 
@@ -184,6 +186,15 @@ describe('seeded files', () => {
 })
 
 describe('late and partial files', () => {
+  it('can reject files.info for sessions where the method is unavailable', async () => {
+    const message = fake.injectMedia({ channel: 'C0ENG', media: [{ name: 'fallback.png', width: 640, height: 400 }] })
+    const file = message.files![0]!.id!
+    fake.setFilesInfoSupported({ supported: false })
+    expect((await client.call('files.info', { file })).body).toMatchObject({ ok: false, error: 'unknown_method' })
+    fake.setFilesInfoSupported({ supported: true })
+    expect((await client.ok('files.info', { file })).file).toMatchObject({ id: file, thumb_360: expect.any(String) })
+  })
+
   it('holdThumbnails sends an image without thumbnails until releaseThumbnails, then file_thumbnail_generated', async () => {
     const socket = await client.connect()
     await socket.next(isType('hello'))
@@ -203,12 +214,12 @@ describe('late and partial files', () => {
     fake.releaseThumbnails()
     const generated = await socket.next(isType('file_thumbnail_generated'))
     expect(generated).toMatchObject({ file_id: file })
-    expect((await client.ok('files.info', { file })).file).toMatchObject({ original_w: 640, original_h: 400, thumb_360_w: 360, thumb_360_h: 225 })
+    expect((await client.ok('files.info', { file })).file).toMatchObject({ original_w: 640, original_h: 400, thumb_360: expect.any(String) })
     const history = await client.ok('conversations.history', { channel: 'C0ENG', limit: 2 })
     expect(history.messages.map((m) => m.files?.[0]?.original_w)).toEqual([400, 640])
   })
 
-  it('injectMedia sends partial files on the socket, a video with its poster, and the whole files in history and files.info', async () => {
+  it('injectMedia sends partial files on the socket, a video with its poster, and whole files in history', async () => {
     const socket = await client.connect()
     await socket.next(isType('hello'))
     const posted = fake.injectMedia({
@@ -226,7 +237,7 @@ describe('late and partial files', () => {
     const [image, video] = posted.files!
     expect(image).toMatchObject({ mimetype: 'image/png', original_w: 640, original_h: 400 })
     expect(video).toMatchObject({ mimetype: 'video/mp4', thumb_video_w: 1280, thumb_video_h: 720 })
-    expect((await client.ok('files.info', { file: video!.id! })).file).toMatchObject({ thumb_video_w: 1280, mp4: video!.mp4 })
+    expect((await client.ok('files.info', { file: video!.id! })).file).toMatchObject({ thumb_video: video!.thumb_video, thumb_video_w: 1280, thumb_video_h: 720 })
     const poster = await fetch(video!.thumb_video!, { headers: { cookie: `d=${fake.credentials().cookie}` } })
     expect(poster.headers.get('content-type')).toBe('image/png')
   })

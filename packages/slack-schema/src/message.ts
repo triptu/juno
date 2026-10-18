@@ -75,6 +75,15 @@ export const File = S.Struct({
   thumb_video_h: opt(S.Number),
   /** A video Slack transcoded for playback. */
   mp4: opt(S.String),
+  hls: opt(S.String),
+  duration_ms: opt(S.Number),
+  /** A text snippet preview from Slack. */
+  preview: opt(S.String),
+  preview_highlight: opt(S.String),
+  preview_is_truncated: opt(S.Boolean),
+  lines: opt(S.Number),
+  lines_more: opt(S.Number),
+  edit_link: opt(S.String),
   original_w: opt(S.Number),
   original_h: opt(S.Number),
 })

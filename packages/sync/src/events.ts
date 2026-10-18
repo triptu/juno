@@ -209,7 +209,7 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
       case 'file_change':
       case 'file_shared':
       case 'file_thumbnail_generated':
-        // Carries no sizes: `files.info` brings the thumbnails with them (`run/files.ts`).
+        // Carries no sizes: file info or a message re-read brings the thumbnails with them (`run/files.ts`).
         return yield* Queue.offer(ctx.fileFetches, { kind: 'event', fileId: frame.file_id })
       default:
         return

@@ -1,0 +1,1 @@
+- 10-18 21:10 · late-files · Try files.info before falling back to an exact message read within each bounded thumbnail-recovery attempt. The fake returns file info by default and has a switch for the reported unknown_method response, because live probes disagree about availability.
