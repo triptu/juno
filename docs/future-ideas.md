@@ -60,6 +60,20 @@ Juno's rule is topics, not channels. The next step is topics, not apps: one list
 - **Hiring loop.** A candidate thread shows the scorecard state from the applicant tracker, and feedback you owe shows under Waiting on you. Narrow, but every manager hires.
 - **Evidence for a review.** On an explicit ask only: gather what a report delivered, the thanks they got and the decisions they drove from Slack and the connected tools, cited, into a document you write from. Private to you and never automatic.
 
+## Multiplayer
+
+These assume the other person runs Juno too. Juno's client-only layer (titles, resolution, watches, decisions) is private to one person today; between two Junos it can be shared, with consent on every item and reciprocity by default. How it travels is open: Slack message metadata, a small relay with end-to-end encryption, or the encrypted backup extended to peers.
+
+- **Claim a thread.** Two managers are asked in the same thread. When one takes it, the other's row says "Maya has this" and leaves Waiting on you. Nobody answers twice and nobody waits for the other.
+- **Asks that travel.** Your Waiting on them is their Waiting on you. The ask shows on their Home as a quiet row with your deadline; when they snooze it to Thursday, your side reads "Sam will reply Thursday". A promise they make is confirmed by their Juno, not inferred by yours. The nag moves out of the conversation into the chrome.
+- **Shared titles, resolution and decisions.** A title one person set becomes the topic's title for everyone on Juno. Resolving proposes, never imposes ("Maya marked this done. Agree?"). A decision recorded on one side is confirmed by the other, so the team's decision list is shared rather than one reading.
+- **Compose-time availability.** Your Juno knows you are heads-down until 3. The other person's composer shows "Tushar sees this at 3" with Send anyway or Send at 3. Status that is true, without the stale emoji.
+- **Handoff with context.** "Over to you" sends a topic to another Juno user with your framing, the decision so far, the open loops, and any private note you choose to include. It lands in their Waiting on you.
+- **Backchannel beside the thread.** Two managers in a public thread DM each other about it, and that DM lives nowhere near the thread. Juno links the DM to the topic and shows it beside it for both of them. It is only a linked DM, so nothing is hidden from Slack.
+- **Private acknowledgement.** "Got it" that posts no reaction to Slack but tells the sender's Juno. Per-person opt-in and reciprocal. The safe form of the seen-by idea declined below.
+- **Juno to Juno.** "Find Maya and me 30 minutes this week" is settled between the two agents from both calendars, each person confirming. "Ask Maya's Juno whether the deploy went out" is answered from her connections if she allowed that question. Consent per person and per connection, under 13.9's trust rules.
+- **Shared tidying.** On a channel two people manage, one person's Automated move or Tidy up outcome shows on the other's Home as a suggestion with the name on it.
+
 ## Making connections easier
 
 - **Connect from what your team shares.** Juno sees that your team pasted Linear links forty times this week and offers "Connect Linear?" as a proactive ask, the pattern 13.6 already defines. Setup is paste a URL or a command, sign in, done.
@@ -70,4 +84,4 @@ Juno's rule is topics, not channels. The next step is topics, not apps: one list
 
 - **Weekly reflection page** (topics resolved, people talked to most). Nice, not useful most days. "Your week, for your manager" keeps the useful half.
 - **Automatic re-titling on drift.** The open question in SPEC section 19. Answer: offer a split only when a reply is on a different subject; never retitle silently.
-- **Seen-by on your messages.** Slack does not expose others' reads. Acknowledgement count covers the useful case.
+- **Seen-by on your messages.** Slack does not expose others' reads. Acknowledgement count covers the useful case, and Private acknowledgement (Multiplayer) covers it when both sides run Juno.
