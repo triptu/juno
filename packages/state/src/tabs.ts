@@ -296,13 +296,18 @@ export function closeAllTabs(tabs: Tabs): Tabs {
   return closeEach(tabs, unpinnedIds(tabs.tabs))
 }
 
-/** ⌘⇧T: the last closed tab, back at its old index (within its pinned or unpinned group) with its history, and active. */
-export function reopenClosedTab(tabs: Tabs): Tabs {
-  const last = tabs.closed.at(-1)
+/**
+ * ⌘⇧T: the last closed tab, back at its old index (within its pinned or
+ * unpinned group) with its history, and active. With `id`, that closed tab
+ * instead (the "Draft closed" toast's Undo); nothing when it is not closed.
+ */
+export function reopenClosedTab(tabs: Tabs, id?: string): Tabs {
+  const at = id === undefined ? tabs.closed.length - 1 : tabs.closed.findLastIndex((entry) => entry.tab.id === id)
+  const last = tabs.closed[at]
   if (last === undefined) return tabs
   const pinned = pinnedCount(tabs.tabs)
   const index = last.tab.pinned ? Math.min(last.index, pinned) : Math.min(Math.max(last.index, pinned), tabs.tabs.length)
-  return { tabs: tabs.tabs.toSpliced(index, 0, last.tab), active: last.tab.id, recent: touch(tabs.recent, last.tab.id), closed: tabs.closed.slice(0, -1) }
+  return { tabs: tabs.tabs.toSpliced(index, 0, last.tab), active: last.tab.id, recent: touch(tabs.recent, last.tab.id), closed: tabs.closed.toSpliced(at, 1) }
 }
 
 /** Pins a tab after the pinned ones, or unpins it to the first unpinned place. */
