@@ -1,0 +1,1 @@
+- 10-19 00:34 · fake-slack-features · Fake Slack merges typed method and control maps from one feature list before opening a port, rejecting duplicate names. Reactions are the first separate feature; other methods and public controls stay in place so this refactor preserves behaviour.

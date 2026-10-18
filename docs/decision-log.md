@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-19 00:34 · fake-slack-features · Fake Slack merges typed method and control maps from one feature list before opening a port, rejecting duplicate names. Reactions are the first separate feature; other methods and public controls stay in place so this refactor preserves behaviour.
 - 10-19 00:23 · feature-slots · The Sidebar, TopicHeader and TopicRow views each take a generic slot (`top`, `actions`, `accessory` with `accessoryLabel`) filled from one list in their container, so huddles and later features add an entry there instead of editing the views. An empty list adds no element and no new prop identity.
 - 10-19 00:16 · tab-kinds-table · Each kind of tab's strip look, history menu label and page come from one table, `tabKinds` in the renderer, typed to list every kind of `Place`. A new kind of tab adds a `Place` member and one table entry instead of editing branches across the renderer.
 - 10-19 00:15 · huddles-design-approved · The huddle design (SPEC section 20 and `@juno/huddle-views`) is approved. The sidebar bar is a card in the accent colour, with green only for speaking and live. A shared window shows a preview in your own tab; a shared full screen does not.

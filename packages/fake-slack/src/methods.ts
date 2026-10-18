@@ -5,7 +5,6 @@
  */
 import type { Message, MethodArgs, MethodName, MethodOk, SearchMatch, ThreadView } from '@juno/slack-schema'
 import { compareTs, isReply, permalinkPath } from '@juno/slack-schema'
-import { isKnownReaction } from './emojiNames.ts'
 import { fileObject } from './files.ts'
 import { blocksToText } from './richtext.ts'
 import { edgeUserObject, type Workspace } from './state.ts'
@@ -59,7 +58,7 @@ function inWindow(ts: string, oldest: string | undefined, latest: string | undef
   return true
 }
 
-function requireConversation(ctx: MethodContext, channel: string, needMember = false) {
+export function requireConversation(ctx: MethodContext, channel: string, needMember = false) {
   const conversation = ctx.workspace.conversation(channel)
   if (conversation === undefined) return new ApiError('channel_not_found')
   const member = conversation.members.has(ctx.workspace.selfId)
@@ -71,7 +70,7 @@ function withChannel(ws: Workspace, channel: string, message: Message): Message 
   return ws.withThreadFields({ ...message, channel })
 }
 
-export const handlers: Handlers = {
+export const coreMethods = {
   /** Every group; deleted ones only with `include_disabled`, as live. No `users`, no paging. */
   'usergroups.list': (ctx, args) => ({
     usergroups: [...ctx.workspace.usergroups.values()].filter((group) => args.include_disabled === true || (group.date_delete ?? 0) === 0),
@@ -400,9 +399,6 @@ export const handlers: Handlers = {
     return { channel: args.channel, ts: args.ts }
   },
 
-  'reactions.add': (ctx, args) => reaction(ctx, args, true),
-  'reactions.remove': (ctx, args) => reaction(ctx, args, false),
-
   'search.modules.messages': (ctx, args) => {
     const ws = ctx.workspace
     const query = parseQuery(args.query)
@@ -549,17 +545,7 @@ export const handlers: Handlers = {
     return { file: fileObject(ctx.baseUrl, file) }
   },
 
-}
-
-function reaction(ctx: MethodContext, args: MethodArgs<'reactions.add'>, add: boolean): MethodResult<'reactions.add'> {
-  const ws = ctx.workspace
-  const conversation = requireConversation(ctx, args.channel, true)
-  if (conversation instanceof ApiError) return conversation
-  if (ws.find(args.channel, args.timestamp) === undefined) return new ApiError('message_not_found')
-  if (!isKnownReaction(args.name, new Set(ws.emoji.keys()))) return new ApiError('invalid_name')
-  const failure = ws.react(args.channel, args.timestamp, args.name, ws.selfId, add)
-  return failure === undefined ? {} : new ApiError(failure)
-}
+} satisfies Partial<Handlers>
 
 interface ParsedQuery {
   terms: string[]
