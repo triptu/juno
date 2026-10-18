@@ -148,7 +148,7 @@ function cleanup() {
 
 function main() {
   if (argv.includes('--help')) {
-    console.log('node scripts/batch-merge.mjs [--dry-run | --push] [--local] branch...\nnode scripts/batch-merge.mjs --continue batch-N [--push] [--local]\nChecks are typecheck, lint and the unit tests, on a Namespace machine or with --local on this Mac. Dry run merges and regenerates locally, runs no checks and cannot push.')
+    console.log('node scripts/batch-merge.mjs [--dry-run | --push] [--local] branch...\nnode scripts/batch-merge.mjs --continue batch-N [--push] [--local]\nChecks are typecheck, lint, and the unit tests the batch reaches (with specs:check and conformance when the code the specs model changed), on a Namespace machine or with --local on this Mac. Dry run merges and regenerates locally, runs no checks and cannot push.')
     return
   }
   if (push && dryRun) throw new Error('--dry-run cannot be combined with --push')
@@ -186,12 +186,15 @@ function main() {
     checkMessages()
     const checkedHead = git(state.worktree, 'rev-parse', 'HEAD')
     // Merge first, test in full afterwards (docs/development.md, "Testing"): a batch gates on
-    // typecheck, lint and the unit tests; the CI keeper runs the full suites on main.
+    // typecheck, lint and the unit tests the merged change reaches (pnpm affected --batch, which
+    // adds specs:check and conformance when the code the specs model changed). Files that passed
+    // with the same inputs, in an agent's run or an earlier batch, are skipped by the shared
+    // results cache. The full suites run on main afterwards.
     if (!state.dryRun) {
       run('pnpm', ['typecheck'])
       run('pnpm', ['lint'])
-      // --local runs the unit tests on this Mac through the machine lock, for when Namespace is down.
-      run('pnpm', argv.includes('--local') ? ['test'] : ['remote', 'test'])
+      // --local runs them on this Mac through the machine lock, for when Namespace is down.
+      run('pnpm', ['affected', '--batch', '--base', state.base, ...(argv.includes('--local') ? ['--local'] : [])])
     }
     clean()
     if (git(state.worktree, 'rev-parse', 'HEAD') !== checkedHead) throw new Error('HEAD changed during checks; continue to check again')
