@@ -39,7 +39,7 @@ Every budget is a p95 over the runs of the scenario in section 8 unless marked p
 | Send (Enter) → pending message painted | 50 ms | Only ready wrong-place routing may stop a send; Enter never waits for a model. Text fixes show after sending: local ones as soon as the send is accepted, grammar's whenever its answer comes (within two minutes). The fix line is a row of the sent message and never takes focus. |
 | Scroll, sidebar and message list | p95 frame ≤ 8.3 ms main-thread work; zero long animation frames (> 50 ms) in a 3 s scroll at 2 000 px/s; dropped frames < 1 % | Measured with a CDP trace and the LoAF observer. |
 | Juno chat: Enter → your bubble painted | 16 ms | One frame (SPEC 13.12). The bubble is the renderer's pending send, shown before the agent stores it. `juno.chat-send`. |
-| Juno chat: Enter → Juno's first bubble painted | 2.5 s on OpenRouter | SPEC 13.12. `juno.chat-bubble`; `perf.spec.ts` measures it against the fake OpenRouter, so there it is the agent's own overhead. A Codex turn may be slower and shows the dots meanwhile. The agent's part alone, send to first bubble and an approved card's click to its run's first bubble, is gated at 100 ms p95 by `packages/agent/test/turn-timing.bench.test.ts` (measured 6.2 and 9.0 ms, 10-18). |
+| Juno chat: Enter → Juno's first bubble painted | 2.5 s on OpenRouter | SPEC 13.12. `juno.chat-bubble`; `perf.spec.ts` measures it against the fake OpenRouter, so there it is the agent's own overhead. A Codex turn may be slower and shows the dots meanwhile. The agent's part alone, send to first bubble and an approved card's click to its run's first bubble, is gated at 100 ms p95 by `packages/agent/test/turn-timing.bench.test.ts` (medians 5 and 7 ms, p95 6 to 18 ms over three remote runs, 10-18). |
 | Juno panel: ⌘J or the header's Juno button → panel painted with its composer | 16 ms | One frame; with an About chip too (plan v3 §19.3). The topic reflows once. `juno.panel-open`. |
 | Juno switcher: a pick → the Juno page painted with its rows, in the tab or the panel | 50 ms | As a cached topic open, with 500 runs stored for Activity. The switch waits for the page's first value (at most 150 ms) and paints the finished page in one frame, never an empty page under the header. Activity reads its newest 50 runs by `runs_by_start`; the agent builds them within 40 ms over 500 runs and the 200-run snapshot stays under 200 KB (`packages/agent/test/activity.test.ts`); closed rows are `content-visibility: auto`. `perf.spec.ts` measures the panel's switch to Activity. `juno.page-switch`. Measured 22.5 ms p95 (10-18). |
 | Scroll, Juno chat | as the message list | The chat's rows are in flow with `content-visibility: auto`, and its window is the agent's page of at most 200 rows. |
@@ -1302,15 +1302,15 @@ A full `pnpm perf` on the M2 (60 Hz, so a one-frame budget is 24.7 ms) at main `
 - **Mention typing.** Alternated three times with `89111e14`, every run passed, but main's p95 was higher in each pair: 52.4, 51.7 and 53.3 ms against 38.7, 49.3 and 43.5 ms. Main's input to its frame was 15.6 ms p95, inside the frame; the extra is after it, where more of main's keystrokes wait one more refresh (frame to presentation p95 about 40 ms against 34 to 39). Traced with `JUNO_TRACE_SKIA`, the GPU raster per presented frame rose from 0.85 to 0.91 ms and the renderer's paint and layout were the same, which does not explain a refresh. The traced pair also came out the other way round (51.9 base, 43.2 main). No cause found and nothing to fix yet; if it fails again, trace the suggestion list's frames first, as 7.1 says.
 - **Renderer working set.** The scroll scenario printed 126 MB for the tab against 93 MB on 10-17, and 139 against 102 MB alternated with `89111e14`, while the JS heap (20.4 against 20.1 MB) and the DOM (9,530 against 9,514 elements) stayed the same. A first-parent bisect on that number read 164 to 215 MB at the commits in between, above both ends, so the working set follows the Mac's memory pressure, not the code (8, "`app.getAppMetrics()` reports working set"). It was stopped. The memory budget is private memory, which this scenario does not print.
 
-**Agent side.** On the fake model, which answers at once, so these are the agent's own time:
+**Agent side.** On the fake model, which answers at once, so these are the agent's own time. Three remote runs; each p95 is of 15 or 10 samples, so one slow sample sets it:
 
 | Measure | 10-18 |
 | --- | --- |
-| A normal message: send to the model request, median / p95 | 5.3 / 6.0 ms |
-| Send to the first bubble | 5.4 / 6.2 ms |
+| A normal message: send to the model request, median / p95 | 5.0 to 5.3 / 5.8 to 17.7 ms |
+| Send to the first bubble | 5.1 to 5.4 / 6.0 to 17.9 ms |
 | Request size on a chat with history and memory (system text, messages and tools) | 24,492 characters median |
-| A connection call approved on its card: click to the click run started | 1.8 / 3.8 ms |
-| Click to the run's model request / first bubble | 6.8 / 8.9 ms, 7.0 / 9.0 ms |
+| A connection call approved on its card: click to the click run started | 1.7 to 1.8 / 3.5 to 3.8 ms |
+| Click to the run's model request / first bubble | 6.7 to 6.8 / 8.3 to 17.4 ms, 6.8 to 7.0 / 8.5 to 17.6 ms |
 | Its request size, with the call's result | 26,792 characters median |
 | Cache hit over eight requests with memory writes: no outline / the outline / the outline first | 0.988 / 0.980 / 0.858 |
 
