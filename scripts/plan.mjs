@@ -53,7 +53,8 @@ export function lanes(steps, serial) {
 
 /**
  * Worker counts for the three lanes on an 8-core machine: four app workers,
- * two unit workers, and one simulation beside one Apalache checker. Gallery
+ * two unit workers, and two simulations beside one Apalache checker when
+ * bounded results are uncached. Gallery
  * has six workers because its checks spend time waiting for the browser.
  * A step's own KEY=VALUE words still win.
  */
@@ -62,7 +63,7 @@ export function sideBySide(cores) {
   return {
     app: { JUNO_E2E_WORKERS: String(Math.max(2, Math.floor(cores / 2))), GALLERY_WORKERS: galleryWorkers, GALLERY_SHIFT_PARTS: galleryWorkers },
     rest: { JUNO_VITEST_WORKERS: String(Math.max(1, Math.floor(cores / 4))), JUNO_TEST_PACKAGE_JOBS: '1' },
-    specs: { SPECS_JOBS: String(Math.max(1, Math.floor(cores / 8))), SPECS_APALACHE: '1' },
+    specs: { SPECS_JOBS: String(Math.max(1, Math.floor(cores / 4))), SPECS_APALACHE: '1' },
   }
 }
 
