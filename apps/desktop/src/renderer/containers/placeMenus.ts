@@ -6,8 +6,8 @@
  * view (inventory 15.8) adds the channel to a sidebar view or removes it. The
  * person menu is `notifyActions.showPersonMenu`.
  */
-import { channelMenuItems, channelsIgnore, isViewMenuAction, notifyChoiceOf, type ChannelMenuAction, type ContextMenuAt, type NotifyAction, type NotifyTargetView, type RowChannel } from '@juno/contract'
-import { currentNotificationSettings, junoAvailableAtom, loadNotificationSettings, popupContextMenu, registry, runAction, sidebarFilterAtom } from '@juno/state'
+import { channelMenuItems, isViewMenuAction, notifyChoiceOf, type ChannelMenuAction, type ContextMenuAt, type NotifyAction, type NotifyTargetView, type RowChannel } from '@juno/contract'
+import { currentNotificationSettings, ignoreChannel, junoAvailableAtom, loadNotificationSettings, popupContextMenu, registry, sidebarFilterAtom } from '@juno/state'
 import { markFilterChange } from './filterMark'
 import { askJunoAbout } from './juno/actions'
 import { openTopic } from './navigation'
@@ -58,7 +58,7 @@ async function runChannelAction(chosen: ChannelMenuAction, channel: MenuChannel,
       if (channel.mainId !== undefined) openTopic(channel.mainId)
       return
     case 'ignore-channel':
-      return void runAction(registry, channelsIgnore, { channel: channel.id }, { text: `Ignoring ${channel.label}` })
+      return void ignoreChannel(registry, channel)
     case 'ask-juno':
       return askJunoAbout({ _tag: 'channel', channelId: channel.id, name: channel.name, tint: channel.tint })
   }
