@@ -34,19 +34,25 @@ export type SessionSecrets = typeof SessionSecrets.Type
 export const SignInMethod = Schema.Literals(['window', 'import'])
 export type SignInMethod = typeof SignInMethod.Type
 
+/** A verified session as the renderer sees it: no secrets. Main keeps the last one in `launch.json` so a relaunch opens on the shell. */
+export const ReadySession = Schema.TaggedStruct('ready', {
+  teamId: Schema.String,
+  teamName: Schema.String,
+  userId: Schema.String,
+  /** The user's handle from `auth.test`. */
+  userName: Schema.String,
+  /** `https://<workspace>.slack.com/`, the base of Slack links (the fake's URL in tests). */
+  workspaceUrl: Schema.String,
+  enterprise: Schema.optionalKey(Schema.Struct({ id: Schema.String, name: Schema.optionalKey(Schema.String) })),
+})
+export type ReadySession = typeof ReadySession.Type
+
 export const SessionStatus = Schema.Union([
+  /** The engine is reading the stored session and checking it with Slack. Every engine starts here. */
+  Schema.TaggedStruct('starting', {}),
   Schema.TaggedStruct('signedOut', {}),
   Schema.TaggedStruct('signingIn', { method: SignInMethod }),
-  Schema.TaggedStruct('ready', {
-    teamId: Schema.String,
-    teamName: Schema.String,
-    userId: Schema.String,
-    /** The user's handle from `auth.test`. */
-    userName: Schema.String,
-    /** `https://<workspace>.slack.com/`, the base of Slack links (the fake's URL in tests). */
-    workspaceUrl: Schema.String,
-    enterprise: Schema.optionalKey(Schema.Struct({ id: Schema.String, name: Schema.optionalKey(Schema.String) })),
-  }),
+  ReadySession,
   /** A session existed but Slack no longer accepts it. Local data stays. */
   Schema.TaggedStruct('authRequired', { reason: Schema.String }),
 ])

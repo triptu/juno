@@ -24,7 +24,7 @@ const isAccent = Schema.is(AccentSchema)
 const isDensity = Schema.is(DensitySchema)
 
 /** One value of the page's query string, or undefined without a location (tests). */
-function launchParam(name: string): string | undefined {
+export function launchParam(name: string): string | undefined {
   const search = (globalThis as { readonly location?: { readonly search: string } }).location?.search ?? ''
   return new RegExp(`[?&]${name}=([^&]*)`).exec(search)?.[1]
 }

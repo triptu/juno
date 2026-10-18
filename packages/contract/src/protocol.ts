@@ -12,7 +12,7 @@
  * session state; it only does the Electron work and reports.
  */
 import { Schema } from 'effect'
-import { SessionSecrets, SignInFailureKind, SignInMethod } from './routes/session'
+import { ReadySession, SessionSecrets, SignInFailureKind, SignInMethod } from './routes/session'
 
 /** What main sends the engine once, before any port, over parentPort. */
 export const EngineConfig = Schema.Struct({
@@ -111,6 +111,8 @@ export const EngineToMain = Schema.Union([
   Schema.TaggedStruct('storeSecrets', { secrets: SessionSecrets }),
   /** Please delete the secrets and clear the Slack session; answer with `signedOut`. */
   Schema.TaggedStruct('signOut', {}),
+  /** The session is verified. Main keeps it, with no secrets, so the next launch opens on the shell. */
+  Schema.TaggedStruct('sessionReady', { session: ReadySession }),
   /** Slack rejected the session. Main may want to raise the window. */
   Schema.TaggedStruct('authRequired', { reason: Schema.String }),
   /** Please answer with `handshake` for this socket URL. */

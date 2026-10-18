@@ -4,7 +4,8 @@
  * The engine owns the state machine; main does the Electron work on request
  * (`HostLink`). At start the engine asks main for the stored secrets, opens
  * the workspace store (so the first live query is answered from the cache)
- * and verifies the secrets with `auth.test`. A sign-in or import asks main
+ * and verifies the secrets with `auth.test`; the status is `starting` until
+ * that settles, so the renderer can tell a check in progress from no session. A sign-in or import asks main
  * to capture a session, verifies it the same way, and only then tells main
  * to store it, so `secrets.bin` never holds a session Slack has not
  * accepted.
@@ -83,10 +84,12 @@ export class Session extends Context.Service<
       const transport = yield* HttpTransport
       const workspace = yield* Workspace
       const serviceScope = yield* Effect.scope
-      const state = yield* SubscriptionRef.make<SessionStatus>({ _tag: 'signedOut' })
+      const state = yield* SubscriptionRef.make<SessionStatus>({ _tag: 'starting' })
       const active = yield* Ref.make<ActiveSession | undefined>(undefined)
 
-      const setStatus = (next: SessionStatus) => SubscriptionRef.set(state, next)
+      /** A ready status also goes to main, which keeps it so the next launch opens on the shell. */
+      const setStatus = (next: SessionStatus) =>
+        SubscriptionRef.set(state, next).pipe(Effect.andThen(next._tag === 'ready' ? host.send({ _tag: 'sessionReady', session: next }) : Effect.void))
 
       const slackLayer = (secrets: SessionSecrets) =>
         SlackClient.layer.pipe(

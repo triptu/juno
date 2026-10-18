@@ -12,7 +12,7 @@ import { rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Schema } from 'effect'
 import { nativeTheme } from 'electron'
-import { AccentSchema, DEFAULT_THEME, DensitySchema, SidebarLayout, ThemeSchema, type Theme } from '@juno/contract'
+import { AccentSchema, DEFAULT_THEME, DensitySchema, ReadySession, SidebarLayout, ThemeSchema, type Theme } from '@juno/contract'
 
 export const Launch = Schema.Struct({
   theme: ThemeSchema,
@@ -27,6 +27,9 @@ export const Launch = Schema.Struct({
   hideWhileSharing: Schema.optionalKey(Schema.Boolean),
   sidebar: Schema.optionalKey(SidebarLayout),
   bounds: Schema.optionalKey(Schema.Struct({ x: Schema.Int, y: Schema.Int, width: Schema.Int, height: Schema.Int })),
+  // The session the engine last verified, with no secrets, so a relaunch paints the shell first and never the
+  // sign-in page. Removed on sign-out and when Slack rejects the session.
+  session: Schema.optionalKey(ReadySession),
 })
 export type Launch = typeof Launch.Type
 

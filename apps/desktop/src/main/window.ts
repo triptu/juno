@@ -340,7 +340,7 @@ function setAppMenu(state: MenuState, rebuild = false): void {
 
 /**
  * The page reads `?theme=`, `?accent=`, `?density=`, `?privacy=` and `?sidebar=` so its first render matches the window background, the saved
- * accent, density and privacy mode, and the saved sidebar. `?fullscreen=1` is a reload in full screen, so the title bars start without the
+ * accent, density and privacy mode, and the saved sidebar. `?session=` is the last verified session, so a relaunch renders the shell first. `?fullscreen=1` is a reload in full screen, so the title bars start without the
  * traffic lights' room. `?tour=manual` (tests only) keeps the welcome card from showing by itself.
  */
 function pageUrl(base: string, launch: PageLaunch, fullScreen: boolean): string {
@@ -352,6 +352,7 @@ function pageUrl(base: string, launch: PageLaunch, fullScreen: boolean): string 
   if (launch.privacy === true) url.searchParams.set('privacy', launch.privacySharing === true ? 'sharing' : 'on')
   const sidebar = launch.sidebar ?? DEFAULT_SIDEBAR
   url.searchParams.set('sidebar', `${sidebar.width}${sidebar.collapsed ? '-hidden' : ''}`)
+  if (launch.session !== undefined) url.searchParams.set('session', JSON.stringify(launch.session))
   if (fullScreen) url.searchParams.set('fullscreen', '1')
   // Under JUNO_E2E the welcome card shows only when asked, unless the test wants it to show by itself (JUNO_E2E_TOUR).
   if (process.env.JUNO_E2E === '1' && process.env.JUNO_E2E_TOUR !== '1') url.searchParams.set('tour', 'manual')

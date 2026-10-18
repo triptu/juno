@@ -9,12 +9,14 @@
  *   send `storeSecrets`.
  * - `signOut`: delete `secrets.bin`, clear the `persist:slack` session and
  *   forget the Slack keychain password an import read.
+ * - `sessionReady`: keep the verified session, with no secrets, for the next
+ *   launch's first frame (`launch.json`). `signOut` and `authRequired` drop it.
  * - `handshake`: the cookie header, origin, user agent and proxy for a
  *   socket URL (ADR 0007). `setCookies`: store `Set-Cookie` values from an
  *   upgrade response.
  */
 import { BrowserWindow, session as electronSession } from 'electron'
-import type { EngineToMain, MainToEngine, SessionSecrets } from '@juno/contract'
+import type { EngineToMain, MainToEngine, ReadySession, SessionSecrets } from '@juno/contract'
 import type { SecretsStore } from './secrets'
 import { forgetSlackKeychain, importFromSlackApp, type ImportOptions } from './slackImport'
 import { openSignInWindow, SLACK_PARTITION, type SignInWindowOptions } from './signInWindow'
@@ -26,6 +28,8 @@ export interface SessionHostDeps {
   readonly send: (message: MainToEngine) => void
   readonly signInWindow: SignInWindowOptions
   readonly importOptions: ImportOptions
+  /** Keeps the verified session for the next launch, or drops it. */
+  readonly saveSession: (session: ReadySession | undefined) => void
 }
 
 export class SessionHost {
@@ -56,8 +60,12 @@ export class SessionHost {
       case 'signOut':
         void this.#signOut()
         return true
+      case 'sessionReady':
+        this.#deps.saveSession(message.session)
+        return true
       case 'authRequired':
         console.warn(`main: slack session needs a new sign-in (${message.reason})`)
+        this.#deps.saveSession(undefined)
         return true
       case 'handshake':
         void this.#handshake(message.id, message.url)
@@ -99,6 +107,7 @@ export class SessionHost {
   }
 
   async #signOut(): Promise<void> {
+    this.#deps.saveSession(undefined)
     await this.#deps.secrets.delete()
     forgetSlackKeychain()
     const slackSession = electronSession.fromPartition(SLACK_PARTITION)
