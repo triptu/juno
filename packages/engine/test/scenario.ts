@@ -34,7 +34,7 @@ export async function bootedEngine(track: Array<RunningEngine>, options: EngineO
  * The new engine owns the fake and the directory from then on. `options`
  * start it as `bootedEngine`'s do.
  */
-export async function restart(track: Array<RunningEngine>, engine: RunningEngine, whileStopped: (fake: FakeSlack) => void = () => {}, options: EngineOptions = {}): Promise<RunningEngine> {
+export async function restart(track: Array<RunningEngine>, engine: RunningEngine, whileStopped: (fake: FakeSlack) => void = () => {}, options: EngineOptions = {}, liveMillis = 30_000): Promise<RunningEngine> {
   const { fake, userData } = engine
   const credentials = fake.credentials()
   // Background work (the follow pass) must not answer after the stop and count against the next engine.
@@ -56,7 +56,7 @@ export async function restart(track: Array<RunningEngine>, engine: RunningEngine
   }
   track.push(owned)
   await owned.status('ready')
-  await owned.phase('live', 30_000)
+  await owned.phase('live', liveMillis)
   await owned.syncIdle()
   return owned
 }

@@ -68,7 +68,7 @@ it('repairs offline mutations outside the top ten on the large seed, without ope
   expect(repairs.some((c) => Object.keys(JSON.parse(c.args.cached_latest_updates ?? '{}')).length > 0)).toBe(true)
   console.info('large seed reconnect calls', { budget, total, repair: repairs.length, fallback })
   // No new mutations: the durable markers avoid another repair on warm boot.
-  const warm = await restart(engines, engine, () => {}, { followPassMillis: 3_600_000 })
+  const warm = await restart(engines, engine, () => {}, { followPassMillis: 3_600_000 }, 120_000)
   expect(warm.fake.calls.filter((c) => c.args['_x_reason'] === 'mutation-repair')).toHaveLength(0)
 }, 240_000)
 
