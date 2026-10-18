@@ -34,6 +34,7 @@ import ProgressRing from './ProgressRing.fixtures'
 import ScrollArea from './ScrollArea.fixtures'
 import Segmented from './Segmented.fixtures'
 import Select from './Select.fixtures'
+import SelectButton from './SelectButton.fixtures'
 import Slider from './Slider.fixtures'
 import Surface from './Surface.fixtures'
 import Swatch from './Swatch.fixtures'
@@ -77,6 +78,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   ScrollArea,
   Segmented,
   Select,
+  SelectButton,
   Slider,
   Surface,
   Swatch,

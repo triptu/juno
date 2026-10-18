@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import type { SelectHTMLAttributes } from 'react'
+import type { ButtonHTMLAttributes, ReactNode, Ref, SelectHTMLAttributes } from 'react'
 import { accent, colors, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { variants as typeVariants } from './internal/type'
 
@@ -25,6 +25,32 @@ export function Select({ options, size = 32, label, ...rest }: SelectProps) {
         </option>
       ))}
     </select>
+  )
+}
+
+export interface SelectButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'style' | 'className' | 'children'> {
+  readonly ref?: Ref<HTMLButtonElement>
+  readonly size?: 28 | 30 | 32
+  /** Before the value: the chosen item's icon. */
+  readonly leading?: ReactNode
+  /** Nothing chosen yet: `children` is the prompt, in the muted tone. */
+  readonly placeholder?: boolean
+  /** The list is showing: `aria-expanded`. */
+  readonly expanded?: boolean
+  readonly children: ReactNode
+}
+
+/**
+ * A button drawn like `Select`, for a list Juno draws itself (a searchable
+ * list in a `Popover`), where the OS menu cannot filter. It shrinks with its
+ * row and cuts a long value with an ellipsis.
+ */
+export function SelectButton({ ref, size = 32, leading, placeholder = false, expanded, children, type = 'button', ...rest }: SelectButtonProps) {
+  return (
+    <button ref={ref} type={type} aria-haspopup="dialog" aria-expanded={expanded} {...rest} {...stylex.props(styles.select, styles.button, typeVariants.ui, sizeStyles[size], placeholder && styles.placeholder)}>
+      {leading === undefined ? null : <span {...stylex.props(styles.leading)}>{leading}</span>}
+      <span {...stylex.props(styles.value)}>{children}</span>
+    </button>
   )
 }
 
@@ -61,6 +87,27 @@ const styles = stylex.create({
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
+  },
+  button: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: spacing['--space-1-5'],
+    minWidth: 0,
+    textAlign: 'start',
+    cursor: 'default',
+  },
+  placeholder: {
+    color: colors['--foreground-muted'],
+  },
+  leading: {
+    display: 'inline-flex',
+    flexShrink: 0,
+    color: colors['--foreground-muted'],
+  },
+  value: {
+    minWidth: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
   },
 })
 

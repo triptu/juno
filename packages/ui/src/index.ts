@@ -31,7 +31,7 @@ export { ProgressRing } from './ProgressRing'
 export { ringRoom } from './ringRoom'
 export { ScrollArea } from './ScrollArea'
 export { Segmented } from './Segmented'
-export { Select } from './Select'
+export { Select, SelectButton } from './Select'
 
 export { Surface } from './Surface'
 export { Swatch } from './Swatch'
