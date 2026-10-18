@@ -2,6 +2,7 @@
 // thumbnails"). Live, a fresh image reaches the socket before Slack has made its thumbnails, and a socket
 // message can carry a partial file (`file_access: "check_file_info"`); nothing in the message changes
 // later, so Juno asks `files.info` and the card becomes the picture in place.
+import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
 
 test.describe.configure({ timeout: 120_000 })
@@ -9,6 +10,20 @@ test.describe.configure({ timeout: 120_000 })
 const ENG_MAIN = '#eng'
 const PHOTOS_MAIN = '#photos'
 const DAY_MINUTES = 24 * 60
+
+/** The size of the picture at `src`, loaded as an image in the page. */
+function naturalSize(win: Page, src: string): Promise<{ width: number; height: number }> {
+  return win.evaluate(
+    (url) =>
+      new Promise<{ width: number; height: number }>((resolve, reject) => {
+        const image = new Image()
+        image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight })
+        image.onerror = () => reject(new Error('poster did not load'))
+        image.src = url
+      }),
+    src,
+  )
+}
 
 test('an old card stored before Slack made the thumbnail becomes the picture when its topic opens', async ({ juno, win, fake }) => {
   fake.addChannel({ id: 'C0PHOTOS', name: 'photos', messages: [{ user: 'U0LEO', text: 'Photos from the offsite go here.', ago: 3 * DAY_MINUTES }] })
@@ -55,17 +70,7 @@ test('images and videos in #eng show inline and open full screen, and a partial 
     expect(poster).toMatch(/^juno:\/\/files\/[^/]+\/poster\?url=/)
     expect(await player.getAttribute('src')).toMatch(/^juno:\/\/files\/[^/]+\/video\?url=/)
     // Loaded as an image, as the player loads it: a real picture of the poster's size.
-    const size = await win.evaluate(
-      (src) =>
-        new Promise<{ width: number; height: number }>((resolve, reject) => {
-          const image = new Image()
-          image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight })
-          image.onerror = () => reject(new Error('poster did not load'))
-          image.src = src
-        }),
-      poster!,
-    )
-    expect(size).toEqual({ width: 1280, height: 720 })
+    expect(await naturalSize(win, poster!)).toEqual({ width: 1280, height: 720 })
 
     const open = row.getByRole('button', { name: 'Open demo.mp4 full screen' })
     await open.click()
@@ -77,12 +82,8 @@ test('images and videos in #eng show inline and open full screen, and a partial 
     await expect(open).toBeFocused()
   })
   await test.step('images and a video from the socket open full screen, and the arrow keys and Esc move through and close it', async () => {
-    fake.injectMedia({
-      channel: 'C0ENG',
-      user: 'U0MAYA',
-      text: 'Before and after the fix',
-      media: [{ name: 'before.png', width: 900, height: 600 }, { name: 'after.png', width: 900, height: 600 }, { name: 'walkthrough.mp4', width: 1280, height: 720, kind: 'video' }],
-    })
+    const media = [{ name: 'before.png', width: 900, height: 600 }, { name: 'after.png', width: 900, height: 600 }, { name: 'walkthrough.mp4', width: 1280, height: 720, kind: 'video' as const }]
+    fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Before and after the fix', media })
     const row = topic.message('Before and after the fix')
     await expect(row.locator('[data-thumbnail-grid]')).toHaveAttribute('data-count', '3')
     const first = row.getByRole('button', { name: 'Open before.png' })
