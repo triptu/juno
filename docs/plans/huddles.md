@@ -4,7 +4,7 @@ October 2026. Started 2026-10-18. Inputs: `docs/research/slack-huddles.md`, arch
 
 ## How we work
 
-- One step at a time, with no wide fan-out. Each step is a small set of small commits on the branch `t3/af9c43ee`.
+- One step at a time, with no wide fan-out. Each step is a small set of small commits on the branch `t3/scope-slack-huddles`.
 - Design is finished and signed off first, so the build can go on while the owner is away.
 - Codex (GPT-6-Astra) reviews anything we are not confident in: the Quint spec, the engine's call lifecycle, the socket-events seam and the request-shape change. Claude reviews UI and design.
 - The spike (phase 2) needs the owner: a private test channel and their phone as the second participant.
