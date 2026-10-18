@@ -3,11 +3,12 @@
 //
 //   pnpm verify:main                 local main
 //   pnpm verify:main --ref origin/main
+//   pnpm verify:main --no-cache        rerun every Quint check
 //   pnpm verify:main --with-mac      also, on this Mac: the e2e tests tagged @mac,
 //                                    then `perf` and `test:feel`
 //
 // It checks main out into a temporary detached worktree, so nothing local is
-// sent, and runs `test`, `specs:check` (with no cache: every Quint run),
+// sent, and runs `test`, `specs:check` (random simulations uncached),
 // `test:gallery` and `test:desktop` as one plan on one machine
 // (scripts/plan.mjs, through scripts/remote.mjs). The summary goes to
 // .juno-status/verify-main.md and .json in this checkout, each suite's lines
@@ -32,6 +33,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
 const ref = argv.includes('--ref') ? argv[argv.indexOf('--ref') + 1] : 'main'
 const withMac = argv.includes('--with-mac')
+const noCache = argv.includes('--no-cache')
 
 const git = (...args) => {
   const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' })
@@ -53,7 +55,7 @@ for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => process.exi
 
 const suites = [
   { name: 'test', words: ['test'] },
-  { name: 'specs:check', words: ['SPECS_CACHE=off', 'specs:check'] },
+  { name: 'specs:check', words: [...(noCache ? ['SPECS_CACHE=off'] : ['SPECS_RUN_CACHE=off']), 'specs:check', ...(noCache ? ['--no-cache'] : [])] },
   { name: 'test:gallery', words: ['test:gallery'] },
   { name: 'test:desktop', words: ['JUNO_COVERAGE=1', 'test:desktop'] },
 ]
@@ -89,7 +91,7 @@ function splitPlan(planned) {
 
 console.log(`verify:main: ${commit.slice(0, 10)} ${subject}`)
 const words = suites.flatMap((suite, index) => [...(index ? ['+'] : []), ...suite.words])
-const runs = [run('plan', process.execPath, [join(checkout, 'scripts/remote.mjs'), 'test:plan', ...words], checkout, { SPECS_CACHE: 'off' }).then((planned) => splitPlan(planned))]
+const runs = [run('plan', process.execPath, [join(checkout, 'scripts/remote.mjs'), 'test:plan', ...words], checkout, noCache ? { SPECS_CACHE: 'off' } : {}).then((planned) => splitPlan(planned))]
 if (withMac) {
   // The @mac tests need the installed workspace and a build here; they take a heavy-job slot.
   runs.push(

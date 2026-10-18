@@ -33,11 +33,13 @@ mkdirSync(generated, { recursive: true })
 // A passing job is cached under a hash of its arguments, what is checked on its
 // output, its spec file and the Quint and Apalache versions, so an unchanged
 // check is not run again. Bump cacheVersion when the checks on a result or the
-// Apalache adapter below change. The cache is shared by every worktree. SPECS_CACHE=off or --no-cache runs everything.
+// Apalache adapter below change. The cache is shared by every worktree. SPECS_RUN_CACHE=off
+// reruns simulations while retaining deterministic results; SPECS_CACHE=off or --no-cache runs everything.
 const jobs = []
 // SPECS_CACHE_DIR: pnpm remote brings the Mac's cache along and back.
 const cacheDir = process.env.SPECS_CACHE_DIR ?? join(tmpdir(), 'juno-cache', 'specs')
 const useCache = process.env.SPECS_CACHE !== 'off' && !process.argv.includes('--no-cache')
+const cacheRuns = process.env.SPECS_RUN_CACHE !== 'off'
 const parallel = Math.max(1, Number(process.env.SPECS_JOBS ?? 3))
 const apalacheLanes = Math.max(1, Number(process.env.SPECS_APALACHE ?? 1))
 const sha = (...parts) => {
@@ -141,10 +143,11 @@ function spawnQuint(args, timeout, port) {
 
 async function runJob(job, lane = 0) {
   const { args, violation, timeout, trace, check, checks } = job
+  const cacheJob = useCache && (args[0] !== 'run' || cacheRuns)
   const label = `quint ${args.join(' ')}`
   const key = sha(runnerHash, JSON.stringify(args), violation, checks, specHash(args[1]))
   const cached = join(cacheDir, `${key}.json`)
-  if (useCache && existsSync(cached)) {
+  if (cacheJob && existsSync(cached)) {
     const saved = JSON.parse(readFileSync(cached, 'utf8'))
     if (trace) writeFileSync(trace, saved.trace)
     check(saved.output)
@@ -167,7 +170,7 @@ async function runJob(job, lane = 0) {
   } catch (error) {
     throw Object.assign(error, { log })
   }
-  if (useCache) {
+  if (cacheJob) {
     mkdirSync(cacheDir, { recursive: true })
     const temporary = `${cached}.${process.pid}`
     writeFileSync(temporary, JSON.stringify({ output, notes, trace: trace ? readFileSync(trace, 'utf8') : undefined }))
