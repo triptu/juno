@@ -108,6 +108,7 @@ function PanelChat({ tabId, topicId }: { readonly tabId: string; readonly topicI
         />
       )}
       contextOf={contextOf}
+      {...(detail === undefined ? {} : { mentionPlace: { channel: detail.channel.id, ...(detail.kind === 'thread' && detail.rootTs !== undefined ? { threadTs: detail.rootTs } : {}) } })}
       onSent={onSent}
       onEscape={close}
       composerContext={

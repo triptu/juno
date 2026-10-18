@@ -217,6 +217,7 @@ export {
   junoPanelOpenAtom,
   junoPanelViewAtom,
   junoPanelWidthAtom,
+  junoPicksAtom,
   junoQuoteAtom,
   messageFlashAtom,
   openedAtNewAtom,

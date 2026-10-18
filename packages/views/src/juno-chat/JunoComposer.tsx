@@ -3,7 +3,7 @@ import { ArrowUp } from '@phosphor-icons/react/dist/icons/ArrowUp'
 import type { KeyboardEvent, ReactNode, Ref } from 'react'
 import { chatCopy, type Quote } from '@juno/agent-contract'
 import { layout, opacity, spacing } from '@juno/tokens/tokens.stylex'
-import { IconButton, Surface, Textarea } from '@juno/ui'
+import { IconButton, Surface, Textarea, type TextareaMark } from '@juno/ui'
 import { mentionProps, transfers, type ComposerMention } from '../Composer'
 import { QuoteStub } from './QuoteStub'
 
@@ -11,6 +11,8 @@ export interface JunoComposerProps {
   /** The draft is the renderer's: controlled. */
   readonly value: string
   readonly onChange: (value: string, caret: number) => void
+  /** The picked people and channels, drawn as chips over their names, as in the topic composer. */
+  readonly marks?: ReadonlyArray<TextareaMark>
   readonly mention?: ComposerMention
   readonly onFieldKey?: (event: KeyboardEvent<HTMLTextAreaElement>) => boolean
   readonly onCaret?: (caret: number) => void
@@ -47,7 +49,7 @@ export interface JunoComposerProps {
  * the textarea growing to 160px, and the round send button, dimmed while the
  * draft is empty and never disabled by a run. Enter sends, Shift Enter adds a line.
  */
-export function JunoComposer({ value, onChange, onSend, onEscape, quote, onClearQuote, enabled, placeholder = chatCopy.composer.placeholder, inputRef, column = 'page', context, mention, onFieldKey, onCaret, leading, attachments, onFiles, hasFiles = false }: JunoComposerProps) {
+export function JunoComposer({ value, onChange, onSend, onEscape, quote, onClearQuote, enabled, placeholder = chatCopy.composer.placeholder, inputRef, column = 'page', context, marks = NO_MARKS, mention, onFieldKey, onCaret, leading, attachments, onFiles, hasFiles = false }: JunoComposerProps) {
   const panel = column === 'panel'
   const canSend = enabled && (value.trim().length > 0 || hasFiles)
   const files = transfers(enabled ? onFiles : undefined, undefined)
@@ -89,7 +91,7 @@ export function JunoComposer({ value, onChange, onSend, onEscape, quote, onClear
             disabled={!enabled}
             onChange={(event) => onChange(event.currentTarget.value, event.currentTarget.selectionStart)}
             onKeyDown={onKeyDown}
-            {...mentionProps([], mention, onCaret)}
+            {...mentionProps(marks, mention, onCaret)}
             onPaste={onFiles === undefined || !enabled ? undefined : files.onPaste}
             dir="auto"
           />
@@ -102,6 +104,8 @@ export function JunoComposer({ value, onChange, onSend, onEscape, quote, onClear
     </div>
   )
 }
+
+const NO_MARKS: ReadonlyArray<TextareaMark> = []
 
 const styles = stylex.create({
   // Disabled (AI off, update needed, another device): dimmed like any disabled control, so it does not invite typing.

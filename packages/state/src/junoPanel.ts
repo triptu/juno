@@ -29,7 +29,7 @@
 import { Schema } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
-import { JUNO_PANEL_WIDTH, prefsGet, prefsSet } from '@juno/contract'
+import { JUNO_PANEL_WIDTH, prefsGet, prefsSet, type MentionPick } from '@juno/contract'
 import type { About, Selection } from '@juno/agent-contract'
 import { liveQuery, runCommand } from './atoms'
 import { aiAssistOnAtom } from './notifications'
@@ -102,6 +102,9 @@ export const JUNO_TAB_ABOUT = 'juno-tab'
 export const junoAboutAtom = Atom.family((_key: string) => Atom.make<Exclude<About, { _tag: 'topic' }> | undefined>(undefined).pipe(Atom.keepAlive))
 
 export const junoDraftAtom = Atom.family((_key: string) => Atom.make('').pipe(Atom.keepAlive))
+
+/** The people and channels picked with @ and # in that draft (`junoDraftAtom`'s key); the names stand in the draft's text. */
+export const junoPicksAtom = Atom.family((_key: string) => Atom.make<ReadonlyArray<MentionPick>>([]).pipe(Atom.keepAlive))
 
 export const openedAtNewAtom = Atom.family((_topicId: string) => Atom.make<string | undefined>(undefined).pipe(Atom.keepAlive))
 

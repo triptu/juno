@@ -29,6 +29,7 @@ import type {
   CardId,
   CardChoice,
   ChatItem,
+  ChatMention,
   ChatPage,
   ChatPageSnapshot,
   ChatSummary,
@@ -115,6 +116,8 @@ export interface PendingSend {
   readonly replyTo?: ReplyTarget
   /** Images and text files for Juno, as the composer prepared them. */
   readonly files?: ReadonlyArray<JunoFileInput>
+  /** The people and channels picked with @ and # that stand in `text`. */
+  readonly mentions?: ReadonlyArray<ChatMention>
   readonly delivery: OwnerMessageItem['delivery']
 }
 
@@ -283,6 +286,7 @@ export function chatActions(registry: Registry) {
       ...(send.context ? { context: send.context } : {}),
       ...(send.replyTo ? { replyTo: send.replyTo } : {}),
       ...(send.files !== undefined && send.files.length > 0 ? { files: send.files } : {}),
+      ...(send.mentions !== undefined && send.mentions.length > 0 ? { mentions: send.mentions } : {}),
     })
     if (Exit.isSuccess(exit)) {
       // Stored: the bubble stays until a page shows the agent's row (`landed`), which can arrive after this acknowledgement.
@@ -305,7 +309,7 @@ export function chatActions(registry: Registry) {
 
   return {
     /** The composer's send. Returns the new op id, the row's key from the first frame. */
-    send: (text: string, options: { readonly context?: SendContext; readonly replyTo?: ReplyTarget; readonly files?: ReadonlyArray<JunoFileInput> } = {}): OpId => {
+    send: (text: string, options: { readonly context?: SendContext; readonly replyTo?: ReplyTarget; readonly files?: ReadonlyArray<JunoFileInput>; readonly mentions?: ReadonlyArray<ChatMention> } = {}): OpId => {
       prune()
       const send: PendingSend = { opId: uuidv7() as OpId, text, at: Date.now(), ...options, delivery: { _tag: 'sending' } }
       send.files?.forEach((file, n) => {

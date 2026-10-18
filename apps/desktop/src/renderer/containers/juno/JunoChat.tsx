@@ -1,7 +1,6 @@
-import { useEmojiSuggestions } from '../emojiSuggestions'
 import { useRef, useState, type ReactNode } from 'react'
 import { chatCopy, type ChatPage, type JunoPage, type Quote, type SendContext } from '@juno/agent-contract'
-import { junoDraftAtom, nowAtom, registry } from '@juno/state'
+import { junoDraftAtom, junoPicksAtom, nowAtom, registry, type MentionPlace } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { JunoChatFrame, JunoChatList, JunoComposer, NewMessagesPill } from '@juno/views'
 import { useChatActions, useChatSend, useFocusRequest, useRemoval } from './chatActions'
@@ -9,6 +8,9 @@ import { useReactionPicker } from './chatReactions'
 import { useBubbleMeasure, useChatPosition, useEdges, useReadMarks, useScrollRelease, useStickToBottom } from './chatScroll'
 import { useAgentState, useChatItems, useChatWindow } from './chatWindow'
 import { useChatFiles } from './chatFiles'
+import { useMentions } from '../mentions'
+
+const NO_PLACE: MentionPlace = {}
 
 /** Times change at most at a day boundary; re-render for it this often. */
 const TIME_STEP = 10 * 60_000
@@ -29,6 +31,8 @@ export interface JunoChatProps {
   readonly onEscape?: () => void
   /** A link to a Juno page in the chat: the tab or the panel shows it in place (SPEC 13.10). */
   readonly onOpenPage: (page: JunoPage) => void
+  /** The conversation the @ suggestions rank people by: the panel's topic. */
+  readonly mentionPlace?: MentionPlace
 }
 
 /**
@@ -47,6 +51,8 @@ export interface JunoChatProps {
  * - A Juno bubble fully on screen for a second in the focused window is read.
  *   A hidden tab sits in `<Activity>` with its effects gone, so it reads
  *   nothing and takes no focus until shown.
+ * - @ and # suggest people and channels as in a topic's composer (SPEC
+ *   13.1); the picks go with the message, so Juno reads each one's id.
  * - Sends show at once (`chatItemsAtom` holds them as `sending`). Files
  *   attached here are Juno's only: they are read in the renderer and go
  *   with the message to the agent, never staged for Slack (`junoFiles`).
@@ -54,7 +60,7 @@ export interface JunoChatProps {
  *   one frame with its contents, as a tab switch does: ⌘J opens and closes
  *   it all day (performance 8.5).
  */
-export function JunoChat({ column, draftKey, header, contextOf, composerContext, onSent, onEscape, onOpenPage }: JunoChatProps) {
+export function JunoChat({ column, draftKey, header, contextOf, composerContext, onSent, onEscape, onOpenPage, mentionPlace = NO_PLACE }: JunoChatProps) {
   const agent = useAgentState()
   const { page, pageRef, current, loaded, setWindow } = useChatWindow(column, agent)
   const now = useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP) * TIME_STEP)
@@ -71,10 +77,11 @@ export function JunoChat({ column, draftKey, header, contextOf, composerContext,
   useScrollRelease(scrollRef, pinnedRef, pageRef, setAtBottom)
   useEdges({ scrollRef, topEdgeRef, bottomEdgeRef }, positioned, page, items, setWindow)
   useReadMarks(scrollRef, positioned, items)
-  // The composer: the draft, and the bubble or card a reply quotes.
+  // The composer: the draft, its @ and # picks, and the bubble or card a reply quotes.
   const draft = useAtomValue(junoDraftAtom(draftKey))
   const setDraft = (value: string) => registry.set(junoDraftAtom(draftKey), value)
-  const emojiSuggestions = useEmojiSuggestions({ text: draft, onChange: setDraft, field: inputRef })
+  const picks = useAtomValue(junoPicksAtom(draftKey))
+  const mentions = useMentions({ text: draft, picks, onPicks: (next) => registry.set(junoPicksAtom(draftKey), next), onChange: setDraft, field: inputRef, place: mentionPlace })
   const [quote, setQuote] = useState<Quote | undefined>(undefined)
   useFocusRequest(column, inputRef)
   const { toBottom, send } = useChatSend({ contextOf, onSent, quote, setQuote, sentAtRef, newestBubbleId, scrollRef, pinnedRef, pageRef, setAtBottom, setWindow })
@@ -94,10 +101,11 @@ export function JunoChat({ column, draftKey, header, contextOf, composerContext,
         <JunoComposer
           column={column}
           value={draft}
-          onChange={emojiSuggestions.onChange}
-          onCaret={emojiSuggestions.onCaret}
-          onFieldKey={emojiSuggestions.onFieldKey}
-          {...(emojiSuggestions.mention === undefined ? {} : { mention: emojiSuggestions.mention })}
+          onChange={mentions.onChange}
+          onCaret={mentions.onCaret}
+          onFieldKey={mentions.onFieldKey}
+          marks={mentions.marks}
+          {...(mentions.mention === undefined ? {} : { mention: mentions.mention })}
           onSend={files.send}
           {...(onEscape === undefined ? {} : { onEscape })}
           {...(quote === undefined ? {} : { quote, onClearQuote: () => setQuote(undefined) })}

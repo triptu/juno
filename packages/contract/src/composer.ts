@@ -17,6 +17,7 @@ export {
   insertMention,
   mentionQueryAt,
   mentionTokens,
+  picksIn,
   rankSuggestions,
   removeTokenBefore,
   type MentionPick,

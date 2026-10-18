@@ -63,6 +63,21 @@ export class JunoChatPane {
     return this.root.getByRole('textbox', { name: /^Ask Juno/ })
   }
 
+  /** The @, # or emoji suggestions above the composer. */
+  get suggestions(): Locator {
+    return this.root.locator('[data-mention-suggestions]')
+  }
+
+  /** The suggestion row whose name starts with `name`. */
+  suggestion(name: string): Locator {
+    return this.suggestions.getByRole('option', { name: new RegExp(`^${name}(\\s|$)`) })
+  }
+
+  /** The picked people and channels drawn as chips in the composer's field. */
+  get composerChips(): Locator {
+    return this.root.locator('[data-juno-composer] [data-mark]')
+  }
+
   ownerBubble(text: string): Locator {
     return this.root.locator('[data-chat-owner]').filter({ hasText: text })
   }
