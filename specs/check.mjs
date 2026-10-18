@@ -343,7 +343,7 @@ if (!memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
       drained.has(file) ? { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true } : {})
     simulate(file, `${schedule}BugStep`, invariant, `${name}-bug.itf.json`, true)
   }
-  for (const schedule of [...outboxSchedules, 'boundedAction', 'defectAction']) {
+  for (const schedule of [...outboxSchedules, 'boundedAction', 'defectAction', 'expiredReaction']) {
     simulate('outbox', `${schedule}Step`, 'invariants', `outbox-${schedule}.itf.json`, false, false,
       { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true })
   }

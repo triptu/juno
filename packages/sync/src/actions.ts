@@ -183,7 +183,7 @@ export const insertAction = (kind: ActionKind, channel: string, dependsOn: strin
 export const writePayload = (action: PendingAction, payload: ActionPayload, now: number) =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
-    yield* sql`UPDATE outbox SET payload_json = ${JSON.stringify(payload)}, attempts = 0, next_at = ${String(now)}, last_error = NULL WHERE id = ${action.id}`
+    yield* sql`UPDATE outbox SET payload_json = ${JSON.stringify(payload)}, attempts = 0, created_at = ${String(now)}, next_at = ${String(now)}, last_error = NULL WHERE id = ${action.id}`
     yield* touch(payload.topics)
   })
 
