@@ -5,7 +5,7 @@
 // with Retry and Dismiss, and a reaction that waits long says so.
 import { describe, expect, it } from 'vitest'
 import { editMessage, openTopic, reactToMessage, sendMessage } from '@juno/state'
-import { sleep, waitFor, WAIT_MS } from './harness'
+import { waitFor, WAIT_MS } from './harness'
 import { apiCalls, quiet, readDb, valueOf } from './scenario'
 import { actionRows, booted, chip, eng, inSlack, MAIN, refOf, rowWith, sent, stopEnginesAfterEach, watch } from './actionScenario'
 
@@ -145,7 +145,7 @@ describe('reactions: refused or waiting', () => {
     expect(rowWith(refused, 'Not yet an emoji')?.reactionIssue).toMatchObject({ name: 'shipit', on: true, state: 'failed' })
     expect(apiCalls(engine, 'reactions.add')).toHaveLength(1)
     // It is not sent again on its own.
-    await sleep(1500)
+    await engine.workPass('action')
     expect(apiCalls(engine, 'reactions.add')).toHaveLength(1)
     // Retry, once the workspace has the emoji.
     engine.fake.addEmoji({ name: 'shipit', url: 'https://example.invalid/shipit.png' })
@@ -177,7 +177,7 @@ describe('reactions: refused or waiting', () => {
   })
 
   it('says a reaction is not sent yet when it waits too long', async () => {
-    const engine = await booted({ actionStallMillis: 1000 })
+    const engine = await booted({ timing: { actionStallMillis: 1000 } })
     const rows = watch(engine, MAIN)
     await rows((list) => list.length > 0, 'the window')
     // The reaction waits for its post, which Slack holds.
@@ -211,11 +211,11 @@ describe('reactions from pages', () => {
 })
 
 it('expires an offline reaction and gives Retry a fresh pending window', async () => {
-  const engine = await booted({ actionStallMillis: 100, actionDeadlineMillis: 1000 })
+  const engine = await booted({ timing: { actionStallMillis: 100, actionDeadlineMillis: 1000 } })
   const rows = watch(engine, MAIN)
   const message = await sent(engine, 'Waited offline', rows)
   engine.fake.goOffline()
-  await sleep(200)
+  await engine.phase('offline')
   valueOf(await reactToMessage(engine.registry, refOf(message), 'eyes', true))
   await rows((list) => rowWith(list, 'Waited offline')?.reactionIssue?.state === 'waiting', 'pending offline')
   await rows((list) => rowWith(list, 'Waited offline')?.reactionIssue?.state === 'failed', 'deadline failed')

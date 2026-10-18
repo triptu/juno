@@ -26,7 +26,7 @@
  *   and Remove. No answer, Slack's own trouble (`internal_error` and
  *   friends), a rate limit or no session: tried again with bounded backoff,
  *   also after a restart.
- * - A reaction that has not gone out after `STALL_MILLIS` (its post is
+ * - A reaction that has not gone out after `timing.actionStallMillis` (its post is
  *   still being sent, an earlier change to the message holds it, or it
  *   keeps failing to reach Slack) is marked, and the message says it is not
  *   sent yet. A defect fails its row immediately; transient errors stop after five
@@ -40,13 +40,15 @@
  * checks that it loses nothing (`checkCopyDelete`) and cancels it
  * otherwise. After the socket
  * comes back, a copy's delete waits for the catch-up, at most
- * `COPY_CATCH_UP_MILLIS`; the check then also needs the copy's own topic
+ * `timing.copyCatchUpMillis`; the check then also needs the copy's own topic
  * rechecked since the reconnect, so a delete of the kept message made
  * meanwhile on another device is stored first. Otherwise the copy is kept.
  *
  * Nothing is sent while no sync runs or its socket is down. The end of
  * each boot or catch-up makes every row due (architecture 5.8).
  */
+import { WorkControl, observeWork } from '../workControl'
+import { EngineTiming } from '../config'
 import { Cause, Clock, Context, Effect, Layer, Queue, Ref, Stream } from 'effect'
 import { millisToTs, type Ts } from '@juno/domain'
 import { liveQuery, transaction } from '@juno/store'
@@ -68,7 +70,6 @@ import {
   type PendingAction,
   type TopicFetcher,
 } from '@juno/sync'
-import { EngineConfig } from '../config'
 import { NotSent, Outbox, type MirrorError } from '../outbox'
 import { SyncLink } from '../syncLink'
 import { watchWorkerPasses } from '../workerPasses'
@@ -81,20 +82,6 @@ type Message = Parameters<TopicFetcher['sent']>[0]['message']
 
 /** Failed exchanges per intent, including the initial call. */
 const MAX_ATTEMPTS = 5
-/** Longest wait between two tries of a row that keeps failing. */
-const MAX_BACKOFF_MILLIS = 5 * 60_000
-/** How long a row waits for a session before it is tried again. */
-const NO_SESSION_MILLIS = 5_000
-/** A worker pass that failed (a store error) is tried again after this. */
-const PASS_RETRY_MILLIS = 5_000
-/** After a reconnect, how long a copy's delete waits for the catch-up before the copy is kept instead. */
-const COPY_CATCH_UP_MILLIS = 2 * 60_000
-/** How often a row waiting for its post looks again, besides the wakes from the send commands. */
-const DEPENDENCY_POLL_MILLIS = 250
-/** How long a reaction may wait without going out before the view says it is not sent yet. */
-const STALL_MILLIS = 3_000
-/** A reaction never remains pending indefinitely, including while offline. */
-const REACTION_DEADLINE_MILLIS = 5 * 60_000
 /** Refusals Slack gives for its own trouble: tried again later, like no answer. */
 const TRANSIENT = new Set(['internal_error', 'fatal_error', 'request_timeout', 'service_unavailable', 'ratelimited'])
 
@@ -117,12 +104,12 @@ export class ActionWorker extends Context.Service<
     readonly wake: Effect.Effect<void>
   }
 >()('juno/engine/send/ActionWorker') {
-  static readonly layer: Layer.Layer<ActionWorker, never, Workspace | Outbox | SyncLink | EngineConfig> = Layer.effect(
+  static readonly layer: Layer.Layer<ActionWorker, never, Workspace | Outbox | SyncLink> = Layer.effect(
     ActionWorker,
     Effect.gen(function* () {
-      const config = yield* EngineConfig
-      const stallMillis = config.actionStallMillis ?? STALL_MILLIS
-      const deadlineMillis = config.actionDeadlineMillis ?? REACTION_DEADLINE_MILLIS
+      const control = yield* WorkControl
+      const timing = yield* EngineTiming
+      const backoff = (attempts: number) => Math.min(timing.retryBaseMillis * 2 ** attempts, timing.retryCapMillis)
       const workspace = yield* Workspace
       const outbox = yield* Outbox
       const link = yield* SyncLink
@@ -201,13 +188,14 @@ export class ActionWorker extends Context.Service<
             const gap = { reconnectedAt: yield* Ref.get(reconnectedAt), caughtUp: yield* Ref.get(inStep) }
             // A call can wait in the send lane across a socket drop. Until the catch-up ends or its
             // deadline passes, the row waits for it, as in `pass`, rather than keep the copy.
-            if (!gap.caughtUp && isCopyDelete(action) && (!(yield* link.online) || (yield* Clock.currentTimeMillis) < (gap.reconnectedAt ?? 0) + COPY_CATCH_UP_MILLIS)) {
+            if (!gap.caughtUp && isCopyDelete(action) && (!(yield* link.online) || (yield* Clock.currentTimeMillis) < (gap.reconnectedAt ?? 0) + timing.copyCatchUpMillis)) {
               return yield* new NotSent()
             }
             if (!(yield* local(transaction(checkCopyDelete(action, place.ts, gap))))) return yield* new NotSent()
           })
           if (action.kind === 'delete' && (yield* Effect.result(check))._tag === 'Failure') return false
           const selfId = (yield* local(storedMe))?.userId ?? ''
+          control.onActionReady?.()
           const result = yield* Effect.result(callFor(action, place.ts, selfId, check))
           const now = yield* Clock.currentTimeMillis
           const done = () => actionDone(action, now)
@@ -238,7 +226,7 @@ export class ActionWorker extends Context.Service<
               yield* local(transaction(defer(action, now + Math.max(error.retryAfterMillis, backoff(action.attempts)), error._tag)))
               return false
             case 'NotSignedIn':
-              yield* local(transaction(defer(action, now + NO_SESSION_MILLIS, error._tag)))
+              yield* local(transaction(defer(action, now + timing.noSessionMillis, error._tag)))
               return false
             case 'Offline':
               yield* local(transaction(defer(action, now + backoff(action.attempts), error._tag)))
@@ -267,15 +255,15 @@ export class ActionWorker extends Context.Service<
               yield* local(transaction(dropAction(action)))
               continue
             }
-            const deadline = action.createdAt + deadlineMillis
+            const deadline = action.createdAt + timing.actionDeadlineMillis
             if (now >= deadline) {
               yield* local(transaction(failAction(action, 'pending_timeout')))
               continue
             }
             timers.push(deadline)
             if (action.payload.stalled === true) continue
-            if (now >= action.createdAt + stallMillis) yield* local(transaction(markStalled(action)))
-            else timers.push(action.createdAt + stallMillis)
+            if (now >= action.createdAt + timing.actionStallMillis) yield* local(transaction(markStalled(action)))
+            else timers.push(action.createdAt + timing.actionStallMillis)
           }
           const fetcher = yield* link.fetcher
           // Pending-state timers still run offline; network attempts wait for the socket.
@@ -285,7 +273,7 @@ export class ActionWorker extends Context.Service<
           const waiting = new Set<number>()
           const caughtUp = yield* Ref.get(inStep)
           // A copy's delete waits for the catch-up, which wakes the worker, but not past this; then the check keeps the copy.
-          const catchUpDeadline = ((yield* Ref.get(reconnectedAt)) ?? now) + COPY_CATCH_UP_MILLIS
+          const catchUpDeadline = ((yield* Ref.get(reconnectedAt)) ?? now) + timing.copyCatchUpMillis
           let copyWait: number | undefined
           for (const listed of yield* local(pendingActions)) {
             const keys = actionTarget(listed)
@@ -324,16 +312,17 @@ export class ActionWorker extends Context.Service<
           const after = yield* Clock.currentTimeMillis
           const blocked = new Set<string | number>(waiting)
           if (copyWait !== undefined) for (const action of rest) if (isCopyDelete(action)) blocked.add(action.id)
-          const deadlines = [...timers, ...(copyWait === undefined ? [] : [copyWait]), ...(waiting.size === 0 ? [] : [after + DEPENDENCY_POLL_MILLIS])]
+          const deadlines = [...timers, ...(copyWait === undefined ? [] : [copyWait]), ...(waiting.size === 0 ? [] : [after + timing.dependencyPollMillis])]
           const wake = nextWake(rest, after, blocked, deadlines)
           if (wake.repeatedHead !== undefined) yield* Effect.logWarning('send: repeated immediate action wake', { id: wake.repeatedHead })
           return wake.delay
-        }).pipe(Effect.catchCause((cause) => Effect.as(Effect.logError('send: action pass failed', { cause }), PASS_RETRY_MILLIS)))
+        }).pipe(Effect.catchCause((cause) => Effect.as(Effect.logError('send: action pass failed', { cause }), timing.workerRetryMillis)))
 
+      ;(yield* WorkControl).onWake?.('action', wake)
       const loop = Effect.gen(function* () {
         while (true) {
           const open = yield* workspace.current
-          const wait = open === undefined ? undefined : yield* pass(open)
+          const wait = yield* (open === undefined ? Effect.succeed(undefined) : pass(open)).pipe(observeWork('action'))
           yield* Effect.raceFirst(Queue.take(signal), wait === undefined ? Effect.never : Effect.sleep(wait))
         }
       })
@@ -377,5 +366,3 @@ const actedAlready = (action: PendingAction, ts: string): Acted =>
   action.kind === 'react'
     ? ({ kind: 'reacted', channel: action.channel, ts, name: action.payload.name ?? '', added: action.payload.want === true } as const)
     : ({ kind: 'deleted', channel: action.channel, ts } as const)
-
-const backoff = (attempts: number): number => Math.min(1000 * 2 ** attempts, MAX_BACKOFF_MILLIS)

@@ -1,0 +1,1 @@
+- 10-19 04:16 · engine-test-timing · Keep engine scheduling in one typed host config with unchanged production defaults; tests scale intervals by twenty and observe completed work, while TestClock checks the read boundary and real windows remain only for debounce and CPU measurements.

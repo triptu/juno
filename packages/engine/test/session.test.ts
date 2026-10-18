@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { sessionImportFromSlackApp, sessionSignIn, sessionSignOut } from '@juno/contract'
 import { runCommand } from '@juno/state'
 import { workspacePaths } from '@juno/store'
-import { sleep, startTestEngine, waitFor, type EngineOptions, type RunningEngine } from './harness'
+import { startTestEngine, waitFor, type EngineOptions, type RunningEngine } from './harness'
 
 const running: Array<RunningEngine> = []
 afterEach(async () => {
@@ -74,7 +74,8 @@ describe('session', () => {
     expect(['user_session_expiration', 'invalid_auth']).toContain(expired._tag === 'authRequired' && expired.reason)
     expect(sentTags(e)).toContain('authRequired')
     // The session's client is gone with it: no socket comes back on its own.
-    await sleep(100)
+    await waitFor(() => e.fake.socketCount() === 0 ? true : undefined, undefined, 'expired session socket closed')
+    await e.workPass('post')
     expect(e.fake.socketCount()).toBe(0)
   })
 

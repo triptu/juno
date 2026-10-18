@@ -42,6 +42,7 @@ import {
   isLookup,
   isPost,
   observe,
+  settle,
   readStore,
   sOf,
   storedMessages,
@@ -376,8 +377,7 @@ export const outboxSpec: Spec<World, View> = {
   },
   own,
   perform,
-  // The next try of a copy's delete waits out the backoff of every refused try before it: 32 s by the sixth.
-  roundMs: (steps) => (steps.some((state) => ['deleteCopy', 'keepCopy'].includes(sOf(state).label)) ? 75_000 : undefined),
+
   expected: (states, index) => ({
     d1: expectedDraft(states, index, 1),
     d2: expectedDraft(states, index, 2),
@@ -393,7 +393,7 @@ export const outboxSpec: Spec<World, View> = {
       `  outbox: ${JSON.stringify(readDb(world.engine, 'user.db', (db) => db.prepare('SELECT kind, target_key, depends_on, payload_json, attempts, next_at, last_error FROM outbox').all()))}`,
     ].join('\n'),
   observe,
+  settle,
   // A catch-up's reads are not gated: one still running would store what the next step puts in Slack.
   busy: (world) => !world.closed && world.engine.syncing(),
 }
-

@@ -14,7 +14,7 @@ function message(engine: RunningEngine, channel: string, ts: string) {
 }
 
 it('does not refresh a sweep baseline across a socket gap while counts is in flight', async () => {
-  const engine = await bootedEngine(engines, { sweepIntervalMillis: 500, recheckTopics: 0, followPassMillis: DAY })
+  const engine = await bootedEngine(engines, { timing: { sweepIntervalMillis: 500, followPassMillis: DAY }, recheckTopics: 0 })
   const target = engine.fake.workspace.main('C0ENG').at(-1)!
   engine.fake.holdNext({ method: 'client.counts', before: true })
   await waitFor(() => engine.fake.heldCount({ method: 'client.counts' }) === 1 ? true : undefined, 20_000, 'sweep counts held')
@@ -30,7 +30,7 @@ it('does not refresh a sweep baseline across a socket gap while counts is in fli
 })
 
 it('repairs an edit lost on a half-open socket despite sweeps before timeout detection', async () => {
-  const engine = await bootedEngine(engines, { sweepIntervalMillis: 500, recheckTopics: 0, followPassMillis: DAY })
+  const engine = await bootedEngine(engines, { timing: { sweepIntervalMillis: 500, followPassMillis: DAY }, recheckTopics: 0 })
   const target = engine.fake.workspace.main('C0ENG').at(-1)!
   const baseline = () => readDb(engine, 'cache.db', (db) => db.prepare('SELECT updated FROM conversation_repairs WHERE channel = ?').get('C0ENG'))?.updated
   const before = baseline()
@@ -51,7 +51,7 @@ it('repairs an edit lost on a half-open socket despite sweeps before timeout det
 
 it('does not promote a conversation baseline after applying its frame fails', async () => {
   let ts = ''
-  const engine = await bootedEngine(engines, { sweepIntervalMillis: 500, recheckTopics: 0, followPassMillis: DAY, initial: (fake) => {
+  const engine = await bootedEngine(engines, { timing: { sweepIntervalMillis: 500, followPassMillis: DAY }, recheckTopics: 0, initial: (fake) => {
     ts = fake.injectMessage({ channel: 'C0ENG', text: 'Before failed frame' }).ts
     return fake.signIn()
   } })

@@ -23,6 +23,8 @@
  *   agent's ledger or its word that it has room again (the owner raised the
  *   cap) starts a new pass at once. AI assist off stops new calls.
  */
+import { EngineTiming } from './config'
+import { observeWork, workWakes } from './workControl'
 import { AiProvider, cacheKeyOf, isFinal, tasks, type AiCallMeta, type TitleTopicInput } from '@juno/ai'
 import { quietDaysOf, type TopicId } from '@juno/domain'
 import { unescapeMrkdwn } from '@juno/richtext'
@@ -39,9 +41,6 @@ import { homeStage } from './home/ready'
 export const TITLE_DAILY_BUDGET = 200
 const PASS_SIZE = 12
 const CONCURRENCY = 2
-const DEBOUNCE = '1500 millis'
-const TICK = '30 seconds'
-const DEFER_MILLIS = 60_000
 const DAY = 86_400_000
 const KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'thread_subs', 'conversations', 'ignored_channels', 'prefs', 'sync_state']
 
@@ -80,6 +79,7 @@ const storeTitle = (topicId: string, input: TitleTopicInput, title: string, meta
 const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | AiProvider> => Effect.gen(function* () {
   if (!(yield* aiAssistOn) || !(yield* homeStage).ready) return
   const sql = yield* StoreReader
+  const timing = yield* EngineTiming
   const now = yield* Clock.currentTimeMillis
   const day = now - (now % DAY)
   const spent = memory.spent
@@ -136,7 +136,7 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
         stopped = true
         return
       }
-      memory.deferred.set(row.topic_id, now + DEFER_MILLIS)
+      memory.deferred.set(row.topic_id, now + timing.titleDeferMillis)
       return
     }
     yield* storeTitle(row.topic_id, input, answer.value, answer.meta)
@@ -148,6 +148,7 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
 /** Runs the job for the life of the engine. */
 export const TitleJob: Layer.Layer<never, never, Workspace | AiProvider | AiCredentials | AiSpend | EngineConfig> = Layer.effectDiscard(Effect.gen(function* () {
   if (!(yield* aiJobsOn)) return
+  const timing = yield* EngineTiming
   const workspace = yield* Workspace
   const provider = yield* AiProvider
   const wakes = yield* aiWakes
@@ -160,8 +161,9 @@ export const TitleJob: Layer.Layer<never, never, Workspace | AiProvider | AiCred
       const memory: Memory = { spent, deferred: new Map() }
       // A wake forgets the waits and runs a pass after the one under way, which it does not stop.
       const woken = wakes.pipe(Stream.mapEffect(() => Effect.sync(() => memory.deferred.clear())))
-      return Stream.merge(Stream.merge(liveQuery(KEYS, Effect.void).pipe(Stream.debounce(DEBOUNCE)), Stream.tick(TICK)), woken).pipe(
-        Stream.mapEffect(() => runPass(memory).pipe(Effect.catch(() => Effect.logWarning('titles: a pass failed')), Effect.provideService(AiProvider, provider))),
+      return Stream.merge(Stream.merge(liveQuery(KEYS, Effect.void).pipe(Stream.debounce(timing.titleDebounceMillis)), Stream.tick(timing.titleTickMillis)), woken).pipe(
+        Stream.merge(workWakes('title')),
+        Stream.mapEffect(() => runPass(memory).pipe(observeWork('title'), Effect.catch(() => Effect.logWarning('titles: a pass failed')), Effect.provideService(AiProvider, provider))),
         Stream.provide(open.context),
       )
     }),

@@ -10,7 +10,7 @@ import { Cause, Exit, Option } from 'effect'
 import { topicsSubscribe, topicsUnsubscribe } from '@juno/contract'
 import type { FakeSlack } from '@juno/fake-slack'
 import { runCommand } from '@juno/state'
-import { sleep, startTestEngine, waitFor, type EngineOptions, type RunningEngine } from './harness'
+import { startTestEngine, type EngineOptions, type RunningEngine } from './harness'
 
 const MINUTE = 60_000
 export const DAY = 24 * 60 * MINUTE
@@ -38,7 +38,7 @@ export async function restart(track: Array<RunningEngine>, engine: RunningEngine
   const { fake, userData } = engine
   const credentials = fake.credentials()
   // Background work (the follow pass) must not answer after the stop and count against the next engine.
-  await quiet(engine)
+  await engine.syncIdle()
   engine.registry.dispose()
   await engine.handle.stop()
   track.splice(track.indexOf(engine), 1)
@@ -78,21 +78,14 @@ export const callMap = (engine: RunningEngine): Record<string, number> => {
   return map
 }
 
-/** Drains sync cycles, then waits for a quiet API window. For command recovery, use `handle.commandIdle()`. */
-export async function quiet(engine: RunningEngine, label = 'the engine to go quiet'): Promise<void> {
+/** Waits for the work already triggered, without inferring idleness from elapsed time. */
+export async function quiet(engine: RunningEngine): Promise<void> {
   await engine.syncIdle()
-  let calls = engine.fake.calls.length
-  await waitFor(
-    async () => {
-      await sleep(300)
-      const now = engine.fake.calls.length
-      const settled = now === calls
-      calls = now
-      return settled ? true : undefined
-    },
-    30_000,
-    label,
-  )
+  await engine.socketIdle()
+  await engine.handle.commandIdle()
+  if (engine.fake.heldCount() === 0 && engine.fake.gated().length === 0) {
+    await Promise.all([engine.workPass('post'), engine.workPass('action'), engine.workPass('mark')])
+  }
 }
 
 /** Opens a workspace file read-only, runs `f`, closes it. */

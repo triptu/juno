@@ -42,7 +42,7 @@ import {
   SocketHandshake,
   type SlackSessionShape,
 } from '@juno/slack'
-import { EngineConfig } from '../config'
+import { EngineConfig, EngineTiming } from '../config'
 import { HostLink } from '../protocol/host'
 import { Workspace } from '../workspace'
 import { hostHandshake } from './handshake'
@@ -81,6 +81,7 @@ export class Session extends Context.Service<
     Effect.gen(function* () {
       const host = yield* HostLink
       const config = yield* EngineConfig
+      const timing = yield* EngineTiming
       const transport = yield* HttpTransport
       const workspace = yield* Workspace
       const serviceScope = yield* Effect.scope
@@ -98,19 +99,20 @@ export class Session extends Context.Service<
             Layer.mergeAll(
               Layer.succeed(HttpTransport, transport),
               Layer.succeed(SocketHandshake, hostHandshake(host)),
-              slackConfigLayer(
-                config.fakeSlackUrl === undefined
-                  ? {}
-                  : {
-                      // A refused reconnect against the fake should not wait out a 60 s backoff in a test, nor a presence
-                      // test the 19 s tickle spacing (presence.spec.ts; the pacing itself is tested in @juno/slack).
-                      socket: { allowedHosts: ['slack.com', new URL(config.fakeSlackUrl).hostname], backoffCapMillis: 2_000, tickleSpacingMillis: 2_000 },
-                      // The fake has no rate limits; spacing background calls would only slow tests, unless a test times a real first sync.
-                      ...(config.fakeSlackPaced !== true
-                        ? { lanes: { backgroundMinIntervalMillis: 0, interactiveRefillIntervalMillis: 0 } }
-                        : config.fakeSlackPaceScale === undefined ? {} : { lanes: scaledPacing(config.fakeSlackPaceScale) }),
-                    },
-              ),
+              slackConfigLayer({
+                transientBackoffMillis: timing.slackRetryBaseMillis,
+                transientBackoffCapMillis: timing.slackRetryCapMillis,
+                socket: {
+                  pingIntervalMillis: timing.socketPingMillis, pongTimeoutMillis: timing.socketPongTimeoutMillis,
+                  helloTimeoutMillis: timing.socketHelloTimeoutMillis, backoffBaseMillis: timing.socketBackoffBaseMillis,
+                  backoffCapMillis: timing.socketBackoffCapMillis, tickleSpacingMillis: timing.socketTickleMillis,
+                  ...(config.fakeSlackUrl === undefined ? {} : { allowedHosts: ['slack.com', new URL(config.fakeSlackUrl).hostname] }),
+                },
+                // The fake has no rate limits; performance tests opt into request pacing.
+                ...(config.fakeSlackUrl === undefined ? {} : config.fakeSlackPaced !== true
+                  ? { lanes: { backgroundMinIntervalMillis: 0, interactiveRefillIntervalMillis: 0 } }
+                  : config.fakeSlackPaceScale === undefined ? {} : { lanes: scaledPacing(config.fakeSlackPaceScale) }),
+              }),
             ),
           ),
         )

@@ -30,13 +30,14 @@
  *
  * Nothing runs once the user deleted the view.
  */
+import { observeWork, workWakes } from '../workControl'
 import { AiProvider, tasks, type SampleMessage } from '@juno/ai'
 import { junoVerdict } from '@juno/domain'
 import { liveQuery, StoreReader, syncState, type InvalidationKeys, type SqlError } from '@juno/store'
 import { BOOT_KEY } from '@juno/sync'
 import { Clock, Duration, Effect, Layer, Stream } from 'effect'
 import { aiAssistOn, aiJobsOn } from '../ai'
-import { EngineConfig } from '../config'
+import { EngineConfig, EngineTiming } from '../config'
 import { AiCredentials, aiWakes } from '../aiCredentials'
 import { AiSpend } from '../aiSpend'
 import { automatedViewState, candidates, classify, clearVerdict, moveBackOut, movedIn, moveToAutomated, selfIdOf, senderOf, setVerdict, write, type SampleRow } from '../automatedView'
@@ -46,14 +47,10 @@ import { decideAndStore, HOME_DAILY_BUDGET, usedToday } from './assist'
 import { unescapeMrkdwn } from '@juno/richtext'
 
 const KEYS: InvalidationKeys = ['conversations', 'topics', 'sync_state', 'sidebar_views', 'automated_channels', 'ignored_channels', 'prefs', 'users']
-const WINDOW_MILLIS = 3_000
-const TICK = '15 minutes'
 /** Juno calls one pass makes at most. */
 const PASS_CALLS = 6
 /** Messages Juno reads. */
 const JUNO_MESSAGES = 20
-const DEFER_BASE_MILLIS = 60_000
-const DEFER_CAP_MILLIS = 60 * 60_000
 
 interface Memory {
   /** Conversation id to what it was looked at with: its activity and whether AI assist was on. */
@@ -87,6 +84,7 @@ const runPass = (memory: Memory, jobs: boolean): Effect.Effect<void, SqlError, S
   Effect.gen(function* () {
     if ((yield* syncState.get(BOOT_KEY)) === undefined) return
     if ((yield* automatedViewState) === 'deleted') return
+    const timing = yield* EngineTiming
     const now = yield* Clock.currentTimeMillis
     const selfId = yield* selfIdOf
     yield* recheckMoved(memory, selfId, now)
@@ -121,7 +119,7 @@ const runPass = (memory: Memory, jobs: boolean): Effect.Effect<void, SqlError, S
         if (decision._tag === 'Decided') answer = decision.value
         else {
           const attempts = (memory.deferred.get(row.id)?.attempts ?? 0) + 1
-          memory.deferred.set(row.id, { until: now + Math.min(DEFER_CAP_MILLIS, DEFER_BASE_MILLIS * 2 ** (attempts - 1)), attempts })
+          memory.deferred.set(row.id, { until: now + Math.min(timing.aiDeferCapMillis, timing.aiDeferBaseMillis * 2 ** (attempts - 1)), attempts })
         }
       }
       const judged = answer === undefined ? 'ambiguous' : junoVerdict(answer.probability)
@@ -179,11 +177,12 @@ const junoSample = (rows: ReadonlyArray<SampleRow>, selfId: string | undefined) 
 /** Runs the job for the life of the engine. */
 export const AutomatedJob: Layer.Layer<never, never, Workspace | AiProvider | AiCredentials | AiSpend | EngineConfig> = Layer.effectDiscard(
   Effect.gen(function* () {
+    const timing = yield* EngineTiming
     const workspace = yield* Workspace
     const provider = yield* AiProvider
     const wakes = yield* aiWakes
     const jobs = yield* aiJobsOn
-    const window = Duration.millis((yield* EngineConfig).automatedWindowMillis ?? WINDOW_MILLIS)
+    const window = Duration.millis(timing.automatedWindowMillis)
     const passes = workspace.changes.pipe(
       Stream.switchMap((open) => {
         if (open === undefined) return Stream.empty
@@ -194,10 +193,11 @@ export const AutomatedJob: Layer.Layer<never, never, Workspace | AiProvider | Ai
           memory.checked.clear()
           memory.deferred.clear()
         })))
-        const triggers = Stream.merge(Stream.merge(liveQuery(KEYS, Effect.void).pipe(Stream.groupedWithin(1000, window)), Stream.tick(TICK)), woken)
+        const triggers = Stream.merge(Stream.merge(liveQuery(KEYS, Effect.void).pipe(Stream.groupedWithin(1000, window)), Stream.tick(timing.automatedTickMillis)), woken)
         return triggers.pipe(
+          Stream.merge(workWakes('automated')),
           Stream.mapEffect(() =>
-            runPass(memory, jobs).pipe(
+            runPass(memory, jobs).pipe(observeWork('automated'),
               Effect.catch((error) => Effect.logWarning('home: an Automated pass failed', error)),
               Effect.provideService(AiProvider, provider),
             ),

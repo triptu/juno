@@ -14,7 +14,7 @@ function message(engine: RunningEngine, channel: string, ts: string) {
 }
 
 it('repairs offline mutations outside the top ten on the large seed, without opening the topic', async () => {
-  const engine = await bootedEngine(engines, { fakeOptions: { seed: largeSeed() }, followPassMillis: 3_600_000 }, 120_000)
+  const engine = await bootedEngine(engines, { fakeOptions: { seed: largeSeed() }, timing: { followPassMillis: 3_600_000 } }, 120_000)
   const target = readDb(engine, 'cache.db', (db) => db.prepare(`
     SELECT m.channel, m.thread_ts FROM messages m JOIN conversations c ON c.id = m.channel
     WHERE m.thread_ts IS NOT NULL AND m.thread_ts <> m.ts AND m.deleted = 0 AND m.partial = 0
@@ -67,6 +67,6 @@ it('repairs offline mutations outside the top ten on the large seed, without ope
   })
   console.info('large seed reconnect calls', { budget, total, repair: repairs.length, fallback })
   // No new mutations: the durable markers avoid another repair on warm boot.
-  const warm = await restart(engines, engine, () => {}, { followPassMillis: 3_600_000 }, 120_000)
+  const warm = await restart(engines, engine, () => {}, { timing: { followPassMillis: 3_600_000 } }, 120_000)
   expect(warm.fake.calls.filter((c) => c.args['_x_reason'] === 'mutation-repair')).toHaveLength(0)
 }, 240_000)

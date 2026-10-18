@@ -34,7 +34,7 @@ it('keeps existing titles after a key change, then respects the daily budget for
     const calls = () => engine.main.host.fromEngine.filter(message => message._tag === 'aiCall' && message.task === 'titleTopic').length
     const asked = calls()
     engine.main.host.deliver({ _tag: 'aiKey', key: 'fake-changed-key' })
-    await new Promise(resolve => setTimeout(resolve, 3_000))
+    await engine.workPass('title')
     expect(stored()).toEqual(before)
     expect(calls()).toBe(asked)
   })
@@ -60,7 +60,7 @@ it('keeps existing titles after a key change, then respects the daily budget for
     engine.fake.workspace.post({ channel: 'C0ENG', user: SELF_ID, text: 'Following this.', threadTs: root.ts })
     const id = `t:C0ENG:${root.ts}`
     await engine.rowsUntil(rows => rows.some(row => row.id === id), 'new sidebar thread')
-    await new Promise(resolve => setTimeout(resolve, 3_000))
+    await engine.workPass('title')
     const after = await engine.rowsUntil(rows => rows.some(row => row.id === id), 'sidebar after the title pass')
     expect(after.find(row => row.id === id)?.titleSource).toBe('fallback')
     // The first words are message text: privacy mode blurs them.
@@ -100,7 +100,7 @@ it('asks a title the model refused once, not again on later passes or after a wa
 
   // A wake (a key change) and the passes after it do not send the same thread again.
   engine.main.host.deliver({ _tag: 'aiKey', key: 'fake-changed-key' })
-  await new Promise(resolve => setTimeout(resolve, 3_500))
+  await engine.workPass('title')
   expect(calls()).toBe(refused)
   const rows = await engine.rowsUntil(rows => rows.some(row => row.id === id), 'the refused thread')
   expect(rows.find(row => row.id === id)?.titleSource).toBe('fallback')

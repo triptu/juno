@@ -21,19 +21,18 @@
  * A top-level module like `notificationRuntime.ts`: the notifications
  * feature serves the switch and Restore through it.
  */
+import { observeWork, workWakes } from './workControl'
 import { Context, Duration, Effect, Layer, Ref, Schema, Semaphore, Stream } from 'effect'
 import type { SlackScheduleView } from '@juno/contract'
 import { slackScheduleFor, slackScheduleKeys, slackScheduleMatches, slackScheduleSnapshot, type Hours, type SlackSchedulePrefs } from '@juno/domain'
 import { NotificationSettingsSchema, readSettings } from '@juno/notifications'
 import { invalidate, liveQuery, prefs, StoreReader, StoreWriter, transaction, type SqlError } from '@juno/store'
-import { EngineConfig } from './config'
+import { EngineTiming } from './config'
 import { Outbox, type MirrorError } from './outbox'
 import { SyncLink } from './syncLink'
 import { Workspace, type StoreServices } from './workspace'
 
 const PREF = 'slackSchedule'
-/** Changing the hours on the page is two selects; one write covers both. */
-const DEBOUNCE_MILLIS = 1_000
 
 const SchedulePrefs = Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Boolean]))
 const State = Schema.Struct({
@@ -97,10 +96,10 @@ export class SlackSchedule extends Context.Service<
     readonly restore: Effect.Effect<void, SqlError | MirrorError, StoreServices>
   }
 >()('juno/engine/SlackSchedule') {
-  static readonly layer: Layer.Layer<SlackSchedule, never, Workspace | Outbox | SyncLink | EngineConfig> = Layer.effect(
+  static readonly layer: Layer.Layer<SlackSchedule, never, Workspace | Outbox | SyncLink> = Layer.effect(
     SlackSchedule,
     Effect.gen(function* () {
-      const debounce = (yield* EngineConfig).slackScheduleDebounceMillis ?? DEBOUNCE_MILLIS
+      const debounce = (yield* EngineTiming).slackScheduleDebounceMillis
       const workspace = yield* Workspace
       const outbox = yield* Outbox
       const link = yield* SyncLink
@@ -109,10 +108,7 @@ export class SlackSchedule extends Context.Service<
       const caughtUp = yield* Ref.make(false)
 
       const write = (changes: SlackSchedulePrefs) =>
-        Effect.gen(function* () {
-          yield* outbox.send((api) => api.call('users.prefs.set', { prefs: JSON.stringify(changes) }))
-          yield* storePrefs(changes)
-        })
+        outbox.send((api) => api.call('users.prefs.set', { prefs: JSON.stringify(changes) })).pipe(Effect.andThen(storePrefs(changes)))
 
       const pass = Effect.gen(function* () {
         if (!(yield* Ref.get(caughtUp))) return
@@ -150,7 +146,8 @@ export class SlackSchedule extends Context.Service<
             const ends = link.caughtUps.pipe(Stream.mapEffect(() => Ref.set(caughtUp, true)))
             return Stream.merge(ends, liveQuery(['prefs', 'team'], Effect.void)).pipe(
               Stream.debounce(Duration.millis(debounce)),
-              Stream.mapEffect(() => pass),
+              Stream.merge(workWakes('slackSchedule')),
+              Stream.mapEffect(() => pass.pipe(observeWork('slackSchedule'))),
               Stream.provide(open.context),
             )
           }),
@@ -167,10 +164,7 @@ export class SlackSchedule extends Context.Service<
             const { appliedFor: _, ...rest } = state
             yield* writeState(enabled ? { ...rest, enabled, hoursChosen: true } : { ...state, enabled })
           }).pipe(lock.withPermit),
-        hoursSet: Effect.gen(function* () {
-          const state = yield* readState
-          if (state.hoursChosen !== true) yield* writeState({ ...state, hoursChosen: true })
-        }).pipe(lock.withPermit),
+        hoursSet: readState.pipe(Effect.flatMap((state) => state.hoursChosen === true ? Effect.void : writeState({ ...state, hoursChosen: true })), lock.withPermit),
         restore: Effect.gen(function* () {
           const state = yield* readState
           if (state.saved === undefined) return

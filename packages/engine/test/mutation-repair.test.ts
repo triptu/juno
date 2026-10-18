@@ -15,7 +15,7 @@ function message(engine: RunningEngine, channel: string, ts: string) {
 }
 
 it('retains queued work when one repair range is refused and retries it after restart', async () => {
-  const engine = await bootedEngine(engines, { followPassMillis: 3_600_000, recheckTopics: 0 })
+  const engine = await bootedEngine(engines, { timing: { followPassMillis: 3_600_000 }, recheckTopics: 0 })
   const marker = () => readDb(engine, 'cache.db', (db) => db.prepare(
     "SELECT updated, history_invalid FROM conversation_repairs WHERE channel = 'C0ENG'",
   ).get())
@@ -29,14 +29,14 @@ it('retains queued work when one repair range is refused and retries it after re
   await engine.phase('live', 30_000)
   await engine.syncIdle()
   expect(readDb(engine, 'cache.db', (db) => db.prepare('SELECT count(*) AS n FROM repair_pending').get())?.n).toBeGreaterThan(0)
-  const warm = await restart(engines, engine, () => {}, { followPassMillis: 3_600_000 })
+  const warm = await restart(engines, engine, () => {}, { timing: { followPassMillis: 3_600_000 } })
   expect(warm.fake.calls.some((c) => c.args['_x_reason'] === 'mutation-repair' && c.args.channel === 'C0ENG')).toBe(true)
   expect(message(warm, 'C0ENG', target.ts)?.text).toBe('Repair must retry.')
   expect(marker()).not.toEqual(before)
 })
 
 it('repairs a deletion when only history_invalid advances', async () => {
-  const engine = await bootedEngine(engines, { followPassMillis: 3_600_000, recheckTopics: 0 })
+  const engine = await bootedEngine(engines, { timing: { followPassMillis: 3_600_000 }, recheckTopics: 0 })
   const before = engine.fake.workspace.countEntry(engine.fake.workspace.conversations.get('C0ENG')!)
   const stored = readDb(engine, 'cache.db', (db) => db.prepare(
     "SELECT ts FROM messages WHERE channel = 'C0ENG' AND thread_ts IS NULL AND deleted = 0 AND reply_count = 0 LIMIT 1",
@@ -212,7 +212,7 @@ it('tombstones bounded cached replies and drops the job when its root no longer 
 it('drops an inaccessible old thread without tombstoning its cached recent replies', async () => {
   let root = ''
   let reply = ''
-  const engine = await bootedEngine(engines, { recheckTopics: 0, followPassMillis: DAY, initial: (fake) => {
+  const engine = await bootedEngine(engines, { recheckTopics: 0, timing: { followPassMillis: DAY }, initial: (fake) => {
     root = seedThread(fake, { channel: 'C0ENG', text: 'Old root', ago: 40 * DAY, replies: [60_000], follow: true }).ts
     reply = fake.workspace.replies('C0ENG', Ts.make(root))[0]!.ts
     return fake.signIn()

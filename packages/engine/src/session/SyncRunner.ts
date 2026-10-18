@@ -24,12 +24,12 @@
 import { Cause, Context, Effect, Fiber, Layer, Stream, SubscriptionRef } from 'effect'
 import { RequestQueue } from '@juno/slack'
 import { AiProvider } from '@juno/ai'
-import { HOLD_MILLIS, holdUndecided, releaseHolds, sortAndRelease, sortClearCases } from '../automatedView'
+import { holdUndecided, releaseHolds, sortAndRelease, sortClearCases } from '../automatedView'
 import { OwnerActivity, startActivity } from '../activity'
 import { NotificationControl, startNotifications } from '../notificationRuntime'
 import type { SlackAuthRequired } from '@juno/slack'
 import { runSync, syncConfigLayer, type SyncPhase } from '@juno/sync'
-import { SyncControl } from '../config'
+import { SyncControl, EngineTiming } from '../config'
 import { Session, type ActiveSession } from './Session'
 import { SyncLink } from '../syncLink'
 import { Workspace } from '../workspace'
@@ -51,6 +51,7 @@ export class SyncRunner extends Context.Service<
       const session = yield* Session
       const workspace = yield* Workspace
       const control = yield* SyncControl
+      const timing = yield* EngineTiming
       const link = yield* SyncLink
       // The host hears it too: tests compare it with the fake's socket.
       const setOnline = (online: boolean) => link.setOnline(online).pipe(Effect.andThen(Effect.sync(() => control.onConnection?.(online))))
@@ -87,7 +88,7 @@ export class SyncRunner extends Context.Service<
             const { onEvent, onSelfPresence } = yield* startNotifications
             const activity = yield* startActivity
             return yield* runSync({
-              onEvent: (event, me) => onEvent(event, me).pipe(Effect.andThen(activity.onEvent(event))),
+              onEvent: (event, me) => onEvent(event, me).pipe(Effect.andThen(activity.onEvent(event)), Effect.andThen(Effect.sync(() => control.onEvent?.(event)))),
               onSelfPresence,
               onCycle: (event) =>
                 (event === 'finished' ? link.caughtUp : Effect.void).pipe(
@@ -101,9 +102,9 @@ export class SyncRunner extends Context.Service<
               openTopics: link.shown,
               // Clear bot channels are in Automated before the sync reports live (SPEC 5, "Automated"); nothing stays held after.
               onBooted: sortClearCases().pipe(Effect.andThen(releaseHolds), Effect.provide(open.context), Effect.catch((error) => Effect.logWarning('sync: Automated not sorted', error))),
-              // The first sync's All waits for the rules: undecided channels are held until their history is sorted, for HOLD_MILLIS at most.
+              // The first sync's All waits for the rules: undecided channels are held until their history is sorted, for the configured hold at most.
               onListed: holdUndecided.pipe(
-                Effect.andThen(Effect.forkIn(Effect.sleep(HOLD_MILLIS).pipe(Effect.andThen(releaseHolds)), active.scope)),
+                Effect.andThen(Effect.forkIn(Effect.sleep(timing.automatedHoldMillis).pipe(Effect.andThen(releaseHolds)), active.scope)),
                 Effect.provide(open.context),
                 Effect.asVoid,
                 Effect.catch((error) => Effect.logWarning('sync: Automated holds not set', error)),
@@ -115,6 +116,10 @@ export class SyncRunner extends Context.Service<
             Effect.provide(open.context),
             Effect.provide(
               syncConfigLayer({
+                bootRetryMillis: timing.bootRetryMillis,
+                usersBatchMillis: timing.usersBatchMillis,
+                sweepIntervalMillis: timing.sweepIntervalMillis,
+                followPassMillis: timing.followPassMillis,
                 ...control.config,
               }),
             ),

@@ -3,7 +3,7 @@
  * specs/readstate.qnt `accept`, `respond`, `retry`, `reject`).
  *
  * Each topic has at most one `mark` outbox row, written by the commands. A
- * new row waits `MARK_DELAY_MILLIS`, and later marks replace its intent, so
+ * new row waits the configured coalescing window, and later marks replace its intent, so
  * marks in quick succession make one call. The worker sends the row's
  * current intent through `Outbox.send`, one topic at a time
  * (`Outbox.exclusive`):
@@ -23,6 +23,8 @@
  * unread reply for Mark as unread. When the mirror setting is off the row is
  * dropped unsent and the mark stays local.
  */
+import { WorkControl, observeWork } from './workControl'
+import { EngineTiming } from './config'
 import { Clock, Context, Effect, Layer, Queue, Schedule, Stream } from 'effect'
 import { millisToTs, parseTopicId, type ParsedTopicId, type Ts } from '@juno/domain'
 import { transaction, type SqlError } from '@juno/store'
@@ -35,12 +37,6 @@ import { Workspace, type OpenWorkspace, type StoreServices } from './workspace'
 import { queueReadCatchUp } from './readCatchUp'
 import { mirrorSetting } from './readSetting'
 
-/** Longest wait between two tries of a mark that keeps failing. */
-const MAX_BACKOFF_MILLIS = 5 * 60_000
-/** How long a mark waits for a session before it is tried again. */
-const NO_SESSION_MILLIS = 5_000
-/** A worker pass that failed (a store error) is tried again after this. */
-const PASS_RETRY_MILLIS = 5_000
 /** Lookups that cannot reach Slack are tried again this many times, about a minute in all. */
 const LOOKUP_RETRIES = 6
 
@@ -56,6 +52,8 @@ export class MarkWorker extends Context.Service<
   static readonly layer: Layer.Layer<MarkWorker, never, Workspace | Outbox | EngineConfig | SyncLink> = Layer.effect(
     MarkWorker,
     Effect.gen(function* () {
+      const timing = yield* EngineTiming
+      const backoff = (attempts: number) => Math.min(timing.retryBaseMillis * 2 ** attempts, timing.retryCapMillis)
       const workspace = yield* Workspace
       const outbox = yield* Outbox
       const sync = yield* SyncLink
@@ -89,7 +87,7 @@ export class MarkWorker extends Context.Service<
           )
           // Something newer was observed while the lookup was in flight, and Slack still disagrees: ask again.
           if (outcome === 'lookup') return yield* Effect.fail('again' as const)
-        }).pipe(Effect.retry({ schedule: Schedule.exponential('1 second'), times: LOOKUP_RETRIES }))
+        }).pipe(Effect.retry({ schedule: Schedule.exponential(timing.lookupRetryMillis), times: LOOKUP_RETRIES }))
 
       const send = (open: OpenWorkspace, topicId: string) =>
         outbox.exclusive(topicId)(
@@ -128,7 +126,7 @@ export class MarkWorker extends Context.Service<
                 if (yield* local(transaction(rejectMark(topicId, mark.gen, answeredAt)))) yield* outbox.background(lookUp(open, topic, topicId))
                 return yield* Effect.logWarning('reads: Slack refused a mark', { code: error.code })
               case 'NotSignedIn':
-                return yield* local(deferMark(topicId, answeredMillis + NO_SESSION_MILLIS, error._tag))
+                return yield* local(deferMark(topicId, answeredMillis + timing.noSessionMillis, error._tag))
               case 'RateLimited':
                 return yield* local(deferMark(topicId, answeredMillis + Math.max(error.retryAfterMillis, backoff(mark.attempts)), error._tag))
               case 'Offline':
@@ -156,13 +154,14 @@ export class MarkWorker extends Context.Service<
           const after = yield* Clock.currentTimeMillis
           return Math.max(0, Math.min(...rest.map((mark) => mark.nextAt)) - after)
         }).pipe(
-          Effect.catchCause((cause) => Effect.as(Effect.logError('reads: mark pass failed', { cause }), PASS_RETRY_MILLIS)),
+          Effect.catchCause((cause) => Effect.as(Effect.logError('reads: mark pass failed', { cause }), timing.workerRetryMillis)),
         )
 
+      ;(yield* WorkControl).onWake?.('mark', wake)
       const loop = Effect.gen(function* () {
         while (true) {
           const open = yield* workspace.current
-          const wait = open === undefined ? undefined : yield* pass(open)
+          const wait = yield* (open === undefined ? Effect.succeed(undefined) : pass(open)).pipe(observeWork('mark'))
           yield* Effect.raceFirst(Queue.take(signal), wait === undefined ? Effect.never : Effect.sleep(wait))
         }
       })
@@ -181,5 +180,3 @@ const inStore =
   (open: OpenWorkspace) =>
   <A>(effect: Effect.Effect<A, SqlError, StoreServices>): Effect.Effect<A> =>
     effect.pipe(Effect.provide(open.context), Effect.orDie)
-
-const backoff = (attempts: number): number => Math.min(1000 * 2 ** attempts, MAX_BACKOFF_MILLIS)

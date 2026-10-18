@@ -79,7 +79,7 @@ export function outboxConformance(index: number) {
         it(`refuses ${entry.file}`, async () => {
           const corrected = readTrace(join(dir, entry.corrected!))
           const at = fork(trace, corrected)
-          const outcome = await replay(outboxSpec, trace, { roundMs: 8_000 })
+          const outcome = await replay(outboxSpec, trace, { roundMs: 2_500 })
           if (outcome.ok) throw new Error(`the engine followed the broken schedule ${entry.file}`)
           // It must leave the schedule where the bug does. Earlier is fine only when the engine is
           // already in a state the corrected schedule reaches after the fork (Juno's own steps ran ahead).

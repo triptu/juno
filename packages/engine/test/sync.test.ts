@@ -669,7 +669,8 @@ describe('follow state (review M3 finding 1, specs/follow.qnt)', () => {
     // Slack accepted the add (its handler ran and sent thread_subscribed), then another client unfollowed.
     engine.fake.unfollowThread({ channel: 'C0PLATFORM', threadTs: tsOf(id) })
     await waitFor(() => (engine.fake.frames.some((f) => f.type === 'thread_unsubscribed') ? true : undefined), 10_000, 'the unfollow event')
-    await sleep(200)
+    await engine.socketIdle()
+    await engine.rowsUntil((rows) => rows.some((r) => r.id === id), 'pending follow visible')
     // The command is still pending, so its intent stays visible.
     expect((await engine.rows()).some((r) => r.id === id)).toBe(true)
     engine.fake.release()
@@ -699,7 +700,7 @@ describe('an Unsubscribe Slack accepted sticks (specs/follow.qnt acceptedUnfollo
     // The delayed follow arrives now; Slack never echoes the Unsubscribe.
     engine.fake.releaseFrames({ count: 1 })
     engine.fake.releaseFrames({ drop: true })
-    await sleep(300)
+    await engine.socketIdle()
     await quiet(engine)
     expect(watch.stop()).toEqual(new Set([0]))
     expect((await engine.rows()).some((r) => r.id === id)).toBe(false)
@@ -857,8 +858,7 @@ describe('periodic sweep', () => {
   it('discovers a late-indexed reply older than the previous sweep cursor', async () => {
     const threadText = 'An unfollowed thread for delayed search indexing.'
     const engine = await bootedEngine({
-      sweepIntervalMillis: 500,
-      followPassMillis: 60 * 60_000,
+      timing: { sweepIntervalMillis: 500, followPassMillis: 60 * 60_000 },
       initial: (fake) => {
         seedThread(fake, { channel: 'C0ENG', text: threadText, ago: 2 * DAY, replies: [], follow: false })
         return fake.signIn()
@@ -889,7 +889,7 @@ describe('periodic sweep', () => {
 
 describe('scheduled thread view sweep', () => {
   it('keeps repairs from fetched follow pages when a later page fails', async () => {
-    const engine = await bootedEngine({ sweepIntervalMillis: 500, followPassMillis: 0 })
+    const engine = await bootedEngine({ timing: { sweepIntervalMillis: 500, followPassMillis: 0 } })
     const target = [...engine.fake.workspace.subscriptions.values()]
       .filter((subscription) => subscription.subscribed && engine.fake.workspace.replies(subscription.channel, subscription.threadTs).length > 1)
       .toSorted((a, b) => {
@@ -919,7 +919,7 @@ describe('scheduled thread view sweep', () => {
   })
 
   it('leaves an unchanged cache alone and repairs a missed reply', async () => {
-    const engine = await bootedEngine({ sweepIntervalMillis: 500, followPassMillis: 0 })
+    const engine = await bootedEngine({ timing: { sweepIntervalMillis: 500, followPassMillis: 0 } })
     const rootTs = tsOf(threadId(engine, 'C0ENG', 'Draft plan is in the doc.'))
     const cache = new DatabaseSync(join(engine.userData, 'workspaces', engine.fake.teamId, 'cache.db'), { readOnly: true })
     try {
@@ -979,11 +979,11 @@ describe('subscriptions after a failure (review M3 finding 10)', () => {
     await waitFor(() => (engine.fake.heldCount({ method: 'subscriptions.thread.add' }) === 1 ? true : undefined), 10_000, 'the held add')
     // Another client follows the thread while Juno's call is failing.
     engine.fake.followThread({ channel: 'C0PLATFORM', threadTs: tsOf(id) })
-    await sleep(200)
+    await engine.socketIdle()
     engine.fake.release()
     expect(errorOf(await pending)).toMatchObject({ _tag: 'Rejected' })
     await quiet(engine)
-    expect((await engine.rows()).some((r) => r.id === id)).toBe(true)
+    await engine.rowsUntil((rows) => rows.some((r) => r.id === id), 'follow restored after rejection')
     expect(storedFollow(engine, 'C0PLATFORM', tsOf(id))).toBe(1)
   })
 
