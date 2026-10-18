@@ -64,6 +64,9 @@ async function converse(mac: Mac, text: string, answer: string) {
 
 const texts = (turns: Turns) => turns.messages().map((m) => m.text)
 
+/** The removed message's marker. Letters outside hex, so no timestamp, number or id can contain it. */
+const MARKER = 'quokka'
+
 /** The tables of agent.sqlite whose rows hold `word` anywhere. */
 const holding = (turns: Turns, word: string) =>
   (turns.store.db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>)
@@ -276,7 +279,7 @@ it('a removal raises the deletion record, its purge regenerates the backup witho
   const a = await startMac('Studio', fakeKeychain())
   await a.h.turns.backup!.setFolder(folder)
   await a.h.turns.backup!.exportPhrase()
-  await converse(a, 'the door code is 4417', 'Got it.')
+  await converse(a, `the safe word is ${MARKER}`, 'Got it.')
   await converse(a, 'lunch at noon', 'Noted.')
   await a.h.turns.backup!.flush()
   const before = tempDir()
@@ -284,7 +287,7 @@ it('a removal raises the deletion record, its purge regenerates the backup witho
 
   // The owner's Remove (WP16): the record is raised first, then the removal commits, then the purge
   // regenerates the backup.
-  const secret = a.h.turns.messages().find((m) => m.kind === 'user' && m.text.includes('4417'))!
+  const secret = a.h.turns.messages().find((m) => m.kind === 'user' && m.text.includes(MARKER))!
   expect(await a.h.turns.redaction.remove({ opId: 'remove-1', messageIds: [secret.id], alsoRemoveReply: false })).toMatchObject({ _tag: 'removed', gen: 1 })
   expect(a.keychain.values().deletionRecord).toBe('1')
   await a.h.turns.redaction.idle()
@@ -293,7 +296,7 @@ it('a removal raises the deletion record, its purge regenerates the backup witho
   expect(manifestOf(folder, 2)).toMatchObject({ label: 1, deletion: 1 })
 
   const { mac: b } = await restoreOnNewMac('Laptop', a, folder)
-  expect(holding(b.h.turns, '4417')).toEqual([])
+  expect(holding(b.h.turns, MARKER)).toEqual([])
   expect(texts(b.h.turns).join('\n')).toContain('lunch at noon')
 
   // This Mac's keychain holds the record, so the copy from before the removal is refused.
@@ -301,7 +304,7 @@ it('a removal raises the deletion record, its purge regenerates the backup witho
   // A new Mac has no trusted record: it restores the old copy and the Review page says it cannot check
   // (spec staleFolderCannotRestoreRemoved, a documented v1 limit while the strict option is off).
   const { mac: c } = await restoreOnNewMac('Spare', a, before)
-  expect(texts(c.h.turns).join('\n')).toContain('4417')
+  expect(texts(c.h.turns).join('\n')).toContain(MARKER)
   expect(c.h.turns.ownership.review().page.unchecked).toBe(true)
 })
 
