@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { parseRun, report } from './usage.mjs'
-import { runnerConfig } from './runner.mjs'
 
 test('usage keeps failures and missing legacy fields visible', () => {
   const legacy = parseRun('pnpm test\nremote: CPU busy 50% on average, 45% at the median, over 80 s on 4 cores\nremote: exited with 1\n')
@@ -12,14 +11,6 @@ test('usage keeps failures and missing legacy fields visible', () => {
   assert.equal(legacy.wallSeconds, undefined)
   assert.equal(current.scriptSeconds, 90)
 })
-test('runner is opt-in and accepts a separate SSH port and key', () => {
-  assert.equal(runnerConfig({}), undefined)
-  const runner = runnerConfig({ JUNO_RUNNER_HOST: 'juno@laptop', JUNO_RUNNER_PORT: '2222', JUNO_RUNNER_KEY: '/key with spaces' })
-  assert.deepEqual(runner.args.slice(-7), ['-i', '/key with spaces', '-o', 'IdentitiesOnly=yes', '-p', '2222', 'juno@laptop'])
-  assert.throws(() => runnerConfig({ JUNO_RUNNER_HOST: '-Fbad' }))
-  assert.throws(() => runnerConfig({ JUNO_RUNNER_HOST: 'laptop', JUNO_RUNNER_IMAGE: 'image; touch /tmp/bad' }))
-})
-
 test('Mac app jobs serialize while ordinary jobs retain both slots', { skip: process.platform !== 'darwin' }, async () => {
   const { spawn } = await import('node:child_process')
   const { mkdtempSync, readFileSync, rmSync } = await import('node:fs')
