@@ -202,7 +202,7 @@ test('exposes only the bridge to the page', async ({ win }) => {
     app: ['getInfo', 'diagnostics', 'logDiagnostics', 'showLogs', 'reportState'],
     engine: ['requestPort', 'restart'],
     agent: ['requestPort', 'setOpenRouterKey', 'provider', 'setProvider', 'codex', 'codexSignIn', 'onProvider', 'chooseFolder', 'recoveryPhrase', 'typeRecoveryPhrase'],
-    launch: ['setTheme', 'setAccent', 'setDensity', 'setPrivacy', 'setSidebar', 'onPrivacy'],
+    launch: ['setTheme', 'setAccent', 'setTopicTitleLines', 'setDensity', 'setPrivacy', 'setSidebar', 'onPrivacy'],
     window: ['onFullScreen'],
     sharing: ['get', 'set'],
     contextMenu: ['popup'],
