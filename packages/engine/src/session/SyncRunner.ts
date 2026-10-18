@@ -29,7 +29,7 @@ import { OwnerActivity, startActivity } from '../activity'
 import { NotificationControl, startNotifications } from '../notificationRuntime'
 import type { SlackAuthRequired } from '@juno/slack'
 import { runSync, syncConfigLayer, type SyncPhase } from '@juno/sync'
-import { EngineConfig, SyncControl } from '../config'
+import { SyncControl } from '../config'
 import { Session, type ActiveSession } from './Session'
 import { SyncLink } from '../syncLink'
 import { Workspace } from '../workspace'
@@ -45,12 +45,11 @@ export class SyncRunner extends Context.Service<
     readonly slowedUntil: Stream.Stream<number | undefined>
   }
 >()('juno/engine/SyncRunner') {
-  static readonly layer: Layer.Layer<SyncRunner, never, Session | Workspace | EngineConfig | SyncLink | AiProvider | NotificationControl | OwnerActivity> = Layer.effect(
+  static readonly layer: Layer.Layer<SyncRunner, never, Session | Workspace | SyncLink | AiProvider | NotificationControl | OwnerActivity> = Layer.effect(
     SyncRunner,
     Effect.gen(function* () {
       const session = yield* Session
       const workspace = yield* Workspace
-      const engineConfig = yield* EngineConfig
       const control = yield* SyncControl
       const link = yield* SyncLink
       // The host hears it too: tests compare it with the fake's socket.
