@@ -107,7 +107,7 @@ describe('marking read', () => {
 })
 
 describe("Main's new threads", () => {
-  it('counts the threads started since Main was last read; reading Main clears it', async () => {
+  it('counts the threads others started since Main was last read; reading Main clears it', async () => {
     const engine = await bootedEngine()
     const engMain = 'm:C0ENG'
     // #eng was read up to the Postgres plan; the staging bill thread started after it.
@@ -116,6 +116,11 @@ describe("Main's new threads", () => {
     engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0DEV', text: 'Looking now.', threadTs: root.ts })
     await rowWhen(engine, engMain, (r) => r.newThreads === 2, 'two new threads')
     expect((await engine.rows()).filter((r) => r.kind === 'thread' && r.newThreads !== 0)).toEqual([])
+    // A thread you started from another client is not new to you.
+    const own = engine.fake.injectMessage({ channel: 'C0ENG', user: engine.fake.selfId, text: 'Who owns the deploy step?' })
+    engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: 'I do.', threadTs: own.ts })
+    await waitFor(() => readDb(engine, 'cache.db', (db) => db.prepare('SELECT 1 FROM topic_index WHERE topic_id = ?').get(`t:C0ENG:${own.ts}`)), 10_000, 'own thread indexed')
+    expect((await engine.rows(scoped(engMain))).find((r) => r.id === engMain)?.newThreads).toBe(2)
 
     valueOf(await markRead(engine, engMain))
     await rowWhen(engine, engMain, (r) => r.newThreads === 0, 'no new threads once Main is read')
