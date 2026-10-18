@@ -8,8 +8,8 @@
  * that a session was stored or cleared.
  */
 import { safeStorage } from 'electron'
-import { readFile, rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { open, readFile, rename, rm } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 import { Schema } from 'effect'
 import { SessionSecrets } from '@juno/contract'
 
@@ -48,7 +48,26 @@ export class SecretsStore {
   async write(secrets: SessionSecrets): Promise<void> {
     const json = JSON.stringify(encode(secrets))
     const bytes = this.#plaintext ? Buffer.from(json, 'utf8') : safeStorage.encryptString(json)
-    await writeFile(this.#file, bytes, { mode: 0o600 })
+    const temporary = `${this.#file}.${process.pid}.tmp`
+    try {
+      const file = await open(temporary, 'w', 0o600)
+      try {
+        await file.writeFile(bytes)
+        await file.sync()
+      } finally {
+        await file.close()
+      }
+      await rename(temporary, this.#file)
+      const directory = await open(dirname(this.#file), 'r')
+      try {
+        await directory.sync()
+      } finally {
+        await directory.close()
+      }
+    } catch (cause) {
+      await rm(temporary, { force: true })
+      throw cause
+    }
   }
 
   async delete(): Promise<void> {

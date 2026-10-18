@@ -57,8 +57,11 @@ export class SessionHost {
         void this.#capture('import', () => importFromSlackApp(this.#deps.importOptions))
         return true
       case 'storeSecrets':
-        void this.#deps.secrets.write(message.secrets).catch((cause: unknown) => {
+        void this.#deps.secrets.write(message.secrets).then(() => {
+          this.#deps.send({ _tag: 'secretsStored' })
+        }).catch((cause: unknown) => {
           console.error('main: could not write secrets.bin', cause instanceof Error ? cause.name : '')
+          this.#deps.send({ _tag: 'sessionFailed', method: message.method, kind: 'other', message: 'Juno could not save the Slack session. Try signing in again.' })
         })
         return true
       case 'signOut':

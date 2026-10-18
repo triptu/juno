@@ -45,16 +45,7 @@ test('signed out at launch, a sign-in window closed early, then a sign-in that v
 test('comes back signed in after a relaunch', async ({ juno, fake, userData, running }) => {
   await juno.signIn()
   await juno.expectSignedIn('Juno Fake')
-  // The signed-in UI precedes main's asynchronous write. Relaunch only after the session is on disk.
-  await expect.poll(async () => {
-    try {
-      const stored: unknown = JSON.parse(await readFile(join(userData, 'secrets.bin'), 'utf8'))
-      return typeof stored === 'object' && stored !== null && 'teamId' in stored ? stored.teamId : undefined
-    } catch (error) {
-      if (error instanceof SyntaxError || (error instanceof Error && 'code' in error && error.code === 'ENOENT')) return undefined
-      throw error
-    }
-  }).toBe(fake.teamId)
+  // Quit as soon as the ready UI appears; ready now includes the durable store acknowledgement.
   await running.close()
 
   const again = await launchApp(userData, { fakeSlackUrl: fake.url })
