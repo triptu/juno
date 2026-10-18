@@ -358,10 +358,10 @@ export class FakeSlack {
   /**
    * Slack has made the held thumbnails: stored messages and `files.info`
    * carry them, and each file gets a `file_thumbnail_generated` frame, as
-   * live (`event: 'file_change'` sends that instead; `'none'` sends nothing).
+   * live (`event: 'file_change'` or `'file_created'` sends that instead; `'none'` sends nothing).
    * Files uploaded later have thumbnails at once.
    */
-  releaseThumbnails(input: { event?: 'file_thumbnail_generated' | 'file_change' | 'none' } = {}): void {
+  releaseThumbnails(input: { event?: 'file_thumbnail_generated' | 'file_change' | 'file_created' | 'none' } = {}): void {
     const ws = this.workspace
     ws.holdThumbnails = false
     const released = [...ws.files.values()].filter((file) => file.thumbsHeld === true)
@@ -375,7 +375,7 @@ export class FakeSlack {
       })
     }
     if (input.event === 'none') return
-    for (const file of released) ws.emit({ type: input.event ?? 'file_thumbnail_generated', file_id: file.id, event_ts: ws.eventTs() })
+    for (const file of released) ws.emit({ type: input.event ?? 'file_thumbnail_generated', file_id: file.id, ...(input.event === 'file_created' ? { file: { id: file.id } } : {}), event_ts: ws.eventTs() })
   }
 
   /**

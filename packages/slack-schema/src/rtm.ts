@@ -303,10 +303,11 @@ export type PrefChangeEvent = typeof PrefChangeEvent.Type
  * it and `file_thumbnail_generated` a fraction of a second later with the
  * square and 360/480 thumbnail urls but no sizes. `file_shared`,
  * `file_change` and `file_public` carry `file: { id }` alone. Juno reads
- * only the id and asks `files.info` (research section 3).
+ * only the id and asks `files.info`; `file_created` also signals that
+ * processing finished (research section 3).
  */
 export const FileEvent = S.Struct({
-  type: S.Literals(['file_change', 'file_shared', 'file_thumbnail_generated']),
+  type: S.Literals(['file_change', 'file_shared', 'file_thumbnail_generated', 'file_created']),
   file_id: S.String,
   event_ts: opt(Ts),
 })

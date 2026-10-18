@@ -58,6 +58,28 @@ test('an old card stored before Slack made the thumbnail becomes the picture whe
   expect(await image.boundingBox()).toMatchObject({ width: 320, height: 240 })
 })
 
+test('reopening a topic retries an image after its background lookups ran out', async ({ juno, win, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { topic } = juno
+  await juno.sidebar.row(ENG_MAIN).open()
+  await topic.expectTitle('Main')
+
+  fake.holdThumbnails()
+  fake.resetCalls()
+  fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Slow image processing', media: [{ name: 'late.png', width: 800, height: 600 }] })
+  await expect(topic.message('Slow image processing').locator('[data-file-card]')).toHaveCount(1)
+  await expect.poll(() => fake.calls.filter((call) => call.method === 'files.info').length, { timeout: 60_000 }).toBe(4)
+  await win.waitForTimeout(1_000)
+  // No message update or file event arrives, and the next history page is newer than this message.
+  fake.releaseThumbnails({ event: 'none' })
+  await juno.sidebar.row('Proposal: cut offline mode').open()
+  await juno.sidebar.row(ENG_MAIN).open()
+  const image = topic.message('Slow image processing').getByRole('button', { name: 'Open late.png' })
+  await expect(image).toBeVisible({ timeout: 15_000 })
+  await expect.poll(() => image.locator('img').evaluate((node: HTMLImageElement) => node.naturalWidth)).toBeGreaterThan(0)
+})
+
 test('a video plays inline with its poster, and opens full screen', async ({ juno, win, fake }) => {
   await juno.signIn()
   await juno.waitForSync()

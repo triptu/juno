@@ -72,7 +72,11 @@ test('a sent image Slack has no thumbnails for yet shows at once from the local 
     // Stored without thumbnails: still the staged copy, still an image.
     await expect(image.locator('img[src^="juno://uploads/"]')).toHaveCount(1)
     await expect(row.getByRole('button', { name: 'Download chart.png' })).toHaveCount(0)
-    fake.releaseThumbnails()
+    // Processing can outlast all four background tries. Only file_created follows.
+    await expect.poll(() => fake.calls.filter((call) => call.method === 'files.info').length, { timeout: 60_000 }).toBe(4)
+    // Let the final empty response reach the sync before delivering the completion event.
+    await win.waitForTimeout(1_000)
+    fake.releaseThumbnails({ event: 'file_created' })
     await expect(image.locator('img[src^="juno://files/"]')).toHaveCount(1, { timeout: 15_000 })
     await expect.poll(() => image.locator('img[src^="juno://files/"]').evaluate((node: HTMLImageElement) => node.naturalWidth), { timeout: 15_000 }).toBeGreaterThan(0)
   })
