@@ -126,7 +126,7 @@ Rules:
 - Deltas carry only rows whose `rev` changed. The engine diffs against the last snapshot it sent on that subscription.
 - Pasted file bytes go over the port in chunks of at most 1 MB. `ArrayBuffer` transfer is not available on `MessagePortMain`; buffers are copied ([MessagePortMain](https://www.electronjs.org/docs/latest/api/message-port-main)).
 - The preload stays a few hundred bytes. It asks main for the engine port as the page starts and hands it over when the page asks, forwards later ports, and exposes the small `window.juno` surface, nothing else.
-- Start order in the renderer (`main.tsx`): the sidebar's list is read before the first render, so its request goes out as soon as the engine says it is ready on the port; the shell renders once that first request is sent, or after 50 ms. Started the other way round, the request waited behind the shell's render and first layout. A topic open asks for its messages with its header (`whenReady` in `navigation.ts`), not after it.
+- Start order in the renderer (`main.tsx`): the sidebar's list is read before the first render, so its request goes out as soon as the engine says it is ready on the port; the shell commits synchronously in the same task, before the page can paint. Waiting for the first request or a 50 ms timer let Electron show an empty window before React mounted. A topic open asks for its messages with its header (`whenReady` in `navigation.ts`), not after it.
 
 ### 2.3 Rendering and compositing
 

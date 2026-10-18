@@ -1,0 +1,1 @@
+- 10-18 14:05 · session-spec-97 · Commit the initial shell synchronously before the page can paint; waiting for the engine port and React scheduling exposed an empty visible frame on signed-in relaunch. Keep the session test’s zero-sign-in and every-frame-sidebar assertions unchanged.

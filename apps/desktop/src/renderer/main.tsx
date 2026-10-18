@@ -6,6 +6,7 @@ import { acquireAgentPort, configureAgentConnection } from '@juno/state/agent'
 import { afterPaint, mark, measure, observeFrames } from '@juno/state/perf'
 import { RegistryContext } from '@juno/state/react'
 import { StrictMode } from 'react'
+import { flushSync } from 'react-dom'
 import { createRoot } from 'react-dom/client'
 import { TooltipLayer } from '@juno/views'
 import { App } from './App'
@@ -14,21 +15,8 @@ import { clearCaretsLeftBehind } from './containers/caret'
 mark('juno.start')
 
 // The engine port comes from main through the preload, which asked for it as the page started.
-// The first one is taken now and the connection's first attempt uses it; reconnects ask again.
-// The client holds its requests until the engine says it is ready on the port, so `firstSend`
-// settles when the first batch has really gone out.
-let sent: () => void = () => {}
-const firstSend = new Promise<void>((resolve) => {
-  sent = resolve
-})
-let firstPort: Promise<PortLike> | undefined = acquireRendererPort().then((port) => {
-  const post = port.postMessage.bind(port)
-  port.postMessage = (message) => {
-    post(message)
-    sent()
-  }
-  return port
-})
+// The first connection takes that port; reconnects ask again.
+let firstPort: Promise<PortLike> | undefined = acquireRendererPort()
 firstPort.catch(() => {})
 configureConnection(registry, {
   acquire: () => {
@@ -64,16 +52,9 @@ const found = document.getElementById('root')
 if (!found) throw new Error('Missing #root element')
 const container: HTMLElement = found
 
-/**
- * The shell renders once the sidebar's request has gone out: the port and
- * the engine's ready message are usually waiting already, so that is a task
- * or two, and a render started first would hold the main thread while they
- * wait behind it. The shell never waits more than `PORT_WAIT_MS` for the
- * engine.
- */
-const PORT_WAIT_MS = 50
-function renderShell(): void {
-  // One registry for the whole app, shared with code outside React (prefetch).
+// Commit the shell before the page can paint. Waiting for the engine port or
+// React's scheduled render lets ready-to-show expose an empty window first.
+flushSync(() => {
   createRoot(container).render(
     <StrictMode>
       <RegistryContext.Provider value={registry}>
@@ -82,8 +63,5 @@ function renderShell(): void {
       </RegistryContext.Provider>
     </StrictMode>,
   )
-  afterPaint(() => measure('juno.shell-paint', 'juno.start'))
-}
-// The rest of the batch is sent in the same task as the first request.
-const nextTask = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
-void Promise.race([firstSend.then(nextTask), new Promise<void>((resolve) => setTimeout(resolve, PORT_WAIT_MS))]).then(renderShell)
+})
+afterPaint(() => measure('juno.shell-paint', 'juno.start'))
