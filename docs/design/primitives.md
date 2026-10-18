@@ -202,6 +202,12 @@ Shortcuts come from `menuShortcuts` in `@juno/contract` (the app menu's accelera
 
 Feature components that compose the above and hold app logic: `Sidebar`, `TopicRow`, `TopicHeader`, `MessageList` / `Message` / `Bubble`, `MessageText` (token segmenting into Chips), `HoverToolbar`, `Composer` (with `SendCheckBar`, `AudienceWarning`, `MentionSuggestions`), `CommandPalette`, `AllTopicsTable`, `ForYouCard`, `JunoThread` (+ `SendCard`, `TopicsCard`, `ResolveCard`), `NotificationRules`, `IgnoreList`, `NewMessageForm`, `ContextMenu` (native bridge).
 
+The huddle views (`@juno/huddle-views`, inventory 22) add no primitive. They are built from `IconButton` (`variant="island"`, radius `lg` in the bar, `full` in the tab), `Surface kind="island"`, `HeaderBand`, `ContextPill`, `Avatar`, `Popover` with `OptionList` (the device menu), `EmptyState`, `Button` and `Text`. Three small parts are kept inside the package, each with fewer than three uses, so none is promoted yet:
+
+- `PeopleStack`: `AvatarStack`'s overlap and "+N" with the speaking ring on a face (bar, header control). `AvatarStack` has no per-person state; if a third place needs the ring, add a `speaking` field to `AvatarStackPerson` instead.
+- `TextControl`: a 28px text button with the island fills (Leave, Thread), the same look as `IslandButton` in `@juno/views`, which this package cannot import. If a third package needs it, move `IslandButton` into `@juno/ui`.
+- The source picker's tile: a radio with a picture and a name, used once.
+
 ## Count
 
 24 primitives (Surface gains the `island` kind and `HeaderBand`): Icon, Button, NavItem, IconButton, Avatar (+AvatarStack, AvatarButton), ChannelIcon (+Swatch, DayToggles), Chip, ContextPill, Kbd, Text, Surface (+Divider, LabelledRule), Popover/OptionList, ScrollArea, Tabs, Fields (TextField, Textarea, Select, Checkbox, Slider, Segmented), ListRow, Toast, EmptyState, Illustration, Logo, ProgressRing, Page/PageHeader/Section, CodeBlock, Card.
