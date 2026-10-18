@@ -184,3 +184,23 @@ test('the pass builds files for the top DM partners, a DM run gets the file and 
   await panel.expectJuno('You said: what does Maya need from me this week?')
   expect(askedWith(model, 'what does Maya need from me').memory).toContain('Relationship: Manager (set by the owner)')
 })
+
+test('tagging a person in Juno chat loads their existing file after the recent messages', async ({ juno, slack, model }) => {
+  await ready(juno)
+  await exchangeWithMaya(juno, slack)
+  await learnFromHome(juno, model)
+
+  const chat = await openChat(juno)
+  await chat.composer.pressSequentially('Ask @Ma')
+  await expect(chat.suggestion('Maya')).toBeVisible()
+  await chat.composer.press('Enter')
+  await chat.composer.pressSequentially('about the plan')
+  await chat.composer.press('Enter')
+  await chat.expectJuno('You said: Ask @Maya about the plan')
+
+  const request = askedWith(model, 'Ask @Maya about the plan')
+  expect(request.input).toContain('<person id="U0MAYA" name="Maya"/>')
+  expect(request.memory).toMatch(/<\/recent>\n<people-now>\n## Maya Chen \(U0MAYA\)/)
+  expect(request.memory).toContain(TALK)
+  expect(request.memory).toContain(WORK)
+})

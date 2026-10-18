@@ -130,6 +130,34 @@ it('a DM run carries that person\'s file after the recent messages; the outline 
   expect(memoryOf(h.chatRequests().at(-1)!)).toContain('Also runs the planning offsite')
 })
 
+it('a tagged person with a file is included in the model input', async () => {
+  h = await turnsHarness({ compaction: false, host: slack(() => []) })
+  const store = h.turns.store
+  writeEntry(store, { id: 'maya', runId: null, by: 'juno', person: 'U0MAYA', section: 'work', text: 'Owns the migration plan', source: 'slack', tainted: true, create: { name: 'Maya Chen', reason: 'interaction' } })
+  writeEntry(store, { id: 'sam', runId: null, by: 'juno', person: 'U0SAM', section: 'work', text: 'Runs the platform team', source: 'slack', tainted: true, create: { name: 'Sam Okafor', reason: 'interaction' } })
+
+  h.fake.script([reply(say('I will ask them.'))])
+  await h.ended(h.send('ask these people for an update', {
+    mentions: [
+      { kind: 'person', id: 'U0MAYA', name: 'Maya Chen' },
+      { kind: 'channel', id: 'C0ENG', name: 'eng' },
+      { kind: 'person', id: 'U0PRIYA', name: 'Priya Raman' },
+      { kind: 'person', id: 'U0SAM', name: 'Sam Okafor' },
+      { kind: 'person', id: 'U0MAYA', name: 'Maya Chen' },
+    ],
+  }))
+
+  const memory = memoryOf(h.chatRequests().at(-1)!)
+  expect(memory.indexOf('</recent>')).toBeLessThan(memory.indexOf('<people-now>'))
+  expect(memory).toContain('## Maya Chen (U0MAYA)\n')
+  expect(memory).toContain('Owns the migration plan')
+  expect(memory).toContain('## Sam Okafor (U0SAM)\n')
+  expect(memory).toContain('Runs the platform team')
+  expect(memory).not.toContain('Priya Raman')
+  expect(memory.match(/## Maya Chen \(U0MAYA\)/g)).toHaveLength(1)
+  expect(people(store)).toHaveLength(2)
+})
+
 it('splits the older People doc once, keeps background updates daily and inside the AI limit, and never restarts a deleted file', async () => {
   let now = 0
   const host = slack(() => exchanges(now))
