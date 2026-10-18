@@ -7,7 +7,7 @@ import { SlackApi, SlackSession, type SocketEvent } from '@juno/slack'
 import { liveQuery, StoreReader, type ConversationRow } from '@juno/store'
 import { Clock, Context, Effect, Layer, Ref, Stream, SubscriptionRef } from 'effect'
 import { HostLink } from './protocol/host'
-import { SocketEvents, type SessionStart } from './socketEvents'
+import { SocketEvents, type SessionStart, type SocketInput } from './socketEvents'
 
 const safe = <A, E, R>(effect: Effect.Effect<A, E, R>) => effect.pipe(Effect.catch(() => Effect.logWarning('notifications: operation failed')))
 const run = (effect: Effect.Effect<void, unknown> | undefined) => effect === undefined ? Effect.void : safe(effect)
@@ -50,7 +50,7 @@ export class NotificationControl extends Context.Service<NotificationControl, {
     const host = yield* NotificationHost
     const ai = yield* AiProvider
     const events = yield* SocketEvents
-    yield* events.subscribe(sessionNotifications(control, host, ai))
+    yield* events.subscribe('notifications', sessionNotifications(control, host, ai))
     return control
   }))
 }
@@ -177,6 +177,7 @@ const sessionNotifications = (control: NotificationControl['Service'], host: Not
       yield* safe(notifications.tick)
     }
   }))
-  // `SocketEvents` calls this after the sync stored the event, one event at a time, so the message's channel and people are in the store.
-  return (event: SocketEvent, me: Me) => event._tag === 'Frame' ? safe(handle({ frame: event.frame, me })).pipe(Effect.provideService(StoreReader, sql)) : Effect.void
+  // `SocketEvents` calls this after the sync wrote the event, one event at a time, so the message's channel and people are in the store.
+  // After `Overflowed` the frames it replaced go unnotified; `SocketEvents` logged them.
+  return (input: SocketInput, me: Me) => input._tag === 'Frame' ? safe(handle({ frame: input.frame, me })).pipe(Effect.provideService(StoreReader, sql)) : Effect.void
 }).pipe(Effect.provideService(AiProvider, ai))

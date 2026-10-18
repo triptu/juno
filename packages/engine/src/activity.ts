@@ -32,7 +32,7 @@ export class OwnerActivity extends Context.Service<OwnerActivity, {
       message._tag === 'active' ? Effect.flatMap(Clock.currentTimeMillis, (now) => SubscriptionRef.set(lastActiveAt, now)) : Effect.void))
     const control = yield* NotificationControl
     const events = yield* SocketEvents
-    yield* events.subscribe(sessionActivity(lastActiveAt, control))
+    yield* events.subscribe('activity', sessionActivity(lastActiveAt, control))
     return OwnerActivity.of({ lastActiveAt })
   }))
 }
@@ -48,5 +48,6 @@ const sessionActivity = (lastActiveAt: SubscriptionRef.SubscriptionRef<number | 
     yield* socket.tickle('polling')
   })
   yield* Effect.forkScoped(Stream.runForEach(SubscriptionRef.changes(lastActiveAt), () => tickle))
-  return (event) => event._tag === 'Connected' ? tickle : Effect.void
+  // `Overflowed` needs nothing: the next `active` from main tickles anyway.
+  return (input) => input._tag === 'Connected' ? tickle : Effect.void
 })

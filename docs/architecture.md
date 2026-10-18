@@ -458,7 +458,7 @@ Each event is one writer transaction wrapped in `Reactivity.withBatch` so querie
 
 `presence_change` is not stored; `user_typing` is forwarded as an event for the open topic only.
 
-After each event's transaction, the engine's `SocketEvents` hands the event and `me` to every subscriber (notifications, the activity tickle), each through its own queue of 1024 drained by one fiber, so a subscriber sees events in socket order and after they are stored; a subscriber that falls 1024 behind makes the sync wait, with a warning, rather than lose an event. Subscribers start again for each sync, in its scope, so an ended session's events never reach the next one.
+After each event's write attempt (a failed write is logged and the event still follows), the engine's `SocketEvents` hands the event and `me` to every subscriber (notifications, the activity tickle), each through its own queue of 1024 drained by one fiber, so a subscriber sees events in socket order, one at a time. Publishing never waits: when a subscriber's queue is full, its queued events are dropped, it gets one `Overflowed` next and then the new events, and a warning names it. Notifications skip `Overflowed` (those messages go unnotified), activity ignores it, and a subscriber that keeps state from events reads that state again. Subscribers start again for each sync, in its scope, so an ended session's events never reach the next one.
 
 ## 7. Renderer state
 
