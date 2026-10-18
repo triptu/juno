@@ -42,6 +42,9 @@ export interface SettingsGeneralProps {
   /** A plain click on a web link opens it in the web panel (SPEC 7). */
   readonly webPanel: boolean
   readonly onWebPanelChange: (enabled: boolean) => void
+  /** A quote or fact under Home's greeting when nothing waits (SPEC 12). */
+  readonly homeThoughts: boolean
+  readonly onHomeThoughtsChange: (enabled: boolean) => void
   readonly mirrorReads: boolean
   readonly onMirrorReadsChange: (enabled: boolean) => void
   /** Earlier reads still to send to Slack (`reads.catchUpStatus`); undefined until it arrives. */
@@ -59,8 +62,8 @@ export interface SettingsGeneralProps {
   readonly onHideWhileSharingChange: (enabled: boolean) => void
 }
 
-/** General: topic recency, tabs, peek, links, Slack read mirroring, hiding text while sharing, message checks and the fast classifier. */
-export function SettingsGeneral({ quietDays, onQuietDaysChange, tabExpiry, onTabExpiryChange, peekKey, onPeekKeyChange, webPanel, onWebPanelChange, classifier, onClassifierChange, mirrorReads, onMirrorReadsChange, catchUp, onCatchUp, checks, grammarUnavailable, onCheckChange, hideWhileSharing, sharingDetection, onHideWhileSharingChange }: SettingsGeneralProps) {
+/** General: topic recency, tabs, peek, Home's thought, links, Slack read mirroring, hiding text while sharing, message checks and the fast classifier. */
+export function SettingsGeneral({ quietDays, onQuietDaysChange, tabExpiry, onTabExpiryChange, peekKey, onPeekKeyChange, homeThoughts, onHomeThoughtsChange, webPanel, onWebPanelChange, classifier, onClassifierChange, mirrorReads, onMirrorReadsChange, catchUp, onCatchUp, checks, grammarUnavailable, onCheckChange, hideWhileSharing, sharingDetection, onHideWhileSharingChange }: SettingsGeneralProps) {
   return (
     <Page width="settings">
       <PageHeader title="General" />
@@ -77,6 +80,13 @@ export function SettingsGeneral({ quietDays, onQuietDaysChange, tabExpiry, onTab
       <Section heading="Peek" sub="Hold the key over a topic in the sidebar to read it without marking it read.">
         <Surface kind="group" padding="md" sx={styles.card}>
           <PeekKeySetting value={peekKey} onChange={onPeekKeyChange} />
+        </Surface>
+      </Section>
+      <Section heading="Home">
+        <Surface kind="group" padding="md" sx={styles.card}>
+          <Checkbox role="switch" label="Show a thought when Home is empty" checked={homeThoughts}
+            onChange={(event) => onHomeThoughtsChange(event.currentTarget.checked)}
+            description="A short quote or fact under the greeting when nothing is waiting." />
         </Surface>
       </Section>
       <Section heading="Links">
