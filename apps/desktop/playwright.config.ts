@@ -15,11 +15,11 @@ export default defineConfig({
   // run more with JUNO_E2E_WORKERS.
   workers: Number(process.env.JUNO_E2E_WORKERS ?? 1),
   fullyParallel: false,
-  retries: process.env.CI ? 1 : 0,
+  retries: process.env.CI || process.env.JUNO_REMOTE_CONTAINER ? 1 : 0,
   // Tests tagged @mac depend on macOS behaviour. pnpm remote runs on Linux and
   // skips them; every Mac run, including the scheduled full run, keeps them.
   grepInvert: process.platform === 'darwin' ? undefined : /@mac/,
-  reporter: process.env.CI ? 'github' : 'list',
+  reporter: [[process.env.CI ? 'github' : 'list'], ['../../scripts/test-results-reporter.mjs']],
   use: {
     trace: 'retain-on-failure',
   },
