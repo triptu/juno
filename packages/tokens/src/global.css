@@ -65,7 +65,15 @@ textarea {
 
 /* Scrollbars: 10px, transparent track, a soft thumb inset by 3px. A scroll
    area that shows its thumb only on hover sets --scrollbar-thumb on itself
-   (ScrollArea in @juno/ui); the gutter never changes. */
+   (ScrollArea in @juno/ui); the gutter never changes. The variable does not
+   inherit, so changing it on hover restyles only the area, not every row in
+   it; the area's own thumb takes it explicitly, and a scroller nested inside
+   keeps the default thumb. */
+@property --scrollbar-thumb {
+  syntax: '*';
+  inherits: false;
+}
+
 ::-webkit-scrollbar {
   width: var(--scrollbar-size);
   height: var(--scrollbar-size);
@@ -82,6 +90,7 @@ textarea {
 }
 
 ::-webkit-scrollbar-thumb {
+  --scrollbar-thumb: inherit;
   background-color: var(--scrollbar-thumb, var(--border-strong));
   border: 3px solid transparent;
   background-clip: padding-box;

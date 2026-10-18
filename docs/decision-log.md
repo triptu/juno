@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-18 19:55 · ui-review-followups · `ScrollArea scrollbar="hover"` keeps its `--scrollbar-thumb` variable, but `global.css` registers it as not inherited (`@property`, `inherits: false`) and the thumb inherits it explicitly. Entering the area restyled every row (2,001 elements in a 2,000-row probe); now it restyles one (M3 code review). A rule on the thumb with the area's `:hover` was tried first: Chrome does not show it in the thumb's computed style, so the gallery check could not see it. Scrollers nested inside a hover area now keep their own always-on thumb.
 - 10-18 19:13 · ignored-add-row · Settings › Ignored's add row sits above the list's card, so its searchable list opens over the page and a new row lands right under it. The select is a new `SelectButton` (the `Select` field as a button), since a native select cannot filter; Ignore calls the channel menu's own `ignoreChannel` action.
 - 10-18 19:02 · signin-session-durability · Sign-in waits for Main to sync and atomically replace `secrets.bin` before publishing `ready`; storage errors return through the sign-in failure path.
 - 10-18 18:50 · orchestrator · The main process logs unhandled promise rejections and keeps running; engine and agent still exit and are restarted by main; the process log is installed once per process. Why: one stray rejection in main quit the whole app (found via the coverage hook in session.spec:158).
