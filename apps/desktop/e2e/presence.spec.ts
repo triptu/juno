@@ -53,6 +53,8 @@ test('Set yourself away from the avatar menu sets Slack presence and stays away 
   await expect(juno.accountMenu.item('Set yourself active')).toBeVisible()
   await juno.accountMenu.expectPresence(/^Away/)
   await juno.accountMenu.close()
+  // With the menu closed, the avatar button's description gives the state.
+  await expect(juno.sidebar.accountButton).toHaveAccessibleDescription('Away')
   slack.resetCalls()
   // You keep using the Mac; Juno sends nothing that would show you active.
   await pollAndWait(juno, 0)
@@ -67,6 +69,7 @@ test('Set yourself away from the avatar menu sets Slack presence and stays away 
   await expect(juno.accountMenu.item('Set yourself away')).toBeVisible()
   await juno.accountMenu.expectPresence(/^Active/)
   await juno.accountMenu.close()
+  await expect(juno.sidebar.accountButton).toHaveAccessibleDescription('Active')
   await juno.setSystemIdle(0)
   await expect.poll(() => slack.tickles(), { timeout: 15_000 }).toBeGreaterThan(0)
 })

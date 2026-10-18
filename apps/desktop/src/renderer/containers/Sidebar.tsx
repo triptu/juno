@@ -146,7 +146,7 @@ export function Sidebar() {
     <SidebarView
       titlebarLeading={<TitlebarNav />}
       fullScreen={fullScreen}
-      account={account}
+      account={{ ...account, ...(presence === undefined ? {} : { presence: presence.active ? 'active' : 'away' }) }}
       filter={{ kind: filter.kind, unreadOnly: filter.unreadOnly, view: filter.view }}
       dots={dots}
       {...(filter.scope === undefined ? {} : { scope: { name: scopeChannel?.name ?? filter.scope, kind: scopeChannel?.kind ?? 'public' } })}
