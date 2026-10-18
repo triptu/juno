@@ -12,6 +12,7 @@
  *
  * Flags:
  *   --create-only   find or create the test channel, print its name and exit
+ *   --status        read only: whether the test channel has a huddle running, and whether it still lists you
  *   --minutes N     stay in the huddle N minutes (default 5), a status line every 10 s
  *   --socket        also open the RTM socket, read-only, and print room frames by type and field names
  *   --headed        show the browser window, to hear the huddle on this Mac
@@ -34,7 +35,7 @@ import { EdgeHuddlesInfoOk, type MethodArgs, type MethodName, type MethodOk } fr
 import { HttpTransport, SlackClient, SlackApi, SlackEdge, SlackSession, SlackSocket, slackConfigLayer, SocketHandshake, type SlackSessionShape } from '@juno/slack'
 import { openHuddlePage, type HuddlePage } from './huddle-live-browser.ts'
 import { callPlan, Guard, NAMES } from './huddle-live-guard.ts'
-import { log, MediaReport, printPaths, safeError } from './huddle-live-report.ts'
+import { log, MediaReport, printHuddles, printPaths, safeError } from './huddle-live-report.ts'
 import { readCachedSession } from './live-common.ts'
 
 const argv = process.argv.slice(2)
@@ -42,6 +43,7 @@ const flags = new Set(argv)
 const flag = (name: string) => (argv.includes(name) ? argv[argv.indexOf(name) + 1] : undefined)
 const useFake = flags.has('--fake')
 const createOnly = flags.has('--create-only')
+const statusOnly = flags.has('--status')
 const withSocket = flags.has('--socket')
 const minutes = Number(flag('--minutes') ?? 5)
 
@@ -56,7 +58,7 @@ if (!Number.isFinite(minutes) || minutes <= 0 || minutes > 60) {
   process.exit(2)
 }
 
-const guard = new Guard({ createOnly, useFake, withSocket })
+const guard = new Guard({ createOnly, statusOnly, useFake, withSocket })
 
 // The session.
 
@@ -151,9 +153,14 @@ function connect(t: Target) {
     const result = await runtime.runPromise(
       Effect.result(SlackEdge.use((edge) => edge.call('huddles/info', { channel_ids: [guard.channel] }, EdgeHuddlesInfoOk, { lane: 'interactive' }))),
     )
-    if (result._tag === 'Failure') return log(`edge huddles/info ${when}: ${guard.describe(result.failure)}`)
+    if (result._tag === 'Failure') {
+      log(`edge huddles/info ${when}: ${guard.describe(result.failure)}`)
+      return undefined
+    }
     log(`edge huddles/info ${when}: ok`)
-    printPaths(`edge huddles/info ${when}`, JSON.parse(guard.answers.get('edge huddles/info') ?? '{}'))
+    const answer: unknown = JSON.parse(guard.answers.get('edge huddles/info') ?? '{}')
+    printPaths(`edge huddles/info ${when}`, answer)
+    return answer
   }
   return { runtime, slack, huddlesInfo }
 }
@@ -175,7 +182,7 @@ function remember(joined: MethodOk<'rooms.join'> | undefined) {
 
 async function main(): Promise<number> {
   log(`${useFake ? 'fake' : 'LIVE'} run. Calls, in order:`)
-  for (const line of callPlan({ createOnly, useFake, withSocket, minutes })) console.log(`    ${line}`)
+  for (const line of callPlan({ createOnly, statusOnly, useFake, withSocket, minutes })) console.log(`    ${line}`)
   log('nothing else is allowed; the guard refuses it before it leaves')
   const t = await target()
   const connection = connect(t)
@@ -188,7 +195,7 @@ async function main(): Promise<number> {
     log(`failed: ${safeError(error)}`)
   } finally {
     clearTimeout(overall)
-    if (!(await cleanup(connection, open))) code = 1
+    if (!(await cleanup(connection, open, t.session.userId))) code = 1
     await t.close()
   }
   return code
@@ -202,6 +209,10 @@ async function run(t: Target, connection: Connection, open: Open): Promise<numbe
     log(`test channel: ${channelName}`)
     return 0
   }
+  if (statusOnly) {
+    printHuddles(await connection.huddlesInfo('now'), t.session.userId)
+    return 0
+  }
   if (withSocket) open.socket = startSocket(connection.runtime)
 
   await connection.huddlesInfo('before the join')
@@ -209,7 +220,7 @@ async function run(t: Target, connection: Connection, open: Open): Promise<numbe
   log(`nearest Chime region: ${useFake ? 'fixed (fake)' : region === undefined ? 'unknown, joining without one' : 'found'}`)
   if (stopRequested !== undefined) return 1
 
-  call.joinInFlight = connection.slack('rooms.join', { channel_id: guard.channel!, ...(region === undefined ? {} : { regions: [region] }) }, { reason: 'calls-api/joinRoom', singleAttempt: true })
+  call.joinInFlight = connection.slack('rooms.join', { channel_id: guard.channel!, ...(region === undefined ? {} : { regions: [region] }), multidevice: false }, { reason: 'calls-api/joinRoom', singleAttempt: true })
   const joined = await call.joinInFlight
   call.joinInFlight = undefined
   remember(joined)
@@ -246,7 +257,7 @@ async function run(t: Target, connection: Connection, open: Open): Promise<numbe
 }
 
 /** Stops the media, sends `rooms.leave` for any attendee this run got, and closes everything. False when the leave failed or the guard refused something. */
-async function cleanup(connection: Connection, open: Open): Promise<boolean> {
+async function cleanup(connection: Connection, open: Open, self: string): Promise<boolean> {
   let ok = true
   if (open.page !== undefined) log(`Chime session: ${await open.page.leave()}`)
   // A join still in flight is awaited, so its attendee gets a leave too.
@@ -256,10 +267,23 @@ async function cleanup(connection: Connection, open: Open): Promise<boolean> {
   }
   if (guard.joins > 0) {
     if (call.callId !== undefined && call.attendeeId !== undefined) {
-      const left = await connection.slack('rooms.leave', { channel_id: guard.channel!, call_id: call.callId, attendee_id: call.attendeeId }, { reason: 'calls-api/leaveRoom' })
+      // Does leaving the Chime meeting alone end Slack's huddle? Read it before and after the leave.
+      if (!useFake) printHuddles(await connection.huddlesInfo('after the Chime stop, before rooms.leave'), self)
+      // As the official client's user leave (`userLeaveEffects`): the form field `reason` is `user_initiated`.
+      const left = await connection.slack(
+        'rooms.leave',
+        { channel_id: guard.channel!, call_id: call.callId, attendee_id: call.attendeeId, reason: 'user_initiated' },
+        { reason: 'calls-api/leaveRoom' },
+      )
       call.leaveSent = true
-      log(`rooms.leave ${left === undefined ? 'FAILED (see above)' : 'succeeded'}`)
-      ok = left !== undefined
+      // On a workspace with huddles_arch_v2 Slack answers `feature_not_enabled`; the official client logs it as an arch mismatch and goes on. Stopping Chime is what removes the attendee there.
+      const archV2 = left === undefined && (JSON.parse(guard.answers.get('rooms.leave') ?? '{}') as { error?: unknown }).error === 'feature_not_enabled'
+      log(`rooms.leave ${left !== undefined ? 'succeeded' : archV2 ? 'not used by this workspace (feature_not_enabled, as the official client expects)' : 'FAILED (see above)'}`)
+      ok = left !== undefined || archV2
+      if (!useFake) {
+        await new Promise((done) => setTimeout(done, 3_000))
+        printHuddles(await connection.huddlesInfo('3 s after rooms.leave'), self)
+      }
     } else {
       log('rooms.leave not sent: the join gave no call id or attendee id, so there is nothing to leave')
     }

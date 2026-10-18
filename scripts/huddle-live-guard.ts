@@ -13,27 +13,26 @@ export const NAMES = ['juno-huddle-test', 'juno-huddle-test-2'] as const
 
 export interface GuardOptions {
   readonly createOnly: boolean
+  /** `--status`: read the test channel's huddles and nothing else. */
+  readonly statusOnly: boolean
   readonly useFake: boolean
   readonly withSocket: boolean
 }
 
 /** What the run may call, printed before the first call. */
-export function callPlan({ createOnly, useFake, withSocket, minutes }: GuardOptions & { readonly minutes: number }): Array<string> {
+export function callPlan({ createOnly, statusOnly, useFake, withSocket, minutes }: GuardOptions & { readonly minutes: number }): Array<string> {
+  const find = ['auth.test', 'client.userBoot (find the test channel by name)', 'conversations.info, the test channel only (membership and member count)']
+  if (statusOnly) return [...find, 'api.getFlannelHttpUrl (the edge base url), then edge huddles/info, the test channel only']
+  if (createOnly) return [...find, 'conversations.create, private, only juno-huddle-test or juno-huddle-test-2, once per name, only if no usable one exists']
   return [
-    'auth.test',
-    'client.userBoot (find the test channel by name)',
-    'conversations.info, the test channel only (membership and member count)',
-    ...(createOnly || useFake ? ['conversations.create, private, only juno-huddle-test or juno-huddle-test-2, once per name, only if no usable one exists'] : []),
-    ...(createOnly
-      ? []
-      : [
-          'api.getFlannelHttpUrl (the edge base url), then edge huddles/info, the test channel only, before and after the join',
-          `GET https://nearest-media-region.l.chime.aws (not Slack; skipped with --fake)`,
-          'rooms.join, the test channel only, once, one attempt (_x_reason calls-api/joinRoom)',
-          useFake ? 'stop (the fake has no Chime)' : `Chime media in a local Chromium page for ${minutes} min, fake microphone`,
-          'rooms.leave, the test channel only, on every way out (_x_reason calls-api/leaveRoom)',
-        ]),
-    ...(withSocket && !createOnly ? ['client.getWebSocketURL, then the RTM socket, read-only'] : []),
+    ...find,
+    ...(useFake ? ['conversations.create, as above, on the fake only'] : []),
+    'api.getFlannelHttpUrl (the edge base url), then edge huddles/info, the test channel only, before and after the join',
+    `GET https://nearest-media-region.l.chime.aws (not Slack; skipped with --fake)`,
+    'rooms.join, the test channel only, once, one attempt (_x_reason calls-api/joinRoom)',
+    useFake ? 'stop (the fake has no Chime)' : `Chime media in a local Chromium page for ${minutes} min, fake microphone`,
+    "rooms.leave with reason user_initiated, the test channel only, on every way out (_x_reason calls-api/leaveRoom)",
+    ...(withSocket ? ['client.getWebSocketURL, then the RTM socket, read-only'] : []),
   ]
 }
 
@@ -85,14 +84,14 @@ export class Guard {
   }
 
   #check(method: string, field: (name: string) => string | undefined): string | undefined {
-    const { createOnly, useFake, withSocket } = this.#options
+    const { createOnly, statusOnly, useFake, withSocket } = this.#options
     switch (method) {
       case 'auth.test':
       case 'client.userBoot':
       case 'api.getFlannelHttpUrl':
         return undefined
       case 'client.getWebSocketURL':
-        return withSocket ? undefined : 'socket not asked for'
+        return withSocket && !statusOnly ? undefined : 'socket not asked for'
       case 'conversations.info':
         return field('channel') !== undefined && field('channel') === (this.channel ?? this.candidate) ? undefined : 'not the test channel'
       case 'conversations.create': {
@@ -105,12 +104,14 @@ export class Guard {
         return undefined
       }
       case 'rooms.join':
+        if (createOnly || statusOnly) return 'no join with --create-only or --status'
         if (this.channel === undefined || field('channel_id') !== this.channel) return 'not the test channel'
         if (field('thread_ts') !== undefined) return 'no thread_ts'
         if (this.joins > 0) return 'one join per run'
         this.joins++
         return undefined
       case 'rooms.leave':
+        if (createOnly || statusOnly) return 'no leave with --create-only or --status'
         return this.channel !== undefined && field('channel_id') === this.channel ? undefined : 'not the test channel'
       default:
         return 'not on the list'

@@ -43,6 +43,23 @@ export const safeError = (error: unknown) =>
     ? `${error.name}: ${(error.message.split('\n')[0] ?? '').replace(/\b\w+:\/\/\S+/g, '<url>').replace(/[A-Za-z0-9+/=_-]{24,}/g, '<redacted>').slice(0, 160)}`
     : 'unknown error'
 
+/** Whether the test channel has a huddle running and whether it still lists this user: counts, booleans and ages only. */
+export function printHuddles(answer: unknown, self: string) {
+  if (answer === undefined) return
+  const huddles = ((answer as { huddles?: unknown }).huddles ?? []) as ReadonlyArray<{ active_members?: ReadonlyArray<string>; dropped_members?: ReadonlyArray<string>; start_date?: number; expiration?: number }>
+  log(`huddles running in the test channel: ${huddles.length}`)
+  const now = Date.now() / 1000
+  for (const huddle of huddles) {
+    const active = huddle.active_members ?? []
+    const dropped = huddle.dropped_members ?? []
+    log(
+      `  active members ${active.length} (you ${active.includes(self) ? 'among them' : 'not among them'}), dropped members ${dropped.length} (you ${dropped.includes(self) ? 'among them' : 'not among them'})` +
+        `, started ${huddle.start_date === undefined ? '?' : `${Math.round((now - huddle.start_date) / 60)} min ago`}` +
+        `, expiration ${huddle.expiration === undefined ? '?' : huddle.expiration === 0 ? '0' : `${Math.round(huddle.expiration - now)} s from now`}`,
+    )
+  }
+}
+
 /** What the page sends through `junoReport`. */
 export type HuddleEvent =
   | { readonly kind: 'lifecycle'; readonly name: string; readonly detail?: string }
@@ -118,10 +135,11 @@ export class MediaReport {
     else this.#present.delete(event.attendeeId)
     const shape = idShape(event.externalUserId)
     this.#shapes.add(shape)
-    const user = event.externalUserId.split('#')[0] ?? ''
+    const parts = event.externalUserId.split(/[-#]/)
+    const yours = parts.indexOf(this.#selfUser)
     log(
       `chime attendee ${event.present ? 'joined' : event.dropped ? 'dropped' : 'left'}: ${who}, ExternalUserId ${shape}, ` +
-        `its part before '#' is ${user === this.#selfUser ? 'your user id' : 'not your user id'}, remote attendees now ${this.#remoteCount()}`,
+        `${yours === -1 ? 'no part is your user id' : `part ${yours + 1} of ${parts.length} is your user id`}, remote attendees now ${this.#remoteCount()}`,
     )
   }
 
