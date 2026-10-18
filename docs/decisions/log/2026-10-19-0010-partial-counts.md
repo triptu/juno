@@ -1,0 +1,1 @@
+- 10-19 00:10 · Sync · Accept partial incremental counts rows and preserve omitted unread fields; a two-field live row previously aborted decoding before the cycle could merge any counts.
