@@ -542,11 +542,8 @@ export const handlers: Handlers = {
     return { files }
   },
 
-  'files.info': (ctx, args) => {
-    const file = ctx.workspace.files.get(args.file)
-    if (file?.bytes === undefined) return new ApiError('file_not_found')
-    return { file: fileObject(ctx.baseUrl, file) }
-  },
+  'files.info': () => new ApiError('unknown_method'),
+
 }
 
 function reaction(ctx: MethodContext, args: MethodArgs<'reactions.add'>, add: boolean): MethodResult<'reactions.add'> {
