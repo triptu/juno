@@ -31,9 +31,10 @@ export async function bootedEngine(track: Array<RunningEngine>, options: EngineO
 /**
  * Stops `engine` and starts a new one on the same user-data directory and
  * fake: a warm boot. `whileStopped` runs in between, with no socket open.
- * The new engine owns the fake and the directory from then on.
+ * The new engine owns the fake and the directory from then on. `options`
+ * start it as `bootedEngine`'s do.
  */
-export async function restart(track: Array<RunningEngine>, engine: RunningEngine, whileStopped: (fake: FakeSlack) => void = () => {}): Promise<RunningEngine> {
+export async function restart(track: Array<RunningEngine>, engine: RunningEngine, whileStopped: (fake: FakeSlack) => void = () => {}, options: EngineOptions = {}): Promise<RunningEngine> {
   const { fake, userData } = engine
   const credentials = fake.credentials()
   // Background work (the follow pass) must not answer after the stop and count against the next engine.
@@ -43,7 +44,7 @@ export async function restart(track: Array<RunningEngine>, engine: RunningEngine
   track.splice(track.indexOf(engine), 1)
   whileStopped(fake)
   fake.resetCalls()
-  const next = await startTestEngine({ reuse: { userData, fake, credentials }, initial: () => credentials })
+  const next = await startTestEngine({ ...options, reuse: { userData, fake, credentials }, initial: () => credentials })
   // `reuse` leaves the fake and the directory alone on stop; this wrapper cleans them up.
   const owned: RunningEngine = {
     ...next,

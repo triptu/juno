@@ -172,6 +172,8 @@ export interface EngineOptions {
   readonly actionStallMillis?: number
   /** How long a new read mark waits before it is sent (the app waits 400 ms). */
   readonly markDelayMillis?: number
+  /** How long Slack's notification schedule waits after a change before it writes (the app waits 1 s). */
+  readonly slackScheduleDebounceMillis?: number
   /**
    * Space Slack calls as the app does (`SlackConfig.lanes`), not with the fake's pacing off, every spacing divided
    * by this number (1 is the app's pacing) so the methods keep their real ratios.
@@ -197,7 +199,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
   let cycles = 0
   let pendingCycles = 0
   let online = false
-  const handle = await startEngine(transport, { userData, e2e: true, dev: false, fakeSlackUrl: fake.url, ai: 'fake', aiJobs: options.aiJobs === true, ...(options.paced === undefined ? {} : { fakeSlackPaced: true, ...(options.paced === 1 ? {} : { fakeSlackPaceScale: options.paced }) }), ...(options.actionStallMillis === undefined ? {} : { actionStallMillis: options.actionStallMillis }), ...(options.markDelayMillis === undefined ? {} : { markDelayMillis: options.markDelayMillis }) }, {
+  const handle = await startEngine(transport, { userData, e2e: true, dev: false, fakeSlackUrl: fake.url, ai: 'fake', aiJobs: options.aiJobs === true, ...(options.paced === undefined ? {} : { fakeSlackPaced: true, ...(options.paced === 1 ? {} : { fakeSlackPaceScale: options.paced }) }), ...(options.actionStallMillis === undefined ? {} : { actionStallMillis: options.actionStallMillis }), ...(options.markDelayMillis === undefined ? {} : { markDelayMillis: options.markDelayMillis }), ...(options.slackScheduleDebounceMillis === undefined ? {} : { slackScheduleDebounceMillis: options.slackScheduleDebounceMillis }) }, {
     ...(options.notifications === undefined ? {} : { notifications: options.notifications }),
     host: main.host,
     httpTransport: main.httpTransport,

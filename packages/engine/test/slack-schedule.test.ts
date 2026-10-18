@@ -16,20 +16,27 @@ const before = { dnd_enabled: true, dnd_days: 'every_day', dnd_start_hour: '22:0
 /** Juno's default notification hours, Monday to Friday 9 to 7, as Slack prefs. */
 const weekdays = { dnd_enabled: true, dnd_days: 'weekdays', dnd_start_hour: '19:00', dnd_end_hour: '09:00' }
 
-const withSchedule = (schedule: Record<string, unknown>) =>
+/** The app waits 1 s after a change before it writes; most tests wait less, so their checks that nothing more is written are short. */
+const DEBOUNCE_MILLIS = 200
+const APP_DEBOUNCE_MILLIS = 1_000
+
+const withSchedule = (schedule: Record<string, unknown>, debounce = DEBOUNCE_MILLIS) =>
   bootedEngine(engines, {
+    slackScheduleDebounceMillis: debounce,
     initial: (fake) => {
       fake.workspace.prefs = { ...fake.workspace.prefs, ...schedule }
       return fake.signIn()
     },
   })
 
+const restarted = (engine: RunningEngine) => restart(engines, engine, undefined, { slackScheduleDebounceMillis: DEBOUNCE_MILLIS })
+
 const writes = (engine: RunningEngine) => apiCalls(engine, 'users.prefs.set').map((call) => JSON.parse(call.args['prefs'] ?? '{}') as unknown)
 const dnd = (engine: RunningEngine) => Object.fromEntries(Object.entries(engine.fake.workspace.prefs).filter(([key]) => key.startsWith('dnd_')))
 
 /** Past the debounce and the pass after it. */
-async function settled(engine: RunningEngine): Promise<void> {
-  await sleep(2_500)
+async function settled(engine: RunningEngine, debounce = DEBOUNCE_MILLIS): Promise<void> {
+  await sleep(debounce * 2 + 500)
   await quiet(engine)
 }
 
@@ -55,7 +62,7 @@ describe("Slack's notification schedule: when Juno writes", () => {
     expect(dnd(engine)).toMatchObject(before)
     expect(await pageWhen(engine, (view) => view.waitingForHours, 'waiting for hours')).toEqual({ enabled: true, canRestore: false, changedInSlack: false, waitingForHours: true })
     // A restart with the defaults still writes nothing.
-    const next = await restart(engines, engine)
+    const next = await restarted(engine)
     await next.phase('live', 30_000)
     await settled(next)
     expect(writes(next)).toEqual([])
@@ -79,7 +86,7 @@ describe("Slack's notification schedule: when Juno writes", () => {
     expect(dnd(engine)).toMatchObject(weekdays)
     expect(await pageWhen(engine, (view) => view.canRestore, 'Restore offered')).toEqual({ enabled: true, canRestore: true, changedInSlack: false, waitingForHours: false })
 
-    const next = await restart(engines, engine)
+    const next = await restarted(engine)
     await next.phase('live', 30_000)
     await settled(next)
     expect(writes(next)).toEqual([])
@@ -94,18 +101,19 @@ describe("Slack's notification schedule: when Juno writes", () => {
   })
 
   it('changing the hours writes once, with the last values', async () => {
-    const engine = await withSchedule(weekdays)
-    await settled(engine)
+    // The app's own wait, so the two changes fall inside it however slow the machine.
+    const engine = await withSchedule(weekdays, APP_DEBOUNCE_MILLIS)
+    await settled(engine, APP_DEBOUNCE_MILLIS)
     engine.fake.resetCalls()
     valueOf(await setHours(engine, { days: [1, 2, 3, 4, 5], from: 8 * 60, to: 19 * 60 }))
     valueOf(await setHours(engine, { days: [1, 2, 3, 4, 5], from: 8 * 60, to: 18 * 60 + 30 }))
     await waitFor(() => (writes(engine).length > 0 ? true : undefined), 10_000, 'the write')
-    await settled(engine)
+    await settled(engine, APP_DEBOUNCE_MILLIS)
     expect(writes(engine)).toEqual([{ dnd_enabled: true, dnd_days: 'weekdays', dnd_start_hour: '18:30', dnd_end_hour: '08:00' }])
     // Presence hours are not Slack's schedule.
     engine.fake.resetCalls()
     valueOf(await runCommand(engine.registry, notificationsSetHours, { which: 'presence', hours: { days: [1, 2, 3], from: 600, to: 960 } }))
-    await settled(engine)
+    await settled(engine, APP_DEBOUNCE_MILLIS)
     expect(writes(engine)).toEqual([])
   })
 

@@ -21,18 +21,19 @@
  * A top-level module like `notificationRuntime.ts`: the notifications
  * feature serves the switch and Restore through it.
  */
-import { Context, Effect, Layer, Ref, Schema, Semaphore, Stream } from 'effect'
+import { Context, Duration, Effect, Layer, Ref, Schema, Semaphore, Stream } from 'effect'
 import type { SlackScheduleView } from '@juno/contract'
 import { slackScheduleFor, slackScheduleKeys, slackScheduleMatches, slackScheduleSnapshot, type Hours, type SlackSchedulePrefs } from '@juno/domain'
 import { NotificationSettingsSchema, readSettings } from '@juno/notifications'
 import { invalidate, liveQuery, prefs, StoreReader, StoreWriter, transaction, type SqlError } from '@juno/store'
+import { EngineConfig } from './config'
 import { Outbox, type MirrorError } from './outbox'
 import { SyncLink } from './syncLink'
 import { Workspace, type StoreServices } from './workspace'
 
 const PREF = 'slackSchedule'
 /** Changing the hours on the page is two selects; one write covers both. */
-const DEBOUNCE = '1 second'
+const DEBOUNCE_MILLIS = 1_000
 
 const SchedulePrefs = Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Boolean]))
 const State = Schema.Struct({
@@ -96,9 +97,10 @@ export class SlackSchedule extends Context.Service<
     readonly restore: Effect.Effect<void, SqlError | MirrorError, StoreServices>
   }
 >()('juno/engine/SlackSchedule') {
-  static readonly layer: Layer.Layer<SlackSchedule, never, Workspace | Outbox | SyncLink> = Layer.effect(
+  static readonly layer: Layer.Layer<SlackSchedule, never, Workspace | Outbox | SyncLink | EngineConfig> = Layer.effect(
     SlackSchedule,
     Effect.gen(function* () {
+      const debounce = (yield* EngineConfig).slackScheduleDebounceMillis ?? DEBOUNCE_MILLIS
       const workspace = yield* Workspace
       const outbox = yield* Outbox
       const link = yield* SyncLink
@@ -147,7 +149,7 @@ export class SlackSchedule extends Context.Service<
             if (open === undefined) return Stream.empty
             const ends = link.caughtUps.pipe(Stream.mapEffect(() => Ref.set(caughtUp, true)))
             return Stream.merge(ends, liveQuery(['prefs', 'team'], Effect.void)).pipe(
-              Stream.debounce(DEBOUNCE),
+              Stream.debounce(Duration.millis(debounce)),
               Stream.mapEffect(() => pass),
               Stream.provide(open.context),
             )

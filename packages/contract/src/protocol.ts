@@ -40,6 +40,8 @@ export const EngineConfig = Schema.Struct({
   actionStallMillis: Schema.optionalKey(Schema.Number),
   /** Tests only: how long a new read mark waits before it is sent (the app waits 400 ms). */
   markDelayMillis: Schema.optionalKey(Schema.Number),
+  /** Tests only: how long Slack's notification schedule waits after a change before it writes (the app waits 1 s). */
+  slackScheduleDebounceMillis: Schema.optionalKey(Schema.Number),
   /** Tests only: open the cache with one more migration, as the next build would, to test that an update keeps the cache. */
   cacheMigrationProbe: Schema.optionalKey(Schema.Boolean),
 })
