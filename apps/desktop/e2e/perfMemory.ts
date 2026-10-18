@@ -4,8 +4,12 @@ import type { Juno } from './driver/juno'
 import { hooks, type RunningApp } from './fixtures'
 import { privateMemory } from './perfStats'
 
-/** The memory budgets of performance.md section 1, MB of private memory. */
-export const MEMORY_BUDGETS = { main: 80, renderer: 250, engine: 300 } as const
+/**
+ * The heavy scenario's budgets (performance.md section 1), MB of private memory after its 30 s idle. The
+ * renderer has 300 MB here, not the 250 MB of the scroll and memory scenario: after a scrolling peak Chromium
+ * keeps the freed pages of its allocators, which nothing in the app holds (8.11, owner 10-18).
+ */
+export const HEAVY_MEMORY_BUDGETS = { main: 80, renderer: 300, engine: 300 } as const
 
 export interface MemoryReading {
   /** Private memory per process, MB; undefined off macOS. */

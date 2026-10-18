@@ -16,7 +16,7 @@ import { privateMemory, stats } from './perfStats'
 import { traced } from './perfTrace'
 import { scrollReading } from './perfScroll'
 import { selectionDragReading } from './perfSelection'
-import { heavyUse, MEMORY_BUDGETS, memoryDump, readMemory } from './perfMemory'
+import { HEAVY_MEMORY_BUDGETS, heavyUse, memoryDump, readMemory } from './perfMemory'
 import { typingReading } from './perfTyping'
 import { answer } from './juno-agent/chat'
 import { Juno, press, type SidebarFilterName } from './driver/juno'
@@ -728,8 +728,8 @@ test.describe('large workspace', () => {
       await readMemory(running, 'memory after launch')
       if (process.env['JUNO_MEMORY_DUMP'] !== undefined) await memoryDump(running.win, `${process.env['JUNO_MEMORY_DUMP']}-launch-live.json`, false)
       const after = await heavyUse(juno, running)
-      for (const [name, budget] of Object.entries(MEMORY_BUDGETS)) {
-        const value = after[name as keyof typeof MEMORY_BUDGETS]
+      for (const [name, budget] of Object.entries(HEAVY_MEMORY_BUDGETS)) {
+        const value = after[name as keyof typeof HEAVY_MEMORY_BUDGETS]
         if (value !== undefined) expect.soft(value, `${name} private memory after heavy use: ${value.toFixed(0)} MB against a budget of ${budget} MB`).toBeLessThanOrEqual(budget)
       }
     } finally {
