@@ -1,0 +1,1 @@
+- 10-18 13:58 · idle-cpu-platform-gates · Keep the native Window and Graphics idle budgets at 2% in a separate @mac gate; the software-rendered Linux runner uses a 15% spin ceiling for those processes, while engine, agent, network, main and other-helper limits stay the same everywhere. Both gates run the same fake-server scenarios.
