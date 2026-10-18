@@ -1,6 +1,13 @@
 # Huddles plan
 
-October 2026. Inputs: `docs/research/slack-huddles.md`, architecture sections 2, 3, 6, 7 and 15, `performance.md`, `docs/research/screen-share-detection.md`, and the code on `main` at `3d7b9c9d`. Not started; the owner says when.
+October 2026. Started 2026-10-18. Inputs: `docs/research/slack-huddles.md`, architecture sections 2, 3, 6, 7 and 15, `performance.md`, `docs/research/screen-share-detection.md`, and the code on `main` at `3d7b9c9d`. Not started; the owner says when.
+
+## How we work
+
+- One step at a time, with no wide fan-out. Each step is a small set of small commits on the branch `t3/af9c43ee`.
+- Design is finished and signed off first, so the build can go on while the owner is away.
+- Codex (GPT-6-Astra) reviews anything we are not confident in: the Quint spec, the engine's call lifecycle, the socket-events seam and the request-shape change. Claude reviews UI and design.
+- The spike (phase 2) needs the owner: a private test channel and their phone as the second participant.
 
 ## 1. Scope
 
