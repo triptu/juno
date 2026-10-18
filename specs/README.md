@@ -539,6 +539,8 @@ Validation on 2026-10-14 after the WP8 and WP9 alignment: the full root `pnpm sp
 
 `agent-actions.qnt` also contains `agent_resolve`: the corrected/broken pair checks that Undo retains the host receipt, so a repeated dispatch cannot resolve the topic again.
 
+`retryRefused` (decision of 10-18) is the owner's Retry in the topic on a send Slack refused: the outbox posts it as the owner's own send, the agent makes no attempt, and its card takes the receipt. `effectsWithinAttempts` says a send lands at most once per attempt Juno made; the `retryTwice` bug, a destination that takes the retried post twice, breaks it.
+
 `agent-actions.qnt` also contains `agent_host_gate` (decision of 10-18): the host's own check on writes to Slack, under an agent that may dispatch any action, payload and authorization. The owner's click is recorded with the engine as the card shows it. `writesClicked` says every write is a click on that action with that payload, so Juno never writes on its own; `oneWritePerAction` says a replay or a second authorization writes nothing more. Random runs check both; `payloadBugStep` (a host that checks only the action) and `reuseBugStep` (a host that lets a second authorization take a used click) each break one. The code is `packages/engine/src/agent-host/approvals.ts` and `packages/agent-juno/src/dispatch.ts`.
 
 ## Request pacing
