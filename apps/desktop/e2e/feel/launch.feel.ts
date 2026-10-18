@@ -43,7 +43,7 @@ test('relaunch while Slack checks the session never shows the sign-in page', asy
       name: 'relaunch-checking', title: 'Relaunch while Slack checks the session',
       probes: [
         { kind: 'box', name: 'signIn', selector: '#sign-in-title' },
-        { kind: 'box', name: 'sidebar', selector: '[role="complementary"][aria-label="Sidebar"]' },
+        { kind: 'box', name: 'sidebar', selector: 'aside[aria-label="Sidebar"]' },
       ],
       checks: [(evidence) => {
         const { frames } = evidence.recording

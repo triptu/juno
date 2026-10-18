@@ -81,7 +81,7 @@ async function watchSignInFrames(win: Page): Promise<() => Promise<{ readonly fr
     const tick = () => {
       state.frames += 1
       if (document.getElementById('sign-in-title') !== null) state.signIn += 1
-      if (document.querySelector('[role="complementary"][aria-label="Sidebar"]') !== null) state.shell += 1
+      if (document.querySelector('aside[aria-label="Sidebar"]') !== null) state.shell += 1
       if (state.on) requestAnimationFrame(tick)
     }
     tick()
