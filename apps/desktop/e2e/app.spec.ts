@@ -22,60 +22,95 @@ function brightness(rgb: string): number {
   return (r + g + b) / 3
 }
 
-test('renders the shell with bundled fonts and token colours', async ({ win }) => {
-  await expect(win).toHaveTitle('Juno')
+// Signed out, on the sign-in page. The theme switch goes last, so the other steps see the light theme.
+test('the signed-out shell: fonts, colours, the bridge and the theme', async ({ win }) => {
+  await test.step('renders the shell with bundled fonts and token colours', async () => {
+    await expect(win).toHaveTitle('Juno')
 
-  const title = win.getByRole('heading', { name: "Hi, I'm Juno", level: 1, exact: true })
-  await expect(title).toBeVisible()
+    const title = win.getByRole('heading', { name: "Hi, I'm Juno", level: 1, exact: true })
+    await expect(title).toBeVisible()
 
-  const button = win.getByRole('button', { name: 'Sign in to Slack' })
-  await expect(button).toBeVisible()
+    const button = win.getByRole('button', { name: 'Sign in to Slack' })
+    await expect(button).toBeVisible()
 
-  // Fonts come from @fontsource, not the system or the network.
-  await win.evaluate(() => document.fonts.ready)
-  await expect(title).toHaveCSS('font-family', /Instrument Serif/)
-  await expect(button).toHaveCSS('font-family', /Figtree Variable/)
-  const loaded = await win.evaluate(() => ({
-    serif: document.fonts.check('24px "Instrument Serif"'),
-    sans: document.fonts.check('16px "Figtree Variable"'),
-  }))
-  expect(loaded).toEqual({ serif: true, sans: true })
+    // Fonts come from @fontsource, not the system or the network.
+    await win.evaluate(() => document.fonts.ready)
+    await expect(title).toHaveCSS('font-family', /Instrument Serif/)
+    await expect(button).toHaveCSS('font-family', /Figtree Variable/)
+    const loaded = await win.evaluate(() => ({
+      serif: document.fonts.check('24px "Instrument Serif"'),
+      sans: document.fonts.check('16px "Figtree Variable"'),
+    }))
+    expect(loaded).toEqual({ serif: true, sans: true })
 
-  // The page background is the --background token, and the button uses the
-  // arrow cursor, never the pointer.
-  const main = win.getByRole('main')
-  await expect(main).toHaveCSS('background-color', await resolveColorVar(win, '--background'))
-  await expect(button).toHaveCSS('cursor', 'default')
-})
-
-test('only the title bars drag the window, and every control on them opts out', async ({ juno, win }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.sidebar.expectRows()
-  const report = await win.evaluate(() => {
-    const region = (node: Element) => getComputedStyle(node).getPropertyValue('-webkit-app-region')
-    const all = [...document.querySelectorAll('*')]
-    const drags = all.filter((node) => region(node) === 'drag')
-    const overlaps = (a: DOMRect, b: DOMRect) => a.width > 0 && a.height > 0 && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
-    const uncovered: string[] = []
-    for (const control of document.querySelectorAll('button, a[href], input, textarea, select, [role="tab"], [role="row"], [tabindex]')) {
-      const box = control.getBoundingClientRect()
-      if (!drags.some((drag) => overlaps(box, drag.getBoundingClientRect()))) continue
-      let covered = false
-      for (let node: Element | null = control; node !== null && region(node) !== 'drag'; node = node.parentElement) {
-        if (region(node) === 'no-drag') covered = true
-      }
-      if (!covered) uncovered.push(control.getAttribute('aria-label') ?? control.textContent?.slice(0, 40) ?? control.tagName)
-    }
-    // The property is inherited: count where a region starts.
-    const holders = all.filter((node) => (region(node) === 'no-drag' || region(node) === 'drag') && (node.parentElement === null || region(node.parentElement) !== region(node))).map((node) => `${node.tagName.toLowerCase()}${node.getAttribute('role') === null ? '' : `[${node.getAttribute('role')}]`} ${node.getAttribute('aria-label') ?? ''}`.trim())
-    return { drags: drags.length, regions: holders.length, holders, uncovered }
+    // The page background is the --background token, and the button uses the
+    // arrow cursor, never the pointer.
+    const main = win.getByRole('main')
+    await expect(main).toHaveCSS('background-color', await resolveColorVar(win, '--background'))
+    await expect(button).toHaveCSS('cursor', 'default')
   })
-  // The sidebar's top bar and the tab strip at least.
-  expect(report.drags).toBeGreaterThanOrEqual(2)
-  expect(report.uncovered).toEqual([])
-  // Regions sit on the title bars' groups, not on every control: each one is redrawn every frame it moves (performance.md 8.5).
-  expect(report.regions, report.holders.join(', ')).toBeLessThan(20)
+
+  await test.step('exposes only the bridge to the page', async () => {
+    await expect(win.getByRole('heading', { name: "Hi, I'm Juno", exact: true })).toBeVisible()
+    const exposed = await win.evaluate(() => {
+      const globals = window as unknown as Record<string, unknown>
+      return {
+        require: typeof globals['require'],
+        process: typeof globals['process'],
+        juno: Object.keys(window.juno),
+        updates: Object.keys(window.juno.updates),
+        app: Object.keys(window.juno.app),
+        engine: Object.keys(window.juno.engine),
+        agent: Object.keys(window.juno.agent),
+        launch: Object.keys(window.juno.launch),
+        window: Object.keys(window.juno.window),
+        sharing: Object.keys(window.juno.sharing),
+        contextMenu: Object.keys(window.juno.contextMenu),
+        shell: Object.keys(window.juno.shell),
+        clipboard: Object.keys(window.juno.clipboard),
+        menu: Object.keys(window.juno.menu),
+        notifications: Object.keys(window.juno.notifications),
+        webPanel: Object.keys(window.juno.webPanel),
+      }
+    })
+    expect(exposed).toEqual({
+      require: 'undefined',
+      process: 'undefined',
+      juno: ['updates', 'app', 'engine', 'agent', 'launch', 'window', 'sharing', 'contextMenu', 'shell', 'clipboard', 'menu', 'notifications', 'webPanel'],
+      updates: ['get', 'set', 'restart', 'download', 'notes', 'onChange'],
+      app: ['getInfo', 'diagnostics', 'logDiagnostics', 'showLogs', 'reportState'],
+      engine: ['requestPort', 'restart'],
+      agent: ['requestPort', 'setOpenRouterKey', 'provider', 'setProvider', 'codex', 'codexSignIn', 'onProvider', 'chooseFolder', 'recoveryPhrase', 'typeRecoveryPhrase'],
+      launch: ['setTheme', 'setAccent', 'setDensity', 'setPrivacy', 'setSidebar', 'onPrivacy'],
+      window: ['onFullScreen'],
+      sharing: ['get', 'set'],
+      contextMenu: ['popup'],
+      shell: ['openExternal', 'openInSlack', 'editUndo', 'downloadFile', 'openFile'],
+      clipboard: ['writeText', 'writeImage'],
+      menu: ['onCommand'],
+      notifications: ['setViewing', 'onOpen', 'test', 'permission', 'requestPermission', 'openSettings'],
+      webPanel: ['show', 'setBounds', 'hide', 'close', 'onState'],
+    })
+  })
+
+  await test.step('switches to the dark theme in place', async () => {
+    const main = win.getByRole('main')
+    const lightBackground = await resolveColorVar(win, '--background')
+    await expect(main).toHaveCSS('background-color', lightBackground)
+
+    const dark = win.getByRole('radio', { name: 'Dark' })
+    await expect(dark).toHaveAttribute('aria-checked', 'false')
+    await dark.click()
+
+    await expect(dark).toHaveAttribute('aria-checked', 'true')
+    const darkBackground = await resolveColorVar(win, '--background')
+    expect(darkBackground).not.toBe(lightBackground)
+    expect(brightness(darkBackground)).toBeLessThan(brightness(lightBackground))
+    await expect(main).toHaveCSS('background-color', darkBackground)
+
+    await win.getByRole('radio', { name: 'Light' }).click()
+    await expect(main).toHaveCSS('background-color', lightBackground)
+  })
 })
 
 /**
@@ -98,119 +133,90 @@ async function expectOptsOut(surface: Locator, name: string): Promise<void> {
   expect(found.drags, `${name}: nothing inside may drag`).toBe(0)
 }
 
-test('every surface that can open over a title bar opts out of its drag region', async ({ juno, win, fake }) => {
+// Signed in. The drag regions are counted first, before any surface has opened.
+test('the signed-in shell: drag regions, surfaces over the title bars, and the build line', async ({ juno, win, fake, app }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { sidebar, topic, palette, tabs, write } = juno
 
-  await win.locator('aside [aria-label="Account and settings"]').click()
-  await expectOptsOut(win.getByRole('menu', { name: 'Account' }), 'avatar menu')
-  await win.keyboard.press('Escape')
-
-  await sidebar.root.getByRole('button', { name: 'New view', exact: true }).click()
-  await expectOptsOut(sidebar.viewSheet, 'view sheet')
-  await sidebar.viewSheet.getByRole('button', { name: 'Cancel' }).click()
-  await expect(sidebar.viewSheet).toHaveCount(0)
-
-  await palette.open()
-  await expectOptsOut(win.getByRole('dialog', { name: 'Search and commands' }), 'palette')
-  await win.keyboard.press('Escape')
-
-  await sidebar.row('#eng').open()
-  await topic.expectTitle('Main')
-  await topic.openSwitcher()
-  await expectOptsOut(win.locator('[data-topic-switcher]'), 'topic switcher')
-  await win.keyboard.press('Escape')
-
-  fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Drag region check' })
-  const row = topic.message('Drag region check')
-  await row.hover()
-  await row.getByRole('button', { name: 'More reactions' }).click()
-  await expectOptsOut(win.locator('[data-floating="picker"]'), 'emoji picker')
-  await win.keyboard.press('Escape')
-
-  await tabs.newTabButton.click()
-  await tabs.expectActive('Home')
-  await write.chip.click()
-  await expectOptsOut(write.list, 'destination list')
-  await win.keyboard.press('Escape')
-  await write.composer.pressSequentially('@ma')
-  await expectOptsOut(write.sendTo, 'Send to list')
-  await win.keyboard.press('Escape')
-  await write.composer.fill('')
-  await write.pickConversation('eng', 'eng')
-  await write.composer.pressSequentially('Ask @ma')
-  await expectOptsOut(write.suggestions, 'mention suggestions')
-})
-
-test('answers app.getInfo over the typed IPC bridge', async ({ juno, app }) => {
-  await juno.signIn()
-  const version = await app.evaluate((electronModule) => electronModule.app.getVersion())
-  const electron = await app.evaluate(() => process.versions.electron)
-  // The build line is in Settings › About.
-  await juno.openSettings('About')
-  await expect(juno.settings.root.getByText(`Juno ${version} on ${process.platform}, Electron ${electron}`)).toBeVisible()
-})
-
-test('switches to the dark theme in place', async ({ win }) => {
-  const main = win.getByRole('main')
-  const lightBackground = await resolveColorVar(win, '--background')
-  await expect(main).toHaveCSS('background-color', lightBackground)
-
-  const dark = win.getByRole('radio', { name: 'Dark' })
-  await expect(dark).toHaveAttribute('aria-checked', 'false')
-  await dark.click()
-
-  await expect(dark).toHaveAttribute('aria-checked', 'true')
-  const darkBackground = await resolveColorVar(win, '--background')
-  expect(darkBackground).not.toBe(lightBackground)
-  expect(brightness(darkBackground)).toBeLessThan(brightness(lightBackground))
-  await expect(main).toHaveCSS('background-color', darkBackground)
-
-  await win.getByRole('radio', { name: 'Light' }).click()
-  await expect(main).toHaveCSS('background-color', lightBackground)
-})
-
-test('exposes only the bridge to the page', async ({ win }) => {
-  await expect(win.getByRole('heading', { name: "Hi, I'm Juno", exact: true })).toBeVisible()
-  const exposed = await win.evaluate(() => {
-    const globals = window as unknown as Record<string, unknown>
-    return {
-      require: typeof globals['require'],
-      process: typeof globals['process'],
-      juno: Object.keys(window.juno),
-      updates: Object.keys(window.juno.updates),
-      app: Object.keys(window.juno.app),
-      engine: Object.keys(window.juno.engine),
-      agent: Object.keys(window.juno.agent),
-      launch: Object.keys(window.juno.launch),
-      window: Object.keys(window.juno.window),
-      sharing: Object.keys(window.juno.sharing),
-      contextMenu: Object.keys(window.juno.contextMenu),
-      shell: Object.keys(window.juno.shell),
-      clipboard: Object.keys(window.juno.clipboard),
-      menu: Object.keys(window.juno.menu),
-      notifications: Object.keys(window.juno.notifications),
-      webPanel: Object.keys(window.juno.webPanel),
-    }
+  await test.step('only the title bars drag the window, and every control on them opts out', async () => {
+    await juno.sidebar.expectRows()
+    const report = await win.evaluate(() => {
+      const region = (node: Element) => getComputedStyle(node).getPropertyValue('-webkit-app-region')
+      const all = [...document.querySelectorAll('*')]
+      const drags = all.filter((node) => region(node) === 'drag')
+      const overlaps = (a: DOMRect, b: DOMRect) => a.width > 0 && a.height > 0 && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
+      const uncovered: string[] = []
+      for (const control of document.querySelectorAll('button, a[href], input, textarea, select, [role="tab"], [role="row"], [tabindex]')) {
+        const box = control.getBoundingClientRect()
+        if (!drags.some((drag) => overlaps(box, drag.getBoundingClientRect()))) continue
+        let covered = false
+        for (let node: Element | null = control; node !== null && region(node) !== 'drag'; node = node.parentElement) {
+          if (region(node) === 'no-drag') covered = true
+        }
+        if (!covered) uncovered.push(control.getAttribute('aria-label') ?? control.textContent?.slice(0, 40) ?? control.tagName)
+      }
+      // The property is inherited: count where a region starts.
+      const holders = all.filter((node) => (region(node) === 'no-drag' || region(node) === 'drag') && (node.parentElement === null || region(node.parentElement) !== region(node))).map((node) => `${node.tagName.toLowerCase()}${node.getAttribute('role') === null ? '' : `[${node.getAttribute('role')}]`} ${node.getAttribute('aria-label') ?? ''}`.trim())
+      return { drags: drags.length, regions: holders.length, holders, uncovered }
+    })
+    // The sidebar's top bar and the tab strip at least.
+    expect(report.drags).toBeGreaterThanOrEqual(2)
+    expect(report.uncovered).toEqual([])
+    // Regions sit on the title bars' groups, not on every control: each one is redrawn every frame it moves (performance.md 8.5).
+    expect(report.regions, report.holders.join(', ')).toBeLessThan(20)
   })
-  expect(exposed).toEqual({
-    require: 'undefined',
-    process: 'undefined',
-    juno: ['updates', 'app', 'engine', 'agent', 'launch', 'window', 'sharing', 'contextMenu', 'shell', 'clipboard', 'menu', 'notifications', 'webPanel'],
-    updates: ['get', 'set', 'restart', 'download', 'notes', 'onChange'],
-    app: ['getInfo', 'diagnostics', 'logDiagnostics', 'showLogs', 'reportState'],
-    engine: ['requestPort', 'restart'],
-    agent: ['requestPort', 'setOpenRouterKey', 'provider', 'setProvider', 'codex', 'codexSignIn', 'onProvider', 'chooseFolder', 'recoveryPhrase', 'typeRecoveryPhrase'],
-    launch: ['setTheme', 'setAccent', 'setDensity', 'setPrivacy', 'setSidebar', 'onPrivacy'],
-    window: ['onFullScreen'],
-    sharing: ['get', 'set'],
-    contextMenu: ['popup'],
-    shell: ['openExternal', 'openInSlack', 'editUndo', 'downloadFile', 'openFile'],
-    clipboard: ['writeText', 'writeImage'],
-    menu: ['onCommand'],
-    notifications: ['setViewing', 'onOpen', 'test', 'permission', 'requestPermission', 'openSettings'],
-    webPanel: ['show', 'setBounds', 'hide', 'close', 'onState'],
+
+  await test.step('every surface that can open over a title bar opts out of its drag region', async () => {
+    await win.locator('aside [aria-label="Account and settings"]').click()
+    await expectOptsOut(win.getByRole('menu', { name: 'Account' }), 'avatar menu')
+    await win.keyboard.press('Escape')
+
+    await sidebar.root.getByRole('button', { name: 'New view', exact: true }).click()
+    await expectOptsOut(sidebar.viewSheet, 'view sheet')
+    await sidebar.viewSheet.getByRole('button', { name: 'Cancel' }).click()
+    await expect(sidebar.viewSheet).toHaveCount(0)
+
+    await palette.open()
+    await expectOptsOut(win.getByRole('dialog', { name: 'Search and commands' }), 'palette')
+    await win.keyboard.press('Escape')
+
+    await sidebar.row('#eng').open()
+    await topic.expectTitle('Main')
+    await topic.openSwitcher()
+    await expectOptsOut(win.locator('[data-topic-switcher]'), 'topic switcher')
+    await win.keyboard.press('Escape')
+
+    fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Drag region check' })
+    const row = topic.message('Drag region check')
+    await row.hover()
+    await row.getByRole('button', { name: 'More reactions' }).click()
+    await expectOptsOut(win.locator('[data-floating="picker"]'), 'emoji picker')
+    await win.keyboard.press('Escape')
+
+    await tabs.newTabButton.click()
+    await tabs.expectActive('Home')
+    await write.chip.click()
+    await expectOptsOut(write.list, 'destination list')
+    await win.keyboard.press('Escape')
+    await write.composer.pressSequentially('@ma')
+    await expectOptsOut(write.sendTo, 'Send to list')
+    await win.keyboard.press('Escape')
+    await write.composer.fill('')
+    await write.pickConversation('eng', 'eng')
+    await write.composer.pressSequentially('Ask @ma')
+    await expectOptsOut(write.suggestions, 'mention suggestions')
+  })
+
+  await test.step('answers app.getInfo over the typed IPC bridge', async () => {
+    // Close the mention suggestions and empty the field the step above left.
+    await win.keyboard.press('Escape')
+    await write.composer.fill('')
+    const version = await app.evaluate((electronModule) => electronModule.app.getVersion())
+    const electron = await app.evaluate(() => process.versions.electron)
+    // The build line is in Settings › About.
+    await juno.openSettings('About')
+    await expect(juno.settings.root.getByText(`Juno ${version} on ${process.platform}, Electron ${electron}`)).toBeVisible()
   })
 })
 
