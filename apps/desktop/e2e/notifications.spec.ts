@@ -2,8 +2,9 @@
  * Notifications from the owner's side (SPEC 14): Notify me on a channel,
  * thread or person, the OS notification and its click (also on a topic
  * already open in a tab), why a message did or did not notify, the
- * Notifications and Ignored sections of Settings, and Set yourself
- * away or active, and the test notification and macOS permission line.
+ * Notifications and Ignored sections of Settings, and the test
+ * notification and macOS permission line. Set yourself away and active
+ * is in presence.spec.ts.
  * Main records OS notifications instead of showing them
  * (`junoTest.notifications`) and fakes macOS's permission
  * (`junoTest.notificationPermission`).
@@ -111,112 +112,92 @@ test('a topic on screen in a focused window does not notify, and unread mentions
   await expect.poll(async () => (await juno.osNotifications()).map((notification) => notification.body), { timeout: 15_000 }).toContain('Disk at 95% on db-2')
 })
 
-test('Settings › Notifications saves hours and what matters, and Appearance changes the density', async ({ juno }) => {
+// The defaults are read first, before any step changes a setting.
+test('Settings: Notifications and Appearance save, the test notification and permission line, and Ignored', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await juno.openNotifications()
-  const page = juno.notifications
 
-  await page.setFrom('Notifications', '10am')
-  await page.setTo('Active in Slack', '8pm')
-  await page.day('Notifications', 'Saturday').click()
-  await page.writeMatters('The launch and hiring.')
+  await test.step('Settings › Notifications saves hours and what matters, and Appearance changes the density', async () => {
+    await juno.openNotifications()
+    const page = juno.notifications
 
-  // Every value comes back from the engine: close Settings and open it again.
-  await juno.tabs.close('Settings')
-  await juno.openNotifications()
-  await expect(page.root.getByRole('combobox', { name: 'Notifications from' })).toHaveValue(String(10 * 60))
-  await expect(page.root.getByRole('combobox', { name: 'Active in Slack to' })).toHaveValue(String(20 * 60))
-  await expect(page.day('Notifications', 'Saturday')).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.day('Active in Slack', 'Saturday')).toHaveAttribute('aria-pressed', 'false')
-  await expect(page.matters).toHaveValue('The launch and hiring.')
+    await page.setFrom('Notifications', '10am')
+    await page.setTo('Active in Slack', '8pm')
+    await page.day('Notifications', 'Saturday').click()
+    await page.writeMatters('The launch and hiring.')
 
-  // Settings is one tab: the avatar menu's Settings shows General in it, and the list moves between sections.
-  await juno.openSettings('Appearance')
-  await expect(juno.tabs.tab('Settings')).toHaveCount(1)
-  await expect(juno.settings.themeRadio('System')).toHaveAttribute('aria-checked', 'true')
-  // Compact is the default for a user who never chose one.
-  await expect(juno.settings.densityRadio('Compact')).toHaveAttribute('aria-checked', 'true')
-  await expect.poll(() => juno.win.evaluate(() => document.documentElement.dataset['density'])).toBe('compact')
-  await juno.settings.densityRadio('Comfortable').click()
-  await expect.poll(() => juno.win.evaluate(() => document.documentElement.dataset['density'])).toBe('comfortable')
-  await juno.settings.show('Notifications')
-  await expect(page.matters).toHaveValue('The launch and hiring.')
-})
+    // Every value comes back from the engine: close Settings and open it again.
+    await juno.tabs.close('Settings')
+    await juno.openNotifications()
+    await expect(page.root.getByRole('combobox', { name: 'Notifications from' })).toHaveValue(String(10 * 60))
+    await expect(page.root.getByRole('combobox', { name: 'Active in Slack to' })).toHaveValue(String(20 * 60))
+    await expect(page.day('Notifications', 'Saturday')).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.day('Active in Slack', 'Saturday')).toHaveAttribute('aria-pressed', 'false')
+    await expect(page.matters).toHaveValue('The launch and hiring.')
 
-test('Send test notification posts one notification, and a line shows when macOS does not let Juno notify', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.openNotifications()
-  const page = juno.notifications
-  const line = page.root.getByRole('status', { name: 'Notification permission' })
-  const test = { title: 'Juno', body: 'Notifications from Juno look like this.' }
+    // Settings is one tab: the avatar menu's Settings shows General in it, and the list moves between sections.
+    await juno.openSettings('Appearance')
+    await expect(juno.tabs.tab('Settings')).toHaveCount(1)
+    await expect(juno.settings.themeRadio('System')).toHaveAttribute('aria-checked', 'true')
+    // Compact is the default for a user who never chose one.
+    await expect(juno.settings.densityRadio('Compact')).toHaveAttribute('aria-checked', 'true')
+    await expect.poll(() => juno.win.evaluate(() => document.documentElement.dataset['density'])).toBe('compact')
+    await juno.settings.densityRadio('Comfortable').click()
+    await expect.poll(() => juno.win.evaluate(() => document.documentElement.dataset['density'])).toBe('comfortable')
+    await juno.settings.show('Notifications')
+    await expect(page.matters).toHaveValue('The launch and hiring.')
+  })
 
-  // Allowed: no line, and the button posts one notification the way a message's is posted.
-  await expect(page.root.getByRole('button', { name: 'Send test notification' })).toBeVisible()
-  await expect(line).toHaveCount(0)
-  await page.root.getByRole('button', { name: 'Send test notification' }).click()
-  await expect.poll(async () => (await juno.osNotifications()).filter((shown) => shown.title === test.title && shown.body === test.body)).toHaveLength(1)
+  await test.step('Send test notification posts one notification, and a line shows when macOS does not let Juno notify', async () => {
+    await juno.openNotifications()
+    const page = juno.notifications
+    const line = page.root.getByRole('status', { name: 'Notification permission' })
+    const test = { title: 'Juno', body: 'Notifications from Juno look like this.' }
 
-  // Denied: the line and Open Notification Settings, read again when the window regains focus.
-  await juno.setNotificationPermission('denied')
-  await juno.win.evaluate(() => window.dispatchEvent(new Event('focus')))
-  await expect(line).toContainText("macOS is not showing Juno's notifications.")
-  await line.getByRole('button', { name: 'Open Notification Settings' }).click()
-  await expect.poll(() => juno.notificationSettingsOpened()).toBe(1)
+    // Allowed: no line, and the button posts one notification the way a message's is posted.
+    await expect(page.root.getByRole('button', { name: 'Send test notification' })).toBeVisible()
+    await expect(line).toHaveCount(0)
+    await page.root.getByRole('button', { name: 'Send test notification' }).click()
+    await expect.poll(async () => (await juno.osNotifications()).filter((shown) => shown.title === test.title && shown.body === test.body)).toHaveLength(1)
 
-  // Turned on in System Settings: back in Juno, the line goes.
-  await juno.setNotificationPermission('allowed')
-  await juno.win.evaluate(() => window.dispatchEvent(new Event('focus')))
-  await expect(line).toHaveCount(0)
+    // Denied: the line and Open Notification Settings, read again when the window regains focus.
+    await juno.setNotificationPermission('denied')
+    await juno.win.evaluate(() => window.dispatchEvent(new Event('focus')))
+    await expect(line).toContainText("macOS is not showing Juno's notifications.")
+    await line.getByRole('button', { name: 'Open Notification Settings' }).click()
+    await expect.poll(() => juno.notificationSettingsOpened()).toBe(1)
 
-  // Not asked yet: the action asks macOS instead, and the line goes once allowed.
-  await juno.setNotificationPermission('notDetermined')
-  await juno.win.evaluate(() => window.dispatchEvent(new Event('focus')))
-  await line.getByRole('button', { name: 'Allow notifications' }).click()
-  await expect(line).toHaveCount(0)
-  expect(await juno.notificationSettingsOpened()).toBe(1)
-})
+    // Turned on in System Settings: back in Juno, the line goes.
+    await juno.setNotificationPermission('allowed')
+    await juno.win.evaluate(() => window.dispatchEvent(new Event('focus')))
+    await expect(line).toHaveCount(0)
 
-test('Set yourself away and active from the avatar menu sets Slack presence', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.accountMenu.open()
-  // The schedule applied at launch decides where it starts.
-  const away = juno.accountMenu.item('Set yourself away')
-  const startsActive = (await away.count()) > 0
-  slack.resetCalls()
-  await juno.accountMenu.item(startsActive ? 'Set yourself away' : 'Set yourself active').click()
-  await slack.expectPresenceSet(startsActive ? 'away' : 'active')
-  await juno.accountMenu.open()
-  await expect(juno.accountMenu.item(startsActive ? 'Set yourself active' : 'Set yourself away')).toBeVisible()
-  await juno.accountMenu.expectPresence(startsActive ? /^Away/ : /^Active/)
+    // Not asked yet: the action asks macOS instead, and the line goes once allowed.
+    await juno.setNotificationPermission('notDetermined')
+    await juno.win.evaluate(() => window.dispatchEvent(new Event('focus')))
+    await line.getByRole('button', { name: 'Allow notifications' }).click()
+    await expect(line).toHaveCount(0)
+    expect(await juno.notificationSettingsOpened()).toBe(1)
+  })
 
-  // And back.
-  slack.resetCalls()
-  await juno.accountMenu.item(startsActive ? 'Set yourself active' : 'Set yourself away').click()
-  await slack.expectPresenceSet(startsActive ? 'active' : 'away')
-})
+  await test.step('Settings › Ignored lists an ignored channel, and Stop ignoring has Undo', async () => {
+    await juno.openSettings('Ignored')
+    const settings = juno.settings
+    await expect(settings.root.getByText('Nothing ignored.')).toBeVisible()
 
-test('Settings › Ignored lists an ignored channel, and Stop ignoring has Undo', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.openSettings('Ignored')
-  const settings = juno.settings
-  await expect(settings.root.getByText('Nothing ignored.')).toBeVisible()
+    await juno.sidebar.selectView('Automated')
+    await juno.sidebar.row(ALERTS_MAIN).chooseInMenu('ignore-channel')
+    await juno.expectToast('Ignoring #alerts-prod')
+    await juno.tabs.select('Settings')
+    await expect(settings.ignored('alerts-prod')).toContainText('Nothing hidden yet')
 
-  await juno.sidebar.selectView('Automated')
-  await juno.sidebar.row(ALERTS_MAIN).chooseInMenu('ignore-channel')
-  await juno.expectToast('Ignoring #alerts-prod')
-  await juno.tabs.select('Settings')
-  await expect(settings.ignored('alerts-prod')).toContainText('Nothing hidden yet')
-
-  await settings.stopIgnoring('alerts-prod')
-  await juno.expectToast('Stopped ignoring #alerts-prod')
-  await expect(settings.root.getByText('Nothing ignored.')).toBeVisible()
-  await juno.undoFromToast()
-  await expect(settings.ignored('alerts-prod')).toBeVisible()
-  await expect(settings.root.getByText('Nothing ignored.')).toHaveCount(0)
+    await settings.stopIgnoring('alerts-prod')
+    await juno.expectToast('Stopped ignoring #alerts-prod')
+    await expect(settings.root.getByText('Nothing ignored.')).toBeVisible()
+    await juno.undoFromToast()
+    await expect(settings.ignored('alerts-prod')).toBeVisible()
+    await expect(settings.root.getByText('Nothing ignored.')).toHaveCount(0)
+  })
 })
 
 const longThread = test.extend({
