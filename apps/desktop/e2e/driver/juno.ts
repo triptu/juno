@@ -819,9 +819,7 @@ export class Juno {
    * "Set up Juno" unless `skipSetUp` is false.
    */
   async signIn(options: { readonly email?: string; readonly skipSetUp?: boolean } = {}): Promise<void> {
-    const opened = this.app.waitForEvent('window')
-    await this.signInButton.click()
-    const page = await opened
+    const page = await this.openSignInWindow()
     await page.getByPlaceholder('Email').fill(options.email ?? 'tushar@juno-fake.test')
     await page.getByPlaceholder('Password').fill('password')
     await Promise.all([page.waitForEvent('close'), page.getByRole('button', { name: 'Sign in' }).click()])
@@ -844,10 +842,19 @@ export class Juno {
 
   /** Clicks "Sign in to Slack" and closes the window without signing in. */
   async abandonSignIn(): Promise<void> {
-    const opened = this.app.waitForEvent('window')
-    await this.signInButton.click()
-    const page = await opened
+    const page = await this.openSignInWindow()
     await page.close()
+  }
+
+  /**
+   * Clicks "Sign in to Slack" and returns the window it opens. The main
+   * window is never taken for it: closing that by mistake leaves the test
+   * with no app window.
+   */
+  private async openSignInWindow(): Promise<Page> {
+    const opened = this.app.waitForEvent('window', { predicate: (page) => page !== this.win })
+    await this.signInButton.click()
+    return opened
   }
 
   /** Clicks "Use the Slack app's session" and skips "Set up Juno" unless `skipSetUp` is false (as for an import that fails). The app reads the fixture directory it was launched with. */
