@@ -179,12 +179,12 @@ export const ReleaseNote = Schema.Struct({
 export type ReleaseNote = typeof ReleaseNote.Type
 
 /**
- * "What's new": `installed` is the running version's section, `update` the sections
- * between it and the found update, newest first. `failed` when the changelog
+ * "What's new": the ten newest sections, newest first, with the running version
+ * identified for the view. `failed` when the changelog
  * could not be fetched.
  */
 export const ReleaseNotes = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal('notes'), entries: Schema.Array(ReleaseNote) }),
+  Schema.Struct({ kind: Schema.Literal('notes'), installedVersion: Schema.String, availableVersions: Schema.Array(Schema.String), entries: Schema.Array(ReleaseNote) }),
   Schema.Struct({ kind: Schema.Literal('failed') }),
 ])
 export type ReleaseNotes = typeof ReleaseNotes.Type

@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ReleaseNote } from '@juno/contract'
-import { spacing } from '@juno/tokens/tokens.stylex'
-import { Button, Checkbox, Text } from '@juno/ui'
+import { layout, spacing } from '@juno/tokens/tokens.stylex'
+import { Button, Checkbox, ScrollArea, Text } from '@juno/ui'
 
 /**
  * A newer version. `restart`: downloaded by a signed build, installed by Restart to
@@ -12,7 +12,7 @@ export type UpdateOffer =
   | { readonly kind: 'download'; readonly version: string; readonly download: 'none' | 'downloading' | 'failed' }
 
 /** "What's new" once asked for: loading, failed, or the changelog's sections. Null while closed. */
-export type WhatsNew = null | { readonly for: 'installed' | 'update'; readonly notes: 'loading' | 'failed' | ReadonlyArray<ReleaseNote> }
+export type WhatsNew = null | { readonly for: 'installed' | 'update'; readonly notes: 'loading' | 'failed' | { readonly installedVersion: string; readonly availableVersions: ReadonlyArray<string>; readonly entries: ReadonlyArray<ReleaseNote> } }
 
 export interface UpdateSettingsProps {
   readonly available: boolean
@@ -33,21 +33,23 @@ function offerLine(offer: UpdateOffer): string {
   return `Juno ${offer.version} is available.`
 }
 
-function Notes({ notes }: { readonly notes: 'loading' | 'failed' | ReadonlyArray<ReleaseNote> }) {
+function Notes({ notes }: { readonly notes: 'loading' | 'failed' | { readonly installedVersion: string; readonly availableVersions: ReadonlyArray<string>; readonly entries: ReadonlyArray<ReleaseNote> } }) {
   if (notes === 'loading') return <Text variant="meta" tone="muted" as="p">Loading what's new…</Text>
   if (notes === 'failed') return <Text variant="meta" tone="muted" as="p">Could not load what's new. Try again later.</Text>
-  if (notes.length === 0) return <Text variant="meta" tone="muted" as="p">No notes for this version.</Text>
+  if (notes.entries.length === 0) return <Text variant="meta" tone="muted" as="p">No recent release notes.</Text>
   return (
-    <div {...stylex.props(styles.notes)} aria-label="What's new">
-      {notes.map((note) => (
+    <ScrollArea sx={styles.scroll} aria-label="What's new">
+      <div {...stylex.props(styles.notes)}>
+      {notes.entries.map((note) => (
         <section key={note.version} {...stylex.props(styles.note)}>
-          <Text variant="ui" weight="medium" as="h3">Juno {note.version}{note.date === null ? '' : `, ${note.date}`}</Text>
+          <div {...stylex.props(styles.heading)}><Text variant="ui" weight="medium" as="h3">Juno {note.version}{note.date === null ? '' : `, ${note.date}`}</Text>{note.version === notes.installedVersion ? <Text variant="meta" tone="muted">Installed</Text> : notes.availableVersions.includes(note.version) ? <Text variant="meta" tone="muted">Available</Text> : null}</div>
           <ul {...stylex.props(styles.lines)}>
             {note.lines.map((line, index) => <li key={index}><Text variant="body">{line}</Text></li>)}
           </ul>
         </section>
       ))}
-    </div>
+      </div>
+    </ScrollArea>
   )
 }
 
@@ -84,6 +86,8 @@ const styles = stylex.create({
     flexDirection: 'column',
     gap: spacing['--space-3'],
   },
+  scroll: { maxHeight: layout['--popover-max-height'] },
+  heading: { display: 'flex', alignItems: 'baseline', gap: spacing['--space-2'] },
   note: {
     display: 'flex',
     flexDirection: 'column',

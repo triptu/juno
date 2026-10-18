@@ -31,7 +31,7 @@ export function Updates() {
     void window.juno.updates.notes(scope)
       .then((value) => {
         const result = decodeNotes(value)
-        setWhatsNew((current) => current?.for === scope ? { for: scope, notes: result.kind === 'notes' ? result.entries : 'failed' } : current)
+        setWhatsNew((current) => current?.for === scope ? { for: scope, notes: result.kind === 'notes' ? { installedVersion: result.installedVersion, availableVersions: result.availableVersions, entries: result.entries } : 'failed' } : current)
       })
       .catch(() => setWhatsNew((current) => current?.for === scope ? { for: scope, notes: 'failed' } : current))
   }

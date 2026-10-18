@@ -55,15 +55,15 @@ async function startFakeReleases(): Promise<FakeReleases> {
     if (request.headers.authorization !== TOKEN) return response.writeHead(404).end()
     if (path === `${REPO}/releases/latest`) {
       return response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({
-        tag_name: 'v0.1.7',
+        tag_name: 'v0.1.8',
         assets: [
-          { name: 'Juno-0.1.7-arm64.dmg', url: `${fake.url}${REPO}/releases/assets/2` },
+          { name: 'Juno-0.1.8-arm64.dmg', url: `${fake.url}${REPO}/releases/assets/2` },
           { name: 'latest-mac.yml', url: `${fake.url}${REPO}/releases/assets/3` },
         ],
       }))
     }
     if (path === `${REPO}/releases/assets/2` && request.headers.accept === 'application/octet-stream') {
-      return response.writeHead(302, { location: `${filesUrl}/signed/Juno-0.1.7-arm64.dmg?sig=1` }).end()
+      return response.writeHead(302, { location: `${filesUrl}/signed/Juno-0.1.8-arm64.dmg?sig=1` }).end()
     }
     if (path === `${REPO}/contents/CHANGELOG.md`) return response.writeHead(200, { 'content-type': 'text/plain' }).end(fake.changelog)
     response.writeHead(404).end()
@@ -92,11 +92,13 @@ const withReleases = test.extend<{ releases: FakeReleases }>({
 
 withReleases('an unsigned build offers the new version as a DMG and shows what is new', async ({ juno, app, releases }) => {
   const current = await app.evaluate(({ app: electronApp }) => electronApp.getVersion())
-  expect(current).toMatch(/^0\.1\.[1-6]$/)
+  expect(current).toMatch(/^0\.1\.[1-7]$/)
   releases.changelog = [
     '# Changelog', '',
-    '## 0.1.7 - 2026-12-01', '', '- Faster search.', '',
+    '## 0.1.8 - 2026-12-01', '', '- Faster search.', '',
     `## ${current} - 2026-10-17`, '', '- Updates from the releases repository.', '',
+    '## 0.1.4 - 2026-10-01', '', '- Added topic filters.', '',
+    '## 0.1.3 - 2026-09-25', '', '- Improved startup.', '',
   ].join('\n')
   await juno.signIn()
   await juno.waitForSync()
@@ -106,10 +108,14 @@ withReleases('an unsigned build offers the new version as a DMG and shows what i
   await expect(updates).toBeEnabled()
   await expect(updates).not.toBeChecked()
 
-  // What's new for the installed version, fetched only when asked.
+  // What's new lists recent versions, fetched only when asked.
   await about.getByRole('button', { name: "What's new" }).click()
   await expect(about.getByText('Updates from the releases repository.')).toBeVisible()
-  await expect(about.getByText('Faster search.')).toHaveCount(0)
+  await expect(about.getByText('Faster search.')).toBeVisible()
+  await expect(about.getByText('Added topic filters.')).toBeVisible()
+  await expect(about.getByText('Juno 0.1.8, 2026-12-01')).toBeVisible()
+  await expect(about.getByText('Installed', { exact: true })).toBeVisible()
+  await expect(about.getByText('Available', { exact: true })).toBeVisible()
   expect(releases.api.map((request) => request.path)).toEqual([`${REPO}/contents/CHANGELOG.md`])
   await about.getByRole('button', { name: "What's new" }).click()
   await expect(about.getByText('Updates from the releases repository.')).toHaveCount(0)
@@ -117,16 +123,16 @@ withReleases('an unsigned build offers the new version as a DMG and shows what i
   // Opting in checks at once; an unsigned build offers the DMG.
   await updates.click()
   await expect(updates).toBeChecked()
-  await expect(about.getByText('Juno 0.1.7 is available.')).toBeVisible()
+  await expect(about.getByText('Juno 0.1.8 is available.')).toBeVisible()
   await expect(about.getByRole('button', { name: 'Restart to update' })).toHaveCount(0)
   await about.getByRole('button', { name: "What's new" }).nth(1).click()
   await expect(about.getByText('Faster search.')).toBeVisible()
-  await expect(about.getByText('Updates from the releases repository.')).toHaveCount(0)
+  await expect(about.getByText('Updates from the releases repository.')).toBeVisible()
 
   await about.getByRole('button', { name: 'Download the new version' }).click()
   await expect.poll(() => app.evaluate(() => (globalThis as unknown as { junoTest: { opened: string[] } }).junoTest.opened.slice())).toHaveLength(1)
   const [opened] = await app.evaluate(() => (globalThis as unknown as { junoTest: { opened: string[] } }).junoTest.opened.slice())
-  expect(opened).toMatch(/Juno-0\.1\.7-arm64\.dmg$/)
+  expect(opened).toMatch(/Juno-0\.1\.8-arm64\.dmg$/)
   expect(await readFile(opened!)).toEqual(DMG)
   await expect(about.getByRole('button', { name: 'Download the new version' })).toBeEnabled()
 

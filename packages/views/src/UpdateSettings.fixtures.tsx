@@ -6,6 +6,7 @@ const base: UpdateSettingsProps = { available: true, enabled: false, offer: null
 const notes = [
   { version: '0.3.0', date: '2026-11-02', lines: ['Peek shows the last reply.', 'Fixed a crash on sign out.'] },
   { version: '0.2.0', date: '2026-10-20', lines: ['Updates come from the releases repository.'] },
+  { version: '0.1.0', date: '2026-09-18', lines: ['Juno starts with a calm topic list.', 'Open a thread as its own topic.'] },
 ]
 export default defineFixtures(UpdateSettings, {
   Updates: {
@@ -18,7 +19,8 @@ export default defineFixtures(UpdateSettings, {
     unavailable: fixture({ ...base, available: false }),
   },
   "What's new": {
-    update: fixture({ ...base, enabled: true, offer: { kind: 'download', version: '0.3.0', download: 'none' }, whatsNew: { for: 'update', notes } }),
+    recent: fixture({ ...base, enabled: true, offer: { kind: 'download', version: '0.3.0', download: 'none' }, whatsNew: { for: 'installed', notes: { installedVersion: '0.2.0', availableVersions: ['0.3.0'], entries: notes } } }),
+    update: fixture({ ...base, enabled: true, offer: { kind: 'download', version: '0.3.0', download: 'none' }, whatsNew: { for: 'update', notes: { installedVersion: '0.2.0', availableVersions: ['0.3.0'], entries: notes } } }),
     loading: fixture({ ...base, whatsNew: { for: 'installed', notes: 'loading' } }),
     failed: fixture({ ...base, whatsNew: { for: 'installed', notes: 'failed' } }),
   },
