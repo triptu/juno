@@ -80,6 +80,55 @@ export const hostNotificationHost = Layer.effect(NotificationHost, Effect.gen(fu
 
 type Frame = Extract<SocketEvent, { readonly _tag: 'Frame' }>['frame']
 
+/** Turns one stored frame into a notification candidate, or a presence change of the user's own. */
+const frameHandler = (userId: string, sql: StoreReader['Service'], notifications: Notifications) => Effect.fn('Notifications.frame')(function* ({ frame, me }: { readonly frame: Frame; readonly me: Me }) {
+  if (frame.type === 'manual_presence_change') {
+    if (frame.user === undefined || frame.user === userId) yield* notifications.observePresence(frame.presence)
+    return
+  }
+  if (frame.type !== 'message' && frame.type !== 'desktop_notification') return
+  if (frame.type === 'message' && ('message' in frame || 'deleted_ts' in frame || !('ts' in frame))) return
+  if (!('channel' in frame) || frame.channel === undefined) return
+  const ts = frame.type === 'desktop_notification' ? frame.msg ?? frame.ts : frame.ts
+  if (ts === undefined) return
+  const user = 'user' in frame ? frame.user : undefined
+  if (user === userId) return
+  const text = frame.type === 'desktop_notification' ? frame.content : ('text' in frame ? frame.text ?? '' : '')
+  // The people the message mentions, by name: the notification's text never shows an id.
+  const mentioned = new Set([...`${text} ${'blocks' in frame ? JSON.stringify(frame.blocks ?? []) : ''}`.matchAll(/<@([UW][A-Z0-9]+)|"user_id":"([UW][A-Z0-9]+)"/g)].map((m) => (m[1] ?? m[2])!))
+  const names = new Map<string, string>()
+  if (mentioned.size > 0) {
+    for (const row of yield* sql<{ id: string; name: string | null }>`SELECT id, COALESCE(display_name, real_name, name) AS name FROM users WHERE id IN ${sql.in([...mentioned])}`) {
+      if (row.name !== null) names.set(row.id, row.name)
+    }
+  }
+  // And the groups, by handle.
+  const groupIds = new Set([...`${text} ${'blocks' in frame ? JSON.stringify(frame.blocks ?? []) : ''}`.matchAll(/<!subteam\^([A-Z0-9]+)|"usergroup_id":"([A-Z0-9]+)"/g)].map((m) => (m[1] ?? m[2])!))
+  const groups = new Map<string, { readonly handle: string }>()
+  if (groupIds.size > 0) {
+    for (const row of yield* sql<{ id: string; handle: string }>`SELECT id, handle FROM usergroups WHERE id IN ${sql.in([...groupIds])}`) groups.set(row.id, { handle: row.handle })
+  }
+  const body = messageBody(frame.type === 'desktop_notification' ? { text } : frame, { user: (id) => names.get(id), usergroup: (id) => groups.get(id) })
+  const mentionsMe = messageMentionsMe(body, me)
+  const mentionsMeDirectly = mentionsMe && messageMentionsMeDirectly(body, me)
+  const conversations = yield* sql<ConversationRow & { ignored: number; person_name: string | null; sender_name: string | null }>`SELECT c.*, ig.channel IS NOT NULL AS ignored,
+    COALESCE(u.display_name, u.real_name, u.name) AS person_name,
+    COALESCE(sender.display_name, sender.real_name, sender.name) AS sender_name FROM conversations c
+    LEFT JOIN ignored_channels ig ON ig.channel = c.id LEFT JOIN users u ON u.id = c.user_id LEFT JOIN users sender ON sender.id = ${user ?? ''} WHERE c.id = ${frame.channel}`
+  const channel = conversations[0]
+  if (channel === undefined) return
+  const threadTs = 'thread_ts' in frame ? frame.thread_ts : undefined
+  const topicId = threadTs === undefined || threadTs === ts ? `m:${channel.id}` : `t:${channel.id}:${threadTs}`
+  if (frame.type === 'message' && !mentionsMe && !isDm(channel.kind)) {
+    const { settings } = yield* readSettings
+    if (settings.channels[channel.id] !== 'every' && settings.people[user ?? ''] !== 'every' && settings.threads?.[topicId] !== 'every') return
+  }
+  yield* notifications.receive({ channel: { id: ChannelId.make(channel.id), kind: channel.kind,
+    name: channel.person_name ?? channel.name ?? (channel.kind === 'im' ? UNKNOWN_PERSON : channel.id), ignored: channel.ignored === 1 },
+    senderId: UserId.make(user ?? ''), ...(channel.sender_name === null ? {} : { senderName: channel.sender_name }), mentionsMe, mentionsMeDirectly, ts, text: plainText(body),
+    topicId })
+})
+
 /** Runs for each sync, in its scope, and shares its store and Slack client. */
 const sessionNotifications = (control: NotificationControl['Service'], host: NotificationHost, ai: AiProvider['Service']): SessionStart => Effect.gen(function* () {
   const api = yield* SlackApi
@@ -93,53 +142,7 @@ const sessionNotifications = (control: NotificationControl['Service'], host: Not
     Effect.as(true), Effect.catch(() => Effect.succeed(false)),
   ))
   yield* Effect.acquireRelease(control.attach(notifications), () => control.attach(undefined))
-  const handle = Effect.fn('Notifications.frame')(function* ({ frame, me }: { readonly frame: Frame; readonly me: Me }) {
-    if (frame.type === 'manual_presence_change') {
-      if (frame.user === undefined || frame.user === session.userId) yield* notifications.observePresence(frame.presence)
-      return
-    }
-    if (frame.type !== 'message' && frame.type !== 'desktop_notification') return
-    if (frame.type === 'message' && ('message' in frame || 'deleted_ts' in frame || !('ts' in frame))) return
-    if (!('channel' in frame) || frame.channel === undefined) return
-    const ts = frame.type === 'desktop_notification' ? frame.msg ?? frame.ts : frame.ts
-    if (ts === undefined) return
-    const user = 'user' in frame ? frame.user : undefined
-    if (user === session.userId) return
-    const text = frame.type === 'desktop_notification' ? frame.content : ('text' in frame ? frame.text ?? '' : '')
-    // The people the message mentions, by name: the notification's text never shows an id.
-    const mentioned = new Set([...`${text} ${'blocks' in frame ? JSON.stringify(frame.blocks ?? []) : ''}`.matchAll(/<@([UW][A-Z0-9]+)|"user_id":"([UW][A-Z0-9]+)"/g)].map((m) => (m[1] ?? m[2])!))
-    const names = new Map<string, string>()
-    if (mentioned.size > 0) {
-      for (const row of yield* sql<{ id: string; name: string | null }>`SELECT id, COALESCE(display_name, real_name, name) AS name FROM users WHERE id IN ${sql.in([...mentioned])}`) {
-        if (row.name !== null) names.set(row.id, row.name)
-      }
-    }
-    // And the groups, by handle.
-    const groupIds = new Set([...`${text} ${'blocks' in frame ? JSON.stringify(frame.blocks ?? []) : ''}`.matchAll(/<!subteam\^([A-Z0-9]+)|"usergroup_id":"([A-Z0-9]+)"/g)].map((m) => (m[1] ?? m[2])!))
-    const groups = new Map<string, { readonly handle: string }>()
-    if (groupIds.size > 0) {
-      for (const row of yield* sql<{ id: string; handle: string }>`SELECT id, handle FROM usergroups WHERE id IN ${sql.in([...groupIds])}`) groups.set(row.id, { handle: row.handle })
-    }
-    const body = messageBody(frame.type === 'desktop_notification' ? { text } : frame, { user: (id) => names.get(id), usergroup: (id) => groups.get(id) })
-    const mentionsMe = messageMentionsMe(body, me)
-    const mentionsMeDirectly = mentionsMe && messageMentionsMeDirectly(body, me)
-    const conversations = yield* sql<ConversationRow & { ignored: number; person_name: string | null; sender_name: string | null }>`SELECT c.*, ig.channel IS NOT NULL AS ignored,
-      COALESCE(u.display_name, u.real_name, u.name) AS person_name,
-      COALESCE(sender.display_name, sender.real_name, sender.name) AS sender_name FROM conversations c
-      LEFT JOIN ignored_channels ig ON ig.channel = c.id LEFT JOIN users u ON u.id = c.user_id LEFT JOIN users sender ON sender.id = ${user ?? ''} WHERE c.id = ${frame.channel}`
-    const channel = conversations[0]
-    if (channel === undefined) return
-    const threadTs = 'thread_ts' in frame ? frame.thread_ts : undefined
-    const topicId = threadTs === undefined || threadTs === ts ? `m:${channel.id}` : `t:${channel.id}:${threadTs}`
-    if (frame.type === 'message' && !mentionsMe && !isDm(channel.kind)) {
-      const { settings } = yield* readSettings
-      if (settings.channels[channel.id] !== 'every' && settings.people[user ?? ''] !== 'every' && settings.threads?.[topicId] !== 'every') return
-    }
-    yield* notifications.receive({ channel: { id: ChannelId.make(channel.id), kind: channel.kind,
-      name: channel.person_name ?? channel.name ?? (channel.kind === 'im' ? UNKNOWN_PERSON : channel.id), ignored: channel.ignored === 1 },
-      senderId: UserId.make(user ?? ''), ...(channel.sender_name === null ? {} : { senderName: channel.sender_name }), mentionsMe, mentionsMeDirectly, ts, text: plainText(body),
-      topicId })
-  })
+  const handle = frameHandler(session.userId, sql, notifications)
   // Re-read persisted preferences only when they change. The initial pass also catches missed starts.
   let last: string | undefined
   yield* Effect.forkScoped(Stream.runForEach(liveQuery(['prefs'], Effect.gen(function* () {
