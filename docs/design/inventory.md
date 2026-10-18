@@ -206,7 +206,7 @@ Every Main (a channel's, a DM's or a group DM's) has two lines and no line 3:
   - **Place and tags** in one flex run (gap 8). The place: the glyph 13 muted and the name (no "#"), gap 4 (the prototype's "Messages outside threads" label is gone). The glyph says only what kind of place it is: `hash` for a public channel, `lock` for a private one (title "Private channel"), `user` for a DM and `users` for a group DM. A channel's own icon is for its art, never this line. The name truncates first; then the tags follow it in order:
     - No Main tag, ever: Main is the default (decided 10-16).
     - Reopened tag: 18px, padding 0 6, radius 6, filled `--secondary-default`, no border, 11/500 subtle, title "New activity after it was resolved".
-    - No message count on any row. A Main's `chats-circle` 13 + the number of threads started since it was last read (tabular, title "3 new threads", hidden at 0) follows its title on line 1.
+    - No message count on any row. A Main's `chats-circle` 13 + the number of threads others started since it was last read (tabular, title "3 new threads", hidden at 0) follows its title on line 1. Your own threads do not count, and reading the Main clears it.
   - **Resolve** (22px) overlays the end of the line in its one cell, so it takes no width. On hover or keyboard focus it fades in (`--row-action-opacity`) while whatever reaches the end of the line fades out under its last 34px (`--row-place-mask`). Only opacity and the mask change.
 - Title text: manual title, else AI title, else first ~6 words of the first message with "…" (a cut on the end of a sentence keeps the sentence and adds no "…"; a final full stop is dropped). Main rows show the channel label ("#eng", "Maya Chen").
 
