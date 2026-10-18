@@ -1,10 +1,11 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
+import type { MemoryPersonId } from '@juno/agent-contract'
 import { chat } from '@juno/tokens/tokens.stylex'
 import { defineFixtures, scene, type FixtureFrame } from '@juno/ui'
 import { JunoHeader, JunoPanelActions, type JunoView } from '../juno-chat/JunoHeader'
 import { ActivityPage } from './ActivityPage'
-import { activity, docs, memory, NOW, remembers, scheduled } from './fixtures'
+import { activity, docsWithPeople, faces, memory, NOW, remembers, scheduled } from './fixtures'
 import { JunoPageFrame } from './JunoPageFrame'
 import { MemoryPage } from './MemoryPage'
 import { MemoryDocsPage } from './MemoryDocsPage'
@@ -53,6 +54,29 @@ const tab: FixtureFrame = { width: 960, height: 760, padded: false }
 // The panel beside a topic at its usual width.
 const panel: FixtureFrame = { width: 360, height: 760, padded: false }
 
+/** What Juno remembers with person files, or one file open. */
+const remembersPage = (person?: string) => (
+  <MemoryDocsPage
+    page={docsWithPeople}
+    now={NOW}
+    faces={faces}
+    {...(person === undefined ? {} : { person: person as MemoryPersonId })}
+    onEditStart={noop}
+    onAddStart={noop}
+    onDraftChange={noop}
+    onSave={noop}
+    onCancel={noop}
+    onDelete={noop}
+    onOpenPerson={noop}
+    onClosePerson={noop}
+    onRelationship={noop}
+    onDeleteStart={noop}
+    onDeleteCancel={noop}
+    onDeleteFile={noop}
+    pinned={<PinList page={remembers} now={NOW} onEditStart={noop} onDraftChange={noop} onSave={noop} onCancel={noop} onRemove={noop} />}
+  />
+)
+
 export default defineFixtures(
   JunoPageFrame,
   {
@@ -66,25 +90,9 @@ export default defineFixtures(
     },
     'Other pages': {
       scheduled: scene(() => framed('scheduled', <ScheduledPage page={scheduled} now={NOW} onPause={noop} onResume={noop} onEdit={noop} onDelete={noop} />), tab),
-      remembers: scene(
-        () =>
-          framed(
-            'remembers',
-            <MemoryDocsPage
-              page={docs}
-              now={NOW}
-              onEditStart={noop}
-              onAddStart={noop}
-              onDraftChange={noop}
-              onSave={noop}
-              onCancel={noop}
-              onDelete={noop}
-              pinned={<PinList page={remembers} now={NOW} onEditStart={noop} onDraftChange={noop} onSave={noop} onCancel={noop} onRemove={noop} />}
-            />,
-            'panel',
-          ),
-        panel,
-      ),
+      remembers: scene(() => framed('remembers', remembersPage(), 'panel'), panel),
+      // A person's file in place of the page, under the Juno header in the panel.
+      'remembers-person': scene(() => framed('remembers', remembersPage('U0MAYA'), 'panel'), panel),
       memory: scene(() => framed('memory', <MemoryPage page={memory} now={NOW} />), tab),
     },
   },

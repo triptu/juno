@@ -379,7 +379,6 @@ export const chatCopy = {
       deleteFile: 'Delete file',
       deleteTitle: (name: string) => `Delete what Juno knows about ${name}?`,
       deleteBody: 'Every note in this file goes. Juno won\'t start a file on them again unless you ask.',
-      knowsAbout: (name: string) => `What Juno knows about ${name}`,
       noFile: (name: string) => `Juno has no file on ${name} yet. It starts one once you message with them, or when you ask.`,
     },
   },

@@ -5,6 +5,7 @@ export { CODEX_ENABLED, JunoBackupPage, JunoSettingsPage, type JunoBackupPagePro
 export { JunoPageFrame } from './JunoPageFrame'
 export { MemoryPage } from './MemoryPage'
 export { MemoryDocsPage, type DocEditing } from './MemoryDocsPage'
+export type { PersonFaces } from './PersonFile'
 export { ProviderSection, type ProviderDrafts } from './ProviderSection'
 export { PinList } from './PinList'
 export { RulesSection } from './RulesSection'
