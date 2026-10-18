@@ -1,16 +1,18 @@
-/** Counts select conversations; conditional pages repair their cached Main and thread ranges. */
-import { compareTs, millisToTs, Ts, type CountEntry, type Message } from '@juno/slack-schema'
+/** Counts enqueue recent cached ranges; a bounded background pass drains them. */
+import { compareTs, millisToTs, Ts, type CountEntry } from '@juno/slack-schema'
 import { SlackApi } from '@juno/slack'
 import { StoreWriter, transaction } from '@juno/store'
 import { Clock, Effect } from 'effect'
 import type { BootError, BootServices } from './boot'
-import type { SyncContext } from './context'
+import { awaitEarlierFetches, type SyncContext } from './context'
 import { writeDeleted } from './events'
 import { applyPage, mainTopicOf, threadTopicOf } from './pages'
 
 interface Marker { readonly updated: string | null; readonly history_invalid: string | null }
+interface Job { readonly id: number; readonly channel: string; readonly thread: string; readonly oldest: string; readonly latest: string; readonly cursor: string | null; readonly boundary: string | null }
+export const REPAIR_CALL_LIMIT = 10
 
-/** Acknowledge only the snapshot that was repaired, never a newer counts response. */
+/** These are observed markers; unfinished work lives durably in repair_pending. */
 export const saveRepairMarkers = (entries: ReadonlyArray<CountEntry>) => Effect.gen(function* () {
   const sql = yield* StoreWriter
   for (const entry of entries) {
@@ -23,81 +25,90 @@ export const saveRepairMarkers = (entries: ReadonlyArray<CountEntry>) => Effect.
   }
 })
 
-interface Cached { readonly ts: string; readonly server_version: string | null }
-type RepairResult = { readonly kind: 'empty' } | { readonly kind: 'incomplete' } | { readonly kind: 'repaired'; readonly topic: string }
-
-/** A complete bounded range, including unchanged ids in the page's presence set. */
-const repairTopic = (ctx: SyncContext, channel: string, thread: string | null): Effect.Effect<RepairResult, BootError, BootServices> => Effect.gen(function* () {
+/** Missing baselines seed only. Partial counts preserve absent markers; any supplied difference is dirty. */
+export const queueRepairs = (ctx: SyncContext, entries: ReadonlyArray<CountEntry>) => transaction(Effect.gen(function* () {
   const sql = yield* StoreWriter
-  const known = yield* sql<Cached>`SELECT m.ts, u.server_version FROM messages m
-    LEFT JOIN message_updates u ON u.channel = m.channel AND u.ts = m.ts
-    WHERE m.channel = ${channel} AND m.deleted = 0 AND
-      (CASE WHEN ${thread} IS NULL THEN (m.thread_ts IS NULL OR m.thread_ts = m.ts OR m.subtype = 'thread_broadcast')
-        ELSE m.thread_ts = ${thread} OR m.ts = ${thread} END)
-    ORDER BY m.ts`
-  const oldest = known[0]?.ts
-  const latest = known.at(-1)?.ts
-  if (oldest === undefined || latest === undefined) return { kind: 'empty' as const }
-  const cached = Object.fromEntries(known.flatMap((m) => m.server_version === null ? [] : [[m.ts, Ts.make(m.server_version)]]))
-  const requestedMillis = yield* Clock.currentTimeMillis
-  const requestedAt = millisToTs(requestedMillis)
-  const api = yield* SlackApi
-  const present = new Set<string>()
-  const deleted = new Set<string>()
-  const topic = thread === null ? mainTopicOf(channel) : threadTopicOf(channel, thread)
-  let cursor: string | undefined
-  do {
-    const args = { channel, oldest, latest, inclusive: true, limit: ctx.config.historyPageLimit,
-      cached_latest_updates: cached, ...(cursor === undefined ? {} : { cursor }) }
-    const page = thread === null
-      ? yield* api.call('conversations.history', { ...args, ignore_replies: true, no_user_profile: true }, { lane: 'background', reason: 'mutation-repair' })
-      : yield* api.call('conversations.replies', { ...args, ts: Ts.make(thread) }, { lane: 'background', reason: 'mutation-repair' })
-    const messages: ReadonlyArray<Message> = page.messages.map((m) => {
-      const version = page.latest_updates?.[m.ts] ?? m.version
-      return { ...m, reactions: m.reactions ?? [], ...(version === undefined ? {} : { version }) }
-    })
-    for (const m of page.messages) present.add(m.ts)
-    for (const ts of page.unchanged_messages ?? []) present.add(ts)
-    for (const ts of page.deleted ?? []) deleted.add(ts)
-    yield* applyPage(ctx, channel, messages, { kind: 'page', requestedAt }, { alsoTouch: [topic] })
-    const next = page.response_metadata?.next_cursor
-    if (page.has_more && (!next || next === cursor)) {
-      // Never certify a truncated range or infer absence beyond it.
-      return { kind: 'incomplete' as const }
-    }
-    cursor = page.has_more ? next : undefined
-    yield* Effect.yieldNow
-  } while (cursor !== undefined)
-  yield* transaction(Effect.gen(function* () {
-    for (const message of known) {
-      if (!present.has(message.ts) || deleted.has(message.ts)) yield* writeDeleted(ctx, channel, message.ts, { kind: 'page', requestedAt })
-    }
-    yield* sql`INSERT INTO rechecked_topics (topic_id, requested_at, from_ts, to_ts) VALUES (${topic}, ${requestedMillis}, ${oldest}, ${latest})
-      ON CONFLICT (topic_id) DO UPDATE SET requested_at = excluded.requested_at, from_ts = excluded.from_ts, to_ts = excluded.to_ts`
-  }))
-  return { kind: 'repaired' as const, topic }
-})
-
-export const repairMutations = (ctx: SyncContext, entries: ReadonlyArray<CountEntry>): Effect.Effect<ReadonlySet<string>, BootError, BootServices> => Effect.gen(function* () {
-  const sql = yield* StoreWriter
-  const repaired = new Set<string>()
+  const from = millisToTs((yield* Clock.currentTimeMillis) - ctx.config.recheckLookbackMillis)
   for (const entry of entries) {
     const [previous] = yield* sql<Marker>`SELECT updated, history_invalid FROM conversation_repairs WHERE channel = ${entry.id}`
-    const changed = (value: string | undefined, old: string | null | undefined) => value !== undefined && (old == null || compareTs(value, old) > 0)
-    if (!changed(entry.updated, previous?.updated) && !changed(entry.history_invalid, previous?.history_invalid)) continue
-    const [member] = yield* sql`SELECT id FROM conversations WHERE id = ${entry.id} AND is_member = 1 AND is_archived = 0`
-    if (member === undefined) continue
-    const threads = yield* sql<{ thread_ts: string }>`SELECT DISTINCT thread_ts FROM messages
-      WHERE channel = ${entry.id} AND thread_ts IS NOT NULL AND deleted = 0`
-    let complete = true
-    for (const thread of [null, ...threads.map((row) => row.thread_ts)]) {
-      const result = yield* repairTopic(ctx, entry.id, thread).pipe(
-        Effect.catchTag('SlackRejected', () => Effect.succeed({ kind: 'incomplete' as const })),
-      )
-      if (result.kind === 'incomplete') complete = false
-      if (result.kind === 'repaired') repaired.add(result.topic)
+    const changed = (value: string | undefined, old: string | null) => value !== undefined && value !== old
+    if (previous !== undefined && (changed(entry.updated, previous.updated) || changed(entry.history_invalid, previous.history_invalid))) {
+      const [member] = yield* sql`SELECT id FROM conversations WHERE id = ${entry.id} AND is_member = 1 AND is_archived = 0`
+      if (member !== undefined) {
+        // Old roots fetched only for thread metadata cannot extend Main's range. A thread needs cached replies.
+        const ranges = yield* sql<{ thread: string; latest: string }>`SELECT
+          CASE WHEN thread_ts IS NOT NULL AND thread_ts <> ts AND subtype IS NOT 'thread_broadcast' THEN thread_ts ELSE '' END AS thread,
+          max(ts) AS latest FROM messages WHERE channel = ${entry.id} AND deleted = 0 AND partial = 0 AND ts >= ${from}
+          GROUP BY thread`
+        for (const range of ranges) {
+          yield* sql`INSERT INTO repair_pending (channel, thread, oldest, latest) VALUES (${entry.id}, ${range.thread}, ${from}, ${range.latest})
+            ON CONFLICT (channel, thread) DO UPDATE SET oldest = excluded.oldest, latest = excluded.latest, cursor = NULL, boundary = NULL`
+        }
+      }
     }
-    if (complete) yield* transaction(saveRepairMarkers([entry]))
+    yield* saveRepairMarkers([entry])
   }
-  return repaired
+}))
+
+/** One page only. Presence includes unchanged ids; retention-limited pages never prove absence. */
+const repairPage = (ctx: SyncContext, job: Job): Effect.Effect<void, BootError, BootServices> => Effect.gen(function* () {
+  const sql = yield* StoreWriter
+  const recent = millisToTs((yield* Clock.currentTimeMillis) - ctx.config.recheckLookbackMillis)
+  if (compareTs(job.latest, recent) < 0) {
+    yield* sql`DELETE FROM repair_pending WHERE id = ${job.id}`
+    return
+  }
+  const known = yield* sql<{ ts: string; server_version: string | null }>`SELECT m.ts, u.server_version FROM messages m
+    LEFT JOIN message_updates u ON u.channel = m.channel AND u.ts = m.ts
+    WHERE m.channel = ${job.channel} AND m.deleted = 0 AND m.ts >= ${job.oldest} AND m.ts >= ${recent} AND m.ts <= ${job.latest} AND
+      (${job.boundary} IS NULL OR CASE WHEN ${job.thread} = '' THEN m.ts < ${job.boundary} ELSE m.ts > ${job.boundary} END) AND
+      (CASE WHEN ${job.thread} = '' THEN (m.thread_ts IS NULL OR m.thread_ts = m.ts OR m.subtype = 'thread_broadcast')
+        ELSE m.thread_ts = ${job.thread} AND m.ts <> ${job.thread} END) ORDER BY m.ts`
+  const cached = Object.fromEntries(known.flatMap((m) => m.server_version === null ? [] : [[m.ts, Ts.make(m.server_version)]]))
+  const requestedAt = millisToTs(yield* Clock.currentTimeMillis)
+  const api = yield* SlackApi
+  const args = { channel: job.channel, oldest: job.oldest, latest: job.latest, inclusive: true,
+    limit: ctx.config.historyPageLimit, cached_latest_updates: cached, ...(job.cursor === null ? {} : { cursor: job.cursor }) }
+  const page = job.thread === ''
+    ? yield* api.call('conversations.history', { ...args, ignore_replies: true, no_user_profile: true }, { lane: 'background', reason: 'mutation-repair', singleAttempt: true })
+    : yield* api.call('conversations.replies', { ...args, ts: Ts.make(job.thread) }, { lane: 'background', reason: 'mutation-repair', singleAttempt: true })
+  const topic = job.thread === '' ? mainTopicOf(job.channel) : threadTopicOf(job.channel, job.thread)
+  const messages = page.messages.map((m) => ({ ...m, reactions: m.reactions ?? [] }))
+  yield* applyPage(ctx, job.channel, messages, { kind: 'page', requestedAt }, { alsoTouch: [topic], latestUpdates: page.latest_updates })
+  const present = new Set<string>([...page.messages.map((m) => m.ts), ...(page.unchanged_messages ?? [])])
+  const inRange = [...present].filter((ts) => compareTs(ts, job.oldest) >= 0 && compareTs(ts, job.latest) <= 0).sort(compareTs)
+  const edge = job.thread === '' ? inRange[0] : inRange.at(-1)
+  const next = page.response_metadata?.next_cursor
+  // A missing cursor or empty truncated page cannot certify coverage. Keep the job for another catch-up.
+  if (page.has_more && (!next || next === job.cursor || edge === undefined)) return
+  const lower = job.thread === '' && page.has_more ? edge! : job.oldest
+  const upper = job.thread !== '' && page.has_more ? edge! : job.latest
+  yield* transaction(Effect.gen(function* () {
+    if (!page.is_limited) {
+      for (const message of known) {
+        if (compareTs(message.ts, lower) >= 0 && compareTs(message.ts, upper) <= 0 && !present.has(message.ts)) {
+          yield* writeDeleted(ctx, job.channel, message.ts, { kind: 'page', requestedAt })
+        }
+      }
+    }
+    // Keep request bounds stable; exclude earlier pages from the next absence check.
+    if (page.has_more) yield* sql`UPDATE repair_pending SET cursor = ${next!}, boundary = ${edge!} WHERE id = ${job.id}`
+    else yield* sql`DELETE FROM repair_pending WHERE id = ${job.id}`
+  }))
+})
+
+/** One request per queued range per pass, at most ten. Failed jobs retain their place for the next pass. */
+export const repairMutations = (ctx: SyncContext): Effect.Effect<void, BootError, BootServices> => Effect.gen(function* () {
+  yield* awaitEarlierFetches(ctx)
+  const sql = yield* StoreWriter
+  const jobs = yield* sql<Job>`SELECT * FROM repair_pending ORDER BY id LIMIT ${REPAIR_CALL_LIMIT}`
+  for (const job of jobs) {
+    yield* repairPage(ctx, job).pipe(
+      Effect.catchTag('SlackRejected', () => Effect.void),
+      Effect.catchTag('SlackRateLimited', () => Effect.void),
+    )
+    // Rotate unfinished ranges behind unattempted work, including refusals and rate limits.
+    yield* sql`UPDATE repair_pending SET id = (SELECT max(id) + 1 FROM repair_pending) WHERE id = ${job.id}`
+    yield* Effect.yieldNow
+  }
 })

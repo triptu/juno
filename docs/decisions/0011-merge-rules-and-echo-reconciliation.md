@@ -28,4 +28,4 @@ A seeded, randomised engine test interleaves events, pages, drops and sends and 
 - Correctness does not depend on arrival order, which the socket, the queue and the user's actions cannot guarantee.
 - Messages need `last_event_ts` and `version` columns, and the store needs `synced_ranges` instead of a single cursor.
 - The convergence test is the main sync test; the 24-hour soak becomes an occasional check.
-- Server versions are stored separately from local row versions; a repair acknowledges counts markers only after all cached ranges in the conversation complete.
+- Server versions are stored separately from local row versions; observed counts markers and durable pending ranges commit atomically; bounded background pages drain the queue after `live`.

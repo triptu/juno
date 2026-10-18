@@ -1,5 +1,6 @@
 import { SlackAuthRequired } from '@juno/slack'
 import { Clock, Effect, FiberSet, Scope } from 'effect'
+import { repairMutations } from '../mutationRepair'
 import { bootState, catchUp, followPass } from '../boot'
 import { fetchTopic, type FetchReport } from '../open'
 import { wantUsers } from '../users'
@@ -91,6 +92,11 @@ const catchUpAfterGap = (runtime: SyncRuntime) => Effect.gen(function* () {
   yield* refreshOpenTopics(runtime)
 })
 
+export const repairAfterLive = (runtime: SyncRuntime) => repairMutations(runtime.ctx).pipe(
+  runtime.work.withPermit,
+  Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: mutation repair deferred', { tag: error._tag })),
+)
+
 export const makeReconcile = (runtime: SyncRuntime) => {
   const { cycle, work, settle } = runtime
   /**
@@ -105,6 +111,7 @@ export const makeReconcile = (runtime: SyncRuntime) => {
     Effect.tapError((error) => Effect.logWarning('sync: catch-up failed', { tag: error._tag })),
     Effect.andThen(settle),
     Effect.catchIf(isNotAuth, (error) => settle().pipe(Effect.andThen(retryCatchUp(error)))),
+    Effect.andThen(repairAfterLive(runtime)),
     Effect.andThen(followPassIfDue(runtime)),
   ))
   const retryCatchUp = makeCatchUpRetry(runtime, reconcile)

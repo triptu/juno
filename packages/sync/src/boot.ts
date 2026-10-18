@@ -41,7 +41,7 @@ import { Invalidation, StoreWriter, transaction, type SqlError } from '@juno/sto
 import { Clock, Deferred, Effect, Queue } from 'effect'
 import { reindexOptions, type SyncContext } from './context'
 import { activeConversations, historyOrder, loadCounts } from './counts'
-import { saveRepairMarkers } from './mutationRepair'
+import { saveRepairMarkers, queueRepairs } from './mutationRepair'
 import { discoverSince, searchPreviews } from './discovery'
 import { FollowFence } from './followFence'
 import { readMetadata, storeMetadata } from './metadata'
@@ -600,7 +600,8 @@ export const catchUp = (ctx: SyncContext, previous: BootState, phase: Phase, opt
       yield* loadThreadViews(ctx, { until, probe: options.refreshWorkspace, lane: 'interactive' })
     }
     const discovered = yield* discoverOrLog(discoverSince(ctx, previous.lastSyncAt, counts.entries, {}))
-    if (options.recheck !== undefined) yield* recheck(ctx, options.recheck, counts.entries)
+    if (options.recheck !== undefined) yield* recheck(ctx, options.recheck)
+    if (options.recheck !== undefined) yield* queueRepairs(ctx, counts.entries)
     yield* fillUsers(ctx)
     const state: BootState = {
       ...(previous.quietDays === undefined ? {} : { quietDays: previous.quietDays }),

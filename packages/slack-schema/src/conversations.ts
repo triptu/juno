@@ -118,6 +118,7 @@ export type ConversationsHistoryArgs = typeof ConversationsHistoryArgs.Type
 
 /** Fields shared by history and replies responses. */
 const PageFields = {
+  is_limited: opt(S.Boolean),
   messages: S.Array(Message),
   has_more: S.Boolean,
   response_metadata: opt(ResponseMetadata),
@@ -131,7 +132,6 @@ const PageFields = {
 export const ConversationsHistoryFields = {
   ...PageFields,
   mutation_timestamps: opt(S.Struct({ latest: opt(S.NullOr(Ts)), updated: opt(Ts), history_invalid: opt(Ts) })),
-  is_limited: opt(S.Boolean),
   pin_count: opt(S.Number),
   channel_actions_count: opt(S.Number),
   channel_actions_ts: opt(S.NullOr(Ts)),

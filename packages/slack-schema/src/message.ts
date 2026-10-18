@@ -154,7 +154,6 @@ export const MessageFields = {
   subtype: opt(S.String),
   channel: opt(S.String),
   ts: Ts,
-  version: opt(Ts),
   user: opt(S.String),
   bot_id: opt(S.NullOr(S.String)),
   bot_profile: opt(BotProfile),

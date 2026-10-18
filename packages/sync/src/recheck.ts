@@ -26,13 +26,12 @@
  */
 import { millisToTs, parseTopicId, type Ts } from '@juno/domain'
 import { SlackApi } from '@juno/slack'
-import { compareTs, type CountEntry, type Message } from '@juno/slack-schema'
+import { compareTs, type Message } from '@juno/slack-schema'
 import { StoreWriter, transaction } from '@juno/store'
 import { Clock, Effect } from 'effect'
 import type { BootError, BootServices } from './boot'
 import { awaitEarlierFetches, type SyncContext } from './context'
 import { writeDeleted } from './events'
-import { repairMutations } from './mutationRepair'
 import { RECHECK_KEY } from './sent'
 import { setSyncState } from './write'
 import { applyPage, mainTopicOf, threadTopicOf } from './pages'
@@ -109,7 +108,7 @@ const recheckOne = (ctx: SyncContext, target: Target, from: Ts): Effect.Effect<v
     const edge = page.messages.at(-1)?.ts
     const inSpan = (ts: string) => !page.has_more || edge === undefined || (target.kind === 'main' ? compareTs(ts, edge) >= 0 : compareTs(ts, edge) <= 0)
     const present = new Set<string>(page.messages.map((message) => message.ts))
-    const gone = known.filter((ts) => inSpan(ts) && !present.has(ts))
+    const gone = known.filter((ts) => !page.is_limited && inSpan(ts) && !present.has(ts))
     const sql = yield* StoreWriter
     const fromTs = target.kind === 'main' && page.has_more && edge !== undefined ? edge : from
     const toTs = target.kind === 'thread' && page.has_more && edge !== undefined ? edge : null
@@ -128,15 +127,12 @@ const recheckOne = (ctx: SyncContext, target: Target, from: Ts): Effect.Effect<v
  * fetches requested before it, whose older answers could otherwise land
  * after its own and bring back a message it found gone.
  */
-export const recheck = (ctx: SyncContext, options: RecheckOptions, counts: ReadonlyArray<CountEntry>): Effect.Effect<void, BootError, BootServices> =>
+export const recheck = (ctx: SyncContext, options: RecheckOptions): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
     yield* awaitEarlierFetches(ctx)
     yield* transaction(setSyncState(RECHECK_KEY, { startedAt: yield* Clock.currentTimeMillis }))
-    const repaired = yield* repairMutations(ctx, counts)
     const from = millisToTs(options.since - ctx.config.recheckLookbackMillis)
     for (const target of yield* targets(ctx, options.first, from)) {
-      const topic = target.kind === 'main' ? mainTopicOf(target.channel) : threadTopicOf(target.channel, target.threadTs)
-      if (repaired.has(topic)) continue
       yield* recheckOne(ctx, target, from).pipe(
         Effect.catchTag('SlackRejected', (error) => Effect.logWarning('sync: recheck refused, skipped', { reason: error.error })),
       )

@@ -26,6 +26,7 @@ export const mergeOne = (
   channel: string,
   message: Message,
   source: MergeSource,
+  serverVersion?: Ts,
 ): Effect.Effect<ReadonlyArray<MessageRow>, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
     const existing = yield* readMessage(channel, message.ts)
@@ -44,9 +45,9 @@ export const mergeOne = (
     if (merged.applyReactions) yield* replaceReactions(merged.row, message.reactions ?? [], ctx.me.userId)
     // Only certify a full body whose reactions were accepted. Partial search
     // results cannot safely suppress a later history body.
-    if (source.kind === 'page' && (merged.applyReactions || existing === undefined) && message.version !== undefined) {
+    if (source.kind === 'page' && (merged.applyReactions || existing === undefined) && serverVersion !== undefined) {
       const sql = yield* StoreWriter
-      yield* sql`INSERT INTO message_updates (channel, ts, server_version) VALUES (${channel}, ${message.ts}, ${message.version})
+      yield* sql`INSERT INTO message_updates (channel, ts, server_version) VALUES (${channel}, ${message.ts}, ${serverVersion})
         ON CONFLICT (channel, ts) DO UPDATE SET server_version = excluded.server_version
         WHERE message_updates.server_version <> excluded.server_version`
     }
@@ -98,6 +99,7 @@ export const mergeOne = (
   })
 
 export interface ApplyPageOptions {
+  readonly latestUpdates?: Readonly<Record<string, Ts>>
   /** Topics to re-index as well, such as Main for a history page that brought nothing. */
   readonly alsoTouch?: Iterable<string>
   /**
@@ -120,7 +122,7 @@ export const applyPage = (
   transaction(
     Effect.gen(function* () {
       const rows: Array<MessageRow> = []
-      for (const message of messages) rows.push(...(yield* mergeOne(ctx, channel, message, source)))
+      for (const message of messages) rows.push(...(yield* mergeOne(ctx, channel, message, source, options.latestUpdates?.[message.ts])))
       const topics = topicsOfMessages(rows)
       for (const id of options.alsoTouch ?? []) topics.add(id)
       if (options.seedReadBefore !== undefined) yield* seedThreadsRead(rows, options.seedReadBefore)

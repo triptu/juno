@@ -65,13 +65,14 @@ export const apiCalls = (engine: RunningEngine, method?: string) =>
   engine.fake.calls.filter((c) => c.kind === 'api' && (method === undefined || c.method === method))
 
 /** A page of the recheck after a drop or a restart (`@juno/sync` `recheck.ts`). */
-export const notRecheck = (call: { readonly args: Readonly<Record<string, string>> }) => call.args['_x_reason'] !== 'recheck'
+export const notRecheck = (call: { readonly args: Readonly<Record<string, string>> }) => !['recheck', 'mutation-repair'].includes(call.args['_x_reason'] ?? '')
 
 /** Calls by `kind:method`, for exact budgets. The recheck's pages count apart, as `recheck:method`. */
 export const callMap = (engine: RunningEngine): Record<string, number> => {
   const map: Record<string, number> = {}
   for (const call of engine.fake.calls) {
-    const key = notRecheck(call) ? `${call.kind}:${call.method}` : `recheck:${call.method}`
+    const reason = call.args['_x_reason']
+    const key = notRecheck(call) ? `${call.kind}:${call.method}` : `${reason}:${call.method}`
     map[key] = (map[key] ?? 0) + 1
   }
   return map

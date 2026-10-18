@@ -366,7 +366,7 @@ changed, with nothing to run. `git diff --check` and the generated decision-log
 check passed. Live probes established the results above; no product test suite
 or sync-protocol verification is claimed for this documentation-only branch.
 
-## Implemented recovery and call comparison (2026-10-19)
+## Initial implementation and call comparison (2026-10-19, superseded below)
 
 `mutationRepair.ts` now compares full counts with durable repaired markers on
 reconnect and warm boot. It repairs every cached Main and thread range of dirty
@@ -420,3 +420,67 @@ confirm the earlier hypothetical 70% call saving: that estimate assumed replacin
 the fallback, which this change deliberately retains. Messages with no saved server version need a full body once to establish it.
 Conditional versions reduce
 body transfer, but no byte percentage or live latency improvement was measured.
+
+## Controlled self-DM mutations (2026-10-19)
+
+The owner authorized writes in their self-DM. The probe verified the authenticated
+user against the DM member, created one root and one reply, and mutated only those
+two messages. Both were deleted afterwards. Credentials stayed in memory; output
+contained booleans, field types and the labels `root` and `reply`, with no real ids
+or message content. Calls were spaced by at least 1.5 seconds. Each stage read full
+counts, then full and conditional history and replies using the previous stage's
+`latest_updates`. The history range contained the root; replies contained both.
+
+| Stage | `updated` | `history_invalid` | `latest_updates` | Conditional history / replies |
+| --- | --- | --- | --- | --- |
+| Post root and reply | Baseline present | Baseline present | Both messages have versions | Root / root and reply (empty version cache) |
+| Edit both | Changed | Same | Both versions changed | Root / root and reply |
+| Add reaction to both | Changed | Same | Both versions changed | Root / root and reply |
+| Remove reaction from both | Changed | Same | Both versions changed | Root / root and reply |
+| Delete reply | Changed | Changed | Root changed; reply absent | Root / root; `deleted` empty |
+| Delete remaining root | Same | Changed | Empty history version map | Empty history; `deleted` empty; replies not queried |
+
+`latest` stayed fixed through edits, reactions and reply deletion, then changed on
+root deletion. No message-level `version` field was observed. The fake therefore
+stores versions separately and supplies them only through `latest_updates` when
+conditional pages are requested. It advances edit and reaction versions; deleting
+a reply updates its root's version and the conversation's `updated`, whereas
+removing the final root only advances `history_invalid`. It returns an empty
+`deleted` list, as this experiment did, rather than inventing tombstone ids outside
+a page. Absence is checked only over proven page coverage.
+
+This establishes these behaviors in one self-DM, not a guarantee across retention
+policies, Slack Connect, all workspace types or every event. The ten ordinary
+fallback pages always run, even for a topic repaired conditionally. Tests also
+exercise omitted/backwards markers and a reaction whose marker/version does not
+advance. Such changes outside the fallback can still wait for an open-topic read.
+
+### Revised bounds
+
+The foreground boot/reconnect keeps its original ten-page fallback budget.
+Additional mutation repair starts only after phase `live`, on the background
+lane, under the sync work permit. It attempts at most ten pages per catch-up,
+one page per queued range. Main and cached replies are bounded to the most recent
+24 hours (the recheck lookback setting) at enqueue time. Old roots fetched for
+thread metadata do not extend Main; a root without cached recent replies does
+not get a reply job. Unfinished cursors and refused/rate-limited jobs persist in
+`repair_pending` and rotate behind unattempted work on the next catch-up or sweep.
+The original request bounds stay fixed while a cursor advances.
+
+A missing baseline seeds the current markers without enqueueing all cached
+conversations after upgrade. Any supplied marker difference, including a backwards
+move, queues work. Missing fields preserve the baseline. Observed markers and
+queued ranges commit atomically; the marker now records observation, not completion.
+Limited pages cannot prove deletion by absence. Thread roots are excluded from
+thread absence checks. Repair does not certify outbox recheck coverage; the
+ordinary fallback remains responsible for that safety barrier.
+
+The revised large-seed reconnect observed 18 calls: one userBoot, one counts,
+thirteen replies (ten fallback and three repair), one getView and two searches.
+No mutation-repair history page was needed for this target: its cached Main
+roots were outside the recent window. All three offline changes were recovered
+without opening the topic. This is a request count with fake pacing disabled,
+not a latency or byte benchmark. The earlier 21-call result above describes the
+unbounded implementation. Failed repair calls are single-attempt, so transport
+retries cannot exceed the ten-request cap. Queued ranges whose latest message
+has aged out are discarded; absence checks always enforce the current lookback.

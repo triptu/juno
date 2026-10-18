@@ -77,9 +77,9 @@ describe('recheck after a gap', () => {
     await quiet(engine)
     await offline(engine, () => changeWhileAway(engine, seeded))
     await expectChanges(engine, seeded)
-    // Marker repair covers #eng and its threads; the fallback covers the remaining recent topics.
-    const rechecks = engine.fake.calls.filter((c) => ['recheck', 'mutation-repair'].includes(c.args['_x_reason'] ?? ''))
-    expect(rechecks.length).toBeGreaterThanOrEqual(10)
+    // One page for each recently active topic, at most ten: #eng's Main and the new thread among them.
+    const rechecks = engine.fake.calls.filter((c) => c.args['_x_reason'] === 'recheck')
+    expect(rechecks).toHaveLength(10)
     expect(rechecks.some((c) => c.method === 'conversations.history' && c.args['channel'] === 'C0ENG')).toBe(true)
     expect(rechecks.some((c) => c.method === 'conversations.replies' && c.args['ts'] === seeded.root.ts)).toBe(true)
   })
@@ -99,7 +99,7 @@ describe('recheck after a gap', () => {
     await quiet(engine)
     engine.fake.goOffline()
     await engine.phase('offline')
-    engine.fake.holdNext({ method: 'conversations.history', reason: 'mutation-repair' })
+    engine.fake.holdNext({ method: 'conversations.history', reason: 'recheck' })
     engine.fake.goOnline()
     // The recheck's first Main page, #eng's, has left; a message posted now is stored by its event before the page lands.
     const [held] = await waitFor(() => (engine.fake.heldCount({ method: 'conversations.history' }) === 1 ? engine.fake.heldCalls({ method: 'conversations.history' }) : undefined), 30_000, 'the held recheck page')
@@ -157,23 +157,24 @@ describe('reconnect', () => {
     expect(storedFollow(engine, 'C0LEADERSHIP', tsOf(finance))).toBe(0)
 
     // The budget: the socket's URL is left out (its count depends on the backoff), everything else is exact.
-    const { 'api:client.getWebSocketURL': _socket, ...budget } = callMap(engine)
+    const { 'api:client.getWebSocketURL': _socket, 'mutation-repair:conversations.history': repairMain = 0, 'mutation-repair:conversations.replies': repairThreads = 0, ...budget } = callMap(engine)
+    expect(repairMain + repairThreads).toBeLessThanOrEqual(10)
     expect(budget).toEqual({
       'api:client.counts': 1,
       // One workspace snapshot also supplies the newly joined channel.
       'api:client.userBoot': 1,
-      // Two delta reads plus three dirty conversation repairs.
-      'api:conversations.history': 5,
-      // The fallback skips topics already covered by mutation repair.
-      'recheck:conversations.history': 3,
-      'recheck:conversations.replies': 2,
+      // The two conversations whose latest moved.
+      'api:conversations.history': 2,
+      // The recheck of the drop: the ten most recently active topics, one page each.
+      'recheck:conversations.history': 5,
+      'recheck:conversations.replies': 5,
       // One page back to the last sync (its last thread is older), then the complete pass of two pages.
       'api:subscriptions.thread.getView': 3,
-      // Six cached thread repairs and the root of the stored follow the list left out.
-      'api:conversations.replies': 7,
+      // The root of the one stored follow the list left out.
+      'api:conversations.replies': 1,
       'api:search.modules.messages': 1,
     })
-    expect(apiCalls(engine, 'conversations.replies').filter((c) => notRecheck(c) && c.args['_x_reason'] !== 'mutation-repair')[0]!.args['ts']).toBe(tsOf(finance))
+    expect(apiCalls(engine, 'conversations.replies').filter(notRecheck)[0]!.args['ts']).toBe(tsOf(finance))
   })
 
   it('reads followed threads past the first getView page', async () => {

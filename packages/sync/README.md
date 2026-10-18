@@ -133,20 +133,24 @@ Known limits: thread marks made elsewhere while the socket was down reach Juno a
 
 ## Mutation repair after a gap
 
-Full counts on reconnect and warm boot select cached conversations whose
-`updated` or `history_invalid` exceeds the last repaired snapshot. Every cached
-Main and thread range in those conversations is read with conditional versions;
-unchanged ids count as present. Ranges are paged to completion before absence
-can imply deletion. The captured markers are durable only after all the
-conversation's ranges succeed. Failed or truncated ranges keep the old markers.
-Cold boot establishes the initial baseline. An upgraded cache with no markers
-repairs its cached conversations once before it has a baseline.
+Full counts on reconnect and warm boot compare supplied `updated` and
+`history_invalid` with observed markers using inequality, including backwards
+moves. Missing baselines seed without a repair storm. Changed conversations
+atomically enqueue recent cached ranges with the new observed markers.
 
-The existing ten-topic, 24-hour recheck remains for missing or incomplete marker
-coverage. Topics fully covered by mutation repair are skipped in that fallback.
-Markers select conversations, not individual threads, and cannot repair uncached
-history. `latest` still selects new-message history; the ten-minute discovery
-sweep and five-minute overlap, and hourly follow repair, are unchanged.
+After `live`, at most ten background pages run, one per queued range. Main and
+cached replies are limited to the latest 24 hours; old roots do not extend Main
+and roots without cached recent replies get no thread job. Pending cursors and
+failures persist and rotate behind unattempted ranges for the next catch-up or
+sweep. `SlackRateLimited` leaves the job queued. Conditional versions come only
+from `latest_updates`, separately from Message decoding. Unchanged ids count as
+present. Absence is inferred only inside proven recent page bounds, excluding
+thread roots and any `is_limited` response. Repair does not certify outbox coverage.
+
+All ten ordinary fallback pages still run before `live`, including topics queued
+for repair. Missing markers or versions that fail to advance cannot suppress the
+fallback. Counts cannot find uncached history. The ten-minute discovery sweep,
+five-minute overlap and hourly follow repair are unchanged.
 
 Incremental counts rows update only supplied fields. `{ id, last_read }` updates
 the read pointer without clearing `latest`, `has_unreads` or `mention_count`.
