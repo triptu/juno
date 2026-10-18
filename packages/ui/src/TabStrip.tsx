@@ -72,7 +72,7 @@ export function TabStrip({ label = 'Tabs', leading, fullScreen = false, trailing
     ensure.current = async () => {
       const { TabDrag } = await loadTabDrag()
       if (stopped) return undefined
-      drag.current ??= new TabDrag(element, { onMove: (from, to) => move.current?.(from, to) })
+      if (drag.current === undefined) drag.current = new TabDrag(element, { onMove: (from, to) => move.current?.(from, to) })
       return drag.current
     }
     const idle = requestIdleCallback(() => void ensure.current(), { timeout: 5_000 })

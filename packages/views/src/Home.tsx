@@ -68,17 +68,21 @@ export interface HomeProps {
  */
 export function Home({ scene, title, line, items, done, now, enter = true, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, onDismiss, onAsk, loading = false, reservedItems = 0, composer, waiting = false, welcome, thought }: HomeProps) {
   const headingId = useId()
-  let step = 0
-  const part = () => (enter ? [styles.rise, styles.delay(step++)] : [])
   const shownThought = thought === undefined || items.length > 0 || loading ? undefined : thought
+  const itemsShown = items.length > 0 || reservedItems > 0
+  // Each shown part enters one stagger step after the one above it: the scene, the greeting, then these.
+  const thoughtStep = 2
+  const itemsStep = thoughtStep + (shownThought === undefined ? 0 : 1)
+  const welcomeStep = itemsStep + (itemsShown ? 1 : 0)
+  const part = (step: number) => (enter ? [styles.rise, styles.delay(step)] : [])
   return (
     <div data-home="" data-home-waiting={waiting ? '' : undefined} data-home-loading={loading ? '' : undefined} aria-busy={loading || undefined} {...stylex.props(styles.root)}>
       <div {...stylex.props(styles.scroll)}>
         {waiting ? null : <div {...stylex.props(styles.column, welcome !== undefined && styles.columnWelcome)}>
-          <div {...stylex.props(welcome !== undefined && styles.sceneGives, ...part())}>
+          <div {...stylex.props(welcome !== undefined && styles.sceneGives, ...part(0))}>
             <HomeScene name={scene} />
           </div>
-          <div {...stylex.props(styles.greeting, welcome !== undefined && styles.greetingGives, ...part())}>
+          <div {...stylex.props(styles.greeting, welcome !== undefined && styles.greetingGives, ...part(1))}>
             <h2 id={headingId} {...stylex.props(styles.title)}>
               {title}
             </h2>
@@ -91,13 +95,13 @@ export function Home({ scene, title, line, items, done, now, enter = true, onOpe
           {shownThought === undefined ? null : reservedItems > 0 ? (
             // Over the reserved slots, out of the flow: a row that lands takes its place and nothing moves.
             <div {...stylex.props(styles.thoughtAnchor)}>
-              <HomeThought thought={shownThought} sx={[styles.thoughtOver, ...part()]} />
+              <HomeThought thought={shownThought} sx={[styles.thoughtOver, ...part(thoughtStep)]} />
             </div>
           ) : (
-            <HomeThought thought={shownThought} sx={part()} />
+            <HomeThought thought={shownThought} sx={part(thoughtStep)} />
           )}
-          {items.length === 0 && reservedItems === 0 ? null : (
-            <ul aria-labelledby={headingId} {...stylex.props(styles.items, welcome !== undefined && styles.itemsWelcome, reservedItems > 0 && styles.itemSlots(reservedItems), ...part())}>
+          {itemsShown ? (
+            <ul aria-labelledby={headingId} {...stylex.props(styles.items, welcome !== undefined && styles.itemsWelcome, reservedItems > 0 && styles.itemSlots(reservedItems), ...part(itemsStep))}>
               {items.map((item) => (
                 <HomeRow
                   key={item.id}
@@ -115,8 +119,8 @@ export function Home({ scene, title, line, items, done, now, enter = true, onOpe
                 />
               ))}
             </ul>
-          )}
-          {welcome === undefined ? null : <div data-home-welcome="" {...stylex.props(styles.welcome, ...part())}>{welcome}</div>}
+          ) : null}
+          {welcome === undefined ? null : <div data-home-welcome="" {...stylex.props(styles.welcome, ...part(welcomeStep))}>{welcome}</div>}
         </div>}
       </div>
       {composer}
