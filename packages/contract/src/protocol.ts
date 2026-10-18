@@ -78,6 +78,8 @@ export const MainToEngine = Schema.Union([
   Schema.TaggedStruct('secrets', { secrets: Schema.NullOr(SessionSecrets) }),
   /** A sign-in or import ended without a session. `details` is the import's report for "Copy details": no secrets, no values. */
   Schema.TaggedStruct('sessionFailed', { method: SignInMethod, kind: SignInFailureKind, message: Schema.String, details: Schema.optionalKey(Schema.String) }),
+  /** Main has flushed the verified session store. */
+  Schema.TaggedStruct('secretsStored', {}),
   /** Main has cleared secrets and cookies after `signOut`. */
   Schema.TaggedStruct('signedOut', {}),
   /** The answer to `handshake`: what the socket upgrade needs (ADR 0007). */
@@ -114,7 +116,7 @@ export const EngineToMain = Schema.Union([
   /** Please import the Slack app's session; answer with `secrets` or `sessionFailed`. */
   Schema.TaggedStruct('importFromSlackApp', {}),
   /** The session verified; please encrypt and store it. */
-  Schema.TaggedStruct('storeSecrets', { secrets: SessionSecrets }),
+  Schema.TaggedStruct('storeSecrets', { method: SignInMethod, secrets: SessionSecrets }),
   /** Please delete the secrets and clear the Slack session; answer with `signedOut`. */
   Schema.TaggedStruct('signOut', {}),
   /** The session is verified. Main keeps it, with no secrets, so the next launch opens on the shell. */

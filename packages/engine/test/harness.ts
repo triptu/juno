@@ -82,6 +82,7 @@ export function fakeMain(fake: FakeSlack, initial?: Credentials) {
       }
       case 'storeSecrets':
         stored = message.secrets
+        host.deliver({ _tag: 'secretsStored' })
         break
       case 'signOut':
         stored = null

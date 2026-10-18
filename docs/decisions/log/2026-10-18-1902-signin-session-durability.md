@@ -1,0 +1,1 @@
+- 10-18 19:02 · signin-session-durability · Sign-in waits for Main to sync and atomically replace `secrets.bin` before publishing `ready`; storage errors return through the sign-in failure path.

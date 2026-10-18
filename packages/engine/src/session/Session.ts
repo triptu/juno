@@ -133,7 +133,7 @@ export class Session extends Context.Service<
        * makes it the active session. Fails with the error `auth.test` gave;
        * the client scope is closed on any failure.
        */
-      const activate = (secrets: SessionSecrets) =>
+      const activate = (secrets: SessionSecrets, beforeReady: Effect.Effect<void, SignInFailed> = Effect.void) =>
         Effect.gen(function* () {
           yield* workspace.open(workspaceIdOf(secrets)).pipe(Effect.orDie)
           const scope = yield* Scope.make()
@@ -150,6 +150,7 @@ export class Session extends Context.Service<
           yield* closeActive
           if (workspaceId !== workspaceIdOf(secrets)) yield* workspace.open(workspaceId).pipe(Effect.orDie)
           yield* Ref.set(active, { secrets, scope, context, workspaceId })
+          yield* beforeReady.pipe(Effect.onError(() => closeActive))
           yield* setStatus({
             _tag: 'ready',
             teamId: auth.team_id,
@@ -167,7 +168,7 @@ export class Session extends Context.Service<
           Effect.gen(function* () {
             const messages = yield* host.messages
             const answer = yield* Effect.forkScoped(
-              Stream.runHead(Stream.filter(messages, (m): m is SessionAnswer => m._tag === 'secrets' || m._tag === 'sessionFailed')),
+            Stream.runHead(Stream.filter(messages, (m): m is SessionAnswer => m._tag === 'secrets' || m._tag === 'sessionFailed')),
             )
             yield* host.send({ _tag: request })
             const value = yield* Fiber.join(answer)
@@ -214,10 +215,22 @@ export class Session extends Context.Service<
             yield* restore
             return yield* new SignInFailed({ kind: 'no-token', message: 'No session was found.' })
           }
-          const result = yield* Effect.result(activate(answer.secrets))
+          const secrets = answer.secrets
+          const result = yield* Effect.result(activate(secrets, Effect.scoped(Effect.gen(function* () {
+            const messages = yield* host.messages
+            const storedAnswer = yield* Effect.forkScoped(
+              Stream.runHead(Stream.filter(messages, (m): m is Extract<MainToEngine, { _tag: 'secretsStored' | 'sessionFailed' }> => m._tag === 'secretsStored' || m._tag === 'sessionFailed')),
+            )
+            yield* host.send({ _tag: 'storeSecrets', method, secrets })
+            const stored = yield* Fiber.join(storedAnswer)
+            if (stored._tag === 'None') return yield* new SignInFailed({ kind: 'other', message: 'Juno could not save the Slack session. Try signing in again.' })
+            if (stored.value._tag === 'sessionFailed') return yield* new SignInFailed({ kind: stored.value.kind, message: stored.value.message })
+            return yield* Effect.void
+          }))))
           if (result._tag === 'Failure') {
             yield* restore
             const error = result.failure
+            if (error._tag === 'SignInFailed') return yield* error
             return yield* new SignInFailed(
               error._tag === 'SlackAuthRequired'
                 ? { kind: 'rejected', message: `Slack rejected the session (${error.error}).` }
@@ -226,7 +239,6 @@ export class Session extends Context.Service<
                   : { kind: 'other', message: `Slack answered unexpectedly (${error._tag}).` },
             )
           }
-          yield* host.send({ _tag: 'storeSecrets', secrets: answer.secrets })
         })
 
       const signOut = Effect.scoped(
