@@ -152,6 +152,10 @@ Where it came from:
 
 The desktop suite's time is now about half setup (section 1.2), spread over fewer tests. What is left to gain there is in the specs that need a fresh app or a relaunch per test (`juno-agent/crash`, `realtime`, `quick-start`, `presence`), each kept for that reason.
 
+### 5.3 After rebasing onto main
+
+The branch was rebased onto main at `6c15fbb4` (21 commits newer); main's new About diagnostics test in `engine.spec` stays a test of its own, and the bridge allowlist change in `app.spec` went into the merged test. `pnpm affected` then passed `test`, `specs:conformance` and `test:gallery`, and `pnpm remote test:desktop` ran 410 passed and 2 failed, both in specs this branch does not change: `updates.spec` "an unsigned build offers the new version as a DMG" expects the app's version to match `0.1.[1-6]` and has failed since "Release 0.1.7" (a test that pins a value every release changes), and `juno-agent/selection.spec` "⌘J with text selected…", the Backspace flake the keeper saw once on 10-18.
+
 ## 6. Mutation check
 
 Ten behaviours, each broken in the code (not committed), run against the slimmer suite on one remote machine. Every break was caught; each failure names the broken behaviour.
