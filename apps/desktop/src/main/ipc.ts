@@ -1,6 +1,6 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 import { Schema } from 'effect'
-import { Channels, ShellRoutes, type DownloadResult, type NotificationPermission, type SharingSetting, type ShellInput, type ShellOutput } from '@juno/contract'
+import { Channels, ShellRoutes, type AppState, type Diagnostics, type DownloadResult, type NotificationPermission, type SharingSetting, type ShellInput, type ShellOutput } from '@juno/contract'
 import type { AgentSupervisor } from './agent'
 import type { BackupSecrets } from './backupSecrets'
 import { openInBrowser } from './browser'
@@ -90,9 +90,11 @@ export interface IpcDeps {
   readonly openFile: (file: { readonly url: string; readonly name: string }) => Promise<DownloadResult>
   /** Copy image in the viewer (files.ts), bound the same way. */
   readonly copyImage: (src: string) => Promise<'copied' | 'failed'>
+  /** Settings › About's diagnostics, and the renderer's view and sync for the idle CPU check (processWatch.ts). */
+  readonly processes: { readonly diagnostics: () => Diagnostics; readonly reportState: (state: AppState) => void }
 }
 
-export function registerIpc({ updates, supervisor, agent, providers, codex, backupSecrets, setTheme, setAccent, setDensity, setPrivacy, setSidebar, sharing, setViewing, notifications, downloadFile, openFile, copyImage }: IpcDeps): void {
+export function registerIpc({ updates, supervisor, agent, providers, codex, backupSecrets, setTheme, setAccent, setDensity, setPrivacy, setSidebar, sharing, setViewing, notifications, downloadFile, openFile, copyImage, processes }: IpcDeps): void {
   handle(Channels.updatesGet, () => updates.get())
   handle(Channels.updatesSet, ({ enabled }) => updates.set(enabled))
   handle(Channels.updatesRestart, () => updates.restart())
@@ -104,6 +106,8 @@ export function registerIpc({ updates, supervisor, agent, providers, codex, back
     platform: process.platform as 'darwin' | 'win32' | 'linux',
     electron: process.versions.electron ?? 'unknown',
   }))
+  handle(Channels.appDiagnostics, () => processes.diagnostics())
+  handle(Channels.appReportState, (state) => processes.reportState(state))
 
   // The port cannot travel in the invoke answer; it goes out through
   // webContents.postMessage and the preload forwards it to the page. The
