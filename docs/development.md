@@ -874,7 +874,7 @@ A changed app file that was in no bundle when the map was recorded (types only, 
 
 `pnpm remote <script> [args...]` tries a configured SSH runner first, then runs a root script on Namespace if the runner is unreachable or full for 60 seconds. Both backends stream output and the exit code back.
 
-SSH unit-only jobs (`test`, `test:agent*`, `specs:check`, and plans containing only those) reserve 1 core with a Docker CPU limit of 2. Jobs and plans containing `test:gallery` without desktop or e2e steps reserve 3 cores with a limit of 3. Any `test:desktop` or `test:e2e` step reserves 4 cores with a limit of 4, including plans that also run the gallery. Other scripts keep 8 cores. Host admission counts reservations, not CPU limits. `--machine` or `JUNO_REMOTE_MACHINE` overrides both values on SSH and the shape on Namespace; default SSH reservations shrink to fit a smaller host.
+SSH wide unit-only jobs reserve 4 cores with a Docker CPU limit of 4: `test` without named files or with more than 20 named files, and `specs:check` without a carried cache or with caching disabled, including those steps inside `test:plan`. The 20-file threshold keeps small affected slices cheap and gives broad selections across packages the full budget; it is a scheduling heuristic. Narrow unit selections, `test:agent*`, and cached spec checks reserve 1 core with a limit of 2. Jobs and plans containing `test:gallery` without desktop or e2e steps reserve 3 cores with a limit of 3. Any `test:desktop` or `test:e2e` step reserves 4 cores with a limit of 4, including plans that also run the gallery. Other scripts keep 8 cores. Host admission counts reservations, not CPU limits. `--machine` or `JUNO_REMOTE_MACHINE` overrides both values on SSH and the shape on Namespace; default SSH reservations shrink to fit a smaller host.
 
 Namespace, including fallback, uses the standard shape, 8x16 (see "Machine shapes"). Each Namespace run gets its own machine and waits when the shared core cap is full; nothing takes the local heavy-job lock. Use it for `test`, `specs:check`, `test:agent*`, `test:gallery`, `test:desktop` (the desktop e2e alone; it passes arguments on, for example `pnpm remote test:desktop e2e/topic.spec.ts`) and `test:e2e`. `perf` and `test:feel` are refused: they time the Mac. Desktop e2e tests tagged `@mac` (`{ tag: '@mac' }`) depend on macOS behaviour and are skipped on Linux; the nightly Mac run includes them. The native Window and Graphics idle budgets are `@mac` only; the remote `idle-cpu.spec.ts` check uses a 25% runaway ceiling for every Juno process. For idle CPU changes, run the fine budgets through the local heavy-job lock with `pnpm test:desktop idle-cpu.spec.ts --grep @mac`.
 
@@ -1154,9 +1154,16 @@ Causes found so far (2026-10-15):
 
 ## Machine shapes
 
-Both backends now use the same toolchain and install per run. The [toolchain and store measurements](#toolchain-and-store-measurements) compare fresh and warm runs with the earlier full image. Worker counts and machine reservations are unchanged. Namespace requests a 4 GB dependency cache, with 1,666 MB used in these slices.
+Both backends now use the same toolchain and install per run. The [toolchain and store measurements](#toolchain-and-store-measurements) compare fresh and warm runs with the earlier full image. Namespace worker counts and machine reservations are unchanged. Namespace requests a 4 GB dependency cache, with 1,666 MB used in these slices.
 
-SSH reserves 1 core for unit-only jobs (CPU limit 2), 3 for gallery jobs without desktop or e2e steps, and 4 for jobs with desktop or e2e steps, as described under "Remote runs". Both `--machine` and `JUNO_REMOTE_MACHINE` override the reservation and limit.
+SSH reserves 4 cores for wide unit-only jobs (CPU limit 4), 1 for narrow unit jobs (CPU limit 2), 3 for gallery jobs without desktop or e2e steps, and 4 for jobs with desktop or e2e steps, as described under "Remote runs". Both `--machine` and `JUNO_REMOTE_MACHINE` override the reservation and limit.
+
+One full laptop unit run on 2026-10-19 with the wide sizing
+(`JUNO_REMOTE_MAX_VCPU=0 pnpm remote test`) passed: 4 reserved cores, CPU limit
+4, 325 s script time and 328.53 s wall time. Two packages used two Vitest
+workers each; the image and store were warm. CPU busy averaged 50% and peak
+container memory was 1.54 GiB including file cache. See
+[the measurement scope](self-hosted-runner.md#laptop-measurements).
 
 SSH laptop measurements on 2026-10-19 (24 threads, 30 GiB RAM), one successful
 sequential run per size, with the image present:
@@ -1173,9 +1180,9 @@ app plan used two desktop workers and one unit worker; the standalone gallery
 used three workers and shift parts. At 2 cores the unit job used two workers
 in one package. All tests passed without test retries. The owner chose to lend
 16 of 24 threads, leaving eight for the desktop: 4 app plans, or 5 gallery jobs,
-or 16 unit jobs fit at once. The measured peaks (2.76 GiB per app plan,
-1.85 GiB per gallery slice, 1.21 GiB per unit slice) total about 11.04 GiB,
-9.25 GiB or 19.36 GiB respectively, below the roughly 24 GB job budget.
+or 4 wide unit jobs, or 16 narrow unit jobs fit at once. At the earlier measured
+slice peaks, four app plans use about 11.04 GiB, five gallery slices 9.25 GiB,
+and sixteen narrow unit slices 19.36 GiB, below the roughly 24 GB job budget.
 16 is the owner's choice, not a memory-derived limit. These are sequential
 slices, not a concurrent full-suite test.
 See [the commands and measurement scope](self-hosted-runner.md#laptop-measurements).
@@ -1218,7 +1225,7 @@ Earlier measurements, with a shape per script (2026-10-15, TypeScript 7; "script
 | `specs:traces` | 8x16, eight jobs | 132 s at 97% busy; 333 s at 98% on 4x8 |
 | `specs:check`, nothing cached | 8x16 | 126 s (214 s on 4x8, 82 to 100 s on 16x32) |
 
-Standalone SSH workers follow `JUNO_RUNNER_JOB_CORES` (`scripts/remote/workers.sh`): vitest one per core in one package at a time, desktop two workers at 4 cores, gallery three workers and shift parts at 4 cores, Quint one simulation per two cores and one checker per four, at least one each. Plan lanes use the smaller counts under "Plans" above. Namespace keeps its existing standalone workers: vitest at least four workers, two unit packages at a time, with the agent timing project run afterwards on 2-core machines, Electron one per two cores, one per core from eight cores, except three workers on each 4-core desktop shard, the gallery three per core, spec simulations one per two cores beside one Apalache server per four, except trace-only runs use one job per core without Apalache. `pnpm remote --shards n` also splits the gallery (each machine takes every n-th state) and the spec check across n machines; it costs about the same and is not the default.
+Standalone SSH workers follow `JUNO_RUNNER_JOB_CORES` (`scripts/remote/workers.sh`): Vitest uses two workers in one package at a 2-core limit; at limits of 4 or more, two packages divide the worker budget equally (two workers each at 4 cores). Desktop uses two workers at 4 cores, gallery three workers and shift parts at 4 cores, and Quint one simulation per two cores and one checker per four, at least one each. Plan lanes use the smaller counts under "Plans" above. Namespace keeps its existing standalone workers: vitest at least four workers, two unit packages at a time, with the agent timing project run afterwards on 2-core machines, Electron one per two cores, one per core from eight cores, except three workers on each 4-core desktop shard, the gallery three per core, spec simulations one per two cores beside one Apalache server per four, except trace-only runs use one job per core without Apalache. `pnpm remote --shards n` also splits the gallery (each machine takes every n-th state) and the spec check across n machines; it costs about the same and is not the default.
 
 Earlier full-suite pilots on the same prebuilt image (15 October 2026):
 

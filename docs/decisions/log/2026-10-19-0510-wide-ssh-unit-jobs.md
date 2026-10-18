@@ -1,0 +1,1 @@
+- 10-19 05:10 · wide-ssh-unit-jobs · Reserve and limit wide SSH unit jobs to four cores: full unit runs, selections over 20 files, and spec checks without a carried cache; use two packages with two Vitest workers each, keep narrow jobs at one reserved core with a two-core limit, and preserve gallery, desktop and explicit sizes.
