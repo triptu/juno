@@ -246,7 +246,13 @@ export function webPanelCanShow(url: string): boolean {
 }
 
 /** renderer -> main request/response routes over `ipcRenderer.invoke`. */
+export const LogDiagnostics = Schema.Struct({
+  osVersion: Schema.String,
+  logs: Schema.Array(Schema.Struct({ process: Schema.Literals(['main', 'engine', 'agent']), lines: Schema.Array(Schema.String) })),
+})
 export const ShellRoutes = {
+  [Channels.appLogDiagnostics]: { input: Schema.Void, output: LogDiagnostics },
+  [Channels.appShowLogs]: { input: Schema.Void, output: Schema.Void },
   [Channels.updatesGet]: { input: Schema.Void, output: UpdateState },
   [Channels.updatesSet]: { input: Schema.Struct({ enabled: Schema.Boolean }), output: UpdateState },
   [Channels.updatesRestart]: { input: Schema.Void, output: Schema.Void },

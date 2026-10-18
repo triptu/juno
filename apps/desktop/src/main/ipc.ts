@@ -1,5 +1,8 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 import { Schema } from 'effect'
+import { release } from 'node:os'
+import { mkdir } from 'node:fs/promises'
+import { logFolder, warningLines } from '../logging'
 import { Channels, ShellRoutes, type AppState, type Diagnostics, type DownloadResult, type NotificationPermission, type SharingSetting, type ShellInput, type ShellOutput } from '@juno/contract'
 import type { AgentSupervisor } from './agent'
 import type { BackupSecrets } from './backupSecrets'
@@ -57,6 +60,7 @@ export const folderForTests: { next: string | null | undefined } = { next: undef
 /** Under JUNO_E2E, links for the Slack app are recorded here instead of opening it. */
 export const slackLinksForTests: string[] = []
 const e2e = process.env.JUNO_E2E === '1'
+export const logsForTests = { opened: 0 }
 
 export interface IpcDeps {
   readonly updates: Updates
@@ -107,6 +111,13 @@ export function registerIpc({ updates, supervisor, agent, providers, codex, back
     electron: process.versions.electron ?? 'unknown',
   }))
   handle(Channels.appDiagnostics, () => processes.diagnostics())
+  handle(Channels.appLogDiagnostics, async () => ({ osVersion: process.platform === 'darwin' ? `macOS ${process.getSystemVersion()}` : `${process.platform} ${release()}`, logs: await warningLines() }))
+  handle(Channels.appShowLogs, async () => {
+    await mkdir(logFolder(), { recursive: true })
+    if (e2e) { logsForTests.opened++; return }
+    const error = await shell.openPath(logFolder())
+    if (error) throw new Error('Could not open logs')
+  })
   handle(Channels.appReportState, (state) => processes.reportState(state))
 
   // The port cannot travel in the invoke answer; it goes out through

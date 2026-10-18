@@ -20,6 +20,8 @@ export const Channels = {
   appGetInfo: 'app.getInfo',
   /** Settings › About's diagnostics: each process's CPU and memory, and what the engine and agent supervisors are doing. */
   appDiagnostics: 'app.diagnostics',
+  appLogDiagnostics: 'app.logDiagnostics',
+  appShowLogs: 'app.showLogs',
   /** The renderer tells main its view and whether a sync runs, for main's idle CPU check (no titles, no ids). */
   appReportState: 'app.reportState',
   /** Renderer asks main for a fresh engine port. The port arrives on `Events.enginePort`. */
@@ -245,6 +247,8 @@ export interface JunoBridge {
     readonly getInfo: () => Promise<unknown>
     /** A `Diagnostics`, answered by main. */
     readonly diagnostics: () => Promise<unknown>
+    readonly logDiagnostics: () => Promise<unknown>
+    readonly showLogs: () => Promise<unknown>
     /** An `AppState`: the view kind and whether a sync runs. */
     readonly reportState: (state: unknown) => Promise<unknown>
   }

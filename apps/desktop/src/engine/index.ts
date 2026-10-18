@@ -16,11 +16,14 @@
  */
 // First, so coverage (test runs only) starts before the rest of the bundle runs.
 import '../coverage'
+import { installProcessLog } from '../processLog'
 import { net } from 'electron'
 import { Effect, Layer, Schema } from 'effect'
 import { MainToEngine, type EngineToMain } from '@juno/contract'
 import { electronTransport, startEngine, type EngineHandle, type Host } from '@juno/engine'
 import { HttpTransport, HttpTransportError, type HttpResponse } from '@juno/slack'
+
+const processLog = installProcessLog('engine')
 
 const parent = process.parentPort
 const decode = Schema.decodeUnknownSync(MainToEngine)
@@ -78,12 +81,12 @@ parent.on('message', (event) => {
   switch (message._tag) {
     case 'config': {
       if (engine !== undefined) return
-      engine = startEngine(transport, message.config, { host, httpTransport: ElectronNet, agentTransport, agentWrites: 'enabled' })
+      engine = startEngine(transport, message.config, { host, httpTransport: ElectronNet, agentTransport, agentWrites: 'enabled', logger: processLog.effectLogger })
       engine.then(
-        () => send({ _tag: 'ready' }),
+        () => { processLog.log('INFO', 'process ready'); send({ _tag: 'ready' }) },
         (cause: unknown) => {
           console.error('engine: failed to start', cause)
-          process.exit(1)
+          void processLog.close().finally(() => process.exit(1))
         },
       )
       return
@@ -98,7 +101,7 @@ parent.on('message', (event) => {
       void (engine ?? Promise.resolve(undefined))
         .then((handle) => handle?.stop())
         .catch((cause: unknown) => console.error('engine: failed to stop', cause))
-        .finally(() => process.exit(0))
+        .finally(async () => { await processLog.close(); process.exit(0) })
       return
     }
     case 'agentPort': {
