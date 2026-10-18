@@ -951,6 +951,12 @@ image's private `/home/pwuser` directory. The toolchain makes that directory
 readable and searchable by other job uids. Timings above precede this permission
 fix. After rebuilding, the Rust evaluator and Apalache both passed a one-step
 model check as the laptop's uid 1000, using the warmed downloads.
+The final Namespace image also passed the app plan. That fresh machine had a
+cold store: install took 70 seconds, including a 67-second registry request
+while checking supply-chain policies. Total wall time was 203 seconds, including
+the 42.6-second image build and push. The laptop's permission-fix rebuild took
+46.4 seconds. These follow-up checks show why the initial timings are observations,
+not a reliable estimate for every cold run.
 
 Namespace saved a 1,666 MB cache generation. Its first follow-up fresh machine
 missed the cache and installed in 15 seconds; a later fresh machine restored
