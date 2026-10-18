@@ -21,6 +21,14 @@ describe('grammar validation', () => {
     expect(masked).not.toContain('U123')
     expect(masked.indexOf('its broken')).toBe(draft.lastIndexOf('its broken'))
   })
+  it('accepts plain spelling fixes without rewriting the sentence', () => {
+    const edits = [edit('grammer', 'grammar', 5, 'spelling'), edit('chek', 'check', 13, 'spelling')]
+    expect(check('does grammer chek properly happen?', edits)).toEqual({ ok: true, value: { edits } })
+    for (const [from, to] of [['chek', 'Check'], ['chek', 'check!'], ['chek', 'please check'], ['grammer', 'syntax']]) {
+      expect(check(from!, [edit(from!, to!, 0, 'spelling')])).toEqual({ ok: true, value: { edits: [] } })
+    }
+    expect(check('`chek`', [edit('chek', 'check', 1, 'spelling')])).toEqual({ ok: true, value: { edits: [] } })
+  })
   it('rejects malformed output', () => {
     expect(check('its broken', [{ from: 'its', to: "it's" }]).ok).toBe(false)
     expect(check('its broken', [edit('its', "it's", -1)]).ok).toBe(false)

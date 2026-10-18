@@ -3,6 +3,8 @@ import type { GrammarCheckInput, GrammarEdit } from '../tasks/grammarCheck'
 /** Invented grammatical contexts, deliberately small. Production uses the model. */
 export function fakeGrammarCheck({ draft }: GrammarCheckInput): { edits: GrammarEdit[] } {
   const rules: ReadonlyArray<{ pattern: RegExp; to: string; kind: GrammarEdit['kind'] }> = [
+    { pattern: /\bgrammer\b/gi, to: 'grammar', kind: 'spelling' },
+    { pattern: /\bchek\b/gi, to: 'check', kind: 'spelling' },
     { pattern: /\bits(?= broken\b)/gi, to: "it's", kind: 'confusion' },
     { pattern: /\bit's(?= owner\b)/gi, to: 'its', kind: 'confusion' },
     { pattern: /\byour(?= welcome\b)/gi, to: "you're", kind: 'confusion' },

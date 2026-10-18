@@ -10,7 +10,7 @@ export const GrammarCheckOutput = Type.Object({
     start: Type.Integer({ minimum: 0 }),
     from: Type.String({ minLength: 1, maxLength: 80 }),
     to: Type.String({ minLength: 1, maxLength: 80 }),
-    kind: Type.Union([Type.Literal('confusion'), Type.Literal('missing'), Type.Literal('doubled'), Type.Literal('agreement')]),
+    kind: Type.Union([Type.Literal('confusion'), Type.Literal('missing'), Type.Literal('doubled'), Type.Literal('agreement'), Type.Literal('spelling')]),
   }), { maxItems: 12 }),
 })
 export type GrammarEdit = Static<typeof GrammarCheckOutput>['edits'][number]
@@ -29,12 +29,27 @@ const sameCase = (from: string, to: string) => {
   return /^[A-Z][a-z ']+$/.test(from) && /^[A-Z][a-z ']+$/.test(to)
 }
 
+/** At most two letter changes in one word; the model still decides whether it is misspelled. */
+function nearbySpelling(from: string, to: string): boolean {
+  if (!/^[a-z]{3,}$/.test(from) || !/^[a-z]{3,}$/.test(to) || Math.abs(from.length - to.length) > 2) return false
+  let previous = Array.from({ length: to.length + 1 }, (_, i) => i)
+  for (let i = 1; i <= from.length; i++) {
+    const row = [i]
+    for (let j = 1; j <= to.length; j++) {
+      row.push(Math.min(row[j - 1]! + 1, previous[j]! + 1, previous[j - 1]! + (from[i - 1] === to[j - 1] ? 0 : 1)))
+    }
+    previous = row
+  }
+  return previous[to.length]! <= 2
+}
+
 /** Restricts the model to a small word edit; it cannot change case, punctuation or surrounding prose. */
 function minimal(edit: GrammarEdit): boolean {
   const { from, to, kind } = edit
   if (!/^[A-Za-z]+(?:'[A-Za-z]+)?(?: [A-Za-z]+(?:'[A-Za-z]+)?){0,2}$/.test(from) || !/^[A-Za-z]+(?:'[A-Za-z]+)?(?: [A-Za-z]+(?:'[A-Za-z]+)?){0,2}$/.test(to)) return false
   if (from === to || !sameCase(from, to)) return false
   const a = from.toLowerCase(), b = to.toLowerCase()
+  if (kind === 'spelling') return nearbySpelling(a, b)
   if (kind === 'confusion') return CONFUSIONS.some((group) => group.includes(a) && group.includes(b))
   if (kind === 'agreement') return !from.includes(' ') && !to.includes(' ') && (
     VERBS.some((group) => group.includes(a) && group.includes(b)) ||
@@ -67,8 +82,8 @@ function clean(output: Static<typeof GrammarCheckOutput>, input: GrammarCheckInp
  * room for a slow provider. One attempt: each exact text is asked once.
  */
 export const grammarCheck = defineStructuredTask<GrammarCheckInput, typeof GrammarCheckOutput>({
-  name: 'grammarCheck', version: 2, tier: 'decision', timeoutMillis: 20_000, maxAttempts: 1, maxTokens: 256,
-  prompt, tool: { name: 'grammar', description: 'Report only clear grammar errors as minimal word edits.' },
+  name: 'grammarCheck', version: 3, tier: 'decision', timeoutMillis: 20_000, maxAttempts: 1, maxTokens: 256,
+  prompt, tool: { name: 'grammar', description: 'Report only clear spelling and grammar errors as minimal word edits.' },
   output: GrammarCheckOutput, clean,
   render: ({ draft }) => {
     const ranges = editableRanges(draft)

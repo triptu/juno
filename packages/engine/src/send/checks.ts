@@ -225,7 +225,7 @@ export const grammarForSent = (text: string, grammarChecks: GrammarChecks, works
     return yield* Effect.gen(function* () {
       const options = yield* checkPrefs
       if (!(yield* grammarOn(options))) return {}
-      const grammar = (yield* grammarChecks.answer(text, open, waitMillis)).filter((edit) => options.typos || edit.kind !== 'doubled')
+      const grammar = (yield* grammarChecks.answer(text, open, waitMillis)).filter((edit) => options.typos || (edit.kind !== 'doubled' && edit.kind !== 'spelling'))
       if (grammar.length === 0) return {}
       // Run local rules on the grammar result so overlapping doubled-word fixes apply once.
       let fixed = text
