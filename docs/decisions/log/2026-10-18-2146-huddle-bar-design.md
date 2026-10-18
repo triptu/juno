@@ -1,0 +1,1 @@
+- 10-18 21:46 · huddle-bar-design · The huddle bar sits under the sidebar's title bar, above Juno, as a raised card of two 28px rows: one button that opens the huddle tab (place, one status line, faces) and Mute, Share screen, Microphone and speaker and Leave. One height in every state; only what is under it moves (SPEC 20).

@@ -1,0 +1,1 @@
+- 10-18 21:49 · huddle-switch-no-confirm · Joining a huddle while in another needs no confirmation: the header control reads Switch and its tooltip names the huddle you leave. Starting one has no confirmation either, as in Slack.

@@ -1,0 +1,1 @@
+- 10-18 21:54 · huddle-live-green · Live in a huddle is green (`--huddle-live`, a step deeper than the presence dot so it holds 3:1 on the tiles): the speaking ring and the headphones on a running huddle's Main row and on Join. A glyph, not a dot, since a dot already means unread.

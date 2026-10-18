@@ -4,6 +4,16 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-18 21:55 · huddle-views-package · `@juno/huddle-views` depends on `ui` and `tokens` only, with its own view models; `check-deps` and `check-tokens` treat any `*-views/` directory as views.
+- 10-18 21:54 · huddle-live-green · Live in a huddle is green (`--huddle-live`, a step deeper than the presence dot so it holds 3:1 on the tiles): the speaking ring and the headphones on a running huddle's Main row and on Join. A glyph, not a dot, since a dot already means unread.
+- 10-18 21:53 · huddle-mute-key · ⌘⇧Space mutes and unmutes while Juno is active, as in Slack; a Huddle menu in the menu bar holds Show Huddle, Mute Microphone, Share Screen… and Leave Huddle.
+- 10-18 21:52 · huddle-alone-leave · After 10 minutes alone in a huddle, Juno leaves it and says so in a toast; after 30 seconds of lost connection it leaves too, with Rejoin.
+- 10-18 21:51 · huddle-sounds · Huddles play two of Juno's own sounds, one for a join and one for a leave, yours included, and none past eight people. No other call sounds and no ringing.
+- 10-18 21:50 · huddle-quit-confirm · Quitting (and Restart to update) while in a huddle asks "Leave the huddle and quit?", since a stray ⌘Q cannot be undone. Closing the window or the huddle tab never leaves the huddle.
+- 10-18 21:49 · huddle-switch-no-confirm · Joining a huddle while in another needs no confirmation: the header control reads Switch and its tooltip names the huddle you leave. Starting one has no confirmation either, as in Slack.
+- 10-18 21:48 · huddle-thread-new-tab · Thread in the huddle tab opens the huddle's thread in a new tab right after it, an exception to opening in the current tab, so the call stays one tab away.
+- 10-18 21:47 · huddle-tab-design · The huddle tab is "eng · Huddle": the header islands with the status line and Thread, tiles for audio only, up to two shares with a line of people under them, and the controls where a topic's composer sits. No notice area: the status line says it, and actions live on their controls. Your own share is never drawn in your own tab.
+- 10-18 21:46 · huddle-bar-design · The huddle bar sits under the sidebar's title bar, above Juno, as a raised card of two 28px rows: one button that opens the huddle tab (place, one status line, faces) and Mute, Share screen, Microphone and speaker and Leave. One height in every state; only what is under it moves (SPEC 20).
 - 10-18 21:05 · huddles-quint · The huddle call lifecycle gets a Quint spec (`specs/huddle.qnt`). It covers no ghost participant after a quit or crash, one live call at a time, a leave during a join, and stale leave frames.
 - 10-18 21:04 · huddles-share-privacy · If Juno's own screen share switches on privacy mode through `screenWatch`, that is accepted. Sharing does not suppress the watch.
 - 10-18 21:03 · huddles-no-call-budget · A live huddle has no CPU or memory budget for now. We make it work first and measure after. The existing budgets still hold whenever no huddle is running, and the Chime SDK loads only when the user joins.

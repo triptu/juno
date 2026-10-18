@@ -1,0 +1,1 @@
+- 10-18 21:48 · huddle-thread-new-tab · Thread in the huddle tab opens the huddle's thread in a new tab right after it, an exception to opening in the current tab, so the call stays one tab away.

@@ -1,0 +1,1 @@
+- 10-18 21:47 · huddle-tab-design · The huddle tab is "eng · Huddle": the header islands with the status line and Thread, tiles for audio only, up to two shares with a line of people under them, and the controls where a topic's composer sits. No notice area: the status line says it, and actions live on their controls. Your own share is never drawn in your own tab.
