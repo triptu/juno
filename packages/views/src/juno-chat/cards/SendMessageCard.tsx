@@ -95,17 +95,18 @@ function Row({
           {text}
         </p>
       )}
+      {/* Each state is its own line in the slot, so one never resizes into the next. */}
       <div {...stylex.props(styles.result)}>
         {result._tag === 'sent' ? (
-          <Text variant="meta" tone="muted">
+          <Text key="sent" variant="meta" tone="muted">
             {copy.sent} · <OpenButton target={result.open} actions={actions} />
           </Text>
         ) : result._tag === 'failed' ? (
-          <Text variant="meta" tone="muted" truncate>
+          <Text key="failed" variant="meta" tone="muted" truncate>
             {result.reason === undefined ? chatCopy.card.failed : `${chatCopy.card.failed} · ${result.reason}`}
           </Text>
         ) : result._tag === 'sending' || approved ? (
-          <Text variant="meta" tone="muted">
+          <Text key={result._tag === 'sending' ? 'sending' : 'approved'} variant="meta" tone="muted">
             {result._tag === 'sending' ? copy.sending : copy.approved}
           </Text>
         ) : null}
