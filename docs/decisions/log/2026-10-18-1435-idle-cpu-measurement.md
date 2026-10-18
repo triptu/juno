@@ -1,0 +1,1 @@
+- 10-18 14:35 · home-idle · Measure idle CPU for 60 seconds after 10 seconds settling; allow Window 3% only with a visible focused text field for its native caret, and keep other states at 2% (owner).

@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-18 14:35 · home-idle · Measure idle CPU for 60 seconds after 10 seconds settling; allow Window 3% only with a visible focused text field for its native caret, and keep other states at 2% (owner).
 - 10-18 14:33 · home-idle · Keep the idle CPU gate unchanged: Home's trace shows two deferred V8 memory-reducer collections, with no application timer or animation loop; record the reproduced 2.3% miss without claiming a fix.
 - 10-18 13:58 · idle-cpu-platform-gates · Keep the native Window and Graphics idle budgets at 2% in a separate @mac gate; the software-rendered Linux runner uses a 15% spin ceiling for those processes, while engine, agent, network, main and other-helper limits stay the same everywhere. Both gates run the same fake-server scenarios.
 - 10-18 13:42 · process-logs · Process logs use fixed event labels and allowlisted metadata before buffered asynchronous writes, with 5 MB rotation and three backups; About copies only safe warning/error tails and engine-owned outbox aggregates, and opens the log folder through main.

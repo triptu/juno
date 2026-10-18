@@ -10,8 +10,8 @@
 // someone the store knows, under a newer one that names nobody. Here #eng
 // is small, so that spin cost little; `idle.test.ts` reads a large channel.
 //
-// JUNO_IDLE_WINDOW_MS sets each state's window (20 s by default; the
-// measurements in performance.md used 60 s).
+// JUNO_IDLE_WINDOW_MS sets each state's window (60 s by default, as in
+// the original measurements in performance.md).
 import { rm } from 'node:fs/promises'
 import type { Page } from '@playwright/test'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
@@ -20,7 +20,7 @@ import { Juno } from './driver/juno'
 import { expect, hooks, launchApp, tempUserData, test, writeSlackApp, type RunningApp } from './fixtures'
 import { answer, JunoChatPane } from './juno-agent/chat'
 
-const IDLE_WINDOW_MS = Number(process.env.JUNO_IDLE_WINDOW_MS ?? 20_000)
+const IDLE_WINDOW_MS = Number(process.env.JUNO_IDLE_WINDOW_MS ?? 60_000)
 
 /**
  * performance.md section 1, "Idle CPU": each process's share of one core,
@@ -30,11 +30,15 @@ const IDLE_WINDOW_MS = Number(process.env.JUNO_IDLE_WINDOW_MS ?? 20_000)
  */
 type Gate = 'portable' | 'mac'
 
-// The 2% Window and Graphics budgets were measured on the Mac. The Linux
+// The native Window and Graphics budgets were measured on the Mac. The Linux
 // runner renders in software, so it uses a 15% spin ceiling for these two
 // processes. The @mac scenarios keep the native budgets; backend budgets
 // stay the same on every platform and in both gates.
 const SOFTWARE_RENDERING_CEILING = 15
+// A focused text field's native caret blinks at rest. Give only its Window
+// 3%, rather than treating normal Mac text editing as an idle spin.
+const FOCUSED_WINDOW_BUDGET = 3
+const SETTLE_MS = 10_000
 const BUDGETS: Record<string, number> = { main: 2, window: 2, graphics: 2, engine: 3, agent: 2, network: 1, other: 1 }
 
 interface Reading {
@@ -58,17 +62,24 @@ async function idleCpu(running: RunningApp, ms: number): Promise<ReadonlyArray<R
 
 /** Measures `state`, prints one line for it, and holds each process to its budget. */
 async function expectIdle(running: RunningApp, state: string, gate: Gate): Promise<void> {
-  // Let what the step started settle; a share is the average over the window.
-  await new Promise((resolve) => setTimeout(resolve, 3_000))
+  // Navigation leaves load cleanup, including deferred V8 collections. Let
+  // it settle, then average a full minute as the original measurements did.
+  await new Promise((resolve) => setTimeout(resolve, SETTLE_MS))
+  const focusedTextField = await running.win.evaluate(() => {
+    if (!document.hasFocus() || document.visibilityState !== 'visible') return false
+    const active = document.activeElement
+    return active instanceof HTMLElement && (active.isContentEditable || active.matches('textarea:read-write, input:read-write'))
+  })
   const readings = await idleCpu(running, IDLE_WINDOW_MS)
   const line = readings.map((r) => `${r.name} ${r.cpu.toFixed(1)}`).join(', ')
-  console.log(`idle cpu, ${state} (${IDLE_WINDOW_MS / 1000} s): ${line}`)
+  console.log(`idle cpu, ${state} (${IDLE_WINDOW_MS / 1000} s, ${focusedTextField ? 'focused text field' : 'no focused text field'}): ${line}`)
   test.info().annotations.push({ type: 'idle cpu', description: `${state}: ${line}` })
   for (const reading of readings) {
     const rendering = reading.kind === 'window' || reading.kind === 'graphics'
     // Native rendering is checked by the separate @mac gate below.
     if (rendering && gate === 'portable' && process.platform === 'darwin') continue
-    const budget = rendering && gate === 'portable' ? SOFTWARE_RENDERING_CEILING : BUDGETS[reading.kind] ?? BUDGETS.other!
+    const nativeBudget = reading.kind === 'window' && focusedTextField ? FOCUSED_WINDOW_BUDGET : BUDGETS[reading.kind] ?? BUDGETS.other!
+    const budget = rendering && gate === 'portable' ? SOFTWARE_RENDERING_CEILING : nativeBudget
     expect.soft(reading.cpu, `${state}: ${reading.name} (${reading.type}, pid ${reading.pid}) at ${reading.cpu.toFixed(1)} % of a core, budget ${budget} %`).toBeLessThan(budget)
   }
 }
@@ -191,6 +202,10 @@ for (const gate of ['portable', 'mac'] as const) {
         await expect(win.locator('[data-topic-view]').filter({ visible: true })).toBeVisible({ timeout: 15_000 })
         await win.mouse.move(900, 400)
         await expectIdle(running, 'a topic', gate)
+
+        await juno.topic.composer.focus()
+        await expect(juno.topic.composer).toBeFocused()
+        await expectIdle(running, 'a topic with its composer focused', gate)
 
         await junoStates(running, gate)
         await tabAndWindowStates(running, gate)
