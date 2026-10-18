@@ -41,6 +41,46 @@ export const AppInfo = Schema.Struct({
 })
 export type AppInfo = typeof AppInfo.Type
 
+/** Juno's name for a process: main, the window's renderer, the engine, the agent, the GPU process, the network service, or another Chromium helper. */
+export const ProcessKind = Schema.Literals(['main', 'window', 'engine', 'agent', 'graphics', 'network', 'other'])
+export type ProcessKind = typeof ProcessKind.Type
+
+/** One process for the diagnostics: CPU as a share of one core over the last few seconds, memory as its resident size. */
+export const ProcessReading = Schema.Struct({
+  kind: ProcessKind,
+  /** "Engine", "Juno agent", "Window", "Graphics", "Network", "Main", or Chromium's name for another helper. */
+  name: Schema.String,
+  /** Electron's type: Browser, Tab, Utility, GPU. */
+  type: Schema.String,
+  pid: Schema.Int,
+  cpu: Schema.Number,
+  memoryMb: Schema.Number,
+})
+export type ProcessReading = typeof ProcessReading.Type
+
+/** What main knows for Settings › About's diagnostics. */
+export const Diagnostics = Schema.Struct({
+  processes: Schema.Array(ProcessReading),
+  /** The engine supervisor's state: starting, ready, restarting, failed, stopped. */
+  engine: Schema.String,
+  /** The agent supervisor's state; stopped while no provider is set up. */
+  agent: Schema.String,
+  /** Seconds since launch. */
+  uptime: Schema.Number,
+  /** "window focused", "window hidden", "window minimized". */
+  window: Schema.String,
+  /** Main's last idle CPU line (processes.ts), if a process stayed busy while the app was idle. */
+  busyWhileIdle: Schema.optionalKey(Schema.String),
+})
+export type Diagnostics = typeof Diagnostics.Type
+
+/** What the renderer tells main for its idle CPU check: a view kind ("topic", "home", "juno"), never a title or an id. */
+export const AppState = Schema.Struct({
+  view: Schema.String.check(Schema.isMaxLength(40)),
+  syncing: Schema.Boolean,
+})
+export type AppState = typeof AppState.Type
+
 /**
  * Main's answer to a port request. `sent` means the port is on its way (or
  * queued until the engine reports ready); `failed` means the engine supervisor
@@ -206,13 +246,21 @@ export function webPanelCanShow(url: string): boolean {
 }
 
 /** renderer -> main request/response routes over `ipcRenderer.invoke`. */
+export const LogDiagnostics = Schema.Struct({
+  osVersion: Schema.String,
+  logs: Schema.Array(Schema.Struct({ process: Schema.Literals(['main', 'engine', 'agent']), lines: Schema.Array(Schema.String) })),
+})
 export const ShellRoutes = {
+  [Channels.appLogDiagnostics]: { input: Schema.Void, output: LogDiagnostics },
+  [Channels.appShowLogs]: { input: Schema.Void, output: Schema.Void },
   [Channels.updatesGet]: { input: Schema.Void, output: UpdateState },
   [Channels.updatesSet]: { input: Schema.Struct({ enabled: Schema.Boolean }), output: UpdateState },
   [Channels.updatesRestart]: { input: Schema.Void, output: Schema.Void },
   [Channels.updatesDownload]: { input: Schema.Void, output: UpdateState },
   [Channels.updatesNotes]: { input: Schema.Struct({ scope: Schema.Literals(['installed', 'update']) }), output: ReleaseNotes },
   [Channels.appGetInfo]: { input: Schema.Void, output: AppInfo },
+  [Channels.appDiagnostics]: { input: Schema.Void, output: Diagnostics },
+  [Channels.appReportState]: { input: AppState, output: Schema.Void },
   [Channels.engineRequestPort]: { input: Schema.Void, output: PortRequestResult },
   [Channels.engineRestart]: { input: Schema.Void, output: Schema.Void },
   [Channels.agentRequestPort]: { input: Schema.Void, output: PortRequestResult },

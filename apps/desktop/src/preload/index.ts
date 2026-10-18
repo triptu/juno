@@ -55,6 +55,10 @@ const bridge: JunoBridge = {
   },
   app: {
     getInfo: () => ipcRenderer.invoke(Channels.appGetInfo),
+    diagnostics: () => ipcRenderer.invoke(Channels.appDiagnostics),
+    logDiagnostics: () => ipcRenderer.invoke(Channels.appLogDiagnostics),
+    showLogs: () => ipcRenderer.invoke(Channels.appShowLogs),
+    reportState: (state) => ipcRenderer.invoke(Channels.appReportState, state),
   },
   engine: {
     requestPort: requestEnginePort,

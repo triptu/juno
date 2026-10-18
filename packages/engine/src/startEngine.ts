@@ -13,7 +13,7 @@
  * tests). Both default to the Node flavour so a bare `startEngine` still
  * serves.
  */
-import { Context, Effect, Exit, Layer, Scope } from 'effect'
+import { Context, Effect, Exit, Layer, Logger, Scope } from 'effect'
 import type { HandlerOptions } from '@juno/agent-juno'
 import type { EngineConfig as Config } from '@juno/contract'
 import { HttpTransport } from '@juno/slack'
@@ -39,6 +39,8 @@ export interface EngineHandle {
 }
 
 export interface EngineHostOptions {
+  readonly logger?: Logger.Logger<unknown, void>
+
   readonly notifications?: NotificationHost
   /** Optional cycle observer and sync schedule overrides, used by the test harness. */
   readonly sync?: SyncControlOptions
@@ -82,11 +84,11 @@ export function startEngine(transport: Transport, config: Config, options: Engin
       return {
         config,
         wake: () => Effect.runPromise(notifications.wake),
-        setPresence: (value) => Effect.runPromise(notifications.setPresence(value)),
+        setPresence: (value: Presence) => Effect.runPromise(notifications.setPresence(value)),
         currentPresence: () => Effect.runPromise(notifications.currentPresence),
         stop: () => Effect.runPromise(Scope.close(scope, Exit.void)),
         commandIdle: () => Effect.runPromise(outbox.idle),
       }
-    }),
+    }).pipe(Effect.provide(Logger.layer(options.logger === undefined ? [Logger.defaultLogger] : [options.logger]))),
   )
 }

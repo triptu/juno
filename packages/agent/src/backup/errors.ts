@@ -1,8 +1,7 @@
 /**
  * What the owner reads when backup folder work fails (a folder change, a
- * move, a restore), and what the log keeps. The owner gets one plain line
- * with what to do; the log gets the error's name, code and message, which
- * hold paths but never a key, a phrase or message text.
+ * move, a restore). The owner gets one plain line with what to do.
+ * The desktop process logger separately records safe error types and stack locations.
  */
 import { chatCopy } from '@juno/agent-contract'
 import { ForeignBackup, OwnedElsewhere } from './backup'
@@ -33,11 +32,4 @@ export function backupFailure(error: unknown): BackupFailure {
     default:
       return { reason: 'unavailable', message: 'Juno could not use the backup folder. Check that it is available and try again.' }
   }
-}
-
-/** One line for the log: `EACCES Error: EACCES: permission denied, open '/Volumes/…'`. */
-export function describeFailure(error: unknown): string {
-  if (!(error instanceof Error)) return 'a non-error value was thrown'
-  const tag = code(error)
-  return `${tag === undefined ? '' : `${tag} `}${error.name}: ${error.message}`
 }

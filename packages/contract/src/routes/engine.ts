@@ -43,4 +43,12 @@ export const enginePing = Rpc.make('engine.ping', {
   success: Schema.Struct({ pong: Schema.Int, at: Schema.Number }),
 })
 
-export const EngineRoutes = RpcGroup.make(engineStatus, enginePing)
+export const OutboxCount = Schema.Struct({
+  kind: Schema.Literals(['post', 'mark', 'edit', 'delete', 'react']),
+  state: Schema.Literals(['queued', 'sending', 'unknown', 'failed', 'retrying', 'waiting']),
+  count: Schema.Int,
+})
+export const engineOutbox = Rpc.make('engine.outbox', {
+  success: Schema.NullOr(Schema.Array(OutboxCount)),
+})
+export const EngineRoutes = RpcGroup.make(engineStatus, enginePing, engineOutbox)

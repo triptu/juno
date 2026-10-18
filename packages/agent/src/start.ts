@@ -20,7 +20,7 @@ import { bindViewHost } from './view-tools/host'
  * resources.
  */
 import { mkdirSync } from 'node:fs'
-import { Context, Effect, Exit, Layer, Schema, Scope, Stream } from 'effect'
+import { Context, Effect, Exit, Layer, Logger, Schema, Scope, Stream } from 'effect'
 import { AGENT_HOST_PROTOCOL, HostHello, type AgentConfig } from '@juno/agent-contract'
 import { bindActionHost } from './actions/host'
 import { AgentHost } from './host/client'
@@ -73,6 +73,8 @@ export type AgentTurns = Omit<TurnsOptions, 'agentDir' | 'host' | 'actions' | 'v
 }
 
 export interface AgentOptions {
+  readonly logger?: Logger.Logger<unknown, void>
+
   /** Opens the turn engine. Without it the agent only reaches its host. */
   readonly turns?: AgentTurns
   /** Serves the renderer's RPCs on these ports. */
@@ -104,6 +106,9 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
   const { renderer } = options
   const mcp = options.turns !== undefined && options.mcp !== undefined ? withMcp(options.turns, options.mcp.credentials, options.mcp.review) : undefined
   const turns = mcp?.turns ?? options.turns
+  const runOptions: Effect.RunOptions = { onFiberStart: (fiber) => {
+    if (options.logger) fiber.setContext(Context.add(fiber.context, Logger.CurrentLoggers, new Set([options.logger])))
+  } }
   return Effect.runPromise(
     Effect.gen(function* () {
       const scope = yield* Scope.make()
@@ -193,5 +198,6 @@ export function startAgent(config: AgentConfig, connection: HostConnection, opti
         stop: () => Effect.runPromise(Scope.close(scope, Exit.void)),
       }
     }),
+    runOptions,
   )
 }

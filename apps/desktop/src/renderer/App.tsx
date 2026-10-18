@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useLayoutEffect } from 'react'
-import { accentAtom, closeSidebarSheet, densityAtom, junoSetupPendingAtom, openSidebarSheet, persistAccent, persistTheme, privacyAtom, registry, resolvedThemeAtom, sessionUnknownAtom, signedInAtom, themeAtom, type Accent, type Density, type ResolvedTheme, type Theme } from '@juno/state'
+import { accentAtom, closeSidebarSheet, densityAtom, junoSetupPendingAtom, openSidebarSheet, persistAccent, persistTheme, privacyAtom, registry, reportAppStateAtom, resolvedThemeAtom, sessionUnknownAtom, signedInAtom, themeAtom, type Accent, type Density, type ResolvedTheme, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { AppearanceSettings, applyPrivacy, applyTheme, SheetOpenContext, Shell, type AccentName, type DensityName, type ThemeName, type ThemePreference } from '@juno/views'
 import { chunk } from './containers/chunks'
@@ -49,6 +49,8 @@ export function App() {
   const setUpPending = useAtomValue(junoSetupPendingAtom)
 
   useEffect(followFullScreen, [])
+  // Main's idle CPU check hears the view and whether a sync runs (processes.ts).
+  useEffect(() => registry.mount(reportAppStateAtom), [])
 
   useEffect(() => {
     if (signedIn !== undefined) return
