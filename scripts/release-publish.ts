@@ -24,23 +24,31 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { addChangelogEntry, compareVersions, isVersion, normalizeVersion, parseChangelog } from '../apps/desktop/src/main/releaseNotes.ts'
+import { releaseGate, printGate } from './release-gate.mjs'
 import { recordReleaseTiming } from './release-timings.mjs'
 
-const root = resolve(import.meta.dirname, '..')
+const scriptRoot = resolve(import.meta.dirname, '..')
 const { values } = parseArgs({
   options: {
     notes: { type: 'string' },
+    checkout: { type: 'string', default: scriptRoot },
+    source: { type: 'string' },
     urgent: { type: 'boolean', default: false },
     prerelease: { type: 'boolean', default: false },
     'dry-run': { type: 'boolean', default: false },
-    dir: { type: 'string', default: join(root, 'apps/desktop/release') },
+    dir: { type: 'string' },
     repo: { type: 'string', default: 'triptu/juno-releases' },
   },
 })
+const root = resolve(values.checkout)
 const dry = values['dry-run']
 const repo = values.repo
-const dir = resolve(values.dir)
+const dir = resolve(values.dir ?? join(root, 'apps/desktop/release'))
 const urgent = values.urgent
+const buildCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
+const sourceCommit = values.source ?? buildCommit
+if (!/^[a-f0-9]{40}$/.test(sourceCommit)) fail('source must be a full commit id')
+execFileSync('git', ['merge-base', '--is-ancestor', sourceCommit, buildCommit], { cwd: root })
 
 function fail(message: string): never {
   console.error(`release:publish: ${message}`)
@@ -93,21 +101,18 @@ if (!signed && files.some((name) => name.endsWith('.zip'))) fail('an unsigned bu
 
 const sharedStatus = resolve(root, execFileSync('git', ['rev-parse', '--git-common-dir'], { cwd: root, encoding: 'utf8' }).trim(), '../.juno-status')
 if (!urgent) {
-  const summaryFile = join(sharedStatus, 'verify-main.json')
-  if (!existsSync(summaryFile)) fail('no CI keeper full-suite result; use --urgent only for a problem hurting the owner now')
-  const summary = JSON.parse(readFileSync(summaryFile, 'utf8')) as { commit?: string; passed?: boolean }
-  if (!summary.passed || !summary.commit) fail('the latest CI keeper full-suite run is not green')
-  const changed = execFileSync('git', ['diff', '--name-only', summary.commit, '--'], { cwd: root, encoding: 'utf8' }).trim().split('\n').filter(Boolean)
-  if (changed.some((name) => name !== 'apps/desktop/package.json')) fail(`changes since the green commit are not limited to the version bump: ${changed.join(', ')}`)
-  const greenPackage = JSON.parse(execFileSync('git', ['show', `${summary.commit}:apps/desktop/package.json`], { cwd: root, encoding: 'utf8' })) as Record<string, unknown>
-  const currentPackage = JSON.parse(readFileSync(join(root, 'apps/desktop/package.json'), 'utf8')) as Record<string, unknown>
-  if (JSON.stringify({ ...greenPackage, version }) !== JSON.stringify(currentPackage)) fail('the app package differs from the green commit beyond its version')
+  const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
+  if (execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim()) fail('commit or remove working-tree changes before publishing')
+  const gate = releaseGate(root, commit)
+  if (!gate) fail('no eligible full-run record for this commit; inspect pnpm verify:main results')
+  printGate(gate)
 }
 
 // The repository.
 gh(['auth', 'status'])
-const releases = JSON.parse(gh(['release', 'list', '--repo', repo, '--limit', '200', '--json', 'tagName,isDraft,isPrerelease'])) as Array<{ tagName: string; isDraft: boolean; isPrerelease: boolean }>
+const releases = JSON.parse(gh(['release', 'list', '--repo', repo, '--limit', '200', '--json', 'tagName,isDraft,isPrerelease,publishedAt'])) as Array<{ tagName: string; isDraft: boolean; isPrerelease: boolean; publishedAt: string }>
 if (releases.some((release) => release.tagName === tag)) fail(`${repo} already has ${tag}; bump the version (pnpm release:version)`)
+if (!urgent && releases.some((release) => !release.isDraft && !release.isPrerelease && Date.now() - Date.parse(release.publishedAt) < 6 * 60 * 60 * 1000)) fail('the last release was less than 6 hours ago')
 const newest = releases.filter((release) => !release.isDraft && !release.isPrerelease && isVersion(release.tagName))
   .map((release) => normalizeVersion(release.tagName)).sort(compareVersions).at(-1)
 if (newest !== undefined && compareVersions(version, newest) <= 0) fail(`${version} is not newer than the published ${newest}`)
@@ -120,14 +125,14 @@ if (dry) process.exit(0)
 if (urgent) {
   for (const args of [['typecheck'], ['lint'], ['remote', 'test'], ['test:package']]) {
     console.log(`release:publish: urgent gate: pnpm ${args.join(' ')}`)
-    execFileSync('pnpm', args, { cwd: root, stdio: 'inherit' })
+    execFileSync('pnpm', args, { cwd: root, stdio: 'inherit', env: { ...process.env, JUNO_E2E_AI_JOBS: '1' } })
   }
 }
 
 const scratch = mkdtempSync(join(tmpdir(), 'juno-release-'))
 try {
   const notesFile = join(scratch, 'notes.md')
-  writeFileSync(notesFile, `${lines.map((line) => `- ${line}`).join('\n')}\n${urgent ? '\n<!-- juno-release: urgent -->\n' : ''}`)
+  writeFileSync(notesFile, `${lines.map((line) => `- ${line}`).join('\n')}\n${urgent ? '\n<!-- juno-release: urgent -->\n' : ''}\n<!-- juno-source: ${sourceCommit} -->\n<!-- juno-build: ${buildCommit} -->\n`)
   const uploadStarted = Date.now()
   gh(['release', 'create', tag, '--repo', repo, '--draft', '--title', `Juno ${version}`, '--notes-file', notesFile,
     ...(values.prerelease ? ['--prerelease'] : []), ...files.map((name) => join(dir, name))])
