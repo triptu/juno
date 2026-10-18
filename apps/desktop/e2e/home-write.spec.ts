@@ -288,3 +288,38 @@ test('a new thread whose root fails stays in the sidebar with Not sent and Retry
   const root = fake.messages('C0ENG').find((message) => message.text === 'first')!
   expect(fake.messages('C0ENG').find((message) => message.text === 'second')?.thread_ts).toBe(root.ts)
 })
+
+test('closing Home with a draft shows "Draft closed", and Undo brings the tab back with its draft', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { write, tabs } = juno
+
+  await write.recentRow('Maya').click()
+  await write.write(DRAFT)
+  await tabs.closeAt('Home', 0)
+  await juno.expectToast('Draft closed')
+  // The last tab closed, so a fresh Home took its place.
+  await expect(write.composer).toHaveValue('')
+  await write.expectDestination('Juno')
+
+  await juno.undoFromToast()
+  await expect(tabs.tab('Home')).toHaveCount(2)
+  await expect(write.composer).toHaveValue(DRAFT)
+  await write.expectDestination('Maya')
+  await expect(write.composer).toBeFocused()
+})
+
+test('a send Slack refuses says why in a toast, and the draft and destination stay', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { write } = juno
+
+  await write.pickConversation('jon', 'Jonas')
+  fake.forceError({ method: 'conversations.open', error: 'user_disabled' })
+  await write.write('Welcome aboard')
+  await write.send()
+  await juno.expectToast('Not sent · Their account is deactivated')
+  await expect(write.composer).toHaveValue('Welcome aboard')
+  await write.expectDestination('Jonas')
+  expect(fake.calls.some((call) => call.method === 'chat.postMessage')).toBe(false)
+})
