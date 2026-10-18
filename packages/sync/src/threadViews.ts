@@ -10,7 +10,7 @@ import type { Message, Reaction, ThreadView } from '@juno/slack-schema'
 import { StoreWriter, type MessageRow, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
 import type { SyncContext } from './context'
-import { FollowFence } from './followFence'
+import { FollowFence, type FollowFenceService } from './followFence'
 import { mergeMessage, mergeRootCounters } from './merge'
 
 interface SubscriptionRow {
@@ -86,25 +86,23 @@ const toReadState = (row: ReadRow, pending: boolean): ReadState => ({
   commanded: row.commanded === 1,
 })
 
-/**
- * Certifies the getView rows that would only move follow observation
- * fences. The caller holds the writer transaction while this reads the page
- * in batches and publishes those in-process fences.
- */
-export const threadViewPageUnchanged = (
-  ctx: SyncContext,
-  observations: ReadonlyArray<{ readonly view: ThreadView; readonly requestedAt: Ts }>,
-): Effect.Effect<ReadonlyArray<boolean>, SqlError, StoreWriter> =>
+interface PageSnapshot {
+  readonly messages: ReadonlyArray<MessageRow>
+  readonly messageByKey: ReadonlyMap<string, MessageRow>
+  readonly reactions: ReadonlyMap<string, ReadonlyArray<ReactionRow>>
+  readonly subscriptions: ReadonlyMap<string, SubscriptionRow>
+  readonly reads: ReadonlyMap<string, ReadRow>
+  readonly cursors: ReadonlyMap<string, CursorRow>
+  readonly pending: ReadonlySet<string>
+}
+
+const pageSnapshot = (views: ReadonlyArray<ThreadView>): Effect.Effect<PageSnapshot, SqlError, StoreWriter> =>
   Effect.gen(function* () {
-    const views = observations.map(({ view }) => view)
-    if (views.length === 0) return []
     const sql = yield* StoreWriter
-    const fence = yield* FollowFence
     const roots = views.map((view) => view.root_msg.ts)
     const channels = [...new Set(views.map((view) => view.root_msg.channel))]
     const topics = views.map((view) => threadTopicId(view.root_msg.channel as ChannelId, view.root_msg.ts as Ts))
-
-    const [messageRows, reactionRows, subscriptionRows, readRows, cursorRows, pendingRows] = yield* Effect.all([
+    const [messages, reactionRows, subscriptionRows, readRows, cursorRows, pendingRows] = yield* Effect.all([
       sql<MessageRow>`SELECT * FROM messages
         WHERE channel IN ${sql.in(channels)} AND (ts IN ${sql.in(roots)} OR thread_ts IN ${sql.in(roots)})`,
       sql<ReactionRow>`SELECT channel, ts, name, count, user_ids_json, me FROM reactions
@@ -119,74 +117,82 @@ export const threadViewPageUnchanged = (
       sql<{ kind: string; target_key: string }>`SELECT kind, target_key FROM outbox
         WHERE (kind = 'follow' AND target_key IN ${sql.in(topics)}) OR (kind = 'mark' AND target_key IN ${sql.in(topics)})`,
     ], { concurrency: 1 })
-
-    const storedMessages = new Map(messageRows.map((row) => [keyOf(row.channel, row.ts), row]))
     const reactions = new Map<string, Array<ReactionRow>>()
     for (const row of reactionRows) {
       const rows = reactions.get(keyOf(row.channel, row.ts)) ?? []
       rows.push(row)
       reactions.set(keyOf(row.channel, row.ts), rows)
     }
-    const subscriptions = new Map(subscriptionRows.map((row) => [keyOf(row.channel, row.thread_ts), row]))
-    const reads = new Map(readRows.map((row) => [row.topic_id, row]))
-    const cursors = new Map(cursorRows.map((row) => [keyOf(row.channel, row.thread_ts), row]))
-    const pending = new Set(pendingRows.map((row) => `${row.kind}:${row.target_key}`))
-    const unchanged: Array<boolean> = []
-
-    for (const { view, requestedAt } of observations) {
-      const root = view.root_msg
-      const channel = root.channel
-      const rootKey = keyOf(channel, root.ts)
-      const topic = threadTopicId(channel as ChannelId, root.ts as Ts)
-      const incoming = messagesOf(view)
-      let advanceFence = false
-      const matches = (() => {
-        if (incoming.some((message) => ctx.lateReactions.has(keyOf(channel, message.ts)))) return false
-
-        for (const message of incoming) {
-          const stored = storedMessages.get(keyOf(channel, message.ts))
-          if (stored === undefined) return false
-          const merged = mergeMessage(stored, message, channel, { kind: 'page', requestedAt })
-          if (merged.changed) return false
-          if (merged.applyReactions && !sameReactions(reactions.get(keyOf(channel, message.ts)) ?? [], message.reactions ?? [], ctx.me.userId)) return false
-        }
-
-        const storedRoot = storedMessages.get(rootKey)
-        if (storedRoot === undefined) return false
-        const replyCount = messageRows.filter((row) => row.channel === channel && row.ts !== root.ts && row.thread_ts === root.ts && row.deleted === 0).length
-        for (const reply of incoming.slice(1)) {
-          if (mergeRootCounters(storedRoot, { reply_count: replyCount, latest_reply: reply.ts }, { kind: 'page', requestedAt }).changed) return false
-        }
-
-        const sub = subscriptions.get(rootKey)
-        if (sub === undefined || pending.has(`follow:${topic}`)) return false
-        const subscribed = root.subscribed ?? true
-        if (sub.subscribed !== (subscribed ? 1 : 0)) return false
-        if (root.last_read !== undefined && sub.slack_last_read !== root.last_read) return false
-        const observedAt = fence.effective(channel, root.ts, sub.observed_at ?? undefined)
-        advanceFence = observedAt === undefined || compareTs(requestedAt, observedAt) > 0
-
-        const read = reads.get(topic)
-        if (read === undefined) return false
-        if (root.last_read !== undefined) {
-          if (pending.has(`mark:${topic}`)) return false
-          const outcome = observeServerRead(toReadState(read, false), {
-            kind: 'page',
-            lastReadTs: root.last_read as Ts,
-            requestedAt,
-          }).outcome
-          if (outcome !== 'ignored') return false
-        }
-
-        const completeFrom = root.last_read ?? root.latest_reply ?? root.ts
-        const cursor = cursors.get(rootKey)
-        const complete = replyCount >= root.reply_count
-        const nextFrom = cursor?.complete_from === null || cursor?.complete_from === undefined || compareTs(completeFrom, cursor.complete_from) < 0
-          ? completeFrom
-          : cursor.complete_from
-        return cursor !== undefined && cursor.replies_complete === (complete ? 1 : 0) && cursor.complete_from === nextFrom
-      })()
-      unchanged.push(matches && (!advanceFence || fence.advance(channel, root.ts, requestedAt)))
+    return {
+      messages,
+      messageByKey: new Map(messages.map((row) => [keyOf(row.channel, row.ts), row])),
+      reactions,
+      subscriptions: new Map(subscriptionRows.map((row) => [keyOf(row.channel, row.thread_ts), row])),
+      reads: new Map(readRows.map((row) => [row.topic_id, row])),
+      cursors: new Map(cursorRows.map((row) => [keyOf(row.channel, row.thread_ts), row])),
+      pending: new Set(pendingRows.map((row) => `${row.kind}:${row.target_key}`)),
     }
-    return unchanged
+  })
+
+const observationUnchanged = (
+  ctx: SyncContext,
+  snapshot: PageSnapshot,
+  fence: FollowFenceService,
+  view: ThreadView,
+  requestedAt: Ts,
+): boolean => {
+  const root = view.root_msg
+  const channel = root.channel
+  const rootKey = keyOf(channel, root.ts)
+  const topic = threadTopicId(channel as ChannelId, root.ts as Ts)
+  const incoming = messagesOf(view)
+  if (incoming.some((message) => ctx.lateReactions.has(keyOf(channel, message.ts)))) return false
+  for (const message of incoming) {
+    const stored = snapshot.messageByKey.get(keyOf(channel, message.ts))
+    if (stored === undefined) return false
+    const merged = mergeMessage(stored, message, channel, { kind: 'page', requestedAt })
+    if (merged.changed) return false
+    if (merged.applyReactions && !sameReactions(snapshot.reactions.get(keyOf(channel, message.ts)) ?? [], message.reactions ?? [], ctx.me.userId)) return false
+  }
+  const storedRoot = snapshot.messageByKey.get(rootKey)
+  if (storedRoot === undefined) return false
+  const replyCount = snapshot.messages.filter((row) => row.channel === channel && row.ts !== root.ts && row.thread_ts === root.ts && row.deleted === 0).length
+  for (const reply of incoming.slice(1)) {
+    if (mergeRootCounters(storedRoot, { reply_count: replyCount, latest_reply: reply.ts }, { kind: 'page', requestedAt }).changed) return false
+  }
+  const sub = snapshot.subscriptions.get(rootKey)
+  if (sub === undefined || snapshot.pending.has(`follow:${topic}`)) return false
+  if (sub.subscribed !== ((root.subscribed ?? true) ? 1 : 0)) return false
+  if (root.last_read !== undefined && sub.slack_last_read !== root.last_read) return false
+  const read = snapshot.reads.get(topic)
+  if (read === undefined) return false
+  if (root.last_read !== undefined) {
+    if (snapshot.pending.has(`mark:${topic}`)) return false
+    const outcome = observeServerRead(toReadState(read, false), { kind: 'page', lastReadTs: root.last_read as Ts, requestedAt }).outcome
+    if (outcome !== 'ignored') return false
+  }
+  const completeFrom = root.last_read ?? root.latest_reply ?? root.ts
+  const cursor = snapshot.cursors.get(rootKey)
+  const complete = replyCount >= root.reply_count
+  const nextFrom = cursor?.complete_from === null || cursor?.complete_from === undefined || compareTs(completeFrom, cursor.complete_from) < 0 ? completeFrom : cursor.complete_from
+  if (cursor === undefined || cursor.replies_complete !== (complete ? 1 : 0) || cursor.complete_from !== nextFrom) return false
+  const observedAt = fence.effective(channel, root.ts, sub.observed_at ?? undefined)
+  return (observedAt !== undefined && compareTs(requestedAt, observedAt) <= 0) || fence.advance(channel, root.ts, requestedAt)
+}
+
+/**
+ * Certifies the getView rows that would only move follow observation
+ * fences. The caller holds the writer transaction while this reads the page
+ * in batches and publishes those in-process fences.
+ */
+export const threadViewPageUnchanged = (
+  ctx: SyncContext,
+  observations: ReadonlyArray<{ readonly view: ThreadView; readonly requestedAt: Ts }>,
+): Effect.Effect<ReadonlyArray<boolean>, SqlError, StoreWriter> =>
+  Effect.gen(function* () {
+    const views = observations.map(({ view }) => view)
+    if (views.length === 0) return []
+    const fence = yield* FollowFence
+    const snapshot = yield* pageSnapshot(views)
+    return observations.map(({ view, requestedAt }) => observationUnchanged(ctx, snapshot, fence, view, requestedAt))
   })
