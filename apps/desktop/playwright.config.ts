@@ -4,6 +4,11 @@ import { defineConfig } from '@playwright/test'
 // here as well as in scripts/without-run-as-node.mjs.
 delete process.env.ELECTRON_RUN_AS_NODE
 
+const excludedTags = [
+  ...(process.platform === 'darwin' ? [] : ['@mac']),
+  ...(process.env.JUNO_INCLUDE_FLAKY === '1' ? [] : ['@flaky']),
+]
+
 export default defineConfig({
   testDir: 'e2e',
   // e2e/coverage.ts records which source files each spec runs, under JUNO_COVERAGE=1.
@@ -15,11 +20,11 @@ export default defineConfig({
   // run more with JUNO_E2E_WORKERS.
   workers: Number(process.env.JUNO_E2E_WORKERS ?? 1),
   fullyParallel: false,
-  retries: process.env.CI ? 1 : 0,
+  retries: process.env.CI || process.env.JUNO_REMOTE_CONTAINER ? 1 : 0,
   // Tests tagged @mac depend on macOS behaviour. pnpm remote runs on Linux and
-  // skips them; every Mac run, including the scheduled full run, keeps them.
-  grepInvert: process.platform === 'darwin' ? undefined : /@mac/,
-  reporter: process.env.CI ? 'github' : 'list',
+  // skips them. Scheduled runs include quarantined tests; selective runs skip them.
+  grepInvert: excludedTags.length ? new RegExp(excludedTags.join('|')) : undefined,
+  reporter: [[process.env.CI ? 'github' : 'list'], ['../../scripts/test-results-reporter.mjs']],
   use: {
     trace: 'retain-on-failure',
   },

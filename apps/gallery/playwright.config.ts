@@ -28,7 +28,9 @@ export default defineConfig({
   // GALLERY_WORKERS lets a machine of its own (pnpm remote) run more.
   workers: Number(process.env.GALLERY_WORKERS ?? (process.env.CI ? 2 : 3)),
   fullyParallel: true,
-  reporter: process.env.CI ? 'github' : 'list',
+  retries: process.env.CI || process.env.JUNO_REMOTE_CONTAINER ? 1 : 0,
+  grepInvert: process.env.JUNO_INCLUDE_FLAKY === '1' ? undefined : /@flaky/,
+  reporter: [[process.env.CI ? 'github' : 'list'], ['../../scripts/test-results-reporter.mjs']],
   use: {
     baseURL: `http://localhost:${port}`,
     channel: process.env.GALLERY_BROWSER === 'chromium' ? undefined : 'chrome',

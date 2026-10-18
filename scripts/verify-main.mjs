@@ -3,15 +3,16 @@
 //
 //   pnpm verify:main                 local main
 //   pnpm verify:main --ref origin/main
+//   pnpm verify:main --nightly         uncached Quint plus the Mac suites
 //   pnpm verify:main --no-cache        rerun every Quint check
 //   pnpm verify:main --with-mac      also, on this Mac: the e2e tests tagged @mac,
 //                                    then `perf` and `test:feel`
 //
 // It checks main out into a temporary detached worktree, so nothing local is
-// sent, and runs `test`, `specs:check` (random simulations uncached),
-// `test:gallery` and `test:desktop` as one plan on one machine
+// sent, and runs `test`, `specs:check` (Apalache cached; --no-cache or --nightly bypasses it),
+// `specs:conformance`, `test:gallery` and `test:desktop` as one plan on one machine
 // (scripts/plan.mjs, through scripts/remote.mjs). The summary goes to
-// .juno-status/verify-main.md and .json in this checkout, each suite's lines
+// shared .juno-status/verify-main.md and .json, each suite's lines
 // to .juno-status/verify-main/<run>/<suite>.log. The exit code is 1 if any
 // suite failed. perf and test:feel time the Mac, so they run only with
 // --with-mac, one after the other, each holding the whole machine; the feel
@@ -24,16 +25,19 @@
 
 import { spawn, spawnSync } from 'node:child_process'
 import { cpSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { writeRecord } from './verify-records.mjs'
+import { statusFolder } from './release-gate.mjs'
+import { testResults } from './test-results-reporter.mjs'
+import { scratchFolder } from './worktree-folder.mjs'
 import { formatMap, MAP_PATH, mergePartials } from './coverage-map.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
 const ref = argv.includes('--ref') ? argv[argv.indexOf('--ref') + 1] : 'main'
-const withMac = argv.includes('--with-mac')
-const noCache = argv.includes('--no-cache')
+const withMac = argv.includes('--with-mac') || argv.includes('--nightly')
+const noCache = argv.includes('--no-cache') || argv.includes('--nightly')
 
 const git = (...args) => {
   const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' })
@@ -43,11 +47,12 @@ const git = (...args) => {
 
 const commit = git('rev-parse', ref)
 const subject = git('log', '-1', '--format=%s', commit)
-const runId = new Date().toISOString().replace(/[-:]/g, '').replace(/\..*/, '')
-const statusDir = join(root, '.juno-status')
+const runId = new Date().toISOString().replace(/[-:]/g, '').replace('.', '')
+const statusDir = statusFolder(root)
 const logDir = join(statusDir, 'verify-main', runId)
 mkdirSync(logDir, { recursive: true })
-const checkout = join(mkdtempSync(join(tmpdir(), 'juno-verify-main-')), 'main')
+mkdirSync(scratchFolder(), { recursive: true })
+const checkout = join(mkdtempSync(join(scratchFolder(), 'juno-verify-main-')), 'main')
 git('worktree', 'add', '--detach', checkout, commit)
 const removeCheckout = () => spawnSync('git', ['worktree', 'remove', '--force', checkout], { cwd: root, stdio: 'ignore' })
 process.on('exit', removeCheckout)
@@ -56,8 +61,9 @@ for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => process.exi
 const suites = [
   { name: 'test', words: ['test'] },
   { name: 'specs:check', words: [...(noCache ? ['SPECS_CACHE=off'] : ['SPECS_RUN_CACHE=off']), 'specs:check', ...(noCache ? ['--no-cache'] : [])] },
-  { name: 'test:gallery', words: ['test:gallery'] },
-  { name: 'test:desktop', words: ['JUNO_COVERAGE=1', 'test:desktop'] },
+  { name: 'specs:conformance', words: [...(noCache ? ['SPECS_CACHE=off'] : []), 'specs:conformance'] },
+  { name: 'test:gallery', words: ['JUNO_INCLUDE_FLAKY=1', 'test:gallery'] },
+  { name: 'test:desktop', words: ['JUNO_COVERAGE=1', 'JUNO_INCLUDE_FLAKY=1', 'test:desktop'] },
 ]
 
 /** Runs one suite, writing its log; resolves with the outcome. */
@@ -91,14 +97,14 @@ function splitPlan(planned) {
 
 console.log(`verify:main: ${commit.slice(0, 10)} ${subject}`)
 const words = suites.flatMap((suite, index) => [...(index ? ['+'] : []), ...suite.words])
-const runs = [run('plan', process.execPath, [join(checkout, 'scripts/remote.mjs'), 'test:plan', ...words], checkout, noCache ? { SPECS_CACHE: 'off' } : {}).then((planned) => splitPlan(planned))]
+const runs = [run('plan', process.execPath, [join(checkout, 'scripts/remote.mjs'), 'test:plan', ...words], checkout).then((planned) => splitPlan(planned))]
 if (withMac) {
   // The @mac tests need the installed workspace and a build here; they take a heavy-job slot.
   runs.push(
     (async () => {
       const install = spawnSync('pnpm', ['install', '--frozen-lockfile', '--reporter=silent'], { cwd: checkout, stdio: 'ignore' })
       if (install.status !== 0) return [{ suite: 'test:desktop @mac', code: 1, seconds: 0, log: '' }]
-      return [await run('test:desktop @mac', 'pnpm', ['test:desktop', '--grep', '@mac'], checkout)]
+      return [await run('test:desktop @mac', 'pnpm', ['test:desktop', '--grep', '@mac'], checkout, { JUNO_INCLUDE_FLAKY: '1' })]
     })(),
   )
 }
@@ -123,7 +129,7 @@ if (partials.length > 0) {
 console.log(`verify:main: ${coverageNote}`)
 if (withMac) {
   // After the rest, so they do not time a machine the other suites are using.
-  for (const suite of ['perf', 'test:feel']) results = [...results, await run(suite, 'pnpm', [suite], checkout)]
+  for (const suite of ['perf', 'test:feel']) results = [...results, await run(suite, 'pnpm', [suite], checkout, { JUNO_INCLUDE_FLAKY: '1' })]
   const sheet = join(checkout, 'apps/desktop/feel-report')
   if (existsSync(sheet)) cpSync(sheet, join(logDir, 'feel-report'), { recursive: true, force: true })
 }
@@ -154,9 +160,10 @@ const summary = {
   finishedAt: new Date().toISOString(),
   passed: results.every((result) => result.code === 0),
   coverage: coverageNote,
-  suites: results.map((result) => ({ ...result, log: relative(root, result.log), failures: result.code === 0 ? [] : failures(result.log) })),
+  nightly: argv.includes('--nightly'),
+  suites: results.map((result) => ({ ...result, log: result.log ? join('.juno-status', relative(statusDir, result.log)) : '', failures: result.code === 0 ? [] : failures(result.log), tests: result.log && existsSync(result.log) ? testResults(readFileSync(result.log, 'utf8')) : undefined })),
 }
-writeFileSync(join(statusDir, 'verify-main.json'), `${JSON.stringify(summary, null, 2)}\n`)
+writeRecord(statusDir, runId, summary)
 const markdown = [
   `# verify:main ${summary.passed ? 'passed' : 'FAILED'}`,
   '',
@@ -167,6 +174,8 @@ const markdown = [
   '| Suite | Result | Time | Log |',
   '| --- | --- | --- | --- |',
   ...summary.suites.map((suite) => `| \`${suite.suite}\` | ${suite.code === 0 ? 'passed' : `failed (${suite.code})`} | ${suite.seconds} s | \`${suite.log}\` |`),
+  '',
+  ...summary.suites.flatMap((suite) => (suite.tests?.flaky ?? []).map((test) => `- FLAKY ${test.id}: ${test.title} (passed on retry)`)),
   ...summary.suites
     .filter((suite) => suite.failures.length > 0)
     .flatMap((suite) => ['', `## ${suite.suite}`, '', ...suite.failures.map((failure) => `- ${failure}`)]),
