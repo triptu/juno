@@ -20,38 +20,45 @@ const growingEdge = async (list: Locator): Promise<'top' | 'bottom'> =>
     : 'top'
 const RINA = 'Rina finished the onsite'
 
-for (const path of ['topic bottom', 'topic divider', 'Main with threads', 'DM', 'Home', 'All topics', 'Juno'] as const) {
-  test(`stable open: ${path}`, async ({ juno, win, fake }) => {
-    await juno.signIn()
-    await juno.waitForSync()
-    fake.holdNext({ method: 'conversations.replies', reason: 'open' })
-    fake.holdNext({ method: 'conversations.history', reason: 'open' })
-    if (path === 'Home') await juno.sidebar.row(POSTGRES).open()
-    const selector = path === 'Home' ? '[data-home-item]' : path === 'All topics' ? '[data-all-topics-row]' : path === 'Juno' ? '[data-juno-header]' : '[data-topic-view] [data-message-row]'
-    await expectStableAnchor(win, selector, async () => {
-      switch (path) {
-        case 'Home':
-          await juno.home.open()
-          break
-        case 'All topics':
-          await juno.allTopics.open()
-          break
-        case 'Juno':
-          await win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
-          await win.locator('[data-juno-header]').waitFor({ state: 'visible' })
-          break
-        default:
-          if (path === 'DM') await win.locator('[data-topic-id="m:D0MAYA"]').click()
-          else await juno.sidebar.row(path === 'topic bottom' ? POSTGRES : path === 'topic divider' ? RINA : '#eng').open()
-          await expect(juno.topic.header).toBeVisible()
-      }
-      if (path.startsWith('topic') || path === 'DM' || path === 'Main with threads') await expect.poll(() => fake.heldCount()).toBeGreaterThan(0)
-      fake.release()
-      if (path.startsWith('topic') || path === 'DM' || path === 'Main with threads') await expect(juno.topic.list.locator('[data-message-row]').first()).toBeVisible()
-      await win.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+// Each path opens a topic or page this test has not opened before, from Home as at launch, so the first message row
+// the probe finds is the new topic's. The Home path opens the topic it leaves from first.
+test('topics and pages open without a layout shift', async ({ juno, win, fake }) => {
+  test.setTimeout(120_000)
+  await juno.signIn()
+  await juno.waitForSync()
+  for (const [index, path] of (['topic bottom', 'topic divider', 'Main with threads', 'DM', 'Home', 'All topics', 'Juno'] as const).entries()) {
+    await test.step(`stable open: ${path}`, async () => {
+      if (index > 0) await juno.home.open()
+      fake.holdNext({ method: 'conversations.replies', reason: 'open' })
+      fake.holdNext({ method: 'conversations.history', reason: 'open' })
+      if (path === 'Home') await juno.sidebar.row(POSTGRES).open()
+      const selector = path === 'Home' ? '[data-home-item]' : path === 'All topics' ? '[data-all-topics-row]' : path === 'Juno' ? '[data-juno-header]' : '[data-topic-view] [data-message-row]'
+      await expectStableAnchor(win, selector, async () => {
+        switch (path) {
+          case 'Home':
+            await juno.home.open()
+            break
+          case 'All topics':
+            await juno.allTopics.open()
+            break
+          case 'Juno':
+            await win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
+            await win.locator('[data-juno-header]').waitFor({ state: 'visible' })
+            break
+          default:
+            if (path === 'DM') await win.locator('[data-topic-id="m:D0MAYA"]').click()
+            else await juno.sidebar.row(path === 'topic bottom' ? POSTGRES : path === 'topic divider' ? RINA : '#eng').open()
+            await expect(juno.topic.header).toBeVisible()
+        }
+        if (path.startsWith('topic') || path === 'DM' || path === 'Main with threads') await expect.poll(() => fake.heldCount()).toBeGreaterThan(0)
+        // Lets the held calls go and forgets both rules, so nothing is held in the next step.
+        fake.release()
+        if (path.startsWith('topic') || path === 'DM' || path === 'Main with threads') await expect(juno.topic.list.locator('[data-message-row]').first()).toBeVisible()
+        await win.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+      })
     })
-  })
-}
+  }
+})
 
 // No line is held for reactions a message does not have yet (SPEC 7, "Stable geometry"). The last message's first
 // chip grows it in one step: in a list that fits the view, downwards; at the bottom of a longer one, the list keeps
