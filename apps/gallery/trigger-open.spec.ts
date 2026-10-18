@@ -25,8 +25,8 @@ async function background(page: Page, route: Route, theme: Theme, selector: stri
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
     await page.mouse.down()
   }
-  // The fill eases over --duration-fast; read it once it has settled.
-  await page.waitForTimeout(200)
+  // Under reduced motion the fill changes without a transition; two frames let hover and press reach the styles.
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
   const value = await trigger.evaluate((element) => getComputedStyle(element).backgroundColor)
   if (press !== undefined) await page.mouse.up()
   return value

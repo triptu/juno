@@ -69,10 +69,16 @@ export async function openState(page: Page, route: Route, theme: Theme = 'light'
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
   }, route.route)
   await page.waitForFunction(() => !document.documentElement.hasAttribute('data-theme-switching'))
-  // Let entrances (toasts, popovers) finish; an endless animation does not hold this up.
+  // Let entrances (toasts, popovers) finish. An endless animation (a spinner) never does, so it is not waited for;
+  // the cap is for a finite one that runs long.
   await page.evaluate(() =>
     Promise.race([
-      Promise.all(document.getAnimations().map((animation) => animation.finished.catch(() => {}))),
+      Promise.all(
+        document
+          .getAnimations()
+          .filter((animation) => Number.isFinite(Number(animation.effect?.getComputedTiming().endTime)))
+          .map((animation) => animation.finished.catch(() => {})),
+      ),
       new Promise((resolve) => setTimeout(resolve, 600)),
     ]),
   )
