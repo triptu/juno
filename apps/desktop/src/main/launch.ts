@@ -12,7 +12,7 @@ import { rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { Schema } from 'effect'
 import { nativeTheme } from 'electron'
-import { AccentSchema, DEFAULT_THEME, DensitySchema, ReadySession, SidebarLayout, ThemeSchema, type Theme } from '@juno/contract'
+import { AccentSchema, DEFAULT_THEME, DensitySchema, TopicTitleLinesSchema, ReadySession, SidebarLayout, ThemeSchema, type Theme } from '@juno/contract'
 
 export const Launch = Schema.Struct({
   theme: ThemeSchema,
@@ -20,6 +20,7 @@ export const Launch = Schema.Struct({
   // Optional so a launch.json written before accents existed still decodes.
   accent: Schema.optionalKey(AccentSchema),
   density: Schema.optionalKey(DensitySchema),
+  topicTitleLines: Schema.optionalKey(TopicTitleLinesSchema),
   // Privacy mode (SPEC section 5) as the user left it: message text blurred for screen sharing. It stays on
   // across a relaunch. A mode the screen watch turned on is not saved.
   privacy: Schema.optionalKey(Schema.Boolean),

@@ -269,6 +269,7 @@ app.whenReady().then(() => {
     backupSecrets,
     setTheme: (theme) => updateLaunch({ theme }),
     setAccent: (accent) => updateLaunch({ accent }),
+    setTopicTitleLines: (topicTitleLines) => updateLaunch({ topicTitleLines }),
     setDensity: (density) => updateLaunch({ density }),
     // The user's own choice: sharing no longer owns the mode, so it stays as they set it.
     setPrivacy: setUserPrivacy,

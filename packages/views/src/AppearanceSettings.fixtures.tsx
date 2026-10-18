@@ -4,6 +4,10 @@ import { AppearanceSettings } from './AppearanceSettings'
 const noop = () => {}
 
 export default defineFixtures(AppearanceSettings, {
+  Titles: {
+    'one-line': fixture({ theme: 'system', accent: 'coral', density: 'compact', topicTitleLines: 'one', onTopicTitleLinesChange: noop, onThemeChange: noop, onAccentChange: noop, onDensityChange: noop }),
+    'two-lines': fixture({ theme: 'system', accent: 'coral', density: 'compact', topicTitleLines: 'two', onTopicTitleLinesChange: noop, onThemeChange: noop, onAccentChange: noop, onDensityChange: noop }),
+  },
   Theme: {
     'light-coral': fixture({ theme: 'light', accent: 'coral', onThemeChange: noop, onAccentChange: noop }),
     'dark-coral': fixture({ theme: 'dark', accent: 'coral', onThemeChange: noop, onAccentChange: noop }),

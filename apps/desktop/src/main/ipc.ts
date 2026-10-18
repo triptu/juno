@@ -74,6 +74,7 @@ export interface IpcDeps {
   readonly backupSecrets: BackupSecrets
   readonly setTheme: (theme: Launch['theme']) => void
   readonly setAccent: (accent: NonNullable<Launch['accent']>) => void
+  readonly setTopicTitleLines: (lines: NonNullable<Launch['topicTitleLines']>) => void
   readonly setDensity: (density: NonNullable<Launch['density']>) => void
   readonly setPrivacy: (privacy: boolean) => void
   readonly setSidebar: (sidebar: NonNullable<Launch['sidebar']>) => void
@@ -98,7 +99,7 @@ export interface IpcDeps {
   readonly processes: { readonly diagnostics: () => Diagnostics; readonly reportState: (state: AppState) => void }
 }
 
-export function registerIpc({ updates, supervisor, agent, providers, codex, backupSecrets, setTheme, setAccent, setDensity, setPrivacy, setSidebar, sharing, setViewing, notifications, downloadFile, openFile, copyImage, processes }: IpcDeps): void {
+export function registerIpc({ updates, supervisor, agent, providers, codex, backupSecrets, setTheme, setAccent, setDensity, setTopicTitleLines, setPrivacy, setSidebar, sharing, setViewing, notifications, downloadFile, openFile, copyImage, processes }: IpcDeps): void {
   handle(Channels.updatesGet, () => updates.get())
   handle(Channels.updatesSet, ({ enabled }) => updates.set(enabled))
   handle(Channels.updatesRestart, () => updates.restart())
@@ -173,6 +174,9 @@ export function registerIpc({ updates, supervisor, agent, providers, codex, back
     setAccent(accent)
   })
 
+  handle(Channels.launchSetTopicTitleLines, ({ topicTitleLines }) => {
+    setTopicTitleLines(topicTitleLines)
+  })
   handle(Channels.launchSetDensity, ({ density }) => {
     setDensity(density)
   })

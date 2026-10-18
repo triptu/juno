@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ElementType, HTMLAttributes, PointerEvent, ReactNode } from 'react'
-import { accent, colors } from '@juno/tokens/tokens.stylex'
+import { accent, colors, text } from '@juno/tokens/tokens.stylex'
 import { pointerMoved } from './internal/pointer'
 import type { LayoutStyles } from './internal/sx'
 import { numeric as numericStyles, variants as typeVariants, weight as weightStyles, type TextVariant, type Weight } from './internal/type'
@@ -17,6 +17,8 @@ export interface TextProps extends Omit<HTMLAttributes<HTMLElement>, 'style' | '
   readonly weight?: Weight
   /** One line with an ellipsis. */
   readonly truncate?: boolean
+  /** List topic title: follows Appearance’s line limit. */
+  readonly topicTitle?: boolean
   /** Clamp to this many lines with an ellipsis. */
   readonly clamp?: 1 | 2 | 3
   /**
@@ -75,6 +77,7 @@ export function Text({
   tone = 'inherit',
   weight,
   truncate = false,
+  topicTitle = false,
   clamp,
   tooltipWhenTruncated = false,
   numeric = false,
@@ -101,6 +104,7 @@ export function Text({
         tones[tone],
         weight && weightStyles[weight],
         truncate && styles.truncate,
+        topicTitle && styles.topicTitle,
         clamp !== undefined && styles.clamp(clamp),
         numeric && numericStyles.tabular,
         selectable ? styles.selectable : styles.unselectable,
@@ -131,6 +135,15 @@ const styles = stylex.create({
     overflow: 'hidden',
     textWrap: 'pretty',
   }),
+  topicTitle: {
+    display: '-webkit-box',
+    WebkitBoxOrient: 'vertical',
+    WebkitLineClamp: text['--topic-title-lines'],
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    overflowWrap: 'anywhere',
+    whiteSpace: text['--topic-title-white-space'],
+  },
   prose: {
     overflowWrap: 'anywhere',
     textWrap: 'pretty',

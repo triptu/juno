@@ -143,7 +143,7 @@ function ThreadRow({ thread, now, active, current, onOpen, onActivate }: RowProp
       selected={current}
       leading={<TopicArt topicId={thread.id} {...(thread.art === undefined ? {} : { recipe: thread.art })} size={20} />}
       label={
-        <Text variant="body" weight={thread.unreadCount > 0 ? 'semibold' : 'medium'} tone={thread.resolved === true ? 'subtle' : 'default'} truncate tooltipWhenTruncated dir="auto" sx={styles.title}>
+        <Text variant="body" weight={thread.unreadCount > 0 ? 'semibold' : 'medium'} tone={thread.resolved === true ? 'subtle' : 'default'} topicTitle tooltipWhenTruncated dir="auto" sx={styles.title}>
           {thread.title}
         </Text>
       }

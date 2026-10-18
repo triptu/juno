@@ -207,3 +207,5 @@ Feature components that compose the above and hold app logic: `Sidebar`, `TopicR
 24 primitives (Surface gains the `island` kind and `HeaderBand`): Icon, Button, NavItem, IconButton, Avatar (+AvatarStack, AvatarButton), ChannelIcon (+Swatch, DayToggles), Chip, ContextPill, Kbd, Text, Surface (+Divider, LabelledRule), Popover/OptionList, ScrollArea, Tabs, Fields (TextField, Textarea, Select, Checkbox, Slider, Segmented), ListRow, Toast, EmptyState, Illustration, Logo, ProgressRing, Page/PageHeader/Section, CodeBlock, Card.
 
 Differences from the first proposal: Button's accent variant is called `primary`; Tile and Avatar are one component; Menu/MenuItem were folded into OptionList (same row anatomy, one keyboard model); PageHeader got a `Page` container for the width and padding instead of setting them itself; `Icon` takes a component rather than a name.
+
+`Text topicTitle` follows `--topic-title-lines` for list titles, with ellipsis and no reserved second line. Combine with `tooltipWhenTruncated` to show the full title only while its width or height is clipped.

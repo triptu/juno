@@ -30,7 +30,7 @@ import { inField } from './fieldMenu'
 import { channelIconFor } from './look'
 import { RenameField } from './RenameField'
 
-/** Every row is this tall, so the virtual list knows every position without measuring (inventory 10: min-height 52). */
+/** Minimum row height; the virtualizer measures wrapped titles (inventory 10). */
 const ROW_HEIGHT = 52
 /** Rows drawn beyond the viewport on each side (performance 3.5). */
 const OVERSCAN = 6
@@ -130,7 +130,7 @@ export const AllTopicsRow = memo(function AllTopicsRow({
           {renaming ? (
             <RenameField title={row.title} size="row" onSave={(title) => onRename?.(row.id, title)} onCancel={() => onRenameCancel?.(row.id)} />
           ) : (
-            <Text variant="bodySmall" tone="default" weight={unread ? 'semibold' : 'medium'} truncate dir="auto" tooltipWhenTruncated data-row-title="" data-sensitive={row.kind !== 'main' && row.titleSensitive === true ? '' : undefined}>
+            <Text variant="bodySmall" tone="default" weight={unread ? 'semibold' : 'medium'} topicTitle dir="auto" tooltipWhenTruncated data-row-title="" data-sensitive={row.kind !== 'main' && row.titleSensitive === true ? '' : undefined}>
               {row.kind === 'main' ? row.channel.label : row.title}
             </Text>
           )}
@@ -396,7 +396,7 @@ const Table = memo(function Table({ ready, total, rowKey, renderRow, onVisibleRa
         ) : (
           <div ref={rowsBox} {...stylex.props(styles.rows, rowsHeight(virtualizer.getTotalSize()))}>
             {items.map((item) => (
-              <div key={item.key} data-row-index={item.index} {...stylex.props(styles.slot, slotAt(item.start - margin))}>
+              <div key={item.key} data-index={item.index} ref={virtualizer.measureElement} data-row-index={item.index} {...stylex.props(styles.slot, slotAt(item.start - margin))}>
                 {renderRow(item.index, item.index === tabbable)}
               </div>
             ))}
@@ -507,19 +507,20 @@ const styles = stylex.create({
   rows: {
     position: 'relative',
   },
-  // Each row's box is fixed and contained, so a row entering or leaving lays out only itself.
+  // Measure each visible slot; wrapped titles determine its height.
   slot: {
     position: 'absolute',
     top: 0,
     insetInline: 0,
-    height: sizes['--row-52'],
-    contain: 'strict',
+    contain: 'content',
   },
   row: {
+    height: 'calc-size(auto, round(up, size, 1px))', // tokens-allow: whole pixels match the virtualizer’s rounded measurements
+    minHeight: sizes['--row-52'],
     cursor: 'default',
     userSelect: 'none',
     contain: 'content',
-    paddingBlock: spacing['--space-2'],
+    paddingBlock: spacing['--space-1-5'],
     borderRadius: radii['--radius-lg'],
     borderBottomWidth: '1px',
     borderBottomStyle: 'solid',

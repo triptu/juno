@@ -85,6 +85,7 @@ const bridge: JunoBridge = {
   launch: {
     setTheme: (theme) => ipcRenderer.invoke(Channels.launchSetTheme, { theme }),
     setAccent: (accent) => ipcRenderer.invoke(Channels.launchSetAccent, { accent }),
+    setTopicTitleLines: (topicTitleLines) => ipcRenderer.invoke(Channels.launchSetTopicTitleLines, { topicTitleLines }),
     setDensity: (density) => ipcRenderer.invoke(Channels.launchSetDensity, { density }),
     setPrivacy: (privacy) => ipcRenderer.invoke(Channels.launchSetPrivacy, { privacy }),
     setSidebar: ({ width, collapsed }) => ipcRenderer.invoke(Channels.launchSetSidebar, { width, collapsed }),

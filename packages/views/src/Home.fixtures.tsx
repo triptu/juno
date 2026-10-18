@@ -108,6 +108,10 @@ const strip = stylex.create({ row: { display: 'flex', flexWrap: 'wrap', gap: spa
 export default defineFixtures(
   Home,
   {
+    Titles: {
+      'one-line': state({ items: [rewritten.waiting, { ...rewritten.resume, aiTitle: 'Plan' }] }, { ...minimum, topicTitleLines: 'one' }),
+      'two-lines': state({ items: [rewritten.waiting, { ...rewritten.resume, aiTitle: 'Plan' }] }, { ...minimum, topicTitleLines: 'two' }),
+    },
     Items: {
       three: state(),
       // The same rows with the assistant's title lines: every box stays where it was (gallery behaviour test).

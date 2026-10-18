@@ -1,6 +1,6 @@
 import { memo, Suspense, useEffect, useState } from 'react'
 import { prefsGet, prefsSet, MIRROR_READS_PREF, readsCatchUp, type SendCheckPref, type SettingsSection, type SharingSetting } from '@juno/contract'
-import { tidyUpPrefsAtom, setTidyUpPrefs, aiActivityAtom, copyText, nowAtom, getSharingSetting, setSharingSetting, quietDaysAtom, setQuietDays, sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, ignoredChannelsAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setPeekKey, setTabExpiry, setWebPanelOn, tabExpiryAtom, themeAtom, webPanelOnAtom, type Accent, type Density, type Theme } from '@juno/state'
+import { tidyUpPrefsAtom, setTidyUpPrefs, aiActivityAtom, copyText, nowAtom, getSharingSetting, setSharingSetting, quietDaysAtom, setQuietDays, sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, topicTitleLinesAtom, persistTopicTitleLines, type TopicTitleLines, ignoredChannelsAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setPeekKey, setTabExpiry, setWebPanelOn, tabExpiryAtom, themeAtom, webPanelOnAtom, type Accent, type Density, type Theme } from '@juno/state'
 import { junoPageActions, junoSettingsAtom } from '@juno/state/agent'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { AiActivityPage, SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored, SettingsPage, SettingsTidyUp } from '@juno/views'
@@ -137,6 +137,11 @@ function Appearance() {
   const [theme, setTheme] = useAtom(themeAtom)
   const [accent, setAccent] = useAtom(accentAtom)
   const [density, setDensity] = useAtom(densityAtom)
+  const [topicTitleLines, setTopicTitleLines] = useAtom(topicTitleLinesAtom)
+  const changeTopicTitleLines = (next: TopicTitleLines) => {
+    setTopicTitleLines(next)
+    persistTopicTitleLines(next)
+  }
   const changeTheme = (next: Theme) => {
     setTheme(next)
     persistTheme(next)
@@ -149,7 +154,7 @@ function Appearance() {
     setDensity(next)
     persistDensity(next)
   }
-  return <SettingsAppearance theme={theme} accent={accent} density={density} onThemeChange={changeTheme} onAccentChange={changeAccent} onDensityChange={changeDensity} quickReactions={<QuickReactions />} />
+  return <SettingsAppearance topicTitleLines={topicTitleLines} onTopicTitleLinesChange={changeTopicTitleLines} theme={theme} accent={accent} density={density} onThemeChange={changeTheme} onAccentChange={changeAccent} onDensityChange={changeDensity} quickReactions={<QuickReactions />} />
 }
 
 function Ignored() {

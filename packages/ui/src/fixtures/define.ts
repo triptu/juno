@@ -43,6 +43,8 @@ export interface FixtureFrame {
    * app's default; a `density` in the gallery address overrides it.
    */
   readonly density?: 'comfortable' | 'compact'
+  /** Appearance’s title limit, shared by every list in this frame. */
+  readonly topicTitleLines?: 'one' | 'two'
 }
 
 export interface Fixture<P> {
