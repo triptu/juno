@@ -1610,3 +1610,25 @@ What is left is history at 40 a minute. Three ways to shorten it, each a product
 | Unread threads shown as a dot | 33 | 0 |
 
 The 33 dots before were threads whose reply coverage was recorded after their last re-index. Single runs, not a distribution. Full sync is now set by history alone: 300 calls at 40 a minute.
+
+### Two-line topic titles (2026-10-18)
+
+Measured on this Mac through the exclusive heavy lock, against `0579089f` with the same sidebar-reveal scenario added. Both production builds use the 1,200-topic seed and its 300-row sidebar window. The changed build selects Two lines through Appearance before measuring. Command: `pnpm perf -g 'launch warm start|scroll frame times'`, with `JUNO_PERF_TOPIC_TITLES=two` for the changed build.
+
+| Measurement | One-line baseline | Two-line build |
+| --- | --- | --- |
+| Continuous scroll frame work, p95 | 3.8 ms | 6.0 ms |
+| Stepped scroll frame work, p95 | 3.8 ms | 8.9 ms |
+| Held-clock stepped frame work, p95 | 4.3 ms | 3.9 ms |
+| Dropped frames, continuous / stepped | 0.0% / 0.0% | 0.5% / 0.5% |
+| Long animation frames, continuous / stepped | 0 / 0 | 0 / 2 |
+| Show sidebar, p95 of eight opens | 22.7 ms | 22.6 ms |
+| Warm start to rows, median of five launches | 802.7 ms | 538.7 ms |
+| Snapshot to rows, median | 39.3 ms | 31.2 ms |
+| Renderer private memory after scrolling | 207 MB | 186 MB |
+
+The changed build meets the 8.3 ms continuous-scroll work budget and the 7 ms held-clock budget, but this run fails the zero-long-frame gate. Its two stepped-scroll frames were 58.6 and 50.8 ms, with no recorded script or blocking time; 38.1 and 43.1 ms elapsed before rendering began. An earlier two-line run passed scrolling at 4.8 ms continuous p95 with no long frames. These are separate runs, not pooled samples. The final run measured 761 continuous, 837 stepped and 844 held-clock frames; the baseline measured 764, 842 and 840.
+
+Both builds fail the existing 500 ms median warm-start gate. Sidebar opening shows no observed regression; startup varies enough across these runs that the lower median is not evidence of a speedup. The completed combined commands both exited 1. The original logs are `/Volumes/AgentWork/two-line-titles-before.log` and `/Volumes/AgentWork/two-line-titles-after-final.log`.
+
+A subsequent diagnostic pair ran only `scroll frame times`, with `JUNO_PERF_TRACE` enabled on both sides. Both exited 0 with no long frames. Baseline → two lines: continuous p95 5.2 → 5.0 ms, stepped 5.3 → 5.1 ms, held-clock 4.9 → 4.7 ms, dropped frames 0.3%/0.0% → 0.3%/0.0%. Loads were 3.2 and 3.4; frame counts were 763/835/839 and 760/838/841. The long-frame failure did not reproduce. These traced runs add CPU profiling and are kept separate from the first pair; the small difference is not evidence of a speedup. Logs and traces are under `/Volumes/AgentWork/two-line-titles-{before,after}-scroll-repeat.log` and `/Volumes/AgentWork/two-line-titles-trace-{before,after}`.

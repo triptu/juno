@@ -40,13 +40,28 @@ test('topic title lines apply immediately, keep the scrolled row anchored, and s
   const list = juno.sidebar.list
   const box = (await list.boundingBox())!
   await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await win.evaluate(() => {
+    const values: number[] = []
+    const observer = new PerformanceObserver((entries) => values.push(...entries.getEntries().map((entry) => (entry as PerformanceEntry & { value: number }).value)))
+    observer.observe({ type: 'layout-shift' })
+    Object.assign(window, { titleScrollShifts: { observer, values } })
+  })
   for (let i = 0; i < 12; i++) {
     await win.mouse.wheel(0, 200)
     await win.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
   }
+  const shifts = await win.evaluate(() => {
+    const state = window as unknown as { titleScrollShifts?: { observer: PerformanceObserver; values: number[] } }
+    const probe = state.titleScrollShifts!
+    probe.values.push(...probe.observer.takeRecords().map((entry) => (entry as PerformanceEntry & { value: number }).value))
+    probe.observer.disconnect()
+    delete state.titleScrollShifts
+    return probe.values
+  })
+  expect(shifts, 'scrolling wrapped titles causes no layout shift, including during recent input').toEqual([])
   const anchor = await list.evaluate((node) => {
     const top = node.getBoundingClientRect().top
-    const row = Array.from(node.querySelectorAll<HTMLElement>('[data-topic-row]')).find((row) => row.getBoundingClientRect().bottom > top)!
+    const row = Array.from(node.querySelectorAll<HTMLElement>('[data-topic-row]')).find((candidate) => candidate.getBoundingClientRect().bottom > top)!
     return { id: row.dataset['topicId']!, top: row.getBoundingClientRect().top }
   })
   const held = list.locator(`[data-topic-id="${anchor.id}"]`)
