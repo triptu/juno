@@ -67,6 +67,8 @@ test('five quick reactions set in Settings show in the toolbar in order, react i
   await expect.poll(() => pillNames(juno)).toEqual(CHOSEN)
 
   fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Release notes are ready for review' })
+  // The message moves #eng to the top. Clicking before it moves would land on the row that takes its place.
+  await juno.sidebar.expectTop('#eng')
   const row = await hoveredMessage(juno, 'Release notes are ready for review')
   expect(await toolbarLabels(row)).toEqual(TOOLBAR)
   const ts = fake.messages('C0ENG').find((m) => m.text === 'Release notes are ready for review')!.ts
