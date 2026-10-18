@@ -126,6 +126,11 @@ test('a message removed from a card does not come back at the bottom of the chat
   await chat.expectJuno('Done.')
   await chat.send(FORGET)
   const remove = card(chat, 'remove')
+  // Juno's "Done." takes the status bubble's place under the card and the chat scrolls by the
+  // difference, so a click while the run still answers can land beside the button.
+  await expect(remove).toHaveAttribute('data-card-status', 'open')
+  await expect(chat.root.locator('[data-chat-juno]').filter({ hasText: 'Done.' })).toHaveCount(2)
+  await expect(chat.root.locator('[data-chat-status]')).toHaveCount(0)
   await remove.getByRole('button', { name: 'Remove', exact: true }).click()
   await expect(remove).toContainText('Removed 1 message')
   await expect(chat.root.locator('[data-chat-note="removed"]')).toHaveText('Removed')
