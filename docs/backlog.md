@@ -30,5 +30,4 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
   - Corrections that update "What matters to you" with Undo (M10; the rule is WP15's `toolDecision('notificationsSet', run)`: run in a clean owner run, a Change card otherwise).
   - Coding hand-offs: project and branch on the Task card, a plan first when needed, the cause when done (WP18, M4).
 - Screenshots: `docs/design/handoff/screenshots/01-ui.png` (catch-up card, Browse and Theme icons, For you), `04-ui.png` (grouping card), `10-ui.png` (For you) and `14-ui.png` (stealth) show removed things. Replace them with shots of the built app once M5 lands.
-- Home: "muted" in SPEC 12 is read as a thread set to Never (not followed); a DM whose Notify me is Never can still show. Use the notification levels once they are in the store.
 - Fake Slack search: add the message fields `files`, `reactions`, `bot_profile`, `extracts`, `blocks_extracts` and `blocks_extracts_typed`; remove `total` to match live. Thread metadata with `extra_message_data`, page-based paging and no highlight markers already match.

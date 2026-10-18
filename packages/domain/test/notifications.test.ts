@@ -3,6 +3,7 @@ import {
   decideNotification,
   defaultNotificationSettings,
   inHours,
+  notificationIsMuted,
   nextSwitch,
   nextHoursStart,
   localTime,
@@ -34,6 +35,16 @@ const settings: NotificationSettings = {
 const incidents = { id: 'C0INCIDENTS', kind: 'public', name: 'incidents' } as const
 const ai: DecisionContext = { aiAssist: true, userName: (id) => ({ U0MAYA: 'Maya Chen', U0SAM: 'Sam Okafor' })[id] }
 const aiOff: DecisionContext = { ...ai, aiAssist: false }
+
+describe('effective notification level for Home', () => {
+  it('mutes on Never unless an applicable Every message level overrides it', () => {
+    expect(notificationIsMuted('never')).toBe(true)
+    expect(notificationIsMuted(undefined, 'never', undefined)).toBe(true)
+    expect(notificationIsMuted('every', 'never')).toBe(false)
+    expect(notificationIsMuted('never', undefined, 'every')).toBe(false)
+    expect(notificationIsMuted(undefined, undefined, undefined)).toBe(false)
+  })
+})
 
 function candidate(overrides: Partial<NotificationCandidate> = {}): NotificationCandidate {
   return { channel: hiring, senderId: leoId, mentionsMe: false, at: at(MON, 12), ...overrides }
