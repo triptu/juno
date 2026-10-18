@@ -4,6 +4,12 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-18 21:05 · huddles-quint · The huddle call lifecycle gets a Quint spec (`specs/huddle.qnt`). It covers no ghost participant after a quit or crash, one live call at a time, a leave during a join, and stale leave frames.
+- 10-18 21:04 · huddles-share-privacy · If Juno's own screen share switches on privacy mode through `screenWatch`, that is accepted. Sharing does not suppress the watch.
+- 10-18 21:03 · huddles-no-call-budget · A live huddle has no CPU or memory budget for now. We make it work first and measure after. The existing budgets still hold whenever no huddle is running, and the Chime SDK loads only when the user joins.
+- 10-18 21:02 · huddles-media-in-renderer · The Chime media session runs in the main renderer, as a service outside React started at the app root. This is an exception to "the renderer is UI only": WebRTC and the elements that play the stream must share one page. All Slack I/O and the call's state stay in the engine.
+- 10-18 21:01 · huddles-request-shape · Huddle methods (`rooms.join`, `rooms.leave` and the rest) go out with the same query parameters, form fields and `_x_reason` as the official desktop client, copied from a recorded request. We match Slack's client rather than test which fields the server checks.
+- 10-18 21:00 · huddles-scope · Huddles come in two steps, audio and then screen share. Video and everything sent as Slack's protobuf peer messages (reactions, raised hands, drawing, mute requests) are out of scope. An active huddle shows as a two-row sidebar bar, and the full huddle is a tab (`docs/plans/huddles.md`).
 - 10-18 19:13 · ignored-add-row · Settings › Ignored's add row sits above the list's card, so its searchable list opens over the page and a new row lands right under it. The select is a new `SelectButton` (the `Select` field as a button), since a native select cannot filter; Ignore calls the channel menu's own `ignoreChannel` action.
 - 10-18 19:02 · signin-session-durability · Sign-in waits for Main to sync and atomically replace `secrets.bin` before publishing `ready`; storage errors return through the sign-in failure path.
 - 10-18 18:50 · orchestrator · The main process logs unhandled promise rejections and keeps running; engine and agent still exit and are restarted by main; the process log is installed once per process. Why: one stray rejection in main quit the whole app (found via the coverage hook in session.spec:158).

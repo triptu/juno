@@ -1,0 +1,1 @@
+- 10-18 21:03 · huddles-no-call-budget · A live huddle has no CPU or memory budget for now. We make it work first and measure after. The existing budgets still hold whenever no huddle is running, and the Chime SDK loads only when the user joins.
