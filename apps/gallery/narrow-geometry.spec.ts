@@ -32,13 +32,12 @@ const STATES: ReadonlyArray<readonly [Route, boolean]> = [
 const frameOf = (page: Page, at: Route) => page.locator(`[data-fixture-frame="${at.route}"]`)
 
 test.describe('the minimum window', () => {
-  for (const theme of ['light', 'dark'] as const) {
-    for (const [at, buttons] of STATES) {
-      test(`${at.route}, ${theme}: no text overlaps`, async ({ page }) => {
-        await openState(page, at, theme)
-        expect(await findOverlaps(page, { route: at.route, buttons })).toEqual([])
-      })
-    }
+  // In light only: the dark theme changes colours and shadows, never a size (packages/tokens/src/themes.stylex.ts).
+  for (const [at, buttons] of STATES) {
+    test(`${at.route}: no text overlaps`, async ({ page }) => {
+      await openState(page, at)
+      expect(await findOverlaps(page, { route: at.route, buttons })).toEqual([])
+    })
   }
 
   test('the Send message card keeps its kind label whole and puts "in {topic}" under the pill', async ({ page }) => {
