@@ -1437,6 +1437,38 @@ Nothing on screen animates at rest: the one endless animation, the chat's status
 
 **Platform gates.** The Window and Graphics budgets remain 2% of one core on the Mac. Those limits were measured with native rendering; the remote Linux runner renders in software, so its CPU cost is not comparable. `idle-cpu.spec.ts` runs the same scenarios in two gates: the portable gate keeps the engine (3%), Juno agent (2%), network (1%), main (2%) and other-helper (1%) limits everywhere, and on Linux checks Window and Graphics only against a 15% ceiling that catches a real spin. The separate `@mac` gate enforces the original Window and Graphics limits, along with the backend limits, and is excluded from remote Linux runs. On this Mac, run only that gate through the heavy-job lock with `pnpm test:desktop idle-cpu.spec.ts --grep @mac`. The default 20-second windows are unchanged; `JUNO_IDLE_WINDOW_MS=60000` uses the original measurement window.
 
+**Home's short-window miss, investigated on 10-18.** The default 20-second
+Mac gate read Window 2.2% in the diagnostics review and 2.3% in a new
+minified build of `ab35e024`. The latter run was stopped after reproducing
+the failure, before completing its three requested repetitions. No
+production fix or three-pass result is established.
+
+A Chromium trace started before sync settled, without the CPU profiler,
+captured 30 seconds idle on Home and then 30 seconds on a topic. Both ran
+through `pnpm test:desktop` and its machine-wide heavy lock. Window read
+1.5% on Home and 0.2% on the topic. Home's trace names two V8 "memory reducer"
+collections, starting 8.9 and 17.7 seconds into the idle window, including
+parallel marking on renderer worker threads. The first reduced the JS heap
+from 48.5 MB to 21.9 MB. The topic window had no major collection.
+
+Home had no running CSS animation, no JavaScript animation-frame callback,
+one minute-boundary timer and one layout in those 30 seconds. Its 61 main
+frames match the focused textarea's native caret blinking twice a second.
+The topic had one main frame and one layout. Source inspection confirms
+that `nowAtom` wakes at minute boundaries and the asks stream emits only
+changed values. The trace supports deferred garbage collection as the
+extra work in this first idle window, but does not establish an application
+loop to remove. The caret, garbage collector, 2% budget and 20-second gate
+remain unchanged.
+
+An earlier capture started the CPU profiler after sync and then measured
+CPU after the trace. That read 0.5% on Home, but is not a comparable
+before/after result. Trace startup and the extra wait change the measured
+window. Local evidence is in `/Volumes/AgentWork/home-idle-evidence/`:
+`baseline-three.log`, `early.log`, and `early/*-idle-sample.trace.json`.
+The full early traces and temporary probes are there too. The probes were
+removed from the worktree after capture.
+
 **Seeing it next time.** Settings › About › Diagnostics lists each process with Juno's name and Electron's type, its CPU over the last few seconds and its memory, and **Copy diagnostics** puts a plain-text report on the clipboard (SPEC 14). Main samples every 15 s and logs one line when a process stays above 30 % of a core for 2 minutes while the window has no input and no sync runs, with the window's state and the view; the report repeats the last such line.
 
 ### Engine speed measurements (2026-10-15)
