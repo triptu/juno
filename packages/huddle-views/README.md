@@ -4,7 +4,7 @@ The huddle views (SPEC section 20, inventory 22): React components built from `@
 
 ## Public API
 
-- `HuddleBar`: the two-row card at the top of the sidebar while the user is in a huddle. Row one opens the huddle tab on mouse down (⌘ for a new tab): the place, the status line and the other people. Row two is `HuddleControls`. One height in every state. The Sidebar view needs a `top` slot under its title bar to place it (plan, seam 2); until then the gallery's `HuddleInSidebar` composition puts it there by hand.
+- `HuddleBar`: the two-row card at the top of the sidebar while the user is in a huddle. Row one opens the huddle tab on mouse down (⌘ for a new tab): the place, the status line and the other people. Row two is `HuddleControls`. One height in every state. It goes in the Sidebar view's `top` slot, from the list in `containers/sidebarTop.tsx`; the gallery's `HuddleInSidebar` composition shows it there.
 - `HuddlePage`: the huddle tab. `state` is `in` (the controls), `out` (Join huddle or Switch to this huddle), `ended` or `failed`. Audio only it shows tiles; with shares it shows up to two shared screens and a line of people under them. `renderShare(id)` is where the container puts the video element, inside a `[data-huddle-video]` box that is a size container; fit it with `object-fit: contain`.
 - `HuddleControls`: Mute, Share screen (only when `canShare`), Microphone and speaker with its menu, and Leave, in the bar's (`bar`) or the tab's (`island`) shape.
 - `HuddleHeaderButton`: the Start huddle, Join, Switch and In huddle control for the right island of a channel's or DM's Main. Its narrow form follows the topic header's container query.

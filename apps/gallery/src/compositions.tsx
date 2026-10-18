@@ -2,51 +2,26 @@
  * Views from two packages drawn together, as the app will compose them.
  * The gallery is the one place that depends on both, so these live here.
  *
- * `HuddleInSidebar` puts the huddle bar (`@juno/huddle-views`) at the top
- * of the real sidebar (`@juno/views`). The Sidebar view has no slot for it
- * yet (docs/plans/huddles.md, seam 2: a `top` slot under the title bar), so
- * the fixture places the bar right after the sidebar's title bar in the
- * DOM, where that slot will render it. Once the slot exists, pass the bar
- * to it here and drop the placing.
+ * `HuddleInSidebar` puts the huddle bar (`@juno/huddle-views`) in the real
+ * sidebar's (`@juno/views`) `top` slot, under the title bar.
  */
 import * as stylex from '@stylexjs/stylex'
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
+import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'
 import { HuddleBar, HuddleDeviceMenu, type HuddleBarProps, type HuddlePerson } from '@juno/huddle-views'
 import { defineFixtures, scene, type FixtureFrame, type FixtureSet } from '@juno/ui'
 import { fixtures as views } from '@juno/views/fixtures'
 
 const noop = () => {}
 
-// The Sidebar's own List/default state: its rows, filters and title bar.
-const sidebarScene = (): ReactNode => {
-  const state = views['Sidebar']?.groups.find((group) => group.id === 'list')?.states.find((entry) => entry.key === 'default')
-  return state?.fixture.render?.() ?? null
-}
-
 interface SidebarWithBarProps {
   readonly bar: ReactNode
 }
 
+// The Sidebar's own List/default state (its rows, filters and title bar), with the bar in its `top` slot.
 function SidebarWithBar({ bar }: SidebarWithBarProps) {
-  const root = useRef<HTMLDivElement>(null)
-  const [slot, setSlot] = useState<HTMLElement | null>(null)
-  useLayoutEffect(() => {
-    const titlebar = root.current?.querySelector('aside > header')
-    if (titlebar === null || titlebar === undefined) return
-    const host = document.createElement('div')
-    host.dataset['sidebarTop'] = ''
-    host.style.flexShrink = '0'
-    titlebar.after(host)
-    setSlot(host)
-    return () => host.remove()
-  }, [])
-  return (
-    <div ref={root} {...stylex.props(styles.root)}>
-      {sidebarScene()}
-      {slot === null ? null : createPortal(bar, slot)}
-    </div>
-  )
+  const state = views['Sidebar']?.groups.find((group) => group.id === 'list')?.states.find((entry) => entry.key === 'default')
+  const sidebar = state?.fixture.render?.()
+  return <div {...stylex.props(styles.root)}>{isValidElement(sidebar) ? cloneElement(sidebar as ReactElement<{ top?: ReactNode }>, { top: bar }) : null}</div>
 }
 
 const people: ReadonlyArray<HuddlePerson> = [

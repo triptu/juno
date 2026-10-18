@@ -82,6 +82,12 @@ export interface SidebarProps {
   readonly titlebarLeading?: ReactNode
   /** The window is in full screen, where macOS hides the traffic lights: the title bar starts at the sidebar's inset. */
   readonly fullScreen?: boolean
+  /**
+   * Under the title bar, above Juno: bars a feature shows while it is active,
+   * such as the huddle bar. The slot adds no element or spacing of its own;
+   * each bar brings its own insets and does not shrink.
+   */
+  readonly top?: ReactNode
   readonly account: SidebarAccount
   /** Unread Juno messages: the count on the Juno item, in the sidebar's counter colours. */
   readonly junoUnread?: number
@@ -139,7 +145,8 @@ export interface SidebarProps {
 
 /**
  * The left pane (spec section 5): the title bar with the traffic-light
- * space, Search, All topics, Home and the account button, the Juno nav item, a
+ * space, Search, All topics, Home and the account button, the `top` bars,
+ * the Juno nav item, a
  * hairline, the quick filters with their dots and the Unread toggle, the
  * scope chip when scoped, the list the owner renders into it, and a footer
  * while there is something to say: the sync status card, and, while
@@ -148,6 +155,7 @@ export interface SidebarProps {
 export function Sidebar({
   titlebarLeading,
   fullScreen = false,
+  top,
   account,
   junoUnread = 0,
   junoBusy = false,
@@ -243,6 +251,8 @@ export function Sidebar({
           </div>
         </div>
       </header>
+
+      {top}
 
       <nav aria-label="Pages" {...stylex.props(styles.nav)}>
         <NavItem
