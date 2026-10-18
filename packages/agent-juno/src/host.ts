@@ -6,7 +6,7 @@
  * the open workspace's store and the outbox.
  */
 import { Context, type Effect, type Stream } from 'effect'
-import type { HostAiCall, HostInteraction, HostSpendAsk, HostView, HostViewDraft, HostViewChange, HostViewUndo, HostChannel, WatchConversation, WatchSnapshot, WatchHours, AgentHostError, HostCursor, HostDispatch, HostMessage, HostMessagePage, HostPresence, HostUserId, Place, TopicLink } from '@juno/agent-contract'
+import type { HostAiCall, HostInteraction, HostSpendAsk, HostView, HostViewDraft, HostViewChange, HostViewUndo, HostChannel, WatchConversation, WatchSnapshot, WatchHours, AgentHostError, HostCursor, HostDispatch, HostMessage, HostMessagePage, HostPresence, HostSendState, HostUserId, Place, TopicLink } from '@juno/agent-contract'
 
 export type Message = typeof HostMessage.Type
 export type MessagePage = typeof HostMessagePage.Type
@@ -123,6 +123,8 @@ export class JunoHost extends Context.Service<
     }
     /** Waits for the attempt's queued post to settle: Slack has it, refused it, or the owner deleted the draft. */
     readonly posted: (attempt: Attempt) => Effect.Effect<PostOutcome>
+    /** Each recent send as its outbox row has it now, then on every change (`host.outbox.states`). */
+    readonly sendStates?: Stream.Stream<ReadonlyArray<typeof HostSendState.Type>>
     /** Messages Slack holds in the channel (or the thread) carrying `clientMsgId`, asked of Slack, not the cache. */
     readonly sent: (channelId: string, threadTs: string | undefined, clientMsgId: string) => Effect.Effect<ReadonlyArray<Message>, AgentHostError>
   }
