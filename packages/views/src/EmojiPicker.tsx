@@ -163,7 +163,7 @@ export function EmojiPicker({ catalog, custom = EMPTY, recent = EMPTY, selected 
           ))}
         </div>
         {results === undefined ? null : (
-          <div ref={resultsRef} {...stylex.props(styles.results)}>
+          <div ref={resultsRef} data-emoji-results="" {...stylex.props(styles.results)}>
             {results.map((section, index) => (
               <EmojiSection key={section.key} section={section} selected={selected} tabStop={index === 0} />
             ))}

@@ -68,10 +68,21 @@ async function expectBadgesWhole(chat: JunoChatPane, count: number): Promise<Rea
   return seen
 }
 
+/**
+ * Scrolls the list to an end with the mouse wheel, as a person does. A scroll set from a script is not the user's, so
+ * the list keeps holding its bottom and a commit puts it back there (docs/development.md, "Hunting a flaky test").
+ */
 async function scrollTo(chat: JunoChatPane, where: 'top' | 'bottom'): Promise<void> {
   const scroller = chat.root.locator('[data-scroll]')
-  await scroller.evaluate((el, at) => el.scrollTo({ top: at === 'top' ? 0 : el.scrollHeight, behavior: 'instant' }), where)
-  await expect.poll(() => scroller.evaluate((el, at) => (at === 'top' ? el.scrollTop : el.scrollHeight - el.clientHeight - el.scrollTop) <= 1, where)).toBe(true)
+  const box = (await scroller.boundingBox())!
+  const page = chat.root.page()
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await expect
+    .poll(async () => {
+      await page.mouse.wheel(0, where === 'top' ? -4000 : 4000)
+      return scroller.evaluate((el, at) => (at === 'top' ? el.scrollTop : el.scrollHeight - el.clientHeight - el.scrollTop) <= 1, where)
+    })
+    .toBe(true)
 }
 
 /** Puts a bubble's row at the top of the list, under the header, as revealing a row does (`scrollIntoView`, the list's `scroll-padding-top`). */

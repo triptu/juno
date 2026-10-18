@@ -103,13 +103,16 @@ export class JunoChatPane {
     await this.reactions.getByRole('button', { name: `React ${emoji}` }).click()
   }
 
-  /** Any emoji, through More reactions and the emoji picker's search. */
+  /**
+   * Any emoji, through More reactions and the emoji picker's search. Picks from the results: until the search
+   * renders, the browse grid's button matches too, and a click that found it waits on it once the grid is hidden.
+   */
   async reactWithPicker(bubble: string, search: string, name: string): Promise<void> {
     await this.openReactions(bubble)
     await this.reactions.getByRole('button', { name: 'More reactions' }).click()
     const picker = this.root.locator('[data-emoji-picker]')
     await picker.getByRole('textbox', { name: 'Search emoji' }).fill(search)
-    await picker.getByRole('button', { name: `:${name}:`, exact: true }).click()
+    await picker.locator('[data-emoji-results]').getByRole('button', { name: `:${name}:`, exact: true }).click()
   }
 
   async reply(bubble: string): Promise<void> {

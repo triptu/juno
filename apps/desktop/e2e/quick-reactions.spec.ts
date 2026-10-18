@@ -117,7 +117,7 @@ test('Add opens the emoji picker over the page; a pick shows in the toolbar, and
   // A click in the grid adds it and closes the picker.
   await addButton.click()
   await picker(juno).getByRole('textbox', { name: 'Search emoji' }).fill('tada')
-  await picker(juno).getByRole('button', { name: ':tada:' }).first().click()
+  await picker(juno).locator('[data-emoji-results]').getByRole('button', { name: ':tada:' }).first().click()
   await expect(picker(juno)).toHaveCount(0)
   await expect.poll(() => pillNames(juno)).toEqual(['+1', 'white_check_mark', 'eyes', 'tada'])
 
