@@ -230,11 +230,18 @@ const loadThreadViews = (
     while (true) {
       const requestedAt = yield* nowTs
       firstRequestedAt ??= requestedAt
-      const page = yield* api.call(
+      const pageResult = yield* Effect.result(api.call(
         'subscriptions.thread.getView',
         { limit: ctx.config.getViewPageLimit, ...(current === undefined ? {} : { current_ts: current }) },
         { lane: options.lane, reason: 'threads' },
-      )
+      ))
+      if (pageResult._tag === 'Failure') {
+        // Keep repairs from every page Slack already returned. A later-page
+        // failure must not discard them; the next pass can retry the gap.
+        if (batched.length > 0) yield* applyThreadViewObservations(ctx, batched, options.lane)
+        return yield* pageResult.failure
+      }
+      const page = pageResult.success
       for (const view of page.threads) listed.add(`${view.root_msg.channel}:${view.root_msg.ts}`)
       const observations = page.threads.map((view) => ({ view, requestedAt }))
       if (options.batchPages === true) batched.push(...observations)

@@ -109,8 +109,8 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
     // No command is in flight before the sync runs; `follow` outbox rows are left over from a crash.
     yield* transaction(clearPendingFollows).pipe(Effect.catchCause((cause) => Effect.logError('sync: pending follows not cleared', { cause })))
     const events = yield* socket.events
-    const reconcile = makeReconcile(runtime, true)
-    const sweep = makeReconcile(runtime, false)
+    const reconcile = makeReconcile(runtime)
+    const sweep = makeReconcile(runtime)
     const { reboot, bootLoop } = makeBootLoop(runtime, sweep)
     const handle = handleSocketEvent(runtime, reconcile, reboot)
     const consumer = Stream.runForEach(events, (event) => handle(event).pipe(Effect.andThen(options.onEvent?.(event, ctx.me) ?? Effect.void)))

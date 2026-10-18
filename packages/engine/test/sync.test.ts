@@ -841,6 +841,68 @@ describe('search matches (review M3 finding 3)', () => {
 })
 
 describe('periodic sweep', () => {
+  it('discovers a late-indexed reply older than the previous sweep cursor', async () => {
+    const threadText = 'An unfollowed thread for delayed search indexing.'
+    const engine = await bootedEngine({
+      sweepIntervalMillis: 500,
+      followPassMillis: 60 * 60_000,
+      initial: (fake) => {
+        seedThread(fake, { channel: 'C0ENG', text: threadText, ago: 2 * DAY, replies: [], follow: false })
+        return fake.signIn()
+      },
+    })
+    const root = engine.fake.messages('C0ENG').find((message) => message.text === threadText)!
+
+    engine.fake.resetCalls()
+    await engine.nextSync()
+    const late = engine.fake.workspace.post({
+      channel: 'C0ENG',
+      threadTs: root.ts,
+      user: 'U0MAYA',
+      text: 'Indexed after the cursor moved',
+      at: engine.fake.now() - 30_000,
+      silent: true,
+    })
+    await engine.nextSync()
+
+    // Incremental getView still runs, but Slack does not list this unfollowed
+    // thread. Only discovery can expose the retro-timestamped reply.
+    expect(apiCalls(engine, 'subscriptions.thread.getView').length).toBeGreaterThan(0)
+    expect(readDb(engine, 'cache.db', (db) => db.prepare('SELECT text FROM messages WHERE channel = ? AND ts = ?').get('C0ENG', late.ts))).toEqual({
+      text: 'Indexed after the cursor moved',
+    })
+  })
+
+  it('keeps repairs from fetched follow pages when a later page fails', async () => {
+    const engine = await bootedEngine({ sweepIntervalMillis: 500, followPassMillis: 0 })
+    const target = [...engine.fake.workspace.subscriptions.values()]
+      .filter((subscription) => subscription.subscribed && engine.fake.workspace.replies(subscription.channel, subscription.threadTs).length > 1)
+      .toSorted((a, b) => {
+        const activity = (subscription: typeof a) => engine.fake.workspace.find(subscription.channel, subscription.threadTs)?.latest_reply ?? subscription.threadTs
+        return activity(b).localeCompare(activity(a))
+      })[0]!
+    const replies = engine.fake.workspace.replies(target.channel, target.threadTs)
+    const markUnreadFrom = replies.at(-1)!
+    const expectedRead = replies.at(-2)!.ts
+
+    engine.fake.holdFrames({ types: ['thread_marked'] })
+    engine.fake.markThreadRead({ channel: target.channel, threadTs: target.threadTs, ts: markUnreadFrom.ts, read: false })
+    engine.fake.releaseFrames({ drop: true })
+    engine.fake.gate((method, args) => method === 'subscriptions.thread.getView' && args['current_ts'] !== undefined)
+    engine.fake.resetCalls()
+    const sweep = engine.nextSync()
+    const before = await waitFor(() => engine.fake.gated().find((call) => call.stage === 'before'), 10_000, 'the later getView page')
+    engine.fake.decide(before.id, { error: 'internal_error' })
+    const answer = await waitFor(() => engine.fake.gated().find((call) => call.id === before.id && call.stage === 'answer'), 10_000, 'the failed getView answer')
+    engine.fake.decide(answer.id, 'answer')
+    engine.fake.gate()
+    await sweep
+
+    expect(readDb(engine, 'user.db', (db) => db.prepare('SELECT last_read_ts FROM topic_reads WHERE topic_id = ?').get(`t:${target.channel}:${target.threadTs}`))).toEqual({
+      last_read_ts: expectedRead,
+    })
+  })
+
   it('leaves an unchanged cache alone and repairs a missed reply', async () => {
     const engine = await bootedEngine({ sweepIntervalMillis: 500, followPassMillis: 0 })
     const rootTs = tsOf(threadId(engine, 'C0ENG', 'Draft plan is in the doc.'))
