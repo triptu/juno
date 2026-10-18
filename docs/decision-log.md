@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-19 04:18 · fake-thread-pages · Build a request-local followed-thread index in fake Slack, reuse it for unread counts, and expand only the requested page; retain exact timestamp ordering and avoid a cross-request cache that could hide mutations.
 - 10-19 04:16 · engine-test-timing · Keep engine scheduling in one typed host config with unchanged production defaults; tests scale intervals by twenty and observe completed work, while TestClock checks the read boundary and real windows remain only for debounce and CPU measurements.
 - 10-19 03:22 · unit-setup · Copy a closed empty migrated store for each fresh engine test, combine related assertions in named flows, and split independent large-seed and socket-liveness repair files for remote parallelism; keep engines, fake servers, cold syncs and failure scenarios isolated.
 - 10-19 03:01 · runner · Reserve 1 SSH core with a 2-core CPU limit for unit-only jobs, 3 cores for gallery jobs without desktop or e2e, and 4 for jobs with desktop or e2e; keep three gallery workers at 3 cores and explicit machine overrides. The owner chose 16 lent cores: 4 app plans, 5 gallery jobs or 16 unit jobs at once. Keep Namespace at 8x16 and the 60-second capacity fallback.
