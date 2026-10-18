@@ -38,6 +38,7 @@ const SOFTWARE_RENDERING_CEILING = 15
 // A focused text field's native caret blinks at rest. Give only its Window
 // 3%, rather than treating normal Mac text editing as an idle spin.
 const FOCUSED_WINDOW_BUDGET = 3
+const SYNC_SWEEP_ENGINE_BUDGET = 1
 const SETTLE_MS = 10_000
 const BUDGETS: Record<string, number> = { main: 2, window: 2, graphics: 2, engine: 3, agent: 2, network: 1, other: 1 }
 
@@ -82,6 +83,8 @@ async function expectIdle(running: RunningApp, state: string, gate: Gate, fake?:
     test.info().annotations.push({ type: 'busy cpu', description: `${state}: ${methods}; ${busy}` })
     expect(calls.some((call) => call.method === 'client.counts'), `${state}: only a discovery sweep may replace an idle window`).toBe(true)
     expect(calls.filter((call) => !call.ok), `${state}: Slack work must succeed`).toHaveLength(0)
+    const engine = readings.find((reading) => reading.kind === 'engine')
+    expect(engine?.cpu, `${state}: scheduled sync engine CPU, budget ${SYNC_SWEEP_ENGINE_BUDGET}%`).toBeLessThan(SYNC_SWEEP_ENGINE_BUDGET)
     await new Juno(running.app, running.win).expectEngineLive()
     await new Promise((resolve) => setTimeout(resolve, SETTLE_MS))
     const retryCalls = fake.calls.length
