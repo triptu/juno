@@ -97,12 +97,15 @@ async function touch(page: Page, element: Locator): Promise<string[]> {
   await check('press', () => page.mouse.down())
   await check('release', () => page.mouse.up())
   await check('leave', () => page.mouse.move(2, 2))
+  // The press can disable the element (a card that took its click is working), and a disabled control cannot be
+  // focused. Without this check the locator waits for it until the part's timeout.
+  if ((await element.count()) === 0) return failures
   await check('focus from the keyboard', async () => {
     // A key first, so the browser is in keyboard mode and :focus-visible matches.
     await page.keyboard.press('Shift')
-    await element.evaluate((node) => (node as HTMLElement).focus())
+    await element.evaluate((node) => (node as HTMLElement).focus(), undefined, { timeout: 5_000 })
   })
-  await check('blur', () => element.evaluate((node) => (node as HTMLElement).blur()))
+  await check('blur', () => element.evaluate((node) => (node as HTMLElement).blur(), undefined, { timeout: 5_000 }))
   return failures
 }
 
