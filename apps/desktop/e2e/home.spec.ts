@@ -136,6 +136,22 @@ test('Home shows what waits from the sidebar, and each row opens its topic', asy
   await tabs.expectCount(1)
 })
 
+test('a DM set to Never leaves Home and returns when set to When it matters', async ({ juno, slack }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  slack.as('Maya').dm('Can you look at the hiring plan today?')
+
+  const maya = juno.sidebar.row('Maya', { exact: true })
+  await expect(maya.root).toBeVisible({ timeout: 30_000 })
+  await maya.chooseInMenu('notify-never')
+  await juno.home.open()
+  await expect(juno.home.root.locator('a[href*="m%3AD0MAYA"]')).toHaveCount(0)
+
+  await maya.chooseInMenu('notify-matters')
+  await expect.poll(() => freshHome(juno, OFFSITE), { timeout: 30_000 }).toContain('waiting')
+  await expect(juno.home.root.locator('a[href*="m%3AD0MAYA"]')).toBeVisible()
+})
+
 test("A Home row from a DM shows the person's photo and names them once; a channel's keeps its art", async ({ juno, slack }) => {
   await juno.signIn()
   await juno.waitForSync()
