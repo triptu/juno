@@ -99,6 +99,9 @@ export class Workspace {
   /** When a conversation last changed for self (a message, a read mark, membership), in ms. An incremental `client.counts` lists only these. */
   /** Some server responses omit mutation markers; the bounded fallback must still work. */
   mutationMarkers = true
+  /** Test retention visibility: older messages are omitted and pages declare is_limited. */
+  readonly retainedSince = new Map<string, Ts>()
+  readonly messageVersions = new Map<string, Ts>()
   readonly mutationUpdated = new Map<string, Ts>()
   readonly historyInvalid = new Map<string, Ts>()
   readonly changedAt = new Map<string, number>()
@@ -333,8 +336,10 @@ export class Workspace {
       latest: latest?.ts ?? null,
       has_unreads: unread.length > 0,
       mention_count: mentions,
-      updated: this.mutationMarkers ? this.mutationUpdated.get(c.id) ?? latest?.ts ?? lastRead : undefined,
-      history_invalid: this.mutationMarkers ? this.historyInvalid.get(c.id) ?? NEVER_READ : undefined,
+      ...(this.mutationMarkers ? {
+        updated: this.mutationUpdated.get(c.id) ?? latest?.ts ?? lastRead,
+        history_invalid: this.historyInvalid.get(c.id) ?? NEVER_READ,
+      } : {}),
     }
   }
 
@@ -483,9 +488,9 @@ export class Workspace {
       text: mrkdwn ? escapeText(text) : toMrkdwn(text),
       blocks: textToBlocks(mrkdwn ? unescapeText(escapeText(text)) : text),
       edited: { user: editor, ts: editTs },
-      version: editTs,
     }
     list[index] = message
+    this.messageVersions.set(`${channel}:${ts}`, editTs)
     this.mutationUpdated.set(channel, editTs)
     this.#touchConversation(channel)
     this.emit({
@@ -516,7 +521,6 @@ export class Workspace {
     }
     const eventTs = this.eventTs()
     this.historyInvalid.set(channel, eventTs)
-    this.mutationUpdated.set(channel, eventTs)
     if (isReply(previous) && previous.thread_ts !== undefined) this.#touchRoot(channel, previous.thread_ts)
     this.#touchConversation(channel)
     this.emit({
@@ -601,7 +605,8 @@ export class Workspace {
     const reactions: Reaction[] =
       existing === undefined ? [...current, updated] : current.map((r) => (r.name === name ? updated : r)).filter((r) => (r.count ?? 0) > 0)
     const version = this.eventTs()
-    list[index] = { ...(reactions.length === 0 ? omitReactions(message) : { ...message, reactions }), version }
+    list[index] = reactions.length === 0 ? omitReactions(message) : { ...message, reactions }
+    this.messageVersions.set(`${channel}:${ts}`, version)
     this.mutationUpdated.set(channel, version)
     this.#touchConversation(channel)
     this.emit({
@@ -745,13 +750,13 @@ export class Workspace {
     const replies = this.replies(channel, rootTs)
     const users = [...new Set(replies.map((r) => r.user).filter((u): u is string => u !== undefined))]
     this.mutationUpdated.set(channel, this.eventTs())
+    this.messageVersions.set(`${channel}:${rootTs}`, this.eventTs())
     const { reply_count: _c, reply_users: _u, reply_users_count: _n, latest_reply: _l, thread_ts: _t, ...rest } = root
     list[index] =
       replies.length === 0
-        ? { ...rest, version: this.eventTs() }
+        ? rest
         : {
             ...rest,
-            version: this.eventTs(),
             thread_ts: rootTs,
             reply_count: replies.length,
             reply_users: users,

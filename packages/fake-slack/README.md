@@ -47,10 +47,14 @@ Mutation recovery (`docs/research/slack-catchup.md`): counts expose independent
 `updated` and `history_invalid` markers. The fake advances `updated` for posts,
 edits and reactions, and `history_invalid` for deletion. History and replies
 accept `cached_latest_updates`, return changed bodies with `latest_updates`,
-unchanged ids in `unchanged_messages`, and deleted cached ids in `deleted`.
-Paging counts unchanged messages too. These mutation-to-marker rules are the
-protocol assumption tested by Juno, not a claim that live Slack coverage has
-been proved for every mutation.
+unchanged ids in `unchanged_messages`, and an empty `deleted` list, as the
+controlled self-DM deletion test returned. Versions live in a separate map, not
+on Message bodies. Deleting a reply also changes its root version; deleting the
+final root advances only `history_invalid`.
+Paging counts unchanged messages too. These rules match the controlled self-DM test,
+not a completeness guarantee for every workspace and event. Tests can override
+marker/version maps to model backwards or unchanged values, and `retainedSince`
+omits older messages while marking history and replies `is_limited`.
 
 In-process tests can set `workspace.mutationMarkers = false` to model counts that
 omit both markers. Outbox conformance uses this for an uncovered fallback range.

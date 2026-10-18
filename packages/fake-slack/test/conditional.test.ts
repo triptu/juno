@@ -24,7 +24,8 @@ it('returns unchanged ids, changed bodies and deletions with independent mutatio
   const after = await client.ok('conversations.replies', { channel, ts: root.ts, cached_latest_updates: before.latest_updates ?? {} })
   expect(after.messages.find((m) => m.ts === edited.ts)?.text).toBe('Changed.')
   expect(after.messages.find((m) => m.ts === reacted.ts)?.reactions ?? []).toEqual([])
-  expect(after.deleted).toContain(deleted.ts)
+  expect(after.deleted).toEqual([])
+  expect(after.messages.some((m) => m.ts === deleted.ts)).toBe(false)
   const nextCounts = await client.ok('client.counts', {})
   const previous = counts.channels.find((c) => c.id === channel)!
   const next = nextCounts.channels.find((c) => c.id === channel)!
