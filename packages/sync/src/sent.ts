@@ -147,7 +147,7 @@ const copyDeleteOf = (row: MessageRow): Effect.Effect<PendingAction | undefined,
     const rows = yield* sql<{ id: number }>`SELECT id FROM outbox WHERE kind = 'delete' AND target_key = ${row.channel} AND depends_on IS NULL
       AND json_extract(payload_json, '$.ts') = ${row.ts} AND json_extract(payload_json, '$.clientMsgId') IS NULL`
     if (rows[0] === undefined) return undefined
-    return { id: rows[0].id, kind: 'delete', channel: row.channel, dependsOn: null, payload: { ts: row.ts, clientMsgId: null, topics: messageTopics(row) }, attempts: 0, nextAt: 0, createdAt: 0 }
+    return { id: rows[0].id, kind: 'delete', channel: row.channel, dependsOn: null, payload: { ts: row.ts, clientMsgId: null, topics: messageTopics(row) }, attempts: 0, lastError: null, nextAt: 0, createdAt: 0 }
   })
 
 /** The kept message of a sent post was deleted: a file copy hidden for it is shown and becomes the message. */

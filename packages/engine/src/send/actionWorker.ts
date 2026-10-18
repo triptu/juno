@@ -24,13 +24,14 @@
  *   the row, so the message shows what Slack has. A refused reaction stays
  *   as `failed`: the chip shows what Slack has and the message offers Retry
  *   and Dismiss. No answer, Slack's own trouble (`internal_error` and
- *   friends), a rate limit or no session: tried again with backoff, also
- *   after a restart.
+ *   friends), a rate limit or no session: tried again with bounded backoff,
+ *   also after a restart.
  * - A reaction that has not gone out after `STALL_MILLIS` (its post is
  *   still being sent, an earlier change in the channel holds it, or it
  *   keeps failing to reach Slack) is marked, and the message says it is not
- *   sent yet. A row whose run fails with a defect is put off with backoff,
- *   so it never holds back the rows after it.
+ *   sent yet. A defect fails its row immediately; transient errors stop after five
+ *   attempts. Failed rows retain their intent for Retry or Dismiss and
+ *   release later rows in the channel.
  *
  * Sync also writes rows: the delete of a second copy of one of Juno's
  * posts (`@juno/sync` `sent.ts`), which wakes this worker. Before that
@@ -54,7 +55,7 @@ import {
   checkCopyDelete,
   deferAction,
   dropAction,
-  failReaction,
+  failAction,
   flushActions,
   isFailed,
   markStalled,
@@ -77,6 +78,8 @@ import { inStore } from './worker'
 /** A message as Slack sends it, the shape `TopicFetcher.acted` stores. */
 type Message = Parameters<TopicFetcher['sent']>[0]['message']
 
+/** Failed exchanges per intent, including the initial call. */
+const MAX_ATTEMPTS = 5
 /** Longest wait between two tries of a row that keeps failing. */
 const MAX_BACKOFF_MILLIS = 5 * 60_000
 /** How long a row waits for a session before it is tried again. */
@@ -137,7 +140,7 @@ export class ActionWorker extends Context.Service<
             const text = action.payload.text ?? ''
             const blocks = action.payload.blocksJson == null ? undefined : JSON.parse(action.payload.blocksJson)
             return outbox
-              .send((api) => api.call('chat.update', { channel, ts: ts as Ts, text, ...(blocks === undefined ? {} : { blocks }) }))
+              .send((api) => api.call('chat.update', { channel, ts: ts as Ts, text, ...(blocks === undefined ? {} : { blocks }) }, { singleAttempt: true }))
               .pipe(
                 Effect.flatMap((answer) =>
                   Effect.map(Clock.currentTimeMillis, (now) => {
@@ -151,17 +154,20 @@ export class ActionWorker extends Context.Service<
           }
           case 'delete':
             return outbox
-              .sendChecked((api) => api.call('chat.delete', { channel, ts: ts as Ts }, { beforeSend: check }))
+              .sendChecked((api) => api.call('chat.delete', { channel, ts: ts as Ts }, { beforeSend: check, singleAttempt: true }))
               .pipe(Effect.as({ kind: 'deleted', channel, ts } as const))
           case 'react': {
             const name = action.payload.name ?? ''
             const added = action.payload.want === true
             return outbox
-              .send((api) => api.call(added ? 'reactions.add' : 'reactions.remove', { channel, timestamp: ts as Ts, name }))
+              .send((api) => api.call(added ? 'reactions.add' : 'reactions.remove', { channel, timestamp: ts as Ts, name }, { singleAttempt: true }))
               .pipe(Effect.as({ kind: 'reacted', channel, ts, name, added } as const))
           }
         }
       }
+
+      const defer = (action: PendingAction, nextAt: number, code: string) =>
+        action.attempts + 1 >= MAX_ATTEMPTS ? failAction(action, code) : deferAction(action, nextAt, code)
 
       /** Settles one row. Answers whether it still waits for its post. */
       const run = (open: OpenWorkspace, fetcher: TopicFetcher, action: PendingAction) =>
@@ -188,8 +194,8 @@ export class ActionWorker extends Context.Service<
           // and again holding the lane, so a change made while it waited is seen.
           const check = Effect.gen(function* () {
             const gap = { reconnectedAt: yield* Ref.get(reconnectedAt), caughtUp: yield* Ref.get(inStep) }
-            // The call retries Slack's own trouble itself, so a retry can come after a socket drop. Until the
-            // catch-up ends or its deadline passes, the row waits for it, as in `pass`, rather than keep the copy.
+            // A call can wait in the send lane across a socket drop. Until the catch-up ends or its
+            // deadline passes, the row waits for it, as in `pass`, rather than keep the copy.
             if (!gap.caughtUp && isCopyDelete(action) && (!(yield* link.online) || (yield* Clock.currentTimeMillis) < (gap.reconnectedAt ?? 0) + COPY_CATCH_UP_MILLIS)) {
               return yield* new NotSent()
             }
@@ -215,21 +221,21 @@ export class ActionWorker extends Context.Service<
                 return false
               }
               if (TRANSIENT.has(error.code)) {
-                yield* local(transaction(deferAction(action, now + backoff(action.attempts), error.code)))
+                yield* local(transaction(defer(action, now + backoff(action.attempts), error.code)))
                 return false
               }
               yield* Effect.logWarning('send: Slack refused a message change', { kind: action.kind, code: error.code })
-              yield* local(transaction(action.kind === 'react' ? failReaction(action, error.code) : dropAction(action)))
+              yield* local(transaction(action.kind === 'react' ? failAction(action, error.code) : dropAction(action)))
               return false
             }
             case 'RateLimited':
-              yield* local(transaction(deferAction(action, now + Math.max(error.retryAfterMillis, backoff(action.attempts)), error._tag)))
+              yield* local(transaction(defer(action, now + Math.max(error.retryAfterMillis, backoff(action.attempts)), error._tag)))
               return false
             case 'NotSignedIn':
-              yield* local(transaction(deferAction(action, now + NO_SESSION_MILLIS, error._tag)))
+              yield* local(transaction(defer(action, now + NO_SESSION_MILLIS, error._tag)))
               return false
             case 'Offline':
-              yield* local(transaction(deferAction(action, now + backoff(action.attempts), error._tag)))
+              yield* local(transaction(defer(action, now + backoff(action.attempts), error._tag)))
               return false
           }
         })
@@ -239,6 +245,12 @@ export class ActionWorker extends Context.Service<
       const pass = (open: OpenWorkspace) =>
         Effect.gen(function* () {
           const local = inStore(open)
+          // Retire legacy exhausted rows before any network call, including rows behind a head.
+          for (const action of yield* local(pendingActions)) {
+            if (action.lastError === 'defect' || action.attempts >= MAX_ATTEMPTS) {
+              yield* local(transaction(failAction(action, action.lastError ?? 'retry_limit')))
+            }
+          }
           const fetcher = yield* link.fetcher
           // No sync, no session, or offline: rows wait for the connection.
           if (fetcher === undefined || !(yield* link.online)) return undefined
@@ -260,19 +272,22 @@ export class ActionWorker extends Context.Service<
               copyWait = catchUpDeadline
               continue
             }
-            // A defect in one row's run is logged and the row put off, so the rows after it still go.
+            // Defects are bugs, not transient failures: keep the intent for an explicit retry.
             const ran = yield* run(open, fetcher, action).pipe(
               Effect.catchCause((cause) =>
                 Cause.hasInterruptsOnly(cause) ? Effect.failCause(cause) : Effect.gen(function* () {
-                  yield* Effect.logError('send: action failed to run', { kind: action.kind, cause })
-                  yield* local(transaction(deferAction(action, (yield* Clock.currentTimeMillis) + backoff(action.attempts), 'defect')))
+                  yield* Effect.logError('send: action failed to run', { kind: action.kind, id: action.id })
+                  yield* local(transaction(failAction(action, 'defect')))
                   return false
                 }),
               ),
             )
             if (ran) waiting.add(action.id)
             // A row that ended lets the channel's next row go in this pass, before rows of later channels.
-            else if ((yield* local(readAction(action.id))) === undefined) held.delete(action.channel)
+            else {
+              const remaining = yield* local(readAction(action.id))
+              if (remaining === undefined || isFailed(remaining)) held.delete(action.channel)
+            }
           }
           // A reaction still pending after `STALL_MILLIS` is marked once, so the view says it is not sent yet.
           const checkedAt = yield* Clock.currentTimeMillis

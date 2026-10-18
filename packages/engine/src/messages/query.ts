@@ -315,6 +315,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
         conversation?.name,
         pending.get(row.ts)?.state,
         local.size === 0 ? '' : localKey(row, local),
+        intent?.actionIssue?.id,
         intent?.issue === undefined ? '' : `${intent.issue.state}:${intent.issue.on ? 1 : 0}:${intent.issue.name}`,
         ...own.flatMap((r) => [r.name, r.count, r.me, r.users.join(',')]),
       ].join('\u0001')
@@ -324,7 +325,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
         view = held.row
       } else {
         const thread = topicId === undefined ? undefined : threadLink(topicId, row, title, target.channel, conversation, lookups)
-        view = shapeRow(row, body, { groupStart, isRoot, selfId, reactions: own, reactionIssue: intent?.issue, thread, cache, pending: pending.get(row.ts), local })
+        view = shapeRow(row, body, { groupStart, isRoot, selfId, reactions: own, reactionIssue: intent?.issue, actionIssue: intent?.actionIssue, thread, cache, pending: pending.get(row.ts), local })
       }
       nextRows.set(row.ts, { key, row: view })
       out.push(view)
@@ -440,6 +441,7 @@ interface ShapeInput {
   readonly isRoot: boolean
   readonly selfId: string | undefined
   readonly reactions: ReadonlyArray<StoredReaction>
+  readonly actionIssue: MessageView['actionIssue']
   readonly reactionIssue: ReactionIssue | undefined
   readonly thread: ThreadLink | undefined
   readonly cache: MessageCache
@@ -479,6 +481,7 @@ function shapeRow(row: WindowMessage, body: CachedBody, input: ShapeInput): Mess
     broadcast: row.subtype === 'thread_broadcast',
     root: input.isRoot,
     reactions: kind === 'message' ? reactions : [],
+    ...(input.actionIssue === undefined ? {} : { actionIssue: input.actionIssue }),
     ...(kind === 'message' && input.reactionIssue !== undefined ? { reactionIssue: input.reactionIssue } : {}),
     files: kind !== 'message' ? [] : input.pending === undefined ? filesOf(row, input.local) : pendingFiles(input.pending),
     ...(input.thread === undefined ? {} : { thread: input.thread }),
@@ -529,6 +532,7 @@ interface Intent {
   edit?: { readonly text: string; readonly blocksJson: string | null }
   deleted: boolean
   readonly reactions: Map<string, boolean>
+  actionIssue?: NonNullable<MessageView['actionIssue']>
   issue?: ReactionIssue
 }
 
@@ -546,7 +550,8 @@ function intentsOf(rows: ReadonlyArray<ActionRow>): Intents {
     const intent = (payload.ts !== null ? byTs.get(payload.ts) : undefined) ?? (payload.clientMsgId !== null ? byClientMsgId.get(payload.clientMsgId) : undefined) ?? { deleted: false, reactions: new Map<string, boolean>() }
     if (payload.ts !== null) byTs.set(payload.ts, intent)
     if (payload.clientMsgId !== null) byClientMsgId.set(payload.clientMsgId, intent)
-    if (row.kind === 'delete') intent.deleted = true
+    if (row.kind !== 'react' && payload.failed !== undefined) intent.actionIssue = { id: row.id, kind: row.kind }
+    else if (row.kind === 'delete') intent.deleted = true
     else if (row.kind === 'edit' && payload.text !== undefined) intent.edit = { text: payload.text, blocksJson: payload.blocksJson ?? null }
     else if (row.kind === 'react' && payload.name !== undefined) {
       // A refused reaction shows what Slack has; one that has waited long shows the change and says it is not sent yet.

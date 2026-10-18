@@ -184,6 +184,7 @@ export const MessageView = Schema.Struct({
   reactions: Schema.Array(ReactionView),
   /** The newest of the user's reaction changes Slack has not taken, when there is one. */
   reactionIssue: Schema.optionalKey(ReactionIssue),
+  actionIssue: Schema.optionalKey(Schema.Struct({ id: Schema.Int, kind: Schema.Literals(['edit', 'delete']) })),
   files: Schema.Array(FileView),
   /** Main only: the message has a thread. */
   thread: Schema.optionalKey(ThreadLink),

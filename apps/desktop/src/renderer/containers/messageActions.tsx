@@ -20,7 +20,7 @@
  */
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import type { TopicDetail } from '@juno/contract'
-import { editMessage, junoAvailableAtom, quickReactionsAtom, registry, type MessageWindow } from '@juno/state'
+import { resolveMessageAction, editMessage, junoAvailableAtom, quickReactionsAtom, registry, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import type { MessageActions } from '@juno/views'
 import { chunk, usePreloaded } from './chunks'
@@ -118,7 +118,7 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
   const quick = useAtomValue(quickReactionsAtom)
   // Ask Juno on a selection shows only while AI assist is on.
   const juno = useAtomValue(junoAvailableAtom)
-  const actions = useMemo(() => ({ ...commands, quickReactions: quick }), [commands, quick])
+  const actions = useMemo(() => ({ ...commands, quickReactions: quick, onResolveAction: (id: number, retry: boolean) => { void resolveMessageAction(registry, id, retry) } }), [commands, quick])
   const rowMessage = (ts: string) => latest.current.list.rows.get(ts)
   // The hooks below run their effects after the ones above, as when this was one function.
   const [selection, setSelection] = useSelectionQuote(scrollRef)

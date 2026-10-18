@@ -13,7 +13,7 @@ import { Clock, Effect } from 'effect'
 import { NotFound, NotSignedIn, Rejected, type MessageActionError, type MessageRef } from '@juno/contract'
 import { composeOutgoing, type MentionTargets } from '@juno/richtext'
 import { StoreWriter, transaction, type Invalidation, type SqlError } from '@juno/store'
-import { queueDelete, queueEdit, queueReaction, resolveTarget, storedMe, type ActionRefusal, type MessageRef as StoreRef } from '@juno/sync'
+import { resolveFailedAction, queueDelete, queueEdit, queueReaction, resolveTarget, storedMe, type ActionRefusal, type MessageRef as StoreRef } from '@juno/sync'
 import { userName, type UserRow } from '../topicRows'
 import { Workspace } from '../workspace'
 
@@ -113,3 +113,6 @@ export const reactToMessage = (message: MessageRef, name: string, on: boolean): 
     const refusal = yield* inWorkspace((_, now) => queueReaction({ ref: toStoreRef(message), name, on, now }))
     yield* refused(message, refusal)
   })
+
+export const resolveMessageAction = (id: number, retry: boolean) =>
+  inWorkspace((_, now) => resolveFailedAction(id, retry, now))

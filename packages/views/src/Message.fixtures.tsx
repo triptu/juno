@@ -82,6 +82,10 @@ export default defineFixtures(
       failed: one(failedRow, { startsGroup: true, onRetry: noop, onDiscard: noop }),
       'failed-continuation': one(failedRow, { onRetry: noop, onDiscard: noop }),
     },
+    Action: {
+      'edit-failed': one({ ...ownMessage, message: { ...ownMessage.message, actionIssue: { id: 1, kind: 'edit' } } }, { startsGroup: true, actions: { ...noopActions, onResolveAction: noop } }),
+      'delete-failed': one({ ...ownMessage, message: { ...ownMessage.message, actionIssue: { id: 2, kind: 'delete' } } }, { startsGroup: true, actions: { ...noopActions, onResolveAction: noop } }),
+    },
     // The user's reaction Slack did not take: refused, with Retry and Dismiss, or not sent for a while.
     Reaction: {
       refused: one(reactionRefused, { startsGroup: true, onSetReaction: noop }),

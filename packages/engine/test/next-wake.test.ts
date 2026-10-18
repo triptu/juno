@@ -9,11 +9,11 @@ it('counts only channel heads and the timers that can unblock work', () => {
   expect(wake(rows, 100, new Set([1, 3])).delay).toBeUndefined()
 })
 
-it('never returns zero twice for the same unchanged head, and reports the incident once', () => {
+it('never returns zero twice for the same head, and reports the incident once', () => {
   const wake = wakeSchedule()
   const rows = [{ id: 1, channel: 'A', nextAt: 0 }]
   expect(wake(rows, 100)).toEqual({ delay: 0, repeatedHead: undefined })
   expect(wake(rows, 101)).toEqual({ delay: 50, repeatedHead: 1 })
-  expect(wake(rows, 151)).toEqual({ delay: 50, repeatedHead: undefined })
+  expect(wake([{ ...rows[0]!, nextAt: 150 }], 151)).toEqual({ delay: 50, repeatedHead: undefined })
   expect(wake([{ ...rows[0]!, id: 2 }], 152).delay).toBe(0)
 })

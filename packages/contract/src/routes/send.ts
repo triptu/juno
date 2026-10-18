@@ -108,6 +108,11 @@ export const messagesReact = Rpc.make('messages.react', {
   error: MessageActionError,
 })
 
+/** Retry or dismiss a failed edit or delete without rebuilding its saved intent. */
+export const messagesResolveAction = Rpc.make('messages.resolveAction', {
+  payload: { id: Schema.Int, retry: Schema.Boolean }, success: Schema.Void, error: NotSignedIn,
+})
+
 /** Wrong place: the draft reads like a reply to this topic of the channel. */
 export const RouteFinding = Schema.Struct({
   topicId: Schema.String,
@@ -167,4 +172,4 @@ export const draftsGet = liveValueRoute('drafts.get', { payload: { topicId: Sche
 /** Replaces a topic's draft; an empty or blank text deletes it. */
 export const draftsSet = Rpc.make('drafts.set', { payload: { topicId: Schema.String, text: Schema.String }, success: Schema.Void, error: NotSignedIn })
 
-export const SendRoutes = RpcGroup.make(messagesSend, messagesRetry, messagesDiscard, messagesEdit, messagesDelete, messagesReact, messagesCheck, messagesPrecheck, messagesPostcheck, messagesGrammar, draftsGet, draftsSet)
+export const SendRoutes = RpcGroup.make(messagesResolveAction, messagesSend, messagesRetry, messagesDiscard, messagesEdit, messagesDelete, messagesReact, messagesCheck, messagesPrecheck, messagesPostcheck, messagesGrammar, draftsGet, draftsSet)

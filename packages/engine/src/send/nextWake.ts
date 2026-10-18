@@ -7,7 +7,7 @@ interface Row {
 /**
  * Only a channel's head can run. Later rows cannot advance its wake, even
  * when overdue. Dependency and stall timers are separate wakes. A second
- * immediate wake for the same unchanged head yields for 50 ms and reports
+ * immediate wake for the same head yields for 50 ms and reports
  * it once, so a missed settlement cannot silently spin the event loop.
  */
 export function wakeSchedule() {
@@ -23,7 +23,7 @@ export function wakeSchedule() {
     const due = [...heads.map((row) => row.nextAt), ...timers]
     const delay = due.length === 0 ? undefined : Math.max(0, Math.min(...due) - now)
     const head = heads.find((row) => row.nextAt <= now)
-    const key = delay === 0 && head !== undefined ? `${head.id}:${head.nextAt}` : undefined
+    const key = delay === 0 && head !== undefined ? String(head.id) : undefined
     if (key !== undefined && key === immediate) {
       const repeatedHead = warned ? undefined : head?.id
       warned = true

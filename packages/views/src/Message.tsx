@@ -23,6 +23,7 @@ import { clockTime, fullTime } from './time'
  * memoized (performance 5.1).
  */
 export interface MessageActions {
+  readonly onResolveAction?: (id: number, retry: boolean) => void
   /** The toolbar's one-click reactions, in order; the default three when absent. */
   readonly quickReactions?: ReadonlyArray<QuickReaction>
   readonly onReact: (message: MessageView, name: string) => void
@@ -326,6 +327,14 @@ export const Message = memo(function Message({
           progress={pending === 'sending' ? progress : undefined}
         />
         <Reactions reactions={message.reactions} onToggle={toggle} people={reactors ?? NO_PEOPLE} />
+        {message.actionIssue !== undefined ? (
+          <Text variant="meta" tone="muted" as="p" sx={styles.failed}>
+            {message.actionIssue.kind === 'edit' ? 'Edit not sent.' : 'Delete not sent.'}{' '}
+            <TextButton tone="default" onClick={() => actions?.onResolveAction?.(message.actionIssue!.id, true)}>Retry</TextButton>
+            {' · '}
+            <TextButton tone="default" onClick={() => actions?.onResolveAction?.(message.actionIssue!.id, false)}>Dismiss</TextButton>
+          </Text>
+        ) : null}
         {message.reactionIssue !== undefined ? <ReactionIssueLine ts={message.ts} issue={message.reactionIssue} onSet={onSetReaction} /> : null}
         {main && message.thread !== undefined && onOpenThread !== undefined ? <ThreadLink link={message.thread} onOpen={onOpenThread} tabIndex={tabbable ? 0 : -1} /> : null}
         {suggestion !== undefined && editor === undefined ? (
