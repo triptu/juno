@@ -56,6 +56,8 @@ export const agentHostHandlers = (options: HandlerOptions) =>
         'host.slack.history': ({ accountId, channelId, cursor, limit }) => asAccount(accountId, host.history(channelId, cursor, limit)),
         'host.slack.replies': ({ accountId, channelId, threadTs, cursor, limit }) => asAccount(accountId, host.replies(channelId, threadTs, cursor, limit)),
         'host.slack.person': ({ accountId, userId }) => asAccount(accountId, host.person(userId)),
+        'host.slack.people': ({ accountId, since, limit }) => asAccount(accountId, host.people?.(since, limit) ?? unsupported('People counts are unavailable.')),
+        'host.slack.members': ({ accountId, names }) => asAccount(accountId, host.members?.(names) ?? unsupported('Member lookup is unavailable.')),
         'host.topics.list': ({ cursor, limit }) => host.topics(cursor, limit),
         'host.topics.get': ({ topicId }) =>
           Effect.gen(function* () {

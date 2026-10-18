@@ -6,7 +6,7 @@
  * the open workspace's store and the outbox.
  */
 import { Context, type Effect, type Stream } from 'effect'
-import type { HostAiCall, HostSpendAsk, HostView, HostViewDraft, HostViewChange, HostViewUndo, HostChannel, WatchConversation, WatchSnapshot, WatchHours, AgentHostError, HostCursor, HostDispatch, HostMessage, HostMessagePage, HostPresence, HostUserId, Place, TopicLink } from '@juno/agent-contract'
+import type { HostAiCall, HostInteraction, HostSpendAsk, HostView, HostViewDraft, HostViewChange, HostViewUndo, HostChannel, WatchConversation, WatchSnapshot, WatchHours, AgentHostError, HostCursor, HostDispatch, HostMessage, HostMessagePage, HostPresence, HostUserId, Place, TopicLink } from '@juno/agent-contract'
 
 export type Message = typeof HostMessage.Type
 export type MessagePage = typeof HostMessagePage.Type
@@ -81,6 +81,10 @@ export class JunoHost extends Context.Service<
     readonly resolve?: (dispatch: Dispatch) => Effect.Effect<typeof import('@juno/agent-contract').HostDispatchResult.Type, AgentHostError>
     readonly undoResolve?: (actionId: string) => Effect.Effect<void, AgentHostError>
     readonly person: (userId: string) => Effect.Effect<{ readonly id: typeof HostUserId.Type; readonly name: string; readonly displayName: string }, AgentHostError>
+    /** Who the owner exchanged messages with in DMs and threads since `since` (ms), most first: counts and names only. */
+    readonly people?: (since: number, limit: number) => Effect.Effect<{ readonly people: ReadonlyArray<typeof HostInteraction.Type> }, AgentHostError>
+    /** Workspace members for each name asked. */
+    readonly members?: (names: ReadonlyArray<string>) => Effect.Effect<{ readonly members: ReadonlyArray<{ readonly name: string; readonly ids: ReadonlyArray<{ readonly id: typeof HostUserId.Type; readonly name: string }> }> }, AgentHostError>
 
     /** The current presence, then every change. */
     readonly presence: Stream.Stream<Presence>
