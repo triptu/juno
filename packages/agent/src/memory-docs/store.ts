@@ -88,11 +88,6 @@ export function entries(store: Store): ReadonlyArray<Entry> {
   return (store.db.prepare('SELECT * FROM memory_entries WHERE active = 1 ORDER BY id').all() as unknown as EntryRow[]).map(entryOf)
 }
 
-/** One person's active entries, oldest first. */
-export function personEntries(store: Store, person: string): ReadonlyArray<Entry> {
-  return (store.db.prepare('SELECT * FROM memory_entries WHERE active = 1 AND person = ? ORDER BY id').all(person) as unknown as EntryRow[]).map(entryOf)
-}
-
 /** The docs' entries, as the rules and the model name them: `e12`. Entries of a person file are not the docs'. */
 export const docEntries = (all: ReadonlyArray<Entry>): ReadonlyArray<DocEntry> =>
   all.filter((entry) => entry.person === null).map((entry) => ({ id: `e${entry.id}`, doc: entry.doc, text: entry.text }))

@@ -10,7 +10,7 @@
  * grants, the auto-review and the owner's rules from importing this folder.
  */
 import {
-  peopleContext, peopleIn, peopleLine, docLimits, qualifies, splitPeopleNotes,
+  peopleContext, peopleIn, peopleLine, docLimits, splitPeopleNotes,
   type Interaction, type PersonFile, type PersonSummary, type Relationship,
 } from '@juno/agent-memory'
 import type { SendContext } from '@juno/agent-contract'
@@ -256,10 +256,4 @@ export function createContacts(): Contacts {
       byId = new Map(list.map((i) => [i.id, i]))
     },
   }
-}
-
-/** Whether Juno may start a file on `id` without the owner asking: they qualify by what they exchanged. */
-export const inTouch = (contacts: Contacts, id: string, now: number): boolean => {
-  const seen = contacts.get(id)
-  return seen !== undefined && qualifies(seen, now)
 }
