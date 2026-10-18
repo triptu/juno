@@ -10,9 +10,9 @@
  * scope can close.
  *
  * The boot window is the user's quiet window (the `quietDays` pref, the
- * same one the sidebar reads), observed by the sync while it runs. Against the fake
- * (`EngineConfig.fakeSlackUrl`) the complete follow pass runs with every
- * catch-up instead of hourly.
+ * same one the sidebar reads), observed by the sync while it runs. The
+ * engine uses the production sync schedule against both Slack and the fake;
+ * focused tests override it through `SyncControl`.
  *
  * `phases` is the sync's phase while one runs, `undefined` otherwise,
  * `syncing` says whether one of its cycles is running, and `slowedUntil`
@@ -116,8 +116,6 @@ export class SyncRunner extends Context.Service<
             Effect.provide(open.context),
             Effect.provide(
               syncConfigLayer({
-                // Against the fake the complete follow pass runs with every catch-up, so tests see it each time.
-                ...(engineConfig.fakeSlackUrl === undefined ? {} : { followPassMillis: 0 }),
                 ...control.config,
               }),
             ),

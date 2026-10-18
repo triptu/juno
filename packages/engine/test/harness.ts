@@ -216,7 +216,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
     sync: {
       config: {
         sweepIntervalMillis: options.sweepIntervalMillis ?? 0,
-        ...(options.followPassMillis === undefined ? {} : { followPassMillis: options.followPassMillis }),
+        followPassMillis: options.followPassMillis ?? 0,
         ...(options.bootRetryMillis === undefined ? {} : { bootRetryMillis: options.bootRetryMillis }),
         ...(options.recheckTopics === undefined ? {} : { recheckTopics: options.recheckTopics }),
       },
