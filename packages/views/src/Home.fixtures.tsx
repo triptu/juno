@@ -97,7 +97,7 @@ const two = [homeItems.waiting, homeItems.resume]
 /** Home's thoughts (SPEC 12): a short quote, and a fact near the longest the list allows. */
 const quote = { text: 'How we spend our days is, of course, how we spend our lives.', by: 'Annie Dillard' }
 const longQuote = { text: 'The first principle is that you must not fool yourself and you are the easiest person to fool.', by: 'Richard Feynman' }
-const fact = { text: 'The light reaching your eyes from the Andromeda Galaxy left it about 2.5 million years ago, before our own species existed.' }
+const fact = { text: 'In 1885 Hermann Ebbinghaus published pioneering experiments on memory, with himself as the only subject. Most of what he forgot, he lost within the first day.' }
 const narrow: FixtureFrame = { width: 560, height: 720, padded: false }
 
 const card = (done: ReadonlyArray<WelcomeHintName> = [], hidden = false) => <WelcomeCard done={done} peekKey="option" onClose={noop} hidden={hidden} />
