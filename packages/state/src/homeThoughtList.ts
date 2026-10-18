@@ -186,7 +186,7 @@ export const HOME_THOUGHTS: ReadonlyArray<ThoughtEntry> = [
   { text: 'Saturn is the only planet in the solar system that is less dense than water.', theme: 'wonder', source: "NASA, 'Saturn: Facts'" },
   { text: "Saturn's rings reach up to 282,000 km from the planet, yet the main rings are typically only about 10 metres thick.", theme: 'wonder', source: "NASA, 'Saturn: Facts'" },
   { text: 'Uranus is tilted about 98 degrees, so it rolls around the Sun on its side, and each of its seasons lasts about 21 years.', theme: 'wonder', source: "NASA, 'Uranus: Facts'" },
-  { text: 'If Jupiter were a hollow shell, about 1,000 Earths could fit inside, yet it spins once in under 10 hours, the shortest day of any planet.', theme: 'wonder', source: 'NASA, "Jupiter: Facts"' },
+  { text: 'About 1,300 Earths could fit inside Jupiter, yet it spins once in under 10 hours, the shortest day of any planet.', theme: 'wonder', source: 'NASA NSSDCA, "Jupiter Fact Sheet" (volume ratio Jupiter/Earth 1321)' },
   { text: 'On 7 January 1610 Galileo saw points of light beside Jupiter. Within days he realised they were moons circling it, the first found around another planet.', theme: 'wonder', source: "Galileo, 'Sidereus Nuncius' (1610); NASA, 'Jupiter: Facts'" },
   { text: 'Sunsets on Mars look blue, because fine dust in its air scatters blue light near the Sun.', theme: 'wonder', source: "NASA, 'Sunset in Mars' Gale Crater' (PIA19400, 2015)" },
   { text: 'A day on Mars is only about 40 minutes longer than a day on Earth.', theme: 'wonder', source: "NASA, 'Mars: Facts'" },
