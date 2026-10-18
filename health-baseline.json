@@ -8,8 +8,8 @@
     "unusedDependencies": 0,
     "unlistedDependencies": 0,
     "clonePairs": 5,
-    "oversizedFiles": 44,
-    "oversizedFunctions": 129
+    "oversizedFiles": 45,
+    "oversizedFunctions": 128
   },
   "clonedLines": 93,
   "oversizedFiles": [
@@ -55,6 +55,7 @@
     "packages/views/src/juno-chat/fixtures/data.ts",
     "scripts/check-deps.mjs",
     "scripts/probe-live.ts",
+    "scripts/remote.mjs",
     "scripts/sync-live-dry-run.ts",
     "specs/check.mjs"
   ],
@@ -128,7 +129,6 @@
     "packages/engine/src/topics/query.ts:shapeRows/Effect.gen#1",
     "packages/engine/test/actions.test.ts:describe('edit')#1",
     "packages/engine/test/agent-host.test.ts:describe('the AgentHost port')#1",
-    "packages/engine/test/art.test.ts:describe('topic art')#1",
     "packages/engine/test/bench/messages-large.test.ts:describe.skipIf()('messages.list on the large seed')#1",
     "packages/engine/test/bench/messages-large.test.ts:describe.skipIf()('messages.list on the large seed')/it('opens a 300-message thread and serves its window within budget')#1",
     "packages/engine/test/bench/topics-large.test.ts:describe.skipIf()('topics.list on the large seed')#1",
