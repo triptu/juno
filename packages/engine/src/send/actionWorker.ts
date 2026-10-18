@@ -71,6 +71,7 @@ import { EngineConfig } from '../config'
 import { NotSent, Outbox, type MirrorError } from '../outbox'
 import { SyncLink } from '../syncLink'
 import { Workspace, type OpenWorkspace } from '../workspace'
+import { wakeSchedule } from './nextWake'
 import { inStore } from './worker'
 
 /** A message as Slack sends it, the shape `TopicFetcher.acted` stores. */
@@ -233,6 +234,7 @@ export class ActionWorker extends Context.Service<
           }
         })
 
+      const nextWake = wakeSchedule()
       /** Settles every due row. Returns how long until the next one is due, or `undefined` when none waits. */
       const pass = (open: OpenWorkspace) =>
         Effect.gen(function* () {
@@ -280,17 +282,14 @@ export class ActionWorker extends Context.Service<
             if (checkedAt - action.createdAt >= stallMillis) yield* local(transaction(markStalled(action)))
             else stalls.push(action.createdAt + stallMillis)
           }
-          // Only a channel's first row can go. The rows behind it wait for it to end, which wakes the worker,
-          // so their own past `nextAt` must not make the next pass due at once.
-          const heads = new Map<string, PendingAction>()
-          for (const action of yield* local(pendingActions)) if (!heads.has(action.channel)) heads.set(action.channel, action)
-          // A copy's delete held for the catch-up is due at the deadline, not at its `nextAt`.
-          const rest = [...heads.values()].filter((action) => !waiting.has(action.id) && !(copyWait !== undefined && isCopyDelete(action)))
+          const rest = yield* local(pendingActions)
           const after = yield* Clock.currentTimeMillis
-          const due = [...rest.map((action) => action.nextAt), ...stalls, ...(copyWait === undefined ? [] : [copyWait])]
-          const next = due.length === 0 ? undefined : Math.max(0, Math.min(...due) - after)
-          // A row waiting for its post looks again soon; the post's own settling does not wake this worker.
-          return waiting.size === 0 ? next : Math.min(next ?? DEPENDENCY_POLL_MILLIS, DEPENDENCY_POLL_MILLIS)
+          const blocked = new Set<string | number>(waiting)
+          if (copyWait !== undefined) for (const action of rest) if (isCopyDelete(action)) blocked.add(action.id)
+          const timers = [...stalls, ...(copyWait === undefined ? [] : [copyWait]), ...(waiting.size === 0 ? [] : [after + DEPENDENCY_POLL_MILLIS])]
+          const wake = nextWake(rest, after, blocked, timers)
+          if (wake.repeatedHead !== undefined) yield* Effect.logWarning('send: repeated immediate action wake', { id: wake.repeatedHead })
+          return wake.delay
         }).pipe(Effect.catchCause((cause) => Effect.as(Effect.logError('send: action pass failed', { cause }), PASS_RETRY_MILLIS)))
 
       const loop = Effect.gen(function* () {

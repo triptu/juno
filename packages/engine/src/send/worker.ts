@@ -39,6 +39,7 @@
  * behind a call that outlasted the socket, stays `queued` and goes when
  * the socket is back.
  */
+import { wakeSchedule } from './nextWake'
 import { Clock, Context, Effect, Layer, Queue, Stream } from 'effect'
 import { millisToTs, type Ts } from '@juno/domain'
 import { transaction, type SqlError } from '@juno/store'
@@ -296,6 +297,7 @@ export class PostWorker extends Context.Service<
         })
 
       /** Settles every due row. Returns how long until the next one is due, or `undefined` when none waits. */
+      const nextWake = wakeSchedule()
       const pass = (open: OpenWorkspace) =>
         Effect.gen(function* () {
           const local = inStore(open)
@@ -320,13 +322,14 @@ export class PostWorker extends Context.Service<
             } else if (row.state === 'unknown') {
               yield* lookUp(open, fetcher, row)
               // A lookup that finds nothing puts the row back in the queue, ahead of later rows: start again.
-              return 0
+              break
             }
           }
-          const rest = (yield* local(pendingPosts)).filter((row) => row.state !== 'failed' && !row.threadTs?.startsWith('pending:') && !waiting.has(row.channel))
-          if (rest.length === 0) return undefined
-          const after = yield* Clock.currentTimeMillis
-          return Math.max(0, Math.min(...rest.map((row) => row.nextAt)) - after)
+          const rest = (yield* local(pendingPosts)).filter((row) => row.state !== 'failed' && !row.threadTs?.startsWith('pending:'))
+          const blocked = new Set(rest.filter((row) => waiting.has(row.channel)).map((row) => row.clientMsgId))
+          const wake = nextWake(rest.map((row) => ({ ...row, id: row.clientMsgId })), yield* Clock.currentTimeMillis, blocked)
+          if (wake.repeatedHead !== undefined) yield* Effect.logWarning('send: repeated immediate post wake')
+          return wake.delay
         }).pipe(Effect.catchCause((cause) => Effect.as(Effect.logError('send: post pass failed', { cause }), PASS_RETRY_MILLIS)))
 
       const loop = Effect.gen(function* () {
