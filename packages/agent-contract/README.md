@@ -98,3 +98,9 @@ conversation id, even if it has left the Slack cache.
 `host.slack.channels` adds a paginated directory read: account, name `pattern`
 (case-insensitive glob, `*` and `?`), cursor and limit; channel ids/names and the
 next cursor. It returns no messages, topics, descriptions or user profiles.
+
+`host.slack.people` gives the people the owner exchanged messages with in
+one-to-one DMs and threads since `since`, most first: id, name, the two counts,
+the newest message's time and the DM's id, for person files (SPEC 13.8).
+`host.slack.members` looks up workspace members by name. Neither returns message
+text.

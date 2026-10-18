@@ -49,6 +49,8 @@ incomplete or limited Slack history fails rather than reporting no reply.
 The sidebar view routes (`host.views.*`) enforce the same account check and
 forward to the engine's shared sheet commands. They are local settings, so
 `writes: disabled` does not disable them. `host.slack.channels` reads only the
-cached channel directory, with a paginated name glob.
+cached channel directory, with a paginated name glob. `host.slack.people` and
+`host.slack.members` are optional on `JunoHost` (`unsupported` without them):
+counts and names from the store, never message text.
 
 Resolve is local to Juno, available with Slack writes disabled. Its mark-read step uses the same read-mirroring preference as the user command. It never unfollows or posts a Slack message.
