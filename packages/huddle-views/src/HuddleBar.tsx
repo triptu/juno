@@ -39,7 +39,9 @@ export interface HuddleBarProps extends HuddleControlsState, HuddleControlsActio
  * change in the huddle moves nothing in the sidebar.
  */
 export function HuddleBar({ place, connection, duration, people, sharers = [], sharingSource, onOpen, devices, announcement, ...controls }: HuddleBarProps) {
-  const status = statusLine({ connection, micBlocked: controls.micBlocked ?? false, sharers, sharing: controls.sharing, ...(sharingSource === undefined ? {} : { sharingSource }), duration })
+  // While the user shares, the bar names only what they share: with the others too it would push out the place's name.
+  const others = controls.sharing && sharingSource !== undefined ? [] : sharers
+  const status = statusLine({ connection, micBlocked: controls.micBlocked ?? false, sharers: others, sharing: controls.sharing, ...(sharingSource === undefined ? {} : { sharingSource }), duration })
   // A notice keeps its share of the room; the duration gives way first.
   const notice = status !== duration
   return (
