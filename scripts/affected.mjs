@@ -36,6 +36,7 @@ import { ImportGraph } from './import-graph.mjs'
 import { driverSpecs, galleryComponents, mapProblem, MAX_COVERAGE_SPECS, rankSpecs, reachSpecs, selectSpecs } from './affected-select.mjs'
 import { HEAVY_AREAS, heavyAreasChanged, inPaths, perfInteractionsChanged, PROTOCOL_PATHS } from './test-areas.mjs'
 import { runPlan } from './affected-run.mjs'
+import { nodeTestScripts, unitTestMatcher } from './affected-tests.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
@@ -69,7 +70,7 @@ const files = new Set(git('ls-files', '--cached', '--others', '--exclude-standar
 /** What every suite installs and compiles with: a change reaches every unit test, and a sample of every e2e suite. */
 const dependencies = ['pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', 'tsconfig.base.json']
 /** The tools that plan and run the suites: a change runs the tool tests and one spec end to end (--wide: everything). */
-const tools = ['scripts/affected.mjs', 'scripts/affected-select.mjs', 'scripts/affected-run.mjs', 'scripts/test-areas.mjs', 'scripts/import-graph.mjs', 'scripts/coverage-map.mjs', 'scripts/remote.mjs', 'scripts/heavy.mjs', 'scripts/build-cached.mjs', 'scripts/without-run-as-node.mjs']
+const tools = ['scripts/affected.mjs', 'scripts/affected-select.mjs', 'scripts/affected-run.mjs', 'scripts/affected-tests.mjs', 'scripts/test-areas.mjs', 'scripts/import-graph.mjs', 'scripts/coverage-map.mjs', 'scripts/remote.mjs', 'scripts/heavy.mjs', 'scripts/build-cached.mjs', 'scripts/without-run-as-node.mjs']
 const toolChanged = changed.filter((file) => tools.includes(file) || file.startsWith('scripts/remote/'))
 const everythingChanged = [...changed.filter((file) => dependencies.includes(file)), ...(wide ? toolChanged : [])]
 
@@ -124,9 +125,9 @@ const pending = (items) =>
     return !passed(item.key)
   })
 
-// Unit tests.
+// Unit tests: the vitest files of every package and app (scripts/affected-tests.mjs).
 const unitItems = [...files]
-  .filter((file) => /^(packages|apps)\/[^/]+\/test\/.*\.test\.ts$/.test(file))
+  .filter(unitTestMatcher(root))
   .map((file) => {
     const dir = file.split('/').slice(0, 2).join('/')
     const config = [`${dir}/package.json`, `${dir}/vitest.config.ts`, `${dir}/tsconfig.json`]
@@ -361,10 +362,10 @@ if (specs.length > 0) {
   })
 }
 
-const toolsOrAll = !batch && (everythingChanged.length > 0 || toolChanged.length > 0)
-if (toolsOrAll || (!batch && changed.some((file) => file.startsWith('scripts/health')))) plan.push({ script: 'test:health', args: [], local: true, items: [], why: 'health ratchet rules' })
-if (toolsOrAll || (!batch && changed.some((file) => file.startsWith('scripts/batch-merge') || file.startsWith('scripts/check-migration-order')))) plan.push({ script: 'test:repo-tools', args: [], local: true, items: [], why: 'repository tool checks' })
-if (toolsOrAll || (!batch && changed.includes('scripts/flake.mjs'))) plan.push({ script: 'test:remote-pool', args: [], local: true, items: [], why: 'remote pool lifecycle decisions' })
+// The Node tests of the repository's scripts (scripts/affected-tests.mjs).
+for (const { script, reached } of nodeTestScripts(root, changed))
+  if (everythingChanged.length > 0 || toolChanged.length > 0 || reached.length > 0)
+    plan.push({ script, args: [], local: true, items: [], why: reached.length > 0 ? `${reached[0].file} ${reached[0].test === reached[0].file ? 'changed' : `reaches ${reached[0].test}`}${reached.length > 1 ? ` (and ${reached.length - 1} more)` : ''}` : 'the tools or dependencies changed' })
 
 // perf and feel are suggested only for an interaction with a budget whose own files changed.
 const interactions = batch ? [] : perfInteractionsChanged(changed)
