@@ -1011,3 +1011,44 @@ module agent_resolve {
   action bugStep = advance(true)
   val undoSurvivesRedelivery = s.pc < 2 or not(s.resolved)
 }
+
+// The host's own gate on writes to Slack (decision of 10-18). The owner's
+// click is recorded with the engine as the card shows it (action and exact
+// payload). The agent, whatever the model, a proactive run or a tool asks,
+// can only dispatch: any action, payload and authorization. The host writes
+// only on an unused click with the same payload, and answers a repeat of
+// the authorization that took it from its record. `payload` is the bug of a
+// host that checks the action but not the payload; `reuse` lets a second
+// authorization take a used click.
+module agent_host_gate {
+  type Write = { act: int, payload: int, auth: int }
+  var s: { clicks: Set[{ act: int, payload: int }], used: int -> int, writes: List[Write], label: str }
+  pure val actions = Set(1, 2)
+  pure val payloads = Set(1, 2)
+  pure val auths = Set(1, 2, 3)
+  action init = s' = { clicks: Set(), used: actions.mapBy(_ => 0), writes: List(), label: "init" }
+  action click = {
+    nondet a = actions.oneOf()
+    nondet p = payloads.oneOf()
+    s' = { ...s, clicks: s.clicks.union(Set({ act: a, payload: p })), label: "click" }
+  }
+  action dispatchWith(bug: str): bool = {
+    nondet a = actions.oneOf()
+    nondet p = payloads.oneOf()
+    nondet u = auths.oneOf()
+    val clicked = s.clicks.contains({ act: a, payload: p }) or (bug == "payload" and s.clicks.exists(c => c.act == a))
+    val free = s.used.get(a) == 0 or bug == "reuse"
+    val repeat = s.writes.select(w => w.auth == u and w.act == a).length() > 0
+    if (clicked and free and not(repeat)) s' = { ...s, used: s.used.set(a, u), writes: s.writes.append({ act: a, payload: p, auth: u }), label: "write" }
+    else s' = { ...s, label: "refused" }
+  }
+  action step = any { click, dispatchWith("") }
+  action payloadBugStep = any { click, dispatchWith("payload") }
+  action reuseBugStep = any { click, dispatchWith("reuse") }
+  // Juno never writes on its own: every write is a click on that action with that payload.
+  val writesClicked = s.writes.foldl(true, (ok, w) => ok and s.clicks.contains({ act: w.act, payload: w.payload }))
+  // One click, one write: a replay or a second authorization writes nothing more.
+  val oneWritePerAction = actions.forall(a => s.writes.select(w => w.act == a).length() <= 1)
+  val hostGateSafety = writesClicked and oneWritePerAction
+  val reachedAgreement = s.writes.length() > 0
+}
