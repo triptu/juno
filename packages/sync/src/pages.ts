@@ -47,7 +47,8 @@ export const mergeOne = (
     if (source.kind === 'page' && (merged.applyReactions || existing === undefined) && message.version !== undefined) {
       const sql = yield* StoreWriter
       yield* sql`INSERT INTO message_updates (channel, ts, server_version) VALUES (${channel}, ${message.ts}, ${message.version})
-        ON CONFLICT (channel, ts) DO UPDATE SET server_version = excluded.server_version`
+        ON CONFLICT (channel, ts) DO UPDATE SET server_version = excluded.server_version
+        WHERE message_updates.server_version <> excluded.server_version`
     }
     // A reaction event came before this message was stored; a page requested before it does not have it.
     if (source.kind !== 'event') {

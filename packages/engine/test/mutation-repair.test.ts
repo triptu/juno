@@ -82,7 +82,7 @@ it('retains a dirty marker when one repair range is refused and retries it after
   engine.fake.goOffline()
   await engine.phase('offline')
   engine.fake.editMessage({ channel: 'C0ENG', ts: target.ts, text: 'Repair must retry.' })
-  engine.fake.forceError({ method: 'conversations.history', error: 'internal_error', times: 1 })
+  engine.fake.forceError({ method: 'conversations.history', error: 'not_allowed', times: 1 })
   engine.fake.goOnline()
   await engine.phase('live', 30_000)
   await engine.syncIdle()

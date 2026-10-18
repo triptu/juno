@@ -77,7 +77,7 @@ describe('recheck after a gap', () => {
     await quiet(engine)
     await offline(engine, () => changeWhileAway(engine, seeded))
     await expectChanges(engine, seeded)
-    // One page for each recently active topic, at most ten: #eng's Main and the new thread among them.
+    // Marker repair covers #eng and its threads; the fallback covers the remaining recent topics.
     const rechecks = engine.fake.calls.filter((c) => ['recheck', 'mutation-repair'].includes(c.args['_x_reason'] ?? ''))
     expect(rechecks.length).toBeGreaterThanOrEqual(10)
     expect(rechecks.some((c) => c.method === 'conversations.history' && c.args['channel'] === 'C0ENG')).toBe(true)
@@ -162,14 +162,14 @@ describe('reconnect', () => {
       'api:client.counts': 1,
       // One workspace snapshot also supplies the newly joined channel.
       'api:client.userBoot': 1,
-      // The two conversations whose latest moved.
+      // Two delta reads plus three dirty conversation repairs.
       'api:conversations.history': 5,
-      // The recheck of the drop: the ten most recently active topics, one page each.
+      // The fallback skips topics already covered by mutation repair.
       'recheck:conversations.history': 3,
       'recheck:conversations.replies': 2,
       // One page back to the last sync (its last thread is older), then the complete pass of two pages.
       'api:subscriptions.thread.getView': 3,
-      // The root of the one stored follow the list left out.
+      // Six cached thread repairs and the root of the stored follow the list left out.
       'api:conversations.replies': 7,
       'api:search.modules.messages': 1,
     })

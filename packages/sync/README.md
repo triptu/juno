@@ -152,3 +152,6 @@ Incremental counts rows update only supplied fields. `{ id, last_read }` updates
 the read pointer without clearing `latest`, `has_unreads` or `mention_count`.
 Before this fix those rows failed decoding and aborted the sync cycle before
 any counts could be merged; the retry kept using the old cursor.
+
+Unchanged counts fields and server-version certificates do not write to the
+cache. This keeps the existing quiet-sweep no-write guarantee with partial rows.

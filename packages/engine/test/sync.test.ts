@@ -376,13 +376,19 @@ describe('warm boot', () => {
     cache.close()
     expect(thread).toMatchObject({ message_count: 7, unread_count: 1 })
 
-    // Only the conversation whose latest moved was fetched; the thread reply came from the discovery search.
+    // Delta history follows latest; mutation repair is counted separately below. Discovery supplied the new reply.
     await quiet(second)
-    expect(apiCalls(second, 'conversations.history').filter(notRecheck).map((c) => c.args['channel'])).toEqual(['C0PRODUCT'])
-    expect(apiCalls(second, 'conversations.replies').filter(notRecheck).map((call) => call.args)).toEqual([
+    expect(apiCalls(second, 'conversations.history').filter((c) => notRecheck(c) && c.args['_x_reason'] !== 'mutation-repair').map((c) => c.args['channel'])).toEqual(['C0PRODUCT'])
+    expect(apiCalls(second, 'conversations.replies').filter((c) => notRecheck(c) && c.args['_x_reason'] !== 'mutation-repair').map((call) => call.args)).toEqual([
       expect.objectContaining({ channel: 'C0ENG', ts: oldRoot.ts, limit: '1', _x_reason: 'root' }),
     ])
-    const { 'recheck:conversations.history': history, 'recheck:conversations.replies': replies, ...budget } = callMap(second)
+    const calls = callMap(second)
+    for (const repair of second.fake.calls.filter((c) => c.args['_x_reason'] === 'mutation-repair')) {
+      const key = `${repair.kind}:${repair.method}`
+      calls[key] = (calls[key] ?? 0) - 1
+      if (calls[key] === 0) delete calls[key]
+    }
+    const { 'recheck:conversations.history': history, 'recheck:conversations.replies': replies, ...budget } = calls
     const rechecks = { 'recheck:conversations.history': history, 'recheck:conversations.replies': replies }
     expect(budget).toEqual({
       'api:presence.set': 1,
@@ -401,8 +407,8 @@ describe('warm boot', () => {
       // Search finds the new reply but not its old root. Fetch the root's authoritative reply count.
       'api:conversations.replies': 1,
     })
-    // The recheck for the time the app was closed: the ten most recently active topics, one page each.
-    expect((rechecks['recheck:conversations.history'] ?? 0) + (rechecks['recheck:conversations.replies'] ?? 0)).toBe(10)
+    // The fallback remains bounded to ten topics and skips ranges already repaired.
+    expect((rechecks['recheck:conversations.history'] ?? 0) + (rechecks['recheck:conversations.replies'] ?? 0)).toBeLessThanOrEqual(10)
 
     await second.stop()
     engines.splice(engines.indexOf(second), 1)
@@ -807,7 +813,7 @@ describe('search matches (review M3 finding 3)', () => {
     await second.phase('live')
     await quiet(second)
     expect(apiCalls(second, 'search.modules.messages').every((c) => c.args['extra_message_data'] === '1')).toBe(true)
-    expect(apiCalls(second, 'conversations.replies').filter((c) => c.args['ts'] === root.ts)).toHaveLength(0)
+    expect(apiCalls(second, 'conversations.replies').filter((c) => c.args['ts'] === root.ts && c.args['_x_reason'] === 'root')).toHaveLength(0)
     const stored = readDb(second, 'cache.db', (db) => db.prepare('SELECT text, reply_count, latest_reply FROM messages WHERE channel = ? AND ts = ?').get('C0ENG', root.ts))
     expect(stored).toMatchObject({ text: 'Search-only root', reply_count: 1, latest_reply: reply.ts })
     expect(readDb(second, 'cache.db', (db) => db.prepare('SELECT text FROM messages WHERE channel = ? AND ts = ?').get('C0ENG', reply.ts))).toMatchObject({ text: 'Search-only reply' })

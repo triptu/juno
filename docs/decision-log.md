@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-19 00:29 · Sync · Skip cache writes for unchanged counts fields and server-version certificates so partial incremental rows retain the quiet-sweep no-write guarantee.
 - 10-19 00:11 · Sync · Repair cached Main and thread ranges selected by counts mutation markers on boot and reconnect, acknowledge markers only after complete repair, and retain the bounded fallback until live coverage is established.
 - 10-19 00:10 · Sync · Accept partial incremental counts rows and preserve omitted unread fields; a two-field live row previously aborted decoding before the cycle could merge any counts.
 - 10-18 23:18 · Tushar · A Juno Send card follows its outbox row: a refused send the owner retries from the topic turns the card from Failed to Sent · Open. The agent itself still never retries.

@@ -139,10 +139,11 @@ const keptCopy = (engine: RunningEngine) =>
 describe('send: a copy whose delete waits across a reconnect', () => {
   it('keeps the copy when the recheck after the reconnect does not read its channel', async () => {
     const engine = await bootedEngine(engines, { recheckTopics: 0 })
+    engine.fake.workspace.mutationMarkers = false
     await quiet(engine)
     engine.fake.resetCalls()
     const id = await copyAcrossDrop(engine, 'Sent before the drop', 5)
-    // Nothing on screen and no active topics to read: the recheck reads no topic.
+    // No markers and no fallback topics: nothing certifies this gap.
     for (const unmount of unmounts.splice(0)) unmount()
     engine.fake.dropSocket()
     await waitFor(() => keptCopy(engine), WAIT_MS, 'the copy kept')
@@ -156,7 +157,7 @@ describe('send: a copy whose delete waits across a reconnect', () => {
     const id = await copyAcrossDrop(engine, 'Sent before the drop, then rechecked', 2)
     engine.fake.dropSocket()
     await waitFor(() => (inSlack(engine, id) === 1 ? true : undefined), WAIT_MS, 'the copy deleted')
-    expect(apiCalls(engine, 'conversations.history').some((call) => call.args['_x_reason'] === 'recheck' && call.args['channel'] === 'C0ENG')).toBe(true)
+    expect(apiCalls(engine, 'conversations.history').some((call) => ['recheck', 'mutation-repair'].includes(call.args['_x_reason'] ?? '') && call.args['channel'] === 'C0ENG')).toBe(true)
     expect(keptCopy(engine)).toBeUndefined()
   })
 })
