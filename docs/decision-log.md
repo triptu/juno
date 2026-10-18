@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-18 19:02 · signin-session-durability · Sign-in waits for Main to sync and atomically replace `secrets.bin` before publishing `ready`; storage errors return through the sign-in failure path.
 - 10-18 18:50 · orchestrator · The main process logs unhandled promise rejections and keeps running; engine and agent still exit and are restarted by main; the process log is installed once per process. Why: one stray rejection in main quit the whole app (found via the coverage hook in session.spec:158).
 - 10-18 18:23 · idle-sweep-window · Keep the 3% idle engine budget; print a window containing a successful scheduled discovery sweep and replace it once with a settled window containing no Slack calls, so scheduled sync work is not mistaken for an idle loop.
 - 10-18 18:12 · idle-log-flush · Flush process logs 250 ms after a line arrives and leave no timer for an empty buffer; the minimized-engine profile counted 239 empty-buffer interval wakes in one minute.
