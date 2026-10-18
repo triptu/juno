@@ -79,3 +79,34 @@ test('Home moves nothing when it becomes ready before the first sync ends', asyn
   await expect(page.locator('[data-home] h2 + p')).toHaveCount(0)
   expect(places[1]).toEqual(places[0])
 })
+
+/**
+ * Home's thought (SPEC 12) is centred under the greeting, 14px under it as
+ * the greeting is under the scene. During the first sync it sits over the
+ * reserved slots, so a row that lands takes its place and the greeting
+ * stays where it was.
+ */
+test("Home centres the thought under the greeting, and a row that lands takes its place without moving the greeting", async ({ page }) => {
+  const places: Array<{ readonly greeting: number; readonly row: number | undefined }> = []
+  for (const state of ['empty/thought-filling', 'empty/thought-gives-way']) {
+    await open(page, 'Home', state)
+    places.push(await page.locator('[data-home]').evaluate((node) => ({
+      greeting: node.querySelector('h2')!.getBoundingClientRect().top,
+      row: node.querySelector('[data-home-item]')?.getBoundingClientRect().top,
+    })))
+  }
+  await expect(page.locator('[data-home-thought]')).toHaveCount(0)
+  expect(places[1]!.greeting).toBe(places[0]!.greeting)
+
+  for (const state of ['empty/thought-quote', 'empty/thought-fact', 'empty/thought-narrow', 'empty/thought-filling']) {
+    await open(page, 'Home', state)
+    const at = await page.locator('[data-home]').evaluate((node) => {
+      const scene = node.querySelector('svg')!.getBoundingClientRect()
+      const greeting = node.querySelector('h2')!.getBoundingClientRect()
+      const thought = node.querySelector('[data-home-thought]')!.getBoundingClientRect()
+      return { sceneGap: greeting.top - scene.bottom, thoughtGap: thought.top - greeting.bottom, greetingMid: greeting.left + greeting.width / 2, thoughtMid: thought.left + thought.width / 2 }
+    })
+    expect(Math.abs(at.thoughtGap - at.sceneGap), state).toBeLessThan(0.5)
+    expect(Math.abs(at.thoughtMid - at.greetingMid), state).toBeLessThan(1)
+  }
+})
