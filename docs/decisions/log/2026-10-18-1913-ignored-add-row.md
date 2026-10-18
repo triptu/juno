@@ -1,0 +1,1 @@
+- 10-18 19:13 · ignored-add-row · Settings › Ignored's add row sits above the list's card, so its searchable list opens over the page and a new row lands right under it. The select is a new `SelectButton` (the `Select` field as a button), since a native select cannot filter; Ignore calls the channel menu's own `ignoreChannel` action.

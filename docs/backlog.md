@@ -27,7 +27,6 @@ Small items noticed during work that are not yet assigned to a milestone. Remove
 - Session durability: sign-in does not wait for main to finish writing `secrets.bin` before publishing ready. An immediate quit can race persistence; the relaunch test now waits for the saved session. Add a storage acknowledgement before reporting sign-in complete.
 - Sign-out: one loaded baseline run stalled after sync stopped, with Sign out disabled and the session still signed in. It did not recur in 40 loaded runs after the driver fix. Capture teardown stages if it returns.
 - Notifications (M10): benchmark the revised `{ notify, reason }` gate with What matters against the old live measurements. The engine budget is two seconds with the AI-off fallback.
-- Settings › Ignored: the ignore list has no add row yet (inventory 14: a select of channels not ignored and Ignore). Ignoring is from a channel's menu.
 - Notifications (M10): a Juno Agent tool to read and change notification settings and hours (Local tier, Undo, only from the owner's own words), over `notifications.settings`, `notifications.setHours`, `notifications.setMatters` and `notifications.setLevel`.
 - Notifications: `docs/design/handoff/screenshots/12-ui.png` shows the old page; replace it with a shot of the built page in M10.
 - Juno Agent ideas adopted 10-14 from `docs/research/agent-native-chat-products.md`: specced in SPEC (principle 5, sections 5, 7, 13.1, 13.3, 13.4, 13.6, 13.9, 14, 15), inventory §12, §12.1, §15.2, §15.4 and §15.6, and plan v3 §19, which names the work package for each. Still to build:
