@@ -39,9 +39,9 @@ Every budget is a p95 over the runs of the scenario in section 8 unless marked p
 | Send (Enter) → pending message painted | 50 ms | Only ready wrong-place routing may stop a send; Enter never waits for a model. Text fixes show after sending: local ones as soon as the send is accepted, grammar's whenever its answer comes (within two minutes). The fix line is a row of the sent message and never takes focus. |
 | Scroll, sidebar and message list | p95 frame ≤ 8.3 ms main-thread work; zero long animation frames (> 50 ms) in a 3 s scroll at 2 000 px/s; dropped frames < 1 % | Measured with a CDP trace and the LoAF observer. |
 | Juno chat: Enter → your bubble painted | 16 ms | One frame (SPEC 13.12). The bubble is the renderer's pending send, shown before the agent stores it. `juno.chat-send`. |
-| Juno chat: Enter → Juno's first bubble painted | 2.5 s on OpenRouter | SPEC 13.12. `juno.chat-bubble`; `perf.spec.ts` measures it against the fake OpenRouter, so there it is the agent's own overhead. A Codex turn may be slower and shows the dots meanwhile. |
+| Juno chat: Enter → Juno's first bubble painted | 2.5 s on OpenRouter | SPEC 13.12. `juno.chat-bubble`; `perf.spec.ts` measures it against the fake OpenRouter, so there it is the agent's own overhead. A Codex turn may be slower and shows the dots meanwhile. The agent's part alone, send to first bubble and an approved card's click to its run's first bubble, is gated at 100 ms p95 by `packages/agent/test/turn-timing.bench.test.ts` (medians 5 and 7 ms, p95 6 to 18 ms over three remote runs, 10-18). |
 | Juno panel: ⌘J or the header's Juno button → panel painted with its composer | 16 ms | One frame; with an About chip too (plan v3 §19.3). The topic reflows once. `juno.panel-open`. |
-| Juno switcher: a pick → the Juno page painted with its rows, in the tab or the panel | 50 ms | As a cached topic open, with 500 runs stored for Activity. The switch waits for the page's first value (at most 150 ms) and paints the finished page in one frame, never an empty page under the header. Activity reads its newest 50 runs by `runs_by_start`; the agent builds them within 40 ms over 500 runs and the 200-run snapshot stays under 200 KB (`packages/agent/test/activity.test.ts`); closed rows are `content-visibility: auto`. `perf.spec.ts` measures the panel's switch to Activity. `juno.page-switch`. |
+| Juno switcher: a pick → the Juno page painted with its rows, in the tab or the panel | 50 ms | As a cached topic open, with 500 runs stored for Activity. The switch waits for the page's first value (at most 150 ms) and paints the finished page in one frame, never an empty page under the header. Activity reads its newest 50 runs by `runs_by_start`; the agent builds them within 40 ms over 500 runs and the 200-run snapshot stays under 200 KB (`packages/agent/test/activity.test.ts`); closed rows are `content-visibility: auto`. `perf.spec.ts` measures the panel's switch to Activity. `juno.page-switch`. Measured 22.5 ms p95 (10-18). |
 | Scroll, Juno chat | as the message list | The chat's rows are in flow with `content-visibility: auto`, and its window is the agent's page of at most 200 rows. |
 | Live query update, write → pixels | 50 ms | Engine commit → invalidation → query → encode → port → decode → render → paint. Background (socket) updates may add the 30 ms trailing debounce; user commands may not. |
 | Engine: one live query run (sidebar window, messages window) | 5 ms; FTS query 20 ms | 5 k topics, 100 k messages. Asserted by the engine benchmark with `EXPLAIN QUERY PLAN`. |
@@ -49,7 +49,7 @@ Every budget is a p95 over the runs of the scenario in section 8 unless marked p
 | Engine: longest synchronous block of the event loop after boot | 50 ms | Boot may parse `userBoot` in one block; nothing after it may. |
 | Idle CPU after sync: the engine, nothing happening | under 3 % of one core, averaged over 20 s | No work is due, so nothing runs: every worker and fiber sleeps until a wake or the next due time. Asserted by `idle-cpu.spec.ts` (the built app, engine) and `idle.test.ts` (the engine on a 3 000-message channel, where that spin costs about 7 %). On 10-16 the engine spun at 103 % on a large real workspace: a re-index asked for a stored person mentioned in an older unread message, and the users fiber re-indexed and asked again every 50 ms. |
 | Memory after the large-workspace scenario (boot, 20 topics opened, 50 tab switches, 2 minutes of scrolling) | Renderer private 250 MB, JS heap 120 MB; engine private 300 MB; main 80 MB | `app.getAppMetrics()` and `process.getProcessMemoryInfo().private`. Three repetitions of the scenario must not grow the renderer heap by more than 5 %. |
-| Renderer bundle | Initial JS ≤ 1.1 MB uncompressed (1.0 MB until 10-16, raised once React DOM and Effect alone were about 650 KB of it; warm start and topic open stay the real gates), CSS ≤ 150 KB; secondary surfaces are lazy chunks; the default New chat frame and composer stay eager | The built shell ships 1,054.6 KB of JS (356.6 KB gzip) and 143.3 KB of CSS, minified (2026-10-18, after Home's review sheets became their own chunk and `SheetLayer` left `BackupSheets.tsx`, which had pulled the Backup sheets into the start bundle: 1,092.4 KB before; 990.7 KB on 10-17, 969.3 KB on 10-16, 1,054.6 KB before the 10-17 split). `scripts/check-bundle-size.mjs` runs at the end of `pnpm build` and fails over budget. Measure before adding a dependency. |
+| Renderer bundle | Initial JS ≤ 1.1 MB uncompressed (1.0 MB until 10-16, raised once React DOM and Effect alone were about 650 KB of it; warm start and topic open stay the real gates), CSS ≤ 150 KB; secondary surfaces are lazy chunks; the default New chat frame and composer stay eager | The built shell ships 1,058.5 KB of JS (358.1 KB gzip) and 144.4 KB of CSS, minified, at `627f74b1` (2026-10-18); 1,054.6 KB of JS (356.6 KB gzip) and 143.3 KB of CSS earlier that day, after Home's review sheets became their own chunk and `SheetLayer` left `BackupSheets.tsx`, which had pulled the Backup sheets into the start bundle: 1,092.4 KB before; 990.7 KB on 10-17, 969.3 KB on 10-16, 1,054.6 KB before the 10-17 split). `scripts/check-bundle-size.mjs` runs at the end of `pnpm build` and fails over budget. Measure before adding a dependency. |
 | Live query message size | Snapshot ≤ 200 KB; any delta ≤ 32 KB; encode and decode ≤ 5 ms each side | From architecture 2.6, criterion 5. Larger means the window or the view model is wrong. |
 
 ### Startup bundle split (2026-10-16)
@@ -1262,6 +1262,61 @@ from `globalThis.junoStartupMarks` under `JUNO_E2E`). `JUNO_E2E_STARTUP_TRACE=<f
 Chromium trace of the start, renderer and engine included, with JS samples
 and the Juno marks. Tracing starts a few tens of ms after `ready` and slows
 the start, so it shows where the time goes, not how long the start takes.
+
+### 8.9 Milestone review of the 10-17 and 10-18 merges (10-18)
+
+A full `pnpm perf` on the M2 (60 Hz, so a one-frame budget is 24.7 ms) at main `627f74b1`, release 0.1.3: the Juno page switcher and Activity, memory notes with an outline in every prompt, the learning pass, tool approvals with their click run, Home ready early, the selection toolbar and Ask Juno, the text menu, lazy review sheets, English-only locale packs. The exclusive lock was held, load 1.8 to 4.6. The misses were run again, and warm start and mention typing were run alternated with a build of `89111e14` (the 10-17 A/B's main, 8.8) in its own worktree. "10-17" is the last recorded number (8.7's after run; warm start from 8.8). ms, p95 unless marked.
+
+| Metric | 10-17 | 10-18 | Budget | Verdict |
+| --- | --- | --- | --- | --- |
+| Warm start to shell / rows, median | 384.2 / 473.2 | 447.9 / 565.2 in the full run; 360.2 / 456.1 over 20 alternated launches, `89111e14` 365.1 / 478.7 | 400 / 500 | No regression: the first reading was the machine |
+| Launch to focused composer, median | 494.3 | 474.8; `89111e14` 509.1 | | |
+| Quick start, slowest of three | 2894 | 2869 | 5000 | Pass |
+| Topic open, uncached | 36.1 | 33.7 | 50 | Pass |
+| Topic open, cached / prefetched | 28.0 / 19.4 | 18.0 / 19.9 | 50 / 24.7 | Pass |
+| Tab switch, mounted / unmounted | 17.4 / 19.5 | 25.0, then 17.8 / 17.9 | 24.7 / 50 | Noise: one slow sample, passed on the rerun |
+| Peek open | 12.6 | 13.1 | 24.7 | Pass |
+| Home open, quick / after idle | 17.8 / 103.2 | 19.6 / **347.5**, then 16.3 / 23.7 | 50 / 150 | The clock after idle (8.5); passed on the rerun |
+| New tab with Home | 19.5 | 18.2 | 24.7 | Pass |
+| Media viewer open | 13.0 | 27.8 | 50 | Pass; 14 of 16 opens under 5.1 |
+| Filter change | 23.8 | 21.6 | 50 | Pass |
+| ⌘K open / keystroke to rows | 25.3 / 29.8 | 20.1 / 39.0 | 50 / 100 | Pass |
+| Send / send in Main | 36.8 / 30.3 | 35.5 / 46.7 | 50 | Pass |
+| Live update, sidebar / open thread | 14.3 / 21.0 | 18.1 / 29.1 | 50 | Pass |
+| Row hover | 4.9 | 7.9 | 24.7 | Pass |
+| Juno panel open / chat send to bubble | 22.1 / 21.3 | 21.9 / 22.4 | 24.7 | Pass |
+| Juno's first bubble, fake model | 225.6 | 161.6 | 2500 | Pass |
+| Switch to Activity in the panel | not measured | 22.5 | 50 | Pass |
+| All topics open | 29.0 | 26.1, then 23.6 | 50 | Pass |
+| First opens in a second app (account, switcher, emoji, Settings) | 12.8, 16.6, 23.3, 17.6 | 18.5, 16.3, 30.3, 17.5 | 50 | Pass |
+| Sidebar drag, work per frame | 6.6 | 7.0 | 8.3 | Pass |
+| Sidebar scroll, continuous / held-clock | 5.3 / 4.4 | 5.4 / 4.3 | 8.3 / 7 | Pass |
+| All topics scroll | 5.4 / 5.9 | 5.7 / 4.7 and one long frame, then 5.8 / 4.8 | 8.3 / 7 | The long frame (55 ms, no script) is the first-step shape of 8.5; passed on the rerun |
+| Message scroll, prepend shift | 3.4 / 3.5, 0 px | 7.0 / 3.3, 0 px | 8.3 / 7, 0 px | Pass; 6.4 on 8.6 |
+| Chat scroll | 4.5 / 4.1 | 5.4 / 4.4 | 8.3 / 7 | Pass |
+| Mention typing, character presented against the bare input + one refresh | 38.9 against 66.1 | **62.6 against 55.8, 59.1 against 56.8**, then 52.4, 51.7, 53.3 within | one refresh over the control | Borderline, see below |
+| Composer, palette, emoji typing | 52.9, 39.4, 39.7 | 37.3, 38.9, 43.8 | one refresh over the control | Pass |
+| Initial JS / CSS | 1,054.6 / 143.3 KB | 1,058.5 / 144.4 KB | 1,100 / 150 KB | Pass |
+| Renderer JS heap after scrolling | 19.9 MB | 20.4 MB | 120 MB | Pass |
+
+- **Mention typing.** Alternated three times with `89111e14`, every run passed, but main's p95 was higher in each pair: 52.4, 51.7 and 53.3 ms against 38.7, 49.3 and 43.5 ms. Main's input to its frame was 15.6 ms p95, inside the frame; the extra is after it, where more of main's keystrokes wait one more refresh (frame to presentation p95 about 40 ms against 34 to 39). Traced with `JUNO_TRACE_SKIA`, the GPU raster per presented frame rose from 0.85 to 0.91 ms and the renderer's paint and layout were the same, which does not explain a refresh. The traced pair also came out the other way round (51.9 base, 43.2 main). No cause found and nothing to fix yet; if it fails again, trace the suggestion list's frames first, as 7.1 says.
+- **Renderer working set.** The scroll scenario printed 126 MB for the tab against 93 MB on 10-17, and 139 against 102 MB alternated with `89111e14`, while the JS heap (20.4 against 20.1 MB) and the DOM (9,530 against 9,514 elements) stayed the same. A first-parent bisect on that number read 164 to 215 MB at the commits in between, above both ends, so the working set follows the Mac's memory pressure, not the code (8, "`app.getAppMetrics()` reports working set"). It was stopped. The memory budget is private memory, which this scenario does not print.
+
+**Agent side.** On the fake model, which answers at once, so these are the agent's own time. Three remote runs; each p95 is of 15 or 10 samples, so one slow sample sets it:
+
+| Measure | 10-18 |
+| --- | --- |
+| A normal message: send to the model request, median / p95 | 5.0 to 5.3 / 5.8 to 17.7 ms |
+| Send to the first bubble | 5.1 to 5.4 / 6.0 to 17.9 ms |
+| Request size on a chat with history and memory (system text, messages and tools) | 24,492 characters median |
+| A connection call approved on its card: click to the click run started | 1.7 to 1.8 / 3.5 to 3.8 ms |
+| Click to the run's model request / first bubble | 6.7 to 6.8 / 8.3 to 17.4 ms, 6.8 to 7.0 / 8.5 to 17.6 ms |
+| Its request size, with the call's result | 26,792 characters median |
+| Cache hit over eight requests with memory writes: no outline / the outline / the outline first | 0.988 / 0.980 / 0.858 |
+
+The outline costs about 57 tokens a request and keeps the cached prefix: a memory write changes nothing before the recent messages. In the app the first bubble against the fake OpenRouter is 130.5 ms median, so almost all of it is the fake's stream and the renderer, not the agent. The times come from `packages/agent/test/turn-timing.bench.test.ts` (new, in the `agent-timing` project, gated at 100 ms p95 for both firsts), the cache numbers from `memory-cache.test.ts`, both on a remote machine. Writing the test found one behaviour worth knowing: an approval whose card settles while Juno's previous run is still going steers that run instead of starting a click run, as any input does.
+
+No regression found here needed a fix. Logs are under `.juno-status/perf-review-1018/`.
 
 ### Engine speed measurements (2026-10-15)
 
