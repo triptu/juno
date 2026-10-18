@@ -4,7 +4,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
-import { imageContext, toolchainTag } from './image.mjs'
+import { imageContext, imageTag } from './image.mjs'
 import { parsePlan } from '../plan.mjs'
 
 export const quote = (value) => `'${String(value).replaceAll("'", "'\\''")}'`
@@ -44,7 +44,7 @@ export function runnerConfig(env = process.env) {
     args.push('-p', String(port))
   }
   if (env.JUNO_RUNNER_IMAGE && !/^[\w.:/@-]+$/.test(env.JUNO_RUNNER_IMAGE)) throw new Error('JUNO_RUNNER_IMAGE must be a Docker image reference')
-  return { host, args: [...args, host], image: env.JUNO_RUNNER_IMAGE || `juno-toolchain:${toolchainTag()}`, build: !env.JUNO_RUNNER_IMAGE }
+  return { host, args: [...args, host], image: env.JUNO_RUNNER_IMAGE || `juno-toolchain:${imageTag()}`, build: !env.JUNO_RUNNER_IMAGE }
 }
 
 // Health checks fall back only when the transport cannot reach the host.
@@ -66,10 +66,8 @@ export function runnerCommand(cores, runId, command, env = process.env) {
 }
 
 export function runnerCache() {
-  return `cache="$HOME/.cache/juno-runner"; mkdir -p "$cache/pnpm-store" "$cache/runtime" "$HOME/.cache/electron" || exit 70; for path in "$cache/pnpm-store" "$cache/runtime" "$HOME/.cache/electron"; do [ "$(stat -c %u "$path")" = "$(id -u)" ] || { echo "runner: cache must belong to the SSH user: $path" >&2; exit 70; }; done; chmod 700 "$cache/runtime" || exit 70`
+  return `cache="$HOME/.cache/juno-runner"; electron_cache="$HOME/.cache/electron"; mkdir -p "$cache/pnpm-store" "$cache/runtime" "$HOME/.cache/electron" || exit 70; for path in "$cache/pnpm-store" "$cache/runtime" "$HOME/.cache/electron"; do [ "$(stat -c %u "$path")" = "$(id -u)" ] || { echo "runner: cache must belong to the SSH user: $path" >&2; exit 70; }; done; chmod 700 "$cache/runtime" || exit 70`
 }
-
-export const runnerMounts = '--user "$(id -u):$(id -g)" -e HOME=/tmp/juno-home -e JUNO_REMOTE_INSTALL=1 -e PNPM_CONFIG_STORE_DIR=/cache/pnpm-store -e PNPM_CONFIG_CACHE_DIR=/cache/pnpm-store/metadata -e XDG_RUNTIME_DIR=/cache/runtime -e electron_config_cache=/cache/electron -v "$HOME/.cache/juno-runner/pnpm-store:/cache/pnpm-store" -v "$HOME/.cache/juno-runner/runtime:/cache/runtime" -v "$HOME/.cache/electron:/cache/electron"'
 
 // The host lock covers both the presence check and build, across every client.
 const imageLock = 'mkdir -p "$HOME/.cache/juno-runner"; exec 9>"$HOME/.cache/juno-runner/image-build.lock"; flock -x 9'
@@ -78,7 +76,7 @@ export async function ensureRunnerImage(config, log = console.error) {
   const present = spawnSync('ssh', [...config.args, `docker image inspect ${quote(config.image)} >/dev/null 2>&1`], { encoding: 'utf8', timeout: 15_000 })
   if (present.error || present.status === 255) throw new Error(`runner image check failed: ${present.error?.message ?? present.stderr.trim()}`)
   if (present.status === 0) return config.image
-  const context = imageContext(true)
+  const context = imageContext()
   const started = Date.now()
   log(`remote: building ${config.image} on SSH runner (or waiting for another build)`)
   try {

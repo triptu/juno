@@ -7,20 +7,13 @@ import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
-/** The image is named by what goes into it: the Dockerfile, the lockfile and the workspace file. */
-const imageInputs = ['scripts/remote/Dockerfile', 'pnpm-lock.yaml', 'pnpm-workspace.yaml']
-export function toolchainVersions(directory = root) {
+// Only values used to build the toolchain belong in its tag and build context.
+function toolchainVersions(directory = root) {
   return { quint: JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8')).devDependencies['@informalsystems/quint'] }
 }
 
-export function toolchainTag(directory = root) {
-  return createHash('sha256').update(readFileSync(join(directory, 'scripts/remote/Dockerfile.toolchain'))).update(JSON.stringify(toolchainVersions(directory))).digest('hex').slice(0, 16)
-}
-
-export function imageTag() {
-  const hash = createHash('sha256')
-  for (const file of imageInputs) hash.update(file).update('\0').update(readFileSync(join(root, file)))
-  return hash.digest('hex').slice(0, 16)
+export function imageTag(directory = root) {
+  return createHash('sha256').update(readFileSync(join(directory, 'scripts/remote/Dockerfile'))).update(JSON.stringify(toolchainVersions(directory))).digest('hex').slice(0, 16)
 }
 
 export const quote = (value) => (/^[\w@%+=:,./-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`)
@@ -48,28 +41,21 @@ export async function retry(what, attempt) {
   }
 }
 
-/** The same small build context is used by Docker on either backend. */
-export function imageContext(toolchain = false) {
+/** Both backends build the same toolchain without sending a workspace. */
+export function imageContext() {
   const context = mkdtempSync(join(existsSync('/Volumes/AgentWork') ? '/Volumes/AgentWork' : tmpdir(), 'juno-remote-image-'))
   writeFileSync(join(context, 'toolchain.json'), JSON.stringify(toolchainVersions()))
-  const manifests = spawnSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '--', '*package.json'], { cwd: root, encoding: 'utf8' })
-    .stdout.split('\n')
-    .filter(Boolean)
-  for (const file of (toolchain ? [] : [...imageInputs.slice(1), ...manifests, '.npmrc']).filter((name) => existsSync(join(root, name)))) {
-    mkdirSync(dirname(join(context, file)), { recursive: true })
-    writeFileSync(join(context, file), readFileSync(join(root, file)))
-  }
-  writeFileSync(join(context, 'Dockerfile'), readFileSync(join(root, toolchain ? 'scripts/remote/Dockerfile.toolchain' : 'scripts/remote/Dockerfile')))
+  writeFileSync(join(context, 'Dockerfile'), readFileSync(join(root, 'scripts/remote/Dockerfile')))
   return context
 }
 
 /** Builds and pushes the image unless the registry has it. One build at a time per Mac. */
-export async function ensureImage(registry, tag) {
-  const image = `${registry}/juno-remote:${tag}`
+export async function ensureImage(registry, tag, log = console.error) {
+  const image = `${registry}/juno-toolchain:${tag}`
   // A tag once seen in the registry stays there; remember it to skip the lookup.
-  const seen = join(tmpdir(), 'juno-remote-pool', `image-${tag}`)
+  const seen = join(tmpdir(), 'juno-remote-pool', `toolchain-${tag}`)
   if (existsSync(seen)) return image
-  const present = async () => (await retry('listing the registry', () => nsc(['registry', 'list', 'juno-remote', '-o', 'json']))).includes(tag)
+  const present = async () => (await retry('listing the registry', () => nsc(['registry', 'list', 'juno-toolchain', '-o', 'json']))).includes(tag)
   if (await present()) {
     writeFileSync(seen, image)
     return image
@@ -87,12 +73,14 @@ export async function ensureImage(registry, tag) {
   }
   try {
     const context = imageContext()
-    console.error(`remote: building ${image} (the lockfile or Dockerfile changed; a few minutes, once)`)
+    const started = Date.now()
+    log(`remote: building ${image} (the toolchain changed; a few minutes, once)`)
     const built = spawnSync('nsc', ['build', context, '--name', image, '--push', '--platform', 'linux/amd64'], {
       stdio: ['ignore', 'inherit', 'inherit'],
     })
     rmSync(context, { recursive: true, force: true })
     if (built.status !== 0) throw new Error('nsc build failed')
+    log(`remote: toolchain image built in ${((Date.now() - started) / 1000).toFixed(1)} s`)
     writeFileSync(seen, image)
   } finally {
     rmSync(lock, { recursive: true, force: true })

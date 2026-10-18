@@ -216,16 +216,16 @@ warm pool or its daemon. Namespace fallback still needs `nsc` on the Mac.
 ## Build and prune images on the runner
 
 The SSH backend uses `juno-toolchain:<tag>`, built from
-`scripts/remote/Dockerfile.toolchain`. Its tag hashes the Dockerfile and the pinned Quint
+`scripts/remote/Dockerfile`. Its tag hashes the Dockerfile and the pinned Quint
 version from the root manifest. Lockfile and workspace changes do not rebuild it.
-The image holds Playwright, Node, pnpm, Java 21 and Quint's warm downloads.
+Both backends use this toolchain. The image holds Playwright, Node, pnpm, Java 21 and Quint's warm downloads.
 The build context contains only the Dockerfile and Quint's version.
 
 Each job installs its unpacked workspace with
 `pnpm install --frozen-lockfile --prefer-offline`, then checks Bun's pinned
 version. Missing packages download on a cold store. The log reports
 `remote: workspace installed in N s`. The host keeps pnpm's store at
-`~/.cache/juno-runner/pnpm-store` and Electron's downloads at `~/.cache/electron`.
+`~/.cache/juno-runner/pnpm-store`, including registry policy metadata, and Electron's downloads at `~/.cache/electron`.
 Jobs run as the SSH user's uid and reject cache directories owned by another
 user. They share `~/.cache/juno-runner/runtime` for pnpm's store locks.
 Each container keeps its own workspace and home directory.
@@ -245,7 +245,7 @@ Docker reports an image is in use. The prune command shares the build lock and l
 `JUNO_RUNNER_IMAGE` optionally selects an image already present on the runner.
 It disables automatic building and the per-run install. The full image must already contain the workspace dependencies; the job only links them offline. A missing override image is an error.
 Transfer a `docker save` archive and run `docker load < juno-remote.tar`, or pull
-an image from a registry. For Namespace's private registry, install `nsc` on the
+an image from a registry. For a legacy full image in Namespace's private registry, install `nsc` on the
 laptop, run `nsc login` and `nsc docker login` interactively, then run:
 
 ```sh
@@ -338,7 +338,7 @@ My optional prebuilt runner image is:
    tailscale ip -4
    ss -ltn '( sport = :2222 )'
    ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
-   docker image ls --format '{{.Repository}}:{{.Tag}}' | grep 'juno-remote' || true
+   docker image ls --format '{{.Repository}}:{{.Tag}}' | grep -E 'juno-(remote|toolchain)' || true
    Run it as the runner user, through a fresh login so the Docker group applies.
    Give me this PowerShell command to rerun and paste its output back:
    wsl -d Ubuntu-24.04 -u <linux-user> --exec bash -lc '~/juno-runner-check.sh'
