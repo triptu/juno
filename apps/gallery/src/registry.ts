@@ -1,11 +1,14 @@
 /**
- * Every fixture set the gallery knows about: the ui primitives and the
- * feature views. Add a package here and its states get a link, a switcher
+ * Every fixture set the gallery knows about: the ui primitives, the
+ * feature views, the huddle views and the compositions of views from two
+ * packages (compositions.tsx). Add a package here and its states get a link, a switcher
  * entry and a screenshot.
  */
 import type { Fixture, FixtureFrame, FixtureSet } from '@juno/ui'
+import { fixtures as huddleViews } from '@juno/huddle-views/fixtures'
 import { fixtures as ui } from '@juno/ui/fixtures'
 import { fixtures as views } from '@juno/views/fixtures'
+import { compositions } from './compositions'
 import { testFixtures } from './testFixtures'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -47,7 +50,7 @@ export interface ComponentEntry {
 /** `/?test-fixtures#/...` adds the fixtures of the gallery's own tests (testFixtures.tsx). */
 const withTestFixtures = new URLSearchParams(window.location.search).has('test-fixtures')
 
-const sets: Readonly<Record<string, AnyFixtureSet>> = { ...ui, ...views, ...(withTestFixtures ? testFixtures : {}) }
+const sets: Readonly<Record<string, AnyFixtureSet>> = { ...ui, ...views, ...huddleViews, ...compositions, ...(withTestFixtures ? testFixtures : {}) }
 
 /** Every component, sorted by name. */
 export const components: ReadonlyArray<ComponentEntry> = Object.keys(sets)
