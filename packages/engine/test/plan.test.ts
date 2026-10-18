@@ -17,6 +17,7 @@ import { automatedStatements } from '../src/automatedView'
 import { movesStatements } from '../src/home/moves'
 import { activityStatement, frequentConversationsStatement, frequentSendsStatement, pickerStatements } from '../src/newchat/query'
 import { mentionStatements } from '../src/mentions/query'
+import { ignorableStatement } from '../src/topics/ignored'
 import { searchStatements } from '../src/search/query'
 import { countsStatement as allTopicsCountsStatement, orderStatement, placesStatement } from '../src/topics/allTopics'
 import { countsStatement, listStatements, type ListFilter } from '../src/topics/query'
@@ -156,6 +157,13 @@ describe('query plans', () => {
       assert.deepStrictEqual(scans(yield* plan(activity.sql, activity.params)), [])
       const { recent } = pickerStatements('1700000000.000000')
       const lines = yield* plan(recent.sql, recent.params)
+      assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
+    }).pipe(Effect.provide(freshStore)),
+  )
+
+  it.effect('the ignore list\'s add row reads no message or topic table', () =>
+    Effect.gen(function* () {
+      const lines = yield* plan(ignorableStatement, [])
       assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
     }).pipe(Effect.provide(freshStore)),
   )
