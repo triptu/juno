@@ -3,10 +3,10 @@
  * thumbnails, videos without a poster, and partial copies. Each file is
  * asked about with `files.info` on the background lane at most
  * `FILE_TRIES.length` times, after the waits listed, and a file event
- * (`file_shared`, `file_change`, `file_thumbnail_generated`) asks at once
+ * (`file_shared`, `file_change`, `file_created`, `file_thumbnail_generated`) asks at once
  * instead of waiting. The answer goes into every stored message that
  * carries the file, in one transaction. A file whose tries ran out is not
- * asked about again in this session unless an event names it.
+ * asked about again until an event names it or its topic is opened.
  *
  * Files come to be asked about two ways: a write of a recent message that
  * carries one (`pages.ts`), and an opened topic whose stored messages carry
@@ -107,13 +107,12 @@ export const refreshFiles = (ctx: SyncContext) =>
         running.targets.set(`${target.channel}:${target.ts}`, target)
         continue
       }
-      const held = spent.get(fetch.fileId)
-      if (held !== undefined) {
-        held.set(`${target.channel}:${target.ts}`, target)
-        continue
-      }
+      const targets = spent.get(fetch.fileId) ?? new Map<string, Target>()
+      targets.set(`${target.channel}:${target.ts}`, target)
+      if (spent.has(fetch.fileId) && fetch.kind === 'stored') continue
       if (active.size >= MAX_ACTIVE) continue
-      yield* start(fetch.fileId, new Map([[`${target.channel}:${target.ts}`, target]]), FILE_TRIES)
+      spent.delete(fetch.fileId)
+      yield* start(fetch.fileId, targets, FILE_TRIES)
     }
   })
 
@@ -134,7 +133,7 @@ export const queueTopicFiles = (ctx: SyncContext, topicId: string): Effect.Effec
         : yield* sql<{ ts: string; files_json: string }>`SELECT ts, files_json FROM messages
             WHERE channel = ${parsed.channel} AND thread_ts = ${parsed.threadTs} AND files_json IS NOT NULL ORDER BY ts DESC LIMIT ${TOPIC_FILES_LIMIT}`
     for (const row of rows) {
-      for (const fileId of filesToFetch(row.files_json)) yield* Queue.offer(ctx.fileFetches, { kind: 'stored', fileId, channel: parsed.channel, ts: row.ts })
+      for (const fileId of filesToFetch(row.files_json)) yield* Queue.offer(ctx.fileFetches, { kind: 'opened', fileId, channel: parsed.channel, ts: row.ts })
     }
   })
 

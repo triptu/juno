@@ -18,7 +18,7 @@ export interface RootFetch {
  * to ask about now.
  */
 export type FileFetch =
-  | { readonly kind: 'stored'; readonly fileId: string; readonly channel: string; readonly ts: string }
+  | { readonly kind: 'stored' | 'opened'; readonly fileId: string; readonly channel: string; readonly ts: string }
   | { readonly kind: 'event'; readonly fileId: string }
 
 export interface SyncContext {

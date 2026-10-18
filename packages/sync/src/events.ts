@@ -205,6 +205,7 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
         return yield* transaction(changeOwnUsergroup(ctx, frame.subteam_id, frame.type === 'subteam_self_added'))
       case 'pref_change':
         return yield* transaction(setPref(frame.name, frame.value))
+      case 'file_created':
       case 'file_change':
       case 'file_shared':
       case 'file_thumbnail_generated':
