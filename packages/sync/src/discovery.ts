@@ -111,7 +111,10 @@ const searchPages = (ctx: SyncContext, pass: SearchPass, options: DiscoverOption
       const byChannel = new Map<string, Array<Message>>()
       let reachedSince = false
       for (const match of matches) {
-        if (match.ts < sinceTs) reachedSince = true
+        if (match.ts < sinceTs) {
+          reachedSince = true
+          continue
+        }
         const channel = searchMatchChannelId(match)
         if (!members.has(channel)) continue
         const message = pass.toMessage(match)
