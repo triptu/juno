@@ -92,7 +92,7 @@ import {
   type ScrollSnapshot,
   type Tabs,
 } from '@juno/state'
-import { chatCopy, type JunoPage } from '@juno/agent-contract'
+import type { JunoPage } from '@juno/agent-contract'
 import type { JunoView } from '@juno/state'
 import { junoViewReady } from '@juno/state/agent'
 import type { SettingsSection } from '@juno/contract'
@@ -797,30 +797,4 @@ export async function showTabMenu(tabId: string): Promise<void> {
       return
     }
   }
-}
-
-/** What the history menu calls a place: the tab's title for it. */
-function placeLabel(place: Place): string {
-  if (place.kind === 'home') return 'Home'
-  if (place.kind === 'juno') return 'Juno'
-  if (place.kind === 'junoPage') return chatCopy.pageTitles[place.page]
-  if (place.kind === 'settings') return 'Settings'
-  if (place.kind === 'allTopics') return 'All topics'
-  const result = registry.get(topicAtom(place.topicId))
-  const detail = result._tag === 'Success' ? result.value : null
-  if (detail === null) return 'Topic'
-  return detail.kind === 'main' ? detail.channel.label : detail.title
-}
-
-/** A long press on Back (-1) or Forward (1): the active tab's history that way, nearest first, as in Safari. */
-export async function showHistoryMenu(step: 1 | -1): Promise<void> {
-  const tab = activeTab(registry.get(tabsAtom))
-  if (tab === undefined) return
-  const items: Array<{ id: string; label: string }> = []
-  for (let index = tab.history.index + step; index >= 0 && index < tab.history.entries.length && items.length < 20; index += step) {
-    items.push({ id: String(index), label: placeLabel(tab.history.entries[index]!) })
-  }
-  if (items.length === 0) return
-  const chosen = await popupContextMenu(items)
-  if (chosen !== undefined && registry.get(tabsAtom).active === tab.id) goToTabEntry(Number(chosen))
 }
