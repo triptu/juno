@@ -383,7 +383,7 @@ describe('warm boot', () => {
       expect.objectContaining({ channel: 'C0ENG', ts: oldRoot.ts, limit: '1', _x_reason: 'root' }),
     ])
     const { 'recheck:conversations.history': history, 'recheck:conversations.replies': replies, 'mutation-repair:conversations.history': repairMain = 0, 'mutation-repair:conversations.replies': repairThreads = 0, ...budget } = callMap(second)
-    expect(repairMain + repairThreads).toBeLessThanOrEqual(10)
+    expect({ repairMain, repairThreads }).toEqual({ repairMain: 1, repairThreads: 4 })
     const rechecks = { 'recheck:conversations.history': history, 'recheck:conversations.replies': replies }
     expect(budget).toEqual({
       'api:presence.set': 1,

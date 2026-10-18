@@ -125,7 +125,7 @@ Each `<name>Step` checks `invariants` and must finish its drain. Each `<name>Bug
 | `keptDeleted` | Slack holds the post and its copy; the copy's delete waits, and the user deletes the kept message on another device. The check keeps the copy and makes it the message. The bug, deciding only at store time, deletes it too. | `keepsRealSends` |
 | `copyReply` | Someone replies to the copy while its delete waits. The check keeps the copy. The bug deletes it. | `repliesKeepRoot` |
 | `ownDelete` | The user deletes the message in Juno before Juno has stored its copy. When the copy arrives it is hidden and deleted too. The bug takes the user's delete for one made elsewhere and keeps the copy as the message. | `ownDeleteHolds` |
-| `uncoveredRecheck` | As `deletedOffline`, but the server provides no mutation markers and the fallback does not read the post's topic, so the store never learns the kept message is gone. The guarded delete needs the topic read and keeps the copy. The bug waits for the catch-up only and deletes the copy. | `keepsRealSends` |
+| `uncoveredRecheck` | As `deletedOffline`, but the fallback does not read the post's topic; mutation repair does not write outbox coverage, so mutation repair cannot authorize deleting the duplicate. The guarded delete needs the topic read and keeps the copy. The bug waits for the catch-up only and deletes the copy. | `keepsRealSends` |
 | `deletedOffline` | The socket drops while the copy's delete waits, and the user deletes the kept message meanwhile. The guarded delete waits for the catch-up, whose recheck stores the deletion, then keeps the copy. The bug checks the store at once on the reconnect and deletes the copy. | `keepsRealSends` |
 
 The corrected `echoKeepsRow` and `answerAfterEcho` schedules cover echo before answer. Corrected `blindRetry` covers a lost answer followed by a found lookup. Six additional corrected schedules cover `answerBeforeEcho`, `lostLookupAbsent`, `reconnectPage`, `dependentDelete`, `actionRetry` and `uploadRetry`. The absent case drops the first call, loses its answer, confirms absence, and posts once. `reconnectPage` accepts, loses the answer, disconnects, then reconnects and holds a lookup answer. A catch-up page reconciles first, the catch-up flushes, and the lookup answer safely writes the message again. The seven post schedules cover all five delivery and recovery orderings. `dependentDelete` queues a delete while the post is sending; the post is refused and the delete discards the failed row. `actionRetry` edits a stored message; Slack applies it, a newer edit arrives while the call is out, and the answer is lost. The worker sends again and the row ends. `uploadRetry` refuses a post's upload, retries it, and shares the post with an answer that has no message, so the lookup stores it.
@@ -266,6 +266,13 @@ cover suppressing the fallback on unchanged versions, confusing unchanged ids
 with deletion, dropping queued work after failure, and ignoring backwards markers. Random simulation runs
 10,000 traces. Page/event ordering remains in `catchup.qnt`; bounded paging,
 retention, upgrade seeding and call costs have fake integration tests.
+
+
+The mutation-repair model also tracks gap time, message time and job enqueue time.
+Ranges start 24 hours before the gap; expiry uses 24 hours since enqueueing.
+`longGap` contrasts that rule with a window anchored at reopen time.
+`missingThread` contrasts dropping and tombstoning a missing thread with retrying
+it forever. Random simulation includes time advances and missing thread responses.
 
 ## Conversation metadata
 

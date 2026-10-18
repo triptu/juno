@@ -158,7 +158,7 @@ describe('reconnect', () => {
 
     // The budget: the socket's URL is left out (its count depends on the backoff), everything else is exact.
     const { 'api:client.getWebSocketURL': _socket, 'mutation-repair:conversations.history': repairMain = 0, 'mutation-repair:conversations.replies': repairThreads = 0, ...budget } = callMap(engine)
-    expect(repairMain + repairThreads).toBeLessThanOrEqual(10)
+    expect({ repairMain, repairThreads }).toEqual({ repairMain: 1, repairThreads: 3 })
     expect(budget).toEqual({
       'api:client.counts': 1,
       // One workspace snapshot also supplies the newly joined channel.
