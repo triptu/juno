@@ -48,7 +48,7 @@ Every budget is a p95 over the runs of the scenario in section 8 unless marked p
 | Engine: one socket event transaction, including `reindexTopics` | 5 ms | Backfill transactions ≤ 200 rows and ≤ 20 ms. |
 | Engine: longest synchronous block of the event loop after boot | 50 ms | Boot may parse `userBoot` in one block; nothing after it may. |
 | Idle CPU after sync: the engine, nothing happening | under 3 % of one core, averaged over 20 s | No work is due, so nothing runs: every worker and fiber sleeps until a wake or the next due time. Asserted by `idle-cpu.spec.ts` (the built app, engine) and `idle.test.ts` (the engine on a 3 000-message channel, where that spin costs about 7 %). On 10-16 the engine spun at 103 % on a large real workspace: a re-index asked for a stored person mentioned in an older unread message, and the users fiber re-indexed and asked again every 50 ms. |
-| Memory after the large-workspace scenario (boot, 20 topics opened, 50 tab switches, 2 minutes of scrolling) | Renderer private 250 MB, JS heap 120 MB; engine private 300 MB; main 80 MB | `app.getAppMetrics()` and `process.getProcessMemoryInfo().private`. Three repetitions of the scenario must not grow the renderer heap by more than 5 %. |
+| Memory after the large-workspace scenario (boot, 20 topics opened, 50 tab switches, 2 minutes of scrolling) | Renderer private 250 MB, JS heap 120 MB; engine private 300 MB; main 80 MB | `app.getAppMetrics()` and `process.getProcessMemoryInfo().private`, which on macOS is the physical footprint; the scroll and memory scenario of `perf.spec.ts` reads it with `footprint` for main, the renderer and the engine and holds each to these budgets. After that lighter scenario on 10-18: main 51 to 53 MB, renderer 167 to 227 MB, engine 76 to 94 MB (8.10). Three repetitions of the scenario must not grow the renderer heap by more than 5 %. |
 | Renderer bundle | Initial JS ≤ 1.1 MB uncompressed (1.0 MB until 10-16, raised once React DOM and Effect alone were about 650 KB of it; warm start and topic open stay the real gates), CSS ≤ 150 KB; secondary surfaces are lazy chunks; the default New chat frame and composer stay eager | The built shell ships 1,058.5 KB of JS (358.1 KB gzip) and 144.4 KB of CSS, minified, at `627f74b1` (2026-10-18); 1,054.6 KB of JS (356.6 KB gzip) and 143.3 KB of CSS earlier that day, after Home's review sheets became their own chunk and `SheetLayer` left `BackupSheets.tsx`, which had pulled the Backup sheets into the start bundle: 1,092.4 KB before; 990.7 KB on 10-17, 969.3 KB on 10-16, 1,054.6 KB before the 10-17 split). `scripts/check-bundle-size.mjs` runs at the end of `pnpm build` and fails over budget. Measure before adding a dependency. |
 | Live query message size | Snapshot ≤ 200 KB; any delta ≤ 32 KB; encode and decode ≤ 5 ms each side | From architecture 2.6, criterion 5. Larger means the window or the view model is wrong. |
 
@@ -606,8 +606,9 @@ frame, which fails its zero rule; its cause is not attributed.
   10-15 commit is just as slow when the composer is focused first. Script
   cannot see the caret (`getSelection().type` is `None`). The renderer
   now clears it on the frame after focus leaves a text field for
-  something that is not one, unless the user has selected text
-  (`containers/caret.ts`). Heavy frames in the All topics sweep fell
+  something that is not one, unless the user has selected text or a
+  mouse button is down, which may be a drag selection starting from that
+  caret; it looks again on release (`containers/caret.ts`, 8.10). Heavy frames in the All topics sweep fell
   from about 330 to 200, and the sidebar drag and Home open passed. The
   same caret appears after any removed field (the palette, a popover's
   search), so it was not only a test artefact. The cause was named by
@@ -1299,8 +1300,8 @@ A full `pnpm perf` on the M2 (60 Hz, so a one-frame budget is 24.7 ms) at main `
 | Initial JS / CSS | 1,054.6 / 143.3 KB | 1,058.5 / 144.4 KB | 1,100 / 150 KB | Pass |
 | Renderer JS heap after scrolling | 19.9 MB | 20.4 MB | 120 MB | Pass |
 
-- **Mention typing.** Alternated three times with `89111e14`, every run passed, but main's p95 was higher in each pair: 52.4, 51.7 and 53.3 ms against 38.7, 49.3 and 43.5 ms. Main's input to its frame was 15.6 ms p95, inside the frame; the extra is after it, where more of main's keystrokes wait one more refresh (frame to presentation p95 about 40 ms against 34 to 39). Traced with `JUNO_TRACE_SKIA`, the GPU raster per presented frame rose from 0.85 to 0.91 ms and the renderer's paint and layout were the same, which does not explain a refresh. The traced pair also came out the other way round (51.9 base, 43.2 main). No cause found and nothing to fix yet; if it fails again, trace the suggestion list's frames first, as 7.1 says.
-- **Renderer working set.** The scroll scenario printed 126 MB for the tab against 93 MB on 10-17, and 139 against 102 MB alternated with `89111e14`, while the JS heap (20.4 against 20.1 MB) and the DOM (9,530 against 9,514 elements) stayed the same. A first-parent bisect on that number read 164 to 215 MB at the commits in between, above both ends, so the working set follows the Mac's memory pressure, not the code (8, "`app.getAppMetrics()` reports working set"). It was stopped. The memory budget is private memory, which this scenario does not print.
+- **Mention typing.** Alternated three times with `89111e14`, every run passed, but main's p95 was higher in each pair: 52.4, 51.7 and 53.3 ms against 38.7, 49.3 and 43.5 ms. Main's input to its frame was 15.6 ms p95, inside the frame; the extra is after it, where more of main's keystrokes wait one more refresh (frame to presentation p95 about 40 ms against 34 to 39). Traced with `JUNO_TRACE_SKIA`, the GPU raster per presented frame rose from 0.85 to 0.91 ms and the renderer's paint and layout were the same, which does not explain a refresh. The traced pair also came out the other way round (51.9 base, 43.2 main). No cause found and nothing to fix yet; if it fails again, trace the suggestion list's frames first, as 7.1 says. Followed up in 8.10: over 200 keystrokes per build the difference is 1 to 2 ms, and nothing of ours explains it.
+- **Renderer working set.** The scroll scenario printed 126 MB for the tab against 93 MB on 10-17, and 139 against 102 MB alternated with `89111e14`, while the JS heap (20.4 against 20.1 MB) and the DOM (9,530 against 9,514 elements) stayed the same. A first-parent bisect on that number read 164 to 215 MB at the commits in between, above both ends, so the working set follows the Mac's memory pressure, not the code (8, "`app.getAppMetrics()` reports working set"). It was stopped. The memory budget is private memory, which this scenario did not print; it does since 8.10.
 
 **Agent side.** On the fake model, which answers at once, so these are the agent's own time. Three remote runs; each p95 is of 15 or 10 samples, so one slow sample sets it:
 
@@ -1317,6 +1318,46 @@ A full `pnpm perf` on the M2 (60 Hz, so a one-frame budget is 24.7 ms) at main `
 The outline costs about 57 tokens a request and keeps the cached prefix: a memory write changes nothing before the recent messages. In the app the first bubble against the fake OpenRouter is 130.5 ms median, so almost all of it is the fake's stream and the renderer, not the agent. The times come from `packages/agent/test/turn-timing.bench.test.ts` (new, in the `agent-timing` project, gated at 100 ms p95 for both firsts), the cache numbers from `memory-cache.test.ts`, both on a remote machine. Writing the test found one behaviour worth knowing: an approval whose card settles while Juno's previous run is still going steers that run instead of starting a click run, as any input does.
 
 No regression found here needed a fix. Logs are under `.juno-status/perf-review-1018/`.
+
+### 8.10 Follow-ups to the 10-18 review (10-18)
+
+Four items from 8.9, decided by the owner. Measured on the M2 (60 Hz) under the exclusive lock, load 2 to 4; `89111e14` is the 10-17 build, built in its own worktree and alternated with this branch.
+
+**The selection chip.** With the Juno panel open, every `selectionchange` re-read the selection: `getRangeAt`, `Selection.toString()` of all of it, an `offsetParent` read to find the visible topic and a query of every row for the count, each of which can lay out the page, then a state change that re-rendered the whole panel chat. A drag fires about 22 of them. Now (`containers/juno/topicContext.ts`):
+
+- The events only ask for a read in the next frame, so there is at most one a frame.
+- The read builds the range from the selection's anchor and focus, not `getRangeAt`, which makes the selection canonical and lays out first (2.6 of 6.8 ms of the read in a profile). It does nothing when the ends have not moved, finds the sender and whether the topic is on screen (the one layout read) only when the row the selection starts in changes, and counts the messages by position only when the row it ends in changes.
+- The chip keeps the first 420 characters of the selected message text (enough for its snippet and its 400-character tooltip), read by walking the selection's text nodes with no layout and kept while the selection only grows. The whole text is read from the kept range once, when the message is sent.
+- The held selection is a small store that only the chip's line subscribes to, so a drag re-renders the chip, not the chat.
+
+The sent text is now the messages' own text: a line break between blocks and a blank line between messages, without the sender names and times between them that `Selection.toString()` gave. The selection still carries its first sender, `ts` and message count.
+
+The new scenario `drag a selection down the 300-message thread with the Juno panel open, while its chip follows` (`perf.spec.ts`, `e2e/perfSelection.ts`) drags from a message three screens up, one move a frame, to the list's bottom edge and past it while the list scrolls under the selection, first with the panel closed for comparison, then open. It gates the open drag's main-thread work per frame at 8.3 ms p95 with no long animation frame, and checks the chip names the messages. Three alternated pairs, ms per drag:
+
+| | Before | After |
+| --- | --- | --- |
+| `selectionchange` listeners, panel open (closed: 0.7 to 1.3) | 14.3 to 26.0, longest 1.7 to 3.3 | 1.1 to 1.2, longest 0.15 |
+| The chip's read, timed in the page | in the listeners | 7.1 over 23 reads, longest 1.3 |
+| Frame work p95, panel open | 4.6 to 7.7 | 7.0 to 7.5 |
+
+Frame work p95 did not move outside its noise: drawing the selection is most of each frame (about 400 to 670 ms of main-thread work per drag either way). In one profiled drag the chip's script was about the same before and after (6.0 ms of listener and 7.1 ms of React, against 9.7 ms of reading and 3.9 ms of React); what went is the layout the old listener forced on every event and the copy of the whole text. The largest script cost in the drag is not the chip but the message rows' `placeToolbar`, 13 to 21 ms per drag whether or not the panel is open, two rect reads on every pointer move while the hovered row scrolls under the pointer. Skipping it during a drag would leave the hover toolbar where it was until the button is up; that is a look decision, so it is left as is.
+
+**A drag selection that started from a text field selected nothing (fixed).** The new scenario failed in 2 of 3 runs before the chip change: with the panel's composer focused, the press on message text moved focus out of the field, and the caret clearer of 8.4 removed the caret the press had placed on the next frame, before the pointer moved, so the drag had no start. `clearCaretsLeftBehind` now waits while a mouse button is down and looks again on release. `juno-agent/selection.spec.ts` drags over a message with the panel's field focused, resting 100 ms after the press: it failed before and passes after; the scenario then passed 3 of 3.
+
+**Mention typing.** Five more alternated pairs, untraced, 200 keystrokes per build: input to character presented 33.7 ms median, 50.0 ms p95 on this branch against 32.0 and 48.7 ms on `89111e14`; input to its frame 5.6 and 14.7 ms against 5.0 and 13.9 ms; the bare input 31.1 / 53.4 against 31.6 / 39.4. All ten runs passed. Unminified profiles put this branch's extra script at about 0.1 ms a keystroke (`LoadedComposer` and `useMentionRows`, which now also holds the bare "@" answer, 10-18 decision `warm-bare-mention`), which cannot add a refresh. Traced, the order came out the other way again (main 39.9 and 39.4 ms p95, `89111e14` 60.3 and 41.2 ms). So the gap of 8.9 was noise in a gate that compares two 40-sample p95s: a run fails when two of the composer's 40 keystrokes wait one more refresh while the bare input's run was quiet. The scenario now also prints each key of the query (no key stands out: the "@" that opens the list had the highest median in three of five runs, and the slow tail is spread over all four keys). Nothing to fix in the app.
+
+**Private memory.** The scroll and memory scenario now prints each process's private memory beside its working set and holds main, the renderer and the engine to their budgets (section 1). macOS gives Electron's `private` as the physical footprint: 107,409 KB from `process.getProcessMemoryInfo()` against a `footprint` of 105 MB in the same process, so the test reads it with `footprint -f bytes` by pid, with no hook in the app. The engine is listed by `getAppMetrics()` as `node.mojom.NodeService`, not by its service name, and is found by `junoTest.enginePid`. Four runs:
+
+| Process | Private | Working set | Budget |
+| --- | --- | --- | --- |
+| Main | 51 to 53 MB | 86 to 102 MB | 80 MB |
+| Renderer | 167 to 227 MB | 207 to 228 MB | 250 MB |
+| Engine | 76 to 94 MB | 73 to 77 MB | 300 MB |
+| GPU (no budget) | 97 to 107 MB | 51 to 57 MB | |
+
+The renderer's JS heap stayed at 20.0 to 20.5 MB, so its 60 MB spread between runs is native memory (decoded images, rendering and the allocator's caches), and its worst run is 91 % of a budget meant for the heavier scenario of section 1 (20 topics opened, 50 tab switches, 2 minutes of scrolling), which does not exist yet. That scenario, run against this reading, is the next thing to add before trusting the renderer's headroom.
+
+Logs are under `.juno-status/perf-followups-1018/`.
 
 ### Engine speed measurements (2026-10-15)
 

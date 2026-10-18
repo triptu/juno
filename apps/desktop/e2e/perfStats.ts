@@ -66,3 +66,17 @@ export async function holdClock(): Promise<() => Promise<void>> {
   }
   return async () => { await Promise.all(workers.map((worker) => worker.terminate())) }
 }
+
+/**
+ * A process's private memory in MB: macOS's physical footprint, which is
+ * what `process.getProcessMemoryInfo().private` reports inside the process
+ * on macOS (107,409 KB against a footprint of 105 MB on 10-18), the metric
+ * of the memory budgets (performance.md 1). Read from outside, so no
+ * process needs a hook for it. Undefined off macOS.
+ */
+export function privateMemory(pid: number): number | undefined {
+  if (process.platform !== 'darwin') return undefined
+  const out = execFileSync('/usr/bin/footprint', ['--noCategories', '-f', 'bytes', '-p', String(pid)], { encoding: 'utf8' })
+  const bytes = /phys_footprint:\s+(\d+) B/.exec(out)?.[1]
+  return bytes === undefined ? undefined : Number(bytes) / 1024 / 1024
+}

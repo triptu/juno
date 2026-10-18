@@ -12,9 +12,10 @@ import type { Locator, Page } from '@playwright/test'
 import { largeSeed, startFakeSlack, topic300Seed, TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL, type FakeSlack } from '@juno/fake-slack'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
 import { expect, hooks, launchApp, tempUserData, test, writeSlackApp, type RunningApp, type SlackAppFixture } from './fixtures'
-import { stats } from './perfStats'
+import { privateMemory, stats } from './perfStats'
 import { traced } from './perfTrace'
 import { scrollReading } from './perfScroll'
+import { selectionDragReading } from './perfSelection'
 import { typingReading } from './perfTyping'
 import { answer } from './juno-agent/chat'
 import { Juno, press, type SidebarFilterName } from './driver/juno'
@@ -442,6 +443,12 @@ for (const { kind, query } of [{ kind: 'mention', query: '@ma' }, { kind: 'emoji
     const presented = stats(`${kind} typing, input timestamp to character presented`, result.presented)
     stats(`${kind} typing, input to animation frame callback`, result.frame)
     stats(`${kind} typing, animation frame callback to presentation`, result.afterFrame)
+    // By key: which part of the query is slow to show (the trigger that opens the list, a letter that narrows it, the space that closes it).
+    const keys = [...`${query} `]
+    console.log(`${kind} typing by key, input to character presented, median / max: ${keys.map((key, at) => {
+      const own = result.presented.filter((_, i) => i % keys.length === at).toSorted((a, b) => a - b)
+      return `"${key}" ${own[Math.floor(own.length / 2)]!.toFixed(1)} / ${own.at(-1)!.toFixed(1)}`
+    }).join(', ')}`)
     expect.soft(presented.p95, `${kind} typing: input to character presented, within one frame of the bare input`).toBeLessThanOrEqual(budget)
   })
 }
@@ -686,9 +693,21 @@ test.describe('large workspace', () => {
       expect(await juno.lastMark('juno.prefetch')).toBe(warmed)
       console.log(`scrollTop after the run: ${await list.evaluate((node) => node.scrollTop)}`)
 
-      // Memory per process (working set, MB) and the renderer's JS heap and DOM size.
-      const metrics = await running.app.evaluate(({ app }) => app.getAppMetrics().map((metric) => ({ type: metric.type, name: metric.serviceName ?? metric.name ?? '', mb: metric.memory.workingSetSize / 1024 })))
-      for (const metric of metrics) console.log(`memory ${metric.type}${metric.name ? ` ${metric.name}` : ''}: ${metric.mb.toFixed(0)} MB working set`)
+      // Memory per process: private memory, the budgets' metric (performance.md 1), and the working set, which
+      // follows the Mac's memory pressure more than the code (8.9). Then the renderer's JS heap and DOM size.
+      const metrics = await running.app.evaluate(({ app }) => app.getAppMetrics().map((metric) => ({ pid: metric.pid, type: metric.type, name: metric.serviceName ?? metric.name ?? '', mb: metric.memory.workingSetSize / 1024 })))
+      for (const metric of metrics) {
+        const own = privateMemory(metric.pid)
+        console.log(`memory ${metric.type}${metric.name ? ` ${metric.name}` : ''}: ${own === undefined ? '' : `${own.toFixed(0)} MB private, `}${metric.mb.toFixed(0)} MB working set`)
+      }
+      // The engine is listed as a Node service, not by its service name; main knows its pid.
+      const engine = await hooks(running.app, 'enginePid')
+      const budgets = [['main', metrics.find((m) => m.type === 'Browser')?.pid, 80], ['renderer', metrics.find((m) => m.type === 'Tab')?.pid, 250], ['engine', engine, 300]] as const
+      for (const [label, pid, budget] of budgets) {
+        const own = pid === undefined ? undefined : privateMemory(pid)
+        console.log(`${label} private memory after scrolling: ${own === undefined ? 'not read' : `${own.toFixed(0)} MB`}, budget ${budget} MB`)
+        if (own !== undefined) expect.soft(own, `${label} private memory after scrolling: ${own.toFixed(0)} MB against a budget of ${budget} MB`).toBeLessThanOrEqual(budget)
+      }
       const page = await win.evaluate(() => ({ heap: (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0, nodes: document.getElementsByTagName('*').length }))
       console.log(`renderer JS heap ${(page.heap / 1024 / 1024).toFixed(1)} MB, ${page.nodes} DOM elements`)
     } finally {
@@ -892,11 +911,11 @@ test.describe('topic view', () => {
   const THREAD = 'Review the rollout checklist 1'
   const MAIN = '#perf-main'
 
-  const launch = (): Promise<RunningApp> => launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
+  const launch = (agent = false): Promise<RunningApp> => launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, agent })
 
-  /** Launches warm, waits for the sync, and closes any tab a previous launch left, which leaves one Home. */
-  async function ready(): Promise<{ readonly running: RunningApp; readonly juno: Juno }> {
-    const running = await launch()
+  /** Launches warm, waits for the sync, and closes any tab a previous launch left, which leaves one Home. With `agent`, Juno runs on a fake model. */
+  async function ready(agent = false): Promise<{ readonly running: RunningApp; readonly juno: Juno }> {
+    const running = await launch(agent)
     const juno = new Juno(running.app, running.win)
     await juno.sidebar.expectRows()
     await juno.expectEngineLive(120_000)
@@ -1072,6 +1091,37 @@ test.describe('topic view', () => {
       const box = (await juno.topic.scroller.boundingBox())!
       await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
       await scrollReading(win, 'scroll-messages', { steps: 30, direction: 1, interval: await refreshInterval(win), layoutLimit: 2000, at: { x: box.x + box.width / 2, y: box.y + box.height / 2 } })
+    } finally {
+      await running.close()
+    }
+  })
+
+  test('drag a selection down the 300-message thread with the Juno panel open, while its chip follows', async () => {
+    test.setTimeout(300_000)
+    const { running, juno } = await ready(true)
+    const { win } = running
+    try {
+      await expect.poll(() => hooks(running.app, 'agentState'), { timeout: 30_000 }).toBe('ready')
+      await running.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1400, 900))
+      await juno.sidebar.row(THREAD).open()
+      await juno.topic.expectAtBottom()
+      const interval = await refreshInterval(win)
+      // Each drag starts three screens up, so it has rows below to cross.
+      const upFromBottom = async () => {
+        await juno.topic.scroller.evaluate((list) => list.scrollTo({ top: list.scrollHeight - list.clientHeight - 2_400, behavior: 'instant' }))
+        await win.waitForTimeout(500)
+      }
+      // The same drag with the panel closed: what the selection itself costs, for comparison.
+      await upFromBottom()
+      await selectionDragReading(win, juno.topic.scroller, 'select-drag-no-panel', interval)
+      await win.evaluate(() => document.getSelection()?.removeAllRanges())
+      await juno.tabs.menu('juno')
+      await expect(win.locator('aside[data-juno-panel]')).toBeVisible()
+      await upFromBottom()
+      const panel = await selectionDragReading(win, juno.topic.scroller, 'select-drag-panel', interval)
+      await expect(win.locator('[data-panel-selection]')).toHaveText(/^\d+ messages: “/)
+      within('selection drag with the panel open, frame work p95', panel.p95, 8.3)
+      expect.soft(panel.loaf, 'long animation frames while dragging a selection').toBe(0)
     } finally {
       await running.close()
     }

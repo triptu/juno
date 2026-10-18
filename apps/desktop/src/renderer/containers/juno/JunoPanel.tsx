@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ComponentProps } from 'react'
 import { type About, type Place, type SendContext } from '@juno/agent-contract'
 import type { TopicDetail } from '@juno/contract'
 import { junoAboutAtom, junoPanelViewAtom, openedAtNewAtom, registry, topicAtom } from '@juno/state'
@@ -9,7 +9,7 @@ import { closeJunoPanel, moveJunoToTab, resumeJuno } from './actions'
 import { JunoPageView } from './JunoPageView'
 import { JunoChat } from './JunoChat'
 import { NoProviderFrame, useNoProvider } from './NoProviderFrame'
-import { focusTopicComposer, useTopicSelection, visibleRange } from './topicContext'
+import { focusTopicComposer, useHeldSelection, useTopicSelection, visibleRange, type TopicSelectionHold } from './topicContext'
 
 const kindLabels: Record<TopicDetail['channel']['kind'], string> = {
   public: 'Public channel',
@@ -64,13 +64,15 @@ function PanelChat({ tabId, topicId }: { readonly tabId: string; readonly topicI
   const detail = result._tag === 'Success' ? (result.value ?? undefined) : undefined
   const about = useAtomValue(junoAboutAtom(tabId))
   const newFrom = useAtomValue(openedAtNewAtom(topicId))
-  const [selection, clearSelection] = useTopicSelection(topicId)
+  const selection = useTopicSelection(topicId)
   const [menuOpen, setMenuOpen] = useState(false)
 
   const contextOf = (): SendContext | undefined => {
     if (about !== undefined) return chipContext(about)
     if (detail === undefined) return undefined
     const visible = visibleRange()
+    // The chip holds the start of the text; the whole of it is read now, once.
+    const sent = selection.take(topicId)
     return {
       _tag: 'topic',
       topicId,
@@ -79,13 +81,13 @@ function PanelChat({ tabId, topicId }: { readonly tabId: string; readonly topicI
       kind: detail.kind,
       ...(visible === undefined ? {} : { visible }),
       ...(newFrom === undefined ? {} : { newFrom }),
-      ...(selection === undefined ? {} : { selection }),
+      ...(sent === undefined ? {} : { selection: sent }),
     }
   }
 
   const onSent = (context: SendContext | undefined) => {
     if (context?._tag !== 'topic') return
-    clearSelection()
+    selection.clear()
   }
 
   return (
@@ -109,12 +111,19 @@ function PanelChat({ tabId, topicId }: { readonly tabId: string; readonly topicI
       onSent={onSent}
       onEscape={close}
       composerContext={
-        <JunoPanelContext
+        <PanelContext
+          hold={selection}
+          topicId={topicId}
           {...(detail === undefined ? {} : { place: panelPlaceOf(detail) })}
-          {...(selection === undefined ? {} : { selection, onRemoveSelection: clearSelection })}
           {...(about === undefined ? {} : { about, onRemoveAbout: () => registry.set(junoAboutAtom(tabId), undefined) })}
         />
       }
     />
   )
+}
+
+/** The composer's context line: the topic's place, the about chip, and the held selection, which only this renders for. */
+function PanelContext({ hold, topicId, ...rest }: { readonly hold: TopicSelectionHold; readonly topicId: string } & Omit<ComponentProps<typeof JunoPanelContext>, 'selection' | 'onRemoveSelection'>) {
+  const selection = useHeldSelection(hold, topicId)
+  return <JunoPanelContext {...rest} {...(selection === undefined ? {} : { selection, onRemoveSelection: hold.clear })} />
 }
