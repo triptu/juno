@@ -94,15 +94,15 @@ async function touch(page: Page, element: Locator): Promise<string[]> {
   const y = box.y + box.height / 2
 
   await check('hover', () => page.mouse.move(x, y))
-  await check('press', () => page.mouse.down())
-  await check('release', () => page.mouse.up())
-  await check('leave', () => page.mouse.move(2, 2))
   await check('focus from the keyboard', async () => {
     // A key first, so the browser is in keyboard mode and :focus-visible matches.
     await page.keyboard.press('Shift')
     await element.evaluate((node) => (node as HTMLElement).focus())
   })
   await check('blur', () => element.evaluate((node) => (node as HTMLElement).blur()))
+  await check('press', () => page.mouse.down())
+  await check('release', () => page.mouse.up())
+  await check('leave', () => page.mouse.move(2, 2))
   return failures
 }
 
@@ -155,9 +155,22 @@ const cursorOffenders = (page: Page, route: Route) =>
 
 const only = process.env.GALLERY_SHIFT_ONLY?.split(',').map((name) => name.trim())
 
+async function checkStateWithin(route: Route, check: () => Promise<void>): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    await Promise.race([
+      check(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${route.route}: state check did not finish within 30 s`)), 30_000)
+      }),
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 for (let part = 0; part < shards; part++) {
-  // The states come from the built gallery, so the list can only be read once
-  // a page is open; each state is a step in the report.
+  // The states come from the built gallery, so the list can only be read once a page is open.
   test(`no interaction shifts the layout, in any state of any component (part ${part + 1} of ${shards})`, async ({ browser }) => {
     // A part walks states until the queue is empty, at up to eight elements and six touches per state.
     test.setTimeout(15 * 60_000)
@@ -167,30 +180,33 @@ for (let part = 0; part < shards; part++) {
     const queue = claimQueue('shift')
     const failures: string[] = []
     const cursors: string[] = []
-    for (let route = queue.next(routes); route !== undefined; route = queue.next(routes)) {
-      const started = Date.now()
-      const page = await pages.next()
-      await test.step(route.route, async () => {
-        await openState(page, route)
-        for (const hit of await cursorOffenders(page, route)) cursors.push(`${route.route}: ${hit}`)
-        const shotOnly = route.frame.hover !== undefined || route.frame.press !== undefined || route.frame.focus !== undefined
-        if (!queue.claim(`dom ${await drawn(page, route)}`) && shotOnly) return
-        // An interactive fixture can change when touched (a press on Undo puts back other buttons), so the elements
-        // after it would be gone or different: open the state again whenever a touch changed what it draws.
-        const original = await markup(page, route)
-        for (const [index, element] of (await targets(page, route)).entries()) {
-          if ((await markup(page, route)) !== original) {
-            // The same URL again only changes the hash, which keeps the fixture's state: load a blank page first.
-            await page.goto('about:blank')
-            await openState(page, route)
+    try {
+      for (let route = queue.next(routes); route !== undefined; route = queue.next(routes)) {
+        const started = Date.now()
+        const page = await pages.next()
+        await checkStateWithin(route, async () => {
+          await openState(page, route)
+          for (const hit of await cursorOffenders(page, route)) cursors.push(`${route.route}: ${hit}`)
+          const shotOnly = route.frame.hover !== undefined || route.frame.press !== undefined || route.frame.focus !== undefined
+          if (!queue.claim(`dom ${await drawn(page, route)}`) && shotOnly) return
+          // An interactive fixture can change when touched (a press on Undo puts back other buttons), so the elements
+          // after it would be gone or different: open the state again whenever a touch changed what it draws.
+          const original = await markup(page, route)
+          for (const [index, element] of (await targets(page, route)).entries()) {
+            if ((await markup(page, route)) !== original) {
+              // The same URL again only changes the hash, which keeps the fixture's state: load a blank page first.
+              await page.goto('about:blank')
+              await openState(page, route)
+            }
+            for (const failure of await touch(page, element)) failures.push(`${route.route} (element ${index + 1}) ${failure}`)
           }
-          for (const failure of await touch(page, element)) failures.push(`${route.route} (element ${index + 1}) ${failure}`)
-        }
-      })
-      // A slow state holds up its part; name it so it can be looked at.
-      if (Date.now() - started > 10_000) console.log(`slow state: ${route.route} took ${Math.round((Date.now() - started) / 1000)} s`)
+        })
+        // A slow state holds up its part; name it so it can be looked at.
+        if (Date.now() - started > 10_000) console.log(`slow state: ${route.route} took ${Math.round((Date.now() - started) / 1000)} s`)
+      }
+    } finally {
+      await pages.close()
     }
-    await pages.close()
     expect.soft(cursors, 'no state shows the pointer outside external links, and the text cursor only over selectable text').toEqual([])
     expect(failures.join('\n\n')).toBe('')
   })

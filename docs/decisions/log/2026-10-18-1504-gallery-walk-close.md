@@ -1,0 +1,1 @@
+- 10-18 15:04 · gallery-walk-close · The gallery shift walk checks keyboard focus before an activating press can disable a control. Each state has a 30 s deadline. Walk cleanup closes the page without beforeunload, then its context, with 5 s bounds; a context that cannot close ends the worker browser and fails instead of retaining its renderer.
