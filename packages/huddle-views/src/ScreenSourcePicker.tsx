@@ -88,38 +88,55 @@ export function ScreenSourcePicker({ permission, sources, chosen, onChoose, onSh
             </div>
           )}
         </div>
-        <div {...stylex.props(styles.footer)}>
-          {permission === 'granted' && hidesText ? (
-            <span {...stylex.props(styles.note)}>
-              <Icon icon={EyeSlash} size={14} />
-              <Text variant="meta" tone="subtle" truncate>
-                Message text is hidden while you share.
-              </Text>
-            </span>
-          ) : (
-            <span {...stylex.props(styles.note)} />
-          )}
-          <span {...stylex.props(styles.buttons)}>
-            <Button variant="secondary" size="md" onClick={onCancel}>
-              Cancel
-            </Button>
-            {permission === 'granted' ? (
-              <Button variant="primary" size="md" disabled={current === undefined} onClick={() => current !== undefined && onShare(current)}>
-                Share
-              </Button>
-            ) : permission === 'unknown' ? (
-              <Button variant="primary" size="md" autoFocus onClick={onAllow}>
-                Continue
-              </Button>
-            ) : (
-              <Button variant="primary" size="md" autoFocus onClick={onOpenSettings}>
-                Open System Settings
-              </Button>
-            )}
-          </span>
-        </div>
+        <PickerFooter permission={permission} hidesText={hidesText} current={current} onCancel={onCancel} onShare={onShare} onAllow={onAllow} onOpenSettings={onOpenSettings} />
       </div>
     </Surface>
+  )
+}
+
+interface PickerFooterProps {
+  readonly permission: ScreenPermission
+  readonly hidesText: boolean
+  readonly current: string | undefined
+  readonly onCancel: () => void
+  readonly onShare: (id: string) => void
+  readonly onAllow: () => void
+  readonly onOpenSettings: () => void
+}
+
+/** The note on the left and the buttons at the bottom right, the default action last, as a Mac sheet has them. */
+function PickerFooter({ permission, hidesText, current, onCancel, onShare, onAllow, onOpenSettings }: PickerFooterProps) {
+  return (
+    <div {...stylex.props(styles.footer)}>
+      {permission === 'granted' && hidesText ? (
+        <span {...stylex.props(styles.note)}>
+          <Icon icon={EyeSlash} size={14} />
+          <Text variant="meta" tone="subtle" truncate>
+            Message text is hidden while you share.
+          </Text>
+        </span>
+      ) : (
+        <span {...stylex.props(styles.note)} />
+      )}
+      <span {...stylex.props(styles.buttons)}>
+        <Button variant="secondary" size="md" onClick={onCancel}>
+          Cancel
+        </Button>
+        {permission === 'granted' ? (
+          <Button variant="primary" size="md" disabled={current === undefined} onClick={() => current !== undefined && onShare(current)}>
+            Share
+          </Button>
+        ) : permission === 'unknown' ? (
+          <Button variant="primary" size="md" autoFocus onClick={onAllow}>
+            Continue
+          </Button>
+        ) : (
+          <Button variant="primary" size="md" autoFocus onClick={onOpenSettings}>
+            Open System Settings
+          </Button>
+        )}
+      </span>
+    </div>
   )
 }
 

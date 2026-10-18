@@ -5,16 +5,13 @@ import { MonitorArrowUp } from '@phosphor-icons/react/dist/icons/MonitorArrowUp'
 import { PhoneX } from '@phosphor-icons/react/dist/icons/PhoneX'
 import { SlidersHorizontal } from '@phosphor-icons/react/dist/icons/SlidersHorizontal'
 import type { ReactNode } from 'react'
-import { colors, motion, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
+import { radii, spacing } from '@juno/tokens/tokens.stylex'
 import { focusRing, Icon, IconButton, Popover, type PhosphorIcon } from '@juno/ui'
+import { islandText } from './islandText'
 import type { HuddleControlsActions, HuddleControlsState } from './model'
 
 /** Mute and unmute while Juno is the active app (SPEC 20). The app menu owns the accelerator. */
 export const muteShortcut = '⌘⇧Space'
-
-// Hover styles only apply on devices with a real pointer. Local because
-// StyleX cannot read constants from other modules.
-const HOVER = '@media (hover: hover)'
 
 /**
  * `bar`: the sidebar bar's row, rounded rectangles that nest in its 12px
@@ -104,8 +101,8 @@ interface TextControlProps {
 /** A 28px text button with the island controls' fills: Leave, and the tab header's Thread. */
 export function TextControl({ shape, icon, label, onClick }: TextControlProps) {
   return (
-    <button type="button" onClick={onClick} {...stylex.props(styles.text, focusRing.outside, shape === 'bar' ? styles.textBar : styles.textIsland)}>
-      <span {...stylex.props(styles.textIcon)}>
+    <button type="button" onClick={onClick} {...stylex.props(islandText.base, focusRing.outside, shape === 'bar' ? styles.textBar : styles.textIsland)}>
+      <span {...stylex.props(islandText.icon)}>
         <Icon icon={icon} size={14} />
       </span>
       {label}
@@ -123,41 +120,6 @@ const styles = stylex.create({
     alignItems: 'center',
     gap: spacing['--space-0-5'],
   },
-  // The element reset and the island controls' feedback, as IconButton's `island` variant draws it.
-  text: {
-    appearance: 'none',
-    display: 'inline-flex',
-    alignItems: 'center',
-    flexShrink: 0,
-    gap: spacing['--space-1-5'],
-    height: sizes['--control-28'],
-    margin: 0,
-    paddingBlock: 0,
-    paddingInline: spacing['--space-2-5'],
-    boxSizing: 'border-box',
-    borderWidth: 0,
-    color: colors['--foreground-default'],
-    fontFamily: text['--text-meta-family'],
-    fontSize: text['--text-meta-size'],
-    fontWeight: weights['--weight-medium'],
-    whiteSpace: 'nowrap',
-    userSelect: 'none',
-    cursor: 'default',
-    WebkitAppRegion: 'no-drag',
-    backgroundColor: {
-      default: 'transparent',
-      ':hover': { default: null, [HOVER]: colors['--secondary-default'] },
-      ':active': { default: colors['--secondary-default'], [HOVER]: colors['--secondary-default'] },
-    },
-    transitionProperty: 'scale, background-color',
-    transitionDuration: { default: motion['--duration-fast'], '@media (prefers-reduced-motion: reduce)': '0ms' },
-    transitionTimingFunction: motion['--ease-out'],
-    scale: { default: '1', ':active': motion['--press-scale'] },
-  },
   textBar: { borderRadius: radii['--radius-lg'] },
   textIsland: { borderRadius: radii['--radius-pill'] },
-  textIcon: {
-    display: 'inline-flex',
-    color: colors['--foreground-subtle'],
-  },
 })

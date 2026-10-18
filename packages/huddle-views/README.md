@@ -11,7 +11,9 @@ The huddle views (SPEC section 20, inventory 22): React components built from `@
 - `HuddleIndicator`: the green headphones after a Main row's title while a huddle runs there; `huddleIndicatorLabel(count)` is its name, for the row's own description.
 - `HuddleDeviceMenu`: the menu's content, microphones, speakers and Reduce background noise. `systemDevice` is the id of "Same as system".
 - `ScreenSourcePicker`: the Share screen sheet's panel, with the Screen Recording permission steps. The container places it in `SheetLayer` from `@juno/views`.
-- `statusLine`, `sharingLine`, `placeLabel`: the copy rules the bar and the tab share. `muteShortcut` is ⌘⇧Space; the app menu owns the accelerator. `HuddleTabIcon` is the tab's glyph.
+- `statusLine`, `sharingLine`, `placeLabel` (`look.ts`): the copy rules the bar and the tab share. `muteShortcut` is ⌘⇧Space; the app menu owns the accelerator. The tab's glyph is Phosphor's `Headphones`.
+
+`src/index.ts` exports only what something imports today (`HuddleBar`, `HuddleDeviceMenu` and `HuddlePerson`, for the gallery), because knip's ratchet fails on an unused export. The integration adds each view's export when its container imports it. The tab page is split into `HuddlePage` (states and footer), `HuddlePageHeader` and `HuddleStage` (tiles, shares and the people line).
 
 Each view has a `<View>.fixtures.tsx` next to it, registered in `src/fixtures.ts` and shown by the gallery as `@juno/huddle-views/fixtures`. `src/fixtures/data.ts` holds invented people and drawn screens; nothing comes from Slack.
 

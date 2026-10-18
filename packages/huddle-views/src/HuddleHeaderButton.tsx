@@ -1,7 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
 import { Headphones } from '@phosphor-icons/react/dist/icons/Headphones'
-import { colors, motion, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
+import { colors, radii, spacing } from '@juno/tokens/tokens.stylex'
 import { focusRing, Icon, IconButton, tooltip } from '@juno/ui'
+import { islandText } from './islandText'
 import type { HuddlePerson } from './model'
 import { PeopleStack } from './Speaking'
 
@@ -50,7 +51,7 @@ export function HuddleHeaderButton({ mode, people = [], current, place, onClick 
       aria-label={name}
       {...tooltip(hint)}
       onClick={onClick}
-      {...stylex.props(styles.button, faces && styles.withFaces, mode === 'joined' && styles.joined, focusRing.outside)}
+      {...stylex.props(islandText.base, styles.button, faces && styles.withFaces, mode === 'joined' && styles.joined, focusRing.outside)}
     >
       <span {...stylex.props(styles.icon)}>
         <Icon icon={Headphones} size={14} weight="fill" />
@@ -66,40 +67,11 @@ export function HuddleHeaderButton({ mode, people = [], current, place, onClick 
 }
 
 const styles = stylex.create({
-  // IslandButton's look: a 28px pill text button with the island controls' fills.
+  // The island text button as a pill; the narrow form is its icon alone.
   button: {
-    appearance: 'none',
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-    gap: spacing['--space-1-5'],
-    height: sizes['--control-28'],
-    minWidth: sizes['--control-28'],
-    margin: 0,
-    paddingBlock: 0,
     paddingInlineStart: { default: spacing['--space-2-5'], [NARROW]: 0 },
     paddingInlineEnd: { default: spacing['--space-2-5'], [NARROW]: 0 },
-    boxSizing: 'border-box',
-    borderWidth: 0,
     borderRadius: radii['--radius-pill'],
-    color: colors['--foreground-default'],
-    fontFamily: text['--text-meta-family'],
-    fontSize: text['--text-meta-size'],
-    fontWeight: weights['--weight-medium'],
-    whiteSpace: 'nowrap',
-    userSelect: 'none',
-    cursor: 'default',
-    WebkitAppRegion: 'no-drag',
-    backgroundColor: {
-      default: 'transparent',
-      ':hover': { default: null, [HOVER]: colors['--secondary-default'] },
-      ':active': { default: colors['--secondary-default'], [HOVER]: colors['--secondary-default'] },
-    },
-    transitionProperty: 'scale, background-color',
-    transitionDuration: { default: motion['--duration-fast'], '@media (prefers-reduced-motion: reduce)': '0ms' },
-    transitionTimingFunction: motion['--ease-out'],
-    scale: { default: '1', ':active': motion['--press-scale'] },
   },
   // Green says a huddle is running here, as on the sidebar row.
   icon: {
