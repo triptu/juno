@@ -133,6 +133,32 @@ test('the wheel over a long code block reaches the end of the block, then scroll
 })
 
 /**
+ * A scroller inside a hover-only list hides its thumb like the list does: a
+ * long code block's thumb shows only while the pointer is over the list. The
+ * list's hover variable is not inherited, so its rows are not restyled.
+ */
+test('a code block in the message list shows its thumb only while the pointer is over the list', async ({ page }) => {
+  await page.goto('/#/MessageList?__state=content/long-code')
+  const block = page.locator('[data-fixture-frame] pre').first()
+  await expect(block).toBeVisible()
+  expect(await block.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true)
+  const list = page.locator('[data-fixture-frame] [data-scroll-area="hover"]')
+  const thumb = () => block.evaluate((node) => getComputedStyle(node, '::-webkit-scrollbar-thumb').backgroundColor)
+  const transparent = 'rgba(0, 0, 0, 0)'
+
+  const listBox = (await list.boundingBox())!
+  await page.mouse.move(0, 0)
+  await expect.poll(thumb).toBe(transparent)
+  await page.mouse.move(listBox.x + 4, listBox.y + 4)
+  await expect.poll(thumb).not.toBe(transparent)
+  await block.hover()
+  await expect.poll(thumb).not.toBe(transparent)
+  expect(await block.evaluate((node) => getComputedStyle(node).getPropertyValue('--scrollbar-thumb'))).toBe('')
+  await page.mouse.move(0, 0)
+  await expect.poll(thumb).toBe(transparent)
+})
+
+/**
  * Message rows are a whole number of pixels tall (performance 3.3). A row
  * laid out for the first time above the view grows from its estimate, and
  * scroll anchoring moves the list by the difference; a fractional difference
