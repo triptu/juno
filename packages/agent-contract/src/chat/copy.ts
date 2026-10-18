@@ -548,7 +548,7 @@ export const chatCopy = {
       changed: 'Changed',
       added: 'New',
       /** Why a fixed rule is fixed, under the tool's name. */
-      locked: { delete: "Deleting can't be undone, so Juno always asks.", forbidden: 'Juno never merges, buys or force-pushes.' },
+      locked: { delete: "Deleting can't be undone, so Juno always asks.", forbidden: 'Juno never merges, buys or force-pushes.', slack: 'Juno never writes to Slack without your click.' },
       notOffered: 'Not offered',
       noTools: 'Connect to see its tools.', noMatch: 'No tools match.', done: 'Done',
       connect: 'Connect',
