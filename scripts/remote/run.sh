@@ -40,6 +40,7 @@ script_started=$SECONDS
 # Samples how busy the machine is every 2 s, to size the workers above.
 ( prev=($(head -1 /proc/stat)); previous_usage=$(awk '$1 == "usage_usec" { print $2 }' /sys/fs/cgroup/cpu.stat 2>/dev/null)
   while sleep 2; do
+    awk '/^MemTotal:/ { total = $2 } /^MemAvailable:/ { available = $2 } END { print total - available, available }' /proc/meminfo >> /out/memory.txt
     if [ -n "${JUNO_RUNNER_JOB_CORES:-}" ]; then
       usage=$(awk '$1 == "usage_usec" { print $2 }' /sys/fs/cgroup/cpu.stat)
       echo $(( (usage - previous_usage) / (20000 * cores) )) >> /out/cpu.txt
@@ -59,6 +60,9 @@ xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' pnpm "$@"
 code=$?
 echo "remote: script time $(( SECONDS - script_started )) s" >&2
 kill $sampler 2>/dev/null
+if [ -s /out/memory.txt ]; then
+  sort -nr -k1,1 /out/memory.txt | head -1 | awk '{ printf "remote: peak memory used %.1f GB, available %.1f GB\n", $1 / 1048576, $2 / 1048576 }' >&2
+fi
 if [ -s /out/cpu.txt ]; then
   sort -n /out/cpu.txt | awk '{ s += $1; v[NR] = $1 } END { printf "remote: CPU busy %d%% on average, %d%% at the median, over %d s on %d cores\n", s / NR, v[int((NR + 1) / 2)], NR * 2, '"$cores"' }' >&2
 fi
