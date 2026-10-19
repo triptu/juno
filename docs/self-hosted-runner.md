@@ -22,7 +22,7 @@ not a measured runtime boundary. Narrow selections, `test:agent*`, and cached
 spec checks reserve 1 core with a limit of 2. Jobs containing
 `test:gallery` but no `test:desktop` or `test:e2e` reserve 3 cores with a limit
 of 3. Any desktop or e2e step, alone or in a plan, reserves 4 cores with a
-limit of 4, including plans that also run the gallery. Other scripts keep the
+limit of 4, including app jobs that also run the gallery. Other scripts keep the
 8-core default. `--machine` or `JUNO_REMOTE_MACHINE` overrides both the
 reservation and limit. Default reservations shrink to fit a smaller host;
 explicit sizes fail if they exceed its capacity. Host admission counts reserved
@@ -41,7 +41,8 @@ package. Narrow and app jobs keep their existing counts.
 A standalone 4-core app job uses two desktop workers. Gallery-only jobs
 use three workers and shift parts at 3 cores, as they do at 4. Quint uses
 one simulation per two cores and one Apalache checker per four, at least one
-each. Wide unit-only plans retain their unit workers beside the spec lane.
+each. Wide unit-only single-container plans retain their unit workers beside
+the spec lane.
 `test:plan` groups unit, app and specs steps into concurrent jobs, each with
 its own container and the standalone workers above. Conformance belongs to
 the specs job, so it no longer waits behind units or inherits their one-worker
@@ -65,6 +66,60 @@ from every job and the original step indices. Usage summaries count only
 child logs. Cancellation forwards to all jobs and waits for their cleanup.
 
 ## Laptop measurements
+
+### Affected plan shape (2026-10-19)
+
+One before/after observation of an outbox-plus-Chip selection, with unchanged
+product code and tests, on this same laptop. Baseline: `f601148d2`; after:
+`test-plan-shape`. Both runs used a warm toolchain image and dependency store,
+bypassed affected results, and carried the same 28 cached conformance runs:
+
+```sh
+JUNO_REMOTE_MAX_VCPU=0 pnpm affected --no-cache --files packages/engine/src/outbox.ts,packages/ui/src/Chip.tsx
+```
+
+| Work | Before, shared 4-core plan | After, separate SSH jobs |
+| --- | --- | --- |
+| Unit files selected by import closure | 48 | 48 |
+| Files matched by execution filters | 64 | 48 |
+| Unit step | 522 s, two Home failures | 146 s, passed |
+| Conformance step | 65 s | 23 s |
+| Gallery step, 283 tests | 245 s | 221 s |
+| Desktop step, 26 tests | 110 s | 101 s |
+| Remote wall, including setup, admission and reports | 598.6 s | 332.0 s |
+| `affected` wall, including local checks | 604.7 s | 338.5 s |
+
+The old unit executor started 17 packages and stopped on the engine failure
+before reaching the selected desktop notifier test: 63 unit files appeared
+in its summaries, including skips. The new executor started only engine and
+desktop, and all 48 files appeared: 42 passed and six intentionally skipped.
+The baseline Home title mismatch and AI-items timeout did not recur after.
+All four conformance files passed on both sides. The after run's remote plan
+passed; local lint caught the enlarged runner-test file, subsequently split
+into a shared harness. The final branch check verifies that correction.
+
+The before run began around 08:25 IST at load average 1.27; the after run
+began at 08:41 at 7.98. Both started beside two other 4-core reservations.
+The after run's specs job waited about 153 s for eight cores. Units used four
+workers in their own 4-core job instead of one worker under `nice`, and
+conformance used four workers instead of one and could start independently.
+The app job's 322 s now dominates. Installs took 0–1 s per job and traces
+were cached, so neither explains the wall-time difference.
+
+These are single observations on a changing shared host, not a repeatability
+claim. The baseline assertion failures also limit attribution of its extra
+time. An intervening plumbing probe failed before running units because the
+first file enumerator expected Git metadata in the remote workspace; it is
+excluded from the comparison. The final enumerator scans package directories.
+Namespace remains one machine per plan; no extra Namespace machines were
+allocated for these measurements.
+
+Raw local logs: `.remote/20261019T025532-96649-467a73c6/run.log` (before),
+`.remote/20261019T031144-15725-8f685150/plan.log` (after), with child reports
+linked from the latter. Replay counts and plan snapshots are retained under
+`.remote/plan-shape/` in the implementation worktree.
+
+### Earlier unit and machine sizing
 
 The initial full unit run on 2026-10-19 used two packages with two Vitest
 workers each. It passed in 325 s script time and 328.53 s wall time, averaging
