@@ -118,8 +118,8 @@ test('start, mute and leave a huddle from the palette, with the Huddle menu foll
   const { palette } = juno
   await palette.open()
   await palette.type('huddle')
-  await expect(palette.row(/^Leave huddle/)).toHaveCount(0)
-  await palette.choose(/^Start huddle/)
+  await expect(palette.root.getByRole('option', { name: 'Leave huddle' })).toHaveCount(0)
+  await palette.root.getByRole('option', { name: 'Start huddle' }).click()
 
   const bar = win.getByRole('region', { name: 'Huddle' })
   await expect(bar).toBeVisible()
@@ -130,7 +130,7 @@ test('start, mute and leave a huddle from the palette, with the Huddle menu foll
   // Mute from the palette: the menu names the way back.
   await palette.open()
   await palette.type('mute')
-  await palette.choose(/^Mute/)
+  await palette.root.getByRole('option', { name: /^Mute/ }).click()
   await expect.poll(() => localMuted(win)).toBe(true)
   await expect(bar.getByRole('button', { name: /^Mute/ })).toHaveAttribute('aria-pressed', 'true')
   await expect.poll(() => huddleMenuItem(app, 'huddle-mute')).toEqual({ label: 'Unmute Microphone', enabled: true })
@@ -138,14 +138,14 @@ test('start, mute and leave a huddle from the palette, with the Huddle menu foll
   // Show huddle opens the huddle tab.
   await palette.open()
   await palette.type('show huddle')
-  await palette.choose(/^Show huddle/)
+  await palette.root.getByRole('option', { name: 'Show huddle' }).click()
   await juno.tabs.expectActive('eng · Huddle')
 
   // Leave from the palette: the bar goes and the menu dims again.
   const attendeeId = await attendee(win)
   await palette.open()
   await palette.type('leave huddle')
-  await palette.choose(/^Leave huddle/)
+  await palette.root.getByRole('option', { name: 'Leave huddle' }).click()
   await expect(bar).toBeHidden()
   await expect.poll(() => fake.calls.filter((call) => call.method === 'rooms.leave').length).toBe(1)
   await chimeDrops(win, fake, attendeeId!)
@@ -208,6 +208,8 @@ test('quitting in a huddle asks first: Cancel keeps the huddle, Quit leaves it',
 test('once the engine stops for good, quitting in a huddle does not ask', async ({ juno, win, app }) => {
   await openEngMain(juno)
   await win.getByRole('button', { name: 'Start huddle' }).click()
+  // The bar shows once the media session has loaded.
+  await expect(win.getByRole('region', { name: 'Huddle' })).toBeVisible()
   await expect.poll(() => connection(win)).toBe('connected')
 
   // With the engine gone there is nothing left to leave; a Cancel answer would keep the app open if it asked.
