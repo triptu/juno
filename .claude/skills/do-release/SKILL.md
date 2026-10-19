@@ -1,5 +1,5 @@
 ---
-name: releasing
+name: do-release
 description: How to publish a Juno release to triptu/juno-releases so installs update. Use when Tushar asks for a release, an update, a new version or a DMG he can update to. Covers the full-run gate, the publish command, the update token, urgent releases and what may go in the releases repository. Detail is in docs/development.md, "Releasing" and "Full runs".
 ---
 
