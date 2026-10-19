@@ -239,6 +239,8 @@ for (const destination of ['Home', 'All topics'] as const) {
 test('Home rows painted during the first sync stay fixed as later history pages land', { tag: ['@heavy', '@heavy-sync'] }, async ({ juno, win, fake }) => {
   const method = 'conversations.history'
   fake.holdNext({ method })
+  // Previews run beside history, so hold them before any history page can land.
+  fake.holdNext({ method: 'conversations.replies', reason: 'thread-preview', times: 1000 })
   await juno.signIn()
   // Open Home from the sidebar while the sync runs.
   await juno.home.navItem.click()
@@ -260,9 +262,8 @@ test('Home rows painted during the first sync stay fixed as later history pages 
   await expect.poll(() => fake.heldCount({ method })).toBe(1)
   const boxes = () => win.locator('[data-home-item]').evaluateAll((rows) => rows.map((row) => ({ id: row.getAttribute('data-home-item'), ...row.getBoundingClientRect().toJSON() })))
   const painted = await boxes()
-  // The latest-reply fetch comes after every history page: holding it keeps the sync open while the probe watches
-  // the pages land, so the sidebar's progress line leaving at the end is not part of it.
-  fake.holdNext({ method: 'conversations.replies', times: 1000 })
+  // The held previews keep sync open while the probe watches the remaining history pages land;
+  // the sidebar's progress line leaving at the end is checked separately below.
   // The sidebar's list is still being built: its rows take their places by recency, and #alerts-prod and #deploys
   // leave for Automated, as their pages land (sidebar.spec.ts, "during the first sync"). Only those moves are skipped.
   // Home becomes ready once the DMs, mentions and unread followed threads have history, while the sync goes on
