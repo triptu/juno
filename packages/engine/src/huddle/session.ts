@@ -70,6 +70,9 @@ export const HuddleSessions = Layer.effectDiscard(Effect.gen(function* () {
   const link = yield* HostLink
   const config = yield* EngineConfig
   const timing = yield* EngineTiming
+  // Quitting leaves the huddle (SPEC 20): the leave is queued as the engine stops, and the session's work scope waits for
+  // its request to go out. If the session closes first, the stored leave goes out on the next launch.
+  yield* Effect.addFinalizer(() => huddle.leave)
   const fromMain = yield* link.messages
   yield* Effect.forkScoped(Stream.runForEach(fromMain, (message) => (message._tag === 'huddlePages' ? huddle.pages(message.live, message.maxIssued) : Effect.void)))
   yield* Effect.forkScoped(huddle.boot({
