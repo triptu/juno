@@ -11,19 +11,23 @@ module huddle {
   val attendees = Set(1, 2, 3)
   val channels = Set(1, 2)
   val gens = Set(0, 1, 2, 3, 4)
+  val workspaces = Set(1, 2)
   type Frame = { kind: str, channel: int, room: int, attendee: int }
   /** A page's whole media state: the session it holds, the last credentials it received, the last session it ended and why. */
-  type Report = { gen: int, seq: int, holds: int, recv: int, ended: int, reason: str }
-  type HandOff = { gen: int, a: int }
+  type Report = { gen: int, conn: int, seq: int, holds: int, recv: int, ended: int, reason: str }
+  /** Credentials on their way to page `gen` as the answer to a Start that came on engine connection `conn`. */
+  type HandOff = { gen: int, conn: int, a: int }
   type State = {
     up: bool, quitting: bool, phase: str, wanted: int, request: int, cancel: bool,
-    wantedPage: int, requestPage: int,
+    wantedPage: int, requestPage: int, wantedConn: int, requestConn: int,
     current: int, channel: int -> int, room: int -> int,
     received: Set[int], pending: Set[int], unsent: Set[int], sent: Set[int],
-    cancelled: Set[int], handed: Set[int], otherDevice: bool, loaded: bool,
-    holder: int -> int, handedAt: int -> int, handCount: int, staleGone: Set[int],
-    engineLive: int, engReports: int -> Report,
-    page: int, media: Set[int], pageRecv: int, pageSeq: int, pageEnded: int, pageReason: str,
+    cancelled: Set[int], handed: Set[int], otherDevice: bool,
+    ws: int, recWs: int -> int, loadedWs: Set[int],
+    holder: int -> int, handedAt: int -> int, handConn: int -> int, handCount: int, staleGone: Set[int],
+    engineLive: int, engineMax: int, engineSeen: Set[int], closedSeen: int, engReports: int -> Report,
+    page: int, conn: int, media: Set[int], pageRecv: int, pageSeq: int, pageEnded: int, pageReason: str,
+    rule: int,
     pageDirty: bool, pageResend: bool, outbox: Set[Report], handOffs: Set[HandOff],
     connected: bool, dirty: bool, epoch: int, fetchEpoch: int,
     fetching: bool, snapshot: Set[int], snapshotVersion: int,
@@ -36,16 +40,18 @@ module huddle {
   var turn: int
   var remaining: int
 
-  pure val noReport = { gen: 0, seq: 0, holds: 0, recv: 0, ended: 0, reason: "" }
+  pure val noReport = { gen: 0, conn: 0, seq: 0, holds: 0, recv: 0, ended: 0, reason: "" }
   pure val initial = {
     up: true, quitting: false, phase: "idle", wanted: 0, request: 0, cancel: false,
-    wantedPage: 0, requestPage: 0,
+    wantedPage: 0, requestPage: 0, wantedConn: 0, requestConn: 0,
     current: 0, channel: attendees.mapBy(_ => 0), room: attendees.mapBy(_ => 0),
     received: Set(), pending: Set(), unsent: Set(), sent: Set(),
-    cancelled: Set(), handed: Set(), otherDevice: false, loaded: true,
-    holder: attendees.mapBy(_ => 0), handedAt: Set(0, 1, 2, 3).mapBy(_ => 0), handCount: 0, staleGone: Set(),
-    engineLive: 1, engReports: gens.mapBy(_ => noReport),
-    page: 1, media: Set(), pageRecv: 0, pageSeq: 0, pageEnded: 0, pageReason: "",
+    cancelled: Set(), handed: Set(), otherDevice: false,
+    ws: 1, recWs: attendees.mapBy(_ => 0), loadedWs: workspaces,
+    holder: attendees.mapBy(_ => 0), handedAt: Set(0, 1, 2, 3).mapBy(_ => 0), handConn: attendees.mapBy(_ => 0), handCount: 0, staleGone: Set(),
+    engineLive: 1, engineMax: 1, engineSeen: Set(1), closedSeen: 0, engReports: gens.mapBy(_ => noReport),
+    page: 1, conn: 1, media: Set(), pageRecv: 0, pageSeq: 0, pageEnded: 0, pageReason: "",
+    rule: 0,
     pageDirty: false, pageResend: false, outbox: Set(), handOffs: Set(),
     connected: true, dirty: true, epoch: 0,
     fetchEpoch: -1, fetching: false, snapshot: Set(), snapshotVersion: 0,
@@ -55,20 +61,33 @@ module huddle {
   action init = all { s' = initial, before' = initial, turn' = 0, remaining' = 32 }
   action disabled = all { false, s' = s }
 
+  // Main gives out page generations in rising order and reports the live one
+  // and the highest it gave out: every generation at or below that which is
+  // not live is gone. Old rule (rule 12): a generation was gone only once main
+  // had listed it, so one that died unlisted stayed pending.
+  pure def gone(st: State, g: int): bool =
+    if (st.rule == 12) st.engineSeen.contains(g) and g != st.engineLive
+    else st.engineMax != 0 and g <= st.engineMax and g != st.engineLive
+
   // What the engine can know of an attendee's media: no page got its
-  // credentials, main's report shows its page gone (one page at a time, so
-  // every older generation is gone; a page of an earlier engine process that
-  // main does not list is gone too), or its page's latest report, sent after
-  // the hand-off, does not hold it. Old rule (bug 8): a page gone before the
-  // answer was an event already consumed (`staleGone`).
+  // credentials, main's report shows its page gone (a page of an earlier
+  // engine process that main does not list is gone too), or its page's latest
+  // report, sent after the hand-off, does not hold it. A report is after the
+  // hand-off when it came on a later engine connection of the page (the
+  // earlier one is closed), or on the same one and names the credentials.
+  // Old rules: bug 8, a page gone before the answer was an event already
+  // consumed (`staleGone`); rule 11, a report placed itself only by the
+  // credentials it names, so one lost with its connection placed none.
   pure def engStopped(st: State, a: int): bool = {
     pure val g = st.holder.get(a)
     pure val r = st.engReports.get(g)
     pure val earlier = st.handedAt.get(a) == 0
+    pure val after = if (st.rule == 11) r.recv != 0 and st.handedAt.get(r.recv) >= st.handedAt.get(a)
+      else r.conn > st.handConn.get(a) or (r.conn == st.handConn.get(a) and r.recv == a)
     g == 0 or
-    (st.engineLive != 0 and g < st.engineLive and not(st.staleGone.contains(a))) or
+    (gone(st, g) and not(st.staleGone.contains(a))) or
     (earlier and st.engineLive != 0 and g != st.engineLive) or
-    (r.seq > 0 and r.holds != a and (earlier or (r.recv != 0 and st.handedAt.get(r.recv) >= st.handedAt.get(a))))
+    (r.seq > 0 and r.holds != a and (earlier or after))
   }
 
   // Start and Join share rooms.join. A new intent cancels an older join; it
@@ -76,7 +95,7 @@ module huddle {
   // The asking page gets the credentials, once main lists it.
   action choose(c: int): bool = all {
     s.up, not(s.quitting),
-    s' = { ...s, wanted: c, wantedPage: s.page, cancel: s.request != 0, current: 0,
+    s' = { ...s, wanted: c, wantedPage: s.page, wantedConn: s.conn, cancel: s.request != 0, current: 0,
       phase: if (s.request != 0 or s.pending.size() > 0) "leaving" else "idle",
       otherDevice: false, label: "choose" }
   }
@@ -85,10 +104,16 @@ module huddle {
     s' = { ...s, wanted: 0, current: 0, cancel: s.request != 0,
       phase: if (s.request != 0 or s.pending.size() > 0) "leaving" else "idle", label: "leave" }
   }
-  action requestJoin = all {
-    s.up, s.loaded, s.wanted != 0, s.request == 0, s.pending.size() == 0, s.wantedPage == s.engineLive,
+  // Every workspace's stored leaves are loaded, none of this workspace's are
+  // left, and every other workspace's attendee is known stopped. Old rule
+  // (bug 10): only the active workspace was loaded, so another's attendee was
+  // not known at all after a restart.
+  action requestJoin(bug: int): bool = all {
+    s.up, s.wanted != 0, s.request == 0, s.wantedPage == s.engineLive,
+    if (bug == 10) s.loadedWs.contains(s.ws) else s.loadedWs == workspaces,
+    s.pending.filter(a => s.loadedWs.contains(s.recWs.get(a))).forall(a => s.recWs.get(a) != s.ws and engStopped(s, a)),
     s.received != attendees, not(s.otherDevice),
-    s' = { ...s, request: s.wanted, requestPage: s.wantedPage, wanted: 0, cancel: false, phase: "joining", label: "request" }
+    s' = { ...s, request: s.wanted, requestPage: s.wantedPage, requestConn: s.wantedConn, wanted: 0, cancel: false, phase: "joining", label: "request" }
   }
   // The answer is stored, then handed to the asking page if the join was not
   // cancelled and main still lists the page. Old rules: bug 1 skips the
@@ -96,16 +121,18 @@ module huddle {
   // that went while the join was out.
   action answerJoin(a: int, r: int, bug: int): bool = all {
     s.up, s.request != 0, not(s.received.contains(a)),
-    val g = if (bug == 3 or bug == 8) s.requestPage else if (s.cancel or s.requestPage != s.engineLive) 0 else s.requestPage
+    // The Start's connection closed and the engine knows it: no page will get the answer.
+    val g = if (bug == 3 or bug == 8) s.requestPage else if (s.cancel or s.requestPage != s.engineLive or s.requestConn < s.closedSeen) 0 else s.requestPage
     val handOff = g != 0 and (bug == 3 or bug == 8 or not(s.cancel))
     s' = { ...s, request: 0, received: s.received.union(Set(a)),
       channel: s.channel.set(a, s.request), room: s.room.set(a, r),
       pending: if (bug == 1) s.pending else s.pending.union(Set(a)),
       unsent: s.unsent.union(Set(a)),
-      holder: s.holder.set(a, if (handOff) g else 0),
+      holder: s.holder.set(a, if (handOff) g else 0), recWs: s.recWs.set(a, s.ws),
       handedAt: if (handOff) s.handedAt.set(a, s.handCount + 1) else s.handedAt,
+      handConn: if (handOff) s.handConn.set(a, s.requestConn) else s.handConn,
       handCount: if (handOff) s.handCount + 1 else s.handCount,
-      handOffs: if (handOff) s.handOffs.union(Set({ gen: g, a: a })) else s.handOffs,
+      handOffs: if (handOff) s.handOffs.union(Set({ gen: g, conn: s.requestConn, a: a })) else s.handOffs,
       handed: if (handOff) s.handed.union(Set(a)) else s.handed,
       staleGone: if (bug == 8) s.staleGone.union(Set(a)) else s.staleGone,
       cancelled: if (s.cancel) s.cancelled.union(Set(a)) else s.cancelled,
@@ -121,23 +148,22 @@ module huddle {
   // call ends once its media is stopped. Old rule (bug 6): the call stays.
   action reconcile(bug: int): bool = all {
     s.up,
-    val pageWent = s.engineLive != 0
     val stoppedCurrent = s.current != 0 and engStopped(s, s.current)
     val ends = stoppedCurrent and bug != 6
     val r = s.engReports.get(s.holder.get(s.current))
     s' = { ...s,
-      wanted: if (ends or (s.wanted != 0 and pageWent and s.wantedPage < s.engineLive)) 0 else s.wanted,
-      cancel: s.cancel or (s.request != 0 and ((pageWent and s.requestPage < s.engineLive) or ends)),
+      wanted: if (ends or (s.wanted != 0 and gone(s, s.wantedPage))) 0 else s.wanted,
+      cancel: s.cancel or (s.request != 0 and (gone(s, s.requestPage) or ends)),
       current: if (ends) 0 else s.current,
       otherDevice: s.otherDevice or (stoppedCurrent and r.ended == s.current and r.reason == "AudioJoinedFromAnotherDevice"),
       phase: if (ends) "leaving" else s.phase, label: "reconcile" }
   }
   pure def needsReconcile(st: State): bool =
-    (st.wanted != 0 and st.engineLive != 0 and st.wantedPage < st.engineLive) or
-    (st.request != 0 and not(st.cancel) and st.engineLive != 0 and st.requestPage < st.engineLive) or
+    (st.wanted != 0 and gone(st, st.wantedPage)) or
+    (st.request != 0 and not(st.cancel) and gone(st, st.requestPage)) or
     (st.current != 0 and engStopped(st, st.current))
   action sendLeave(a: int): bool = all {
-    s.up, s.loaded, s.pending.contains(a), a != s.current, s.unsent.contains(a),
+    s.up, s.loadedWs.contains(s.ws), s.recWs.get(a) == s.ws, s.pending.contains(a), a != s.current, s.unsent.contains(a),
     s' = { ...s, sent: s.sent.union(Set(a)), unsent: s.unsent.exclude(Set(a)),
       leaveReplies: s.leaveReplies.union(Set(a)), label: "sendLeave" }
   }
@@ -153,7 +179,7 @@ module huddle {
         unsent: if (bug == 7) s.unsent else s.unsent.union(Set(a)), label: "leaveRefused" }
   }
   action clearLeave(a: int): bool = all {
-    s.up, s.loaded, s.pending.contains(a), a != s.current, not(s.unsent.contains(a)), engStopped(s, a),
+    s.up, s.loadedWs.contains(s.ws), s.recWs.get(a) == s.ws, s.pending.contains(a), a != s.current, not(s.unsent.contains(a)), engStopped(s, a),
     s' = { ...s, pending: s.pending.exclude(Set(a)), phase: "idle", label: "clearLeave" }
   }
 
@@ -164,7 +190,7 @@ module huddle {
   // its state to be reported; so does every new connection to the engine.
   action receive(h: HandOff, start: bool): bool = all {
     s.handOffs.contains(h),
-    s' = if (h.gen != s.page) { ...s, handOffs: s.handOffs.exclude(Set(h)), label: "handOffLost" }
+    s' = if (h.gen != s.page or h.conn != s.conn) { ...s, handOffs: s.handOffs.exclude(Set(h)), label: "handOffLost" }
       else { ...s, handOffs: s.handOffs.exclude(Set(h)), pageRecv: h.a,
         media: if (start and s.media.size() == 0) Set(h.a) else s.media, pageDirty: true, label: "receive" }
   }
@@ -176,7 +202,7 @@ module huddle {
     s.outbox.size() < 2,
     val holds = if (s.media.size() == 0) 0 else s.media.fold(0, (x, y) => y)
     s' = { ...s, pageSeq: s.pageSeq + 1, pageDirty: false, pageResend: false,
-      outbox: s.outbox.union(Set({ gen: s.page, seq: s.pageSeq + 1, holds: holds, recv: s.pageRecv, ended: s.pageEnded, reason: s.pageReason })),
+      outbox: s.outbox.union(Set({ gen: s.page, conn: s.conn, seq: s.pageSeq + 1, holds: holds, recv: s.pageRecv, ended: s.pageEnded, reason: s.pageReason })),
       label: "pageReport" }
   }
   // The latest report per page wins, whatever order they arrive in; a page
@@ -184,7 +210,7 @@ module huddle {
   // the stored leaves were loaded found nothing to stop, and was lost.
   action deliver(r: Report, bug: int): bool = all {
     s.up, s.outbox.contains(r),
-    val keep = not(s.engineLive != 0 and r.gen < s.engineLive) and not(bug == 9 and not(s.loaded)) and r.seq > s.engReports.get(r.gen).seq
+    val keep = not(gone(s, r.gen)) and not(bug == 9 and not(s.loadedWs.contains(s.ws))) and r.seq > s.engReports.get(r.gen).seq
     s' = { ...s, outbox: s.outbox.exclude(Set(r)), engReports: if (keep) s.engReports.set(r.gen, r) else s.engReports, label: "deliver" }
   }
   action deliverAny = if (s.outbox == Set()) disabled else { nondet r = s.outbox.oneOf() deliver(r, 0) }
@@ -192,11 +218,25 @@ module huddle {
   // The page reloads, crashes or closes at any time, before a hand-off too; a new page loads.
   action pageEnd = all {
     s.page < 4,
-    s' = { ...s, page: s.page + 1, media: Set(), pageRecv: 0, pageSeq: 0, pageEnded: 0, pageReason: "",
-      pageDirty: false, pageResend: true, label: "pageEnd" }
+    s' = { ...s, page: s.page + 1, conn: s.conn + 1, media: Set(), pageRecv: 0, pageSeq: 0, pageEnded: 0, pageReason: "",
+      pageDirty: false, pageResend: true, outbox: s.outbox.filter(r => r.conn > s.conn), label: "pageEnd" }
+  }
+  // The live page's engine connection closes and it reconnects: answers and
+  // reports still on the old connection are lost; the page sends its state
+  // again. The engine learns later that the old connection closed.
+  action pageReconnect = all {
+    s.conn < 6,
+    s' = { ...s, conn: s.conn + 1, pageResend: true, outbox: s.outbox.filter(r => r.conn > s.conn), label: "pageReconnect" }
+  }
+  action seeClosed = all { s.up, s.closedSeen < s.conn, s' = { ...s, closedSeen: s.conn, label: "seeClosed" } }
+  // The user switches workspace: the session ends (no call, no queued join)
+  // and the other one's starts. The page may still hold the old attendee.
+  action switchWs = all {
+    s.up, s.request == 0,
+    s' = { ...s, ws: 3 - s.ws, wanted: 0, current: 0, cancel: false, phase: "idle", label: "switchWs" }
   }
   // Main's report of the live page, in order, possibly late.
-  action mainReport = all { s.up, s' = { ...s, engineLive: s.page, label: "mainReport" } }
+  action mainReport = all { s.up, s' = { ...s, engineLive: s.page, engineMax: s.page, engineSeen: s.engineSeen.union(Set(s.page)), label: "mainReport" } }
 
   action quit = all {
     s.up, not(s.quitting),
@@ -209,14 +249,15 @@ module huddle {
   }
   // An engine process loses intent, HTTP responses, its knowledge of pages
   // and reports, and what was in flight between it and the page; not disk.
-  pure def engineLost(st: State): State = { ...st, up: false, loaded: false, current: 0, wanted: 0, request: 0, cancel: false,
+  pure def engineLost(st: State): State = { ...st, up: false, loadedWs: Set(), current: 0, wanted: 0, request: 0, cancel: false,
     phase: "idle", connected: false, fetching: false, frames: Set(), leaveReplies: Set(),
-    handedAt: Set(0, 1, 2, 3).mapBy(_ => 0), handCount: 0, staleGone: Set(), engineLive: 0, engReports: gens.mapBy(_ => noReport),
+    handedAt: Set(0, 1, 2, 3).mapBy(_ => 0), handConn: attendees.mapBy(_ => 0), handCount: 0, staleGone: Set(),
+    engineLive: 0, engineMax: 0, engineSeen: Set(), closedSeen: 0, engReports: gens.mapBy(_ => noReport),
     outbox: Set(), handOffs: Set(), unsent: st.pending }
   // The whole app crashes: the page goes with it, and its media.
   action crash = all {
     s.up, s.page < 4,
-    s' = { ...engineLost(s), page: s.page + 1, media: Set(), pageRecv: 0, pageSeq: 0, pageEnded: 0, pageReason: "",
+    s' = { ...engineLost(s), page: s.page + 1, conn: s.conn + 1, media: Set(), pageRecv: 0, pageSeq: 0, pageEnded: 0, pageReason: "",
       pageDirty: false, pageResend: true, label: "crash" }
   }
   // The engine alone crashes; the page lives on with its media.
@@ -225,10 +266,10 @@ module huddle {
   // The stored leaves load later (`load`), after any number of reports.
   action restart = all {
     not(s.up),
-    s' = { ...s, up: true, quitting: false, connected: true, dirty: true, pageResend: true,
+    s' = { ...s, up: true, quitting: false, connected: true, dirty: true, pageResend: true, conn: s.conn + 1,
       epoch: s.epoch + 1, fetching: false, unsent: s.pending, phase: "leaving", label: "restart" }
   }
-  action load = all { s.up, not(s.loaded), s' = { ...s, loaded: true, label: "load" } }
+  action load(w: int): bool = all { s.up, not(s.loadedWs.contains(w)), s' = { ...s, loadedWs: s.loadedWs.union(Set(w)), label: "load" } }
 
   // Slack's running list includes other people. Its changes are independent of
   // media: arch v2 can retain an empty huddle after the local media has stopped.
@@ -280,14 +321,16 @@ module huddle {
 
   // Quiet means the user leaves, Slack stops changing, failures cease, the app
   // restarts and delivery recovers. Drain uses real actions, never assigns agreement.
+  // A Start of a page that already died cannot be withdrawn by the user;
+  // the engine must drop it.
   action seal = all {
-    s' = { ...s, sealed: true, wanted: 0, current: 0, cancel: s.request != 0,
+    s' = { ...s, sealed: true, wanted: if (s.wantedPage == s.page) 0 else s.wanted, current: 0, cancel: s.request != 0,
       phase: "leaving", label: "seal" }
   }
   /** Credentials on their way to the live page, which may still start them. */
   pure def liveHandOffs(st: State): Set[int] = st.handOffs.filter(h => h.gen == st.page).map(h => h.a)
   val cleaned = s.received.subseteq(s.sent) and s.media.size() == 0 and liveHandOffs(s).size() == 0
-  val settled = s.up and s.loaded and s.connected and s.engineLive == s.page and s.current == 0 and s.request == 0 and
+  val settled = s.up and s.loadedWs == workspaces and s.connected and s.engineLive == s.page and s.current == 0 and s.request == 0 and s.wanted == 0 and
     s.pending.size() == 0 and s.frames.size() == 0 and not(s.fetching) and not(s.dirty) and
     s.outbox.size() == 0 and s.handOffs.size() == 0
   val reachedAgreement = s.sealed and settled and cleaned and s.shown == s.slack
@@ -297,7 +340,7 @@ module huddle {
   val noGhost = s.received.subseteq(s.pending.union(s.sent)) and
     s.media.union(liveHandOffs(s)).subseteq(s.pending) and (s.sealed and settled implies cleaned)
   val oneCall = s.media.size() <= 1 and (s.request != 0 implies (s.media.size() == 0 and liveHandOffs(s).size() == 0)) and
-    (s.label == "request" implies before.pending.size() == 0)
+    (s.label == "request" implies before.pending.forall(a => before.recWs.get(a) != before.ws))
   val leaveDuringJoin = not(s.cancelled.contains(s.current)) and s.cancelled.intersect(s.handed).size() == 0 and
     (s.sealed and settled implies s.cancelled.subseteq(s.sent))
   val noStaleLeave = s.label == "roomFrame" implies s.current == before.current
@@ -309,8 +352,9 @@ module huddle {
 
   action progress =
     if (not(s.up)) restart
-    else if (not(s.loaded)) load
+    else if (s.loadedWs != workspaces) { nondet w = workspaces.exclude(s.loadedWs).oneOf() load(w) }
     else if (s.engineLive != s.page) mainReport
+    else if (s.closedSeen < s.conn) seeClosed
     else if (s.handOffs != Set()) receiveAny(false)
     else if (s.media.exclude(Set(s.current)) != Set()) { nondet a = s.media.exclude(Set(s.current)).oneOf() pageStop(a, "left") }
     else if (s.pageDirty or s.pageResend) pageReport
@@ -318,8 +362,10 @@ module huddle {
     else if (needsReconcile(s)) reconcile(0)
     else if (s.request != 0) { nondet a = attendees.exclude(s.received).oneOf() answerJoin(a, 1, 0) }
     else if (s.pending.size() > 0) {
-      val movable = s.pending.filter(a => s.unsent.contains(a) or (a != s.current and engStopped(s, a)))
-      if (movable == Set()) all { s' = { ...s, label: "stuck" } }
+      val movable = s.pending.filter(a => s.recWs.get(a) == s.ws and (s.unsent.contains(a) or (a != s.current and engStopped(s, a))))
+      // Another workspace's leaves go out through its own session.
+      if (movable == Set() and s.pending.exists(a => s.recWs.get(a) != s.ws)) switchWs
+      else if (movable == Set()) all { s' = { ...s, label: "stuck" } }
       else {
         nondet a = movable.oneOf()
         if (s.unsent.contains(a)) sendLeave(a) else clearLeave(a)
@@ -336,12 +382,12 @@ module huddle {
     nondet r = channels.oneOf()
     nondet kind = Set("sh_room_join", "sh_room_leave", "sh_room_update").oneOf()
     any {
-      choose(c), leave, requestJoin, answerJoin(a, r, 0), joinError, reconcile(0),
+      choose(c), leave, requestJoin(0), answerJoin(a, r, 0), joinError, reconcile(0),
       sendLeave(a), clearLeave(a),
       leaveAnswer(a, "ok", 0), leaveAnswer(a, "feature_not_enabled", 0), leaveAnswer(a, "refused", 0),
-      receiveAny(true), receiveAny(false), pageReport, deliverAny, pageEnd, mainReport,
+      receiveAny(true), receiveAny(false), pageReport, deliverAny, pageEnd, mainReport, pageReconnect, seeClosed, switchWs,
       pageStop(a, "left"), pageStop(a, "AudioJoinedFromAnotherDevice"), pageStop(a, "connectionLost"),
-      quit, finishQuit, crash, engineCrash, restart, load, slackChange(c),
+      quit, finishQuit, crash, engineCrash, restart, load(1), load(2), slackChange(c),
       queueFrame({ kind: kind, channel: c, room: r, attendee: a }),
       roomFrame({ kind: kind, channel: c, room: r, attendee: a }, 0),
       disconnect, reconnect, overflow(0), fetchInfo, answerInfo, infoError, seal
@@ -363,9 +409,14 @@ module huddle {
   action startMedia = receiveAny(true)
   action stopReported(a: int, reason: str): bool = all {
     s.up, s.media.contains(a),
-    val r = { gen: s.page, seq: s.pageSeq + 1, holds: 0, recv: s.pageRecv, ended: a, reason: reason }
+    val r = { gen: s.page, conn: s.conn, seq: s.pageSeq + 1, holds: 0, recv: s.pageRecv, ended: a, reason: reason }
     s' = { ...s, media: s.media.exclude(Set(a)), pageEnded: a, pageReason: reason, pageSeq: s.pageSeq + 1,
       pageDirty: false, engReports: s.engReports.set(s.page, r), label: "stopReported" }
+  }
+  /** A Start under an old rule (`rule`), for its counterexample. */
+  action chooseUnder(c: int, rule: int): bool = all {
+    s.up,
+    s' = { ...s, wanted: c, wantedPage: s.page, wantedConn: s.conn, rule: rule, otherDevice: false, label: "choose" }
   }
   action deliverWith(bug: int): bool = if (s.outbox == Set()) disabled else { nondet r = s.outbox.oneOf() deliver(r, bug) }
 
@@ -377,8 +428,27 @@ module huddle {
       if (turn == 0) fetchInfo else if (turn == 1) answerInfo
       else if (turn == 2) slackChange(2) else if (turn == 3) overflow(bug)
       else seal
+    ) else if (which == 18) (
+      // The Start's connection closes and the page reconnects while Slack has
+      // the join; the answer goes out on the old connection and is lost.
+      if (turn == 0) chooseUnder(1, bug) else if (turn == 1) requestJoin(0)
+      else if (turn == 2) pageReconnect else if (turn == 3) answerJoin(1, 1, 0)
+      else if (turn == 4) pageReport else if (turn == 5) deliverAny else seal
+    ) else if (which == 19) (
+      // The user switches workspace mid-call and the engine restarts while
+      // the page still holds the first workspace's attendee.
+      if (turn == 0) choose(1) else if (turn == 1) requestJoin(0)
+      else if (turn == 2) answerJoin(1, 1, 0) else if (turn == 3) startMedia
+      else if (turn == 4) switchWs else if (turn == 5) engineCrash
+      else if (turn == 6) restart else if (turn == 7) load(2)
+      else if (turn == 8) mainReport else if (turn == 9) choose(2)
+      else if (turn == 10 and bug == 10) requestJoin(10) else seal
+    ) else if (which == 20) (
+      // A page main gave out asks, then dies before main lists it.
+      if (turn == 0) pageEnd else if (turn == 1) chooseUnder(1, bug)
+      else if (turn == 2) pageEnd else if (turn == 3) mainReport else seal
     ) else if (turn == 0) choose(1)
-    else if (turn == 1) requestJoin
+    else if (turn == 1) requestJoin(0)
     else if (which == 16) (
       // The page dies while its join is out; main says so before the answer.
       if (turn == 2) pageEnd else if (turn == 3) mainReport
@@ -401,7 +471,7 @@ module huddle {
       else if (turn == 5) sendLeave(1)
       else if (turn == 6) stopReported(1, "left")
       else if (turn == 7) clearLeave(1)
-      else if (turn == 8) requestJoin
+      else if (turn == 8) requestJoin(0)
       else if (turn == 9) answerJoin(2, 2, 0)
       else if (turn == 10) startMedia
       else if (which == 4 and turn == 11) queueFrame({kind: "sh_room_leave", channel: 1, room: 1, attendee: 1})
@@ -472,4 +542,10 @@ module huddle {
   action pageDuringJoinBugStep = scenario(16, 8)
   action earlyReportStep = scenario(17, 0)
   action earlyReportBugStep = scenario(17, 9)
+  action lostStartStep = scenario(18, 0)
+  action lostStartBugStep = scenario(18, 11)
+  action workspaceRestartStep = scenario(19, 0)
+  action workspaceRestartBugStep = scenario(19, 10)
+  action unlistedPageStep = scenario(20, 0)
+  action unlistedPageBugStep = scenario(20, 12)
 }
