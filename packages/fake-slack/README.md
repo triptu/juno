@@ -49,7 +49,7 @@ Startup merges both maps before opening a port and throws on a duplicate method 
 
 `holdNext`, `heldCount` and `release` also cover edge methods using the `edge:` prefix, for example `edge:users/info`. This lets desktop tests delay sender resolution independently of history. Use `file:bytes` to hold thumbnail or download bytes until the test explicitly releases them.
 
-`unfurlFixtures(base)` supplies invented X image/text posts, failed images, YouTube, GitHub, Google Docs and generic previews. Avatar responses require the fake session cookie, so desktop tests exercise the authenticated image path.
+`unfurlFixtures(base)` supplies invented X image/text posts, failed images, YouTube, GitHub, Google Docs and generic previews. `sharedMessage(base, channel, message, author)` turns a posted message into the attachment Slack sends when it is shared into another conversation. Avatar responses require the fake session cookie, so desktop tests exercise the authenticated image path.
 
 Mutation recovery (`docs/research/slack-catchup.md`): counts expose independent
 `updated` and `history_invalid` markers. The fake advances `updated` for thread replies,
