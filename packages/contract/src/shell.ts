@@ -303,6 +303,7 @@ export const ShellRoutes = {
   [Channels.sharingSet]: { input: Schema.Struct({ hide: Schema.Boolean }), output: SharingSetting },
   [Channels.huddleRegister]: { input: Schema.Void, output: HuddleRegistration },
   [Channels.huddleMenu]: { input: Schema.Struct({ menu: HuddleMenu }), output: Schema.Void },
+  [Channels.huddleMicrophoneSettings]: { input: Schema.Void, output: Schema.Void },
   [Channels.contextMenuPopup]: { input: Schema.Struct({ items: ContextMenuItems, at: Schema.optionalKey(ContextMenuAt) }), output: Schema.NullOr(Schema.String) },
   [Channels.shellOpenExternal]: { input: Schema.Struct({ url: Schema.String }), output: Schema.Void },
   [Channels.shellOpenInSlack]: { input: SlackTarget, output: Schema.Void },

@@ -5,7 +5,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { MediaSnapshot } from '@juno/huddle-media'
 import { HuddleDeviceMenu, systemDevice, type HuddleControlsActions, type HuddleControlsState } from '@juno/huddle-views'
-import { chooseMicrophone, chooseSpeaker, leaveCurrentHuddle, refreshDevices, setNoiseSuppression, toggleHuddleMuted } from './media'
+import { chooseMicrophone, chooseSpeaker, leaveCurrentHuddle, openMicrophoneSettings, refreshDevices, setNoiseSuppression, toggleHuddleMuted } from './media'
 
 export interface Controls extends HuddleControlsState, HuddleControlsActions {
   readonly devices: ReactNode
@@ -21,6 +21,7 @@ export function useHuddleControls(media: MediaSnapshot | undefined): Controls {
     sharing: false,
     devicesOpen,
     onMute: toggleHuddleMuted,
+    onOpenMicSettings: openMicrophoneSettings,
     onDevices: (open) => {
       if (open) void refreshDevices()
       setDevicesOpen(open)

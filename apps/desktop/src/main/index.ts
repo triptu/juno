@@ -12,7 +12,7 @@ import { createSupervisor } from './engine'
 import { createEngineTestHooks } from './engineTestHooks'
 import { createHuddleQuit } from './huddleQuit'
 import { copiedForTests, copyImage, downloadFile, downloadsForTests, openedForTests, openFile } from './files'
-import { browserLinksForTests, contextMenuForTests, folderForTests, registerIpc, logsForTests, slackLinksForTests, webPanelForTests } from './ipc'
+import { browserLinksForTests, contextMenuForTests, folderForTests, registerIpc, logsForTests, microphoneSettingsForTests, slackLinksForTests, webPanelForTests } from './ipc'
 import { CUSTOM_ITEM, macKeychain, memoryKeychain, OPENROUTER_ITEM } from './keychain'
 import { ProviderStore } from './providers'
 import { launchWriter, readLaunch, withSession, type Launch } from './launch'
@@ -377,6 +377,7 @@ if (e2e) {
         permissionForTests = permission
       },
       notificationSettingsOpened: () => notificationSettingsOpenedForTests,
+      microphoneSettingsOpened: () => microphoneSettingsForTests.opened,
       slackKeychainReads,
       wake: () => notifier.wake(),
       // The activity watch's seam: the Mac's idle time in seconds, read at once.
