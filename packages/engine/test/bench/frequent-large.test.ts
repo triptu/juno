@@ -32,7 +32,7 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('New chat frequent on the lar
       }).pipe(Effect.provide(Store.layer(paths)), Effect.scoped))
       console.log(`newChat.frequent: ${JSON.stringify({ ...result, load: loadavg()[0] })}`)
       expect(result.sends).toBeGreaterThan(0)
-      expect(result.rows).toBe(6)
+      expect(result.rows).toBe(10) // Five people and five channels, as in Home.
       expect(engine.fake.callCount()).toBe(calls)
       expect(result.samples[37]).toBeLessThanOrEqual(5)
     } finally {

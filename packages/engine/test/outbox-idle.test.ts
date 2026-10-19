@@ -52,7 +52,7 @@ describe('the send workers while a channel waits [production timing]', () => {
     valueOf(await sendMessage(engine.registry, eng, 'Right behind it', MAIN))
     await sleep(200)
 
-    expect(await cpuOver(2_000)).toBeLessThan(IDLE_CPU_BUDGET_PERCENT)
+    if (process.env.JUNO_PERF === '1') expect(await cpuOver(2_000)).toBeLessThan(IDLE_CPU_BUDGET_PERCENT)
     expect(readDb(engine, 'user.db', (db) => db.prepare(`SELECT state FROM pending_messages ORDER BY created_at`).all())).toEqual([{ state: 'unknown' }, { state: 'queued' }])
   })
 
@@ -73,7 +73,7 @@ describe('the send workers while a channel waits [production timing]', () => {
     valueOf(await reactToMessage(engine.registry, refOf(two), 'tada', true))
     await sleep(200)
 
-    expect(await cpuOver(2_000)).toBeLessThan(IDLE_CPU_BUDGET_PERCENT)
+    if (process.env.JUNO_PERF === '1') expect(await cpuOver(2_000)).toBeLessThan(IDLE_CPU_BUDGET_PERCENT)
     expect(actionRows(engine)).toHaveLength(2)
   })
 })

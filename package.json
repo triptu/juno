@@ -26,7 +26,7 @@
     "test": "node scripts/heavy.mjs node scripts/unit.mjs",
     "test:e2e": "node scripts/heavy.mjs --electron sh -c \"pnpm --filter @juno/desktop test:e2e && pnpm --filter @juno/gallery test:e2e\"",
     "test:desktop": "node scripts/heavy.mjs --electron pnpm --filter @juno/desktop test:e2e",
-    "perf": "node scripts/heavy.mjs --exclusive pnpm --filter @juno/desktop perf",
+    "perf": "node scripts/heavy.mjs --exclusive node scripts/perf.mjs",
     "test:feel": "node scripts/heavy.mjs --exclusive pnpm --filter @juno/desktop test:feel",
     "test:gallery": "node scripts/heavy.mjs --electron pnpm --filter @juno/gallery test:e2e",
     "test:plan": "node scripts/plan.mjs",

@@ -1,4 +1,4 @@
-// The Activity page's read time against the Juno switcher budget (docs/performance.md), alone in the timing project:
+// The Activity page's read time against the Juno switcher budget (docs/performance.md), alone under pnpm perf --unit:
 // beside the other packages' tests, one cold read measured the machine, not the query.
 import { afterEach, expect, it } from 'vitest'
 import { activityPage } from '../src/serve/pages'

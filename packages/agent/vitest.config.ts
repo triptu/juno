@@ -10,26 +10,7 @@ export default defineConfig({
     // A machine of its own (pnpm remote) sets JUNO_VITEST_WORKERS higher.
     maxWorkers: Number(process.env.JUNO_VITEST_WORKERS ?? 2),
     setupFiles: process.env.JUNO_UNIT_PROFILE === '1' ? ['test/profile.ts'] : [],
-    projects: [
-      {
-        extends: true,
-        test: {
-          name: 'agent',
-          include: ['test/**/*.test.ts', 'eval/**/*.test.ts'],
-          exclude: ['test/**/*.bench.test.ts'],
-          sequence: { groupOrder: 0 },
-        },
-      },
-      {
-        extends: true,
-        test: {
-          name: 'agent-timing',
-          include: ['test/**/*.bench.test.ts'],
-          fileParallelism: false,
-          sequence: { groupOrder: 1 },
-        },
-      },
-    ],
+    include: ['test/**/*.test.ts', 'eval/**/*.test.ts'],
     // Each test starts several agent processes.
     testTimeout: 120_000,
   },

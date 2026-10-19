@@ -28,7 +28,6 @@ fi
 # The standalone gallery spends part of each touch waiting for animation frames.
 if [ "$cores" -eq 3 ] && [ "$1" = test:gallery ]; then gallery_workers=4; fi
 export JUNO_TEST_PACKAGE_JOBS=${JUNO_TEST_PACKAGE_JOBS:-$package_jobs}
-if [ "$cores" -eq 2 ]; then export JUNO_TEST_TIMING_SEPARATE=${JUNO_TEST_TIMING_SEPARATE:-1}; fi
 export JUNO_VITEST_WORKERS=${JUNO_VITEST_WORKERS:-$vitest_workers}
 # An Electron test runs the app, its engine and a fake Slack: half a core's worth
 # of workers kept tests on time on 4 cores, one per core did not (8 cores take

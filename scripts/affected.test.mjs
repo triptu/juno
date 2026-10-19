@@ -1,5 +1,6 @@
 // pnpm affected's unit test selection, through its real plan (--plan --json) on this repository.
 import assert from 'node:assert/strict'
+import { unitTestMatcher } from './affected-tests.mjs'
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -42,11 +43,11 @@ test('unit execution keeps package identity and starts no unrelated packages', a
   const selected = plan('--batch', '--files', file).steps.find((step) => step.script === 'test')
   assert.deepEqual(selected.items, [file])
   assert.deepEqual(selected.args, ['--files', file])
-  assert.deepEqual(unitCommands(selected.args, root, 2, false), [['--dir', 'packages/domain', 'test', join(root, file)]])
+  assert.deepEqual(unitCommands(selected.args, root, 2), [['--dir', 'packages/domain', 'test', join(root, file)]])
   const other = 'packages/engine/test/notifications.test.ts'
-  assert.deepEqual(unitCommands(['--files', file, other], root, 2, false).map((args) => args[1]), ['packages/domain', 'packages/engine'])
-  assert.throws(() => unitCommands(['--files'], root, 2, false), /at least one/)
-  assert.throws(() => unitCommands(['--files', 'packages/domain/test/absent.test.ts'], root, 2, false), /Not a unit test/)
+  assert.deepEqual(unitCommands(['--files', file, other], root, 2).map((args) => args[1]), ['packages/domain', 'packages/engine'])
+  assert.throws(() => unitCommands(['--files'], root, 2), /at least one/)
+  assert.throws(() => unitCommands(['--files', 'packages/domain/test/absent.test.ts'], root, 2), /Not a unit test/)
 })
 
 test('package configs select the whole package, while lockfile changes select every unit file', () => {
@@ -69,6 +70,12 @@ test('ordinary source changes select only files whose import closure reaches the
   assert.ok(!expected.includes('packages/domain/test/composer-emoji.test.ts'))
 })
 
+test('performance-only files are outside the unit matcher', () => {
+  const matches = unitTestMatcher(root)
+  for (const file of ['packages/agent/test/activity.perf.ts', 'packages/agent/test/serve/chat-cache.perf.ts', 'packages/engine/test/idle.perf.ts']) assert.equal(matches(file), false, file)
+  assert.ok(matches('packages/agent/test/serve/chat-cache-budget.test.ts'))
+})
+
 test('selected unit files exclude nested namesakes that Vitest substring filters would also run', async () => {
   const { existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs')
   const { tmpdir } = await import('node:os')
@@ -80,7 +87,7 @@ test('selected unit files exclude nested namesakes that Vitest substring filters
     const file = 'packages/example/test/one.test.ts'
     writeFileSync(join(dir, file), '')
     writeFileSync(join(dir, 'packages/example/test/nested/test/one.test.ts'), '')
-    assert.deepEqual(unitCommands(['--files', file], dir, 2, false), [
+    assert.deepEqual(unitCommands(['--files', file], dir, 2), [
       ['--dir', 'packages/example', 'test', join(dir, file), '--exclude', 'test/nested/test/one.test.ts'],
     ])
   } finally { rmSync(dir, { recursive: true, force: true }) }

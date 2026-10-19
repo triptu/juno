@@ -5,11 +5,8 @@ import { resolve } from 'node:path'
 import { unitTestMatcher } from './affected-tests.mjs'
 import { forwardSignals } from './remote/children.mjs'
 
-export function unitCommands(args, root, jobs, separateTiming) {
-  if (args[0] !== '--files') return [
-    ['-r', `--workspace-concurrency=${jobs}`, '--if-present', 'test', ...args, ...(separateTiming ? ['--exclude', '**/serve/chat-cache.bench.test.ts'] : [])],
-    ...(separateTiming ? [['--filter', '@juno/agent', 'test', '--project', 'agent-timing']] : []),
-  ]
+export function unitCommands(args, root, jobs) {
+  if (args[0] !== '--files') return [['-r', `--workspace-concurrency=${jobs}`, '--if-present', 'test', ...args]]
   if (args.length === 1) throw new Error('--files needs at least one repository test path')
   const matches = unitTestMatcher(root)
   const packages = new Map()
@@ -34,8 +31,7 @@ if (import.meta.main) {
   const jobs = Number(process.env.JUNO_TEST_PACKAGE_JOBS ?? 2)
   if (!Number.isSafeInteger(jobs) || jobs < 1) throw new Error('JUNO_TEST_PACKAGE_JOBS must be a positive integer')
   const args = process.argv.slice(2)
-  const separateTiming = process.env.JUNO_TEST_TIMING_SEPARATE === '1' && args.length === 0
-  const commands = unitCommands(args, process.cwd(), jobs, separateTiming)
+  const commands = unitCommands(args, process.cwd(), jobs)
   const children = new Set()
   forwardSignals(children)
   let cancelled = false
@@ -52,7 +48,6 @@ if (import.meta.main) {
       if (cancelled) break
       const code = await run(commands.shift())
       result ||= code
-      if (code && separateTiming) break
     }
     return result
   }))

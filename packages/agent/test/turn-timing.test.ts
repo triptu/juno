@@ -1,4 +1,4 @@
-// The agent's own time in a Juno turn, alone in the timing project: on the fake model, which answers at
+// The agent's own time in a Juno turn, with timing budgets checked by pnpm perf --unit: on the fake model, which answers at
 // once, every millisecond between the owner's send and Juno's first bubble is the agent's. A chat with
 // history (twenty earlier runs, summarised by the compactor) and memory docs with an outline, then:
 //
@@ -7,7 +7,7 @@
 //   → its first bubble, the run that carries the call's result (`carryOutcomes`).
 //
 // It prints each request's size (system text, messages and tools), so a prompt that grows shows here too;
-// `memory-cache.test.ts` measures the cached prefix. The numbers for the report: `pnpm remote test --passWithNoTests test/turn-timing.bench.test.ts`.
+// `memory-cache.test.ts` measures the cached prefix. The numbers for the report: `pnpm perf --unit`.
 import { afterEach, expect, it } from 'vitest'
 import { reply } from '@juno/agent-testing'
 import { ActionId, ConnectionId, AccountId, Digest, Revision, SourceGeneration, type CardPayload } from '@juno/agent-cards'
@@ -159,6 +159,6 @@ it('a normal message and the run after an approved card: the agent\'s time to th
 
   // A regression ceiling for the agent's share of the 2.5 s first-bubble budget (docs/performance.md), with room for a
   // shared machine: the rest of the budget is the model's.
-  expect(report.message.toBubble.p95).toBeLessThan(100)
-  expect(report.resume.toBubble.p95).toBeLessThan(100)
+  if (process.env.JUNO_PERF === '1') expect(report.message.toBubble.p95).toBeLessThan(100)
+  if (process.env.JUNO_PERF === '1') expect(report.resume.toBubble.p95).toBeLessThan(100)
 })
