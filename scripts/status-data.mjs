@@ -2,8 +2,7 @@
 // its file or git is missing, so the page always builds.
 
 import { execFileSync } from 'node:child_process'
-import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { readRecords, statusFolder } from './release-gate.mjs'
 import { tag } from './status-areas.mjs'
@@ -100,16 +99,4 @@ export const readLastGreen = (root) => {
 export const changesSince = (root, hash) => {
   const count = hash ? git(root, ['rev-list', '--count', '--first-parent', `${hash}..main`]).trim() : ''
   return count ? Number(count) : -1
-}
-
-// The DMG the owner installs: the orchestrator copies it to ~/Desktop and keeps
-// the one before as `-previous.dmg`.
-export const readDmg = () => {
-  const dir = join(homedir(), 'Desktop')
-  try {
-    const name = readdirSync(dir).find((file) => /^Juno-.*\.dmg$/.test(file) && !file.endsWith('-previous.dmg'))
-    return name ? { name, at: statSync(join(dir, name)).mtime } : undefined
-  } catch {
-    return undefined
-  }
 }

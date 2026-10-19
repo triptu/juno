@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-20 00:49 · Tushar · Remove the manual status input and Desktop DMG tracking; the status page shows decisions, landed commits, the last green run and health because those have real data sources.
 - 10-20 00:45 · release · An agent runs releases when Tushar asks, end to end, following the new `do-release` skill; the update token comes from the keychain item `juno-update-token`. Why: the docs said Tushar ran releases and the gate, so agents asked to release handed the work back.
 - 10-20 00:34 · Desktop e2e · Keep a fresh Electron process per test. A minimal reset prototype saved 436 ms per pair at three workers, projecting to about 22 seconds across the eligible snapshot starts before full cleanup. That estimate does not justify resetting every main-process service; remove the prototype and retain the measured snapshot improvement. Measurements and limitations are in docs/test-speed-4.md.
 - 10-20 00:11 · Desktop e2e · Start ordinary default-seed flows from worker-local synced copies, keyed by the verified build fingerprint and effective sync options. Recreate the seed time, port and fake sessions, and check workspace state and socket counts before each test. Keep a fresh Electron process per test and real sign-in for sync, boot, custom-seed and AI-job scenarios.
