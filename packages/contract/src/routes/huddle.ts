@@ -13,7 +13,14 @@
  *   for the new attendee is stored: the answer carries the Chime meeting
  *   and attendee, once. They are secrets; never log or store them.
  * - `huddle.leave` leaves. It never waits for Slack.
- * - `huddle.media` is the renderer's report, tagged with the attendee id.
+ * - `huddle.media` is the renderer's report, tagged with its page
+ *   generation and the attendee id.
+ *
+ * A page generation names one load of a renderer page. The page's media
+ * service makes one when it starts and registers it with main
+ * (`huddle.register`), which tells the engine which generations are live
+ * (`huddlePages`); a page that reloads, navigates, crashes or closes is
+ * gone, and with it its media.
  */
 import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
@@ -102,9 +109,13 @@ export type HuddleStartResult = typeof HuddleStartResult.Type
 export const HuddleError = Schema.Union([NotSignedIn, Offline, RateLimited, Rejected])
 export type HuddleError = typeof HuddleError.Type
 
-/** `region` is Chime's nearest media region, which only the renderer may look up; null when the lookup failed. */
+/**
+ * `region` is Chime's nearest media region, which only the renderer may
+ * look up; null when the lookup failed. `generation` is the asking page's:
+ * the credentials go to it, and only its reports count for them.
+ */
 export const huddleStart = Rpc.make('huddle.start', {
-  payload: { channelId: Schema.String, region: Schema.NullOr(Schema.String) },
+  payload: { channelId: Schema.String, region: Schema.NullOr(Schema.String), generation: Schema.String },
   success: HuddleStartResult,
   error: HuddleError,
 })
@@ -112,15 +123,14 @@ export const huddleStart = Rpc.make('huddle.start', {
 export const huddleLeave = Rpc.make('huddle.leave', { success: Schema.Void })
 
 /**
- * What the media session did, for the attendee it ran as. `idle`: no
- * session runs in this renderer, sent when the media service starts and
- * when the engine connection comes back with no session running.
+ * What the media session of page `generation` did, for the attendee it ran
+ * as. A report from a page other than the one holding the attendee's
+ * credentials is ignored.
  */
 export const HuddleMediaEvent = Schema.Union([
-  Schema.TaggedStruct('started', { attendeeId: Schema.String }),
-  Schema.TaggedStruct('ended', { attendeeId: Schema.String, reason: HuddleMediaEnd }),
-  Schema.TaggedStruct('muted', { attendeeId: Schema.String, muted: Schema.Boolean }),
-  Schema.TaggedStruct('idle', {}),
+  Schema.TaggedStruct('started', { generation: Schema.String, attendeeId: Schema.String }),
+  Schema.TaggedStruct('ended', { generation: Schema.String, attendeeId: Schema.String, reason: HuddleMediaEnd }),
+  Schema.TaggedStruct('muted', { generation: Schema.String, attendeeId: Schema.String, muted: Schema.Boolean }),
 ])
 export type HuddleMediaEvent = typeof HuddleMediaEvent.Type
 

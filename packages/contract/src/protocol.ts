@@ -98,6 +98,13 @@ export const MainToEngine = Schema.Union([
   Schema.TaggedStruct('wake', {}),
   /** The owner used the Mac in the last 20 s and the screen is not locked. Sent every 10 s while so. */
   Schema.TaggedStruct('active', {}),
+  /**
+   * The renderer page generations that are live (routes/huddle.ts), at the
+   * engine's `ready` and on every change. A generation that was live and is
+   * no longer listed is gone: its page reloaded, navigated, crashed or
+   * closed, so its media is torn down.
+   */
+  Schema.TaggedStruct('huddlePages', { live: Schema.Array(Schema.String) }),
   /** The app quits: finish the requests in flight, close the databases and exit. */
   Schema.TaggedStruct('quit', {}),
 ])
