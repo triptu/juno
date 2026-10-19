@@ -1,6 +1,7 @@
 import { MeetingSessionStatusCode as Code } from 'amazon-chime-sdk-js'
 import { describe, expect, it } from 'vitest'
 import { endReasonOf } from '../src/chime/endReason.ts'
+import { microphoneProblem } from '../src/chime/microphone.ts'
 import { slackUserIdOf } from '../src/externalUserId.ts'
 
 describe('the Slack user in a Chime ExternalUserId', () => {
@@ -40,5 +41,19 @@ describe("why a call ended, from Chime's stop code", () => {
 
   it('reads a dropped connection before the call ever connected as a failed join', () => {
     expect(endReasonOf(Code.SignalingChannelClosedUnexpectedly, { leaving: false, everConnected: false })).toBe('failed')
+  })
+})
+
+describe('why the microphone would not start', () => {
+  const named = (name: string) => Object.assign(new Error(name), { name })
+  it.each([
+    ['PermissionDeniedError', 1, 'denied'],
+    ['PermissionDeniedError', 0, 'denied'],
+    ['NotFoundError', 1, 'unavailable'],
+    ['NotReadableError', 0, 'unavailable'],
+    ['NotReadableError', 1, 'failed'],
+    ['GetUserMediaError', 2, 'failed'],
+  ] as const)('%s with %i microphones is %s', (name, count, access) => {
+    expect(microphoneProblem(named(name), count)).toBe(access)
   })
 })

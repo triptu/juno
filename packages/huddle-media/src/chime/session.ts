@@ -24,6 +24,7 @@ import { SnapshotStore } from '../store.ts'
 import type { Devices, EndReason, HuddleSound, JoinInfo, MediaSession, MicrophoneAccess } from '../types.ts'
 import { deviceList, inUse } from '../devices.ts'
 import { codeName, endReasonOf } from './endReason.ts'
+import { microphoneProblem } from './microphone.ts'
 import { playSoundUrl, type SoundUrls } from './sounds.ts'
 import { VoiceFocus, voiceFocusSupported } from './voiceFocus.ts'
 
@@ -69,6 +70,8 @@ class ChimeMediaSession implements MediaSession {
   #microphone: string | null = null
   #speaker: string | null = null
   #noiseSuppression = true
+  /** How many microphones Chromium lists, those without a label or id too. None means none is connected. */
+  #microphoneCount = 0
   /** Device changes run one at a time, in order. */
   #queue: Promise<unknown> = Promise.resolve()
 
@@ -167,6 +170,7 @@ class ChimeMediaSession implements MediaSession {
 
   async listDevices(): Promise<Devices> {
     const infos = await navigator.mediaDevices.enumerateDevices().catch(() => [])
+    this.#microphoneCount = infos.filter((d) => d.kind === 'audioinput').length
     const mics = deviceList(infos.filter((d) => d.kind === 'audioinput'))
     const outs = deviceList(infos.filter((d) => d.kind === 'audiooutput'))
     this.#store.update((s) => ({
@@ -176,8 +180,8 @@ class ChimeMediaSession implements MediaSession {
     const call = this.#live()
     if (call !== undefined) {
       const { devices, microphoneAccess } = this.getSnapshot()
-      // The microphone was off or missing: try it again unless macOS still says no. The user stays muted.
-      const retry = (microphoneAccess === 'denied' || microphoneAccess === 'unavailable') && (await this.#permission(call)) !== 'denied'
+      // The microphone was off, missing or would not start: try it again unless macOS still says no. The user stays muted.
+      const retry = (microphoneAccess === 'denied' || microphoneAccess === 'unavailable' || microphoneAccess === 'failed') && (await this.#permission(call)) !== 'denied'
       if (retry || inUse(this.#microphone, devices.microphones) !== devices.microphoneInUse) await this.#enqueue(() => this.#applyMicrophone(call))
       if (inUse(this.#speaker, devices.speakers) !== devices.speakerInUse) await this.#enqueue(() => this.#applySpeaker(call))
     }
@@ -378,7 +382,7 @@ class ChimeMediaSession implements MediaSession {
     try {
       stream = await call.av.startAudioInput(device)
     } catch (error) {
-      access = error instanceof Error && error.name === 'PermissionDeniedError' ? 'denied' : 'unavailable'
+      access = microphoneProblem(error, this.#microphoneCount)
       stream = await call.av.startAudioInput(null).catch(() => undefined)
       call.av.realtimeMuteLocalAudio()
     }

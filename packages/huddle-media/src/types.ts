@@ -32,8 +32,12 @@ export type Connection =
    */
   | { readonly state: 'ended'; readonly reason: EndReason; readonly attendeeId: string; readonly code: string }
 
-/** Whether Juno may use the microphone. `unavailable`: no microphone is connected. */
-export type MicrophoneAccess = 'unknown' | 'prompt' | 'granted' | 'denied' | 'unavailable'
+/**
+ * Whether Juno may use the microphone. `denied`: macOS or the page refuses it.
+ * `unavailable`: no microphone is connected. `failed`: there is one, but it
+ * would not start (for example another app holds it).
+ */
+export type MicrophoneAccess = 'unknown' | 'prompt' | 'granted' | 'denied' | 'unavailable' | 'failed'
 
 /** Chime's Voice Focus. `unsupported` when this machine or page cannot run it; the call then goes on without it. */
 export type NoiseSuppression = 'unsupported' | 'on' | 'off'

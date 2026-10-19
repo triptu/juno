@@ -54,7 +54,8 @@ export class FakeMediaSession implements MediaSession {
     const attendee = info.attendee as { AttendeeId?: unknown } | null
     this.#speaking = []
     this.#store.update(startCall(typeof attendee?.AttendeeId === 'string' ? attendee.AttendeeId : 'fake-self'))
-    const blocked = this.getSnapshot().microphoneAccess === 'denied'
+    // As the real session: without a microphone it can use, the call starts muted.
+    const blocked = ['denied', 'unavailable', 'failed'].includes(this.getSnapshot().microphoneAccess)
     this.#store.update((s) => ({
       ...s,
       local: { ...s.local, muted: blocked },
