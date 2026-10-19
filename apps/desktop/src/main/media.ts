@@ -8,20 +8,22 @@
  * Screen capture is `getUserMedia` with `chromeMediaSource: 'desktop'` and
  * the id the share sheet picked (`screenShare.ts`). Electron asks for it as
  * `media` with no device type in `mediaTypes`, since it names only the
- * microphone (`audio`) and the camera (`video`); `display-capture` is
+ * microphone (`audio`) and the camera (`video`) (Electron 44's
+ * `web_contents_permission_helper.cc`); `display-capture` is
  * `getDisplayMedia`'s, which Juno does not call but would get the same
- * answer. The camera is never asked for (video is out of scope) and has no
- * entitlement, so macOS refuses it even where this lets a `video` request
- * through. Whether macOS lets Juno record the screen is its own setting
- * (Screen Recording), which the share sheet reads. No business logic.
+ * answer. The camera is refused (video is out of scope). Whether macOS lets
+ * Juno record the screen is its own setting (Screen Recording), which the
+ * share sheet reads. No business logic.
  */
 import { session, shell, systemPreferences, type Session, type WebContents } from 'electron'
-import { APP_ORIGIN } from './scheme'
+import { APP_SCHEME } from './scheme'
 
+// Not by `URL.origin`: Node gives a custom scheme's URL the origin "null", which would refuse Juno itself.
 const fromApp = (url: string | undefined) => {
   if (url === undefined) return false
   try {
-    return new URL(url).origin === APP_ORIGIN
+    const parsed = new URL(url)
+    return parsed.protocol === `${APP_SCHEME}:` && parsed.host === 'app'
   } catch {
     return false
   }
@@ -53,9 +55,10 @@ export function registerMediaPermissions(target: Session = session.defaultSessio
     if (permission !== 'media') return callback(true)
     if (!ownPage(contents, details.requestingUrl)) return callback(false)
     const types = 'mediaTypes' in details ? (details.mediaTypes ?? []) : []
-    // The microphone alone: ask macOS. No microphone in it: a screen capture.
-    if (types.includes('audio')) return types.every((type) => type === 'audio') ? void microphoneAllowed().then(callback, () => callback(false)) : callback(false)
-    callback(true)
+    // No device: a screen capture. The microphone alone: ask macOS. Anything with the camera: no.
+    if (types.length === 0) return callback(true)
+    if (!types.every((type) => type === 'audio')) return callback(false)
+    void microphoneAllowed().then(callback, () => callback(false))
   })
   target.setPermissionCheckHandler((contents, permission, origin, details) => {
     if (permission === 'display-capture') return ownPage(contents, origin)
