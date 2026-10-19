@@ -5,7 +5,7 @@
  * it, and a sandboxed preload should stay tiny. Schemas live in shell.ts; the
  * types below are imported from them, which is erased at compile time.
  */
-import type { Accent, Density, TopicTitleLines, ProviderChange, SidebarLayout, SlackTarget, Theme, WebPanelBounds } from './shell'
+import type { Accent, Density, HuddleMenu, TopicTitleLines, ProviderChange, SidebarLayout, SlackTarget, Theme, WebPanelBounds } from './shell'
 
 export type { Accent, Density, TopicTitleLines, ProviderChange, SidebarLayout, SlackTarget, Theme, WebPanelBounds } from './shell'
 
@@ -63,6 +63,8 @@ export const Channels = {
   sharingSet: 'sharing.set',
   /** Gives the page its huddle media generation (routes/huddle.ts); main tells the engine while it is live. */
   huddleRegister: 'huddle.register',
+  /** The page's call for the Huddle menu: null while the user is in no huddle, else whether they are muted. */
+  huddleMenu: 'huddle.menu',
   /** Shows a native context menu at the pointer and answers with the chosen item's id, or null. */
   contextMenuPopup: 'contextMenu.popup',
   /** Opens an http or https link in the default browser. */
@@ -124,8 +126,9 @@ export const Events = {
  * The app-menu items main hands to the renderer (architecture, shortcuts):
  * the tab keys, Back and Forward (also the three-finger swipe), Hide
  * Sidebar, Hide Message Text (⌃⌘H), ⌘J for Juno, ⌘K for the palette, Edit › Undo, which undoes typing in a text field or else
- * Juno's last action, Settings (⌘,), which opens Settings, and Help › Show
- * the Tour, which brings the welcome card back on Home (SPEC 4).
+ * Juno's last action, Settings (⌘,), which opens Settings, Help › Show
+ * the Tour, which brings the welcome card back on Home (SPEC 4), and the
+ * Huddle menu (SPEC 20).
  */
 export type MenuCommand =
   /** ⌘T: a new tab with Home. */
@@ -147,6 +150,11 @@ export type MenuCommand =
   | 'settings.open'
   /** Help › Show the Tour. No shortcut. */
   | 'tour.show'
+  /** Huddle › Show Huddle: the huddle tab, focused or opened. */
+  | 'huddle.show'
+  /** Huddle › Mute Microphone or Unmute Microphone. */
+  | 'huddle.mute'
+  | 'huddle.leave'
 
 /**
  * The app menu's shortcuts, in Electron's accelerator form. Main registers
@@ -168,6 +176,8 @@ export const menuShortcuts = {
   'palette.toggle': 'CommandOrControl+K',
   'edit.undo': 'CommandOrControl+Z',
   'settings.open': 'CommandOrControl+,',
+  // Shown in the menu only: the page takes the key, so it also works where the menu does not see it (SPEC 20).
+  'huddle.mute': 'Shift+CommandOrControl+Space',
 } as const satisfies Partial<Record<MenuCommand, string>>
 
 const keyGlyphs: Record<string, string> = {
@@ -327,6 +337,8 @@ export interface JunoBridge {
   readonly huddle: {
     /** Resolves with a `HuddleRegistration`: this page load's media generation, a number main gives out in rising order, the same one until the page goes. */
     readonly register: () => Promise<unknown>
+    /** Tells main the call the Huddle menu follows: null for none, else whether the user is muted. */
+    readonly setMenu: (menu: HuddleMenu) => Promise<unknown>
   }
   readonly contextMenu: {
     /** Resolves with the chosen item's id, or null when the menu closed without a choice. */

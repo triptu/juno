@@ -10,13 +10,15 @@
  *   and every time the engine connection opens.
  * - It runs a session only for the attendee `huddle.call` names, and stops
  *   any other.
+ * - It tells main what the Huddle menu follows, and runs that menu's commands.
  *
  * The credentials from `huddle.start` go to the session and nowhere else:
  * never log, store or report them.
  */
-import type { HuddleCall, HuddleCredentials, HuddleMediaEnd, HuddlePageReport, HuddleRegistration } from '@juno/contract'
+import type { HuddleCall, HuddleCredentials, HuddleMediaEnd, HuddleMenu, HuddlePageReport, HuddleRegistration } from '@juno/contract'
 import type { Devices, EndReason, MediaSession, MediaSnapshot } from '@juno/huddle-media'
-import { connectionStateAtom, huddleCallValueAtom, leaveHuddle, registry, reportHuddleMedia, showToast, startHuddle } from '@juno/state'
+import { connectionStateAtom, huddleCallValueAtom, leaveHuddle, onMenuCommand, registry, reportHuddleMedia, showToast, startHuddle } from '@juno/state'
+import { openHuddle } from '../navigation'
 import { watchHuddleEnds } from './toasts'
 
 /** Chime's nearest media region, which only the page may look up (research section 1). */
@@ -54,6 +56,7 @@ let received: string | null = null
 let ended: HuddlePageReport['ended'] = null
 let seq = 0
 let lastSent = ''
+let lastMenu = ''
 const listeners = new Set<() => void>()
 
 function readPicks(): Picks {
@@ -109,6 +112,28 @@ function onSnapshot(): void {
   }
   for (const listener of listeners) listener()
   void report()
+  sendMenu()
+}
+
+/** The call the user is in, from Join or Start until they are out, as the bar shows it; else undefined. */
+export function currentCall(): HuddleCall | undefined {
+  const call = registry.get(huddleCallValueAtom)
+  return call !== undefined && (call.phase === 'joining' || call.phase === 'joined') ? call : undefined
+}
+
+/** The Huddle menu's state, sent to main when it changed. */
+function sendMenu(): void {
+  const menu: HuddleMenu = currentCall() === undefined ? null : { muted: session?.getSnapshot().local.muted ?? false }
+  const key = JSON.stringify(menu)
+  if (key === lastMenu) return
+  lastMenu = key
+  void window.juno.huddle.setMenu(menu).catch(() => {})
+}
+
+/** Huddle › Show Huddle: the huddle tab, focused or opened. */
+export function showCurrentHuddle(): void {
+  const channelId = currentCall()?.channelId ?? null
+  if (channelId !== null) openHuddle(channelId)
 }
 
 /** The page's whole media state, when it changed or `force`. */
@@ -167,7 +192,19 @@ function reconcile(call: HuddleCall | undefined): void {
 /** Starts the service: called once at the app root, after the first paint. */
 export function startHuddleMedia(): void {
   void register()
-  registry.subscribe(huddleCallValueAtom, reconcile, { immediate: true })
+  registry.subscribe(
+    huddleCallValueAtom,
+    (call) => {
+      reconcile(call)
+      sendMenu()
+    },
+    { immediate: true },
+  )
+  onMenuCommand((command) => {
+    if (command === 'huddle.show') showCurrentHuddle()
+    else if (command === 'huddle.mute') toggleHuddleMuted()
+    else if (command === 'huddle.leave' && currentCall() !== undefined) leaveCurrentHuddle()
+  })
   watchHuddleEnds((channelId) => void joinHuddle(channelId))
   // ⌘⇧Space mutes and unmutes while Juno is the active app (SPEC 20).
   window.addEventListener('keydown', (event) => {

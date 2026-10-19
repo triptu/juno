@@ -6,13 +6,14 @@
  * reuses the action the rest of the app runs: the sidebar's pages, the Juno
  * menu's pages, Settings by section, the theme and accent of Settings ›
  * Appearance, the New tab and New message commands, the account menu's presence
- * and privacy, and the topic menu.
+ * and privacy, the topic menu, and the huddle's controls and header button.
  */
 import { AccentSchema, type Accent, type SettingsSection, type Theme } from '@juno/contract'
 import {
   accentAtom,
   activeTab,
   currentPlace,
+  huddleInChannelAtom,
   junoAvailableAtom,
   junoPanelOpenAtom,
   notificationStatusAtom,
@@ -28,6 +29,8 @@ import {
 } from '@juno/state'
 import { chatCopy } from '@juno/agent-contract'
 import { accentLabels, settingsSections, type PaletteIconName, type PaletteItem } from '@juno/views'
+import { muteShortcut } from '@juno/huddle-views'
+import { currentCall, joinHuddle, leaveCurrentHuddle, mediaSnapshot, showCurrentHuddle, toggleHuddleMuted } from './huddle/media'
 import { closeJunoPanel, openPanel } from './juno/actions'
 import { openAllTopics, openHome, openJuno, openJunoPage, newMessage, openNewTab, openSettings, openTopic, showTheTour } from './navigation'
 import { messageBeforePalette } from './paletteActions'
@@ -129,6 +132,19 @@ function pageRows(): ReadonlyArray<CommandRow> {
   ]
 }
 
+/** The huddle's controls while the user is in one (SPEC 20), as the Huddle menu has them. */
+function huddleRows(): ReadonlyArray<CommandRow> {
+  if (currentCall() === undefined) return []
+  const muted = mediaSnapshot()?.local.muted === true
+  return [
+    muted
+      ? row('huddle-mute', 'unmute', 'Unmute', 'huddle microphone mic', toggleHuddleMuted, { ...stays, hint: muteShortcut })
+      : row('huddle-mute', 'mute', 'Mute', 'huddle microphone mic', toggleHuddleMuted, { ...stays, hint: muteShortcut }),
+    row('huddle-leave', 'leave-huddle', 'Leave huddle', 'call hang up end', leaveCurrentHuddle, stays),
+    row('huddle-show', 'huddle', 'Show huddle', 'call open', showCurrentHuddle),
+  ]
+}
+
 /** The commands that do not need a topic, as things are now: the current theme and accent say "Current". */
 export function globalCommands(): ReadonlyArray<CommandRow> {
   const theme = registry.get(themeAtom)
@@ -151,6 +167,7 @@ export function globalCommands(): ReadonlyArray<CommandRow> {
     privacy
       ? row('privacy', 'show-text', 'Show message text', 'privacy mode screen share', () => setPrivacy(false), { ...stays, hint: '⌃⌘H' })
       : row('privacy', 'hide-text', 'Hide message text', 'privacy mode screen share blur', () => setPrivacy(true), { ...stays, hint: '⌃⌘H' }),
+    ...huddleRows(),
     ...(presence === null
       ? []
       : [
@@ -185,8 +202,18 @@ export function topicCommands(): { readonly heading: string; readonly rows: Read
     row('open-in-slack', 'open-in-slack', 'Open in Slack', 'app', run('open-in-slack'), stays),
     topic.kind === 'thread' && row('rename', 'rename', 'Rename thread', 'title', run('rename')),
     selected !== undefined && row('start-thread', 'start-thread', 'Start thread', 'reply selected message', () => openTopic(`t:${topic.channel.id}:${selected}`)),
+    topic.kind === 'main' && huddleRow(topic.channel.id),
   ]
   return { heading: labelOf(topic), rows: rows.filter((candidate) => candidate !== false) }
+}
+
+/** Start huddle or Join huddle on a channel's or DM's Main, as its header button; none while the user is in this one. */
+function huddleRow(channelId: string): CommandRow | false {
+  if (currentCall()?.channelId === channelId) return false
+  const running = registry.get(huddleInChannelAtom(channelId)) !== undefined
+  return running
+    ? row('huddle-join', 'huddle', 'Join huddle', 'call audio', () => void joinHuddle(channelId), stays)
+    : row('huddle-start', 'huddle', 'Start huddle', 'call audio', () => void joinHuddle(channelId), stays)
 }
 
 const wordsOf = (text: string) => text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((word) => word !== '')

@@ -788,6 +788,11 @@ export function runMenuCommand(command: MenuCommand): void {
       return openSettings()
     case 'tour.show':
       return showTheTour()
+    case 'huddle.show':
+    case 'huddle.mute':
+    case 'huddle.leave':
+      // `huddle/media.ts` handles them.
+      return
     default: {
       const number = Number(command.slice('tab.select.'.length))
       if (paletteTakesTabNumber(number)) return

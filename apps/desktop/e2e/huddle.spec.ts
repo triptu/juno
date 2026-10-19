@@ -102,6 +102,56 @@ test('start a huddle from the header, mute from the bar, open the tab and leave'
   await expect(win.getByRole('button', { name: 'Join huddle' })).toBeVisible({ timeout: 15_000 })
 })
 
+/** A Huddle menu item as main built it: its label and whether it is enabled. */
+const huddleMenuItem = (app: ElectronApplication, id: 'huddle-show' | 'huddle-mute' | 'huddle-leave') =>
+  app.evaluate(({ Menu }, itemId) => {
+    const item = Menu.getApplicationMenu()?.getMenuItemById(itemId)
+    return item === undefined || item === null ? null : { label: item.label, enabled: item.enabled }
+  }, id)
+
+test('start, mute and leave a huddle from the palette, with the Huddle menu following', async ({ juno, fake, win, app }) => {
+  await openEngMain(juno)
+  // No huddle: the Huddle menu is dimmed, and the palette offers only Start huddle on a Main.
+  expect(await huddleMenuItem(app, 'huddle-show')).toEqual({ label: 'Show Huddle', enabled: false })
+  expect(await huddleMenuItem(app, 'huddle-mute')).toEqual({ label: 'Mute Microphone', enabled: false })
+  expect(await huddleMenuItem(app, 'huddle-leave')).toEqual({ label: 'Leave Huddle', enabled: false })
+  const { palette } = juno
+  await palette.open()
+  await palette.type('huddle')
+  await expect(palette.root.getByRole('option', { name: 'Leave huddle' })).toHaveCount(0)
+  await palette.root.getByRole('option', { name: 'Start huddle' }).click()
+
+  const bar = win.getByRole('region', { name: 'Huddle' })
+  await expect(bar).toBeVisible()
+  await expect.poll(() => connection(win)).toBe('connected')
+  await expect.poll(() => huddleMenuItem(app, 'huddle-leave')).toEqual({ label: 'Leave Huddle', enabled: true })
+  expect(await huddleMenuItem(app, 'huddle-show')).toEqual({ label: 'Show Huddle', enabled: true })
+
+  // Mute from the palette: the menu names the way back.
+  await palette.open()
+  await palette.type('mute')
+  await palette.root.getByRole('option', { name: /^Mute/ }).click()
+  await expect.poll(() => localMuted(win)).toBe(true)
+  await expect(bar.getByRole('button', { name: /^Mute/ })).toHaveAttribute('aria-pressed', 'true')
+  await expect.poll(() => huddleMenuItem(app, 'huddle-mute')).toEqual({ label: 'Unmute Microphone', enabled: true })
+
+  // Show huddle opens the huddle tab.
+  await palette.open()
+  await palette.type('show huddle')
+  await palette.root.getByRole('option', { name: 'Show huddle' }).click()
+  await juno.tabs.expectActive('eng · Huddle')
+
+  // Leave from the palette: the bar goes and the menu dims again.
+  const attendeeId = await attendee(win)
+  await palette.open()
+  await palette.type('leave huddle')
+  await palette.root.getByRole('option', { name: 'Leave huddle' }).click()
+  await expect(bar).toBeHidden()
+  await expect.poll(() => fake.calls.filter((call) => call.method === 'rooms.leave').length).toBe(1)
+  await chimeDrops(win, fake, attendeeId!)
+  await expect.poll(() => huddleMenuItem(app, 'huddle-leave')).toEqual({ label: 'Leave Huddle', enabled: false })
+})
+
 test('join a running huddle, and Join here after joining on another device', async ({ juno, fake, win }) => {
   await openEngMain(juno)
   fake.control('startHuddle', { channel: 'C0ENG', user: 'U0MAYA' })
@@ -158,6 +208,8 @@ test('quitting in a huddle asks first: Cancel keeps the huddle, Quit leaves it',
 test('once the engine stops for good, quitting in a huddle does not ask', async ({ juno, win, app }) => {
   await openEngMain(juno)
   await win.getByRole('button', { name: 'Start huddle' }).click()
+  // The bar shows once the media session has loaded.
+  await expect(win.getByRole('region', { name: 'Huddle' })).toBeVisible()
   await expect.poll(() => connection(win)).toBe('connected')
 
   // With the engine gone there is nothing left to leave; a Cancel answer would keep the app open if it asked.

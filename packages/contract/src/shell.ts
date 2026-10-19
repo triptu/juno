@@ -215,6 +215,10 @@ export type SharingSetting = typeof SharingSetting.Type
 export const HuddleRegistration = Schema.Struct({ generation: Schema.Number, fakeMedia: Schema.Boolean })
 export type HuddleRegistration = typeof HuddleRegistration.Type
 
+/** What the Huddle menu follows: null while the user is in no huddle, else whether they are muted (SPEC 20). */
+export const HuddleMenu = Schema.NullOr(Schema.Struct({ muted: Schema.Boolean }))
+export type HuddleMenu = typeof HuddleMenu.Type
+
 /**
  * Whether macOS lets Juno post notifications (Settings › Notifications). `unknown` when main
  * could not ask: the page then offers Open Notification Settings anyway.
@@ -298,6 +302,7 @@ export const ShellRoutes = {
   [Channels.sharingGet]: { input: Schema.Void, output: SharingSetting },
   [Channels.sharingSet]: { input: Schema.Struct({ hide: Schema.Boolean }), output: SharingSetting },
   [Channels.huddleRegister]: { input: Schema.Void, output: HuddleRegistration },
+  [Channels.huddleMenu]: { input: Schema.Struct({ menu: HuddleMenu }), output: Schema.Void },
   [Channels.contextMenuPopup]: { input: Schema.Struct({ items: ContextMenuItems, at: Schema.optionalKey(ContextMenuAt) }), output: Schema.NullOr(Schema.String) },
   [Channels.shellOpenExternal]: { input: Schema.Struct({ url: Schema.String }), output: Schema.Void },
   [Channels.shellOpenInSlack]: { input: SlackTarget, output: Schema.Void },

@@ -20,6 +20,7 @@ import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import { FunnelSimple } from '@phosphor-icons/react/dist/icons/FunnelSimple'
 import { Gear } from '@phosphor-icons/react/dist/icons/Gear'
 import { HardDrives } from '@phosphor-icons/react/dist/icons/HardDrives'
+import { Headphones } from '@phosphor-icons/react/dist/icons/Headphones'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { House } from '@phosphor-icons/react/dist/icons/House'
 import { Info } from '@phosphor-icons/react/dist/icons/Info'
@@ -27,11 +28,14 @@ import { Pulse } from '@phosphor-icons/react/dist/icons/Pulse'
 import { LinkSimple } from '@phosphor-icons/react/dist/icons/LinkSimple'
 import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
+import { Microphone } from '@phosphor-icons/react/dist/icons/Microphone'
+import { MicrophoneSlash } from '@phosphor-icons/react/dist/icons/MicrophoneSlash'
 import { Moon } from '@phosphor-icons/react/dist/icons/Moon'
 import { NotePencil } from '@phosphor-icons/react/dist/icons/NotePencil'
 import { Palette } from '@phosphor-icons/react/dist/icons/Palette'
 import { PaperPlaneTilt } from '@phosphor-icons/react/dist/icons/PaperPlaneTilt'
 import { PencilSimple } from '@phosphor-icons/react/dist/icons/PencilSimple'
+import { PhoneX } from '@phosphor-icons/react/dist/icons/PhoneX'
 import { Plugs } from '@phosphor-icons/react/dist/icons/Plugs'
 import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
 import { PushPin } from '@phosphor-icons/react/dist/icons/PushPin'
@@ -91,6 +95,10 @@ export type PaletteIconName =
   | 'about'
   | 'ai-activity'
   | 'tour'
+  | 'huddle'
+  | 'mute'
+  | 'unmute'
+  | 'leave-huddle'
 
 const icons: Record<PaletteIconName, PhosphorIcon> = {
   thread: ChatsCircle,
@@ -134,6 +142,10 @@ const icons: Record<PaletteIconName, PhosphorIcon> = {
   about: Info,
   'ai-activity': Pulse,
   tour: Compass,
+  huddle: Headphones,
+  mute: MicrophoneSlash,
+  unmute: Microphone,
+  'leave-huddle': PhoneX,
 }
 
 export interface PaletteItem {

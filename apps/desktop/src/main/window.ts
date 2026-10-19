@@ -1,6 +1,6 @@
 import { app, BrowserWindow, Menu, screen, shell, type BaseWindow, type BrowserWindowConstructorOptions, type MenuItemConstructorOptions, type Rectangle } from 'electron'
 import { join } from 'node:path'
-import { DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, Events, menuShortcuts, type MenuCommand } from '@juno/contract'
+import { DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, Events, menuShortcuts, type HuddleMenu, type MenuCommand } from '@juno/contract'
 import { BACKGROUND, backgroundFor, type Launch } from './launch'
 import { APP_URL } from './scheme'
 import { startupMark } from './startupMarks'
@@ -101,7 +101,7 @@ export function createMainWindow(currentLaunch: () => PageLaunch): BrowserWindow
 
   mainWindows.add(window)
   launchOf.set(window, currentLaunch)
-  setAppMenu({ sidebarHidden: launch.sidebar?.collapsed ?? false, privacy: launch.privacy === true })
+  setAppMenu({ sidebarHidden: launch.sidebar?.collapsed ?? false, privacy: launch.privacy === true, huddle: null })
   // The three-finger swipe (Electron does not see the two-finger one): left is Back, as in Safari.
   window.on('swipe', (_event, direction) => {
     if (direction === 'left') tabCommand(window, 'history.back')
@@ -198,10 +198,11 @@ function tabCommand(window: BaseWindow | undefined, command: MenuCommand): void 
   window.webContents.send(Events.menuCommand, command)
 }
 
-/** What the View menu's labels follow: Hide or Show Sidebar, Hide or Show Message Text. */
+/** What the menu's labels follow: Hide or Show Sidebar, Hide or Show Message Text, and the Huddle menu's call. */
 interface MenuState {
   readonly sidebarHidden: boolean
   readonly privacy: boolean
+  readonly huddle: HuddleMenu
 }
 
 /** The state the menu was built with; undefined until the first window. */
@@ -211,7 +212,7 @@ let menuState: MenuState | undefined
 function updateAppMenu(patch: Partial<MenuState>): void {
   if (menuState === undefined) return
   const next = { ...menuState, ...patch }
-  if (next.sidebarHidden !== menuState.sidebarHidden || next.privacy !== menuState.privacy) setAppMenu(next, true)
+  if (next.sidebarHidden !== menuState.sidebarHidden || next.privacy !== menuState.privacy || next.huddle?.muted !== menuState.huddle?.muted) setAppMenu(next, true)
 }
 
 export function setSidebarHidden(sidebarHidden: boolean): void {
@@ -222,11 +223,15 @@ export function setMenuPrivacy(privacy: boolean): void {
   updateAppMenu({ privacy })
 }
 
+export function setMenuHuddle(huddle: HuddleMenu): void {
+  updateAppMenu({ huddle })
+}
+
 /** A menu item that hands `command` to the focused app window. */
-const command = (id: string, label: string, accelerator: string, menuCommand: MenuCommand, hidden = false): MenuItemConstructorOptions => ({
+const command = (id: string, label: string, accelerator: string | undefined, menuCommand: MenuCommand, hidden = false): MenuItemConstructorOptions => ({
   id,
   label,
-  accelerator,
+  ...(accelerator === undefined ? {} : { accelerator }),
   ...(hidden ? { visible: false, acceleratorWorksWhenHidden: true } : {}),
   click: (_item, window) => tabCommand(window, menuCommand),
 })
@@ -291,6 +296,19 @@ function setAppMenu(state: MenuState, rebuild = false): void {
     // ⌘K (SPEC section 10) opens the palette, and closes it again.
     command('search', 'Search…', menuShortcuts['palette.toggle'], 'palette.toggle'),
   ]
+  // The Huddle menu (SPEC 20), dimmed while the user is in no huddle. Share Screen… comes with screen share.
+  const inHuddle = state.huddle !== null
+  const huddle: MenuItemConstructorOptions[] = [
+    { ...command('huddle-show', 'Show Huddle', undefined, 'huddle.show'), enabled: inHuddle },
+    // The page takes ⌘⇧Space itself, so the menu only shows it.
+    {
+      ...command('huddle-mute', state.huddle?.muted === true ? 'Unmute Microphone' : 'Mute Microphone', menuShortcuts['huddle.mute'], 'huddle.mute'),
+      registerAccelerator: false,
+      enabled: inHuddle,
+    },
+    { type: 'separator' },
+    { ...command('huddle-leave', 'Leave Huddle', undefined, 'huddle.leave'), enabled: inHuddle },
+  ]
   const windowItems: MenuItemConstructorOptions[] = [
     { role: 'minimize' },
     { role: 'zoom' },
@@ -331,6 +349,7 @@ function setAppMenu(state: MenuState, rebuild = false): void {
       { label: 'Edit', submenu: edit },
       { label: 'View', submenu: view },
       { label: 'Go', submenu: go },
+      { label: 'Huddle', submenu: huddle },
       { role: 'window', submenu: windowItems },
       // The welcome card (SPEC 4, "The welcome"), again on Home whenever the owner wants it.
       { role: 'help', submenu: [{ id: 'tour', label: 'Show the Tour', click: (_item, window) => tabCommand(window, 'tour.show') }] },
