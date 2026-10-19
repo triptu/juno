@@ -33,8 +33,8 @@ async function homeShowsRecord(juno: Juno): Promise<void> {
     .toContain('automatedMoves')
 }
 
-/** The job takes changes in 3 second windows; after this a pass has looked at them. */
-const afterAPass = (juno: Juno) => juno.win.waitForTimeout(4_000)
+/** The job has examined the changed rows, including a pass that keeps their placement. */
+const afterAPass = (juno: Juno) => juno.workPass('automated')
 
 test('a bot channel joined later moves by itself, the card says why, and Move back works with Undo', async ({ juno, fake }) => {
   await juno.signIn()

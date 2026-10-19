@@ -3,8 +3,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { notificationsRestoreSlackSchedule, notificationsSetHours, notificationsSetSlackSchedule, type Hours, type SlackScheduleView } from '@juno/contract'
 import { notificationsPageAtom, runCommand } from '@juno/state'
-import { sleep, waitFor, type RunningEngine } from './harness'
-import { apiCalls, bootedEngine, quiet, restart, valueOf } from './scenario'
+import { waitFor, type RunningEngine } from './harness'
+import { apiCalls, bootedEngine, restart, valueOf } from './scenario'
 
 const engines: Array<RunningEngine> = []
 afterEach(async () => {
@@ -17,28 +17,25 @@ const before = { dnd_enabled: true, dnd_days: 'every_day', dnd_start_hour: '22:0
 const weekdays = { dnd_enabled: true, dnd_days: 'weekdays', dnd_start_hour: '19:00', dnd_end_hour: '09:00' }
 
 /** The app waits 1 s after a change before it writes; most tests wait less, so their checks that nothing more is written are short. */
-const DEBOUNCE_MILLIS = 200
+const DEBOUNCE_MILLIS = 25
 const APP_DEBOUNCE_MILLIS = 1_000
 
 const withSchedule = (schedule: Record<string, unknown>, debounce = DEBOUNCE_MILLIS) =>
   bootedEngine(engines, {
-    slackScheduleDebounceMillis: debounce,
+    timing: { slackScheduleDebounceMillis: debounce },
     initial: (fake) => {
       fake.workspace.prefs = { ...fake.workspace.prefs, ...schedule }
       return fake.signIn()
     },
   })
 
-const restarted = (engine: RunningEngine) => restart(engines, engine, undefined, { slackScheduleDebounceMillis: DEBOUNCE_MILLIS })
+const restarted = (engine: RunningEngine) => restart(engines, engine, undefined, { timing: { slackScheduleDebounceMillis: DEBOUNCE_MILLIS } })
 
 const writes = (engine: RunningEngine) => apiCalls(engine, 'users.prefs.set').map((call) => JSON.parse(call.args['prefs'] ?? '{}') as unknown)
 const dnd = (engine: RunningEngine) => Object.fromEntries(Object.entries(engine.fake.workspace.prefs).filter(([key]) => key.startsWith('dnd_')))
 
-/** Past the debounce and the pass after it. */
-async function settled(engine: RunningEngine, debounce = DEBOUNCE_MILLIS): Promise<void> {
-  await sleep(debounce * 2 + 500)
-  await quiet(engine)
-}
+/** The real pass decides whether the current hours need a write. */
+const settled = (engine: RunningEngine) => engine.workPass('slackSchedule')
 
 const setHours = (engine: RunningEngine, hours: Hours) => runCommand(engine.registry, notificationsSetHours, { which: 'notifications', hours })
 
@@ -100,20 +97,20 @@ describe("Slack's notification schedule: when Juno writes", () => {
     expect(apiCalls(engine, 'users.prefs.get').filter((call) => call.args['prefs'] !== undefined)).toEqual([])
   })
 
-  it('changing the hours writes once, with the last values', async () => {
+  it('changing the hours writes once, with the last values [production timing]', async () => {
     // The app's own wait, so the two changes fall inside it however slow the machine.
     const engine = await withSchedule(weekdays, APP_DEBOUNCE_MILLIS)
-    await settled(engine, APP_DEBOUNCE_MILLIS)
+    await settled(engine)
     engine.fake.resetCalls()
     valueOf(await setHours(engine, { days: [1, 2, 3, 4, 5], from: 8 * 60, to: 19 * 60 }))
     valueOf(await setHours(engine, { days: [1, 2, 3, 4, 5], from: 8 * 60, to: 18 * 60 + 30 }))
     await waitFor(() => (writes(engine).length > 0 ? true : undefined), 10_000, 'the write')
-    await settled(engine, APP_DEBOUNCE_MILLIS)
+    await settled(engine)
     expect(writes(engine)).toEqual([{ dnd_enabled: true, dnd_days: 'weekdays', dnd_start_hour: '18:30', dnd_end_hour: '08:00' }])
     // Presence hours are not Slack's schedule.
     engine.fake.resetCalls()
     valueOf(await runCommand(engine.registry, notificationsSetHours, { which: 'presence', hours: { days: [1, 2, 3], from: 600, to: 960 } }))
-    await settled(engine, APP_DEBOUNCE_MILLIS)
+    await settled(engine)
     expect(writes(engine)).toEqual([])
   })
 

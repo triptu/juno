@@ -365,3 +365,189 @@ whose mutation markers changed, then use conditional versions to reduce bytes.
 changed, with nothing to run. `git diff --check` and the generated decision-log
 check passed. Live probes established the results above; no product test suite
 or sync-protocol verification is claimed for this documentation-only branch.
+
+## Initial implementation and call comparison (2026-10-19, superseded below)
+
+`mutationRepair.ts` now compares full counts with durable repaired markers on
+reconnect and warm boot. It repairs every cached Main and thread range of dirty
+member conversations, using conditional versions. It does not scan unchanged
+conversations. The ten-topic fallback remains, skipping a topic already repaired.
+Counts select conversations, not threads; a changed conversation may need several
+reply calls. A populated cache upgraded without markers needs one baseline repair.
+
+An incremental `{ id, last_read }` row previously caused `SlackDecodeError` before
+`loadCounts` could merge any entries. The failed cycle kept the old cursor and
+retried. Optional unread fields now decode, and the writer preserves omitted
+`latest`, unread flags and mention counts. The fake returns the observed partial
+shape, and the engine test checks that a sweep keeps the existing unread state.
+
+The fake explicitly assumes edits and reactions advance `updated`, and deletion
+advances `history_invalid`. Its conditional pages retain unchanged ids in paging,
+return new versions with changed bodies, and identify deleted cached ids. Tests
+prove Juno under these assumptions. The live research still does not establish
+complete marker coverage or internal rate limits. The fallback remains for that
+reason. Uncached history and unknown threads are outside mutation repair; ordinary
+history and discovery still find new messages.
+
+Call comparison uses the default `largeSeed()` (300 conversations, 5,000 threads,
+100,000 messages, 2,000 users). The engine boots, caches a followed thread outside
+the top ten, goes offline, and another client edits one cached reply, deletes a
+second and removes a reaction from a third. No topic is opened. Calls are reset
+before reconnect and counted until the sync cycle finishes. The before run uses `872f6355`; one run per side completed without request
+failures. The hourly follow
+pass is not due; periodic sweeps are disabled. Socket URL calls are excluded
+because reconnect backoff changes their count. Background pacing is disabled as
+in other fake-engine tests; these are request counts, not a latency benchmark.
+
+| Request | Before | After |
+| --- | ---: | ---: |
+| `client.userBoot` | 1 | 1 |
+| `client.counts` | 1 | 1 |
+| `conversations.history` | 0 | 1 |
+| `conversations.replies` | 10 | 15 |
+| `subscriptions.thread.getView` | 1 | 1 |
+| `search.modules.messages` | 2 | 2 |
+| Total, excluding socket URL | 15 | 21 |
+
+Before, all three changes remain stale. After, all three are stored without an
+open: six conditional repair calls cover the dirty conversation, and ten fallback
+calls remain. A subsequent unchanged warm boot makes no mutation-repair calls.
+The conditional endpoint test separately verifies zero bodies for an unchanged
+page and correct cursor progression through unchanged ids.
+
+This scenario costs six more calls (40%), with broader coverage. It does **not**
+confirm the earlier hypothetical 70% call saving: that estimate assumed replacing
+the fallback, which this change deliberately retains. Messages with no saved server version need a full body once to establish it.
+Conditional versions reduce
+body transfer, but no byte percentage or live latency improvement was measured.
+
+## Controlled self-DM mutations (2026-10-19)
+
+The owner authorized writes in their self-DM. The probe verified the authenticated
+user against the DM member, created one root and one reply, and mutated only those
+two messages. The sequence ran twice with matching results; all four test messages were
+deleted afterwards. Credentials stayed in memory; output
+contained booleans, field types and the labels `root` and `reply`, with no real ids
+or message content. Calls were spaced by at least 1.5 seconds. Each stage read full
+counts, then full and conditional history and replies using the previous stage's
+`latest_updates`. The history range contained the root; replies contained both.
+
+| Stage | `updated` | `history_invalid` | `latest_updates` | Conditional history / replies |
+| --- | --- | --- | --- | --- |
+| Post root and reply | Baseline present | Baseline present | Both messages have versions | Root / root and reply (empty version cache) |
+| Edit both | Changed | Same | Both versions changed | Root / root and reply |
+| Add reaction to both | Changed | Same | Both versions changed | Root / root and reply |
+| Remove reaction from both | Changed | Same | Both versions changed | Root / root and reply |
+| Delete reply | Changed | Changed | Root changed; reply absent | Root / root; `deleted` empty |
+| Delete remaining root | Same | Changed | Empty history version map | Empty history; `deleted` empty; replies: `thread_not_found` |
+
+`latest` stayed fixed through edits, reactions and reply deletion, then changed on
+root deletion. No message-level `version` field was observed. The fake therefore
+stores versions separately and supplies them only through `latest_updates` when
+conditional pages are requested. It advances edit and reaction versions; deleting
+a reply updates its root's version and the conversation's `updated`, whereas
+removing the final root only advances `history_invalid`. It returns an empty
+`deleted` list, as this experiment did, rather than inventing tombstone ids outside
+a page. Absence is checked only over proven page coverage.
+
+This establishes these behaviors in one self-DM, not a guarantee across retention
+policies, Slack Connect, all workspace types or every event. The ten ordinary
+fallback pages always run, even for a topic repaired conditionally. Tests also
+exercise omitted/backwards markers and a reaction whose marker/version does not
+advance. Such changes outside the fallback can still wait for an open-topic read.
+
+### Revised bounds
+
+The foreground boot/reconnect keeps its original ten-page fallback budget.
+Additional mutation repair starts only after phase `live`, on the background
+lane, under the sync work permit. It attempts at most ten pages per catch-up,
+one page per queued range. Main and cached replies are bounded from
+24 hours before the gap began (the recheck lookback setting). Old roots fetched for
+thread metadata do not extend Main; a root without cached recent replies does
+not get a reply job. Unfinished cursors and refused/rate-limited jobs persist in
+`repair_pending` and rotate behind unattempted work on the next catch-up or sweep.
+The original request bounds stay fixed while a cursor advances.
+
+A missing baseline seeds the current markers without enqueueing all cached
+conversations after upgrade. Any supplied marker difference, including a backwards
+move, queues work. Missing fields preserve the baseline. Observed markers and
+queued ranges commit atomically; the marker now records observation, not completion.
+Limited pages cannot prove deletion by absence. Thread roots are excluded from
+thread absence checks. Repair does not certify outbox recheck coverage; the
+ordinary fallback remains responsible for that safety barrier.
+
+The revised large-seed reconnect observed 18 calls: one userBoot, one counts,
+thirteen replies (ten fallback and three repair), one getView and two searches.
+No mutation-repair history page was needed for this target: its cached Main
+roots were outside the recent window. All three offline changes were recovered
+without opening the topic. This is a request count with fake pacing disabled,
+not a latency or byte benchmark. The earlier 21-call result above describes the
+unbounded implementation. Failed repair calls are single-attempt, so transport
+retries cannot exceed the ten-request cap. Queued ranges expire 24 hours after enqueueing. Their message bounds stay fixed,
+so a multi-day gap still repairs messages from the day the app closed.
+
+
+### Round 2: incremental markers and live activity
+
+A further controlled self-DM probe created a root and reply, edited the reply,
+and deleted both test messages afterwards. It compared incremental counts using
+the preceding counts stamp with full counts after each operation. Calls were
+spaced at least 1.5 seconds apart, with at least two seconds before each mutation.
+Only field names and equality results were recorded.
+
+| Operation | `latest` changed | `updated` changed | `history_invalid` changed |
+| --- | --- | --- | --- |
+| New Main message | Yes | No | No |
+| New thread reply | No | Yes | No |
+| Edit reply | No | Yes | No |
+
+All three incremental rows supplied `id`, `last_read`, `latest`, `has_unreads`,
+`mention_count`, `updated`, and `history_invalid`. Their markers matched full
+counts. Partial read-only rows can still omit these fields. The fake now leaves
+`updated` unchanged for a new Main message instead of assuming it advances.
+
+The large-seed activity test edits cached messages in 150 conversations six times,
+advancing server time ten minutes each round and waiting for live delivery and a
+sweep. Wall-clock sweeps are accelerated; this is a queue/call measurement, not a
+latency benchmark. After that synthetic live hour, it disconnects and edits one
+message offline. At `c6e3739a`, reconnect queued 396 jobs across 150 conversations;
+the offline edit remained stale after two ten-call repair passes. With baseline
+refresh during uninterrupted sweeps, it queues exactly two jobs in one
+conversation and repairs the edit in two calls on the first pass.
+
+Repair selection also interleaves conversations so one conversation's threads do
+not consume the whole pass. The cap remains ten calls. A drop while an incremental
+counts request is in flight prevents baseline refresh. Missing markers preserve
+the stored baseline. A `thread_not_found` response drops the job and tombstones
+cached replies within its fixed bounds. Tests cover a Friday 18:00 close, a
+Saturday edit of a Friday 17:00 message, and a Monday reopen, as well as deleting
+a reply followed by its root while offline.
+
+
+### Round 3: proving delivery before refreshing baselines
+
+A connected socket alone does not prove event delivery: it can remain half-open
+until its pong timeout. Incremental counts markers now become in-memory
+candidates. Only a later sweep, after a pong received after that counts response,
+can promote them. The pong carries the socket receive timestamp, so time spent in
+sync's event queue cannot turn an old pong into new evidence. Disconnect discards
+candidates. Any failed frame blocks promotion for its conversation for the rest
+of the session; an unidentified conversation blocks all promotions. This can
+increase repair work after an error, but preserves the dirty signal.
+
+The fake can hold both message frames and pongs while HTTP keeps working. A
+regression test changes a message, loses its event, lets sweeps run before timeout
+detection, then verifies reconnect repair without fallback pages. A separate test
+forces a frame's database write to fail and verifies its marker stays dirty even
+after a pong and later sweep.
+
+**Unknown:** free-plan hidden history may return `thread_not_found` for an old
+root with recent replies. The self-DM deletion probe does not distinguish that
+case. The response alone therefore drops the job without tombstoning replies.
+Bounded cached replies are tombstoned only if the root is already deleted in
+cache, including when the Main page has proved it absent. No additional live
+Slack writes were needed for this revision.
+
+The send-copy test now explicitly covers markers enabled, an original deleted
+while offline, and zero fallback rechecks. Repair observes the deletion and the
+surviving copy remains visible; this still does not certify outbox recheck coverage.

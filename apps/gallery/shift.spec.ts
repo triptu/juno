@@ -125,9 +125,15 @@ const drawn = (page: Page, route: Route) =>
     return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
   }, route.route)
 
-/** The state's elements and attributes, without scroll positions: what a press on an interactive fixture changes. */
-const markup = (page: Page, route: Route) =>
-  page.evaluate((frameName) => document.querySelector(`[data-fixture-frame="${frameName}"]`)?.innerHTML ?? '', route.route)
+/** Keep the exact markup in the browser: some states have hundreds of KB of DOM. */
+const rememberMarkup = (page: Page, route: Route) => page.evaluate((frameName) => {
+  Object.assign(globalThis, { __junoShiftMarkup: document.querySelector(`[data-fixture-frame="${frameName}"]`)?.innerHTML ?? '' })
+}, route.route)
+
+const markupChanged = (page: Page, route: Route) => page.evaluate((frameName) => {
+  const scope: object = globalThis
+  return !('__junoShiftMarkup' in scope) || scope.__junoShiftMarkup !== (document.querySelector(`[data-fixture-frame="${frameName}"]`)?.innerHTML ?? '')
+}, route.route)
 
 /**
  * SPEC section 16: the arrow cursor everywhere, the text cursor only over
@@ -174,7 +180,8 @@ for (let part = 0; part < shards; part++) {
   // Over every component the walk is @heavy (scripts/test-areas.mjs); limited with GALLERY_SHIFT_ONLY it is not.
   test(`no interaction shifts the layout, in any state of any component (part ${part + 1} of ${shards})`, { tag: only ? [] : ['@heavy', '@heavy-gallery'] }, async ({ browser }) => {
     // A part walks states until the queue is empty, at up to eight elements and six touches per state.
-    test.setTimeout(15 * 60_000)
+    // The full walk took 14.3 minutes on three cores; each state still has its own 30 s limit.
+    test.setTimeout((only ? 15 : 20) * 60_000)
     const pages = await walkPages(browser)
     // JUNO_SHARD=i/n (pnpm remote --shards n): this machine takes every n-th state.
     const routes = (await readRoutes(pages.page())).filter((route, index) => (!only || only.includes(route.component)) && (!shard || index % shard.total === shard.index))
@@ -192,12 +199,13 @@ for (let part = 0; part < shards; part++) {
           if (!queue.claim(`dom ${await drawn(page, route)}`) && shotOnly) return
           // An interactive fixture can change when touched (a press on Undo puts back other buttons), so the elements
           // after it would be gone or different: open the state again whenever a touch changed what it draws.
-          const original = await markup(page, route)
+          await rememberMarkup(page, route)
           for (const [index, element] of (await targets(page, route)).entries()) {
-            if ((await markup(page, route)) !== original) {
+            if (await markupChanged(page, route)) {
               // The same URL again only changes the hash, which keeps the fixture's state: load a blank page first.
               await page.goto('about:blank')
               await openState(page, route)
+              await rememberMarkup(page, route)
             }
             for (const failure of await touch(page, element)) failures.push(`${route.route} (element ${index + 1}) ${failure}`)
           }
@@ -498,6 +506,23 @@ test.describe('the guard itself', () => {
     expect(error?.message).toContain('layout box changed')
     expect(error?.message).toContain('Below')
     expect(error?.message).toContain('dy 30')
+  })
+
+  test('counts nested offset parents and reads their positions again after the action', async ({ page }) => {
+    await page.setContent(frame(
+      '.outer{position:relative;left:20px}.inner{position:relative;left:15px}.child{height:30px}p{margin:0}',
+      '<section class="outer"><section class="inner"><div id="child" class="child">Child</div><p id="below">Below</p></section></section>',
+    ))
+    const report = await measureLayoutShift(page, () => page.evaluate(() => {
+      document.querySelector<HTMLElement>('.outer')!.style.left = '31px'
+      document.querySelector<HTMLElement>('#child')!.style.height = '39px'
+    }))
+    const child = report.moved.find((item) => item.element.startsWith('div#child'))!
+    const below = report.moved.find((item) => item.element.startsWith('p#below'))!
+    expect(child.after.x - child.before.x).toBe(11)
+    expect(child.after.height - child.before.height).toBe(9)
+    expect(below.after.x - below.before.x).toBe(11)
+    expect(below.after.y - below.before.y).toBe(9)
   })
 
   test('lets a press scale, a colour change and a focus ring through', async ({ page }) => {

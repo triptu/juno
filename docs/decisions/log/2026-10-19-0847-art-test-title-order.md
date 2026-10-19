@@ -1,0 +1,1 @@
+- 10-19 08:47 · art-test-title-order · The art refusal test must wait for a new thread's AI title before requesting its first drawing. Hold its debounce on TestClock and request complete art passes explicitly, retaining the exact one-call assertion. A full four-core run exposed the old race: a fallback drawing followed by an allowed AI-title redraw counted twice.

@@ -3,7 +3,7 @@
 // the outbox; a failed upload keeps the text and the files for Retry; a
 // message's image opens in the viewer and a file downloads into Downloads.
 import { readFile } from 'node:fs/promises'
-import { expect, test } from './fixtures'
+import { expect, test, type Fixtures } from './fixtures'
 import { brief, chart, chip, chips, drop, paste, staged } from './attach'
 import { expectStableAnchor } from './shiftProbe'
 
@@ -130,9 +130,18 @@ test('a reply image takes Slack thumbnails after processing without a message up
   expect(info.every((call) => call.error === 'unknown_method')).toBe(true)
 })
 
-test('a file dropped on the topic is sent on its own as a file row with Download', async ({ juno, fake }) => {
+test('drops files in Main and replies and removes a chip before sending', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
+  const context = { juno, fake }
+  await test.step('a file dropped on the topic is sent on its own as a file row with Download', () => dropInMain(context))
+  await test.step('a file dropped on a reply composer is attached once and shared in that thread', () => dropInReply(context))
+  await test.step('a removed chip is not sent, and the text row does not move', () => removeBeforeSending(context))
+})
+
+async function dropInMain({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
+  fake.resetCalls()
+
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
@@ -151,11 +160,11 @@ test('a file dropped on the topic is sent on its own as a file row with Download
   const share = fake.calls.find((call) => call.method === 'files.share')
   expect(share?.args['comment']).toBeUndefined()
   expect(share?.args['blocks']).toBeUndefined()
-})
+}
 
-test('a file dropped on a reply composer is attached once and shared in that thread', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+async function dropInReply({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
+  fake.resetCalls()
+
   const { topic } = juno
   const root = fake.messages('C0ENG').find((message) => message.text?.startsWith('Draft plan is in the doc'))!
   await juno.sidebar.row('Draft plan is in the doc').open()
@@ -168,11 +177,11 @@ test('a file dropped on a reply composer is attached once and shared in that thr
   expect(shares).toHaveLength(1)
   expect(shares[0]!.args['thread_ts']).toBe(root.ts)
   expect(fake.calls.filter((call) => call.method === 'files.getUploadURL')).toHaveLength(1)
-})
+}
 
-test('a removed chip is not sent, and the text row does not move', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+async function removeBeforeSending({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
+  fake.resetCalls()
+
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
@@ -191,7 +200,7 @@ test('a removed chip is not sent, and the text row does not move', async ({ juno
   await topic.composer.press('Enter')
   await topic.expectSent('Two files, then one')
   expect(fake.calls.filter((call) => call.method === 'files.getUploadURL').map((call) => call.args['filename'])).toEqual(['launch-brief.pdf'])
-})
+}
 
 test('a failed upload keeps the text and the file for Retry, and is sent once', async ({ juno, fake }) => {
   await juno.signIn()
@@ -268,7 +277,6 @@ test("a stored message's image opens in the viewer and its file downloads into D
     expect((await readFile(saved)).subarray(0, 5).toString('latin1')).toBe('%PDF-')
   })
 })
-
 
 // A message's images make a grid in the message; any of them opens the media viewer at it, with every one in a
 // filmstrip along the bottom. ← and → move and stop at the ends, the strip shows the one clicked, and Esc closes

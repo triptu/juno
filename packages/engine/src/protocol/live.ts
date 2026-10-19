@@ -25,6 +25,7 @@
  * error of its own to show pipes the stream through `retryFirstRun`, which
  * starts it again with backoff instead.
  */
+import { EngineTiming } from '../config'
 import { Clock, Effect, Option, Result, Schedule, Stream } from 'effect'
 import { liveQuery, type InvalidationKeys } from '@juno/store'
 import type { OpenWorkspace } from '../workspace'
@@ -244,8 +245,6 @@ function sameOrder(a: ReadonlyArray<string>, b: ReadonlyArray<string>): boolean 
   return true
 }
 
-/** 0.5 s, doubling, at most 30 s apart. */
-const FIRST_RUN_RETRY = Schedule.min([Schedule.exponential('500 millis'), Schedule.spaced('30 seconds')])
 
 /**
  * For a served stream (`serveLiveValue`, `serveLiveList`): a failure, which
@@ -255,12 +254,12 @@ const FIRST_RUN_RETRY = Schedule.min([Schedule.exponential('500 millis'), Schedu
  * succeeds. Defects are not retried.
  */
 export const retryFirstRun =
-  (label: string, schedule: Schedule.Schedule<unknown, unknown> = FIRST_RUN_RETRY) =>
+  (label: string, schedule?: Schedule.Schedule<unknown, unknown>) =>
   <A, E, R>(served: Stream.Stream<A, E, R>): Stream.Stream<A, E, R> =>
-    served.pipe(
+    Stream.unwrap(Effect.map(EngineTiming, (timing) => served.pipe(
       Stream.tapError((error) => Effect.logWarning(`${label}: the first run failed; retrying`, error)),
-      Stream.retry(schedule),
-    )
+      Stream.retry(schedule ?? Schedule.min([Schedule.exponential(timing.liveRetryBaseMillis), Schedule.spaced(timing.liveRetryCapMillis)])),
+    )))
 
 /**
  * A live value that follows the open workspace, as Home's destination pickers and

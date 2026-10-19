@@ -1,0 +1,1 @@
+- 10-19 08:56 · Tests · Observe child exits at spawn time in the heavy-queue test and release holders only after both requests are queued; late exit listeners could leave affected waiting forever while holding the Mac reservation. Bound both checks to ten seconds and clean up every child.

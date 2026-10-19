@@ -1,0 +1,1 @@
+- 10-19 01:45 · Home · A Home send refused before it is queued shows "Not sent · {reason}" (the destination stays in the chip, so the 352px toast keeps its room for the reason) and keeps the draft; closing one Home with a draft shows "Draft closed" with Undo for that tab, and bulk closes show no toast.

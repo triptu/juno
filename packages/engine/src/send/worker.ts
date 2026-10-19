@@ -23,7 +23,7 @@
  *   answer Slack gives when it may have run the call (`internal_error` and
  *   friends), makes it `unknown`. `files.share` answers without the
  *   message, so a shared post becomes `unknown` too and waits for the echo.
- * - `unknown`: after `SETTLE_MILLIS`, the worker reads the topic's recent
+ * - `unknown`: after `timing.postSettleMillis`, the worker reads the topic's recent
  *   messages from Slack. The message is there: it is stored, which ends the
  *   row. A complete read without it: the row is `queued` again, except a
  *   post Slack said it shared, which is asked about again later. No answer:
@@ -39,6 +39,8 @@
  * behind a call that outlasted the socket, stays `queued` and goes when
  * the socket is back.
  */
+import { WorkControl, observeWork } from '../workControl'
+import { EngineTiming } from '../config'
 import { wakeSchedule } from './nextWake'
 import { Clock, Context, Effect, Layer, Stream } from 'effect'
 import { millisToTs, type Ts } from '@juno/domain'
@@ -72,14 +74,6 @@ import { Workspace, type OpenWorkspace, type StoreServices } from '../workspace'
 /** A message as Slack sends it, the shape `TopicFetcher.sent` stores. */
 type Message = Parameters<TopicFetcher['sent']>[0]['message']
 
-/** How long after a lost answer the worker asks Slack whether the message is there. */
-export const SETTLE_MILLIS = 2_000
-/** Longest wait between two tries of a row that keeps failing. */
-const MAX_BACKOFF_MILLIS = 5 * 60_000
-/** How long a row waits for a session before it is tried again. */
-const NO_SESSION_MILLIS = 5_000
-/** A worker pass that failed (a store error) is tried again after this. */
-const PASS_RETRY_MILLIS = 5_000
 /** The lookup reads Slack's messages from this long before the send, for clocks that disagree. */
 const LOOKUP_MARGIN_MILLIS = 5 * 60_000
 /** Pages the lookup reads at most before it gives up and asks again later. */
@@ -103,6 +97,8 @@ export class PostWorker extends Context.Service<
   static readonly layer: Layer.Layer<PostWorker, never, Workspace | Outbox | SyncLink | Staging | UploadProgress | PostQueue> = Layer.effect(
     PostWorker,
     Effect.gen(function* () {
+      const timing = yield* EngineTiming
+      const backoff = (attempts: number) => Math.min(timing.retryBaseMillis * 2 ** attempts, timing.retryCapMillis)
       const workspace = yield* Workspace
       const outbox = yield* Outbox
       const link = yield* SyncLink
@@ -159,7 +155,7 @@ export class PostWorker extends Context.Service<
                   yield* local(transaction(deferPost(row.clientMsgId, now + Math.max(error.retryAfterMillis, backoff(row.attempts)), error._tag)))
                   return undefined
                 case 'NotSignedIn':
-                  yield* local(transaction(deferPost(row.clientMsgId, now + NO_SESSION_MILLIS, error._tag)))
+                  yield* local(transaction(deferPost(row.clientMsgId, now + timing.noSessionMillis, error._tag)))
                   return undefined
                 case 'Offline':
                   // Sends wait out a lost connection (spec section 8); the catch-up's flush makes the row due again.
@@ -245,10 +241,10 @@ export class PostWorker extends Context.Service<
             )
           yield* progress.clear(row.clientMsgId)
           const now = yield* Clock.currentTimeMillis
-          if (result === undefined) return yield* local(transaction(postUnknown(row.clientMsgId, now + SETTLE_MILLIS, 'defect')))
+          if (result === undefined) return yield* local(transaction(postUnknown(row.clientMsgId, now + timing.postSettleMillis, 'defect')))
           if (result._tag === 'Success') {
             // `files.share` answers without the message: the echo or a lookup stores it, and a lookup that misses it waits.
-            if (result.success === undefined) return yield* local(transaction(postUnknown(row.clientMsgId, now + SETTLE_MILLIS, SHARED)))
+            if (result.success === undefined) return yield* local(transaction(postUnknown(row.clientMsgId, now + timing.postSettleMillis, SHARED)))
             // The answer may leave out the id; the stored message carries it, which ends the row.
             const message: Message = { ...result.success.message, client_msg_id: result.success.message.client_msg_id ?? row.clientMsgId }
             return yield* fetcher.sent({ channel: result.success.channel, message }).pipe(Effect.orDie)
@@ -256,15 +252,15 @@ export class PostWorker extends Context.Service<
           const error = result.failure
           switch (error._tag) {
             case 'Rejected':
-              if (MAYBE_POSTED.has(error.code)) return yield* local(transaction(postUnknown(row.clientMsgId, now + SETTLE_MILLIS, error.code)))
+              if (MAYBE_POSTED.has(error.code)) return yield* local(transaction(postUnknown(row.clientMsgId, now + timing.postSettleMillis, error.code)))
               yield* Effect.logWarning('send: Slack refused a message', { id: row.clientMsgId, attempts: row.attempts, code: error.code })
               return yield* local(transaction(failPost(row.clientMsgId, error.code)))
             case 'RateLimited':
               return yield* local(transaction(requeuePost(row.clientMsgId, now + Math.max(error.retryAfterMillis, backoff(row.attempts)), error._tag)))
             case 'NotSignedIn':
-              return yield* local(transaction(requeuePost(row.clientMsgId, now + NO_SESSION_MILLIS, error._tag)))
+              return yield* local(transaction(requeuePost(row.clientMsgId, now + timing.noSessionMillis, error._tag)))
             case 'Offline':
-              return yield* local(transaction(postUnknown(row.clientMsgId, now + SETTLE_MILLIS, error._tag)))
+              return yield* local(transaction(postUnknown(row.clientMsgId, now + timing.postSettleMillis, error._tag)))
           }
         })
 
@@ -334,12 +330,13 @@ export class PostWorker extends Context.Service<
           const wake = nextWake(rest.map((row) => ({ ...row, id: row.clientMsgId })), yield* Clock.currentTimeMillis, blocked)
           if (wake.repeatedHead !== undefined) yield* Effect.logWarning('send: repeated immediate post wake')
           return wake.delay
-        }).pipe(Effect.catchCause((cause) => Effect.as(Effect.logError('send: post pass failed', { cause }), PASS_RETRY_MILLIS)))
+        }).pipe(Effect.catchCause((cause) => Effect.as(Effect.logError('send: post pass failed', { cause }), timing.workerRetryMillis)))
 
+      ;(yield* WorkControl).onWake?.('post', wake)
       const loop = Effect.gen(function* () {
         while (true) {
           const open = yield* workspace.current
-          const wait = open === undefined ? undefined : yield* pass(open)
+          const wait = yield* (open === undefined ? Effect.succeed(undefined) : pass(open)).pipe(observeWork('post'))
           yield* Effect.raceFirst(queue.woken, wait === undefined ? Effect.never : Effect.sleep(wait))
         }
       })
@@ -367,5 +364,3 @@ export const inStore =
   (open: OpenWorkspace) =>
   <A>(effect: Effect.Effect<A, SqlError, StoreServices>): Effect.Effect<A> =>
     effect.pipe(Effect.provide(open.context), Effect.orDie)
-
-const backoff = (attempts: number): number => Math.min(1000 * 2 ** attempts, MAX_BACKOFF_MILLIS)

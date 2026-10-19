@@ -1,0 +1,1 @@
+- 10-19 04:14 · fake-thread-pages · Build a request-local followed-thread index in fake Slack, reuse it for unread counts, and expand only the requested page; retain exact timestamp ordering and avoid a cross-request cache that could hide mutations.

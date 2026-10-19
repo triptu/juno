@@ -1,16 +1,55 @@
-// Keep timing assertions outside concurrent package tests on small machines.
+// Run selected files only in their own packages; full runs keep pnpm's scheduler.
 import { spawn } from 'node:child_process'
+import { existsSync, globSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { unitTestMatcher } from './affected-tests.mjs'
+import { forwardSignals } from './remote/children.mjs'
 
-const jobs = Number(process.env.JUNO_TEST_PACKAGE_JOBS ?? 2)
-if (!Number.isSafeInteger(jobs) || jobs < 1) throw new Error('JUNO_TEST_PACKAGE_JOBS must be a positive integer')
-const args = process.argv.slice(2)
-const separateTiming = process.env.JUNO_TEST_TIMING_SEPARATE === '1' && args.length === 0
-let child
-for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => child?.kill(signal))
-const run = (command) => new Promise((resolve) => {
-  child = spawn('pnpm', command, { stdio: 'inherit' })
-  child.on('error', (error) => { console.error(error.message); resolve(1) })
-  child.on('close', (code) => resolve(code ?? 1))
-})
-const code = await run(['-r', `--workspace-concurrency=${jobs}`, '--if-present', 'test', ...args, ...(separateTiming ? ['--exclude', '**/serve/chat-cache.bench.test.ts'] : [])])
-process.exitCode = code || (separateTiming ? await run(['--filter', '@juno/agent', 'test', '--project', 'agent-timing']) : 0)
+export function unitCommands(args, root, jobs) {
+  if (args[0] !== '--files') return [['-r', `--workspace-concurrency=${jobs}`, '--if-present', 'test', ...args]]
+  if (args.length === 1) throw new Error('--files needs at least one repository test path')
+  const matches = unitTestMatcher(root)
+  const packages = new Map()
+  for (const file of new Set(args.slice(1))) {
+    if (file.split('/').some((part) => part === '..' || part === '.') || !matches(file) || !existsSync(resolve(root, file))) throw new Error(`Not a unit test file: ${file}`)
+    const dir = file.split('/').slice(0, 2).join('/')
+    if (!packages.has(dir)) packages.set(dir, [])
+    packages.get(dir).push(resolve(root, file))
+  }
+  const candidates = [...globSync([...packages.keys()].map((dir) => `${dir}/**/*`), { cwd: root, exclude: ['**/node_modules/**'] })].filter(matches).map((file) => resolve(root, file))
+  return [...packages].map(([dir, files]) => {
+    // Vitest's filename filters use substrings, even for absolute paths.
+    // Exclude namesakes in nested folders and files with a longer extension.
+    const prefix = resolve(root, dir) + '/'
+    const filters = files.map((file) => file.slice(prefix.length).toLowerCase())
+    const extra = candidates.filter((file) => file.startsWith(prefix) && !files.includes(file) && filters.some((filter) => file.slice(prefix.length).toLowerCase().includes(filter)))
+    return ['--dir', dir, 'test', ...files, ...extra.flatMap((file) => ['--exclude', file.slice(prefix.length)])]
+  })
+}
+
+if (import.meta.main) {
+  const jobs = Number(process.env.JUNO_TEST_PACKAGE_JOBS ?? 2)
+  if (!Number.isSafeInteger(jobs) || jobs < 1) throw new Error('JUNO_TEST_PACKAGE_JOBS must be a positive integer')
+  const args = process.argv.slice(2)
+  const commands = unitCommands(args, process.cwd(), jobs)
+  const children = new Set()
+  forwardSignals(children)
+  let cancelled = false
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => { cancelled = true })
+  const run = (command) => new Promise((done) => {
+    const child = spawn('pnpm', command, { stdio: 'inherit' })
+    children.add(child)
+    child.on('error', (error) => console.error(error.message))
+    child.on('close', (code) => { children.delete(child); done(code ?? 1) })
+  })
+  const codes = await Promise.all(Array.from({ length: args[0] === '--files' ? Math.min(jobs, commands.length) : 1 }, async () => {
+    let result = 0
+    while (commands.length) {
+      if (cancelled) break
+      const code = await run(commands.shift())
+      result ||= code
+    }
+    return result
+  }))
+  process.exitCode = cancelled ? 130 : codes.find((code) => code !== 0) ?? 0
+}

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedOn": "2026-10-18",
+  "recordedOn": "2026-10-19",
   "counts": {
     "unusedFiles": 0,
     "unusedExports": 0,
@@ -9,7 +9,7 @@
     "unlistedDependencies": 0,
     "clonePairs": 5,
     "oversizedFiles": 44,
-    "oversizedFunctions": 130
+    "oversizedFunctions": 128
   },
   "clonedLines": 93,
   "oversizedFiles": [
@@ -118,7 +118,6 @@
     "packages/engine/src/messages/handlers.ts:MessagesHandlers/MessagesRoutes.toLayer/Effect.gen#1",
     "packages/engine/src/messages/query.ts:listMessages#1",
     "packages/engine/src/messages/query.ts:listMessages/Effect.gen#1",
-    "packages/engine/src/notificationRuntime.ts:startNotifications/Effect.gen#1",
     "packages/engine/src/notifications/handlers.ts:NotificationsHandlers/NotificationsRoutes.toLayer/Effect.gen#1",
     "packages/engine/src/send/actionWorker.ts:ActionWorker/layer/Layer.effect/Effect.gen#1",
     "packages/engine/src/send/worker.ts:PostWorker/layer/Layer.effect/Effect.gen#1",
@@ -129,7 +128,6 @@
     "packages/engine/src/topics/query.ts:shapeRows/Effect.gen#1",
     "packages/engine/test/actions.test.ts:describe('edit')#1",
     "packages/engine/test/agent-host.test.ts:describe('the AgentHost port')#1",
-    "packages/engine/test/art.test.ts:describe('topic art')#1",
     "packages/engine/test/bench/messages-large.test.ts:describe.skipIf()('messages.list on the large seed')#1",
     "packages/engine/test/bench/messages-large.test.ts:describe.skipIf()('messages.list on the large seed')/it('opens a 300-message thread and serves its window within budget')#1",
     "packages/engine/test/bench/topics-large.test.ts:describe.skipIf()('topics.list on the large seed')#1",

@@ -41,7 +41,7 @@ it('reads running huddles after an overflow that dropped the reconnect', async (
 
     // A drop the service saw does stop reads.
     yield* listen({ _tag: 'Disconnected', reason: 'closed', retryInMillis: 1_000 })
-    yield* listen({ _tag: 'Frame', frame: { type: 'unknown', raw: { type: 'sh_room_update', huddle: { channel_id: 'C1' }, room: { id: 'R1', participants: ['U1'] } } } })
+    yield* listen({ _tag: 'Frame', receivedAt: 0, frame: { type: 'unknown', raw: { type: 'sh_room_update', huddle: { channel_id: 'C1' }, room: { id: 'R1', participants: ['U1'] } } } })
     yield* Effect.sleep(500)
     expect(reads).toHaveLength(2)
   }).pipe(Effect.provide(Huddle.layer))))

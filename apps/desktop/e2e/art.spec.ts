@@ -1,3 +1,4 @@
+import type { Fixtures } from './fixtures'
 // Topic art's Redraw art against the fake Slack and the fake AI (SPEC 5 "Row
 // anatomy", inventory 15.1 and 16): Redraw art in the row's menu and in the
 // header's title menu draws the topic again, the toast's Undo and ⌘Z put the
@@ -18,9 +19,25 @@ test.use({ aiJobs: true })
 // Titles are the first six words of the root message, so a prefix is enough.
 const POSTGRES = 'Draft plan is in the doc'
 
-test('Redraw art draws a topic again, and Undo puts the previous drawing back', async ({ juno }) => {
+test('shares channel art with Home and redraws topic art with Undo', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
+  const context = { juno }
+  await test.step("a channel in Home's Recent shows the art its Main row shows in the sidebar", () => homeChannelArt(context))
+  await test.step('Redraw art draws a topic again, and Undo puts the previous drawing back', () => redrawTopicArt(context))
+})
+
+async function homeChannelArt({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
+  const markup = await juno.sidebar.row('#eng').artMarkup()
+  const tile = juno.write.recentRow('eng').locator('[data-topic-art]')
+  await expect(tile).toHaveAttribute('data-topic-art', 'art', { timeout: 15_000 })
+  // The sizes differ, so compare the drawing's hue: the ink colour every stroke starts from.
+  const ink = (svg: string) => /stroke="(var\([^"]+\))"/.exec(svg)?.[1]
+  expect(ink(markup)).toBeDefined()
+  expect(ink(await tile.innerHTML())).toBe(ink(markup))
+}
+
+async function redrawTopicArt({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   const row = juno.sidebar.row(POSTGRES)
   const first = await row.artMarkup()
 
@@ -40,19 +57,7 @@ test('Redraw art draws a topic again, and Undo puts the previous drawing back', 
   await expect.poll(() => row.artMarkup()).not.toBe(first)
   await juno.undo()
   await expect.poll(() => row.artMarkup()).toBe(first)
-})
-
-test("a channel in Home's Recent shows the art its Main row shows in the sidebar", async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const markup = await juno.sidebar.row('#eng').artMarkup()
-  const tile = juno.write.recentRow('eng').locator('[data-topic-art]')
-  await expect(tile).toHaveAttribute('data-topic-art', 'art', { timeout: 15_000 })
-  // The sizes differ, so compare the drawing's hue: the ink colour every stroke starts from.
-  const ink = (svg: string) => /stroke="(var\([^"]+\))"/.exec(svg)?.[1]
-  expect(ink(markup)).toBeDefined()
-  expect(ink(await tile.innerHTML())).toBe(ink(markup))
-})
+}
 
 test('with AI assist off, the topic menu has no Redraw art and a selection offers Quote alone', async ({ juno, fake, slackApp, userData, running }) => {
   await juno.signIn()

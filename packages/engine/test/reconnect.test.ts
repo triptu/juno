@@ -157,7 +157,8 @@ describe('reconnect', () => {
     expect(storedFollow(engine, 'C0LEADERSHIP', tsOf(finance))).toBe(0)
 
     // The budget: the socket's URL (its count depends on the backoff) and the huddle read are left out, everything else is exact.
-    const { 'api:client.getWebSocketURL': _socket, 'edge:huddles/info': huddleReads, ...budget } = callMap(engine)
+    const { 'api:client.getWebSocketURL': _socket, 'edge:huddles/info': huddleReads, 'mutation-repair:conversations.history': repairMain = 0, 'mutation-repair:conversations.replies': repairThreads = 0, ...budget } = callMap(engine)
+    expect({ repairMain, repairThreads }).toEqual({ repairMain: 1, repairThreads: 3 })
     // Running huddles are read again after the gap, once; that read may land after this count.
     expect(huddleReads ?? 0).toBeLessThanOrEqual(1)
     expect(budget).toEqual({

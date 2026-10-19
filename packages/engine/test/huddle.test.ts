@@ -154,7 +154,7 @@ it('a late frame or a frame about another room never ends the call or rolls back
 })
 
 it('keeps the "In a huddle" status as the official client does while the call is live, and stops when it ends', async () => {
-  const engine = await booted({ huddleStatusRenewMillis: 300 })
+  const engine = await booted({ timing: { huddleStatusRenewMillis: 300 } })
   const writes = () => apiCalls(engine, 'users.profile.set')
   const result = await joined(engine, 'C0ENG')
   await sleep(500)

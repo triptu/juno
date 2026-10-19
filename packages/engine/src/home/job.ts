@@ -18,6 +18,8 @@
  *   wrote one of the latest messages. Found promises go to `follow_ups`;
  *   one already there keeps its Mark done.
  */
+import { EngineTiming, type EngineTimingConfig } from '../config'
+import { observeWork, workWakes } from '../workControl'
 import { AiProvider, tasks } from '@juno/ai'
 import { channelLabel, resolveTitle, type TopicId } from '@juno/domain'
 import { Invalidation, keys, liveQuery, StoreReader, StoreWriter, transaction, type InvalidationKeys, type SqlError } from '@juno/store'
@@ -33,9 +35,6 @@ import { homeStage } from './ready'
 import { FOLLOWED, HOME_SELECT, OPEN, type HomeRow } from './rows'
 
 const KEYS: InvalidationKeys = ['topics', 'topic_overlay', 'thread_subs', 'prefs', 'sync_state']
-/** Changes in this window are one pass; a steady stream of changes still gets a pass per window. */
-const WINDOW = '3 seconds'
-const TICK = '15 minutes'
 const CONCURRENCY = 2
 /** Topics one pass asks about, per task. */
 const PASS_SIZE = 12
@@ -44,8 +43,6 @@ const SETTLED_DAYS = 7
 const FOLLOW_UP_DAYS = 3
 /** Messages a settled score or a follow-up scan reads. */
 const MESSAGES = 12
-const DEFER_BASE_MILLIS = 60_000
-const DEFER_CAP_MILLIS = 60 * 60_000
 const DAY = 24 * 60 * 60 * 1000
 
 const tsOf = (millis: number) => `${Math.floor(millis / 1000)}.000000`
@@ -66,9 +63,9 @@ interface Memory {
 
 const due = (memory: Memory, key: string, now: number) => (memory.deferred.get(key)?.until ?? 0) <= now
 
-const defer = (memory: Memory, key: string, now: number) => {
+const defer = (memory: Memory, key: string, now: number, timing: EngineTimingConfig) => {
   const attempts = (memory.deferred.get(key)?.attempts ?? 0) + 1
-  memory.deferred.set(key, { until: now + Math.min(DEFER_CAP_MILLIS, DEFER_BASE_MILLIS * 2 ** (attempts - 1)), attempts })
+  memory.deferred.set(key, { until: now + Math.min(timing.aiDeferCapMillis, timing.aiDeferBaseMillis * 2 ** (attempts - 1)), attempts })
 }
 
 /** The title and place a task reads for a topic. */
@@ -87,6 +84,7 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
     // the first sync reads first, and threads, which come with the `getView` pages.
     if (!(yield* homeStage).ready) return
     const sql = yield* StoreReader
+    const timing = yield* EngineTiming
     const now = yield* Clock.currentTimeMillis
     let budget = HOME_DAILY_BUDGET - (yield* usedToday(now))
     if (budget <= 0) return
@@ -120,7 +118,7 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
         Effect.gen(function* () {
           const messages = yield* recentMessages(row, selfId, MESSAGES)
           const decision = yield* decideAndStore(tasks.settledScore, { topicId: row.topic_id as TopicId, ...describe(row, selfId, users), now: nowIso, messages })
-          if (decision._tag !== 'Decided') defer(memory, `settledScore:${row.topic_id}`, yield* Clock.currentTimeMillis)
+          if (decision._tag !== 'Decided') defer(memory, `settledScore:${row.topic_id}`, yield* Clock.currentTimeMillis, timing)
         }),
       { concurrency: CONCURRENCY, discard: true },
     )
@@ -140,7 +138,7 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
       ({ row, messages }) =>
         Effect.gen(function* () {
           const decision = yield* decideAndStore(tasks.followUps, { topicId: row.topic_id as TopicId, ...describe(row, selfId, users), now: nowIso, messages })
-          if (decision._tag !== 'Decided') return defer(memory, `followUps:${row.topic_id}`, yield* Clock.currentTimeMillis)
+          if (decision._tag !== 'Decided') return defer(memory, `followUps:${row.topic_id}`, yield* Clock.currentTimeMillis, timing)
           if (decision.value.followUps.length === 0) return
           const found = String(yield* Clock.currentTimeMillis)
           yield* transaction(
@@ -162,6 +160,7 @@ const runPass = (memory: Memory): Effect.Effect<void, SqlError, StoreServices | 
 export const HomeJob: Layer.Layer<never, never, Workspace | AiProvider | AiCredentials | AiSpend | EngineConfig> = Layer.effectDiscard(
   Effect.gen(function* () {
     if (!(yield* aiJobsOn)) return
+    const timing = yield* EngineTiming
     const workspace = yield* Workspace
     const provider = yield* AiProvider
     const wakes = yield* aiWakes
@@ -173,10 +172,12 @@ export const HomeJob: Layer.Layer<never, never, Workspace | AiProvider | AiCrede
         const woken = wakes.pipe(Stream.mapEffect(() => Effect.sync(() => {
           memory.deferred.clear()
         })))
-        const triggers = Stream.merge(Stream.merge(liveQuery(KEYS, Effect.void).pipe(Stream.groupedWithin(1000, WINDOW)), Stream.tick(TICK)), woken)
+        const triggers = Stream.merge(Stream.merge(liveQuery(KEYS, Effect.void).pipe(Stream.groupedWithin(1000, timing.homeWindowMillis)), Stream.tick(timing.homeTickMillis)), woken)
         return triggers.pipe(
+          Stream.merge(workWakes('home')),
           Stream.mapEffect(() =>
             runPass(memory).pipe(
+              observeWork('home'),
               Effect.catch((error) => Effect.logWarning('home: a pass failed', error)),
               Effect.provideService(AiProvider, provider),
             ),

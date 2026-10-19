@@ -25,6 +25,7 @@
  * A top-level module, like `workspace.ts`. It reaches Slack through the
  * top-level `SessionClient`, so it imports no feature folder.
  */
+import { WorkControl } from './workControl'
 import { Context, Effect, FiberSet, Layer, Schema, Semaphore } from 'effect'
 import { NotSignedIn, Offline, RateLimited, Rejected } from '@juno/contract'
 import type { SlackApiError, SlackApiShape } from '@juno/slack'
@@ -67,6 +68,7 @@ export class Outbox extends Context.Service<
   static readonly layer: Layer.Layer<Outbox, never, SessionClient> = Layer.effect(
     Outbox,
     Effect.gen(function* () {
+      const control = yield* WorkControl
       const client = yield* SessionClient
       const onLane =
         (lane: 'send' | 'interactive' | 'background', singleAttempt = false) =>
@@ -103,10 +105,12 @@ export class Outbox extends Context.Service<
             }
             const held = lock
             held.users += 1
+            control.onCommands?.(key, held.users)
             return held.semaphore.withPermit(effect).pipe(
               Effect.ensuring(
                 Effect.sync(() => {
                   held.users -= 1
+                  control.onCommands?.(key, held.users)
                   if (held.users === 0) locks.delete(key)
                 }),
               ),

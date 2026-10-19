@@ -26,7 +26,7 @@
     "test": "node scripts/heavy.mjs node scripts/unit.mjs",
     "test:e2e": "node scripts/heavy.mjs --electron sh -c \"pnpm --filter @juno/desktop test:e2e && pnpm --filter @juno/gallery test:e2e\"",
     "test:desktop": "node scripts/heavy.mjs --electron pnpm --filter @juno/desktop test:e2e",
-    "perf": "node scripts/heavy.mjs --exclusive pnpm --filter @juno/desktop perf",
+    "perf": "node scripts/heavy.mjs --exclusive node scripts/perf.mjs",
     "test:feel": "node scripts/heavy.mjs --exclusive pnpm --filter @juno/desktop test:feel",
     "test:gallery": "node scripts/heavy.mjs --electron pnpm --filter @juno/gallery test:e2e",
     "test:plan": "node scripts/plan.mjs",
@@ -59,11 +59,11 @@
     "test:agent": "node scripts/heavy.mjs pnpm --filter @juno/agent test",
     "test:notifications": "node scripts/heavy.mjs pnpm --filter @juno/engine test",
     "flake": "node scripts/flake.mjs",
-    "test:remote-pool": "node --test scripts/remote/pool-decisions.test.mjs scripts/remote/usage.test.mjs scripts/remote/runner.test.mjs scripts/remote/pool.test.mjs scripts/remote/outage.test.mjs scripts/plan.test.mjs",
+    "test:remote-pool": "node --test scripts/remote/pool-decisions.test.mjs scripts/remote/usage.test.mjs scripts/remote/runner.test.mjs scripts/remote/workspace.test.mjs scripts/remote/runner-health.test.mjs scripts/remote/runner-pinning.test.mjs scripts/remote/namespace.test.mjs scripts/remote/pool.test.mjs scripts/remote/outage.test.mjs scripts/plan.test.mjs",
     "test:package": "env JUNO_E2E_AI_JOBS=1 node scripts/heavy.mjs --exclusive pnpm --filter @juno/desktop test:package",
     "health:baseline": "node scripts/health.mjs --update-baseline",
     "test:health": "node --test scripts/health.test.mjs",
-    "test:repo-tools": "node scripts/heavy.mjs node --test scripts/batch-merge.test.mjs scripts/check-migration-order.test.mjs scripts/affected-select.test.mjs scripts/heavy.test.mjs scripts/release-gate.test.mjs scripts/release-schedule.test.mjs scripts/test-results-reporter.test.mjs scripts/check-tokens.test.mjs scripts/affected.test.mjs"
+    "test:repo-tools": "node scripts/heavy.mjs node --test scripts/build-cached.test.mjs scripts/batch-merge.test.mjs scripts/check-migration-order.test.mjs scripts/affected-select.test.mjs scripts/heavy.test.mjs scripts/release-gate.test.mjs scripts/release-main.test.mjs scripts/release-schedule.test.mjs scripts/test-results-reporter.test.mjs scripts/check-tokens.test.mjs scripts/affected.test.mjs"
   },
   "devDependencies": {
     "@informalsystems/quint": "0.33.0",

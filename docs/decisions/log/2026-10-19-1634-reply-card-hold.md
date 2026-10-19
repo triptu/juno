@@ -1,0 +1,1 @@
+- 10-19 16:34 · reply-card-hold · Hold the reply-card test’s post before the fake Slack handler runs: holding only its HTTP answer still emits the socket echo, which can legitimately change the card from pending to sent before the sending assertion. The full baseline caught that race; delivery and exact post-count checks remain unchanged.

@@ -13,7 +13,7 @@
  * (`onListed`), `holdUndecided` sorts what the rules can already place and
  * holds the channels they cannot read yet (`automated_holds`, which the
  * sidebar's All leaves out). Each is let go once its history is sorted
- * (`sortAndRelease`), and the rest after `HOLD_MILLIS` or when the boot
+ * (`sortAndRelease`), and the rest after the configured hold or when the boot
  * ends, so a slow history never keeps a channel out of All for long.
  *
  * `automated_channels` holds one row per conversation whose place is
@@ -312,9 +312,6 @@ export const sortClearCases = (channel?: string): Effect.Effect<void, SqlError, 
   }
   if (channel === undefined) yield* startRecording(now)
 })
-
-/** How long the first sync holds an undecided channel out of All at most, from just before rows first show. */
-export const HOLD_MILLIS = 5_000
 
 /**
  * The first sync's look before any row shows, from what is stored by then:

@@ -1,0 +1,1 @@
+- 10-19 03:58 · Toolchain cache access · Make /home/pwuser readable and searchable by other job uids so SSH containers can use Quint's warmed downloads. Why: the Playwright base makes that directory private to uid 1001, while the laptop runs jobs as uid 1000; the real Rust evaluator check failed before the permission change.

@@ -1,0 +1,1 @@
+- 10-19 08:37 · Tests · Keep repository paths through affected unit execution and start only their packages; import closures already select files, but package-relative filters also ran namesakes. Preserve whole-package and whole-suite config fallbacks.

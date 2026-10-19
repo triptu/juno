@@ -2,10 +2,12 @@
 // pending row shows at once, and the answer, the socket echo, a page and the
 // lookup after a lost answer reconcile it in every order, with Slack holding
 // exactly one copy of each message.
+import { controlledClock } from './controlledClock'
+import { step } from './step'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { MessageView } from '@juno/contract'
 import { discardMessage, draftAtom, messagesAtom, retryMessage, saveDraft, sendMessage, type ListWindow } from '@juno/state'
-import { waitFor, WAIT_MS, type RunningEngine } from './harness'
+import { waitFor, WAIT_MS, type RunningEngine, type EngineOptions } from './harness'
 import { apiCalls, bootedEngine, errorOf, quiet, readDb, restart, valueOf } from './scenario'
 
 const engines: Array<RunningEngine> = []
@@ -17,9 +19,8 @@ afterEach(async () => {
 
 const MAIN = 'm:C0ENG'
 const eng = { kind: 'channel', channelId: 'C0ENG' } as const
-
-const booted = async () => {
-  const engine = await bootedEngine(engines)
+const booted = async (options: EngineOptions = {}) => {
+  const engine = await bootedEngine(engines, options)
   await quiet(engine)
   engine.fake.resetCalls()
   return engine
@@ -40,14 +41,12 @@ function watch(engine: RunningEngine, topicId: string) {
       return rows !== undefined && predicate(rows) ? rows : undefined
     }, WAIT_MS, label)
 }
-
 /** Sends `text` to #eng's Main and answers with the `client_msg_id` of the post that went to Slack, for a post nothing holds. */
 async function post(engine: RunningEngine, text: string): Promise<string> {
   const before = apiCalls(engine, 'chat.postMessage').length
   expect(valueOf(await sendMessage(engine.registry, eng, text, MAIN))).toEqual({ topicId: MAIN })
   return waitFor(() => apiCalls(engine, 'chat.postMessage')[before]?.args['client_msg_id'], WAIT_MS, `"${text}" posted`)
 }
-
 /** Sends `text` to #eng's Main and answers with its `client_msg_id`, from the pending row. */
 async function send(engine: RunningEngine, text: string, rows: ReturnType<typeof watch>): Promise<string> {
   const exit = await sendMessage(engine.registry, eng, text, MAIN)
@@ -55,16 +54,12 @@ async function send(engine: RunningEngine, text: string, rows: ReturnType<typeof
   const shown = await rows((list) => list.some((row) => row.pending !== undefined && textOf(row) === text), `"${text}" shown`)
   return shown.find((row) => textOf(row) === text)!.clientMsgId!
 }
-
 const textOf = (row: MessageView) =>
   row.body.blocks
     .flatMap((block) => ('children' in block ? block.children : []))
     .map((inline) => ('text' in inline ? inline.text : ''))
     .join('')
-
-/** Copies of the message in Slack. */
 const inSlack = (engine: RunningEngine, clientMsgId: string) => engine.fake.messages('C0ENG').filter((m) => m.client_msg_id === clientMsgId).length
-/** Copies of the message in the store, and whether its pending row is left. */
 const inStore = (engine: RunningEngine, clientMsgId: string) => ({
   stored: readDb(engine, 'cache.db', (db) => (db.prepare('SELECT count(*) AS n FROM messages WHERE client_msg_id = ?').get(clientMsgId) as { n: number }).n),
   pending: readDb(engine, 'user.db', (db) => (db.prepare('SELECT state FROM pending_messages WHERE client_msg_id = ?').get(clientMsgId) as { state: string } | undefined)?.state),
@@ -75,42 +70,44 @@ const settled = (text: string) => (rows: ReadonlyArray<MessageView>) =>
   rows.filter((row) => textOf(row) === text).length === 1 && rows.some((row) => textOf(row) === text && row.pending === undefined)
 
 describe('send', () => {
-  it('shows the pending row at once, then the answer before the echo replaces it with one message', async () => {
+  it('reconciles sends once with either the answer or echo first', async () => {
     const engine = await booted()
-    const rows = watch(engine, MAIN)
-    await rows((list) => list.length > 0, 'the window')
-    engine.fake.holdFrames({ types: ['message'] })
-    engine.fake.holdNext({ method: 'chat.postMessage', before: true })
-    const id = await send(engine, 'Shipping the fix today', rows)
-    expect(inStore(engine, id)).toEqual({ stored: 0, pending: 'sending' })
-    engine.fake.release()
-    await rows(settled('Shipping the fix today'), 'the answer stored')
-    expect(inStore(engine, id)).toEqual({ stored: 1, pending: undefined })
-    engine.fake.releaseFrames()
-    await quiet(engine)
-    expect((await rows(settled('Shipping the fix today'), 'still one row')).filter((row) => textOf(row) === 'Shipping the fix today')).toHaveLength(1)
-    expect(inSlack(engine, id)).toBe(1)
-    const posts = apiCalls(engine, 'chat.postMessage')
-    expect(posts).toHaveLength(1)
-    expect(posts[0]!.args['client_msg_id']).toBe(id)
-  })
 
-  it('lets the echo reconcile before the answer, and the late answer changes nothing', async () => {
-    const engine = await booted()
-    const rows = watch(engine, MAIN)
-    await rows((list) => list.length > 0, 'the window')
-    engine.fake.holdNext({ method: 'chat.postMessage' })
-    valueOf(await sendMessage(engine.registry, eng, 'Echo first', MAIN))
-    // Slack has run the call and its echo is out; the answer waits.
-    const [held] = await waitFor(() => (engine.fake.heldCount({ method: 'chat.postMessage' }) === 1 ? engine.fake.heldCalls({ method: 'chat.postMessage' }) : undefined), WAIT_MS, 'the held answer')
-    const id = String(held!['client_msg_id'])
-    await rows(settled('Echo first'), 'the echo stored')
-    expect(inStore(engine, id)).toEqual({ stored: 1, pending: undefined })
-    engine.fake.release()
-    await quiet(engine)
-    await rows(settled('Echo first'), 'still one row')
-    expect(inStore(engine, id)).toEqual({ stored: 1, pending: undefined })
-    expect(inSlack(engine, id)).toBe(1)
+    await step('shows the pending row at once, then the answer before the echo replaces it with one message', async () => {
+      const rows = watch(engine, MAIN)
+      await rows((list) => list.length > 0, 'the window')
+      engine.fake.holdFrames({ types: ['message'] })
+      engine.fake.holdNext({ method: 'chat.postMessage', before: true })
+      const id = await send(engine, 'Shipping the fix today', rows)
+      expect(inStore(engine, id)).toEqual({ stored: 0, pending: 'sending' })
+      engine.fake.release()
+      await rows(settled('Shipping the fix today'), 'the answer stored')
+      expect(inStore(engine, id)).toEqual({ stored: 1, pending: undefined })
+      engine.fake.releaseFrames()
+      await quiet(engine)
+      expect((await rows(settled('Shipping the fix today'), 'still one row')).filter((row) => textOf(row) === 'Shipping the fix today')).toHaveLength(1)
+      expect(inSlack(engine, id)).toBe(1)
+      const posts = apiCalls(engine, 'chat.postMessage')
+      expect(posts).toHaveLength(1)
+      expect(posts[0]!.args['client_msg_id']).toBe(id)
+    })
+
+    await step('lets the echo reconcile before the answer, and the late answer changes nothing', async () => {
+      const rows = watch(engine, MAIN)
+      await rows((list) => list.length > 0, 'the window')
+      engine.fake.holdNext({ method: 'chat.postMessage' })
+      valueOf(await sendMessage(engine.registry, eng, 'Echo first', MAIN))
+      // Slack has run the call and its echo is out; the answer waits.
+      const [held] = await waitFor(() => (engine.fake.heldCount({ method: 'chat.postMessage' }) === 1 ? engine.fake.heldCalls({ method: 'chat.postMessage' }) : undefined), WAIT_MS, 'the held answer')
+      const id = String(held!['client_msg_id'])
+      await rows(settled('Echo first'), 'the echo stored')
+      expect(inStore(engine, id)).toEqual({ stored: 1, pending: undefined })
+      engine.fake.release()
+      await quiet(engine)
+      await rows(settled('Echo first'), 'still one row')
+      expect(inStore(engine, id)).toEqual({ stored: 1, pending: undefined })
+      expect(inSlack(engine, id)).toBe(1)
+    })
   })
 
   it('after a lost answer, finds the message in history instead of posting it again', async () => {
@@ -251,31 +248,46 @@ describe('send', () => {
   })
 
   it('flushes when a catch-up ends: a lookup waiting out its backoff runs at once', async () => {
-    const engine = await booted()
-    // A reply, so the catch-up's history pages cannot reconcile it: only the lookup can.
-    const root = engine.fake.messages('C0ENG').find((m) => (m.reply_count ?? 0) > 0)!
-    engine.fake.holdFrames({ types: ['message'] })
-    engine.fake.loseResponse({ method: 'chat.postMessage' })
-    // An error the client does not retry itself, so each lookup fails at once and only the outbox backoff waits.
-    engine.fake.forceError({ method: 'conversations.replies', error: 'request_timeout', times: 100 })
-    valueOf(await sendMessage(engine.registry, { ...eng, threadTs: root.ts }, 'After the flush'))
-    const post = await waitFor(() => apiCalls(engine, 'chat.postMessage')[0], WAIT_MS, 'the post')
-    const id = String(post.args['client_msg_id'])
-    const nextAt = () => readDb(engine, 'user.db', (db) => (db.prepare('SELECT next_at FROM pending_messages WHERE client_msg_id = ?').get(id) as { next_at: number } | undefined)?.next_at)
-    // Each failed lookup doubles the wait (2 s, 4 s, 8 s); stop once the next one is far off.
-    // The catch-up below takes well under a second, so 8 s leaves a wide margin.
-    const due = await waitFor(() => {
-      const at = nextAt()
-      return at !== undefined && at - Date.now() > 6_000 ? at : undefined
-    }, WAIT_MS, 'a long backoff')
-    engine.fake.clearError({ method: 'conversations.replies' })
-    engine.fake.releaseFrames({ drop: true })
-    engine.fake.dropSocket()
-    await engine.phase('live', 30_000)
-    await waitFor(() => (inStore(engine, id).pending === undefined ? true : undefined), WAIT_MS, 'settled after the catch-up')
-    expect(Date.now()).toBeLessThan(due)
-    expect(inStore(engine, id)).toEqual({ stored: 1, pending: undefined })
-    expect(engine.fake.messages('C0ENG').filter((m) => m.client_msg_id === id)).toHaveLength(1)
+    const time = await controlledClock()
+    const engine = await booted({ clock: time.clock, timing: { socketPingMillis: 86_400_000, socketPongTimeoutMillis: 86_400_000 } })
+    try {
+      await time.freeze()
+      // A reply, so the catch-up's history pages cannot reconcile it: only the lookup can.
+      const root = engine.fake.messages('C0ENG').find((m) => (m.reply_count ?? 0) > 0)!
+      engine.fake.holdFrames({ types: ['message'] })
+      engine.fake.loseResponse({ method: 'chat.postMessage' })
+      // An error the client does not retry itself, so each lookup fails at once and only the outbox backoff waits.
+      engine.fake.forceError({ method: 'conversations.replies', error: 'request_timeout', times: 100 })
+      valueOf(await sendMessage(engine.registry, { ...eng, threadTs: root.ts }, 'After the flush'))
+      const post = await waitFor(() => apiCalls(engine, 'chat.postMessage')[0], WAIT_MS, 'the post')
+      const id = String(post.args['client_msg_id'])
+      const nextAt = () => readDb(engine, 'user.db', (db) => (db.prepare('SELECT next_at FROM pending_messages WHERE client_msg_id = ?').get(id) as { next_at: number } | undefined)?.next_at)
+      // Advance each scheduled retry after the failed lookup committed it. No real backoff elapses.
+      const nextAfter = (previous: number) => waitFor(() => {
+        const at = nextAt()
+        return at !== undefined && at > previous ? at : undefined
+      }, WAIT_MS, 'the next lookup backoff')
+      let due = await nextAfter(time.now())
+      while (due - time.now() <= 6_000) {
+        await time.advance(due - time.now())
+        const previous = due
+        due = await nextAfter(previous)
+      }
+      engine.fake.clearError({ method: 'conversations.replies' })
+      engine.fake.releaseFrames({ drop: true })
+      engine.fake.dropSocket()
+      await engine.phase('offline')
+      await time.advance(500)
+      await engine.phase('live', 30_000)
+      await waitFor(() => (inStore(engine, id).pending === undefined ? true : undefined), WAIT_MS, 'settled after the catch-up')
+      expect(time.now()).toBeLessThan(due)
+      expect(inStore(engine, id)).toEqual({ stored: 1, pending: undefined })
+      expect(engine.fake.messages('C0ENG').filter((m) => m.client_msg_id === id)).toHaveLength(1)
+    } finally {
+      await engine.stop()
+      engines.splice(engines.indexOf(engine), 1)
+      await time.close()
+    }
   })
 
   it('waits out a lost connection: a send made offline stays queued, then posts once when the socket is back', async () => {
@@ -287,7 +299,7 @@ describe('send', () => {
     await engine.phase('offline')
     const id = await send(engine, 'Written on the train', rows)
     // Nothing leaves while offline, so the row never becomes a lookup.
-    await new Promise((resolve) => setTimeout(resolve, 1_000))
+    await engine.workPass('post')
     expect(apiCalls(engine, 'chat.postMessage')).toHaveLength(0)
     expect(inStore(engine, id)).toEqual({ stored: 0, pending: 'queued' })
     engine.main.network.offline = false
@@ -320,33 +332,36 @@ describe('send', () => {
     engine.fake.decide(first.id, 'run')
     await waitFor(() => engine.fake.gated().find((call) => call.id === first.id && call.stage === 'answer'), WAIT_MS, 'the first post run')
     engine.fake.decide(first.id, 'answer')
-    await new Promise((resolve) => setTimeout(resolve, 1_000))
+    await engine.workPass('post')
     const second = engine.fake.gated().filter((call) => call.id !== first.id)
     engine.fake.gate(undefined)
     // SPEC 8: sends wait out a lost connection.
     expect(second).toHaveLength(0)
   })
 
-  it('posts in a thread', async () => {
+  it('routes a reply to its thread and opens a new DM before sending', async () => {
     const engine = await booted()
-    const root = engine.fake.messages('C0ENG').find((m) => (m.reply_count ?? 0) > 0)!
-    const topic = `t:C0ENG:${root.ts}`
-    const rows = watch(engine, topic)
-    await rows((list) => list.length > 0, 'the thread')
-    const exit = await sendMessage(engine.registry, { ...eng, threadTs: root.ts }, 'Thursday works for me', topic)
-    expect(valueOf(exit)).toEqual({ topicId: topic })
-    await rows(settled('Thursday works for me'), 'the reply posted')
-    expect(apiCalls(engine, 'chat.postMessage')[0]!.args['thread_ts']).toBe(root.ts)
-  })
 
-  it('opens a DM with conversations.open for a person never messaged, then posts', async () => {
-    const engine = await booted()
-    const { topicId } = valueOf(await sendMessage(engine.registry, { kind: 'person', userId: 'U0JONAS' }, 'Welcome aboard'))
-    const opens = apiCalls(engine, 'conversations.open')
-    expect(opens).toHaveLength(1)
-    expect(opens[0]!.args['users']).toBe('U0JONAS')
-    await watch(engine, topicId)(settled('Welcome aboard'), 'the DM posted')
-    expect(apiCalls(engine, 'chat.postMessage')[0]!.args['channel']).toBe(topicId.slice('m:'.length))
+    await step('posts in a thread', async () => {
+      const root = engine.fake.messages('C0ENG').find((m) => (m.reply_count ?? 0) > 0)!
+      const topic = `t:C0ENG:${root.ts}`
+      const rows = watch(engine, topic)
+      await rows((list) => list.length > 0, 'the thread')
+      const exit = await sendMessage(engine.registry, { ...eng, threadTs: root.ts }, 'Thursday works for me', topic)
+      expect(valueOf(exit)).toEqual({ topicId: topic })
+      await rows(settled('Thursday works for me'), 'the reply posted')
+      expect(apiCalls(engine, 'chat.postMessage')[0]!.args['thread_ts']).toBe(root.ts)
+    })
+
+    await step('opens a DM with conversations.open for a person never messaged, then posts', async () => {
+      engine.fake.resetCalls()
+      const { topicId } = valueOf(await sendMessage(engine.registry, { kind: 'person', userId: 'U0JONAS' }, 'Welcome aboard'))
+      const opens = apiCalls(engine, 'conversations.open')
+      expect(opens).toHaveLength(1)
+      expect(opens[0]!.args['users']).toBe('U0JONAS')
+      await watch(engine, topicId)(settled('Welcome aboard'), 'the DM posted')
+      expect(apiCalls(engine, 'chat.postMessage')[0]!.args['channel']).toBe(topicId.slice('m:'.length))
+    })
   })
 
   it('keeps a draft per topic across a restart, and sending clears it', async () => {
@@ -364,7 +379,6 @@ describe('send', () => {
     await waitFor(() => (draft() === '' ? true : undefined), WAIT_MS, 'the draft cleared')
   })
 })
-
 
 it.each(['C0ENG', 'G0MAYALEO'])('New chat in %s queues a thread root and acknowledges its dependent reply once', async channelId => {
   const engine = await booted()

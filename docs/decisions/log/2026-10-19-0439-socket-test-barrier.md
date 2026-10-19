@@ -1,0 +1,1 @@
+- 10-19 04:39 · socket-test-barrier · Register the test socket barrier as a scoped SocketEvents subscriber at engine startup; SyncRunner keeps the shared publisher, and the barrier observes completed sync write attempts without coupling independent subscribers.

@@ -2,7 +2,7 @@
 // groups and channels suggested as you type, picked with the keyboard, sent
 // as real Slack mentions and channel links, Esc and Backspace, and Home's
 // composer, in a question for Juno and once a person or channel is chosen.
-import { expect, test } from './fixtures'
+import { expect, test, type Fixtures } from './fixtures'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -12,9 +12,18 @@ const ENG_MAIN = '#eng'
 const postedText = (fake: { readonly calls: ReadonlyArray<{ readonly method: string; readonly args: Record<string, unknown> }> }) =>
   fake.calls.filter((call) => call.method === 'chat.postMessage').map((call) => String(call.args['text']))
 
-test('mention a person in a reply: Backspace removes it whole, and it posts as <@U…> and shows as a mention', async ({ juno, fake }) => {
+test('picks people, groups and channels, navigates suggestions and keeps a mention draft', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
+  const context = { juno, fake }
+  await test.step('mention a person in a reply: Backspace removes it whole, and it posts as <@U…> and shows as a mention', () => mentionPerson(context))
+  await test.step('a user group is suggested after the people who match, and posts as Slack sends a group mention', () => mentionGroup(context))
+  await test.step('link a channel with #, picked with Tab', () => linkChannel(context))
+  await test.step('arrows move through the list, and Esc closes it and keeps the text', () => navigateMentions(context))
+  await test.step('a draft keeps its mentions across tab switches', () => keepMentionDraft(context))
+})
+
+async function mentionPerson({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
   const { topic } = juno
   await juno.sidebar.row(POSTGRES).open()
   await topic.expectTitle(POSTGRES)
@@ -50,11 +59,9 @@ test('mention a person in a reply: Backspace removes it whole, and it posts as <
   await topic.expectSent('Thanks')
   expect(postedText(fake).at(-1)).toBe('Thanks <@U0MAYA> the plan works.')
   await expect(topic.message('Thanks').locator('[data-person="U0MAYA"]')).toHaveText('@Maya')
-})
+}
 
-test('a user group is suggested after the people who match, and posts as Slack sends a group mention', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+async function mentionGroup({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
@@ -85,11 +92,9 @@ test('a user group is suggested after the people who match, and posts as Slack s
   const blocks = post.args['blocks']
   expect(typeof blocks === 'string' ? blocks : JSON.stringify(blocks)).toContain('{"type":"usergroup","usergroup_id":"S0PLATFORM"}')
   await expect(topic.message('Heads up').locator('[data-usergroup="S0PLATFORM"]')).toHaveText('@platform')
-})
+}
 
-test('link a channel with #, picked with Tab', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+async function linkChannel({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
@@ -106,11 +111,9 @@ test('link a channel with #, picked with Tab', async ({ juno, fake }) => {
   await topic.expectSent('Notes are in')
   expect(postedText(fake).at(-1)).toBe('Notes are in <#C0PLATFORM|platform> now.')
   await expect(topic.message('Notes are in').locator('[data-channel="C0PLATFORM"]')).toHaveText('#platform')
-})
+}
 
-test('arrows move through the list, and Esc closes it and keeps the text', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+async function navigateMentions({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
   const { topic } = juno
   await juno.sidebar.row(POSTGRES).open()
   await topic.expectTitle(POSTGRES)
@@ -138,11 +141,9 @@ test('arrows move through the list, and Esc closes it and keeps the text', async
   await topic.composer.press('Enter')
   await topic.expectSent('@march')
   expect(postedText(fake).at(-1)).toBe('@march')
-})
+}
 
-test('a draft keeps its mentions across tab switches', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+async function keepMentionDraft({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
   const { topic, sidebar } = juno
   await sidebar.row(POSTGRES).open()
   await topic.composer.pressSequentially('Ask @pri')
@@ -159,7 +160,7 @@ test('a draft keeps its mentions across tab switches', async ({ juno, fake }) =>
   await topic.composer.press('Enter')
   await topic.expectSent('Ask')
   expect(postedText(fake).at(-1)).toBe('Ask <@U0PRIYA> about the copy.')
-})
+}
 
 test('Home suggests people and channels inside a question for Juno and once a person or channel is chosen', async ({ juno, fake }) => {
   await juno.signIn()

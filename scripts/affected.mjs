@@ -1,6 +1,4 @@
-// Works out which tests a change can affect, and runs only those.
-//
-//   pnpm affected                 local Bun check, then the affected suites on one Namespace machine
+//   pnpm affected                 local Bun check, then the affected suites in one remote plan
 //   pnpm affected --plan          print the plan only
 //   pnpm affected --local         run the plan through the local root scripts
 //   pnpm affected --local-on-outage   run the remote steps here if Namespace stays
@@ -36,7 +34,7 @@ import { ImportGraph } from './import-graph.mjs'
 import { driverSpecs, galleryComponents, mapProblem, MAX_COVERAGE_SPECS, rankSpecs, reachSpecs, selectSpecs } from './affected-select.mjs'
 import { HEAVY_AREAS, heavyAreasChanged, inPaths, perfInteractionsChanged, PROTOCOL_PATHS } from './test-areas.mjs'
 import { runPlan } from './affected-run.mjs'
-import { nodeTestScripts, unitTestMatcher } from './affected-tests.mjs'
+import { nodeTestScripts, unitTestItems } from './affected-tests.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
@@ -70,7 +68,7 @@ const files = new Set(git('ls-files', '--cached', '--others', '--exclude-standar
 /** What every suite installs and compiles with: a change reaches every unit test, and a sample of every e2e suite. */
 const dependencies = ['pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', 'tsconfig.base.json']
 /** The tools that plan and run the suites: a change runs the tool tests and one spec end to end (--wide: everything). */
-const tools = ['scripts/affected.mjs', 'scripts/affected-select.mjs', 'scripts/affected-run.mjs', 'scripts/affected-tests.mjs', 'scripts/test-areas.mjs', 'scripts/import-graph.mjs', 'scripts/coverage-map.mjs', 'scripts/remote.mjs', 'scripts/heavy.mjs', 'scripts/build-cached.mjs', 'scripts/without-run-as-node.mjs']
+const tools = ['scripts/affected.mjs', 'scripts/affected-select.mjs', 'scripts/affected-run.mjs', 'scripts/affected-tests.mjs', 'scripts/unit.mjs', 'scripts/plan.mjs', 'scripts/test-areas.mjs', 'scripts/import-graph.mjs', 'scripts/coverage-map.mjs', 'scripts/remote.mjs', 'scripts/heavy.mjs', 'scripts/build-cached.mjs', 'scripts/without-run-as-node.mjs']
 const toolChanged = changed.filter((file) => tools.includes(file) || file.startsWith('scripts/remote/'))
 const everythingChanged = [...changed.filter((file) => dependencies.includes(file)), ...(wide ? toolChanged : [])]
 
@@ -126,18 +124,11 @@ const pending = (items) =>
   })
 
 // Unit tests: the vitest files of every package and app (scripts/affected-tests.mjs).
-const unitItems = [...files]
-  .filter(unitTestMatcher(root))
-  .map((file) => {
-    const dir = file.split('/').slice(0, 2).join('/')
-    const config = [`${dir}/package.json`, `${dir}/vitest.config.ts`, `${dir}/tsconfig.json`]
-    return { suite: 'test', id: file, inputs: new Set([...closure(file), ...config]), own: changed.some((path) => config.includes(path)) }
-  })
+const unitItems = unitTestItems(root, files, changed, closure)
 const unit = pending(unitItems)
-// vitest matches filters against paths inside each package. Two packages with a
-// test of the same name both run it, which only costs time.
-const filters = [...new Set(unit.map((item) => item.id.split('/').slice(2).join('/')))]
-if (unit.length > 0) plan.push({ script: 'test', args: unit.length === unitItems.length ? [] : ['--passWithNoTests', ...filters], items: unit, why: `${unit.length} vitest file(s)` })
+// Keep package identity all the way to Vitest. Relative filters used to run
+// namesakes in unrelated packages and start every package's test process.
+if (unit.length > 0) plan.push({ script: 'test', args: unit.length === unitItems.length ? [] : ['--files', ...unit.map((item) => item.id)], items: unit, why: `${unit.length} vitest file(s)` })
 
 // Specs. specs:check keeps its own cache of passing Quint runs. A narrow plan
 // adds it when the specs themselves changed, or what they run on (the lockfile
@@ -288,7 +279,9 @@ function desktopSelection() {
     if (wide) return { all: `${everythingChanged[0]} changed` }
     // What every spec compiles with changed: no spec can be told apart, so a sample stands in.
     const reason = `${everythingChanged[0]} changed`
-    return { specs: new Map(specItems.map((item) => [item.id, [reason]])), scores: new Map(), required: new Set(), notes: [`${reason}: no spec can be told apart, so the smallest specs stand in for all of them`] }
+    const ownChanges = changed.filter((file) => file.startsWith('apps/desktop/e2e/') && !support.has(file))
+    const required = new Set(specItems.filter((item) => ownChanges.some((file) => closure(item.id).has(file))).map((item) => item.id))
+    return { specs: new Map(specItems.map((item) => [item.id, [reason]])), scores: new Map(), required, notes: [`${reason}: changed specs and their helpers stay required; the smallest specs sample the rest`] }
   }
   if (flag('--graph')) return { all: 'asked for by --graph; the import graph decides' }
   const map = existsSync(join(root, MAP_PATH)) ? JSON.parse(readFileSync(join(root, MAP_PATH), 'utf8')) : undefined
@@ -331,6 +324,12 @@ if (!wide && selection.specs) {
     selection.specs.set(smoke, [`${toolChanged[0]} changed; one spec checks that a run still works (--wide runs everything)`])
     selection.required.add(smoke)
   }
+  if (!batch && toolChanged.length > 0 && files.has(smoke)) {
+    const item = specItems.find((candidate) => candidate.id === smoke)
+    item.own = true
+    // A smoke run verifies the tools too; their contents must invalidate its cache.
+    for (const file of git('ls-files', '--cached', '--others', '--exclude-standard', '--', 'scripts')) item.inputs.add(file)
+  }
   // A spec whose every test is heavy runs only when its area changed.
   for (const area of HEAVY_AREAS.filter((entry) => !heavyActive.has(entry.area)))
     for (const spec of area.whole)
@@ -372,7 +371,7 @@ const interactions = batch ? [] : perfInteractionsChanged(changed)
 
 // --plan --json prints the plan for tools (a replay of past merges, for one).
 if (flag('--json')) {
-  console.log(JSON.stringify({ changed, steps: plan.map((step) => ({ script: step.script, args: step.args, env: step.env, local: step.local === true, items: step.items.map((item) => item.id), why: step.why })), desktopDropped, notes: desktopNotes, heavySkipped: skipTags }))
+  writeFileSync(1, JSON.stringify({ changed, steps: plan.map((step) => ({ script: step.script, args: step.args, env: step.env, local: step.local === true, items: step.items.map((item) => item.id), why: step.why })), desktopDropped, notes: desktopNotes, heavySkipped: skipTags }) + '\n')
   process.exit(0)
 }
 const scope = wide

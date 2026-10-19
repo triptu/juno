@@ -5,7 +5,7 @@ import { expectStableAnchor } from './shiftProbe'
 // mentioned in) and a channel's Main, so they stay in the sidebar under the
 // followed-threads rule as well as the older every-active-thread rule.
 import type { FakeSlack } from '@juno/fake-slack'
-import { expect, test } from './fixtures'
+import { expect, test, type Fixtures } from './fixtures'
 import type { Juno } from './driver/juno'
 
 // A failing test attaches the sidebar's order hold and topic list values (README, "Sidebar trace").
@@ -31,9 +31,16 @@ async function postAbovePostgres(juno: Juno, fake: FakeSlack): Promise<void> {
   await expect.poll(() => juno.sidebar.titles('Recent').then((titles) => titles[0])).toBe('#incidents')
 }
 
-test('after sign-in the sidebar lists followed threads and Main, newest first, with tags and counts', async ({ juno }) => {
+test('shows sidebar rows and unread people, then filters and clears the list', async ({ juno, slack, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
+  const context = { juno, slack, fake }
+  await test.step('after sign-in the sidebar lists followed threads and Main, newest first, with tags and counts', () => initialRows(context))
+  await test.step('the stack shows who wrote the unread replies, and nobody once the topic is read', () => unreadPeople(context))
+  await test.step('the quick filters and the Unread toggle narrow the list, and an empty result offers to clear them', () => filterRows(context))
+})
+
+async function initialRows({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   const { sidebar } = juno
 
   // Nothing is pinned yet, so there is one section and no "Recent" label over it.
@@ -81,11 +88,9 @@ test('after sign-in the sidebar lists followed threads and Main, newest first, w
   // Both groups have unread topics, so both dots show.
   await sidebar.expectFilterDot('Channels', true)
   await sidebar.expectFilterDot('DMs', true)
-})
+}
 
-test('the stack shows who wrote the unread replies, and nobody once the topic is read', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+async function unreadPeople({ juno, slack }: Pick<Fixtures, 'juno' | 'slack'>): Promise<void> {
   const postgres = juno.sidebar.row(POSTGRES)
   await postgres.expectRead()
 
@@ -100,11 +105,9 @@ test('the stack shows who wrote the unread replies, and nobody once the topic is
   await postgres.expectRead()
   await expect(stack).toHaveCount(0)
   await expect(postgres.root.getByRole('img', { name: /Maya|Leo/ })).toHaveCount(0)
-})
+}
 
-test('the quick filters and the Unread toggle narrow the list, and an empty result offers to clear them', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+async function filterRows({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
   const { sidebar } = juno
   await test.step('the quick filters narrow the list, DM rows show no people, and the Unread toggle hides read rows', async () => {
     await sidebar.row(POSTGRES).expectVisible()
@@ -166,7 +169,7 @@ test('the quick filters and the Unread toggle narrow the list, and an empty resu
     await sidebar.clearFilters()
     await sidebar.row(POSTGRES).expectVisible()
   })
-})
+}
 
 test('during the first sync the list says Juno is getting the topics, then shows rows before history lands', async ({ juno, fake }) => {
   // Hold the first boot call, so nothing has arrived when the window opens.

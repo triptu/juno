@@ -38,6 +38,7 @@ import {
   firstName,
   millisToTs,
   MOVED_A_LOT_MIN,
+  notificationIsMuted,
   rankHomeItems,
   resolveTitle,
   SETTLED_MIN_SCORE,
@@ -47,6 +48,7 @@ import {
   type HomeKind,
   type Ts,
 } from '@juno/domain'
+import { readSettings } from '@juno/notifications'
 import { prefs, StoreReader, syncState, type SqlError } from '@juno/store'
 import { BOOT_KEY } from '@juno/sync'
 import { Clock, Effect } from 'effect'
@@ -151,12 +153,19 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
   Effect.gen(function* () {
     const sql = yield* StoreReader
     const aiAssist = yield* aiAssistOn
+    const { settings } = yield* readSettings
     const team = yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`
     const selfId = team[0]?.self_user_id ?? undefined
     const run = (statement: Statement) => sql.unsafe<HomeRow>(statement.sql, statement.params)
 
     const now = yield* Clock.currentTimeMillis
-    const unread = yield* run(homeStatements.unread(millisToTs(now - UNREAD_DAYS * DAY)))
+    const isMuted = (row: Pick<HomeRow, 'kind' | 'topic_id' | 'channel' | 'c_kind' | 'c_user_id'>) => {
+      const threadLevel = row.kind === 'thread' ? settings.threads?.[row.topic_id] : undefined
+      const channelLevel = settings.channels[row.channel]
+      const personLevel = row.c_kind === 'im' && row.c_user_id !== null ? settings.people[row.c_user_id] : undefined
+      return notificationIsMuted(threadLevel, channelLevel, personLevel)
+    }
+    const unread = (yield* run(homeStatements.unread(millisToTs(now - UNREAD_DAYS * DAY)))).filter((row) => !isMuted(row))
     const candidates: Array<HomeCandidate<Candidate>> = []
     const add = (item: Candidate['item'], rows: ReadonlyArray<HomeRow>, extra: Omit<Candidate, 'item' | 'rows'> = {}) =>
       candidates.push({ kind: item.kind, topicIds: rows.map((row) => row.topic_id), value: { item, rows, ...extra } })
@@ -280,7 +289,11 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
       if (record !== undefined) add({ id: 'automatedMoves', kind: 'automatedMoves', title: record.title }, record.rows, { moves: record.moves })
     }
 
-    const ranked = rankHomeItems(candidates, HOME_ITEM_LIMIT)
+    const visibleCandidates = candidates.flatMap((candidate) => {
+      const rows = candidate.value.rows.filter((row) => !isMuted(row))
+      return rows.length === 0 ? [] : [{ ...candidate, topicIds: rows.map((row) => row.topic_id), value: { ...candidate.value, rows } }]
+    })
+    const ranked = rankHomeItems(visibleCandidates, HOME_ITEM_LIMIT)
 
     // Names: the shown topics' people and the senders of the questions, and the user for the greeting.
     const userIds = new Set<string>(senders)

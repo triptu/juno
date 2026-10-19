@@ -1,0 +1,1 @@
+- 10-19 08:47 · Tests · Keep the desktop smoke spec through the final affected-input filter when test tools change, and include script contents in its result-cache key; selecting it as a candidate alone did not run it.

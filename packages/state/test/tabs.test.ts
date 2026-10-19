@@ -275,6 +275,16 @@ describe('reopening closed tabs', () => {
     expect(reopenClosedTab(reopenClosedTab(second))).toBe(reopenClosedTab(second))
   })
 
+  it('reopens a chosen closed tab, wherever it is on the stack', () => {
+    const one = closeTab(three, idOf(three, 'c'))
+    const two = closeTab(one, idOf(one, 'a'))
+    const back = reopenClosedTab(two, idOf(three, 'c'))
+    expect(shown(back)).toEqual(['b', 'c'])
+    expect(activeShows(back)).toBe('c')
+    expect(shown(reopenClosedTab(back))).toEqual(['a', 'b', 'c'])
+    expect(reopenClosedTab(back, idOf(three, 'c'))).toBe(back)
+  })
+
   it('after closing all, reopens them left to right', () => {
     let tabs = closeAllTabs(three)
     tabs = reopenClosedTab(reopenClosedTab(reopenClosedTab(tabs)))

@@ -138,11 +138,13 @@ test('a create that answers 504 but makes its machine later is destroyed, never 
 test('a daemon whose script was deleted is replaced by one running from the pool folder', { timeout: 60_000 }, async () => {
   const { dir, poolDir, run, waitFor, daemonPid, cleanup } = await outageHarness()
   const gone = join(dir, 'checkout', 'scripts', 'remote')
+  const ready = join(dir, 'stale-ready')
   mkdirSync(gone, { recursive: true })
-  writeFileSync(join(gone, 'pool.mjs'), 'setInterval(() => {}, 1000)\n')
+  writeFileSync(join(gone, 'pool.mjs'), `import { writeFileSync } from 'node:fs'; writeFileSync(${JSON.stringify(ready)}, ''); setInterval(() => {}, 1000)\n`)
   const stale = spawn(process.execPath, [join(gone, 'pool.mjs'), '--watch'], { stdio: 'ignore' })
   const staleExit = new Promise((resolvePromise) => stale.on('exit', resolvePromise))
   try {
+    await waitFor(() => existsSync(ready))
     mkdirSync(poolDir, { recursive: true })
     writeFileSync(join(poolDir, 'watcher.pid'), String(stale.pid))
     writeFileSync(join(poolDir, 'watcher.version'), '12')
@@ -151,6 +153,7 @@ test('a daemon whose script was deleted is replaced by one running from the pool
     const client = run('fresh')
     await staleExit
     await waitFor(() => client.output.includes('acquired fresh'))
+    await waitFor(() => daemonPid() > 0 && daemonPid() !== stale.pid)
     assert.notEqual(daemonPid(), stale.pid)
     assert(readFileSync(join(poolDir, 'watcher.script'), 'utf8').startsWith(join(poolDir, 'daemon')))
     assert(existsSync(readFileSync(join(poolDir, 'watcher.script'), 'utf8')))

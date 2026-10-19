@@ -45,6 +45,8 @@ export function tempUserData(): Promise<string> {
 }
 
 export interface LaunchOptions {
+  /** Engine scheduling profile. Timing, perf, feel and @mac checks retain production defaults. */
+  readonly timing?: 'fast' | 'production'
   /** The fake Slack the app signs in against (sign-in window, socket allow-list). */
   readonly fakeSlackUrl?: string
   /** A fixture Slack-app directory for "Use the Slack app's session". */
@@ -144,6 +146,7 @@ function coverageDir(): string | undefined {
  * to test what survives a relaunch.
  */
 export async function launchApp(userData: string, options: LaunchOptions = {}): Promise<RunningApp> {
+  const started = performance.now()
   const env: Record<string, string> = {}
   // pnpm's global virtual store gives the scripts it runs NODE_PATH and a
   // NODE_OPTIONS resolve hook. The app is bundled and the packaged app gets
@@ -154,6 +157,9 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   }
   env.JUNO_USER_DATA = userData
   env.JUNO_E2E = '1'
+  const info = base.info()
+  const production = options.paced === true || /(?:perf|idle-cpu)\.spec\.ts$|[/\\]feel[/\\]/.test(info.file) || info.tags.includes('@mac')
+  env.JUNO_E2E_FAST_TIMING = (options.timing ?? (production ? 'production' : 'fast')) === 'fast' ? '1' : '0'
   delete env.JUNO_E2E_OPENROUTER_KEY
   env.JUNO_FAKE_AI_REQUIRES_KEY = options.fakeAiRequiresKey === true ? '1' : '0'
   if (options.fakeSlackUrl !== undefined) env.JUNO_FAKE_SLACK_URL = options.fakeSlackUrl
@@ -197,13 +203,16 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
     await app.context().addInitScript(startSendTrace)
     await win.evaluate(startSendTrace)
   }
+  if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: launch ${Math.round(performance.now() - started)} ms`)
   return {
     app,
     win,
     close: async () => {
       // Main and the renderers write what ran since their last write; the engine and the agent write as they end.
       if (coverage !== undefined) await app.evaluate(() => (globalThis as unknown as { junoTest: { flushCoverage: () => Promise<void> } }).junoTest.flushCoverage()).catch(() => undefined)
+      const closing = performance.now()
       await app.close()
+      if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: close ${Math.round(performance.now() - closing)} ms`)
       await ownOpenRouter?.close()
     },
   }
@@ -234,6 +243,7 @@ export async function writeSlackApp(
 }
 
 export interface Fixtures {
+  readonly timing: 'fast' | 'production' | undefined
   /** Run the engine's background AI jobs in the `running` app (`LaunchOptions.aiJobs`); `test.use({ aiJobs: true })` opts a file in. */
   readonly aiJobs: boolean
   /** How long the `running` app's fake AI takes to answer (`LaunchOptions.fakeAiDelayMillis`); undefined answers at once. */
@@ -300,7 +310,9 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   // Playwright requires the destructuring pattern even with no dependencies.
   // oxlint-disable-next-line no-empty-pattern
   fake: async ({}, use) => {
+    const started = performance.now()
     const fake = await startFakeSlack()
+    if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: fake ${Math.round(performance.now() - started)} ms`)
     await use(fake)
     await fake.close()
   },
@@ -315,15 +327,17 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     await use(userData)
     await rm(userData, { recursive: true, force: true })
   },
+  timing: [undefined, { option: true }],
   aiJobs: [false, { option: true }],
   fakeAiDelayMillis: [undefined, { option: true }],
   screenShared: [false, { option: true }],
   updateServer: [undefined, { option: true }],
   sidebarTrace: [false, { option: true }],
   sendTrace: [false, { option: true }],
-  running: async ({ fake, slackApp, userData, aiJobs, fakeAiDelayMillis, screenShared, updateServer, sidebarTrace, sendTrace }, use, testInfo) => {
+  running: async ({ fake, slackApp, userData, aiJobs, fakeAiDelayMillis, screenShared, updateServer, sidebarTrace, sendTrace, timing }, use, testInfo) => {
     const running = await launchApp(userData, {
       fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword,
+      ...(timing === undefined ? {} : { timing }),
       aiJobs, screenShared, sidebarTrace, sendTrace, ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }),
       ...(updateServer === undefined ? {} : { updateServer }),
     })

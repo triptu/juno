@@ -1,0 +1,1 @@
+- 10-19 01:45 · Sync · Anchor mutation repair to 24 hours before the gap and expire jobs by enqueue age; drop missing threads with bounded reply tombstones. Refresh markers on uninterrupted sweeps and interleave conversations within the ten-call cap, so live activity does not bury offline changes.

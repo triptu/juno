@@ -5,41 +5,19 @@
 # packs the reports into /out for scripts/remote.mjs to fetch.
 set -uo pipefail
 cd /work
-pnpm install --frozen-lockfile --offline --reporter=silent || exit 70
-echo "remote: workspace linked in ${SECONDS} s" >&2
+source scripts/remote/install.sh
 # Electron's first start on the container's layered filesystem copies the
 # binary up; parallel test workers starting it then fail with ETXTBSY.
 electron=$(node -e "console.log(require('./apps/desktop/node_modules/electron'))" 2>/dev/null) && "$electron" --version >/dev/null 2>&1
 
-# One job per machine, so it can use all of it. Sizes follow the core count
-# (2 to 16, see remoteShapes in scripts/remote.mjs) and never drop below 1.
-cores=${JUNO_RUNNER_JOB_CORES:-$(nproc)}
-at_least() { echo $(( $1 > $2 ? $1 : $2 )); }
-export GALLERY_BROWSER=chromium JUNO_HEAVY_SLOTS=1 JUNO_TEST_FILE_PARALLEL=1
-# Lets scripts/build-cached.mjs reuse a build made earlier in this run.
-export JUNO_REMOTE_CONTAINER=1
-export JUNO_TYPECHECK_JOBS=${JUNO_TYPECHECK_JOBS:-$(at_least $(( cores / 2 )) 1)}
-export JUNO_TEST_PACKAGE_JOBS=${JUNO_TEST_PACKAGE_JOBS:-2}
-if [ "$cores" -eq 2 ]; then export JUNO_TEST_TIMING_SEPARATE=${JUNO_TEST_TIMING_SEPARATE:-1}; fi
-export JUNO_VITEST_WORKERS=${JUNO_VITEST_WORKERS:-$(at_least $cores 4)}
-# An Electron test runs the app, its engine and a fake Slack: half a core's worth
-# of workers kept tests on time on 4 cores, one per core did not (8 cores take
-# one per core, below). The gallery
-# mostly waits on frames and timers, so it runs more workers than cores.
-desktop_workers=$(at_least $(( cores / 2 )) 2)
-# On the standard 8x16 shape, eight workers ran all 380 tests in 266 s without a failure (10-17).
-if [ "$cores" -ge 8 ]; then desktop_workers=$cores; fi
-if [ "$cores" -eq 4 ] && [ "$1" = test:desktop ] && [ -n "${JUNO_SHARD:-}" ]; then desktop_workers=3; fi
-export JUNO_E2E_WORKERS=${JUNO_E2E_WORKERS:-$desktop_workers}
-export GALLERY_WORKERS=${GALLERY_WORKERS:-$(( cores * 3 ))} GALLERY_SHIFT_PARTS=${GALLERY_SHIFT_PARTS:-$(( cores * 3 ))}
-# Spec simulations run beside the Apalache checks here (on the Mac they run first).
-spec_jobs=$(at_least $(( cores / 2 )) 1)
-if [ "$1" = specs:traces ]; then spec_jobs=$cores; fi
-export SPECS_JOBS=${SPECS_JOBS:-$spec_jobs} SPECS_APALACHE=${SPECS_APALACHE:-$(at_least $(( cores / 4 )) 1)} SPECS_OVERLAP=1
+source scripts/remote/workers.sh
 script_started=$SECONDS
 # Samples how busy the machine is every 2 s, to size the workers above.
 ( prev=($(head -1 /proc/stat)); previous_usage=$(awk '$1 == "usage_usec" { print $2 }' /sys/fs/cgroup/cpu.stat 2>/dev/null)
   while sleep 2; do
+    if [ "${JUNO_RUNNER_PINNED:-0}" = 1 ]; then
+      df -B1 --output=target,used /tmp /work | tail -n +2 >> /out/tmpfs.txt
+    fi
     awk '/^MemTotal:/ { total = $2 } /^MemAvailable:/ { available = $2 } END { print total - available, available }' /proc/meminfo >> /out/memory.txt
     if [ -n "${JUNO_RUNNER_JOB_CORES:-}" ]; then
       usage=$(awk '$1 == "usage_usec" { print $2 }' /sys/fs/cgroup/cpu.stat)
@@ -60,6 +38,12 @@ xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' pnpm "$@"
 code=$?
 echo "remote: script time $(( SECONDS - script_started )) s" >&2
 kill $sampler 2>/dev/null
+if [ -n "${JUNO_RUNNER_JOB_CORES:-}" ] && [ -r /sys/fs/cgroup/memory.peak ]; then
+  awk '{ printf "remote: peak container memory %.2f GB (includes file cache)\n", $1 / 1073741824 }' /sys/fs/cgroup/memory.peak >&2
+fi
+if [ -s /out/tmpfs.txt ]; then
+  awk '{ if ($2 > peak[$1]) peak[$1] = $2 } END { for (path in peak) printf "remote: sampled peak tmpfs %s %.1f MiB\n", path, peak[path] / 1048576 }' /out/tmpfs.txt >&2
+fi
 if [ -s /out/memory.txt ]; then
   sort -nr -k1,1 /out/memory.txt | head -1 | awk '{ printf "remote: peak memory used %.1f GB, available %.1f GB\n", $1 / 1048576, $2 / 1048576 }' >&2
 fi

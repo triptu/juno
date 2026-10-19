@@ -5,7 +5,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import type { MessageView } from '@juno/contract'
 import { deleteMessage, messagesAtom, sendMessage, type ListWindow } from '@juno/state'
-import { sleep, waitFor, WAIT_MS, type RunningEngine } from './harness'
+import { waitFor, WAIT_MS, type RunningEngine } from './harness'
 import { apiCalls, bootedEngine, quiet, readDb, valueOf } from './scenario'
 
 const engines: Array<RunningEngine> = []
@@ -142,13 +142,34 @@ describe('send: a copy whose delete waits across a reconnect', () => {
     await quiet(engine)
     engine.fake.resetCalls()
     const id = await copyAcrossDrop(engine, 'Sent before the drop', 5)
-    // Nothing on screen and no active topics to read: the recheck reads no topic.
+    // Mutation repair never certifies outbox coverage; only a fallback recheck can.
     for (const unmount of unmounts.splice(0)) unmount()
     engine.fake.dropSocket()
     await waitFor(() => keptCopy(engine), WAIT_MS, 'the copy kept')
     expect(keptCopy(engine)).toEqual({ reason: 'not-rechecked', hidden: 0 })
     expect(readDb(engine, 'user.db', (db) => (db.prepare(`SELECT count(*) AS n FROM outbox WHERE kind = 'delete'`).get() as { n: number }).n)).toBe(0)
     expect(inSlack(engine, id)).toBe(2)
+  })
+
+  it('keeps the surviving copy when markers find the original deleted offline without a recheck', async () => {
+    const engine = await bootedEngine(engines, { recheckTopics: 0 })
+    await quiet(engine)
+    const id = await copyAcrossDrop(engine, 'Original deleted offline', 5)
+    const original = readDb(engine, 'user.db', (db) => db.prepare('SELECT ts FROM sent_posts WHERE client_msg_id = ?').get(id))?.ts
+    expect(typeof original).toBe('string')
+    for (const unmount of unmounts.splice(0)) unmount()
+    engine.fake.goOffline()
+    await engine.phase('offline')
+    engine.fake.deleteMessage({ channel: 'C0ENG', ts: String(original) })
+    engine.fake.goOnline()
+    await engine.phase('live', WAIT_MS)
+    await engine.syncIdle()
+    await waitFor(() => keptCopy(engine), WAIT_MS, 'surviving copy kept')
+    expect(inSlack(engine, id)).toBe(1)
+    expect(keptCopy(engine)?.hidden).toBe(0)
+    expect(readDb(engine, 'cache.db', (db) => db.prepare('SELECT deleted FROM messages WHERE channel = ? AND ts = ?').get('C0ENG', String(original)))?.deleted).toBe(1)
+    expect(apiCalls(engine, 'conversations.history').some((c) => c.args['_x_reason'] === 'mutation-repair')).toBe(true)
+    expect(engine.fake.calls.some((c) => c.args['_x_reason'] === 'recheck')).toBe(false)
   })
 
   it('deletes the copy once the recheck after the reconnect has read its channel', async () => {
@@ -181,9 +202,10 @@ describe('send: a copy whose delete waits for the send lane', () => {
     expect(valueOf(await sendMessage(engine.registry, { kind: 'channel', channelId: 'C0PRODUCT' }, 'A slow post', 'm:C0PRODUCT'))).toEqual({ topicId: 'm:C0PRODUCT' })
     await waitFor(() => engine.fake.gated()[0], WAIT_MS, 'the slow post at Slack')
     // The copy's echo arrives: it is hidden, its delete is checked and waits for the lane.
+    const ready = engine.actionsReady()
     engine.fake.releaseFrames()
     await waitFor(() => (deletesLeft(engine) === 1 ? true : undefined), WAIT_MS, 'the copy delete queued')
-    await sleep(1_000)
+    await waitFor(() => engine.actionsReady() > ready ? true : undefined, WAIT_MS, 'the copy delete passed preflight')
     // On the phone the user deletes the message Juno kept.
     engine.fake.deleteMessage({ channel: 'C0ENG', ts: kept })
     await waitFor(
@@ -216,7 +238,8 @@ describe('send: the user deletes a message before Juno has seen its copy', () =>
     await waitFor(() => (inSlack(engine, id) === 1 ? true : undefined), WAIT_MS, 'the message deleted in Slack')
     engine.fake.releaseFrames()
     // The copy's echo is stored, and its delete row, if any, settles.
-    await sleep(2_000)
+    await engine.socketIdle()
+    await engine.workPass('action')
     await waitFor(() => (deletesLeft(engine) === 0 ? true : undefined), WAIT_MS, 'the delete rows settled')
     // The user meant the message gone: Slack keeps no copy of it, and Juno shows none.
     expect(inSlack(engine, id)).toBe(0)

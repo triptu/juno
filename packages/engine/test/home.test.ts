@@ -5,7 +5,7 @@ import { homeMarkDone, homeView, homeVisit, prefsSet, type HomeView } from '@jun
 import { SELF_ID } from '@juno/fake-slack'
 import { liveQuery, runCommand, type Registry } from '@juno/state'
 import { waitFor, WAIT_MS, type RunningEngine } from './harness'
-import { bootedEngine, threadId, valueOf } from './scenario'
+import { bootedEngine, restart, threadId, valueOf } from './scenario'
 
 const engines: Array<RunningEngine> = []
 const unmounts: Array<() => void> = []
@@ -41,8 +41,12 @@ describe('Home', () => {
   })
 
   it('with AI assist off, ranks what waits, where the user left off and what moved, and adds nothing from the assistant', async () => {
-    const engine = await bootedEngine(engines, { aiJobs: true })
-    valueOf(await runCommand(engine.registry, prefsSet, { key: 'aiAssist', value: false }))
+    // Persist AI assist off before any background job can title the fixture.
+    const setup = await bootedEngine(engines)
+    valueOf(await runCommand(setup.registry, prefsSet, { key: 'aiAssist', value: false }))
+    const engine = await restart(engines, setup, () => {}, { aiJobs: true })
+    await engine.workPass('title')
+    await engine.workPass('home')
 
     const first = await homeUntil(engine, (view) => view.items.length > 0, 'a waiting item')
     expect(first.firstName).toBe('Tushar')
@@ -66,15 +70,18 @@ describe('Home', () => {
   })
 
   it('with AI assist on, adds a follow-up until Mark done, tidies up settled topics and rewrites a title line', async () => {
-    const engine = await bootedEngine(engines, { aiJobs: true })
-    // Tidy up waits for an hour of quiet here (four by default); the incident thread went quiet 70 minutes ago.
-    valueOf(await runCommand(engine.registry, prefsSet, { key: 'tidyUp', value: { quiet: '1h', threads: true, dms: true } }))
-    // A second settled thread: Dev's, answered by the user, and Dev's thanks two hours ago.
+    // Seed the whole old conversation before AI can cache a score from a partial history.
     const HOUR = 3_600_000
-    const root = engine.fake.workspace.post({ channel: 'C0INCIDENTS', user: 'U0DEV', text: 'The staging deploy keys need rotating before Friday', at: engine.fake.now() - 3 * HOUR })
-    engine.fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts, user: SELF_ID, text: 'Rotated them this morning.', at: engine.fake.now() - 2.5 * HOUR })
-    engine.fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts, user: 'U0DEV', text: 'Great, thanks', at: engine.fake.now() - 2 * HOUR })
-    const keys = `t:C0INCIDENTS:${root.ts}`
+    let keys = ''
+    const engine = await bootedEngine(engines, { aiJobs: true, initial: (fake) => {
+      const root = fake.workspace.post({ channel: 'C0INCIDENTS', user: 'U0DEV', text: 'The staging deploy keys need rotating before Friday', at: fake.now() - 3 * HOUR })
+      fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts, user: SELF_ID, text: 'Rotated them this morning.', at: fake.now() - 2.5 * HOUR })
+      fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts, user: 'U0DEV', text: 'Great, thanks', at: fake.now() - 2 * HOUR })
+      keys = `t:C0INCIDENTS:${root.ts}`
+      return fake.signIn()
+    } })
+    // The fixture incident went quiet 70 minutes ago; one hour makes it eligible.
+    valueOf(await runCommand(engine.registry, prefsSet, { key: 'tidyUp', value: { quiet: '1h', threads: true, dms: true } }))
 
     const view = await homeUntil(engine, (value) => kinds(value).join() === 'waiting,followUp,tidyUp' && value.items[0]!.aiTitle !== undefined, 'the AI items')
     expect(view.items[0]!.aiTitle).toBe('Elena asks: She has a competing offer with a Friday')

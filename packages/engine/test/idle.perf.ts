@@ -1,3 +1,4 @@
+import { productionTiming } from '../src/config'
 // The engine sleeps when nothing happens (performance.md section 1, "Idle
 // CPU after sync"). On 10-16 it spun at 103 % on a large workspace: an
 // unread message mentioned someone the store knew, a newer one named nobody,
@@ -22,8 +23,9 @@ const channelNamed = (fake: FakeSlack, name: string): string => {
   throw new Error(`No channel #${name}`)
 }
 
-it('sleeps after sync, with an older unread message that mentions a known person', async () => {
+it('sleeps after sync, with an older unread message that mentions a known person [production timing]', async () => {
   engine = await startTestEngine({
+    timing: { ...productionTiming, sweepIntervalMillis: 0, followPassMillis: 0 },
     initial: (fake) => {
       const eng = channelNamed(fake, 'eng')
       const now = fake.workspace.clock.now()

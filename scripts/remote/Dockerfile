@@ -1,11 +1,7 @@
-# The image `pnpm remote` runs in. Built by scripts/remote.mjs with `nsc build`
-# and tagged with a hash of this file and the lockfile, so it is rebuilt only
-# when one of them changes. The context holds the lockfile, the workspace file
-# and every package.json, nothing else.
-#
+# Toolchain only. Workspace dependencies are installed against a persistent store.
 # Playwright's image brings Ubuntu, Chromium for the gallery, its system
 # libraries (which Electron also needs) and xvfb.
-FROM mcr.microsoft.com/playwright:v1.64.0-noble
+FROM mcr.microsoft.com/playwright:v1.64.0-noble AS toolchain
 
 ARG NODE_VERSION=26.11.1
 ARG PNPM_VERSION=12.11.2
@@ -15,17 +11,17 @@ RUN apt-get update \
   && curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" | tar -xJ -C /usr/local --strip-components=1 \
   && npm install -g --silent "pnpm@${PNPM_VERSION}"
 
-# Chrome and Electron refuse to run sandboxed as root, so everything runs as pwuser.
-RUN mkdir -p /work && chown pwuser /work
+# SSH runs as its host uid; Namespace uses pwuser. Both can unpack into /work.
+RUN mkdir -p /work && chmod 1777 /work && chmod 755 /home/pwuser
 USER pwuser
 WORKDIR /work
 ENV QUINT_HOME=/home/pwuser/.quint
-COPY --chown=pwuser . /work
-RUN pnpm install --frozen-lockfile \
-  && test "$(pnpm exec bun --version)" = "$(node -p "require('./node_modules/bun/package.json').version")"
+# Only the Quint pin is sent here, never the workspace or lockfile.
+COPY --chown=pwuser toolchain.json /tmp/toolchain.json
+RUN npm install --prefix /tmp/quint --no-audit --no-fund "@informalsystems/quint@$(node -p "require('/tmp/toolchain.json').quint")"
 
 # Quint downloads its Rust evaluator and Apalache on first use; do it here.
 RUN printf 'module warm {\n  var x: int\n  action init = x'"'"' = 0\n  action step = x'"'"' = x\n  val ok = x == 0\n}\n' > /tmp/warm.qnt \
-  && node node_modules/@informalsystems/quint/dist/src/cli.js run /tmp/warm.qnt --backend rust --max-samples 1 --max-steps 1 --invariant ok \
-  && node node_modules/@informalsystems/quint/dist/src/cli.js verify /tmp/warm.qnt --max-steps 1 --invariant ok --apalache-version 0.62.1 \
-  && rm -rf /tmp/warm.qnt _apalache-out
+  && node /tmp/quint/node_modules/@informalsystems/quint/dist/src/cli.js run /tmp/warm.qnt --backend rust --max-samples 1 --max-steps 1 --invariant ok \
+  && node /tmp/quint/node_modules/@informalsystems/quint/dist/src/cli.js verify /tmp/warm.qnt --max-steps 1 --invariant ok --apalache-version 0.62.1 \
+  && rm -rf /tmp/warm.qnt _apalache-out /tmp/quint /tmp/toolchain.json

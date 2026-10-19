@@ -1,13 +1,19 @@
+import { timed } from './profile'
+import { Effect, Record } from 'effect'
+import type { WorkName } from '../src/workControl'
 /**
  * The engine end to end inside Node: the real engine over a MessageChannel,
  * the real state atoms, an in-process fake Slack, and a scripted "main" that
  * answers the engine's parentPort requests the way apps/desktop does.
  */
+import { productionTiming, type EngineTimingConfig } from '../src/config'
 import { mkdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { MessageChannel } from 'node:worker_threads'
 import { HttpTransport } from '@juno/slack'
+import { workspacePaths } from '@juno/store'
+import { migratedWorkspace } from './migratedWorkspace'
 import { startFakeSlack, type Credentials, type FakeSlack, type FakeSlackOptions } from '@juno/fake-slack'
 import type { EngineStatus, SessionSecrets, SessionStatus, TopicRow } from '@juno/contract'
 import {
@@ -138,6 +144,14 @@ export interface RunningEngine {
   readonly userData: string
   readonly handle: EngineHandle
   readonly status: (tag: SessionStatus['_tag']) => Promise<SessionStatus>
+  /** A harmless unknown frame proves earlier socket frames were consumed. */
+  readonly socketIdle: () => Promise<void>
+  /** Requests and awaits a complete pass through its normal serial worker. */
+  readonly workPass: (name: WorkName) => Promise<void>
+  /** Number of actions that passed preflight and requested the send lane. */
+  readonly actionsReady: () => number
+  /** Commands holding or waiting for the same target lock. */
+  readonly pendingCommands: (key: string) => number
   /** Waits for boot or reconnect and its follow pass to finish. Does not drain socket events or command retries. */
   readonly syncIdle: () => Promise<void>
   /** Waits for a sync cycle that starts after this call to finish. */
@@ -167,61 +181,81 @@ export interface EngineOptions {
   readonly reuse?: { readonly userData: string; readonly fake: FakeSlack; readonly credentials: Credentials }
   /** Serve the AgentHost group on these ports, as for the agent process (ADR 0012). */
   readonly agent?: { readonly transport: Transport; readonly writes?: 'enabled' | 'disabled' }
-  /** How long a failed boot waits before it tries again (the app waits 30 s). */
-  readonly bootRetryMillis?: number
-  /** How often the live engine runs its periodic catch-up. Zero disables it. */
-  readonly sweepIntervalMillis?: number
-  /** How often a periodic catch-up also checks every followed thread in the quiet window. */
-  readonly followPassMillis?: number
+  /** Scheduling overrides on the fast profile. Data ages and Retry-After stay real. */
+  readonly timing?: Partial<EngineTimingConfig>
+  readonly clock?: EngineHostOptions['clock']
   /** How many topics the recheck after a drop reads (the app reads 10). */
   readonly recheckTopics?: number
-  /** How long a reaction waits unsent before the message says so (the app waits 30 s). */
-  readonly actionDeadlineMillis?: number
-  readonly actionStallMillis?: number
-  /** How long a new read mark waits before it is sent (the app waits 400 ms). */
-  readonly markDelayMillis?: number
-  /** How long Slack's notification schedule waits after a change before it writes (the app waits 1 s). */
-  readonly slackScheduleDebounceMillis?: number
-  /** How long the Automated job gathers changes before a pass (the app waits 3 s). */
-  readonly automatedWindowMillis?: number
   /**
    * Space Slack calls as the app does (`SlackConfig.lanes`), not with the fake's pacing off, every spacing divided
    * by this number (1 is the app's pacing) so the methods keep their real ratios.
    */
   readonly paced?: number
-  /** How often the "In a huddle" status is renewed while a call is live (the app: 240 s). */
-  readonly huddleStatusRenewMillis?: number
   /** Run the background AI jobs (titles, art, Home's AI items, Juno's Automated check). Off by default, so a test sees no AI result it did not ask for. */
   readonly aiJobs?: boolean
+}
+
+/** All scheduling ratios stay at 1:20; explicit sync passes replace periodic work in ordinary tests. */
+export const fastTiming: EngineTimingConfig = {
+  ...Record.map(productionTiming, (millis) => millis / 20),
+  sweepIntervalMillis: 0,
+  followPassMillis: 0,
 }
 
 /** Starts a fake (unless reused) and the engine on it, with the atoms a test reads. */
 export async function startTestEngine(options: EngineOptions = {}): Promise<RunningEngine> {
   const fake =
     options.reuse?.fake ??
-    (await startFakeSlack({
+    (await timed('fake and seed', () => startFakeSlack({
       ...options.fakeOptions,
       ...(options.enterpriseId === undefined ? {} : { enterpriseId: options.enterpriseId }),
-    }))
+    })))
   const credentials = options.reuse?.credentials ?? options.initial?.(fake)
   const main = fakeMain(fake, credentials)
   const userData = options.reuse?.userData ?? join(tmpdir(), `juno-engine-test-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
   await mkdir(userData, { recursive: true })
+  if (options.reuse === undefined) {
+    const enterprise = fake.workspace.team.enterprise_id
+    await timed('schema copy', () => migratedWorkspace(workspacePaths(userData, enterprise === undefined ? fake.teamId : `${enterprise}-${fake.teamId}`)))
+  }
   const transport = memoryTransport()
   let cycles = 0
   let pendingCycles = 0
   let online = false
-  const handle = await startEngine(transport, { userData, e2e: true, dev: false, fakeSlackUrl: fake.url, ai: 'fake', aiJobs: options.aiJobs === true, ...(options.paced === undefined ? {} : { fakeSlackPaced: true, ...(options.paced === 1 ? {} : { fakeSlackPaceScale: options.paced }) }), ...(options.actionDeadlineMillis === undefined ? {} : { actionDeadlineMillis: options.actionDeadlineMillis }), ...(options.actionStallMillis === undefined ? {} : { actionStallMillis: options.actionStallMillis }), ...(options.markDelayMillis === undefined ? {} : { markDelayMillis: options.markDelayMillis }), ...(options.slackScheduleDebounceMillis === undefined ? {} : { slackScheduleDebounceMillis: options.slackScheduleDebounceMillis }), ...(options.automatedWindowMillis === undefined ? {} : { automatedWindowMillis: options.automatedWindowMillis }), ...(options.huddleStatusRenewMillis === undefined ? {} : { huddleStatusRenewMillis: options.huddleStatusRenewMillis }) }, {
+  const commands = new Map<string, number>()
+  let actionsReady = 0
+  let barrierSent = 0
+  let barrierSeen = 0
+  const work = new Map<WorkName, { started: number; finished: number; wake?: Effect.Effect<void> }>()
+  const stateOf = (name: WorkName) => {
+    let state = work.get(name)
+    if (state === undefined) { state = { started: 0, finished: 0 }; work.set(name, state) }
+    return state
+  }
+  const handle = await timed('engine construction', () => startEngine(transport, { userData, e2e: true, dev: false, fakeSlackUrl: fake.url, ai: 'fake', aiJobs: options.aiJobs === true, ...(options.paced === undefined ? {} : { fakeSlackPaced: true, ...(options.paced === 1 ? {} : { fakeSlackPaceScale: options.paced }) }) }, {
+    timing: { ...fastTiming, ...options.timing },
+    ...(options.clock === undefined ? {} : { clock: options.clock }),
+    work: {
+      onCommands: (key, count) => { if (count === 0) commands.delete(key); else commands.set(key, count) },
+      onActionReady: () => { actionsReady++ },
+      onPass: (name, event) => {
+        const state = stateOf(name)
+        if (event === 'started') state.started++
+        else state.finished = state.started
+      },
+      onWake: (name, wake) => { const state = stateOf(name); if (wake === undefined) delete state.wake; else state.wake = wake },
+    },
     ...(options.notifications === undefined ? {} : { notifications: options.notifications }),
     host: main.host,
     httpTransport: main.httpTransport,
     ...(options.agent === undefined ? {} : { agentTransport: options.agent.transport, agentWrites: options.agent.writes ?? 'disabled' }),
     sync: {
-      config: {
-        sweepIntervalMillis: options.sweepIntervalMillis ?? 0,
-        followPassMillis: options.followPassMillis ?? 0,
-        ...(options.bootRetryMillis === undefined ? {} : { bootRetryMillis: options.bootRetryMillis }),
-        ...(options.recheckTopics === undefined ? {} : { recheckTopics: options.recheckTopics }),
+      config: options.recheckTopics === undefined ? {} : { recheckTopics: options.recheckTopics },
+      onEvent: (event) => {
+        if (event._tag === 'Frame' && event.frame.type === 'unknown') {
+          const raw = event.frame.raw
+          if (typeof raw === 'object' && raw !== null && 'junoTestBarrier' in raw && typeof raw.junoTestBarrier === 'number') barrierSeen = raw.junoTestBarrier
+        }
       },
       onCycle: (event) => {
         if (event === 'started') {
@@ -233,7 +267,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
         online = next
       },
     },
-  })
+  }))
   const connection = {
     acquire: async () => {
       const channel = new MessageChannel()
@@ -281,6 +315,21 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
         WAIT_MS,
         `session ${tag}`,
       ),
+    socketIdle: async () => {
+      if (!online) return
+      const id = ++barrierSent
+      fake.emitFrame({ type: 'juno_test_barrier', junoTestBarrier: id })
+      await waitFor(() => barrierSeen >= id || !online ? true : undefined, WAIT_MS, 'socket frames consumed')
+    },
+    actionsReady: () => actionsReady,
+    pendingCommands: (key) => commands.get(key) ?? 0,
+    workPass: async (name) => {
+      const state = stateOf(name)
+      const wake = await waitFor(() => state.wake, WAIT_MS, `${name} worker ready`)
+      const started = state.started
+      await Effect.runPromise(wake)
+      await waitFor(() => state.finished > started ? true : undefined, WAIT_MS, `${name} pass finished`)
+    },
     syncIdle: async () => {
       await waitFor(() => (cycles > 0 && pendingCycles === 0 ? true : undefined), WAIT_MS, 'the sync cycle to finish')
     },

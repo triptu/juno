@@ -22,8 +22,9 @@ export default {
     // Knip reads every package.json exports map and discovers test/config entries
     // through its Vitest plugin. Package scripts also cover the AI eval entries.
     'packages/*': { project: ['**/*.{ts,tsx}'] },
-    'packages/engine': { entry: ['src/messages/body.ts'], project: ['**/*.{ts,tsx}'], vitest: { config: ['vitest.config.ts', 'vitest.conformance.config.ts'] } },
-    'packages/agent': { entry: ['eval/run.ts', 'bench/*.ts'], project: ['**/*.{ts,tsx}'] },
+    'packages/ai': { vitest: { config: ['vitest.config.ts', 'vitest.perf.config.ts'] } },
+    'packages/engine': { entry: ['src/messages/body.ts'], project: ['**/*.{ts,tsx}'], vitest: { config: ['vitest.config.ts', 'vitest.conformance.config.ts', 'vitest.perf.config.ts'] } },
+    'packages/agent': { entry: ['eval/run.ts', 'bench/*.ts'], project: ['**/*.{ts,tsx}'], vitest: { config: ['vitest.config.ts', 'vitest.perf.config.ts'] } },
     'docs/juno-agent/spikes': { entry: ['*.ts'], project: ['*.ts'] },
     'packages/tokens': {
       project: ['**/*.{ts,tsx}'],

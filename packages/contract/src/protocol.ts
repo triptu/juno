@@ -36,18 +36,6 @@ export const EngineConfig = Schema.Struct({
   fakeAiRequiresKey: Schema.optionalKey(Schema.Boolean),
   /** Tests only: false keeps the background AI jobs (titles, art, Home's AI items, Juno's Automated check) from calling the model, so a test sees no result it did not ask for. Unset means on. */
   aiJobs: Schema.optionalKey(Schema.Boolean),
-  /** Tests only: how long a reaction waits unsent before the message says so (the app waits 3 s). */
-  actionStallMillis: Schema.optionalKey(Schema.Number),
-  /** Tests only: maximum time pending between calls (the app allows five minutes). */
-  actionDeadlineMillis: Schema.optionalKey(Schema.Number),
-  /** Tests only: how long a new read mark waits before it is sent (the app waits 400 ms). */
-  markDelayMillis: Schema.optionalKey(Schema.Number),
-  /** Tests only: how long Slack's notification schedule waits after a change before it writes (the app waits 1 s). */
-  slackScheduleDebounceMillis: Schema.optionalKey(Schema.Number),
-  /** Tests only: how long the Automated job gathers changes before a pass (the app waits 3 s). */
-  automatedWindowMillis: Schema.optionalKey(Schema.Number),
-  /** Tests only: how often the "In a huddle" status is renewed while a call is live (the app: 240 s, ±10%). */
-  huddleStatusRenewMillis: Schema.optionalKey(Schema.Number),
   /** Tests only: open the cache with one more migration, as the next build would, to test that an update keeps the cache. */
   cacheMigrationProbe: Schema.optionalKey(Schema.Boolean),
 })
@@ -69,6 +57,8 @@ export type OsNotification = typeof OsNotification.Type
 /** main -> engine over parentPort. A `port` message carries the port in `ports[0]`. */
 export const MainToEngine = Schema.Union([
   Schema.TaggedStruct('config', { config: EngineConfig }),
+  /** Tests only: request a pass through a background job's serial consumer. */
+  Schema.TaggedStruct('testWork', { id: Schema.Int, name: Schema.Literals(['title', 'art', 'home', 'automated']) }),
   Schema.TaggedStruct('port', {}),
   /** The app window has painted; background provider warm-up may start. */
   Schema.TaggedStruct('painted', {}),
@@ -116,6 +106,8 @@ export type MainToEngine = typeof MainToEngine.Type
 export const EngineToMain = Schema.Union([
   /** Tests only: a fake provider call started. No input or credentials. */
   Schema.TaggedStruct('aiCall', { task: Schema.String }),
+  /** Tests only: completion includes passes that decide there is no work. */
+  Schema.TaggedStruct('testWorkDone', { id: Schema.Int, error: Schema.optionalKey(Schema.String) }),
   /** The engine is serving; main may hand it ports. */
   Schema.TaggedStruct('ready', {}),
   /** Please send the stored secrets (`secrets`, possibly null). */

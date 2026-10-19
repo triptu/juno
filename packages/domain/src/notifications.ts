@@ -34,6 +34,11 @@ export interface Hours {
 /** "When it matters" is the default and is not stored. */
 export type NotifyLevel = 'every' | 'never'
 
+/** Whether any applicable Never level mutes a topic after Every message overrides it. */
+export function notificationIsMuted(...levels: ReadonlyArray<NotifyLevel | undefined>): boolean {
+  return !levels.includes('every') && levels.includes('never')
+}
+
 export interface NotificationSettings {
   /** When the Mac (and Slack's own schedule) may notify. */
   readonly notificationHours: Hours

@@ -1,3 +1,4 @@
+import { timed } from './profile'
 /**
  * Helpers the sync, reconnect and convergence tests share: a booted engine,
  * a warm restart on the same store and fake, call counting, read-only looks
@@ -10,7 +11,7 @@ import { Cause, Exit, Option } from 'effect'
 import { topicsSubscribe, topicsUnsubscribe } from '@juno/contract'
 import type { FakeSlack } from '@juno/fake-slack'
 import { runCommand } from '@juno/state'
-import { sleep, startTestEngine, waitFor, type EngineOptions, type RunningEngine } from './harness'
+import { startTestEngine, type EngineOptions, type RunningEngine } from './harness'
 
 const MINUTE = 60_000
 export const DAY = 24 * 60 * MINUTE
@@ -22,9 +23,9 @@ export const DAY = 24 * 60 * MINUTE
 export async function bootedEngine(track: Array<RunningEngine>, options: EngineOptions = {}, liveMillis = 30_000): Promise<RunningEngine> {
   const engine = await startTestEngine({ initial: (fake) => fake.signIn(), ...options })
   track.push(engine)
-  await engine.status('ready')
-  await engine.phase('live', liveMillis)
-  await engine.syncIdle()
+  await timed('ready', () => engine.status('ready'))
+  await timed('live', () => engine.phase('live', liveMillis))
+  await timed('sync idle', () => engine.syncIdle())
   return engine
 }
 
@@ -34,11 +35,11 @@ export async function bootedEngine(track: Array<RunningEngine>, options: EngineO
  * The new engine owns the fake and the directory from then on. `options`
  * start it as `bootedEngine`'s do.
  */
-export async function restart(track: Array<RunningEngine>, engine: RunningEngine, whileStopped: (fake: FakeSlack) => void = () => {}, options: EngineOptions = {}): Promise<RunningEngine> {
+export async function restart(track: Array<RunningEngine>, engine: RunningEngine, whileStopped: (fake: FakeSlack) => void = () => {}, options: EngineOptions = {}, liveMillis = 30_000): Promise<RunningEngine> {
   const { fake, userData } = engine
   const credentials = fake.credentials()
   // Background work (the follow pass) must not answer after the stop and count against the next engine.
-  await quiet(engine)
+  await timed('sync idle', () => engine.syncIdle())
   engine.registry.dispose()
   await engine.handle.stop()
   track.splice(track.indexOf(engine), 1)
@@ -56,7 +57,7 @@ export async function restart(track: Array<RunningEngine>, engine: RunningEngine
   }
   track.push(owned)
   await owned.status('ready')
-  await owned.phase('live', 30_000)
+  await owned.phase('live', liveMillis)
   await owned.syncIdle()
   return owned
 }
@@ -65,33 +66,27 @@ export const apiCalls = (engine: RunningEngine, method?: string) =>
   engine.fake.calls.filter((c) => c.kind === 'api' && (method === undefined || c.method === method))
 
 /** A page of the recheck after a drop or a restart (`@juno/sync` `recheck.ts`). */
-export const notRecheck = (call: { readonly args: Readonly<Record<string, string>> }) => call.args['_x_reason'] !== 'recheck'
+export const notRecheck = (call: { readonly args: Readonly<Record<string, string>> }) => !['recheck', 'mutation-repair'].includes(call.args['_x_reason'] ?? '')
 
 /** Calls by `kind:method`, for exact budgets. The recheck's pages count apart, as `recheck:method`. */
 export const callMap = (engine: RunningEngine): Record<string, number> => {
   const map: Record<string, number> = {}
   for (const call of engine.fake.calls) {
-    const key = notRecheck(call) ? `${call.kind}:${call.method}` : `recheck:${call.method}`
+    const reason = call.args['_x_reason']
+    const key = notRecheck(call) ? `${call.kind}:${call.method}` : `${reason}:${call.method}`
     map[key] = (map[key] ?? 0) + 1
   }
   return map
 }
 
-/** Drains sync cycles, then waits for a quiet API window. For command recovery, use `handle.commandIdle()`. */
-export async function quiet(engine: RunningEngine, label = 'the engine to go quiet'): Promise<void> {
-  await engine.syncIdle()
-  let calls = engine.fake.calls.length
-  await waitFor(
-    async () => {
-      await sleep(300)
-      const now = engine.fake.calls.length
-      const settled = now === calls
-      calls = now
-      return settled ? true : undefined
-    },
-    30_000,
-    label,
-  )
+/** Waits for the work already triggered, without inferring idleness from elapsed time. */
+export async function quiet(engine: RunningEngine): Promise<void> {
+  await timed('sync idle', () => engine.syncIdle())
+  await engine.socketIdle()
+  await engine.handle.commandIdle()
+  if (engine.fake.heldCount() === 0 && engine.fake.gated().length === 0) {
+    await Promise.all([engine.workPass('post'), engine.workPass('action'), engine.workPass('mark')])
+  }
 }
 
 /** Opens a workspace file read-only, runs `f`, closes it. */

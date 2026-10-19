@@ -1,3 +1,4 @@
+import { step } from './step'
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
@@ -11,60 +12,61 @@ afterEach(async () => {
   for (const engine of engines.splice(0)) await engine.stop()
 })
 
-it('titles recent sidebar threads after sync without opening them and respects the daily budget after a key change', async () => {
+it('keeps existing titles after a key change, then respects the daily budget for new threads', async () => {
   const engine = await bootedEngine(engines, { aiJobs: true })
-  const titled = await engine.rowsUntil(rows => rows.some(row => row.kind === 'thread') && rows.filter(row => row.kind === 'thread').every(row => row.titleSource === 'ai'), 'sidebar titles after sync')
-  expect(titled.filter(row => row.kind === 'thread').length).toBeGreaterThan(1)
-  const calls = () => engine.main.host.fromEngine.filter(message => message._tag === 'aiCall' && message.task === 'titleTopic').length
-  expect(calls()).toBeGreaterThan(0)
-  expect(calls()).toBeLessThanOrEqual(TITLE_DAILY_BUDGET)
+  await step('leaves a stored AI title as it is, sharp in privacy mode, with no second call', async () => {
+    const titled = await engine.rowsUntil(rows => rows.some(row => row.kind === 'thread') && rows.filter(row => row.kind === 'thread').every(row => row.titleSource === 'ai'), 'sidebar titles after sync')
+    const thread = titled.find(row => row.kind === 'thread')!
+    expect(thread.titleSensitive).toBeUndefined()
+    const user = join(engine.userData, 'workspaces', engine.fake.teamId, 'user.db')
+    const sql = <A>(run: (db: DatabaseSync) => A): A => {
+      const db = new DatabaseSync(user)
+      try {
+        return run(db)
+      } finally {
+        db.close()
+      }
+    }
+    // An invented title as an older prompt might have written it.
+    sql(db => db.prepare("UPDATE topic_overlay SET ai_title = 'Go with 100k for Donna' WHERE topic_id = ?").run(thread.id))
+    const stored = () => sql(db => db.prepare('SELECT ai_title, ai_title_at FROM topic_overlay WHERE topic_id = ?').get(thread.id)) as { ai_title: string; ai_title_at: string }
+    const before = stored()
+    const calls = () => engine.main.host.fromEngine.filter(message => message._tag === 'aiCall' && message.task === 'titleTopic').length
+    const asked = calls()
+    engine.main.host.deliver({ _tag: 'aiKey', key: 'fake-changed-key' })
+    await engine.workPass('title')
+    expect(stored()).toEqual(before)
+    expect(calls()).toBe(asked)
+  })
 
-  // Exhaust today's stored budget before a new thread arrives. These are invented answers.
-  const db = new DatabaseSync(join(engine.userData, 'workspaces', engine.fake.teamId, 'cache.db'))
-  try {
-    const insert = db.prepare("INSERT INTO ai_cache (task, key, input_hash, output_json, created_at) VALUES ('titleTopic', ?, 'fake', '\"A title\"', ?)")
-    for (let i = 0; i < TITLE_DAILY_BUDGET; i++) insert.run(`budget-fixture:${i}`, String(Date.now()))
-  } finally {
-    db.close()
-  }
-  const before = calls()
-  engine.main.host.deliver({ _tag: 'aiKey', key: 'fake-changed-key' })
-  const root = engine.fake.workspace.post({ channel: 'C0ENG', user: 'U0LEO', text: 'Postgres migration after the budget is spent' })
-  engine.fake.workspace.post({ channel: 'C0ENG', user: SELF_ID, text: 'Following this.', threadTs: root.ts })
-  const id = `t:C0ENG:${root.ts}`
-  await engine.rowsUntil(rows => rows.some(row => row.id === id), 'new sidebar thread')
-  await new Promise(resolve => setTimeout(resolve, 3_000))
-  const after = await engine.rowsUntil(rows => rows.some(row => row.id === id), 'sidebar after the title pass')
-  expect(after.find(row => row.id === id)?.titleSource).toBe('fallback')
-  // The first words are message text: privacy mode blurs them.
-  expect(after.find(row => row.id === id)?.titleSensitive).toBe(true)
-  expect(calls()).toBe(before)
-})
+  await step('titles recent sidebar threads after sync without opening them and respects the daily budget after a key change', async () => {
+    const titled = await engine.rowsUntil(rows => rows.some(row => row.kind === 'thread') && rows.filter(row => row.kind === 'thread').every(row => row.titleSource === 'ai'), 'sidebar titles after sync')
+    expect(titled.filter(row => row.kind === 'thread').length).toBeGreaterThan(1)
+    const calls = () => engine.main.host.fromEngine.filter(message => message._tag === 'aiCall' && message.task === 'titleTopic').length
+    expect(calls()).toBeGreaterThan(0)
+    expect(calls()).toBeLessThanOrEqual(TITLE_DAILY_BUDGET)
 
-it('leaves a stored AI title as it is, sharp in privacy mode, with no second call', async () => {
-  const engine = await bootedEngine(engines, { aiJobs: true })
-  const titled = await engine.rowsUntil(rows => rows.some(row => row.kind === 'thread') && rows.filter(row => row.kind === 'thread').every(row => row.titleSource === 'ai'), 'sidebar titles after sync')
-  const thread = titled.find(row => row.kind === 'thread')!
-  expect(thread.titleSensitive).toBeUndefined()
-  const user = join(engine.userData, 'workspaces', engine.fake.teamId, 'user.db')
-  const sql = <A>(run: (db: DatabaseSync) => A): A => {
-    const db = new DatabaseSync(user)
+    // Exhaust today's stored budget before a new thread arrives. These are invented answers.
+    const db = new DatabaseSync(join(engine.userData, 'workspaces', engine.fake.teamId, 'cache.db'))
     try {
-      return run(db)
+      const insert = db.prepare("INSERT INTO ai_cache (task, key, input_hash, output_json, created_at) VALUES ('titleTopic', ?, 'fake', '\"A title\"', ?)")
+      for (let i = 0; i < TITLE_DAILY_BUDGET; i++) insert.run(`budget-fixture:${i}`, String(Date.now()))
     } finally {
       db.close()
     }
-  }
-  // An invented title as an older prompt might have written it.
-  sql(db => db.prepare("UPDATE topic_overlay SET ai_title = 'Go with 100k for Donna' WHERE topic_id = ?").run(thread.id))
-  const stored = () => sql(db => db.prepare('SELECT ai_title, ai_title_at FROM topic_overlay WHERE topic_id = ?').get(thread.id)) as { ai_title: string; ai_title_at: string }
-  const before = stored()
-  const calls = () => engine.main.host.fromEngine.filter(message => message._tag === 'aiCall' && message.task === 'titleTopic').length
-  const asked = calls()
-  engine.main.host.deliver({ _tag: 'aiKey', key: 'fake-changed-key' })
-  await new Promise(resolve => setTimeout(resolve, 3_000))
-  expect(stored()).toEqual(before)
-  expect(calls()).toBe(asked)
+    const before = calls()
+    engine.main.host.deliver({ _tag: 'aiKey', key: 'fake-budget-key' })
+    const root = engine.fake.workspace.post({ channel: 'C0ENG', user: 'U0LEO', text: 'Postgres migration after the budget is spent' })
+    engine.fake.workspace.post({ channel: 'C0ENG', user: SELF_ID, text: 'Following this.', threadTs: root.ts })
+    const id = `t:C0ENG:${root.ts}`
+    await engine.rowsUntil(rows => rows.some(row => row.id === id), 'new sidebar thread')
+    await engine.workPass('title')
+    const after = await engine.rowsUntil(rows => rows.some(row => row.id === id), 'sidebar after the title pass')
+    expect(after.find(row => row.id === id)?.titleSource).toBe('fallback')
+    // The first words are message text: privacy mode blurs them.
+    expect(after.find(row => row.id === id)?.titleSensitive).toBe(true)
+    expect(calls()).toBe(before)
+  })
 })
 
 it('asks a title the model refused once, not again on later passes or after a wake, and again once the thread has a new message', async () => {
@@ -98,7 +100,7 @@ it('asks a title the model refused once, not again on later passes or after a wa
 
   // A wake (a key change) and the passes after it do not send the same thread again.
   engine.main.host.deliver({ _tag: 'aiKey', key: 'fake-changed-key' })
-  await new Promise(resolve => setTimeout(resolve, 3_500))
+  await engine.workPass('title')
   expect(calls()).toBe(refused)
   const rows = await engine.rowsUntil(rows => rows.some(row => row.id === id), 'the refused thread')
   expect(rows.find(row => row.id === id)?.titleSource).toBe('fallback')

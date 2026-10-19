@@ -4,7 +4,7 @@
 // conversations.open, ⌘N and "+", and Home from the sidebar.
 import { SELF_ID } from '@juno/fake-slack'
 import { recordBoxes } from './shiftProbe'
-import { expect, test } from './fixtures'
+import { expect, test, type Fixtures } from './fixtures'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -13,9 +13,20 @@ const OFFSITE = 'Can eng take the Wednesday afternoon'
 /** Shares no two words with any #eng thread, so the wrong-place check never stops the send, however soon it answers. */
 const DRAFT = 'Lunch order goes out at noon'
 
-test('a first @ suggests a person, Tab makes them the destination, and the send stays on Home with the field in place', async ({ juno, fake }) => {
+test('writes from Home to people and channels, keeps text and read state, and opens a first DM', async ({ juno, fake, slack }) => {
   await juno.signIn()
   await juno.waitForSync()
+  const context = { juno, fake, slack }
+  await test.step('a first @ suggests a person, Tab makes them the destination, and the send stays on Home with the field in place', () => sendToPerson(context))
+  await test.step('a first # or @ stays text for Juno on Space or Esc, and Recent chooses a person', () => keepPrefixText(context))
+  await test.step('choosing a destination never marks anything read', () => keepDestinationUnread(context))
+  await test.step('a person never messaged: chosen from the list, then conversations.open on send', () => openFirstDm(context))
+  await test.step('a send to a channel starts a thread there, shows it in the sidebar, and Home stays', () => startChannelThread(context))
+})
+
+async function sendToPerson({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
+  fake.resetCalls()
+
   const { write, tabs } = juno
 
   // A launch opens Home, ready to ask Juno.
@@ -46,11 +57,9 @@ test('a first @ suggests a person, Tab makes them the destination, and the send 
   const frames = await fields()
   expect(frames.length, 'the field must be sampled in many frames').toBeGreaterThan(1)
   expect(frames.filter((boxes) => boxes.length !== 1 || JSON.stringify(boxes[0]) !== JSON.stringify(before)), `one field at ${JSON.stringify(before)} in every frame`).toEqual([])
-})
+}
 
-test('a first # or @ stays text for Juno on Space or Esc, and Recent chooses a person', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+async function keepPrefixText({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   const { write } = juno
   await test.step('Space keeps a first # as text for Juno', async () => {
     await write.composer.pressSequentially('#eng')
@@ -79,11 +88,48 @@ test('a first # or @ stays text for Juno on Space or Esc, and Recent chooses a p
     await write.expectDestination('Juno')
     await expect(write.recentRow('Maya')).toHaveAttribute('aria-pressed', 'false')
   })
-})
+}
 
-test('a send to a channel starts a thread there, shows it in the sidebar, and Home stays', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+async function keepDestinationUnread({ juno, slack }: Pick<Fixtures, 'juno' | 'slack'>): Promise<void> {
+  const { write, sidebar } = juno
+
+  slack.as('Leo').postIn('eng', 'Replica lag is under a second now')
+  const engMain = sidebar.row('#eng')
+  await engMain.expectPreview(/Replica lag is under a second now/)
+  const unread = Number(await engMain.root.locator('[title$=" unread"]').textContent())
+  expect(unread).toBeGreaterThan(0)
+  slack.resetCalls()
+
+  await write.pickConversation('eng', 'eng')
+  await write.expectDestination('#eng')
+  await slack.expectNoMarks()
+  await engMain.expectUnread(unread)
+}
+
+async function openFirstDm({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
+  fake.resetCalls()
+
+  const { write } = juno
+
+  await write.chip.click()
+  await write.search.fill('jon')
+  await expect(write.option('Jonas')).toContainText('No messages yet')
+  await write.option('Jonas').click()
+  await write.expectDestination('Jonas')
+  expect(fake.calls.some((call) => call.method === 'conversations.open')).toBe(false)
+
+  await write.write('Welcome aboard. Your laptop arrives Monday.')
+  await write.send()
+  await juno.expectToast('Sent to Jonas')
+  await expect.poll(() => fake.calls.filter((call) => call.method === 'conversations.open').map((call) => call.args['users'])).toEqual(['U0JONAS'])
+  await expect.poll(() => fake.calls.find((call) => call.method === 'chat.postMessage')?.args['channel']).toBeDefined()
+  const posted = fake.calls.find((call) => call.method === 'chat.postMessage')
+  expect(fake.workspace.conversation(String(posted?.args['channel']))?.kind).toBe('im')
+}
+
+async function startChannelThread({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
+  fake.resetCalls()
+
   const { write, tabs, topic, sidebar } = juno
 
   await write.pickConversation('eng', 'eng')
@@ -109,46 +155,7 @@ test('a send to a channel starts a thread there, shows it in the sidebar, and Ho
   // The first message is the thread's root: Slack gives a root with replies its own ts as thread_ts.
   expect(root.thread_ts ?? root.ts).toBe(root.ts)
   expect(fake.messages('C0ENG').find((message) => message.text === 'second')?.thread_ts).toBe(root.ts)
-})
-
-test('choosing a destination never marks anything read', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { write, sidebar } = juno
-
-  slack.as('Leo').postIn('eng', 'Replica lag is under a second now')
-  const engMain = sidebar.row('#eng')
-  await engMain.expectPreview(/Replica lag is under a second now/)
-  const unread = Number(await engMain.root.locator('[title$=" unread"]').textContent())
-  expect(unread).toBeGreaterThan(0)
-  slack.resetCalls()
-
-  await write.pickConversation('eng', 'eng')
-  await write.expectDestination('#eng')
-  await slack.expectNoMarks()
-  await engMain.expectUnread(unread)
-})
-
-test('a person never messaged: chosen from the list, then conversations.open on send', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { write } = juno
-
-  await write.chip.click()
-  await write.search.fill('jon')
-  await expect(write.option('Jonas')).toContainText('No messages yet')
-  await write.option('Jonas').click()
-  await write.expectDestination('Jonas')
-  expect(fake.calls.some((call) => call.method === 'conversations.open')).toBe(false)
-
-  await write.write('Welcome aboard. Your laptop arrives Monday.')
-  await write.send()
-  await juno.expectToast('Sent to Jonas')
-  await expect.poll(() => fake.calls.filter((call) => call.method === 'conversations.open').map((call) => call.args['users'])).toEqual(['U0JONAS'])
-  await expect.poll(() => fake.calls.find((call) => call.method === 'chat.postMessage')?.args['channel']).toBeDefined()
-  const posted = fake.calls.find((call) => call.method === 'chat.postMessage')
-  expect(fake.workspace.conversation(String(posted?.args['channel']))?.kind).toBe('im')
-})
+}
 
 test('Home keeps its draft and destination when a topic opens over it, and Back brings them back', async ({ juno }) => {
   await juno.signIn()
@@ -287,4 +294,39 @@ test('a new thread whose root fails stays in the sidebar with Not sent and Retry
   await topic.expectTitle('first')
   const root = fake.messages('C0ENG').find((message) => message.text === 'first')!
   expect(fake.messages('C0ENG').find((message) => message.text === 'second')?.thread_ts).toBe(root.ts)
+})
+
+test('closing Home with a draft shows "Draft closed", and Undo brings the tab back with its draft', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { write, tabs } = juno
+
+  await write.recentRow('Maya').click()
+  await write.write(DRAFT)
+  await tabs.closeAt('Home', 0)
+  await juno.expectToast('Draft closed')
+  // The last tab closed, so a fresh Home took its place.
+  await expect(write.composer).toHaveValue('')
+  await write.expectDestination('Juno')
+
+  await juno.undoFromToast()
+  await expect(tabs.tab('Home')).toHaveCount(2)
+  await expect(write.composer).toHaveValue(DRAFT)
+  await write.expectDestination('Maya')
+  await expect(write.composer).toBeFocused()
+})
+
+test('a send Slack refuses says why in a toast, and the draft and destination stay', async ({ juno, fake }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { write } = juno
+
+  await write.pickConversation('jon', 'Jonas')
+  fake.forceError({ method: 'conversations.open', error: 'user_disabled' })
+  await write.write('Welcome aboard')
+  await write.send()
+  await juno.expectToast('Not sent · Their account is deactivated')
+  await expect(write.composer).toHaveValue('Welcome aboard')
+  await write.expectDestination('Jonas')
+  expect(fake.calls.some((call) => call.method === 'chat.postMessage')).toBe(false)
 })

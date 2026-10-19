@@ -23,12 +23,10 @@ import { NotFound, NotSignedIn, type CommandResult, type EngineConfig as Config,
 import { markReadLocally, markUnreadLocally, millisToTs, parseTopicId, tsBefore, type ParsedTopicId, type ReadState, type Ts } from '@juno/domain'
 import { StoreWriter, transaction, type Invalidation, type SqlError } from '@juno/store'
 import { patchOverlay, readMessage, readState, reindexTopics, storedMe, threadSub, writeLocalMark } from '@juno/sync'
-import { EngineConfig } from './config'
+import { EngineConfig, EngineTiming } from './config'
 import { Workspace } from './workspace'
 import { mirrorSetting } from './readSetting'
 
-/** How long a new mark waits before it is sent, so marks in quick succession make one call. */
-export const MARK_DELAY_MILLIS = 400
 
 type Topic = ParsedTopicId
 
@@ -103,7 +101,7 @@ const step = (id: string, topic: Topic, config: Config, now: number, change: Cha
     const mirrors = (yield* mirrorSetting(config)).on && (topic.kind === 'main' || (yield* threadSub(topic.channel, topic.threadTs))?.subscribed === true)
     const changed = yield* change(yield* readState(id), millisToTs(now), mirrors)
     if (changed === undefined) return { queued: false }
-    yield* writeLocalMark(id, changed.next, changed.from, now, config.markDelayMillis ?? MARK_DELAY_MILLIS)
+    yield* writeLocalMark(id, changed.next, changed.from, now, (yield* EngineTiming).markDelayMillis)
     const me = yield* storedMe
     if (me !== undefined) yield* reindexTopics([id], { me })
     return { undo: changed.undo, queued: changed.next.pendingLocalWrite }

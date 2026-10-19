@@ -3,11 +3,12 @@
  * the success fields (without `ok`) or an `ApiError`. The server encodes the
  * result through the method's schema.
  */
+import { threadIndex } from './threadViews.ts'
 import type { CountEntry, Message, MethodArgs, MethodName, MethodOk, SearchMatch, ThreadView } from '@juno/slack-schema'
-import { compareTs, isReply, permalinkPath } from '@juno/slack-schema'
+import { compareTs, isReply, permalinkPath, Ts } from '@juno/slack-schema'
 import { fileObject } from './files.ts'
 import { blocksToText } from './richtext.ts'
-import { edgeUserObject, type Workspace } from './state.ts'
+import { edgeUserObject, NEVER_READ, type Workspace } from './state.ts'
 
 export class ApiError {
   readonly error: string
@@ -68,6 +69,19 @@ export function requireConversation(ctx: MethodContext, channel: string, needMem
 
 function withChannel(ws: Workspace, channel: string, message: Message): Message {
   return ws.withThreadFields({ ...message, channel })
+}
+
+/** Conditional pages keep paging over all messages, even when their bodies are omitted. */
+function conditionalPage(messages: Message[], cached: Readonly<Record<string, Ts>> | undefined, version: (ts: Ts) => Ts) {
+  if (cached === undefined) return { messages }
+  const unchanged = messages.filter((m) => cached[m.ts] === version(m.ts))
+  const bodies = messages.filter((m) => cached[m.ts] !== version(m.ts))
+  return {
+    messages: bodies,
+    unchanged_messages: unchanged.map((m) => m.ts),
+    latest_updates: Object.fromEntries(bodies.map((m) => [m.ts, version(m.ts)])),
+    deleted: [],
+  }
 }
 
 export const coreMethods = {
@@ -204,6 +218,7 @@ export const coreMethods = {
     const window = ws
       .main(args.channel)
       .filter((m) => inWindow(m.ts, args.oldest, args.latest, inclusive))
+      .filter((m) => compareTs(m.ts, ws.retainedSince.get(args.channel) ?? NEVER_READ) >= 0)
       .filter((m) => before === undefined || compareTs(m.ts, before) < 0)
       .toReversed()
     const limit = args.limit ?? DEFAULT_LIMIT
@@ -211,9 +226,10 @@ export const coreMethods = {
     const hasMore = window.length > limit
     const last = page.at(-1)
     return {
-      messages: page.map((m) => withChannel(ws, args.channel, m)),
+      ...conditionalPage(page.map((m) => withChannel(ws, args.channel, m)), args.cached_latest_updates, (ts) => ws.messageVersions.get(`${args.channel}:${ts}`) ?? ts),
       has_more: hasMore,
-      is_limited: false,
+      ...(args.include_mutation_timestamps === true ? { mutation_timestamps: { updated: ws.countEntry(conversation).updated, history_invalid: ws.countEntry(conversation).history_invalid } } : {}),
+      is_limited: ws.retainedSince.has(args.channel),
       pin_count: 0,
       channel_actions_count: 0,
       channel_actions_ts: null,
@@ -231,14 +247,16 @@ export const coreMethods = {
     const after = tsFromCursor(args.cursor)
     const thread = [root, ...ws.replies(args.channel, args.ts)]
       .filter((m) => m.ts === root.ts || inWindow(m.ts, args.oldest, args.latest, inclusive))
+      .filter((m) => m.ts === root.ts || compareTs(m.ts, ws.retainedSince.get(args.channel) ?? NEVER_READ) >= 0)
       .filter((m) => m.ts === root.ts || after === undefined || compareTs(m.ts, after) > 0)
     const limit = args.limit ?? DEFAULT_LIMIT
     const page = thread.slice(0, limit)
     const hasMore = thread.length > limit
     const last = page.at(-1)
     return {
-      messages: page.map((m) => withChannel(ws, args.channel, m)),
+      ...conditionalPage(page.map((m) => withChannel(ws, args.channel, m)), args.cached_latest_updates, (ts) => ws.messageVersions.get(`${args.channel}:${ts}`) ?? ts),
       has_more: hasMore,
+      is_limited: ws.retainedSince.has(args.channel),
       response_metadata: hasMore && last !== undefined ? { next_cursor: cursorFor(last.ts) } : { next_cursor: '' },
     }
   },
@@ -298,36 +316,30 @@ export const coreMethods = {
 
   'subscriptions.thread.getView': (ctx, args) => {
     const ws = ctx.workspace
-    const views: Array<{ view: ThreadView; latest: string }> = []
-    for (const sub of ws.subscriptions.values()) {
-      if (!sub.subscribed) continue
-      const root = ws.find(sub.channel, sub.threadTs)
-      if (root === undefined) continue
-      const replies = ws.replies(sub.channel, sub.threadTs)
-      if (replies.length === 0) continue
-      const latest = replies.at(-1)?.ts ?? root.ts
-      if (args.current_ts !== undefined && compareTs(latest, args.current_ts) >= 0) continue
-      if (args.channel_id !== undefined && args.channel_id !== sub.channel) continue
+    const index = threadIndex(ws)
+    const views = index.flatMap(({ sub, root, replies }) => {
+      const latest = replies.at(-1)?.ts
+      return root === undefined || latest === undefined ? [] : [{ sub, root, replies, latest, order: BigInt(latest.replace('.', '')) }]
+    }).filter(({ sub, latest }) =>
+      (args.current_ts === undefined || compareTs(latest, args.current_ts) < 0) &&
+      (args.channel_id === undefined || args.channel_id === sub.channel),
+    ).sort((a, b) => a.order > b.order ? -1 : a.order < b.order ? 1 : 0)
+    // Slack caps each page at ten; only that page needs full response bodies.
+    const limit = Math.min(args.limit ?? GET_VIEW_PAGE_CAP, GET_VIEW_PAGE_CAP)
+    const page: ThreadView[] = views.slice(0, limit).map(({ sub, root, replies, latest }) => {
       const full = withChannel(ws, sub.channel, root)
       const unread = replies.filter((r) => compareTs(r.ts, sub.lastRead) > 0 && r.user !== ws.selfId)
-      views.push({
-        latest,
-        view: {
-          root_msg: { ...full, channel: sub.channel, thread_ts: root.ts, reply_count: replies.length, latest_reply: latest },
-          // Live, a thread with unread replies carries `unread_replies` and no `latest_replies`; a read one the reverse (research section 10, "Live checks").
-          ...(unread.length > 0
-            ? { unread_replies: unread.map((r) => withChannel(ws, sub.channel, r)) }
-            : { latest_replies: replies.slice(-3).map((r) => withChannel(ws, sub.channel, r)) }),
-        },
-      })
-    }
-    views.sort((a, b) => compareTs(b.latest, a.latest))
-    // Slack returns at most 10 threads per page whatever `limit` says (research section 10).
-    const limit = Math.min(args.limit ?? GET_VIEW_PAGE_CAP, GET_VIEW_PAGE_CAP)
-    const page = views.slice(0, limit)
-    const state = ws.threadCounts()
+      return {
+        root_msg: { ...full, channel: sub.channel, thread_ts: root.ts, reply_count: replies.length, latest_reply: latest },
+        // An unread thread carries unread_replies; a read thread carries latest_replies.
+        ...(unread.length > 0
+          ? { unread_replies: unread.map((r) => withChannel(ws, sub.channel, r)) }
+          : { latest_replies: replies.slice(-3).map((r) => withChannel(ws, sub.channel, r)) }),
+      }
+    })
+    const state = ws.threadCounts(index)
     return {
-      threads: page.map((v) => v.view),
+      threads: page,
       has_more: views.length > limit,
       total_unread_replies: Object.values(state.unread_count_by_channel ?? {}).reduce((a, b) => a + b, 0),
       ...(args.fetch_threads_state === true ? { threads_state: state } : {}),

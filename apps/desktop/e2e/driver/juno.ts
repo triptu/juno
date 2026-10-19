@@ -14,6 +14,10 @@ import { expect, type ElectronApplication, type Locator, type Page } from '@play
  */
 const PRESS_MS = 60
 
+interface WorkHooks {
+  readonly workPass: (name: 'title' | 'art' | 'home' | 'automated') => Promise<void>
+}
+
 /** Presses and releases the primary button where the mouse is. */
 export async function press(win: Page): Promise<void> {
   await win.mouse.down()
@@ -841,11 +845,13 @@ export class Juno {
    * "Set up Juno" unless `skipSetUp` is false.
    */
   async signIn(options: { readonly email?: string; readonly skipSetUp?: boolean } = {}): Promise<void> {
+    const started = performance.now()
     const page = await this.openSignInWindow()
     await page.getByPlaceholder('Email').fill(options.email ?? 'tushar@juno-fake.test')
     await page.getByPlaceholder('Password').fill('password')
     await Promise.all([page.waitForEvent('close'), page.getByRole('button', { name: 'Sign in' }).click()])
     if (options.skipSetUp !== false) await this.skipSetUp()
+    if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: sign-in ${Math.round(performance.now() - started)} ms`)
   }
 
   /** "Set up Juno", shown after a first sign-in with no model provider (SPEC 13.10). */
@@ -915,12 +921,18 @@ export class Juno {
     await expect(this.win.getByText(text)).toBeVisible({ timeout: 15_000 })
   }
 
+  /** Wait for a real job pass, including a pass that chooses not to call the model. */
+  async workPass(name: Parameters<WorkHooks['workPass']>[0]): Promise<void> {
+    await this.app.evaluate((_electron, job) => (globalThis as unknown as { junoTest: WorkHooks }).junoTest.workPass(job), name)
+  }
+
   /**
    * Waits until the engine has finished catching up with Slack, so the rows
    * hold still. The sidebar paints before this; tests that compare rows or
    * measure a hover wait for it first.
    */
   async waitForSync(): Promise<void> {
+    const started = performance.now()
     await this.sidebar.expectRows()
     await this.expectEngineLive()
     // Park the pointer and the focus on the workspace. With no tab open that is Home, whose rows sit
@@ -929,6 +941,7 @@ export class Juno {
     await expect(this.home.greeting.or(tabOpen).first()).toBeVisible()
     if (await this.home.greeting.isVisible()) await this.home.greeting.click()
     else await this.win.mouse.click(900, 400)
+    if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: sync ${Math.round(performance.now() - started)} ms`)
   }
 
   /** Switches the theme in Settings › Appearance and waits for the page to follow, then closes Settings. */

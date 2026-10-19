@@ -232,19 +232,7 @@ describe('convergence', () => {
       30_000,
       'every created message stored',
     )
-    let calls = fake.callCount()
-    await waitFor(
-      async () => {
-        await sleep(300)
-        const now = fake.callCount()
-        const settled = now === calls
-        calls = now
-        return settled ? true : undefined
-      },
-      30_000,
-      'the fake to go quiet',
-    )
-    await sleep(200)
+    await quiet(engine)
 
     // 1. Every send is in Slack once and stored once, and no pending row is left.
     await waitFor(() => ((db.prepare('SELECT count(*) AS n FROM pending_messages').get() as { n: number }).n === 0 ? true : undefined), 30_000, 'no pending row')

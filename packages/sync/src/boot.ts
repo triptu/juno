@@ -35,12 +35,14 @@
  * `runSync` schedules it at most hourly.
  */
 import { compareTs, maxTs, millisToTs, type Me, type Ts, type UsergroupId } from '@juno/domain'
+import type { CountEntry } from '@juno/slack-schema'
 import { SlackApi, SlackEdge, SlackSession, type SlackApiError, type SlackAuthRequired } from '@juno/slack'
 import type { Message, ThreadView } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction, type SqlError } from '@juno/store'
 import { Clock, Deferred, Effect, Queue } from 'effect'
 import { reindexOptions, type SyncContext } from './context'
 import { activeConversations, historyOrder, loadCounts } from './counts'
+import { saveRepairMarkers, queueRepairs } from './mutationRepair'
 import { discoverSince, searchPreviews } from './discovery'
 import { FollowFence } from './followFence'
 import { readMetadata, storeMetadata } from './metadata'
@@ -544,7 +546,7 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
       // A failed discovery leaves the gap for the next sweep to search again.
       lastSyncAt: discovered ? startedAt : windowStart,
     }
-    yield* transaction(setSyncState(BOOT_KEY, state))
+    yield* transaction(Effect.andThen(saveRepairMarkers(counts.entries), setSyncState(BOOT_KEY, state)))
   })
 
 export interface CatchUpOptions {
@@ -558,6 +560,8 @@ export interface CatchUpOptions {
   readonly recheck?: RecheckOptions
   /** Persist the new cursor. Periodic sweeps keep it in memory; a restart can safely replay from the last durable boot or reconnect. */
   readonly persistState?: boolean
+  /** Periodic counts stage candidates; socket liveness decides when an older candidate can be promoted. */
+  readonly observeSweepMarkers?: (entries: ReadonlyArray<CountEntry>) => Effect.Effect<void, BootError, BootServices>
 }
 
 /**
@@ -600,6 +604,8 @@ export const catchUp = (ctx: SyncContext, previous: BootState, phase: Phase, opt
     }
     const discovered = yield* discoverOrLog(discoverSince(ctx, previous.lastSyncAt, counts.entries, {}))
     if (options.recheck !== undefined) yield* recheck(ctx, options.recheck)
+    if (options.recheck !== undefined) yield* queueRepairs(ctx, counts.entries, options.recheck.since)
+    else if (options.observeSweepMarkers !== undefined) yield* options.observeSweepMarkers(counts.entries)
     yield* fillUsers(ctx)
     const state: BootState = {
       ...(previous.quietDays === undefined ? {} : { quietDays: previous.quietDays }),

@@ -4,6 +4,8 @@
 // drawing and draws nothing new, Redraw replaces a drawing and its undo puts
 // the old one back, and a model answer outside the vocabulary leaves the
 // placeholder.
+import { step } from './step'
+import { controlledSleep } from './controlledClock'
 import { afterEach, describe, expect, it } from 'vitest'
 import { artRedraw, prefsSet, type TopicRow } from '@juno/contract'
 import { redrawTopic, runAction, runCommand, topicAtom, undoLast } from '@juno/state'
@@ -53,102 +55,121 @@ function liveThread(engine: RunningEngine, text: string): { readonly id: string 
   return { id: `t:C0ENG:${root.ts}` }
 }
 
+async function checkInitialArt(engine: RunningEngine): Promise<void> {
+  const rows = await drawnRows(engine)
+  const drawn = rows.filter((row) => !isDmMain(row) && hasArt(row))
+  expect(drawn.length).toBeGreaterThan(3)
+  expect(drawn.some(isMain)).toBe(true)
+  expect(drawn.some((row) => row.kind === 'thread' && row.channel.kind === 'im')).toBe(true)
+  for (const row of drawn) {
+    const parsed = parseRecipe(row.art!)
+    expect(parsed.ok, `${row.title}: ${row.art}`).toBe(true)
+    if (parsed.ok) expect(parsed.recipe.confident).toBe(true)
+  }
+  // A DM's Main is the person: no drawing, and none asked for.
+  const dmMains = rows.filter(isDmMain)
+  expect(dmMains.length).toBeGreaterThan(0)
+  expect(dmMains.every((row) => row.art === undefined)).toBe(true)
+  const stored = storedArt(engine)
+  expect(stored.filter((row) => row.topic_id.startsWith('m:D0'))).toEqual([])
+  for (const row of drawn) expect(stored.find((entry) => entry.topic_id === row.id)).toMatchObject({ status: 'ok', source: 'ai', recipe: row.art })
+
+  // The header carries the same recipe as the row.
+  const [first] = drawn
+  unmounts.push(engine.registry.mount(topicAtom(first!.id)))
+  const detail = await waitFor(() => {
+    const result = engine.registry.get(topicAtom(first!.id))
+    return result._tag === 'Success' && result.value?.art !== undefined ? result.value : undefined
+  }, WAIT_MS, 'the header with art')
+  expect(detail.art).toBe(first!.art)
+}
+
+async function checkFailedArt(engine: RunningEngine): Promise<void> {
+  const thread = liveThread(engine, 'Broken drawing ::invalid-art:: for this thread')
+  // Only explicit art passes run: a title must finish before its first drawing.
+  await engine.rowsUntil((rows) => rows.some((row) => row.id === thread.id) && rows.filter((row) => row.kind === 'thread').every((row) => row.titleSource === 'ai'), 'all threads titled')
+  await engine.workPass('art')
+  const stored = await waitFor(() => storedArt(engine).find((row) => row.topic_id === thread.id), WAIT_MS, 'the failed attempt stored')
+  expect(stored).toMatchObject({ status: 'failed', recipe: '' })
+  const rows = await drawnRows(engine)
+  expect(rows.find((row) => row.id === thread.id)!.art).toBeUndefined()
+  const asked = artCalls(engine)
+  // A later pass draws a new thread and does not ask about the failed one again.
+  const next = liveThread(engine, 'Postgres replica lag after the failed drawing')
+  await engine.rowsUntil((rows) => rows.some((row) => row.id === next.id && row.titleSource === 'ai'), 'the next thread titled')
+  await engine.workPass('art')
+  await engine.rowsUntil((later) => later.some((row) => row.id === next.id && hasArt(row)), 'the next thread drawn')
+  expect(artCalls(engine)).toBe(asked + 1)
+  const again = engine.registry.get(engine.topicsAtom())
+  expect(again._tag === 'Success' ? again.value.rows.get(thread.id)?.art : 'no rows').toBeUndefined()
+}
+
 describe('topic art', () => {
-  it('draws every thread and channel Main in the sidebar, keeps the photo on a DM Main, and stores each drawing once', async () => {
+  it('draws sidebar and header art, redraws and undoes it, then hides and restores it with AI assist', async () => {
     const engine = await bootedEngine()
-    const rows = await drawnRows(engine)
-    const drawn = rows.filter((row) => !isDmMain(row) && hasArt(row))
-    expect(drawn.length).toBeGreaterThan(3)
-    expect(drawn.some(isMain)).toBe(true)
-    expect(drawn.some((row) => row.kind === 'thread' && row.channel.kind === 'im')).toBe(true)
-    for (const row of drawn) {
-      const parsed = parseRecipe(row.art!)
-      expect(parsed.ok, `${row.title}: ${row.art}`).toBe(true)
-      if (parsed.ok) expect(parsed.recipe.confident).toBe(true)
-    }
-    // A DM's Main is the person: no drawing, and none asked for.
-    const dmMains = rows.filter(isDmMain)
-    expect(dmMains.length).toBeGreaterThan(0)
-    expect(dmMains.every((row) => row.art === undefined)).toBe(true)
-    const stored = storedArt(engine)
-    expect(stored.filter((row) => row.topic_id.startsWith('m:D0'))).toEqual([])
-    for (const row of drawn) expect(stored.find((entry) => entry.topic_id === row.id)).toMatchObject({ status: 'ok', source: 'ai', recipe: row.art })
 
-    // The header carries the same recipe as the row.
-    const [first] = drawn
-    unmounts.push(engine.registry.mount(topicAtom(first!.id)))
-    const detail = await waitFor(() => {
-      const result = engine.registry.get(topicAtom(first!.id))
-      return result._tag === 'Success' && result.value?.art !== undefined ? result.value : undefined
-    }, WAIT_MS, 'the header with art')
-    expect(detail.art).toBe(first!.art)
-  })
+    await step('draws every thread and channel Main in the sidebar, keeps the photo on a DM Main, and stores each drawing once', () => checkInitialArt(engine))
 
-  it('shows the placeholder everywhere while AI assist is off, draws nothing new, and brings the drawings back when it is on again', async () => {
-    const engine = await bootedEngine()
-    // The title job can replace a fallback drawing once; wait before taking the baseline.
-    await engine.rowsUntil(rows => rows.some(row => row.kind === 'thread') && rows.filter(row => row.kind === 'thread').every(row => row.titleSource === 'ai'), 'sidebar threads titled')
-    const before = await drawnRows(engine)
-    expect(before.some(hasArt)).toBe(true)
-    const count = storedArt(engine).length
+    await step('Redraw replaces a drawing with a different one, and Undo after a Redraw puts the previous one back', async () => {
+      const rows = await drawnRows(engine)
+      const target = rows.find((row) => row.kind === 'thread' && hasArt(row))!
 
-    valueOf(await setPref(engine, 'aiAssist', false))
-    const off = await engine.rowsUntil((rows) => rows.length > 0 && rows.every((row) => row.art === undefined), 'every row without art')
-    expect(off.length).toBe(before.length)
-    // A new thread the user replies in (so Slack follows it) arrives: no drawing is made for it.
-    const thread = liveThread(engine, 'Postgres replica lag while AI is off')
-    await engine.rowsUntil((rows) => rows.some((row) => row.id === thread.id), 'the new thread in the sidebar')
-    await new Promise((resolve) => setTimeout(resolve, 2_500))
-    expect(storedArt(engine).length).toBe(count)
-    expect(storedArt(engine).find((row) => row.topic_id === thread.id)).toBeUndefined()
+      // Redraw replaces a drawing with a different one, in the rows and in the store.
+      expect(await redrawTopic(engine.registry, target.id, { text: 'Redrawn' })).toBeUndefined()
+      const after = await engine.rowsUntil((next) => {
+        const row = next.find((candidate) => candidate.id === target.id)
+        return row !== undefined && hasArt(row) && row.art !== target.art
+      }, 'the redrawn row')
+      const redrawn = after.find((row) => row.id === target.id)!
+      expect(parseRecipe(redrawn.art!).ok).toBe(true)
+      expect(storedArt(engine).find((row) => row.topic_id === target.id)).toMatchObject({ source: 'redraw', status: 'ok', recipe: redrawn.art })
+      // Every other row kept its drawing and its object.
+      for (const row of rows) if (row.id !== target.id) expect(after.find((candidate) => candidate.id === row.id)).toBe(row)
 
-    valueOf(await setPref(engine, 'aiAssist', true))
-    const back = await drawnRows(engine)
-    for (const row of before) expect(back.find((candidate) => candidate.id === row.id)?.art).toBe(row.art)
-    // The thread that arrived while AI was off is drawn now.
-    expect(hasArt(back.find((row) => row.id === thread.id)!)).toBe(true)
-  })
+      // Undo after Redraw puts the previous drawing back, in the rows and in the store.
+      const before = storedArt(engine).find((row) => row.topic_id === target.id)
+      expect(await runAction(engine.registry, artRedraw, { id: target.id }, { text: 'Redrawn' })).toBe(true)
+      await engine.rowsUntil((next) => next.some((row) => row.id === target.id && hasArt(row) && row.art !== redrawn.art), 'the row redrawn again')
+      expect(await undoLast(engine.registry)).toBe(true)
+      await engine.rowsUntil((next) => next.some((row) => row.id === target.id && row.art === redrawn.art), 'the previous drawing back')
+      expect(storedArt(engine).find((row) => row.topic_id === target.id)).toEqual(before)
+    })
 
-  it('Redraw replaces a drawing with a different one, and Undo after a Redraw puts the previous one back', async () => {
-    const engine = await bootedEngine()
-    const rows = await drawnRows(engine)
-    const target = rows.find((row) => row.kind === 'thread' && hasArt(row))!
+    await step('shows the placeholder everywhere while AI assist is off, draws nothing new, and brings the drawings back when it is on again', async () => {
+      // The title job can replace a fallback drawing once; wait before taking the baseline.
+      await engine.rowsUntil(rows => rows.some(row => row.kind === 'thread') && rows.filter(row => row.kind === 'thread').every(row => row.titleSource === 'ai'), 'sidebar threads titled')
+      const before = await drawnRows(engine)
+      expect(before.some(hasArt)).toBe(true)
+      const count = storedArt(engine).length
 
-    // Redraw replaces a drawing with a different one, in the rows and in the store.
-    expect(await redrawTopic(engine.registry, target.id, { text: 'Redrawn' })).toBeUndefined()
-    const after = await engine.rowsUntil((next) => {
-      const row = next.find((candidate) => candidate.id === target.id)
-      return row !== undefined && hasArt(row) && row.art !== target.art
-    }, 'the redrawn row')
-    const redrawn = after.find((row) => row.id === target.id)!
-    expect(parseRecipe(redrawn.art!).ok).toBe(true)
-    expect(storedArt(engine).find((row) => row.topic_id === target.id)).toMatchObject({ source: 'redraw', status: 'ok', recipe: redrawn.art })
-    // Every other row kept its drawing and its object.
-    for (const row of rows) if (row.id !== target.id) expect(after.find((candidate) => candidate.id === row.id)).toBe(row)
+      valueOf(await setPref(engine, 'aiAssist', false))
+      const off = await engine.rowsUntil((rows) => rows.length > 0 && rows.every((row) => row.art === undefined), 'every row without art')
+      expect(off.length).toBe(before.length)
+      // A new thread the user replies in (so Slack follows it) arrives: no drawing is made for it.
+      const thread = liveThread(engine, 'Postgres replica lag while AI is off')
+      await engine.rowsUntil((rows) => rows.some((row) => row.id === thread.id), 'the new thread in the sidebar')
+      await engine.workPass('art')
+      expect(storedArt(engine).length).toBe(count)
+      expect(storedArt(engine).find((row) => row.topic_id === thread.id)).toBeUndefined()
 
-    // Undo after Redraw puts the previous drawing back, in the rows and in the store.
-    const before = storedArt(engine).find((row) => row.topic_id === target.id)
-    expect(await runAction(engine.registry, artRedraw, { id: target.id }, { text: 'Redrawn' })).toBe(true)
-    await engine.rowsUntil((next) => next.some((row) => row.id === target.id && hasArt(row) && row.art !== redrawn.art), 'the row redrawn again')
-    expect(await undoLast(engine.registry)).toBe(true)
-    await engine.rowsUntil((next) => next.some((row) => row.id === target.id && row.art === redrawn.art), 'the previous drawing back')
-    expect(storedArt(engine).find((row) => row.topic_id === target.id)).toEqual(before)
+      valueOf(await setPref(engine, 'aiAssist', true))
+      const back = await drawnRows(engine)
+      for (const row of before) expect(back.find((candidate) => candidate.id === row.id)?.art).toBe(row.art)
+      // The thread that arrived while AI was off is drawn now.
+      expect(hasArt(back.find((row) => row.id === thread.id)!)).toBe(true)
+    })
   })
 
   it('keeps the placeholder for a topic the model cannot draw within the vocabulary, and does not ask again', async () => {
-    const engine = await bootedEngine()
-    const thread = liveThread(engine, 'Broken drawing ::invalid-art:: for this thread')
-    const stored = await waitFor(() => storedArt(engine).find((row) => row.topic_id === thread.id), WAIT_MS, 'the failed attempt stored')
-    expect(stored).toMatchObject({ status: 'failed', recipe: '' })
-    const rows = await drawnRows(engine)
-    expect(rows.find((row) => row.id === thread.id)!.art).toBeUndefined()
-    const asked = artCalls(engine)
-    // A later pass draws a new thread and does not ask about the failed one again.
-    const next = liveThread(engine, 'Postgres replica lag after the failed drawing')
-    await engine.rowsUntil((later) => later.some((row) => row.id === next.id && hasArt(row)), 'the next thread drawn')
-    expect(artCalls(engine)).toBe(asked + 1)
-    const again = engine.registry.get(engine.topicsAtom())
-    expect(again._tag === 'Success' ? again.value.rows.get(thread.id)?.art : 'no rows').toBeUndefined()
+    const time = await controlledSleep(30_000)
+    const engine = await bootedEngine({ clock: time.clock, timing: { artDebounceMillis: 30_000 } })
+    try {
+      await checkFailedArt(engine)
+    } finally {
+      await engine.stop()
+      engines.splice(engines.indexOf(engine), 1)
+      await time.close()
+    }
   })
 })
 

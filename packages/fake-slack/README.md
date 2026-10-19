@@ -2,6 +2,8 @@
 
 A fake Slack for tests and development: an HTTP and websocket server that speaks the web client's protocol (`docs/research/slack-data-access.md`), with a control API to make things happen from "another client". See `docs/architecture.md` sections 2.2 and 13.
 
+Live Slack wins. Each behaviour the fake copies should name the live check it comes from and its date, as the `files.info` and `client.counts` notes below do. The fake has been kinder than live Slack before, which hid bugs. Before a fix, a performance claim or a "live bug" report depends on behaviour the fake has not been checked against, run one read-only live probe (`pnpm probe:live`). When the fake and live disagree, change the fake to match live, and keep the old behaviour behind a test control if a test needs it.
+
 ## Public API
 
 ```ts
@@ -48,3 +50,30 @@ Startup merges both maps before opening a port and throws on a duplicate method 
 `holdNext`, `heldCount` and `release` also cover edge methods using the `edge:` prefix, for example `edge:users/info`. This lets desktop tests delay sender resolution independently of history. Use `file:bytes` to hold thumbnail or download bytes until the test explicitly releases them.
 
 `unfurlFixtures(base)` supplies invented X image/text posts, failed images, YouTube, GitHub, Google Docs and generic previews. Avatar responses require the fake session cookie, so desktop tests exercise the authenticated image path.
+
+Mutation recovery (`docs/research/slack-catchup.md`): counts expose independent
+`updated` and `history_invalid` markers. The fake advances `updated` for thread replies,
+edits and reactions; a new Main message changes only `latest`.
+Deletion advances `history_invalid`. History and replies
+accept `cached_latest_updates`, return changed bodies with `latest_updates`,
+unchanged ids in `unchanged_messages`, and an empty `deleted` list, as the
+controlled self-DM deletion test returned. Versions live in a separate map, not
+on Message bodies. Deleting a reply also changes its root version; deleting the
+final root advances only `history_invalid`.
+Paging counts unchanged messages too. These rules match the controlled self-DM test,
+not a completeness guarantee for every workspace and event. Tests can override
+marker/version maps to model backwards or unchanged values, and `retainedSince`
+omits older messages while marking history and replies `is_limited`.
+
+In-process tests can set `workspace.mutationMarkers = false` to model counts that
+omit both markers. The uncovered outbox conformance schedule uses this alongside
+zero fallback topics to model no observation of a deleted original. The separate
+send-copy test keeps markers enabled: repair can observe deletion and keep the
+surviving copy, but only the fallback certifies coverage for deleting a duplicate.
+
+`holdFrames` can hold `pong` as well as message frames. Holding both models a
+half-open socket while HTTP counts still succeeds; the real client timeout detects
+it. The hidden-old-root `thread_not_found` scenario is injected as a refusal in a
+test, not asserted as measured Slack behavior.
+
+Large-workspace reads build a request-local index of followed roots and replies. `getView` chooses its page before expanding thread bodies; unread counts scan messages once. No result is cached across requests, so edits, read marks and follow changes are visible on the next page. Seed posts already in timestamp order append without sorting the whole conversation again.

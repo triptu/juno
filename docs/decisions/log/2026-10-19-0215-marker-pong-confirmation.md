@@ -1,0 +1,1 @@
+- 10-19 02:15 · Sync · Promote sweep marker candidates only at a later sweep after a newer pong; discard them on disconnect and exclude conversations with failed frames for the session. Treat thread_not_found as deletion evidence only when the cached root is deleted.

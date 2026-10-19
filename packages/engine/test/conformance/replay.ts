@@ -6,9 +6,8 @@
  * the steps Juno takes on its own after it (a claim, a lookup, the
  * catch-up). The harness drives the first step, then waits until the
  * engine's projection equals the model's projection of the state at the
- * end of the round, and stays equal for `STABLE_MS` while the engine's own
- * work is done (`busy`). A round that never gets there is a divergence:
- * the engine and the model disagree.
+ * end of the round, after the engine's own work is done (`settle` and `busy`).
+ * A round that never gets there is a divergence: the engine and model disagree.
  *
  * Equal for a while is not enough on a loaded machine: a catch-up whose
  * reads change nothing the projection shows can still be running, and its
@@ -17,10 +16,8 @@
 import { sleep } from '../harness'
 import type { Trace, TraceState } from './itf'
 
-/** How long a round may take. Covers Juno's timers: a lookup after 2 s, backoff after refusals (a copy's delete waits up to 16 s by its fifth), a socket reconnect. */
-export const ROUND_MS = 35_000
-/** How long the projections must stay equal before the round counts as reached. */
-const STABLE_MS = 300
+/** Failure bound, not a sleep: retries use the harness fast timing profile. */
+export const ROUND_MS = 10_000
 
 export interface Spec<W, V> {
   /** Starts the engine and the fake for this trace. */
@@ -36,6 +33,8 @@ export interface Spec<W, V> {
   readonly observe: (world: W) => Promise<V> | V
   /** Whether Juno's own work that the projection does not show is still running; a round is not reached until it ends. */
   readonly busy?: (world: W) => boolean
+  /** Completes already triggered work before checking the projection again. */
+  readonly settle?: (world: W) => Promise<void>
   /** How long a round of these steps may take, when not `ROUND_MS`. */
   readonly roundMs?: (steps: ReadonlyArray<TraceState>) => number | undefined
   /** What else to print about the engine and the fake at a divergence. */
@@ -78,17 +77,17 @@ export async function replay<W, V>(spec: Spec<W, V>, trace: Trace, options: { re
     const want = json(expected)
     const started = Date.now()
     const roundMs = options.roundMs ?? spec.roundMs?.(states.slice(from, to + 1)) ?? ROUND_MS
-    let since: number | undefined
     let actual: V | undefined
     let busy = false
     while (Date.now() - started < roundMs) {
       actual = await spec.observe(world)
       busy = spec.busy?.(world) ?? false
       if (json(actual) === want && !busy) {
-        since ??= Date.now()
-        if (Date.now() - since >= STABLE_MS) return undefined
-      } else since = undefined
-      await sleep(25)
+        await spec.settle?.(world)
+        actual = await spec.observe(world)
+        if (json(actual) === want && !(spec.busy?.(world) ?? false)) return undefined
+      }
+      await sleep(5)
     }
     const reason = json(actual) === want && busy ? 'the engine reached the model state but its own work did not end' : 'the engine did not reach the model state'
     return { from, to, steps: steps(from, to), reason, expected, actual, ...(spec.debug === undefined ? {} : { debug: spec.debug(world) }) }

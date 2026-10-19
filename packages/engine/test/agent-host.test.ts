@@ -407,7 +407,7 @@ describe('the AgentHost port', () => {
     const dispatch = send(account, 'Sent while offline')
     await approve(engine, dispatch)
     const pending = run(agent.client['host.outbox.send'](dispatch))
-    await new Promise((resolve) => setTimeout(resolve, 1_000))
+    await engine.workPass('post')
     expect(engine.fake.callCount('chat.postMessage')).toBe(0)
     engine.main.network.offline = false
     engine.fake.goOnline()

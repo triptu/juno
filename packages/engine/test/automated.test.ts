@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { homeMovesSeen, homeMovesShown, homeView, prefsSet, viewsDelete, viewsList, viewsRemoveChannel, viewsSortChannel, type HomeView, type SidebarView } from '@juno/contract'
 import type { FakeSlack } from '@juno/fake-slack'
 import { liveQuery, runCommand } from '@juno/state'
-import { sleep, waitFor, WAIT_MS, type RunningEngine } from './harness'
+import { waitFor, WAIT_MS, type RunningEngine } from './harness'
 import { bootedEngine, valueOf } from './scenario'
 
 const engines: Array<RunningEngine> = []
@@ -38,7 +38,7 @@ const RELEASES = 'C0RELEASES'
 
 /** The job takes changes in windows (3 s in the app, shorter here): after this, a pass has looked at what changed. */
 const WINDOW_MILLIS = 300
-const afterAPass = () => sleep(WINDOW_MILLIS + 1_000)
+const afterAPass = (engine: RunningEngine) => engine.workPass('automated')
 
 /** More top-level posts from the deploy bot than from people, but not nearly all: the rules cannot tell, nor can the fake AI. */
 function addReleases(fake: FakeSlack): void {
@@ -61,7 +61,7 @@ const withReleases = { initial: (fake: FakeSlack) => (addReleases(fake), fake.si
 
 describe('the Automated view', () => {
   it('holds the bot channels when the first sync is live, and keeps them out of All', async () => {
-    const engine = await bootedEngine(engines, { aiJobs: true, automatedWindowMillis: WINDOW_MILLIS })
+    const engine = await bootedEngine(engines, { aiJobs: true, timing: { automatedWindowMillis: WINDOW_MILLIS } })
     const views = await viewsUntil(engine, (list) => automatedOf(list) !== undefined, 'the Automated view')
     expect(automatedOf(views)).toMatchObject({ name: 'Automated', icon: 'robot', keepOutOfAll: true })
     expect(automatedOf(views)!.channels.map((c) => c.id).toSorted()).toEqual(['C0ALERTSPROD', 'C0DEPLOYS'])
@@ -75,7 +75,7 @@ describe('the Automated view', () => {
   })
 
   it('asks about an ambiguous channel on Home; Move and Keep in All stick, and each undoes', async () => {
-    const engine = await bootedEngine(engines, { ...withReleases, aiJobs: true, automatedWindowMillis: WINDOW_MILLIS })
+    const engine = await bootedEngine(engines, { ...withReleases, aiJobs: true, timing: { automatedWindowMillis: WINDOW_MILLIS } })
     const home = await homeUntil(engine, (view) => view.items.some((item) => item.kind === 'automated'), 'the question on Home')
     const question = home.items.find((item) => item.kind === 'automated')!
     // The reason is Juno's, from the fake AI.
@@ -97,13 +97,13 @@ describe('the Automated view', () => {
     // More bot messages do not move it or ask again.
     for (let n = 0; n < 8; n++) engine.fake.injectMessage({ channel: RELEASES, user: 'U0DEPLOYBOT', text: `web 2.4.${n} tagged` })
     await engine.rowsUntil((rows) => rows.some((row) => row.channel.id === RELEASES && row.preview.text === 'web 2.4.7 tagged'), 'the last tag in All')
-    await afterAPass()
+    await afterAPass(engine)
     expect(holds(await viewsUntil(engine, () => true, 'views'), RELEASES)).toBe(false)
     expect((await homeUntil(engine, () => true, 'home')).items.some((item) => item.kind === 'automated')).toBe(false)
   })
 
   it('never moves back a channel the user took out, and stays deleted once deleted', async () => {
-    const engine = await bootedEngine(engines, { aiJobs: true, automatedWindowMillis: WINDOW_MILLIS })
+    const engine = await bootedEngine(engines, { aiJobs: true, timing: { automatedWindowMillis: WINDOW_MILLIS } })
     await viewsUntil(engine, (list) => holds(list, 'C0ALERTSPROD'), 'alerts in Automated')
     valueOf(await runCommand(engine.registry, viewsRemoveChannel, { id: 'automated', channel: 'C0ALERTSPROD' }))
     const views = await viewsUntil(engine, (list) => !holds(list, 'C0ALERTSPROD'), 'alerts taken out')
@@ -111,21 +111,21 @@ describe('the Automated view', () => {
 
     engine.fake.injectMessage({ channel: 'C0ALERTSPROD', user: 'U0GRAFANA', text: '[FIRING] disk 90% on db-replica-2' })
     await engine.rowsUntil((rows) => rows.some((row) => row.channel.id === 'C0ALERTSPROD' && row.preview.text.includes('disk 90%')), 'the alert in All')
-    await afterAPass()
+    await afterAPass(engine)
     expect(holds(await viewsUntil(engine, () => true, 'views'), 'C0ALERTSPROD')).toBe(false)
 
     valueOf(await runCommand(engine.registry, viewsDelete, { id: 'automated' }))
     await viewsUntil(engine, (list) => automatedOf(list) === undefined, 'deleted')
     engine.fake.injectMessage({ channel: 'C0DEPLOYS', user: 'U0DEPLOYBOT', text: 'web@aa11 deployed to prod' })
     await engine.rowsUntil((rows) => rows.some((row) => row.channel.id === 'C0DEPLOYS' && row.preview.text.includes('aa11')), 'deploys back in All')
-    await afterAPass()
+    await afterAPass(engine)
     expect(automatedOf(await viewsUntil(engine, () => true, 'views'))).toBeUndefined()
   })
 })
 
 describe("Automated's record", () => {
   it('sorts a channel the user joins later, once its bot has written a few messages', async () => {
-    const engine = await bootedEngine(engines, { aiJobs: true, automatedWindowMillis: WINDOW_MILLIS })
+    const engine = await bootedEngine(engines, { aiJobs: true, timing: { automatedWindowMillis: WINDOW_MILLIS } })
     const now = engine.fake.now()
     engine.fake.workspace.addConversation({ id: 'C0BUILDS', name: 'builds', kind: 'public', members: new Set(['U0DEPLOYBOT']), created: now, topic: '', purpose: '', isOpen: true, archived: false })
     engine.fake.joinChannel({ channel: 'C0BUILDS' })
@@ -154,7 +154,7 @@ describe("Automated's record", () => {
   })
 
   it('takes a channel back out once people start most conversations there, and the record says so', async () => {
-    const engine = await bootedEngine(engines, { aiJobs: true, automatedWindowMillis: WINDOW_MILLIS })
+    const engine = await bootedEngine(engines, { aiJobs: true, timing: { automatedWindowMillis: WINDOW_MILLIS } })
     await viewsUntil(engine, (list) => holds(list, 'C0ALERTSPROD'), 'alerts in Automated')
     // The first sync's own sorting is not news.
     expect((await homeUntil(engine, () => true, 'home')).items.some((item) => item.kind === 'automatedMoves')).toBe(false)

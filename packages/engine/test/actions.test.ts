@@ -3,6 +3,8 @@
 // event reconcile it in either order, a message still being sent is waited
 // for (`depends_on`), and a refusal puts back what Slack has. Reactions are
 // in `reactions.test.ts`.
+import { productionTiming } from '../src/config'
+import { step } from './step'
 import { describe, expect, it } from 'vitest'
 import { deleteMessage, editMessage, sendMessage } from '@juno/state'
 import { waitFor, WAIT_MS } from './harness'
@@ -12,57 +14,58 @@ import { actionRows, booted, eng, inSlack, MAIN, refOf, restarted, rowWith, sent
 stopEnginesAfterEach()
 
 describe('edit', () => {
-  it('shows the new text at once; the answer and then the echo leave it as it is', async () => {
+  it('reconciles edits in both echo orders and preserves a newer local edit', async () => {
     const engine = await booted()
-    const rows = watch(engine, MAIN)
-    const message = await sent(engine, 'Shipping Tuesday', rows)
-    engine.fake.holdFrames({ types: ['message'] })
-    engine.fake.holdNext({ method: 'chat.update', before: true })
-    valueOf(await editMessage(engine.registry, refOf(message), 'Shipping Wednesday'))
-    const shown = await rows((list) => rowWith(list, 'Shipping Wednesday')?.edited === true, 'the edit shown')
-    expect(rowWith(shown, 'Shipping Tuesday')).toBeUndefined()
-    expect(inSlack(engine, message.ts)?.text).toBe('Shipping Tuesday')
-    engine.fake.release()
-    await waitFor(() => (actionRows(engine).length === 0 ? true : undefined), WAIT_MS, 'the row ended')
-    expect(inSlack(engine, message.ts)?.text).toBe('Shipping Wednesday')
-    engine.fake.releaseFrames()
-    await quiet(engine)
-    const after = await rows((list) => rowWith(list, 'Shipping Wednesday')?.edited === true, 'still edited')
-    expect(after.filter((row) => row.ts === message.ts)).toHaveLength(1)
-    expect(apiCalls(engine, 'chat.update')).toHaveLength(1)
-  })
 
-  it('keeps the edit when the echo comes before the answer', async () => {
-    const engine = await booted()
-    const rows = watch(engine, MAIN)
-    const message = await sent(engine, 'Lunch at noon', rows)
-    engine.fake.holdNext({ method: 'chat.update' })
-    valueOf(await editMessage(engine.registry, refOf(message), 'Lunch at one'))
-    await waitFor(() => (engine.fake.heldCount({ method: 'chat.update' }) === 1 ? true : undefined), WAIT_MS, 'the held answer')
-    // Slack has run the call and its echo is stored; the row still holds the intent.
-    await waitFor(() => (readDb(engine, 'cache.db', (db) => (db.prepare('SELECT text FROM messages WHERE ts = ?').get(message.ts) as { text: string }).text) === 'Lunch at one' ? true : undefined), WAIT_MS, 'the echo stored')
-    expect(actionRows(engine)).toHaveLength(1)
-    await rows((list) => rowWith(list, 'Lunch at one')?.edited === true, 'shown edited')
-    engine.fake.release()
-    await waitFor(() => (actionRows(engine).length === 0 ? true : undefined), WAIT_MS, 'the row ended')
-    await rows((list) => rowWith(list, 'Lunch at one')?.edited === true, 'still edited')
-  })
+    await step('shows the new text at once; the answer and then the echo leave it as it is', async () => {
+      const rows = watch(engine, MAIN)
+      const message = await sent(engine, 'Shipping Tuesday', rows)
+      engine.fake.holdFrames({ types: ['message'] })
+      engine.fake.holdNext({ method: 'chat.update', before: true })
+      valueOf(await editMessage(engine.registry, refOf(message), 'Shipping Wednesday'))
+      const shown = await rows((list) => rowWith(list, 'Shipping Wednesday')?.edited === true, 'the edit shown')
+      expect(rowWith(shown, 'Shipping Tuesday')).toBeUndefined()
+      expect(inSlack(engine, message.ts)?.text).toBe('Shipping Tuesday')
+      engine.fake.release()
+      await waitFor(() => (actionRows(engine).length === 0 ? true : undefined), WAIT_MS, 'the row ended')
+      expect(inSlack(engine, message.ts)?.text).toBe('Shipping Wednesday')
+      engine.fake.releaseFrames()
+      await quiet(engine)
+      const after = await rows((list) => rowWith(list, 'Shipping Wednesday')?.edited === true, 'still edited')
+      expect(after.filter((row) => row.ts === message.ts)).toHaveLength(1)
+      expect(apiCalls(engine, 'chat.update')).toHaveLength(1)
+    })
 
-  it('holds the user’s edit over another client’s edit that lands while it is out', async () => {
-    const engine = await booted()
-    const rows = watch(engine, MAIN)
-    const message = await sent(engine, 'Draft one', rows)
-    engine.fake.holdNext({ method: 'chat.update', before: true })
-    valueOf(await editMessage(engine.registry, refOf(message), 'Draft three'))
-    await waitFor(() => (engine.fake.heldCount({ method: 'chat.update' }) === 1 ? true : undefined), WAIT_MS, 'the held call')
-    engine.fake.editMessage({ channel: 'C0ENG', ts: message.ts, text: 'Draft two' })
-    await quiet(engine)
-    const during = await rows((list) => rowWith(list, 'Draft three') !== undefined, 'the intent shown')
-    expect(rowWith(during, 'Draft two')).toBeUndefined()
-    engine.fake.release()
-    await waitFor(() => (actionRows(engine).length === 0 ? true : undefined), WAIT_MS, 'the row ended')
-    await rows((list) => rowWith(list, 'Draft three') !== undefined, 'Slack’s last edit is the user’s')
-    expect(inSlack(engine, message.ts)?.text).toBe('Draft three')
+    await step('keeps the edit when the echo comes before the answer', async () => {
+      const rows = watch(engine, MAIN)
+      const message = await sent(engine, 'Lunch at noon', rows)
+      engine.fake.holdNext({ method: 'chat.update' })
+      valueOf(await editMessage(engine.registry, refOf(message), 'Lunch at one'))
+      await waitFor(() => (engine.fake.heldCount({ method: 'chat.update' }) === 1 ? true : undefined), WAIT_MS, 'the held answer')
+      // Slack has run the call and its echo is stored; the row still holds the intent.
+      await waitFor(() => (readDb(engine, 'cache.db', (db) => (db.prepare('SELECT text FROM messages WHERE ts = ?').get(message.ts) as { text: string }).text) === 'Lunch at one' ? true : undefined), WAIT_MS, 'the echo stored')
+      expect(actionRows(engine)).toHaveLength(1)
+      await rows((list) => rowWith(list, 'Lunch at one')?.edited === true, 'shown edited')
+      engine.fake.release()
+      await waitFor(() => (actionRows(engine).length === 0 ? true : undefined), WAIT_MS, 'the row ended')
+      await rows((list) => rowWith(list, 'Lunch at one')?.edited === true, 'still edited')
+    })
+
+    await step('holds the user’s edit over another client’s edit that lands while it is out', async () => {
+      const rows = watch(engine, MAIN)
+      const message = await sent(engine, 'Draft one', rows)
+      engine.fake.holdNext({ method: 'chat.update', before: true })
+      valueOf(await editMessage(engine.registry, refOf(message), 'Draft three'))
+      await waitFor(() => (engine.fake.heldCount({ method: 'chat.update' }) === 1 ? true : undefined), WAIT_MS, 'the held call')
+      engine.fake.editMessage({ channel: 'C0ENG', ts: message.ts, text: 'Draft two' })
+      await quiet(engine)
+      const during = await rows((list) => rowWith(list, 'Draft three') !== undefined, 'the intent shown')
+      expect(rowWith(during, 'Draft two')).toBeUndefined()
+      engine.fake.release()
+      await waitFor(() => (actionRows(engine).length === 0 ? true : undefined), WAIT_MS, 'the row ended')
+      await rows((list) => rowWith(list, 'Draft three') !== undefined, 'Slack’s last edit is the user’s')
+      expect(inSlack(engine, message.ts)?.text).toBe('Draft three')
+    })
   })
 
   it('sends again after a lost answer, and Slack ends with the text once', async () => {
@@ -166,8 +169,8 @@ describe('edit', () => {
     expect(inSlack(engine, message.ts)?.text).toBe('After a restart')
   })
 
-  it('stays idle while the channel’s first edit waits to retry and a second waits behind it', async () => {
-    const engine = await booted()
+  it('stays idle while the channel’s first edit waits to retry and a second waits behind it [production timing]', async () => {
+    const engine = await booted({ timing: { retryBaseMillis: productionTiming.retryBaseMillis, retryCapMillis: productionTiming.retryCapMillis, actionDeadlineMillis: productionTiming.actionDeadlineMillis } })
     const rows = watch(engine, MAIN)
     const first = await sent(engine, 'First draft', rows)
     const second = await sent(engine, 'Second draft', rows)
@@ -180,27 +183,42 @@ describe('edit', () => {
     // The engine shares this thread: a pass that keeps finding the row behind due fills the event loop.
     const before = performance.eventLoopUtilization()
     await new Promise((resolve) => setTimeout(resolve, 1000))
-    expect(performance.eventLoopUtilization(before).utilization).toBeLessThan(0.5)
+    if (process.env.JUNO_PERF === '1') expect(performance.eventLoopUtilization(before).utilization).toBeLessThan(0.5)
     expect(actionRows(engine)).toHaveLength(2)
   })
 })
 
 describe('delete', () => {
-  it('removes the message at once; the answer and the echo in either order leave it gone', async () => {
+  it('deletes a message locally and reconciles deletion by another client', async () => {
     const engine = await booted()
-    const rows = watch(engine, MAIN)
-    const message = await sent(engine, 'Wrong channel, sorry', rows)
-    engine.fake.holdFrames({ types: ['message'] })
-    engine.fake.holdNext({ method: 'chat.delete', before: true })
-    valueOf(await deleteMessage(engine.registry, refOf(message)))
-    await rows((list) => !list.some((row) => row.ts === message.ts), 'gone at once')
-    expect(inSlack(engine, message.ts)).toBeDefined()
-    engine.fake.release()
-    await waitFor(() => (actionRows(engine).length === 0 ? true : undefined), WAIT_MS, 'the row ended')
-    expect(inSlack(engine, message.ts)).toBeUndefined()
-    engine.fake.releaseFrames()
-    await quiet(engine)
-    await rows((list) => !list.some((row) => row.ts === message.ts), 'still gone')
+
+    await step('removes the message at once; the answer and the echo in either order leave it gone', async () => {
+      const rows = watch(engine, MAIN)
+      const message = await sent(engine, 'Wrong channel, sorry', rows)
+      engine.fake.holdFrames({ types: ['message'] })
+      engine.fake.holdNext({ method: 'chat.delete', before: true })
+      valueOf(await deleteMessage(engine.registry, refOf(message)))
+      await rows((list) => !list.some((row) => row.ts === message.ts), 'gone at once')
+      expect(inSlack(engine, message.ts)).toBeDefined()
+      engine.fake.release()
+      await waitFor(() => (actionRows(engine).length === 0 ? true : undefined), WAIT_MS, 'the row ended')
+      expect(inSlack(engine, message.ts)).toBeUndefined()
+      engine.fake.releaseFrames()
+      await quiet(engine)
+      await rows((list) => !list.some((row) => row.ts === message.ts), 'still gone')
+    })
+
+    await step('treats a message already deleted elsewhere as deleted', async () => {
+      const rows = watch(engine, MAIN)
+      const message = await sent(engine, 'Deleted twice', rows)
+      engine.fake.holdFrames({ types: ['message'] })
+      engine.fake.deleteMessage({ channel: 'C0ENG', ts: message.ts })
+      valueOf(await deleteMessage(engine.registry, refOf(message)))
+      await waitFor(() => (actionRows(engine).length === 0 ? true : undefined), WAIT_MS, 'the row ended')
+      engine.fake.releaseFrames()
+      await quiet(engine)
+      await rows((list) => !list.some((row) => row.ts === message.ts), 'gone')
+    })
   })
 
   it('removes a post still being sent once Slack has it, and drops its pending edit', async () => {
@@ -222,20 +240,7 @@ describe('delete', () => {
     await rows((list) => !list.some((row) => row.clientMsgId === pending.clientMsgId), 'still gone')
   })
 
-  it('treats a message already deleted elsewhere as deleted', async () => {
-    const engine = await booted()
-    const rows = watch(engine, MAIN)
-    const message = await sent(engine, 'Deleted twice', rows)
-    engine.fake.holdFrames({ types: ['message'] })
-    engine.fake.deleteMessage({ channel: 'C0ENG', ts: message.ts })
-    valueOf(await deleteMessage(engine.registry, refOf(message)))
-    await waitFor(() => (actionRows(engine).length === 0 ? true : undefined), WAIT_MS, 'the row ended')
-    engine.fake.releaseFrames()
-    await quiet(engine)
-    await rows((list) => !list.some((row) => row.ts === message.ts), 'gone')
-  })
 })
-
 
 // Found by the conformance replay (test/conformance). `outbox` ids were SQLite rowids, which are reused:
 // a delete that replaced an edit whose call was out took the edit's id, and the edit's answer

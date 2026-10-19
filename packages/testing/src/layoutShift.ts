@@ -154,19 +154,19 @@ export async function measureLayoutShift(page: Page, action: () => Promise<unkno
         return parts.join('')
       }
 
-      // Layout position from the top of the page, summed up the offset parents.
-      // Unlike getBoundingClientRect it ignores transforms and scrolling.
-      const layoutOrigin = (el: HTMLElement): { x: number; y: number } => {
-        let x = 0
-        let y = 0
-        for (let node: HTMLElement | null = el; node; node = node.offsetParent instanceof HTMLElement ? node.offsetParent : null) {
-          x += node.offsetLeft
-          y += node.offsetTop
-        }
-        return { x, y }
-      }
-
       const snapshot = (): Snapshot[] => {
+        // Many elements share an offset parent. Read each ancestor once per snapshot;
+        // the page cannot change during this synchronous walk.
+        const origins = new Map<HTMLElement, { x: number; y: number }>()
+        const layoutOrigin = (el: HTMLElement): { x: number; y: number } => {
+          const saved = origins.get(el)
+          if (saved) return saved
+          const parent = el.offsetParent
+          const at = parent instanceof HTMLElement ? layoutOrigin(parent) : { x: 0, y: 0 }
+          const origin = { x: at.x + el.offsetLeft, y: at.y + el.offsetTop }
+          origins.set(el, origin)
+          return origin
+        }
         const origin = layoutOrigin(rootEl)
         const html = [rootEl, ...Array.from(rootEl.querySelectorAll('*'))].filter((el): el is HTMLElement => el instanceof HTMLElement)
         return html.map((el) => {

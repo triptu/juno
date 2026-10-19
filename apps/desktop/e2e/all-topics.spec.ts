@@ -2,7 +2,7 @@
 // lists what the sidebar leaves out (quiet, resolved, unfollowed and
 // never-followed topics), every filter narrows it, a row opens its topic in
 // the tab, and the row menu's actions work here with their undo.
-import { expect, test } from './fixtures'
+import { expect, test, type Fixtures } from './fixtures'
 
 test.describe.configure({ timeout: 90_000 })
 
@@ -55,9 +55,16 @@ test('lists quiet, resolved and never-followed topics, and a row opens its topic
   await juno.topic.expectTitle(/We have 142 flags/)
 })
 
-test('each filter narrows the list: status chips, kind, sort and text', async ({ juno }) => {
+test('filters all topics by status, kind, text and place, then acts on rows with Undo', async ({ juno, slack }) => {
   await juno.signIn()
   await juno.waitForSync()
+  const context = { juno, slack }
+  await test.step('each filter narrows the list: status chips, kind, sort and text', () => filterTopics(context))
+  await test.step('the place picker searches conversations by word, and a pick narrows the list', () => pickTopicPlace(context))
+  await test.step('the row menu works from All topics, each action with its undo', () => actOnTopicRows(context))
+})
+
+async function filterTopics({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   const { allTopics } = juno
   await allTopics.open()
 
@@ -104,11 +111,9 @@ test('each filter narrows the list: status chips, kind, sort and text', async ({
   await expect(allTopics.search).toHaveValue('')
   await allTopics.row(POSTGRES).expectVisible()
   await allTopics.row(QUIET).expectVisible()
-})
+}
 
-test('the place picker searches conversations by word, and a pick narrows the list', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+async function pickTopicPlace({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   const { allTopics } = juno
   await allTopics.open()
 
@@ -148,11 +153,9 @@ test('the place picker searches conversations by word, and a pick narrows the li
   await allTopics.row(POSTGRES).expectAbsent()
   await allTopics.filterPlace('any', 'Anywhere')
   await allTopics.row(POSTGRES).expectVisible()
-})
+}
 
-test('the row menu works from All topics, each action with its undo', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+async function actOnTopicRows({ juno, slack }: Pick<Fixtures, 'juno' | 'slack'>): Promise<void> {
   const { allTopics, sidebar } = juno
   await allTopics.open()
   const postgres = allTopics.row(POSTGRES)
@@ -205,4 +208,4 @@ test('the row menu works from All topics, each action with its undo', async ({ j
   await allTopics.row('Postgres cutover').expectVisible()
   await juno.undo()
   await postgres.expectVisible()
-})
+}

@@ -1,0 +1,1 @@
+- 10-19 09:16 · Remote build cache · Persist desktop and gallery builds on both remote backends, keyed by source, lockfile, build command, toolchain and build environment. Verify output bytes before and after restoring into a private workspace; changed or damaged inputs rebuild. Publish only successful builds and retain eight entries per app.

@@ -28,6 +28,7 @@ import { holdKeys } from '@juno/views'
 import {
   activateTab,
   activeTab,
+  attachmentsAtom,
   allTopicsLayoutAtom,
   flushSidebar,
   bottomWindow,
@@ -70,6 +71,7 @@ import {
   scrollSnapshotAtom,
   selectedTopicAtom,
   setPinned,
+  showToast,
   showWelcome,
   tickWelcome,
   signedInAtom,
@@ -90,6 +92,7 @@ import {
   type OpenOptions,
   type Place,
   type ScrollSnapshot,
+  type Tab,
   type Tabs,
 } from '@juno/state'
 import type { JunoPage } from '@juno/agent-contract'
@@ -684,7 +687,31 @@ function changeTabs(change: (tabs: Tabs) => Tabs): void {
 }
 
 export function closeTabById(tabId: string): void {
-  changeTabs((tabs) => closeTab(tabs, tabId))
+  closeWithUndo(() => tabId)
+}
+
+/**
+ * Closes the tab `pick` names once the changes before it apply. A Home with
+ * a draft (text, a destination or files) shows "Draft closed" with Undo
+ * (inventory 4, "Reopen closed tab"). The draft, destination and files stay
+ * in their atoms, so Undo brings the tab back with them as they were.
+ */
+function closeWithUndo(pick: (tabs: Tabs) => string | undefined): void {
+  // The change may run more than once, on the tabs as a waiting change leaves them; the last run is the close.
+  let closing: Tab | undefined
+  changeTabs((tabs) => {
+    const id = pick(tabs)
+    closing = tabs.tabs.find((tab) => tab.id === id)
+    return closing === undefined ? tabs : closeTab(tabs, closing.id)
+  })
+  const tab = closing
+  if (tab === undefined || currentPlace(tab).kind !== 'home') return
+  if (untouched(registry.get(homeDraftAtom(tab.id))) && registry.get(attachmentsAtom(tab.id)).length === 0) return
+  const onUndo = () => {
+    changeTabs((tabs) => reopenClosedTab(tabs, tab.id))
+    return Promise.resolve(true)
+  }
+  showToast(registry, { text: 'Draft closed', onUndo }, true)
 }
 
 /** A tab dragged, or moved with ⌃⇧← and ⌃⇧→, to `index` in the strip. */
@@ -694,7 +721,7 @@ export function moveTabTo(tabId: string, index: number): void {
 
 /** ⌘W: closes whichever tab is active once the changes before it apply. */
 function closeActiveTab(): void {
-  changeTabs((tabs) => (tabs.active === undefined ? tabs : closeTab(tabs, tabs.active)))
+  closeWithUndo((tabs) => tabs.active)
 }
 
 /** The app menu and the three-finger swipe. */

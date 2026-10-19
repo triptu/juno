@@ -10,7 +10,8 @@ export default defineConfig({
     // A machine of its own (pnpm remote) sets JUNO_VITEST_WORKERS higher.
     maxWorkers: Number(process.env.JUNO_VITEST_WORKERS ?? 2),
     include: ['test/**/*.test.ts'],
-    // node:sqlite is synchronous; one process keeps the temp directories apart.
-    fileParallelism: false,
+    // Every test owns its temporary directory and SQLite handles. Remote workers
+    // can overlap files; keep the shared Mac default unchanged.
+    fileParallelism: process.env.JUNO_TEST_FILE_PARALLEL === '1',
   },
 })
