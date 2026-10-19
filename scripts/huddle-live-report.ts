@@ -167,3 +167,34 @@ export class MediaReport {
     )
   }
 }
+
+/** The unit an epoch time is in, judged by its size: `seconds` (10 digits), `milliseconds` (13), else `unknown`. Prints no value. */
+export function timeUnit(value: unknown): 'seconds' | 'milliseconds' | 'unknown' | 'absent' {
+  if (value === undefined || value === null) return 'absent'
+  const n = typeof value === 'string' ? Number(value) : value
+  if (typeof n !== 'number' || !Number.isFinite(n)) return 'unknown'
+  if (n >= 1e9 && n < 1e10) return 'seconds'
+  if (n >= 1e12 && n < 1e13) return 'milliseconds'
+  return 'unknown'
+}
+
+/**
+ * The identity and time facts the engine relies on (docs/research/slack-huddles.md
+ * section 6): booleans and units only, never an id or a time.
+ */
+export interface IdentityFacts {
+  joinFrameRoomId?: string
+  joinFrameDateStart?: unknown
+  infoCallId?: string
+  infoStartDate?: unknown
+  externalUserIdRoom?: string
+}
+
+export function printIdentityFacts(facts: IdentityFacts, callId: string | undefined) {
+  const same = (other: string | undefined) => (other === undefined || callId === undefined ? 'unknown' : String(other === callId))
+  log(`fact: sh_room_join room.id equals rooms.join call.call_id: ${same(facts.joinFrameRoomId)}`)
+  log(`fact: sh_room_join room.date_start unit: ${timeUnit(facts.joinFrameDateStart)}`)
+  log(`fact: huddles/info call_id equals rooms.join call.call_id: ${same(facts.infoCallId)}`)
+  log(`fact: huddles/info start_date unit: ${timeUnit(facts.infoStartDate)}`)
+  log(`fact: attendee ExternalUserId room part equals rooms.join call.call_id: ${same(facts.externalUserIdRoom)}`)
+}

@@ -183,6 +183,7 @@ Run with `scripts/huddle-live.ts` on the owner's session, in a private test chan
   - `attendee`: `AttendeeId`, `ExternalUserId`, `JoinToken`, `Capabilities.{Audio, Content, Video}`, `EventActions` (null).
   - `canvas`: `canvas_file_id`, `thread_channel_id`, `root_thread_ts`.
   - `huddle`: `id`, `name`, `created_by`, `date_start`, `date_end`, `participants[]`, `participant_history[]`, `channels[]`, `has_ended`, `huddle_link`, `thread_root_ts`, `background_id`, `external_unique_id`, `attached_file_ids[]`, `pending_invitees`, `last_invite_status_by_user`, `prototypes.{is_prewarmed, is_scheduled}`, `recording.can_record_summary`, `locale`.
+- **Identities and times** (a third run, 2026-10-19, 30 s, booleans and units only): the `room.id` of `sh_room_join`, the `call_id` of `huddles/info` and the room part of `ExternalUserId` all equal the `call.call_id` of `rooms.join`. `room.date_start` and `huddles/info`'s `start_date` are epoch seconds.
 - **`ExternalUserId`** has the shape `T` + 10 chars, `-`, `R` + 10 chars, `-`, `U` + 10 chars: team id, room id, user id. The third part is the joining user's id. There is no `#` session part.
 - **Socket frames** for the room: `sh_room_join` on join, `huddle_invite_cancel` (`type, team_id, channel_id, event_ts`) right after it, and `sh_room_leave` on leave. `sh_room_join` and `sh_room_leave` have `type`, `user`, `huddle.channel_id`, `event_ts`, `ts` and a full `room`:
   - `id`, `name`, `media_server`, `media_backend_type`, `created_by`, `date_start`, `date_end`, `channels[]`, `is_dm_call`, `has_ended`.
@@ -206,7 +207,6 @@ Run with `scripts/huddle-live.ts` on the owner's session, in a private test chan
 - Whether Slack checks the client for other huddle methods. `rooms.join` accepted Juno's request shape (section 6).
 - Whether Chime cares about the page origin in Electron. A `http://localhost` page in Chrome connected (section 6).
 - Whether audio from another participant arrives. The spike had no second participant yet.
-- How the room id in `ExternalUserId` relates to the call id, and what the official client reads from it. Its shape is known (section 6).
 - The protobuf schema of the peer messages (field numbers and types). The descriptors are in the minified bundle but were not decoded. Not needed for Juno's scope.
 - Whether the legacy calls-server path (`hostname`, `port`, `turn_auth`) is ever returned today. The live answer had `free_willy`.
 - Whether multi-device join (`multidevice`) or quick join needs extra calls not seen here.

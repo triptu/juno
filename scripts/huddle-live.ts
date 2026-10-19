@@ -35,7 +35,7 @@ import { EdgeHuddlesInfoOk, type MethodArgs, type MethodName, type MethodOk } fr
 import { HttpTransport, SlackClient, SlackApi, SlackEdge, SlackSession, SlackSocket, slackConfigLayer, SocketHandshake, type SlackSessionShape } from '@juno/slack'
 import { openHuddlePage, type HuddlePage } from './huddle-live-browser.ts'
 import { callPlan, Guard, NAMES } from './huddle-live-guard.ts'
-import { log, MediaReport, printHuddles, printPaths, safeError } from './huddle-live-report.ts'
+import { log, MediaReport, printHuddles, printIdentityFacts, printPaths, safeError, type IdentityFacts } from './huddle-live-report.ts'
 import { readCachedSession } from './live-common.ts'
 
 const argv = process.argv.slice(2)
@@ -172,12 +172,27 @@ interface Open {
   socket?: Fiber.Fiber<void>
 }
 
+/** Kept in memory only, for `printIdentityFacts`: never printed. */
+const facts: IdentityFacts = {}
+
 /** Keeps the call id and attendee id of a join answer, for the leave. */
 function remember(joined: MethodOk<'rooms.join'> | undefined) {
   if (joined === undefined) return
   call.callId = joined.call.call_id
   const id = joined.call.free_willy?.attendee['AttendeeId']
   call.attendeeId = typeof id === 'string' ? id : undefined
+  const external = joined.call.free_willy?.attendee['ExternalUserId']
+  // As recorded: team id, room id, user id.
+  if (typeof external === 'string') facts.externalUserIdRoom = external.split('-')[1]
+}
+
+/** The running huddle of the test channel in a `huddles/info` answer, for the facts. */
+function rememberInfo(answer: unknown) {
+  const huddles = (answer as { huddles?: ReadonlyArray<{ channel_id?: unknown; call_id?: unknown; start_date?: unknown }> } | undefined)?.huddles ?? []
+  const mine = huddles.find((h) => h.channel_id === guard.channel)
+  if (mine === undefined) return
+  if (typeof mine.call_id === 'string') facts.infoCallId = mine.call_id
+  facts.infoStartDate = mine.start_date
 }
 
 async function main(): Promise<number> {
@@ -235,6 +250,7 @@ async function run(t: Target, connection: Connection, open: Open): Promise<numbe
   open.page = await openHuddlePage({ headed: flags.has('--headed'), onEvent: (event) => media.on(event) })
   if (useFake) {
     log('fake: not starting media (the fake has no Chime)')
+    rememberInfo(await connection.huddlesInfo('after the join'))
     return 0
   }
   if (stopRequested !== undefined) return 1
@@ -249,7 +265,7 @@ async function run(t: Target, connection: Connection, open: Open): Promise<numbe
     console.log(media.status(Date.now() - started, withSocket ? socketReport : undefined))
     if (!infoAfter && media.started) {
       infoAfter = true
-      await connection.huddlesInfo('after the join')
+      rememberInfo(await connection.huddlesInfo('after the join'))
     }
   }
   media.summary()
@@ -288,6 +304,7 @@ async function cleanup(connection: Connection, open: Open, self: string): Promis
       log('rooms.leave not sent: the join gave no call id or attendee id, so there is nothing to leave')
     }
   }
+  if (guard.joins > 0) printIdentityFacts(facts, call.callId)
   if (open.socket !== undefined) {
     await connection.runtime.runPromise(Fiber.interrupt(open.socket))
     log(`socket room frame types: ${[...socketReport.seenTypes].map(([type, n]) => `${type} x${n}`).join(', ') || 'none'}`)
@@ -358,6 +375,11 @@ function startSocket(runtime: ManagedRuntime.ManagedRuntime<SlackSocket, never>)
     socketReport.roomFrames++
     const mine = (guard.channel !== undefined && data.includes(guard.channel)) || (call.callId !== undefined && data.includes(call.callId))
     if (mine) socketReport.aboutThisRoom++
+    if (frame.type === 'sh_room_join' && mine && facts.joinFrameRoomId === undefined) {
+      const room = (frame as { room?: { id?: unknown; date_start?: unknown } }).room
+      if (typeof room?.id === 'string') facts.joinFrameRoomId = room.id
+      facts.joinFrameDateStart = room?.date_start
+    }
     const seen = socketReport.seenTypes.get(frame.type) ?? 0
     socketReport.seenTypes.set(frame.type, seen + 1)
     if (seen === 0) printPaths(`socket frame ${frame.type} (${mine ? 'this room' : 'another room'})`, frame)
