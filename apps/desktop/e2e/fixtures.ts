@@ -144,6 +144,7 @@ function coverageDir(): string | undefined {
  * to test what survives a relaunch.
  */
 export async function launchApp(userData: string, options: LaunchOptions = {}): Promise<RunningApp> {
+  const started = performance.now()
   const env: Record<string, string> = {}
   // pnpm's global virtual store gives the scripts it runs NODE_PATH and a
   // NODE_OPTIONS resolve hook. The app is bundled and the packaged app gets
@@ -197,13 +198,16 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
     await app.context().addInitScript(startSendTrace)
     await win.evaluate(startSendTrace)
   }
+  if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: launch ${Math.round(performance.now() - started)} ms`)
   return {
     app,
     win,
     close: async () => {
       // Main and the renderers write what ran since their last write; the engine and the agent write as they end.
       if (coverage !== undefined) await app.evaluate(() => (globalThis as unknown as { junoTest: { flushCoverage: () => Promise<void> } }).junoTest.flushCoverage()).catch(() => undefined)
+      const closing = performance.now()
       await app.close()
+      if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: close ${Math.round(performance.now() - closing)} ms`)
       await ownOpenRouter?.close()
     },
   }
@@ -300,7 +304,9 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   // Playwright requires the destructuring pattern even with no dependencies.
   // oxlint-disable-next-line no-empty-pattern
   fake: async ({}, use) => {
+    const started = performance.now()
     const fake = await startFakeSlack()
+    if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: fake ${Math.round(performance.now() - started)} ms`)
     await use(fake)
     await fake.close()
   },
