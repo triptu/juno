@@ -85,3 +85,9 @@ test('selected unit files exclude nested namesakes that Vitest substring filters
     ])
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })
+
+test('tool changes keep the desktop smoke spec through the final input filter', () => {
+  const steps = plan('--files', 'scripts/remote/plan.mjs').steps
+  assert.deepEqual(steps.find((step) => step.script === 'test:desktop')?.items, ['apps/desktop/e2e/app.spec.ts'])
+  assert.ok(!plan('--batch', '--files', 'scripts/remote/plan.mjs').steps.some((step) => step.script === 'test:desktop'))
+})

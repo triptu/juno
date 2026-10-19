@@ -330,6 +330,12 @@ if (!wide && selection.specs) {
     selection.specs.set(smoke, [`${toolChanged[0]} changed; one spec checks that a run still works (--wide runs everything)`])
     selection.required.add(smoke)
   }
+  if (!batch && toolChanged.length > 0 && files.has(smoke)) {
+    const item = specItems.find((candidate) => candidate.id === smoke)
+    item.own = true
+    // A smoke run verifies the tools too; their contents must invalidate its cache.
+    for (const file of git('ls-files', '--cached', '--others', '--exclude-standard', '--', 'scripts')) item.inputs.add(file)
+  }
   // A spec whose every test is heavy runs only when its area changed.
   for (const area of HEAVY_AREAS.filter((entry) => !heavyActive.has(entry.area)))
     for (const spec of area.whole)
