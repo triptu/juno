@@ -162,6 +162,10 @@ module huddle {
     (st.wanted != 0 and gone(st, st.wantedPage)) or
     (st.request != 0 and not(st.cancel) and gone(st, st.requestPage)) or
     (st.current != 0 and engStopped(st, st.current))
+  // Leave stops the page's media and sends rooms.leave at once; the stored
+  // record is cleared only once the media is known stopped (and its request
+  // has gone out): `leave` clears `current`, so the page stops the media,
+  // `sendLeave` sends at once, and `clearLeave` waits for `engStopped`.
   action sendLeave(a: int): bool = all {
     s.up, s.loadedWs.contains(s.ws), s.recWs.get(a) == s.ws, s.pending.contains(a), a != s.current, s.unsent.contains(a),
     s' = { ...s, sent: s.sent.union(Set(a)), unsent: s.unsent.exclude(Set(a)),
