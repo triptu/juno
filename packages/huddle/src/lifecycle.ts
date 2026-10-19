@@ -28,7 +28,7 @@ export interface Identity {
 
 /** A stored record: the identity, and the renderer page generation its credentials went to (null: never handed out). */
 export interface Stored extends Identity {
-  readonly generation: string | null
+  readonly generation: number | null
 }
 
 /**
@@ -50,14 +50,14 @@ export interface Intent {
   readonly channelId: string
   readonly region: string | null
   /** The renderer page that asked, which gets the credentials. */
-  readonly generation: string
+  readonly generation: number
   /** Ties the intent to the Start that asked for it, so its caller gets the answer. */
   readonly ticket: number
 }
 
 export interface Current {
   readonly identity: Identity
-  readonly generation: string
+  readonly generation: number
 }
 
 export interface Lifecycle {
@@ -146,10 +146,10 @@ export const reconcile = (s: Lifecycle, view: MediaView): Lifecycle => {
 
 /**
  * Model `requestJoin`'s guard: a wanted join from a page main lists, none
- * in flight, the session's stored leaves loaded, none of them left, every
- * attendee of another workspace stopped, and no eviction since the last
- * Start. After a restart the stored records are `pending`, so they go out
- * before any new join.
+ * in flight, the stored leaves of every workspace loaded (`loaded`), none
+ * of this workspace's left, every attendee of another workspace stopped,
+ * and no eviction since the last Start. After a restart the stored records
+ * are `pending`, so they go out before any new join.
  */
 export const canRequest = (s: Lifecycle, view: MediaView, workspace: string, loaded: boolean): s is Lifecycle & { readonly wanted: Intent } =>
   s.wanted !== undefined && s.request === undefined && loaded && !s.otherDevice && !s.quitting &&
@@ -161,15 +161,20 @@ export const requestJoin = (s: Lifecycle & { readonly wanted: Intent }): Lifecyc
 
 /**
  * The record `answerJoin` stores for an answer. It goes to the asking page
- * only if the join was not cancelled and main still lists the page; else no
- * page ever had its media, and it is left at once.
+ * only if the join was not cancelled, main still lists the page, and the
+ * Start that asked is still waiting (`callerWaiting`: its connection did not
+ * close); else no page ever had its media, and it is left at once.
  */
-export const recordFor = (s: Lifecycle, view: MediaView, identity: Identity): Stored => ({
+export const recordFor = (s: Lifecycle, view: MediaView, identity: Identity, callerWaiting: boolean): Stored => ({
   ...identity,
-  generation: !s.cancel && s.request !== undefined && pageState(view, s.request.generation) === 'live' ? s.request.generation : null,
+  generation: !s.cancel && callerWaiting && s.request !== undefined && pageState(view, s.request.generation) === 'live' ? s.request.generation : null,
 })
 
-/** Model `answerJoin`, after `record` was stored. A record no page holds is a leave at once; otherwise it is the current call. */
+/**
+ * Model `answerJoin`, after `record` was stored. A record no page holds is a
+ * leave at once; otherwise it is the current call. A join that was not
+ * cancelled but reached no page ends as a lost connection.
+ */
 export const answerJoin = (s: Lifecycle, record: Stored, workspace: string): Lifecycle => {
   const { generation, ...identity } = record
   return {
@@ -177,6 +182,7 @@ export const answerJoin = (s: Lifecycle, record: Stored, workspace: string): Lif
     request: undefined,
     pending: [...s.pending, { record, workspace, dispatch: 'queued' }],
     current: generation === null ? undefined : { identity, generation },
+    ended: generation === null && !s.cancel && s.request !== undefined ? { channelId: s.request.channelId, reason: 'connectionLost' } : s.ended,
   }
 }
 
@@ -249,16 +255,15 @@ export const detached = (s: Lifecycle, workspace: string): Lifecycle => ({
   pending: s.pending.map((p) => (p.workspace === workspace && p.dispatch !== 'dispatched' ? { ...p, dispatch: 'queued' } : p)),
 })
 
-/**
- * Model `restart`, once the stored records are loaded: they are merged
- * with what this process already knows. A record new to this process has
- * not been sent here.
- */
-export const restart = (s: Lifecycle, stored: ReadonlyArray<Stored>, workspace: string): Lifecycle => {
+/** Stored records of `workspace` merged with what this process already knows. A record new to this process has not been sent here. */
+export const merge = (s: Lifecycle, stored: ReadonlyArray<Stored>, workspace: string): Lifecycle => {
   const known = new Set(s.pending.map((p) => p.record.attendeeId))
   const loaded = stored.filter((record) => !known.has(record.attendeeId)).map((record): Pending => ({ record, workspace, dispatch: 'queued' }))
-  return { ...s, quitting: false, pending: [...s.pending, ...loaded] }
+  return { ...s, pending: [...s.pending, ...loaded] }
 }
+
+/** Model `restart`, once a session's stored records are loaded. */
+export const restart = (s: Lifecycle, stored: ReadonlyArray<Stored>, workspace: string): Lifecycle => ({ ...merge(s, stored, workspace), quitting: false })
 
 /** The holding page's report while the current call's session is up, for the UI. */
 export const currentMedia = (s: Lifecycle, view: MediaView) =>

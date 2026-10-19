@@ -70,30 +70,36 @@ describe('room frames', () => {
 })
 
 const WS = 'T1'
-const G1 = 'page-1'
+/** Page generations as main gives them out. */
+const G0 = 10
+const G1 = 11
+const G2 = 12
 const a = { channelId: 'C1', callId: 'R1', attendeeId: 'A1' }
 const b = { channelId: 'C2', callId: 'R2', attendeeId: 'A2' }
 const intent = (channelId: string, ticket: number, generation = G1) => ({ channelId, region: null, generation, ticket })
 
+/** A report, and `on`: the engine connection it came on (1 unless given). */
+type ReportInput = Partial<HuddlePageReport> & { readonly generation: number; readonly on?: number }
 interface ViewInput {
-  readonly live?: ReadonlyArray<string>
-  readonly gone?: ReadonlyArray<string>
-  readonly reports?: ReadonlyArray<Partial<HuddlePageReport> & { readonly generation: string }>
-  readonly handed?: ReadonlyArray<string>
+  readonly live?: ReadonlyArray<number>
+  readonly maxIssued?: number
+  readonly reports?: ReadonlyArray<ReportInput>
+  /** Hand-offs of this process, by attendee, on connection 1 unless given. */
+  readonly handed?: ReadonlyArray<string | readonly [string, number]>
   readonly reported?: boolean
 }
-/** The pages' state: main lists `live`, listed `gone` before; each page's latest report; this process's hand-offs in order. */
-const view = ({ live = [G1], gone = [], reports = [], handed = [], reported = true }: ViewInput = {}): MediaView => ({
-  pages: { reported, live: new Set(live), seen: new Set([...live, ...gone]) },
-  reports: new Map(reports.map((r) => [r.generation, { seq: 1, holds: null, received: null, connection: 'connected', muted: false, ended: null, ...r }])),
-  handed: new Map(handed.map((attendeeId, at) => [attendeeId, at + 1])),
+/** The pages' state: main lists `live` and gave out up to `maxIssued`; each page's latest report; this process's hand-offs. */
+const view = ({ live = [G1], maxIssued = Math.max(G1, ...live), reports = [], handed = [], reported = true }: ViewInput = {}): MediaView => ({
+  pages: { reported, live: new Set(live), maxIssued: reported ? maxIssued : 0 },
+  reports: new Map(reports.map(({ on = 1, ...r }) => [r.generation, { connection: on, report: { seq: 1, holds: null, received: null, connection: 'connected', muted: false, ended: null, ...r } }])),
+  handed: new Map(handed.map((h) => (typeof h === 'string' ? [h, 1] : h))),
 })
 /** G1 holds A1's session, after its hand-off. */
 const inCall = view({ reports: [{ generation: G1, holds: 'A1', received: 'A1' }], handed: ['A1'] })
 /** G1 reports it stopped A1. */
 const stoppedA = (reason: 'left' | 'anotherDevice' = 'left') => view({ reports: [{ generation: G1, received: 'A1', ended: { attendeeId: 'A1', reason } }], handed: ['A1'] })
 
-const answered = (s: L.Lifecycle, media: MediaView, identity: L.Identity) => L.answerJoin(s, L.recordFor(s, media, identity), WS)
+const answered = (s: L.Lifecycle, media: MediaView, identity: L.Identity, callerWaiting = true) => L.answerJoin(s, L.recordFor(s, media, identity, callerWaiting), WS)
 /** Sent, as `drive` and the client's `beforeSend` do. */
 const sent = (s: L.Lifecycle, attendeeId: string) => L.dispatched(L.sending(s, attendeeId), attendeeId)
 const joinedA = (() => {
@@ -103,28 +109,40 @@ const joinedA = (() => {
 })()
 
 describe('lifecycle: the pages as current state', () => {
-  it('holds a Start back until main lists its page, and never hands out to a page that went', () => {
-    const wanted = L.choose(L.initial, intent('C1', 1, 'page-2'))
+  it('holds a Start back until main has given out its page, and never hands out to a page that went', () => {
+    const wanted = L.choose(L.initial, intent('C1', 1, G2))
     expect(L.canRequest(wanted, view(), WS, true)).toBe(false)
-    expect(L.canRequest(wanted, view({ live: [G1, 'page-2'] }), WS, true)).toBe(true)
+    expect(L.canRequest(wanted, view({ live: [G1, G2] }), WS, true)).toBe(true)
+    // Given out but dead before main listed it: gone, so the Start is dropped.
+    expect(L.reconcile(wanted, view({ live: [G1], maxIssued: G2 + 1 })).wanted).toBeUndefined()
     // The page went while its join was out: the answer is a leave no page holds.
     const out = L.requestJoin({ ...L.initial, wanted: intent('C1', 1) })
-    const gone = view({ live: [], gone: [G1] })
+    const gone = view({ live: [], maxIssued: G1 })
     const s = answered(L.reconcile(out, gone), gone, a)
     expect(s.current).toBeUndefined()
     expect(s.pending).toEqual([{ record: { ...a, generation: null }, workspace: WS, dispatch: 'queued' }])
     expect(L.toClear(sent(s, 'A1'), gone, WS)).toEqual([{ ...a, generation: null }])
   })
 
-  it('takes a report sent before the hand-off as saying nothing about it', () => {
+  it('hands nothing to a Start whose connection closed before Slack answered', () => {
+    const s = answered(L.requestJoin({ ...L.initial, wanted: intent('C1', 1) }), view(), a, false)
+    expect(s.current).toBeUndefined()
+    expect(s.ended).toEqual({ channelId: 'C1', reason: 'connectionLost' })
+    expect(mediaStopped(view(), { ...a, generation: null })).toBe(true)
+  })
+
+  it('places a report after the hand-off by its connection, or by naming the credentials on the same one', () => {
     const before = view({ reports: [{ generation: G1, received: null }], handed: ['A1'] })
     expect(L.reconcile(joinedA, before).current).toEqual(joinedA.current)
     expect(L.phaseOf(joinedA, before)).toBe('joining')
     expect(L.phaseOf(joinedA, inCall)).toBe('joined')
+    // The Start's response was lost with its connection: a report on the next one still counts.
+    const reconnected = view({ reports: [{ generation: G1, received: null, on: 2 }], handed: ['A1'] })
+    expect(L.reconcile(joinedA, reconnected).current).toBeUndefined()
   })
 
   it('ends the call once its page reports it stopped, with the page’s reason, and ignores other pages', () => {
-    expect(L.reconcile(joinedA, view({ reports: [{ generation: 'page-0', received: 'A1' }], handed: ['A1'] })).current).toEqual(joinedA.current)
+    expect(L.reconcile(joinedA, view({ reports: [{ generation: G0, received: 'A1' }], handed: ['A1'] })).current).toEqual(joinedA.current)
     const evicted = L.reconcile(joinedA, stoppedA('anotherDevice'))
     expect(evicted).toMatchObject({ current: undefined, otherDevice: true, ended: { channelId: 'C1', reason: 'anotherDevice' } })
     const cleared = L.clearLeave(sent(evicted, 'A1'), new Set(['A1']))
@@ -133,7 +151,7 @@ describe('lifecycle: the pages as current state', () => {
   })
 
   it('ends the call when main lists its page gone', () => {
-    expect(L.reconcile(joinedA, view({ live: [], gone: [G1], handed: ['A1'] }))).toMatchObject({ current: undefined, ended: { reason: 'connectionLost' } })
+    expect(L.reconcile(joinedA, view({ live: [G2], handed: ['A1'] }))).toMatchObject({ current: undefined, ended: { reason: 'connectionLost' } })
   })
 
   it('counts a record loaded after a restart as stopped by any report of its page in this process, whenever it came', () => {
@@ -143,8 +161,8 @@ describe('lifecycle: the pages as current state', () => {
     expect(mediaStopped(view(), { ...a, generation: G1 })).toBe(false)
     const reportedEarly = view({ reports: [{ generation: G1, received: 'A0', ended: { attendeeId: 'A1', reason: 'left' } }] })
     expect(L.toClear(sent(loaded, 'A1'), reportedEarly, WS)).toEqual([{ ...a, generation: G1 }])
-    // Its page not in main's first report: gone, since every live page is listed.
-    expect(mediaStopped(view({ live: ['page-2'] }), { ...a, generation: G1 })).toBe(true)
+    // Its page not live in main's report: gone.
+    expect(mediaStopped(view({ live: [G2] }), { ...a, generation: G1 })).toBe(true)
     expect(mediaStopped(view({ live: [], reported: false }), { ...a, generation: G1 })).toBe(false)
   })
 })
@@ -181,13 +199,16 @@ describe('lifecycle: leaves', () => {
     expect(L.toSend(s, WS)).toEqual([{ ...b, generation: null }])
   })
 
-  it('keeps the stop barrier across a workspace change, and leaves other workspaces their own leaves', () => {
+  it('keeps the stop barrier across a workspace change and a restart, and leaves other workspaces their own leaves', () => {
     const away = L.detached(L.leave(joinedA), WS)
     const other = L.choose(L.restart(away, [], 'T2'), intent('C9', 6))
     expect(L.canRequest(other, inCall, 'T2', true)).toBe(false)
     expect(L.toSend(other, 'T2')).toEqual([])
     expect(L.canRequest(other, stoppedA(), 'T2', true)).toBe(true)
     expect(L.toSend(other, WS)).toEqual([{ ...a, generation: G1 }])
+    // After a restart, T1's leave comes from the boot load: until then joins wait.
     expect(L.canRequest(L.choose(L.initial, intent('C2', 5)), view(), WS, false)).toBe(false)
+    const booted = L.choose(L.restart(L.merge(L.initial, [{ ...a, generation: G1 }], WS), [], 'T2'), intent('C9', 7))
+    expect(L.canRequest(booted, view(), 'T2', true)).toBe(false)
   })
 })

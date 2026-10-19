@@ -6,6 +6,7 @@
  * - `media.ts`: the pages' media, as current state.
  * - `core.ts`: the state, the lock, and the I/O the rules call for.
  * - `attach.ts`: a sync's session, and its end.
+ * - `boot.ts`: every workspace's stored leaves, read at boot.
  * - `reads.ts`: running huddles from room frames and `huddles/info`.
  * - `slack.ts`: the requests, in the official client's shape.
  * - `status.ts`: the "In a huddle" status while the call is live.
@@ -14,6 +15,7 @@ import { Context, Data, Effect, Layer, Scope, Stream, SubscriptionRef } from 'ef
 import type { HuddleCall, HuddleError, HuddlePageReport, HuddleStartResult, RunningHuddles } from '@juno/contract'
 import type { SlackApi, SlackEdge, SocketEvent } from '@juno/slack'
 import { attach } from './attach'
+import { boot, type BootStores } from './boot'
 import { leave, makeCore, pages, report, start } from './core'
 import type { Stored } from './lifecycle'
 
@@ -52,13 +54,19 @@ export class Huddle extends Context.Service<Huddle, {
   readonly call: Stream.Stream<HuddleCall>
   /** Running huddles by channel: at subscribe time, then every change. */
   readonly running: Stream.Stream<RunningHuddles>
-  /** Start or join the huddle in `channelId`, leaving the current call first. Answers page `generation` with the credentials once the leave is stored. */
-  readonly start: (channelId: string, region: string | null, generation: string) => Effect.Effect<HuddleStartResult, HuddleError>
+  /**
+   * Start or join the huddle in `channelId`, leaving the current call first.
+   * Answers page `generation`, on engine connection `connection`, with the
+   * credentials once the leave is stored.
+   */
+  readonly start: (channelId: string, region: string | null, generation: number, connection: number) => Effect.Effect<HuddleStartResult, HuddleError>
   readonly leave: Effect.Effect<void>
-  /** A renderer page's whole media state. */
-  readonly report: (report: HuddlePageReport) => Effect.Effect<void>
-  /** Main's report of the live renderer page generations. */
-  readonly pages: (live: ReadonlyArray<string>) => Effect.Effect<void>
+  /** A renderer page's whole media state, and the engine connection it came on. */
+  readonly report: (report: HuddlePageReport, connection: number) => Effect.Effect<void>
+  /** Main's report of the live renderer page generations and the highest it gave out. */
+  readonly pages: (live: ReadonlyArray<number>, maxIssued: number) => Effect.Effect<void>
+  /** Reads every workspace's stored leaves; joins wait until it is done. Run once, at boot. */
+  readonly boot: (stores: BootStores) => Effect.Effect<void>
   /** Gives the service a session until the calling scope closes, and returns the listener for its socket. */
   readonly attach: (session: HuddleSession) => Effect.Effect<HuddleListener, never, Scope.Scope>
 }>()('juno/huddle/Huddle') {
@@ -67,10 +75,11 @@ export class Huddle extends Context.Service<Huddle, {
     return Huddle.of({
       call: SubscriptionRef.changes(core.callRef),
       running: SubscriptionRef.changes(core.runningRef),
-      start: (channelId, region, generation) => start(core, channelId, region, generation),
+      start: (channelId, region, generation, connection) => start(core, channelId, region, generation, connection),
       leave: leave(core),
-      report: (next) => report(core, next),
-      pages: (live) => pages(core, live),
+      report: (next, connection) => report(core, next, connection),
+      pages: (live, maxIssued) => pages(core, live, maxIssued),
+      boot: (stores) => boot(core, stores),
       attach: (session) => attach(core, session),
     })
   }))

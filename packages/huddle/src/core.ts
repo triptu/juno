@@ -25,7 +25,7 @@ import type { SlackApiError } from '@juno/slack'
 import type { MethodOk } from '@juno/slack-schema'
 import type { HuddleSession } from './Huddle'
 import * as L from './lifecycle'
-import { noMedia, pageState, type MediaView } from './media'
+import { noMedia, pageState, type MediaView, type Received } from './media'
 import { applyJoined, toRunningHuddles, type Running } from './running'
 import { codeOf, joinedFrom, joinRequest, leaveRequest, toHuddleError } from './slack'
 import { keepStatus } from './status'
@@ -54,8 +54,14 @@ export interface Attached {
 /** Renderer page generations as main reports them (`media.ts`). */
 interface Pages {
   reported: boolean
-  live: ReadonlySet<string>
-  readonly seen: Set<string>
+  live: ReadonlySet<number>
+  maxIssued: number
+}
+
+/** A Start waiting for its answer, and the engine connection it came on. Removed when its caller goes. */
+interface Waiter {
+  readonly deferred: Deferred.Deferred<HuddleStartResult, HuddleError>
+  readonly connection: number
 }
 
 export interface Core {
@@ -65,12 +71,14 @@ export interface Core {
   attached: Attached | undefined
   tickets: number
   leavesInFlight: number
-  readonly waiters: Map<number, Deferred.Deferred<HuddleStartResult, HuddleError>>
+  readonly waiters: Map<number, Waiter>
   readonly pages: Pages
-  /** The latest whole-state report of each page not known to be gone. */
-  readonly reports: Map<string, HuddlePageReport>
-  /** The hand-offs of this process, by attendee, in order. */
+  /** The latest whole-state report of each page not known to be gone, with the connection it came on. */
+  readonly reports: Map<number, Received>
+  /** The hand-offs of this process, by attendee: the connection the Start came on. */
   readonly handed: Map<string, number>
+  /** Workspaces whose stored leaves are still to be read at boot (`boot.ts`); undefined before the boot load began. */
+  booting: ReadonlySet<string> | undefined
   /** Refusals in a row per attendee, for the pause before the next try. */
   readonly attempts: Map<string, number>
   readonly callRef: SubscriptionRef.SubscriptionRef<HuddleCall>
@@ -109,9 +117,10 @@ export const makeCore = Effect.gen(function* () {
     tickets: 0,
     leavesInFlight: 0,
     waiters: new Map(),
-    pages: { reported: false, live: new Set(), seen: new Set() },
+    pages: { reported: false, live: new Set(), maxIssued: 0 },
     reports: new Map(),
     handed: new Map(),
+    booting: undefined,
     attempts: new Map(),
     callRef: yield* SubscriptionRef.make(toCall(L.initial, noMedia, new Map())),
     runningRef: yield* SubscriptionRef.make<RunningHuddles>({}),
@@ -132,7 +141,7 @@ export const settleWaiters = (core: Core) =>
     const live = new Set([s.wanted?.ticket, s.request !== undefined && !s.cancel ? s.request.ticket : undefined])
     const done = [...waiters].filter(([ticket]) => !live.has(ticket))
     for (const [ticket] of done) waiters.delete(ticket)
-    return Effect.forEach(done, ([, deferred]) => Deferred.succeed(deferred, { _tag: 'cancelled' }), { discard: true })
+    return Effect.forEach(done, ([, waiter]) => Deferred.succeed(waiter.deferred, { _tag: 'cancelled' }), { discard: true })
   })
 
 export const markDue = (to: Attached, channel: string | 'all') =>
@@ -158,27 +167,28 @@ const answered = (core: Core, to: Attached, intent: L.Intent, answer: Result.Res
     const joined = Result.isSuccess(answer) ? joinedFrom(intent.channelId, answer.success) : undefined
     if (joined === undefined) {
       const failure = Result.isFailure(answer) ? yield* toHuddleError(answer.failure) : new Rejected({ code: 'create_meeting_failed' })
-      if (!core.s.cancel && waiter !== undefined) yield* Deferred.fail(waiter, failure)
+      if (!core.s.cancel && waiter !== undefined) yield* Deferred.fail(waiter.deferred, failure)
       core.s = L.joinError(core.s, codeOf(failure))
       return
     }
     const { identity, credentials } = joined
-    const record = L.recordFor(core.s, view(core), identity)
+    // A Start whose connection closed while Slack answered gets nothing: no page has the credentials, so none is recorded as holding them.
+    const record = L.recordFor(core.s, view(core), identity, waiter !== undefined)
     // The record is durable before the credentials leave this function (model `answerJoin`).
     const stored = yield* Effect.result(to.session.leaves.write([...L.storedIn(core.s, workspace), record]))
     if (Result.isFailure(stored)) {
       yield* Effect.logError('huddle: the pending leave was not stored; leaving at once', { cause: stored.failure.cause })
       // As a cancelled answer: never handed out, and left at once.
       core.s = L.answerJoin({ ...core.s, cancel: true }, { ...identity, generation: null }, workspace)
-      if (waiter !== undefined) yield* Deferred.die(waiter, stored.failure)
+      if (waiter !== undefined) yield* Deferred.die(waiter.deferred, stored.failure)
       return
     }
     core.s = L.answerJoin(core.s, record, workspace)
-    if (record.generation !== null) core.handed.set(identity.attendeeId, core.handed.size + 1)
+    if (record.generation !== null && waiter !== undefined) core.handed.set(identity.attendeeId, waiter.connection)
     if (Result.isSuccess(answer)) core.running = applyJoined(core.running, identity.channelId, identity.callId, answer.success.huddle)
     yield* markDue(to, identity.channelId)
     if (record.generation === null || waiter === undefined) return
-    yield* Deferred.succeed(waiter, { _tag: 'joined', channelId: identity.channelId, callId: identity.callId, attendeeId: identity.attendeeId, credentials })
+    yield* Deferred.succeed(waiter.deferred, { _tag: 'joined', channelId: identity.channelId, callId: identity.callId, attendeeId: identity.attendeeId, credentials })
   })
 
 /** One join, in the work scope. The answer is handled under the lock even when its Start was cancelled. */
@@ -249,7 +259,8 @@ const drive = (core: Core) =>
         const next = L.clearLeave(core.s, new Set(clear.map((record) => record.attendeeId)))
         if (yield* store(core, to, next)) core.s = next
       }
-      if (L.canRequest(core.s, media, workspace, to.loaded)) {
+      // Every workspace's stored leaves are read: this session's, and all of them at boot.
+      if (L.canRequest(core.s, media, workspace, to.loaded && core.booting?.size === 0)) {
         const intent = core.s.wanted
         core.s = L.requestJoin(core.s)
         yield* Effect.forkIn(join(core, to, intent), to.work)
@@ -265,17 +276,24 @@ export function step<A, E>(core: Core, change: Effect.Effect<A, E>): Effect.Effe
   return core.lock.withPermits(1)(change.pipe(Effect.ensuring(drive(core))))
 }
 
-export const start = Effect.fn('Huddle.start')(function* (core: Core, channelId: string, region: string | null, generation: string) {
-  const waiter = yield* Deferred.make<HuddleStartResult, HuddleError>()
-  yield* step(core, Effect.gen(function* () {
+export const start = Effect.fn('Huddle.start')(function* (core: Core, channelId: string, region: string | null, generation: number, connection: number) {
+  const deferred = yield* Deferred.make<HuddleStartResult, HuddleError>()
+  const ticket = yield* step(core, Effect.gen(function* () {
     if (core.attached === undefined) return yield* new Offline()
-    // A page main already listed as gone cannot run media. One not listed yet waits for main.
-    if (pageState(view(core), generation) === 'gone') return yield* Deferred.succeed(waiter, { _tag: 'cancelled' })
+    // A page main counts as gone cannot run media. One above the highest it gave out waits for main.
+    if (pageState(view(core), generation) === 'gone') {
+      yield* Deferred.succeed(deferred, { _tag: 'cancelled' })
+      return undefined
+    }
     const ticket = ++core.tickets
-    core.waiters.set(ticket, waiter)
+    core.waiters.set(ticket, { deferred, connection })
     core.s = L.choose(core.s, { channelId, region, generation, ticket })
+    return ticket
   }))
-  return yield* Deferred.await(waiter)
+  // The caller's connection closed: its answer would reach no page, so the join hands it to none.
+  return yield* Deferred.await(deferred).pipe(Effect.onInterrupt(() => ticket === undefined ? Effect.void : step(core, Effect.sync(() => {
+    core.waiters.delete(ticket)
+  }))))
 })
 
 export const leave = (core: Core) =>
@@ -283,18 +301,18 @@ export const leave = (core: Core) =>
     core.s = L.leave(core.s)
   }))
 
-/** A page's whole media state. The one with the highest `seq` wins, whatever order they come in; a page main listed as gone is ignored. */
-export const report = (core: Core, next: HuddlePageReport) =>
+/** A page's whole media state, on engine connection `connection`. The one with the highest `seq` wins, whatever order they come in; a page main counts as gone is ignored. */
+export const report = (core: Core, next: HuddlePageReport, connection: number) =>
   step(core, Effect.sync(() => {
     const known = core.reports.get(next.generation)
-    if (pageState(view(core), next.generation) !== 'gone' && (known === undefined || next.seq > known.seq)) core.reports.set(next.generation, next)
+    if (pageState(view(core), next.generation) !== 'gone' && (known === undefined || next.seq > known.report.seq)) core.reports.set(next.generation, { report: next, connection })
   }))
 
-/** Main's report of the live page generations. */
-export const pages = (core: Core, live: ReadonlyArray<string>) =>
+/** Main's report of the live page generations and the highest it gave out. */
+export const pages = (core: Core, live: ReadonlyArray<number>, maxIssued: number) =>
   step(core, Effect.sync(() => {
     core.pages.reported = true
     core.pages.live = new Set(live)
-    for (const generation of live) core.pages.seen.add(generation)
+    core.pages.maxIssued = Math.max(core.pages.maxIssued, maxIssued)
     for (const generation of core.reports.keys()) if (pageState(view(core), generation) === 'gone') core.reports.delete(generation)
   }))
