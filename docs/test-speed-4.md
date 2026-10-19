@@ -207,8 +207,8 @@ passed on retry (`layout-shift.spec.ts` cold sync), 45 skipped.
 | Playwright suite | 769 s | 95% of wall | First test at 0.8 s |
 | Worker idle at the end | 4, 9, 19 s | 1–2% | Busy 765, 760, 750 s of 769 s |
 | Summed test time | 2,276 s | 100% | 404 test runs including two retries |
-| Electron launch to first window | 376 s | 17% | 404 launches, median 0.89 s, p90 1.34 s |
-| Sign-in: button to signed-in window | 393 s | 17% | 388 sign-ins, median 1.00 s |
+| Electron launch to first window | 376 s | 17% | 404 attempts containing launches; per-attempt median 0.89 s, p90 1.34 s |
+| Sign-in: button to signed-in window | 393 s | 17% | 388 attempts containing sign-in; per-attempt median 1.00 s |
 | Sync wait after sign-in | 486 s | 21% | Median 1.19 s; engine busy until idle is 194 s of it (median 0.42 s) |
 | Close | 64 s | 3% | Median 0.15 s |
 | Fake Slack start | 15 s | 1% | Median 37 ms |
@@ -216,7 +216,9 @@ passed on retry (`layout-shift.spec.ts` cold sync), 45 skipped.
 | Fixed waits (`waitForTimeout`) | 72 s | 3% | `mark-unread` 12 s, `presence` 8 s, `send-checks`, `ai-errors`, `break-pass-1017` 6 s each |
 | `expect.poll` and `toPass` | 135 s | 6% | `juno-agent/crash` 29 s, `send-checks` 10 s, `juno-agent/transfer` 9 s, `quick-start` 9 s |
 
-Fixed waits and polls are part of the setup or test-step rows; they are not added again. Launch,
+Phase times are summed within each test attempt, so a restart test includes multiple launches in one
+value. Phase counts count attempts containing that phase, not individual calls. Fixed waits and
+polls are part of the setup or test-step rows; they are not added again. Launch,
 sign-in and sync together are 55% of summed test time. A warm relaunch on the same user data
 (local Mac, one worker) was ready 0.21–0.30 s after its window opened, against 0.93 s for sign-in
 plus sync on a fresh one, so most of the sign-in and sync cost is first sync, not boot.
@@ -231,8 +233,10 @@ walk (54 s), the 429 storm (34 s) and the title-lines relaunch (24 s).
 
 Other cheap wins seen, with estimated savings (estimates, not measured):
 
-- The build key hashes all of `packages/` and `scripts/`, tests included, so a change to only a
-  unit test or a script rebuilds the app: about 30 s per remote desktop run after such a change.
+- The build key now excludes package/app test directories and script test files. Seed definitions,
+  migrations and other source helpers still invalidate it. Build-cache checks verified both
+  behaviours; the avoided 30 s build cost is an estimate from the baseline cold build, not a
+  separate timed before/after pair.
 - Fixed waits sum to 72 s; replacing the five largest with waits on a condition would save
   perhaps 30 s summed, about 10 s of wall time.
 - `juno-agent/crash` spends 29 s in polls; a signal for the agent's restart could save perhaps
@@ -240,3 +244,104 @@ Other cheap wins seen, with estimated savings (estimates, not measured):
 - The sync wait spends about 0.7 s (median) after rows show beyond the engine going idle, in rows,
   Home's greeting and parking the pointer. Not broken down further; worth a look.
 - Worker imbalance is small (19 s at most), so reordering specs would gain little.
+
+## Synced desktop starts
+
+Default-seed flows now boot a fresh Electron process from a private copy of a worker's synced
+workspace. The fake is rebuilt with the original seed time, port and accepted sessions. The
+snapshot key includes the verified build fingerprint and effective sync options. Copies expire
+within the worker and are never kept between runs. The fixture checks fake workspace state
+before and after boot, and checks that a fresh socket connects. Details and exceptions live in
+[Desktop e2e](../apps/desktop/e2e/README.md#synced-start).
+
+The inherited full snapshot run finished after the previous worker exited. Its report is complete
+but failed for the same header-order expectation and first-sync retry as the baseline.
+
+| Run | Remote wall | Build | Playwright | Summed attempts | Result |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Before, `52dbdbb50` | 812.5 s | 31.69 s | 769.3 s | 2,275.8 s | 400 passed, 1 failed, 1 flaky, 45 skipped |
+| First snapshot, `9ca20e022` | 697.4 s | 0.02 s restored | 688.9 s | 2,036.9 s | 400 passed, 1 failed, 1 flaky, 45 skipped |
+| Snapshot validation 1 | 695.5 s | 29.74 s | 652.9 s | 1,932.7 s | 402 passed, 45 skipped; no retries |
+| Snapshot validation 2 | 665.1 s | 0.02 s restored | 657.3 s | 1,946.7 s | 402 passed, 45 skipped; no retries |
+
+The first snapshot pair saves 80.4 s in Playwright while retaining the same failures. Its wall-time
+saving also includes a warm build. Validation 1 has a cold build like the baseline: 117.0 s less
+wall time, or 14.4%. It also contains the header and preview-hold fixes, so that whole reduction
+cannot be attributed to snapshots alone. Among 150 matching successful first attempts that
+switch to snapshots, summed test time is 772.9 s before, 556.1 s in the inherited snapshot run,
+and 557.5 / 560.2 s in the two validation runs. That excludes the failed header test, retains snapshot-building cost,
+and does not sum overlapping tests into a wall-time claim. The two complete validation suites take
+652.9–657.3 s, 14.6–15.1% less than the baseline. Validation 2 restores the build, which accounts
+for about 30 s of its extra wall-time reduction. [Every spec's before/after
+totals](test-speed-4-specs.md) are recorded, including unchanged and slower specs.
+
+All runs use two physical cores and three workers. Validation 1 averaged 87% CPU busy, with a
+94% median, and peaked at 2.66 GB container memory including file cache; the baseline was 89%,
+96% and 2.68 GB. It built eight snapshots, costing 23.2 s summed within test setup. The suite is
+still CPU busy; agent lifecycle flows, real sync and the test bodies remain most of the work.
+Validation 2 averaged 89% CPU busy, with a 95% median, and peaked at 2.85 GB. Its eight snapshot
+builds cost 24.5 s summed. These are individual full-suite observations, not an interleaved
+distribution of baseline runs. Both retain the same 45 platform/perf skips as the baseline. Cold
+sync and agent lifecycle flows remain in the suite; ordinary snapshot starts still connect and catch
+up for real.
+
+Failure fixes keep their assertions:
+
+- The topic header's focus order includes the new huddle button, still missing in `origin/main`
+  when checked. The check now visits all five buttons.
+- The first-sync Home probe held reply previews too late. Previews run alongside history, so
+  the hold is installed before sign-in. Its existing held-request and stable-position checks remain.
+- A focused run exposed a different cold-page flake: unfocused sidebar rows reordered while
+  Home was being checked. SPEC 5 allows this while cold history and Automated membership arrive.
+  The page probes exclude only the sidebar's topic-list region, as the adjacent probe already
+  does. Home/All topics anchors and all movement outside that region remain checked; sidebar
+  flows cover its order. This scope correction follows validation 1 and is included in validation 2.
+
+A temporary negative control cleared the fake's read pointers after the snapshot was selected.
+Fixture setup failed with "The fake no longer matches the synced workspace" before the test body
+ran, in `.remote/juno-1792435873225-66019-d48d4790/run.log`. The injected spec was removed.
+Build-cache checks also change seed, migration and sync source files and verify that they rebuild,
+while edits confined to tests reuse the build. Running that regression check against the old
+cache-key code failed on the first test-only edit; the new code passes. Lint and Bun typechecking
+pass.
+
+`pnpm affected` passed every step: Bun typechecking, all 11 lint checks, 100 repository-tool
+checks, and the selected unit and desktop tests. The unit lane passed 391 tests with 8 existing
+skips. Its report is `.remote/juno-1792436660827-69795-8b407637/run.log`; the desktop report is
+`.remote/juno-1792436660827-69796-85af0eaa/run.log`, and the coordinator is
+`.remote/juno-1792436659690-69658-aa4b9ea9/plan.log`. No production app code remains changed,
+and no branch was pushed or merged during this work.
+
+## Worker app reuse experiment
+
+A temporary prototype kept Electron main alive, stopped the engine, destroyed its windows,
+restored the snapshot workspace and launch preferences, restarted the fake on its original port,
+and opened a new engine and renderer. Each measurement ended only after rows, engine readiness
+and Home were ready. It then opened the seeded thread and asserted its title; every reset also
+checked for exactly one fake socket. Five pairs alternated which mode ran first.
+
+| Load | Samples per mode | Fresh launch median, range | Minimal reset median, range | Median paired saving |
+| --- | ---: | ---: | ---: | ---: |
+| One worker | 5 | 879 ms, 830–894 | 672 ms, 642–684 | 207 ms |
+| Three workers | 15 | 2,106 ms, 1,873–2,597 | 1,653 ms, 1,150–2,002 | 436 ms |
+
+Both remote jobs reserved two physical cores. The three-worker job averaged 94% CPU busy and
+99% at the median over four threads. Three repeats ran concurrently, each with its own fake,
+user-data directory and five alternating pairs; all passed without retries. The engine and
+renderer still have to start and sync, which limits the benefit of keeping main alive.
+
+This is a lower-cost prototype, not a safe reusable fixture. It did not reset provider/keychain
+state, notification deduplication, all main-process test counters, Chromium storage or every
+background service. Both modes kept warm Chromium caches. Complete isolation would add work.
+The earlier full snapshot run had 151 snapshot starts; 151 × 0.436 / 3 projects to about 22 s
+of suite time, about 3% of the 813 s baseline. That projection is a guess, not a full-suite
+reuse measurement, and does not include the extra cleanup. The prototype was removed rather
+than adding a second application lifecycle for that expected saving. All specs retain fresh
+Electron launches, including launch, quit, restart, recovery, update and multi-window scenarios.
+No full suite was run with the incomplete reset.
+
+Logs: `.remote/juno-1792435048736-62095-f2bc30da/run.log` and
+`.remote/juno-1792435106251-62448-a7bd5db3/run.log`. The first experiment invocation is excluded:
+it closed a fixture-owned server twice, failed teardown, and did not retain individual samples.
+The corrected experiment owns its fake independently. Its source and main-process patch are
+kept locally in `.remote/reuse-experiment.ts` and `.remote/reuse-experiment.patch` for review.
