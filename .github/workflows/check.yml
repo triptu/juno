@@ -18,4 +18,4 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
-      # Heavy suites run through pnpm affected on Namespace.
+      # Heavy suites run through pnpm affected and pnpm verify:main on the SSH laptop.
