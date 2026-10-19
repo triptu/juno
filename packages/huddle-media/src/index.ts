@@ -6,3 +6,4 @@
  * `@juno/huddle-media/fake`.
  */
 export type { Devices, EndReason, MediaSession, MediaSnapshot } from './types.ts'
+export { huddleSounds, type SoundView } from './sounds.ts'
