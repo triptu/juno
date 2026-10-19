@@ -20,7 +20,7 @@ export const backfillWindow = (ctx: SyncContext): Effect.Effect<void, BootError,
   const counts = yield* loadCounts(ctx, undefined, 'background')
   for (const conversation of yield* activeConversations(counts.entries, start)) {
     yield* fillHistory(ctx, conversation.id, start, conversation.latest).pipe(
-      Effect.catchTag('SlackRejected', (error) => Effect.logWarning('sync: window history refused', { tag: error._tag, reason: error.error })),
+      Effect.catchTag('SlackRejected', (error) => Effect.logWarning('sync: window history refused', { cause: error })),
     )
   }
   yield* followPass(ctx)

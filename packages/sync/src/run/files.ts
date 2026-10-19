@@ -86,7 +86,7 @@ export const refreshFiles = (ctx: SyncContext) =>
           if (result._tag === 'Failure') {
             // A refused message read will not change; the session's end is someone else's to report.
             if (result.failure._tag === 'SlackRejected' || result.failure._tag === 'SlackAuthRequired') return 'gone' as const
-            yield* Effect.logDebug('sync: file message read failed', { tag: result.failure._tag })
+            yield* Effect.logDebug('sync: file message read failed', { cause: result.failure })
             continue
           }
           const file = result.success

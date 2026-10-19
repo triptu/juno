@@ -361,7 +361,7 @@ const loadHistoryWindow = (ctx: SyncContext, channel: string, start: Ts, options
  * limit and auth failures still fail the step.
  */
 const skipRejected = (load: Effect.Effect<void, BootError, BootServices>): Effect.Effect<void, BootError, BootServices> =>
-  load.pipe(Effect.catchTag('SlackRejected', (error) => Effect.logWarning('sync: history refused, skipped', { tag: error._tag, reason: error.error })))
+  load.pipe(Effect.catchTag('SlackRejected', (error) => Effect.logWarning('sync: history refused, skipped', { cause: error })))
 
 /** History since the synced range, in pages, for a conversation whose `latest` moved. */
 const loadHistorySince = (ctx: SyncContext, channel: string, since: string): Effect.Effect<void, BootError, BootServices> =>
@@ -460,7 +460,7 @@ const discoverOrLog = (sweep: Effect.Effect<void, SlackApiError | SqlError, Boot
   sweep.pipe(
     Effect.as(true),
     Effect.catch((error) =>
-      error._tag === 'SlackAuthRequired' ? Effect.fail(error) : Effect.as(Effect.logWarning('sync: discovery failed', { tag: error._tag }), false),
+      error._tag === 'SlackAuthRequired' ? Effect.fail(error) : Effect.as(Effect.logWarning('sync: discovery failed', { cause: error }), false),
     ),
   )
 

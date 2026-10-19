@@ -186,7 +186,7 @@ export class Session extends Context.Service<
         const error = result.failure
         if (error._tag === 'SlackAuthRequired') return yield* expire(error.error)
         // Slack could not be reached or answered oddly: keep the session on file and show what we know.
-        yield* Effect.logWarning('session: auth.test failed at start', { tag: error._tag })
+        yield* Effect.logWarning('session: auth.test failed at start', { cause: error })
         yield* setStatus({
           _tag: 'ready',
           teamId: answer.secrets.teamId,

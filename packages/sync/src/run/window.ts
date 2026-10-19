@@ -32,7 +32,7 @@ export const watchWindow = (runtime: SyncRuntime) => {
         const result = yield* Effect.result(runtime.cycle(attempt.pipe(work.withPermit)))
         if (result._tag === 'Success') return
         if (result.failure._tag === 'SlackAuthRequired') return yield* result.failure
-        yield* Effect.logWarning('sync: window backfill failed, retrying', { tag: result.failure._tag })
+        yield* Effect.logWarning('sync: window backfill failed, retrying', { cause: result.failure })
         yield* Effect.sleep(config.bootRetryMillis)
       }
     })) : Stream.empty),

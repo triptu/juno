@@ -24,7 +24,7 @@ export const makeTopicFetcher = (runtime: SyncRuntime) => Effect.gen(function* (
             run('background').pipe(
               Effect.tap(nameSenders),
               Effect.asVoid,
-              Effect.catchIf(isNotAuth, (retry) => Effect.logWarning(`sync: ${label} failed on the background lane`, { tag: retry._tag })),
+              Effect.catchIf(isNotAuth, (retry) => Effect.logWarning(`sync: ${label} failed on the background lane`, { cause: retry })),
             ),
           ).pipe(Effect.asVoid)
           : Effect.void,

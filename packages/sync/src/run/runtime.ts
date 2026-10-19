@@ -60,11 +60,11 @@ export const makeSyncRuntime = (options: RunSyncOptions) => Effect.gen(function*
   // Each says whether it finished; a failure other than an expired session is logged.
   const refreshEmoji = syncEmoji().pipe(
     Effect.as(true),
-    Effect.catchIf(isNotAuth, (error) => Effect.as(Effect.logWarning('sync: emoji refresh failed', { tag: error._tag }), false)),
+    Effect.catchIf(isNotAuth, (error) => Effect.as(Effect.logWarning('sync: emoji refresh failed', { cause: error }), false)),
   )
   const refreshUsergroups = syncUsergroups(ctx).pipe(
     Effect.as(true),
-    Effect.catchIf(isNotAuth, (error) => Effect.as(Effect.logWarning('sync: user groups refresh failed', { tag: error._tag }), false)),
+    Effect.catchIf(isNotAuth, (error) => Effect.as(Effect.logWarning('sync: user groups refresh failed', { cause: error }), false)),
   )
   const reportBoot: Phase = phase
   // Catch-ups and reboots run in the background; joining the set below is what lets their auth failures end the sync.

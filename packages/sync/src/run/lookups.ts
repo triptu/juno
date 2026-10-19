@@ -19,7 +19,7 @@ export const fetchRoots = (ctx: SyncContext) => Effect.gen(function* () {
       )
       if (result._tag === 'Failure') {
         if (result.failure._tag === 'SlackAuthRequired') return yield* result.failure
-        return yield* Effect.logDebug('sync: root fetch failed', { tag: result.failure._tag })
+        return yield* Effect.logDebug('sync: root fetch failed', { cause: result.failure })
       }
       // The root carries `subscribed` and `last_read`, so a thread older than the window is a row as soon as it is followed.
       yield* applyPage(ctx, channel, result.success.messages, { kind: 'page', requestedAt }).pipe(
@@ -44,7 +44,7 @@ export const lookUpReads = (ctx: SyncContext) => Effect.gen(function* () {
     const result = yield* Effect.result(api.call('conversations.info', { channel }, { lane: 'background', reason: 'conversation' }))
     if (result._tag === 'Failure') {
       if (result.failure._tag === 'SlackAuthRequired') return yield* result.failure
-      yield* Effect.logDebug('sync: read lookup failed', { tag: result.failure._tag })
+      yield* Effect.logDebug('sync: read lookup failed', { cause: result.failure })
       continue
     }
     const lastRead = result.success.channel.last_read

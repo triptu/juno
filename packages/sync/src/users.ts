@@ -176,9 +176,9 @@ const fetchSoon = (ctx: SyncContext, ids: ReadonlyArray<string>, lane: Lane = 'i
   fetchUsers(ctx, ids, lane).pipe(
     Effect.catchTag('SlackRateLimited', () => Effect.sync(() => wantUsers(ctx, ids, true))),
     Effect.catchTags({
-      SlackRejected: (error) => Effect.logWarning('sync: users not named', { tag: error._tag }),
-      SlackTransportError: (error) => Effect.logWarning('sync: users not named', { tag: error._tag }),
-      SlackDecodeError: (error) => Effect.logWarning('sync: users not named', { tag: error._tag }),
+      SlackRejected: (error) => Effect.logWarning('sync: users not named', { cause: error }),
+      SlackTransportError: (error) => Effect.logWarning('sync: users not named', { cause: error }),
+      SlackDecodeError: (error) => Effect.logWarning('sync: users not named', { cause: error }),
     }),
   )
 
@@ -237,7 +237,7 @@ export const nameUsers = (ctx: SyncContext): Effect.Effect<never, SlackAuthRequi
       yield* fetchUsers(ctx, [...missing], 'background').pipe(
         Effect.catchIf(
           (error) => error._tag !== 'SlackAuthRequired' && error._tag !== 'SqlError',
-          (error) => Effect.logWarning('sync: users not named', { tag: error._tag }),
+          (error) => Effect.logWarning('sync: users not named', { cause: error }),
         ),
       )
     }).pipe(Effect.catchTag('SqlError', (cause) => Effect.logError('sync: users not stored', { cause }))),

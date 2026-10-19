@@ -36,7 +36,7 @@ export const makeBootLoop = (
     Effect.andThen(refreshUsergroups),
     Effect.andThen(refreshEmoji),
     Effect.andThen(followPassIfDue(runtime)),
-    Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: reboot failed', { tag: error._tag })),
+    Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: reboot failed', { cause: error })),
   ))
 
   const initialize = cycle(Effect.gen(function* () {
@@ -48,7 +48,7 @@ export const makeBootLoop = (
       if (result._tag === 'Success') break
       const error = result.failure
       if (error._tag === 'SlackAuthRequired') return yield* error
-      yield* Effect.logWarning('sync: boot failed, retrying', { tag: error._tag })
+      yield* Effect.logWarning('sync: boot failed, retrying', { cause: error })
       const wake = yield* Deferred.make<void>()
       state.bootRetry = wake
       yield* phase({ _tag: 'offline' }).pipe(

@@ -16,7 +16,7 @@ const refreshOpenTopics = (runtime: SyncRuntime) => Effect.gen(function* () {
   for (const topicId of open) {
     yield* fetchTopic(ctx, topicId, 'interactive').pipe(
       Effect.tap(nameSenders),
-      Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: open topic not refreshed', { tag: error._tag })),
+      Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: open topic not refreshed', { cause: error })),
     )
   }
 })
@@ -35,7 +35,7 @@ export const followPassIfDue = (runtime: SyncRuntime) => {
     state.lastFollowPass = now
   }).pipe(
     work.withPermit,
-    Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: follow pass failed', { tag: error._tag })),
+    Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: follow pass failed', { cause: error })),
   )
 }
 
@@ -96,7 +96,7 @@ const catchUpAfterGap = (runtime: SyncRuntime) => Effect.gen(function* () {
 
 export const repairAfterLive = (runtime: SyncRuntime) => repairMutations(runtime.ctx).pipe(
   runtime.work.withPermit,
-  Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: mutation repair deferred', { tag: error._tag })),
+  Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: mutation repair deferred', { cause: error })),
 )
 
 export const makeReconcile = (runtime: SyncRuntime) => {
@@ -110,7 +110,7 @@ export const makeReconcile = (runtime: SyncRuntime) => {
    */
   const reconcile: Effect.Effect<void, SlackAuthRequired, SyncServices | Scope.Scope> = cycle(catchUpAfterGap(runtime).pipe(
     work.withPermit,
-    Effect.tapError((error) => Effect.logWarning('sync: catch-up failed', { tag: error._tag })),
+    Effect.tapError((error) => Effect.logWarning('sync: catch-up failed', { cause: error })),
     Effect.andThen(settle),
     Effect.catchIf(isNotAuth, (error) => settle().pipe(Effect.andThen(retryCatchUp(error)))),
     Effect.andThen(repairAfterLive(runtime)),
