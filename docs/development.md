@@ -50,7 +50,7 @@ Run these from the repo root.
 | `pnpm gallery:shots` | Builds the gallery and screenshots every state in light and dark into `apps/gallery/shots/<Component>/<group>/<state>-<theme>.png`. |
 | `pnpm specs:check` | Checks every Quint spec in `specs/`, including the broken and corrected pairs for Juno Agent. Runs simulations three at a time, the Apalache checks on one shared server, and skips checks that passed before with the same inputs (see "Faster test runs"). `--memory`, `--actions` or `--recovery` selects one agent spec. See `specs/README.md`. |
 | `pnpm specs:conformance` | Generates Quint traces of `specs/outbox.qnt` and replays them against the engine and the fake Slack (`specs/README.md`, "Conformance"). About 30 s on a remote machine when its traces are cached. |
-| `pnpm remote <script>` | Runs a Linux-safe root script (`test`, `specs:check`, `specs:conformance`, `test:agent*`, `test:gallery`, `test:e2e`) on a fresh Namespace machine and streams the output. `--dry-run` shows what would be sent and run. See ADR 0013. |
+| `pnpm remote <script>` | Runs a Linux-safe root script (`test`, `specs:check`, `specs:conformance`, `test:agent*`, `test:gallery`, `test:e2e`) on the shared SSH runner and streams the output. `--dry-run` shows what would be sent and run. See ADR 0013. |
 | `pnpm flake <spec>` | Repeats desktop e2e, gallery or package tests many times on remote machines (`-g <title>`, `--repeat 40`, `--machines 1\|2`, `--workers n`) and reports how many runs failed, with traces of the failures. See "Hunting a flaky test". |
 | `pnpm test:agent-contracts` | Runs the `agent-cards` and `agent-contract` property tests: card identities, digests, retries, the RPC codecs and the chat projection. |
 | `pnpm --filter @juno/agent-memory test` | Runs the pure memory rules' property tests. Its script takes the heavy-job lock itself. |
@@ -154,7 +154,7 @@ change reaches, plus `specs:check` and `specs:conformance` when the code the
 specs model changed ("Affected tests"), on one machine. Files that passed with
 the same inputs, in an agent's run or an earlier batch, are skipped through the
 shared results cache. The full suites run on main afterwards (see "Testing").
-When Namespace is down, `--local` runs those steps on this Mac instead, through
+When the SSH runner is unavailable, `--local` runs those steps on this Mac instead, through
 the machine lock. A failed command retains the worktree;
 fix the cause, commit source fixes, and continue to rerun checks.
 
@@ -733,9 +733,9 @@ Measured on 10-17 on this Mac, eight alternating runs of each while other agents
 
 ## Testing
 
-Since 10-16, Juno merges first and tests in full afterwards. Many agents work at once, and when each one ran `pnpm affected` the remote queue held about 20 jobs: one run asked for about 8 machines (4 desktop shards, gallery, unit tests, spec checks), the 24 vCPU cap fit one run at a time, and jobs of 1.5 to 3 minutes waited 10 to 56 minutes.
+Juno merges first and tests in full afterwards. Agents run selective checks before reporting; the CI keeper runs full suites on the schedule below. Remote jobs share the laptop through tstack, including jobs from other projects.
 
-**Agents.** Before reporting, an agent runs `pnpm affected`: the local Bun check and lint, then, as one remote plan, the unit files its change reaches, the specs it added or changed, the specs it names with `--spec`, and at most 10 more desktop specs that cover the change most directly ("Affected tests"). Heavy tests run only when the change is in their area, and the Quint checks only when the code the specs model changed. `pnpm affected --plan` first shows what it would run and why. `--wide` runs every spec the change can reach, for the rare change that needs it. One remote run at a time per agent. To run a few unit test files by hand, use `pnpm remote test --passWithNoTests <files>` (paths relative to their package); one spec, `pnpm remote test:desktop <files>`.
+**Agents.** Before reporting, an agent runs `pnpm affected`: the local Bun check and lint, then, as one remote plan with separate SSH jobs, the unit files its change reaches, the specs it added or changed, the specs it names with `--spec`, and at most 10 more desktop specs that cover the change most directly ("Affected tests"). Heavy tests run only when the change is in their area, and the Quint checks only when the code the specs model changed. `pnpm affected --plan` first shows what it would run and why. `--wide` runs every spec the change can reach, for the rare change that needs it. One remote run at a time per agent. To run a few unit test files by hand, use `pnpm remote test --passWithNoTests <files>` (paths relative to their package); one spec, `pnpm remote test:desktop <files>`.
 
 **Merging.** The orchestrator merges finished branches into main in batches after typecheck, lint and the unit tests pass on the merged tree. The full suites do not gate a merge.
 
@@ -743,7 +743,7 @@ Since 10-16, Juno merges first and tests in full afterwards. Many agents work at
 
 **Flakes.** Remote Playwright runs retry once. Tests that pass only on retry remain listed as flaky in the console and full-run summary. Tag a confirmed main flake `{ tag: '@flaky' }` the same day and add its exact reporter ID, reason and date to `.juno-status/release-waivers.json`. Triage this list daily. Tagged tests skip selective runs and still run in scheduled runs. To triage one remotely, use `pnpm remote --env JUNO_INCLUDE_FLAKY=1 test:desktop --grep @flaky` (or `test:gallery`). Release waivers apply only to named test failures in complete reports, never to a crash, timeout, missing report or other infrastructure failure. Remove the tag and waiver when fixed. Do not weaken assertions or run retry loops to obtain green results.
 
-**Remote plan shape**: `pnpm affected` and `pnpm verify:main` use separate unit, app and specs jobs on an SSH runner, or one 8x16 machine on Namespace. The app job builds the desktop app once and does not shard desktop e2e. See "Remote runs" and "Machine shapes".
+**Remote plan shape**: `pnpm affected` and `pnpm verify:main` use separate unit, app and specs jobs on the SSH runner. The app job builds the desktop app once and does not shard desktop e2e. See "Remote runs" and "Machine shapes".
 
 **Test selection by coverage** (landed 10-17): `pnpm affected` picks desktop e2e specs by a coverage map the keeper refreshes, and gallery behaviour specs by the components they open. See "Desktop specs by coverage".
 
@@ -845,16 +845,16 @@ These apply to every new or changed test. The audit has the measurements behind 
 
 ## Affected tests
 
-`pnpm affected` works out which tests the change can reach and runs only those. After local Bun checking passes, the remote suites run as one plan: separate jobs on SSH, or one machine on Namespace (`pnpm remote test:plan`, see "Remote runs"), and the local steps (lint, the Node checks) run on the Mac beside it. Each step's result comes back separately, so the results cache records the steps that passed (`--local` runs every step one after another through the local root scripts; `--plan` only prints the plan, and `--plan --json` prints it as JSON; `--files a,b` plans for given files; `--spec <spec>` also runs that desktop or gallery spec, repeated or comma-separated; `--max-specs <n>` allows more coverage-picked desktop specs than 10; `--wide` plans every spec the change can reach, heavy tests included, as before 10-18; `--batch` is the batch gate's plan, below; `--local-on-outage` runs the remote steps here if Namespace stays unreachable, see "Outages" under "Remote runs"). The change is every file that differs from the merge base with `origin/main` (or `main` when there is no remote), committed or not, plus new files. Agents use it while iterating and for their report; full suites run on a schedule against `main` and before a merge when asked.
+`pnpm affected` works out which tests the change can reach and runs only those. After local Bun checking passes, the remote suites run as one plan: separate SSH jobs through tstack (`pnpm remote test:plan`, see "Remote runs"), and the local steps (lint, the Node checks) run on the Mac beside it. Each step's result comes back separately, so the results cache records the steps that passed (`--local` runs every step one after another through the local root scripts; `--plan` only prints the plan, and `--plan --json` prints it as JSON; `--files a,b` plans for given files; `--spec <spec>` also runs that desktop or gallery spec, repeated or comma-separated; `--max-specs <n>` allows more coverage-picked desktop specs than 10; `--wide` plans every spec the change can reach, heavy tests included, as before 10-18; `--batch` is the batch gate's plan, below). The change is every file that differs from the merge base with `origin/main` (or `main` when there is no remote), committed or not, plus new files. Agents use it while iterating and for their report; full suites run on a schedule against `main` and before a merge when asked.
 
 An import graph over `apps/` and `packages/` decides what each change reaches, and for desktop e2e specs a coverage map narrows it ("Desktop specs by coverage" below). The graph follows relative imports, `@juno/*` through each package's `exports`, and named imports followed through barrel files (`export * from` and `export { } from`) to the module that declares the name. The rules:
 
 | Changed | Runs |
 | --- | --- |
 | `pnpm-lock.yaml`, `pnpm-workspace.yaml`, the root `package.json`, `tsconfig.base.json` | every unit test, `specs:check`, conformance, and a sample of each e2e suite: the 10 smallest desktop specs and 10 gallery components (no spec can be told apart) |
-| `scripts/affected.mjs`, `scripts/affected-select.mjs`, `scripts/affected-run.mjs`, `scripts/affected-tests.mjs`, `scripts/test-areas.mjs`, `scripts/import-graph.mjs`, `scripts/coverage-map.mjs`, `scripts/remote*`, `scripts/heavy.mjs`, `scripts/build-cached.mjs`, `scripts/without-run-as-node.mjs` | the tool tests (`test:health`, `test:repo-tools`, `test:remote-pool`) and `e2e/app.spec.ts`, as a check that a run still works |
+| `scripts/affected.mjs`, `scripts/affected-select.mjs`, `scripts/affected-run.mjs`, `scripts/affected-tests.mjs`, `scripts/test-areas.mjs`, `scripts/import-graph.mjs`, `scripts/coverage-map.mjs`, `scripts/remote*`, `scripts/heavy.mjs`, `scripts/build-cached.mjs`, `scripts/without-run-as-node.mjs` | the tool tests (`test:health`, `test:repo-tools`, `test:runner`) and `e2e/app.spec.ts`, as a check that a run still works |
 | A vitest file, a file one reaches, or a package's `package.json`, `vitest.config.ts` or `tsconfig.json` | those vitest files (`pnpm test --files <repository paths>`). A vitest file is any file a package's or app's `vitest.config.ts` includes (every project's `include`, `test/**/*.test.ts` by default), in `packages/` and `apps/` alike: `apps/desktop/test/`, `packages/agent/eval/` |
-| A script under `scripts/` that a Node test imports, or the test itself | the root script that runs that test with `node --test` (`test:repo-tools`, `test:health`, `test:remote-pool`); every `scripts/**/*.test.mjs` belongs to one (`scripts/affected.test.mjs` checks) |
+| A script under `scripts/` that a Node test imports, or the test itself | the root script that runs that test with `node --test` (`test:repo-tools`, `test:health`, `test:runner`); every `scripts/**/*.test.mjs` belongs to one (`scripts/affected.test.mjs` checks) |
 | `specs/` (not Markdown) | `pnpm specs:check`, narrowed to `--memory`, `--actions` or `--recovery` when only that agent spec changed; its cache skips checks whose inputs passed before |
 | The code the specs model (`PROTOCOL_PATHS` in `scripts/test-areas.mjs`): `specs/`, `packages/sync/`, the engine's `outbox.ts` and `send/`, the conformance harness | `pnpm specs:conformance` |
 | A file a component's fixtures reach | `pnpm test:gallery` with `GALLERY_SHIFT_ONLY` set to at most 10 of those components, ranked as desktop specs are (below), and the other behaviour specs that open one of them |
@@ -912,207 +912,54 @@ A changed app file that was in no bundle when the map was recorded (types only, 
 
 ## Remote runs
 
-`pnpm remote <script> [args...]` tries a configured SSH runner first, then runs a root script on Namespace if the runner is unreachable or full for 60 seconds. Both backends stream output and the exit code back. Once an SSH plan splits into jobs, all its jobs stay on the runner and wait for capacity; none fall back independently to Namespace.
+`pnpm remote <script> [args...]` runs on the SSH laptop through tstack's shared
+host allocator. Install tstack with `/tstack:setup`; its checkout is
+`$TSTACK_HOME` (default `~/Documents/code/tstack`). Juno owns the test plan,
+workload sizes, workers, toolchain image, workspace install and result parsing.
+tstack owns reservations, pinned containers, leases, heartbeats and cleanup.
+See [Juno runner configuration](self-hosted-runner.md); use `/tstack:runner`
+for machine setup, lessons and troubleshooting.
 
-The host's `~/.config/juno-runner/cores` accepts a quota count (`16`, legacy mode) or a physical-core list (`4-11`). A listed core is its lowest sibling CPU; the host reads `thread_siblings_list` to reserve every sibling under the shared lock. The laptop lends only its eight dense Zen 5c cores (CPUs 4–11 and 16–23), keeping the four fast Zen 5 cores out of runner containers. Admission prefers adjacent cores. Each pinned app, gallery or wide unit job reserves two physical cores; narrow units reserve one. Spec and conformance budgets round up to whole cores (cached spec checks one, uncached checks two, conformance four). Wide units mean no named files or more than 20 files. `--machine` or `JUNO_REMOTE_MACHINE` specifies a thread budget rounded up to whole two-thread cores; default sizes shrink to fit, explicit oversized jobs fail.
+Jobs wait up to 60 seconds for capacity (`--wait <seconds>` or
+`JUNO_RUNNER_WAIT` changes this). An unavailable or full runner fails. Use
+`pnpm remote --local <script>` or `pnpm affected --local` to run the steps on
+this Mac through the heavy lock. No automatic local fallback is enabled.
+Namespace, if needed again, is available only through `/tstack:runner`.
 
-Pinned Docker jobs use their sibling CPU set and a CPU quota equal to the actual thread count. Memory is capped at 3 GiB per physical core, with no swap: 3 GiB for narrow units, 6 GiB for app/gallery/wide units, 12 GiB for conformance. Both `/tmp` and the disposable `/work` workspace use tmpfs (2 GiB each, or 4 GiB each for jobs with at least four physical cores); these consume the memory cap. `TMPDIR`, `TMP` and `TEMP` point to `/tmp`. SQLite, engine/Electron profiles and build output stay in RAM; dependency/build caches and downloaded reports stay on disk. Custom full-image overrides keep their baked `/work`. Leases release only after Docker stops; admission reaps killed owners and their recorded process groups before reusing cores. Jobs still time out after three hours. See [runner capacity and isolation](self-hosted-runner.md#capacity-and-isolation).
-
-Numeric configs keep the old quota-only rules and Docker arguments: wide units and desktop/e2e reserve 4 slots, gallery 3, narrow units/cached specs 1 with a CPU limit of 2, other scripts 8. Existing clients support this format; drain them before switching to a list.
-The [dense-core measurements](self-hosted-runner.md#dense-core-pinning-2026-10-19) observed unit / desktop / gallery script times of 10 / 83 / 24 s before and 12 / 118 / 30 s after. Two concurrent desktop jobs used disjoint sibling sets and each took 129 s, about 9% above solo; one sidebar layout-shift assertion retried successfully. These are single observations. Pinning reserves cores reliably, but these dense-core runs did not retain the former solo speed.
-
-Namespace, including fallback, uses the standard shape, 8x16 (see "Machine shapes"). Each Namespace run gets its own machine and waits when the shared core cap is full; nothing takes the local heavy-job lock. Use it for `test`, `specs:check`, `test:agent*`, `test:gallery`, `test:desktop` (the desktop e2e alone; it passes arguments on, for example `pnpm remote test:desktop e2e/topic.spec.ts`) and `test:e2e`. `perf` and `test:feel` are refused: they time the Mac. Desktop e2e tests tagged `@mac` (`{ tag: '@mac' }`) depend on macOS behaviour and are skipped on Linux; the nightly Mac run includes them. The native Window and Graphics idle budgets are `@mac` only; the remote `idle-cpu.spec.ts` check uses a 25% runaway ceiling for every Juno process. For idle CPU changes, run the fine budgets through the local heavy-job lock with `pnpm test:desktop idle-cpu.spec.ts --grep @mac`.
-
-- **Plans on SSH.** `pnpm remote test:plan <step> + <step> ...` groups steps into independent unit, app (`test:desktop`, `test:gallery`, `test:e2e`) and specs (`specs:*`, including conformance) jobs. Each job gets its own container, physical core set (or legacy quota reservation), CPU limit, workspace install and report directory. Steps within a job run in order at normal priority with the standalone worker counts. The app job keeps one build of each app. Sizing applies per job: broad units get 2 physical cores, app jobs get 2, and conformance gets 4. Together they fit the laptop's eight lent physical cores when it is free; other clients can delay individual jobs. Once split, jobs wait for SSH capacity without a deadline rather than allocating separate Namespace machines. An unreachable runner still falls back to one Namespace plan before splitting. `JUNO_RUNNER_PLAN=single` keeps the former single-container SSH plan and its 60-second busy fallback; `JUNO_PLAN_SERIAL=1` also keeps one container, running every step in order. `--machine` applies to each SSH job. `KEY=VALUE` words before a step's script override that step's environment.
-- **Plans on Namespace.** All steps stay on one machine. App steps run in order, units and conformance share a lane, and `specs:check` has its own lane. The latter lanes run under `nice`. Workers scale with the CPU limit: desktop gets half, gallery three quarters, units and Quint simulations a quarter each, rounded down and at least one. At 8 cores this is four desktop or six gallery workers, two unit workers in one package, and two simulations plus one Apalache checker. `JUNO_PLAN_SERIAL=1` runs every step in order. Explicit step settings win. `scripts/build-cached.mjs` reuses verified output from the persistent build cache or an earlier step, so an unchanged app need not build again (both backends).
-- **Plan results.** Each completed step emits `plan: step <i> <script> exited with <code> after <s> s`, with the original plan index on both backends. SSH job output is prefixed with `[runner:unit]`, `[runner:app]` or `[runner:specs]`; each child keeps its `run.log` and reports. The coordinator writes `plan.log`, so usage summaries do not count child CPU time twice. Cancellation reaches every child and waits for cleanup. A missing step result fails the plan. `pnpm affected` records passing steps independently.
-The [affected-plan measurement](self-hosted-runner.md#affected-plan-shape-2026-10-19) observed 604.7 s to 338.5 s total wall time for an outbox-plus-Chip change. Units went from 522 s to 146 s and conformance from 65 s to 23 s; the app job then dominated at 322 s. This is one before/after observation with shared-runner load and baseline test failures, not a controlled speedup claim.
-
-- **What is sent.** The files git sees in the worktree (tracked or new, not ignored), so uncommitted work is tested; `.env`, `node_modules`, build output and design images under `docs/` are not. The script stops if a file looks like a key or token file or holds what looks like a real Slack token.
-- **Where it runs.** Both backends use the toolchain in `scripts/remote/Dockerfile`: Playwright's Ubuntu image, Node 26, pnpm, Java 21 and Quint's Rust evaluator and Apalache. Its tag hashes only the Dockerfile and the root manifest's Quint pin. Namespace builds and pushes a missing `juno-toolchain:<tag>` with `nsc build`; SSH builds the same image locally. Each container unpacks a fresh workspace, installs with `pnpm install --frozen-lockfile --prefer-offline`, checks Bun's version, and runs the script under xvfb. Electron and Bun download through their approved install scripts. The log reports `remote: workspace installed in N s`.
-- **Build cache.** Both backends mount `builds/` beside the dependency store as `/cache/builds` and set `JUNO_BUILD_CACHE_DIR`. A fresh source archive is hashed without Git. Only successful builds are published, by renaming a private temporary directory; every restore checks its output checksum again. Corrupt or pruned entries are cache misses. The cache keeps eight recent builds per app. Tests always execute after a build hit. `pnpm remote --env JUNO_REBUILD=1 test:desktop` bypasses reuse. Locally, setting `JUNO_BUILD_CACHE_DIR` enables the same shared-output cache; without it only the worktree’s own output is reused.
-- **Dependency cache.** SSH mounts its persistent pnpm store and metadata, pnpm runtime locks, and Electron downloads. Namespace requests `--volume cache:juno-workspace-v1:/var/cache/juno-runner:4gb` on new machines and mounts the same directories from that machine into each container. A warm pool machine reuses its disk. `JUNO_REMOTE_STORE_CACHE=off` disables the volume request; `JUNO_REMOTE_STORE_TAG` selects another tag for measurements. If the plan rejects cache volumes before allocating a machine, the run logs the fallback and creates a machine without the volume. New machines then install cold. Registry, transport and capacity failures retain their existing recovery. [Namespace's cache lifecycle](https://namespace.so/docs/architecture/storage/cache-volumes) permits cache misses and commits only clean instance completions, so every install can fetch missing packages. `JUNO_RUNNER_HOST= pnpm remote ...` forces Namespace for a comparison.
-
-- **Results.** Output streams live and is saved as `.remote/<run>/run.log`, including failing test names even if downloading the reports fails. Reports (spec traces, Playwright results and any generated HTML report) land in the same directory. The exit code is the script's own.
-- **Memory.** The remote runner samples `MemTotal - MemAvailable` every two seconds and prints the peak used and available memory after each script. These are machine-wide values. SSH also prints cgroup v2 `memory.peak`, including file cache, for the job container; use that peak to size shared host capacity. SSH CPU busy uses cgroup CPU time divided by the Docker CPU limit, rather than all host threads.
-- **Warm pool.** After a clean run the machine goes back to a pool kept in the system temp folder (`scripts/remote/pool.mjs`); the next run on this Mac claims it with the image already pulled, which takes a small suite from about 190 s to 19 s. A machine runs one job at a time. The pool keeps at most `JUNO_REMOTE_IDLE_PER_SHAPE` (default 2) idle machines of each shape; a detached pool daemon destroys one after `JUNO_REMOTE_IDLE_MINUTES` (default 8) idle minutes (the cost is in "Current cost controls"), every machine ends after 3 hours, and after a failure or Ctrl-C the machine is destroyed at once. `pnpm remote --status` lists the pool; `pnpm remote --drain` destroys the idle machines.
-- **Admission.** Requests enter a first-come, first-served file queue shared across worktrees. With one shape, a free machine or 8 free cores fit any request. A request that does not fit (an explicit larger `--machine`) does not hold free cores: later requests that fit may start, until it has waited `JUNO_REMOTE_HOLD_SECONDS` (default 120). After that it holds the cores it needs, so a stream of small jobs cannot starve it. Queue order survives daemon failure; dead clients are removed. All participating worktrees must use this pool version for daemon-only polling and queue fairness; older clients still use direct admission. Output reports position, requested cores and elapsed wait every ten seconds. Provisioning stays in the client, outside the decision lock, with cores reserved before the daemon grants it. The daemon admits every request against its own cap, so runs from older worktrees, which still send `cap: 24`, get the current cap; a request whose `JUNO_REMOTE_MAX_VCPU` was set below the default keeps its lower cap.
-- **Recovery.** Creation attempts are recorded before `nsc create`; machines carry pool-owner and attempt labels. The first acquisition starts a shared daemon (an upgrade of the reaper watcher). It runs from a copy of the pool's modules in the pool folder (`daemon/<hash>/`, `scripts/remote/daemon-home.mjs`), never from a worktree: on 10-17 one started by `verify:main` outlived its temporary checkout. A daemon of an older version, or one whose script no longer exists, is replaced; the pool checks the process's command before signalling it. It owns inventory and admission, polling once five seconds after the previous reconciliation finishes; slow calls never overlap. Clients publish requests in the pool’s `queue/` directory and read their answers without calling Namespace. The daemon exits after six minutes when there are no requests or machines to reconcile. Untracked pool machines get a five-minute grace period; live local owners and pending creates are protected. Known idle cleanup runs under the decision lock before the inventory call, so a failed listing does not prevent that cleanup attempt. Machines labelled for another pool are left alone. Legacy `juno-remote=1` machines without an owner label are reconciled against this Mac's shared state. Failed destroys stay marked `destroying` and are retried. Workspace listings allow 90 seconds per call and three attempts for transient errors; `null` means no instances. During each daemon tick, reconciliation and admission share one snapshot. Newer machine records and pending creates still reserve capacity. If the daemon dies or cannot start, clients use the same durable queue and decision lock in direct mode, sharing successful inventory for up to five seconds and invalidating it before and after creates and destroys. A reservation identifies its request, so recovering an unanswered request cannot allocate it twice. Failed destroys remain recorded for the daemon to verify on its next poll. A transient workspace listing failure pauses acquisition and retries after two seconds; it never treats usage as zero. Timed-out creates get two quick retries (after two and four seconds), then one a minute while the failures last. Known partial instances are destroyed first. A failed attempt, or one whose client died during `nsc create`, keeps its reservation and attempt label until an inventory taken after the failure has shown its machine destroyed, or has not shown it for five minutes. While Namespace cannot be listed nothing is forgotten, and the daemon stays up while such a record exists, so a machine that arrives late is destroyed when it appears and is never handed out. A client that died before calling `nsc create` frees its reservation at once. Authentication and configuration errors still fail. Infrastructure failures use exit 255 and `infraFailure` in the log summary.
-- **Outages.** On 10-17 Namespace's EU compute API hung from 07:12 to about 11:10 IST: `nsc list` timed out and creates returned 504 or `DeadlineExceeded`, while sign-in still worked. The daemon could not read the inventory, so it admitted nothing, and four runs waited up to two hours without saying why. Every failed or timed-out `nsc list` and `nsc create` (502, 503 and 504 included) is now recorded in the pool folder's `namespace-outage` file (`scripts/remote/outage.mjs`), with when the failures started and the last error; a success clears its call. Once a call has failed at least twice over three minutes (`JUNO_REMOTE_OUTAGE_AFTER`), every waiting run prints one line, such as `remote: Namespace unreachable since 07:12 (nsc list timed out 14 times; last: ...). Waiting; use --local to run on this Mac.`, then a reminder every five minutes in place of its queue position. `pnpm remote --status` shows the same line. Runs keep waiting by default, since this Mac is the owner's computer. `JUNO_REMOTE_OUTAGE_WAIT=10m` (or `90s`, `1h`; a bare number is minutes) makes a run give up once the outage has lasted that long, with exit code 75 and `outage: true` in the log summary. `pnpm affected` then says that `--local` runs the steps here; `pnpm affected --local-on-outage` sets the wait to 10 minutes unless it is set, and on exit 75 runs the remote steps on this Mac through the heavy-job lock. `batch-merge --local` runs a batch's unit tests here. One `nsc list` may take `JUNO_REMOTE_LIST_TIMEOUT_SECONDS` (default 90); `nsc create` is ended after 10 minutes and other `nsc` calls after 2.
-- **Cap.** Machines in use and idle stay within `JUNO_REMOTE_MAX_VCPU` (default 48 vCPU, approved by the owner on 10-17 to clear the queue; 24 from 10-16). `JUNO_REMOTE_MAX_VCPU` may lower it, or raise it up to the Team plan's 64; the pool daemon uses the value from the run that started it. A run waits while the pool is full; after a minute it reports tracked and untracked workspace vCPU. An idle machine of another shape is destroyed to make room. Namespace's image builders (`nsc.purpose=builder`) are not counted: they stay up idle after an image build and are not ours to release, and on 10-16 two of them (32 vCPU) stopped every run for over 15 minutes while 31 requests waited.
-- **Cost.** Namespace bills vCPU-minutes (about $0.001 each on the Team plan), whatever the shape, so a machine costs its vCPU count times the minutes it is up, idle or not. The 48 vCPU cap bounds the spend at about $2.88 an hour with every machine busy. `--keep` leaves a machine available for `nsc ssh <id>` and tracked until its 3-hour expiry; it is neither reused nor drained.
-- **Setup.** `brew install namespacelabs/namespace/nsc` and `nsc login` once on the Mac. No credentials live in the repo.
-- **Timings** (2026-10-15, 16x32, before the standard shape; the one-machine numbers are in "Machine shapes"). Local times are with a free slot, before any queue wait. A new machine adds about 20 s to create and 45 s to pull the image; a warm one adds about 10 s.
-
-  | Script | Local (Mac) | Remote, new machine | Remote, warm machine | Script only | CPU busy |
-  | --- | --- | --- | --- | --- | --- |
-  | `test` | 160 s | 225 s | 107 s | about 85 s (the engine's `sync.test.ts` alone is about 60 s) | 8% |
-  | `specs:check`, nothing cached | 629 s (614 to 645 s in other agents' logs) | 214 s | 120 s | 82 to 100 s | 87% |
-  | `specs:check --shards 2` | | | | 68 and 72 s per shard | 80 to 84% |
-  | `specs:check`, all cached | | | 39 s | 0.2 s | |
-  | `test:agent-contracts` | about 5 s | 190 s | 14 to 21 s | 2 s | 12% |
-  | `test:gallery` | 16.4 min (13.7 to 18.5 min in other agents' logs) | 153 s | 85 s | 53 s | 30 to 36% |
-  | `test:desktop` | 2.9 min plus the build | 261 s | 124 s | 25 s | 31% |
-
-  The slowest Apalache check (about 50 to 70 s with the server start) is the floor of a spec check, so `--shards 2` saves about 20 s and more shards save nothing; it is not the default.
-- **Shards.** Opt-in only. `pnpm remote --shards n <script>` runs the script on n machines at once with `JUNO_SHARD=i/n`; for `test:desktop` each machine runs its Playwright shard and the parent merges the blob reports into `.remote/shards-*/html`; `specs:check` keeps its share of the jobs (dealt by expected cost, typechecks on every shard).
-- **Spec cache.** A remote spec check takes the Mac's cache of passing Quint runs along (staged in `.remote/`) and brings back what it adds, so a check that passed anywhere is not run again.
-- **Dials.** About one dial in four to Namespace's SSH gateway fails from this network and nsc takes 16 s to give up. The remote command prints a start line first; with none after 8 s, the run dials again (up to six times).
-- **`--dry-run`** prints the steps without creating anything.
-
-### Toolchain and store measurements
-
-Measured on 2026-10-19 from `9f3c80b04` and this change. Each reported workload
-ran once per state, sequentially, with 23 unit tests and, for the app plan,
-four desktop tests. All passed without test retries. SSH uses its default
-1-core reservation with a 2-core limit for the unit run, and 4 cores for the
-app plan. Namespace uses 8x16. These observations include network variation;
-they are not established speedups. Builds below had a missing tag but reused
-the common base and Node layers.
-
-| Measure, seconds | SSH full image | SSH toolchain | Namespace full image | Namespace toolchain |
-| --- | --- | --- | --- | --- |
-| Missing-tag build | 113–185, earlier owner measurements | 63.5 | About 120, earlier measurements | 53.3, including push |
-| Cold install | Baked into image | 55 | Baked into image | 26 for the unit run, 3 for the app plan |
-| Warm install or offline linking | 0–1 | 0–1 | 0–1 | 0–1 on both a fresh cache hit and a warm machine |
-| Install after a lockfile change | Rebuilds the image | 5, same image tag | Rebuilds the image | Not measured; the shared tag test covers both backends |
-| Unit run, wall | 91, image present | 220 with the first build, 52 warm, 55 after the lockfile change | 58 fresh, 56 warm | 143 with the first build, 67 fresh with cached store, 42 warm |
-| App plan, wall | 105, image present | 78 warm | 77 fresh, 62 warm | 85 fresh with cold store, 67 fresh with cached store, 46 warm |
-
-The SSH wall times above precede the IPv4 transport fix. After that fix, the
-same warm unit run took 32 seconds. Three fresh-shell `runner:check` calls
-passed in 0.67–1.68 seconds and still reported 16 cores. DNS lookup took
-10–1,209 ms. Raw SSH tried an unreachable advertised IPv6 address for five
-seconds before IPv4, while IPv4-only probes passed in 0.17–0.42 seconds.
-The new fresh cached Namespace unit run, the new warm unit run and the old
-warm unit run each had a gateway retry before the command started. The new
-warm unit observation includes that retry.
-
-Five alternating warm installs per flag gave a median of 214 ms for
-`--prefer-offline` (204–282 ms) and 220 ms for `--offline` (198–275 ms).
-The ranges overlap. Keep `--prefer-offline` so cold stores and new packages
-work. The first SSH install's policy metadata was copied into the persistent
-cache after timing exposed it outside the store; later runs mount that
-metadata directly. The temporary lockfile commit added `is-number@7.0.0` to
-one package, then was removed. No image build occurred for that change.
-
-Two concurrent SSH containers installed against the same pnpm store and runtime
-lock directory. Both checked that their uid matched the store owner. The image
-contained no workspace manifest or node_modules.
-The same uid check initially exposed Quint's warmed downloads behind the base
-image's private `/home/pwuser` directory. The toolchain makes that directory
-readable and searchable by other job uids. Timings above precede this permission
-fix. After rebuilding, the Rust evaluator and Apalache both passed a one-step
-model check as the laptop's uid 1000, using the warmed downloads.
-The final Namespace image also passed the app plan. That fresh machine had a
-cold store: install took 70 seconds, including a 67-second registry request
-while checking supply-chain policies. Total wall time was 203 seconds, including
-the 42.6-second image build and push. The laptop's permission-fix rebuild took
-46.4 seconds. These follow-up checks show why the initial timings are observations,
-not a reliable estimate for every cold run.
-
-Namespace saved a 1,666 MB cache generation. Its first follow-up fresh machine
-missed the cache and installed in 15 seconds; a later fresh machine restored
-it and installed in one second. Cache misses during distribution are expected,
-as described in [Namespace's cache lifecycle](https://namespace.so/docs/architecture/storage/cache-volumes).
-The two measurement cache tags were released. The common toolchain remains the
-default: warm installs cost at most one reported second, and these app plans
-show no clear Namespace regression that would justify a separate full image.
-
-Reproduce the workloads, one command at a time:
+`test:plan` splits unit, app and specs steps into independent SSH jobs. App
+steps run in order and share builds; conformance stays with specs. Each job
+gets a separate install and report directory, and releases its cores when it
+finishes. `JUNO_RUNNER_PLAN=single` keeps one job; `JUNO_PLAN_SERIAL=1` also
+runs every step in order. `KEY=VALUE` before a step overrides its environment.
 
 ```sh
-JUNO_REMOTE_MAX_VCPU=0 pnpm remote test --passWithNoTests test/messages.test.ts
-JUNO_REMOTE_MAX_VCPU=0 pnpm remote test:plan test --passWithNoTests test/messages.test.ts + test:desktop e2e/app.spec.ts
-JUNO_RUNNER_HOST= pnpm remote --fresh test --passWithNoTests test/messages.test.ts
-JUNO_RUNNER_HOST= pnpm remote test:plan test --passWithNoTests test/messages.test.ts + test:desktop e2e/app.spec.ts
+pnpm runner:check
+pnpm remote test --passWithNoTests test/messages.test.ts
+pnpm remote test:plan test --passWithNoTests test/messages.test.ts + test:desktop e2e/app.spec.ts
+pnpm remote --cores 2 --wait 120 test:gallery shift.spec.ts
 ```
 
-For Namespace, use a new `JUNO_REMOTE_STORE_TAG` for a cold store, reuse that tag
-on a fresh machine for a cache hit, and omit `--fresh` for a warm pool machine.
-`JUNO_REMOTE_IDLE_MINUTES=0` destroys a measurement machine after its run.
-`JUNO_REMOTE_STORE_CACHE=off` on a new machine measures the machine-disk fallback. Cache hits are
-best effort; check pnpm's reused and downloaded counts before calling a run warm.
+The worktree snapshot includes tracked and unignored files, with non-Markdown
+design assets under `docs/` excluded. It refuses files that look like credentials
+or contain real Slack tokens or cookies. Ignored dependencies and build output
+stay on the client. Never put secrets in the workspace.
 
-## Current cost controls
+Juno's toolchain image is built on the runner through tstack's shared build
+lock. Dependencies install per run against `/cache/pnpm-store` with
+`--frozen-lockfile --prefer-offline`; lockfile changes do not rebuild the image.
+Electron downloads and verified app builds persist under `/cache`. Spec cache
+entries travel with the job and return with its results. Reports and logs land
+in `.remote/`, with `plan.log` for the coordinator and `run.log` for each child.
+`pnpm remote:usage` summarizes the retained logs across worktrees.
 
-The defaults are 48 vCPU in the workspace (at most about $2.88 an hour with every
-machine busy; approved by the owner on 10-17), two idle machines per shape and eight
-idle minutes (since 10-16; before, one machine and one minute). `JUNO_REMOTE_MAX_VCPU=0` refuses Namespace runs before an image build.
-A request larger than the cap fails instead of waiting forever.
-`JUNO_REMOTE_IDLE_MINUTES=0` destroys a machine immediately on release.
-These settings never reclaim a machine with a live owner. Releases record their
-own idle window. The pool upgrades the old background reaper so its five-minute
-policy does not survive a code update; it verifies the reaper command before
-sending it a signal.
+The Mac client stays awake with `caffeinate -i -w <pid>` for the remote run.
+Heartbeat loss or a closed connection makes tstack stop the job and free its
+cores. A killed coordinator closes its children's pipes so their jobs stop too.
 
-The idle policy trades idle vCPU-minutes for warm starts. A new 8x16 machine
-costs about 20 s to create and 37 to 145 s to pull the image (logs from 10-16),
-that is 8 to 22 vCPU-minutes and one to two and a half minutes of wall time per
-run; a warm one starts in about 4 s. Two idle 8x16 machines for eight minutes
-cost at most 2 x 8 vCPU x 8 min = 128 vCPU-minutes (about $0.13) after the last
-run of a busy spell. The bound per hour is 2 x 8 x 60 = 960 vCPU-minutes (about
-$0.96 an hour) if both machines sat idle the whole hour, which needs runs that
-arrive less than eight minutes apart and never use them. In practice a machine
-is idle only between runs, at most 64 vCPU-minutes per run. Before, one idle
-machine per shape for one minute cost at most 14 vCPU-minutes per spell, but
-most runs paid for a new machine. Idle machines count against the cap, and a
-run that needs room destroys idle machines of another shape first.
-
-`pnpm remote:usage [--days 7]` reads `.remote/*/run.log` in all registered worktrees.
-It reports counts, failures, cores, CPU busy, median script/startup/wall time,
-measured core-minutes and the share of fresh machines. New logs include the
-script, arguments, backend, machine shape, result and total wall time. Older
-missing values are `?`; coverage counts show which logs support the cost total.
-Core-minutes include measured creation, execution, reports and cleanup, but not
-pool idle time. See [the cost audit](remote-costs.md) for the day-level machine
-inventory and its limits.
-
-Set `JUNO_REMOTE_IMAGE_CACHE=on` to try Namespace's native container image cache,
-backed by an 8 GB cache volume for the measured 6 GB image working set. It caches
-unpacked layers and downloaded blobs. It is off by default: five alternating
-pairs gave 54.7 seconds uncached versus 54.5 seconds with the cache among
-successes; the cache arm completed three of five attempts. Cache volumes add
-storage charges. The roughly ten-second target was reached only on cache hits.
-`--fresh` requests a new machine instead of claiming a warm one, for startup
-measurements. Cache misses still pull from the registry. The image is unchanged, so this does not trigger a
-new builder. The pool records pending creates as reserved cores and releases its
-decision lock before provisioning, allowing independent creates within the cap.
-
-`pnpm remote test:desktop` runs on one machine and builds the app once. `--shards n`
-splits it across n machines; each returns a blob report and the parent merges them
-into `.remote/shards-*/html`, and a failed shard or missing report fails the parent.
-`test:e2e` runs the desktop e2e and then the gallery on one machine.
-`pnpm flake` keeps its repetition semantics instead of splitting its selected tests.
-
-Configure `~/.config/juno/runner.json` on the Mac with `host`, `port`, and `key`
-to prefer an SSH runner for every agent, including `pnpm affected` and
-`pnpm verify:main` plans. `JUNO_RUNNER_HOST`, `JUNO_RUNNER_PORT`, and
-`JUNO_RUNNER_KEY` override file values. An empty `JUNO_RUNNER_HOST` selects
-Namespace. The real host and user belong only in the machine-local file.
-
-The SSH runner uses `juno-toolchain:<tag>`. The tag hashes `scripts/remote/Dockerfile`
-and the root manifest's Quint pin, so changing the lockfile does not rebuild it.
-A missing tag is built on the runner under a host build lock. No `nsc` or
-Namespace registry access is needed on the runner. Each run installs with
-`--frozen-lockfile --prefer-offline` against `~/.cache/juno-runner/pnpm-store` (including pnpm metadata),
-checks Bun's version and reports `remote: workspace installed in N s`.
-Electron downloads use `~/.cache/electron`. Containers use the host uid and
-share pnpm's runtime locks. Cache ownership must match that uid.
-`JUNO_RUNNER_IMAGE` selects a full preloaded image and skips the install.
-`pnpm runner:check` reports a missing local tag without failing, and
-`pnpm runner:prune` removes old full-image and toolchain tags and unused build
-cache while keeping the selected image. It leaves dependency caches alone.
-Docker refuses removal of images referenced by containers.
-
-An unreachable runner falls back to Namespace. For `.local` hosts, SSH tries IPv4 first and falls back to dual stack if the transport cannot connect. The successful family is reused for the job. This avoids a five-second stall on the laptop's advertised but unreachable IPv6 address. Authentication and connected-host failures still stop the run. After the image is ready, a job
-waits at most 60 seconds for runner cores before falling back. With
-`JUNO_REMOTE_MAX_VCPU=0`, it waits without a deadline and never allocates
-Namespace machines. SSH authentication errors, broken Docker, failed builds,
-and failed tests return an error without fallback. A runner job does not start
-the Namespace warm pool or daemon. Without a configured host, Namespace remains
-the default. Setup and a standalone Windows prompt are in
-[Set up an optional SSH runner](self-hosted-runner.md).
+`perf`, `test:feel` and `gallery:shots` stay on the Mac. Tests tagged `@mac`
+are skipped on Linux and included in nightly Mac runs. For idle CPU changes,
+run the fine budgets through the heavy lock with
+`pnpm test:desktop idle-cpu.spec.ts --grep @mac`.
 
 ## Hunting a flaky test
 
@@ -1204,110 +1051,36 @@ Causes found so far (2026-10-15):
 
 ## Machine shapes
 
-Both backends now use the same toolchain and install per run. The [toolchain and store measurements](#toolchain-and-store-measurements) compare fresh and warm runs with the earlier full image. Namespace worker counts and machine reservations are unchanged. Namespace requests a 4 GB dependency cache, with 1,666 MB used in these slices.
+Juno requests physical cores from the laptop's shared `4-11` allocation:
 
-SSH physical mode reserves two whole cores for wide units, gallery and desktop/e2e, one for narrow units and cached specs, and four for conformance. The laptop lends only dense cores 4–11 and their siblings; each core carries a 3 GiB memory budget. Numeric configs keep quota-only sizing. See "Remote runs" for config formats, tmpfs, overrides and cleanup.
+| Job | Cores | Memory cap |
+| --- | ---: | ---: |
+| Narrow unit, agent tests, cached spec check | 1 | 3 GiB |
+| Wide unit, uncached spec check, gallery, app | 2 | 6 GiB |
+| Conformance, trace generation, other scripts | 4 | 12 GiB |
 
-Full laptop unit tuning on 2026-10-19 compared 4, 8, and 12 Vitest workers
-per package with two package jobs on four reserved cores and a four-core limit.
-The selected four-worker setting passed in 224 s script time, averaging 78%
-CPU with 1.90 GiB peak container memory. Both higher counts hit two engine
-assertion failures. The initial two-worker setting took 325 s. See the
-[worker comparison and measurement scope](self-hosted-runner.md#laptop-measurements).
+Wide units have no named files or more than 20. `--cores` overrides the request;
+default sizes shrink to fit smaller hosts. Explicit oversized requests fail.
+The older `--machine linux/amd64:NxM` and `JUNO_REMOTE_MACHINE` spellings round
+N threads up to whole two-thread cores. On quota hosts a narrow job gets one
+CPU, with no burst to two.
 
-SSH laptop measurements on 2026-10-19 (24 threads, 30 GiB RAM), one successful
-sequential run per size, with the image present:
+The shared host maps sibling CPUs and sets the actual thread quota. Workers
+use its `RUNNER_THREADS`, forwarded as `JUNO_RUNNER_JOB_CORES`; they never infer
+threads from the request. At four threads wide units run four Vitest workers
+in each of two packages, desktop runs three workers (two in sequential plans),
+and gallery runs three. Quint uses one simulation per two threads and one
+Apalache checker per four, at least one each. Explicit worker settings win.
 
-| Work | 8 cores: script / CPU busy / peak GiB | Earlier reduced size: script / CPU busy / peak GiB |
-| --- | --- | --- |
-| App plan: 54 unit tests and 21 desktop tests | 72 s / 41% / 4.07 | 4 cores: 86 s / 72% / 2.76 |
-| Unit files: 54 tests | 46 s / 11% / 1.25 | 2 cores: 46 s / 44% / 1.21 |
-| Gallery shift slice | 33 s / 36% / 2.65 | 4 cores: 38 s / 57% / 1.85 |
-
-These measurements predate the new reservations. CPU busy is relative to the
-Docker CPU limit. Peak memory includes the container's file cache; script time excludes setup and report download. At 4 cores the
-app plan used two desktop workers and one unit worker; the standalone gallery
-used three workers and shift parts. At 2 cores the unit job used two workers
-in one package. All tests passed without test retries. The historical quota config lent
-16 of 24 threads: 4 app plans, or 5 gallery jobs,
-or 4 wide unit jobs, or 16 narrow unit jobs fit at once. At the earlier measured
-slice peaks, four app plans use about 11.04 GiB, five gallery slices 9.25 GiB,
-and sixteen narrow unit slices 19.36 GiB, below the roughly 24 GB job budget.
-The current physical config lends dense cores 4–11 and caps combined job memory
-at 24 GiB. These historical numbers are sequential slices, not a concurrent
-full-suite test.
-See [the commands and measurement scope](self-hosted-runner.md#laptop-measurements).
-
-Namespace runs every script on one standard shape, 8x16 (`standardShape` in `scripts/remote.mjs`; `--machine` overrides). With one shape a free machine fits any waiting run and a warm machine is reused by the next run whatever it runs, so the pool does not fragment. Six 8x16 machines fit the 48 vCPU cap, so six plans run at once; 16x32 would fit three. `pnpm affected` and `pnpm verify:main` send their remote suites as one plan (`test:plan`), and the desktop e2e is not sharded.
-
-A typical UI change, before and after (`packages/views/src/Composer.tsx`: the gallery for six components and the whole desktop e2e, 380 tests), measured on 10-16 and 10-17 while other agents' runs were queued:
-
-| | Before: five 4x8 machines (four desktop shards, the gallery) | After: one 8x16 machine, one plan |
-| --- | --- | --- |
-| vCPU asked for | 20 (two runs at once needed 40, above the 24 vCPU cap then) | 8 (three runs fit in 24 vCPU, six in 48) |
-| Queue wait | 52 to 230 s per job | 278 s, behind other agents' 4x8 jobs |
-| Start-up | 4 s warm, 85 s on a new machine | 41 s on a new machine (37 s image pull), about 4 s warm |
-| Script | shards 95 / 107 / 178 / 204 s, gallery 102 s; each shard builds the app | 369 s: gallery 103 s, then desktop 266 s with one build (about 20 s) |
-| CPU busy | 37 to 70% per machine | 61% on average, 83% at the median |
-| Wall time | 381 s | 687 s with the wait; about 410 s without it, about 375 s warm |
-| Machine time | 60 vCPU-minutes | about 56 vCPU-minutes |
-
-On an idle pool one run is slower than five machines at once (about 375 s warm against about 210 s), but it asks for 8 vCPU instead of 20, builds once, and fits beside two other runs, where before a second run waited for the first. Two runs at once were not measured before merging; measure them on main. Running the gallery beside the desktop e2e on the same machine took 317 s but failed three tests (one gallery cursor test, two desktop timing tests) at 95% median CPU, so the app suites run one after another.
-
-**Lanes side by side** (10-17). A plan originally ran the app suites in one lane and the unit tests and spec checks in another, at the same time (`scripts/plan.mjs`). With each suite's own worker count the machine was far past full: busy time stops at 100%, so the remote run now also prints the runnable tasks per core and the kernel's CPU pressure (the share of time some task waited for a core), with a 30 s timeline. The 10-17 split gave the app lane 5 desktop or 8 gallery workers on 8 cores, and beside it vitest with 4 workers and one package at a time, then spec checks with 2 jobs and one Apalache. The table below records that two-lane plan. The current three-lane plan uses the worker counts under "Plans" above. A step's own `KEY=VALUE` words still win; a suite run alone keeps its own counts. The full `verify:main` plan on one 8x16, one commit:
-
-| Workers | Script | Busy, average | Runnable per core, median | CPU pressure, median | Failed |
-| --- | --- | --- | --- | --- | --- |
-| Each suite's own (desktop 8, gallery 24) | 534 s | 92% | 4 to 7 | about 85% | 2 layout-shift tests |
-| Desktop 6, the rest unchanged | 560 s | 93% | 3 to 7 | about 80% | the codex removal test |
-| Desktop 6, gallery 12, the other lane smaller | 540 s | 82% | 2.2 | 58% | the chat-cache benchmark |
-| Every suite one after another, desktop 6 | 625 s | 72% | 1.4 | 30% | none |
-| Desktop 5, gallery 8, the other lane smaller (the default) | 564 s | 79% | 1.6 | 42% | none |
-
-Alone, the gallery at 3 workers per core still ran 5.5 runnable tasks per core; the desktop suite at 6 workers ran 2 to 3. Most failures reported from plan runs on 10-17 were waits that a loaded core made late (layout-shift probes, 1 s polls, the conformance replay's settle time, the chat benchmark).
-
-Earlier measurements, with a shape per script (2026-10-15, TypeScript 7; "script" excludes start-up):
-
-| Script | Shape then | Script time |
-| --- | --- | --- |
-| `test` | 2x4 | 262 s in the full suite; 156 s on 4x8 |
-| `test:gallery`, every component | 8x16 | 132–146 s at 78–87% busy; 215 s at 73% on 4x8 |
-| `test:desktop` | four 4x8 machines, 3 workers each | 83 / 187 / 112 / 82 s; 37–66% busy; 30.9 script core-min total |
-| `specs:traces` | 8x16, eight jobs | 132 s at 97% busy; 333 s at 98% on 4x8 |
-| `specs:check`, nothing cached | 8x16 | 126 s (214 s on 4x8, 82 to 100 s on 16x32) |
-
-Standalone SSH workers follow `JUNO_RUNNER_JOB_CORES` (`scripts/remote/workers.sh`): Vitest uses two workers in one package at a 2-core limit; wide unit jobs use one worker per allocated core in each of two packages (four workers each at 4 cores). Other jobs retain their existing counts. Standalone desktop uses three workers at four allocated threads (two in sequential app plans), gallery three workers and shift parts at four threads, and Quint one simulation per two cores and one checker per four, at least one each. Split SSH jobs keep these standalone counts. `JUNO_RUNNER_PLAN=single` restores the smaller shared-lane counts described above; wide unit-only plans still retain standalone unit counts. Namespace keeps its existing standalone workers: vitest at least four workers, two unit packages at a time, Electron one per two cores, one per core from eight cores, except three workers on each 4-core desktop shard, the gallery three per core, spec simulations one per two cores beside one Apalache server per four, except trace-only runs use one job per core without Apalache. `pnpm remote --shards n` also splits the gallery (each machine takes every n-th state) and the spec check across n machines; it costs about the same and is not the default.
-
-Earlier full-suite pilots on the same prebuilt image (15 October 2026):
-
-| Work | Before: script / busy / core-min | After: script / busy / core-min |
-| --- | --- | --- |
-| Unit | 4 cores: 156 s / 43% / 10.4 | 2 cores: 262 s / 67% / 8.7 |
-| Desktop | 8 cores: 277 s / 56% / 36.9 | two 4-core shards: 272 and 210 s / 42% and 72% / 32.1 total |
-
-The two-core unit run passed in 262 seconds. Desktop shards
-passed and their reports merged; five tests were added on main between pilots.
-The longest shard is no slower in this pilot, but shared-capacity waits staggered
-them: total wall time grew from 738 to about 2,734 seconds. This does not prove
-parallel end-to-end wall time. Unit total wall time was 246 seconds before and
-303 after. See [the measurement limits and reproduction commands](remote-costs.md).
-
-Historical measurements before the cost controls above: a typical `pnpm affected` run (a view and an engine file changed: typecheck, lint, 90 vitest files, the gallery for one component and the whole desktop e2e), measured on 2026-10-15 with every item run (`--no-cache`):
-
-| | Before: 16x32 for every step | After: shapes above |
-| --- | --- | --- |
-| Machines | four of 16 vCPU (64 vCPU, the whole cap) | 2 + 4 + 4 + 8 = 18 vCPU |
-| Machine time while running | 60 vCPU-minutes (warm machines) | 37 to 38 vCPU-minutes (new machines, including start-up) |
-| Idle time afterwards, at most | 4 x 16 vCPU x 10 min = 640 vCPU-minutes | 18 vCPU x 5 min = 90 vCPU-minutes |
-| Cost | $0.06 running, up to $0.70 with idle time | $0.04 running, up to $0.13 with idle time |
-| Wall time | 289 s | 216 to 273 s |
-| Runs at once within the cap | one | three |
-
-Both wall times include waiting for machines, because other worktrees still on 16x32 held the cap; without waiting the new shapes take about 2.4 minutes with new machines (the desktop e2e is the longest step) and less with warm ones.
+The host caps memory without swap and mounts `/tmp` and `/work` as tmpfs.
+Each tmpfs is 2 GiB, or 4 GiB for requests of four or more cores; tmpfs consumes
+the memory cap. Split plans release each job's cores independently.
+One remote run at a time per agent; other projects use the same allocator.
+Use `runner list` to see their combined usage.
 
 ## Heavy jobs share one queue
 
-Tests, e2e runs, gallery shots, benchmarks and spec checks spawn many processes. Several agents often work in separate worktrees on the same machine, so the root scripts (`pnpm test`, `pnpm test:e2e`, `pnpm test:feel`, `pnpm test:gallery`, `pnpm gallery:shots`, `pnpm specs:check`, `pnpm test:agent-contracts`, `pnpm test:agent-testing`) run through `scripts/heavy.mjs`. It takes a machine-wide lock in the system temp folder, shared by every worktree, and waits for a free slot. There are two slots by default (`JUNO_HEAVY_SLOTS` changes it). On the Mac, `--electron` also takes a single shared app-launch slot. `test:desktop`, `test:e2e`, `test:gallery` and `gallery:shots` use it, so only one of these jobs runs at once. Ordinary jobs can still use both slots, or run beside one app job. An app job waiting for the app-launch slot holds no general slot. Timing runs (`pnpm perf`, `pnpm test:feel`) pass `--exclusive`, which takes every slot and stops new jobs from starting while it waits, so their numbers are not skewed by another run. Release packaging passes `--priority release` with `--exclusive`: it moves ahead of all queued jobs while it waits for active jobs to finish, without interrupting them. Use `node scripts/heavy.mjs --status` to see holders and queued commands, PIDs and wait times. The wrapper sets `JUNO_HEAVY_HELD` for its child; nested heavy commands run within the parent's reservation and cannot deadlock waiting for a slot the parent holds. Running a package's tests directly bypasses the queue, so prefer the root scripts. `pnpm test:health` and `pnpm test:remote-pool` skip the queue: they are small Node tests that should not wait behind perf or package runs.
+Tests, e2e runs, gallery shots, benchmarks and spec checks spawn many processes. Several agents often work in separate worktrees on the same machine, so the root scripts (`pnpm test`, `pnpm test:e2e`, `pnpm test:feel`, `pnpm test:gallery`, `pnpm gallery:shots`, `pnpm specs:check`, `pnpm test:agent-contracts`, `pnpm test:agent-testing`) run through `scripts/heavy.mjs`. It takes a machine-wide lock in the system temp folder, shared by every worktree, and waits for a free slot. There are two slots by default (`JUNO_HEAVY_SLOTS` changes it). On the Mac, `--electron` also takes a single shared app-launch slot. `test:desktop`, `test:e2e`, `test:gallery` and `gallery:shots` use it, so only one of these jobs runs at once. Ordinary jobs can still use both slots, or run beside one app job. An app job waiting for the app-launch slot holds no general slot. Timing runs (`pnpm perf`, `pnpm test:feel`) pass `--exclusive`, which takes every slot and stops new jobs from starting while it waits, so their numbers are not skewed by another run. Release packaging passes `--priority release` with `--exclusive`: it moves ahead of all queued jobs while it waits for active jobs to finish, without interrupting them. Use `node scripts/heavy.mjs --status` to see holders and queued commands, PIDs and wait times. The wrapper sets `JUNO_HEAVY_HELD` for its child; nested heavy commands run within the parent's reservation and cannot deadlock waiting for a slot the parent holds. Running a package's tests directly bypasses the queue, so prefer the root scripts. `pnpm test:health` and `pnpm test:runner` skip the queue: they are small Node tests that should not wait behind perf or package runs.
 
 
 ## Releasing
@@ -1417,7 +1190,7 @@ ReactiveObjC, which the updater needs. Juno's own code is about 8 MB
 
 Keep all credentials in the environment or repository Actions secrets. Never
 commit certificates, keys, passwords or tokens. No secrets are needed for PR
-lint/typecheck. Heavy checks run through `pnpm affected` on Namespace.
+lint/typecheck. Heavy checks run through `pnpm affected` on the SSH runner.
 
 ### Steps
 
@@ -1682,7 +1455,7 @@ At `d0876483`, all 18 cases passed in 38.5 seconds on one `linux/amd64:4x8` remo
 
 `expectStableAnchor` in `apps/desktop/e2e/shiftProbe.ts` samples a retained DOM anchor's screen coordinates every animation frame and asserts exactly zero movement. It also requires Chromium's Layout Shift observer and rejects entries without recent input. The anchor check includes the recent-input interval, which otherwise hides jumps for 500 ms. Start it before releasing delayed data, and wait for the resulting UI inside its action. A missing anchor fails.
 
-Use `fake.holdNext({ method, reason: 'open' })`, assert the call is held, then `fake.release({ method })` to exercise partial caches. Use silent fake posts followed by one socket message to reproduce history missing above the latest message. Do not substitute a settled gallery fixture for this case. Repeat with `pnpm flake apps/desktop/e2e/layout-shift.spec.ts --repeat 20 --machines 1`. Keep `JUNO_REMOTE_MAX_VCPU` at its default or lower.
+Use `fake.holdNext({ method, reason: 'open' })`, assert the call is held, then `fake.release({ method })` to exercise partial caches. Use silent fake posts followed by one socket message to reproduce history missing above the latest message. Do not substitute a settled gallery fixture for this case. Repeat with `pnpm flake apps/desktop/e2e/layout-shift.spec.ts --repeat 20 --machines 1`. Keep one remote run at a time; all jobs share the laptop’s configured cores.
 
 ## Scheduled full run
 
