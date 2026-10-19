@@ -169,7 +169,9 @@ describe('cold boot', () => {
     await quiet(engine)
     const history = apiCalls(engine, 'conversations.history')
     expect(new Set(history.map((c) => c.args['channel'])).size).toBe(history.length)
-    const { 'edge:users/info': namesCalls, ...calls } = callMap(engine)
+    const { 'edge:users/info': namesCalls, 'edge:huddles/info': huddleReads, ...calls } = callMap(engine)
+    // Running huddles, once the socket connects; on a cold boot the read waits for the conversations, so it may land after this count.
+    expect(huddleReads ?? 0).toBeLessThanOrEqual(1)
     // Names before rows: the DM and group DM people right after counts, then each person once, on the page they first appear
     // on; a getView page or a preview search page names everyone on it in one call. The preview search runs beside
     // history, so which of them first names a sender varies; never a call per row.
@@ -382,7 +384,9 @@ describe('warm boot', () => {
     expect(apiCalls(second, 'conversations.replies').filter(notRecheck).map((call) => call.args)).toEqual([
       expect.objectContaining({ channel: 'C0ENG', ts: oldRoot.ts, limit: '1', _x_reason: 'root' }),
     ])
-    const { 'recheck:conversations.history': history, 'recheck:conversations.replies': replies, ...budget } = callMap(second)
+    const { 'recheck:conversations.history': history, 'recheck:conversations.replies': replies, 'edge:huddles/info': huddleReads, ...budget } = callMap(second)
+    // Running huddles, once the socket connects; that read may land after this count.
+    expect(huddleReads ?? 0).toBeLessThanOrEqual(1)
     const rechecks = { 'recheck:conversations.history': history, 'recheck:conversations.replies': replies }
     expect(budget).toEqual({
       'api:presence.set': 1,
