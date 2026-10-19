@@ -190,6 +190,29 @@ export interface IdentityFacts {
   externalUserIdRoom?: string
 }
 
+/** From the join answer's attendee: the room part of `ExternalUserId` (team id, room id, user id, as recorded). */
+export function factsFromJoin(facts: IdentityFacts, attendee: Readonly<Record<string, unknown>> | undefined) {
+  const external = attendee?.['ExternalUserId']
+  if (typeof external === 'string') facts.externalUserIdRoom = external.split('-')[1]
+}
+
+/** From the first `sh_room_join` of the test channel. */
+export function factsFromFrame(facts: IdentityFacts, frame: unknown) {
+  if (facts.joinFrameRoomId !== undefined) return
+  const room = (frame as { room?: { id?: unknown; date_start?: unknown } }).room
+  if (typeof room?.id === 'string') facts.joinFrameRoomId = room.id
+  facts.joinFrameDateStart = room?.date_start
+}
+
+/** From the test channel's running huddle in a `huddles/info` answer. */
+export function factsFromInfo(facts: IdentityFacts, answer: unknown, channel: string | undefined) {
+  const huddles = (answer as { huddles?: ReadonlyArray<{ channel_id?: unknown; call_id?: unknown; start_date?: unknown }> } | undefined)?.huddles ?? []
+  const mine = huddles.find((h) => h.channel_id === channel)
+  if (mine === undefined) return
+  if (typeof mine.call_id === 'string') facts.infoCallId = mine.call_id
+  facts.infoStartDate = mine.start_date
+}
+
 export function printIdentityFacts(facts: IdentityFacts, callId: string | undefined) {
   const same = (other: string | undefined) => (other === undefined || callId === undefined ? 'unknown' : String(other === callId))
   log(`fact: sh_room_join room.id equals rooms.join call.call_id: ${same(facts.joinFrameRoomId)}`)

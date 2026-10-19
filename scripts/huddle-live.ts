@@ -35,7 +35,7 @@ import { EdgeHuddlesInfoOk, type MethodArgs, type MethodName, type MethodOk } fr
 import { HttpTransport, SlackClient, SlackApi, SlackEdge, SlackSession, SlackSocket, slackConfigLayer, SocketHandshake, type SlackSessionShape } from '@juno/slack'
 import { openHuddlePage, type HuddlePage } from './huddle-live-browser.ts'
 import { callPlan, Guard, NAMES } from './huddle-live-guard.ts'
-import { log, MediaReport, printHuddles, printIdentityFacts, printPaths, safeError, type IdentityFacts } from './huddle-live-report.ts'
+import { factsFromFrame, factsFromInfo, factsFromJoin, log, MediaReport, printHuddles, printIdentityFacts, printPaths, safeError, type IdentityFacts } from './huddle-live-report.ts'
 import { readCachedSession } from './live-common.ts'
 
 const argv = process.argv.slice(2)
@@ -181,18 +181,7 @@ function remember(joined: MethodOk<'rooms.join'> | undefined) {
   call.callId = joined.call.call_id
   const id = joined.call.free_willy?.attendee['AttendeeId']
   call.attendeeId = typeof id === 'string' ? id : undefined
-  const external = joined.call.free_willy?.attendee['ExternalUserId']
-  // As recorded: team id, room id, user id.
-  if (typeof external === 'string') facts.externalUserIdRoom = external.split('-')[1]
-}
-
-/** The running huddle of the test channel in a `huddles/info` answer, for the facts. */
-function rememberInfo(answer: unknown) {
-  const huddles = (answer as { huddles?: ReadonlyArray<{ channel_id?: unknown; call_id?: unknown; start_date?: unknown }> } | undefined)?.huddles ?? []
-  const mine = huddles.find((h) => h.channel_id === guard.channel)
-  if (mine === undefined) return
-  if (typeof mine.call_id === 'string') facts.infoCallId = mine.call_id
-  facts.infoStartDate = mine.start_date
+  factsFromJoin(facts, joined.call.free_willy?.attendee)
 }
 
 async function main(): Promise<number> {
@@ -250,7 +239,7 @@ async function run(t: Target, connection: Connection, open: Open): Promise<numbe
   open.page = await openHuddlePage({ headed: flags.has('--headed'), onEvent: (event) => media.on(event) })
   if (useFake) {
     log('fake: not starting media (the fake has no Chime)')
-    rememberInfo(await connection.huddlesInfo('after the join'))
+    factsFromInfo(facts, await connection.huddlesInfo('after the join'), guard.channel)
     return 0
   }
   if (stopRequested !== undefined) return 1
@@ -265,7 +254,7 @@ async function run(t: Target, connection: Connection, open: Open): Promise<numbe
     console.log(media.status(Date.now() - started, withSocket ? socketReport : undefined))
     if (!infoAfter && media.started) {
       infoAfter = true
-      rememberInfo(await connection.huddlesInfo('after the join'))
+      factsFromInfo(facts, await connection.huddlesInfo('after the join'), guard.channel)
     }
   }
   media.summary()
@@ -375,11 +364,7 @@ function startSocket(runtime: ManagedRuntime.ManagedRuntime<SlackSocket, never>)
     socketReport.roomFrames++
     const mine = (guard.channel !== undefined && data.includes(guard.channel)) || (call.callId !== undefined && data.includes(call.callId))
     if (mine) socketReport.aboutThisRoom++
-    if (frame.type === 'sh_room_join' && mine && facts.joinFrameRoomId === undefined) {
-      const room = (frame as { room?: { id?: unknown; date_start?: unknown } }).room
-      if (typeof room?.id === 'string') facts.joinFrameRoomId = room.id
-      facts.joinFrameDateStart = room?.date_start
-    }
+    if (frame.type === 'sh_room_join' && mine) factsFromFrame(facts, frame)
     const seen = socketReport.seenTypes.get(frame.type) ?? 0
     socketReport.seenTypes.set(frame.type, seen + 1)
     if (seen === 0) printPaths(`socket frame ${frame.type} (${mine ? 'this room' : 'another room'})`, frame)
