@@ -1,1 +1,0 @@
-- 10-20 02:31 · huddle-share-paused · A shared screen that no huddle tab shows is paused with Chime's `pauseVideoTile`, so Chime's server stops sending it and the page decodes nothing; opening the tab resumes it, with "Loading Maya's screen" until the first frame. The bar still says who is sharing.

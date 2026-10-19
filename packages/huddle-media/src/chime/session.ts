@@ -82,7 +82,8 @@ class ChimeMediaSession implements MediaSession {
     }
     configuration.reconnectTimeoutMs = RECONNECT_TIMEOUT_MS
     const attendeeId = configuration.credentials?.attendeeId ?? ''
-    configuration.videoDownlinkBandwidthPolicy = new ContentOnlyDownlinkPolicy(attendeeId)
+    const policy = new ContentOnlyDownlinkPolicy(attendeeId)
+    configuration.videoDownlinkBandwidthPolicy = policy
     this.#store.update(startCall(attendeeId))
 
     const attempt = { left: false }
@@ -90,7 +91,7 @@ class ChimeMediaSession implements MediaSession {
     const supported = await voiceFocusSupported(this.#logger)
     this.#starting = undefined
     if (attempt.left) return
-    const call = newCall(configuration, supported, this.#logger, (id, ready) => {
+    const call = newCall(configuration, supported, this.#logger, policy, (id, ready) => {
       if (!call.ended) this.#store.update(shareReady(id, ready))
     })
     this.#call = call

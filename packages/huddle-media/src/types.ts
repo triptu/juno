@@ -160,7 +160,7 @@ export interface MediaSession {
   /**
    * Shows the share of `attendeeId` (a `RemoteShare`'s) in `element`, now or
    * once its video arrives, until the returned function is called. A share no
-   * element shows is paused, so it costs no bandwidth or decoding. One
+   * element shows is not received, so it costs no bandwidth or decoding. One
    * element per share; a second call replaces the first.
    */
   showShare(attendeeId: string, element: HTMLVideoElement): () => void

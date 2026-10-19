@@ -61,6 +61,15 @@ describe('screen shares', () => {
     expect(store.getSnapshot().remotes).toHaveLength(2)
   })
 
+  it('names a share\'s owner once their attendee arrives after it', () => {
+    const store = new SnapshotStore(INITIAL_SNAPSHOT)
+    store.update(startCall('self'))
+    store.update(presence('a#content', true, ''))
+    expect(store.getSnapshot().shares[0]?.userId).toBeUndefined()
+    store.update(presence('a', true, ALICE))
+    expect(store.getSnapshot().shares[0]?.userId).toBe('U0AAAAAAAAA')
+  })
+
   it('never lists the user\'s own share', () => {
     const store = storeWithTwo()
     store.update(presence('self#content', true, ''))

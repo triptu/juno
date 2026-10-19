@@ -58,17 +58,20 @@ export const presence =
     if (attendeeId.endsWith(CONTENT_SUFFIX)) {
       const owner = attendeeId.slice(0, -CONTENT_SUFFIX.length)
       if (owner === s.local.attendeeId) return s
-      const known = s.shares.find((share) => share.attendeeId === attendeeId)
-      if (present === (known !== undefined)) return s
       if (!present) return { ...s, shares: s.shares.filter((share) => share.attendeeId !== attendeeId) }
       const userId = slackUserIdOf(externalUserId) ?? s.remotes.find((r) => r.attendeeId === owner)?.userId
+      const known = s.shares.find((share) => share.attendeeId === attendeeId)
+      // A repeat may name the owner the first call could not.
+      if (known !== undefined) return known.userId !== undefined || userId === undefined ? s : { ...s, shares: s.shares.map((share) => (share === known ? { ...share, userId } : share)) }
       return { ...s, shares: [...s.shares, { attendeeId, userId, ready: false }] }
     }
     const known = s.remotes.some((r) => r.attendeeId === attendeeId)
     if (present === known) return s
     if (!present) return { ...s, remotes: s.remotes.filter((r) => r.attendeeId !== attendeeId), activeSpeaker: s.activeSpeaker === attendeeId ? undefined : s.activeSpeaker }
     const remote: RemoteAttendee = { attendeeId, externalUserId, userId: slackUserIdOf(externalUserId), muted: false, speaking: false }
-    return { ...s, remotes: [...s.remotes, remote] }
+    // Their share may have come first, without a user it could name.
+    const shares = s.shares.map((share) => (share.userId === undefined && share.attendeeId === `${attendeeId}${CONTENT_SUFFIX}` ? { ...share, userId: remote.userId } : share))
+    return { ...s, remotes: [...s.remotes, remote], shares }
   }
 
 /** A share's video has its first frame in a bound element, or no longer. Unknown ids are ignored. */
