@@ -1,3 +1,4 @@
+import { timed } from './profile'
 /**
  * Helpers the sync, reconnect and convergence tests share: a booted engine,
  * a warm restart on the same store and fake, call counting, read-only looks
@@ -22,9 +23,9 @@ export const DAY = 24 * 60 * MINUTE
 export async function bootedEngine(track: Array<RunningEngine>, options: EngineOptions = {}, liveMillis = 30_000): Promise<RunningEngine> {
   const engine = await startTestEngine({ initial: (fake) => fake.signIn(), ...options })
   track.push(engine)
-  await engine.status('ready')
-  await engine.phase('live', liveMillis)
-  await engine.syncIdle()
+  await timed('ready', () => engine.status('ready'))
+  await timed('live', () => engine.phase('live', liveMillis))
+  await timed('sync idle', () => engine.syncIdle())
   return engine
 }
 
@@ -38,7 +39,7 @@ export async function restart(track: Array<RunningEngine>, engine: RunningEngine
   const { fake, userData } = engine
   const credentials = fake.credentials()
   // Background work (the follow pass) must not answer after the stop and count against the next engine.
-  await engine.syncIdle()
+  await timed('sync idle', () => engine.syncIdle())
   engine.registry.dispose()
   await engine.handle.stop()
   track.splice(track.indexOf(engine), 1)
@@ -80,7 +81,7 @@ export const callMap = (engine: RunningEngine): Record<string, number> => {
 
 /** Waits for the work already triggered, without inferring idleness from elapsed time. */
 export async function quiet(engine: RunningEngine): Promise<void> {
-  await engine.syncIdle()
+  await timed('sync idle', () => engine.syncIdle())
   await engine.socketIdle()
   await engine.handle.commandIdle()
   if (engine.fake.heldCount() === 0 && engine.fake.gated().length === 0) {
