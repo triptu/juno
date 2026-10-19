@@ -1,75 +1,95 @@
-// Runs a build only when its inputs changed since the last successful build.
-//
-//   node ../../scripts/build-cached.mjs <output dir> <command> [args...]
-//
-// Run from an app directory. The inputs are every file git sees (tracked or
-// new, not ignored) in the app, in packages/ and the lockfile, plus the
-// environment variables that change the output. Their hash is written to
-// <output dir>/.inputs-hash after the build succeeds, with the size and
-// modification time of every output file, so a build by another command
-// (`pnpm dev` writes out/main) is noticed. When both match, the build is
-// skipped. JUNO_REBUILD=1 always builds.
-
+// Reuses only builds whose source, toolchain, environment and output bytes match.
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 
 const [outDir, ...command] = process.argv.slice(2)
-if (!outDir || command.length === 0) {
-  console.error('usage: node scripts/build-cached.mjs <output dir> <command> [args...]')
-  process.exit(2)
-}
-
+if (!outDir || command.length === 0) throw new Error('usage: build-cached.mjs <output dir> <command> [args...]')
 const app = process.cwd()
 const root = resolve(app, '../..')
-const files = spawnSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', relative(root, app), 'packages', 'pnpm-lock.yaml'], {
-  cwd: root,
-  encoding: 'utf8',
-  maxBuffer: 64 * 1024 * 1024,
+const output = join(app, outDir)
+const marker = '.inputs-hash'
+const ignored = new Set(['node_modules', '.git', 'out', 'dist', 'test-results', 'playwright-report', 'blob-report', 'coverage', 'shots', 'feel-report', '.scratch'])
+const walk = (dir, filter = () => true) => existsSync(dir) ? readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+  if (!filter(entry.name)) return []
+  const path = join(dir, entry.name)
+  return entry.isDirectory() ? walk(path, filter) : [path]
+}) : []
+const hashFiles = (base, files) => {
+  const hash = createHash('sha256')
+  for (const file of files.toSorted()) {
+    hash.update(JSON.stringify([relative(base, file), existsSync(file) ? createHash('sha256').update(readFileSync(file)).digest('hex') : null]))
+  }
+  return hash.digest('hex')
+}
+const rootFiles = readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isFile()).map((entry) => entry.name)
+const inputs = [relative(root, app), 'packages', 'scripts', ...rootFiles]
+const git = spawnSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', ...inputs], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+// Remote archives have no Git directory. Walk the same source roots, excluding generated files.
+const files = git.status === 0 && git.stdout.length > 0
+  ? [...new Set(git.stdout.split('\0').filter(Boolean))].map((file) => join(root, file))
+  : inputs.flatMap((name) => {
+    const path = join(root, name)
+    return rootFiles.includes(name) ? [path] : walk(path, (part) => !ignored.has(part))
+  })
+// Vite reads ignored .env files too; their contents affect local builds.
+const envFiles = [root, app].flatMap((dir) => readdirSync(dir).filter((name) => /^\.env(?:\.|$)/.test(name)).map((name) => join(dir, name)))
+const buildInputs = [...new Set([...files, ...envFiles])].filter((file) => {
+  const path = relative(app, file)
+  return !path.startsWith('e2e/') && !/^[^/]+\.spec\.ts$|^playwright(?:\.[^/]*)?\.config\.ts$/.test(path)
 })
-// A copy without git has no earlier build to reuse: build. Inside a remote
-// container (JUNO_REMOTE_CONTAINER=1) the sources cannot change during the run
-// and the output starts empty, so a build made earlier in the same run is reused:
-// a plan's steps build the desktop app once.
-if (files.status !== 0) {
-  const marker = join(app, outDir, '.built-in-container')
-  const container = process.env.JUNO_REMOTE_CONTAINER === '1' && process.env.JUNO_REBUILD !== '1'
-  if (container && existsSync(marker) && readFileSync(marker, 'utf8') === command.join(' ')) {
-    console.log(`build-cached: ${outDir}/ was built earlier in this run, skipping \`${command.join(' ')}\``)
+const environment = Object.entries(process.env).filter(([name]) => /^(VITE_|ELECTRON_VITE_)/.test(name) || ['JUNO_UNMINIFIED', 'JUNO_COVERAGE', 'NODE_ENV'].includes(name)).toSorted(([a], [b]) => a.localeCompare(b))
+const key = createHash('sha256').update(JSON.stringify({ version: 2, app: relative(root, app), outDir, command, node: process.version, platform: process.platform, arch: process.arch, environment, source: hashFiles(root, buildInputs) })).digest('hex')
+const fingerprint = (dir) => hashFiles(dir, walk(dir).filter((file) => relative(dir, file) !== marker))
+const valid = (dir) => {
+  try { return readFileSync(join(dir, marker), 'utf8') === `${key} ${fingerprint(dir)}` } catch { return false }
+}
+const cacheRoot = process.env.JUNO_BUILD_CACHE_DIR
+const cached = cacheRoot && join(cacheRoot, relative(root, app).replaceAll('/', '-'), key)
+const started = performance.now()
+if (process.env.JUNO_REBUILD !== '1') {
+  if (valid(output)) {
+    console.log(`build-cached: ${outDir}/ is up to date; skipped ${JSON.stringify(command)}`)
     process.exit(0)
   }
-  const built = spawnSync(command[0], command.slice(1), { stdio: 'inherit', shell: process.platform === 'win32' })
-  if (container && built.status === 0) writeFileSync(marker, command.join(' '))
-  process.exit(built.status ?? 1)
+  if (cached && valid(cached)) {
+    try {
+      rmSync(output, { recursive: true, force: true })
+      cpSync(cached, output, { recursive: true })
+      if (!valid(output)) throw new Error('output checksum mismatch')
+      utimesSync(cached, new Date(), new Date())
+      console.log(`build-cached: restored ${outDir}/ in ${((performance.now() - started) / 1000).toFixed(2)} s; skipped ${JSON.stringify(command)}`)
+      process.exit(0)
+    } catch (error) {
+      // Another job may have pruned this entry. A cache miss must still build cleanly.
+      console.log(`build-cached: restore missed (${error.message}); rebuilding`)
+      rmSync(output, { recursive: true, force: true })
+    }
+  }
 }
-
-const hash = createHash('sha256')
-hash.update(command.join(' '))
-for (const name of ['JUNO_UNMINIFIED', 'JUNO_COVERAGE', 'NODE_ENV']) hash.update(`\0${name}=${process.env[name] ?? ''}`)
-for (const file of files.stdout.split('\0').filter(Boolean).toSorted()) {
-  const path = join(root, file)
-  // A deleted file that git still tracks counts as absent.
-  hash.update(`\0${file}\0`).update(existsSync(path) ? readFileSync(path) : 'deleted')
-}
-const digest = hash.digest('hex')
-const stamp = join(app, outDir, '.inputs-hash')
-const outputs = () => {
-  const list = readdirSync(join(app, outDir), { recursive: true, withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name !== '.inputs-hash')
-    .map((entry) => {
-      const path = join(entry.parentPath, entry.name)
-      const { size, mtimeMs } = statSync(path)
-      return `${relative(app, path)} ${size} ${mtimeMs}`
-    })
-  return createHash('sha256').update(list.toSorted().join('\n')).digest('hex')
-}
-
-if (process.env.JUNO_REBUILD !== '1' && existsSync(stamp) && readFileSync(stamp, 'utf8') === `${digest} ${outputs()}`) {
-  console.log(`build-cached: ${outDir}/ is up to date, skipping \`${command.join(' ')}\` (JUNO_REBUILD=1 forces a build)`)
-  process.exit(0)
-}
-
+// A failed or partial build must never leave a passing stamp.
+rmSync(join(output, marker), { force: true })
 const result = spawnSync(command[0], command.slice(1), { stdio: 'inherit', shell: process.platform === 'win32' })
 if (result.status !== 0) process.exit(result.status ?? 1)
-writeFileSync(stamp, `${digest} ${outputs()}`)
+writeFileSync(join(output, marker), `${key} ${fingerprint(output)}`)
+console.log(`build-cached: built ${outDir}/ in ${((performance.now() - started) / 1000).toFixed(2)} s`)
+if (cached) {
+  const parent = resolve(cached, '..')
+  mkdirSync(parent, { recursive: true })
+  const temporary = mkdtempSync(join(parent, '.building-'))
+  try {
+    cpSync(output, temporary, { recursive: true })
+    // Entries are immutable. A concurrent writer of the same key can win.
+    if (!valid(cached)) rmSync(cached, { recursive: true, force: true })
+    try { renameSync(temporary, cached) } catch (error) {
+      if (!valid(cached)) throw error
+    }
+  } finally { rmSync(temporary, { recursive: true, force: true }) }
+  // Bound persistent storage to eight builds per app. Readers verify their private copy.
+  const old = readdirSync(parent).filter((name) => /^[a-f0-9]{64}$/.test(name)).flatMap((name) => {
+    const path = join(parent, name)
+    try { return [{ path, at: statSync(path).mtimeMs }] } catch { return [] }
+  }).sort((a, b) => b.at - a.at).slice(8)
+  for (const { path } of old) if (path !== cached) rmSync(path, { recursive: true, force: true })
+}
