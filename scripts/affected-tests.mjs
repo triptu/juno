@@ -52,3 +52,14 @@ export function nodeTestScripts(root, changed) {
       return { script, reached: tests.flatMap((test) => [...scriptImports(root, test)].filter((file) => changed.includes(file)).map((file) => ({ test, file }))) }
     })
 }
+
+/** File import closures plus package configs, shared by selection and its cache. */
+export function unitTestItems(root, files, changed, closure) {
+  return [...files]
+    .filter(unitTestMatcher(root))
+    .map((file) => {
+      const dir = file.split('/').slice(0, 2).join('/')
+      const config = [`${dir}/package.json`, `${dir}/vitest.config.ts`, `${dir}/tsconfig.json`]
+      return { suite: 'test', id: file, inputs: new Set([...closure(file), ...config]), own: changed.some((path) => config.includes(path)) }
+    })
+}

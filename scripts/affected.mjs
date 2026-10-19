@@ -36,7 +36,7 @@ import { ImportGraph } from './import-graph.mjs'
 import { driverSpecs, galleryComponents, mapProblem, MAX_COVERAGE_SPECS, rankSpecs, reachSpecs, selectSpecs } from './affected-select.mjs'
 import { HEAVY_AREAS, heavyAreasChanged, inPaths, perfInteractionsChanged, PROTOCOL_PATHS } from './test-areas.mjs'
 import { runPlan } from './affected-run.mjs'
-import { nodeTestScripts, unitTestMatcher } from './affected-tests.mjs'
+import { nodeTestScripts, unitTestItems } from './affected-tests.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
@@ -126,13 +126,7 @@ const pending = (items) =>
   })
 
 // Unit tests: the vitest files of every package and app (scripts/affected-tests.mjs).
-const unitItems = [...files]
-  .filter(unitTestMatcher(root))
-  .map((file) => {
-    const dir = file.split('/').slice(0, 2).join('/')
-    const config = [`${dir}/package.json`, `${dir}/vitest.config.ts`, `${dir}/tsconfig.json`]
-    return { suite: 'test', id: file, inputs: new Set([...closure(file), ...config]), own: changed.some((path) => config.includes(path)) }
-  })
+const unitItems = unitTestItems(root, files, changed, closure)
 const unit = pending(unitItems)
 // Keep package identity all the way to Vitest. Relative filters used to run
 // namesakes in unrelated packages and start every package's test process.
