@@ -15,6 +15,7 @@ import { browserLinksForTests, contextMenuForTests, folderForTests, registerIpc,
 import { CUSTOM_ITEM, macKeychain, memoryKeychain, OPENROUTER_ITEM } from './keychain'
 import { ProviderStore } from './providers'
 import { launchWriter, readLaunch, withSession, type Launch } from './launch'
+import { registerMediaPermissions } from './media'
 import { registerAppScheme, serveAppScheme } from './scheme'
 import { SecretsStore } from './secrets'
 import { SessionHost } from './session'
@@ -237,6 +238,7 @@ app.whenReady().then(() => {
   // packaged app does not have, so the start-up scenarios would measure something that never ships.
   if (process.platform === 'darwin' && !app.isPackaged && !e2e) app.dock?.setIcon(join(__dirname, '../../build/icon.png'))
   serveAppScheme(join(__dirname, '../renderer'), fakeSlackUrl === undefined ? undefined : new URL(fakeSlackUrl).origin)
+  registerMediaPermissions()
   powerMonitor.on('resume', () => notifier.wake())
   powerMonitor.on('lock-screen', () => {
     screenLocked = true

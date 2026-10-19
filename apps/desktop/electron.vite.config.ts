@@ -10,9 +10,16 @@ import stylex from '@stylexjs/unplugin'
 /**
  * Injects the renderer's Content Security Policy (architecture section 14).
  * Production allows only bundled code and styles; images may come from the
- * juno: scheme, Slack's CDN and Gravatar. Dev additionally allows the inline
- * React Refresh preamble, Vite's injected styles and the HMR websocket.
+ * juno: scheme, Slack's CDN and Gravatar. A huddle's media session talks to
+ * Chime (`*.chime.aws`: the nearest region, signalling and its event
+ * ingest), and Chime's Voice Focus loads its scripts, workers and wasm from
+ * `*.sdkassets.chime.aws` (packages/huddle-media/README.md). Dev
+ * additionally allows the inline React Refresh preamble, Vite's injected
+ * styles and the HMR websocket.
  */
+const CHIME = 'https://*.chime.aws wss://*.chime.aws'
+const VOICE_FOCUS = 'https://*.sdkassets.chime.aws'
+
 function contentSecurityPolicy(): Plugin {
   return {
     name: 'juno:csp',
@@ -20,11 +27,12 @@ function contentSecurityPolicy(): Plugin {
       const dev = Boolean(context.server)
       const policy = [
         "default-src 'self'",
-        dev ? "script-src 'self' 'unsafe-inline'" : "script-src 'self'",
+        `script-src 'self'${dev ? " 'unsafe-inline'" : ''} 'wasm-unsafe-eval' blob: ${VOICE_FOCUS}`,
+        `worker-src 'self' blob: ${VOICE_FOCUS}`,
         dev ? "style-src 'self' 'unsafe-inline'" : "style-src 'self'",
         "font-src 'self'",
         "img-src 'self' juno: https://*.slack-edge.com https://secure.gravatar.com data:",
-        dev ? "connect-src 'self' ws://localhost:*" : "connect-src 'self'",
+        `connect-src 'self'${dev ? ' ws://localhost:*' : ''} ${CHIME}`,
       ].join('; ')
       return [
         {
