@@ -1,5 +1,3 @@
-// Works out which tests a change can affect, and runs only those.
-//
 //   pnpm affected                 local Bun check, then the affected suites in one remote plan
 //   pnpm affected --plan          print the plan only
 //   pnpm affected --local         run the plan through the local root scripts
@@ -281,7 +279,9 @@ function desktopSelection() {
     if (wide) return { all: `${everythingChanged[0]} changed` }
     // What every spec compiles with changed: no spec can be told apart, so a sample stands in.
     const reason = `${everythingChanged[0]} changed`
-    return { specs: new Map(specItems.map((item) => [item.id, [reason]])), scores: new Map(), required: new Set(), notes: [`${reason}: no spec can be told apart, so the smallest specs stand in for all of them`] }
+    const ownChanges = changed.filter((file) => file.startsWith('apps/desktop/e2e/') && !support.has(file))
+    const required = new Set(specItems.filter((item) => ownChanges.some((file) => closure(item.id).has(file))).map((item) => item.id))
+    return { specs: new Map(specItems.map((item) => [item.id, [reason]])), scores: new Map(), required, notes: [`${reason}: changed specs and their helpers stay required; the smallest specs sample the rest`] }
   }
   if (flag('--graph')) return { all: 'asked for by --graph; the import graph decides' }
   const map = existsSync(join(root, MAP_PATH)) ? JSON.parse(readFileSync(join(root, MAP_PATH), 'utf8')) : undefined

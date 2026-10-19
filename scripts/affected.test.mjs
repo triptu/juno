@@ -98,3 +98,11 @@ test('tool changes keep the desktop smoke spec through the final input filter', 
   assert.deepEqual(steps.find((step) => step.script === 'test:desktop')?.items, ['apps/desktop/e2e/app.spec.ts'])
   assert.ok(!plan('--batch', '--files', 'scripts/remote/plan.mjs').steps.some((step) => step.script === 'test:desktop'))
 })
+
+test('a root config change keeps changed desktop specs and their private helpers mandatory', () => {
+  const steps = plan('--max-specs', '0', '--files', 'package.json,apps/desktop/e2e/mentions.spec.ts,apps/desktop/e2e/idleJourney.ts').steps
+  const desktop = steps.find((step) => step.script === 'test:desktop')?.items ?? []
+  assert.ok(desktop.includes('apps/desktop/e2e/mentions.spec.ts'))
+  assert.ok(desktop.includes('apps/desktop/e2e/idle-cpu.spec.ts'))
+  assert.ok(!desktop.some((file) => file.endsWith('.perf.spec.ts')))
+})
