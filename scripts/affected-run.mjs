@@ -1,19 +1,17 @@
 // Runs a pnpm affected plan (scripts/affected.mjs). The remote steps run as one
-// plan (separate SSH jobs or one Namespace machine), beside the local steps;
+// plan (separate SSH jobs), beside the local steps;
 // `local` runs every step one after another here. Each step's result comes
 // back separately, so the caller records the steps that passed.
 
 import { spawn } from 'node:child_process'
 import { join } from 'node:path'
 import { forwardSignals } from './remote/children.mjs'
-import { outageExit } from './remote/pool-decisions.mjs'
 
 /**
  * Returns `{ step, code }` for each step that ran. A failing local typecheck
- * stops the run before it pays for remote machines. Without `localOnOutage` a
- * remote run waits out an outage, since this Mac is the owner's computer.
+ * stops the run before starting remote jobs. --local uses the heavy queue.
  */
-export async function runPlan(plan, { root, local: localAll, localOnOutage }) {
+export async function runPlan(plan, { root, local: localAll }) {
   const children = new Set()
   forwardSignals(children)
   const spawnStep = (command, env, onLine) =>
@@ -36,8 +34,7 @@ export async function runPlan(plan, { root, local: localAll, localOnOutage }) {
   const runRemote = async (steps) => {
     const words = steps.flatMap((step, index) => [...(index ? ['+'] : []), ...Object.entries(step.env ?? {}).map(([key, value]) => `${key}=${value}`), step.script, ...step.args])
     const codes = new Map()
-    const env = localOnOutage && !process.env.JUNO_REMOTE_OUTAGE_WAIT ? { JUNO_REMOTE_OUTAGE_WAIT: '10m' } : {}
-    const code = await spawnStep(['node', [join(root, 'scripts/remote.mjs'), 'test:plan', ...words]], env, (line) => {
+    const code = await spawnStep(['node', [join(root, 'scripts/remote.mjs'), 'test:plan', ...words]], {}, (line) => {
       const result = /^plan: step (\d+) \S+ exited with (\d+)/.exec(line)
       if (result) codes.set(Number(result[1]), Number(result[2]))
       process.stdout.write(`${line}\n`)
@@ -62,12 +59,6 @@ export async function runPlan(plan, { root, local: localAll, localOnOutage }) {
   })()
   const [localResults, remoteResults] = await Promise.all([local, remote.length ? runRemote(remote) : []])
   results.push(...localResults)
-  if (remoteResults.some(({ code }) => code === outageExit) && localOnOutage) {
-    console.log('affected: Namespace is unreachable; running the remote steps on this Mac')
-    for (const { step } of remoteResults) results.push(await run(step))
-  } else {
-    if (remoteResults.some(({ code }) => code === outageExit)) console.log('affected: Namespace is unreachable; pnpm affected --local runs these steps on this Mac')
-    results.push(...remoteResults)
-  }
+  results.push(...remoteResults)
   return results
 }

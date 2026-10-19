@@ -47,7 +47,6 @@
     "agent:eval": "pnpm --filter @juno/agent exec node --import ../../scripts/ts-resolve-hooks.mjs eval/run.ts",
     "remote": "node scripts/remote.mjs",
     "runner:check": "node scripts/remote/runner.mjs",
-    "runner:prune": "node scripts/remote/runner.mjs --prune",
     "remote:usage": "node scripts/remote/usage.mjs",
     "affected": "node scripts/affected.mjs",
     "verify:main": "node scripts/verify-main.mjs",
@@ -59,11 +58,11 @@
     "test:agent": "node scripts/heavy.mjs pnpm --filter @juno/agent test",
     "test:notifications": "node scripts/heavy.mjs pnpm --filter @juno/engine test",
     "flake": "node scripts/flake.mjs",
-    "test:remote-pool": "node --test scripts/remote/pool-decisions.test.mjs scripts/remote/usage.test.mjs scripts/remote/runner.test.mjs scripts/remote/workspace.test.mjs scripts/remote/runner-health.test.mjs scripts/remote/runner-pinning.test.mjs scripts/remote/namespace.test.mjs scripts/remote/pool.test.mjs scripts/remote/outage.test.mjs scripts/plan.test.mjs",
     "test:package": "env JUNO_E2E_AI_JOBS=1 node scripts/heavy.mjs --exclusive pnpm --filter @juno/desktop test:package",
     "health:baseline": "node scripts/health.mjs --update-baseline",
     "test:health": "node --test scripts/health.test.mjs",
-    "test:repo-tools": "node scripts/heavy.mjs node --test scripts/build-cached.test.mjs scripts/batch-merge.test.mjs scripts/check-migration-order.test.mjs scripts/affected-select.test.mjs scripts/heavy.test.mjs scripts/release-gate.test.mjs scripts/release-main.test.mjs scripts/release-schedule.test.mjs scripts/test-results-reporter.test.mjs scripts/check-tokens.test.mjs scripts/affected.test.mjs"
+    "test:repo-tools": "node scripts/heavy.mjs node --test scripts/build-cached.test.mjs scripts/batch-merge.test.mjs scripts/check-migration-order.test.mjs scripts/affected-select.test.mjs scripts/heavy.test.mjs scripts/release-gate.test.mjs scripts/release-main.test.mjs scripts/release-schedule.test.mjs scripts/test-results-reporter.test.mjs scripts/check-tokens.test.mjs scripts/affected.test.mjs",
+    "test:runner": "node --test scripts/remote/usage.test.mjs scripts/remote/runner.test.mjs scripts/remote/workspace.test.mjs scripts/remote/runner-health.test.mjs scripts/plan.test.mjs"
   },
   "devDependencies": {
     "@informalsystems/quint": "0.33.0",

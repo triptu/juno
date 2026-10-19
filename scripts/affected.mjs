@@ -1,8 +1,6 @@
 //   pnpm affected                 local Bun check, then the affected suites in one remote plan
 //   pnpm affected --plan          print the plan only
 //   pnpm affected --local         run the plan through the local root scripts
-//   pnpm affected --local-on-outage   run the remote steps here if Namespace stays
-//                                 unreachable for JUNO_REMOTE_OUTAGE_WAIT (default 10m here)
 //   pnpm affected --base <ref>    compare with another ref (default: the merge base with main)
 //   pnpm affected --plan --files packages/ui/src/Chip.tsx   plan for those files
 //   pnpm affected --graph         pick desktop specs by the import graph, not the coverage map
@@ -391,7 +389,7 @@ for (const entry of interactions)
   console.log(`  (${entry.interaction} has a perf budget and ${entry.files.length === 1 ? entry.files[0] : `${entry.files.length} of its files`} changed: on the Mac, pnpm perf -g "${entry.perf}"${entry.feel ? ` and pnpm test:feel ${entry.feel}` : ''})`)
 if (flag('--plan') || plan.length === 0) process.exit(0)
 
-const results = await runPlan(plan, { root, local: flag('--local'), localOnOutage: flag('--local-on-outage') })
+const results = await runPlan(plan, { root, local: flag('--local') })
 mkdirSync(resultsDir, { recursive: true })
 for (const { step, code } of results) if (code === 0) for (const item of step.items) writeFileSync(join(resultsDir, item.key), `${item.suite} ${item.id}\n`)
 console.log('affected: results')

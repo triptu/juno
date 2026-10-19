@@ -14,7 +14,7 @@ export async function runShards({ total, rest, self, root, desktop, dryRun }) {
   const codes = await Promise.all(Array.from({ length: total }, (_, index) => new Promise((resolve) => {
     const args = [self, '--env', `JUNO_SHARD=${index}/${total}`, ...rest]
     if (desktop) args.push(`--shard=${index + 1}/${total}`, '--reporter=line,blob')
-    const child = spawn(process.execPath, args, { cwd: root, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn(process.execPath, args, { cwd: root, env: { ...process.env, JUNO_RUNNER_PARENT: '1' }, stdio: ['pipe', 'pipe', 'pipe'] })
     children.add(child)
     let report
     for (const stream of [child.stdout, child.stderr]) createInterface({ input: stream }).on('line', (line) => {

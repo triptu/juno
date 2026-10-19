@@ -11,7 +11,7 @@ RUN apt-get update \
   && curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" | tar -xJ -C /usr/local --strip-components=1 \
   && npm install -g --silent "pnpm@${PNPM_VERSION}"
 
-# SSH runs as its host uid; Namespace uses pwuser. Both can unpack into /work.
+# tstack runs jobs as the SSH uid; the image builds its toolchain as pwuser.
 RUN mkdir -p /work && chmod 1777 /work && chmod 755 /home/pwuser
 USER pwuser
 WORKDIR /work

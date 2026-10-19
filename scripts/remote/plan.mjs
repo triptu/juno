@@ -1,4 +1,4 @@
-// One SSH plan owns independent jobs. Namespace keeps one machine per plan.
+// One SSH plan owns independent jobs through the shared tstack allocator.
 import { spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import { appSuites, parsePlan } from '../plan.mjs'
@@ -29,15 +29,14 @@ export async function runRunnerPlan(jobs, { self, root, options, log }) {
   log(`remote: SSH plan in ${jobs.length} jobs: ${jobs.map((job) => job.kind).join(', ')}; each waits for runner capacity`)
   const codes = await Promise.all(jobs.map(({ kind, steps }) => new Promise((done) => {
     const flags = [
-      ...(options.explicitMachine ? ['--machine', options.machine] : []),
+      ...(options.cores !== undefined ? ['--cores', String(options.cores)] : []),
+      '--wait', String(options.wait ?? 60),
       ...options.env.flatMap((pair) => ['--env', pair]),
       '--env', 'JUNO_RUNNER_PLAN=single', '--env', 'JUNO_PLAN_SERIAL=1',
     ]
-    // Once jobs start, do not scatter the remainder onto paid machines.
-    // Each container uses the existing host admission, cleanup and reports.
     const child = spawn(process.execPath, [self, ...flags, 'test:plan', ...planWords(steps)], {
-      cwd: root, stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, JUNO_RUNNER_PLAN: 'single', JUNO_REMOTE_MAX_VCPU: '0' },
+      cwd: root, stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, JUNO_RUNNER_PLAN: 'single', JUNO_RUNNER_PARENT: '1' },
     })
     children.add(child)
     const results = new Map()

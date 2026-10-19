@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { unitTestMatcher } from './affected-tests.mjs'
 import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -14,7 +14,7 @@ const plan = (...args) => {
   return JSON.parse(result.stdout)
 }
 const unitFiles = (result) => result.steps.find((step) => step.script === 'test')?.items ?? []
-const tracked = (...patterns) => spawnSync('git', ['ls-files', ...patterns], { cwd: root, encoding: 'utf8' }).stdout.split('\n').filter(Boolean)
+const tracked = (...patterns) => spawnSync('git', ['ls-files', ...patterns], { cwd: root, encoding: 'utf8' }).stdout.split('\n').filter((file) => file && existsSync(join(root, file)))
 
 test('a change to desktop code outside the renderer reaches the desktop unit tests that import it, in the batch gate too', () => {
   // main-rejection-nonfatal (b1c55d3c): the batch gate ran no tests for these.
@@ -31,8 +31,8 @@ test('every vitest file in apps and packages runs when it changes', () => {
 test('a script change runs the root Node test scripts whose tests import it, and every script test is in one', () => {
   const steps = (file) => plan('--batch', '--files', file).steps.map((step) => step.script)
   assert.ok(steps('scripts/check-tokens.mjs').includes('test:repo-tools'))
-  assert.ok(steps('scripts/remote/usage.mjs').includes('test:remote-pool'))
-  assert.ok(!steps('scripts/check-tokens.mjs').includes('test:remote-pool'))
+  assert.ok(steps('scripts/remote/usage.mjs').includes('test:runner'))
+  assert.ok(!steps('scripts/check-tokens.mjs').includes('test:runner'))
   const scripts = Object.values(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts).filter((command) => /\bnode --test\b/.test(command)).join(' ')
   for (const file of tracked('scripts/**/*.test.mjs', 'scripts/*.test.mjs')) assert.ok(scripts.includes(file), `${file} is in no root node --test script`)
 })

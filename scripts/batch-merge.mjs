@@ -148,7 +148,7 @@ function cleanup() {
 
 function main() {
   if (argv.includes('--help')) {
-    console.log('node scripts/batch-merge.mjs [--dry-run | --push] [--local] branch...\nnode scripts/batch-merge.mjs --continue batch-N [--push] [--local]\nChecks are typecheck, lint, and the unit tests the batch reaches (with specs:check and conformance when the code the specs model changed), on a Namespace machine or with --local on this Mac. Dry run merges and regenerates locally, runs no checks and cannot push.')
+    console.log('node scripts/batch-merge.mjs [--dry-run | --push] [--local] branch...\nnode scripts/batch-merge.mjs --continue batch-N [--push] [--local]\nChecks are typecheck, lint, and the unit tests the batch reaches (with specs:check and conformance when the code the specs model changed), on the SSH runner or with --local on this Mac. Dry run merges and regenerates locally, runs no checks and cannot push.')
     return
   }
   if (push && dryRun) throw new Error('--dry-run cannot be combined with --push')
@@ -193,7 +193,7 @@ function main() {
     if (!state.dryRun) {
       run('pnpm', ['typecheck'])
       run('pnpm', ['lint'])
-      // --local runs them on this Mac through the machine lock, for when Namespace is down.
+      // --local runs them on this Mac through the machine lock, for when the runner is unavailable.
       run('pnpm', ['affected', '--batch', '--base', state.base, ...(argv.includes('--local') ? ['--local'] : [])])
     }
     clean()

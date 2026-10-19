@@ -2,9 +2,16 @@
 # Runs inside the remote container (scripts/remote/Dockerfile) after the
 # worktree has been unpacked over /work: links the workspace from the
 # installed store, runs `pnpm <script> [args...]` under a virtual display, and
-# packs the reports into /out for scripts/remote.mjs to fetch.
+# packs the reports into .remote for scripts/remote.mjs to fetch.
 set -uo pipefail
 cd /work
+export JUNO_RUNNER_JOB_CORES=${RUNNER_THREADS:?tstack did not provide allocated threads}
+echo "remote: allocated threads=$JUNO_RUNNER_JOB_CORES"
+export JUNO_REMOTE_INSTALL=1 JUNO_BUILD_CACHE_DIR=/cache/builds
+export PNPM_CONFIG_CACHE_DIR=/cache/pnpm-store/metadata electron_config_cache=/cache/electron
+export TMP=/tmp TEMP=/tmp XDG_RUNTIME_DIR=/tmp/juno-runtime
+mkdir -p "$XDG_RUNTIME_DIR" /cache/builds /cache/electron .remote
+chmod 700 "$XDG_RUNTIME_DIR"
 source scripts/remote/install.sh
 # Electron's first start on the container's layered filesystem copies the
 # binary up; parallel test workers starting it then fail with ETXTBSY.
@@ -67,5 +74,5 @@ done
 # The spec cache pnpm remote brought along, with what this run added to it.
 [ -n "${SPECS_CACHE_DIR:-}" ] && [ -d "$SPECS_CACHE_DIR" ] && reports+=("${SPECS_CACHE_DIR#/work/}")
 [ -n "${JUNO_TYPECHECK_CACHE_DIR:-}" ] && [ -d "$JUNO_TYPECHECK_CACHE_DIR" ] && reports+=("${JUNO_TYPECHECK_CACHE_DIR#/work/}")
-[ ${#reports[@]} -gt 0 ] && tar -czf /out/reports.tgz "${reports[@]}"
+[ ${#reports[@]} -gt 0 ] && tar -czf .remote/reports.tgz "${reports[@]}"
 exit $code

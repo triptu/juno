@@ -2,42 +2,37 @@ import { spawn, spawnSync } from 'node:child_process'
 import { readFileSync, rmSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import { imageContext, imageTag } from './image.mjs'
 import { parsePlan } from '../plan.mjs'
 
 export const quote = (value) => `'${String(value).replaceAll("'", "'\\''")}'`
+export const localHint = '--local runs the steps on this Mac through the heavy lock'
 
-/** SSH admission and CPU limits follow the workload; explicit sizes still win. */
-export function runnerJobSize({ script, args, machine, explicitMachine, specsCached = false }, capacity, pinned = false) {
+/** Juno sizes work in physical cores; quota hosts use the same counts as CPUs. */
+export function runnerJobSize({ script, args, cores, specsCached = false }, capacity) {
   const steps = script === 'test:plan' ? parsePlan(args) : [{ script, args, env: {} }]
-  const scripts = steps.map((step) => step.script)
-  const unitOnly = scripts.every((name) => name === 'test' || name.startsWith('test:agent') || name === 'specs:check')
-  // More than 20 named files is a broad affected run, rather than a small slice.
+  const unitOnly = steps.every((step) => step.script === 'test' || step.script.startsWith('test:agent') || step.script === 'specs:check')
   const wide = steps.some((step) => {
     if (step.script === 'specs:check') return !specsCached || step.env.SPECS_CACHE === 'off' || step.env.SPECS_RUN_CACHE === 'off' || step.args.includes('--no-cache')
     if (step.script !== 'test') return false
     const files = step.args.filter((arg) => !arg.startsWith('-') && /\.[cm]?[jt]sx?$/.test(arg))
     return files.length === 0 || files.length > 20
   })
-  const wideUnit = unitOnly && wide
-  if (explicitMachine) {
-    const cores = Number(/:(\d+)x/.exec(machine)?.[1])
-    return { reserved: pinned ? Math.ceil(cores / 2) : cores, cpus: pinned ? Math.ceil(cores / 2) * 2 : cores, wideUnit }
-  }
-  const requested = scripts.some((name) => name === 'test:desktop' || name === 'test:e2e') ? 4
-    : scripts.includes('test:gallery') ? 3 : unitOnly ? wide ? 4 : 1 : 8
-  const reserved = Math.min(pinned ? Math.ceil(requested / 2) : requested, capacity)
-  return { reserved, cpus: pinned ? reserved * 2 : unitOnly && !wide ? 2 : reserved, wideUnit }
+  const requested = steps.some((step) => !['test:desktop', 'test:e2e', 'test:gallery', 'test', 'specs:check'].includes(step.script) && !step.script.startsWith('test:agent')) ? 4
+    : unitOnly ? wide ? 2 : 1 : 2
+  const reserved = cores ?? Math.min(requested, capacity)
+  if (!Number.isSafeInteger(reserved) || reserved < 1 || reserved > capacity) throw new Error(`job needs ${reserved} cores; runner lends ${capacity}`)
+  return { reserved, wideUnit: unitOnly && wide }
 }
 
-/** Budgets include RAM-backed workspace, temporary databases and file cache. */
-export function runnerContainerLimits(size, pinned, install) {
-  if (!pinned) return `--cpus ${size.cpus} -e JUNO_RUNNER_JOB_CORES=${size.cpus} -e JUNO_RUNNER_WIDE_UNIT=${size.wideUnit ? 1 : 0}`
-  const memory = size.reserved * 3
-  const temporary = size.reserved >= 4 ? 4 : 2
-  return `-e JUNO_RUNNER_PINNED=1 --cpuset-cpus "$JUNO_RUNNER_CPUSET" --cpus "$JUNO_RUNNER_THREADS" -e JUNO_RUNNER_JOB_CORES="$JUNO_RUNNER_THREADS" -e JUNO_RUNNER_WIDE_UNIT=${size.wideUnit ? 1 : 0} --memory ${memory}g --memory-swap ${memory}g --tmpfs /tmp:rw,exec,nosuid,size=${temporary}g,mode=1777 -e TMPDIR=/tmp -e TMP=/tmp -e TEMP=/tmp${install ? ` --tmpfs /work:rw,exec,nosuid,size=${temporary}g,mode=1777` : ''}`
+export function hostCommand(sub, args = [], env = process.env) {
+  const home = env.TSTACK_HOME || join(homedir(), 'Documents/code/tstack')
+  let script
+  try { script = readFileSync(join(home, 'scripts/runner/host.sh'), 'utf8') } catch {
+    throw new Error(`Cannot read tstack's scripts/runner/host.sh in ${home}. Install tstack with /tstack:setup, or set TSTACK_HOME.`)
+  }
+  return `sh -c ${quote(script)} host.sh ${[sub, ...args].map(quote).join(' ')}`
 }
 
 export function runnerConfig(env = process.env) {
@@ -49,10 +44,9 @@ export function runnerConfig(env = process.env) {
   }
   if (!file || typeof file !== 'object' || Array.isArray(file)) throw new Error(`${path} must contain an object`)
   const host = env.JUNO_RUNNER_HOST ?? file.host
-  if (!host) return undefined
+  if (!host) throw new Error(`Configure ~/.config/juno/runner.json or JUNO_RUNNER_HOST; see docs/self-hosted-runner.md. ${localHint}.`)
   if (typeof host !== 'string' || !/^[a-zA-Z0-9_.@:-]+$/.test(host) || host.startsWith('-')) throw new Error('JUNO_RUNNER_HOST must be an SSH host or user@host')
   const args = ['-T', '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes', '-o', 'ConnectTimeout=5', '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=3']
-  // Some mDNS names advertise an unreachable IPv6 address. Probe IPv4 first.
   if (/\.local\.?$/i.test(host)) args.unshift('-4')
   const key = env.JUNO_RUNNER_KEY ?? file.key
   if (key) {
@@ -68,88 +62,58 @@ export function runnerConfig(env = process.env) {
   return { host, args: [...args, host], image: env.JUNO_RUNNER_IMAGE || `juno-toolchain:${imageTag()}`, build: !env.JUNO_RUNNER_IMAGE }
 }
 
-// Health checks fall back only when the transport cannot reach the host.
-// Authentication and host configuration faults fail the run.
 export function checkRunner(config) {
-  const command = `echo __juno_runner_connected; bash -ec ${quote(`${readFileSync(new URL('./runner-capacity.sh', import.meta.url), 'utf8')}
- test "$(uname -sm)" = 'Linux x86_64'; command -v flock >/dev/null; command -v timeout >/dev/null; docker info >/dev/null; runner_capacity "$HOME/.config/juno-runner/cores" || { echo 'runner: invalid cores config or topology' >&2; exit 70; }; printf 'juno-runner-ready %s %s\\n' "$capacity" "$pinned"`)}`
+  const command = `echo __juno_runner_connected; ${hostCommand('check', [config.image])}`
   const candidates = config.args[0] === '-4' ? [config.args, config.args.slice(1)] : [config.args]
   let reason
   for (const args of candidates) {
-    const result = spawnSync('ssh', [...args, command], { encoding: 'utf8', timeout: 15_000 })
+    const result = spawnSync('ssh', [...args, command], { encoding: 'utf8', timeout: 60_000 })
     if (result.status === 255 && /Permission denied|Host key verification failed|REMOTE HOST IDENTIFICATION HAS CHANGED|bad permissions|Load key|no such identity|no matching (host key|key exchange)/i.test(result.stderr ?? '')) throw new Error(`runner SSH configuration failed: ${result.stderr.trim()}`)
     if ((result.status === 255 || result.error?.code === 'ETIMEDOUT') && !result.stdout?.includes('__juno_runner_connected')) {
       reason = result.stderr?.trim() || result.error?.message
       continue
     }
-    if (result.error || result.status !== 0) throw new Error(`runner health check failed: ${result.error?.message ?? result.stderr.trim()}`)
-    const ready = /^juno-runner-ready (\d+)(?: ([01]))?$/m.exec(result.stdout)
-    const cores = Number(ready?.[1])
-    if (!Number.isSafeInteger(cores) || cores < 1) throw new Error('runner returned no valid core capacity')
-    // Reuse the successful address family for image checks, jobs and reports.
+    const facts = Object.fromEntries((result.stdout ?? '').split('\n').filter((line) => line.includes('=')).map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]))
+    if (result.error || result.status !== 0 || !facts.os?.startsWith('Linux ') || facts.arch !== 'x86_64' || !facts.docker || facts.docker.startsWith('error')) throw new Error(`runner health check failed: ${result.error?.message ?? (result.stderr.trim() || facts.docker || 'requires Linux x86_64 and Docker')}`)
+    if (!config.build && facts.image?.startsWith('missing')) throw new Error(`runner override image unavailable: ${config.image}`)
+    const ready = /^(\d+) (pinned|quota)\b/.exec(facts.capacity ?? '')
+    if (!ready || Number(ready[1]) < 1) throw new Error(`runner health check failed: ${facts.capacity || 'no valid core capacity'}`)
     config.args = args
-    return { reachable: true, cores, ...(ready[2] === '1' ? { pinned: true } : {}) }
+    return { reachable: true, cores: Number(ready[1]), pinned: ready[2] === 'pinned' }
   }
   return { reachable: false, reason }
 }
 
-export function runnerCommand(cores, runId, command, env = process.env) {
-  const script = readFileSync(new URL('./runner-capacity.sh', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('./runner-host.sh', import.meta.url), 'utf8')
-  return `bash -c ${quote(script)} -- ${cores} ${quote(runId)} ${quote(command)} ${Number(env.JUNO_REMOTE_MAX_VCPU ?? 48) === 0 ? -1 : 60}`
-}
-
-export function runnerCache() {
-  return `cache="$HOME/.cache/juno-runner"; electron_cache="$HOME/.cache/electron"; mkdir -p "$cache/pnpm-store" "$cache/builds" "$cache/runtime" "$HOME/.cache/electron" || exit 70; for path in "$cache/pnpm-store" "$cache/builds" "$cache/runtime" "$HOME/.cache/electron"; do [ "$(stat -c %u "$path")" = "$(id -u)" ] || { echo "runner: cache must belong to the SSH user: $path" >&2; exit 70; }; done; chmod 700 "$cache/runtime" || exit 70`
-}
-
-// The host lock covers both the presence check and build, across every client.
-const imageLock = 'mkdir -p "$HOME/.cache/juno-runner"; exec 9>"$HOME/.cache/juno-runner/image-build.lock"; flock -x 9'
+/** The shared host owns the image lock too. Its build command accepts a tar context. */
 export async function ensureRunnerImage(config, log = console.error) {
   if (!config.build) return config.image
-  const present = spawnSync('ssh', [...config.args, `docker image inspect ${quote(config.image)} >/dev/null 2>&1`], { encoding: 'utf8', timeout: 15_000 })
-  if (present.error || present.status === 255) throw new Error(`runner image check failed: ${present.error?.message ?? present.stderr.trim()}`)
-  if (present.status === 0) return config.image
   const context = imageContext()
-  const started = Date.now()
-  log(`remote: building ${config.image} on SSH runner (or waiting for another build)`)
   try {
-    const tar = spawn('tar', ['-czf', '-', '--no-xattrs', '-C', context, '.'], { env: { ...process.env, COPYFILE_DISABLE: '1' }, stdio: ['ignore', 'pipe', 'pipe'] })
-    const ssh = spawn('ssh', [...config.args, `set -eu; ${imageLock}; if docker image inspect ${quote(config.image)} >/dev/null 2>&1; then cat >/dev/null; else docker build --target toolchain --progress=plain --platform linux/amd64 -t ${quote(config.image)} -; fi`], { stdio: ['pipe', 'pipe', 'pipe'] })
-    let errors = ''
-    const done = (child) => new Promise((resolvePromise, reject) => { child.on('error', reject); child.on('close', resolvePromise) })
-    const tarDone = done(tar), sshDone = done(ssh)
-    ssh.stdin.on('error', () => {})
-    tar.stdout.pipe(ssh.stdin)
-    tar.stderr.on('data', (chunk) => { errors = (errors + chunk).slice(-8000) })
-    for (const stream of [ssh.stdout, ssh.stderr]) createInterface({ input: stream }).on('line', (line) => {
-      errors = (errors + line + '\n').slice(-8000)
-      if (/^#\d+ (\[|DONE|CACHED|ERROR|exporting to image)/.test(line)) log(`remote: build ${line}`)
-    })
-    // SSH can reject the context early; stop tar rather than leave a blocked writer.
-    ssh.once('close', () => tar.kill())
-    const [tarCode, sshCode] = await Promise.all([tarDone, sshDone])
-    if (tarCode !== 0 || sshCode !== 0) throw new Error(`runner image build failed: ${errors.trim()}`)
-    log(`remote: runner image built in ${((Date.now() - started) / 1000).toFixed(1)} s`)
+    const tar = spawnSync('tar', ['-czf', '-', '--no-xattrs', '-C', context, '.'], { env: { ...process.env, COPYFILE_DISABLE: '1' } })
+    if (tar.status !== 0) throw new Error('could not pack the toolchain build context')
+    log(`remote: checking or building ${config.image} through tstack`)
+    const child = spawn('ssh', [...config.args, hostCommand('build', [config.image])], { stdio: ['pipe', 'pipe', 'pipe'] })
+    child.stdin.on('error', () => {})
+    child.stdin.end(tar.stdout)
+    for (const stream of [child.stdout, child.stderr]) stream.on('data', (chunk) => log(chunk.toString().trimEnd()))
+    const stop = () => child.kill('SIGTERM')
+    process.on('SIGTERM', stop); process.on('SIGINT', stop); process.on('SIGHUP', stop)
+    try {
+      const code = await new Promise((resolve, reject) => { child.on('error', reject); child.on('close', resolve) })
+      if (code !== 0) throw new Error(`runner image build failed (${code})`)
+    } finally {
+      process.off('SIGTERM', stop); process.off('SIGINT', stop); process.off('SIGHUP', stop)
+    }
     return config.image
   } finally { rmSync(context, { recursive: true, force: true }) }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const config = runnerConfig()
-  if (!config) throw new Error('Configure ~/.config/juno/runner.json or JUNO_RUNNER_HOST; see docs/self-hosted-runner.md')
-  const health = checkRunner(config)
-  if (!health.reachable) throw new Error(`runner unreachable: ${health.reason}`)
-  console.log(`runner: ${config.host} ready, ${health.cores} cores`)
-  if (process.argv[2] === '--prune') {
-    // Keep the current image and all images used by containers. Never force removal.
-    const command = `set -eu; ${imageLock}; images=$(docker image ls --format '{{.Repository}}:{{.Tag}}' --filter 'reference=juno-remote:*' --filter 'reference=juno-toolchain:*'); for image in $images; do [ "$image" = ${quote(config.image)} ] || docker image rm "$image"; done; docker builder prune -f`
-    const pruned = spawnSync('ssh', [...config.args, command], { stdio: 'inherit' })
-    if (pruned.status !== 0) throw new Error('runner image prune failed')
-  } else {
-    const image = spawnSync('ssh', [...config.args, `set -e; docker info >/dev/null; if docker image inspect ${quote(config.image)} --format '{{.Id}}'; then echo __juno_image_present; else echo __juno_image_missing; fi`], { encoding: 'utf8', timeout: 15_000 })
-    if (image.status !== 0) throw new Error(`runner image check failed: ${image.error?.message ?? image.stderr.trim()}`)
-    if (image.stdout.includes('__juno_image_present')) console.log(`runner: image ${config.image} ready`)
-    else if (image.stdout.includes('__juno_image_missing') && config.build) console.log(`runner: image ${config.image} missing; will be built on first use`)
-    else throw new Error(`runner override image unavailable: ${config.image}`)
-  }
+  try {
+    const config = runnerConfig()
+    const health = checkRunner(config)
+    if (!health.reachable) throw new Error(`runner unreachable: ${health.reason}. ${localHint}.`)
+    console.log(`runner: ready, ${health.cores} ${health.pinned ? 'physical cores' : 'CPUs'}; shared tstack allocator`)
+    if (process.argv[2] === '--prune') throw new Error('Use /tstack:runner for shared host maintenance')
+  } catch (error) { console.error(error.message); process.exitCode = 1 }
 }
