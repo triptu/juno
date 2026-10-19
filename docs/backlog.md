@@ -1,6 +1,6 @@
 # Backlog
 
-Small items noticed during work that are not yet assigned to a milestone. Remove an item when it is done.
+Small items noticed during work that are not yet assigned to a milestone. The change that finishes an item removes it in the same commit. Before starting an item, confirm on `origin/main` that it is still open, because this list drifts from the code.
 
 - Image-row report: confirm the owner's reported image displays in the running app after the `files.info` fallback; the cause on that live session remains unproven.
 - Identity-provider sign-in (Google, Okta) leaves slack.com and is blocked by the sign-in window allow-list. The Slack-app import covers it for now.

@@ -2,6 +2,8 @@
 
 A fake Slack for tests and development: an HTTP and websocket server that speaks the web client's protocol (`docs/research/slack-data-access.md`), with a control API to make things happen from "another client". See `docs/architecture.md` sections 2.2 and 13.
 
+Live Slack wins. Each behaviour the fake copies should name the live check it comes from and its date, as the `files.info` and `client.counts` notes below do. The fake has been kinder than live Slack before, which hid bugs. Before a fix, a performance claim or a "live bug" report depends on behaviour the fake has not been checked against, run one read-only live probe (`pnpm probe:live`). When the fake and live disagree, change the fake to match live, and keep the old behaviour behind a test control if a test needs it.
+
 ## Public API
 
 ```ts

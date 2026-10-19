@@ -48,4 +48,6 @@ Read the parts relevant to your task, and the package's README, before changing 
 
 Docs, comments, UI copy and commit messages use plain, simple, concise English. No metaphors, no hype. UI copy follows SPEC.md section 17 (sentence case, short verb-first buttons, no emoji in chrome).
 
+When a rule or fact changes, rewrite the text that states it, in every doc that states it. Do not add an "Update:" note under the old text; readers act on the first instruction they see.
+
 `AGENTS.md` is a symlink to this file. Edit `CLAUDE.md` only.
