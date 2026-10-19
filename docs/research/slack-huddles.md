@@ -74,7 +74,7 @@ All go through the normal `apiCall` (same `/api/<method>` POST with the `xoxc` t
 | `huddles.external.new`, `.generate`, `.linkInfo`, `.listExternalParticipants`, `.kick`, `.end` | External guests by link. |
 | `calls.request`, `calls.reject`, `calls.apps.list` | Legacy calls and call apps. |
 | `meetings.channel.getOrCreate`, `meetings.update`, `meetings.removeChannel`, `meetings.transcribeChunk` | Calendar meeting channels. |
-| `users.profile.set` with `huddle_state_expiration_ts` | Keeps the "in a huddle" status alive (every ~240 s ±10%, sets expiry now+300 s; flag `huddles_set_status`). |
+| `users.profile.set` with `huddle_state_expiration_ts` | Keeps the "in a huddle" status alive (every ~240 s ±10%, sets expiry now+300 s; flag `huddles_set_status`). The profile is one JSON field, `{"huddle_state_expiration_ts": <seconds>}`, the only field written, with reason `increment-huddle-state-expiration-ts`. It starts when the call reaches `STARTED`; on `ENDING` or an error the timer is cancelled and nothing is sent, so the status lapses at the expiry (`scheduleHuddleStateExpirationIncrement`, `boot-async`). |
 
 Edge (Flannel) API: `HUDDLES_INFO:"huddles/info"` (query `channel_ids`, chunks of IDs, concurrency 2) and `HUDDLES_LIST:"huddles/list"` (`shared`, method map next to `MEMBER_INFO:"users/info"`). The response feeds `upsertKnownHuddlesForTeamId`, which reads `{channel_id, call_id, active_members, dropped_members}` per huddle. After a reconnect the client re-fetches huddles for every channel in `huddles.activeChannels`.
 
