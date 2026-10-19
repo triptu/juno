@@ -1,0 +1,1 @@
+- 10-19 18:30 · huddle-fake-media · Under JUNO_E2E, `huddle.register` tells the page to run the fake media session, which loads as its own lazy chunk; no test talks to Chime, and the built app is the same one tests run. Production never loads the fake chunk, since main says so only under JUNO_E2E.

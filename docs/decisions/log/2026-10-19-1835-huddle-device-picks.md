@@ -1,0 +1,1 @@
+- 10-19 18:35 · huddle-device-picks · The microphone, speaker and Reduce background noise picks are kept in the renderer's localStorage, on this Mac only (SPEC 20), not in a workspace pref: they belong to the Mac's devices, not to the workspace.
