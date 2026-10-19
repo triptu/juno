@@ -29,6 +29,8 @@ interface Huddles {
   leaveDelayMs: number
   /** On v2, how long a huddle with nobody left stays listed in `huddles/info`. */
   emptyDelayMs: number
+  /** Self's `huddle_state_expiration_ts`, the one profile field the "In a huddle" status writes. */
+  statusExpiresAt: number | undefined
 }
 
 /** Keyed by workspace so two fakes never share huddles. */
@@ -37,7 +39,7 @@ const state = new WeakMap<Workspace, Huddles>()
 function huddlesOf(ws: Workspace): Huddles {
   const existing = state.get(ws)
   if (existing !== undefined) return existing
-  const created: Huddles = { byChannel: new Map(), calls: 0, attendees: 0, arch: 'v2', leaveDelayMs: 1_000, emptyDelayMs: 3_000 }
+  const created: Huddles = { byChannel: new Map(), calls: 0, attendees: 0, arch: 'v2', leaveDelayMs: 1_000, emptyDelayMs: 3_000, statusExpiresAt: undefined }
   state.set(ws, created)
   return created
 }
@@ -108,14 +110,19 @@ function running(fake: FakeSlack, channel: string): FakeHuddle {
  * `rooms.join` starts a huddle in the channel when none runs, adds self and
  * answers with a fake Chime meeting and a fresh attendee in the shape the
  * spike recorded (`call.free_willy`). Nothing listens at its urls: tests use
- * the fake media session, never Chime. `rooms.leave` removes the attendee,
- * and self once they hold none; the last one out ends the huddle. Each
- * change sends its room frame. The edge `huddles/info` lists the running
- * huddles of the channels asked for.
+ * the fake media session, never Chime. On arch v2, the default as on the
+ * owner's workspace, `rooms.leave` answers `feature_not_enabled` and the
+ * attendee leaves when its media stops (`stopMedia`); on v1 `rooms.leave`
+ * removes it. Self leaves once they hold no attendee; the last one out ends
+ * the huddle. Each change sends its room frame. The edge `huddles/info`
+ * lists the running huddles of the channels asked for. `users.profile.set`
+ * keeps self's huddle status expiry, the only profile field it takes.
  *
- * Controls: `startHuddle` and `joinHuddle` (another user starts or joins),
- * `leaveHuddle` (another user leaves) and `endHuddle` (the huddle ends for
- * everyone, as a room update with `has_ended`).
+ * Controls: `setHuddleArch`, `stopMedia` (Chime dropped self's attendee),
+ * `huddleStatus` (self's status expiry), `startHuddle` and `joinHuddle`
+ * (another user starts or joins), `leaveHuddle` (another user leaves) and
+ * `endHuddle` (the huddle ends for everyone, as a room update with
+ * `has_ended`).
  */
 export const huddlesFeature = {
   methods: {
@@ -152,6 +159,10 @@ export const huddlesFeature = {
         huddle: { id: huddle.callId, channels: [conversation.id], participants: [...huddle.participants], date_start: huddle.dateStart },
       }
     },
+    'users.profile.set': (ctx, args) => {
+      huddlesOf(ctx.workspace).statusExpiresAt = args.profile.huddle_state_expiration_ts
+      return {}
+    },
     'rooms.leave': (ctx, args) => {
       const huddles = huddlesOf(ctx.workspace)
       if (huddles.arch === 'v2') return new ApiError('feature_not_enabled')
@@ -173,6 +184,8 @@ export const huddlesFeature = {
     },
   },
   controls: {
+    /** Self's huddle status expiry in epoch seconds, or null before any was set. */
+    huddleStatus: (fake) => huddlesOf(fake.workspace).statusExpiresAt ?? null,
     /** `arch`, and on v2 the two delays (see `Huddles`). */
     setHuddleArch: (fake, input: { arch: 'v1' | 'v2'; leaveDelayMs?: number; emptyDelayMs?: number }) => {
       const huddles = huddlesOf(fake.workspace)
