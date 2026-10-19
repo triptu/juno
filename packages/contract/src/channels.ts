@@ -67,6 +67,12 @@ export const Channels = {
   huddleMenu: 'huddle.menu',
   /** Mute while macOS blocks the microphone: System Settings at Privacy & Security, Microphone. */
   huddleMicrophoneSettings: 'huddle.microphoneSettings',
+  /** The share sheet: the screens and windows to share, with thumbnails, or why there are none (macOS Screen Recording). */
+  huddleShareSources: 'huddle.shareSources',
+  /** The share sheet's Continue: shows the macOS Screen Recording prompt once, then answers as `huddle.shareSources`. */
+  huddleAllowScreenRecording: 'huddle.allowScreenRecording',
+  /** System Settings at Privacy & Security, Screen & System Audio Recording. */
+  huddleScreenRecordingSettings: 'huddle.screenRecordingSettings',
   /** Shows a native context menu at the pointer and answers with the chosen item's id, or null. */
   contextMenuPopup: 'contextMenu.popup',
   /** Opens an http or https link in the default browser. */
@@ -156,6 +162,8 @@ export type MenuCommand =
   | 'huddle.show'
   /** Huddle › Mute Microphone or Unmute Microphone. */
   | 'huddle.mute'
+  /** Huddle › Share Screen… (the share sheet) or Stop Sharing. */
+  | 'huddle.share'
   | 'huddle.leave'
 
 /**
@@ -343,6 +351,12 @@ export interface JunoBridge {
     readonly setMenu: (menu: HuddleMenu) => Promise<unknown>
     /** Opens System Settings at Privacy & Security, Microphone. */
     readonly openMicrophoneSettings: () => Promise<unknown>
+    /** Resolves with `ShareSources`, undecoded. */
+    readonly shareSources: () => Promise<unknown>
+    /** Shows the macOS Screen Recording prompt, then resolves with `ShareSources`, undecoded. */
+    readonly allowScreenRecording: () => Promise<unknown>
+    /** Opens System Settings at Privacy & Security, Screen & System Audio Recording. */
+    readonly openScreenRecordingSettings: () => Promise<unknown>
   }
   readonly contextMenu: {
     /** Resolves with the chosen item's id, or null when the menu closed without a choice. */

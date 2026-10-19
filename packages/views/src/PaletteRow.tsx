@@ -28,6 +28,7 @@ import { Pulse } from '@phosphor-icons/react/dist/icons/Pulse'
 import { LinkSimple } from '@phosphor-icons/react/dist/icons/LinkSimple'
 import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
+import { MonitorArrowUp } from '@phosphor-icons/react/dist/icons/MonitorArrowUp'
 import { Microphone } from '@phosphor-icons/react/dist/icons/Microphone'
 import { MicrophoneSlash } from '@phosphor-icons/react/dist/icons/MicrophoneSlash'
 import { Moon } from '@phosphor-icons/react/dist/icons/Moon'
@@ -41,6 +42,7 @@ import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
 import { PushPin } from '@phosphor-icons/react/dist/icons/PushPin'
 import { PushPinSlash } from '@phosphor-icons/react/dist/icons/PushPinSlash'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
+import { StopCircle } from '@phosphor-icons/react/dist/icons/StopCircle'
 import { Sun } from '@phosphor-icons/react/dist/icons/Sun'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { UserCircle } from '@phosphor-icons/react/dist/icons/UserCircle'
@@ -99,6 +101,8 @@ export type PaletteIconName =
   | 'mute'
   | 'unmute'
   | 'leave-huddle'
+  | 'share-screen'
+  | 'stop-sharing'
 
 const icons: Record<PaletteIconName, PhosphorIcon> = {
   thread: ChatsCircle,
@@ -146,6 +150,8 @@ const icons: Record<PaletteIconName, PhosphorIcon> = {
   mute: MicrophoneSlash,
   unmute: Microphone,
   'leave-huddle': PhoneX,
+  'share-screen': MonitorArrowUp,
+  'stop-sharing': StopCircle,
 }
 
 export interface PaletteItem {

@@ -15,6 +15,7 @@ import type { ProviderStore } from './providers'
 import type { Updates } from './updates'
 import type { Launch } from './launch'
 import { openMicrophoneSettings } from './media'
+import type { ScreenShareSources } from './screenShare'
 import { APP_ORIGIN } from './scheme'
 import { closeWebPanel, hideWebPanel, setWebPanelBounds, showWebPanel } from './webPanel'
 import { setMenuHuddle } from './window'
@@ -83,6 +84,8 @@ export interface IpcDeps {
   readonly setDensity: (density: NonNullable<Launch['density']>) => void
   readonly setPrivacy: (privacy: boolean) => void
   readonly setSidebar: (sidebar: NonNullable<Launch['sidebar']>) => void
+  /** The share sheet's screens and windows, and macOS's Screen Recording permission (screenShare.ts). */
+  readonly shareSources: ScreenShareSources
   /** "Hide message text while sharing the screen" (screenWatch.ts). */
   readonly sharing: { readonly get: () => SharingSetting; readonly set: (hide: boolean) => SharingSetting }
   /** The topic the window shows, or null while it shows none or is not focused. */
@@ -104,7 +107,7 @@ export interface IpcDeps {
   readonly processes: { readonly diagnostics: () => Diagnostics; readonly reportState: (state: AppState) => void }
 }
 
-export function registerIpc({ updates, supervisor, agent, providers, codex, backupSecrets, setTheme, setAccent, setDensity, setTopicTitleLines, setPrivacy, setSidebar, sharing, setViewing, notifications, downloadFile, openFile, copyImage, processes }: IpcDeps): void {
+export function registerIpc({ updates, supervisor, agent, providers, codex, backupSecrets, setTheme, setAccent, setDensity, setTopicTitleLines, setPrivacy, setSidebar, sharing, shareSources, setViewing, notifications, downloadFile, openFile, copyImage, processes }: IpcDeps): void {
   handle(Channels.updatesGet, () => updates.get())
   handle(Channels.updatesSet, ({ enabled }) => updates.set(enabled))
   handle(Channels.updatesRestart, () => updates.restart())
@@ -207,6 +210,9 @@ export function registerIpc({ updates, supervisor, agent, providers, codex, back
     setMenuHuddle(menu)
   })
   handle(Channels.huddleMicrophoneSettings, () => (e2e ? void (microphoneSettingsForTests.opened += 1) : openMicrophoneSettings()))
+  handle(Channels.huddleShareSources, () => shareSources.list())
+  handle(Channels.huddleAllowScreenRecording, () => shareSources.allow())
+  handle(Channels.huddleScreenRecordingSettings, () => shareSources.openSettings())
 
   handle(Channels.sharingGet, () => sharing.get())
   handle(Channels.sharingSet, ({ hide }) => sharing.set(hide))
