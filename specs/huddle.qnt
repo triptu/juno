@@ -28,6 +28,7 @@ module huddle {
     engineLive: int, engineMax: int, engineSeen: Set[int], closedSeen: int, engReports: int -> Report,
     page: int, conn: int, media: Set[int], pageRecv: int, pageSeq: int, pageEnded: int, pageReason: str,
     rule: int,
+    persisted: int, persistGen: int, persistConn: int, persistCancel: bool, persistBug: int, persistCaller: bool, startCancelled: bool,
     pageDirty: bool, pageResend: bool, outbox: Set[Report], handOffs: Set[HandOff],
     connected: bool, dirty: bool, epoch: int, fetchEpoch: int,
     fetching: bool, snapshot: Set[int], snapshotVersion: int,
@@ -52,6 +53,7 @@ module huddle {
     engineLive: 1, engineMax: 1, engineSeen: Set(1), closedSeen: 0, engReports: gens.mapBy(_ => noReport),
     page: 1, conn: 1, media: Set(), pageRecv: 0, pageSeq: 0, pageEnded: 0, pageReason: "",
     rule: 0,
+    persisted: 0, persistGen: 0, persistConn: 0, persistCancel: false, persistBug: 0, persistCaller: true, startCancelled: false,
     pageDirty: false, pageResend: false, outbox: Set(), handOffs: Set(),
     connected: true, dirty: true, epoch: 0,
     fetchEpoch: -1, fetching: false, snapshot: Set(), snapshotVersion: 0,
@@ -95,7 +97,7 @@ module huddle {
   // The asking page gets the credentials, once main lists it.
   action choose(c: int): bool = all {
     s.up, not(s.quitting),
-    s' = { ...s, wanted: c, wantedPage: s.page, wantedConn: s.conn, cancel: s.request != 0, current: 0,
+    s' = { ...s, wanted: c, wantedPage: s.page, wantedConn: s.conn, cancel: s.request != 0, current: 0, startCancelled: false,
       phase: if (s.request != 0 or s.pending.size() > 0) "leaving" else "idle",
       otherDevice: false, label: "choose" }
   }
@@ -115,29 +117,58 @@ module huddle {
     s.received != attendees, not(s.otherDevice),
     s' = { ...s, request: s.wanted, requestPage: s.wantedPage, requestConn: s.wantedConn, wanted: 0, cancel: false, phase: "joining", label: "request" }
   }
-  // The answer is stored, then handed to the asking page if the join was not
-  // cancelled and main still lists the page. Old rules: bug 1 skips the
-  // record; bug 3 hands out a cancelled answer; bug 8 hands out to a page
-  // that went while the join was out.
-  action answerJoin(a: int, r: int, bug: int): bool = all {
-    s.up, s.request != 0, not(s.received.contains(a)),
+  // The answer is stored first (`answerJoin`), then handed to the asking
+  // page in a step of its own (`handOff`) if the join was not cancelled, main
+  // still lists the page, and the Start still waits for it. The Start can be
+  // cancelled between the two (`cancelStart` takes no lock); a cancelled one
+  // gets nothing, so no page has the credentials and the attendee is left at
+  // once. Old rules: bug 1 skips the record; bug 3 hands out a cancelled
+  // answer; bug 8 hands out to a page that went while the join was out; bug
+  // 13 decides on the Start before the store, so a Start cancelled during it
+  // is recorded as holding credentials no page ever gets.
+  pure def stored(st: State, a: int, r: int, bug: int): State = {
     // The Start's connection closed and the engine knows it: no page will get the answer.
-    val g = if (bug == 3 or bug == 8) s.requestPage else if (s.cancel or s.requestPage != s.engineLive or s.requestConn < s.closedSeen) 0 else s.requestPage
-    val handOff = g != 0 and (bug == 3 or bug == 8 or not(s.cancel))
-    s' = { ...s, request: 0, received: s.received.union(Set(a)),
-      channel: s.channel.set(a, s.request), room: s.room.set(a, r),
-      pending: if (bug == 1) s.pending else s.pending.union(Set(a)),
-      unsent: s.unsent.union(Set(a)),
-      holder: s.holder.set(a, if (handOff) g else 0), recWs: s.recWs.set(a, s.ws),
-      handedAt: if (handOff) s.handedAt.set(a, s.handCount + 1) else s.handedAt,
-      handConn: if (handOff) s.handConn.set(a, s.requestConn) else s.handConn,
-      handCount: if (handOff) s.handCount + 1 else s.handCount,
-      handOffs: if (handOff) s.handOffs.union(Set({ gen: g, conn: s.requestConn, a: a })) else s.handOffs,
-      handed: if (handOff) s.handed.union(Set(a)) else s.handed,
-      staleGone: if (bug == 8) s.staleGone.union(Set(a)) else s.staleGone,
-      cancelled: if (s.cancel) s.cancelled.union(Set(a)) else s.cancelled,
-      current: if (handOff and (bug == 3 or not(s.cancel))) a else 0,
-      phase: if (handOff) "joining" else "leaving", label: "answer" }
+    pure val g = if (bug == 3 or bug == 8) st.requestPage else if (st.cancel or st.requestPage != st.engineLive or st.requestConn < st.closedSeen) 0 else st.requestPage
+    { ...st, request: 0, received: st.received.union(Set(a)),
+      channel: st.channel.set(a, st.request), room: st.room.set(a, r),
+      pending: if (bug == 1) st.pending else st.pending.union(Set(a)),
+      unsent: st.unsent.union(Set(a)), recWs: st.recWs.set(a, st.ws), holder: st.holder.set(a, 0),
+      staleGone: if (bug == 8) st.staleGone.union(Set(a)) else st.staleGone,
+      cancelled: if (st.cancel) st.cancelled.union(Set(a)) else st.cancelled,
+      persisted: a, persistGen: g, persistConn: st.requestConn, persistCancel: st.cancel, persistBug: bug,
+      persistCaller: not(st.startCancelled), phase: "joining", label: "answer" }
+  }
+  pure def handedOff(st: State, bug: int): State = {
+    pure val a = st.persisted
+    pure val waiting = if (bug == 13) st.persistCaller else not(st.startCancelled)
+    pure val handOff = st.persistGen != 0 and (st.persistBug == 3 or st.persistBug == 8 or not(st.persistCancel)) and waiting
+    // Credentials for a cancelled Start go back on its cancelled request, never to the page.
+    pure val reaches = handOff and not(st.startCancelled)
+    { ...st, holder: st.holder.set(a, if (handOff) st.persistGen else 0),
+      handedAt: if (handOff) st.handedAt.set(a, st.handCount + 1) else st.handedAt,
+      handConn: if (handOff) st.handConn.set(a, st.persistConn) else st.handConn,
+      handCount: if (handOff) st.handCount + 1 else st.handCount,
+      handOffs: if (reaches) st.handOffs.union(Set({ gen: st.persistGen, conn: st.persistConn, a: a })) else st.handOffs,
+      handed: if (handOff) st.handed.union(Set(a)) else st.handed,
+      current: if (handOff and (st.persistBug == 3 or not(st.persistCancel))) a else 0,
+      persisted: 0, startCancelled: false, phase: if (handOff) "joining" else "leaving", label: "handOff" }
+  }
+  action answerJoin(a: int, r: int, bug: int): bool = all {
+    s.up, s.request != 0, s.persisted == 0, not(s.received.contains(a)),
+    s' = stored(s, a, r, bug)
+  }
+  action handOff(bug: int): bool = all { s.up, s.persisted != 0, s' = handedOff(s, bug) }
+  /** Store and hand off with nothing between, for schedules about other things. */
+  action answerNow(a: int, r: int, bug: int): bool = all {
+    s.up, s.request != 0, s.persisted == 0, not(s.received.contains(a)),
+    s' = handedOff(stored(s, a, r, bug), 0)
+  }
+  // The page's Start request is cancelled while its connection stays open
+  // (the user's Cancel during "Joining…"). Its intent stays; its answer is
+  // handed to no page.
+  action cancelStart = all {
+    s.up, not(s.startCancelled), s.wanted != 0 or s.request != 0 or s.persisted != 0,
+    s' = { ...s, startCancelled: true, label: "cancelStart" }
   }
   action joinError = all {
     s.up, s.request != 0,
@@ -257,6 +288,7 @@ module huddle {
     phase: "idle", connected: false, fetching: false, frames: Set(), leaveReplies: Set(),
     handedAt: Set(0, 1, 2, 3).mapBy(_ => 0), handConn: attendees.mapBy(_ => 0), handCount: 0, staleGone: Set(),
     engineLive: 0, engineMax: 0, engineSeen: Set(), closedSeen: 0, engReports: gens.mapBy(_ => noReport),
+    persisted: 0, startCancelled: false,
     outbox: Set(), handOffs: Set(), unsent: st.pending }
   // The whole app crashes: the page goes with it, and its media.
   action crash = all {
@@ -356,6 +388,7 @@ module huddle {
 
   action progress =
     if (not(s.up)) restart
+    else if (s.persisted != 0) handOff(0)
     else if (s.loadedWs != workspaces) { nondet w = workspaces.exclude(s.loadedWs).oneOf() load(w) }
     else if (s.engineLive != s.page) mainReport
     else if (s.closedSeen < s.conn) seeClosed
@@ -380,12 +413,19 @@ module huddle {
     else if (s.dirty) fetchInfo
     else all { s' = { ...s, label: "idle" } }
 
+  // While an answer is being stored the engine holds its lock: only the
+  // hand-off, a Start's cancel, the page, Slack and a crash can act.
   action input = {
     nondet a = attendees.oneOf()
     nondet c = channels.oneOf()
     nondet r = channels.oneOf()
     nondet kind = Set("sh_room_join", "sh_room_leave", "sh_room_update").oneOf()
-    any {
+    if (s.persisted != 0) any {
+      handOff(0), cancelStart, receiveAny(true), receiveAny(false), pageReport, pageEnd, pageReconnect,
+      pageStop(a, "left"), pageStop(a, "AudioJoinedFromAnotherDevice"), pageStop(a, "connectionLost"),
+      crash, engineCrash, slackChange(c)
+    } else any {
+      cancelStart,
       choose(c), leave, requestJoin(0), answerJoin(a, r, 0), joinError, reconcile(0),
       sendLeave(a), clearLeave(a),
       leaveAnswer(a, "ok", 0), leaveAnswer(a, "feature_not_enabled", 0), leaveAnswer(a, "refused", 0),
@@ -420,7 +460,7 @@ module huddle {
   /** A Start under an old rule (`rule`), for its counterexample. */
   action chooseUnder(c: int, rule: int): bool = all {
     s.up,
-    s' = { ...s, wanted: c, wantedPage: s.page, wantedConn: s.conn, rule: rule, otherDevice: false, label: "choose" }
+    s' = { ...s, wanted: c, wantedPage: s.page, wantedConn: s.conn, rule: rule, otherDevice: false, startCancelled: false, label: "choose" }
   }
   action deliverWith(bug: int): bool = if (s.outbox == Set()) disabled else { nondet r = s.outbox.oneOf() deliver(r, bug) }
 
@@ -432,17 +472,24 @@ module huddle {
       if (turn == 0) fetchInfo else if (turn == 1) answerInfo
       else if (turn == 2) slackChange(2) else if (turn == 3) overflow(bug)
       else seal
+    ) else if (which == 21) (
+      // The user cancels the Start while its answer is being stored; the
+      // page's connection stays open, and its reports there hold nothing.
+      if (turn == 0) choose(1) else if (turn == 1) requestJoin(0)
+      else if (turn == 2) answerJoin(1, 1, 0) else if (turn == 3) cancelStart
+      else if (turn == 4) handOff(bug) else if (turn == 5) pageReport
+      else if (turn == 6) deliverAny else seal
     ) else if (which == 18) (
       // The Start's connection closes and the page reconnects while Slack has
       // the join; the answer goes out on the old connection and is lost.
       if (turn == 0) chooseUnder(1, bug) else if (turn == 1) requestJoin(0)
-      else if (turn == 2) pageReconnect else if (turn == 3) answerJoin(1, 1, 0)
+      else if (turn == 2) pageReconnect else if (turn == 3) answerNow(1, 1, 0)
       else if (turn == 4) pageReport else if (turn == 5) deliverAny else seal
     ) else if (which == 19) (
       // The user switches workspace mid-call and the engine restarts while
       // the page still holds the first workspace's attendee.
       if (turn == 0) choose(1) else if (turn == 1) requestJoin(0)
-      else if (turn == 2) answerJoin(1, 1, 0) else if (turn == 3) startMedia
+      else if (turn == 2) answerNow(1, 1, 0) else if (turn == 3) startMedia
       else if (turn == 4) switchWs else if (turn == 5) engineCrash
       else if (turn == 6) restart else if (turn == 7) load(2)
       else if (turn == 8) mainReport else if (turn == 9) choose(2)
@@ -456,14 +503,14 @@ module huddle {
     else if (which == 16) (
       // The page dies while its join is out; main says so before the answer.
       if (turn == 2) pageEnd else if (turn == 3) mainReport
-      else if (turn == 4) answerJoin(1, 1, bug) else seal
+      else if (turn == 4) answerNow(1, 1, bug) else seal
     )
     else if (which == 3 and turn == 2) leave
-    else if (which == 3 and turn == 3) answerJoin(1, 1, bug)
+    else if (which == 3 and turn == 3) answerNow(1, 1, bug)
     else if (which == 3) seal
     else if (which == 10 and turn == 2) joinError
     else if (which == 10) seal
-    else if (turn == 2) answerJoin(1, 1, bug)
+    else if (turn == 2) answerNow(1, 1, bug)
     else if (which == 11 and turn == 3) crash
     else if (which == 11) seal
     else if (turn == 3) startMedia
@@ -476,7 +523,7 @@ module huddle {
       else if (turn == 6) stopReported(1, "left")
       else if (turn == 7) clearLeave(1)
       else if (turn == 8) requestJoin(0)
-      else if (turn == 9) answerJoin(2, 2, 0)
+      else if (turn == 9) answerNow(2, 2, 0)
       else if (turn == 10) startMedia
       else if (which == 4 and turn == 11) queueFrame({kind: "sh_room_leave", channel: 1, room: 1, attendee: 1})
       else if (which == 4 and turn == 12) roomFrame({kind: "sh_room_leave", channel: 1, room: 1, attendee: 1}, bug)
@@ -552,4 +599,6 @@ module huddle {
   action workspaceRestartBugStep = scenario(19, 10)
   action unlistedPageStep = scenario(20, 0)
   action unlistedPageBugStep = scenario(20, 12)
+  action cancelDuringPersistStep = scenario(21, 0)
+  action cancelDuringPersistBugStep = scenario(21, 13)
 }
