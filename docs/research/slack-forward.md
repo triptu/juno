@@ -10,7 +10,7 @@ Research for Juno's Forward… (SPEC section 7, "Forward"). Analysed 2026-10-19.
   - `shared` = `gantry-v2-shared.3b03bc2a28796cb1.min.js`
 - **Public code** that calls the method: emacs-slack (`slack-message-editor.el`), jollyroger182/ooc (`src/slack/operations.ts`), 3kh0/super-platinum (`crates/super-platinum-core/src/slack/api/forward.rs`, `forwarding/scheduled.rs`), ImShyMike/slack-undoc-client (`src/types.ts`). cgrossde/slackcli's `docs/forward.md` says the method does not exist; the client code shows it does.
 - **Event fixtures** from the Haskell `slack-web` package (`forwarded_message.json`, `share_with_message.json`, `share_without_message.json`).
-- **The live check** of 2026-10-19, `scripts/forward-live.ts` (`JUNO_LIVE=1 pnpm forward:live`): in the self-DM only, it posts a message and a reply, forwards them with and without a note, tries two refusals, reads the history and deletes everything it made. It prints field names and true or false, never values.
+- **The live check** of 2026-10-19, `scripts/forward-live.ts` (`JUNO_LIVE=1 pnpm forward:live`): in the self-DM only, it posts a message and a reply, forwards them with and without a note, uploads a 1×1 image and forwards that file-only message, tries two refusals, reads the history and deletes everything it made, the file too. It prints field names and true or false, never values.
 
 ## The call
 
@@ -41,6 +41,7 @@ There is no thread field and no list of destinations: one call per destination, 
 - `client_msg_id` is the one the call sent. So the echo, history pages and a lookup can match the copy to the request, as for `chat.postMessage` (ADR 0011).
 - Without a note: `text` is `""` and there are no top-level `blocks`. With a note: the note's `blocks`, and a `text` Slack derives from them.
 - One attachment with `is_share: true`, `is_msg_unfurl: true`, `color: "D0D0D0"`, `ts` (the original's), `channel_id`, `channel_team`, `author_id`, `author_name`, `author_link`, `author_icon`, `author_subname`, `from_url` (the permalink, with `thread_ts` for a thread root or reply), `fallback`, `text` with `mrkdwn_in: ["text"]`, `blocks` (the original's `rich_text`), `footer`, `id`. A thread root also has `is_thread_root_unfurl`, a reply `is_reply_unfurl`; the footer then reads "Thread in …", else "Posted in …".
+- **Observed, live:** a forward of a message of only files (no words) has, on the attachment, the original's `files` as whole file objects (thumbnails, `original_w`/`original_h`, `url_private`), and no `text` or `blocks`. Its `fallback` is a line "[date] name: file", the only words Slack gives; a forward with words has the same kind of `fallback` beside `text`.
 - In history pages the original's words are in the attachment's `blocks`. Event fixtures and older public code carry them in `message_blocks[0].message.blocks` instead; Juno's attachment parser reads both.
 - Forwarding a reply adds nothing to the source thread (its reply count stayed 1).
 
@@ -65,5 +66,5 @@ Decision `2026-10-19-2213-forward-share-message`. Juno forwards with `chat.share
 
 - Whether Slack honours `private_message_forwarding` on the server, or only the client checks it. Juno does not check it; a refusal would show as "Not sent." with Slack's code.
 - The exact refusal codes for a destination the user cannot post in, and for a source the user cannot read.
-- Whether a forward of a message with files carries the files in the attachment, and how a forward of a forward looks.
+- How a forward of a forward looks, and whether a forward of a message with both words and files carries the files the same way (inferred: it does).
 - Whether Slack ever answers `chat.shareMessage` with the message itself.

@@ -11,11 +11,13 @@
  *    then forwards the reply, each with a new `client_msg_id`.
  * 3. Tries a forward to your user id instead of a conversation id, and one
  *    of a ts no message has.
+ * 3b. Uploads a tiny image to the self-DM with no words, and forwards that
+ *    file-only message, to see where the shared files go.
  * 4. Reads the self-DM's history and reports the shape of each forward.
  * 5. Deletes everything it posted.
  *
- * Writes are guarded: posts, forwards and deletes go only to the self-DM,
- * and deletes only of what this run made. Output: methods, `ok` or the
+ * Writes are guarded: posts, uploads, forwards and deletes go only to the
+ * self-DM, and deletes only of the messages and the file this run made. Output: methods, `ok` or the
  * error code, field names and whether expected values matched. No token,
  * cookie, id, name or message text is printed.
  */
@@ -38,15 +40,21 @@ const { session, cookie } = cached
 const apiBase = new URL('/api/', session.workspaceUrl).toString()
 
 const READS = new Set(['auth.test', 'client.userBoot', 'conversations.history', 'conversations.replies'])
-const WRITES = new Set(['chat.postMessage', 'chat.shareMessage', 'chat.delete'])
+const WRITES = new Set(['chat.postMessage', 'chat.shareMessage', 'chat.delete', 'files.share', 'files.delete'])
+/** Upload steps that name no conversation: the file is shared only by `files.share`, into the self-DM. */
+const UPLOADS = new Set(['files.getUploadURL', 'files.completeUpload'])
 
 let selfDm: string | undefined
 /** What this run made, the only messages it may delete. */
 const made = new Set<string>()
+/** The files this run uploaded, the only files it may delete. */
+const madeFiles = new Set<string>()
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
 async function call(method: string, fields: Record<string, string>): Promise<Json> {
-  if (!READS.has(method)) {
+  if (method === 'files.delete') {
+    if (!madeFiles.has(fields.file ?? '')) throw new Error('forward-live: files.delete is not allowed here')
+  } else if (!READS.has(method) && !UPLOADS.has(method)) {
     const inSelfDm = selfDm !== undefined && fields.channel === selfDm && (method !== 'chat.shareMessage' || fields.share_channel === selfDm || fields.share_channel === session.userId)
     if (!WRITES.has(method) || !inSelfDm || (method === 'chat.delete' && !made.has(fields.ts ?? ''))) throw new Error(`forward-live: ${method} is not allowed here`)
   }
@@ -104,6 +112,30 @@ try {
   await share('toUserId', { timestamp: sourceTs, share_channel: session.userId })
   await share('missingTs', { timestamp: '1000000000.000100', share_channel: channel })
 
+  // A file-only message: a 1x1 PNG, shared into the self-DM with no words.
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64')
+  const target = await call('files.getUploadURL', { filename: 'juno-forward-check.png', length: String(png.byteLength) })
+  let fileTs: string | undefined
+  if (target.ok === true && typeof target.upload_url === 'string' && typeof target.file === 'string') {
+    madeFiles.add(target.file)
+    const form = new FormData()
+    form.append('file', new Blob([png], { type: 'image/png' }), 'juno-forward-check.png')
+    const uploaded = await fetch(target.upload_url, { method: 'POST', body: form })
+    report.fileUpload = uploaded.status
+    await call('files.completeUpload', { files: JSON.stringify([{ id: target.file, title: 'juno-forward-check.png' }]) })
+    const shared = await call('files.share', { files: target.file, channel, client_msg_id: randomUUID() })
+    report.fileShare = answer(shared)
+    await sleep(3000)
+    const latest = await call('conversations.history', { channel, oldest: before, limit: '50' })
+    const fileMessage = ((latest.messages as Array<Json> | undefined) ?? []).find((each) => ((each.files as Array<Json> | undefined) ?? []).some((file) => file.id === target.file))
+    if (fileMessage !== undefined && typeof fileMessage.ts === 'string') {
+      fileTs = fileMessage.ts
+      made.add(fileTs)
+      report.fileMessageTextEmpty = fileMessage.text === ''
+      await share('fileOnly', { timestamp: fileTs, share_channel: channel })
+    } else report.fileMessage = 'not found in history'
+  } else report.fileUpload = answer(target)
+
   await sleep(2000)
   const history = await call('conversations.history', { channel, oldest: before, limit: '50' })
   const messages = (history.messages as Array<Json> | undefined) ?? []
@@ -118,6 +150,7 @@ try {
     const first = attachments[0] ?? {}
     const blocks = (first.message_blocks as Array<Json> | undefined)?.[0]
     const footer = typeof first.footer === 'string' ? first.footer : undefined
+    const innerFiles = (blocks?.message as Json | undefined)?.files
     report[`${forward.name}Stored`] = {
       messageKeys: Object.keys(message).sort(),
       subtype: message.subtype ?? null,
@@ -136,7 +169,17 @@ try {
       fromUrlHasThreadTs: typeof first.from_url === 'string' ? first.from_url.includes('thread_ts=') : null,
       footerKind: footer === undefined ? null : footer.startsWith('Posted in') ? 'Posted in …' : footer.startsWith('Thread in') ? 'Thread in …' : /conversation/i.test(footer) ? '… conversation' : /direct message/i.test(footer) ? '… direct message' : 'other',
       messageBlocksKeys: blocks === undefined ? null : Object.keys(blocks).sort(),
+      messageBlocksMessageKeys: blocks === undefined ? null : Object.keys((blocks.message as Json | undefined) ?? {}).sort(),
       color: first.color ?? null,
+      attachmentTextEmpty: typeof first.text === 'string' ? first.text === '' : null,
+      fallbackLooksLikeDateLine: typeof first.fallback === 'string' ? /^\[[^\]]+\] [^:]+: /.test(first.fallback) : null,
+      textLooksLikeDateLine: typeof first.text === 'string' ? /^\[[^\]]+\] [^:]+: /.test(first.text) : null,
+      attachmentBlocksCount: Array.isArray(first.blocks) ? first.blocks.length : null,
+      attachmentFilesCount: Array.isArray(first.files) ? first.files.length : null,
+      attachmentFileKeys: Array.isArray(first.files) ? Object.keys((first.files[0] as Json | undefined) ?? {}).sort() : null,
+      messageBlocksFilesCount: Array.isArray(innerFiles) ? innerFiles.length : null,
+      messageBlocksFileKeys: Array.isArray(innerFiles) ? Object.keys((innerFiles[0] as Json | undefined) ?? {}).sort() : null,
+      topFilesCount: Array.isArray(message.files) ? message.files.length : null,
     }
   }
   if (reply.ok === true) {
@@ -148,6 +191,7 @@ try {
 } finally {
   const deleted: Array<string> = []
   for (const ts of [...made].reverse()) deleted.push(answer(await call('chat.delete', { channel: selfDm ?? '', ts })))
+  for (const file of madeFiles) deleted.push(answer(await call('files.delete', { file })))
   report.cleanup = deleted
 }
 console.log(JSON.stringify(report, null, 2))
