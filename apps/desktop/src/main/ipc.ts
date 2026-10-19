@@ -197,7 +197,7 @@ export function registerIpc({ updates, supervisor, agent, providers, codex, back
 
   // Huddle media generations for the engine (huddlePages.ts).
   const huddlePages = watchHuddlePages(supervisor)
-  handle(Channels.huddleRegister, ({ generation }, event) => huddlePages.register(event.sender.id, generation))
+  handle(Channels.huddleRegister, (_input, event) => huddlePages.register(event.sender.id))
 
   handle(Channels.sharingGet, () => sharing.get())
   handle(Channels.sharingSet, ({ hide }) => sharing.set(hide))

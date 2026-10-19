@@ -16,10 +16,10 @@
  * - `huddle.report` is a renderer page's whole media state.
  *
  * A page generation names one load of a renderer page. The page's media
- * service makes one when it starts and registers it with main
- * (`huddle.register`), which tells the engine which generations are live
- * (`huddlePages`); a page that reloads, navigates, crashes or closes is
- * gone, and with it its media.
+ * service gets one from main when it starts (`huddle.register`); main gives
+ * them out in rising order and tells the engine which are live and the
+ * highest it gave out (`huddlePages`). A page that reloads, navigates,
+ * crashes or closes is gone, and with it its media.
  */
 import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
@@ -115,10 +115,11 @@ export type HuddleError = typeof HuddleError.Type
  * `region` is Chime's nearest media region, which only the renderer may
  * look up; null when the lookup failed. `generation` is the asking page's:
  * the credentials go to it once main has reported it live, and only its
- * reports count for them. A generation main has not listed yet waits.
+ * reports count for them. A generation above the highest main has
+ * reported giving out waits for main's next report.
  */
 export const huddleStart = Rpc.make('huddle.start', {
-  payload: { channelId: Schema.String, region: Schema.NullOr(Schema.String), generation: Schema.String },
+  payload: { channelId: Schema.String, region: Schema.NullOr(Schema.String), generation: Schema.Number },
   success: HuddleStartResult,
   error: HuddleError,
 })
@@ -132,7 +133,7 @@ export const huddleLeave = Rpc.make('huddle.leave', { success: Schema.Void })
  * so a report may be sent twice or arrive late or out of order.
  */
 export const HuddlePageReport = Schema.Struct({
-  generation: Schema.String,
+  generation: Schema.Number,
   /** Counts up with each report the page sends. */
   seq: Schema.Int,
   /** The attendee whose media session the page has (connecting, connected or reconnecting), or null for none. */

@@ -61,7 +61,7 @@ export const Channels = {
   sharingGet: 'sharing.get',
   /** Turns "Hide message text while sharing the screen" on or off; answers as `sharing.get`. */
   sharingSet: 'sharing.set',
-  /** Registers the page's huddle media generation (routes/huddle.ts); main tells the engine while it is live. */
+  /** Gives the page its huddle media generation (routes/huddle.ts); main tells the engine while it is live. */
   huddleRegister: 'huddle.register',
   /** Shows a native context menu at the pointer and answers with the chosen item's id, or null. */
   contextMenuPopup: 'contextMenu.popup',
@@ -325,8 +325,8 @@ export interface JunoBridge {
     readonly set: (hide: boolean) => Promise<unknown>
   }
   readonly huddle: {
-    /** Registers this page load's media generation, made by its media service when it starts. Resolves once main has told the engine. */
-    readonly register: (generation: string) => Promise<unknown>
+    /** Resolves with this page load's media generation, a number main gives out in rising order; the same one until the page goes. */
+    readonly register: () => Promise<unknown>
   }
   readonly contextMenu: {
     /** Resolves with the chosen item's id, or null when the menu closed without a choice. */

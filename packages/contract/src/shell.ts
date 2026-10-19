@@ -290,7 +290,7 @@ export const ShellRoutes = {
   [Channels.launchSetSidebar]: { input: SidebarLayout, output: Schema.Void },
   [Channels.sharingGet]: { input: Schema.Void, output: SharingSetting },
   [Channels.sharingSet]: { input: Schema.Struct({ hide: Schema.Boolean }), output: SharingSetting },
-  [Channels.huddleRegister]: { input: Schema.Struct({ generation: Schema.String }), output: Schema.Void },
+  [Channels.huddleRegister]: { input: Schema.Void, output: Schema.Number },
   [Channels.contextMenuPopup]: { input: Schema.Struct({ items: ContextMenuItems, at: Schema.optionalKey(ContextMenuAt) }), output: Schema.NullOr(Schema.String) },
   [Channels.shellOpenExternal]: { input: Schema.Struct({ url: Schema.String }), output: Schema.Void },
   [Channels.shellOpenInSlack]: { input: SlackTarget, output: Schema.Void },

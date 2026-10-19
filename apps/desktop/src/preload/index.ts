@@ -111,7 +111,7 @@ const bridge: JunoBridge = {
     set: (hide) => ipcRenderer.invoke(Channels.sharingSet, { hide }),
   },
   huddle: {
-    register: (generation) => ipcRenderer.invoke(Channels.huddleRegister, { generation }),
+    register: () => ipcRenderer.invoke(Channels.huddleRegister),
   },
   contextMenu: {
     popup: (items, at) =>
