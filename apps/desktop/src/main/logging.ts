@@ -4,8 +4,9 @@ import { installProcessLog } from '../processLog'
 export const mainLog = installProcessLog('main')
 let closing: Promise<void> | undefined
 let closed = false
-app.on('before-quit', () => {
-  if (closed || closing) return
+app.on('before-quit', (event) => {
+  // A quit held for the huddle question (huddleQuit.ts) has not started.
+  if (event.defaultPrevented || closed || closing) return
   mainLog.log('INFO', 'process stopping')
   closing = mainLog.close().finally(() => { closed = true })
 })

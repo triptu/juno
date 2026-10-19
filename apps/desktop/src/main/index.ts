@@ -10,6 +10,7 @@ import { codexHome } from './codex'
 import { appMcpCredentials } from './mcpCredentials'
 import { createSupervisor } from './engine'
 import { createEngineTestHooks } from './engineTestHooks'
+import { createHuddleQuit } from './huddleQuit'
 import { copiedForTests, copyImage, downloadFile, downloadsForTests, openedForTests, openFile } from './files'
 import { browserLinksForTests, contextMenuForTests, folderForTests, registerIpc, logsForTests, slackLinksForTests, webPanelForTests } from './ipc'
 import { CUSTOM_ITEM, macKeychain, memoryKeychain, OPENROUTER_ITEM } from './keychain'
@@ -21,7 +22,7 @@ import { SecretsStore } from './secrets'
 import { SessionHost } from './session'
 import { slackKeychainReads } from './slackImport'
 import { Notifier, type ShownNotification } from './notifier'
-import { createNotificationPermission, loadPermissionBridge, settingsUrls } from './notificationPermission'
+import { createNotificationPermission, loadPermissionBridge, openSettings } from './notificationPermission'
 import { mainLog as processLog } from './logging'
 import { createProcessWatch } from './processWatch'
 import { createScreenWatch, loadScreenProbe, writeProbeForTests, type ScreenProbe } from './screenWatch'
@@ -107,9 +108,10 @@ const engineTests = createEngineTestHooks(e2e, (message) => supervisor.send(mess
 const supervisor = createSupervisor({
   ...(fakeSlackUrl === undefined ? {} : { fakeSlackUrl }),
   onMessage: (message) => {
-    if (!engineTests.handle(message) && !notifier.handle(message) && !sessionHost.handle(message)) console.warn(`main: unhandled engine message ${message._tag}`)
+    if (!engineTests.handle(message) && !notifier.handle(message) && !sessionHost.handle(message) && !huddleQuit.handle(message)) console.warn(`main: unhandled engine message ${message._tag}`)
   },
 })
+const huddleQuit = createHuddleQuit(e2e, appWindow)
 
 /** Under JUNO_E2E notifications are recorded, not shown; a test clicks them through `junoTest`. */
 const notificationsForTests: Array<{ readonly title: string; readonly body: string; click: () => void }> = []
@@ -182,12 +184,7 @@ const notificationPermission = e2e
   : createNotificationPermission(loadPermissionBridge)
 
 /** System Settings at Juno's notifications; the Notifications pane if macOS refuses the entry's link. */
-async function openNotificationSettings(): Promise<void> {
-  if (e2e) return void (notificationSettingsOpenedForTests += 1)
-  // Packaged, macOS knows Juno by its bundle id; in development the app is Electron.
-  const [entry, pane] = settingsUrls(app.isPackaged ? 'app.juno.desktop' : 'com.github.Electron')
-  await shell.openExternal(entry).catch(() => shell.openExternal(pane))
-}
+const openNotificationSettings = async () => (e2e ? void (notificationSettingsOpenedForTests += 1) : openSettings(app.isPackaged))
 
 // The backup's secrets in the keychain (memory under tests), WP21.
 const backupSecrets = appBackupSecrets(e2e)
@@ -249,7 +246,7 @@ app.whenReady().then(() => {
   })
   const fakeSlackOrigin = fakeSlackUrl === undefined ? undefined : new URL(fakeSlackUrl).origin
   registerIpc({
-    updates,
+    updates: { ...updates, restart: () => void huddleQuit.confirm('restart').then((ok) => ok && updates.restart()) },
     supervisor,
     downloadFile: (file) => downloadFile(file, fakeSlackOrigin, e2e),
     openFile: (file) => openFile(file, fakeSlackOrigin, e2e),
@@ -325,7 +322,8 @@ app.on('window-all-closed', () => {
 /** The engine finishing its last requests as the app quits; undefined once it has exited. */
 let engineStopping: Promise<void> | undefined
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  if (event.defaultPrevented) return // held for the huddle question (huddleQuit.ts)
   activity.stop()
   screenWatch.stop()
   updates.stop()
@@ -373,6 +371,7 @@ if (e2e) {
       notifications: () => notificationsForTests.map(({ title, body }) => ({ title, body })),
       clickNotification: (index = 0) => notificationsForTests[index]?.click(),
       dockBadge: () => badgeForTests,
+      ...huddleQuit.testHooks,
       notificationPermission: (permission: NotificationPermission) => {
         permissionForTests = permission
       },

@@ -132,5 +132,12 @@ export const EngineToMain = Schema.Union([
   Schema.TaggedStruct('notify', { notification: OsNotification }),
   /** Whether any topic has an unread mention: the dock shows a `•` badge. */
   Schema.TaggedStruct('badge', { mentions: Schema.Boolean }),
+  /**
+   * The huddle the user is in or joining, at the engine's start and on every
+   * change; null for none. Main asks before quitting while there is one
+   * (SPEC 20, "Quitting"). `place` is its label ("#eng", "Maya Chen"), null
+   * when the store does not know it; `direct` is a DM or group DM.
+   */
+  Schema.TaggedStruct('huddle', { call: Schema.NullOr(Schema.Struct({ place: Schema.NullOr(Schema.String), direct: Schema.Boolean })) }),
 ])
 export type EngineToMain = typeof EngineToMain.Type

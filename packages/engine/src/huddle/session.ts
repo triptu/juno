@@ -16,7 +16,8 @@
  *
  * Main reports the live renderer page generations and the highest it gave
  * out (`huddlePages`); the service takes a page that is not listed as gone,
- * with its media.
+ * with its media. The engine tells main which huddle the user is in
+ * (`huddle`), so a quit can ask first.
  *
  * At boot every workspace's stored leaves are read, not only the open one's
  * (`listWorkspaces`, `peekUserPref`): a page may still hold media for a
@@ -26,6 +27,7 @@ import { Effect, Layer, Schema, Stream } from 'effect'
 import { Huddle, HuddleStoreError } from '@juno/huddle'
 import { listWorkspaces, peekUserPref, prefs, StoreReader, transaction } from '@juno/store'
 import { EngineConfig, EngineTiming } from '../config'
+import { conversationLabel } from '../placeLabel'
 import { HostLink } from '../protocol/host'
 import { SocketEvents, type SessionServices, type SocketListener } from '../socketEvents'
 import { Workspace } from '../workspace'
@@ -75,6 +77,19 @@ export const HuddleSessions = Layer.effectDiscard(Effect.gen(function* () {
   yield* Effect.addFinalizer(() => huddle.leave)
   const fromMain = yield* link.messages
   yield* Effect.forkScoped(Stream.runForEach(fromMain, (message) => (message._tag === 'huddlePages' ? huddle.pages(message.live, message.maxIssued) : Effect.void)))
+  // Main asks before a quit or a restart to update while the user is in a huddle (SPEC 20, "Quitting"), naming where.
+  const callOf = (channelId: string | null) =>
+    Effect.gen(function* () {
+      if (channelId === null) return null
+      const open = yield* workspace.current
+      const found = open === undefined ? undefined : yield* conversationLabel(channelId).pipe(Effect.provide(open.context), Effect.orElseSucceed(() => undefined))
+      return { place: found?.label ?? null, direct: found?.direct ?? false }
+    })
+  yield* Effect.forkScoped(huddle.call.pipe(
+    Stream.map((call) => (call.phase === 'joining' || call.phase === 'joined' ? call.channelId : null)),
+    Stream.changes,
+    Stream.runForEach((channelId) => Effect.flatMap(callOf(channelId), (call) => link.send({ _tag: 'huddle', call }))),
+  ))
   yield* Effect.forkScoped(huddle.boot({
     workspaces: listWorkspaces(config.userData).pipe(Effect.mapError((cause) => new HuddleStoreError({ cause }))),
     read: (workspaceId) =>

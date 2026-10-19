@@ -20,7 +20,7 @@ export const conversationLabel = (channel: string) =>
   Effect.gen(function* () {
     const sql = yield* StoreReader
     const row = (yield* sql<ConversationNaming>`SELECT kind, name, user_id, member_ids_json, is_member FROM conversations WHERE id = ${channel}`)[0]
-    return row === undefined ? undefined : { label: yield* labelOf(channel, row), member: row.kind === 'public' || row.is_member !== 0 }
+    return row === undefined ? undefined : { label: yield* labelOf(channel, row), member: row.kind === 'public' || row.is_member !== 0, direct: row.kind === 'im' || row.kind === 'mpim' }
   })
 
 /** A conversation's label, or undefined when the store does not know it or you are not in it. */

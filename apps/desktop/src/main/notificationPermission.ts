@@ -15,6 +15,7 @@
  * refused outright, and a reading that does not come back in time is
  * `unknown`; Settings then offers Open Notification Settings anyway.
  */
+import { shell } from 'electron'
 import type { NotificationPermission } from '@juno/contract'
 
 export interface PermissionBridge {
@@ -29,6 +30,12 @@ export const settingsUrls = (bundleId: string) => [
   `x-apple.systempreferences:com.apple.Notifications-Settings.extension?id=${bundleId}`,
   'x-apple.systempreferences:com.apple.Notifications-Settings.extension',
 ] as const
+
+/** Opens System Settings at Juno's notifications. Packaged, macOS knows Juno by its bundle id; in development the app is Electron. */
+export async function openSettings(packaged: boolean): Promise<void> {
+  const [entry, pane] = settingsUrls(packaged ? 'app.juno.desktop' : 'com.github.Electron')
+  await shell.openExternal(entry).catch(() => shell.openExternal(pane))
+}
 
 /** How long a completion block may take before the answer is `unknown`. A permission prompt waits on the user, so it gets longer. */
 const READ_MS = 3_000
