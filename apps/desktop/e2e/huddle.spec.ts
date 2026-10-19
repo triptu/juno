@@ -6,56 +6,14 @@
  * Slack learns of a leave from Chime, so the test tells the fake when the
  * page's media stopped (`stopMedia`), as Chime would.
  */
-import type { ElectronApplication, Locator, Page } from '@playwright/test'
-import { TEAM, type FakeSlack } from '@juno/fake-slack'
-import type { Juno } from './driver/juno'
+import type { ElectronApplication } from '@playwright/test'
+import { TEAM } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 import { hooks } from './hooks'
+import { addRemote, attendee, chimeDrops, connection, endMedia, huddleMenuItem, localMuted, microphoneAccess, openEngMain, played, playing, sharesReady, startShare, stopShare } from './huddleFake'
 import { expectStableAnchor } from './shiftProbe'
 
 test.describe.configure({ timeout: 90_000 })
-
-/** The fake media session's surface the test drives (`FakeMediaSession`). */
-interface FakeMedia {
-  getSnapshot(): {
-    readonly local: { readonly attendeeId: string | undefined; readonly muted: boolean }
-    readonly connection: { readonly state: string }
-    readonly shares: ReadonlyArray<{ readonly userId: string | undefined; readonly ready: boolean }>
-    readonly localShare: { readonly sourceId: string; readonly name: string } | undefined
-  }
-  /** The window the user shares closes, as macOS ends its capture. */
-  endOwnSource(): void
-  addRemote(remote: { readonly userId: string }): string
-  /** Someone starts or stops sharing their screen; a shown share plays a drawn test pattern. */
-  startShare(userId: string): string
-  stopShare(userId: string): void
-  end(reason: string): void
-  setMicrophoneAccess(access: string): void
-  /** The call sounds the page asked for, in order. */
-  readonly played: ReadonlyArray<string>
-}
-type MediaWindow = Window & { readonly __junoHuddleMedia: FakeMedia }
-
-const connection = (win: Page) => win.evaluate(() => (window as unknown as MediaWindow).__junoHuddleMedia.getSnapshot().connection.state)
-const localMuted = (win: Page) => win.evaluate(() => (window as unknown as MediaWindow).__junoHuddleMedia.getSnapshot().local.muted)
-const attendee = (win: Page) => win.evaluate(() => (window as unknown as MediaWindow).__junoHuddleMedia.getSnapshot().local.attendeeId ?? null)
-const addRemote = (win: Page, userId: string) => win.evaluate((id) => (window as unknown as MediaWindow).__junoHuddleMedia.addRemote({ userId: id }), userId)
-const played = (win: Page) => win.evaluate(() => [...(window as unknown as MediaWindow).__junoHuddleMedia.played])
-const microphoneAccess = (win: Page, access: string) => win.evaluate((given) => (window as unknown as MediaWindow).__junoHuddleMedia.setMicrophoneAccess(given), access)
-const startShare = (win: Page, userId: string) => win.evaluate((id) => (window as unknown as MediaWindow).__junoHuddleMedia.startShare(id), userId)
-const stopShare = (win: Page, userId: string) => win.evaluate((id) => (window as unknown as MediaWindow).__junoHuddleMedia.stopShare(id), userId)
-const sharesReady = (win: Page) => win.evaluate(() => (window as unknown as MediaWindow).__junoHuddleMedia.getSnapshot().shares.map((share) => share.ready))
-/** The video plays and keeps getting new frames: more are decoded over 300 ms. */
-const playing = (video: Locator) =>
-  video.evaluate(async (element: HTMLVideoElement) => {
-    const frames = () => element.getVideoPlaybackQuality().totalVideoFrames
-    if (element.readyState < 2 || element.paused || element.videoWidth === 0) return false
-    const before = frames()
-    await new Promise((resolve) => setTimeout(resolve, 300))
-    return frames() > before
-  })
-const ownShare = (win: Page) => win.evaluate(() => (window as unknown as MediaWindow).__junoHuddleMedia.getSnapshot().localShare?.sourceId ?? null)
-const endMedia = (win: Page, reason: string) => win.evaluate((why) => (window as unknown as MediaWindow).__junoHuddleMedia.end(why), reason)
 
 /** Main's quit dialog under JUNO_E2E: recorded, and answered as the test says (`main/index.ts`). */
 interface QuitHooks {
@@ -63,20 +21,6 @@ interface QuitHooks {
 }
 const quitAsked = (app: ElectronApplication) => app.evaluate(() => [...(globalThis as unknown as QuitHooks).junoTest.huddleQuitAsked()])
 const answerQuit = (app: ElectronApplication, answer: 'confirm' | 'cancel') => app.evaluate((_, given) => (globalThis as unknown as QuitHooks).junoTest.huddleQuitAnswer(given), answer)
-
-async function openEngMain(juno: Juno): Promise<void> {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.sidebar.row('#eng').open()
-  await juno.topic.expectTitle('Main')
-  await juno.sidebar.leave()
-}
-
-/** The page's media stopped: Chime drops the attendee, which on v2 is how Slack learns of the leave. */
-async function chimeDrops(win: Page, fake: FakeSlack, attendeeId: string): Promise<void> {
-  await expect.poll(() => connection(win)).toBe('ended')
-  fake.control('stopMedia', { attendeeId })
-}
 
 test('start a huddle from the header, mute from the bar, open the tab and leave', async ({ juno, fake, win }) => {
   await openEngMain(juno)
@@ -200,13 +144,6 @@ test('someone shares their screen: the bar says so, the tab shows it, two can sh
   await bar.getByRole('button', { name: 'Leave' }).click()
   await chimeDrops(win, fake, attendeeId!)
 })
-
-/** A Huddle menu item as main built it: its label and whether it is enabled. */
-const huddleMenuItem = (app: ElectronApplication, id: 'huddle-show' | 'huddle-mute' | 'huddle-share' | 'huddle-leave') =>
-  app.evaluate(({ Menu }, itemId) => {
-    const item = Menu.getApplicationMenu()?.getMenuItemById(itemId)
-    return item === undefined || item === null ? null : { label: item.label, enabled: item.enabled }
-  }, id)
 
 test('start, mute and leave a huddle from the palette, with the Huddle menu following', async ({ juno, fake, win, app }) => {
   await openEngMain(juno)
@@ -396,125 +333,4 @@ test('Switch leaves the huddle the user is in, joins the other, and says so', as
 
   await bar.getByRole('button', { name: 'Leave' }).click()
   await chimeDrops(win, fake, second!)
-})
-
-/** Under JUNO_E2E main draws the share sheet's sources and a test says what macOS answers (`main/screenShare.ts`). */
-const screenRecording = (app: ElectronApplication, permission: 'unknown' | 'denied' | 'granted') =>
-  app.evaluate((_, given) => (globalThis as unknown as { junoTest: { screenRecording: (p: string) => void } }).junoTest.screenRecording(given), permission)
-
-test('share a window, then a screen, from the bar and the tab; stop; a closed window stops the share', async ({ juno, fake, win, app }) => {
-  await openEngMain(juno)
-  await win.getByRole('button', { name: 'Start huddle' }).click()
-  const bar = win.getByRole('region', { name: 'Huddle' })
-  await expect(bar).toBeVisible()
-  await expect.poll(() => connection(win)).toBe('connected')
-  fake.control('joinHuddle', { channel: 'C0ENG', user: 'U0MAYA' })
-  await addRemote(win, 'U0MAYA')
-  const faces = '[data-huddle-bar] button [role="img"]'
-  await expect(win.locator(faces)).toHaveAccessibleName('Maya')
-  expect(await huddleMenuItem(app, 'huddle-share')).toEqual({ label: 'Share Screen…', enabled: true })
-
-  // Share screen opens the sheet: the screens, then the windows, Juno's own left out, the first screen chosen.
-  await bar.getByRole('button', { name: 'Share screen' }).click()
-  const sheet = win.getByRole('dialog', { name: 'Share your screen' })
-  await expect(sheet).toBeVisible()
-  await expect(sheet.getByRole('radio')).toHaveCount(4)
-  await expect(sheet.getByRole('radio', { name: 'Built-in display' })).toHaveAttribute('aria-checked', 'true')
-  await expect(sheet.getByRole('radio', { name: 'Q4 roadmap — Docs' })).toBeVisible()
-
-  // Pick the window and share it: the bar names it, and nothing in the bar moves.
-  const before = await bar.boundingBox()
-  await sheet.getByRole('radio', { name: 'Q4 roadmap — Docs' }).click()
-  await expectStableAnchor(win, faces, async () => {
-    await sheet.getByRole('button', { name: 'Share', exact: true }).click()
-    await expect(bar).toContainText("You're sharing Q4 roadmap — Docs")
-  })
-  expect(await bar.boundingBox()).toEqual(before)
-  await expect(sheet).toBeHidden()
-  expect(await ownShare(win)).toBe('window:101:0')
-  await expect(bar.getByRole('button', { name: 'Stop sharing' })).toHaveAttribute('aria-pressed', 'true')
-  await expect.poll(() => huddleMenuItem(app, 'huddle-share')).toEqual({ label: 'Stop Sharing', enabled: true })
-
-  // The tab previews the window from the capture itself.
-  await bar.getByRole('button', { name: 'Open huddle in #eng' }).click()
-  await juno.tabs.expectActive('eng · Huddle')
-  const preview = win.getByRole('region', { name: 'Your window, Q4 roadmap — Docs' })
-  await expect(preview).toContainText('Your window')
-  await expect.poll(() => playing(preview.locator('video'))).toBe(true)
-
-  // Stop sharing on the preview, then share a screen with the keyboard: Enter shares the chosen one.
-  await preview.getByRole('button', { name: 'Stop sharing' }).click()
-  await expect(preview).toHaveCount(0)
-  await expect.poll(() => ownShare(win)).toBeNull()
-  const controls = win.getByRole('group', { name: 'Huddle controls' }).last()
-  await controls.getByRole('button', { name: 'Share screen' }).click()
-  await expect(sheet.getByRole('radio', { name: 'Built-in display' })).toBeFocused()
-  await win.keyboard.press('ArrowRight')
-  await expect(sheet.getByRole('radio', { name: 'Studio Display' })).toHaveAttribute('aria-checked', 'true')
-  await win.keyboard.press('Enter')
-  await expect(sheet).toBeHidden()
-  // A whole screen is named, never previewed.
-  await expect(win.locator('[data-huddle-page]')).toContainText("You're sharing Studio Display")
-  await expect(win.locator('[data-share="own"]')).toHaveCount(0)
-  await expect(win.locator('[data-huddle-page]').getByRole('listitem', { name: 'Maya' })).toBeVisible()
-
-  // Stop from the bar.
-  await bar.getByRole('button', { name: 'Stop sharing' }).click()
-  await expect.poll(() => ownShare(win)).toBeNull()
-  await expect(bar).not.toContainText('sharing')
-  await expect.poll(() => huddleMenuItem(app, 'huddle-share')).toEqual({ label: 'Share Screen…', enabled: true })
-
-  // Share the window from ⌘K; then the window closes, and the share stops with a toast.
-  await juno.palette.open()
-  await juno.palette.type('share screen')
-  await juno.palette.root.getByRole('option', { name: 'Share screen…' }).click()
-  await sheet.getByRole('radio', { name: 'Terminal' }).dblclick()
-  await expect.poll(() => ownShare(win)).toBe('window:102:0')
-  await win.evaluate(() => (window as unknown as MediaWindow).__junoHuddleMedia.endOwnSource())
-  await juno.expectToast('Stopped sharing. The window closed.')
-  await expect(bar).not.toContainText('sharing')
-
-  // Esc closes the sheet without sharing.
-  await bar.getByRole('button', { name: 'Share screen' }).click()
-  await expect(sheet).toBeVisible()
-  await win.keyboard.press('Escape')
-  await expect(sheet).toBeHidden()
-  expect(await ownShare(win)).toBeNull()
-
-  const attendeeId = await attendee(win)
-  await bar.getByRole('button', { name: 'Leave' }).click()
-  await chimeDrops(win, fake, attendeeId!)
-})
-
-test('until macOS lets Juno record the screen, the share sheet asks, then points to System Settings', async ({ juno, fake, win, app }) => {
-  await openEngMain(juno)
-  await win.getByRole('button', { name: 'Start huddle' }).click()
-  const bar = win.getByRole('region', { name: 'Huddle' })
-  await expect(bar).toBeVisible()
-  await expect.poll(() => connection(win)).toBe('connected')
-  const sheet = win.getByRole('dialog', { name: 'Share your screen' })
-
-  // Not asked yet: Continue shows the macOS prompt, which the test answers with Allow.
-  await screenRecording(app, 'unknown')
-  await bar.getByRole('button', { name: 'Share screen' }).click()
-  await expect(sheet).toContainText('Allow screen recording')
-  await sheet.getByRole('button', { name: 'Continue' }).click()
-  await expect(sheet.getByRole('radio', { name: 'Built-in display' })).toBeVisible()
-  await sheet.getByRole('button', { name: 'Cancel' }).click()
-  await expect(sheet).toBeHidden()
-
-  // Off for Juno: the sheet says so, and Open System Settings opens them at Screen Recording.
-  await screenRecording(app, 'denied')
-  await bar.getByRole('button', { name: 'Share screen' }).click()
-  await expect(sheet).toContainText('Screen recording is off for Juno')
-  await expect(sheet.getByRole('radio')).toHaveCount(0)
-  await sheet.getByRole('button', { name: 'Open System Settings' }).click()
-  await expect.poll(() => hooks(app, 'screenRecordingSettingsOpened')).toBe(1)
-  await win.keyboard.press('Escape')
-  await expect(sheet).toBeHidden()
-  expect(await ownShare(win)).toBeNull()
-
-  const attendeeId = await attendee(win)
-  await bar.getByRole('button', { name: 'Leave' }).click()
-  await chimeDrops(win, fake, attendeeId!)
 })
