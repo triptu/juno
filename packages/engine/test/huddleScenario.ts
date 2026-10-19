@@ -10,7 +10,7 @@ import { join } from 'node:path'
 import { afterEach } from 'vitest'
 import { huddleCall, huddleMedia, huddleRunning, huddleStart, type HuddleCall, type HuddleMediaEnd, type HuddleStartResult, type RunningHuddles } from '@juno/contract'
 import { liveQuery, runCommand } from '@juno/state'
-import { waitFor, WAIT_MS, type RunningEngine } from './harness'
+import { waitFor, WAIT_MS, type EngineOptions, type RunningEngine } from './harness'
 import { apiCalls, bootedEngine, readDb, valueOf } from './scenario'
 
 export const track: Array<RunningEngine> = []
@@ -35,8 +35,8 @@ export function watchHuddles(engine: RunningEngine): RunningEngine {
   return engine
 }
 
-export async function booted(): Promise<RunningEngine> {
-  return watchHuddles(await bootedEngine(track))
+export async function booted(options: EngineOptions = {}): Promise<RunningEngine> {
+  return watchHuddles(await bootedEngine(track, options))
 }
 
 export const callUntil = (engine: RunningEngine, done: (call: HuddleCall) => boolean, label: string) =>

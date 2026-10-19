@@ -5,7 +5,7 @@ import { expect, it } from 'vitest'
 import { huddleLeave } from '@juno/contract'
 import { runCommand } from '@juno/state'
 import { sleep, waitFor, WAIT_MS } from './harness'
-import { valueOf } from './scenario'
+import { apiCalls, valueOf } from './scenario'
 import {
   booted, callOrder, callUntil, inCall, isRoomFrame, joined, joins, leaves, leftAttendees, recordOf, runningUntil, SELF, start, started,
   stopHuddleEnginesAfterEach, stopMedia, storedLeaves,
@@ -151,4 +151,31 @@ it('a late frame or a frame about another room never ends the call or rolls back
   engine.fake.release()
   await sleep(300)
   expect(leftAttendees(engine)).toEqual([first.attendeeId])
+})
+
+it('keeps the "In a huddle" status as the official client does while the call is live, and stops when it ends', async () => {
+  const engine = await booted({ huddleStatusRenewMillis: 300 })
+  const writes = () => apiCalls(engine, 'users.profile.set')
+  const result = await joined(engine, 'C0ENG')
+  await sleep(500)
+  // Not live until the page's media session started.
+  expect(writes()).toHaveLength(0)
+  await started(engine, result.attendeeId)
+  await waitFor(() => (writes().length >= 1 ? true : undefined), WAIT_MS, 'the status set')
+  expect(writes()[0]?.args['_x_reason']).toBe('increment-huddle-state-expiration-ts')
+  const profile = JSON.parse(writes()[0]?.args['profile'] ?? '{}') as Record<string, number>
+  // The one field the official client writes, now plus 300 s.
+  expect(Object.keys(profile)).toEqual(['huddle_state_expiration_ts'])
+  expect(profile['huddle_state_expiration_ts']! - Date.now() / 1000).toBeGreaterThan(295)
+  expect(profile['huddle_state_expiration_ts']! - Date.now() / 1000).toBeLessThanOrEqual(300)
+  expect(engine.fake.control('huddleStatus', {})).toBe(profile['huddle_state_expiration_ts'])
+  await waitFor(() => (writes().length >= 3 ? true : undefined), WAIT_MS, 'renewed')
+
+  valueOf(await runCommand(engine.registry, huddleLeave, undefined))
+  await stopMedia(engine, result.attendeeId)
+  await callUntil(engine, (call) => call.phase === 'idle', 'idle')
+  const after = writes().length
+  await sleep(1_000)
+  // No more renewals, and no clearing write: the status lapses at its expiry, as in the official client.
+  expect(writes()).toHaveLength(after)
 })
