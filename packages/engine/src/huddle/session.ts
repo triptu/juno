@@ -14,12 +14,17 @@
  * `null` included), is a typed failure the service waits out, never an
  * empty list: only a missing pref is one.
  *
- * Main reports the live renderer page generations (`huddlePages`); the
- * service takes a page that is no longer listed as gone, with its media.
+ * Main reports the live renderer page generations and the highest it gave
+ * out (`huddlePages`); the service takes a page that is not listed as gone,
+ * with its media.
+ *
+ * At boot every workspace's stored leaves are read, not only the open one's
+ * (`listWorkspaces`, `peekUserPref`): a page may still hold media for a
+ * workspace the user left before the engine restarted.
  */
 import { Effect, Layer, Schema, Stream } from 'effect'
 import { Huddle, HuddleStoreError } from '@juno/huddle'
-import { prefs, StoreReader, transaction } from '@juno/store'
+import { listWorkspaces, peekUserPref, prefs, StoreReader, transaction } from '@juno/store'
 import { EngineConfig } from '../config'
 import { HostLink } from '../protocol/host'
 import { SocketEvents, type SessionServices, type SocketListener } from '../socketEvents'
@@ -32,7 +37,7 @@ const Records = Schema.Array(Schema.Struct({
   callId: Schema.String,
   attendeeId: Schema.String,
   /** The renderer page generation the credentials went to; null when none did. */
-  generation: Schema.NullOr(Schema.String),
+  generation: Schema.NullOr(Schema.Number),
 }))
 
 /**
@@ -40,12 +45,12 @@ const Records = Schema.Array(Schema.Struct({
  * anything else that is not a list of records, bad JSON and `null`
  * included. Read here rather than with `prefs.get`, which throws on bad JSON.
  */
+const decodeRecords = (json: string | undefined) => (json === undefined ? Effect.succeed([]) : Schema.decodeUnknownEffect(Schema.fromJsonString(Records))(json))
+
 const readRecords = Effect.gen(function* () {
   const sql = yield* StoreReader
   const rows = yield* sql<{ value_json: string }>`SELECT value_json FROM prefs WHERE key = ${PENDING_LEAVES_PREF}`
-  const row = rows[0]
-  if (row === undefined) return []
-  return yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Records))(row.value_json)
+  return yield* decodeRecords(rows[0]?.value_json)
 })
 
 /** The conversations the user is in, to read running huddles for. */
@@ -65,7 +70,12 @@ export const HuddleSessions = Layer.effectDiscard(Effect.gen(function* () {
   const link = yield* HostLink
   const config = yield* EngineConfig
   const fromMain = yield* link.messages
-  yield* Effect.forkScoped(Stream.runForEach(fromMain, (message) => (message._tag === 'huddlePages' ? huddle.pages(message.live) : Effect.void)))
+  yield* Effect.forkScoped(Stream.runForEach(fromMain, (message) => (message._tag === 'huddlePages' ? huddle.pages(message.live, message.maxIssued) : Effect.void)))
+  yield* Effect.forkScoped(huddle.boot({
+    workspaces: listWorkspaces(config.userData).pipe(Effect.mapError((cause) => new HuddleStoreError({ cause }))),
+    read: (workspaceId) =>
+      peekUserPref(config.userData, workspaceId, PENDING_LEAVES_PREF).pipe(Effect.flatMap(decodeRecords), Effect.mapError((cause) => new HuddleStoreError({ cause }))),
+  }))
   yield* events.subscribe('huddle', Effect.gen(function* () {
     const context = yield* Effect.context<SessionServices>()
     const open = yield* workspace.current

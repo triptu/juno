@@ -20,13 +20,14 @@ export const HuddleHandlers = HuddleRoutes.toLayer(
     return {
       'huddle.call': () => serveLiveValue(runs(huddle.call), { measure }),
       'huddle.running': () => serveLiveValue(runs(huddle.running), { measure }),
-      'huddle.start': ({ channelId, region, generation }) =>
+      // The RPC client id is the page's engine connection: a new port gets a higher one.
+      'huddle.start': ({ channelId, region, generation }, { client }) =>
         Effect.gen(function* () {
           if ((yield* workspace.current) === undefined) return yield* new NotSignedIn()
-          return yield* huddle.start(channelId, region, generation)
+          return yield* huddle.start(channelId, region, generation, client.id)
         }),
       'huddle.leave': () => huddle.leave,
-      'huddle.report': ({ report }) => huddle.report(report),
+      'huddle.report': ({ report }, { client }) => huddle.report(report, client.id),
     }
   }),
 )
