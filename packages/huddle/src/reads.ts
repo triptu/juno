@@ -5,6 +5,10 @@
  * own channel due. A read is dropped when a socket gap, or a frame for that
  * channel, came while it was out (specs/huddle.qnt, `answerInfo` and
  * `discardInfo`). Frames never change the call.
+ *
+ * `Overflowed` means events were dropped, a connect or a drop among them,
+ * so the connection is `unknown` after it and reads go on; only a
+ * `Disconnected` the service saw stops them.
  */
 import { Effect, Queue, Result } from 'effect'
 import type { HuddleInfo } from '@juno/slack-schema'
@@ -22,7 +26,7 @@ const applyRead = (core: Core, to: Attached, read: { readonly all: boolean; read
     const info = to.info
     if (core.attached !== to) return
     // A gap while the read was out: the whole answer may predate what was lost (model `discardInfo`).
-    if (read.gap !== info.gap || !info.connected) {
+    if (read.gap !== info.gap || info.connection === 'down') {
       if (read.all) info.dirtyAll = true
       for (const id of read.ids) info.dirty.add(id)
       return yield* Queue.offer(info.wake, undefined)
@@ -51,7 +55,7 @@ export const reader = (core: Core, to: Attached) =>
     while (true) {
       yield* Queue.take(info.wake)
       yield* Effect.sleep(INFO_DEBOUNCE_MILLIS)
-      if (!info.connected || (!info.dirtyAll && info.dirty.size === 0)) continue
+      if (info.connection === 'down' || (!info.dirtyAll && info.dirty.size === 0)) continue
       const all = info.dirtyAll
       const ids = new Set(info.dirty)
       if (all) for (const channel of yield* to.session.channels) ids.add(channel)
@@ -91,14 +95,15 @@ export const listener = (core: Core, to: Attached): HuddleListener => (input) =>
         return yield* publish(core)
       }
       case 'Connected':
-        info.connected = true
+        info.connection = 'up'
         info.gap += 1
         return yield* markDue(to, 'all')
       case 'Disconnected':
-        info.connected = false
+        info.connection = 'down'
         info.gap += 1
         return
       case 'Overflowed':
+        info.connection = 'unknown'
         info.gap += 1
         return yield* markDue(to, 'all')
     }
