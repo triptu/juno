@@ -143,6 +143,8 @@ const styles = stylex.create({
     gap: spacing['--space-1-5'],
     marginTop: spacing['--space-1-5'],
     minWidth: 0,
+    // Chrome, also inside a shared message's card, whose selectable text would give it the text cursor.
+    cursor: 'default',
   },
   flush: { marginTop: 0 },
   card: {

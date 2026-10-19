@@ -42,7 +42,8 @@ export function SharedPlace({ source }: { readonly source: NonNullable<Attachmen
 /**
  * A shared message's files when Juno has nothing to draw them with: one
  * quiet line each, its kind and name in the sidebar preview's words
- * ("Video: demo.mov", "File: report.pdf").
+ * ("Video: demo.mov", "File: report.pdf"). The line is message text, so it
+ * can be selected.
  */
 export function SharedFileLines({ files }: { readonly files: ReadonlyArray<FileBlock> }) {
   return files.map((file) => {
@@ -50,7 +51,7 @@ export function SharedFileLines({ files }: { readonly files: ReadonlyArray<FileB
     const word = kind === 'image' ? 'Image' : kind === 'video' ? 'Video' : kind === 'audio' ? 'Audio' : 'File'
     return <div key={file.id} data-shared-file="" {...stylex.props(styles.fileLine)}>
       <Icon icon={fileIcon[kind]} size={14} />
-      <Text variant="ui" tone="muted" truncate dir="auto" title={file.name} data-sensitive="">{`${word}: ${file.name}`}</Text>
+      <Text variant="ui" tone="muted" truncate selectable dir="auto" title={file.name} data-sensitive="">{`${word}: ${file.name}`}</Text>
     </div>
   })
 }
