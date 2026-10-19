@@ -46,6 +46,8 @@ export const EngineConfig = Schema.Struct({
   slackScheduleDebounceMillis: Schema.optionalKey(Schema.Number),
   /** Tests only: how long the Automated job gathers changes before a pass (the app waits 3 s). */
   automatedWindowMillis: Schema.optionalKey(Schema.Number),
+  /** Tests only: how often the "In a huddle" status is renewed while a call is live (the app: 240 s, ±10%). */
+  huddleStatusRenewMillis: Schema.optionalKey(Schema.Number),
   /** Tests only: open the cache with one more migration, as the next build would, to test that an update keeps the cache. */
   cacheMigrationProbe: Schema.optionalKey(Schema.Boolean),
 })

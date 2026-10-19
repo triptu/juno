@@ -189,6 +189,8 @@ export interface EngineOptions {
    * by this number (1 is the app's pacing) so the methods keep their real ratios.
    */
   readonly paced?: number
+  /** How often the "In a huddle" status is renewed while a call is live (the app: 240 s). */
+  readonly huddleStatusRenewMillis?: number
   /** Run the background AI jobs (titles, art, Home's AI items, Juno's Automated check). Off by default, so a test sees no AI result it did not ask for. */
   readonly aiJobs?: boolean
 }
@@ -209,7 +211,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
   let cycles = 0
   let pendingCycles = 0
   let online = false
-  const handle = await startEngine(transport, { userData, e2e: true, dev: false, fakeSlackUrl: fake.url, ai: 'fake', aiJobs: options.aiJobs === true, ...(options.paced === undefined ? {} : { fakeSlackPaced: true, ...(options.paced === 1 ? {} : { fakeSlackPaceScale: options.paced }) }), ...(options.actionDeadlineMillis === undefined ? {} : { actionDeadlineMillis: options.actionDeadlineMillis }), ...(options.actionStallMillis === undefined ? {} : { actionStallMillis: options.actionStallMillis }), ...(options.markDelayMillis === undefined ? {} : { markDelayMillis: options.markDelayMillis }), ...(options.slackScheduleDebounceMillis === undefined ? {} : { slackScheduleDebounceMillis: options.slackScheduleDebounceMillis }), ...(options.automatedWindowMillis === undefined ? {} : { automatedWindowMillis: options.automatedWindowMillis }) }, {
+  const handle = await startEngine(transport, { userData, e2e: true, dev: false, fakeSlackUrl: fake.url, ai: 'fake', aiJobs: options.aiJobs === true, ...(options.paced === undefined ? {} : { fakeSlackPaced: true, ...(options.paced === 1 ? {} : { fakeSlackPaceScale: options.paced }) }), ...(options.actionDeadlineMillis === undefined ? {} : { actionDeadlineMillis: options.actionDeadlineMillis }), ...(options.actionStallMillis === undefined ? {} : { actionStallMillis: options.actionStallMillis }), ...(options.markDelayMillis === undefined ? {} : { markDelayMillis: options.markDelayMillis }), ...(options.slackScheduleDebounceMillis === undefined ? {} : { slackScheduleDebounceMillis: options.slackScheduleDebounceMillis }), ...(options.automatedWindowMillis === undefined ? {} : { automatedWindowMillis: options.automatedWindowMillis }), ...(options.huddleStatusRenewMillis === undefined ? {} : { huddleStatusRenewMillis: options.huddleStatusRenewMillis }) }, {
     ...(options.notifications === undefined ? {} : { notifications: options.notifications }),
     host: main.host,
     httpTransport: main.httpTransport,

@@ -19,6 +19,7 @@
 import { Effect, Layer, Schema, Stream } from 'effect'
 import { Huddle, HuddleStoreError } from '@juno/huddle'
 import { prefs, StoreReader, transaction } from '@juno/store'
+import { EngineConfig } from '../config'
 import { HostLink } from '../protocol/host'
 import { SocketEvents, type SessionServices, type SocketListener } from '../socketEvents'
 import { Workspace } from '../workspace'
@@ -48,6 +49,7 @@ export const HuddleSessions = Layer.effectDiscard(Effect.gen(function* () {
   const events = yield* SocketEvents
   const workspace = yield* Workspace
   const link = yield* HostLink
+  const config = yield* EngineConfig
   const fromMain = yield* link.messages
   yield* Effect.forkScoped(Stream.runForEach(fromMain, (message) => (message._tag === 'huddlePages' ? huddle.pages(message.live) : Effect.void)))
   yield* events.subscribe('huddle', Effect.gen(function* () {
@@ -57,6 +59,7 @@ export const HuddleSessions = Layer.effectDiscard(Effect.gen(function* () {
     if (open === undefined) return ignore
     const listener = yield* huddle.attach({
       workspace: open.id,
+      ...(config.huddleStatusRenewMillis === undefined ? {} : { statusRenewMillis: config.huddleStatusRenewMillis }),
       slack: context,
       leaves: {
         read: prefs.get(PENDING_LEAVES_PREF).pipe(
