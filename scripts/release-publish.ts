@@ -12,7 +12,7 @@
  *
  * Flags:
  *   --notes <file>   the changelog lines for this version, one per line (required)
- *   --urgent         publish after typecheck, lint, unit tests and package smoke; run a full run for it next
+ *   --urgent         publish after typecheck, lint, unit tests and package smoke; start pnpm verify:main for it next
  *   --prerelease     publish as a pre-release: the app never offers it, and CHANGELOG.md is left alone
  *   --dry-run        check everything and print the plan; change nothing
  *   --dir <path>     the build folder (default apps/desktop/release)
