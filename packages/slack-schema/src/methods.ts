@@ -22,6 +22,8 @@ import {
   ChatDeleteFields,
   ChatPostMessageArgs,
   ChatPostMessageFields,
+  ChatShareMessageArgs,
+  ChatShareMessageFields,
   ChatUpdateArgs,
   ChatUpdateFields,
   ReactionArgs,
@@ -101,6 +103,7 @@ export const Methods = {
   // The official client sends `active` or `away` (research section 3, Presence); `auto` is the public `users.setPresence` value.
   'presence.set': method(S.Struct({ presence: S.Literals(['active', 'away']) }), {}),
   'chat.postMessage': method(ChatPostMessageArgs, ChatPostMessageFields),
+  'chat.shareMessage': method(ChatShareMessageArgs, ChatShareMessageFields),
   'chat.update': method(ChatUpdateArgs, ChatUpdateFields),
   'chat.delete': method(ChatDeleteArgs, ChatDeleteFields),
   'reactions.add': method(ReactionArgs, ReactionFields),
