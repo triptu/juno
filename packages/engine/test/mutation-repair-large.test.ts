@@ -58,7 +58,8 @@ it('repairs offline mutations outside the top ten on the large seed, without ope
   const budget = Object.fromEntries(['client.counts', 'conversations.history', 'conversations.replies', 'search.modules.messages', 'subscriptions.thread.getView'].map(
     (method) => [method, engine.fake.callCount(method)],
   ))
-  const total = engine.fake.calls.filter((c) => c.method !== 'client.getWebSocketURL').length
+  // Running huddles are read after each connect (packages/huddle), apart from the repair's budget.
+  const total = engine.fake.calls.filter((c) => c.method !== 'client.getWebSocketURL' && c.method !== 'huddles/info').length
   const fallback = engine.fake.calls.filter((c) => c.args['_x_reason'] === 'recheck').length
   expect({ budget, total, repair: repairs.length, fallback }).toEqual({
     // The ten fallback topics include one Main and nine threads on this seed.
