@@ -128,6 +128,10 @@ export interface JoinInfo {
   readonly noiseSuppression?: boolean
 }
 
+/** A call sound (`sounds.ts`). */
+export type { HuddleSound } from './sounds.ts'
+import type { HuddleSound } from './sounds.ts'
+
 /**
  * One huddle's audio, in the renderer. One call at a time: `join` while a call
  * is connecting or connected throws. After it ends, `join` may start a new one.
@@ -145,6 +149,8 @@ export interface MediaSession {
   /** `null` is "Same as system". */
   chooseMicrophone(id: string | null): Promise<void>
   chooseSpeaker(id: string | null): Promise<void>
+  /** Plays a short call sound, quietly, on the speaker in use or the one picked. Works in any state, after an end too. */
+  playSound(sound: HuddleSound): void
   /** Returns the unsubscribe function. */
   subscribe(listener: () => void): () => void
   /** The same object until something changes. */

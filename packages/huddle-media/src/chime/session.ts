@@ -21,9 +21,10 @@ import {
 import { CONTENT_SUFFIX } from '../externalUserId.ts'
 import { INITIAL_SNAPSHOT, patchAttendee, presence, setConnection, speakers, startCall } from '../snapshot.ts'
 import { SnapshotStore } from '../store.ts'
-import type { Devices, EndReason, JoinInfo, MediaSession, MicrophoneAccess } from '../types.ts'
+import type { Devices, EndReason, HuddleSound, JoinInfo, MediaSession, MicrophoneAccess } from '../types.ts'
 import { deviceList, inUse } from '../devices.ts'
 import { codeName, endReasonOf } from './endReason.ts'
+import { playSoundUrl, type SoundUrls } from './sounds.ts'
 import { VoiceFocus, voiceFocusSupported } from './voiceFocus.ts'
 
 /** After this long without a connection the call ends as `connection-lost` (SPEC 20: "After 30 seconds"). */
@@ -52,8 +53,8 @@ interface Call {
   readonly cleanups: Array<() => void>
 }
 
-export function createChimeMediaSession(): MediaSession {
-  return new ChimeMediaSession()
+export function createChimeMediaSession(options: { readonly sounds?: SoundUrls } = {}): MediaSession {
+  return new ChimeMediaSession(options.sounds ?? {})
 }
 
 class ChimeMediaSession implements MediaSession {
@@ -71,8 +72,18 @@ class ChimeMediaSession implements MediaSession {
   /** Device changes run one at a time, in order. */
   #queue: Promise<unknown> = Promise.resolve()
 
+  readonly #sounds: SoundUrls
+
+  constructor(sounds: SoundUrls) {
+    this.#sounds = sounds
+  }
+
   subscribe = this.#store.subscribe
   getSnapshot = this.#store.getSnapshot
+
+  playSound(sound: HuddleSound): void {
+    playSoundUrl(this.#sounds[sound], inUse(this.#speaker, this.getSnapshot().devices.speakers))
+  }
 
   async join(info: JoinInfo): Promise<void> {
     const state = this.getSnapshot().connection.state

@@ -8,8 +8,8 @@ WebRTC needs a Chromium page, and the stream has to be in the same page as the e
 
 ## Entries
 
-- `@juno/huddle-media`: the types (`src/types.ts`). It exports only what something imports today (`MediaSession`, `MediaSnapshot`, `Devices`, `EndReason`), since knip fails on an unused export.
-- `@juno/huddle-media/chime`: `createChimeMediaSession()`, on `amazon-chime-sdk-js` 3.32.0 (the version Slack ships). The SDK is about 2.2 MB minified (550 KB gzip), so load this entry only with `import()` on join; it must never reach the initial bundle. Only `src/chime/` and the tests may import the SDK.
+- `@juno/huddle-media`: the types (`src/types.ts`) and the sound rule (`src/sounds.ts`). It exports only what something imports today (`MediaSession`, `MediaSnapshot`, `Devices`, `EndReason`, `huddleSounds`, `SoundView`), since knip fails on an unused export.
+- `@juno/huddle-media/chime`: `createChimeMediaSession({ sounds })`, with the urls of the join and leave sounds the app bundles, on `amazon-chime-sdk-js` 3.32.0 (the version Slack ships). The SDK is about 2.2 MB minified (550 KB gzip), so load this entry only with `import()` on join; it must never reach the initial bundle. Only `src/chime/` and the tests may import the SDK.
 - `@juno/huddle-media/fake`: `createFakeMediaSession(options)` for e2e tests and the gallery. No network and no WebRTC. The app loads it as a lazy chunk only when main says the page runs under JUNO_E2E (`huddle.register`), and puts it on `window.__junoHuddleMedia` for the test to drive.
 
 ## The interface
@@ -23,6 +23,7 @@ interface MediaSession {
   listDevices(): Promise<Devices>   // also retries a blocked microphone; call it on window focus
   chooseMicrophone(id: string | null): Promise<void>  // null: same as system
   chooseSpeaker(id: string | null): Promise<void>
+  playSound(sound: 'join' | 'leave'): void  // quietly, on the speaker in use; also after an end
   subscribe(listener: () => void): () => void
   getSnapshot(): MediaSnapshot
 }
@@ -48,6 +49,10 @@ The snapshot (`src/types.ts` has the comments):
 - **Lifetime.** The session owns one `<audio>` element, created with the session and never put in the page, and binds the call to it. `leave()` or Chime's own stop unbinds it, stops the microphone and frees Voice Focus. `leave()` is safe in any state, also while `join` is still starting.
 - **The engine learns of an end from the snapshot.** When Chime ends the call by itself (`another-device`, `connection-lost`, `meeting-ended`, `removed`, `full`, `failed`), only the renderer knows. The owner of the session watches for `connection.state === 'ended'` with a reason other than `left` and tells the engine, passing `attendeeId`, so the engine can send `rooms.leave` and clear its call. The attendee id makes a late end of an older call easy to ignore.
 
+## Sounds
+
+`huddleSounds(before, after)` is SPEC 20's rule for the call sounds, as a pure function over a small view: the user's own call (`out`, `connecting`, `connected`, `reconnecting`), its attendee id, and the other people the engine's call names. The user's call connecting plays `join` and its end plays `leave`; a reconnect plays nothing, and a call that never connected plays nothing when it ends. Other people coming and going play `join` and `leave`, except past eight people in the huddle. The first list of other people is where they start, so the people already there when the user joins make no sound. The app reads the view on every snapshot and call change (`apps/desktop/src/renderer/containers/huddle/media.ts`) and plays what the rule returns through `playSound`. The Chime session plays a sound with its own `Audio` element at half volume, sent with `setSinkId` to the speaker in use. The sounds are WAV files in `apps/desktop/src/renderer/containers/huddle/sounds/`, made by `scripts/huddle-sounds.mjs` from plain sine notes.
+
 ## Chime set-up
 
 - Audio only: `NoVideoDownlinkBandwidthPolicy`, so a camera someone turns on in Slack is never received.
@@ -61,8 +66,8 @@ The integration has to allow, in the renderer's CSP: `connect-src` for Chime's `
 
 ## The fake
 
-`createFakeMediaSession({ autoConnect, microphones, speakers, microphoneAccess, noiseSuppression })` implements `MediaSession`; `join` connects at once unless `autoConnect` is false. The test drives the rest: `addRemote({ userId, attendeeId?, muted? })`, `removeRemote(id)`, `setSpeaking(id, on)` (the local attendee too; the latest to start is the active speaker), `setRemoteMuted(id, muted)`, `setConnection('connecting' | 'connected' | 'reconnecting')` (only `connected` sends), `setSending(on)`, `end(reason)`, `setMicrophoneAccess(access)`, `setDevices({ microphones, speakers })`, and for phase 4 `startShare(userId)` and `stopShare(userId)`.
+`createFakeMediaSession({ autoConnect, microphones, speakers, microphoneAccess, noiseSuppression })` implements `MediaSession`; `join` connects at once unless `autoConnect` is false. The test drives the rest: `addRemote({ userId, attendeeId?, muted? })`, `removeRemote(id)`, `setSpeaking(id, on)` (the local attendee too; the latest to start is the active speaker), `setRemoteMuted(id, muted)`, `setConnection('connecting' | 'connected' | 'reconnecting')` (only `connected` sends), `setSending(on)`, `end(reason)`, `setMicrophoneAccess(access)`, `setDevices({ microphones, speakers })`, and for phase 4 `startShare(userId)` and `stopShare(userId)`. It plays no sound: `played` lists the sounds `playSound` was asked for, in order.
 
 ## Tests
 
-`test/rules.test.ts` covers the pure rules (the `ExternalUserId` parse and the stop code mapping), `test/snapshot.test.ts` snapshot identity, and `test/fake.test.ts` drives the fake's timeline. The Chime session itself runs against real Chime only in `scripts/huddle-live.ts`, which now uses it.
+`test/rules.test.ts` covers the pure rules (the `ExternalUserId` parse and the stop code mapping), `test/sounds.test.ts` the sound rule, `test/snapshot.test.ts` snapshot identity, and `test/fake.test.ts` drives the fake's timeline. The Chime session itself runs against real Chime only in `scripts/huddle-live.ts`, which now uses it.

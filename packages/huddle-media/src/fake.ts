@@ -8,7 +8,7 @@ import { inUse } from './devices.ts'
 import { CONTENT_SUFFIX } from './externalUserId.ts'
 import { INITIAL_SNAPSHOT, patchAttendee, presence, setConnection, speakers, startCall } from './snapshot.ts'
 import { SnapshotStore } from './store.ts'
-import type { Devices, EndReason, JoinInfo, MediaDevice, MediaSession, MicrophoneAccess } from './types.ts'
+import type { Devices, EndReason, HuddleSound, JoinInfo, MediaDevice, MediaSession, MicrophoneAccess } from './types.ts'
 
 export interface FakeMediaOptions {
   /** `join` connects at once. Default true; when false, call `setConnection('connected')`. */
@@ -35,6 +35,8 @@ export class FakeMediaSession implements MediaSession {
   readonly #noiseSupported: boolean
   /** Who speaks now, loudest first. */
   #speaking: ReadonlyArray<string> = []
+  /** The sounds `playSound` was asked for, in order, for a test to read. */
+  readonly played: Array<HuddleSound> = []
 
   constructor(options: FakeMediaOptions = {}) {
     this.#autoConnect = options.autoConnect ?? true
@@ -65,6 +67,10 @@ export class FakeMediaSession implements MediaSession {
 
   async leave(): Promise<void> {
     this.end('left')
+  }
+
+  playSound(sound: HuddleSound): void {
+    this.played.push(sound)
   }
 
   setMuted(muted: boolean): void {
