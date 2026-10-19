@@ -16,6 +16,7 @@ import type { Updates } from './updates'
 import type { Launch } from './launch'
 import { APP_ORIGIN } from './scheme'
 import { closeWebPanel, hideWebPanel, setWebPanelBounds, showWebPanel } from './webPanel'
+import { setMenuHuddle } from './window'
 
 /**
  * Registers a request/response handler for one contract route. The input is
@@ -199,6 +200,9 @@ export function registerIpc({ updates, supervisor, agent, providers, codex, back
   const huddlePages = watchHuddlePages(supervisor)
   // Under JUNO_E2E the page runs the fake media session, so no test talks to Chime.
   handle(Channels.huddleRegister, (_input, event) => ({ generation: huddlePages.register(event.sender.id), fakeMedia: e2e }))
+  handle(Channels.huddleMenu, ({ menu }) => {
+    setMenuHuddle(menu)
+  })
 
   handle(Channels.sharingGet, () => sharing.get())
   handle(Channels.sharingSet, ({ hide }) => sharing.set(hide))

@@ -112,6 +112,7 @@ const bridge: JunoBridge = {
   },
   huddle: {
     register: () => ipcRenderer.invoke(Channels.huddleRegister),
+    setMenu: (menu) => ipcRenderer.invoke(Channels.huddleMenu, { menu: menu === null ? null : { muted: menu.muted } }),
   },
   contextMenu: {
     popup: (items, at) =>
