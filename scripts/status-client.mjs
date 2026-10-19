@@ -1,5 +1,5 @@
 // The status page's inline script: search and area filter (kept in the URL
-// hash), open days kept across reloads, relative times, and a reload every 20 s.
+// hash), open days kept across reloads, and a reload every 20 s.
 
 export const clientScript = `
 const q = document.getElementById('q')
@@ -59,20 +59,10 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && document.activeElement === q) { q.value = ''; apply(); q.blur() }
 })
 
-function ago() {
-  for (const el of document.querySelectorAll('[data-ts]')) {
-    const min = Math.round((Date.now() - Number(el.dataset.ts)) / 60000)
-    el.textContent = min < 1 ? 'just now' : min < 60 ? min + ' min ago' : Math.round(min / 60) + ' h ago'
-    el.classList.toggle('stale', min > 180)
-  }
-}
-
 apply()
-ago()
 const y = Number(sessionStorage.getItem('scrollY'))
 if (y) scrollTo(0, y)
 setInterval(() => {
-  ago()
   if (Date.now() - lastKey < 10000) return
   sessionStorage.setItem('scrollY', String(scrollY))
   location.reload()

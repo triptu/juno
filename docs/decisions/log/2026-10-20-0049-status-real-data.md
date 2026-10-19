@@ -1,0 +1,1 @@
+- 10-20 00:49 · Tushar · Remove the manual status input and Desktop DMG tracking; the status page shows decisions, landed commits, the last green run and health because those have real data sources.

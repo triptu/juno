@@ -16,7 +16,6 @@ Run these from a Juno checkout with dependencies installed (not the main checkou
 1. **Look first.** `git fetch origin main`, then `pnpm release:scheduled --dry-run`. It prints the newest `origin/main` commit with a green full-run record, the gate result, the next version and the release notes. It changes nothing.
 2. **Get a green full run if needed.** If the dry run says no eligible full run covers the changes you need, run `pnpm verify:main --ref origin/main` once (about 25 minutes, one remote plan on the laptop). Results land in the main checkout's `.juno-status/verify-main/`.
    - If it fails, find the cause. Fix failures in code (or start a fixer agent per failure) and merge the fixes, then run it once more. Never rerun in a loop hoping for green, and never weaken an assertion.
-   - A test that fails only sometimes on main may be tagged `@flaky` and added to `.juno-status/release-waivers.json` with its reporter ID, reason and date ("Flakes" in `docs/development.md`). Waivers cover named test failures only, never a crash, timeout or missing report.
 3. **Publish.** Read the updater token from the keychain straight into the command:
 
    ```sh

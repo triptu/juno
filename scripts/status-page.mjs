@@ -6,26 +6,7 @@
 // never fail on a missing or broken file. The page reloads itself every 20 s and
 // keeps its search and area filter across reloads.
 //
-// .juno-status/now.json is written by the orchestrator (local, not committed).
-// Keep each list accurate, since the owner reads the page top to bottom:
-//
-//   needsYou   [{ title, detail }]  Real blockers only: work that is stopped until
-//              the owner acts or answers. Remove an item as soon as it is resolved.
-//              Optional checks and questions that can wait go in `later`.
-//   running    [{ name, model?, detail?, since? }]  Agents working right now. Drop
-//              an agent when it finishes.
-//   next       ["..." or { name, detail }]  What starts after the running work, in order.
-//   later      [{ title, detail }]  "When you have time": optional checks, live
-//              tests and questions the owner can take up whenever. Not blockers.
-//   pendingDecisions ["MM-DD HH:MM · who · text"]  Calls made for the owner that
-//              they may want to override.
-//   ideas      ["..." or { name, detail }]  Possible work nobody has picked up.
-//   dmg        { commit, builtAt }  The commit the owner's DMG on ~/Desktop came from.
-//   updated    ISO time of the last write.
-//
-// Also read: docs/decision-log.md, main's git history, the full-run records under
-// .juno-status/verify-main (last green commit), .juno-status/health.json and the
-// DMG on ~/Desktop.
+// Reads decisions, main's git history, full-run records and health.
 // Areas of work are tagged by the keyword table in status-areas.mjs.
 
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -33,19 +14,16 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { areas } from './status-areas.mjs'
 import { clientScript } from './status-client.mjs'
-import { changesSince, readDecisions, readDmg, readJson, readLanded, readLastGreen } from './status-data.mjs'
+import { changesSince, readDecisions, readJson, readLanded, readLastGreen } from './status-data.mjs'
 
 const rootArg = process.argv.indexOf('--root')
 const root = rootArg > 0 ? resolve(process.argv[rootArg + 1]) : join(dirname(fileURLToPath(import.meta.url)), '..')
 const outDir = join(root, '.juno-status')
 
-const now = readJson(join(outDir, 'now.json')) ?? {}
 const health = readJson(join(outDir, 'health.json'))
 const decisions = readDecisions(root)
 const landed = readLanded(root)
 const green = readLastGreen(root)
-const dmg = readDmg()
-const list = (value) => (Array.isArray(value) ? value : [])
 
 const esc = (s) =>
   String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
@@ -58,52 +36,15 @@ const dayLabel = (mmdd) => {
   return Number.isNaN(date.getTime()) ? mmdd : ist(date, { weekday: 'short', day: 'numeric', month: 'short' })
 }
 const tags = (names) => names.map((name) => `<span class="tag">${esc(name)}</span>`).join('')
-const ago = (date) => `<span data-ts="${date.getTime()}"></span>`
-
-const updatedTimes = [now.updated, now.updatedAt].map((t) => new Date(t)).filter((d) => !Number.isNaN(d.getTime()))
-const updated = updatedTimes.toSorted((a, b) => b - a)[0]
-
 const section = (id, title, body, count) =>
   `<section id="${id}"><h2>${esc(title)}${count ? ` <span class="count">${count}</span>` : ''}</h2>${body}</section>`
 
-// Needs you, running, next.
-const needs = list(now.needsYou)
-const needsBody = needs.length
-  ? `<ul class="cards">${needs.map((n) => `<li class="card needs"><strong>${inline(n.title)}</strong>${n.detail ? `<p>${inline(n.detail)}</p>` : ''}</li>`).join('')}</ul>`
-  : ''
-
-const running = list(now.running)
-const runningBody = running.length
-  ? `<ul class="cards">${running
-      .map(
-        (r) =>
-          `<li class="card"><strong>${inline(r.name)}</strong>${r.model || r.since ? `<span class="meta"> · ${esc(r.model ?? '')}${r.since ? ` since ${esc(r.since)}` : ''}</span>` : ''}${r.detail ? `<p>${inline(r.detail)}</p>` : ''}</li>`,
-      )
-      .join('')}</ul>`
-  : '<p class="quiet">No agents running.</p>'
-
-// A list item is a plain string or { name, detail }.
-const item = (n) =>
-  typeof n === 'string' ? inline(n) : `<strong>${inline(n.name ?? n.title ?? '')}</strong>${n.detail ? ` · ${inline(n.detail)}` : ''}`
-const nextItems = list(now.next)
-const nextBody = nextItems.length
-  ? `<ol class="plain">${nextItems.map((n) => `<li>${item(n)}</li>`).join('')}</ol>`
-  : '<p class="quiet">Nothing queued.</p>'
-
-// Build: last green commit, DMG, health.
-function dmgLine() {
-  const commit = now.dmg?.commit
-  const builtAt = new Date(now.dmg?.builtAt ?? dmg?.at ?? Number.NaN)
-  const when = Number.isNaN(builtAt.getTime()) ? '' : ist(builtAt, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
-  const file = dmg ? `~/Desktop/${esc(dmg.name)}` : 'not on the Desktop'
-  return `<div class="stat"><span class="label">DMG</span>${commit ? `from <code>${esc(String(commit).slice(0, 8))}</code> ` : ''}<span class="meta">${file}${when ? ` · built ${esc(when)}` : ''}</span></div>`
-}
+// Last green commit and health.
 const greenAt = changesSince(root, green?.hash)
 const buildParts = [
   green
     ? `<div class="stat"><span class="label">Last green</span><code>${esc(green.hash.slice(0, 8))}</code> <span class="meta">${esc(ist(green.at, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))}${greenAt > 0 ? ` · main has ${greenAt} change${greenAt === 1 ? '' : 's'} since` : greenAt === 0 ? ' · main is at it' : ''}</span></div>`
     : '<div class="stat"><span class="label">Last green</span><span class="meta">none recorded</span></div>',
-  dmgLine(),
 ]
 if (health) {
   const c = health.counts ?? {}
@@ -128,29 +69,6 @@ const landedRow = (l) => {
 const landedBody = landed.length
   ? `<ul class="rows">${landed.slice(0, 10).map(landedRow).join('')}</ul>${landed.length > 10 ? `<details class="more"><summary>${landed.length - 10} earlier</summary><ul class="rows">${landed.slice(10).map(landedRow).join('')}</ul></details>` : ''}`
   : '<p class="quiet">No history found.</p>'
-
-// When you have time: later, decisions made for the owner, ideas.
-const fold = (title, detail) =>
-  `<li><details><summary>${inline(title)}</summary>${detail ? `<p>${inline(detail)}</p>` : ''}</details></li>`
-const later = list(now.later)
-// "MM-DD HH:MM · who · text", or any other string.
-const pendingRow = (p) => {
-  const [when, who, ...rest] = typeof p === 'string' ? p.split(' · ') : []
-  return rest.length
-    ? `<li class="decision"><span class="time">${esc(when)}</span><span class="who">${esc(who)}</span><span class="text">${inline(rest.join(' · '))}</span></li>`
-    : `<li class="decision"><span></span><span></span><span class="text">${item(p)}</span></li>`
-}
-const pending = list(now.pendingDecisions)
-const ideas = list(now.ideas)
-const laterBody = [
-  later.length ? `<ul class="folds">${later.map((l) => fold(l.title ?? l.name ?? l, l.detail)).join('')}</ul>` : '<p class="quiet">Nothing waiting.</p>',
-  pending.length
-    ? `<h3>Decided for you, override if you disagree <span class="count">${pending.length}</span></h3><ul class="rows">${pending.map(pendingRow).join('')}</ul>`
-    : '',
-  ideas.length
-    ? `<h3>Ideas <span class="count">${ideas.length}</span></h3><ul class="folds">${ideas.map((i) => (typeof i === 'string' ? `<li>${inline(i)}</li>` : fold(i.name ?? i.title, i.detail))).join('')}</ul>`
-    : '',
-].join('')
 
 // By area: counts and the latest decisions, newest day first.
 const areaNames = [...areas.map(([name]) => name), 'Other']
@@ -188,7 +106,7 @@ const chips = ['All', ...areaNames]
   .join('')
 const filterBar = `<div class="filters"><input id="q" type="search" placeholder="Search decisions and landed work" autocomplete="off"><div class="chips">${chips}</div><p class="meta" id="result"></p></div>`
 
-const header = `<header><h1>Juno status</h1><p class="meta">${updated ? `Updated ${esc(clock(updated))} IST, ${ago(updated)}` : 'No now.json yet'} · page built ${esc(clock(new Date()))} IST</p></header>`
+const header = `<header><h1>Juno status</h1><p class="meta">Decisions, landed work and build health · page built ${esc(clock(new Date()))} IST</p></header>`
 
 const html = `<!doctype html>
 <html lang="en">
@@ -200,12 +118,8 @@ const html = `<!doctype html>
 </head>
 <body><main>
 ${header}
-${needs.length ? section('needs', 'Needs you', needsBody, needs.length) : '<p class="all-clear">Nothing needs you.</p>'}
-${section('running', 'Now running', runningBody, running.length)}
 ${section('build', 'Build', buildBody)}
 ${section('landed', 'Recently landed on main', landedBody)}
-${section('next', 'Next', nextBody, nextItems.length)}
-${section('later', 'When you have time', laterBody, later.length)}
 ${section('areas', 'By area', `<div class="areas">${areaCards}</div>`)}
 ${section('decisions', 'Decisions', filterBar + decisionDays, decisions.length)}
 </main>
@@ -226,23 +140,14 @@ main { max-width: 980px; margin: 0 auto; padding: 40px 28px 96px; }
 header { margin-bottom: 20px; }
 h1 { font-size: 24px; line-height: 1.2; margin: 0 0 4px; }
 h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 12px; }
-h3 { font-size: 14px; margin: 24px 0 8px; }
 section { padding: 28px 0; border-top: 1px solid var(--line); }
 p { margin: 0; }
 .count { display: inline-block; background: var(--chip); color: var(--fg); border-radius: 999px; padding: 0 8px; font-size: 12px; font-weight: 500; letter-spacing: 0; }
 .meta, .time, .quiet { color: var(--muted); }
 .meta { font-size: 13px; }
 .time { font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 13px; }
-.all-clear { padding: 14px 0; border-top: 1px solid var(--line); color: var(--green); font-weight: 500; }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .88em; background: var(--chip); border-radius: 4px; padding: 1px 5px; }
 ul, ol { margin: 0; padding: 0; }
-.cards { list-style: none; display: grid; gap: 10px; }
-.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
-.card strong { font-weight: 550; }
-.card p { margin-top: 4px; color: var(--muted); max-width: 80ch; }
-.card.needs { border-color: var(--accent); background: var(--soft); }
-.plain { padding-left: 20px; max-width: 80ch; }
-.plain li { margin: 6px 0; }
 .stats { display: grid; gap: 8px; }
 .stat { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
 .label { width: 88px; flex: none; font-weight: 600; font-size: 13px; }
@@ -259,11 +164,6 @@ details[open] > summary::before { transform: rotate(90deg); }
 .sub { list-style: disc; padding: 0 0 10px 44px; color: var(--muted); font-size: 14px; max-width: 86ch; }
 .sub .linked { color: var(--fg); }
 .more > summary { padding: 8px 0; color: var(--muted); }
-.folds { list-style: none; max-width: 86ch; }
-.folds li { border-top: 1px solid var(--line); }
-.folds li:first-child { border-top: 0; }
-.folds summary { padding: 8px 0; }
-.folds p { padding: 0 0 12px 14px; color: var(--muted); }
 .areas { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
 .area { font: inherit; color: inherit; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
 .area:hover { border-color: var(--muted); }
@@ -290,7 +190,6 @@ details[open] > summary::before { transform: rotate(90deg); }
 .tags { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 8px; vertical-align: 1px; }
 .tag { font-size: 11px; line-height: 1.6; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; white-space: nowrap; }
 [hidden] { display: none !important; }
-.stale { color: var(--accent); }
 @media (max-width: 640px) { .decision { grid-template-columns: 44px minmax(0, 1fr); } .who { grid-column: 2; } .text { grid-column: 1 / -1; } }
 `
 }

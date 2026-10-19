@@ -742,9 +742,9 @@ Juno merges first and tests in full afterwards. Agents run selective checks befo
 
 **Merging.** Finished branches merge into main in batches (`scripts/batch-merge.mjs`, "Batch merges") after typecheck, lint and the unit tests pass on the merged tree. The full suites do not gate a merge.
 
-**Full runs.** `pnpm verify:main --ref origin/main` runs every suite on main, including heavy sync tests and quarantined tests; `--nightly` adds uncached Quint and the Mac suites ("Full runs" below). Run Quint uncached when its specs or checker change too. Conformance is in the full plan. Do not repeat `test:agent` separately; the unit suite already includes it.
+**Full runs.** `pnpm verify:main --ref origin/main` runs every suite on main, including heavy sync tests; `--nightly` adds uncached Quint and the Mac suites ("Full runs" below). Run Quint uncached when its specs or checker change too. Conformance is in the full plan. Do not repeat `test:agent` separately; the unit suite already includes it.
 
-**Flakes.** Remote Playwright runs retry once. Tests that pass only on retry remain listed as flaky in the console and full-run summary. A confirmed main flake is tagged `{ tag: '@flaky' }`, and its exact reporter ID, reason and date go in `.juno-status/release-waivers.json`. Tagged tests skip selective runs and still run in full runs. To triage one remotely, use `pnpm remote --env JUNO_INCLUDE_FLAKY=1 test:desktop --grep @flaky` (or `test:gallery`). Release waivers apply only to named test failures in complete reports, never to a crash, timeout, missing report or other infrastructure failure. Remove the tag and waiver when fixed. Do not weaken assertions or run retry loops to obtain green results.
+**Flakes.** Remote Playwright runs retry once. Tests that pass only on retry remain listed as flaky in the console and full-run summary. A failed test fails the gate. Fix intermittent failures without weakening assertions or running retry loops to obtain green results. Use `pnpm flake` to investigate them ("Hunting a flaky test" below).
 
 **Remote plan shape**: `pnpm affected` and `pnpm verify:main` use separate unit, app and specs jobs on the SSH runner. The app job builds the desktop app once and does not shard desktop e2e. See "Remote runs" and "Machine shapes".
 
@@ -1302,14 +1302,7 @@ run does not erase an older green record. Only docs, tests and the app version
 may change after the verified commit. The publish checkout must be clean.
 `node scripts/release-gate.mjs <commit>` checks this without a build or upload.
 
-The optional shared `.juno-status/release-waivers.json` is a short JSON array:
-
-```json
-[{ "id": "test-id-from-juno-tests", "reason": "Known intermittent focus race", "date": "2026-10-18" }]
-```
-
-Every waived failure is printed during publish. Legacy red records without a
-complete test report cannot use waivers. Never infer a green record from a log.
+A failed test fails the release gate. Never infer a green record from a log.
 
 Use `--urgent` only for a fix to a problem hurting the
 owner now, such as a CPU spin, data loss or a crash on launch. It runs local
@@ -1466,7 +1459,7 @@ Use `fake.holdNext({ method, reason: 'open' })`, assert the call is held, then `
 `pnpm verify:main --ref origin/main` runs every suite on main; fetch main first.
 No agent runs it on a schedule. It checks out that commit in a temporary worktree on the scratch volume and
 runs unit tests, Quint checks, conformance, gallery and desktop tests as
-one plan of separate SSH jobs on the laptop. Heavy sync tests and `@flaky` tests stay in
+one plan of separate SSH jobs on the laptop. Heavy sync tests stay in
 this run. Random Quint simulations run each time; deterministic Apalache and
 typecheck results use the cache. Changes to sync or outbox code also trigger selective protocol checks.
 
@@ -1481,8 +1474,7 @@ require a full Mac run. Keep timing gates on a quiet Mac and inspect its load.
 Results live in the main checkout's shared `.juno-status`: the latest
 `verify-main.json` and `.md`, permanent per-commit JSON under
 `verify-main/commits/<commit>/<run>.json`, and logs under `verify-main/<run>/`.
-The summary includes tests that passed on retry. A failed suite still exits 1;
-release waivers do not change CI results. The command refreshes the coverage
+The summary includes tests that passed on retry. A failed suite exits 1. The command refreshes the coverage
 map in the invoking checkout; commit that map after a run on main.
 
 On 2026-10-18, one full run at `6c15fbb4` before and one at `d0ecf4ab` after this lane/cache change used separate 8x16 machines. Wall time was 1,418 s before and 1,453 s after. The old unit-then-spec lane took 222 + 281 = 503 s; the new parallel unit and spec lanes took 378 and 364 s, so both finished by 378 s. Both full runs failed for the same unrelated reasons: the gallery's `RemoveCard/remove/click-then-working` shift state consumed about 13 minutes and its part timed out at 15 minutes (gallery 938 s before, 950 s after), and `updates.spec.ts` expected version `0.1.1`–`0.1.6` while the app was `0.1.7` (desktop 413 s before, 427 s after). The gallery timeout dominated total time, so the 125 s shorter unit/spec path did not reduce this pair of full runs. The gallery hang was fixed on main after these runs.
