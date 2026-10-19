@@ -39,7 +39,7 @@ test('photos load in messages and sidebar stacks and unfurls keep text when imag
   // A shared message's words come as blocks and as text; they show once.
   const shared = juno.topic.message('Preview shared')
   await shared.scrollIntoViewIfNeeded()
-  await expect(shared.locator('section[aria-label="Attachment"]')).toContainText('Thread in Slack conversation')
+  await expect(shared.locator('[data-shared-source]')).toHaveText('eng')
   expect(((await shared.textContent()) ?? '').split('Shared words appear once.').length - 1).toBe(1)
   await juno.accountMenu.open()
   const accountPhoto = juno.accountMenu.root.locator('img[src^="juno://files/avatar"]')

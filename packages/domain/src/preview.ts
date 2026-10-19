@@ -88,7 +88,7 @@ function fileKind(file: File): FileKind {
 
 /** A shared message's words, a bot attachment's title or text, or a link's domain. */
 function attachmentLabel(attachment: Attachment, lookups: Lookups): string {
-  const shared = attachment.is_msg_unfurl === true || attachment.message_blocks !== undefined
+  const shared = attachment.is_msg_unfurl === true || attachment.is_share === true || attachment.message_blocks !== undefined
   const words = oneLine([attachment.title, attachment.text, attachment.pretext, attachment.fallback].map((part) => (part === undefined ? '' : previewText(bodyFromMrkdwn(part, lookups)))).find((part) => part !== '') ?? '')
   if (shared) return words === '' ? 'Shared message' : `Shared message: ${words}`
   if (words !== '') return words

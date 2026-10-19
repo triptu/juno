@@ -1,5 +1,5 @@
 import type { Attachment } from '@juno/slack-schema'
-import type { Block, ContentBlock, Inline, Lookups } from './model'
+import type { Block, ContentBlock, Inline, Lookups, SharedSource } from './model'
 import { bodyFromBlocks } from './from-blocks'
 import { inlineText } from './inline'
 import { mrkdwnBlocks, mrkdwnInlines } from './from-mrkdwn'
@@ -23,7 +23,14 @@ export function attachmentBlock(attachment: Attachment, lookups: Lookups): Extra
   if (!blocks.length && !attachment.title && attachment.fallback) blocks.push(...mrkdwnBlocks(attachment.fallback, lookups))
   const titleUrl = attachment.title_link || attachment.from_url || attachment.original_url
   const title: Inline[] = titleUrl && attachment.title ? [{ kind: 'link', url: titleUrl, text: inlineText(mrkdwnInlines(attachment.title, lookups)) }] : mrkdwnInlines(attachment.title ?? '', lookups)
-  const footer = mrkdwnInlines(attachment.footer || attachment.service_name || '', lookups)
+  // A shared message names its place from Juno's own data. When Juno does not know the place, Slack's footer stays, as a link to the message.
+  const from = sharedFrom(attachment)
+  const place = from === undefined ? undefined : lookups.place?.(from.channel)
+  const source: SharedSource | undefined = from === undefined || place === undefined ? undefined : { kind: place.kind, name: place.name, url: from.url, thread: from.thread }
+  const label = mrkdwnInlines(attachment.footer || attachment.service_name || '', lookups)
+  const footer: Inline[] = source !== undefined ? []
+    : from !== undefined ? [{ kind: 'link', url: from.url, text: inlineText(label) || (attachment.channel_name ? `#${attachment.channel_name}` : 'Slack message') }]
+    : label
   const timestamp = Number(attachment.ts)
   if (attachment.ts !== undefined && Number.isFinite(timestamp) && Math.abs(timestamp) < 8.64e12) {
     if (footer.length) footer.push({ kind: 'text', text: ' · ' })
@@ -32,8 +39,28 @@ export function attachmentBlock(attachment: Attachment, lookups: Lookups): Extra
   return { kind: 'attachment',
     ...(attachment.author_name ? { author: { name: attachment.author_name, ...(attachment.author_icon ? { icon: attachment.author_icon } : {}) } } : {}),
     ...(attachment.footer_icon || attachment.service_icon ? { footerIcon: attachment.footer_icon || attachment.service_icon } : {}),
-    tint: attachmentTint(attachment.color), title, blocks, footer }
+    tint: attachmentTint(attachment.color), title, blocks, ...(source === undefined ? {} : { source }), footer }
 }
+
+/**
+ * A shared Slack message's permalink, read: the conversation it was posted
+ * in, and whether it was a reply (a reply's link carries `thread_ts`).
+ * Undefined for any other attachment.
+ */
+function sharedFrom(attachment: Attachment): { readonly url: string; readonly channel: string; readonly thread: boolean } | undefined {
+  if (attachment.is_share !== true && attachment.is_msg_unfurl !== true) return undefined
+  const url = attachment.from_url
+  if (url === undefined) return undefined
+  const [, id, message] = PERMALINK.exec(url) ?? []
+  const channel = attachment.channel_id || id
+  if (channel === undefined || channel === '') return undefined
+  const threadTs = THREAD_TS.exec(url)?.[1]
+  return { url, channel, thread: threadTs !== undefined && threadTs.replace('.', '') !== message }
+}
+
+/** `https://<team>.slack.com/archives/<channel>/p<digits>`: the channel and the message's ts digits. */
+const PERMALINK = /^https?:\/\/[^/?#]+\/archives\/([A-Z0-9]+)\/p(\d+)/
+const THREAD_TS = /[?&]thread_ts=(\d+\.?\d*)/
 
 function attachmentTint(color: string | undefined): Extract<Block, { kind: 'attachment' }>['tint'] {
   if (color === 'good') return 'success'

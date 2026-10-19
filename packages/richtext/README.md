@@ -25,7 +25,11 @@ Unknown inline elements (`file`, `canvas`, `message_mention`, future ones) decod
 `pnpm --filter @juno/richtext test`. Table-driven tests with real payload shapes: `decode.test.ts` (a payload decoded with `Schema.decodeUnknownSync(Message)`, including an unknown element, then rendered), `rendering.test.ts`, `outgoing.test.ts`, `links.test.ts`, `emoji.test.ts`, and `content.test.ts` (dates, files, attachment text and workspace emoji). Use redacted or invented text, never real message content.
 
 Integration attachments retain titles and links, mrkdwn bodies, two-column fields,
-context, images, footer dates and URL actions. Fallback text is used only when
+context, images, footer dates and URL actions. A shared Slack message (`is_share`
+or `is_msg_unfurl` with a `from_url` permalink) gets a `source`: its place's kind
+and name from the `place` lookup, the permalink, and `thread` when the link carries
+another message's `thread_ts`; its footer is then only the date. Without a known
+place the footer is Slack's own text as a link to the permalink. Fallback text is used only when
 there is no structured content. `messageTitle` uses a structured title for an
 empty root or an integration event summary. Otherwise it keeps the original
 mrkdwn so title readers can resolve mentions when names arrive. Unknown blocks retain text and URL

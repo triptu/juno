@@ -24,6 +24,7 @@
 import { Effect } from 'effect'
 import { pendingRowId, type FileView, type MessageView, type Person, type ReactionIssue, type ReactionView, type ThreadLink } from '@juno/contract'
 import {
+  channelLabelBare,
   hashId,
   messageMentionsMe,
   resolveTitle,
@@ -73,7 +74,8 @@ export interface MessageCache {
   bodies: Map<string, CachedBody>
   /** Users read so far, `null` for an id with no row. */
   users: Map<string, UserRow | null>
-  channels: Map<string, string | null>
+  /** Conversations read so far, `null` for an id with no row. */
+  channels: Map<string, ChannelRow | null>
   /** User groups read so far, `null` for an id with no row. */
   usergroups: Map<string, UsergroupName | null>
   /** Custom emoji image urls, `null` for a name with no custom emoji. */
@@ -109,6 +111,13 @@ export function forgetLookups(cache: MessageCache): void {
   cache.emoji = new Map()
   cache.emojiAliases = new Map()
   cache.epoch += 1
+}
+
+interface ChannelRow {
+  readonly kind: ChannelInfo['kind']
+  readonly name: string | null
+  readonly user_id: string | null
+  readonly member_ids_json: string | null
 }
 
 interface ConversationInfo {
@@ -230,18 +239,30 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     for (const list of reactions.values()) for (const reaction of list) for (const id of reaction.users.slice(0, REACTORS_SHOWN + 1)) senders.add(id)
     yield* readUsers(sql, cache, senders)
     const wanted = { users: new Set<string>(), channels: new Set<string>(), usergroups: new Set<string>(), emoji: new Set<string>() }
+    const user = (id: string) => {
+      const row = cache.users.get(id)
+      if (row === undefined) wanted.users.add(id)
+      return row === undefined || row === null ? undefined : userName(id, row)
+    }
     const lookups = {
       ...(selfId === undefined ? {} : { me: selfId }),
       ...(me?.usergroupIds === undefined ? {} : { myUsergroups: me.usergroupIds }),
-      user: (id: string) => {
-        const user = cache.users.get(id)
-        if (user === undefined) wanted.users.add(id)
-        return user === undefined || user === null ? undefined : userName(id, user)
-      },
+      user,
       channel: (id: string) => {
-        const name = cache.channels.get(id)
-        if (name === undefined) wanted.channels.add(id)
-        return name ?? undefined
+        const row = cache.channels.get(id)
+        if (row === undefined) wanted.channels.add(id)
+        return row?.name ?? undefined
+      },
+      // A DM is named by its people, as the sidebar names it.
+      place: (id: string) => {
+        const row = cache.channels.get(id)
+        if (row === undefined) wanted.channels.add(id)
+        if (row === undefined || row === null) return undefined
+        const nameOf = (member: string) => user(member) ?? member
+        if (row.kind === 'im') return row.user_id === null ? undefined : { kind: row.kind, name: nameOf(row.user_id) }
+        if (row.name === null) return undefined
+        const members = row.kind === 'mpim' ? placeMembers(row, selfId) : []
+        return { kind: row.kind, name: channelLabelBare({ kind: row.kind, name: row.name, memberNames: members.map(nameOf) }) }
       },
       usergroup: (id: string) => {
         const group = cache.usergroups.get(id)
@@ -279,8 +300,13 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     // Emoji names in reactions are looked up too, so the second pass has them.
     for (const list of reactions.values()) for (const reaction of list) if (emojiUnicode(reaction.name) === undefined) lookups.emoji(splitEmojiName(reaction.name).name)
     if (wanted.users.size + wanted.channels.size + wanted.usergroups.size + wanted.emoji.size > 0) {
-      yield* readUsers(sql, cache, wanted.users)
       yield* readChannels(sql, cache, wanted.channels)
+      // The people a DM a shared message came from is named by.
+      const placePeople = [...wanted.channels].flatMap((id) => {
+        const row = cache.channels.get(id)
+        return row?.kind === 'im' && row.user_id !== null ? [row.user_id] : row?.kind === 'mpim' ? placeMembers(row, selfId) : []
+      })
+      yield* readUsers(sql, cache, [...wanted.users, ...placePeople])
       yield* readUsergroups(sql, cache, wanted.usergroups)
       yield* readEmoji(sql, cache, wanted.emoji)
       for (const row of parsedNow) bodies.set(row.ts, parse(row))
@@ -357,8 +383,14 @@ const readChannels = (sql: SqlClient.SqlClient, cache: MessageCache, ids: Iterab
     const missing = [...ids].filter((id) => !cache.channels.has(id))
     if (missing.length === 0) return
     for (const id of missing) cache.channels.set(id, null)
-    for (const row of yield* sql<{ id: string; name: string | null }>`SELECT id, name FROM conversations WHERE id IN ${sql.in(missing)}`) cache.channels.set(row.id, row.name)
+    for (const row of yield* sql<ChannelRow & { id: string }>`SELECT id, kind, name, user_id, member_ids_json FROM conversations WHERE id IN ${sql.in(missing)}`) {
+      cache.channels.set(row.id, { kind: row.kind, name: row.name, user_id: row.user_id, member_ids_json: row.member_ids_json })
+    }
   })
+
+/** A group DM's members other than you. */
+const placeMembers = (row: ChannelRow, selfId: string | undefined): ReadonlyArray<string> =>
+  (parseJson<Array<string>>(row.member_ids_json) ?? []).filter((id) => id !== selfId)
 
 /** User groups by id. A deleted group keeps its handle. */
 const readUsergroups = (sql: SqlClient.SqlClient, cache: MessageCache, ids: Iterable<string>) =>

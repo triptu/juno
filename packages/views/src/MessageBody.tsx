@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import type { BodyBlock, BodyInline, MessageBody as MessageBodyModel } from '@juno/contract'
 import { colors, radii, spacing, text, weights, sizes } from '@juno/tokens/tokens.stylex'
 import { Chip, CodeBlock, Divider, focusRing, Text, type ActivateEvent, type HueName } from '@juno/ui'
-import { AttachmentCard, AttachmentFields, AttachmentImage } from './AttachmentCard'
+import { AttachmentCard, AttachmentFields, AttachmentImage, SharedPlace } from './AttachmentCard'
 import { MessageLink as Link, type LinkInfo } from './MessageLink'
 import { slackDate } from './time'
 
@@ -79,7 +79,9 @@ function Block({ block, now, hueOf, onChannel, onLink, linkInfo, tabIndex }: Blo
     case 'attachment':
       return <AttachmentCard attachment={block} tabbable={tabIndex === 0}
         title={<Inlines inlines={block.title} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} />}
-        footer={<Inlines inlines={block.footer} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} />}>
+        // A shared message's place opens the message, as a Slack link in the text does.
+        source={block.source && <Link url={block.source.url} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} quiet><SharedPlace source={block.source} /></Link>}
+        footer={<Inlines inlines={block.footer} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} quiet />}>
         {block.blocks.map((child, index) => <Block key={index} block={child} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} />)}
       </AttachmentCard>
     case 'image':
@@ -153,10 +155,12 @@ interface InlinesProps {
   readonly onLink: ((url: string, event: ActivateEvent) => void) | undefined
   readonly linkInfo: LinkInfo | undefined
   readonly tabIndex: 0 | -1
+  /** Links take the muted text's colour (an attachment's footer). */
+  readonly quiet?: boolean
 }
 
-function Inlines({ inlines, now, hueOf, onChannel, onLink, linkInfo, tabIndex }: InlinesProps) {
-  return inlines.map((inline, index) => <Inline key={index} inline={inline} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} />)
+function Inlines({ inlines, now, hueOf, onChannel, onLink, linkInfo, tabIndex, quiet }: InlinesProps) {
+  return inlines.map((inline, index) => <Inline key={index} inline={inline} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} quiet={quiet} />)
 }
 
 interface InlineProps {
@@ -167,14 +171,15 @@ interface InlineProps {
   readonly onLink: ((url: string, event: ActivateEvent) => void) | undefined
   readonly linkInfo: LinkInfo | undefined
   readonly tabIndex: 0 | -1
+  readonly quiet?: boolean | undefined
 }
 
-function Inline({ inline, now, hueOf, onChannel, onLink, linkInfo, tabIndex }: InlineProps) {
+function Inline({ inline, now, hueOf, onChannel, onLink, linkInfo, tabIndex, quiet }: InlineProps) {
   switch (inline.kind) {
     case 'text':
       return styled(inline.text, inline.style)
     case 'link':
-      return <Link url={inline.url} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex}>{styled(inline.text, inline.style)}</Link>
+      return <Link url={inline.url} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} quiet={quiet}>{styled(inline.text, inline.style)}</Link>
     // Chip text sits in <bdi> so "@Name" keeps its own direction inside a
     // right-to-left paragraph (otherwise the "@" jumps to the other end).
     case 'user':
@@ -229,7 +234,7 @@ function Inline({ inline, now, hueOf, onChannel, onLink, linkInfo, tabIndex }: I
       const label = slackDate(inline.timestamp, inline.format, now)
       const time = <time dateTime={new Date(inline.timestamp * 1000).toISOString()}>{label}</time>
       if (inline.url === undefined) return time
-      return <Link url={inline.url} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex}>{time}</Link>
+      return <Link url={inline.url} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} quiet={quiet}>{time}</Link>
     }
   }
 }

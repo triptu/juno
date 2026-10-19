@@ -1,4 +1,4 @@
-export type { Lookups, MessageBody, UsergroupName } from './model'
+export type { Lookups, MessageBody, PlaceName, UsergroupName } from './model'
 export { inlinesOf } from './model'
 export { UNKNOWN_PERSON } from './inline'
 

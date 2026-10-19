@@ -16,6 +16,8 @@ interface LinkProps {
   readonly onLink: ((url: string, event: ActivateEvent) => void) | undefined
   readonly linkInfo: LinkInfo | undefined
   readonly tabIndex: 0 | -1
+  /** In the muted text around it, underlined only on hover: an attachment's footer. */
+  readonly quiet?: boolean | undefined
   readonly children: ReactNode
 }
 
@@ -24,7 +26,7 @@ interface LinkProps {
  * inside Juno shows where it goes instead, once known, and keeps the arrow
  * cursor. Only links that leave the app get the pointer.
  */
-export function MessageLink({ url, onLink, linkInfo, tabIndex, children }: LinkProps) {
+export function MessageLink({ url, onLink, linkInfo, tabIndex, quiet = false, children }: LinkProps) {
   const inApp = linkInfo?.inApp(url) === true
   const [described, setDescribed] = useState<{ readonly url: string; readonly place: string }>()
   const title = described?.url === url ? described.place : url
@@ -36,7 +38,7 @@ export function MessageLink({ url, onLink, linkInfo, tabIndex, children }: LinkP
     if (inApp && described?.url !== url) void linkInfo?.describe(url).then((place) => place === undefined || setDescribed({ url, place }))
   }
   return (
-    <a href={url} title={title} onClick={open} onMouseEnter={describe} draggable={false} tabIndex={tabIndex} data-in-app={inApp ? '' : undefined} {...stylex.props(styles.link, focusRing.outside, inApp ? styles.inAppLink : styles.outLink)}>
+    <a href={url} title={title} onClick={open} onMouseEnter={describe} draggable={false} tabIndex={tabIndex} data-in-app={inApp ? '' : undefined} {...stylex.props(styles.link, quiet && styles.quiet, focusRing.outside, inApp ? styles.inAppLink : styles.outLink)}>
       {children}
     </a>
   )
@@ -49,6 +51,10 @@ const styles = stylex.create({
     textDecorationColor: colors['--link-underline'],
     textUnderlineOffset: sizes['--link-underline-offset'],
     borderRadius: radii['--radius-xs'],
+  },
+  quiet: {
+    color: 'inherit',
+    textDecorationLine: { default: 'none', ':hover': { default: null, '@media (hover: hover)': 'underline' } },
   },
   outLink: {
     cursor: 'pointer', // external-link-cursor

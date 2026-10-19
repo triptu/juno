@@ -13,6 +13,7 @@
  * string or an image url, so a view draws a body without lookups.
  */
 import { Schema } from 'effect'
+import { ConversationKind } from '@juno/domain'
 
 export const BodyInlineStyle = Schema.Struct({
   bold: Schema.optionalKey(Schema.Literal(true)),
@@ -95,6 +96,12 @@ export const BodyBlock = Schema.Union([
     tint: Schema.Literals(['neutral', 'info', 'success', 'warning', 'danger']),
     title: Schema.Array(BodyInline),
     blocks: Schema.Array(ContentBlock),
+    /**
+     * Where a shared Slack message was posted, when Juno knows the place: its
+     * kind, its name (a channel's without "#", a DM's people), its permalink,
+     * and whether it was a reply. With it, `footer` holds only the date.
+     */
+    source: Schema.optionalKey(Schema.Struct({ kind: ConversationKind, name: Schema.String, url: Schema.String, thread: Schema.Boolean })),
     footer: Schema.Array(BodyInline),
   }),
 ])

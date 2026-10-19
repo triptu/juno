@@ -1,0 +1,1 @@
+- 10-19 21:59 · shared-message-source · A shared message's card names its place from Juno's own conversations (richtext's `place` lookup, by `channel_id` or the channel in `from_url`) and links it to the permalink, so it opens through the same path as a Slack link in a message; Slack's generic footer stays only when Juno does not know the place.
