@@ -22,9 +22,9 @@ import { listener, reader } from './reads'
 /** At quit or sign-out, how long to wait for a join in flight and the leaves sent. Main kills the engine 3 s after `quit`. */
 export const DETACH_WAIT_MILLIS = 2_000
 
-/** Waits until `done` holds or `millis` pass. */
+/** Waits until `done` holds or `millis` pass. Returns at once when it already holds, so a stop never waits on the clock for nothing. */
 const waitUntil = (done: () => boolean, millis: number) =>
-  Effect.sleep(50).pipe(Effect.repeat({ until: done }), Effect.timeoutOption(millis), Effect.asVoid)
+  Effect.suspend(() => (done() ? Effect.void : Effect.sleep(50).pipe(Effect.repeat({ until: done }), Effect.timeoutOption(millis), Effect.asVoid)))
 
 const detach = (core: Core, to: Attached) =>
   Effect.gen(function* () {
