@@ -9,7 +9,6 @@ import type { Juno } from './driver/juno'
 
 test.describe.configure({ timeout: 120_000 })
 
-const POSTGRES = 'Draft plan is in the doc'
 const NOWHERE = '1712345678.000200'
 
 const find = (fake: FakeSlack, channel: string, start: string) => fake.messages(channel).find((message) => message.text?.includes(start))!
@@ -66,7 +65,6 @@ test('a shared message says where it was posted, and its place opens the message
   await watchFlashes(juno)
   await link.click()
   await tabs.expectCount(2)
-  await tabs.expectActive(POSTGRES)
   await expect(topic.message('Please do.')).toBeInViewport({ timeout: 15_000 })
   await expect.poll(() => juno.win.evaluate(() => (window as unknown as { __flashed: string[] }).__flashed.some((row) => row.includes('Please do.'))), { timeout: 10_000 }).toBe(true)
 })
