@@ -533,6 +533,8 @@ interface PendingRow {
   readonly text: string
   readonly blocks_json: string | null
   readonly file_ids_json: string | null
+  /** A forward's source and its card (`send/forward.ts`). */
+  readonly share_json: string | null
   readonly created_at: string
   readonly state: 'queued' | 'sending' | 'unknown' | 'failed'
 }
@@ -668,14 +670,15 @@ const pendingMessage = (row: PendingRow, selfId: string | undefined): WindowMess
   text: row.text,
   blocks_json: row.blocks_json,
   files_json: null,
-  attachments_json: null,
+  // A forward shows its source as the shared card Slack's copy will carry.
+  attachments_json: row.share_json === null ? null : JSON.stringify([(JSON.parse(row.share_json) as { attachment: unknown }).attachment]),
   edited_ts: null,
   deleted: 0,
   client_msg_id: row.client_msg_id,
   reply_count: 0,
   latest_reply: null,
   // An edit before the post went out rewrites the row's text, so its body is parsed again.
-  version: contentVersion(row.text, row.blocks_json),
+  version: contentVersion(row.text, `${row.blocks_json ?? ''}${row.share_json ?? ''}`),
   last_event_ts: null,
 })
 

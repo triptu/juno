@@ -9,6 +9,10 @@
  *   message shows at once as a pending row in `messages.list` and the
  *   outbox posts it. With `draftOf`, that topic's draft is cleared in the
  *   same transaction.
+ * - `messages.forward`: queues a forward of a stored message to a
+ *   channel's or a person's Main, with an optional note, the same way:
+ *   a pending row in the destination that the outbox posts with
+ *   `chat.shareMessage` (spec section 7, "Forward").
  * - `messages.retry`: Retry on a failed row. It is queued again.
  * - `messages.discard`: Delete draft on a failed row. It is removed.
  * - `messages.edit`, `messages.delete`: the user's own message, from the
@@ -72,6 +76,23 @@ export const messagesSend = Rpc.make('messages.send', {
     /** Main sends from Home in channels and group DMs open a locally followed thread. */
     startThread: Schema.optionalKey(Schema.Boolean),
     files: Schema.optionalKey(Schema.Array(Schema.String)),
+  },
+  success: SendResult,
+  error: SendError,
+})
+
+/**
+ * Forward the stored message `source` (not a pending one) to `to`'s Main,
+ * with `note` above it; the note may be empty. `clientMsgId` is the
+ * renderer's, as for `messages.send`. `NotFound` when the message is not
+ * stored or is not in Slack yet; `Rejected` `invalid_target` for a thread.
+ */
+export const messagesForward = Rpc.make('messages.forward', {
+  payload: {
+    to: SendTarget,
+    note: Schema.String,
+    clientMsgId: Schema.String,
+    source: Schema.Struct({ channelId: Schema.String, ts: Schema.String }),
   },
   success: SendResult,
   error: SendError,
@@ -172,4 +193,4 @@ export const draftsGet = liveValueRoute('drafts.get', { payload: { topicId: Sche
 /** Replaces a topic's draft; an empty or blank text deletes it. */
 export const draftsSet = Rpc.make('drafts.set', { payload: { topicId: Schema.String, text: Schema.String }, success: Schema.Void, error: NotSignedIn })
 
-export const SendRoutes = RpcGroup.make(messagesResolveAction, messagesSend, messagesRetry, messagesDiscard, messagesEdit, messagesDelete, messagesReact, messagesCheck, messagesPrecheck, messagesPostcheck, messagesGrammar, draftsGet, draftsSet)
+export const SendRoutes = RpcGroup.make(messagesResolveAction, messagesSend, messagesForward, messagesRetry, messagesDiscard, messagesEdit, messagesDelete, messagesReact, messagesCheck, messagesPrecheck, messagesPostcheck, messagesGrammar, draftsGet, draftsSet)

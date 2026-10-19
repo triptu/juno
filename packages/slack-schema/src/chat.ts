@@ -1,7 +1,8 @@
 /**
- * Writes: posting, editing and deleting messages, and reactions.
+ * Writes: posting, forwarding, editing and deleting messages, and reactions.
  *
- * Source: docs/research/slack-data-access.md section 3 (Posting, Reactions).
+ * Source: docs/research/slack-data-access.md section 3 (Posting, Reactions),
+ * docs/research/slack-forward.md (Forward).
  */
 import { Schema as S } from 'effect'
 import { Blocks } from './blocks.ts'
@@ -34,6 +35,29 @@ export const ChatPostMessageArgs = S.Struct({
 export type ChatPostMessageArgs = typeof ChatPostMessageArgs.Type
 
 export const ChatPostMessageFields = { channel: S.String, ts: Ts, message: Message } as const
+
+// chat.shareMessage
+
+/**
+ * A forward, as the official client's Forward dialog sends it: the message
+ * at `channel` and `timestamp`, shared into `share_channel`, which must be
+ * a conversation id (a user id is `channel_not_found`). `text` is always
+ * empty; the note goes in `blocks`. The message Slack stores carries
+ * `client_msg_id`, so it is matched as a post is (research `slack-forward.md`).
+ */
+export const ChatShareMessageArgs = S.Struct({
+  channel: S.String,
+  timestamp: Ts,
+  share_channel: S.String,
+  text: S.String,
+  blocks: opt(FormJson(Blocks)),
+  client_msg_id: S.String,
+  skip_dlp_user_warning: opt(FormBoolean),
+})
+export type ChatShareMessageArgs = typeof ChatShareMessageArgs.Type
+
+/** The answer names the new message without carrying it. */
+export const ChatShareMessageFields = { channel: S.String, ts: Ts } as const
 
 // chat.update
 

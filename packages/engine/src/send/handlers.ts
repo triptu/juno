@@ -19,6 +19,7 @@ import { deleteMessage, editMessage, reactToMessage, resolveMessageAction } from
 import { checkMessage, dailyBudget, grammarForSent, postcheckMessage, precheckMessage, ROUTE_DAILY_BUDGET } from './checks'
 import { grammarChecks } from './grammar'
 import { discardMessage, retryMessage, sendMessage } from './commands'
+import { forwardMessage } from './forward'
 import { draftKeys, readDraft, writeDraft } from './drafts'
 import { PostWorker } from './worker'
 
@@ -70,6 +71,7 @@ export const SendHandlers = SendRoutes.toLayer(
         if (entry === undefined || left <= 0) return {}
         return yield* grammarForSent(entry.text, grammar, entry.workspace, left)
       }).pipe(checking),
+      'messages.forward': (payload) => provide(forwardMessage(payload)),
       'messages.retry': ({ clientMsgId }) => provide(retryMessage(clientMsgId)),
       'messages.discard': ({ clientMsgId }) => provide(discardMessage(clientMsgId)),
       'messages.edit': ({ message, text }) => provide(editMessage(message, text)),

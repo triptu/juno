@@ -38,6 +38,8 @@ export interface DestinationChipProps {
   readonly buttonRef?: Ref<HTMLButtonElement>
   /** A printable key typed on the closed chip: the owner moves focus to the field and types it there, as a token field does. */
   readonly onType?: (text: string) => void
+  /** Where the list opens: above the chip by default, below it in the Forward sheet. */
+  readonly placement?: 'top-start' | 'bottom-start'
 }
 
 /**
@@ -49,7 +51,7 @@ export interface DestinationChipProps {
  * nothing; the new name rises into it once, briefly. It opens the
  * destination list above itself, Juno first.
  */
-export function DestinationChip({ destination, juno = true, open, onOpen, query, onQuery, conversations, loading, onPick, buttonRef, onType }: DestinationChipProps) {
+export function DestinationChip({ destination, juno = true, open, onOpen, query, onQuery, conversations, loading, onPick, buttonRef, onType, placement = 'top-start' }: DestinationChipProps) {
   useEffect(() => {
     const idle = requestIdleCallback(() => void loadLists(), { timeout: 5_000 })
     return () => cancelIdleCallback(idle)
@@ -60,7 +62,7 @@ export function DestinationChip({ destination, juno = true, open, onOpen, query,
     <Popover
       open={open}
       onClose={() => onOpen(false)}
-      placement="top-start"
+      placement={placement}
       width="picker"
       maxHeight="none"
       layer="picker"
@@ -383,13 +385,8 @@ const styles = stylex.create({
     textOverflow: 'ellipsis',
     minWidth: 0,
   },
-  buttonLabelWide: {
-    maxWidth: THREAD_LABEL_MAX,
-  },
-  caret: {
-    display: 'inline-flex',
-    color: colors['--foreground-muted'],
-  },
+  buttonLabelWide: { maxWidth: THREAD_LABEL_MAX },
+  caret: { display: 'inline-flex', color: colors['--foreground-muted'] },
 })
 
 const tintStyles = stylex.create({

@@ -40,6 +40,7 @@
     "presence:live": "node scripts/presence-live.ts",
     "probe:live": "node scripts/probe-live.ts",
     "react:live": "node --import ./scripts/ts-resolve-hooks.mjs scripts/react-live.ts",
+    "forward:live": "node --import ./scripts/ts-resolve-hooks.mjs scripts/forward-live.ts",
     "huddle:live": "node --import ./scripts/ts-resolve-hooks.mjs scripts/huddle-live.ts",
     "sync:timeline": "node --import ./scripts/ts-resolve-hooks.mjs scripts/first-sync-live.ts",
     "sync:live": "node --import ./scripts/ts-resolve-hooks.mjs scripts/sync-live-dry-run.ts",

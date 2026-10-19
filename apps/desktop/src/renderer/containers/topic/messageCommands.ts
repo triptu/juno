@@ -4,7 +4,7 @@
  */
 import { useMemo, type Dispatch, type KeyboardEvent, type RefObject, type SetStateAction } from 'react'
 import type { MessageView, TopicDetail } from '@juno/contract'
-import { deleteMessage, reactToMessage, registry, type MessageWindow } from '@juno/state'
+import { deleteMessage, forwardSheetAtom, reactToMessage, registry, type MessageWindow } from '@juno/state'
 import type { MenuAnchor, MessageActions } from '@juno/views'
 import type { ComposerHandle } from '../messageActions'
 import { isOwnEditable, landedTs, refOf } from '../messageRows'
@@ -65,6 +65,12 @@ interface CommandsInput {
   readonly setConfirming: Dispatch<SetStateAction<Confirming | undefined>>
   readonly setPicker: Dispatch<SetStateAction<Picker | undefined>>
   readonly setMenuMessage: Dispatch<SetStateAction<string | undefined>>
+}
+
+/** Forward… opens the sheet with the message as the list shows it, its sender and where it was posted (SPEC 7, "Forward"). */
+function openForward(channel: string, message: MessageView, { list, detail }: NonNullable<Latest['current']>): void {
+  const sender = message.senderId === undefined ? undefined : list.refs.people.get(message.senderId)
+  registry.set(forwardSheetAtom, { channelId: channel, message, sender, place: detail.channel.label })
 }
 
 /** The rows' handlers, created once per topic (performance 5.1); they read the latest state through `latest`. */
@@ -140,6 +146,7 @@ export function useMessageCommands({ channel, scrollRef, composer, latest, setEd
       if (chosen === 'edit' && isOwnEditable(now)) startEdit(now)
       else if (chosen === 'delete' && isOwnEditable(now)) askDelete(now)
       else if (chosen === 'reply') handlers.onReply?.(now)
+      else if (chosen === 'forward' && now.pending === undefined) openForward(channel, now, latest.current)
     }
     return { ...handlers, menu }
     // `channel` is fixed for a topic tab; the rest is read through refs.

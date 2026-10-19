@@ -13,7 +13,8 @@
  *   yet (`upload`); a file Slack's upload host refuses makes the row
  *   `failed`, and a lost connection makes it wait. Then the row becomes
  *   `sending` in its own transaction, and one `chat.postMessage`, or
- *   `files.share` for a post with files, with its `client_msg_id` goes out through
+ *   `files.share` for a post with files, or `chat.shareMessage` for a
+ *   forward (`forward.ts`), with its `client_msg_id` goes out through
  *   `Outbox.sendOnce`, which never retries, because a retry after a lost
  *   answer posts twice. The claim records the post in `sent_posts`, so a
  *   copy Chromium makes by sending the request again is deleted when it is
@@ -21,8 +22,9 @@
  *   which ends the row. A refusal makes it `failed`; a rate limit or a lost
  *   session puts it back to `queued` for later; a lost answer, or an
  *   answer Slack gives when it may have run the call (`internal_error` and
- *   friends), makes it `unknown`. `files.share` answers without the
- *   message, so a shared post becomes `unknown` too and waits for the echo.
+ *   friends), makes it `unknown`. `files.share` and `chat.shareMessage`
+ *   answer without the message, so such a post becomes `unknown` too and
+ *   waits for the echo.
  * - `unknown`: after `timing.postSettleMillis`, the worker reads the topic's recent
  *   messages from Slack. The message is there: it is stored, which ends the
  *   row. A complete read without it: the row is `queued` again, except a
@@ -45,7 +47,7 @@ import { wakeSchedule } from './nextWake'
 import { Clock, Context, Effect, Layer, Stream } from 'effect'
 import { millisToTs, type Ts } from '@juno/domain'
 import { transaction, type SqlError } from '@juno/store'
-import { SlackRejected } from '@juno/slack'
+import { SlackRejected, type SlackApiShape } from '@juno/slack'
 import {
   claimPost,
   deferLookup,
@@ -80,7 +82,7 @@ const LOOKUP_MARGIN_MILLIS = 5 * 60_000
 const LOOKUP_PAGES = 5
 /** Refusals that Slack may give after running the call: the answer is unknown, not a refusal. */
 const MAYBE_POSTED = new Set(['internal_error', 'fatal_error', 'request_timeout', 'service_unavailable'])
-/** `last_error` of a post Slack accepted without sending the message back (`files.share`). */
+/** `last_error` of a post Slack accepted without sending the message back (`files.share`, `chat.shareMessage`). */
 const SHARED = 'shared'
 /** What `post` answers while a file the post took is still staging. */
 const WAITING = 'waiting'
@@ -211,29 +213,8 @@ export class PostWorker extends Context.Service<
           // Recorded as the user's send, so a copy the network makes is deleted (ADR 0014).
           const me = (yield* local(storedMe))?.userId ?? ''
           if (!(yield* local(transaction(claimPost(row.clientMsgId, me))))) return
-          const blocks = row.blocksJson === null ? undefined : JSON.parse(row.blocksJson)
-          const threadTs = row.threadTs === undefined ? {} : { thread_ts: row.threadTs as Ts }
           const result = yield* outbox
-            .sendOnce((api) =>
-              fileIds.length === 0
-                ? api.call('chat.postMessage', { channel: row.channel, text: row.text, ...(blocks === undefined ? {} : { blocks }), client_msg_id: row.clientMsgId, ...threadTs })
-                : // A message with files is shared, as the official composer does: the files and the text in one call.
-                  Effect.as(
-                    api.call(
-                      'files.share',
-                      {
-                        files: fileIds,
-                        channel: row.channel,
-                        ...(blocks === undefined ? (row.text === '' ? {} : { comment: row.text }) : { blocks }),
-                        client_msg_id: row.clientMsgId,
-                        resharing_aware: true,
-                        ...threadTs,
-                      },
-                      { reason: 'send_message_with_files' },
-                    ),
-                    undefined,
-                  ),
-            )
+            .sendOnce((api) => request(api, row, fileIds))
             .pipe(
               Effect.result,
               // A bug after the request left may still have posted: unknown, never failed.
@@ -243,7 +224,7 @@ export class PostWorker extends Context.Service<
           const now = yield* Clock.currentTimeMillis
           if (result === undefined) return yield* local(transaction(postUnknown(row.clientMsgId, now + timing.postSettleMillis, 'defect')))
           if (result._tag === 'Success') {
-            // `files.share` answers without the message: the echo or a lookup stores it, and a lookup that misses it waits.
+            // `files.share` and `chat.shareMessage` answer without the message: the echo or a lookup stores it, and a lookup that misses it waits.
             if (result.success === undefined) return yield* local(transaction(postUnknown(row.clientMsgId, now + timing.postSettleMillis, SHARED)))
             // The answer may leave out the id; the stored message carries it, which ends the row.
             const message: Message = { ...result.success.message, client_msg_id: result.success.message.client_msg_id ?? row.clientMsgId }
@@ -284,7 +265,7 @@ export class PostWorker extends Context.Service<
             if (found !== undefined) return yield* fetcher.sent({ channel: row.channel, message: found }).pipe(Effect.orDie)
             cursor = answer.value.response_metadata?.next_cursor || undefined
             if (!answer.value.has_more || cursor === undefined) {
-              // Slack said it shared the files: the message is there even if the read does not show it yet.
+              // Slack said it took the post (files, a forward): the message is there even if the read does not show it yet.
               if (row.lastError === SHARED) return yield* local(transaction(deferLookup(row.clientMsgId, now + backoff(row.attempts))))
               // Slack has decided the lost request by now (specs/outbox.qnt): it is not there, so it may go again.
               return yield* local(transaction(requeuePost(row.clientMsgId, now, 'lost')))
@@ -356,6 +337,40 @@ export class PostWorker extends Context.Service<
       yield* Effect.forkScoped(loop)
       return PostWorker.of({ wake })
     }),
+  )
+}
+
+/**
+ * The one request that posts a row: `chat.postMessage`; `files.share` for a
+ * post with files, as the official composer sends one; `chat.shareMessage`
+ * for a forward (`forward.ts`), as the official Forward dialog sends it, with
+ * no text and the note as blocks. The last two answer without the message.
+ */
+const request = (api: SlackApiShape, row: PendingPost, fileIds: ReadonlyArray<string>) => {
+  const blocks = row.blocksJson === null ? undefined : JSON.parse(row.blocksJson)
+  const threadTs = row.threadTs === undefined ? {} : { thread_ts: row.threadTs as Ts }
+  if (row.share !== undefined) {
+    const note = blocks === undefined ? {} : { blocks }
+    return Effect.as(
+      api.call('chat.shareMessage', { channel: row.share.channel, timestamp: row.share.ts as Ts, share_channel: row.channel, text: '', ...note, client_msg_id: row.clientMsgId }, { reason: 'sendShareMessage' }),
+      undefined,
+    )
+  }
+  if (fileIds.length === 0) return api.call('chat.postMessage', { channel: row.channel, text: row.text, ...(blocks === undefined ? {} : { blocks }), client_msg_id: row.clientMsgId, ...threadTs })
+  return Effect.as(
+    api.call(
+      'files.share',
+      {
+        files: [...fileIds],
+        channel: row.channel,
+        ...(blocks === undefined ? (row.text === '' ? {} : { comment: row.text }) : { blocks }),
+        client_msg_id: row.clientMsgId,
+        resharing_aware: true,
+        ...threadTs,
+      },
+      { reason: 'send_message_with_files' },
+    ),
+    undefined,
   )
 }
 
