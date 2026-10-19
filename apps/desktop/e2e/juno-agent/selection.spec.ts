@@ -82,8 +82,7 @@ test('Ask Juno on highlighted text opens the panel with the selection quoted, an
   await expect(chip).toHaveCount(0)
 })
 
-// @flaky since 2026-10-18: Backspace on the chip sometimes leaves it (.juno-status/release-waivers.json).
-test('⌘J with text selected across messages asks about it without closing the panel, and Backspace on the chip removes it', { tag: '@flaky' }, async ({ juno, model }) => {
+test('⌘J with text selected across messages asks about it without closing the panel, and Backspace on the chip removes it', async ({ juno, model }) => {
   await ready(juno)
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.expectTitle(POSTGRES)

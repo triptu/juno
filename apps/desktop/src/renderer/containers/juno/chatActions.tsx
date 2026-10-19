@@ -63,6 +63,8 @@ export function useFocusRequest(column: 'page' | 'panel', inputRef: RefObject<HT
   useEffect(() => {
     if (focusRequest.where !== (column === 'page' ? 'tab' : 'panel') || focusRequest.n <= focusTaken.current) return
     focusTaken.current = focusRequest.n
+    // The open panel already has focus: a later frame must not take it back from the chip.
+    if (column === 'panel' && document.activeElement === inputRef.current) return
     // After the input that asked: a sidebar item acts on pointerdown, and the mousedown that follows focuses the item.
     const frame = requestAnimationFrame(() => inputRef.current?.focus())
     return () => cancelAnimationFrame(frame)
