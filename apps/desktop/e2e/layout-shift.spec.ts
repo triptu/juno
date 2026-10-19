@@ -228,11 +228,13 @@ for (const destination of ['Home', 'All topics'] as const) {
     const selector = destination === 'Home' ? '[data-home-item]' : '[data-all-topics-row]'
     await expect(win.locator(selector)).toHaveCount(0)
     const anchor = destination === 'Home' ? '[data-home-scene]' : selector
+    // The unfocused sidebar may reorder as cold history and Automated membership arrive (SPEC 5).
+    // This probe checks the destination page; sidebar.spec.ts checks the changing topic list.
     await expectStableAnchor(win, anchor, async () => {
       fake.release({ method: 'subscriptions.thread.getView' })
       await expect(win.locator('[data-topic-row]').first()).toBeVisible()
       await expect(win.locator(selector).first()).toBeVisible()
-    })
+    }, { outside: '[aria-label="Sidebar"] [role="group"][aria-label="Topics"]' })
   })
 }
 
