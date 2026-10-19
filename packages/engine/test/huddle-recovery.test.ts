@@ -8,7 +8,7 @@ import { expect, it } from 'vitest'
 import { sleep, waitFor, WAIT_MS } from './harness'
 import { readDb, restart, valueOf } from './scenario'
 import {
-  booted, callOrder, callUntil, inCall, joined, joins, leftAttendees, PAGE, pagesLive, recordOf, runningUntil, start, started, stopHuddleEnginesAfterEach,
+  booted, callOrder, callUntil, inCall, joined, joins, leftAttendees, PAGE, PAGE2, pagesLive, recordOf, runningUntil, start, started, stopHuddleEnginesAfterEach,
   storedLeaves, track, watchHuddles, writeStoredLeaves,
 } from './huddleScenario'
 
@@ -49,8 +49,8 @@ it('ends the call when main says the page reloaded, ignores the old page, and jo
   const engine = await booted()
   pagesLive(engine, PAGE)
   const first = await inCall(engine, 'C0ENG')
-  // The page reloads: main says page-1 is gone and the new page-2 is live. Chime lost the attendee with the page.
-  pagesLive(engine, 'page-2')
+  // The page reloads: main says PAGE is gone and the new PAGE2 is live. Chime lost the attendee with the page.
+  pagesLive(engine, PAGE2)
   engine.fake.control('stopMedia', { attendeeId: first.attendeeId })
   const call = await callUntil(engine, (c) => c.phase === 'idle', 'the call ended')
   expect(call.ended).toEqual({ channelId: 'C0ENG', reason: 'connectionLost' })
@@ -59,8 +59,8 @@ it('ends the call when main says the page reloaded, ignores the old page, and jo
   // A late report from the old page, and a Start from it, change nothing.
   await started(engine, first.attendeeId)
   expect(valueOf(await start(engine, 'C0ENG'))).toEqual({ _tag: 'cancelled' })
-  const second = await joined(engine, 'C0ENG', 'page-2')
-  await started(engine, second.attendeeId, 'page-2')
+  const second = await joined(engine, 'C0ENG', PAGE2)
+  await started(engine, second.attendeeId, PAGE2)
   await callUntil(engine, (c) => c.phase === 'joined' && c.attendeeId === second.attendeeId, 'joined from the new page')
 })
 
@@ -110,11 +110,11 @@ it('after an abrupt crash, sends the stored leave before any new join, once main
   }))
   expect(storedLeaves(next)).toEqual([recordOf(first)])
   await waitFor(() => (leftAttendees(next).includes(first.attendeeId) ? true : undefined), WAIT_MS, 'the stored leave sent again')
-  const starting = start(next, 'C0PRODUCT', 'page-2')
+  const starting = start(next, 'C0PRODUCT', PAGE2)
   await sleep(500)
   // The old page may still be running its media until main says otherwise.
   expect(joins(next)).toHaveLength(0)
-  pagesLive(next, 'page-2')
+  pagesLive(next, PAGE2)
   expect(valueOf(await starting)._tag).toBe('joined')
   expect(callOrder(next).indexOf('rooms.leave')).toBeLessThan(callOrder(next).indexOf('rooms.join'))
 })

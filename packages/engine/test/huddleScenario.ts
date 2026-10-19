@@ -9,7 +9,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { afterEach } from 'vitest'
 import { huddleCall, huddleReport, huddleRunning, huddleStart, type HuddleCall, type HuddleMediaEnd, type HuddlePageReport, type HuddleStartResult, type RunningHuddles } from '@juno/contract'
-import { liveQuery, runCommand } from '@juno/state'
+import { liveQuery, runCommand, type Registry } from '@juno/state'
 import { waitFor, WAIT_MS, type EngineOptions, type RunningEngine } from './harness'
 import { apiCalls, bootedEngine, readDb, valueOf } from './scenario'
 
@@ -23,7 +23,9 @@ export function stopHuddleEnginesAfterEach(): void {
 
 export const SELF = 'U0TUSHAR'
 /** The test's renderer page, as its media service registers it. */
-export const PAGE = 'page-1'
+export const PAGE = 1001
+/** The page that loads after `PAGE`. */
+export const PAGE2 = 1002
 export const callAtom = liveQuery(huddleCall)(undefined)
 export const runningAtom = liveQuery(huddleRunning)(undefined)
 
@@ -66,21 +68,26 @@ export const joined = async (engine: RunningEngine, channelId: string, generatio
 
 let seq = 0
 
+
 /** The page's whole media state, numbered as the page numbers its reports. */
-export const report = async (engine: RunningEngine, state: Partial<HuddlePageReport> & { readonly generation?: string } = {}) =>
-  valueOf(await runCommand(engine.registry, huddleReport, { report: { generation: PAGE, seq: ++seq, holds: null, received: null, connection: 'connected', muted: false, ended: null, ...state } }))
+/** `via`: the registry it goes through, another engine connection of the page; else the engine's own. */
+export const report = async (engine: RunningEngine, state: Partial<HuddlePageReport> & { readonly generation?: number } = {}, via: Registry = engine.registry) =>
+  valueOf(await runCommand(via, huddleReport, { report: { generation: PAGE, seq: ++seq, holds: null, received: null, connection: 'connected', muted: false, ended: null, ...state } }))
 
 /** The page started the session it was handed. */
-export const started = (engine: RunningEngine, attendeeId: string, generation = PAGE) => report(engine, { generation, holds: attendeeId, received: attendeeId })
+export const started = (engine: RunningEngine, attendeeId: string, generation: number = PAGE) => report(engine, { generation, holds: attendeeId, received: attendeeId })
 
 /** The page's media session ended: it reports so, and Chime drops the attendee. */
-export const stopMedia = async (engine: RunningEngine, attendeeId: string, reason: HuddleMediaEnd = 'left', generation = PAGE) => {
+export const stopMedia = async (engine: RunningEngine, attendeeId: string, reason: HuddleMediaEnd = 'left', generation: number = PAGE) => {
   await report(engine, { generation, received: attendeeId, ended: { attendeeId, reason } })
   engine.fake.control('stopMedia', { attendeeId })
 }
 
 /** Main's report of the live page generations. */
-export const pagesLive = (engine: RunningEngine, ...live: Array<string>) => engine.main.host.deliver({ _tag: 'huddlePages', live })
+export const pagesLive = (engine: RunningEngine, ...live: Array<number>) => pagesReport(engine, live, Math.max(0, ...live))
+
+/** Main's report with the highest generation it gave out, which may be a page that never got listed. */
+export const pagesReport = (engine: RunningEngine, live: ReadonlyArray<number>, maxIssued: number) => engine.main.host.deliver({ _tag: 'huddlePages', live, maxIssued })
 
 /** Joined with media running, as the page would after the hand-off. */
 export const inCall = async (engine: RunningEngine, channelId: string, generation = PAGE) => {
@@ -101,7 +108,7 @@ export const storedLeaves = (engine: RunningEngine): unknown =>
     return row === undefined ? undefined : JSON.parse(row.value_json)
   })
 
-export const recordOf = (result: Joined, generation: string | null = PAGE) => ({ channelId: result.channelId, callId: result.callId, attendeeId: result.attendeeId, generation })
+export const recordOf = (result: Joined, generation: number | null = PAGE) => ({ channelId: result.channelId, callId: result.callId, attendeeId: result.attendeeId, generation })
 
 /** Writes the stored leaves directly, as a damaged or older store would hold them. The engine must be stopped. */
 export function writeStoredLeaves(userData: string, workspaceId: string, value: string): void {

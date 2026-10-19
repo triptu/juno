@@ -7,7 +7,7 @@ import { runCommand } from '@juno/state'
 import { sleep, waitFor, WAIT_MS } from './harness'
 import { apiCalls, valueOf } from './scenario'
 import {
-  booted, callOrder, callUntil, inCall, isRoomFrame, joined, joins, leaves, leftAttendees, recordOf, runningUntil, SELF, start, started,
+  booted, callOrder, callUntil, inCall, isRoomFrame, joined, joins, leaves, leftAttendees, PAGE, recordOf, runningUntil, SELF, start, started,
   stopHuddleEnginesAfterEach, stopMedia, storedLeaves,
 } from './huddleScenario'
 
@@ -102,7 +102,7 @@ it('after another device took over, ends the call, and ignores reports from othe
   const engine = await booted()
   const first = await inCall(engine, 'C0ENG')
   // Another page's report about this attendee changes nothing.
-  await stopMedia(engine, first.attendeeId, 'anotherDevice', 'page-0')
+  await stopMedia(engine, first.attendeeId, 'anotherDevice', PAGE - 1)
   expect((await callUntil(engine, () => true, 'call')).phase).toBe('joined')
   await stopMedia(engine, first.attendeeId, 'anotherDevice')
   const call = await callUntil(engine, (c) => c.phase === 'idle', 'idle')
