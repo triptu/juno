@@ -72,7 +72,7 @@ export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presenc
           ) : (
             <span {...stylex.props(styles.avatar)}>
               {avatar}
-              <PresenceDot active={presence.active} surface="raised" />
+              <PresenceDot active={presence.active} surface="raised" paused={paused !== undefined} />
             </span>
           )
         }

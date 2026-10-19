@@ -44,6 +44,8 @@ export interface SidebarAccount {
   readonly avatarUrl?: string
   /** Whether Slack shows you as active, drawn as a dot on the avatar. Omitted while unknown. */
   readonly presence?: 'active' | 'away'
+  /** "Paused until 9am" while notifications are paused, shown as a moon on the avatar. */
+  readonly paused?: string
 }
 
 export interface SidebarFilter {
@@ -242,6 +244,7 @@ export function Sidebar({
                     onClick={() => onAccountMenu(!accountMenuOpen)}
                     {...(account.avatarUrl === undefined ? {} : { src: account.avatarUrl })}
                     {...(account.presence === undefined ? {} : { presence: account.presence })}
+                    {...(account.paused === undefined ? {} : { paused: account.paused })}
                   />
                 }
               >

@@ -20,6 +20,12 @@ export default defineFixtures(
       'active-hover': fixture({ ...base, presence: 'active' }, { hover: 'button' }),
       'away-open': fixture({ ...base, presence: 'away', open: true }),
     },
+    // Notifications paused: the dot becomes a moon in its colour.
+    Paused: {
+      active: fixture({ ...base, src: photo, presence: 'active', paused: 'Paused until 9am' }),
+      away: fixture({ ...base, src: photo, presence: 'away', paused: 'Paused until 9am' }),
+      initials: fixture({ ...base, presence: 'away', paused: 'Paused until 9am' }),
+    },
     // The menu's open fill is the hover fill, through the press too, so opening changes no colour (gallery trigger-open spec).
     Open: {
       'avatar-hover': fixture(base, { hover: 'button' }),
