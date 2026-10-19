@@ -95,6 +95,8 @@ export interface TopicFetcher {
   readonly sent: (sent: Parameters<typeof applySent>[1]) => Effect.Effect<void, SqlError>
   /** Stores an edit, delete or reaction Slack accepted, with `alongside` in the same transaction (`applyActed`). */
   readonly acted: (acted: Acted, alongside: Effect.Effect<unknown, SqlError, StoreWriter | Invalidation>) => Effect.Effect<void, SqlError>
+  /** Asks `nameUsers` for users the store lacks, as a page that names them would (`wantUsers`). Returns at once; the names land in `users`. */
+  readonly wantUsers: (ids: ReadonlyArray<string>) => Effect.Effect<void>
 }
 
 export type SyncServices = SlackApi | SlackEdge | SlackSocket | SlackSession | StoreWriter | StoreReader | Invalidation

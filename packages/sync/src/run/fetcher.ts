@@ -45,6 +45,7 @@ export const makeTopicFetcher = (runtime: SyncRuntime) => Effect.gen(function* (
     opened: (channel) => applyOpened(ctx.metadata, channel).pipe(Effect.provide(services)),
     sent: (sent) => applySent(ctx, sent).pipe(Effect.provide(services)),
     acted: (acted, alongside) => applyActed(ctx, acted, alongside).pipe(Effect.provide(services)),
+    wantUsers: (ids) => Effect.sync(() => wantUsers(ctx, ids)),
   }
   return fetcher
 })
