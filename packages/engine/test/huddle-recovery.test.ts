@@ -1,9 +1,9 @@
 // Huddle recovery (specs/huddle.qnt): running huddles after socket gaps, a
 // renderer page that reloads mid-call, shutdown while a join is out, a store
-// that cannot be read, and an abrupt crash.
+// that cannot be read, and an abrupt crash. Page lifetimes against the
+// engine's are in huddle-pages.test.ts.
 import { copyFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
 import { expect, it } from 'vitest'
 import { sleep, waitFor, WAIT_MS } from './harness'
 import { readDb, restart, valueOf } from './scenario'
@@ -79,17 +79,20 @@ it('handles a join answered while the engine shuts down: stored, left, and never
   expect(readDb(engine, 'user.db', (db) => db.prepare('SELECT value_json FROM prefs WHERE key = ?').get('huddle.pendingLeaves'))).toEqual({ value_json: '[]' })
 })
 
-it('holds joins back while the stored leaves cannot be read, and goes on once they can', async () => {
+it('holds joins back while the stored leaves are malformed or null, and goes on once they read', async () => {
   const engine = await booted()
-  const next = watchHuddles(await restart(track, engine, () => writeStoredLeaves(engine.userData, engine.fake.teamId, '{"not":"a list"}')))
+  const next = watchHuddles(await restart(track, engine, () => writeStoredLeaves(engine.userData, engine.fake.teamId, 'not json {')))
+  pagesLive(next, PAGE)
   const starting = start(next, 'C0ENG')
   await callUntil(next, (call) => call.phase === 'joining', 'joining')
   await sleep(1_500)
   expect(joins(next)).toHaveLength(0)
-  // The store says it again, readable now; the next read finds no leave, and the join goes.
-  const db = new DatabaseSync(join(next.userData, 'workspaces', next.fake.teamId, 'user.db'))
-  db.prepare('UPDATE prefs SET value_json = ? WHERE key = ?').run('[]', 'huddle.pendingLeaves')
-  db.close()
+  // A stored null is not an empty list either.
+  writeStoredLeaves(next.userData, next.fake.teamId, 'null')
+  await sleep(2_500)
+  expect(joins(next)).toHaveLength(0)
+  // Readable now: the next read finds no leave, and the join goes.
+  writeStoredLeaves(next.userData, next.fake.teamId, '[]')
   expect(valueOf(await starting)._tag).toBe('joined')
 })
 

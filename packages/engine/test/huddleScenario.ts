@@ -1,14 +1,14 @@
 /**
  * Helpers the huddle tests share. The renderer page's media session is
- * played by the test: it reports `huddle.media` with its page generation,
- * and `stopMedia` also tells the fake Slack that Chime dropped the attendee,
+ * played by the test: it sends its whole state with `huddle.report`, and
+ * `stopMedia` also tells the fake Slack that Chime dropped the attendee,
  * which is what removes it on arch v2. Main's page reports are delivered
- * with `pagesLive`.
+ * with `pagesLive`; `booted` lists the test's page.
  */
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { afterEach } from 'vitest'
-import { huddleCall, huddleMedia, huddleRunning, huddleStart, type HuddleCall, type HuddleMediaEnd, type HuddleStartResult, type RunningHuddles } from '@juno/contract'
+import { huddleCall, huddleReport, huddleRunning, huddleStart, type HuddleCall, type HuddleMediaEnd, type HuddlePageReport, type HuddleStartResult, type RunningHuddles } from '@juno/contract'
 import { liveQuery, runCommand } from '@juno/state'
 import { waitFor, WAIT_MS, type EngineOptions, type RunningEngine } from './harness'
 import { apiCalls, bootedEngine, readDb, valueOf } from './scenario'
@@ -36,7 +36,9 @@ export function watchHuddles(engine: RunningEngine): RunningEngine {
 }
 
 export async function booted(options: EngineOptions = {}): Promise<RunningEngine> {
-  return watchHuddles(await bootedEngine(track, options))
+  const engine = watchHuddles(await bootedEngine(track, options))
+  pagesLive(engine, PAGE)
+  return engine
 }
 
 export const callUntil = (engine: RunningEngine, done: (call: HuddleCall) => boolean, label: string) =>
@@ -62,12 +64,16 @@ export const joined = async (engine: RunningEngine, channelId: string, generatio
   return result
 }
 
-export const started = async (engine: RunningEngine, attendeeId: string, generation = PAGE) =>
-  valueOf(await runCommand(engine.registry, huddleMedia, { event: { _tag: 'started', generation, attendeeId } }))
+/** The page's whole media state. */
+export const report = async (engine: RunningEngine, state: Partial<HuddlePageReport> & { readonly generation?: string } = {}) =>
+  valueOf(await runCommand(engine.registry, huddleReport, { report: { generation: PAGE, holds: null, received: null, connection: 'connected', muted: false, ended: null, ...state } }))
+
+/** The page started the session it was handed. */
+export const started = (engine: RunningEngine, attendeeId: string, generation = PAGE) => report(engine, { generation, holds: attendeeId, received: attendeeId })
 
 /** The page's media session ended: it reports so, and Chime drops the attendee. */
 export const stopMedia = async (engine: RunningEngine, attendeeId: string, reason: HuddleMediaEnd = 'left', generation = PAGE) => {
-  valueOf(await runCommand(engine.registry, huddleMedia, { event: { _tag: 'ended', generation, attendeeId, reason } }))
+  await report(engine, { generation, received: attendeeId, ended: { attendeeId, reason } })
   engine.fake.control('stopMedia', { attendeeId })
 }
 
