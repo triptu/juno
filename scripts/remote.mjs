@@ -3,7 +3,7 @@
 //   pnpm remote [--dry-run] [--machine linux/amd64:4x8] [--keep] [--env KEY=VALUE] <script> [args...]
 //   pnpm remote test
 //   pnpm remote specs:check --memory
-//   pnpm remote test:plan test + test:desktop   several scripts on one machine (scripts/plan.mjs)
+//   pnpm remote test:plan test + test:desktop   separate SSH jobs, or one Namespace machine
 //   pnpm remote --shards 2 specs:check     one script split across machines
 //   pnpm remote --status | --drain
 //
@@ -15,7 +15,7 @@
 
 import { randomUUID } from 'node:crypto'
 import { spawn, spawnSync } from 'node:child_process'
-import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
@@ -24,6 +24,7 @@ import { runnerConfig, checkRunner, runnerCommand, runnerJobSize, ensureRunnerIm
 import { snapshot } from './remote/workspace.mjs'
 import { createWithStore, namespaceCache, namespaceStoreVolume, workspaceMounts } from './remote/namespace.mjs'
 import { imageTag, ensureImage, nsc, retry, quote, sleep } from './remote/image.mjs'
+import { runnerPlanJobs, runRunnerPlan } from './remote/plan.mjs'
 import { runShards } from './remote/shards.mjs'
 import { acquire, destroy, idleMinutes, keep, reap, release, status } from './remote/pool.mjs'
 import { outage } from './remote/outage.mjs'
@@ -141,7 +142,11 @@ console.error(`remote: ${files.length} files (${(bytes / 1024 / 1024).toFixed(1)
 if (options.dryRun) {
   console.log('remote: dry run; these steps would run:')
   const config = runnerConfig()
-  if (config) console.log(`  try SSH runner image ${config.image}${config.build ? ' (built on the runner if missing)' : ''}; Namespace steps apply if unreachable or full for 60 s`)
+  if (config) {
+    const jobs = runnerPlanJobs(options)
+    console.log(`  try SSH runner image ${config.image}${config.build ? ' (built on the runner if missing)' : ''}`)
+    console.log(jobs.length ? `  SSH jobs: ${jobs.map((job) => `${job.kind} (${job.steps.map((step) => step.script).join(', ')})`).join(' | ')}; wait for capacity once split; one Namespace plan if unreachable` : '  Namespace steps apply if unreachable or full for 60 s')
+  }
   console.log(`  image nscr.io/<workspace>/juno-toolchain:${imageTag()} (nsc build --push if the registry lacks it)`)
   console.log(`  a warm ${options.machine} machine from the pool, or nsc ${[...create('3h'), ...namespaceStoreVolume()].map(quote).join(' ')} --cidfile <tmp>/id`)
   console.log(`  git ls-files ... | tar -czf - --null -T - | nsc ssh -T <id> ${quote(container('<image>'))}`)
@@ -151,7 +156,7 @@ if (options.dryRun) {
 }
 
 mkdirSync(reportDir, { recursive: true })
-const runLog = join(reportDir, 'run.log')
+let runLog = join(reportDir, 'run.log')
 writeFileSync(runLog, `pnpm ${scriptArgs}\nremote: run ${JSON.stringify({ version: 1, script: options.script, args: options.args, machine: options.machine, started: new Date(started).toISOString() })}\n`)
 const elapsed = () => `${((Date.now() - started) / 1000).toFixed(0)} s`
 const work = mkdtempSync(join(tmpdir(), 'juno-remote-'))
@@ -182,6 +187,7 @@ const cleanup = () => {
 process.on('exit', (exitCode) => { cleanup(); finishLog(exitCode) })
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
   process.on(signal, () => {
+    if (backend === 'ssh-plan') return // The coordinator forwards signals and waits for every job's cleanup.
     console.error(`remote: ${signal}, stopping the remote run`)
     activeSsh?.kill(signal)
     activeTar?.kill(signal)
@@ -227,7 +233,7 @@ let finalized = false
 function finishLog(result) {
   if (finalized) return
   finalized = true
-  appendFileSync(runLog, `remote: exited with ${result}\nremote: summary ${JSON.stringify({ code: result, infraFailure, outage: outageFailure, backend, cpuLimit: backend === 'ssh' ? cpuLimit : undefined, cores: backend === 'ssh' ? cores : Number(/:(\d+)x/.exec(options.machine)?.[1]), warm, readySeconds, startupSeconds, machineSeconds, wallSeconds: (Date.now() - started) / 1000 })}\n`)
+  appendFileSync(runLog, `remote: exited with ${result}\nremote: summary ${JSON.stringify({ code: result, infraFailure, outage: outageFailure, backend, cpuLimit: backend === 'ssh' ? cpuLimit : undefined, cores: backend === 'ssh-plan' ? undefined : backend === 'ssh' ? cores : Number(/:(\d+)x/.exec(options.machine)?.[1]), warm, readySeconds, startupSeconds, machineSeconds, wallSeconds: (Date.now() - started) / 1000 })}\n`)
 }
 try {
   runner = runnerConfig()
@@ -250,6 +256,16 @@ try {
   appendFileSync(runLog, `remote: backend ${backend}\n`)
   if (backend === 'ssh') {
     image = await ensureRunnerImage(runner, (message) => { console.error(message); appendFileSync(runLog, `${message}\n`) })
+    const jobs = runnerPlanJobs(options)
+    if (jobs.length) {
+      backend = 'ssh-plan'
+      const planLog = join(reportDir, 'plan.log')
+      renameSync(runLog, planLog)
+      runLog = planLog
+      code = await runRunnerPlan(jobs, { self, root, options, log: (line) => { console.log(line); appendFileSync(runLog, `${line}\n`) } })
+      console.error(`remote: plan output in ${relative(root, runLog)}`)
+      process.exit(code)
+    }
     id = runner.host
     acquiredAt = Date.now()
     console.error(`remote: SSH runner (${cores} cores); CPU limit ${cpuLimit}; running pnpm ${options.script}`)

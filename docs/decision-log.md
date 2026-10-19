@@ -4,6 +4,10 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-19 08:56 · Tests · Observe child exits at spawn time in the heavy-queue test and release holders only after both requests are queued; late exit listeners could leave affected waiting forever while holding the Mac reservation. Bound both checks to ten seconds and clean up every child.
+- 10-19 08:47 · Tests · Keep the desktop smoke spec through the final affected-input filter when test tools change, and include script contents in its result-cache key; selecting it as a candidate alone did not run it.
+- 10-19 08:40 · Tests · Run SSH plans as independent unit, app and specs jobs using existing per-job sizes; keep app builds together and conformance off the unit lane. Keep Namespace on one machine, and keep split jobs on SSH so capacity waits cannot allocate several paid machines.
+- 10-19 08:37 · Tests · Keep repository paths through affected unit execution and start only their packages; import closures already select files, but package-relative filters also ran namesakes. Preserve whole-package and whole-suite config fallbacks.
 - 10-19 05:10 · wide-ssh-unit-jobs · Reserve and limit wide SSH unit jobs to four cores for full runs, selections over 20 files, and spec checks without a carried cache. Use two packages with four Vitest workers each at four cores, including in unit-only plans. The 4/8/12-worker comparison selected four: 224 s at 78% CPU, while higher counts failed engine assertions. Keep narrow, app and explicit resource sizes unchanged.
 - 10-19 04:52 · half-open-test-clock · Advance the half-open socket repair test with TestClock after each completed sweep; the laptop run exposed a race between sweep work and the fast real pong deadline, so the test now advances the production deadline explicitly.
 - 10-19 04:39 · socket-test-barrier · Register the test socket barrier as a scoped SocketEvents subscriber at engine startup; SyncRunner keeps the shared publisher, and the barrier observes completed sync write attempts without coupling independent subscribers.

@@ -5,7 +5,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
-const globPattern = (glob) => new RegExp(`^${glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*\*\//g, '(?:.*/)?').replace(/\*/g, '[^/]*')}$`)
+const globPattern = (glob) => new RegExp(`^${glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*\*\/|\*/g, (part) => part === '**/' ? '(?:.*/)?' : '[^/]*')}$`)
 
 /**
  * Whether a repo path is a vitest file: in a package or app under `packages/`
@@ -50,5 +50,16 @@ export function nodeTestScripts(root, changed) {
     .map(([script, command]) => {
       const tests = command.split(/\s+/).filter((word) => /\.test\.[cm]?js$/.test(word))
       return { script, reached: tests.flatMap((test) => [...scriptImports(root, test)].filter((file) => changed.includes(file)).map((file) => ({ test, file }))) }
+    })
+}
+
+/** File import closures plus package configs, shared by selection and its cache. */
+export function unitTestItems(root, files, changed, closure) {
+  return [...files]
+    .filter(unitTestMatcher(root))
+    .map((file) => {
+      const dir = file.split('/').slice(0, 2).join('/')
+      const config = [`${dir}/package.json`, `${dir}/vitest.config.ts`, `${dir}/tsconfig.json`]
+      return { suite: 'test', id: file, inputs: new Set([...closure(file), ...config]), own: changed.some((path) => config.includes(path)) }
     })
 }

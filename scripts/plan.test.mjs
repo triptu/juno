@@ -40,3 +40,44 @@ test('wide unit-only plans keep inherited unit concurrency while other lanes sta
   assert.deepEqual(sideBySide(4, true), { ...normal, rest: {} })
   assert.deepEqual(normal.rest, { JUNO_VITEST_WORKERS: '1', JUNO_TEST_PACKAGE_JOBS: '1' })
 })
+
+test('SSH jobs group app builds, isolate conformance from units, and retain step indices and environments', async () => {
+  const { runnerPlanJobs, planWords } = await import('./remote/plan.mjs')
+  const options = { script: 'test:plan', env: [], args: ['test', '--files', 'packages/domain/test/notifications.test.ts', '+', 'specs:conformance', '+', 'GALLERY_SHIFT_ONLY=Chip', 'test:gallery', '+', 'specs:check', '+', 'test:desktop', 'e2e/app.spec.ts'] }
+  const jobs = runnerPlanJobs(options, {})
+  assert.deepEqual(jobs.map(({ kind, steps }) => [kind, steps.map((s) => s.index)]), [['unit', [0]], ['specs', [1, 3]], ['app', [2, 4]]])
+  assert.deepEqual(parsePlan(planWords(jobs[2].steps)), parsePlan(options.args).filter((s) => ['test:gallery', 'test:desktop'].includes(s.script)))
+  assert.deepEqual(runnerPlanJobs(options, { JUNO_RUNNER_PLAN: 'single' }), [])
+  assert.deepEqual(runnerPlanJobs({ ...options, env: ['JUNO_PLAN_SERIAL=1'] }, {}), [])
+  assert.deepEqual(runnerPlanJobs({ ...options, args: ['test:gallery', '+', 'test:desktop'] }, {}), [])
+})
+
+test('SSH job execution overlaps jobs, reports original indices, and fails missing steps without Namespace fallback', async () => {
+  const { existsSync, mkdtempSync, writeFileSync, readFileSync, rmSync } = await import('node:fs')
+  const { join } = await import('node:path')
+  const { runnerPlanJobs, runRunnerPlan } = await import('./remote/plan.mjs')
+  const { tmpdir } = await import('node:os')
+  const dir = mkdtempSync(join(existsSync('/Volumes/AgentWork') ? '/Volumes/AgentWork' : tmpdir(), 'juno-plan-test-'))
+  try {
+    const self = join(dir, 'remote.mjs')
+    writeFileSync(self, `import {appendFileSync} from 'node:fs';
+const args=process.argv.slice(2); const kind=args.includes('test:gallery')?'app':'unit';
+appendFileSync(${JSON.stringify(join(dir, 'calls'))},JSON.stringify({kind,args,cap:process.env.JUNO_REMOTE_MAX_VCPU,time:Date.now(),event:'start'})+'\\n');
+setTimeout(()=>{console.log('plan: step 0 '+(kind==='app'?'test:gallery':'test')+' exited with 0 after 1 s'); appendFileSync(${JSON.stringify(join(dir, 'calls'))},JSON.stringify({kind,event:'end',time:Date.now()})+'\\n');process.exitCode=0},200);
+`)
+    const options = { script: 'test:plan', args: ['test', '+', 'test:gallery', '+', 'test:desktop'], env: ['CUSTOM=space value'], machine: 'linux/amd64:4x8', explicitMachine: true }
+    const logs = []
+    assert.equal(await runRunnerPlan(runnerPlanJobs(options, {}), { self, root: dir, options, log: (line) => logs.push(line) }), 255)
+    const calls = readFileSync(join(dir, 'calls'), 'utf8').trim().split('\n').map(JSON.parse)
+    assert.deepEqual(calls.slice(0, 2).map((c) => c.event), ['start', 'start'])
+    for (const call of calls.filter((c) => c.event === 'start')) {
+      assert.equal(call.cap, '0')
+      assert.ok(call.args.includes('CUSTOM=space value'))
+      assert.ok(call.args.includes('JUNO_PLAN_SERIAL=1'))
+      assert.ok(call.args.includes('linux/amd64:4x8'))
+    }
+    assert.ok(logs.includes('plan: step 0 test exited with 0 after 1 s'))
+    assert.ok(logs.includes('plan: step 1 test:gallery exited with 0 after 1 s'))
+    assert.ok(logs.includes('plan: step 2 test:desktop exited with 255 (job did not finish this step)'))
+  } finally { rmSync(dir, { recursive: true, force: true }) }
+})

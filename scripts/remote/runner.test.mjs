@@ -8,6 +8,7 @@ import { runnerConfig, runnerCommand, runnerJobSize } from './runner.mjs'
 import { imageTag } from './image.mjs'
 import { sideBySide } from '../plan.mjs'
 import { parseRun } from './usage.mjs'
+import { runnerHarness } from './runner-test-harness.mjs'
 
 test('runner settings load from the machine file, with environment values taking precedence', () => {
   const home = mkdtempSync(join(tmpdir(), 'juno-runner-config-'))
@@ -77,47 +78,6 @@ test('spec cache presence and step overrides select narrow or wide jobs', () => 
   }
 })
 
-// Exercise the public CLI through fake transports, including workspace streaming.
-function runnerHarness() {
-  const dir = mkdtempSync(join(tmpdir(), 'juno-runner-cli-'))
-  const calls = join(dir, 'calls')
-  writeFileSync(join(dir, 'ssh'), `#!/usr/bin/env node
-const fs = require('node:fs');
-const command = process.argv.at(-1);
-fs.appendFileSync(process.env.TEST_CALLS, 'ssh\\n');
-if (process.env.TEST_MODE === 'unreachable') process.exit(255);
-if (process.env.TEST_MODE === 'auth') { console.error('Permission denied (publickey)'); process.exit(255); }
-if (command.includes('docker build')) {
- if (process.env.TEST_MODE === 'build-failed') { console.error('Docker build failed'); process.exit(1); }
- let bytes = 0; process.stdin.on('data', chunk => bytes += chunk.length);
- process.stdin.on('end', () => { fs.appendFileSync(process.env.TEST_CALLS, 'build ' + bytes + '\\n'); console.error('#1 DONE 0.1s'); });
-} else if (command.includes('__juno_runner_connected')) {
- if (process.env.TEST_MODE === 'broken') { console.error('Docker unavailable'); process.exit(1); }
- console.log('__juno_runner_connected\\njuno-runner-ready ' + (process.env.TEST_CAPACITY || '4'));
-} else if (command.includes('__juno_remote_exit_')) {
- fs.appendFileSync(process.env.TEST_CALLS, 'reservation ' + command.match(/ -- (\\d+) '/)[1] + ' cpus ' + command.match(/--cpus (\\d+)/)[1] + ' job-cores ' + command.match(/JUNO_RUNNER_JOB_CORES=(\\d+)/)[1] + '\\n');
- fs.appendFileSync(process.env.TEST_CALLS, 'wide-unit ' + command.match(/JUNO_RUNNER_WIDE_UNIT=(\\d+)/)[1] + '\\n');
- if (process.env.TEST_MODE === 'busy') { console.log('__juno_remote_started\\n__juno_remote_busy\\n__juno_remote_released'); process.exit(75); }
- fs.appendFileSync(process.env.TEST_CALLS, (command.includes('JUNO_REMOTE_INSTALL=1') && command.includes('PNPM_CONFIG_STORE_DIR=/cache/pnpm-store') && command.includes('--user') ? 'install with cache' : 'full image') + '\\n');
- const marker = command.match(/__juno_remote_exit_[\\w-]+=/)[0];
- let bytes = 0; process.stdin.on('data', chunk => { bytes += chunk.length });
- process.stdin.on('end', () => {
-   fs.appendFileSync(process.env.TEST_CALLS, 'workspace ' + bytes + '\\n');
-   console.log('__juno_remote_started\\n__juno_remote_ready\\nremote: script time 1 s\\n' + marker + '7');
- });
-} else if (command.includes('docker image inspect')) {
- if (command.includes('__juno_image_present')) console.log('__juno_image_missing');
- else if (['build', 'build-failed'].includes(process.env.TEST_MODE)) process.exit(1);
-} else { process.stdin.resume(); }
-`)
-  writeFileSync(join(dir, 'nsc'), '#!/bin/sh\necho nsc >> "$TEST_CALLS"\necho not-json\n')
-  writeFileSync(join(dir, 'git'), "#!/bin/sh\nprintf 'package.json\\0scripts/remote.mjs\\0scripts/remote/run.sh\\0'\n")
-  chmodSync(join(dir, 'git'), 0o755)
-  chmodSync(join(dir, 'ssh'), 0o755)
-  chmodSync(join(dir, 'nsc'), 0o755)
-  const env = { ...process.env, HOME: dir, TMPDIR: dir, TMP: dir, TEMP: dir, PATH: `${dir}:${process.env.PATH}`, TEST_CALLS: calls, JUNO_RUNNER_HOST: 'runner-test', JUNO_RUNNER_IMAGE: 'test/image:tag', JUNO_REMOTE_MAX_VCPU: '0' }
-  return { dir, calls, env }
-}
 
 const jobSizeFiles = Array.from({ length: 21 }, (_, index) => `test/file-${index}.test.ts`)
 const jobSizeCases = [
@@ -172,7 +132,7 @@ test('SSH job sizes follow scripts and plan steps, with explicit sizes taking pr
       }
       writeFileSync(calls, '')
       const child = spawnSync(process.execPath, ['scripts/remote.mjs', ...flags, ...args], {
-        env: { ...env, TEST_MODE: 'healthy', TEST_CAPACITY: '16', JUNO_REMOTE_MACHINE: undefined, ...overrides }, encoding: 'utf8', timeout: 30_000,
+        env: { ...env, TEST_MODE: 'healthy', TEST_CAPACITY: '16', JUNO_RUNNER_PLAN: 'single', JUNO_REMOTE_MACHINE: undefined, ...overrides }, encoding: 'utf8', timeout: 30_000,
       })
       const path = /remote: output in (.+)\/run.log/.exec(child.stderr)?.[1]
       if (path) runs.push(path)
@@ -396,4 +356,30 @@ fi
     assert.equal(run({ JUNO_REMOTE_INSTALL: '' }).status, 0)
     assert.match(readFileSync(join(dir, 'calls'), 'utf8'), /install --frozen-lockfile --offline --reporter=silent/)
   } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test('the remote CLI splits an SSH plan once, keeps one app job, and maps every result back', () => {
+  const { dir, calls, env } = runnerHarness()
+  const runs = []
+  try {
+    const child = spawnSync(process.execPath, ['scripts/remote.mjs', 'test:plan', 'test', '+', 'specs:conformance', '+', 'test:gallery', '+', 'test:desktop'], {
+      env: { ...env, TEST_MODE: 'plan', TEST_CAPACITY: '16', JUNO_RUNNER_PLAN: undefined, JUNO_PLAN_SERIAL: undefined }, encoding: 'utf8', timeout: 30_000,
+    })
+    for (const match of (child.stdout + child.stderr).matchAll(/remote: (?:plan )?output in (.+)\/(?:run|plan)\.log/g)) runs.push(match[1])
+    assert.equal(child.status, 0, child.stderr + child.stdout)
+    assert.match(child.stdout, /SSH plan in 3 jobs: unit, specs, app/)
+    const called = readFileSync(calls, 'utf8')
+    assert.equal((called.match(/workspace /g) ?? []).length, 3)
+    assert.doesNotMatch(called, /nsc/)
+    assert.equal((called.match(/reservation 4 cpus 4/g) ?? []).length, 2)
+    assert.equal((called.match(/reservation 8 cpus 8/g) ?? []).length, 1)
+    for (const [index, script] of ['test', 'specs:conformance', 'test:gallery', 'test:desktop'].entries()) assert.match(child.stdout, new RegExp(`^plan: step ${index} ${script} exited with 0 after 1 s$`, 'm'))
+    const group = /remote: plan output in (.+)/.exec(child.stderr)[1]
+    assert.ok(existsSync(group))
+    assert.equal(JSON.parse(/^remote: summary (.+)$/m.exec(readFileSync(group, 'utf8'))[1]).cores, undefined)
+    assert.ok(!existsSync(join(group, '..', 'run.log')), 'coordinator log must not double count child CPU usage')
+  } finally {
+    for (const path of runs) rmSync(path, { recursive: true, force: true })
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
