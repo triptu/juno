@@ -1,0 +1,1 @@
+- 10-19 10:04 · Engine test hooks · Keep e2e request correlation and AI call observation in a main-process helper, and job-pass ordering in an engine-process helper. The process entries wire those helpers instead of growing their message handlers; production message handling and scheduling stay unchanged. The API-key flow can await the independent title and art passes together.

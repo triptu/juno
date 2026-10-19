@@ -9,6 +9,7 @@ import { appBackupSecrets } from './backupSecrets'
 import { codexHome } from './codex'
 import { appMcpCredentials } from './mcpCredentials'
 import { createSupervisor } from './engine'
+import { createEngineTestHooks } from './engineTestHooks'
 import { copiedForTests, copyImage, downloadFile, downloadsForTests, openedForTests, openFile } from './files'
 import { browserLinksForTests, contextMenuForTests, folderForTests, registerIpc, logsForTests, slackLinksForTests, webPanelForTests } from './ipc'
 import { CUSTOM_ITEM, macKeychain, memoryKeychain, OPENROUTER_ITEM } from './keychain'
@@ -101,21 +102,11 @@ const fakeSlackUrl = e2e ? process.env.JUNO_FAKE_SLACK_URL : undefined
 const slackAppDir = e2e ? process.env.JUNO_SLACK_APP_DIR : undefined
 const keychainPassword = e2e ? process.env.JUNO_SLACK_SAFE_STORAGE_PASSWORD : undefined
 
-const aiCallsForTests: Record<string, number> = {}
-let nextTestWork = 0
-const testWorkReplies = new Map<number, (error: string | undefined) => void>()
+const engineTests = createEngineTestHooks(e2e, (message) => supervisor.send(message))
 const supervisor = createSupervisor({
   ...(fakeSlackUrl === undefined ? {} : { fakeSlackUrl }),
   onMessage: (message) => {
-    if (message._tag === 'testWorkDone') {
-      if (e2e) testWorkReplies.get(message.id)?.(message.error)
-      return
-    }
-    if (message._tag === 'aiCall') {
-      if (e2e) aiCallsForTests[message.task] = (aiCallsForTests[message.task] ?? 0) + 1
-      return
-    }
-    if (!notifier.handle(message) && !sessionHost.handle(message)) console.warn(`main: unhandled engine message ${message._tag}`)
+    if (!engineTests.handle(message) && !notifier.handle(message) && !sessionHost.handle(message)) console.warn(`main: unhandled engine message ${message._tag}`)
   },
 })
 
@@ -362,21 +353,7 @@ if (e2e) {
     junoTest: {
       enginePid: () => supervisor.pid,
       logsOpened: () => logsForTests.opened,
-      aiCalls: () => ({ ...aiCallsForTests }),
-      workPass: (name: 'title' | 'art' | 'home' | 'automated') => new Promise<void>((resolve, reject) => {
-        const id = ++nextTestWork
-        const timer = setTimeout(() => {
-          testWorkReplies.delete(id)
-          reject(new Error(`${name} pass did not finish within 10 s`))
-        }, 10_000)
-        testWorkReplies.set(id, (error) => {
-          clearTimeout(timer)
-          testWorkReplies.delete(id)
-          if (error === undefined) resolve()
-          else reject(new Error(error))
-        })
-        supervisor.send({ _tag: 'testWork', id, name })
-      }),
+      ...engineTests.hooks,
       engineState: () => supervisor.currentState,
       failEngine: () => supervisor.giveUp(),
       contextMenu: contextMenuForTests,

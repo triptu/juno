@@ -17,6 +17,7 @@
 // First, so coverage (test runs only) starts before the rest of the bundle runs.
 import '../coverage'
 import { installProcessLog } from '../processLog'
+import { createTestWork } from './testWork'
 import { net } from 'electron'
 import { Effect, Layer, Record, Schema } from 'effect'
 import { MainToEngine, type EngineToMain } from '@juno/contract'
@@ -69,10 +70,7 @@ const ElectronNet: Layer.Layer<HttpTransport> = Layer.succeed(HttpTransport, {
     }),
 })
 
-const testWakes = new Map<string, Effect.Effect<void>>()
-const testStarted = new Map<string, number>()
-const testRequests = new Map<number, { name: string; after: number }>()
-let testMode = false
+let testWork: ReturnType<typeof createTestWork> | undefined
 let engine: Promise<EngineHandle> | undefined
 parent.on('message', (event) => {
   let message: MainToEngine
@@ -85,23 +83,11 @@ parent.on('message', (event) => {
   switch (message._tag) {
     case 'config': {
       if (engine !== undefined) return
-      testMode = message.config.e2e && message.config.fakeSlackUrl !== undefined
-      const fastTiming = testMode && process.env.JUNO_E2E_FAST_TIMING === '1'
+      testWork = message.config.e2e && message.config.fakeSlackUrl !== undefined ? createTestWork(send) : undefined
+      const fastTiming = testWork !== undefined && process.env.JUNO_E2E_FAST_TIMING === '1'
       engine = startEngine(transport, message.config, {
         host, httpTransport: ElectronNet, agentTransport, agentWrites: 'enabled', logger: processLog.effectLogger,
-        ...(fastTiming ? { work: {
-          onPass: (name, event) => {
-            const started = testStarted.get(name) ?? 0
-            if (event === 'started') testStarted.set(name, started + 1)
-            else for (const [id, request] of testRequests) {
-              if (request.name === name && started > request.after) {
-                testRequests.delete(id)
-                send({ _tag: 'testWorkDone', id })
-              }
-            }
-          },
-          onWake: (name, wake) => { if (wake === undefined) testWakes.delete(name); else testWakes.set(name, wake) },
-        } } : {}),
+        ...(fastTiming && testWork ? { work: testWork.control } : {}),
         ...(fastTiming
           ? { timing: {
               ...Record.map(productionTiming, (millis) => millis / 20),
@@ -124,13 +110,7 @@ parent.on('message', (event) => {
       return
     }
     case 'testWork': {
-      if (!testMode) return
-      const wake = testWakes.get(message.name)
-      if (wake === undefined) send({ _tag: 'testWorkDone', id: message.id, error: `${message.name} job is not ready` })
-      else {
-        testRequests.set(message.id, { name: message.name, after: testStarted.get(message.name) ?? 0 })
-        void Effect.runPromise(wake)
-      }
+      testWork?.request(message)
       return
     }
     case 'port': {
