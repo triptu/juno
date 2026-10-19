@@ -5,6 +5,7 @@
 // the old one back, and a model answer outside the vocabulary leaves the
 // placeholder.
 import { step } from './step'
+import { controlledSleep } from './controlledClock'
 import { afterEach, describe, expect, it } from 'vitest'
 import { artRedraw, prefsSet, type TopicRow } from '@juno/contract'
 import { redrawTopic, runAction, runCommand, topicAtom, undoLast } from '@juno/state'
@@ -140,19 +141,31 @@ describe('topic art', () => {
   })
 
   it('keeps the placeholder for a topic the model cannot draw within the vocabulary, and does not ask again', async () => {
-    const engine = await bootedEngine()
-    const thread = liveThread(engine, 'Broken drawing ::invalid-art:: for this thread')
-    const stored = await waitFor(() => storedArt(engine).find((row) => row.topic_id === thread.id), WAIT_MS, 'the failed attempt stored')
-    expect(stored).toMatchObject({ status: 'failed', recipe: '' })
-    const rows = await drawnRows(engine)
-    expect(rows.find((row) => row.id === thread.id)!.art).toBeUndefined()
-    const asked = artCalls(engine)
-    // A later pass draws a new thread and does not ask about the failed one again.
-    const next = liveThread(engine, 'Postgres replica lag after the failed drawing')
-    await engine.rowsUntil((later) => later.some((row) => row.id === next.id && hasArt(row)), 'the next thread drawn')
-    expect(artCalls(engine)).toBe(asked + 1)
-    const again = engine.registry.get(engine.topicsAtom())
-    expect(again._tag === 'Success' ? again.value.rows.get(thread.id)?.art : 'no rows').toBeUndefined()
+    const time = await controlledSleep(30_000)
+    const engine = await bootedEngine({ clock: time.clock, timing: { artDebounceMillis: 30_000 } })
+    try {
+      const thread = liveThread(engine, 'Broken drawing ::invalid-art:: for this thread')
+      // Only explicit art passes run: a title must finish before its first drawing.
+      await engine.rowsUntil((rows) => rows.some((row) => row.id === thread.id) && rows.filter((row) => row.kind === 'thread').every((row) => row.titleSource === 'ai'), 'all threads titled')
+      await engine.workPass('art')
+      const stored = await waitFor(() => storedArt(engine).find((row) => row.topic_id === thread.id), WAIT_MS, 'the failed attempt stored')
+      expect(stored).toMatchObject({ status: 'failed', recipe: '' })
+      const rows = await drawnRows(engine)
+      expect(rows.find((row) => row.id === thread.id)!.art).toBeUndefined()
+      const asked = artCalls(engine)
+      // A later pass draws a new thread and does not ask about the failed one again.
+      const next = liveThread(engine, 'Postgres replica lag after the failed drawing')
+      await engine.rowsUntil((rows) => rows.some((row) => row.id === next.id && row.titleSource === 'ai'), 'the next thread titled')
+      await engine.workPass('art')
+      await engine.rowsUntil((later) => later.some((row) => row.id === next.id && hasArt(row)), 'the next thread drawn')
+      expect(artCalls(engine)).toBe(asked + 1)
+      const again = engine.registry.get(engine.topicsAtom())
+      expect(again._tag === 'Success' ? again.value.rows.get(thread.id)?.art : 'no rows').toBeUndefined()
+    } finally {
+      await engine.stop()
+      engines.splice(engines.indexOf(engine), 1)
+      await time.close()
+    }
   })
 })
 
