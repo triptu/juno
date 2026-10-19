@@ -102,9 +102,15 @@ const slackAppDir = e2e ? process.env.JUNO_SLACK_APP_DIR : undefined
 const keychainPassword = e2e ? process.env.JUNO_SLACK_SAFE_STORAGE_PASSWORD : undefined
 
 const aiCallsForTests: Record<string, number> = {}
+let nextTestWork = 0
+const testWorkReplies = new Map<number, (error: string | undefined) => void>()
 const supervisor = createSupervisor({
   ...(fakeSlackUrl === undefined ? {} : { fakeSlackUrl }),
   onMessage: (message) => {
+    if (message._tag === 'testWorkDone') {
+      if (e2e) testWorkReplies.get(message.id)?.(message.error)
+      return
+    }
     if (message._tag === 'aiCall') {
       if (e2e) aiCallsForTests[message.task] = (aiCallsForTests[message.task] ?? 0) + 1
       return
@@ -357,6 +363,20 @@ if (e2e) {
       enginePid: () => supervisor.pid,
       logsOpened: () => logsForTests.opened,
       aiCalls: () => ({ ...aiCallsForTests }),
+      workPass: (name: 'title' | 'art' | 'home' | 'automated') => new Promise<void>((resolve, reject) => {
+        const id = ++nextTestWork
+        const timer = setTimeout(() => {
+          testWorkReplies.delete(id)
+          reject(new Error(`${name} pass did not finish within 10 s`))
+        }, 10_000)
+        testWorkReplies.set(id, (error) => {
+          clearTimeout(timer)
+          testWorkReplies.delete(id)
+          if (error === undefined) resolve()
+          else reject(new Error(error))
+        })
+        supervisor.send({ _tag: 'testWork', id, name })
+      }),
       engineState: () => supervisor.currentState,
       failEngine: () => supervisor.giveUp(),
       contextMenu: contextMenuForTests,

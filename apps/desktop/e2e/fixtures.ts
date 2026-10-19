@@ -45,6 +45,8 @@ export function tempUserData(): Promise<string> {
 }
 
 export interface LaunchOptions {
+  /** Engine scheduling profile. Timing, perf, feel and @mac checks retain production defaults. */
+  readonly timing?: 'fast' | 'production'
   /** The fake Slack the app signs in against (sign-in window, socket allow-list). */
   readonly fakeSlackUrl?: string
   /** A fixture Slack-app directory for "Use the Slack app's session". */
@@ -155,6 +157,9 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   }
   env.JUNO_USER_DATA = userData
   env.JUNO_E2E = '1'
+  const info = base.info()
+  const production = options.paced === true || /(?:perf|idle-cpu)\.spec\.ts$|[/\\]feel[/\\]/.test(info.file) || info.tags.includes('@mac')
+  env.JUNO_E2E_FAST_TIMING = (options.timing ?? (production ? 'production' : 'fast')) === 'fast' ? '1' : '0'
   delete env.JUNO_E2E_OPENROUTER_KEY
   env.JUNO_FAKE_AI_REQUIRES_KEY = options.fakeAiRequiresKey === true ? '1' : '0'
   if (options.fakeSlackUrl !== undefined) env.JUNO_FAKE_SLACK_URL = options.fakeSlackUrl
@@ -238,6 +243,7 @@ export async function writeSlackApp(
 }
 
 export interface Fixtures {
+  readonly timing: 'fast' | 'production' | undefined
   /** Run the engine's background AI jobs in the `running` app (`LaunchOptions.aiJobs`); `test.use({ aiJobs: true })` opts a file in. */
   readonly aiJobs: boolean
   /** How long the `running` app's fake AI takes to answer (`LaunchOptions.fakeAiDelayMillis`); undefined answers at once. */
@@ -321,15 +327,17 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     await use(userData)
     await rm(userData, { recursive: true, force: true })
   },
+  timing: [undefined, { option: true }],
   aiJobs: [false, { option: true }],
   fakeAiDelayMillis: [undefined, { option: true }],
   screenShared: [false, { option: true }],
   updateServer: [undefined, { option: true }],
   sidebarTrace: [false, { option: true }],
   sendTrace: [false, { option: true }],
-  running: async ({ fake, slackApp, userData, aiJobs, fakeAiDelayMillis, screenShared, updateServer, sidebarTrace, sendTrace }, use, testInfo) => {
+  running: async ({ fake, slackApp, userData, aiJobs, fakeAiDelayMillis, screenShared, updateServer, sidebarTrace, sendTrace, timing }, use, testInfo) => {
     const running = await launchApp(userData, {
       fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword,
+      ...(timing === undefined ? {} : { timing }),
       aiJobs, screenShared, sidebarTrace, sendTrace, ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }),
       ...(updateServer === undefined ? {} : { updateServer }),
     })

@@ -57,6 +57,8 @@ export type OsNotification = typeof OsNotification.Type
 /** main -> engine over parentPort. A `port` message carries the port in `ports[0]`. */
 export const MainToEngine = Schema.Union([
   Schema.TaggedStruct('config', { config: EngineConfig }),
+  /** Tests only: request a pass through a background job's serial consumer. */
+  Schema.TaggedStruct('testWork', { id: Schema.Int, name: Schema.Literals(['title', 'art', 'home', 'automated']) }),
   Schema.TaggedStruct('port', {}),
   /** The app window has painted; background provider warm-up may start. */
   Schema.TaggedStruct('painted', {}),
@@ -97,6 +99,8 @@ export type MainToEngine = typeof MainToEngine.Type
 export const EngineToMain = Schema.Union([
   /** Tests only: a fake provider call started. No input or credentials. */
   Schema.TaggedStruct('aiCall', { task: Schema.String }),
+  /** Tests only: completion includes passes that decide there is no work. */
+  Schema.TaggedStruct('testWorkDone', { id: Schema.Int, error: Schema.optionalKey(Schema.String) }),
   /** The engine is serving; main may hand it ports. */
   Schema.TaggedStruct('ready', {}),
   /** Please send the stored secrets (`secrets`, possibly null). */

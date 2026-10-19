@@ -14,6 +14,10 @@ import { expect, type ElectronApplication, type Locator, type Page } from '@play
  */
 const PRESS_MS = 60
 
+interface WorkHooks {
+  readonly workPass: (name: 'title' | 'art' | 'home' | 'automated') => Promise<void>
+}
+
 /** Presses and releases the primary button where the mouse is. */
 export async function press(win: Page): Promise<void> {
   await win.mouse.down()
@@ -915,6 +919,11 @@ export class Juno {
 
   async expectSignInError(text: string | RegExp): Promise<void> {
     await expect(this.win.getByText(text)).toBeVisible({ timeout: 15_000 })
+  }
+
+  /** Wait for a real job pass, including a pass that chooses not to call the model. */
+  async workPass(name: Parameters<WorkHooks['workPass']>[0]): Promise<void> {
+    await this.app.evaluate((_electron, job) => (globalThis as unknown as { junoTest: WorkHooks }).junoTest.workPass(job), name)
   }
 
   /**

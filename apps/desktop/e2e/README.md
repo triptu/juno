@@ -2,6 +2,14 @@
 
 The app's end-to-end tests, against the fake Slack server. Fixtures, `launchApp` and the options a file can `test.use` are in `fixtures.ts`; the page objects are in `driver/`. Setup, commands and the remote runner are in `docs/development.md`.
 
+## Scheduling and setup timings
+
+Ordinary fake-Slack launches use the engine unit harness's 1:20 scheduling scale. The engine host accepts it only with both e2e mode and a fake Slack URL; a normal launch keeps production defaults. `test.use({ timing: 'production' })` or `launchApp(dir, { timing: 'production' })` keeps real timing for a test of a window itself. Presence-spacing checks opt out. Paced sync launches, `perf.spec.ts`, `idle-cpu.spec.ts`, feel scenarios and tests tagged `@mac` keep production timing automatically.
+
+For a negative AI or Automated assertion, `await juno.workPass('title' | 'art' | 'home' | 'automated')` requests a pass through the job's existing serial consumer. The engine acknowledges only a pass started after that request, including a pass that chooses not to call the model. It fails after 10 seconds instead of accepting an unfinished pass. AI jobs still need `aiJobs: true`.
+
+`pnpm remote --env JUNO_E2E_TIMINGS=1 test:desktop <specs>` prints separate fake-start, Electron-launch, sign-in, sync-wait and close durations in milliseconds. These are setup observations, not the Mac performance budgets. Each test still owns its fake and user-data directory; no signed-in profile is shared.
+
 ## Sidebar trace
 
 A sidebar test that fails because a row did not appear, or did not move, needs to say whether the sidebar held its order or was given no new list. The sidebar trace records both.

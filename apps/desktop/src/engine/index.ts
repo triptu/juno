@@ -18,9 +18,9 @@
 import '../coverage'
 import { installProcessLog } from '../processLog'
 import { net } from 'electron'
-import { Effect, Layer, Schema } from 'effect'
+import { Effect, Layer, Record, Schema } from 'effect'
 import { MainToEngine, type EngineToMain } from '@juno/contract'
-import { electronTransport, startEngine, type EngineHandle, type Host } from '@juno/engine'
+import { electronTransport, productionTiming, startEngine, type EngineHandle, type Host } from '@juno/engine'
 import { HttpTransport, HttpTransportError, type HttpResponse } from '@juno/slack'
 
 const processLog = installProcessLog('engine')
@@ -69,6 +69,10 @@ const ElectronNet: Layer.Layer<HttpTransport> = Layer.succeed(HttpTransport, {
     }),
 })
 
+const testWakes = new Map<string, Effect.Effect<void>>()
+const testStarted = new Map<string, number>()
+const testRequests = new Map<number, { name: string; after: number }>()
+let testMode = false
 let engine: Promise<EngineHandle> | undefined
 parent.on('message', (event) => {
   let message: MainToEngine
@@ -81,7 +85,27 @@ parent.on('message', (event) => {
   switch (message._tag) {
     case 'config': {
       if (engine !== undefined) return
-      engine = startEngine(transport, message.config, { host, httpTransport: ElectronNet, agentTransport, agentWrites: 'enabled', logger: processLog.effectLogger })
+      testMode = message.config.e2e && message.config.fakeSlackUrl !== undefined
+      const fastTiming = testMode && process.env.JUNO_E2E_FAST_TIMING === '1'
+      engine = startEngine(transport, message.config, {
+        host, httpTransport: ElectronNet, agentTransport, agentWrites: 'enabled', logger: processLog.effectLogger,
+        ...(fastTiming ? { work: {
+          onPass: (name, event) => {
+            const started = testStarted.get(name) ?? 0
+            if (event === 'started') testStarted.set(name, started + 1)
+            else for (const [id, request] of testRequests) {
+              if (request.name === name && started > request.after) {
+                testRequests.delete(id)
+                send({ _tag: 'testWorkDone', id })
+              }
+            }
+          },
+          onWake: (name, wake) => { if (wake === undefined) testWakes.delete(name); else testWakes.set(name, wake) },
+        } } : {}),
+        ...(fastTiming
+          ? { timing: Record.map(productionTiming, (millis) => millis / 20) }
+          : {}),
+      })
       engine.then(
         () => { processLog.log('INFO', 'process ready'); send({ _tag: 'ready' }) },
         (cause: unknown) => {
@@ -89,6 +113,16 @@ parent.on('message', (event) => {
           void processLog.close().finally(() => process.exit(1))
         },
       )
+      return
+    }
+    case 'testWork': {
+      if (!testMode) return
+      const wake = testWakes.get(message.name)
+      if (wake === undefined) send({ _tag: 'testWorkDone', id: message.id, error: `${message.name} job is not ready` })
+      else {
+        testRequests.set(message.id, { name: message.name, after: testStarted.get(message.name) ?? 0 })
+        void Effect.runPromise(wake)
+      }
       return
     }
     case 'port': {

@@ -49,8 +49,8 @@ async function homeAsks(juno: Juno): Promise<void> {
     .toContain('automated')
 }
 
-/** The job takes changes in 3 second windows; after this a pass has looked at them. */
-const afterAPass = (juno: Juno) => juno.win.waitForTimeout(4_000)
+/** The job has examined the changed rows, including a pass that keeps their placement. */
+const afterAPass = (juno: Juno) => juno.workPass('automated')
 
 test('the view fills on the first sync, keeps the bot channels out of All, and its sheet says what Juno added', async ({ juno }) => {
   await juno.signIn()

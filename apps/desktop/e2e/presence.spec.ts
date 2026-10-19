@@ -16,6 +16,9 @@ import { AUTO_AWAY_MILLIS } from '@juno/fake-slack'
 import type { Juno } from './driver/juno'
 import { expect, test } from './fixtures'
 
+// This spec checks the socket's real activity spacing.
+test.use({ timing: 'production' })
+
 /** Longer than the fake's 2 s tickle spacing, so pacing cannot be what holds a tickle back. */
 const PAST_SPACING_MS = 2_500
 /** Main's "active" reaches the engine, and a tickle the fake, well within this. */
