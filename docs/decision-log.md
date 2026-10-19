@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-20 00:52 · Tushar · Describe only implemented performance tooling: remove the unbuilt baseline, host-class and history plan, and document the current Mac harness, fixtures, fixed budgets and feel suite. Keep dated measurement records unchanged.
 - 10-20 00:50 · Tushar · Remove flaky-test quarantine and release waivers; failed tests fail the gate, and selective runs no longer skip tests tagged as flaky. Keep the flake-hunting tool for investigation.
 - 10-20 00:49 · Tushar · Remove the manual status input and Desktop DMG tracking; the status page shows decisions, landed commits, the last green run and health because those have real data sources.
 - 10-20 00:45 · release · An agent runs releases when Tushar asks, end to end, following the new `do-release` skill; the update token comes from the keychain item `juno-update-token`. Why: the docs said Tushar ran releases and the gate, so agents asked to release handed the work back.
