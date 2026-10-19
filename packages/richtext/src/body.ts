@@ -3,7 +3,7 @@ import type { Message } from '@juno/slack-schema'
 import type { Block, Lookups, MessageBody } from './model'
 import { bodyFromBlocks } from './from-blocks'
 import { mrkdwnBlocks } from './from-mrkdwn'
-import { attachmentBlock } from './attachments'
+import { attachmentBlock, fileBlock } from './attachments'
 import { inlineText } from './inline'
 
 /**
@@ -22,12 +22,7 @@ export function messageBody(content: MessageContent, lookups: Lookups = {}): Mes
   for (const attachment of content.attachments ?? []) {
     blocks.push(attachmentBlock(attachment, lookups))
   }
-  for (const file of content.files ?? []) {
-    const width = file.original_w ?? file.thumb_360_w
-    const height = file.original_h ?? file.thumb_360_h
-    const dimensions = width !== undefined && height !== undefined && width > 0 && height > 0 ? { width, height } : {}
-    blocks.push({ kind: 'file', id: file.id, name: file.name || file.title || file.id, mimetype: file.mimetype ?? 'application/octet-stream', ...dimensions })
-  }
+  for (const file of content.files ?? []) blocks.push(fileBlock(file))
   return { blocks }
 }
 
