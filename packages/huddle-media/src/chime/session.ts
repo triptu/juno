@@ -7,13 +7,10 @@
 import {
   ConsoleLogger,
   DefaultActiveSpeakerPolicy,
-  DefaultDeviceController,
-  DefaultMeetingSession,
   LogLevel,
   MeetingSessionConfiguration,
   NoVideoDownlinkBandwidthPolicy,
   type AudioInputDevice,
-  type AudioVideoFacade,
   type AudioVideoObserver,
   type Logger,
   type MeetingSessionStatus,
@@ -23,6 +20,7 @@ import { INITIAL_SNAPSHOT, patchAttendee, presence, setConnection, speakers, sta
 import { SnapshotStore } from '../store.ts'
 import type { Devices, EndReason, HuddleSound, JoinInfo, MediaSession, MicrophoneAccess } from '../types.ts'
 import { deviceList, inUse } from '../devices.ts'
+import { newCall, type Call } from './call.ts'
 import { codeName, endReasonOf } from './endReason.ts'
 import { microphoneProblem } from './microphone.ts'
 import { playSoundUrl, type SoundUrls } from './sounds.ts'
@@ -32,27 +30,6 @@ import { VoiceFocus, voiceFocusSupported } from './voiceFocus.ts'
 const RECONNECT_TIMEOUT_MS = 30_000
 /** `leave()` waits this long for Chime to say it stopped. */
 const LEAVE_TIMEOUT_MS = 5_000
-const noop = () => {}
-
-interface Call {
-  readonly attendeeId: string
-  readonly av: AudioVideoFacade
-  readonly voiceFocusSupported: boolean
-  voiceFocus: VoiceFocus | undefined
-  started: boolean
-  leaving: boolean
-  everConnected: boolean
-  ended: boolean
-  watchingAccess: boolean
-  /** The microphone track Chime sends, and the stop of its listeners. */
-  track: MediaStreamTrack | undefined
-  unwatchTrack: () => void
-  /** Chime's server-side signal strength for us, 0 to 1; null until it reports. */
-  signal: number | null
-  readonly stopped: Promise<void>
-  readonly resolveStopped: () => void
-  readonly cleanups: Array<() => void>
-}
 
 export function createChimeMediaSession(options: { readonly sounds?: SoundUrls } = {}): MediaSession {
   return new ChimeMediaSession(options.sounds ?? {})
@@ -112,7 +89,7 @@ class ChimeMediaSession implements MediaSession {
     const supported = await voiceFocusSupported(this.#logger)
     this.#starting = undefined
     if (attempt.left) return
-    const call = this.#newCall(configuration, supported)
+    const call = newCall(configuration, supported, this.#logger)
     this.#call = call
     this.#store.update((s) => ({ ...s, noiseSuppression: supported ? (this.#noiseSuppression ? 'on' : 'off') : 'unsupported' }))
     this.#observe(call)
@@ -200,31 +177,6 @@ class ChimeMediaSession implements MediaSession {
     this.#store.update((s) => ({ ...s, devices: { ...s.devices, speaker: id } }))
     const call = this.#live()
     if (call !== undefined) await this.#enqueue(() => this.#applySpeaker(call))
-  }
-
-  #newCall(configuration: MeetingSessionConfiguration, withVoiceFocus: boolean): Call {
-    // Voice Focus runs in Web Audio; without it, the plain path has less latency.
-    const devices = new DefaultDeviceController(this.#logger, { enableWebAudio: withVoiceFocus })
-    const av = new DefaultMeetingSession(configuration, this.#logger, devices).audioVideo
-    let resolveStopped: () => void = noop
-    const stopped = new Promise<void>((resolve) => (resolveStopped = resolve))
-    return {
-      attendeeId: configuration.credentials?.attendeeId ?? '',
-      av,
-      voiceFocusSupported: withVoiceFocus,
-      voiceFocus: undefined,
-      started: false,
-      leaving: false,
-      everConnected: false,
-      ended: false,
-      watchingAccess: false,
-      track: undefined,
-      unwatchTrack: noop,
-      signal: null,
-      stopped,
-      resolveStopped,
-      cleanups: [],
-    }
   }
 
   /** The current call, unless it has ended. */
