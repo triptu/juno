@@ -1,0 +1,1 @@
+- 10-20 00:50 · list-open-keeps-focus · An open from a sidebar row keeps focus on the row, so ↑ and ↓ go on through the list (SPEC 5); the first character typed on a row moves focus to the open topic's composer and lands there. Opens from anywhere else focus the composer directly.

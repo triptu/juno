@@ -1,0 +1,1 @@
+- 10-20 00:45 · paused-snooze-badge · While notifications are paused, a snooze badge (a "z" in an open circle, as Slack draws Do Not Disturb) takes the place of the avatar's presence dot, in the text colour, never the presence green: pause and presence are separate, and presence stays in the description and the menu. A moon was rejected because a pause can come during the day.
