@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { sidebarLayoutAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { Shell } from '@juno/views'
+import { Forward } from './Forward'
 import { collapseSidebar, resetSidebarWidth, resizeSidebar } from './layout'
 import { Palette } from './Palette'
 import { Toasts } from './Toasts'
@@ -24,7 +25,12 @@ export function Frame({ sidebar, peek, children }: { readonly sidebar: ReactNode
       onSidebarCollapse={collapseSidebar}
       peek={peek}
       toast={<Toasts />}
-      overlay={<Palette />}
+      overlay={
+        <>
+          <Palette />
+          <Forward />
+        </>
+      }
     >
       {children}
     </Shell>

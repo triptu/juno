@@ -62,6 +62,7 @@ import JunoComposer from './juno-chat/JunoComposer.fixtures'
 import JunoHeader from './juno-chat/JunoHeader.fixtures'
 import OwnerBubble from './juno-chat/OwnerBubble.fixtures'
 import RemoveSheet from './juno-chat/RemoveSheet.fixtures'
+import ForwardSheet from './ForwardSheet.fixtures'
 import StatusBubble from './juno-chat/StatusBubble.fixtures'
 import ActivityPage from './juno-pages/ActivityPage.fixtures'
 import BackupSection from './juno-pages/BackupSections.fixtures'
@@ -148,6 +149,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   PinList,
   RemoveCard: removeCard,
   RemoveSheet,
+  ForwardSheet,
   ResolveCard: resolveCard,
   RestoreSheet: restoreSheet,
   ReviewPage,
