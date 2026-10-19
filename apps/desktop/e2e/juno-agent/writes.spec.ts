@@ -58,7 +58,8 @@ test('Juno proposes a reply, nothing reaches Slack without the click, and Send p
   expect(sent()).toHaveLength(0)
   expect(fake.callCount('chat.postMessage')).toBe(0)
 
-  fake.holdNext({ method: 'chat.postMessage' })
+  // Hold before Slack handles the post: its socket echo can mark it sent before the HTTP reply.
+  fake.holdNext({ method: 'chat.postMessage', before: true })
   await card.getByRole('button', { name: 'Send', exact: true }).click()
   const row = card.locator('[data-send-row]')
   await expect(row).toHaveAttribute('data-send-row', 'sending')

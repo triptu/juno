@@ -7,6 +7,6 @@ import base from './playwright.config'
  */
 export default defineConfig({
   ...base,
-  testMatch: 'perf.spec.ts',
+  testMatch: ['perf.spec.ts', '*.perf.spec.ts'],
   reporter: [['list'], ['./e2e/no-skips.ts']],
 })

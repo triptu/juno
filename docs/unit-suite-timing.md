@@ -220,7 +220,7 @@ An intermediate full run passed but took 152 s; agent tests alone took 46.85 s v
 - `reads.test.ts`: the exact 400 ms coalescing boundary, advanced with Effect TestClock.
 - `mutation-repair-socket.test.ts`: the production pong deadline, advanced with TestClock after the sweeps complete.
 - `slack-schedule.test.ts`: a real one-second notification-hours debounce, explicitly named `[production timing]`.
-- `actions.test.ts`: real idle CPU observation with production retry delays and action deadline. `idle.test.ts` and both `outbox-idle.test.ts` cases retain the production timing profile, apart from disabled periodic sweeps. All are explicitly named `[production timing]`.
+- `actions.test.ts`: real idle CPU observation with production retry delays and action deadline. `idle.perf.ts` and both `outbox-idle.test.ts` cases retain the production timing profile, apart from disabled periodic sweeps. All are explicitly named `[production timing]`. Their CPU assertions now run through `pnpm perf --unit` on the Mac; normal runs keep the queue-state checks. See [round 4](test-speed-4.md) for the timing split.
 - `packages/engine/test/boot-retry.test.ts`: the existing production retry boundary with TestClock; unchanged.
 
 ### Validation and evidence

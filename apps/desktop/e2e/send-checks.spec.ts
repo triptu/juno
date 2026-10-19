@@ -1,3 +1,4 @@
+import type { Fixtures } from './fixtures'
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { expect, launchApp, test } from './fixtures'
@@ -102,9 +103,18 @@ test("Send to Main sends a checked draft where it was typed, and hiring details 
   })
 })
 
-test('local fixes send first and Review opens a draft without changing the sent message', async ({ juno, fake }) => {
+test('reviews local fixes, dismisses them and corrects a doubled word', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
+  const context = { juno, fake }
+  await test.step('local fixes send first and Review opens a draft without changing the sent message', () => reviewLocalFixes(context))
+  await test.step('Dismiss removes the fix line without changing the message, and it stays away', () => dismissLocalFixes(context))
+  await test.step('a doubled word is offered as a fix after sending', () => reviewDoubledWord(context))
+})
+
+async function reviewLocalFixes({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
+  fake.resetCalls()
+
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.send(TYPOS)
   await juno.topic.expectSent(TYPOS)
@@ -124,11 +134,11 @@ test('local fixes send first and Review opens a draft without changing the sent 
   await editor.press('Enter')
   await expect.poll(() => fake.calls.filter((call) => call.method === 'chat.update').length).toBe(1)
   await expect(suggestion).toHaveCount(0)
-})
+}
 
-test('Dismiss removes the fix line without changing the message, and it stays away', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+async function dismissLocalFixes({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
+  fake.resetCalls()
+
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.send(TYPOS)
   await juno.topic.expectSent(TYPOS)
@@ -144,11 +154,11 @@ test('Dismiss removes the fix line without changing the message, and it stays aw
   await juno.topic.expectSent(TYPOS)
   await expect(suggestion).toHaveCount(0)
   expect(posts(fake).map((call) => call.args['text'])).toEqual([TYPOS])
-})
+}
 
-test('a doubled word is offered as a fix after sending', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+async function reviewDoubledWord({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
+  fake.resetCalls()
+
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.send(DOUBLED)
   await juno.topic.expectSent(DOUBLED)
@@ -157,7 +167,7 @@ test('a doubled word is offered as a fix after sending', async ({ juno, fake }) 
   await suggestion.getByRole('button', { name: 'Review', exact: true }).click()
   await expect(juno.topic.list.getByRole('textbox', { name: 'Edit message' })).toHaveValue('I think the build is green')
   expect(posts(fake).map((call) => call.args['text'])).toEqual([DOUBLED])
-})
+}
 
 test.describe('with a model slower than the typing pause', () => {
   test.use({ fakeAiDelayMillis: 1_000 })
@@ -291,7 +301,6 @@ test('Home sends local mistakes unchanged; the fix line waits on the message in 
   await juno.topic.expectSent(TYPOS)
   await expect(juno.win.locator('[data-send-suggestion]')).toContainText('recieve → receive')
 })
-
 
 // Lowercase i left alone by default is a clarity rule (packages/domain/test/checks.test.ts).
 test('Capital i, turned on in General, flags lowercase i', async ({ juno, fake }) => {

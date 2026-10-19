@@ -1,3 +1,4 @@
+import type { Fixtures } from './fixtures'
 /**
  * Privacy mode turns on by itself when a share starts while Juno runs (SPEC
  * section 5, docs/research/screen-share-detection.md). Main's screen watch is
@@ -13,9 +14,15 @@ const RINA = 'Rina finished the onsite'
 const SWITCH = 'Hide message text while sharing the screen'
 const ALWAYS_ON = "Another app is recording the screen all the time, so Juno can't tell when you share. Use ⌃⌘H to hide message text."
 
-test('a share that starts while Juno runs hides message text and says why, and stopping shows it again', async ({ juno }) => {
+test('hides text while sharing and respects manual privacy and the setting', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
+  const context = { juno }
+  await test.step('a share that starts while Juno runs hides message text and says why, and stopping shows it again', () => sharePrivacy(context))
+  await test.step('a mode turned on by hand stays on after sharing stops, and the setting turns hiding off', () => manualPrivacy(context))
+})
+
+async function sharePrivacy({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   const { sidebar, privacy } = juno
   const rina = sidebar.row(RINA)
   await rina.expectVisible()
@@ -44,7 +51,46 @@ test('a share that starts while Juno runs hides message text and says why, and s
   await expect(privacy.footer).toBeVisible()
   await privacy.stopSharing()
   await expect(privacy.footer).toHaveCount(0)
-})
+}
+
+async function manualPrivacy({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
+  const { sidebar, privacy } = juno
+  const rina = sidebar.row(RINA)
+  await rina.expectVisible()
+
+  await privacy.toggleWithMenu()
+  await expect(privacy.footer).toBeVisible()
+  await privacy.startSharing()
+  await privacy.stopSharing()
+  await expect(privacy.footer).toBeVisible()
+  expect(await privacy.footerText()).toBe('Message text hidden')
+  await privacy.expectBlurred(rina.preview)
+
+  // Turned on by sharing, then touched by hand (off and on again): it is the user's now and stays on.
+  await privacy.toggleWithMenu()
+  await expect(privacy.footer).toHaveCount(0)
+  await privacy.startSharing()
+  await expect(privacy.footer).toBeVisible()
+  await privacy.toggleWithMenu()
+  await privacy.toggleWithMenu()
+  await privacy.stopSharing()
+  await expect(privacy.footer).toBeVisible()
+  expect(await privacy.footerText()).toBe('Message text hidden')
+  await privacy.toggleWithMenu()
+  await expect(privacy.footer).toHaveCount(0)
+
+  // Off in Settings › General: sharing leaves the text alone.
+  await juno.openSettings('General')
+  const toggle = juno.settings.root.getByRole('switch', { name: SWITCH })
+  await expect(toggle).toBeChecked()
+  await toggle.uncheck()
+  await expect(toggle).not.toBeChecked()
+  await privacy.startSharing()
+  await privacy.stopSharing()
+  await expect(privacy.footer).toHaveCount(0)
+  await juno.openSettings('General')
+  await expect(toggle).not.toBeChecked()
+}
 
 test('a capture running at launch hides nothing, and true then false then true hides the text', async ({ juno, running, userData, fake, slackApp }) => {
   await juno.signIn()
@@ -100,45 +146,4 @@ test.describe('with a capture running at launch', () => {
     await juno.privacy.startSharing()
     await expect(juno.privacy.footer).toBeVisible()
   })
-})
-
-test('a mode turned on by hand stays on after sharing stops, and the setting turns hiding off', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { sidebar, privacy } = juno
-  const rina = sidebar.row(RINA)
-  await rina.expectVisible()
-
-  await privacy.toggleWithMenu()
-  await expect(privacy.footer).toBeVisible()
-  await privacy.startSharing()
-  await privacy.stopSharing()
-  await expect(privacy.footer).toBeVisible()
-  expect(await privacy.footerText()).toBe('Message text hidden')
-  await privacy.expectBlurred(rina.preview)
-
-  // Turned on by sharing, then touched by hand (off and on again): it is the user's now and stays on.
-  await privacy.toggleWithMenu()
-  await expect(privacy.footer).toHaveCount(0)
-  await privacy.startSharing()
-  await expect(privacy.footer).toBeVisible()
-  await privacy.toggleWithMenu()
-  await privacy.toggleWithMenu()
-  await privacy.stopSharing()
-  await expect(privacy.footer).toBeVisible()
-  expect(await privacy.footerText()).toBe('Message text hidden')
-  await privacy.toggleWithMenu()
-  await expect(privacy.footer).toHaveCount(0)
-
-  // Off in Settings › General: sharing leaves the text alone.
-  await juno.openSettings('General')
-  const toggle = juno.settings.root.getByRole('switch', { name: SWITCH })
-  await expect(toggle).toBeChecked()
-  await toggle.uncheck()
-  await expect(toggle).not.toBeChecked()
-  await privacy.startSharing()
-  await privacy.stopSharing()
-  await expect(privacy.footer).toHaveCount(0)
-  await juno.openSettings('General')
-  await expect(toggle).not.toBeChecked()
 })

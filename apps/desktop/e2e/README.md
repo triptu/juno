@@ -8,7 +8,7 @@ Ordinary fake-Slack launches use the engine unit harness's 1:20 scheduling scale
 
 For a negative AI or Automated assertion, `await juno.workPass('title')` (also `art`, `home` or `automated`) requests a pass through the job's existing serial consumer. The engine acknowledges only a pass started after that request, including a pass that chooses not to call the model. It fails after 10 seconds instead of accepting an unfinished pass. AI jobs still need `aiJobs: true`.
 
-`pnpm remote --env JUNO_E2E_TIMINGS=1 test:desktop <specs>` prints separate fake-start, Electron-launch, sign-in, sync-wait and close durations in milliseconds. These are setup observations, not the Mac performance budgets. Each test still owns its fake and user-data directory; no signed-in profile is shared.
+`pnpm remote --env JUNO_E2E_TIMINGS=1 test:desktop <specs>` prints separate fake-start, Electron-launch, sign-in, sync-wait and close durations in milliseconds. These are setup observations, not the Mac performance budgets. Related checks with the same starting state share one launch with labelled `test.step` calls. Each flow owns its fake and user-data directory; cold starts, different fixtures and failure scenarios remain separate. Timing budgets live in `*.perf.spec.ts` and run through `pnpm perf` on the Mac. The `@heavy-idle` portable resource smoke check uses short real CPU and memory windows; app diagnostics remain the primary way to find field spins.
 
 ## Sidebar trace
 

@@ -2,7 +2,7 @@
 // chip while a person or channel is chosen, Main by default, a thread to
 // reply in it. It hides for Juno and goes back to Main when the destination
 // changes.
-import { expect, test } from './fixtures'
+import { expect, test, type Fixtures } from './fixtures'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -10,9 +10,15 @@ test.describe.configure({ timeout: 120_000 })
 const POSTGRES = 'Draft plan is in the doc'
 const REPLY = 'Dry run notes are in the staging channel'
 
-test('a thread chosen in the topic chip takes the send as a reply there, and the topic shows it', async ({ juno, fake }) => {
+test('sends to a chosen thread and resets the topic chip when the destination changes', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
+  const context = { juno, fake }
+  await test.step('a thread chosen in the topic chip takes the send as a reply there, and the topic shows it', () => sendToThread(context))
+  await test.step('the topic chip hides for Juno and goes back to Main when the destination changes', () => changeDestination(context))
+})
+
+async function sendToThread({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
   const { write, tabs, topic, sidebar } = juno
 
   // Juno has no topics.
@@ -64,12 +70,11 @@ test('a thread chosen in the topic chip takes the send as a reply there, and the
   await sidebar.row(POSTGRES).open()
   await topic.expectTitle(POSTGRES)
   await topic.expectMessage(REPLY)
-})
+}
 
-test('the topic chip hides for Juno and goes back to Main when the destination changes', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { write } = juno
+async function changeDestination({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
+  await juno.tabs.menu('new-message')
+const { write } = juno
 
   await write.pickConversation('eng', 'eng')
   await write.pickTopic('draft', POSTGRES)
@@ -93,4 +98,4 @@ test('the topic chip hides for Juno and goes back to Main when the destination c
   // Back to #eng: Main again, not the thread chosen before.
   await write.pickConversation('eng', 'eng')
   await write.expectTopic('Main')
-})
+}

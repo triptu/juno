@@ -47,10 +47,12 @@ aliases, replies and rolled-back transactions. That reference is deliberately
 independent of the cache implementation.
 
 The benchmark seeds 5,000 synthetic messages in the real SQLite schema and keeps
-a live run and a task card. Its Vitest project runs after the other agent tests,
-with file parallelism off, so their child processes do not compete with its timer.
-The 5 ms and 50 ms p95 limits apply to the events of all five cached runs together, as every budget in `docs/performance.md` is a p95 over the runs of its scenario; each run's own p95 is still reported. Five alternating pairs of fresh Node processes measure
-the original and cached projection. Each process warms up for ten events, then
+a live run and a task card. `pnpm perf --unit` runs `test/serve/chat-cache.perf.ts`
+on the Mac under the exclusive heavy lock, with one Vitest worker and no file
+parallelism. Normal tests retain one cached correctness/payload scenario and
+the randomized comparisons, without latency gates.
+The 5 ms and 50 ms p95 limits apply to the events of all five cached runs together, as every budget in `docs/performance.md` is a p95 over the runs of its scenario; each run's own p95 is still reported. Five fresh Node processes measure the cached projection; setting
+`JUNO_CHAT_BENCH_REPORT` also measures the original projection for comparison. Each process warms up for ten events, then
 measures 100 alternating reaction writes, status changes, card updates, live bubble appends
 and read marks through
 the encoded 40-row window. It checks the changed value on every iteration. No

@@ -2,7 +2,7 @@
 // 15 and 16): resolve and reopen, pin, rename, ignore, mark read and
 // unread, Copy Slack link and Open in Slack, each with its toast, and each
 // undone with the toast's Undo or ⌘Z (Edit › Undo).
-import { expect, test } from './fixtures'
+import { expect, test, type Fixtures } from './fixtures'
 
 test.describe.configure({ timeout: 90_000 })
 
@@ -14,9 +14,15 @@ const ALERTS_MAIN = '#alerts-prod'
 
 const MARKS = ['conversations.mark', 'subscriptions.thread.mark']
 
-test('Resolve hides the row and marks it read, Undo brings it back unread, and a new reply reopens it', async ({ juno, slack }) => {
+test('resolves and reopens topics, with Undo and pinned rows', async ({ juno, slack }) => {
   await juno.signIn()
   await juno.waitForSync()
+  const context = { juno, slack }
+  await test.step('Resolve hides the row and marks it read, Undo brings it back unread, and a new reply reopens it', () => resolveTopic(context))
+  await test.step('a pinned topic stays in Pinned when resolved, and the header reopens it', () => resolvePinnedTopic(context))
+})
+
+async function resolveTopic({ juno, slack }: Pick<Fixtures, 'juno' | 'slack'>): Promise<void> {
   const roadmap = juno.sidebar.row(ROADMAP)
   await roadmap.expectUnread(3)
   slack.resetCalls()
@@ -40,11 +46,9 @@ test('Resolve hides the row and marks it read, Undo brings it back unread, and a
   slack.as('Maya').replyIn(ROADMAP, 'One more thing on the proposal.')
   await roadmap.expectVisible()
   await roadmap.expectTag('Reopened')
-})
+}
 
-test('a pinned topic stays in Pinned when resolved, and the header reopens it', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+async function resolvePinnedTopic({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   const { sidebar } = juno
   const postgres = sidebar.row(POSTGRES)
 
@@ -77,7 +81,7 @@ test('a pinned topic stays in Pinned when resolved, and the header reopens it', 
   await juno.undo()
   await juno.undo()
   await sidebar.expectNoSection('Pinned')
-})
+}
 
 test('Rename from a row edits the row, from the header edits the header, and clearing a title brings the old one back', async ({ juno }) => {
   await juno.signIn()

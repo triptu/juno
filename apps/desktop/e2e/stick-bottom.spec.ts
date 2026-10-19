@@ -7,7 +7,7 @@ import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 import type { FakeSlack } from '@juno/fake-slack'
 import type { Juno } from './driver/juno'
 import type { Slack } from './driver/slack'
-import { expect, test } from './fixtures'
+import { expect, test, type Fixtures } from './fixtures'
 import { answer, JunoChatPane, test as chatTest } from './juno-agent/chat'
 import { expectStableAnchor } from './shiftProbe'
 
@@ -126,8 +126,16 @@ test('a thread at the bottom keeps a new reply fully in view', async ({ juno, wi
   await juno.topic.expectNoPill()
 })
 
-test('Main at the bottom keeps a new message fully in view after a click on a message', async ({ juno, win, slack, fake }) => {
-  const channel = await openLongMain(juno, fake, slack)
+test('keeps Main at the bottom through arrivals and composer growth, and holds its position when scrolled up', async ({ juno, win, slack, fake }) => {
+  await openLongMain(juno, fake, slack)
+  const context = { juno, win, slack, fake }
+  await test.step('Main at the bottom keeps a new message fully in view after a click on a message', () => mainArrival(context))
+  await test.step('Main at the bottom keeps its last message in view while the composer grows', () => composerGrowth(context))
+  await test.step('scrolled up in Main, a new message moves nothing and shows the pill', () => scrolledUpArrival(context))
+})
+
+async function mainArrival({ juno, win, slack, fake }: Pick<Fixtures, 'juno' | 'win' | 'slack' | 'fake'>): Promise<void> {
+  const channel = slack.channel('eng')
   await juno.topic.message('Earlier message 29').click()
   await frames(win, 10)
   expect(await distance(juno.topic.scroller)).toBeLessThanOrEqual(1)
@@ -139,7 +147,27 @@ test('Main at the bottom keeps a new message fully in view after a click on a me
   await frames(win, 5)
   expectHeldAtEnd(await watched())
   await juno.topic.expectNoPill()
-})
+}
+
+async function composerGrowth({ juno, win }: Pick<Fixtures, 'juno' | 'win'>): Promise<void> {
+  const height = await juno.topic.scroller.evaluate((node) => node.clientHeight)
+  const watched = await watchResize(win, TOPIC_SCROLLER)
+  await juno.topic.composer.fill('one\ntwo\nthree\nfour\nfive')
+  // The first entry is the observer's own first look, before the composer grew; a later one is the list shrunk.
+  expectHeldAtEnd(await watched(height))
+  expect(await distance(juno.topic.scroller)).toBeLessThanOrEqual(1)
+}
+
+async function scrolledUpArrival({ juno, win, slack, fake }: Pick<Fixtures, 'juno' | 'win' | 'slack' | 'fake'>): Promise<void> {
+  await juno.topic.composer.fill('')
+  await juno.topic.expectAtBottom()
+  const channel = slack.channel('eng')
+  await juno.topic.scrollUp(600)
+  await expectStableAnchor(win, '[data-topic-view] [data-message-row]', async () => {
+    fake.injectMessage({ channel, user: slack.as('Maya').id, text: 'A new message while scrolled up' })
+    await juno.topic.expectPill('1 new message')
+  })
+}
 
 /**
  * Reads, each time the scroller's box changes size, whether its last row is fully inside it and how far it is from
@@ -175,25 +203,6 @@ async function watchResize(page: Page, scroller: string): Promise<(below: number
     })
   }
 }
-
-test('Main at the bottom keeps its last message in view while the composer grows', async ({ juno, win, slack, fake }) => {
-  await openLongMain(juno, fake, slack)
-  const height = await juno.topic.scroller.evaluate((node) => node.clientHeight)
-  const watched = await watchResize(win, TOPIC_SCROLLER)
-  await juno.topic.composer.fill('one\ntwo\nthree\nfour\nfive')
-  // The first entry is the observer's own first look, before the composer grew; a later one is the list shrunk.
-  expectHeldAtEnd(await watched(height))
-  expect(await distance(juno.topic.scroller)).toBeLessThanOrEqual(1)
-})
-
-test('scrolled up in Main, a new message moves nothing and shows the pill', async ({ juno, win, slack, fake }) => {
-  const channel = await openLongMain(juno, fake, slack)
-  await juno.topic.scrollUp(600)
-  await expectStableAnchor(win, '[data-topic-view] [data-message-row]', async () => {
-    fake.injectMessage({ channel, user: slack.as('Maya').id, text: 'A new message while scrolled up' })
-    await juno.topic.expectPill('1 new message')
-  })
-})
 
 /** The chat test with a model that holds its answer to a message with "held" in it until the gate opens. */
 const heldTest = chatTest.extend<{ readonly gate: { readonly wait: Promise<void>; readonly open: () => void } }>({
