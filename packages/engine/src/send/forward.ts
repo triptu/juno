@@ -22,6 +22,7 @@ import { StoreWriter, transaction, type SqlError } from '@juno/store'
 import type { PendingShare } from '@juno/sync'
 import { Outbox } from '../outbox'
 import { queueText } from '../postQueue'
+import { SessionClient } from '../sessionClient'
 import { SyncLink } from '../syncLink'
 import { userName, type UserRow } from '../topicRows'
 import { Workspace } from '../workspace'
@@ -34,13 +35,14 @@ export interface ForwardInput {
   readonly source: { readonly channelId: string; readonly ts: string }
 }
 
-export const forwardMessage = (input: ForwardInput): Effect.Effect<SendResult, SendError, Outbox | Workspace | SyncLink> =>
+export const forwardMessage = (input: ForwardInput): Effect.Effect<SendResult, SendError, Outbox | Workspace | SyncLink | SessionClient> =>
   Effect.gen(function* () {
     // One destination's Main for v1: Slack's Forward dialog has no thread either.
     if (input.to.kind === 'channel' && input.to.threadTs !== undefined) return yield* new Rejected({ code: 'invalid_target' })
     const open = yield* (yield* Workspace).current
     if (open === undefined) return yield* new NotSignedIn()
-    const share = yield* sourceShare(input.source.channelId, input.source.ts).pipe(Effect.provide(open.context), Effect.orDie)
+    const workspaceUrl = yield* (yield* SessionClient).workspaceUrl
+    const share = yield* sourceShare(workspaceUrl, input.source.channelId, input.source.ts).pipe(Effect.provide(open.context), Effect.orDie)
     if (share === undefined) return yield* new NotFound({ kind: 'message', id: input.source.ts })
     const channel = yield* conversationOf(input.to)
     const now = yield* Clock.currentTimeMillis
@@ -64,11 +66,12 @@ interface SourceRow {
 
 /**
  * The source message as Slack's shared-message attachment shows it: the
- * author, the words as blocks and as mrkdwn, and where it was posted.
+ * author, the words as blocks and as mrkdwn, where it was posted, and its
+ * permalink, from which the card names the place (`richtext` `sharedFrom`).
  * Undefined when the message is not stored, is deleted, or is a pending
  * row Slack does not have yet.
  */
-const sourceShare = (channel: string, ts: string): Effect.Effect<PendingShare | undefined, SqlError, StoreWriter> =>
+const sourceShare = (workspaceUrl: string, channel: string, ts: string): Effect.Effect<PendingShare | undefined, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     const source = (yield* sql<SourceRow>`SELECT ts, thread_ts, user_id, bot_name, bot_icon, text, blocks_json, reply_count
@@ -90,6 +93,7 @@ const sourceShare = (channel: string, ts: string): Effect.Effect<PendingShare | 
       ...(source.user_id === null ? {} : { author_id: source.user_id }),
       author_name: name,
       ...(icon === undefined ? {} : { author_icon: icon }),
+      from_url: permalink(workspaceUrl, channel, source.ts, source.thread_ts ?? undefined),
       text: source.text,
       fallback: `${name}: ${source.text}`,
       mrkdwn_in: ['text'],
@@ -98,3 +102,9 @@ const sourceShare = (channel: string, ts: string): Effect.Effect<PendingShare | 
     }
     return { channel, ts: source.ts, attachment }
   })
+
+/** A message's Slack permalink, as Slack builds it: the thread is named for a reply only. */
+const permalink = (workspaceUrl: string, channel: string, ts: string, threadTs: string | undefined): string => {
+  const base = `${workspaceUrl.replace(/\/+$/, '')}/archives/${channel}/p${ts.replace('.', '')}`
+  return threadTs !== undefined && threadTs !== ts ? `${base}?thread_ts=${threadTs}&cid=${channel}` : base
+}

@@ -48,6 +48,8 @@ test('Forward… shares a message into a channel with a note', async ({ juno, fa
   await juno.topic.expectSent('For the roadmap review')
   const forwarded = juno.topic.message('For the roadmap review')
   await expect(forwarded.getByRole('region', { name: 'Attachment' })).toContainText(HANDOFF)
+  // The card names the place it was forwarded from, as any shared message's card does.
+  await expect(forwarded.locator('[data-shared-source]')).toHaveText('eng')
 
   const shares = fake.calls.filter((call) => call.method === 'chat.shareMessage')
   expect(shares).toHaveLength(1)
@@ -69,6 +71,8 @@ test('a forward Slack refuses shows Not sent. in the destination, and Retry send
   const failed = juno.topic.failed('This one is refused first')
   await expect(failed.row).toContainText('Not sent.')
   await expect(failed.row.getByRole('region', { name: 'Attachment' })).toContainText(HANDOFF)
+  // The pending card already has the footer Slack's copy will have.
+  await expect(failed.row.locator('[data-shared-source]')).toHaveText('eng')
 
   await failed.retry()
   await juno.topic.expectSent('This one is refused first')

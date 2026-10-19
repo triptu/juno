@@ -1,5 +1,5 @@
 /**
- * The Slack client of the ready session, as top-level modules see it.
+ * The Slack client and workspace url of the ready session, as top-level modules see them.
  *
  * A top-level module, like `workspace.ts`, so the outbox (and through it the
  * topic commands) can call Slack without importing the session feature:
@@ -18,5 +18,7 @@ export class SessionClient extends Context.Service<
   {
     /** The ready session's `SlackApi`. Fails with `NotSignedIn` when there is no session. */
     readonly api: Effect.Effect<SlackApiShape, NotSignedIn>
+    /** The ready session's workspace url, as `auth.test` gave it (`https://<team>.slack.com/`). Fails with `NotSignedIn` when there is no session. */
+    readonly workspaceUrl: Effect.Effect<string, NotSignedIn>
   }
 >()('juno/engine/SessionClient') {}

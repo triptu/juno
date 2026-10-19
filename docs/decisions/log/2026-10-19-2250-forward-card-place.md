@@ -1,0 +1,1 @@
+- 10-19 22:50 · forward-card-place · A forward's pending card carries its source's permalink, so it names the place as Slack's copy does and the row does not change when the copy lands. The engine builds it from the ready session's workspace url, which the top-level `SessionClient` now gives, so `send` still imports no other feature.

@@ -9,6 +9,7 @@ import { liveQuery, transaction } from '@juno/store'
 import { AiProvider } from '@juno/ai'
 import { Clock, Effect, Stream } from 'effect'
 import { EngineConfig } from '../config'
+import { SessionClient } from '../sessionClient'
 import { SyncLink } from '../syncLink'
 import { Staging } from '../staging'
 import { Outbox } from '../outbox'
@@ -36,6 +37,7 @@ export const SendHandlers = SendRoutes.toLayer(
     const staging = yield* Staging
     const ai = yield* AiProvider
     const config = yield* EngineConfig
+    const session = yield* SessionClient
     const sent = new Map<string, { text: string; at: number; workspace: unknown }>()
     const routeBudget = dailyBudget(ROUTE_DAILY_BUDGET)
     const grammar = grammarChecks()
@@ -71,7 +73,7 @@ export const SendHandlers = SendRoutes.toLayer(
         if (entry === undefined || left <= 0) return {}
         return yield* grammarForSent(entry.text, grammar, entry.workspace, left)
       }).pipe(checking),
-      'messages.forward': (payload) => provide(forwardMessage(payload)),
+      'messages.forward': (payload) => provide(forwardMessage(payload).pipe(Effect.provideService(SessionClient, session))),
       'messages.retry': ({ clientMsgId }) => provide(retryMessage(clientMsgId)),
       'messages.discard': ({ clientMsgId }) => provide(discardMessage(clientMsgId)),
       'messages.edit': ({ message, text }) => provide(editMessage(message, text)),
