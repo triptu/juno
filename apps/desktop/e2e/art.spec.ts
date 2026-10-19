@@ -9,7 +9,7 @@ import type { Fixtures } from './fixtures'
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
-import { expect, launchApp, syncedTest, test } from './fixtures'
+import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
 
 test.describe.configure({ timeout: 120_000 })
@@ -19,7 +19,9 @@ test.use({ aiJobs: true })
 // Titles are the first six words of the root message, so a prefix is enough.
 const POSTGRES = 'Draft plan is in the doc'
 
-syncedTest('shares channel art with Home and redraws topic art with Undo', async ({ juno }) => {
+test('shares channel art with Home and redraws topic art with Undo', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
   const context = { juno }
   await test.step("a channel in Home's Recent shows the art its Main row shows in the sidebar", () => homeChannelArt(context))
   await test.step('Redraw art draws a topic again, and Undo puts the previous drawing back', () => redrawTopicArt(context))
@@ -57,7 +59,9 @@ async function redrawTopicArt({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   await expect.poll(() => row.artMarkup()).toBe(first)
 }
 
-syncedTest('with AI assist off, the topic menu has no Redraw art and a selection offers Quote alone', async ({ juno, fake, slackApp, userData, running }) => {
+test('with AI assist off, the topic menu has no Redraw art and a selection offers Quote alone', async ({ juno, fake, slackApp, userData, running }) => {
+  await juno.signIn()
+  await juno.waitForSync()
   await running.close()
   const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
   db.prepare(`INSERT INTO prefs (key, value_json) VALUES ('aiAssist', 'false') ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json`).run()

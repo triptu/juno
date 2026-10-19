@@ -117,7 +117,10 @@ syncedTest('a topic on screen in a focused window does not notify, and unread me
 })
 
 // The defaults are read first, before any step changes a setting.
-syncedTest('Settings: Notifications and Appearance save, the test notification and permission line, and Ignored', async ({ juno }) => {
+test('Settings: Notifications and Appearance save, the test notification and permission line, and Ignored', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+
   await test.step('Settings › Notifications saves hours and what matters, and Appearance changes the density', () => notificationsAndAppearance(juno))
   await test.step('Send test notification posts one notification, and a line shows when macOS does not let Juno notify', () => testNotificationAndPermission(juno))
   await test.step('Settings › Ignored lists an ignored channel, and Stop ignoring has Undo', () => ignoredChannels(juno))

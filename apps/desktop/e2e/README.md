@@ -10,6 +10,17 @@ For a negative AI or Automated assertion, `await juno.workPass('title')` (also `
 
 `pnpm remote --env JUNO_E2E_TIMINGS=1 test:desktop <specs>` prints separate fake-start, Electron-launch, sign-in, sync-wait and close durations in milliseconds. These are setup observations, not the Mac performance budgets. Related checks with the same starting state share one launch with labelled `test.step` calls. Each flow owns its fake and user-data directory; cold starts, different fixtures and failure scenarios remain separate. Timing budgets live in `*.perf.spec.ts` and run through `pnpm perf` on the Mac. The `@heavy-idle` portable resource smoke check uses short real CPU and memory windows; app diagnostics remain the primary way to find field spins.
 
+## Synced start
+
+Most tests begin signed in to the default seed with the first sync done. `test.use({ synced: true })` in a file, or `syncedTest` from `fixtures.ts` for single tests in a file whose other tests sign in themselves, starts the app that way without signing in. The test body then starts where `juno.signIn()` and `juno.waitForSync()` used to leave it.
+
+- **How:** each worker signs in once to a fresh default seed, waits for the sync, quits, and keeps that user-data directory (`synced.ts`). Each synced test gets a copy and a fake made to match it: the same seed run at the same seed time (`seedTime`), on the same port (the seed's avatar and file URLs name it), accepting the same sessions. The app then boots warm, as after a relaunch, and the fixture waits for `waitForSync()`.
+- **Never stale:** the copy is built by the same build in the same run, and again after five minutes, so its seed is at most five minutes older than a fresh one would be. A copy kept between runs would save one sign-in per worker (2–3 s) and could go stale, so none is kept. Launch options that change what the first sync writes (`timing`, `aiJobs`, `fakeAiDelayMillis`) each get their own copy.
+- **Guard:** after the warm boot the fixture compares a hash of the fake's workspace with the hash taken when the copy was synced, leaving out self presence (the engine sets it from the clock at each session start). A difference fails the test at once: something changed the fake before the app started, as a `fake` override in the file does.
+- **Real sign-in stays** for tests whose subject is sign-in, the first sync, quick start, sync convergence or boot: `session`, `quick-start`, `layout-shift`, `app`, `engine`, `realtime`, `cache-update`, `mirror-reads`, the first-sync tests in `sidebar`, `home-thoughts` and `break-pass-1017`, tests that change the fake before signing in, perf, idle and feel. They keep the default, `synced: false`. The Juno Agent specs override `running` and keep signing in where they need to.
+- **Not with AI jobs:** `synced` refuses `aiJobs: true`. The jobs keep writing titles and art after the first sync, so a copy holds results a fresh sign-in has not made yet (`home.spec.ts` read the AI title where it expected the message text). `art`, `automated`, `home` and the follow-up review card sign in.
+- The Notifications settings flow in `notifications.spec.ts` signs in: on a warm start it lost an hours change to a race in the page (`docs/backlog.md`).
+
 ## Sidebar trace
 
 A sidebar test that fails because a row did not appear, or did not move, needs to say whether the sidebar held its order or was given no new list. The sidebar trace records both.

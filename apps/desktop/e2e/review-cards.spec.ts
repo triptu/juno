@@ -27,7 +27,9 @@ test.describe('follow-ups that look done', () => {
   // Promises come from the background AI jobs.
   test.use({ aiJobs: true })
 
-  syncedTest('a later link of yours proposes Mark done, with the message quoted; Undo and Not done put it back in Follow-up', async ({ juno, fake, win }) => {
+  test('a later link of yours proposes Mark done, with the message quoted; Undo and Not done put it back in Follow-up', async ({ juno, fake, win }) => {
+    await juno.signIn()
+    await juno.waitForSync()
     // The job finds the promise the user made to Sam.
     await expect.poll(() => freshHome(juno), { timeout: 60_000 }).toContain('followUp')
 

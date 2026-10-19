@@ -252,7 +252,7 @@ export interface WorkerFixtures {
   readonly syncedWorkspaces: SyncedWorkspaces
 }
 
-type SyncOptions = Pick<LaunchOptions, 'timing' | 'aiJobs' | 'fakeAiDelayMillis'>
+type SyncOptions = Pick<LaunchOptions, 'timing' | 'fakeAiDelayMillis'>
 
 /** Signs in to a fresh default seed on `dir` and syncs, for `SyncedWorkspaces`. */
 async function buildSynced(dir: string, options: SyncOptions): Promise<Omit<SyncedWorkspace, 'dir'>> {
@@ -263,13 +263,8 @@ async function buildSynced(dir: string, options: SyncOptions): Promise<Omit<Sync
   try {
     const slackApp = await writeSlackApp(fake, appDir)
     const running = await launchApp(dir, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, ...options })
-    try {
-      const juno = new Juno(running.app, running.win)
-      await juno.signIn()
-      await juno.waitForSync()
-    } finally {
-      await running.close()
-    }
+    const juno = new Juno(running.app, running.win)
+    await juno.signIn().then(() => juno.waitForSync()).finally(running.close)
     if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: synced-build ${Math.round(performance.now() - started)} ms`)
     return { port: Number(new URL(fake.url).port), seedTime, sessions: fake.sessions(), fakeState: fakeState(fake) }
   } finally {
@@ -309,7 +304,9 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   synced: [false, { option: true }],
   syncedStart: async ({ synced, syncedWorkspaces, timing, aiJobs, fakeAiDelayMillis }, use) => {
     if (!synced) return use(undefined)
-    const options: SyncOptions = { aiJobs, ...(timing === undefined ? {} : { timing }), ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }) }
+    // AI jobs keep working after the first sync, so a copy would hold titles and art a fresh sign-in has not made yet.
+    if (aiJobs) throw new Error('synced: true does not combine with aiJobs: true; sign in instead.')
+    const options: SyncOptions = { ...(timing === undefined ? {} : { timing }), ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }) }
     const key = JSON.stringify(options)
     let workspace = await syncedWorkspaces.get(key, (dir) => buildSynced(dir, options))
     let fake: FakeSlack

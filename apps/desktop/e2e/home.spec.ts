@@ -6,7 +6,7 @@
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { SELF_ID, startFakeSlack, TEAM } from '@juno/fake-slack'
-import { expect, launchApp, syncedTest, test } from './fixtures'
+import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
 
 test.describe.configure({ timeout: 150_000 })
@@ -88,7 +88,9 @@ test('during the first sync Home greets, counts as the sidebar does and shows ro
   })
 })
 
-syncedTest('Home shows what waits from the sidebar, and each row opens its topic', async ({ juno, slack, win }) => {
+test('Home shows what waits from the sidebar, and each row opens its topic', async ({ juno, slack, win }) => {
+  await juno.signIn()
+  await juno.waitForSync()
   const { home, sidebar, topic, tabs } = juno
 
   // Home from the sidebar, with the question Elena asked.
@@ -136,7 +138,9 @@ syncedTest('Home shows what waits from the sidebar, and each row opens its topic
   await tabs.expectCount(1)
 })
 
-syncedTest('a DM set to Never leaves Home and returns when set to When it matters', async ({ juno, slack }) => {
+test('a DM set to Never leaves Home and returns when set to When it matters', async ({ juno, slack }) => {
+  await juno.signIn()
+  await juno.waitForSync()
   slack.as('Maya').dm('Can you look at the hiring plan today?')
 
   const maya = juno.sidebar.row('Maya', { exact: true })
@@ -150,7 +154,9 @@ syncedTest('a DM set to Never leaves Home and returns when set to When it matter
   await expect(juno.home.root.locator('a[href*="m%3AD0MAYA"]')).toBeVisible()
 })
 
-syncedTest("A Home row from a DM shows the person's photo and names them once; a channel's keeps its art", async ({ juno, slack }) => {
+test("A Home row from a DM shows the person's photo and names them once; a channel's keeps its art", async ({ juno, slack }) => {
+  await juno.signIn()
+  await juno.waitForSync()
   const { home } = juno
 
   // Elena's question in a #hiring thread: the tile is the thread's art, and the meta line has the thread and the channel.
@@ -204,7 +210,9 @@ test('Mark done clears a follow-up, and Resolve all resolves the settled topics 
   expect(await freshHome(juno, POSTGRES)).not.toContain('followUp')
 })
 
-syncedTest('with AI assist off, Home shows the rules alone, with their plain titles and no Juno to write to, and the Juno tab says Juno is off', async ({ juno, fake, slackApp, userData, running }) => {
+test('with AI assist off, Home shows the rules alone, with their plain titles and no Juno to write to, and the Juno tab says Juno is off', async ({ juno, fake, slackApp, userData, running }) => {
+  await juno.signIn()
+  await juno.waitForSync()
   await running.close()
   const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
   db.prepare(`INSERT INTO prefs (key, value_json) VALUES ('aiAssist', 'false') ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json`).run()
