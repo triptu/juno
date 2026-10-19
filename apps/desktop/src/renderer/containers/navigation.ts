@@ -317,9 +317,13 @@ export function openTopic(id: string, options: OpenOptions = {}): void {
   openTopicFresh(id, options, undefined, undefined)
 }
 
-/** A sidebar row's open: the list goes on holding its order under the pointer. */
+/**
+ * A sidebar row's open: the list goes on holding its order under the
+ * pointer, and focus stays on the row, so ↑ and ↓ go on through the list;
+ * a character typed there goes to the composer (`focusPageComposer`).
+ */
 export function openTopicFromList(id: string, options: OpenOptions = {}): void {
-  openTopicFresh(id, options, undefined, undefined)
+  openTopicFresh(id, options, undefined, undefined, false)
 }
 
 /**
@@ -347,18 +351,19 @@ export function openTopicInBackground(id: string, { after, unlessShown = false }
   })
 }
 
-function openTopicFresh(id: string, options: OpenOptions, target: string | undefined, snapshot: ScrollSnapshot | undefined): void {
+function openTopicFresh(id: string, options: OpenOptions, target: string | undefined, snapshot: ScrollSnapshot | undefined, focus = true): void {
   // A topic in a new tab: the welcome card's second hint (SPEC 4).
   if (options.newTab === true) tickWelcome(registry, 'tab')
   const showing = options.newTab === true ? undefined : tabShowing(registry.get(tabsAtom), id)
   if (showing !== undefined) {
-    focusTab(showing.id)
+    if (focus) focusTab(showing.id)
+    else switchToTab(showing.id)
     return
   }
   // A fresh open starts at the divider or the bottom (or `snapshot`), not where it was left: `landFresh`.
   // A new tab does not replace the current one, so a later open in the current tab does not cancel it.
   show(
-    (tabs) => withComposerFocus(openPlace(tabs, topicPlace(id), options)),
+    (tabs) => (focus ? withComposerFocus(openPlace(tabs, topicPlace(id), options)) : openPlace(tabs, topicPlace(id), options)),
     { id, fresh: true, name: 'juno.topic-open', ...(target === undefined ? {} : { target }), ...(snapshot === undefined ? {} : { snapshot }) },
     options.newTab !== true,
   )

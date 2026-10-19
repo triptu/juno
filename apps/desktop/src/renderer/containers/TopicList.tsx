@@ -1,6 +1,7 @@
 import { memo, startTransition, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { SIDEBAR_WINDOW, type KindFilter } from '@juno/contract'
 import {
+  activeTab,
   quietDaysAtom,
   currentRowAtom,
   defaultTopicListFilter,
@@ -10,11 +11,14 @@ import {
   registry,
   resumeSidebarHold,
   rowRenamingAtom,
+  selectedTopicAtom,
   setSidebarEngaged,
   traceSidebarHold,
   sidebarFilterAtom,
   sidebarRowAtom,
   sidebarSectionsAtom,
+  tabsAtom,
+  tabTopic,
   topicListAtom,
   topicSelectedAtom,
   type TopicListFilter,
@@ -25,6 +29,7 @@ import { useAtomValue } from '@juno/state/react'
 import { relativeTime, TopicList as TopicListView, TopicRow as TopicRowView, type ActivateEvent, type TopicListEmpty } from '@juno/views'
 import { markFilterChange, takeFilterMark } from './filterMark'
 import { openAllTopics, openTopicFromList, warmTopic } from './navigation'
+import { typeOnRow } from './pageFocus'
 import { useRowAccessory } from './rowAccessories'
 import { cancelRename, renameTopic, resolveTopic, showRowMenu } from './topicActions'
 import { editSelectedView } from './viewActions'
@@ -63,6 +68,13 @@ function emptyKind(ready: boolean, filter: TopicListFilter, syncing: boolean, em
 
 // Row callbacks are created once and take the id, so no row ever receives
 // a new function (performance.md 5.1).
+
+/** A key typed on a row goes to the composer, once the composer on screen is the selected topic's. */
+function typeOnSelectedRow(): void {
+  const tab = activeTab(registry.get(tabsAtom))
+  const shown = tab === undefined ? undefined : tabTopic(tab)
+  typeOnRow(shown !== undefined && shown === registry.get(selectedTopicAtom))
+}
 
 /** Mouse down on a row (or Enter): opens the topic in the current tab, or a new one with ⌘. */
 function open(id: string, event: ActivateEvent): void {
@@ -281,6 +293,7 @@ export const TopicList = memo(function TopicList() {
       onRowFocus={focusRow}
       onEngagedChange={engage}
       onTouch={touch}
+      onTypeOnRow={typeOnSelectedRow}
     />
   )
 })

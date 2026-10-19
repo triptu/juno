@@ -47,6 +47,12 @@ export interface TopicListProps {
   readonly onEngagedChange?: (engaged: boolean, inside: { readonly pointer: boolean; readonly keyboard: boolean }) => void
   /** The pointer moved, or keyboard focus moved, inside the list. */
   readonly onTouch?: () => void
+  /**
+   * A character was typed on a focused row. The owner moves focus to where
+   * the text goes (the open topic's composer) in the same keydown, so the
+   * key lands there.
+   */
+  readonly onTypeOnRow?: () => void
 }
 
 const labels: Record<TopicListSectionId, string> = { pinned: 'Pinned', recent: 'Recent' }
@@ -71,6 +77,7 @@ export function TopicList({
   onRowFocus,
   onEngagedChange,
   onTouch,
+  onTypeOnRow,
 }: TopicListProps) {
   const shown = sections.filter((section) => section.ids.length > 0)
   const isEmpty = shown.length === 0
@@ -97,7 +104,7 @@ export function TopicList({
       role="group"
       aria-label="Topics"
       scrollbar="hover"
-      onKeyDown={moveFocus}
+      onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => (typedOnRow(event) ? onTypeOnRow?.() : moveFocus(event))}
       onFocus={onFocus}
       onBlur={onBlur}
       onPointerEnter={(event: PointerEvent<HTMLElement>) => pointerMoved(event) && engage('pointer', true)}
@@ -200,6 +207,12 @@ function Empty({ kind, quietDays, enter, onClearFilters, onViewAll, onEditView }
 }
 
 const ROW = '[data-topic-row]'
+
+/** A character typed on a row: one printable key, not Space (which opens the row) and not a shortcut. */
+function typedOnRow(event: KeyboardEvent<HTMLDivElement>): boolean {
+  if (event.key.length !== 1 || event.key === ' ' || event.metaKey || event.ctrlKey || event.altKey) return false
+  return event.target instanceof HTMLElement && event.target.matches(ROW)
+}
 
 /** ArrowUp, ArrowDown, Home and End move focus between rows (performance.md 3.2). */
 function moveFocus(event: KeyboardEvent<HTMLDivElement>): void {

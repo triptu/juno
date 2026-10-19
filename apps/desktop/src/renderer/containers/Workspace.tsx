@@ -32,7 +32,7 @@ import { JunoPanel, loadJuno } from './juno/lazy'
 import { useNotificationBridge, WhyLayer } from './notificationBridge'
 import { closeTabById, loadAllTopicsPage, moveTabTo, openNewTab, runMenuCommand, showTabMenu, stepTabHistory, switchToTab } from './navigation'
 import { runUndoCommand } from './topicActions'
-import { focusPage, forcePageFocus, takeForcedPageFocus } from './pageFocus'
+import { focusPage, forcePageFocus, pageComposer, takeForcedPageFocus, takeTypedAhead } from './pageFocus'
 import { loadSettingsTab, tabKindOf } from './tabKinds'
 import { TitlebarNav } from './TitlebarNav'
 
@@ -104,6 +104,7 @@ function onFocusIn(event: FocusEvent): void {
  * moved there by the keyboard, stays.
  */
 function restoreFocus(tabId: string): void {
+  if (takeTypedAhead()) return
   const force = takeForcedPageFocus(tabId)
   const focused = document.activeElement
   if (!force && focused instanceof HTMLElement && focused !== document.body && focused.checkVisibility()) return
@@ -114,10 +115,6 @@ function restoreFocus(tabId: string): void {
   else element.focus({ preventScroll: true })
 }
 
-/** The composer of the page on screen, if it has one. */
-function pageComposer(): HTMLElement | undefined {
-  return [...document.querySelectorAll<HTMLElement>('section[aria-label="Workspace"] main [data-composer] textarea')].find((field) => field.checkVisibility())
-}
 
 /** The mouse's back and forward buttons. */
 function onMouseUp(event: MouseEvent): void {

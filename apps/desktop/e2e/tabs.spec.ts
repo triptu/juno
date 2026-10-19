@@ -1,4 +1,4 @@
-// Tabs: opening uses the current tab and focuses its composer, ⌘-click opens a new one, a plain open
+// Tabs: opening uses the current tab and typing goes to its composer, ⌘-click opens a new one, a plain open
 // of an open topic focuses its tab, one topic in two tabs scrolls apart,
 // closing focuses the neighbour and never leaves no tab, a new tab opens
 // Home and does not cancel an open still waiting, where "+" sits, the app
@@ -28,22 +28,28 @@ syncedTest('tabs open, focus and close from the sidebar, the keyboard and the ap
 
 async function openFocusAndClose(juno: Juno): Promise<void> {
   const { sidebar, tabs } = juno
-  // An open topic's composer takes focus, so typing goes straight in.
+  // An open from the list keeps focus on its row for the arrows; typing goes to the composer, even before the topic shows.
   await sidebar.row(POSTGRES).open()
+  await juno.win.keyboard.type('ok')
   await tabs.expectActive(POSTGRES)
   await expect(juno.topic.composer).toBeFocused()
+  await expect(juno.topic.composer).toHaveValue('ok')
+  await juno.topic.composer.fill('')
   await sidebar.row(RINA).open()
   await tabs.expectCount(1)
   await tabs.expectActive(RINA)
-  await expect(juno.topic.composer).toBeFocused()
+  await sidebar.row(RINA).expectFocused()
   await juno.win.keyboard.type('x')
+  await expect(juno.topic.composer).toBeFocused()
   await expect(juno.topic.composer).toHaveValue('x')
   await juno.win.keyboard.press('Backspace')
 
   await sidebar.row(POSTGRES).openInNewTab()
   await tabs.expectCount(2)
   await tabs.expectActive(POSTGRES)
-  await expect(juno.topic.composer).toBeFocused()
+  await juno.win.keyboard.type('x')
+  await expect(juno.topic.composer).toHaveValue('x')
+  await juno.win.keyboard.press('Backspace')
   await sidebar.row(ROADMAP).openInNewTab()
   await tabs.expectCount(3)
   expect(await tabs.titles()).toEqual([expect.stringMatching(/^Rina/), expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Proposal/)])
@@ -53,7 +59,6 @@ async function openFocusAndClose(juno: Juno): Promise<void> {
   await tabs.expectCount(3)
   await tabs.expectActive(RINA)
   await sidebar.row(RINA).expectSelected()
-  await expect(juno.topic.composer).toBeFocused()
 
   // Switching moves nothing in the strip.
   await expectNoLayoutShift(juno.win, () => tabs.select(POSTGRES), { root: '[role="tablist"]' })

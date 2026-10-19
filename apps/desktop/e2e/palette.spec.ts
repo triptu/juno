@@ -69,6 +69,8 @@ async function openConversations({ juno }: Pick<Fixtures, 'juno'>): Promise<void
   await palette.expectClosed()
   await topic.expectTitle('Main')
   await expect(topic.header).toContainText('platform')
+  // Opened from ⌘K, the topic is ready to type in.
+  await expect(topic.composer).toBeFocused()
   await tabs.expectCount(1)
 
   await palette.open()
