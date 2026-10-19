@@ -1,6 +1,6 @@
 // First, so coverage (test runs only) starts before the rest of the bundle runs.
 import { flushAllCoverage, recordWindowCoverage } from '../coverage'
-import { app, BrowserWindow, Notification, powerMonitor, shell } from 'electron'
+import { app, BrowserWindow, dialog, Notification, powerMonitor, shell } from 'electron'
 import { Events, type NotificationPermission, type NotificationTarget, type PrivacyState } from '@juno/contract'
 import { join } from 'node:path'
 import { createActivityWatch } from './activity'
@@ -10,6 +10,7 @@ import { codexHome } from './codex'
 import { appMcpCredentials } from './mcpCredentials'
 import { createSupervisor } from './engine'
 import { createEngineTestHooks } from './engineTestHooks'
+import { createHuddleQuit, type QuitDialog } from './huddleQuit'
 import { copiedForTests, copyImage, downloadFile, downloadsForTests, openedForTests, openFile } from './files'
 import { browserLinksForTests, contextMenuForTests, folderForTests, registerIpc, logsForTests, slackLinksForTests, webPanelForTests } from './ipc'
 import { CUSTOM_ITEM, macKeychain, memoryKeychain, OPENROUTER_ITEM } from './keychain'
@@ -107,8 +108,23 @@ const engineTests = createEngineTestHooks(e2e, (message) => supervisor.send(mess
 const supervisor = createSupervisor({
   ...(fakeSlackUrl === undefined ? {} : { fakeSlackUrl }),
   onMessage: (message) => {
-    if (!engineTests.handle(message) && !notifier.handle(message) && !sessionHost.handle(message)) console.warn(`main: unhandled engine message ${message._tag}`)
+    if (!engineTests.handle(message) && !notifier.handle(message) && !sessionHost.handle(message) && !huddleQuit.handle(message)) console.warn(`main: unhandled engine message ${message._tag}`)
   },
+})
+
+/** Under JUNO_E2E the quit dialog is recorded, not shown, and answered with `huddleQuitAnswerForTests`. */
+const huddleQuitAskedForTests: Array<QuitDialog> = []
+let huddleQuitAnswerForTests: 'confirm' | 'cancel' = 'confirm'
+
+const huddleQuit = createHuddleQuit(async (asked) => {
+  if (e2e) {
+    huddleQuitAskedForTests.push(asked)
+    return huddleQuitAnswerForTests === 'confirm'
+  }
+  const options = { type: 'warning' as const, message: asked.title, detail: asked.detail, buttons: [asked.confirm, 'Cancel'], defaultId: 0, cancelId: 1 }
+  const window = appWindow()
+  const { response } = window?.isVisible() === true ? await dialog.showMessageBox(window, options) : await dialog.showMessageBox(options)
+  return response === 0
 })
 
 /** Under JUNO_E2E notifications are recorded, not shown; a test clicks them through `junoTest`. */
@@ -249,7 +265,8 @@ app.whenReady().then(() => {
   })
   const fakeSlackOrigin = fakeSlackUrl === undefined ? undefined : new URL(fakeSlackUrl).origin
   registerIpc({
-    updates,
+    // Restart to update asks first in a huddle, as a quit does.
+    updates: { ...updates, restart: () => void huddleQuit.confirm('restart').then((ok) => ok && updates.restart()) },
     supervisor,
     downloadFile: (file) => downloadFile(file, fakeSlackOrigin, e2e),
     openFile: (file) => openFile(file, fakeSlackOrigin, e2e),
@@ -325,7 +342,16 @@ app.on('window-all-closed', () => {
 /** The engine finishing its last requests as the app quits; undefined once it has exited. */
 let engineStopping: Promise<void> | undefined
 
-app.on('before-quit', () => {
+// In a huddle a quit waits for the user to confirm (SPEC 20, "Quitting"). Prepended, so it runs before
+// the listeners that stop things; they skip a quit it held. A confirmed quit starts again.
+app.prependListener('before-quit', (event) => {
+  if (!huddleQuit.held()) return
+  event.preventDefault()
+  void huddleQuit.confirm('quit').then((ok) => ok && app.quit())
+})
+
+app.on('before-quit', (event) => {
+  if (event.defaultPrevented) return
   activity.stop()
   screenWatch.stop()
   updates.stop()
@@ -373,6 +399,10 @@ if (e2e) {
       notifications: () => notificationsForTests.map(({ title, body }) => ({ title, body })),
       clickNotification: (index = 0) => notificationsForTests[index]?.click(),
       dockBadge: () => badgeForTests,
+      huddleQuitAsked: () => huddleQuitAskedForTests,
+      huddleQuitAnswer: (answer: 'confirm' | 'cancel') => {
+        huddleQuitAnswerForTests = answer
+      },
       notificationPermission: (permission: NotificationPermission) => {
         permissionForTests = permission
       },
