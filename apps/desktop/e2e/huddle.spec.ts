@@ -7,7 +7,7 @@
  * page's media stopped (`stopMedia`), as Chime would.
  */
 import type { Page } from '@playwright/test'
-import type { FakeSlack } from '@juno/fake-slack'
+import { TEAM, type FakeSlack } from '@juno/fake-slack'
 import type { Juno } from './driver/juno'
 import { expect, test } from './fixtures'
 
@@ -70,6 +70,12 @@ test('start a huddle from the header, mute from the bar, open the tab and leave'
   fake.control('joinHuddle', { channel: 'C0ENG', user: 'U0MAYA' })
   await addRemote(win, 'U0MAYA')
   await expect(bar.locator('img, [data-avatar]').first()).toBeVisible()
+
+  // Someone the store has never seen joins: Juno asks Slack who they are, and the bar names them.
+  fake.workspace.addUser({ id: 'U0RINSATO', team_id: TEAM.id, name: 'rin', real_name: 'Rin Sato', profile: { display_name: 'Rin Sato', real_name: 'Rin Sato' } })
+  fake.control('joinHuddle', { channel: 'C0ENG', user: 'U0RINSATO' })
+  await addRemote(win, 'U0RINSATO')
+  await expect(bar.getByRole('img', { name: /Rin Sato/ })).toBeVisible()
 
   // The bar's first row opens the huddle tab.
   await bar.getByRole('button', { name: 'Open huddle in #eng' }).click()

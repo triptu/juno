@@ -136,7 +136,7 @@ Four parallel tracks, then one integration task:
   - `state/src/huddle.ts` and the containers.
   - Main: `media.ts` (permission handlers), `NSMicrophoneUsageDescription`, the `com.apple.security.device.audio-input` entitlement, and a leave on quit.
   - e2e specs against the fake: start, join, mute from the bar, open the tab, someone else joins and leaves, leave, and quit during a huddle.
-  - Built on the branch `huddle-app` (2026-10-19) as an early build for the owner's feedback: all of the above except the quit e2e, with ⌘⇧Space in the page and the "joined on another device" toast with Join here. Not built yet: the quit and restart confirmation dialog, the Huddle menu and its ⌘K entries, the join and leave sounds, leaving after 10 minutes alone, Mute's link to System Settings while the microphone is blocked, the switch toast, and fetching people the store does not know.
+  - Built on the branch `huddle-app` (2026-10-19) as an early build for the owner's feedback: all of the above except the quit e2e, with ⌘⇧Space in the page and the "joined on another device" toast with Join here. Not built yet: the quit and restart confirmation dialog, the Huddle menu and its ⌘K entries, the join and leave sounds, leaving after 10 minutes alone, Mute's link to System Settings while the microphone is blocked, and the switch toast. A huddle's people the store lacks are named through the sync's `nameUsers`, as an opened topic's senders are.
 
 The owner then checks with real people in the test channel.
 
