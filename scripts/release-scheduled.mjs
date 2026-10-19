@@ -6,7 +6,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { compareVersions, normalizeVersion } from '../apps/desktop/src/main/releaseNotes.ts'
-import { git, isAncestor, printGate, readRecords, readWaivers, releaseGate, statusFolder } from './release-gate.mjs'
+import { git, isAncestor, printGate, readRecords, releaseGate, statusFolder } from './release-gate.mjs'
 import { releaseDue, releaseNotes, selectCommit } from './release-schedule.mjs'
 import { syncReleasedVersion } from './release-main.mjs'
 import { worktreeFolder } from './worktree-folder.mjs'
@@ -44,12 +44,11 @@ async function scheduled() {
   }
   const tip = git(root, 'rev-parse', 'origin/main')
   const records = readRecords(status)
-  const waivers = readWaivers(status)
-  const candidate = selectCommit(root, tip, records, waivers)
+  const candidate = selectCommit(root, tip, records)
   const previous = latest ? previousCommit(latest.tagName) : undefined
   const reason = releaseDue({ candidate, previous, publishedAt: latest?.publishedAt })
   console.log(`release:scheduled: origin/main ${tip}; ${records.length} full-run record(s)`)
-  if (candidate) printGate(releaseGate(root, candidate, records, waivers))
+  if (candidate) printGate(releaseGate(root, candidate, records))
   if (reason) { console.log(`release:scheduled: no action: ${reason}`); return }
   if (previous && !isAncestor(root, previous, candidate)) throw new Error('selected commit does not descend from the last released source; refusing a rollback')
   const current = JSON.parse(git(root, 'show', `${candidate}:apps/desktop/package.json`)).version

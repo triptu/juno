@@ -62,8 +62,8 @@ const suites = [
   { name: 'test', words: ['test'] },
   { name: 'specs:check', words: [...(noCache ? ['SPECS_CACHE=off'] : ['SPECS_RUN_CACHE=off']), 'specs:check', ...(noCache ? ['--no-cache'] : [])] },
   { name: 'specs:conformance', words: [...(noCache ? ['SPECS_CACHE=off'] : []), 'specs:conformance'] },
-  { name: 'test:gallery', words: ['JUNO_INCLUDE_FLAKY=1', 'test:gallery'] },
-  { name: 'test:desktop', words: ['JUNO_COVERAGE=1', 'JUNO_INCLUDE_FLAKY=1', 'test:desktop'] },
+  { name: 'test:gallery', words: ['test:gallery'] },
+  { name: 'test:desktop', words: ['JUNO_COVERAGE=1', 'test:desktop'] },
 ]
 
 /** Runs one suite, writing its log; resolves with the outcome. */
@@ -104,7 +104,7 @@ if (withMac) {
     (async () => {
       const install = spawnSync('pnpm', ['install', '--frozen-lockfile', '--reporter=silent'], { cwd: checkout, stdio: 'ignore' })
       if (install.status !== 0) return [{ suite: 'test:desktop @mac', code: 1, seconds: 0, log: '' }]
-      return [await run('test:desktop @mac', 'pnpm', ['test:desktop', '--grep', '@mac'], checkout, { JUNO_INCLUDE_FLAKY: '1' })]
+      return [await run('test:desktop @mac', 'pnpm', ['test:desktop', '--grep', '@mac'], checkout)]
     })(),
   )
 }
@@ -129,7 +129,7 @@ if (partials.length > 0) {
 console.log(`verify:main: ${coverageNote}`)
 if (withMac) {
   // After the rest, so they do not time a machine the other suites are using.
-  for (const suite of ['perf', 'test:feel']) results = [...results, await run(suite, 'pnpm', [suite], checkout, { JUNO_INCLUDE_FLAKY: '1' })]
+  for (const suite of ['perf', 'test:feel']) results = [...results, await run(suite, 'pnpm', [suite], checkout)]
   const sheet = join(checkout, 'apps/desktop/feel-report')
   if (existsSync(sheet)) cpSync(sheet, join(logDir, 'feel-report'), { recursive: true, force: true })
 }

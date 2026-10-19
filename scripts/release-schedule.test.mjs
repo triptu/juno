@@ -29,6 +29,6 @@ test('selects the newest compatible main commit, leaving untested production cha
   const docs = commit('README.md')
   const tip = commit('other.js')
   const record = { commit: first, passed: true, suites: ['test', 'specs:check', 'test:gallery', 'test:desktop'].map((suite) => ({ suite, code: 0 })) }
-  assert.equal(selectCommit(root, tip, [record], []), docs)
-  assert.equal(selectCommit(root, tip, [], []), null)
+  assert.equal(selectCommit(root, tip, [record]), docs)
+  assert.equal(selectCommit(root, tip, []), null)
 })

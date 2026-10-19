@@ -1,0 +1,1 @@
+- 10-20 00:50 · Tushar · Remove flaky-test quarantine and release waivers; failed tests fail the gate, and selective runs no longer skip tests tagged as flaky. Keep the flake-hunting tool for investigation.

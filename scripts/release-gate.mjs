@@ -16,31 +16,12 @@ export function readRecords(status) {
   return [...new Map(records.map((record) => [`${record.commit}:${record.finishedAt}`, record])).values()]
 }
 
-export function readWaivers(status) {
-  const file = join(status, 'release-waivers.json')
-  const entries = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : []
-  if (!Array.isArray(entries) || entries.some((entry) => !entry || typeof entry.id !== 'string' || !entry.id.trim() || typeof entry.reason !== 'string' || !entry.reason.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(entry.date) || !Number.isFinite(Date.parse(entry.date)))) {
-    throw new Error('release-waivers.json must contain entries with a test id, reason and YYYY-MM-DD date')
-  }
-  return entries
-}
-
-/** Only complete test reports can waive a failing suite. Infrastructure errors stay red. */
-export function assessRecord(record, waivers) {
+/** A full run passes only when every required suite ran and every suite passed. */
+export function assessRecord(record) {
   const required = ['test', 'specs:check', 'test:gallery', 'test:desktop']
-  if (!required.every((name) => record.suites.some((suite) => suite.suite === name))) return null
-  const waived = []
-  for (const suite of record.suites) {
-    if (suite.code === 0) continue
-    const report = suite.tests
-    if (suite.code !== 1 || !report || report.status !== 'failed' || report.errors !== 0 || report.incomplete !== 0 || !report.failures?.length) return null
-    for (const failure of report.failures) {
-      const waiver = waivers.find((entry) => entry.id === failure.id)
-      if (!waiver) return null
-      waived.push({ ...waiver, title: failure.title, suite: suite.suite })
-    }
-  }
-  return waived.length || record.passed === true ? waived : null
+  return record.passed === true
+    && required.every((name) => record.suites.some((suite) => suite.suite === name))
+    && record.suites.every((suite) => suite.code === 0)
 }
 
 export function docsOrTests(file) {
@@ -59,17 +40,15 @@ export function compatible(root, green, commit) {
   return JSON.stringify({ ...before, version: after.version }) === JSON.stringify(after)
 }
 
-export function releaseGate(root, commit, records = readRecords(statusFolder(root)), waivers = readWaivers(statusFolder(root))) {
+export function releaseGate(root, commit, records = readRecords(statusFolder(root))) {
   for (const record of records) {
-    const waived = assessRecord(record, waivers)
-    if (waived && compatible(root, record.commit, commit)) return { commit, record, waived }
+    if (assessRecord(record) && compatible(root, record.commit, commit)) return { commit, record }
   }
   return null
 }
 
 export function printGate(gate) {
   console.log(`release gate: ${gate.commit} covered by full run ${gate.record.commit} (${gate.record.finishedAt})`)
-  for (const entry of gate.waived) console.log(`  WAIVED ${entry.id}: ${entry.title} — ${entry.reason} (${entry.date})`)
 }
 
 if (import.meta.main) {

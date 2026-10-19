@@ -1,7 +1,7 @@
 import { assessRecord, compatible, git, isAncestor } from './release-gate.mjs'
 
-export function selectCommit(root, tip, records, waivers) {
-  const eligible = records.filter((record) => assessRecord(record, waivers) && isAncestor(root, record.commit, tip))
+export function selectCommit(root, tip, records) {
+  const eligible = records.filter((record) => assessRecord(record) && isAncestor(root, record.commit, tip))
   if (!eligible.length) return null
   for (const commit of git(root, 'rev-list', '--first-parent', tip).split('\n')) {
     const record = eligible.find((entry) => compatible(root, entry.commit, commit))
