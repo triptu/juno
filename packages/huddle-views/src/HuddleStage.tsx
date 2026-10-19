@@ -3,7 +3,7 @@ import { CornersIn } from '@phosphor-icons/react/dist/icons/CornersIn'
 import { CornersOut } from '@phosphor-icons/react/dist/icons/CornersOut'
 import { MicrophoneSlash } from '@phosphor-icons/react/dist/icons/MicrophoneSlash'
 import { StopCircle } from '@phosphor-icons/react/dist/icons/StopCircle'
-import type { ReactNode } from 'react'
+import type { ReactNode, RefCallback } from 'react'
 import { colors, layout, motion, opacity, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
 import { focusRing, Icon, Text, tooltip } from '@juno/ui'
 import type { HuddlePerson, HuddleShare } from './model'
@@ -17,24 +17,14 @@ const STACKED = '@container huddle (width < 720px)'
 /** How many people the line under a share shows before "+N". */
 const STRIP_MAX = 8
 
-export interface PeopleTilesProps {
-  /** Everyone in the huddle, the user first. */
-  readonly people: ReadonlyArray<HuddlePerson>
-  /** The connection is down: the tiles dim. */
-  readonly dim: boolean
-}
-
-/** Audio only (SPEC 20): a tile per person, centred in the room between the header and the controls. */
-export function PeopleTiles({ people, dim }: PeopleTilesProps) {
-  return (
-    <div {...stylex.props(styles.tilesArea)}>
-      <ul aria-label="People in the huddle" {...stylex.props(styles.tiles, dim && styles.dim)}>
-        {people.map((person) => (
-          <Tile key={person.id} person={person} />
-        ))}
-      </ul>
-    </div>
-  )
+/**
+ * The element a shared screen plays in, for a container's `renderShare`. It
+ * fills the share's box and fits the picture whole (`contain`), letterboxed
+ * on the box's fill. `onElement` hands the element to the media session; it
+ * may return the unbind, as a React ref callback can.
+ */
+export function HuddleShareVideo({ onElement }: { readonly onElement: RefCallback<HTMLVideoElement> }) {
+  return <video ref={onElement} autoPlay muted playsInline disablePictureInPicture {...stylex.props(styles.picture)} />
 }
 
 /** The window the user shares, previewed in their own tab. */
@@ -86,23 +76,6 @@ export function ShareStage({ shares, own, people, renderShare, expanded, onExpan
   )
 }
 
-function Tile({ person }: { readonly person: HuddlePerson }) {
-  const name = person.you === true ? 'You' : person.name
-  return (
-    <li aria-label={person.muted === true ? `${name}, muted` : name} data-speaking={person.speaking === true ? '' : undefined} {...stylex.props(styles.tile, person.speaking === true && styles.tileSpeaking)}>
-      <PersonAvatar person={person} size={44} showSpeaking={false} />
-      <Text variant="ui" weight="medium" tone="default" truncate dir="auto" sx={styles.tileName}>
-        {name}
-      </Text>
-      {person.muted === true ? (
-        <span aria-hidden {...stylex.props(styles.tileMuted)}>
-          <Icon icon={MicrophoneSlash} size={14} />
-        </span>
-      ) : null}
-    </li>
-  )
-}
-
 /** The people under a share: a photo, the first name and a slashed microphone when muted, then "+N". */
 function PeopleStrip({ people, dim }: { readonly people: ReadonlyArray<HuddlePerson>; readonly dim: boolean }) {
   const shown = people.slice(0, STRIP_MAX)
@@ -151,15 +124,15 @@ function ShareBox({ share, content, expandable, expanded, onExpand, wide }: Shar
   const label = `${share.ownerName}'s screen`
   return (
     <section aria-label={label} data-share={share.id} {...stylex.props(stylex.defaultMarker(), styles.share, wide && styles.shareWide)}>
+      {/* The video stays in place while it loads, so its first frame has an element to arrive in. */}
+      <div data-huddle-video={share.id} {...stylex.props(styles.video)}>
+        {content}
+      </div>
       {share.loading === true ? (
-        <Text variant="meta" tone="subtle">
+        <Text variant="meta" tone="subtle" sx={styles.loading}>
           Loading {label}
         </Text>
-      ) : (
-        <div data-huddle-video={share.id} {...stylex.props(styles.video)}>
-          {content}
-        </div>
-      )}
+      ) : null}
       <span {...stylex.props(styles.shareLabel)}>{label}</span>
       {expandable ? (
         <button
@@ -193,66 +166,8 @@ function OwnShareBox({ own }: { readonly own: OwnPreview }) {
 }
 
 const styles = stylex.create({
-  // The tiles centred in the room between the header and the controls; they scroll under the header when there are many.
-  tilesArea: {
-    flexGrow: 1,
-    minHeight: 0,
-    display: 'flex',
-    overflowY: 'auto',
-    overscrollBehavior: 'contain',
-    paddingTop: layout['--header-band'],
-    paddingInline: spacing['--space-6'],
-    paddingBottom: spacing['--space-4'],
-  },
-  tiles: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    alignContent: 'center',
-    gap: spacing['--space-3'],
-    width: '100%',
-    maxWidth: layout['--page-width'],
-    margin: 'auto',
-    padding: 0,
-    listStyle: 'none',
-    transitionProperty: 'opacity',
-    transitionDuration: { default: motion['--duration-fast'], '@media (prefers-reduced-motion: reduce)': '0ms' },
-  },
   dim: {
     opacity: opacity['--opacity-dim'],
-  },
-  tile: {
-    position: 'relative',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: spacing['--space-2'],
-    width: layout['--huddle-tile-width'],
-    paddingBlock: spacing['--space-4'],
-    paddingInline: spacing['--space-3'],
-    boxSizing: 'border-box',
-    borderRadius: radii['--radius-3xl'],
-    backgroundColor: colors['--secondary-default'],
-    outlineStyle: 'solid',
-    outlineWidth: sizes['--speaking-ring'],
-    outlineOffset: `calc(-1 * ${sizes['--speaking-ring']})`,
-    outlineColor: 'transparent',
-    transitionProperty: 'outline-color',
-    transitionDuration: { default: motion['--duration-fast'], '@media (prefers-reduced-motion: reduce)': '0ms' },
-    transitionTimingFunction: motion['--ease-out'],
-  },
-  tileSpeaking: {
-    outlineColor: colors['--huddle-live'],
-  },
-  tileName: {
-    maxWidth: '100%',
-  },
-  tileMuted: {
-    position: 'absolute',
-    top: spacing['--space-2-5'],
-    insetInlineEnd: spacing['--space-2-5'],
-    display: 'inline-flex',
-    color: colors['--foreground-subtle'],
   },
   stageArea: {
     flexGrow: 1,
@@ -292,6 +207,16 @@ const styles = stylex.create({
     position: 'absolute',
     inset: 0,
     display: 'block',
+  },
+  picture: {
+    display: 'block',
+    width: '100%',
+    height: '100%',
+    objectFit: 'contain',
+  },
+  // Positioned, so it paints over the video box that waits under it.
+  loading: {
+    position: 'relative',
   },
   shareLabel: {
     position: 'absolute',
