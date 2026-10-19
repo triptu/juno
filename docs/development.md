@@ -1463,7 +1463,15 @@ line. The script:
 3. creates a draft release `v<version>` with the DMG, its block map and
    `latest-mac.yml` (plus the ZIP and its block map if signed);
 4. adds the section to `CHANGELOG.md` with today's date;
-5. publishes the draft and marks it latest. Installs see it from now on.
+5. publishes the draft and marks it latest. Installs see it from now on;
+6. sets the released version on the current `origin/main` tip with a version-only
+   commit, `Set version to x.y.z after release`, unless main already has that
+   version or a newer one. It never pushes the release checkout onto main.
+
+The main update uses a normal push, fetching and rebasing on concurrent changes
+for up to four attempts. It never force-pushes. If it fails after publication,
+the command exits non-zero. Rerun the same publish command to finish only the
+main update; an already published stable version is not uploaded again.
 
 `--dry-run` checks and prints the plan without changing anything.
 `--prerelease` publishes a pre-release, which the updater never offers, and
@@ -1521,8 +1529,13 @@ area. Keep product commit subjects plain enough to read as release notes.
 
 The command uses the existing `gh` login and requires `JUNO_UPDATE_TOKEN` in its
 environment. Supply it through the existing secure release setup, never in a
-command log. It does not push main. The version commit remains on a local
-`scheduled-release-x.y.z` branch; future versions use GitHub as their source.
+command log. After publication it uses the main-version update described above.
+The build version commit stays in the release checkout; only its version field
+is replayed on the current main tip, preserving newer work. This version-only
+change remains covered by the release gate. If the release bump is already on
+main, no second bump is added. Before selecting another release, a rerun repairs
+main from the latest published stable version and exits without publishing.
+This recovery needs the `gh` login but no update token or build artifacts.
 A failed checkout and notes remain for the keeper to inspect. A successful run
 removes its checkout. Only failures need keeper attention. After an interrupted
 run, check the PID in `.juno-status/release-scheduled.lock` and GitHub before

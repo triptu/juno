@@ -15,7 +15,7 @@ test('six-hour cadence and already released commits do nothing', () => {
 })
 
 test('notes group user changes and omit merge and test maintenance subjects', () => {
-  const notes = releaseNotes(['Merge ci-fix', 'Release 0.1.7', 'Refresh the coverage map', 'Fix message edits after reconnect', 'Keep sidebar rows steady', 'Fix message edits after reconnect'])
+  const notes = releaseNotes(['Merge ci-fix', 'Release 0.1.7', 'Set version to 0.1.8 after release', 'Refresh the coverage map', 'Fix message edits after reconnect', 'Keep sidebar rows steady', 'Fix message edits after reconnect'])
   assert.equal(notes, '- Messages: Fix message edits after reconnect.\n- Navigation: Keep sidebar rows steady.\n')
 })
 

@@ -25,6 +25,7 @@ import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { addChangelogEntry, compareVersions, isVersion, normalizeVersion, parseChangelog } from '../apps/desktop/src/main/releaseNotes.ts'
 import { releaseGate, printGate } from './release-gate.mjs'
+import { syncReleasedVersion } from './release-main.mjs'
 import { recordReleaseTiming } from './release-timings.mjs'
 
 const scriptRoot = resolve(import.meta.dirname, '..')
@@ -63,6 +64,15 @@ function gh(args: string[], input?: string): string {
 const version = String(JSON.parse(readFileSync(join(root, 'apps/desktop/package.json'), 'utf8')).version)
 if (!isVersion(version) || normalizeVersion(version) !== version) fail(`apps/desktop/package.json has "${version}", not a plain semver version`)
 const tag = `v${version}`
+// The repository.
+gh(['auth', 'status'])
+const releases = JSON.parse(gh(['release', 'list', '--repo', repo, '--limit', '200', '--json', 'tagName,isDraft,isPrerelease,publishedAt'])) as Array<{ tagName: string; isDraft: boolean; isPrerelease: boolean; publishedAt: string }>
+const published = releases.find((release) => release.tagName === tag && !release.isDraft && !release.isPrerelease)
+if (published && !values.prerelease) {
+  if (!dry) syncReleasedVersion(root, version)
+  console.log(`release:publish: ${tag} is already published; only the main version update was needed`)
+  process.exit(0)
+}
 if (values.notes === undefined) fail('--notes <file> is required: the changelog lines for this version')
 const lines = parseChangelog(`## ${version}\n${readFileSync(values.notes, 'utf8')}`)[0]?.lines ?? []
 if (lines.length === 0) fail(`${values.notes} has no lines`)
@@ -108,9 +118,6 @@ if (!urgent) {
   printGate(gate)
 }
 
-// The repository.
-gh(['auth', 'status'])
-const releases = JSON.parse(gh(['release', 'list', '--repo', repo, '--limit', '200', '--json', 'tagName,isDraft,isPrerelease,publishedAt'])) as Array<{ tagName: string; isDraft: boolean; isPrerelease: boolean; publishedAt: string }>
 if (releases.some((release) => release.tagName === tag)) fail(`${repo} already has ${tag}; bump the version (pnpm release:version)`)
 if (!urgent && releases.some((release) => !release.isDraft && !release.isPrerelease && Date.now() - Date.parse(release.publishedAt) < 6 * 60 * 60 * 1000)) fail('the last release was less than 6 hours ago')
 const newest = releases.filter((release) => !release.isDraft && !release.isPrerelease && isVersion(release.tagName))
@@ -155,6 +162,7 @@ try {
     console.log(`release:publish: CI keeper request written; run pnpm verify:main --ref ${commit} now`)
   }
   console.log(`release:publish: published ${tag}`)
+  if (!values.prerelease) syncReleasedVersion(root, version)
 } finally {
   rmSync(scratch, { recursive: true, force: true })
 }
