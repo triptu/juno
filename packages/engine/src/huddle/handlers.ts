@@ -20,10 +20,10 @@ export const HuddleHandlers = HuddleRoutes.toLayer(
     return {
       'huddle.call': () => serveLiveValue(runs(huddle.call), { measure }),
       'huddle.running': () => serveLiveValue(runs(huddle.running), { measure }),
-      'huddle.start': ({ channelId, region }) =>
+      'huddle.start': ({ channelId, region, generation }) =>
         Effect.gen(function* () {
           if ((yield* workspace.current) === undefined) return yield* new NotSignedIn()
-          return yield* huddle.start(channelId, region)
+          return yield* huddle.start(channelId, region, generation)
         }),
       'huddle.leave': () => huddle.leave,
       'huddle.media': ({ event }) => huddle.media(event),

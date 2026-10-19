@@ -9,16 +9,29 @@
  * durable database (cache.db can be deleted and rebuilt), and a leave only
  * makes sense with that workspace's session, which is when it is read.
  * Other engine state that must outlive a crash lives in prefs the same way
- * (`slackSchedule.ts`, `readCatchUp.ts`). No credentials are stored.
+ * (`slackSchedule.ts`, `readCatchUp.ts`). No credentials are stored. A read
+ * that fails, or a stored value that is not a list of records, is a failure
+ * the service waits out, never an empty list: only a missing pref is one.
+ *
+ * Main reports the live renderer page generations (`huddlePages`); the
+ * service takes a page that is no longer listed as gone, with its media.
  */
-import { Effect, Layer, Schema } from 'effect'
-import { Huddle, HuddleStoreError, type Identity } from '@juno/huddle'
+import { Effect, Layer, Schema, Stream } from 'effect'
+import { Huddle, HuddleStoreError } from '@juno/huddle'
 import { prefs, StoreReader, transaction } from '@juno/store'
-import { SocketEvents, type SessionServices } from '../socketEvents'
+import { HostLink } from '../protocol/host'
+import { SocketEvents, type SessionServices, type SocketListener } from '../socketEvents'
+import { Workspace } from '../workspace'
 
 export const PENDING_LEAVES_PREF = 'huddle.pendingLeaves'
 
-const Identities = Schema.Array(Schema.Struct({ channelId: Schema.String, callId: Schema.String, attendeeId: Schema.String }))
+const Records = Schema.Array(Schema.Struct({
+  channelId: Schema.String,
+  callId: Schema.String,
+  attendeeId: Schema.String,
+  /** The renderer page generation the credentials went to; null when none did. */
+  generation: Schema.NullOr(Schema.String),
+}))
 
 /** The conversations the user is in, to read running huddles for. */
 const memberChannels = Effect.gen(function* () {
@@ -27,19 +40,28 @@ const memberChannels = Effect.gen(function* () {
   return rows.map((row) => row.id)
 })
 
-/** Attaches `Huddle` to each sync, in that sync's scope. */
+const ignore: SocketListener = () => Effect.void
+
+/** Attaches `Huddle` to each sync, in that sync's scope, and passes main's page reports on. */
 export const HuddleSessions = Layer.effectDiscard(Effect.gen(function* () {
   const huddle = yield* Huddle
   const events = yield* SocketEvents
+  const workspace = yield* Workspace
+  const link = yield* HostLink
+  const fromMain = yield* link.messages
+  yield* Effect.forkScoped(Stream.runForEach(fromMain, (message) => (message._tag === 'huddlePages' ? huddle.pages(message.live) : Effect.void)))
   yield* events.subscribe('huddle', Effect.gen(function* () {
     const context = yield* Effect.context<SessionServices>()
+    const open = yield* workspace.current
+    // The sync runs on the open workspace's store; there is always one.
+    if (open === undefined) return ignore
     const listener = yield* huddle.attach({
+      workspace: open.id,
       slack: context,
       leaves: {
-        // An unreadable record is dropped with a warning: nothing can be left without its ids.
         read: prefs.get(PENDING_LEAVES_PREF).pipe(
-          Effect.flatMap((raw) => Schema.decodeUnknownEffect(Identities)(raw ?? [])),
-          Effect.catch((error) => Effect.logWarning('huddle: stored leaves unreadable', { error: String(error) }).pipe(Effect.as<ReadonlyArray<Identity>>([]))),
+          Effect.flatMap((raw) => Schema.decodeUnknownEffect(Records)(raw ?? [])),
+          Effect.mapError((cause) => new HuddleStoreError({ cause })),
           Effect.provide(context),
         ),
         write: (records) =>
@@ -53,7 +75,8 @@ export const HuddleSessions = Layer.effectDiscard(Effect.gen(function* () {
         Effect.catch((error) => Effect.logWarning('huddle: channels unreadable', { error: String(error) }).pipe(Effect.as<ReadonlyArray<string>>([]))),
       ),
     })
-    return (input) => listener(input)
+    const forward: SocketListener = (input) => listener(input)
+    return forward
   }))
 }))
 
