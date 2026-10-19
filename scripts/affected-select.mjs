@@ -17,7 +17,7 @@ export const MAX_COVERAGE_SPECS = 10
  * Map from each picked spec to the reasons it was picked, with `scores` (how
  * directly each spec covers the change; see `rankSpecs`), `required` (changed
  * specs and those whose own helper changed) and `notes` (what a narrow
- * selection left to the scheduled full run).
+ * selection left to a full run).
  *
  * - `specs`: every desktop e2e spec file.
  * - `changed`: the change, as repo paths.
@@ -76,7 +76,7 @@ export function selectSpecs({ specs, changed, map, support, own, app, isNew, dri
     if (!SOURCE.test(file)) {
       const reason = `${file} is an app file outside the JavaScript bundles (style sheet, page or asset)`
       if (!narrow) return { all: reason }
-      notes.push(`${reason}: no spec picked for it; the gallery and the scheduled full run check it`)
+      notes.push(`${reason}: no spec picked for it; the gallery and a full run (pnpm verify:main) check it`)
       continue
     }
     if (file in map.files) for (const spec of ran(file)) pick(spec, `ran ${file}${ranBy(file)}`, weightOf(file))

@@ -1,4 +1,4 @@
-// The scheduled full run: every suite against main, in separate SSH jobs,
+// The full run: every suite against main, in separate SSH jobs,
 // then a short summary.
 //
 //   pnpm verify:main                 local main
@@ -20,8 +20,8 @@
 //
 // The desktop suite records coverage (JUNO_COVERAGE=1), and the run writes the
 // coverage map pnpm affected selects specs by to
-// apps/desktop/e2e/coverage-map.json in this checkout; the CI keeper commits
-// it (docs/development.md, "Affected tests").
+// apps/desktop/e2e/coverage-map.json in this checkout; commit it after a
+// run on main (docs/development.md, "Affected tests").
 
 import { spawn, spawnSync } from 'node:child_process'
 import { cpSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'

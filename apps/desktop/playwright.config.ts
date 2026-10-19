@@ -23,7 +23,7 @@ export default defineConfig({
   fullyParallel: false,
   retries: process.env.CI || process.env.JUNO_REMOTE_CONTAINER ? 1 : 0,
   // Tests tagged @mac depend on macOS behaviour. pnpm remote runs on Linux and
-  // skips them. Scheduled runs include quarantined tests; selective runs skip them.
+  // skips them. Full runs include quarantined tests; selective runs skip them.
   grepInvert: excludedTags.length ? new RegExp(excludedTags.map((tag) => `${tag}\\b`).join('|')) : undefined,
   reporter: [[process.env.CI ? 'github' : 'list'], ['../../scripts/test-results-reporter.mjs']],
   use: {
