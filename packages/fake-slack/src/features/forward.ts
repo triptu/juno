@@ -61,10 +61,12 @@ function sharedAttachment(ctx: MethodContext, channel: string, source: Message):
     ...(user?.profile?.image_48 === undefined ? {} : { author_icon: user.profile.image_48 }),
     author_link: `${ctx.baseUrl}/team/${source.user ?? ''}`,
     from_url: `${ctx.baseUrl}${permalinkPath(channel, source.ts, source.thread_ts)}`,
-    fallback: `[${source.ts}] ${name}: ${source.text ?? ''}`,
-    text: source.text ?? '',
+    // A message of only files, as seen live: its files and no words, and a fallback that names the files.
+    fallback: `[${source.ts}] ${name}: ${source.text || (source.files ?? []).map((file) => file.name ?? file.id).join(', ')}`,
+    ...(source.text ? { text: source.text } : {}),
     mrkdwn_in: ['text'],
     ...(source.blocks === undefined ? {} : { blocks: source.blocks }),
+    ...(source.files === undefined || source.files.length === 0 ? {} : { files: source.files }),
     footer: `${inThread ? 'Thread in' : 'Posted in'} ${where}`,
   }
 }

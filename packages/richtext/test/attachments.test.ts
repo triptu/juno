@@ -82,6 +82,15 @@ describe('a shared Slack message', () => {
   it('falls back to the text when it has no blocks', () => {
     expect(count(plainText(parse({ attachments: [shared] })))).toBe(1)
   })
+
+  it("shows the files of a message with no words, never Slack's fallback line", () => {
+    const fallback = '[October 19th, 2026 3:23 PM] Maya: demo.mov'
+    const { text: _, ...wordless } = shared
+    const body = parse({ text: '', attachments: [{ ...wordless, is_share: true, fallback, files: [{ id: 'F0CLIP', name: 'demo.mov', mimetype: 'video/quicktime', original_w: 1280, original_h: 720 }] }] })
+    const card = body.blocks[0]
+    expect(card?.kind === 'attachment' && card.blocks).toEqual([{ kind: 'file', id: 'F0CLIP', name: 'demo.mov', mimetype: 'video/quicktime', width: 1280, height: 720 }])
+    expect(plainText(body)).not.toContain(fallback)
+  })
 })
 
 describe('where a shared Slack message came from', () => {

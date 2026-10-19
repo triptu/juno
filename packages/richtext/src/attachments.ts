@@ -1,4 +1,4 @@
-import type { Attachment } from '@juno/slack-schema'
+import type { Attachment, File } from '@juno/slack-schema'
 import type { Block, ContentBlock, Inline, Lookups, SharedSource } from './model'
 import { bodyFromBlocks } from './from-blocks'
 import { inlineText } from './inline'
@@ -13,6 +13,8 @@ export function attachmentBlock(attachment: Attachment, lookups: Lookups): Extra
   const rich = bodyFromBlocks([...(attachment.blocks ?? []), ...shared], lookups).blocks
   blocks.push(...rich)
   if (attachment.text && rich.length === 0) blocks.push(...mrkdwnBlocks(attachment.text, lookups))
+  // A shared message's files follow its words. With them the card never falls back to Slack's "[date] name: file" line.
+  for (const file of attachment.files ?? []) blocks.push(fileBlock(file))
   if (attachment.fields?.length) blocks.push({ kind: 'fields', items: attachment.fields.map((f) => mrkdwnInlines([f.title && `*${f.title}*`, f.value].filter(Boolean).join('\n'), lookups)) })
   const url = attachment.image_url || attachment.thumb_url
   if (url) blocks.push({ kind: 'image', url, alt: attachment.title || 'Attachment image', ...(attachment.image_width && attachment.image_height ? { width: attachment.image_width, height: attachment.image_height } : {}) })
@@ -40,6 +42,14 @@ export function attachmentBlock(attachment: Attachment, lookups: Lookups): Extra
     ...(attachment.author_name ? { author: { name: attachment.author_name, ...(attachment.author_icon ? { icon: attachment.author_icon } : {}) } } : {}),
     ...(attachment.footer_icon || attachment.service_icon ? { footerIcon: attachment.footer_icon || attachment.service_icon } : {}),
     tint: attachmentTint(attachment.color), title, blocks, ...(source === undefined ? {} : { source }), footer }
+}
+
+/** A file as a body names it; the message's `files` carry the rest. */
+export function fileBlock(file: File): Extract<ContentBlock, { kind: 'file' }> {
+  const width = file.original_w ?? file.thumb_360_w
+  const height = file.original_h ?? file.thumb_360_h
+  const dimensions = width !== undefined && height !== undefined && width > 0 && height > 0 ? { width, height } : {}
+  return { kind: 'file', id: file.id, name: file.name || file.title || file.id, mimetype: file.mimetype ?? 'application/octet-stream', ...dimensions }
 }
 
 /**

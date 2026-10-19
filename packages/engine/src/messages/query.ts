@@ -515,7 +515,7 @@ function shapeRow(row: WindowMessage, body: CachedBody, input: ShapeInput): Mess
     reactions: kind === 'message' ? reactions : [],
     ...(input.actionIssue === undefined ? {} : { actionIssue: input.actionIssue }),
     ...(kind === 'message' && input.reactionIssue !== undefined ? { reactionIssue: input.reactionIssue } : {}),
-    files: kind !== 'message' ? [] : input.pending === undefined ? filesOf(row, input.local) : pendingFiles(input.pending),
+    files: kind !== 'message' ? [] : [...(input.pending === undefined ? filesOf(parseJson<ReadonlyArray<SlackFile>>(row.files_json), input.local) : pendingFiles(input.pending)), ...filesOf(sharedFiles(row), input.local)],
     ...(input.thread === undefined ? {} : { thread: input.thread }),
     ...(row.client_msg_id === null ? {} : { clientMsgId: row.client_msg_id }),
     ...(input.pending === undefined ? {} : { pending: input.pending.state === 'failed' ? ('failed' as const) : ('sending' as const) }),
@@ -807,8 +807,13 @@ function boxOf(src: string, width: number, height: number): NonNullable<FileView
   return { src, width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) }
 }
 
-function filesOf(row: WindowMessage, local: ReadonlyMap<string, LocalFile>): ReadonlyArray<FileView> {
-  const files = parseJson<ReadonlyArray<SlackFile>>(row.files_json)
+/** The files of the messages a row shares, which its cards draw (`richtext` `attachmentBlock`). */
+function sharedFiles(row: WindowMessage): ReadonlyArray<SlackFile> | undefined {
+  if (row.attachments_json === null || !row.attachments_json.includes('"files"')) return undefined
+  return (parseJson<ReadonlyArray<{ readonly files?: ReadonlyArray<SlackFile> }>>(row.attachments_json) ?? []).flatMap((attachment) => attachment.files ?? [])
+}
+
+function filesOf(files: ReadonlyArray<SlackFile> | undefined, local: ReadonlyMap<string, LocalFile>): ReadonlyArray<FileView> {
   if (files === undefined) return []
   const out: Array<FileView> = []
   for (const file of files) {

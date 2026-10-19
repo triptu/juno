@@ -20,6 +20,8 @@ export interface FilesProps {
   readonly tabbable?: boolean
   /** How far the files' upload has got, 0 to 1: a slim line under them that takes no room. */
   readonly progress?: number | undefined
+  /** No space above: the files sit in a shared message's card, which spaces its own content. */
+  readonly flush?: boolean
 }
 
 // The upload line's thickness.
@@ -37,13 +39,13 @@ const PROGRESS_HEIGHT = '2px' // tokens-allow: the upload line's thickness
  * it is drawn over the row's bottom padding, so it appearing or going moves
  * nothing.
  */
-export function Files({ files, onOpenMedia, onDownload, tabbable = true, progress }: FilesProps) {
+export function Files({ files, onOpenMedia, onDownload, tabbable = true, progress, flush = false }: FilesProps) {
   if (files.length === 0) return null
   const tabIndex = tabbable ? 0 : -1
   const media = mediaOf(files)
   const first = files.findIndex(isMedia)
   return (
-    <div {...stylex.props(styles.files)}>
+    <div {...stylex.props(styles.files, flush && styles.flush)}>
       {files.map((file, index) => {
         if (index === first) return <MediaGrid key="media" media={media} onOpen={onOpenMedia} tabIndex={tabIndex} />
         if (isMedia(file)) return null
@@ -142,6 +144,7 @@ const styles = stylex.create({
     marginTop: spacing['--space-1-5'],
     minWidth: 0,
   },
+  flush: { marginTop: 0 },
   card: {
     display: 'flex',
     alignItems: 'center',

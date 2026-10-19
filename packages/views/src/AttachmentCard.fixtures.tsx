@@ -1,5 +1,7 @@
 import type { BodyBlock, BodyInline } from '@juno/contract'
 import { defineFixtures, fixture, hueForId } from '@juno/ui'
+import { Files } from './FileCard'
+import { clip } from './fixtures/media'
 import { MessageBody, type MessageBodyProps } from './MessageBody'
 
 const pr: BodyBlock = {
@@ -31,6 +33,9 @@ const sharedWords: Extract<BodyBlock, { kind: 'attachment' }> = {
   footer: [sharedDate],
 }
 const shared: Extract<BodyBlock, { kind: 'attachment' }> = { ...sharedWords, source: { kind: 'public', name: 'eng', url: permalink, thread: false } }
+// A shared message of only a video: the card draws it as the message would. Without the file's details, a quiet line names it.
+const sharedVideo: BodyBlock = { ...shared, blocks: [{ kind: 'file', id: clip.id, name: clip.name, mimetype: 'video/mp4', width: 1280, height: 720 }] }
+const sharedFiles: BodyBlock = { ...shared, blocks: [{ kind: 'file', id: 'F0REC', name: 'Screen Recording 2026-10-19 at 3.17.13 PM.mov', mimetype: 'video/quicktime' }, { kind: 'file', id: 'F0PLAN', name: 'q4-plan.pdf', mimetype: 'application/pdf' }] }
 // A place Juno does not know keeps Slack's footer, as the link.
 const sharedElsewhere: BodyBlock = { ...sharedWords, footer: [{ kind: 'link', url: permalink, text: 'Thread in Slack conversation' }, { kind: 'text', text: ' · ' }, sharedDate] }
 
@@ -42,6 +47,8 @@ export default defineFixtures(MessageBody, {
   'shared-thread-private': state({ ...shared, source: { kind: 'private', name: 'release-war-room', url: `${permalink}?thread_ts=1792178000.000050&cid=C0ENG`, thread: true } }),
   'shared-dm': state({ ...shared, source: { kind: 'im', name: 'Maya Chen', url: permalink, thread: false } }),
   'shared-elsewhere': state(sharedElsewhere),
+  'shared-video': fixture<MessageBodyProps>({ ...state(sharedVideo).props, renderFiles: () => <Files files={[clip]} onOpenMedia={() => {}} flush /> }),
+  'shared-files-quiet': state(sharedFiles),
   'failed-image': state({ ...tweet, blocks: [...tweet.blocks, { kind: 'image', url: 'data:image/png;base64,AAAA', alt: 'Unavailable preview', width: 1200, height: 630 }] }),
   youtube: state({ ...tweet, author: { name: 'Example Studio', icon }, title: [{ kind: 'link', url: 'https://example.test/watch/demo', text: 'How the demo works' }], blocks: [{ kind: 'image', url: previewImage, alt: 'Demo preview', width: 640, height: 360 }], footer: [{ kind: 'text', text: 'YouTube' }] }),
   generic: state({ ...pr, tint: 'neutral', title: [{ kind: 'link', url: 'https://example.test/article/1', text: 'A useful observation' }], blocks: [{ kind: 'paragraph', children: [{ kind: 'text', text: 'The summary supplied by the page.' }] }, { kind: 'image', url: previewImage, alt: 'Article preview', width: 800, height: 420 }], footer: [{ kind: 'text', text: 'Example Journal' }] }),

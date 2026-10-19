@@ -123,6 +123,8 @@ export const Attachment = S.Struct({
   is_share: opt(S.Boolean),
   channel_id: opt(S.String),
   channel_name: opt(S.String),
+  /** A shared message's files. Live, a file-only message shared this way has no `text` or `blocks`, only these and a `fallback` line. */
+  files: opt(S.Array(File)),
   /** A shared or linked Slack message: its own blocks, beside the same words as mrkdwn `text`. */
   message_blocks: opt(S.Array(S.Struct({ message: opt(S.Struct({ blocks: opt(Blocks) })) }))),
 })

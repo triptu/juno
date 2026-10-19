@@ -2,7 +2,8 @@
 // messages"): its card says where it was posted, from Juno's own data, and
 // that place opens the original message in its topic, which flashes. A
 // conversation Juno does not have keeps Slack's footer, which opens the
-// message's Slack link outside.
+// message's Slack link outside. A shared message of only files shows its
+// files, never Slack's "[date] name: file" fallback line.
 import { sharedMessage, type FakeSlack } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
@@ -80,4 +81,25 @@ test("a message shared from a conversation Juno does not have keeps Slack's foot
   await juno.expectToast('Juno cannot reach that conversation · Opened in the browser')
   await expect.poll(() => juno.browserLinks()).toContain(`${fake.url}/archives/C0NOWHERE/p${NOWHERE.replace('.', '')}`)
   await juno.tabs.expectCount(1)
+})
+
+test("a shared message of only a video shows the video, and its row names it, not Slack's fallback line", async ({ juno, fake }) => {
+  seedShares(fake)
+  const clip = fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', media: [{ name: 'screen-recording.mp4', width: 1280, height: 720, kind: 'video' }] })
+  // Forwarded with no note: the sharing message has no words of its own.
+  fake.workspace.post({ channel: 'C0PRODUCT', user: 'U0SAM', text: '', attachments: [sharedMessage(fake.url, 'C0ENG', clip, 'Maya')], silent: true })
+  await juno.signIn()
+  await juno.waitForSync()
+  const row = juno.sidebar.row('#product')
+  await row.expectPreview(/Shared message: Video$/)
+  await row.open()
+
+  const card = juno.topic.list.locator('section[aria-label="Attachment"]').filter({ has: juno.win.locator('[data-inline-video]') })
+  await expect(card).toBeVisible({ timeout: 15_000 })
+  await expect(card.getByLabel('screen-recording.mp4', { exact: true })).toBeVisible()
+  await expect(card).not.toContainText('Maya: screen-recording.mp4')
+  await expect(card.locator('[data-shared-source]')).toHaveText('eng')
+  // The video is drawn once, in the card, not again under it.
+  const message = juno.topic.list.locator('[data-message-row]').filter({ has: juno.win.locator('section[aria-label="Attachment"] [data-inline-video]') })
+  await expect(message.locator('[data-inline-video]')).toHaveCount(1)
 })

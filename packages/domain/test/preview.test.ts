@@ -42,6 +42,13 @@ describe('preview text', () => {
     expect(messagePreviewText({ text: '', subtype: 'huddle_thread' })).toBe('Huddle')
   })
 
+  it("names a shared message of only files by its files, not Slack's fallback line", () => {
+    const fallback = '[October 19th, 2026 3:23 PM] Maya: demo.mov'
+    expect(messagePreviewText({ text: '', attachments: [{ is_share: true, fallback, files: [{ id: 'F0CLIP', name: 'demo.mov', mimetype: 'video/quicktime' }] }] })).toBe('Shared message: Video')
+    expect(messagePreviewText({ text: '', attachments: [{ is_share: true, fallback, files: [{ id: 'F0PLAN', name: 'plan.pdf', mimetype: 'application/pdf' }] }] })).toBe('Shared message: File: plan.pdf')
+    expect(messagePreviewText({ text: '', attachments: [{ is_share: true, fallback }] })).toBe(`Shared message: ${fallback}`)
+  })
+
   it('keeps an emoji-only message as its emoji', () => {
     expect(messagePreviewText({ text: ':tada:' })).toBe('🎉')
   })

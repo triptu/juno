@@ -4,6 +4,7 @@ import type { FileView, MessageView, Person, QuickReaction, ReactionIssue } from
 import { colors, density, layout, motion, opacity, radii, sizes, spacing, text, tints, z } from '@juno/tokens/tokens.stylex'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
 import { Avatar, focusRing, Icon, Text, type ActivateEvent, type HueName } from '@juno/ui'
+import { SharedFileLines, type FileBlock } from './AttachmentCard'
 import { Files } from './FileCard'
 import { mediaOf } from './MediaGrid'
 import type { MediaViewing } from './MediaViewer'
@@ -228,6 +229,30 @@ export const Message = memo(function Message({
     else event.currentTarget.style.removeProperty('--row-toolbar-display')
   }
   const toggle = onToggleReaction === undefined ? undefined : (reaction: string) => onToggleReaction(message.ts, reaction)
+  const openMedia =
+    onOpenMedia === undefined
+      ? undefined
+      : (file: FileView) => {
+          const items = mediaOf(message.files)
+          onOpenMedia({ items, index: Math.max(0, items.findIndex((each) => each === file)), sender: name, at: message.at })
+        }
+  // A shared message's files are drawn in its card; the rest under the body.
+  const carded = cardFileIds(message)
+  const own = carded === undefined ? message.files : message.files.filter((file) => !carded.has(file.id))
+  const renderFiles =
+    carded === undefined
+      ? undefined
+      : (blocks: ReadonlyArray<FileBlock>) => {
+          const ids = new Set(blocks.map((block) => block.id))
+          const files = message.files.filter((file) => ids.has(file.id))
+          const missing = blocks.filter((block) => !files.some((file) => file.id === block.id))
+          return (
+            <>
+              <Files files={files} onOpenMedia={openMedia} onDownload={onDownload} tabbable={tabbable} flush />
+              {missing.length === 0 ? null : <SharedFileLines files={missing} />}
+            </>
+          )
+        }
   const { pending, clientMsgId } = message
   // A failed send has Retry and Delete draft instead; a deleted or unloaded message has nothing to act on.
   const toolbar =
@@ -298,7 +323,7 @@ export const Message = memo(function Message({
         {editor !== undefined ? (
           editor
         ) : message.kind === 'message' ? (
-          <MessageBody body={message.body} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabbable={tabbable} />
+          <MessageBody body={message.body} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabbable={tabbable} renderFiles={renderFiles} />
         ) : (
           <Text variant="body" tone="muted" as="p" sx={styles.placeholder}>
             {message.kind === 'deleted' ? 'This message was deleted.' : 'Loading message'}
@@ -310,15 +335,8 @@ export const Message = memo(function Message({
           </Text>
         ) : null}
         <Files
-          files={message.files}
-          onOpenMedia={
-            onOpenMedia === undefined
-              ? undefined
-              : (file: FileView) => {
-                  const items = mediaOf(message.files)
-                  onOpenMedia({ items, index: Math.max(0, items.findIndex((each) => each === file)), sender: name, at: message.at })
-                }
-          }
+          files={own}
+          onOpenMedia={openMedia}
           onDownload={onDownload}
           tabbable={tabbable}
           progress={pending === 'sending' ? progress : undefined}
@@ -379,6 +397,16 @@ export const Message = memo(function Message({
  * The user's reaction change Slack has not taken. Refused: what Slack has
  * is shown, with Retry and Remove. Waiting long: one quiet line.
  */
+/** The ids of the files the message's shared cards draw, or undefined when it has none, which is nearly always. */
+function cardFileIds(message: MessageView): ReadonlySet<string> | undefined {
+  let ids: Set<string> | undefined
+  for (const block of message.body.blocks) {
+    if (block.kind !== 'attachment') continue
+    for (const child of block.blocks) if (child.kind === 'file') (ids ??= new Set()).add(child.id)
+  }
+  return ids
+}
+
 function ReactionIssueLine({ issue, onResolve }: { readonly issue: ReactionIssue; readonly onResolve: MessageActions['onResolveAction'] }) {
   if (issue.state === 'waiting') {
     return (
