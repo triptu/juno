@@ -1,6 +1,6 @@
 /**
  * Notifications from the owner's side (SPEC 14): Notify me on a channel,
- * thread or person, the OS notification and its click (also on a topic
+ * thread or person, the OS notification, its title for a group DM, and its click (also on a topic
  * already open in a tab), why a message did or did not notify, the
  * Notifications and Ignored sections of Settings, and the test
  * notification and macOS permission line. Set yourself away and active
@@ -48,6 +48,19 @@ test('Notify me on a channel lists it on the page, and removing it there has Und
   await expect(page.root.getByText('Every channel and person is set to When it matters.')).toBeVisible()
   await juno.undoFromToast()
   await expect(page.level('Never')).toContainText('alerts-prod')
+})
+
+test('a group DM notifies under its people\'s names, not Slack\'s internal name', async ({ juno, slack }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+
+  await juno.sidebar.row('Maya, Leo', { exact: true }).open()
+  await juno.topic.chooseInMessageMenu('lunch friday?', 'notify-every', { onSender: true })
+  await juno.expectToast('Leo: Every message')
+
+  await juno.openNotifications()
+  slack.as('Leo').groupDm('Moved it to 1pm')
+  await expect.poll(() => juno.osNotifications(), { timeout: 15_000 }).toContainEqual({ title: 'Maya, Leo', body: 'Moved it to 1pm' })
 })
 
 test('a DM set to Every message notifies, the click opens it at the message, and the menu says why', async ({ juno, slack }) => {

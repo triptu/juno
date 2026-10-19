@@ -100,6 +100,14 @@ export class Person {
     throw new Error(`No DM with ${this.id}`)
   }
 
+  /** Says `text` in a group DM you share. Returns the message ts. */
+  groupDm(text: string): string {
+    for (const [id, conversation] of this.slack.fake.workspace.conversations) {
+      if (conversation.kind === 'mpim' && conversation.members.has(this.id)) return this.slack.fake.injectMessage({ channel: id, user: this.id, text }).ts
+    }
+    throw new Error(`No group DM with ${this.id}`)
+  }
+
   /**
    * Posted in a channel's Main `days` ago, with no event: Juno's cache does
    * not hold it, so only Slack's search finds it. Returns the message ts.
