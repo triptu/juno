@@ -42,8 +42,15 @@ const microphoneAccess = (win: Page, access: string) => win.evaluate((given) => 
 const startShare = (win: Page, userId: string) => win.evaluate((id) => (window as unknown as MediaWindow).__junoHuddleMedia.startShare(id), userId)
 const stopShare = (win: Page, userId: string) => win.evaluate((id) => (window as unknown as MediaWindow).__junoHuddleMedia.stopShare(id), userId)
 const sharesReady = (win: Page) => win.evaluate(() => (window as unknown as MediaWindow).__junoHuddleMedia.getSnapshot().shares.map((share) => share.ready))
-/** The video has frames, plays and moves on. */
-const playing = (video: Locator) => video.evaluate((element: HTMLVideoElement) => element.readyState >= 2 && !element.paused && element.videoWidth > 0 && element.currentTime > 0)
+/** The video plays and keeps getting new frames: more are decoded over 300 ms. */
+const playing = (video: Locator) =>
+  video.evaluate(async (element: HTMLVideoElement) => {
+    const frames = () => element.getVideoPlaybackQuality().totalVideoFrames
+    if (element.readyState < 2 || element.paused || element.videoWidth === 0) return false
+    const before = frames()
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    return frames() > before
+  })
 const endMedia = (win: Page, reason: string) => win.evaluate((why) => (window as unknown as MediaWindow).__junoHuddleMedia.end(why), reason)
 
 /** Main's quit dialog under JUNO_E2E: recorded, and answered as the test says (`main/index.ts`). */
