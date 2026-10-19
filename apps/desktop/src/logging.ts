@@ -1,4 +1,4 @@
-/** Buffered process logs. Only catalog events, numeric fields and checked ids reach disk. */
+/** Buffered process logs. Only catalog events and checked diagnostic fields reach disk. */
 import { appendFile, mkdir, rename, stat, open } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -11,6 +11,7 @@ export type LogProcess = typeof LOG_PROCESSES[number]
 export type Level = 'INFO' | 'WARN' | 'ERROR'
 const FIELDS = new Set(['id', 'rowId', 'pid', 'count', 'attempts', 'retryInMillis', 'cpu', 'memoryMb', 'passes'])
 const ERROR_NAMES = new Set(['Error', 'TypeError', 'RangeError', 'SyntaxError', 'AggregateError', 'ReferenceError'])
+const SLACK_ERRORS = new Set(['SlackTransportError', 'SlackDecodeError', 'SlackRejected', 'SlackAuthRequired', 'SlackRateLimited'])
 
 export function logFolder(): string {
   return process.env.JUNO_E2E === '1' && process.env.JUNO_USER_DATA
@@ -18,7 +19,7 @@ export function logFolder(): string {
     : join(homedir(), 'Library', 'Logs', 'Juno')
 }
 
-/** Deliberately drops error messages, paths, arbitrary tags, string fields and object payloads. */
+/** Deliberately drops error messages, paths, arbitrary tags, unchecked strings and object payloads. */
 export function safeDetails(value: unknown, depth = 0, seen = new Set<unknown>()): string {
   if (depth > 5 || value === null || typeof value !== 'object' || seen.has(value)) return ''
   seen.add(value)
@@ -26,6 +27,14 @@ export function safeDetails(value: unknown, depth = 0, seen = new Set<unknown>()
   if ('_tag' in value) {
     const tag: unknown = Reflect.get(value, '_tag')
     if (typeof tag === 'string' && ['Fail', 'Die', 'Interrupt', 'SqlError', 'SlackTransportError', 'SlackDecodeError', 'SlackRejected', 'SlackAuthRequired', 'SlackRateLimited', 'SchemaError', 'Offline', 'Rejected', 'RateLimited', 'NotSignedIn'].includes(tag)) parts.push(`cause=${tag}`)
+    if (typeof tag === 'string' && SLACK_ERRORS.has(tag)) {
+      const method: unknown = Reflect.get(value, 'method')
+      if (typeof method === 'string' && method.length <= 80 && method.trim() === method && /^[a-z]+(?:\.[a-zA-Z]+)+$/.test(method)) parts.push(`method=${method}`)
+      if (tag === 'SlackRejected') {
+        const code: unknown = Reflect.get(value, 'error')
+        if (typeof code === 'string' && code.trim() === code && /^[a-z_]{1,64}$/.test(code)) parts.push(`code=${code}`)
+      }
+    }
   }
   if (value instanceof Error) {
     parts.push(`cause=${ERROR_NAMES.has(value.name) ? value.name : 'Error'}`)
