@@ -266,3 +266,36 @@ test('while macOS blocks the microphone, Mute says so and opens System Settings'
   await bar.getByRole('button', { name: 'Leave' }).click()
   await chimeDrops(win, fake, attendeeId!)
 })
+
+test('Switch leaves the huddle the user is in, joins the other, and says so', async ({ juno, fake, win }) => {
+  await openEngMain(juno)
+  await win.getByRole('button', { name: 'Start huddle' }).click()
+  const bar = win.getByRole('region', { name: 'Huddle' })
+  await expect(bar).toBeVisible()
+  await expect.poll(() => connection(win)).toBe('connected')
+  const first = await attendee(win)
+
+  // Maya's huddle in #product: its header offers Switch, with no confirmation.
+  fake.control('startHuddle', { channel: 'C0PRODUCT', user: 'U0MAYA' })
+  await juno.sidebar.row('#product').open()
+  await juno.topic.expectTitle('Main')
+  await juno.sidebar.leave()
+  const switchButton = win.getByRole('button', { name: /^Switch/ })
+  await expect(switchButton).toBeVisible({ timeout: 15_000 })
+  await switchButton.click()
+  await juno.expectToast('Left the huddle in #eng')
+
+  // The first huddle is left before the second is joined; there is never a second call.
+  await expect.poll(() => fake.calls.filter((call) => call.method === 'rooms.leave').map((call) => call.args['attendee_id'])).toEqual([first])
+  // Chime drops the first attendee; the page may already be connecting the second, so the test does not wait for `ended`.
+  fake.control('stopMedia', { attendeeId: first! })
+  await expect(bar.getByRole('button', { name: 'Open huddle in #product' })).toBeVisible()
+  await expect.poll(() => attendee(win)).not.toBe(first)
+  await expect.poll(() => connection(win)).toBe('connected')
+  const joins = fake.calls.filter((call) => call.method === 'rooms.join').map((call) => call.args['channel_id'])
+  expect(joins).toEqual(['C0ENG', 'C0PRODUCT'])
+  const second = await attendee(win)
+
+  await bar.getByRole('button', { name: 'Leave' }).click()
+  await chimeDrops(win, fake, second!)
+})
