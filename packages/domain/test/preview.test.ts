@@ -35,6 +35,7 @@ describe('preview text', () => {
   it('reads a shared message, a bot attachment, an unfurl and a huddle', () => {
     expect(messagePreviewText({ text: '', attachments: [{ is_msg_unfurl: true, text: 'Ship it on Friday' }] })).toBe('Shared message: Ship it on Friday')
     expect(messagePreviewText({ text: '', attachments: [{ message_blocks: [] }] })).toBe('Shared message')
+    expect(messagePreviewText({ text: '', attachments: [{ is_share: true, channel_id: 'C0ENG', text: 'Ship it on Friday' }] })).toBe('Shared message: Ship it on Friday')
     expect(messagePreviewText({ text: '', attachments: [{ title: 'Build 412 passed', text: 'All green' }] })).toBe('Build 412 passed')
     expect(messagePreviewText({ text: '', attachments: [{ fallback: '[FIRING] disk 90%' }] })).toBe('[FIRING] disk 90%')
     expect(messagePreviewText({ text: '', attachments: [{ from_url: 'https://docs.example.org/page' }] })).toBe('Link: docs.example.org')

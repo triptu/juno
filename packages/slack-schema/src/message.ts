@@ -119,6 +119,10 @@ export const Attachment = S.Struct({
   service_name: opt(S.String),
   service_icon: opt(S.String),
   is_msg_unfurl: opt(S.Boolean),
+  /** A message shared from another conversation, with that conversation's id and, when Slack gives it, its name. */
+  is_share: opt(S.Boolean),
+  channel_id: opt(S.String),
+  channel_name: opt(S.String),
   /** A shared or linked Slack message: its own blocks, beside the same words as mrkdwn `text`. */
   message_blocks: opt(S.Array(S.Struct({ message: opt(S.Struct({ blocks: opt(Blocks) })) }))),
 })

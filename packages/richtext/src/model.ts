@@ -46,6 +46,23 @@ export type ContentBlock =
   | { readonly kind: 'image'; readonly url: string; readonly alt: string; readonly width?: number; readonly height?: number }
   | { readonly kind: 'file'; readonly id: string; readonly name: string; readonly mimetype: string; readonly width?: number; readonly height?: number }
 
+export type PlaceKind = 'public' | 'private' | 'im' | 'mpim'
+
+/** A conversation as a reader names it: a channel's name without "#", or the people of a DM. */
+export interface PlaceName {
+  readonly kind: PlaceKind
+  readonly name: string
+}
+
+/**
+ * Where a shared Slack message was posted, when Juno knows the place.
+ * `url` is its permalink; `thread` when it was a reply in a thread.
+ */
+export interface SharedSource extends PlaceName {
+  readonly url: string
+  readonly thread: boolean
+}
+
 export type Block = ContentBlock | {
   readonly kind: 'attachment'
   readonly author?: { readonly name: string; readonly icon?: string }
@@ -53,6 +70,8 @@ export type Block = ContentBlock | {
   readonly tint: 'neutral' | 'info' | 'success' | 'warning' | 'danger'
   readonly title: ReadonlyArray<Inline>
   readonly blocks: ReadonlyArray<ContentBlock>
+  /** A shared message's place. With it, `footer` holds only the date; the view draws the place before it. */
+  readonly source?: SharedSource
   readonly footer: ReadonlyArray<Inline>
 }
 
@@ -72,6 +91,8 @@ export interface Lookups {
   readonly user?: (id: string) => string | undefined
   /** Channel name for a channel id, without "#". */
   readonly channel?: (id: string) => string | undefined
+  /** The kind and name of any conversation by id, DMs included: where a shared message came from. */
+  readonly place?: (id: string) => PlaceName | undefined
   /** Handle (without "@") and full name for a usergroup id. */
   readonly usergroup?: (id: string) => UsergroupName | undefined
   /** The user groups the signed-in user belongs to. Sets `isMine` on usergroup mentions. */
