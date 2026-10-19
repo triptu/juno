@@ -130,6 +130,8 @@ test('someone shares their screen: the bar says so, the tab shows it, two can sh
   await openEngMain(juno)
   await win.getByRole('button', { name: 'Start huddle' }).click()
   const bar = win.getByRole('region', { name: 'Huddle' })
+  // The bar shows once the media session has loaded.
+  await expect(bar).toBeVisible()
   await expect.poll(() => connection(win)).toBe('connected')
   for (const user of ['U0MAYA', 'U0LEO']) {
     fake.control('joinHuddle', { channel: 'C0ENG', user })
