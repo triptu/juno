@@ -35,7 +35,7 @@ import { Option, Schema } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
 import { JunoPage } from '@juno/agent-contract'
-import { PickConversation, prefsGet, prefsSet, SettingsSectionSchema, type SettingsSection, type TopicDetail } from '@juno/contract'
+import { mainTopicOf, PickConversation, prefsGet, prefsSet, SettingsSectionSchema, type SettingsSection, type TopicDetail } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
 import { topicAtom } from './messages'
@@ -48,7 +48,7 @@ export type JunoTabPage = Exclude<JunoPage, 'settings' | 'connections'>
 /** What a Juno tab or the Juno panel shows: the chat, or one of its pages. */
 export type JunoView = 'chat' | JunoTabPage
 
-/** What a tab shows: a topic, or a page: Home (section 12), All topics (section 11), Settings at one of its sections (section 14), the Juno chat (section 13) or a Juno page (13.10). */
+/** What a tab shows: a topic, or a page: Home (section 12), All topics (section 11), Settings at one of its sections (section 14), the Juno chat (section 13), a Juno page (13.10) or a channel's huddle (20). */
 export type Place =
   | { readonly kind: 'topic'; readonly topicId: string; readonly viewId?: string }
   | { readonly kind: 'home' }
@@ -58,6 +58,8 @@ export type Place =
   | { readonly kind: 'juno' }
   /** A page behind the Juno menu (SPEC 13.10). */
   | { readonly kind: 'junoPage'; readonly page: JunoTabPage }
+  /** The huddle of a channel or DM, one tab per channel. */
+  | { readonly kind: 'huddle'; readonly channelId: string }
 
 export const homePlace: Place = { kind: 'home' }
 export const allTopicsPlace: Place = { kind: 'allTopics' }
@@ -65,6 +67,7 @@ export const settingsPlace = (section: SettingsSection): Place => ({ kind: 'sett
 export const junoPlace: Place = { kind: 'juno' }
 export const junoPagePlace = (page: JunoTabPage): Place => ({ kind: 'junoPage', page })
 export const topicPlace = (topicId: string): Place => ({ kind: 'topic', topicId })
+export const huddlePlace = (channelId: string): Place => ({ kind: 'huddle', channelId })
 
 /** The places a tab showed, oldest first, and the one it shows. */
 export interface TabHistory {
@@ -124,7 +127,10 @@ export function tabTopic(tab: Tab): string | undefined {
 }
 /** Settings is one place whatever its section, so it shows in one tab. */
 const samePlace = (a: Place, b: Place) =>
-  a.kind === 'topic' ? b.kind === 'topic' && a.topicId === b.topicId : a.kind === 'junoPage' ? b.kind === 'junoPage' && a.page === b.page : a.kind === b.kind
+  a.kind === 'topic' ? b.kind === 'topic' && a.topicId === b.topicId
+  : a.kind === 'junoPage' ? b.kind === 'junoPage' && a.page === b.page
+  : a.kind === 'huddle' ? b.kind === 'huddle' && a.channelId === b.channelId
+  : a.kind === b.kind
 
 export const activeTab = (tabs: Tabs): Tab | undefined => tabs.tabs.find((tab) => tab.id === tabs.active)
 /**
@@ -418,6 +424,7 @@ const PlaceJson = Schema.Union([
   // Saved before Settings was one page: Notifications, Preferences, and Settings › Juno and Connections as Juno pages.
   Schema.Struct({ kind: Schema.Literals(['notifications', 'preferences']) }),
   Schema.Struct({ kind: Schema.Literal('junoPage'), page: JunoPage }),
+  Schema.Struct({ kind: Schema.Literal('huddle'), channelId: Schema.String }),
 ])
 
 /** A saved place as it reads today: the pages that became sections of Settings open there. */
@@ -605,7 +612,7 @@ export interface TabSummary {
   readonly id: string
   readonly pinned: boolean
   readonly place: Place
-  /** A topic's header: undefined until it arrives (and for a page), null for a topic the store does not know. */
+  /** A topic's header, or a huddle's channel's Main: undefined until it arrives (and for a page), null for a topic the store does not know. */
   readonly detail: TopicDetail | null | undefined
 }
 
@@ -620,7 +627,7 @@ export const tabStripAtom = Atom.make((get): ReadonlyArray<TabSummary> => {
   const previous = new Map(Option.getOrElse(get.self<ReadonlyArray<TabSummary>>(), () => []).map((tab) => [tab.id, tab]))
   return get(tabsAtom).tabs.map((tab) => {
     const place = currentPlace(tab)
-    const result = place.kind === 'topic' ? get(topicAtom(place.topicId)) : undefined
+    const result = place.kind === 'topic' ? get(topicAtom(place.topicId)) : place.kind === 'huddle' ? get(topicAtom(mainTopicOf(place.channelId))) : undefined
     const detail = result !== undefined && AsyncResult.isSuccess(result) ? result.value : undefined
     const held = previous.get(tab.id)
     return held !== undefined && held.pinned === tab.pinned && samePlace(held.place, place) && held.detail === detail ? held : { id: tab.id, pinned: tab.pinned, place, detail }

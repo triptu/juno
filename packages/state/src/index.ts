@@ -95,6 +95,7 @@ export {
   tabStripAtom,
   tabTopic,
   topicPlace,
+  huddlePlace,
   updateTabs,
   setHomeDraft,
   type OpenOptions,
@@ -290,3 +291,4 @@ export {
 export { sendCheckPrefsAtom, aiAvailableAtom, setSendCheckPref } from './sendCheckPrefs'
 
 export { sentSuggestionsAtom, dismissSentSuggestion, type SentSuggestion } from './sentSuggestions'
+export { huddleCallValueAtom, huddleChannelAtom, huddleCountAtom, huddleInChannelAtom, huddleLastRunAtom, huddlePeopleOf, type HuddleLastRun, leaveHuddle, reportHuddleMedia, startHuddle } from './huddle'
