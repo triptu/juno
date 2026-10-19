@@ -19,6 +19,8 @@ interface FakeMedia {
   getSnapshot(): { readonly local: { readonly attendeeId: string | undefined; readonly muted: boolean }; readonly connection: { readonly state: string } }
   addRemote(remote: { readonly userId: string }): string
   end(reason: string): void
+  /** The call sounds the page asked for, in order. */
+  readonly played: ReadonlyArray<string>
 }
 type MediaWindow = Window & { readonly __junoHuddleMedia: FakeMedia }
 
@@ -26,6 +28,7 @@ const connection = (win: Page) => win.evaluate(() => (window as unknown as Media
 const localMuted = (win: Page) => win.evaluate(() => (window as unknown as MediaWindow).__junoHuddleMedia.getSnapshot().local.muted)
 const attendee = (win: Page) => win.evaluate(() => (window as unknown as MediaWindow).__junoHuddleMedia.getSnapshot().local.attendeeId ?? null)
 const addRemote = (win: Page, userId: string) => win.evaluate((id) => (window as unknown as MediaWindow).__junoHuddleMedia.addRemote({ userId: id }), userId)
+const played = (win: Page) => win.evaluate(() => [...(window as unknown as MediaWindow).__junoHuddleMedia.played])
 const endMedia = (win: Page, reason: string) => win.evaluate((why) => (window as unknown as MediaWindow).__junoHuddleMedia.end(why), reason)
 
 /** Main's quit dialog under JUNO_E2E: recorded, and answered as the test says (`main/index.ts`). */
@@ -63,6 +66,9 @@ test('start a huddle from the header, mute from the bar, open the tab and leave'
   expect(joined).toHaveLength(1)
   expect(joined[0]?.args).toMatchObject({ channel_id: 'C0ENG', regions: 'us-east-1', _x_reason: 'calls-api/joinRoom' })
   await expect(win.getByRole('button', { name: /^In huddle/ })).toBeVisible()
+  // The join sound plays once the call connects, and the bar is live once the engine has it.
+  await expect.poll(() => played(win)).toEqual(['join'])
+  await expect(bar).not.toContainText('Joining…')
   // The row shows the huddle running in its channel.
   await expect(juno.sidebar.row('#eng').root.locator('[data-huddle-indicator]')).toBeVisible()
 
@@ -74,10 +80,11 @@ test('start a huddle from the header, mute from the bar, open the tab and leave'
   await win.keyboard.press('Meta+Shift+Space')
   await expect(mute).toHaveAttribute('aria-pressed', 'false')
 
-  // Someone joins: the bar shows them.
+  // Someone joins: the bar shows them, and the join sound plays.
   fake.control('joinHuddle', { channel: 'C0ENG', user: 'U0MAYA' })
   await addRemote(win, 'U0MAYA')
   await expect(bar.locator('img, [data-avatar]').first()).toBeVisible()
+  await expect.poll(() => played(win)).toEqual(['join', 'join'])
 
   // Someone the store has never seen joins: Juno asks Slack who they are, and the bar names them.
   fake.workspace.addUser({ id: 'U0RINSATO', team_id: TEAM.id, name: 'rin', real_name: 'Rin Sato', profile: { display_name: 'Rin Sato', real_name: 'Rin Sato' } })
@@ -98,6 +105,8 @@ test('start a huddle from the header, mute from the bar, open the tab and leave'
   await expect.poll(() => fake.calls.filter((call) => call.method === 'rooms.leave').length).toBe(1)
   expect(fake.calls.find((call) => call.method === 'rooms.leave')?.args).toMatchObject({ channel_id: 'C0ENG', attendee_id: attendeeId, reason: 'user_initiated' })
   await chimeDrops(win, fake, attendeeId!)
+  // Two joins (Maya, then Rin), then the user's own leave.
+  await expect.poll(() => played(win)).toEqual(['join', 'join', 'join', 'leave'])
   // The tab stays, and shows the huddle without the user: Maya is still in it.
   await expect(win.getByRole('button', { name: 'Join huddle' })).toBeVisible({ timeout: 15_000 })
 })

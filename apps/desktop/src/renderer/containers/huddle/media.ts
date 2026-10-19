@@ -11,14 +11,18 @@
  * - It runs a session only for the attendee `huddle.call` names, and stops
  *   any other.
  * - It tells main what the Huddle menu follows, and runs that menu's commands.
+ * - It plays the join and leave sounds (`huddleSounds`) through the session,
+ *   on the speaker the user picked.
  *
  * The credentials from `huddle.start` go to the session and nowhere else:
  * never log, store or report them.
  */
 import type { HuddleCall, HuddleCredentials, HuddleMediaEnd, HuddleMenu, HuddlePageReport, HuddleRegistration } from '@juno/contract'
-import type { Devices, EndReason, MediaSession, MediaSnapshot } from '@juno/huddle-media'
-import { connectionStateAtom, huddleCallValueAtom, leaveHuddle, onMenuCommand, registry, reportHuddleMedia, showToast, startHuddle } from '@juno/state'
+import { huddleSounds, type Devices, type EndReason, type MediaSession, type MediaSnapshot, type SoundView } from '@juno/huddle-media'
+import { connectionStateAtom, huddleCallValueAtom, leaveHuddle, onMenuCommand, registry, reportHuddleMedia, sessionProfileAtom, showToast, startHuddle } from '@juno/state'
 import { openHuddle } from '../navigation'
+import joinSound from './sounds/huddle-join.wav?url'
+import leaveSound from './sounds/huddle-leave.wav?url'
 import { watchHuddleEnds } from './toasts'
 
 /** Chime's nearest media region, which only the page may look up (research section 1). */
@@ -57,6 +61,7 @@ let ended: HuddlePageReport['ended'] = null
 let seq = 0
 let lastSent = ''
 let lastMenu = ''
+let lastSounds: SoundView = { own: 'out', attendeeId: null, others: null }
 const listeners = new Set<() => void>()
 
 function readPicks(): Picks {
@@ -82,7 +87,7 @@ function load(fake: boolean): Promise<MediaSession> {
         Object.assign(window, { __junoHuddleMedia: created })
         return created as MediaSession
       })
-    : import('@juno/huddle-media/chime').then((module) => module.createChimeMediaSession())
+    : import('@juno/huddle-media/chime').then((module) => module.createChimeMediaSession({ sounds: { join: joinSound, leave: leaveSound } }))
   ).then((created) => {
     session = created
     created.subscribe(onSnapshot)
@@ -113,6 +118,26 @@ function onSnapshot(): void {
   for (const listener of listeners) listener()
   void report()
   sendMenu()
+  playSounds()
+}
+
+/** What the sound rule reads now: the session's own call, and the other people the engine's call names. */
+function soundView(): SoundView {
+  const snapshot = session?.getSnapshot()
+  const state = snapshot?.connection.state
+  if (snapshot === undefined || (state !== 'connecting' && state !== 'connected' && state !== 'reconnecting')) return { own: 'out', attendeeId: null, others: null }
+  const attendeeId = snapshot.local.attendeeId ?? null
+  const call = registry.get(huddleCallValueAtom)
+  const profile = registry.get(sessionProfileAtom)
+  const selfId = profile._tag === 'Success' ? profile.value?.id : undefined
+  const others = call?.phase === 'joined' && call.attendeeId === attendeeId ? [...new Set(call.participants)].filter((id) => id !== selfId) : null
+  return { own: state, attendeeId, others }
+}
+
+function playSounds(): void {
+  const next = soundView()
+  for (const sound of huddleSounds(lastSounds, next)) session?.playSound(sound)
+  lastSounds = next
 }
 
 /** The call the user is in, from Join or Start until they are out, as the bar shows it; else undefined. */
@@ -197,6 +222,7 @@ export function startHuddleMedia(): void {
     (call) => {
       reconcile(call)
       sendMenu()
+      playSounds()
     },
     { immediate: true },
   )
