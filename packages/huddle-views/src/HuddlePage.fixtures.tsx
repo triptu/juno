@@ -75,7 +75,8 @@ export default defineFixtures(
       'window while Maya shares': fixture(page({ people: [you, ...others(3)], shares: [mayaShare], renderShare, renderOwnShare }, { sharing: true, sharingSource: yourWindow })),
       'window while Maya shares, narrow': fixture(page({ people: [you, ...others(3)], shares: [mayaShare], renderShare, renderOwnShare }, { sharing: true, sharingSource: yourWindow }), { width: 600, height: 716 }),
       'stop sharing focus': fixture(page({ people: [you, ...others(2)], renderOwnShare }, { sharing: true, sharingSource: yourWindow }), { ...frame, focus: '[data-share="own"] button' }),
-      'mic blocked': fixture(page({}, { micBlocked: true, muted: true, onOpenMicSettings: noop })),
+      'mic blocked': fixture(page({}, { microphone: 'blocked', muted: true, onOpenMicSettings: noop })),
+      'no microphone': fixture(page({}, { microphone: 'missing', muted: true })),
       devices: fixture(page({ devices: deviceMenu() }, { devicesOpen: true })),
     },
     Connection: {

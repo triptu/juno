@@ -49,11 +49,18 @@ export interface HuddleShare {
 /** What the call is doing. `joining` from the click until media connects; `reconnecting` while the connection is down. */
 export type HuddleConnection = 'joining' | 'live' | 'reconnecting'
 
+/**
+ * Why the user cannot speak. `blocked`: macOS does not let Juno use the
+ * microphone. `missing`: no microphone is connected. `failed`: there is one,
+ * but it would not start.
+ */
+export type MicrophoneProblem = 'blocked' | 'missing' | 'failed'
+
 /** The controls' state, shared by the bar and the tab. */
 export interface HuddleControlsState {
   readonly muted: boolean
-  /** macOS does not let Juno use the microphone: Mute shows the slashed microphone and opens System Settings. */
-  readonly micBlocked?: boolean
+  /** Mute shows the slashed microphone; while `blocked` it opens System Settings, otherwise it is dimmed. */
+  readonly microphone?: MicrophoneProblem
   /** The user is sharing their screen. */
   readonly sharing: boolean
   /** Share screen is offered (phase 4). Absent until then, and no space is kept for it. */

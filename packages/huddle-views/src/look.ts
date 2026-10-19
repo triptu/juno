@@ -4,7 +4,7 @@ import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import type { ReactNode } from 'react'
 import type { ContextTint, PhosphorIcon } from '@juno/ui'
-import type { HuddleConnection, HuddlePlace, HuddlePlaceKind } from './model'
+import type { HuddleConnection, HuddlePlace, HuddlePlaceKind, MicrophoneProblem } from './model'
 
 /** The glyph that says what kind of place it is, as the sidebar's place line draws it. */
 export const placeIcons: Record<HuddlePlaceKind, PhosphorIcon> = {
@@ -41,9 +41,16 @@ export function sharingLine(others: ReadonlyArray<string>, you: boolean): string
   return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]} are sharing`
 }
 
+/** The status line and Mute's tooltip for each microphone problem (SPEC 20, "When things go wrong"). */
+export const microphoneCopy: Record<MicrophoneProblem, { readonly status: string; readonly tooltip: string }> = {
+  blocked: { status: 'Microphone blocked', tooltip: 'Allow the microphone in System Settings' },
+  missing: { status: 'No microphone', tooltip: 'No microphone connected' },
+  failed: { status: 'Microphone unavailable', tooltip: "Couldn't start the microphone" },
+}
+
 export interface StatusInput {
   readonly connection: HuddleConnection
-  readonly micBlocked?: boolean
+  readonly microphone?: MicrophoneProblem | undefined
   /** First names of the others who share. */
   readonly sharers?: ReadonlyArray<string>
   readonly sharing?: boolean
@@ -57,13 +64,13 @@ export interface StatusInput {
 
 /**
  * The one status line the bar and the tab's header show (SPEC 20): the most
- * useful thing first. A connection problem, then a blocked microphone, then
+ * useful thing first. A connection problem, then a microphone problem, then
  * who is sharing, then being alone, then how long the huddle has run.
  */
-export function statusLine({ connection, micBlocked = false, sharers = [], sharing = false, sharingSource, alone = false, duration }: StatusInput): ReactNode {
+export function statusLine({ connection, microphone, sharers = [], sharing = false, sharingSource, alone = false, duration }: StatusInput): ReactNode {
   if (connection === 'joining') return 'Joining…'
   if (connection === 'reconnecting') return 'Reconnecting…'
-  if (micBlocked) return 'Microphone blocked'
+  if (microphone !== undefined) return microphoneCopy[microphone].status
   if (sharing && sharingSource !== undefined) {
     const others = sharingLine(sharers, false)
     return others === undefined ? `You're sharing ${sharingSource}` : `You're sharing ${sharingSource} · ${others}`

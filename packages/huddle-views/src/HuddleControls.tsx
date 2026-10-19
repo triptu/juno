@@ -8,6 +8,7 @@ import type { ReactNode } from 'react'
 import { colors, radii, spacing } from '@juno/tokens/tokens.stylex'
 import { focusRing, Icon, IconButton, Popover, type PhosphorIcon } from '@juno/ui'
 import { islandText } from './islandText'
+import { microphoneCopy } from './look'
 import type { HuddleControlsActions, HuddleControlsState } from './model'
 
 /** Mute and unmute while Juno is the active app (SPEC 20). The app menu owns the accelerator. */
@@ -34,7 +35,7 @@ export interface HuddleControlsProps extends HuddleControlsState, HuddleControls
 export function HuddleControls({
   shape,
   muted,
-  micBlocked = false,
+  microphone,
   sharing,
   canShare = false,
   shareFull = false,
@@ -51,8 +52,10 @@ export function HuddleControls({
     <>
       <span {...stylex.props(styles.group)}>
         <Fills shape={shape}>
-          {micBlocked ? (
-            <IconButton icon={MicrophoneSlash} label="Allow the microphone in System Settings" size={28} iconSize={16} radius={radius} variant="island" onClick={onOpenMicSettings} />
+          {microphone === 'blocked' ? (
+            <IconButton icon={MicrophoneSlash} label={microphoneCopy.blocked.tooltip} size={28} iconSize={16} radius={radius} variant="island" onClick={onOpenMicSettings} />
+          ) : microphone !== undefined ? (
+            <IconButton icon={MicrophoneSlash} label={microphoneCopy[microphone].tooltip} size={28} iconSize={16} radius={radius} variant="island" dimmed />
           ) : (
             <IconButton icon={muted ? MicrophoneSlash : Microphone} label="Mute" shortcut={muteShortcut} size={28} iconSize={16} radius={radius} variant="island" pressed={muted} onClick={onMute} />
           )}
