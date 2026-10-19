@@ -21,9 +21,9 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { loadavg } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { worktreeFolder } from './worktree-folder.mjs'
+import { mainCheckout, worktreeFolder } from './worktree-folder.mjs'
 
 const [command, target, ...rest] = process.argv.slice(2)
 const option = (name) => {
@@ -32,7 +32,7 @@ const option = (name) => {
 }
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] }).trim()
 
-const main = dirname(git('rev-parse', '--path-format=absolute', '--git-common-dir'))
+const main = mainCheckout(process.cwd())
 const folder = worktreeFolder(main)
 
 if (command === 'add' && target) await add(target)

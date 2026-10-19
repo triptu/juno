@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
-import { worktreeFolder } from './worktree-folder.mjs'
+import { mainCheckout, worktreeFolder } from './worktree-folder.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -122,4 +122,14 @@ test('worktrees go on the AgentWork volume when it is mounted, else in .claude/w
   assert.equal(worktreeFolder('/repo/juno', { env: {}, exists: mounted }), '/Volumes/AgentWork/worktrees/juno')
   assert.equal(worktreeFolder('/repo/juno', { env: {}, exists: () => false }), '/repo/juno/.claude/worktrees')
   assert.equal(worktreeFolder('/repo/juno', { env: { JUNO_WORKTREE_DIR: '/tmp/trees' }, exists: mounted }), '/tmp/trees')
+})
+
+test('a linked worktree with another folder name finds the main checkout and its name', (t) => {
+  const f = fixture(t)
+  const linked = resolve(f.dir, '.claude/worktrees/t3-1234')
+  f.git(['worktree', 'add', '-b', 'linked', linked, 'main'])
+  const main = realpathSync(f.dir)
+  assert.equal(realpathSync(mainCheckout(linked)), main)
+  const mounted = (path) => path === '/Volumes/AgentWork/.fseventsd/no_log'
+  assert.equal(worktreeFolder(mainCheckout(linked), { env: {}, exists: mounted }), worktreeFolder(mainCheckout(f.dir), { env: {}, exists: mounted }))
 })

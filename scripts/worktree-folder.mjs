@@ -8,15 +8,25 @@
 //
 // See docs/development.md, "Worktrees and installs".
 
+import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { basename, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 
 export const AGENT_WORK = '/Volumes/AgentWork'
 
 /** The AgentWork volume's path when it is mounted, else undefined. */
 export function agentWork({ exists = existsSync } = {}) {
   return exists(join(AGENT_WORK, '.fseventsd/no_log')) ? AGENT_WORK : undefined
+}
+
+/**
+ * The main checkout of the repository that `checkout` belongs to. A linked
+ * worktree's own folder name (such as t3-1234) is not the repository's name.
+ */
+export function mainCheckout(checkout) {
+  const common = execFileSync('git', ['-C', checkout, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8' }).trim()
+  return dirname(common)
 }
 
 /** The folder that holds the worktrees of the repository whose main checkout is `main`. */

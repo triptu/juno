@@ -9,7 +9,7 @@ import { compareVersions, normalizeVersion } from '../apps/desktop/src/main/rele
 import { git, isAncestor, printGate, readRecords, releaseGate, statusFolder } from './release-gate.mjs'
 import { releaseDue, releaseNotes, selectCommit } from './release-schedule.mjs'
 import { syncReleasedVersion } from './release-main.mjs'
-import { worktreeFolder } from './worktree-folder.mjs'
+import { mainCheckout, worktreeFolder } from './worktree-folder.mjs'
 
 const root = resolve(import.meta.dirname, '..')
 const { values } = parseArgs({ options: { 'dry-run': { type: 'boolean', default: false }, repo: { type: 'string', default: 'triptu/juno-releases' } } })
@@ -76,8 +76,7 @@ function previousCommit(tag) {
 
 function publish(candidate, version, notes) {
   const name = `scheduled-release-${version}`
-  const main = resolve(root, git(root, 'rev-parse', '--git-common-dir'), '..')
-  const checkout = join(worktreeFolder(main), name)
+  const checkout = join(worktreeFolder(mainCheckout(root)), name)
   const notesFile = join(status, `${name}-notes.md`)
   writeFileSync(notesFile, notes)
   // Keep a failed checkout for inspection. Never silently resume a partial publish.

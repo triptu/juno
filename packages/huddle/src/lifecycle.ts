@@ -118,13 +118,13 @@ export const choose = (s: Lifecycle, intent: Intent): Lifecycle => ({
   ended: undefined,
 })
 
-/** Model `leave`. */
-export const leave = (s: Lifecycle): Lifecycle => ({
+/** Model `leave`. `alone`: Juno left after 10 minutes with nobody else in the call (`alone.ts`). */
+export const leave = (s: Lifecycle, reason: 'left' | 'alone' = 'left'): Lifecycle => ({
   ...s,
   wanted: undefined,
   current: undefined,
   cancel: s.request !== undefined,
-  ended: endedBy(s, 'left'),
+  ended: endedBy(s, reason),
 })
 
 /**

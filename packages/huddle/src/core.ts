@@ -19,10 +19,11 @@
  * scope, not the caller's fiber, so its answer is handled even after a
  * Leave or while the session closes.
  */
-import { Deferred, Effect, Fiber, Queue, Result, Semaphore, SubscriptionRef, type Scope } from 'effect'
+import { Clock, Deferred, Effect, Fiber, Queue, Result, Semaphore, SubscriptionRef, type Scope } from 'effect'
 import { Offline, Rejected, type HuddleCall, type HuddleError, type HuddlePageReport, type HuddleStartResult, type RunningHuddles } from '@juno/contract'
 import type { SlackApiError } from '@juno/slack'
 import type { MethodOk } from '@juno/slack-schema'
+import { aloneNow, leaveAt, type Alone } from './alone'
 import type { HuddleSession } from './Huddle'
 import { failureOf } from './failure'
 import * as L from './lifecycle'
@@ -94,6 +95,8 @@ export interface Core {
   readonly runningRef: SubscriptionRef.SubscriptionRef<RunningHuddles>
   /** The "In a huddle" status kept for the live call's attendee, if any. */
   status: { readonly attendeeId: string; readonly fiber: Fiber.Fiber<never> } | undefined
+  /** The user alone in the live call, and the timer that leaves it (`alone.ts`). */
+  alone: { readonly since: Alone; readonly fiber: Fiber.Fiber<void> } | undefined
 }
 
 /** The pages' current state, for the rules. */
@@ -134,12 +137,43 @@ export const makeCore = Effect.gen(function* () {
     callRef: yield* SubscriptionRef.make(toCall(L.initial, noMedia, new Map())),
     runningRef: yield* SubscriptionRef.make<RunningHuddles>({}),
     status: undefined,
+    alone: undefined,
   }
   return core
 })
 
+/**
+ * Leaves the call after the user has been alone in it for 10 minutes. Anyone joining, or the call ending or
+ * changing, stops the timer, and it starts again the next time the user is alone. `publish` runs it, since
+ * it follows every change of the call and of who is in it. Never waits.
+ */
+const followAlone = (core: Core, to: Attached | undefined) =>
+  Effect.gen(function* () {
+    const now = yield* Clock.currentTimeMillis
+    const current = core.s.current?.identity
+    const connection = L.currentMedia(core.s, view(core))?.connection
+    const next = aloneNow(core.alone?.since, {
+      attendeeId: current?.attendeeId,
+      live: connection === 'connected' || connection === 'reconnecting',
+      participants: current === undefined ? [] : core.running.get(current.channelId)?.participants ?? [],
+    }, now)
+    if (core.alone?.since === next) return
+    const before = core.alone
+    core.alone = undefined
+    if (before !== undefined) yield* Effect.forkDetach(Fiber.interrupt(before.fiber))
+    if (next === undefined || to === undefined) return
+    const due = Effect.sleep(leaveAt(next, to.session.aloneLeaveMillis) - now).pipe(Effect.andThen(step(core, Effect.sync(() => {
+      if (core.alone?.since !== next) return
+      core.alone = undefined
+      core.s = L.leave(core.s, 'alone')
+    }))))
+    core.alone = { since: next, fiber: yield* Effect.forkIn(due, to.work) }
+  })
+
+/** Sends the call and the running huddles to subscribers. Under the lock. */
 export const publish = (core: Core) =>
-  Effect.suspend(() => SubscriptionRef.set(core.callRef, toCall(core.s, view(core), core.running))).pipe(
+  followAlone(core, core.attached).pipe(
+    Effect.andThen(Effect.suspend(() => SubscriptionRef.set(core.callRef, toCall(core.s, view(core), core.running)))),
     Effect.andThen(Effect.suspend(() => SubscriptionRef.set(core.runningRef, toRunningHuddles(core.running)))),
   )
 

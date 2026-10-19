@@ -103,6 +103,7 @@ export const HuddleSessions = Layer.effectDiscard(Effect.gen(function* () {
     const listener = yield* huddle.attach({
       workspace: open.id,
       statusRenewMillis: timing.huddleStatusRenewMillis,
+      aloneLeaveMillis: timing.huddleAloneMillis,
       slack: context,
       leaves: {
         read: readRecords.pipe(
