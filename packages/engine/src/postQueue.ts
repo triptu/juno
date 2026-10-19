@@ -11,7 +11,7 @@
  */
 import { Context, Effect, Layer, Queue } from 'effect'
 import { composeOutgoing } from '@juno/richtext'
-import { queuePost, type PendingFile } from '@juno/sync'
+import { queuePost, type PendingFile, type PendingShare } from '@juno/sync'
 
 export class PostQueue extends Context.Service<
   PostQueue,
@@ -42,6 +42,8 @@ export const queueText = (post: {
   readonly threadTs: string | undefined
   readonly text: string
   readonly files?: ReadonlyArray<PendingFile>
+  /** A forward's source (`send/forward.ts`); the text is its note. */
+  readonly share?: PendingShare
   readonly createdAt: number
 }) => {
   const empty = post.text.trim() === ''

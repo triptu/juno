@@ -55,6 +55,7 @@ export {
   retryPost,
   type PendingFile,
   type PendingPost,
+  type PendingShare,
 } from './posts'
 export { type Acted } from './events'
 export {

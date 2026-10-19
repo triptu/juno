@@ -30,6 +30,7 @@ import reviewKeeps from './202610181900_review_keeps'
 import keptSuggestions from './202610182100_kept_suggestions'
 import noAiTitleVersion from './202610182200_no_ai_title_version'
 import agentApprovals from './202610182230_agent_approvals'
+import forwards from './202610191200_forwards'
 
 /**
  * Migrations for `user.db`, keyed `<timestamp>_<name>`. Add a file per change
@@ -67,4 +68,5 @@ export const userMigrations: Record<string, Effect.Effect<void, unknown, SqlClie
   '202610182100_kept_suggestions': keptSuggestions,
   '202610182200_no_ai_title_version': noAiTitleVersion,
   '202610182230_agent_approvals': agentApprovals,
+  '202610191200_forwards': forwards,
 }

@@ -242,7 +242,7 @@ module outboxProtocol {
   }
   // An ambiguous failure is observable only after Slack has decided the
   // request. It cannot still be in transit when an absent lookup permits resend.
-  // An accepted `files.share` answers without the message, which is this
+  // An accepted `files.share` or `chat.shareMessage` (a forward) answers without the message, which is this
   // action from `accepted`: the row waits for the echo or a lookup.
   action lostWith(k: int, guard: bool): bool = all {
     not(s.sealed) or s.request.get(k) == "dropped",

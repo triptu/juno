@@ -136,6 +136,7 @@ export {
   saveDraft,
   sendMessage,
 } from './send'
+export { forwardMessage, forwardSheetAtom, type ForwardSheetState } from './forward'
 export { errorOf } from './result'
 export {
   aiAssistOnAtom,

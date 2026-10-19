@@ -40,7 +40,6 @@ export interface SendInput {
 
 export const sendMessage = (input: SendInput): Effect.Effect<SendResult, SendError, Outbox | Workspace | Staging | SyncLink> =>
   Effect.gen(function* () {
-    const outbox = yield* Outbox
     const workspace = yield* Workspace
     const staging = yield* Staging
     const { to } = input
@@ -49,17 +48,7 @@ export const sendMessage = (input: SendInput): Effect.Effect<SendResult, SendErr
     if (fileIds.length > MAX_FILES_PER_MESSAGE) return yield* new Rejected({ code: 'too_many_files' })
     const open = yield* workspace.current
     if (open === undefined) return yield* new NotSignedIn()
-    let channel: string
-    if (to.kind === 'person') {
-      const fetcher = yield* (yield* SyncLink).fetcher
-      if (fetcher === undefined) return yield* new NotSignedIn()
-      const opened = (yield* outbox.send((api) => api.call('conversations.open', { users: to.userId, return_im: true }))).channel
-      // A store failure is a bug, not a state the user can act on (architecture 2.6).
-      yield* fetcher.opened(opened).pipe(Effect.orDie)
-      channel = opened.id
-    } else {
-      channel = to.channelId
-    }
+    const channel = yield* conversationOf(to)
     const threadTs = to.kind === 'channel' ? to.threadTs : undefined
     // Taken last, after the DM is open: a failed send leaves the chips as they were.
     const files = fileIds.length === 0 ? [] : yield* staging.take(fileIds)
@@ -79,6 +68,22 @@ export const sendMessage = (input: SendInput): Effect.Effect<SendResult, SendErr
       }),
     ).pipe(Effect.provide(open.context), Effect.orDie)
     return { topicId }
+  })
+
+/**
+ * The conversation a message to `to` goes to. A person with no DM yet gets
+ * one: `conversations.open`, stored as the socket's `im_created` would
+ * store it. That needs Slack, and a failure fails the command.
+ */
+export const conversationOf = (to: SendTarget): Effect.Effect<string, SendError, Outbox | SyncLink> =>
+  Effect.gen(function* () {
+    if (to.kind === 'channel') return to.channelId
+    const fetcher = yield* (yield* SyncLink).fetcher
+    if (fetcher === undefined) return yield* new NotSignedIn()
+    const opened = (yield* (yield* Outbox).send((api) => api.call('conversations.open', { users: to.userId, return_im: true }))).channel
+    // A store failure is a bug, not a state the user can act on (architecture 2.6).
+    yield* fetcher.opened(opened).pipe(Effect.orDie)
+    return opened.id
   })
 
 const onFailedRow =
