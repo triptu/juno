@@ -47,4 +47,4 @@ Check the failing run's commit before diagnosing a new startup regression. Workt
 
 ## Heavy tests
 
-A test that is slow because of what it checks, and whose code rarely changes, is tagged `@heavy` and its area's tag: `test('...', { tag: ['@heavy', '@heavy-sync'] }, async () => ...)`. `HEAVY_AREAS` in `scripts/test-areas.mjs` lists the areas and the files each covers; add a file there when a heavy test starts to cover it. `pnpm affected` skips an area's heavy tests unless the change is in that area, by setting `JUNO_SKIP_TAGS`; the scheduled full run and a run by hand keep them. See `docs/development.md`, "Affected tests".
+A test that is slow because of what it checks, and whose code rarely changes, is tagged `@heavy` and its area's tag: `test('...', { tag: ['@heavy', '@heavy-sync'] }, async () => ...)`. `HEAVY_AREAS` in `scripts/test-areas.mjs` lists the areas and the files each covers; add a file there when a heavy test starts to cover it. `pnpm affected` skips an area's heavy tests unless the change is in that area, by setting `JUNO_SKIP_TAGS`; a full run (`pnpm verify:main`) and a run by hand keep them. See `docs/development.md`, "Affected tests".
