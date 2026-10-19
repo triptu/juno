@@ -32,6 +32,7 @@ import { JunoPanel, loadJuno } from './juno/lazy'
 import { useNotificationBridge, WhyLayer } from './notificationBridge'
 import { closeTabById, loadAllTopicsPage, moveTabTo, openNewTab, runMenuCommand, showTabMenu, stepTabHistory, switchToTab } from './navigation'
 import { runUndoCommand } from './topicActions'
+import { focusPage, forcePageFocus, takeForcedPageFocus } from './pageFocus'
 import { loadSettingsTab, tabKindOf } from './tabKinds'
 import { TitlebarNav } from './TitlebarNav'
 
@@ -64,7 +65,7 @@ const activeTopicOf = (state: Tabs): string | undefined => {
 }
 
 function selectTab(id: string, event: ActivateEvent): void {
-  if (event.source === 'pointer') pressed = id
+  if (event.source === 'pointer') forcePageFocus(id)
   if (registry.get(tabsAtom).active === id) restoreFocus(id)
   else switchToTab(id)
 }
@@ -95,23 +96,22 @@ function onFocusIn(event: FocusEvent): void {
   if (active !== undefined) lastFocus.set(active, new WeakRef(target))
 }
 
-/** A tab the pointer pressed: its page takes focus once it shows, wherever focus was. */
-let pressed: string | undefined
-
 /**
  * A tab that shows gets back the focus it had, or else its composer. A
- * press on its tab always gives the page focus, as Safari does; a keyboard
- * switch does when it left focus nowhere (⌃Tab while focus was in the page
- * that hid). Focus on a tab in the strip, moved there by the keyboard, stays.
+ * press on its tab, or an open of a topic it shows, always gives the page
+ * focus, as Safari does; a keyboard switch does when it left focus nowhere
+ * (⌃Tab while focus was in the page that hid). Focus on a tab in the strip,
+ * moved there by the keyboard, stays.
  */
 function restoreFocus(tabId: string): void {
-  const force = pressed === tabId
-  pressed = undefined
+  const force = takeForcedPageFocus(tabId)
   const focused = document.activeElement
   if (!force && focused instanceof HTMLElement && focused !== document.body && focused.checkVisibility()) return
   const kept = lastFocus.get(tabId)?.deref()
   const element = kept !== undefined && kept.isConnected && kept.checkVisibility() ? kept : pageComposer()
-  element?.focus({ preventScroll: true })
+  if (element === undefined) return
+  if (force) focusPage(element)
+  else element.focus({ preventScroll: true })
 }
 
 /** The composer of the page on screen, if it has one. */

@@ -21,6 +21,8 @@ export interface TopicComposerProps {
   readonly onSent: () => void
   /** Focus and Quote, for the topic; set once the draft has loaded. */
   readonly handle?: Ref<ComposerHandle>
+  /** Called with the field once the draft has loaded; a topic just opened focuses it. */
+  readonly takeFocus?: (field: HTMLTextAreaElement) => void
   /** ↑ in the empty field: the topic selects its newest message. */
   readonly onArrowUpEmpty?: () => void
   /** Files are being dragged over the topic. */
@@ -64,11 +66,11 @@ export function withQuote(draft: string, text: string): string {
  * shows as sending at once and the engine posts it when the file is ready,
  * or shows it as not sent when the file could not be read.
  */
-export function TopicComposer({ detail, onSent, handle, onArrowUpEmpty, dropping }: TopicComposerProps) {
+export function TopicComposer({ detail, onSent, handle, takeFocus, onArrowUpEmpty, dropping }: TopicComposerProps) {
   const stored = useAtomValue(draftAtom(detail.id))
   const placeholder = detail.kind === 'main' ? `Message ${detail.channel.label}` : 'Reply'
   if (stored._tag !== 'Success') return <ComposerSlot placeholder={placeholder} />
-  return <LoadedComposer detail={detail} initial={stored.value} latest={stored.value} placeholder={placeholder} onSent={onSent} handle={handle} onArrowUpEmpty={onArrowUpEmpty} dropping={dropping} />
+  return <LoadedComposer detail={detail} initial={stored.value} latest={stored.value} placeholder={placeholder} onSent={onSent} handle={handle} takeFocus={takeFocus} onArrowUpEmpty={onArrowUpEmpty} dropping={dropping} />
 }
 
 function LoadedComposer({
@@ -78,6 +80,7 @@ function LoadedComposer({
   placeholder,
   onSent,
   handle,
+  takeFocus,
   onArrowUpEmpty,
   dropping = false,
 }: TopicComposerProps & { readonly initial: string; readonly latest: string; readonly placeholder: string }) {
@@ -101,6 +104,12 @@ function LoadedComposer({
   // The check Enter started; an edit or a newer Enter replaces it, and its answer is dropped.
   const checking = useRef<object | undefined>(undefined)
   const [waiting, setWaiting] = useState(false)
+  // A topic just opened: the field takes focus as soon as it is drawn.
+  useLayoutEffect(() => {
+    if (field.current !== null) takeFocus?.(field.current)
+    // Mounted once per topic; `takeFocus` is called only then.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   // A quote just went in: the caret goes after it once it is drawn.
   const [quotedAt, setQuotedAt] = useState(0)
   useLayoutEffect(() => {

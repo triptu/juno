@@ -6,6 +6,7 @@ import { hueFor, MessageList, NewMessagesPill, TopicView as TopicViewFrame, type
 import { closeTabById, openTopic, warmTopic } from './navigation'
 import { useMessageActions, type ComposerHandle, type MessageActionsOutput } from './messageActions'
 import { showPersonMenu } from './notifyActions'
+import { takeComposerFocus } from './pageFocus'
 import { scopeToChannel, showChannelMenu } from './placeMenus'
 import { messageLinkInfo, openMessageLink } from './slackLinks'
 import { attach } from './attachments'
@@ -221,7 +222,7 @@ function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps)
     <TopicViewFrame
       header={header}
       pill={pill.show ? <NewMessagesPill count={pill.count} onJump={jump} /> : undefined}
-      composer={<TopicComposer key={id} detail={id === detail.id ? detail : { ...detail, id }} onSent={sent} handle={composer} onArrowUpEmpty={messageActions.selectNewest} dropping={files.dropping} />}
+      composer={<TopicComposer key={id} detail={id === detail.id ? detail : { ...detail, id }} onSent={sent} handle={composer} takeFocus={(field) => takeComposerFocus(view, field)} onArrowUpEmpty={messageActions.selectNewest} dropping={files.dropping} />}
       floating={<>{messageActions.floating}{files.viewer}</>}
       onFiles={(dropped) => attach(id, dropped)}
       onDragFiles={files.setDropping}

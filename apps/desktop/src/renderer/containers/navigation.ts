@@ -102,6 +102,7 @@ import { junoViewReady } from '@juno/state/agent'
 import type { SettingsSection } from '@juno/contract'
 import { afterPaint, measure } from '@juno/state/perf'
 import { chunk } from './chunks'
+import { forcePageFocus, wantComposerFocus } from './pageFocus'
 import { toggleSidebar } from './layout'
 import { paletteTakesTabNumber } from './paletteActions'
 import { togglePrivacy } from './privacy'
@@ -158,6 +159,13 @@ function apply(change: (tabs: Tabs) => Tabs): Tabs {
   const next = updateTabs(registry, change)
   registry.set(selectedTopicAtom, activeTopic(next))
   traceSend('tabs applied', () => ({ active: next.active, topic: activeTopic(next) }))
+  return next
+}
+
+/** A topic now on screen in the active tab focuses its composer once it loads, so typing can start at once. */
+function withComposerFocus(next: Tabs): Tabs {
+  const view = activeView(next)
+  if (view !== undefined) wantComposerFocus(view)
   return next
 }
 
@@ -344,13 +352,13 @@ function openTopicFresh(id: string, options: OpenOptions, target: string | undef
   if (options.newTab === true) tickWelcome(registry, 'tab')
   const showing = options.newTab === true ? undefined : tabShowing(registry.get(tabsAtom), id)
   if (showing !== undefined) {
-    switchToTab(showing.id)
+    focusTab(showing.id)
     return
   }
   // A fresh open starts at the divider or the bottom (or `snapshot`), not where it was left: `landFresh`.
   // A new tab does not replace the current one, so a later open in the current tab does not cancel it.
   show(
-    (tabs) => openPlace(tabs, topicPlace(id), options),
+    (tabs) => withComposerFocus(openPlace(tabs, topicPlace(id), options)),
     { id, fresh: true, name: 'juno.topic-open', ...(target === undefined ? {} : { target }), ...(snapshot === undefined ? {} : { snapshot }) },
     options.newTab !== true,
   )
@@ -522,7 +530,7 @@ export function openTopicAt(id: string, ts: string, options: OpenOptions & { rea
     const view = topicView(place.kind === 'topic' ? place.viewId ?? id : id, showing.id)
     const list = registry.get(messageListAtom(view))
     if (list.ready && !list.order.includes(ts)) registry.set(messageWindowSpecAtom(view), { anchor: ts, before: MESSAGE_WINDOW_BEFORE, limit: MESSAGE_WINDOW_DEFAULT })
-    return switchToTab(showing.id)
+    return focusTab(showing.id)
   }
   openTopicFresh(id, options.newTab === true ? { newTab: true } : {}, ts, { anchorKey: ts, offset: MESSAGE_TOP })
 }
@@ -643,6 +651,12 @@ export function switchToTab(tabId: string): void {
   show((current) => activateTab(current, tabId), topic)
 }
 
+/** An open of a place another tab shows: that tab, with its page focused as a press on the tab would. */
+function focusTab(tabId: string): void {
+  if (registry.get(tabsAtom).active !== tabId) forcePageFocus(tabId)
+  switchToTab(tabId)
+}
+
 /** Back (-1) or Forward (1) in the active tab. The topic comes back where it was left. */
 export function stepTabHistory(step: 1 | -1): void {
   const tabs = registry.get(tabsAtom)
@@ -658,7 +672,7 @@ export function goToTabEntry(index: number): void {
   const place = tab?.history.entries[index]
   if (tab === undefined || place === undefined || index === tab.history.index) return
   const topic = place.kind === 'topic' ? { id: place.topicId, view: topicView(place.viewId ?? place.topicId, tab.id), fresh: false, name: 'juno.topic-open' as const } : undefined
-  show((current) => goToEntry(current, index), topic)
+  show((current) => withComposerFocus(goToEntry(current, index)), topic)
 }
 
 /**
