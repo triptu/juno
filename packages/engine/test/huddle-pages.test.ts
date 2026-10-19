@@ -3,6 +3,7 @@
 // pages live, and the engine computes from both whether media may run.
 import { copyFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { expect, it } from 'vitest'
 import { huddleStart } from '@juno/contract'
 import { runCommand } from '@juno/state'
@@ -110,4 +111,38 @@ it('drops a Start from a page that died before main listed it', async () => {
   const outcome = await Promise.race([starting.then(valueOf), sleep(5_000).then(() => 'still waiting' as const)])
   expect(outcome).toEqual({ _tag: 'cancelled' })
   expect(joins(engine)).toHaveLength(0)
+})
+
+/** Restarts with an inactive workspace `T0BROKEN` whose user.db `prepare` leaves as it likes. */
+const restartWithBroken = async (prepare: (dir: string, source: string) => void) => {
+  const engine = await booted()
+  const dir = join(engine.userData, 'workspaces', 'T0BROKEN')
+  return watchHuddles(await restart(track, engine, () => {
+    mkdirSync(dir, { recursive: true })
+    prepare(dir, join(engine.userData, 'workspaces', engine.fake.teamId, 'user.db'))
+  }))
+}
+
+const joinsPromptly = async (next: Awaited<ReturnType<typeof restartWithBroken>>) => {
+  pagesLive(next, PAGE)
+  const outcome = await Promise.race([start(next, 'C0ENG').then(valueOf), sleep(10_000).then(() => 'still waiting' as const)])
+  expect(outcome).toMatchObject({ _tag: 'joined' })
+}
+
+it('joins when an inactive workspace’s user.db has no prefs table yet', async () => {
+  const next = await restartWithBroken((dir) => {
+    // As after a crash before the first migration.
+    const db = new DatabaseSync(join(dir, 'user.db'))
+    db.exec('CREATE TABLE unrelated (x INTEGER)')
+    db.close()
+  })
+  await joinsPromptly(next)
+})
+
+it('joins when an inactive workspace’s stored leaves are unreadable, leaving that workspace out', async () => {
+  const next = await restartWithBroken((dir, source) => {
+    copyFileSync(source, join(dir, 'user.db'))
+    writeStoredLeaves(join(dir, '..', '..'), 'T0BROKEN', 'not json {')
+  })
+  await joinsPromptly(next)
 })
