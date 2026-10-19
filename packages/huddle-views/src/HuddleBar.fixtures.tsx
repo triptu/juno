@@ -36,7 +36,8 @@ export default defineFixtures(
     },
     You: {
       muted: fixture(bar({ muted: true })),
-      'mic blocked': fixture(bar({ micBlocked: true, muted: true, onOpenMicSettings: noop })),
+      'mic blocked': fixture(bar({ microphone: 'blocked', muted: true, onOpenMicSettings: noop })),
+      'no microphone': fixture(bar({ microphone: 'missing', muted: true })),
       'sharing a screen': fixture(bar({ sharing: true, sharingSource: 'Built-in display' })),
       'sharing a window': fixture(bar({ sharing: true, sharingSource: 'Q4 roadmap — Docs' })),
     },

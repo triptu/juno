@@ -231,7 +231,7 @@ test('once the engine stops for good, quitting in a huddle does not ask', async 
   await closed
 })
 
-test('while macOS blocks the microphone, Mute says so and opens System Settings', async ({ juno, fake, win, app }) => {
+test('while macOS blocks the microphone, Mute says so and opens System Settings; with no microphone it only says so', async ({ juno, fake, win, app }) => {
   await openEngMain(juno)
   await win.getByRole('button', { name: 'Start huddle' }).click()
   const bar = win.getByRole('region', { name: 'Huddle' })
@@ -261,6 +261,16 @@ test('while macOS blocks the microphone, Mute says so and opens System Settings'
   await expect(mute).toHaveAttribute('aria-pressed', 'true')
   await mute.click()
   await expect.poll(() => localMuted(win)).toBe(false)
+
+  // The microphone is unplugged and none is left: that is not a block, and System Settings cannot help.
+  await microphoneAccess(win, 'unavailable')
+  await expect(bar).toContainText('No microphone')
+  await expect(bar).not.toContainText('Microphone blocked')
+  expect(await localMuted(win)).toBe(true)
+  const missing = bar.getByRole('button', { name: 'No microphone connected' })
+  await expect(missing).toHaveAttribute('aria-disabled', 'true')
+  await expect(bar.getByRole('button', { name: 'Allow the microphone in System Settings' })).toHaveCount(0)
+  await expect(controls.getByRole('button', { name: 'No microphone connected' })).toBeVisible()
 
   const attendeeId = await attendee(win)
   await bar.getByRole('button', { name: 'Leave' }).click()

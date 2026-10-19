@@ -41,7 +41,7 @@ export interface HuddleBarProps extends HuddleControlsState, HuddleControlsActio
 export function HuddleBar({ place, connection, duration, people, sharers = [], sharingSource, onOpen, devices, announcement, ...controls }: HuddleBarProps) {
   // While the user shares, the bar names only what they share: with the others too it would push out the place's name.
   const others = controls.sharing && sharingSource !== undefined ? [] : sharers
-  const status = statusLine({ connection, micBlocked: controls.micBlocked ?? false, sharers: others, sharing: controls.sharing, ...(sharingSource === undefined ? {} : { sharingSource }), duration })
+  const status = statusLine({ connection, microphone: controls.microphone, sharers: others, sharing: controls.sharing, ...(sharingSource === undefined ? {} : { sharingSource }), duration })
   // A notice keeps its share of the room; the duration gives way first.
   const notice = status !== duration
   return (
@@ -157,7 +157,7 @@ const styles = stylex.create({
     flexShrink: 4,
     minWidth: 0,
   },
-  // While the status line is a notice (Reconnecting…, Microphone blocked, who shares), it shortens with the name, by their widths.
+  // While the status line is a notice (Reconnecting…, a microphone problem, who shares), it shortens with the name, by their widths.
   keeping: { flexShrink: 1 },
   // Heard, not seen: what changed, never the ticking duration.
   announce: {

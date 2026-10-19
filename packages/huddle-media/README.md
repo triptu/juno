@@ -36,7 +36,7 @@ The snapshot (`src/types.ts` has the comments):
 - `remotes`: everyone else in join order, each with `attendeeId`, `externalUserId`, `userId` (the Slack user id parsed from `T…-R…-U…`, research section 6), `muted` and `speaking`.
 - `activeSpeaker`: the attendee id of the loudest person speaking, local or remote.
 - `devices`: microphones and speakers, the system devices' names, the user's picks and the devices in use. A pick that is unplugged stays the pick; the system's device plays until it is back.
-- `microphoneAccess`: `unknown`, `prompt`, `granted`, `denied` or `unavailable` (no microphone).
+- `microphoneAccess`: `unknown`, `prompt`, `granted`, `denied` (macOS or the page refuses it), `unavailable` (no microphone: Chime's `NotFoundError`, or Chromium lists no audio input at all) or `failed` (there is one, but it would not start). `src/chime/microphone.ts` has the rule.
 - `noiseSuppression`: `on`, `off` or `unsupported`.
 - Phase 4, screen share: `shares` (someone else's share: its `#content` attendee and the owner's user id) and `localShare` (always `undefined` for now). The Chime session fills `shares` from presence, so the bar can say who is sharing, but it receives no video yet.
 
@@ -58,7 +58,7 @@ The snapshot (`src/types.ts` has the comments):
 - Audio only: `NoVideoDownlinkBandwidthPolicy`, so a camera someone turns on in Slack is never received.
 - `reconnectTimeoutMs` is 30 s, so a dropped connection ends as `connection-lost` after SPEC 20's 30 seconds. A first connection that never succeeds ends as `failed`.
 - Chime's logger is off: its lines carry urls and join tokens.
-- **Microphone.** When it cannot start (access off, no device), the call goes on with a silent input and muted, so the user can listen. Unmuting is refused until access is back, and the user stays muted then (SPEC 20). A permission change or `listDevices()` tries again.
+- **Microphone.** When it cannot start (access off, no device, or it fails), the call goes on with a silent input and muted, so the user can listen. Unmuting is refused until access is back, and the user stays muted then (SPEC 20). A permission change or `listDevices()` tries again.
 - **Voice Focus.** On by default. `join` checks support first; when supported, the device controller runs Web Audio and the model loads after the call starts, then the microphone is restarted through it. When it is unsupported or fails to load (for example a CSP that blocks `*.sdkassets.chime.aws`), the call goes on without it and `noiseSuppression` reads `unsupported`.
 - Slack also rewrites TURN UDP port 3478 to 22466 (research section 1). Juno does not; the spike connected without it.
 

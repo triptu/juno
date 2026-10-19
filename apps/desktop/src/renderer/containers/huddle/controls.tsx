@@ -3,8 +3,8 @@
  * device menu and the ticking duration.
  */
 import { useEffect, useState, type ReactNode } from 'react'
-import type { MediaSnapshot } from '@juno/huddle-media'
-import { HuddleDeviceMenu, systemDevice, type HuddleControlsActions, type HuddleControlsState } from '@juno/huddle-views'
+import type { MediaSnapshot, MicrophoneAccess } from '@juno/huddle-media'
+import { HuddleDeviceMenu, systemDevice, type HuddleControlsActions, type HuddleControlsState, type MicrophoneProblem } from '@juno/huddle-views'
 import { chooseMicrophone, chooseSpeaker, leaveCurrentHuddle, openMicrophoneSettings, refreshDevices, setNoiseSuppression, toggleHuddleMuted } from './media'
 
 export interface Controls extends HuddleControlsState, HuddleControlsActions {
@@ -14,10 +14,10 @@ export interface Controls extends HuddleControlsState, HuddleControlsActions {
 /** The controls for the call, with the device menu open or closed locally. */
 export function useHuddleControls(media: MediaSnapshot | undefined): Controls {
   const [devicesOpen, setDevicesOpen] = useState(false)
-  const micBlocked = media?.microphoneAccess === 'denied' || media?.microphoneAccess === 'unavailable'
+  const microphone = media === undefined ? undefined : microphoneProblems[media.microphoneAccess]
   return {
     muted: media?.local.muted ?? false,
-    ...(micBlocked ? { micBlocked: true } : {}),
+    ...(microphone === undefined ? {} : { microphone }),
     sharing: false,
     devicesOpen,
     onMute: toggleHuddleMuted,
@@ -29,6 +29,15 @@ export function useHuddleControls(media: MediaSnapshot | undefined): Controls {
     onLeave: leaveCurrentHuddle,
     devices: devicesOpen && media !== undefined ? <DeviceMenu media={media} /> : null,
   }
+}
+
+const microphoneProblems: Record<MicrophoneAccess, MicrophoneProblem | undefined> = {
+  unknown: undefined,
+  prompt: undefined,
+  granted: undefined,
+  denied: 'blocked',
+  unavailable: 'missing',
+  failed: 'failed',
 }
 
 function DeviceMenu({ media }: { readonly media: MediaSnapshot }) {

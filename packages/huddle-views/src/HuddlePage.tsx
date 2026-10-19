@@ -78,7 +78,7 @@ export function HuddlePage({ place, state, people, shares = [], renderShare, ren
     state.kind === 'in'
       ? statusLine({
           connection: state.connection,
-          micBlocked: state.micBlocked ?? false,
+          microphone: state.microphone,
           sharers: shares.map((share) => share.ownerName),
           sharing: state.sharing,
           ...(state.sharingSource === undefined ? {} : { sharingSource: state.sharingSource.name }),
