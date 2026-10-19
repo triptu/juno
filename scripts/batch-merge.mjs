@@ -3,10 +3,11 @@ import { spawnSync } from 'node:child_process'
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { worktreeFolder } from './worktree-folder.mjs'
+import { mainCheckout, worktreeFolder } from './worktree-folder.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const directory = resolve(root, '.juno-status/batches')
+const trees = () => worktreeFolder(mainCheckout(root))
 const generated = ['health-baseline.json', 'docs/decision-log.md']
 const argv = process.argv.slice(2)
 const push = argv.includes('--push')
@@ -100,10 +101,10 @@ function create(branches) {
   const base = git(root, 'rev-parse', '--verify', 'refs/remotes/origin/main^{commit}')
   const refs = new Set(git(root, 'for-each-ref', '--format=%(refname:short)', 'refs/heads/batch-*').split('\n'))
   let n = 1
-  while (refs.has(`batch-${n}`) || existsSync(resolve(directory, `batch-${n}.json`)) || existsSync(resolve(worktreeFolder(root), `batch-${n}`))) n++
+  while (refs.has(`batch-${n}`) || existsSync(resolve(directory, `batch-${n}.json`)) || existsSync(resolve(trees(), `batch-${n}`))) n++
   const name = `batch-${n}`
   statePath = resolve(directory, `${name}.json`)
-  state = { name, base, branches: pinned, next: 0, pending: false, dryRun, worktree: resolve(worktreeFolder(root), name) }
+  state = { name, base, branches: pinned, next: 0, pending: false, dryRun, worktree: resolve(trees(), name) }
   git(root, 'worktree', 'add', '-b', name, state.worktree, base)
   save()
 }
