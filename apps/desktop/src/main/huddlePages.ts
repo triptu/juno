@@ -46,7 +46,7 @@ export function watchHuddlePages(supervisor: Pick<EngineSupervisor, 'send' | 'on
     /** A page's media service registered `generation`. A newer page of the same contents replaces the one before, which is gone by then. */
     register(contentsId: number, generation: string): void {
       live.set(contentsId, generation)
-      // Before the page has its answer, so the engine hears of a generation no later than the page can use it.
+      // The engine holds back a Start from a generation it has not seen listed, so the order of this and the page's Start does not matter.
       report()
     },
   }
