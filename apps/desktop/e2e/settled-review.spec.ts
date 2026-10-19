@@ -11,7 +11,7 @@ test.describe.configure({ timeout: 150_000 })
 // Settled scores come from the background AI jobs.
 test.use({ aiJobs: true })
 
-const INCIDENT = 'p95 on /v2/search jumped'
+const INCIDENT = 'P95 on /v2/search jumped'
 const KEYS = 'The staging deploy keys need rotating'
 const POSTGRES = 'Draft plan is in the doc'
 
@@ -30,6 +30,8 @@ test('the review shows why each topic looks settled; Resolve, Undo, Keep open an
   fake.workspace.post({ channel: 'C0INCIDENTS', threadTs: root.ts as never, user: 'U0DEV', text: 'Great, thanks', at: fake.now() - 2 * 3_600_000 })
   await juno.signIn()
   await juno.waitForSync()
+  // The title job capitalizes p95. Use its settled title throughout the review flow.
+  await expect(juno.sidebar.row(INCIDENT).root).toHaveAttribute('data-title-source', 'ai')
 
   // The default waits four hours of quiet; the incident thread went quiet 70 minutes ago.
   await juno.openSettings('Tidy up')

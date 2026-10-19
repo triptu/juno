@@ -118,6 +118,7 @@ export class SyncRunner extends Context.Service<
               syncConfigLayer({
                 bootRetryMillis: timing.bootRetryMillis,
                 usersBatchMillis: timing.usersBatchMillis,
+                fileRetryMillis: timing.fileRetryMillis,
                 sweepIntervalMillis: timing.sweepIntervalMillis,
                 followPassMillis: timing.followPassMillis,
                 ...control.config,

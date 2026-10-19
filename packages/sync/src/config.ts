@@ -19,6 +19,8 @@ export interface SyncConfigShape {
   readonly usersChunk: number
   /** How long `nameUsers` waits after the first wanted id, so one call carries a burst. */
   readonly usersBatchMillis: number
+  /** First file recovery wait; later attempts wait 3, 10 and 30 times this. */
+  readonly fileRetryMillis: number
   /** How often the discovery sweep runs while live. 0 disables the timer; reconnects still catch up. */
   readonly sweepIntervalMillis: number
   /**
@@ -54,6 +56,7 @@ export const defaultSyncConfig: SyncConfigShape = {
   previewThreads: 50,
   usersChunk: 100,
   usersBatchMillis: 50,
+  fileRetryMillis: 1_000,
   sweepIntervalMillis: 10 * 60_000,
   followPassMillis: 60 * 60_000,
   discovery: 'search',

@@ -17,10 +17,11 @@
 // First, so coverage (test runs only) starts before the rest of the bundle runs.
 import '../coverage'
 import { installProcessLog } from '../processLog'
+import { createTestWork } from './testWork'
 import { net } from 'electron'
-import { Effect, Layer, Schema } from 'effect'
+import { Effect, Layer, Record, Schema } from 'effect'
 import { MainToEngine, type EngineToMain } from '@juno/contract'
-import { electronTransport, startEngine, type EngineHandle, type Host } from '@juno/engine'
+import { electronTransport, productionTiming, startEngine, type EngineHandle, type Host } from '@juno/engine'
 import { HttpTransport, HttpTransportError, type HttpResponse } from '@juno/slack'
 
 const processLog = installProcessLog('engine')
@@ -69,6 +70,7 @@ const ElectronNet: Layer.Layer<HttpTransport> = Layer.succeed(HttpTransport, {
     }),
 })
 
+let testWork: ReturnType<typeof createTestWork> | undefined
 let engine: Promise<EngineHandle> | undefined
 parent.on('message', (event) => {
   let message: MainToEngine
@@ -81,7 +83,23 @@ parent.on('message', (event) => {
   switch (message._tag) {
     case 'config': {
       if (engine !== undefined) return
-      engine = startEngine(transport, message.config, { host, httpTransport: ElectronNet, agentTransport, agentWrites: 'enabled', logger: processLog.effectLogger })
+      testWork = message.config.e2e && message.config.fakeSlackUrl !== undefined ? createTestWork(send) : undefined
+      const fastTiming = testWork !== undefined && process.env.JUNO_E2E_FAST_TIMING === '1'
+      engine = startEngine(transport, message.config, {
+        host, httpTransport: ElectronNet, agentTransport, agentWrites: 'enabled', logger: processLog.effectLogger,
+        ...(fastTiming && testWork ? { work: testWork.control } : {}),
+        ...(fastTiming
+          ? { timing: {
+              ...Record.map(productionTiming, (millis) => millis / 20),
+              // As in the unit harness, explicit catch-ups replace periodic discovery.
+              sweepIntervalMillis: 0,
+              followPassMillis: 0,
+              // Electron and the fake run in separate real processes, on a shared runner.
+              socketHelloTimeoutMillis: productionTiming.socketHelloTimeoutMillis,
+              socketPongTimeoutMillis: productionTiming.socketPongTimeoutMillis,
+            } }
+          : {}),
+      })
       engine.then(
         () => { processLog.log('INFO', 'process ready'); send({ _tag: 'ready' }) },
         (cause: unknown) => {
@@ -89,6 +107,10 @@ parent.on('message', (event) => {
           void processLog.close().finally(() => process.exit(1))
         },
       )
+      return
+    }
+    case 'testWork': {
+      testWork?.request(message)
       return
     }
     case 'port': {

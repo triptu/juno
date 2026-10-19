@@ -19,11 +19,12 @@ import { StoreReader, transaction, type SqlError } from '@juno/store'
 import { parseTopicId, type Ts } from '@juno/domain'
 import { Effect, FiberSet, Queue } from 'effect'
 import type { SyncContext } from '../context'
+import { SyncConfig } from '../config'
 import { filesToFetch, isReady } from '../files'
 import { storeFileInfo } from '../write'
 
-/** The wait before each recovery attempt. Stop after four attempts. */
-const FILE_TRIES = [1_000, 3_000, 10_000, 30_000] as const
+/** Multipliers of fileRetryMillis. Stop after four attempts. */
+const FILE_TRIES = [1, 3, 10, 30] as const
 /** Files asked about at once; more wait for a later write of their message. */
 const MAX_ACTIVE = 50
 /** Files whose tries ran out, kept so an event can still ask about them. Oldest dropped. */
@@ -68,6 +69,8 @@ const readReadyFile = (target: Target, fileId: string) =>
 
 export const refreshFiles = (ctx: SyncContext) =>
   Effect.gen(function* () {
+    const config = yield* SyncConfig
+    const retryWaits = FILE_TRIES.map((factor) => factor * config.fileRetryMillis)
     const tries = yield* FiberSet.make()
     const active = new Map<string, Active>()
     const spent = new Map<string, Map<string, Target>>()
@@ -139,7 +142,7 @@ export const refreshFiles = (ctx: SyncContext) =>
       if (spent.has(fetch.fileId) && fetch.kind === 'stored') continue
       if (active.size >= MAX_ACTIVE) continue
       spent.delete(fetch.fileId)
-      yield* start(fetch.fileId, targets, FILE_TRIES)
+      yield* start(fetch.fileId, targets, retryWaits)
     }
   })
 

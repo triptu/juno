@@ -89,7 +89,7 @@ export function runnerCommand(cores, runId, command, env = process.env) {
 }
 
 export function runnerCache() {
-  return `cache="$HOME/.cache/juno-runner"; electron_cache="$HOME/.cache/electron"; mkdir -p "$cache/pnpm-store" "$cache/runtime" "$HOME/.cache/electron" || exit 70; for path in "$cache/pnpm-store" "$cache/runtime" "$HOME/.cache/electron"; do [ "$(stat -c %u "$path")" = "$(id -u)" ] || { echo "runner: cache must belong to the SSH user: $path" >&2; exit 70; }; done; chmod 700 "$cache/runtime" || exit 70`
+  return `cache="$HOME/.cache/juno-runner"; electron_cache="$HOME/.cache/electron"; mkdir -p "$cache/pnpm-store" "$cache/builds" "$cache/runtime" "$HOME/.cache/electron" || exit 70; for path in "$cache/pnpm-store" "$cache/builds" "$cache/runtime" "$HOME/.cache/electron"; do [ "$(stat -c %u "$path")" = "$(id -u)" ] || { echo "runner: cache must belong to the SSH user: $path" >&2; exit 70; }; done; chmod 700 "$cache/runtime" || exit 70`
 }
 
 // The host lock covers both the presence check and build, across every client.

@@ -13,7 +13,7 @@ export class EngineConfig extends Context.Service<EngineConfig, Config>()('juno/
 
 /** Host controls for observing sync cycles and the socket, and overriding their schedule. */
 export interface SyncControlOptions {
-  readonly config?: Partial<Omit<SyncConfigShape, 'bootRetryMillis' | 'usersBatchMillis' | 'sweepIntervalMillis' | 'followPassMillis'>>
+  readonly config?: Partial<Omit<SyncConfigShape, 'bootRetryMillis' | 'usersBatchMillis' | 'fileRetryMillis' | 'sweepIntervalMillis' | 'followPassMillis'>>
   /** Observes socket events through a subscriber after the sync write attempt. */
   readonly onEvent?: (event: SocketEvent) => void
   readonly onCycle?: (event: 'started' | 'finished') => void
@@ -81,6 +81,8 @@ export interface EngineTimingConfig {
   readonly bootRetryMillis: number
   /** Window gathering missing users into one request. */
   readonly usersBatchMillis: number
+  /** First thumbnail recovery wait; subsequent waits keep their production ratios. */
+  readonly fileRetryMillis: number
   /** Periodic discovery cadence; zero disables periodic sweeps. */
   readonly sweepIntervalMillis: number
   /** Minimum time between full follow passes; zero checks every catch-up. */
@@ -135,6 +137,7 @@ export const productionTiming: EngineTimingConfig = {
   automatedTickMillis: 900_000,
   bootRetryMillis: 30_000,
   usersBatchMillis: 50,
+  fileRetryMillis: 1_000,
   sweepIntervalMillis: 600_000,
   followPassMillis: 3_600_000,
   socketPingMillis: 10_000,

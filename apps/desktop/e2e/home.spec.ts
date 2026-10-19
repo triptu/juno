@@ -109,8 +109,10 @@ test('Home shows what waits from the sidebar, and each row opens its topic', asy
   // Moved a lot: nine replies since the user last read the thread.
   for (let n = 1; n <= 9; n++) slack.as('Leo').replyIn(STAGING, `Cost update ${n}.`)
   await sidebar.row(STAGING).expectPreview(/Cost update 9\./)
+  // The title job can now finish before this flow reaches Home. Assert its settled title.
+  await expect(sidebar.row(STAGING).root).toHaveAttribute('data-title-source', 'ai')
   await home.open()
-  await expect(home.meta('moved')).toHaveText(/^Unrelated: has anyone looked at the… · eng · \d+ new$/)
+  await expect(home.meta('moved')).toHaveText(/^Unrelated: has anyone looked at the · eng · \d+ new$/)
   await home.openItem('moved')
   await topic.expectTitle(STAGING)
 
@@ -218,14 +220,15 @@ test('with AI assist off, Home shows the rules alone, with their plain titles an
 
   const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, aiJobs: true })
   try {
-    const { home, write } = new Juno(again.app, again.win)
+    const relaunched = new Juno(again.app, again.win)
+    const { home, write } = relaunched
     // The relaunch restores the session first.
     await expect(home.navItem).toBeVisible({ timeout: 30_000 })
     await home.open()
     await expect(home.title('waiting')).toHaveText('Elena asked you something')
     expect(await home.kinds()).toEqual(['waiting'])
-    // Nothing arrives later either.
-    await again.win.waitForTimeout(3_000)
+    // A completed background pass still contributes no AI items.
+    await relaunched.workPass('home')
     await expect(home.title('waiting')).toHaveText('Elena asked you something')
     // Juno is an AI surface: Home's composer has no Juno to send to, and the Juno tab says Juno is off rather than asking for a model.
     await expect(write.chip).toHaveAccessibleName('Send to: Pick a conversation')

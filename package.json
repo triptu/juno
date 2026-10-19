@@ -63,7 +63,7 @@
     "test:package": "env JUNO_E2E_AI_JOBS=1 node scripts/heavy.mjs --exclusive pnpm --filter @juno/desktop test:package",
     "health:baseline": "node scripts/health.mjs --update-baseline",
     "test:health": "node --test scripts/health.test.mjs",
-    "test:repo-tools": "node scripts/heavy.mjs node --test scripts/batch-merge.test.mjs scripts/check-migration-order.test.mjs scripts/affected-select.test.mjs scripts/heavy.test.mjs scripts/release-gate.test.mjs scripts/release-main.test.mjs scripts/release-schedule.test.mjs scripts/test-results-reporter.test.mjs scripts/check-tokens.test.mjs scripts/affected.test.mjs"
+    "test:repo-tools": "node scripts/heavy.mjs node --test scripts/build-cached.test.mjs scripts/batch-merge.test.mjs scripts/check-migration-order.test.mjs scripts/affected-select.test.mjs scripts/heavy.test.mjs scripts/release-gate.test.mjs scripts/release-main.test.mjs scripts/release-schedule.test.mjs scripts/test-results-reporter.test.mjs scripts/check-tokens.test.mjs scripts/affected.test.mjs"
   },
   "devDependencies": {
     "@informalsystems/quint": "0.33.0",

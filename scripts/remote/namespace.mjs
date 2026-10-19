@@ -22,7 +22,7 @@ export function createWithStore(args, cidfile, log, { env = process.env, run = n
 }
 
 export function namespaceCache() {
-  return `cache=${namespaceStorePath}; electron_cache="$cache/electron"; mkdir -p "$cache/pnpm-store" "$cache/runtime" "$electron_cache" || exit 70; chown 1001:1001 "$cache/pnpm-store" "$cache/runtime" "$electron_cache" || exit 70; chmod 700 "$cache/runtime" || exit 70; if awk '$2 == "${namespaceStorePath}" { found=1 } END { exit !found }' /proc/mounts; then echo 'remote: workspace cache volume' >&2; else echo 'remote: workspace cache on machine disk' >&2; fi`
+  return `cache=${namespaceStorePath}; electron_cache="$cache/electron"; mkdir -p "$cache/pnpm-store" "$cache/builds" "$cache/runtime" "$electron_cache" || exit 70; chown 1001:1001 "$cache/pnpm-store" "$cache/builds" "$cache/runtime" "$electron_cache" || exit 70; chmod 700 "$cache/runtime" || exit 70; if awk '$2 == "${namespaceStorePath}" { found=1 } END { exit !found }' /proc/mounts; then echo 'remote: workspace cache volume' >&2; else echo 'remote: workspace cache on machine disk' >&2; fi`
 }
 
-export const workspaceMounts = '-e HOME=/tmp/juno-home -e JUNO_REMOTE_INSTALL=1 -e PNPM_CONFIG_STORE_DIR=/cache/pnpm-store -e PNPM_CONFIG_CACHE_DIR=/cache/pnpm-store/metadata -e XDG_RUNTIME_DIR=/cache/runtime -e electron_config_cache=/cache/electron -v "$cache/pnpm-store:/cache/pnpm-store" -v "$cache/runtime:/cache/runtime" -v "$electron_cache:/cache/electron"'
+export const workspaceMounts = '-e HOME=/tmp/juno-home -e JUNO_REMOTE_INSTALL=1 -e PNPM_CONFIG_STORE_DIR=/cache/pnpm-store -e PNPM_CONFIG_CACHE_DIR=/cache/pnpm-store/metadata -e JUNO_BUILD_CACHE_DIR=/cache/builds -e XDG_RUNTIME_DIR=/cache/runtime -e electron_config_cache=/cache/electron -v "$cache/pnpm-store:/cache/pnpm-store" -v "$cache/builds:/cache/builds" -v "$cache/runtime:/cache/runtime" -v "$electron_cache:/cache/electron"'
