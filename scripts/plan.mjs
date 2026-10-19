@@ -55,13 +55,14 @@ export function lanes(steps, serial) {
  * Split the CPU limit between app workers (half the cores), unit workers
  * and simulations (a quarter each), plus one uncached Apalache checker.
  * Gallery gets three quarters because its checks wait for the browser.
+ * Wide unit-only plans retain their inherited unit workers; app plans split them.
  * A step's own KEY=VALUE words still win.
  */
-export function sideBySide(cores) {
+export function sideBySide(cores, wideUnit = false) {
   const galleryWorkers = String(cores === 3 ? 3 : Math.max(1, Math.floor((cores * 3) / 4)))
   return {
     app: { JUNO_E2E_WORKERS: String(Math.max(1, Math.floor(cores / 2))), GALLERY_WORKERS: galleryWorkers, GALLERY_SHIFT_PARTS: galleryWorkers },
-    rest: { JUNO_VITEST_WORKERS: String(Math.max(1, Math.floor(cores / 4))), JUNO_TEST_PACKAGE_JOBS: '1' },
+    rest: wideUnit ? {} : { JUNO_VITEST_WORKERS: String(Math.max(1, Math.floor(cores / 4))), JUNO_TEST_PACKAGE_JOBS: '1' },
     specs: { SPECS_JOBS: String(Math.max(1, Math.floor(cores / 4))), SPECS_APALACHE: '1' },
   }
 }
@@ -80,7 +81,7 @@ if (import.meta.main) {
   const serial = process.env.JUNO_PLAN_SERIAL === '1'
   const planned = lanes(steps, serial)
   const cores = Number(process.env.JUNO_RUNNER_JOB_CORES) || availableParallelism()
-  const shared = planned.length > 1 ? sideBySide(cores) : undefined
+  const shared = planned.length > 1 ? sideBySide(cores, process.env.JUNO_RUNNER_WIDE_UNIT === '1') : undefined
   const run = (step, low) =>
     new Promise((resolvePromise) => {
       const started = Date.now()

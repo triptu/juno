@@ -11,10 +11,6 @@ export const quote = (value) => `'${String(value).replaceAll("'", "'\\''")}'`
 
 /** SSH admission and CPU limits follow the workload; explicit sizes still win. */
 export function runnerJobSize({ script, args, machine, explicitMachine, specsCached = false }, capacity) {
-  if (explicitMachine) {
-    const cores = Number(/:(\d+)x/.exec(machine)?.[1])
-    return { reserved: cores, cpus: cores }
-  }
   const steps = script === 'test:plan' ? parsePlan(args) : [{ script, args, env: {} }]
   const scripts = steps.map((step) => step.script)
   const unitOnly = scripts.every((name) => name === 'test' || name.startsWith('test:agent') || name === 'specs:check')
@@ -25,10 +21,15 @@ export function runnerJobSize({ script, args, machine, explicitMachine, specsCac
     const files = step.args.filter((arg) => !arg.startsWith('-') && /\.[cm]?[jt]sx?$/.test(arg))
     return files.length === 0 || files.length > 20
   })
+  const wideUnit = unitOnly && wide
+  if (explicitMachine) {
+    const cores = Number(/:(\d+)x/.exec(machine)?.[1])
+    return { reserved: cores, cpus: cores, wideUnit }
+  }
   const requested = scripts.some((name) => name === 'test:desktop' || name === 'test:e2e') ? 4
     : scripts.includes('test:gallery') ? 3 : unitOnly ? wide ? 4 : 1 : 8
   const reserved = Math.min(requested, capacity)
-  return { reserved, cpus: unitOnly && !wide ? 2 : reserved }
+  return { reserved, cpus: unitOnly && !wide ? 2 : reserved, wideUnit }
 }
 
 export function runnerConfig(env = process.env) {

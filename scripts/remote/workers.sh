@@ -1,5 +1,5 @@
 # Sourced by run.sh. Explicit worker settings take precedence.
-# SSH containers use their CPU limit, since nproc can see the whole host.
+# SSH workers scale with the CPU limit, since nproc can see the whole host.
 # Namespace containers have a machine to themselves.
 cores=${JUNO_RUNNER_JOB_CORES:-$(nproc)}
 at_least() { echo $(( $1 > $2 ? $1 : $2 )); }
@@ -13,10 +13,14 @@ gallery_workers=$(( cores * 3 ))
 if [ -n "${JUNO_RUNNER_JOB_CORES:-}" ]; then
   package_jobs=1
   vitest_workers=$cores
-  # Two packages share wide jobs; their Vitest workers fit the CPU limit.
+  # Keep the existing package and worker counts for narrow and app jobs.
   if [ "$cores" -ge 4 ]; then
     package_jobs=2
     vitest_workers=$(( cores / package_jobs ))
+  fi
+  # Wide unit jobs overlap I/O with one worker per allocated core in each package.
+  if [ "${JUNO_RUNNER_WIDE_UNIT:-0}" -eq 1 ]; then
+    vitest_workers=$cores
   fi
   gallery_workers=$(at_least $(( cores * 3 / 4 )) 1)
   if [ "$cores" -eq 3 ]; then gallery_workers=3; fi

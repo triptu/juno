@@ -124,12 +124,13 @@ const outputDir = `/tmp/juno-remote-${runId}`
 let backend = 'namespace'
 let runner
 let cpuLimit
+let wideUnit = false
 let cores = Number(/:(\d+)x/.exec(options.machine)?.[1])
 const transport = (command) => backend === 'ssh' ? ['ssh', [...runner.args, command]] : ['nsc', ['ssh', '-T', id, command]]
 const container = (image) => {
   const install = backend === 'namespace' || runner.build
   const cache = install ? `${backend === 'ssh' ? runnerCache() : namespaceCache()}; ` : ''
-  const cpu = backend === 'ssh' ? `--cpus ${cpuLimit} -e JUNO_RUNNER_JOB_CORES=${cpuLimit}` : ''
+  const cpu = backend === 'ssh' ? `--cpus ${cpuLimit} -e JUNO_RUNNER_JOB_CORES=${cpuLimit} -e JUNO_RUNNER_WIDE_UNIT=${wideUnit ? 1 : 0}` : ''
   const user = backend === 'ssh' && install ? '--user "$(id -u):$(id -g)"' : ''
   return `echo __juno_remote_started; ${cache}rm -rf ${outputDir} && mkdir -p ${outputDir} && chmod 777 ${outputDir} && s=$(date +%s) && ${backend === 'ssh' ? `docker image inspect ${image} >/dev/null` : `docker pull -q ${image} >/dev/null`} && echo "remote: image pulled in $(( $(date +%s) - s )) s" >&2 && echo __juno_remote_ready && docker run --name juno-${runId} --rm -i --init --ipc=host ${cpu} ${user} ${install ? workspaceMounts : ''} -v ${outputDir}:/out ${options.env.map((pair) => `-e ${quote(pair)}`).join(' ')} ${image} ` +
     `bash -c 'tar -xzf - -C /work && exec bash scripts/remote/run.sh "$@"' _ ${scriptArgs}; code=$?; [ -s ${outputDir}/reports.tgz ] && echo __juno_remote_reports; echo "${exitMarker}$code"`
@@ -241,6 +242,7 @@ try {
       const size = runnerJobSize({ ...options, specsCached }, health.cores)
       cores = size.reserved
       cpuLimit = size.cpus
+      wideUnit = size.wideUnit
       if (cores > health.cores) throw new Error(`job needs ${cores} cores; runner has ${health.cores}`)
     } else console.error(`remote: runner unreachable, trying Namespace: ${health.reason}`)
   }
