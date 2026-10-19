@@ -83,7 +83,7 @@ async function onlyTheBridge(win: Page): Promise<void> {
   expect(exposed).toEqual({
     require: 'undefined',
     process: 'undefined',
-    juno: ['updates', 'app', 'engine', 'agent', 'launch', 'window', 'sharing', 'contextMenu', 'shell', 'clipboard', 'menu', 'notifications', 'webPanel'],
+    juno: ['updates', 'app', 'engine', 'agent', 'launch', 'window', 'sharing', 'huddle', 'contextMenu', 'shell', 'clipboard', 'menu', 'notifications', 'webPanel'],
     updates: ['get', 'set', 'restart', 'download', 'notes', 'onChange'],
     app: ['getInfo', 'diagnostics', 'logDiagnostics', 'showLogs', 'reportState'],
     engine: ['requestPort', 'restart'],
