@@ -179,3 +179,23 @@ it('keeps the "In a huddle" status as the official client does while the call is
   // No more renewals, and no clearing write: the status lapses at its expiry, as in the official client.
   expect(writes()).toHaveLength(after)
 })
+
+it('leaves a call the user has been alone in for the alone time, and starts counting again when someone joins', async () => {
+  const engine = await booted({ timing: { huddleAloneMillis: 2_000 } })
+  const result = await inCall(engine, 'C0ENG')
+  // Maya joins before the time is up, and leaves again: the count starts over then.
+  await sleep(800)
+  engine.fake.control('joinHuddle', { channel: 'C0ENG', user: 'U0MAYA' })
+  await callUntil(engine, (call) => call.participants.join() === `${SELF},U0MAYA`, 'Maya joined')
+  await sleep(1_000)
+  engine.fake.control('leaveHuddle', { channel: 'C0ENG', user: 'U0MAYA' })
+  const leftAt = Date.now()
+  await callUntil(engine, (call) => call.participants.join() === SELF, 'Maya left')
+  expect((await callUntil(engine, () => true, 'call')).phase).toBe('joined')
+  const leaving = await callUntil(engine, (call) => call.attendeeId === null, 'left alone')
+  expect(Date.now() - leftAt).toBeGreaterThanOrEqual(1_900)
+  expect(leaving.ended).toEqual({ channelId: 'C0ENG', reason: 'alone' })
+  await waitFor(() => (leftAttendees(engine).includes(result.attendeeId) ? true : undefined), WAIT_MS, 'the leave sent')
+  await stopMedia(engine, result.attendeeId)
+  expect(await callUntil(engine, (call) => call.phase === 'idle', 'idle')).toMatchObject({ ended: { channelId: 'C0ENG', reason: 'alone' } })
+})

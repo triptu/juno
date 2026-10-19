@@ -10,6 +10,7 @@
  * - `reads.ts`: running huddles from room frames and `huddles/info`.
  * - `slack.ts`: the requests, in the official client's shape.
  * - `status.ts`: the "In a huddle" status while the call is live.
+ * - `alone.ts`: leaving after 10 minutes alone.
  */
 import { Context, Data, Effect, Layer, Scope, Stream, SubscriptionRef } from 'effect'
 import type { HuddleCall, HuddleError, HuddlePageReport, HuddleStartResult, RunningHuddles } from '@juno/contract'
@@ -42,6 +43,8 @@ export interface HuddleSession {
   readonly channels: Effect.Effect<ReadonlyArray<string>>
   /** Tests only: how often the huddle status is renewed (`status.ts`; the app: 240 s). */
   readonly statusRenewMillis?: number
+  /** Tests only: how long the user may be alone in a call before Juno leaves (`alone.ts`; the app: 10 minutes). */
+  readonly aloneLeaveMillis?: number
 }
 
 /** A socket event, or the `SocketEvents` marker for events dropped while the subscriber fell behind. */

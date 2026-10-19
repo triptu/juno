@@ -109,6 +109,8 @@ export interface EngineTimingConfig {
   readonly liveRetryCapMillis: number
   /** How often the "In a huddle" status is renewed while a call is live (±10%). */
   readonly huddleStatusRenewMillis: number
+  /** How long the user may be alone in a huddle before Juno leaves it (SPEC 20). */
+  readonly huddleAloneMillis: number
 }
 
 export const productionTiming: EngineTimingConfig = {
@@ -153,6 +155,7 @@ export const productionTiming: EngineTimingConfig = {
   liveRetryBaseMillis: 500,
   liveRetryCapMillis: 30_000,
   huddleStatusRenewMillis: 240_000,
+  huddleAloneMillis: 600_000,
 }
 
 export class EngineTiming extends Context.Reference<EngineTimingConfig>('juno/engine/EngineTiming', {

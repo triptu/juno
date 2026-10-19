@@ -3,6 +3,7 @@
 // are tested in the engine against the fake Slack (engine/test/huddle.test.ts).
 import { describe, expect, it } from 'vitest'
 import type { HuddlePageReport } from '@juno/contract'
+import { aloneNow, leaveAt, ALONE_LEAVE_MILLIS } from '../src/alone'
 import * as L from '../src/lifecycle'
 import { mediaStopped, type MediaView } from '../src/media'
 import { applyInfo, applyRoomFrame, decodeRoomFrame, secondsToMillis, type Running } from '../src/running'
@@ -210,5 +211,41 @@ describe('lifecycle: leaves', () => {
     expect(L.canRequest(L.choose(L.initial, intent('C2', 5)), view(), WS, false)).toBe(false)
     const booted = L.choose(L.restart(L.merge(L.initial, [{ ...a, generation: G1 }], WS), [], 'T2'), intent('C9', 7))
     expect(L.canRequest(booted, view(), 'T2', true)).toBe(false)
+  })
+})
+
+describe('leaving after 10 minutes alone', () => {
+  const MINUTE = 60_000
+  const call = (participants: ReadonlyArray<string>, over: Partial<{ attendeeId: string | undefined; live: boolean }> = {}) =>
+    ({ attendeeId: 'A1', live: true, participants, ...over })
+
+  it('counts from when the live call has nobody else, and leaves 10 minutes later', () => {
+    let alone = aloneNow(undefined, call(['U0ME']), 0)
+    expect(alone).toEqual({ attendeeId: 'A1', since: 0 })
+    // Still alone a minute on: the same start, kept as it was.
+    const later = aloneNow(alone, call(['U0ME']), MINUTE)
+    expect(later).toBe(alone)
+    alone = later
+    expect(leaveAt(alone!)).toBe(10 * MINUTE)
+    expect(ALONE_LEAVE_MILLIS).toBe(10 * MINUTE)
+  })
+
+  it('starts again when someone joins and leaves', () => {
+    const first = aloneNow(undefined, call(['U0ME']), 0)
+    expect(aloneNow(first, call(['U0ME', 'U0MAYA']), 9 * MINUTE)).toBeUndefined()
+    const again = aloneNow(undefined, call(['U0ME']), 12 * MINUTE)
+    expect(leaveAt(again!)).toBe(22 * MINUTE)
+  })
+
+  it('does not count before the media is up, or without a call', () => {
+    expect(aloneNow(undefined, call(['U0ME'], { live: false }), 0)).toBeUndefined()
+    expect(aloneNow(undefined, call([], { attendeeId: undefined }), 0)).toBeUndefined()
+    // Before Slack lists anyone, the user counts as alone.
+    expect(aloneNow(undefined, call([]), 0)).toEqual({ attendeeId: 'A1', since: 0 })
+  })
+
+  it('starts over for a new call', () => {
+    const first = aloneNow(undefined, call(['U0ME']), 0)
+    expect(aloneNow(first, call(['U0ME'], { attendeeId: 'A2' }), 5 * MINUTE)).toEqual({ attendeeId: 'A2', since: 5 * MINUTE })
   })
 })

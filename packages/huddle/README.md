@@ -10,4 +10,6 @@ The engine side of huddles (`docs/plans/huddles.md`, SPEC 20). The `Huddle` serv
 
 The engine gives it a session per sync (`attach`) with the Slack client, where the pending leaves are stored and the channels to read; see `engine/src/huddle/`. The renderer runs the media session (`apps/desktop/src/renderer/containers/huddle/media.ts`) and reports to it through `huddle.report`.
 
+`alone.ts` is the rule for leaving a call the user has been alone in for 10 minutes (SPEC 20, "The only one left"). `core.ts` keeps one timer for it, checked on every publish, and the leave ends the call as `alone`, so the page shows its toast.
+
 `status.ts` keeps the "In a huddle" status as the official client does: `users.profile.set` with `huddle_state_expiration_ts` while the call is live, renewed every 240 s or so, and no clearing write on leave.

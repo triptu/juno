@@ -20,6 +20,8 @@ function toastFor(ended: HuddleEnd, join: (channelId: string) => void): ToastCon
       return { text: "Couldn't join the huddle", ...(turnedOff(ended.code) ? {} : again('Try again')) }
     case 'failed':
       return { text: 'Lost the connection to the huddle', ...again('Rejoin') }
+    case 'alone':
+      return { text: 'Left the huddle. Nobody else was in it.' }
     case 'left':
       return undefined
   }
