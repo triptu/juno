@@ -5,12 +5,25 @@
  * again each time the window regains focus. Share starts sharing the pick
  * and closes the sheet.
  */
+import { Schema } from 'effect'
 import { useEffect, useState } from 'react'
-import type { ShareSource, ShareSources } from '@juno/contract'
+import { ShareSources, type ShareSource } from '@juno/contract'
 import { ScreenSourcePicker, type ScreenSource } from '@juno/huddle-views'
-import { allowScreenRecording, getShareSources, getSharingSetting, openScreenRecordingSettings } from '@juno/state'
+import { getSharingSetting } from '@juno/state'
 import { shareScreen } from './media'
 import { closeSharePicker } from './shareSheet'
+
+const decodeSources = Schema.decodeUnknownOption(ShareSources)
+/** When main does not answer: none, as if recording were off. */
+const NO_SOURCES: ShareSources = { permission: 'denied', sources: [] }
+const decoded = (value: unknown): ShareSources => {
+  const result = decodeSources(value)
+  return result._tag === 'Some' ? result.value : NO_SOURCES
+}
+const getShareSources = () => window.juno.huddle.shareSources().then(decoded, () => NO_SOURCES)
+/** Continue: the macOS Screen Recording prompt, then the sources. */
+const allowScreenRecording = () => window.juno.huddle.allowScreenRecording().then(decoded, () => NO_SOURCES)
+const openScreenRecordingSettings = () => void window.juno.huddle.openScreenRecordingSettings().catch(() => {})
 
 const toView = (source: ShareSource): ScreenSource => ({
   id: source.id,

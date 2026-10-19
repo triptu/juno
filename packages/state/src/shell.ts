@@ -1,7 +1,7 @@
 /** Atoms backed by main through the bridge, not the engine. */
 import { Effect, Schema } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
-import { AccentSchema, AppInfo, DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, DEFAULT_THEME, DensitySchema, NotificationPermission, NotificationTarget, PrivacyState, ShareSources, SharingSetting, SIDEBAR_WIDTH, ThemeSchema, type Accent, type Density, type TopicTitleLines, type ResolvedTheme, type SidebarLayout, type SlackTarget, type Theme } from '@juno/contract'
+import { AccentSchema, AppInfo, DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, DEFAULT_THEME, DensitySchema, NotificationPermission, NotificationTarget, PrivacyState, SharingSetting, SIDEBAR_WIDTH, ThemeSchema, type Accent, type Density, type TopicTitleLines, type ResolvedTheme, type SidebarLayout, type SlackTarget, type Theme } from '@juno/contract'
 import type { ContextMenuAt, ContextMenuItem, JunoBridge, MenuCommand } from '@juno/contract/channels'
 
 export type { Accent, Density, TopicTitleLines, ResolvedTheme, Theme } from '@juno/contract'
@@ -141,29 +141,6 @@ export async function getSharingSetting(): Promise<SharingSetting | undefined> {
 export async function setSharingSetting(hide: boolean): Promise<SharingSetting | undefined> {
   const decoded = decodeSharing(await window.juno.sharing.set(hide).catch(() => undefined))
   return decoded._tag === 'Some' ? decoded.value : undefined
-}
-
-const decodeShareSources = Schema.decodeUnknownOption(ShareSources)
-const NO_SOURCES: ShareSources = { permission: 'denied', sources: [] }
-
-/**
- * The share sheet's screens and windows and macOS's Screen Recording answer
- * (SPEC 20). When main does not answer, none, as if recording were off.
- */
-export async function getShareSources(): Promise<ShareSources> {
-  const decoded = decodeShareSources(await window.juno.huddle.shareSources().catch(() => undefined))
-  return decoded._tag === 'Some' ? decoded.value : NO_SOURCES
-}
-
-/** The share sheet's Continue: the macOS Screen Recording prompt, then the sources as `getShareSources` gives them. */
-export async function allowScreenRecording(): Promise<ShareSources> {
-  const decoded = decodeShareSources(await window.juno.huddle.allowScreenRecording().catch(() => undefined))
-  return decoded._tag === 'Some' ? decoded.value : NO_SOURCES
-}
-
-/** System Settings at Privacy & Security, Screen & System Audio Recording. */
-export function openScreenRecordingSettings(): void {
-  window.juno.huddle.openScreenRecordingSettings().catch(() => {})
 }
 
 /** Tells main, so the next launch's first render already uses this density. */
