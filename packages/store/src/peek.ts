@@ -29,12 +29,18 @@ export const listWorkspaces = (userData: string): Effect.Effect<ReadonlyArray<st
   })
 }
 
-/** One user.db pref of `workspaceId` as its stored JSON text, or undefined when it is not set. */
+/**
+ * One user.db pref of `workspaceId` as its stored JSON text, or undefined
+ * when it is not set. A database with no `prefs` table yet (it crashed
+ * before its first migration) has no prefs.
+ */
 export const peekUserPref = (userData: string, workspaceId: string, key: string): Effect.Effect<string | undefined, StoreError> =>
   Invalidation.use((invalidation) =>
     Effect.scoped(
       Effect.gen(function* () {
         const sql = yield* SqliteClient.make({ filename: workspacePaths(userData, workspaceId).userDb, readonly: true, disableWAL: true })
+        const tables = yield* sql<{ name: string }>`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'prefs'`
+        if (tables.length === 0) return undefined
         const rows = yield* sql<{ value_json: string }>`SELECT value_json FROM prefs WHERE key = ${key}`
         return rows[0]?.value_json
       }),
