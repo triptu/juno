@@ -65,6 +65,8 @@ export const Channels = {
   huddleRegister: 'huddle.register',
   /** The page's call for the Huddle menu: null while the user is in no huddle, else whether they are muted. */
   huddleMenu: 'huddle.menu',
+  /** Mute while macOS blocks the microphone: System Settings at Privacy & Security, Microphone. */
+  huddleMicrophoneSettings: 'huddle.microphoneSettings',
   /** Shows a native context menu at the pointer and answers with the chosen item's id, or null. */
   contextMenuPopup: 'contextMenu.popup',
   /** Opens an http or https link in the default browser. */
@@ -339,6 +341,8 @@ export interface JunoBridge {
     readonly register: () => Promise<unknown>
     /** Tells main the call the Huddle menu follows: null for none, else whether the user is muted. */
     readonly setMenu: (menu: HuddleMenu) => Promise<unknown>
+    /** Opens System Settings at Privacy & Security, Microphone. */
+    readonly openMicrophoneSettings: () => Promise<unknown>
   }
   readonly contextMenu: {
     /** Resolves with the chosen item's id, or null when the menu closed without a choice. */

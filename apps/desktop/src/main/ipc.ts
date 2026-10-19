@@ -14,6 +14,7 @@ import { watchHuddlePages } from './huddlePages'
 import type { ProviderStore } from './providers'
 import type { Updates } from './updates'
 import type { Launch } from './launch'
+import { openMicrophoneSettings } from './media'
 import { APP_ORIGIN } from './scheme'
 import { closeWebPanel, hideWebPanel, setWebPanelBounds, showWebPanel } from './webPanel'
 import { setMenuHuddle } from './window'
@@ -63,6 +64,8 @@ export const folderForTests: { next: string | null | undefined } = { next: undef
 export const slackLinksForTests: string[] = []
 const e2e = process.env.JUNO_E2E === '1'
 export const logsForTests = { opened: 0 }
+/** Under JUNO_E2E, Mute's System Settings link while the microphone is blocked counts here instead of opening it. */
+export const microphoneSettingsForTests = { opened: 0 }
 
 export interface IpcDeps {
   readonly updates: Updates
@@ -203,6 +206,7 @@ export function registerIpc({ updates, supervisor, agent, providers, codex, back
   handle(Channels.huddleMenu, ({ menu }) => {
     setMenuHuddle(menu)
   })
+  handle(Channels.huddleMicrophoneSettings, () => (e2e ? void (microphoneSettingsForTests.opened += 1) : openMicrophoneSettings()))
 
   handle(Channels.sharingGet, () => sharing.get())
   handle(Channels.sharingSet, ({ hide }) => sharing.set(hide))

@@ -7,7 +7,7 @@
  * listen. Screen share (display capture) comes with phase 4. No business
  * logic.
  */
-import { session, systemPreferences, type Session, type WebContents } from 'electron'
+import { session, shell, systemPreferences, type Session, type WebContents } from 'electron'
 import { APP_ORIGIN } from './scheme'
 
 const fromApp = (url: string | undefined) => {
@@ -29,6 +29,13 @@ async function microphoneAllowed(): Promise<boolean> {
   if (status === 'granted') return true
   if (status === 'denied' || status === 'restricted') return false
   return systemPreferences.askForMediaAccess('microphone')
+}
+
+/** System Settings at Privacy & Security, Microphone, where the user lets Juno use it again (SPEC 20, "Microphone blocked"). */
+export const MICROPHONE_SETTINGS_URL = 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone'
+
+export async function openMicrophoneSettings(): Promise<void> {
+  await shell.openExternal(MICROPHONE_SETTINGS_URL)
 }
 
 /** Call once, when the app is ready, on the session the main window uses. */

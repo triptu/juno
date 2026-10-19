@@ -19,6 +19,7 @@ interface FakeMedia {
   getSnapshot(): { readonly local: { readonly attendeeId: string | undefined; readonly muted: boolean }; readonly connection: { readonly state: string } }
   addRemote(remote: { readonly userId: string }): string
   end(reason: string): void
+  setMicrophoneAccess(access: string): void
   /** The call sounds the page asked for, in order. */
   readonly played: ReadonlyArray<string>
 }
@@ -29,6 +30,7 @@ const localMuted = (win: Page) => win.evaluate(() => (window as unknown as Media
 const attendee = (win: Page) => win.evaluate(() => (window as unknown as MediaWindow).__junoHuddleMedia.getSnapshot().local.attendeeId ?? null)
 const addRemote = (win: Page, userId: string) => win.evaluate((id) => (window as unknown as MediaWindow).__junoHuddleMedia.addRemote({ userId: id }), userId)
 const played = (win: Page) => win.evaluate(() => [...(window as unknown as MediaWindow).__junoHuddleMedia.played])
+const microphoneAccess = (win: Page, access: string) => win.evaluate((given) => (window as unknown as MediaWindow).__junoHuddleMedia.setMicrophoneAccess(given), access)
 const endMedia = (win: Page, reason: string) => win.evaluate((why) => (window as unknown as MediaWindow).__junoHuddleMedia.end(why), reason)
 
 /** Main's quit dialog under JUNO_E2E: recorded, and answered as the test says (`main/index.ts`). */
@@ -227,4 +229,40 @@ test('once the engine stops for good, quitting in a huddle does not ask', async 
   const closed = app.waitForEvent('close')
   await app.evaluate(({ app: electron }) => electron.quit())
   await closed
+})
+
+test('while macOS blocks the microphone, Mute says so and opens System Settings', async ({ juno, fake, win, app }) => {
+  await openEngMain(juno)
+  await win.getByRole('button', { name: 'Start huddle' }).click()
+  const bar = win.getByRole('region', { name: 'Huddle' })
+  // The bar shows once the media session has loaded.
+  await expect(bar).toBeVisible()
+  await expect.poll(() => connection(win)).toBe('connected')
+
+  // macOS turns the microphone off for Juno: the call goes on, muted, so the user can listen.
+  await microphoneAccess(win, 'denied')
+  await expect(bar).toContainText('Microphone blocked')
+  expect(await localMuted(win)).toBe(true)
+  await expect(bar.getByRole('button', { name: /^Mute/ })).toHaveCount(0)
+  await bar.getByRole('button', { name: 'Allow the microphone in System Settings' }).click()
+  await expect.poll(() => hooks(app, 'microphoneSettingsOpened')).toBe(1)
+
+  // The tab's Mute is the same.
+  await bar.getByRole('button', { name: 'Open huddle in #eng' }).click()
+  await juno.tabs.expectActive('eng · Huddle')
+  const controls = win.getByRole('group', { name: 'Huddle controls' })
+  await controls.getByRole('button', { name: 'Allow the microphone in System Settings' }).click()
+  await expect.poll(() => hooks(app, 'microphoneSettingsOpened')).toBe(2)
+
+  // Access comes back: Mute returns, and the user stays muted until they unmute.
+  await microphoneAccess(win, 'granted')
+  await expect(bar).not.toContainText('Microphone blocked')
+  const mute = bar.getByRole('button', { name: /^Mute/ })
+  await expect(mute).toHaveAttribute('aria-pressed', 'true')
+  await mute.click()
+  await expect.poll(() => localMuted(win)).toBe(false)
+
+  const attendeeId = await attendee(win)
+  await bar.getByRole('button', { name: 'Leave' }).click()
+  await chimeDrops(win, fake, attendeeId!)
 })

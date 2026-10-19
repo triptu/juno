@@ -1,0 +1,1 @@
+- 10-20 02:05 · huddle-mic-settings · While macOS blocks the microphone, Mute in the bar and the tab opens System Settings at Privacy & Security, Microphone (`x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone`) through main's `huddle.microphoneSettings`, which takes no URL from the page. Under JUNO_E2E main counts the opens instead, for the test.

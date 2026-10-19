@@ -18,6 +18,8 @@ interface JunoTestHooks {
   readonly dockBadge: () => string
   /** How many times Open Notification Settings opened System Settings. */
   readonly notificationSettingsOpened: () => number
+  /** How many times Mute opened System Settings at Microphone while macOS blocked it. */
+  readonly microphoneSettingsOpened: () => number
   /** As if the Mac woke from sleep. */
   readonly wake: () => void
 }
