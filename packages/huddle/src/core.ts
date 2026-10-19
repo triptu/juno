@@ -24,6 +24,7 @@ import { Offline, Rejected, type HuddleCall, type HuddleError, type HuddlePageRe
 import type { SlackApiError } from '@juno/slack'
 import type { MethodOk } from '@juno/slack-schema'
 import type { HuddleSession } from './Huddle'
+import { failureOf } from './failure'
 import * as L from './lifecycle'
 import { noMedia, pageState, type MediaView, type Received } from './media'
 import { applyJoined, toRunningHuddles, type Running } from './running'
@@ -163,7 +164,7 @@ export const markDue = (to: Attached, channel: string | 'all') =>
 const store = (core: Core, to: Attached, next: L.Lifecycle) =>
   to.session.leaves.write(L.storedIn(next, to.session.workspace)).pipe(
     Effect.as(true),
-    Effect.catch((error) => Effect.logWarning('huddle: the stored leaves were not rewritten', { cause: error.cause }).pipe(Effect.as(false))),
+    Effect.catch((error) => Effect.logWarning('huddle: the stored leaves were not rewritten', { error: failureOf(error) }).pipe(Effect.as(false))),
   )
 
 /** Model `answerJoin` or `joinError`, under the lock. */
@@ -184,7 +185,7 @@ const answered = (core: Core, to: Attached, intent: L.Intent, answer: Result.Res
     // The record is durable before the credentials leave this function (model `answerJoin`).
     const stored = yield* Effect.result(to.session.leaves.write([...L.storedIn(core.s, workspace), record]))
     if (Result.isFailure(stored)) {
-      yield* Effect.logError('huddle: the pending leave was not stored; leaving at once', { cause: stored.failure.cause })
+      yield* Effect.logError('huddle: the pending leave was not stored; leaving at once', { error: failureOf(stored.failure) })
       // As a cancelled answer: never handed out, and left at once.
       core.s = L.answerJoin({ ...core.s, cancel: true }, { ...identity, generation: null }, workspace)
       if (waiter !== undefined) yield* Deferred.die(waiter.deferred, stored.failure)

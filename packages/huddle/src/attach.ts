@@ -13,6 +13,7 @@
  * before the load still counts.
  */
 import { Effect, Queue, Result, Scope } from 'effect'
+import { failureOf } from './failure'
 import { publish, settleWaiters, step, type Attached, type Core } from './core'
 import type { HuddleSession } from './Huddle'
 import * as L from './lifecycle'
@@ -55,7 +56,7 @@ const load = (core: Core, to: Attached) =>
           to.loaded = true
         }))
       }
-      yield* Effect.logWarning('huddle: the stored leaves could not be read; joins wait', { cause: stored.failure.cause })
+      yield* Effect.logWarning('huddle: the stored leaves could not be read; joins wait', { error: failureOf(stored.failure) })
       yield* Effect.sleep(pause)
       pause = Math.min(pause * 2, 30_000)
     }
