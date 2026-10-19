@@ -19,7 +19,7 @@
  * scope, not the caller's fiber, so its answer is handled even after a
  * Leave or while the session closes.
  */
-import { Deferred, Effect, Queue, Result, Semaphore, SubscriptionRef, type Scope } from 'effect'
+import { Deferred, Effect, Fiber, Queue, Result, Semaphore, SubscriptionRef, type Scope } from 'effect'
 import { Offline, Rejected, type HuddleCall, type HuddleError, type HuddleMediaEvent, type HuddleStartResult, type RunningHuddles } from '@juno/contract'
 import type { SlackApiError } from '@juno/slack'
 import type { MethodOk } from '@juno/slack-schema'
@@ -27,6 +27,7 @@ import type { HuddleSession } from './Huddle'
 import * as L from './lifecycle'
 import { applyJoined, toRunningHuddles, type Running } from './running'
 import { codeOf, joinedFrom, joinRequest, leaveRequest, toHuddleError } from './slack'
+import { keepStatus } from './status'
 
 /** What the running-huddle reads know about the socket. `unknown` after `Overflowed`, which may have dropped a connect or a drop. */
 export interface Info {
@@ -74,6 +75,8 @@ export interface Core {
   readonly attempts: Map<string, number>
   readonly callRef: SubscriptionRef.SubscriptionRef<HuddleCall>
   readonly runningRef: SubscriptionRef.SubscriptionRef<RunningHuddles>
+  /** The "In a huddle" status kept for the live call's attendee, if any. */
+  status: { readonly attendeeId: string; readonly fiber: Fiber.Fiber<never> } | undefined
 }
 
 export const gone = (core: Core): L.Gone => (generation) => {
@@ -110,6 +113,7 @@ export const makeCore = Effect.gen(function* () {
     attempts: new Map(),
     callRef: yield* SubscriptionRef.make(toCall(L.initial, new Map())),
     runningRef: yield* SubscriptionRef.make<RunningHuddles>({}),
+    status: undefined,
   }
   return core
 })
@@ -212,6 +216,17 @@ const sendLeave = (core: Core, to: Attached, record: L.Stored) =>
     core.leavesInFlight -= 1
   })))
 
+/** Keeps the status while the call is live (its media started), and stops it when the call ends or changes. Never waits. */
+const followStatus = (core: Core, to: Attached | undefined) =>
+  Effect.gen(function* () {
+    const live = core.s.current?.started === true ? core.s.current.identity.attendeeId : undefined
+    if (core.status?.attendeeId === live) return
+    const before = core.status
+    core.status = undefined
+    if (before !== undefined) yield* Effect.forkDetach(Fiber.interrupt(before.fiber))
+    if (live !== undefined && to !== undefined) core.status = { attendeeId: live, fiber: yield* Effect.forkIn(keepStatus(to.session), to.work) }
+  })
+
 /** What the rules call for after a change. Runs under the lock. */
 const drive = (core: Core) =>
   Effect.gen(function* () {
@@ -234,6 +249,7 @@ const drive = (core: Core) =>
         yield* Effect.forkIn(join(core, to, intent), to.work)
       }
     }
+    yield* followStatus(core, to)
     yield* settleWaiters(core)
     yield* publish(core)
   })

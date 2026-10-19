@@ -7,6 +7,7 @@
  * - `attach.ts`: a sync's session, and its end.
  * - `reads.ts`: running huddles from room frames and `huddles/info`.
  * - `slack.ts`: the requests, in the official client's shape.
+ * - `status.ts`: the "In a huddle" status while the call is live.
  */
 import { Context, Data, Effect, Layer, Scope, Stream, SubscriptionRef } from 'effect'
 import type { HuddleCall, HuddleError, HuddleMediaEvent, HuddleStartResult, RunningHuddles } from '@juno/contract'
@@ -36,6 +37,8 @@ export interface HuddleSession {
   readonly leaves: LeaveStore
   /** The conversations to read running huddles for after a gap: the ones the user is in. */
   readonly channels: Effect.Effect<ReadonlyArray<string>>
+  /** Tests only: how often the huddle status is renewed (`status.ts`; the app: 240 s). */
+  readonly statusRenewMillis?: number
 }
 
 /** A socket event, or the `SocketEvents` marker for events dropped while the subscriber fell behind. */
