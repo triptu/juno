@@ -8,10 +8,11 @@
 //
 // The first test keeps the 10-16 case: an unread message that mentions
 // someone the store knows, under a newer one that names nobody. Here #eng
-// is small, so that spin cost little; `idle.test.ts` reads a large channel.
+// is small, so that spin cost little; `idle.perf.ts` reads a large channel.
 //
-// JUNO_IDLE_WINDOW_MS sets each state's window (60 s by default, as in
-// the original measurements in performance.md).
+// The portable heavy journey checks CPU and memory on a small seed in under
+// two minutes. App diagnostics are the primary way to catch idle spins in
+// the field. The Mac nightly keeps minute windows and fine process budgets.
 import { rm } from 'node:fs/promises'
 import type { Page } from '@playwright/test'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
@@ -19,21 +20,10 @@ import { largeSeed, startFakeSlack, type FakeSlack } from '@juno/fake-slack'
 import { Juno } from './driver/juno'
 import { expect, hooks, launchApp, tempUserData, test, writeSlackApp, type RunningApp } from './fixtures'
 import { answer, JunoChatPane } from './juno-agent/chat'
+import { portableIdleJourney } from './idleJourney'
 
 const IDLE_WINDOW_MS = Number(process.env.JUNO_IDLE_WINDOW_MS ?? 60_000)
 
-/**
- * performance.md section 1, "Idle CPU": each process's share of one core,
- * averaged over the window, with nothing changing on screen. The engine's
- * 3 % is the 10-16 budget; the rest come from the 10-18 measurements with
- * room for a slower machine.
- */
-type Gate = 'portable' | 'mac'
-
-// Remote runs only look for runaway work. The 25% threshold is far above the
-// 2.45–3.4% readings from three noisy remote failures, and below a sustained
-// spin such as the 100% helper seen earlier this week.
-const RUNAWAY_CEILING = 25
 // A focused text field's native caret blinks at rest. Give only its Window
 // 3%, rather than treating normal Mac text editing as an idle spin.
 const FOCUSED_WINDOW_BUDGET = 3
@@ -60,10 +50,9 @@ async function idleCpu(running: RunningApp, ms: number): Promise<ReadonlyArray<R
   return since(before)
 }
 
-/** Measures `state`, printing readings and applying the platform gate. */
-async function expectIdle(running: RunningApp, state: string, gate: Gate, fake?: FakeSlack): Promise<void> {
-  // Navigation leaves load cleanup, including deferred V8 collections. Let
-  // it settle, then average a full minute as the original measurements did.
+/** Measures `state`, printing readings and applying the Mac budgets. */
+async function expectIdle(running: RunningApp, state: string, fake?: FakeSlack): Promise<void> {
+  // Navigation leaves deferred cleanup; fine Mac budgets need ten seconds.
   await new Promise((resolve) => setTimeout(resolve, SETTLE_MS))
   const focusedTextField = await running.win.evaluate(() => {
     if (!document.hasFocus() || document.visibilityState !== 'visible') return false
@@ -94,8 +83,7 @@ async function expectIdle(running: RunningApp, state: string, gate: Gate, fake?:
   console.log(`idle cpu, ${state} (${IDLE_WINDOW_MS / 1000} s, ${focusedTextField ? 'focused text field' : 'no focused text field'}): ${line}`)
   test.info().annotations.push({ type: 'idle cpu', description: `${state}: ${line}` })
   for (const reading of readings) {
-    const nativeBudget = reading.kind === 'window' && focusedTextField ? FOCUSED_WINDOW_BUDGET : BUDGETS[reading.kind] ?? BUDGETS.other!
-    const budget = gate === 'portable' ? RUNAWAY_CEILING : nativeBudget
+    const budget = reading.kind === 'window' && focusedTextField ? FOCUSED_WINDOW_BUDGET : BUDGETS[reading.kind] ?? BUDGETS.other!
     expect.soft(reading.cpu, `${state}: ${reading.name} (${reading.type}, pid ${reading.pid}) at ${reading.cpu.toFixed(1)} % of a core, budget ${budget} %`).toBeLessThan(budget)
   }
 }
@@ -117,7 +105,7 @@ async function switchTo(win: Page, where: 'aside[data-juno-panel]' | 'main', lab
 }
 
 /** The Juno panel beside a topic with a long chat, Activity in it, then the Juno tab and its Activity, each after the last reply. */
-async function junoStates(running: RunningApp, gate: Gate, fake: FakeSlack): Promise<void> {
+async function junoStates(running: RunningApp, fake: FakeSlack): Promise<void> {
   const { win } = running
   const juno = new Juno(running.app, win)
   await juno.tabs.menu('juno')
@@ -127,11 +115,11 @@ async function junoStates(running: RunningApp, gate: Gate, fake: FakeSlack): Pro
     await panel.expectJuno(`You said: question ${i} about the rollout`)
   }
   await win.mouse.move(400, 400)
-  await expectIdle(running, 'the Juno panel, after a reply, 20 turns', gate, fake)
+  await expectIdle(running, 'the Juno panel, after a reply, 20 turns', fake)
 
   await switchTo(win, 'aside[data-juno-panel]', 'Activity')
   await expect(win.locator('aside[data-juno-panel] [data-juno-header="activity"]')).toBeVisible()
-  await expectIdle(running, 'Activity in the panel', gate, fake)
+  await expectIdle(running, 'Activity in the panel', fake)
   await juno.tabs.menu('juno')
 
   await win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
@@ -139,14 +127,14 @@ async function junoStates(running: RunningApp, gate: Gate, fake: FakeSlack): Pro
   await tab.composer.waitFor()
   await tab.send('one more question')
   await tab.expectJuno('You said: one more question')
-  await expectIdle(running, 'the Juno tab, after a reply', gate, fake)
+  await expectIdle(running, 'the Juno tab, after a reply', fake)
 
   await switchTo(win, 'main', 'Activity')
-  await expectIdle(running, 'Activity in a tab', gate, fake)
+  await expectIdle(running, 'Activity in a tab', fake)
 }
 
 /** Four more topics, each in a tab of its own; then the window minimized, and hidden. */
-async function tabAndWindowStates(running: RunningApp, gate: Gate, fake: FakeSlack): Promise<void> {
+async function tabAndWindowStates(running: RunningApp, fake: FakeSlack): Promise<void> {
   const { app, win } = running
   const juno = new Juno(app, win)
   for (let i = 1; i <= 4; i++) {
@@ -155,83 +143,83 @@ async function tabAndWindowStates(running: RunningApp, gate: Gate, fake: FakeSla
     await expect(win.locator('[data-topic-view]').filter({ visible: true })).toBeVisible({ timeout: 15_000 })
   }
   await win.mouse.move(900, 400)
-  await expectIdle(running, 'several tabs', gate, fake)
+  await expectIdle(running, 'several tabs', fake)
 
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.minimize())
-  await expectIdle(running, 'window minimized', gate, fake)
+  await expectIdle(running, 'window minimized', fake)
   await app.evaluate(({ BrowserWindow }) => {
     const window = BrowserWindow.getAllWindows()[0]!
     window.restore()
     window.hide()
   })
-  await expectIdle(running, 'window hidden', gate, fake)
+  await expectIdle(running, 'window hidden', fake)
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.show())
 }
 
-for (const gate of ['portable', 'mac'] as const) {
-  test.describe(`${gate} process budgets`, { tag: gate === 'mac' ? '@mac' : [] }, () => {
-    test('the engine is idle after sync, with an older unread message that mentions a known person', async ({ juno, slack, running, fake }) => {
-      test.setTimeout(120_000)
+portableIdleJourney()
+
+test.describe('mac process budgets', { tag: '@mac' }, () => {
+  test('the engine is idle after sync, with an older unread message that mentions a known person', async ({ juno, slack, running, fake }) => {
+    test.setTimeout(120_000)
+    await juno.signIn()
+    await juno.sidebar.expectRows()
+    await juno.expectEngineLive()
+    mentionLeo(fake, slack.channel('eng'))
+    slack.as('Maya').postIn('eng', 'thanks, no rush')
+    await expect(juno.sidebar.row('#eng').root).toContainText('thanks, no rush')
+    await expectIdle(running, 'after a mention')
+  })
+
+  test('every process is idle during the first sync while a history call waits', async ({ juno, slack, running }) => {
+    test.setTimeout(120_000)
+    // The first sync waits on one conversation, so the sidebar's syncing card stays.
+    slack.fake.holdNext({ method: 'conversations.history' })
+    await juno.signIn()
+    await expect(juno.sidebar.syncStatus).toHaveText('Syncing with Slack', { timeout: 30_000 })
+    await expectIdle(running, 'syncing card shown')
+    slack.fake.release()
+  })
+
+  // The large seed with Juno on a fake model: each state is reached in turn
+  // in one launch, as a person moves through the app.
+  test('every process at rest on the large seed: Home, a topic, the Juno panel and tab, Activity, several tabs, minimized and hidden', { tag: ['@heavy', '@heavy-idle'] }, async () => {
+    test.setTimeout(20 * IDLE_WINDOW_MS + 600_000)
+    const fake = await startFakeSlack({ seed: largeSeed() })
+    const model = await startFakeOpenRouter({ answer })
+    const userData = await tempUserData()
+    const slackDir = await tempUserData()
+    let running: RunningApp | undefined
+    try {
+      const slackApp = await writeSlackApp(fake, slackDir)
+      running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, agent: true, fakeOpenRouterUrl: model.origin })
+      const { app, win } = running
+      const juno = new Juno(app, win)
       await juno.signIn()
       await juno.sidebar.expectRows()
-      await juno.expectEngineLive()
-      mentionLeo(fake, slack.channel('eng'))
-      slack.as('Maya').postIn('eng', 'thanks, no rush')
-      await expect(juno.sidebar.row('#eng').root).toContainText('thanks, no rush')
-      await expectIdle(running, 'after a mention', gate)
-    })
+      // The large seed's first sync takes a few minutes on a laptop.
+      await juno.expectEngineLive(300_000)
+      await expect.poll(() => hooks(app, 'agentState'), { timeout: 15_000 }).toBe('ready')
+      await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1400, 900))
+      await win.mouse.move(900, 400)
+      await expectIdle(running, 'Home', fake)
 
-    test('every process is idle during the first sync while a history call waits', async ({ juno, slack, running }) => {
-      test.setTimeout(120_000)
-      // The first sync waits on one conversation, so the sidebar's syncing card stays.
-      slack.fake.holdNext({ method: 'conversations.history' })
-      await juno.signIn()
-      await expect(juno.sidebar.syncStatus).toHaveText('Syncing with Slack', { timeout: 30_000 })
-      await expectIdle(running, 'syncing card shown', gate)
-      slack.fake.release()
-    })
+      await juno.sidebar.rows.nth(0).click()
+      await expect(win.locator('[data-topic-view]').filter({ visible: true })).toBeVisible({ timeout: 15_000 })
+      await win.mouse.move(900, 400)
+      await expectIdle(running, 'a topic', fake)
 
-    // The large seed with Juno on a fake model: each state is reached in turn
-    // in one launch, as a person moves through the app.
-    test('every process at rest on the large seed: Home, a topic, the Juno panel and tab, Activity, several tabs, minimized and hidden', { tag: ['@heavy', '@heavy-idle'] }, async () => {
-      test.setTimeout(20 * IDLE_WINDOW_MS + 600_000)
-      const fake = await startFakeSlack({ seed: largeSeed() })
-      const model = await startFakeOpenRouter({ answer })
-      const userData = await tempUserData()
-      const slackDir = await tempUserData()
-      let running: RunningApp | undefined
-      try {
-        const slackApp = await writeSlackApp(fake, slackDir)
-        running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, agent: true, fakeOpenRouterUrl: model.origin })
-        const { app, win } = running
-        const juno = new Juno(app, win)
-        await juno.signIn()
-        await juno.sidebar.expectRows()
-        // The large seed's first sync takes a few minutes on a laptop.
-        await juno.expectEngineLive(300_000)
-        await expect.poll(() => hooks(app, 'agentState'), { timeout: 15_000 }).toBe('ready')
-        await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1400, 900))
-        await win.mouse.move(900, 400)
-        await expectIdle(running, 'Home', gate, fake)
+      await juno.topic.composer.focus()
+      await expect(juno.topic.composer).toBeFocused()
+      await expectIdle(running, 'a topic with its composer focused', fake)
 
-        await juno.sidebar.rows.nth(0).click()
-        await expect(win.locator('[data-topic-view]').filter({ visible: true })).toBeVisible({ timeout: 15_000 })
-        await win.mouse.move(900, 400)
-        await expectIdle(running, 'a topic', gate, fake)
-
-        await juno.topic.composer.focus()
-        await expect(juno.topic.composer).toBeFocused()
-        await expectIdle(running, 'a topic with its composer focused', gate, fake)
-
-        await junoStates(running, gate, fake)
-        await tabAndWindowStates(running, gate, fake)
-      } finally {
-        await running?.close()
-        await fake.close()
-        await model.close()
-        await rm(userData, { recursive: true, force: true })
-        await rm(slackDir, { recursive: true, force: true })
-      }
-    })
+      await junoStates(running, fake)
+      await tabAndWindowStates(running, fake)
+    } finally {
+      await running?.close()
+      await fake.close()
+      await model.close()
+      await rm(userData, { recursive: true, force: true })
+      await rm(slackDir, { recursive: true, force: true })
+    }
   })
-}
+})

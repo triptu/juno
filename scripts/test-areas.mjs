@@ -38,10 +38,11 @@ export const HEAVY_AREAS = [
     area: 'idle',
     suite: 'desktop',
     tag: '@heavy-idle',
-    tests: 'every process at rest on the large seed, in idle-cpu.spec.ts',
+    tests: 'small CPU and memory smoke check, plus fine Mac budgets, in idle-cpu.spec.ts',
     whole: [],
     paths: [
       'apps/desktop/e2e/idle-cpu.spec.ts',
+      'apps/desktop/e2e/idleJourney.ts',
       'apps/desktop/src/main/processes.ts',
       'apps/desktop/src/main/processWatch.ts',
       'apps/desktop/src/main/screenWatch.ts',
