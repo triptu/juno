@@ -10,6 +10,7 @@ import type { ElectronApplication, Page } from '@playwright/test'
 import { TEAM, type FakeSlack } from '@juno/fake-slack'
 import type { Juno } from './driver/juno'
 import { expect, test } from './fixtures'
+import { hooks } from './hooks'
 
 test.describe.configure({ timeout: 90_000 })
 
@@ -152,4 +153,17 @@ test('quitting in a huddle asks first: Cancel keeps the huddle, Quit leaves it',
   await answerQuit(app, 'confirm')
   await running.close()
   expect(fake.calls.find((call) => call.method === 'rooms.leave')?.args).toMatchObject({ channel_id: 'C0ENG', attendee_id: attendeeId })
+})
+
+test('once the engine stops for good, quitting in a huddle does not ask', async ({ juno, win, app }) => {
+  await openEngMain(juno)
+  await win.getByRole('button', { name: 'Start huddle' }).click()
+  await expect.poll(() => connection(win)).toBe('connected')
+
+  // With the engine gone there is nothing left to leave; a Cancel answer would keep the app open if it asked.
+  await hooks(app, 'failEngine')
+  await answerQuit(app, 'cancel')
+  const closed = app.waitForEvent('close')
+  await app.evaluate(({ app: electron }) => electron.quit())
+  await closed
 })
