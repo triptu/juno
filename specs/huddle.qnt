@@ -79,9 +79,16 @@ module huddle {
     s' = { ...s, sent: s.sent.union(Set(a)), unsent: s.unsent.exclude(Set(a)),
       leaveReplies: s.leaveReplies.union(Set(a)), label: "sendLeave" }
   }
-  action leaveAnswer(a: int, answer: str): bool = all {
-    s.leaveReplies.contains(a),
-    s' = { ...s, leaveReplies: s.leaveReplies.exclude(Set(a)), lastReply: answer, label: "leaveAnswer" }
+  // Any answer from Slack, an error included, means it took the leave. A
+  // refusal before Slack took it (a rate limit, the network, the session)
+  // means it did not: the record is pending and unsent again, even if it was
+  // already cleared, and goes out again.
+  action leaveAnswer(a: int, answer: str, bug: int): bool = all {
+    s.up, s.leaveReplies.contains(a),
+    s' = if (answer != "refused") { ...s, leaveReplies: s.leaveReplies.exclude(Set(a)), lastReply: answer, label: "leaveAnswer" }
+      else { ...s, leaveReplies: s.leaveReplies.exclude(Set(a)), lastReply: answer, sent: s.sent.exclude(Set(a)),
+        pending: if (bug == 7) s.pending else s.pending.union(Set(a)),
+        unsent: if (bug == 7) s.unsent else s.unsent.union(Set(a)), label: "leaveRefused" }
   }
   action stopMedia(a: int): bool = all {
     s.up, s.pending.contains(a), a != s.current, not(s.unsent.contains(a)), not(s.stopped.contains(a)),
@@ -93,6 +100,8 @@ module huddle {
   }
   // Chime stops before the renderer's report reaches the engine. Reports can
   // arrive late or twice; another attendee's report never tears down this one.
+  // A renderer page that reloads, crashes or closes stops the media it held
+  // ("pageGone"); main's report of it is the report.
   action forcedStop(a: int, reason: str): bool = all {
     s.media.contains(a),
     s' = { ...s, media: s.media.exclude(Set(a)), stopped: s.stopped.union(Set(a)),
@@ -122,8 +131,17 @@ module huddle {
     s.up,
     s' = { ...s, up: false, current: 0, wanted: 0, request: 0, cancel: false,
       phase: "idle", connected: false, fetching: false, frames: Set(),
-      media: Set(), stopped: s.stopped.union(s.media),
+      media: Set(), stopped: s.stopped.union(s.media), leaveReplies: Set(),
       reports: attendees.mapBy(_ => ""), unsent: s.pending, label: "crash" }
+  }
+  // The engine process alone crashes; the renderer page lives on and keeps
+  // its media until the restarted engine's call names no attendee and the
+  // page stops it (`stopMedia`). A stored record is not taken as stopped.
+  action engineCrash = all {
+    s.up,
+    s' = { ...s, up: false, current: 0, wanted: 0, request: 0, cancel: false,
+      phase: "idle", connected: false, fetching: false, frames: Set(), leaveReplies: Set(),
+      unsent: s.pending, label: "engineCrash" }
   }
   action restart = all {
     not(s.up),
@@ -224,9 +242,9 @@ module huddle {
     any {
       choose(c), leave, requestJoin, answerJoin(a, r, 0), joinError, startMedia,
       sendLeave(a), stopMedia(a), clearLeave(a),
-      leaveAnswer(a, "ok"), leaveAnswer(a, "feature_not_enabled"),
-      forcedStop(a, "AudioJoinedFromAnotherDevice"), forcedStop(a, "connectionLost"), reportStop(a, 0),
-      quit, finishQuit, crash, restart, slackChange(c),
+      leaveAnswer(a, "ok", 0), leaveAnswer(a, "feature_not_enabled", 0), leaveAnswer(a, "refused", 0),
+      forcedStop(a, "AudioJoinedFromAnotherDevice"), forcedStop(a, "connectionLost"), forcedStop(a, "pageGone"), reportStop(a, 0),
+      quit, finishQuit, crash, engineCrash, restart, slackChange(c),
       queueFrame({ kind: kind, channel: c, room: r, attendee: a }),
       roomFrame({ kind: kind, channel: c, room: r, attendee: a }, 0),
       disconnect, reconnect, overflow(0), fetchInfo, answerInfo, infoError, seal
@@ -286,7 +304,7 @@ module huddle {
       else if (turn == 6) disconnect else if (turn == 7) reconnect else seal
     ) else if (which == 7) (
       if (turn == 4) quit else if (turn == 5) sendLeave(1)
-      else if (turn == 6) leaveAnswer(1, "feature_not_enabled")
+      else if (turn == 6) leaveAnswer(1, "feature_not_enabled", 0)
       else if (turn == 7) stopMedia(1) else if (turn == 8) clearLeave(1)
       else if (turn == 9) finishQuit else seal
     ) else if (which == 8) (
@@ -299,6 +317,14 @@ module huddle {
     ) else if (which == 12) (
       if (turn == 4) leave else if (turn == 5) sendLeave(1)
       else if (turn == 6) crash else seal
+    ) else if (which == 13) (
+      if (turn == 4) forcedStop(1, "pageGone") else if (turn == 5) reportStop(1, 0) else seal
+    ) else if (which == 14) (
+      if (turn == 4) engineCrash else if (turn == 5) restart else seal
+    ) else if (which == 15) (
+      if (turn == 4) leave else if (turn == 5) sendLeave(1)
+      else if (turn == 6) stopMedia(1) else if (turn == 7) clearLeave(1)
+      else if (turn == 8) leaveAnswer(1, "refused", bug) else seal
     ) else seal
   )
   action refusedStep = scenario(10, 0)
@@ -319,4 +345,8 @@ module huddle {
   action quitStep = scenario(7, 0)
   action reconnectStep = scenario(8, 0)
   action connectionLostStep = scenario(9, 0)
+  action pageGoneStep = scenario(13, 0)
+  action engineCrashStep = scenario(14, 0)
+  action refusedLeaveStep = scenario(15, 0)
+  action refusedLeaveBugStep = scenario(15, 7)
 }

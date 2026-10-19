@@ -374,12 +374,12 @@ if (!outboxOnly && !memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly)
     { samples: tracesOnly ? 100 : 1000, steps: 96, witnesses: ['reachedAgreement'] })
   const pairs = [
     ['ghost', 'noGhost'], ['oneCall', 'oneCall'], ['cancel', 'leaveDuringJoin'],
-    ['stale', 'noStaleLeave'], ['overflow', 'matchingState'], ['otherDevice', 'otherDevice'],
+    ['stale', 'noStaleLeave'], ['overflow', 'matchingState'], ['otherDevice', 'otherDevice'], ['refusedLeave', 'noGhost'],
   ]
   for (const [schedule, invariant] of pairs) {
     simulate('huddle', `${schedule}BugStep`, invariant, `huddle-${schedule}-bug.itf.json`, true)
   }
-  for (const schedule of [...pairs.map(([name]) => name), 'quit', 'reconnect', 'connectionLost', 'refused', 'crashBeforeMedia', 'crashAfterLeave']) {
+  for (const schedule of [...pairs.map(([name]) => name), 'quit', 'reconnect', 'connectionLost', 'refused', 'crashBeforeMedia', 'crashAfterLeave', 'pageGone', 'engineCrash']) {
     simulate('huddle', `${schedule}Step`, 'invariants', `huddle-${schedule}.itf.json`, false, false,
       { samples: 1, steps: 48, witnesses: ['reachedAgreement'], requireCompletion: true })
   }
