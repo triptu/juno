@@ -5,7 +5,8 @@
  * Quit all reach `before-quit`; this holds it with `preventDefault` until
  * the user answers, and the other `before-quit` listeners skip a held quit.
  * A confirmed quit starts again and goes on as any other: the engine leaves
- * the huddle as it stops. No business logic.
+ * the huddle as it stops. When the engine stops for good the huddle it
+ * reported is dropped, since nothing is left to leave. No business logic.
  *
  * Under JUNO_E2E the dialog is recorded, not shown, and answered as the
  * test says (`testHooks`), Quit by default so a test that ends in a huddle
@@ -75,6 +76,10 @@ export function createHuddleQuit(e2e: boolean, appWindow: () => BrowserWindow | 
       if (message._tag !== 'huddle') return false
       call = message.call
       return true
+    },
+    /** The engine stopped for good: no huddle is left to ask about. */
+    engineFailed(): void {
+      call = null
     },
     confirm,
     testHooks: {

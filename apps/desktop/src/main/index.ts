@@ -112,6 +112,7 @@ const supervisor = createSupervisor({
   },
 })
 const huddleQuit = createHuddleQuit(e2e, appWindow)
+supervisor.onFailed(() => huddleQuit.engineFailed())
 
 /** Under JUNO_E2E notifications are recorded, not shown; a test clicks them through `junoTest`. */
 const notificationsForTests: Array<{ readonly title: string; readonly body: string; click: () => void }> = []

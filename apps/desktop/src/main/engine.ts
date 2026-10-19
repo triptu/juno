@@ -32,6 +32,7 @@ export class EngineSupervisor {
   private readonly pendingPorts = new Map<WebContents, MessagePortMain>()
   private readonly exits: Array<number> = []
   private readonly readyListeners = new Set<() => void>()
+  private readonly failedListeners = new Set<() => void>()
   private aiKey: string | null = null
   private attempt = 0
   private restartTimer: NodeJS.Timeout | undefined
@@ -94,6 +95,11 @@ export class EngineSupervisor {
     this.readyListeners.add(f)
   }
 
+  /** Calls `f` each time the supervisor gives up on the engine. */
+  onFailed(f: () => void): void {
+    this.failedListeners.add(f)
+  }
+
   /** Connects a renderer: one new channel, one end to each side. */
   connect(target: WebContents): PortRequestResult {
     if (this.state === 'failed' || this.state === 'stopped') return 'failed'
@@ -150,6 +156,7 @@ export class EngineSupervisor {
     // Renderers waiting on a port see it close and ask again, and get `failed`.
     for (const port of this.pendingPorts.values()) port.close()
     this.pendingPorts.clear()
+    for (const listener of this.failedListeners) listener()
   }
 
   private end(): void {
