@@ -1,6 +1,6 @@
 # @juno/huddle-media
 
-A huddle's audio, and others' shared screens, in the renderer (`docs/plans/huddles.md`, phase 3, track C, and phase 4). The engine joins the huddle with `rooms.join` and hands the renderer `call.free_willy.{meeting, attendee}`; this package takes those to Chime and reports what happens as a plain store. It is plain TypeScript: no React, Effect, Electron or `window.juno` (`check-deps` holds it to that).
+A huddle's audio, others' shared screens and the user's own, in the renderer (`docs/plans/huddles.md`, phase 3, track C, and phase 4). The engine joins the huddle with `rooms.join` and hands the renderer `call.free_willy.{meeting, attendee}`; this package takes those to Chime and reports what happens as a plain store. It is plain TypeScript: no React, Effect, Electron or `window.juno` (`check-deps` holds it to that).
 
 ## Why it lives in the renderer
 
@@ -8,7 +8,7 @@ WebRTC needs a Chromium page, and the stream has to be in the same page as the e
 
 ## Entries
 
-- `@juno/huddle-media`: the types (`src/types.ts`) and the sound rule (`src/sounds.ts`). It exports only what something imports today (`MediaSession`, `MediaSnapshot`, `Devices`, `EndReason`, `huddleSounds`, `SoundView`), since knip fails on an unused export.
+- `@juno/huddle-media`: the types (`src/types.ts`) and the sound rule (`src/sounds.ts`). It exports only what something imports today (`MediaSession`, `MediaSnapshot`, `Devices`, `EndReason`, `LocalShare`, `ShareEnd`, `ShareSource`, `huddleSounds`, `SoundView`), since knip fails on an unused export.
 - `@juno/huddle-media/chime`: `createChimeMediaSession({ sounds })`, with the urls of the join and leave sounds the app bundles, on `amazon-chime-sdk-js` 3.32.0 (the version Slack ships). The SDK is about 2.2 MB minified (550 KB gzip), so load this entry only with `import()` on join; it must never reach the initial bundle. Only `src/chime/` and the tests may import the SDK.
 - `@juno/huddle-media/fake`: `createFakeMediaSession(options)` for e2e tests and the gallery. No network and no WebRTC. The app loads it as a lazy chunk only when main says the page runs under JUNO_E2E (`huddle.register`), and puts it on `window.__junoHuddleMedia` for the test to drive.
 
@@ -25,6 +25,9 @@ interface MediaSession {
   chooseSpeaker(id: string | null): Promise<void>
   playSound(sound: 'join' | 'leave'): void  // quietly, on the speaker in use; also after an end
   showShare(attendeeId: string, element: HTMLVideoElement): () => void  // plays a share in the element until the returned unbind
+  shareScreen(source: { sourceId; kind; name }): Promise<void>  // captures and shares it, in place of the last
+  stopSharing(): void
+  showOwnShare(element: HTMLVideoElement): () => void  // previews the user's share from its capture until the unbind
   subscribe(listener: () => void): () => void
   getSnapshot(): MediaSnapshot
 }
@@ -40,7 +43,8 @@ The snapshot (`src/types.ts` has the comments):
 - `microphoneAccess`: `unknown`, `prompt`, `granted`, `denied` (macOS or the page refuses it), `unavailable` (no microphone: Chime's `NotFoundError`, or Chromium lists no audio input at all) or `failed` (there is one, but it would not start). `src/chime/microphone.ts` has the rule.
 - `noiseSuppression`: `on`, `off` or `unsupported`.
 - `shares`: others' shared screens, in the order they started (Slack allows two). Each has its `#content` attendee id, the owner's Slack user id (from the share's own `ExternalUserId`, else from the owner's attendee) and `ready`: a frame shows in the element bound with `showShare`. A share is listed from the moment its attendee is present, before any video, so the bar can say who shares at once. The user's own `#content` attendee is never one of them.
-- `localShare`: always `undefined` until sharing your own screen is built.
+- `localShare`: what the user shares (`sourceId`, `kind`, `name`), from the moment its capture runs until it stops; `live` once Chime's `#content` attendee for it is in the call.
+- `shareEnded`: the user's last share that stopped, with `kind`, `reason` (`stopped`, `source-ended`: the window closed or macOS stopped the capture, `failed`) and a rising `seq`. A share replaced by another, or ended with its call, reports nothing.
 
 ## Rules
 
@@ -49,6 +53,7 @@ The snapshot (`src/types.ts` has the comments):
 - **Throttled.** Discrete changes (connection, presence, local mute, devices) publish at once. Speaking, the active speaker and remote mute come from Chime's active speaker detector and volume indicator and publish at most every 100 ms, about 10 snapshots a second.
 - **Single thread.** Everything runs on the renderer's main thread; listeners are called synchronously after each publish and must be cheap. Voice Focus runs in an audio worklet.
 - **Shares are shown, not owned.** The tab gives each share its own `<video>` with `showShare` and calls the unbind when it unmounts. A share no element shows is not received at all, so a share nobody looks at costs no bandwidth or decoding; showing it subscribes to it at Chime's next check, about a second. `firstFrame.ts` decides `ready` the same way for both sessions.
+- **The user's own share.** `shareScreen` captures the source with `getUserMedia` and `chromeMediaSource: 'desktop'` (the id from main's `desktopCapturer`, `huddle.shareSources`), at most 1920 by 1080 and 15 frames a second, with no sound, and hands the stream to Chime's content share. One at a time: a second `shareScreen` replaces the first. `showOwnShare` gives an element the capture's own stream, so a preview costs no second capture. The share stops with its call.
 - **Lifetime.** The session owns one `<audio>` element, created with the session and never put in the page, and binds the call to it. `leave()` or Chime's own stop unbinds it, stops the microphone and frees Voice Focus. `leave()` is safe in any state, also while `join` is still starting.
 - **The engine learns of an end from the snapshot.** When Chime ends the call by itself (`another-device`, `connection-lost`, `meeting-ended`, `removed`, `full`, `failed`), only the renderer knows. The owner of the session watches for `connection.state === 'ended'` with a reason other than `left` and tells the engine, passing `attendeeId`, so the engine can send `rooms.leave` and clear its call. The attendee id makes a late end of an older call easy to ignore.
 
@@ -58,19 +63,20 @@ The snapshot (`src/types.ts` has the comments):
 
 ## Chime set-up
 
-- **Video: shares only.** `ContentOnlyDownlinkPolicy` (`src/chime/contentPolicy.ts`) subscribes to the best stream of each other attendee's `#content` source that an element shows, and nothing else, so a camera someone turns on in Slack is never received. Modelled on the SDK's `AllHighestVideoBandwidthPolicy`; two shares need no bandwidth cap. A change takes effect when Chime's `MonitorTask` next asks `wantsResubscribe` (each metrics report). Chime makes a tile per received share (`isContent`); `ContentTiles` (`src/chime/contentTiles.ts`) binds each to the element `showShare` gave, and tells the policy what is shown. Not `pauseVideoTile`: Chime keys its pause by tile but sends it by stream id, and does not send it again when a share's stream id changes. Juno never starts the camera or its own content share.
+- **Video: shares only.** `ContentOnlyDownlinkPolicy` (`src/chime/contentPolicy.ts`) subscribes to the best stream of each other attendee's `#content` source that an element shows, and nothing else, so a camera someone turns on in Slack is never received. Modelled on the SDK's `AllHighestVideoBandwidthPolicy`; two shares need no bandwidth cap. A change takes effect when Chime's `MonitorTask` next asks `wantsResubscribe` (each metrics report). Chime makes a tile per received share (`isContent`); `ContentTiles` (`src/chime/contentTiles.ts`) binds each to the element `showShare` gave, and tells the policy what is shown. Not `pauseVideoTile`: Chime keys its pause by tile but sends it by stream id, and does not send it again when a share's stream id changes. Juno never starts the camera.
+- **Own share** (`src/chime/ownShare.ts`). Chime runs content share as a second attendee, `<self>#content`, with its own connection and reconnects, and stops the capture's tracks itself when that connection stops. So a new share starts only once Chime says the last one stopped (`contentShareDidStop`, or after 5 s), or Chime's clean-up would stop the new capture. Chime also stops the share when the captured track ends; the session only notes why. A meeting whose features disable content (`contentMaxResolution` of `VideoDisabled`) makes Chime start nothing and say nothing, so the session reports `failed` at once. The share stays through a call's reconnect; its own connection reconnects with it.
 - `reconnectTimeoutMs` is 30 s, so a dropped connection ends as `connection-lost` after SPEC 20's 30 seconds. A first connection that never succeeds ends as `failed`.
 - Chime's logger is off: its lines carry urls and join tokens.
 - **Microphone.** When it cannot start (access off, no device, or it fails), the call goes on with a silent input and muted, so the user can listen. Unmuting is refused until access is back, and the user stays muted then (SPEC 20). A permission change or `listDevices()` tries again.
 - **Voice Focus.** On by default. `join` checks support first; when supported, the device controller runs Web Audio and the model loads after the call starts, then the microphone is restarted through it. When it is unsupported or fails to load (for example a CSP that blocks `*.sdkassets.chime.aws`), the call goes on without it and `noiseSuppression` reads `unsupported`.
 - Slack also rewrites TURN UDP port 3478 to 22466 (research section 1). Juno does not; the spike connected without it.
 
-The integration has to allow, in the renderer's CSP: `connect-src` for Chime's `wss:` and `https:` hosts, and for Voice Focus `script-src`/`worker-src` `https://*.sdkassets.chime.aws` with `'wasm-unsafe-eval'`. Main has to grant the microphone permission to Juno's page. While access is `denied`, Mute opens System Settings at Privacy & Security, Microphone through main (`huddle.microphoneSettings`).
+The integration has to allow, in the renderer's CSP: `connect-src` for Chime's `wss:` and `https:` hosts, and for Voice Focus `script-src`/`worker-src` `https://*.sdkassets.chime.aws` with `'wasm-unsafe-eval'`. Main has to grant the microphone and screen capture to Juno's page (`main/media.ts`), and lists what may be shared (`main/screenShare.ts`). While access is `denied`, Mute opens System Settings at Privacy & Security, Microphone through main (`huddle.microphoneSettings`).
 
 ## The fake
 
-`createFakeMediaSession({ autoConnect, microphones, speakers, microphoneAccess, noiseSuppression })` implements `MediaSession`; `join` connects at once unless `autoConnect` is false. The test drives the rest: `addRemote({ userId, attendeeId?, muted? })`, `removeRemote(id)`, `setSpeaking(id, on)` (the local attendee too; the latest to start is the active speaker), `setRemoteMuted(id, muted)`, `setConnection('connecting' | 'connected' | 'reconnecting')` (only `connected` sends), `setSending(on)`, `end(reason)`, `setMicrophoneAccess(access)`, `setDevices({ microphones, speakers })`, and `startShare(userId)` (returns the share's attendee id) and `stopShare(userId)`. A shown share plays a drawn test pattern (`src/testPattern.ts`: colour bars, its attendee id and a moving block, 15 frames a second from a canvas), so a test can check that video plays. It plays no sound: `played` lists the sounds `playSound` was asked for, in order.
+`createFakeMediaSession({ autoConnect, microphones, speakers, microphoneAccess, noiseSuppression })` implements `MediaSession`; `join` connects at once unless `autoConnect` is false. The test drives the rest: `addRemote({ userId, attendeeId?, muted? })`, `removeRemote(id)`, `setSpeaking(id, on)` (the local attendee too; the latest to start is the active speaker), `setRemoteMuted(id, muted)`, `setConnection('connecting' | 'connected' | 'reconnecting')` (only `connected` sends), `setSending(on)`, `end(reason)`, `setMicrophoneAccess(access)`, `setDevices({ microphones, speakers })`, and `startShare(userId)` (returns the share's attendee id) and `stopShare(userId)` for someone else's share. A shown share plays a drawn test pattern (`src/testPattern.ts`: colour bars, its attendee id and a moving block, 15 frames a second from a canvas), so a test can check that video plays. The user's own share (`shareScreen`) is live at once and plays a test pattern named for the source; `endOwnSource()` ends it as a closed window would, and `failNextShare = true` makes the next one fail. It plays no sound: `played` lists the sounds `playSound` was asked for, in order.
 
 ## Tests
 
-`test/rules.test.ts` covers the pure rules (the `ExternalUserId` parse, the stop code mapping and why the microphone would not start), `test/sounds.test.ts` the sound rule, `test/snapshot.test.ts` snapshot identity and the share rules, and `test/fake.test.ts` drives the fake's timeline. Watching shares runs end to end against the fake in `apps/desktop/e2e/huddle.spec.ts`. The Chime session itself runs against real Chime only in `scripts/huddle-live.ts`, which now uses it; content share against real Chime is checked by hand in a live call.
+`test/rules.test.ts` covers the pure rules (the `ExternalUserId` parse, the stop code mapping and why the microphone would not start), `test/sounds.test.ts` the sound rule, `test/snapshot.test.ts` snapshot identity and the share rules, and `test/fake.test.ts` drives the fake's timeline. Watching shares and sharing your own run end to end against the fake in `apps/desktop/e2e/huddle.spec.ts`. The Chime session itself runs against real Chime only in `scripts/huddle-live.ts`, which now uses it; content share against real Chime, watched and sent, is checked by hand in a live call.

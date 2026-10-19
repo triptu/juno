@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { INITIAL_SNAPSHOT, patchAttendee, presence, shareReady, startCall } from '../src/snapshot.ts'
+import { INITIAL_SNAPSHOT, patchAttendee, presence, setConnection, setLocalShare, shareReady, startCall } from '../src/snapshot.ts'
 import { share, SnapshotStore } from '../src/store.ts'
 
 const ALICE = 'T0123456789-R0123456789-U0AAAAAAAAA'
@@ -84,5 +84,30 @@ describe('screen shares', () => {
     expect(store.getSnapshot().shares[0]?.ready).toBe(true)
     store.update(presence('a#content', false, ''))
     expect(store.getSnapshot().shares).toEqual([])
+  })
+})
+
+describe('the user\'s own share', () => {
+  const window = { sourceId: 'window:7:0', kind: 'window', name: 'Q4 roadmap' } as const
+
+  it('tells two ends alike apart, so each can say why', () => {
+    const store = storeWithTwo()
+    store.update(setLocalShare({ ...window, live: true }))
+    store.update(setLocalShare(undefined, { kind: 'window', reason: 'source-ended' }))
+    const first = store.getSnapshot().shareEnded
+    store.update(setLocalShare({ ...window, live: true }))
+    store.update(setLocalShare(undefined, { kind: 'window', reason: 'source-ended' }))
+    expect(store.getSnapshot().shareEnded).not.toBe(first)
+    expect(store.getSnapshot().shareEnded?.seq).toBe((first?.seq ?? 0) + 1)
+  })
+
+  it('goes with its call, and the next call starts with no share', () => {
+    const store = storeWithTwo()
+    store.update(setLocalShare({ ...window, live: true }))
+    store.update(setConnection({ state: 'ended', reason: 'left', attendeeId: 'self', code: 'Left' }))
+    expect(store.getSnapshot().localShare).toBeUndefined()
+    expect(store.getSnapshot().shareEnded).toBeUndefined()
+    store.update(startCall('self-2'))
+    expect(store.getSnapshot().localShare).toBeUndefined()
   })
 })

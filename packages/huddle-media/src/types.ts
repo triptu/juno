@@ -103,9 +103,36 @@ export interface RemoteShare {
   readonly ready: boolean
 }
 
-/** Phase 4: what the user shares, started from a `chromeMediaSourceId`. Not built yet. */
-export interface LocalShare {
+/** A screen or window to share: the `chromeMediaSourceId` main's `desktopCapturer` gave, and its name. */
+export interface ShareSource {
   readonly sourceId: string
+  readonly kind: 'screen' | 'window'
+  /** "Built-in display", "Q4 roadmap — Docs": the status line says "You're sharing" it. */
+  readonly name: string
+}
+
+/**
+ * What the user shares (docs/plans/huddles.md, phase 4). Present from the
+ * moment the capture runs until the share stops; `live` once Chime's content
+ * attendee is in the call, so others see it.
+ */
+export interface LocalShare extends ShareSource {
+  readonly live: boolean
+}
+
+/**
+ * Why the user's share stopped by itself or by their hand. `source-ended`:
+ * the captured window closed, or macOS stopped the capture. `failed`: the
+ * capture could not start, or Chime could not send it. A share that another
+ * replaced, or that ended with its call, reports nothing.
+ */
+export type ShareEndReason = 'stopped' | 'source-ended' | 'failed'
+
+export interface ShareEnd {
+  /** Rises with each end, so two ends alike still read as two. */
+  readonly seq: number
+  readonly kind: 'screen' | 'window'
+  readonly reason: ShareEndReason
 }
 
 export interface MediaSnapshot {
@@ -120,7 +147,10 @@ export interface MediaSnapshot {
   readonly noiseSuppression: NoiseSuppression
   /** Others' shared screens, in the order they started. */
   readonly shares: ReadonlyArray<RemoteShare>
+  /** The user's own share. */
   readonly localShare: LocalShare | undefined
+  /** The user's last share that stopped, and why; kept until the next end replaces it. */
+  readonly shareEnded: ShareEnd | undefined
 }
 
 /** The `meeting` and `attendee` of `rooms.join`'s `call.free_willy`, as Slack sends them (Chime's own PascalCase shapes). */
@@ -164,6 +194,20 @@ export interface MediaSession {
    * element per share; a second call replaces the first.
    */
   showShare(attendeeId: string, element: HTMLVideoElement): () => void
+  /**
+   * Captures `source` without sound and shares it in the call (Chime content
+   * share), in place of what the user shared before. Resolves once it runs or
+   * failed; a failure shows as `shareEnded`. Does nothing outside a call.
+   */
+  shareScreen(source: ShareSource): Promise<void>
+  /** Stops the user's share, as `stopped`. Safe to call in any state. */
+  stopSharing(): void
+  /**
+   * Shows what the user shares in `element`, from the capture itself (no
+   * second capture), until the returned function is called. A new share
+   * replaces the picture in the same element.
+   */
+  showOwnShare(element: HTMLVideoElement): () => void
   /** Returns the unsubscribe function. */
   subscribe(listener: () => void): () => void
   /** The same object until something changes. */
