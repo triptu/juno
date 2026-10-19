@@ -34,3 +34,9 @@ test('lane workers scale with the reserved cores', () => {
   assert.equal(sideBySide(2).app.JUNO_E2E_WORKERS, '1')
   assert.equal(sideBySide(1).app.GALLERY_WORKERS, '1')
 })
+
+test('wide unit-only plans keep inherited unit concurrency while other lanes stay unchanged', () => {
+  const normal = sideBySide(4)
+  assert.deepEqual(sideBySide(4, true), { ...normal, rest: {} })
+  assert.deepEqual(normal.rest, { JUNO_VITEST_WORKERS: '1', JUNO_TEST_PACKAGE_JOBS: '1' })
+})

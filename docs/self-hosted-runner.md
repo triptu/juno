@@ -11,9 +11,14 @@ wait for runner capacity without a deadline.
 Use an amd64 host with enough RAM for the configured jobs. An 8-core limit with
 16 GB available to Linux is a reasonable starting point. The host's
 `~/.config/juno-runner/cores` file is the total capacity across all clients.
-Use the same Linux account from every client. Unit-only jobs reserve 1 core
-with a Docker CPU limit of 2: `test` (including named files), `test:agent*`,
-`specs:check`, and plans containing only those scripts. Jobs containing
+Use the same Linux account from every client. Wide unit-only jobs reserve 4
+cores with a Docker CPU limit of 4: `test` without named files, `test` with
+more than 20 named files, and `specs:check` without a carried cache (or with
+caching disabled). The same rule applies to unit steps inside `test:plan`.
+The 20-file threshold keeps small affected slices cheap while giving broad
+package-spanning selections the full unit budget; it is a scheduling heuristic,
+not a measured runtime boundary. Narrow selections, `test:agent*`, and cached
+spec checks reserve 1 core with a limit of 2. Jobs containing
 `test:gallery` but no `test:desktop` or `test:e2e` reserve 3 cores with a limit
 of 3. Any desktop or e2e step, alone or in a plan, reserves 4 cores with a
 limit of 4, including plans that also run the gallery. Other scripts keep the
@@ -27,16 +32,52 @@ Jobs release their reservation after Docker stops. Each job has its own containe
 and output directory. A host lock protects reservations. Jobs stop after 3 hours.
 
 Workers use the CPU limit in `JUNO_RUNNER_JOB_CORES`, since `nproc` can see
-all host threads despite Docker's CPU limit. A standalone `test` job reserves
-1 core and uses two vitest workers and one package at a time under its 2-core
-limit. A standalone 4-core app job uses two desktop workers. Gallery-only jobs
+all host threads despite Docker's CPU limit. A narrow unit job uses two
+Vitest workers in one package under its 2-core limit. A wide job runs two
+packages with four Vitest workers each under its 4-core limit.
+`JUNO_RUNNER_WIDE_UNIT=1` selects one worker per allocated core in each
+package. Narrow and app jobs keep their existing counts.
+A standalone 4-core app job uses two desktop workers. Gallery-only jobs
 use three workers and shift parts at 3 cores, as they do at 4. Quint uses
 one simulation per two cores and one Apalache checker per four, at least one
-each. In a plan with several lanes, 4 cores give the app two desktop or three
+each. Wide unit-only plans retain their unit workers beside the spec lane.
+In a plan with app steps, 4 cores give the app two desktop or three
 gallery workers, the unit lane one worker in one package, and the spec lane
 one simulation plus one checker. Step environment settings still win.
 
 ## Laptop measurements
+
+The initial full unit run on 2026-10-19 used two packages with two Vitest
+workers each. It passed in 325 s script time and 328.53 s wall time, averaging
+50% CPU with 1.54 GiB peak container memory.
+
+Worker tuning uses the same full suite, four reserved cores, a four-core CPU
+limit, two package jobs, and a warm image and dependency store. Each setting
+runs once, sequentially. CPU busy is the two-second cgroup average as a share
+of the four-core limit. Peak container memory includes file cache.
+
+| Vitest workers per package | Script time | CPU busy, average | Peak memory | Result |
+| --- | --- | --- | --- | --- |
+| 4, one per core | 224 s | 78% | 1.90 GiB | Passed |
+| 8, two per core | 262 s | 82% | 2.36 GiB | Two engine assertions failed |
+| 12, three per core | 268 s | 84% | 3.06 GiB | Same two engine assertions failed |
+
+Select four workers per package with two package jobs. This was the fastest
+passing setting, averaging 78% CPU with 1.90 GiB peak container memory. Its
+wall time was 226.74 s.
+The four-worker run passed 1,803 tests in 197 files across 18 package
+summaries, retaining the normal skips. Both higher-worker runs failed
+assertions in `test/home.test.ts` and `test/sync.test.ts` and stopped before
+desktop unit tests. Both containers had a 100% CPU median despite averages
+below 90%. Another eight-core runner job started during the eight-worker run. Before the twelve-worker
+run, that job used about 0.4 of a core and 1 GiB memory. These are single
+observations on a shared host, not measurements of run-to-run variation.
+
+Run each setting separately, replacing `<workers>` with 4, 8, or 12:
+
+```sh
+JUNO_REMOTE_MAX_VCPU=0 pnpm remote --env JUNO_TEST_PACKAGE_JOBS=2 --env JUNO_VITEST_WORKERS=<workers> test
+```
 
 Measured on 2026-10-19 on the owner's Linux x86_64 laptop with 24 threads and
 30 GiB RAM. One successful run per size, sequentially, with the image already
@@ -75,9 +116,10 @@ fallback during measurement.
 
 The owner chose to lend 16 of the laptop's 24 threads in
 `~/.config/juno-runner/cores`, leaving eight for the desktop. Admission allows
-4 app plans, or 5 gallery jobs, or 16 unit jobs at once, or mixtures with
-`4 * app + 3 * gallery + unit <= 16`. At the measured peaks, four app plans
-use about 11.04 GiB, five gallery jobs 9.25 GiB, and sixteen unit jobs
+4 app plans, or 5 gallery jobs, or 4 wide unit jobs, or 16 narrow unit jobs
+at once, or mixtures with `4 * app + 3 * gallery + 4 * wide + narrow <= 16`.
+At the earlier measured slice peaks, four app plans
+use about 11.04 GiB, five gallery jobs 9.25 GiB, and sixteen narrow unit jobs
 19.36 GiB, below the roughly 24 GB job budget. The measured peaks remain
 2.76 GiB per app plan, 1.85 GiB per gallery slice and 1.21 GiB per unit slice;
 16 is the owner's choice, not a limit derived from these measurements. These

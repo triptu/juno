@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-19 05:10 · wide-ssh-unit-jobs · Reserve and limit wide SSH unit jobs to four cores for full runs, selections over 20 files, and spec checks without a carried cache. Use two packages with four Vitest workers each at four cores, including in unit-only plans. The 4/8/12-worker comparison selected four: 224 s at 78% CPU, while higher counts failed engine assertions. Keep narrow, app and explicit resource sizes unchanged.
 - 10-19 04:52 · half-open-test-clock · Advance the half-open socket repair test with TestClock after each completed sweep; the laptop run exposed a race between sweep work and the fast real pong deadline, so the test now advances the production deadline explicitly.
 - 10-19 04:39 · socket-test-barrier · Register the test socket barrier as a scoped SocketEvents subscriber at engine startup; SyncRunner keeps the shared publisher, and the barrier observes completed sync write attempts without coupling independent subscribers.
 - 10-19 04:18 · command-and-replay-barriers · Observe commands admitted to a target lock instead of sleeping; before a conformance trace allows a copy delete, await a worker pass to finish any rejected request checked before the preceding world change.

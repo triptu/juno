@@ -4,7 +4,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSyn
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { test } from 'node:test'
-import { runnerConfig, runnerCommand } from './runner.mjs'
+import { runnerConfig, runnerCommand, runnerJobSize } from './runner.mjs'
 import { imageTag } from './image.mjs'
 import { sideBySide } from '../plan.mjs'
 import { parseRun } from './usage.mjs'
@@ -45,9 +45,9 @@ test('runner reservations wait 60 seconds, or indefinitely when Namespace is dis
 
 test('container workers use the CPU limit, preserve overrides and keep Namespace defaults', () => {
   const workerKeys = ['JUNO_TEST_PACKAGE_JOBS', 'JUNO_VITEST_WORKERS', 'JUNO_E2E_WORKERS', 'GALLERY_WORKERS', 'GALLERY_SHIFT_PARTS', 'SPECS_JOBS', 'SPECS_APALACHE']
-  const workers = (cores, overrides = {}) => {
+  const workers = (cores, overrides = {}, wideUnit = false) => {
     const child = spawnSync('bash', ['-uc', 'nproc() { echo 8; }; source "$1" "$2"; env', '_', resolve('scripts/remote/workers.sh'), 'test'], {
-      env: { ...process.env, ...Object.fromEntries(workerKeys.map((key) => [key, undefined])), JUNO_RUNNER_JOB_CORES: cores, ...overrides }, encoding: 'utf8',
+      env: { ...process.env, ...Object.fromEntries(workerKeys.map((key) => [key, undefined])), JUNO_RUNNER_JOB_CORES: cores, JUNO_RUNNER_WIDE_UNIT: wideUnit ? '1' : '0', ...overrides }, encoding: 'utf8',
     })
     assert.equal(child.status, 0, child.stderr)
     const env = Object.fromEntries(child.stdout.trim().split('\n').map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]))
@@ -57,10 +57,24 @@ test('container workers use the CPU limit, preserve overrides and keep Namespace
   assert.deepEqual(workers('3'), [1, 3, 1, 3, 3, 1, 1])
   assert.equal(sideBySide(3).app.GALLERY_WORKERS, '3')
   assert.equal(sideBySide(3).app.GALLERY_SHIFT_PARTS, '3')
-  assert.deepEqual(workers('4'), [1, 4, 2, 3, 3, 2, 1])
-  assert.deepEqual(workers('8'), [1, 8, 8, 6, 6, 4, 2])
+  assert.deepEqual(workers('4'), [2, 2, 2, 3, 3, 2, 1])
+  assert.deepEqual(workers('8'), [2, 4, 8, 6, 6, 4, 2])
+  assert.deepEqual(workers('4', {}, true), [2, 4, 2, 3, 3, 2, 1])
+  assert.deepEqual(workers('8', {}, true), [2, 8, 8, 6, 6, 4, 2])
+  assert.deepEqual(workers('4', { JUNO_VITEST_WORKERS: '3', JUNO_TEST_PACKAGE_JOBS: '1' }, true), [1, 3, 2, 3, 3, 2, 1])
   assert.deepEqual(workers(undefined), [2, 8, 8, 24, 24, 4, 2])
   assert.deepEqual(workers('4', Object.fromEntries(workerKeys.map((key) => [key, '1']))), [1, 1, 1, 1, 1, 1, 1])
+})
+
+test('spec cache presence and step overrides select narrow or wide jobs', () => {
+  const size = (script, args, specsCached) => runnerJobSize({ script, args, specsCached }, 16)
+  assert.deepEqual(size('specs:check', [], true), { reserved: 1, cpus: 2, wideUnit: false })
+  assert.deepEqual(size('specs:check', [], false), { reserved: 4, cpus: 4, wideUnit: true })
+  assert.deepEqual(size('specs:check', ['--no-cache'], true), { reserved: 4, cpus: 4, wideUnit: true })
+  assert.deepEqual(size('test:plan', ['test', 'test/a.test.ts', '+', 'specs:check'], true), { reserved: 1, cpus: 2, wideUnit: false })
+  for (const override of ['SPECS_CACHE=off', 'SPECS_RUN_CACHE=off']) {
+    assert.deepEqual(size('test:plan', [override, 'specs:check'], true), { reserved: 4, cpus: 4, wideUnit: true })
+  }
 })
 
 // Exercise the public CLI through fake transports, including workspace streaming.
@@ -82,6 +96,7 @@ if (command.includes('docker build')) {
  console.log('__juno_runner_connected\\njuno-runner-ready ' + (process.env.TEST_CAPACITY || '4'));
 } else if (command.includes('__juno_remote_exit_')) {
  fs.appendFileSync(process.env.TEST_CALLS, 'reservation ' + command.match(/ -- (\\d+) '/)[1] + ' cpus ' + command.match(/--cpus (\\d+)/)[1] + ' job-cores ' + command.match(/JUNO_RUNNER_JOB_CORES=(\\d+)/)[1] + '\\n');
+ fs.appendFileSync(process.env.TEST_CALLS, 'wide-unit ' + command.match(/JUNO_RUNNER_WIDE_UNIT=(\\d+)/)[1] + '\\n');
  if (process.env.TEST_MODE === 'busy') { console.log('__juno_remote_started\\n__juno_remote_busy\\n__juno_remote_released'); process.exit(75); }
  fs.appendFileSync(process.env.TEST_CALLS, (command.includes('JUNO_REMOTE_INSTALL=1') && command.includes('PNPM_CONFIG_STORE_DIR=/cache/pnpm-store') && command.includes('--user') ? 'install with cache' : 'full image') + '\\n');
  const marker = command.match(/__juno_remote_exit_[\\w-]+=/)[0];
@@ -104,36 +119,57 @@ if (command.includes('docker build')) {
   return { dir, calls, env }
 }
 
+const jobSizeFiles = Array.from({ length: 21 }, (_, index) => `test/file-${index}.test.ts`)
+const jobSizeCases = [
+  [[], ['test'], {}, 4, 4, 1],
+  [[], ['test', '--passWithNoTests'], {}, 4],
+  [[], ['test', ...jobSizeFiles.slice(0, 20)], {}, 1, 2],
+  [[], ['test', ...jobSizeFiles], {}, 4],
+  [[], ['test:plan', 'test', ...jobSizeFiles], {}, 4],
+  [[], ['test:plan', 'test', 'test/messages.test.ts'], {}, 1, 2],
+  [[], ['test', '--passWithNoTests', 'test/messages.test.ts'], {}, 1, 2, 0],
+  [[], ['test:agent'], {}, 1, 2],
+  [[], ['test:agent-testing'], {}, 1, 2],
+  [[], ['test:agent-contracts'], {}, 1, 2],
+  [[], ['specs:check'], {}, 4],
+  [[], ['specs:check'], { TEST_SPEC_CACHE: '1' }, 1, 2],
+  [[], ['specs:check', '--no-cache'], { TEST_SPEC_CACHE: '1' }, 4],
+  [[], ['specs:check'], { TEST_SPEC_CACHE: '1', SPECS_CACHE: 'off' }, 4],
+  [['--env', 'SPECS_CACHE=off'], ['specs:check'], { TEST_SPEC_CACHE: '1' }, 4],
+  [[], ['test:plan', 'test', 'test/a.test.ts', '+', 'specs:check'], { TEST_SPEC_CACHE: '1' }, 1, 2],
+  [[], ['test:plan', 'test', '+', 'specs:check'], { TEST_SPEC_CACHE: '1' }, 4],
+  [[], ['test:desktop', 'e2e/topic.spec.ts'], {}, 4],
+  [[], ['test:gallery'], {}, 3, 3, 0],
+  [[], ['test:e2e'], {}, 4],
+  [[], ['test:plan', 'test', '+', 'SPECS_JOBS=1', 'specs:check'], {}, 4, 4, 1],
+  [[], ['test:plan', 'test', '--grep', 'test:desktop'], {}, 4],
+  [[], ['test:plan', 'test', '+', 'JUNO_E2E_WORKERS=2', 'test:desktop'], {}, 4, 4, 0],
+  [[], ['test:plan', 'GALLERY_SHIFT_ONLY=Chip', 'test:gallery', '+', 'test'], {}, 3],
+  [[], ['test:plan', 'test:e2e'], {}, 4],
+  [[], ['test:plan', 'test:gallery', '+', 'test:desktop'], {}, 4],
+  [[], ['test:plan', 'test:gallery', '+', 'test:e2e'], {}, 4],
+  [[], ['test:plan', 'lint'], {}, 8],
+  [['--machine', 'linux/amd64:8x16'], ['test'], {}, 8],
+  [['--machine', 'linux/amd64:1x2'], ['test'], {}, 1],
+  [['--machine', 'linux/amd64:6x12'], ['test:gallery'], {}, 6],
+  [[], ['test'], { TEST_CAPACITY: '1' }, 1],
+  [[], ['test'], { JUNO_REMOTE_MACHINE: 'linux/amd64:6x12' }, 6],
+  [['--machine', 'linux/amd64:4x8'], ['test'], { JUNO_REMOTE_MACHINE: 'linux/amd64:8x16' }, 4, 4, 1],
+  [['--machine', 'linux/amd64:4x8'], ['test', 'test/a.test.ts'], {}, 4, 4, 0],
+  [[], ['test:desktop'], { TEST_CAPACITY: '2' }, 2],
+]
+
 test('SSH job sizes follow scripts and plan steps, with explicit sizes taking precedence', () => {
   const { dir, calls, env } = runnerHarness()
   const runs = []
-  const cases = [
-    [[], ['test', '--passWithNoTests', 'test/messages.test.ts'], {}, 1, 2],
-    [[], ['test:agent'], {}, 1, 2],
-    [[], ['test:agent-testing'], {}, 1, 2],
-    [[], ['test:agent-contracts'], {}, 1, 2],
-    [[], ['specs:check'], {}, 1, 2],
-    [[], ['test:desktop', 'e2e/topic.spec.ts'], {}, 4],
-    [[], ['test:gallery'], {}, 3],
-    [[], ['test:e2e'], {}, 4],
-    [[], ['test:plan', 'test', '+', 'SPECS_JOBS=1', 'specs:check'], {}, 1, 2],
-    [[], ['test:plan', 'test', '--grep', 'test:desktop'], {}, 1, 2],
-    [[], ['test:plan', 'test', '+', 'JUNO_E2E_WORKERS=2', 'test:desktop'], {}, 4],
-    [[], ['test:plan', 'GALLERY_SHIFT_ONLY=Chip', 'test:gallery', '+', 'test'], {}, 3],
-    [[], ['test:plan', 'test:e2e'], {}, 4],
-    [[], ['test:plan', 'test:gallery', '+', 'test:desktop'], {}, 4],
-    [[], ['test:plan', 'test:gallery', '+', 'test:e2e'], {}, 4],
-    [[], ['test:plan', 'lint'], {}, 8],
-    [['--machine', 'linux/amd64:8x16'], ['test'], {}, 8],
-    [['--machine', 'linux/amd64:1x2'], ['test'], {}, 1],
-    [['--machine', 'linux/amd64:6x12'], ['test:gallery'], {}, 6],
-    [[], ['test'], { TEST_CAPACITY: '1' }, 1, 2],
-    [[], ['test'], { JUNO_REMOTE_MACHINE: 'linux/amd64:6x12' }, 6],
-    [['--machine', 'linux/amd64:4x8'], ['test'], { JUNO_REMOTE_MACHINE: 'linux/amd64:8x16' }, 4],
-    [[], ['test:desktop'], { TEST_CAPACITY: '2' }, 2],
-  ]
   try {
-    for (const [flags, args, overrides, cores, cpus = cores] of cases) {
+    for (const [flags, args, overrides, cores, cpus = cores, wideUnit] of jobSizeCases) {
+      const cache = join(dir, 'juno-cache/specs')
+      rmSync(cache, { recursive: true, force: true })
+      if (overrides.TEST_SPEC_CACHE) {
+        mkdirSync(cache, { recursive: true })
+        writeFileSync(join(cache, 'passed.json'), '{}')
+      }
       writeFileSync(calls, '')
       const child = spawnSync(process.execPath, ['scripts/remote.mjs', ...flags, ...args], {
         env: { ...env, TEST_MODE: 'healthy', TEST_CAPACITY: '16', JUNO_REMOTE_MACHINE: undefined, ...overrides }, encoding: 'utf8', timeout: 30_000,
@@ -143,6 +179,7 @@ test('SSH job sizes follow scripts and plan steps, with explicit sizes taking pr
       assert.equal(child.status, 7, child.stderr)
       assert.match(child.stderr, new RegExp(`SSH runner \\(${cores} cores\\)`))
       assert.match(readFileSync(calls, 'utf8'), new RegExp(`reservation ${cores} cpus ${cpus} job-cores ${cpus}\\n`))
+      if (wideUnit !== undefined) assert.match(readFileSync(calls, 'utf8'), new RegExp(`wide-unit ${wideUnit}\\n`))
       const log = readFileSync(join(path, 'run.log'), 'utf8')
       assert.equal(parseRun(log).cores, cores)
       assert.equal(JSON.parse(/^remote: summary (.+)$/m.exec(log)[1]).cpuLimit, cpus)
