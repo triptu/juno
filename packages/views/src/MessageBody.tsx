@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import type { BodyBlock, BodyInline, MessageBody as MessageBodyModel } from '@juno/contract'
 import { colors, radii, spacing, text, weights, sizes } from '@juno/tokens/tokens.stylex'
 import { Chip, CodeBlock, Divider, focusRing, Text, type ActivateEvent, type HueName } from '@juno/ui'
-import { AttachmentCard, AttachmentFields, AttachmentImage, SharedPlace } from './AttachmentCard'
+import { AttachmentCard, AttachmentFields, AttachmentImage, SharedFileLines, SharedPlace, type FileBlock } from './AttachmentCard'
 import { MessageLink as Link, type LinkInfo } from './MessageLink'
 import { slackDate } from './time'
 
@@ -25,6 +25,11 @@ export interface MessageBodyProps {
    * in every message. Default false.
    */
   readonly tabbable?: boolean
+  /**
+   * Draws the files of a shared message inside its card, given in Slack's
+   * order. Without it each is a quiet line with its kind and name.
+   */
+  readonly renderFiles?: ((files: ReadonlyArray<FileBlock>) => ReactNode) | undefined
 }
 
 // An emoji-only message (one to three emoji and nothing else) is drawn
@@ -49,16 +54,17 @@ export function isEmojiOnly(body: MessageBodyModel): boolean {
  * Draws a `MessageBody`: paragraphs, quotes, code, lists, headings and
  * rules, with mentions as chips, links (Slack links to this workspace open
  * inside Juno, the rest outside), emoji and dates.
- * Files are not drawn here; the message draws them from its `files`. Text
- * is selectable and follows its own direction.
+ * The message's own files are not drawn here; the message draws them from
+ * its `files`. A shared message's files are drawn in its card, by
+ * `renderFiles`. Text is selectable and follows its own direction.
  */
-export function MessageBody({ body, now, hueOf, onChannel, onLink, linkInfo, tabbable = false }: MessageBodyProps) {
+export function MessageBody({ body, now, hueOf, onChannel, onLink, linkInfo, tabbable = false, renderFiles }: MessageBodyProps) {
   const jumbo = isEmojiOnly(body)
   const tabIndex = tabbable ? 0 : -1
   return (
     <div data-msg-text="" {...stylex.props(styles.body, jumbo && styles.jumbo)}>
       {body.blocks.map((block, index) => (
-        <Block key={index} block={block} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} />
+        <Block key={index} block={block} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} renderFiles={renderFiles} />
       ))}
     </div>
   )
@@ -72,18 +78,22 @@ interface BlockProps {
   readonly onLink: ((url: string, event: ActivateEvent) => void) | undefined
   readonly linkInfo: LinkInfo | undefined
   readonly tabIndex: 0 | -1
+  readonly renderFiles?: ((files: ReadonlyArray<FileBlock>) => ReactNode) | undefined
 }
 
-function Block({ block, now, hueOf, onChannel, onLink, linkInfo, tabIndex }: BlockProps) {
+function Block({ block, now, hueOf, onChannel, onLink, linkInfo, tabIndex, renderFiles }: BlockProps) {
   switch (block.kind) {
-    case 'attachment':
+    case 'attachment': {
+      const files = block.blocks.filter((child): child is FileBlock => child.kind === 'file')
       return <AttachmentCard attachment={block} tabbable={tabIndex === 0}
         title={<Inlines inlines={block.title} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} />}
         // A shared message's place opens the message, as a Slack link in the text does.
         source={block.source && <Link url={block.source.url} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} quiet><SharedPlace source={block.source} /></Link>}
         footer={<Inlines inlines={block.footer} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} quiet />}>
         {block.blocks.map((child, index) => <Block key={index} block={child} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} />)}
+        {files.length === 0 ? null : renderFiles === undefined ? <SharedFileLines files={files} /> : renderFiles(files)}
       </AttachmentCard>
+    }
     case 'image':
       return <AttachmentImage image={block} />
     case 'fields':
@@ -142,7 +152,7 @@ function Block({ block, now, hueOf, onChannel, onLink, linkInfo, tabIndex }: Blo
         </div>
       )
     case 'file':
-      // Drawn by the message from its `files`, which carry the thumbnail.
+      // Drawn by the message from its `files`, which carry the thumbnail; in a card, after its words.
       return null
   }
 }

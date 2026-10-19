@@ -884,7 +884,7 @@ Show less, a ghost button whose text starts at the body's edge. Images reserve t
 caps; missing dimensions reserve a 3:2 box. Integration event summaries use
 the attachment or header title for the topic fallback. Previews and search
 include structured content, under the existing preview privacy treatment.
-A shared Slack message's footer starts with its place (`SharedPlace`, SPEC 7, "Shared messages"): "Thread in" for a reply, the kind glyph at 12 (`kindIcon`; the lock is named "Private channel") and the name, 4px apart, as a quiet `MessageLink` (the footer's muted colour, underlined on hover, the arrow cursor inside Juno), then " · " and the date. With no known place, Slack's footer text is that quiet link. Gallery: `AttachmentCard` › shared-message, shared-thread-private, shared-dm, shared-elsewhere.
+A shared Slack message's footer starts with its place (`SharedPlace`, SPEC 7, "Shared messages"): "Thread in" for a reply, the kind glyph at 12 (`kindIcon`; the lock is named "Private channel") and the name, 4px apart, as a quiet `MessageLink` (the footer's muted colour, underlined on hover, the arrow cursor inside Juno), then " · " and the date. With no known place, Slack's footer text is that quiet link. The shared message's files follow its words, drawn by the message's `Files` with no space above (`flush`); a file Juno has no details for is a quiet line (`SharedFileLines`): the kind icon at 14, then "Video: name" in the muted UI text, 6px apart. Gallery: `AttachmentCard` › shared-message, shared-thread-private, shared-dm, shared-elsewhere, shared-video, shared-files-quiet.
 
 ## 22. Huddles
 

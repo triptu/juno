@@ -1,12 +1,15 @@
 import * as stylex from '@stylexjs/stylex'
 import { useState, type ReactNode } from 'react'
-import type { BodyBlock, BodyInline } from '@juno/contract'
+import type { BodyBlock, BodyInline, FileKind } from '@juno/contract'
 import { colors, spacing, text, tints, layout, radii } from '@juno/tokens/tokens.stylex'
-import { Button, Icon } from '@juno/ui'
+import { Button, Icon, Text } from '@juno/ui'
+import { fileIcon } from './FileCard'
 import { kindIcon } from './look'
 import { thumbnailBox } from './MediaGrid'
 
 type Attachment = Extract<BodyBlock, { kind: 'attachment' }>
+/** A file as a body names it; the message's `files` carry its thumbnail. */
+export type FileBlock = Extract<BodyBlock, { kind: 'file' }>
 
 /**
  * `source` is a shared message's place, drawn by the caller as a link to
@@ -34,6 +37,29 @@ export function SharedPlace({ source }: { readonly source: NonNullable<Attachmen
     <Icon icon={kindIcon(source.kind)} size={12} {...(source.kind === 'private' ? { label: 'Private channel' } : {})} />
     <bdi>{source.name}</bdi>
   </span>
+}
+
+/**
+ * A shared message's files when Juno has nothing to draw them with: one
+ * quiet line each, its kind and name in the sidebar preview's words
+ * ("Video: demo.mov", "File: report.pdf").
+ */
+export function SharedFileLines({ files }: { readonly files: ReadonlyArray<FileBlock> }) {
+  return files.map((file) => {
+    const kind = fileKindOf(file.mimetype)
+    const word = kind === 'image' ? 'Image' : kind === 'video' ? 'Video' : kind === 'audio' ? 'Audio' : 'File'
+    return <div key={file.id} data-shared-file="" {...stylex.props(styles.fileLine)}>
+      <Icon icon={fileIcon[kind]} size={14} />
+      <Text variant="ui" tone="muted" truncate dir="auto" title={file.name} data-sensitive="">{`${word}: ${file.name}`}</Text>
+    </div>
+  })
+}
+
+function fileKindOf(mimetype: string): FileKind {
+  if (mimetype.startsWith('image/')) return 'image'
+  if (mimetype.startsWith('video/')) return 'video'
+  if (mimetype.startsWith('audio/')) return 'audio'
+  return mimetype === 'application/pdf' ? 'pdf' : 'file'
 }
 
 /** Two-column fields, in attachments and Block Kit sections. `render` draws a run of inlines. */
@@ -100,6 +126,7 @@ const styles = stylex.create({
     marginBlock: `calc(-1 * ${spacing['--space-1']})`,
   },
   footer: { fontSize: text['--text-tag-small-size'], color: colors['--foreground-muted'] },
+  fileLine: { display: 'flex', alignItems: 'center', gap: spacing['--space-1-5'], minWidth: 0, color: colors['--foreground-muted'] },
   place: { display: 'inline-flex', alignItems: 'center', gap: spacing['--space-1'], verticalAlign: 'bottom' },
   imageBox: (width: number, height: number) => ({ position: 'relative', flexShrink: 0, width, height, maxWidth: '100%', aspectRatio: `${width} / ${height}`, backgroundColor: colors['--background-subtle'], borderRadius: radii['--radius-md'], overflow: 'hidden' }),
   image: { position: 'absolute', inset: 0, display: 'block', width: '100%', height: '100%', objectFit: 'contain' },
