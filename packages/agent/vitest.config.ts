@@ -9,6 +9,7 @@ export default defineConfig({
     // Several agents share one machine; keep each run small (see scripts/heavy.mjs).
     // A machine of its own (pnpm remote) sets JUNO_VITEST_WORKERS higher.
     maxWorkers: Number(process.env.JUNO_VITEST_WORKERS ?? 2),
+    setupFiles: process.env.JUNO_UNIT_PROFILE === '1' ? ['test/profile.ts'] : [],
     projects: [
       {
         extends: true,

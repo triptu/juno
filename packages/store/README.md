@@ -44,7 +44,7 @@ Indexes the sidebar relies on (`docs/performance.md` section 6): `topic_index (l
 
 ## Testing
 
-`pnpm --filter @juno/store test`. Tests open a real store on a temporary directory (`test/helpers.ts`) and use `@effect/vitest`. `it.effect` runs on a `TestClock`, so tests advance the debounce with `TestClock.adjust(DEFAULT_LIVE_QUERY_DEBOUNCE)`. SQLite is `node:sqlite`; Electron 44 runs Node 24, so see `docs/development.md` for running the suite under Electron's Node.
+`pnpm --filter @juno/store test`. Tests open a real store on a private temporary directory (`test/helpers.ts`) and use `@effect/vitest`. Remote runs set `JUNO_TEST_FILE_PARALLEL=1` to overlap files in separate workers; synchronous SQLite handles and files are never shared. `it.effect` runs on a `TestClock`, so tests advance the debounce with `TestClock.adjust(DEFAULT_LIVE_QUERY_DEBOUNCE)`. SQLite is `node:sqlite`; Electron 44 runs Node 24, so see `docs/development.md` for running the suite under Electron's Node.
 
 Home's Recent reads recent own sends through the partial `messages_sender_ts (user_id, ts, channel) WHERE deleted = 0` index.
 

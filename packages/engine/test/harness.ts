@@ -1,3 +1,4 @@
+import { timed } from './profile'
 import { Effect, Record } from 'effect'
 import type { WorkName } from '../src/workControl'
 /**
@@ -205,17 +206,17 @@ export const fastTiming: EngineTimingConfig = {
 export async function startTestEngine(options: EngineOptions = {}): Promise<RunningEngine> {
   const fake =
     options.reuse?.fake ??
-    (await startFakeSlack({
+    (await timed('fake and seed', () => startFakeSlack({
       ...options.fakeOptions,
       ...(options.enterpriseId === undefined ? {} : { enterpriseId: options.enterpriseId }),
-    }))
+    })))
   const credentials = options.reuse?.credentials ?? options.initial?.(fake)
   const main = fakeMain(fake, credentials)
   const userData = options.reuse?.userData ?? join(tmpdir(), `juno-engine-test-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
   await mkdir(userData, { recursive: true })
   if (options.reuse === undefined) {
     const enterprise = fake.workspace.team.enterprise_id
-    await migratedWorkspace(workspacePaths(userData, enterprise === undefined ? fake.teamId : `${enterprise}-${fake.teamId}`))
+    await timed('schema copy', () => migratedWorkspace(workspacePaths(userData, enterprise === undefined ? fake.teamId : `${enterprise}-${fake.teamId}`)))
   }
   const transport = memoryTransport()
   let cycles = 0
@@ -231,7 +232,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
     if (state === undefined) { state = { started: 0, finished: 0 }; work.set(name, state) }
     return state
   }
-  const handle = await startEngine(transport, { userData, e2e: true, dev: false, fakeSlackUrl: fake.url, ai: 'fake', aiJobs: options.aiJobs === true, ...(options.paced === undefined ? {} : { fakeSlackPaced: true, ...(options.paced === 1 ? {} : { fakeSlackPaceScale: options.paced }) }) }, {
+  const handle = await timed('engine construction', () => startEngine(transport, { userData, e2e: true, dev: false, fakeSlackUrl: fake.url, ai: 'fake', aiJobs: options.aiJobs === true, ...(options.paced === undefined ? {} : { fakeSlackPaced: true, ...(options.paced === 1 ? {} : { fakeSlackPaceScale: options.paced }) }) }, {
     timing: { ...fastTiming, ...options.timing },
     ...(options.clock === undefined ? {} : { clock: options.clock }),
     work: {
@@ -266,7 +267,7 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
         online = next
       },
     },
-  })
+  }))
   const connection = {
     acquire: async () => {
       const channel = new MessageChannel()

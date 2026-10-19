@@ -1,0 +1,1 @@
+- 10-19 08:43 · unit-clock-boundaries · Control the send retry deadlines and Automated hold with TestClock instead of depending on the test machine reaching an assertion before a timer. Persist Home's AI-off preference before starting its background jobs. Keep the original assertions, retry ratios and real idle-CPU observation windows.

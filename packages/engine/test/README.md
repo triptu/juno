@@ -8,11 +8,11 @@ node scripts/heavy.mjs pnpm --filter @juno/engine exec vitest run test/sync.test
 
 `startTestEngine()` uses `fastTiming`: the scheduling fields from `src/config.ts` divided by 20. Retry ratios, attempt limits and timer order stay the same. Pass `timing: { ... }` for a scenario override. Periodic sweeps remain disabled (`sweepIntervalMillis: 0`) and `followPassMillis: 0` checks follows at every catch-up. Boot, reconnect and `force_reload` run normally. Data ages, server Retry-After values and network request timeouts keep their real meaning. The app retains its existing defaults.
 
-Timing assertions use `controlledClock()` (Effect TestClock), supplied as `clock`, to freeze after boot and advance to an exact boundary. The read test checks the production 400 ms window this way. The half-open socket repair test advances the production pong deadline only after two sweeps finish. The notification schedule coalescing test keeps its production one-second debounce. Tests measuring actual idle CPU keep production schedules and real observation windows; their names say `[production timing]`.
+Timing assertions use `controlledClock()` (Effect TestClock), supplied as `clock`, to freeze after boot and advance to an exact boundary. The send flush test advances stored retry deadlines and proves reconnect settles before the next one. `controlledSleep(millis)` controls only one duration, leaving all other sleeps and clock reads live; quick-start uses it for Automated's production 5,000 ms hold. The read test checks the production 400 ms window this way. The half-open socket repair test advances the production pong deadline only after two sweeps finish. The notification schedule coalescing test keeps its production one-second debounce. Tests measuring actual idle CPU keep production schedules and real observation windows; their names say `[production timing]`.
 
 A fresh test engine copies an empty migrated store from a template built once per file's isolated module context (`migratedWorkspace.ts`). The template is closed before copying and removed after the file. Each engine has its own database files, fake Slack server on an allocated port, scope and atom registry. It still performs a cold sign-in and sync. Warm restarts reuse their existing files without copying; store migration and recovery tests continue to start from scratch.
 
-Related assertions can share one engine inside a named `step` flow. Separate tests never share a mutable engine. Cold-boot scenarios, different seeds and independent failure cases stay separate. The large-workspace and socket-liveness repair tests live in separate files so remote workers can overlap them. Each large-seed file creates one fake; its warm restart reuses that fake.
+Related assertions can share one engine inside a named `step` flow. Separate tests never share a mutable engine. Cold-boot scenarios, different seeds and independent failure cases stay separate. The large-workspace and socket-liveness repair tests live in separate files so remote workers can overlap them. Each large-seed file creates one fake; its warm restart reuses that fake. The two mutation scenarios use `mutationSeed.ts`: 20,000 messages, 1,000 threads and 300 conversations over seven days. They retain the 150-conversation activity check and exact repair budgets. Performance fixtures keep 100,000 messages.
 
 The engine runs the fake AI, but its background AI jobs (titles, topic art, Home's AI items and title rewrites, Juno's Automated check) are off unless a test passes `aiJobs: true` to `startTestEngine()` or `bootedEngine()`. Without them a thread keeps its fallback title, no art is drawn, and the Automated job places only what its rules can, asking on Home about the rest as with AI assist off. A test that waits for a job's output opts in; `restart()` does not carry the option.
 
@@ -61,3 +61,18 @@ CONFORMANCE_ONLY=copy-7 pnpm specs:conformance          # only the traces whose 
 - A divergence is a finding. Fix the code or the spec, or record why the trace cannot be replayed. Do not loosen the projection to make a trace pass.
 
 Replays use the same fast timing profile. Their projection is checked again after the socket barrier and sync completion, instead of waiting 300 ms per round. Deliberately broken traces get a 2.5 s divergence bound. No trace step depends on a wall-clock duration: retry refusals are stutters and the trace gates the successful operation. The projections, traces and pre-existing skips are unchanged.
+
+## Timing diagnostics
+
+`JUNO_UNIT_PROFILE=1` enables phase timing and CPU sampling in `profile.ts`. Run
+one worker so the files' CPU profiles do not compete. Sampling distorts event-loop
+utilization, so exclude the production idle checks from diagnostic runs; keep
+profiling off for validation and before/after suite timings.
+
+```sh
+pnpm remote --machine linux/amd64:4x8 --env JUNO_TEST_PACKAGE_JOBS=1 --env JUNO_VITEST_WORKERS=1 --env JUNO_UNIT_PROFILE=1 test --passWithNoTests test/mutation-activity.test.ts test/mutation-repair-large.test.ts test/sync.test.ts test/send.test.ts test/actions.test.ts -t '^(?!.*production timing)'
+```
+
+The profile's wall and CPU figures include asynchronous engine work; phases can
+overlap and CPU can exceed wall time through helper threads. See
+[Unit suite timing](../../../docs/unit-suite-timing.md) for the measured split.
