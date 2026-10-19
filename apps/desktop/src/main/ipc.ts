@@ -15,7 +15,7 @@ import type { ProviderStore } from './providers'
 import type { Updates } from './updates'
 import type { Launch } from './launch'
 import { openMicrophoneSettings } from './media'
-import type { ScreenShareSources } from './screenShare'
+import { createScreenShareSources } from './screenShare'
 import { APP_ORIGIN } from './scheme'
 import { closeWebPanel, hideWebPanel, setWebPanelBounds, showWebPanel } from './webPanel'
 import { setMenuHuddle } from './window'
@@ -66,7 +66,11 @@ export const slackLinksForTests: string[] = []
 const e2e = process.env.JUNO_E2E === '1'
 export const logsForTests = { opened: 0 }
 /** Under JUNO_E2E, Mute's System Settings link while the microphone is blocked counts here instead of opening it. */
-export const microphoneSettingsForTests = { opened: 0 }
+const microphoneSettingsForTests = { opened: 0 }
+/** The share sheet's screens and windows, and macOS's Screen Recording permission. */
+const shareSources = createScreenShareSources(e2e)
+/** Main's huddle test hooks (`junoTest`): the System Settings links, and the share sheet's permission and windows. */
+export const huddleSettingsForTests = { microphoneSettingsOpened: () => microphoneSettingsForTests.opened, ...shareSources.testHooks }
 
 export interface IpcDeps {
   readonly updates: Updates
@@ -84,8 +88,6 @@ export interface IpcDeps {
   readonly setDensity: (density: NonNullable<Launch['density']>) => void
   readonly setPrivacy: (privacy: boolean) => void
   readonly setSidebar: (sidebar: NonNullable<Launch['sidebar']>) => void
-  /** The share sheet's screens and windows, and macOS's Screen Recording permission (screenShare.ts). */
-  readonly shareSources: ScreenShareSources
   /** "Hide message text while sharing the screen" (screenWatch.ts). */
   readonly sharing: { readonly get: () => SharingSetting; readonly set: (hide: boolean) => SharingSetting }
   /** The topic the window shows, or null while it shows none or is not focused. */
@@ -107,7 +109,7 @@ export interface IpcDeps {
   readonly processes: { readonly diagnostics: () => Diagnostics; readonly reportState: (state: AppState) => void }
 }
 
-export function registerIpc({ updates, supervisor, agent, providers, codex, backupSecrets, setTheme, setAccent, setDensity, setTopicTitleLines, setPrivacy, setSidebar, sharing, shareSources, setViewing, notifications, downloadFile, openFile, copyImage, processes }: IpcDeps): void {
+export function registerIpc({ updates, supervisor, agent, providers, codex, backupSecrets, setTheme, setAccent, setDensity, setTopicTitleLines, setPrivacy, setSidebar, sharing, setViewing, notifications, downloadFile, openFile, copyImage, processes }: IpcDeps): void {
   handle(Channels.updatesGet, () => updates.get())
   handle(Channels.updatesSet, ({ enabled }) => updates.set(enabled))
   handle(Channels.updatesRestart, () => updates.restart())
@@ -213,6 +215,7 @@ export function registerIpc({ updates, supervisor, agent, providers, codex, back
   handle(Channels.huddleShareSources, () => shareSources.list())
   handle(Channels.huddleAllowScreenRecording, () => shareSources.allow())
   handle(Channels.huddleScreenRecordingSettings, () => shareSources.openSettings())
+  handle(Channels.huddleShareWindowOpen, ({ id }) => shareSources.windowOpen(id))
 
   handle(Channels.sharingGet, () => sharing.get())
   handle(Channels.sharingSet, ({ hide }) => sharing.set(hide))

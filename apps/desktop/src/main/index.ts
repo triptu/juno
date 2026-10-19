@@ -11,9 +11,8 @@ import { appMcpCredentials } from './mcpCredentials'
 import { createSupervisor } from './engine'
 import { createEngineTestHooks } from './engineTestHooks'
 import { createHuddleQuit } from './huddleQuit'
-import { createScreenShareSources } from './screenShare'
 import { copiedForTests, copyImage, downloadFile, downloadsForTests, openedForTests, openFile } from './files'
-import { browserLinksForTests, contextMenuForTests, folderForTests, registerIpc, logsForTests, microphoneSettingsForTests, slackLinksForTests, webPanelForTests } from './ipc'
+import { browserLinksForTests, contextMenuForTests, folderForTests, registerIpc, logsForTests, huddleSettingsForTests, slackLinksForTests, webPanelForTests } from './ipc'
 import { CUSTOM_ITEM, macKeychain, memoryKeychain, OPENROUTER_ITEM } from './keychain'
 import { ProviderStore } from './providers'
 import { launchWriter, readLaunch, withSession, type Launch } from './launch'
@@ -113,7 +112,6 @@ const supervisor = createSupervisor({
   },
 })
 const huddleQuit = createHuddleQuit(e2e, appWindow)
-const shareSources = createScreenShareSources({ e2e, asked: () => launch.screenRecordingAsked === true, setAsked: () => updateLaunch({ screenRecordingAsked: true }) })
 supervisor.onFailed(() => huddleQuit.engineFailed())
 
 /** Under JUNO_E2E notifications are recorded, not shown; a test clicks them through `junoTest`. */
@@ -276,7 +274,6 @@ app.whenReady().then(() => {
       updateLaunch({ sidebar })
       setSidebarHidden(sidebar.collapsed)
     },
-    shareSources,
     sharing: {
       get: () => ({ hide: launch.hideWhileSharing !== false, detection: screenWatch.detection() }),
       set: (hide) => {
@@ -380,8 +377,7 @@ if (e2e) {
         permissionForTests = permission
       },
       notificationSettingsOpened: () => notificationSettingsOpenedForTests,
-      microphoneSettingsOpened: () => microphoneSettingsForTests.opened,
-      ...shareSources.testHooks,
+      ...huddleSettingsForTests,
       slackKeychainReads,
       wake: () => notifier.wake(),
       // The activity watch's seam: the Mac's idle time in seconds, read at once.

@@ -26,8 +26,6 @@ export const Launch = Schema.Struct({
   privacy: Schema.optionalKey(Schema.Boolean),
   // Settings › General, "Hide message text while sharing the screen". On when absent.
   hideWhileSharing: Schema.optionalKey(Schema.Boolean),
-  // Juno has shown the macOS Screen Recording prompt once (screenShare.ts). macOS cannot say so itself.
-  screenRecordingAsked: Schema.optionalKey(Schema.Boolean),
   sidebar: Schema.optionalKey(SidebarLayout),
   bounds: Schema.optionalKey(Schema.Struct({ x: Schema.Int, y: Schema.Int, width: Schema.Int, height: Schema.Int })),
   // The session the engine last verified, with no secrets, so a relaunch paints the shell first and never the

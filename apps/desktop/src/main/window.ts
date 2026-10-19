@@ -212,7 +212,7 @@ let menuState: MenuState | undefined
 function updateAppMenu(patch: Partial<MenuState>): void {
   if (menuState === undefined) return
   const next = { ...menuState, ...patch }
-  if (next.sidebarHidden !== menuState.sidebarHidden || next.privacy !== menuState.privacy || next.huddle?.muted !== menuState.huddle?.muted || next.huddle?.sharing !== menuState.huddle?.sharing) setAppMenu(next, true)
+  if (next.sidebarHidden !== menuState.sidebarHidden || next.privacy !== menuState.privacy || next.huddle?.muted !== menuState.huddle?.muted || next.huddle?.sharing !== menuState.huddle?.sharing || next.huddle?.canShare !== menuState.huddle?.canShare) setAppMenu(next, true)
 }
 
 export function setSidebarHidden(sidebarHidden: boolean): void {
@@ -306,7 +306,7 @@ function setAppMenu(state: MenuState, rebuild = false): void {
       registerAccelerator: false,
       enabled: inHuddle,
     },
-    { ...command('huddle-share', state.huddle?.sharing === true ? 'Stop Sharing' : 'Share Screen…', undefined, 'huddle.share'), enabled: inHuddle },
+    { ...command('huddle-share', state.huddle?.sharing === true ? 'Stop Sharing' : 'Share Screen…', undefined, 'huddle.share'), enabled: state.huddle?.sharing === true || state.huddle?.canShare === true },
     { type: 'separator' },
     { ...command('huddle-leave', 'Leave Huddle', undefined, 'huddle.leave'), enabled: inHuddle },
   ]

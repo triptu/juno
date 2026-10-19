@@ -126,12 +126,21 @@ function onSnapshot(): void {
   sayShareEnd(snapshot.shareEnded)
 }
 
-/** A share that stopped by itself says so (SPEC 20): the shared window closed, or the capture would not start. */
+/**
+ * A share that stopped by itself says so (SPEC 20): the shared window closed,
+ * or the capture would not start. A capture the user stopped from macOS ends
+ * the same way as a closed window, so main is asked whether the window is gone.
+ */
 function sayShareEnd(end: ShareEnd | undefined): void {
   if (end === undefined || end === lastShareEnd) return
   lastShareEnd = end
-  if (end.reason === 'source-ended' && end.kind === 'window') showToast(registry, { text: 'Stopped sharing. The window closed.' })
-  else if (end.reason === 'failed') showToast(registry, { text: "Couldn't share your screen" })
+  if (end.reason === 'failed') showToast(registry, { text: "Couldn't share your screen" })
+  else if (end.reason === 'source-ended' && end.kind === 'window') {
+    void window.juno.huddle.shareWindowOpen(end.sourceId).then(
+      (open) => open === false && showToast(registry, { text: 'Stopped sharing. The window closed.' }),
+      () => {},
+    )
+  }
 }
 
 /** What the sound rule reads now: the session's own call, and the other people the engine's call names. */
@@ -162,7 +171,7 @@ export function currentCall(): HuddleCall | undefined {
 /** The Huddle menu's state, sent to main when it changed. */
 function sendMenu(): void {
   const snapshot = session?.getSnapshot()
-  const menu: HuddleMenu = currentCall() === undefined ? null : { muted: snapshot?.local.muted ?? false, sharing: snapshot?.localShare !== undefined }
+  const menu: HuddleMenu = currentCall() === undefined ? null : { muted: snapshot?.local.muted ?? false, sharing: snapshot?.localShare !== undefined, canShare: !shareFull(snapshot) }
   const key = JSON.stringify(menu)
   if (key === lastMenu) return
   lastMenu = key
@@ -293,15 +302,22 @@ export function toggleHuddleMuted(): void {
   if (snapshot !== undefined && holding !== null) session?.setMuted(!snapshot.local.muted)
 }
 
+/** Slack allows two shares at once: while two others share, the user cannot (SPEC 20, "Two at once"). */
+export function shareFull(snapshot: MediaSnapshot | undefined): boolean {
+  return snapshot?.localShare === undefined && (snapshot?.shares.length ?? 0) >= 2
+}
+
 /** Share screen: opens the share sheet, or stops sharing while the user shares (SPEC 20). */
 export function toggleSharing(): void {
-  if (session?.getSnapshot().localShare !== undefined) stopSharing()
-  else if (holding !== null) openSharePicker()
+  const snapshot = session?.getSnapshot()
+  if (snapshot?.localShare !== undefined) stopSharing()
+  else if (holding !== null && !shareFull(snapshot)) openSharePicker()
 }
 
 /** Shares the screen or window the sheet picked, in place of anything shared before. */
 export function shareScreen(source: ShareSource): Promise<void> {
-  return holding === null ? Promise.resolve() : (session?.shareScreen(source) ?? Promise.resolve())
+  const snapshot = session?.getSnapshot()
+  return holding === null || shareFull(snapshot) ? Promise.resolve() : (session?.shareScreen(source) ?? Promise.resolve())
 }
 
 export function stopSharing(): void {

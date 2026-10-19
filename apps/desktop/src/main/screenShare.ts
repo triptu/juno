@@ -6,14 +6,20 @@
  * `chromeMediaSource: 'desktop'`; `media.ts` lets only Juno's own page do so.
  *
  * macOS answers only whether Juno may record the screen, not whether it has
- * asked, so main remembers in `launch.json` that it asked once
- * (`screenRecordingAsked`). Until then the sheet explains and offers
+ * asked, so main remembers that it asked once in a small file in userData
+ * (`screen-recording-asked`). Until then the sheet explains and offers
  * Continue, which shows the macOS prompt by listing the screens.
+ *
+ * When a shared window's capture ends, the page asks whether the window is
+ * still there (`windowOpen`): the window closed, or the user stopped the
+ * capture from macOS, which SPEC 20 tells apart.
  *
  * Under JUNO_E2E nothing is captured: a test sets the permission and the
  * sources are drawn here.
  */
-import { BrowserWindow, desktopCapturer, nativeImage, screen, shell, systemPreferences, type DesktopCapturerSource } from 'electron'
+import { existsSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { app, BrowserWindow, desktopCapturer, nativeImage, screen, shell, systemPreferences, type DesktopCapturerSource } from 'electron'
 import type { ScreenPermission, ShareSource, ShareSources } from '@juno/contract'
 
 /** Slack caps its thumbnails at 480 by 480; the sheet's tiles are 16:10, so this is the most a tile shows. */
@@ -27,11 +33,15 @@ export interface ScreenShareSources {
   readonly list: () => Promise<ShareSources>
   /** Continue: asks macOS once, then lists. */
   readonly allow: () => Promise<ShareSources>
+  /** Whether the window with this source id is still there to share. */
+  readonly windowOpen: (id: string) => Promise<boolean>
   readonly openSettings: () => Promise<void>
   /** Under JUNO_E2E only. */
   readonly testHooks: {
     readonly screenRecording: (permission: ScreenPermission) => void
     readonly screenRecordingSettingsOpened: () => number
+    /** The fake window with this source id closes. */
+    readonly closeShareWindow: (id: string) => void
   }
 }
 
@@ -75,23 +85,25 @@ function fakeSources(): ReadonlyArray<ShareSource> {
   ]
 }
 
-export function createScreenShareSources(options: { readonly e2e: boolean; readonly asked: () => boolean; readonly setAsked: () => void }): ScreenShareSources {
-  const { e2e } = options
+export function createScreenShareSources(e2e: boolean): ScreenShareSources {
+  const askedFile = () => join(app.getPath('userData'), 'screen-recording-asked')
+  const asked = () => existsSync(askedFile())
   // A test sets the answer itself, the "not asked yet" included; Continue then allows.
   let permissionForTests: ScreenPermission = 'granted'
   let settingsOpenedForTests = 0
+  const closedForTests = new Set<string>()
 
   const allowed = () => process.platform !== 'darwin' || systemPreferences.getMediaAccessStatus('screen') === 'granted'
 
   const permission = (): ScreenPermission => {
     if (e2e) return permissionForTests
-    return allowed() ? 'granted' : options.asked() ? 'denied' : 'unknown'
+    return allowed() ? 'granted' : asked() ? 'denied' : 'unknown'
   }
 
   const list = async (): Promise<ShareSources> => {
     const now = permission()
     if (now !== 'granted') return { permission: now, sources: [] }
-    return { permission: now, sources: e2e ? fakeSources() : await capturerSources() }
+    return { permission: now, sources: e2e ? fakeSources().filter((source) => !closedForTests.has(source.id)) : await capturerSources() }
   }
 
   return {
@@ -101,11 +113,17 @@ export function createScreenShareSources(options: { readonly e2e: boolean; reado
         if (permissionForTests === 'unknown') permissionForTests = 'granted'
         return list()
       }
-      options.setAsked()
+      writeFileSync(askedFile(), '')
       // Listing the screens is what makes macOS ask. It returns at once; the answer counts once the user gives it,
       // and macOS may want Juno reopened first, which the sheet says.
       if (!allowed()) await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } }).catch(() => [])
       return list()
+    },
+    windowOpen: async (id) => {
+      if (e2e) return !closedForTests.has(id)
+      if (!allowed()) return true
+      const windows = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 0, height: 0 } }).catch(() => undefined)
+      return windows === undefined || windows.some((source) => windowKey(source.id) === windowKey(id))
     },
     openSettings: async () => {
       if (e2e) settingsOpenedForTests += 1
@@ -116,6 +134,7 @@ export function createScreenShareSources(options: { readonly e2e: boolean; reado
         permissionForTests = permission
       },
       screenRecordingSettingsOpened: () => settingsOpenedForTests,
+      closeShareWindow: (id) => void closedForTests.add(id),
     },
   }
 }

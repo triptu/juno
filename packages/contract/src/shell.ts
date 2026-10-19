@@ -215,8 +215,8 @@ export type SharingSetting = typeof SharingSetting.Type
 export const HuddleRegistration = Schema.Struct({ generation: Schema.Number, fakeMedia: Schema.Boolean })
 export type HuddleRegistration = typeof HuddleRegistration.Type
 
-/** What the Huddle menu follows: null while the user is in no huddle, else whether they are muted and whether they share their screen (SPEC 20). */
-export const HuddleMenu = Schema.NullOr(Schema.Struct({ muted: Schema.Boolean, sharing: Schema.Boolean }))
+/** What the Huddle menu follows: null while the user is in no huddle, else whether they are muted, share their screen, and may share (not while two others do) (SPEC 20). */
+export const HuddleMenu = Schema.NullOr(Schema.Struct({ muted: Schema.Boolean, sharing: Schema.Boolean, canShare: Schema.Boolean }))
 export type HuddleMenu = typeof HuddleMenu.Type
 
 /**
@@ -333,6 +333,7 @@ export const ShellRoutes = {
   [Channels.huddleShareSources]: { input: Schema.Void, output: ShareSources },
   [Channels.huddleAllowScreenRecording]: { input: Schema.Void, output: ShareSources },
   [Channels.huddleScreenRecordingSettings]: { input: Schema.Void, output: Schema.Void },
+  [Channels.huddleShareWindowOpen]: { input: Schema.Struct({ id: Schema.String.check(Schema.isMaxLength(256)) }), output: Schema.Boolean },
   [Channels.contextMenuPopup]: { input: Schema.Struct({ items: ContextMenuItems, at: Schema.optionalKey(ContextMenuAt) }), output: Schema.NullOr(Schema.String) },
   [Channels.shellOpenExternal]: { input: Schema.Struct({ url: Schema.String }), output: Schema.Void },
   [Channels.shellOpenInSlack]: { input: SlackTarget, output: Schema.Void },

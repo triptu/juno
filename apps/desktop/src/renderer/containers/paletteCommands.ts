@@ -30,7 +30,7 @@ import {
 import { chatCopy } from '@juno/agent-contract'
 import { accentLabels, settingsSections, type PaletteIconName, type PaletteItem } from '@juno/views'
 import { muteShortcut } from '@juno/huddle-views'
-import { currentCall, joinHuddle, leaveCurrentHuddle, mediaSnapshot, showCurrentHuddle, toggleHuddleMuted, toggleSharing } from './huddle/media'
+import { currentCall, joinHuddle, leaveCurrentHuddle, mediaSnapshot, shareFull, showCurrentHuddle, toggleHuddleMuted, toggleSharing } from './huddle/media'
 import { closeJunoPanel, openPanel } from './juno/actions'
 import { openAllTopics, openHome, openJuno, openJunoPage, newMessage, openNewTab, openSettings, openTopic, showTheTour } from './navigation'
 import { messageBeforePalette } from './paletteActions'
@@ -138,15 +138,13 @@ function huddleRows(): ReadonlyArray<CommandRow> {
   const media = mediaSnapshot()
   const muted = media?.local.muted === true
   const sharing = media?.localShare !== undefined
-  // While two others share, Slack has no room for a third.
-  const full = !sharing && (media?.shares.length ?? 0) >= 2
   return [
     muted
       ? row('huddle-mute', 'unmute', 'Unmute', 'huddle microphone mic', toggleHuddleMuted, { ...stays, hint: muteShortcut })
       : row('huddle-mute', 'mute', 'Mute', 'huddle microphone mic', toggleHuddleMuted, { ...stays, hint: muteShortcut }),
     ...(sharing
       ? [row('huddle-share', 'stop-sharing', 'Stop sharing', 'huddle screen share present', toggleSharing, stays)]
-      : full
+      : shareFull(media)
         ? []
         : [row('huddle-share', 'share-screen', 'Share screen…', 'huddle screen share present window', toggleSharing)]),
     row('huddle-leave', 'leave-huddle', 'Leave huddle', 'call hang up end', leaveCurrentHuddle, stays),
