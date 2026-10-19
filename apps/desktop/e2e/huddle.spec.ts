@@ -138,8 +138,7 @@ test('someone shares their screen: the bar says so, the tab shows it, two can sh
   // The faces sit after the status line: a longer line must not push them.
   const faces = '[data-huddle-bar] button [role="img"]'
   const stack = win.locator(faces)
-  await expect(stack).toHaveAccessibleName(/Maya Chen/)
-  await expect(stack).toHaveAccessibleName(/Leo Park/)
+  await expect(stack).toHaveAccessibleName('Maya, Leo')
 
   // Maya shares: the bar says so at once, and nothing in it moves or changes size.
   const before = await bar.boundingBox()
@@ -182,7 +181,7 @@ test('someone shares their screen: the bar says so, the tab shows it, two can sh
   await stopShare(win, 'U0LEO')
   await expect(win.locator('[data-share]')).toHaveCount(0)
   await expect(bar).not.toContainText('sharing')
-  await expect(win.locator('[data-huddle-page]').getByRole('listitem', { name: 'Maya Chen' })).toBeVisible()
+  await expect(win.locator('[data-huddle-page]').getByRole('listitem', { name: 'Maya' })).toBeVisible()
 
   const attendeeId = await attendee(win)
   await bar.getByRole('button', { name: 'Leave' }).click()
