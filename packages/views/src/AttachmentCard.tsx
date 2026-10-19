@@ -2,12 +2,17 @@ import * as stylex from '@stylexjs/stylex'
 import { useState, type ReactNode } from 'react'
 import type { BodyBlock, BodyInline } from '@juno/contract'
 import { colors, spacing, text, tints, layout, radii } from '@juno/tokens/tokens.stylex'
-import { Button } from '@juno/ui'
+import { Button, Icon } from '@juno/ui'
+import { kindIcon } from './look'
 import { thumbnailBox } from './MediaGrid'
 
 type Attachment = Extract<BodyBlock, { kind: 'attachment' }>
 
-export function AttachmentCard({ attachment, title, children, footer, tabbable }: { readonly attachment: Attachment; readonly title: ReactNode; readonly children: ReactNode; readonly footer: ReactNode; readonly tabbable: boolean }) {
+/**
+ * `source` is a shared message's place, drawn by the caller as a link to
+ * the message (`SharedPlace` inside it); it comes before the footer's date.
+ */
+export function AttachmentCard({ attachment, title, children, source, footer, tabbable }: { readonly attachment: Attachment; readonly title: ReactNode; readonly children: ReactNode; readonly source?: ReactNode; readonly footer: ReactNode; readonly tabbable: boolean }) {
   const [expanded, setExpanded] = useState(false)
   const long = attachment.blocks.some((block) => block.kind === 'paragraph' && block.children.reduce((size, inline) => size + ('text' in inline ? inline.text.length : inline.kind === 'break' ? 80 : 0), 0) > 700 || block.kind === 'code' && block.text.length > 700)
   return <section aria-label="Attachment" {...stylex.props(styles.card, tintStyles[attachment.tint])}>
@@ -15,8 +20,20 @@ export function AttachmentCard({ attachment, title, children, footer, tabbable }
     {attachment.title.length > 0 && <div {...stylex.props(styles.title)}>{title}</div>}
     <div {...stylex.props(styles.content, long && !expanded && styles.collapsed)}>{children}</div>
     {long && <div data-expands-in-place="" {...stylex.props(styles.more)}><Button size="sm" variant="ghost" tabIndex={tabbable ? 0 : -1} aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? 'Show less' : 'Show more'}</Button></div>}
-    {attachment.footer.length > 0 && <div {...stylex.props(styles.footer, styles.identity)}>{attachment.footerIcon && <AttachmentIcon url={attachment.footerIcon} />}{footer}</div>}
+    {(source !== undefined || attachment.footer.length > 0) && <div {...stylex.props(styles.footer, styles.identity)}>
+      {attachment.footerIcon && <AttachmentIcon url={attachment.footerIcon} />}
+      <span>{source}{source !== undefined && attachment.footer.length > 0 && ' · '}{footer}</span>
+    </div>}
   </section>
+}
+
+/** Where a shared message was posted: "Thread in", then the place's glyph and name, as the sidebar's place line draws them. */
+export function SharedPlace({ source }: { readonly source: NonNullable<Attachment['source']> }) {
+  return <span data-shared-source="" {...stylex.props(styles.place)}>
+    {source.thread && <span>Thread in </span>}
+    <Icon icon={kindIcon(source.kind)} size={12} {...(source.kind === 'private' ? { label: 'Private channel' } : {})} />
+    <bdi>{source.name}</bdi>
+  </span>
 }
 
 /** Two-column fields, in attachments and Block Kit sections. `render` draws a run of inlines. */
@@ -83,6 +100,7 @@ const styles = stylex.create({
     marginBlock: `calc(-1 * ${spacing['--space-1']})`,
   },
   footer: { fontSize: text['--text-tag-small-size'], color: colors['--foreground-muted'] },
+  place: { display: 'inline-flex', alignItems: 'center', gap: spacing['--space-1'], verticalAlign: 'bottom' },
   imageBox: (width: number, height: number) => ({ position: 'relative', flexShrink: 0, width, height, maxWidth: '100%', aspectRatio: `${width} / ${height}`, backgroundColor: colors['--background-subtle'], borderRadius: radii['--radius-md'], overflow: 'hidden' }),
   image: { position: 'absolute', inset: 0, display: 'block', width: '100%', height: '100%', objectFit: 'contain' },
 })
