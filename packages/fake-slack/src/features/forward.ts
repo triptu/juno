@@ -40,9 +40,8 @@ function share(ctx: MethodContext, args: MethodArgs<'chat.shareMessage'>): Metho
 
 /**
  * The attachment Slack builds for a forwarded message, with the fields
- * Juno's schema reads. Slack also sends `is_share`, `channel_id`,
- * `author_id`, `channel_team` and `is_reply_unfurl` or
- * `is_thread_root_unfurl`, which the schema drops.
+ * Juno's schema reads. Slack also sends `author_id`, `channel_team` and
+ * `is_reply_unfurl` or `is_thread_root_unfurl`, which the schema drops.
  */
 function sharedAttachment(ctx: MethodContext, channel: string, source: Message): NonNullable<Message['attachments']>[number] {
   const ws = ctx.workspace
@@ -53,9 +52,11 @@ function sharedAttachment(ctx: MethodContext, channel: string, source: Message):
   const inThread = isReply(source) || (source.reply_count ?? 0) > 0
   return {
     id: 1,
+    is_share: true,
     is_msg_unfurl: true,
     color: 'D0D0D0',
     ts: source.ts,
+    channel_id: channel,
     author_name: name,
     ...(user?.profile?.image_48 === undefined ? {} : { author_icon: user.profile.image_48 }),
     author_link: `${ctx.baseUrl}/team/${source.user ?? ''}`,
