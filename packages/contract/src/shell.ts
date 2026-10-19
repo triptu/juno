@@ -215,9 +215,35 @@ export type SharingSetting = typeof SharingSetting.Type
 export const HuddleRegistration = Schema.Struct({ generation: Schema.Number, fakeMedia: Schema.Boolean })
 export type HuddleRegistration = typeof HuddleRegistration.Type
 
-/** What the Huddle menu follows: null while the user is in no huddle, else whether they are muted (SPEC 20). */
-export const HuddleMenu = Schema.NullOr(Schema.Struct({ muted: Schema.Boolean }))
+/** What the Huddle menu follows: null while the user is in no huddle, else whether they are muted, share their screen, and may share (not while two others do) (SPEC 20). */
+export const HuddleMenu = Schema.NullOr(Schema.Struct({ muted: Schema.Boolean, sharing: Schema.Boolean, canShare: Schema.Boolean }))
 export type HuddleMenu = typeof HuddleMenu.Type
+
+/**
+ * Whether macOS lets Juno record the screen (SPEC 20, Screen share). macOS
+ * answers only allowed or not, so `unknown` means not allowed and Juno has
+ * not asked yet; `denied`, not allowed after it asked.
+ */
+export const ScreenPermission = Schema.Literals(['unknown', 'denied', 'granted'])
+export type ScreenPermission = typeof ScreenPermission.Type
+
+/** A screen or window the user may share, from `desktopCapturer`. Juno's own windows are left out. */
+export const ShareSource = Schema.Struct({
+  /** The `chromeMediaSourceId` to capture it with: "screen:1:0", "window:4242:0". */
+  id: Schema.String,
+  /** The display's name for a screen ("Built-in Retina Display"), a window's title. */
+  name: Schema.String,
+  kind: Schema.Literals(['screen', 'window']),
+  /** A JPEG data URL, at most 480 by 300; absent when macOS gave none. */
+  thumbnail: Schema.optionalKey(Schema.String),
+  /** A window's app icon as a PNG data URL. */
+  appIcon: Schema.optionalKey(Schema.String),
+})
+export type ShareSource = typeof ShareSource.Type
+
+/** The share sheet's content: the permission, and the sources once it is granted (else none). */
+export const ShareSources = Schema.Struct({ permission: ScreenPermission, sources: Schema.Array(ShareSource) })
+export type ShareSources = typeof ShareSources.Type
 
 /**
  * Whether macOS lets Juno post notifications (Settings › Notifications). `unknown` when main
@@ -304,6 +330,10 @@ export const ShellRoutes = {
   [Channels.huddleRegister]: { input: Schema.Void, output: HuddleRegistration },
   [Channels.huddleMenu]: { input: Schema.Struct({ menu: HuddleMenu }), output: Schema.Void },
   [Channels.huddleMicrophoneSettings]: { input: Schema.Void, output: Schema.Void },
+  [Channels.huddleShareSources]: { input: Schema.Void, output: ShareSources },
+  [Channels.huddleAllowScreenRecording]: { input: Schema.Void, output: ShareSources },
+  [Channels.huddleScreenRecordingSettings]: { input: Schema.Void, output: Schema.Void },
+  [Channels.huddleShareWindowOpen]: { input: Schema.Struct({ id: Schema.String.check(Schema.isMaxLength(256)) }), output: Schema.Boolean },
   [Channels.contextMenuPopup]: { input: Schema.Struct({ items: ContextMenuItems, at: Schema.optionalKey(ContextMenuAt) }), output: Schema.NullOr(Schema.String) },
   [Channels.shellOpenExternal]: { input: Schema.Struct({ url: Schema.String }), output: Schema.Void },
   [Channels.shellOpenInSlack]: { input: SlackTarget, output: Schema.Void },

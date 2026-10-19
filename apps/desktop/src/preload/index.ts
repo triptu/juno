@@ -112,8 +112,12 @@ const bridge: JunoBridge = {
   },
   huddle: {
     register: () => ipcRenderer.invoke(Channels.huddleRegister),
-    setMenu: (menu) => ipcRenderer.invoke(Channels.huddleMenu, { menu: menu === null ? null : { muted: menu.muted } }),
+    setMenu: (menu) => ipcRenderer.invoke(Channels.huddleMenu, { menu: menu === null ? null : { muted: menu.muted, sharing: menu.sharing, canShare: menu.canShare } }),
     openMicrophoneSettings: () => ipcRenderer.invoke(Channels.huddleMicrophoneSettings),
+    shareSources: () => ipcRenderer.invoke(Channels.huddleShareSources),
+    allowScreenRecording: () => ipcRenderer.invoke(Channels.huddleAllowScreenRecording),
+    openScreenRecordingSettings: () => ipcRenderer.invoke(Channels.huddleScreenRecordingSettings),
+    shareWindowOpen: (id) => ipcRenderer.invoke(Channels.huddleShareWindowOpen, { id }),
   },
   contextMenu: {
     popup: (items, at) =>

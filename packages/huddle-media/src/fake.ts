@@ -7,10 +7,11 @@
 import { inUse } from './devices.ts'
 import { CONTENT_SUFFIX } from './externalUserId.ts'
 import { watchFirstFrame } from './firstFrame.ts'
-import { INITIAL_SNAPSHOT, patchAttendee, presence, setConnection, shareReady, speakers, startCall } from './snapshot.ts'
+import { OwnPreviews } from './ownPreview.ts'
+import { INITIAL_SNAPSHOT, patchAttendee, presence, setConnection, setLocalShare, shareReady, speakers, startCall } from './snapshot.ts'
 import { SnapshotStore } from './store.ts'
 import { createTestPattern, type TestPattern } from './testPattern.ts'
-import type { Devices, EndReason, HuddleSound, JoinInfo, MediaDevice, MediaSession, MicrophoneAccess } from './types.ts'
+import type { Devices, EndReason, HuddleSound, JoinInfo, MediaDevice, MediaSession, MicrophoneAccess, ShareSource } from './types.ts'
 
 export interface FakeMediaOptions {
   /** `join` connects at once. Default true; when false, call `setConnection('connected')`. */
@@ -45,6 +46,11 @@ export class FakeMediaSession implements MediaSession {
   /** Who speaks now, loudest first. */
   #speaking: ReadonlyArray<string> = []
   readonly #shown = new Map<string, Shown>()
+  /** The user's own share: a test pattern standing in for the capture. */
+  #own: { readonly source: ShareSource; readonly pattern: TestPattern } | undefined
+  readonly #previews = new OwnPreviews()
+  /** The next `shareScreen` fails, as a capture macOS refuses. */
+  failNextShare = false
   /** The sounds `playSound` was asked for, in order, for a test to read. */
   readonly played: Array<HuddleSound> = []
 
@@ -93,6 +99,31 @@ export class FakeMediaSession implements MediaSession {
     return () => {
       if (this.#shown.get(attendeeId) === shown) this.#hide(attendeeId)
     }
+  }
+
+  /** Shares a drawn test pattern named for the source; live at once. */
+  async shareScreen(source: ShareSource): Promise<void> {
+    const { state } = this.getSnapshot().connection
+    if (state === 'idle' || state === 'ended') return
+    this.#endOwn()
+    if (this.failNextShare) {
+      this.failNextShare = false
+      this.#store.update(setLocalShare(undefined, { sourceId: source.sourceId, kind: source.kind, reason: 'failed' }))
+      return
+    }
+    const pattern = createTestPattern(source.name)
+    this.#own = { source, pattern }
+    this.#previews.set(pattern.stream)
+    this.#store.update(setLocalShare({ ...source, live: true }))
+  }
+
+  stopSharing(): void {
+    const own = this.#endOwn()
+    this.#store.update(setLocalShare(undefined, own === undefined ? undefined : { sourceId: own.sourceId, kind: own.kind, reason: 'stopped' }))
+  }
+
+  showOwnShare(element: HTMLVideoElement): () => void {
+    return this.#previews.show(element)
   }
 
   setMuted(muted: boolean): void {
@@ -165,8 +196,15 @@ export class FakeMediaSession implements MediaSession {
     const { connection, local } = this.getSnapshot()
     if (connection.state === 'idle' || connection.state === 'ended') return
     this.#speaking = []
+    this.#endOwn()
     this.#store.update(setConnection({ state: 'ended', reason, attendeeId: local.attendeeId ?? '', code: `fake:${reason}` }))
     this.#playShares()
+  }
+
+  /** The shared window closes, or the user stops the capture from macOS. */
+  endOwnSource(): void {
+    const own = this.#endOwn()
+    if (own !== undefined) this.#store.update(setLocalShare(undefined, { sourceId: own.sourceId, kind: own.kind, reason: 'source-ended' }))
   }
 
   setMicrophoneAccess(access: MicrophoneAccess): void {
@@ -213,6 +251,16 @@ export class FakeMediaSession implements MediaSession {
         shown.element.srcObject = null
       }
     }
+  }
+
+  /** Stops the user's share's pattern; returns what it shared. */
+  #endOwn(): ShareSource | undefined {
+    const own = this.#own
+    if (own === undefined) return undefined
+    this.#own = undefined
+    own.pattern.stop()
+    this.#previews.set(undefined)
+    return own.source
   }
 
   #hide(attendeeId: string): void {

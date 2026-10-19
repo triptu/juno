@@ -11,7 +11,7 @@ import { useAtomValue } from '@juno/state/react'
 import { openTopic } from '../navigation'
 import { Duration, useHuddleControls } from './controls'
 import { connectionOf, placeOf, useHuddleChannel, useHuddlePeople, useHuddleShares, useMediaSnapshot, useSelfId } from './look'
-import { joinHuddle, showHuddleShare } from './media'
+import { joinHuddle, showHuddleShare, showOwnShare } from './media'
 
 /** "24 minutes", "1 minute", "less than a minute". */
 function lastedOf(millis: number): string {
@@ -35,6 +35,14 @@ function ShareVideo({ id }: { readonly id: string }) {
 
 const renderShare = (id: string) => <ShareVideo id={id} />
 
+/** The window the user shares, from the capture itself. The same element keeps it when the share changes. */
+function OwnShareVideo() {
+  const onElement = useCallback((element: HTMLVideoElement | null) => (element === null ? undefined : showOwnShare(element)), [])
+  return <HuddleShareVideo onElement={onElement} />
+}
+
+const renderOwnShare = () => <OwnShareVideo />
+
 export function HuddleTab({ channelId, tabId }: { readonly channelId: string; readonly tabId: string }) {
   const call = useAtomValue(huddleCallValueAtom)
   const running = useAtomValue(huddleInChannelAtom(channelId))
@@ -56,6 +64,7 @@ export function HuddleTab({ channelId, tabId }: { readonly channelId: string; re
       people={people}
       shares={shares}
       renderShare={renderShare}
+      renderOwnShare={renderOwnShare}
       {...(expanded === undefined ? {} : { expandedShare: expanded })}
       onExpandShare={setExpandedShare}
       onPlace={() => openTopic(mainTopicOf(channelId))}
@@ -75,7 +84,8 @@ export function HuddleTab({ channelId, tabId }: { readonly channelId: string; re
     const duration = <Duration startedAt={here?.startedAt ?? current?.startedAt ?? null} />
     if (joined && current !== undefined) {
       const { devices: _devices, ...rest } = actions
-      return { kind: 'in', connection: connectionOf(current, media), duration, ...rest }
+      const own = media?.localShare
+      return { kind: 'in', connection: connectionOf(current, media), duration, ...rest, ...(own === undefined ? {} : { sharingSource: { kind: own.kind, name: own.name } }) }
     }
     const switching = current !== undefined && (current.phase === 'joining' || current.phase === 'joined')
     if (here !== undefined) return { kind: 'out', duration, ...(switching ? { switching: true } : {}), onJoin: () => void joinHuddle(channel) }

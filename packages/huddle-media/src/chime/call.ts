@@ -2,6 +2,8 @@
 import { DefaultDeviceController, DefaultMeetingSession, type AudioVideoFacade, type Logger, type MeetingSessionConfiguration } from 'amazon-chime-sdk-js'
 import type { ContentOnlyDownlinkPolicy } from './contentPolicy.ts'
 import { ContentTiles } from './contentTiles.ts'
+import { OwnShare, type OwnShareChange } from './ownShare.ts'
+import type { OwnPreviews } from '../ownPreview.ts'
 import type { VoiceFocus } from './voiceFocus.ts'
 
 const noop = () => {}
@@ -11,6 +13,8 @@ export interface Call {
   readonly av: AudioVideoFacade
   /** Others' shared screens. */
   readonly tiles: ContentTiles
+  /** The user's own. */
+  readonly share: OwnShare
   readonly voiceFocusSupported: boolean
   voiceFocus: VoiceFocus | undefined
   started: boolean
@@ -34,6 +38,8 @@ export function newCall(
   logger: Logger,
   policy: ContentOnlyDownlinkPolicy,
   onShareReady: (attendeeId: string, ready: boolean) => void,
+  previews: OwnPreviews,
+  onOwnShare: OwnShareChange,
 ): Call {
   // Voice Focus runs in Web Audio; without it, the plain path has less latency.
   const devices = new DefaultDeviceController(logger, { enableWebAudio: withVoiceFocus })
@@ -44,6 +50,7 @@ export function newCall(
     attendeeId: configuration.credentials?.attendeeId ?? '',
     av,
     tiles: new ContentTiles(av, policy, onShareReady),
+    share: new OwnShare(av, previews, configuration.meetingFeatures.contentMaxResolution, onOwnShare),
     voiceFocusSupported: withVoiceFocus,
     voiceFocus: undefined,
     started: false,

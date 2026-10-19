@@ -6,52 +6,14 @@
  * Slack learns of a leave from Chime, so the test tells the fake when the
  * page's media stopped (`stopMedia`), as Chime would.
  */
-import type { ElectronApplication, Locator, Page } from '@playwright/test'
-import { TEAM, type FakeSlack } from '@juno/fake-slack'
-import type { Juno } from './driver/juno'
+import type { ElectronApplication } from '@playwright/test'
+import { TEAM } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 import { hooks } from './hooks'
+import { addRemote, attendee, chimeDrops, connection, endMedia, huddleMenuItem, localMuted, microphoneAccess, openEngMain, played, playing, sharesReady, startShare, stopShare } from './huddleFake'
 import { expectStableAnchor } from './shiftProbe'
 
 test.describe.configure({ timeout: 90_000 })
-
-/** The fake media session's surface the test drives (`FakeMediaSession`). */
-interface FakeMedia {
-  getSnapshot(): {
-    readonly local: { readonly attendeeId: string | undefined; readonly muted: boolean }
-    readonly connection: { readonly state: string }
-    readonly shares: ReadonlyArray<{ readonly userId: string | undefined; readonly ready: boolean }>
-  }
-  addRemote(remote: { readonly userId: string }): string
-  /** Someone starts or stops sharing their screen; a shown share plays a drawn test pattern. */
-  startShare(userId: string): string
-  stopShare(userId: string): void
-  end(reason: string): void
-  setMicrophoneAccess(access: string): void
-  /** The call sounds the page asked for, in order. */
-  readonly played: ReadonlyArray<string>
-}
-type MediaWindow = Window & { readonly __junoHuddleMedia: FakeMedia }
-
-const connection = (win: Page) => win.evaluate(() => (window as unknown as MediaWindow).__junoHuddleMedia.getSnapshot().connection.state)
-const localMuted = (win: Page) => win.evaluate(() => (window as unknown as MediaWindow).__junoHuddleMedia.getSnapshot().local.muted)
-const attendee = (win: Page) => win.evaluate(() => (window as unknown as MediaWindow).__junoHuddleMedia.getSnapshot().local.attendeeId ?? null)
-const addRemote = (win: Page, userId: string) => win.evaluate((id) => (window as unknown as MediaWindow).__junoHuddleMedia.addRemote({ userId: id }), userId)
-const played = (win: Page) => win.evaluate(() => [...(window as unknown as MediaWindow).__junoHuddleMedia.played])
-const microphoneAccess = (win: Page, access: string) => win.evaluate((given) => (window as unknown as MediaWindow).__junoHuddleMedia.setMicrophoneAccess(given), access)
-const startShare = (win: Page, userId: string) => win.evaluate((id) => (window as unknown as MediaWindow).__junoHuddleMedia.startShare(id), userId)
-const stopShare = (win: Page, userId: string) => win.evaluate((id) => (window as unknown as MediaWindow).__junoHuddleMedia.stopShare(id), userId)
-const sharesReady = (win: Page) => win.evaluate(() => (window as unknown as MediaWindow).__junoHuddleMedia.getSnapshot().shares.map((share) => share.ready))
-/** The video plays and keeps getting new frames: more are decoded over 300 ms. */
-const playing = (video: Locator) =>
-  video.evaluate(async (element: HTMLVideoElement) => {
-    const frames = () => element.getVideoPlaybackQuality().totalVideoFrames
-    if (element.readyState < 2 || element.paused || element.videoWidth === 0) return false
-    const before = frames()
-    await new Promise((resolve) => setTimeout(resolve, 300))
-    return frames() > before
-  })
-const endMedia = (win: Page, reason: string) => win.evaluate((why) => (window as unknown as MediaWindow).__junoHuddleMedia.end(why), reason)
 
 /** Main's quit dialog under JUNO_E2E: recorded, and answered as the test says (`main/index.ts`). */
 interface QuitHooks {
@@ -59,20 +21,6 @@ interface QuitHooks {
 }
 const quitAsked = (app: ElectronApplication) => app.evaluate(() => [...(globalThis as unknown as QuitHooks).junoTest.huddleQuitAsked()])
 const answerQuit = (app: ElectronApplication, answer: 'confirm' | 'cancel') => app.evaluate((_, given) => (globalThis as unknown as QuitHooks).junoTest.huddleQuitAnswer(given), answer)
-
-async function openEngMain(juno: Juno): Promise<void> {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.sidebar.row('#eng').open()
-  await juno.topic.expectTitle('Main')
-  await juno.sidebar.leave()
-}
-
-/** The page's media stopped: Chime drops the attendee, which on v2 is how Slack learns of the leave. */
-async function chimeDrops(win: Page, fake: FakeSlack, attendeeId: string): Promise<void> {
-  await expect.poll(() => connection(win)).toBe('ended')
-  fake.control('stopMedia', { attendeeId })
-}
 
 test('start a huddle from the header, mute from the bar, open the tab and leave', async ({ juno, fake, win }) => {
   await openEngMain(juno)
@@ -196,13 +144,6 @@ test('someone shares their screen: the bar says so, the tab shows it, two can sh
   await bar.getByRole('button', { name: 'Leave' }).click()
   await chimeDrops(win, fake, attendeeId!)
 })
-
-/** A Huddle menu item as main built it: its label and whether it is enabled. */
-const huddleMenuItem = (app: ElectronApplication, id: 'huddle-show' | 'huddle-mute' | 'huddle-leave') =>
-  app.evaluate(({ Menu }, itemId) => {
-    const item = Menu.getApplicationMenu()?.getMenuItemById(itemId)
-    return item === undefined || item === null ? null : { label: item.label, enabled: item.enabled }
-  }, id)
 
 test('start, mute and leave a huddle from the palette, with the Huddle menu following', async ({ juno, fake, win, app }) => {
   await openEngMain(juno)

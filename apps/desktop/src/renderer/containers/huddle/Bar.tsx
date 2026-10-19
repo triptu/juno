@@ -24,6 +24,7 @@ export default function HuddleBarContainer({ call }: { readonly call: HuddleCall
       duration={<Duration startedAt={call.startedAt} />}
       people={people.filter((person) => person.you !== true)}
       sharers={shares.map((share) => share.ownerName)}
+      {...(media?.localShare === undefined ? {} : { sharingSource: media.localShare.name })}
       onOpen={(event) => {
         if (channelId !== null) openHuddle(channelId, { newTab: event.metaKey })
       }}

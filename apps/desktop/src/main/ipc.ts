@@ -15,6 +15,7 @@ import type { ProviderStore } from './providers'
 import type { Updates } from './updates'
 import type { Launch } from './launch'
 import { openMicrophoneSettings } from './media'
+import { createScreenShareSources } from './screenShare'
 import { APP_ORIGIN } from './scheme'
 import { closeWebPanel, hideWebPanel, setWebPanelBounds, showWebPanel } from './webPanel'
 import { setMenuHuddle } from './window'
@@ -65,7 +66,11 @@ export const slackLinksForTests: string[] = []
 const e2e = process.env.JUNO_E2E === '1'
 export const logsForTests = { opened: 0 }
 /** Under JUNO_E2E, Mute's System Settings link while the microphone is blocked counts here instead of opening it. */
-export const microphoneSettingsForTests = { opened: 0 }
+const microphoneSettingsForTests = { opened: 0 }
+/** The share sheet's screens and windows, and macOS's Screen Recording permission. */
+const shareSources = createScreenShareSources(e2e)
+/** Main's huddle test hooks (`junoTest`): the System Settings links, and the share sheet's permission and windows. */
+export const huddleSettingsForTests = { microphoneSettingsOpened: () => microphoneSettingsForTests.opened, ...shareSources.testHooks }
 
 export interface IpcDeps {
   readonly updates: Updates
@@ -207,6 +212,10 @@ export function registerIpc({ updates, supervisor, agent, providers, codex, back
     setMenuHuddle(menu)
   })
   handle(Channels.huddleMicrophoneSettings, () => (e2e ? void (microphoneSettingsForTests.opened += 1) : openMicrophoneSettings()))
+  handle(Channels.huddleShareSources, () => shareSources.list())
+  handle(Channels.huddleAllowScreenRecording, () => shareSources.allow())
+  handle(Channels.huddleScreenRecordingSettings, () => shareSources.openSettings())
+  handle(Channels.huddleShareWindowOpen, ({ id }) => shareSources.windowOpen(id))
 
   handle(Channels.sharingGet, () => sharing.get())
   handle(Channels.sharingSet, ({ hide }) => sharing.set(hide))

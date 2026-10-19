@@ -1,7 +1,7 @@
 /** The snapshot's starting value and the changes both sessions make to it. */
 import { CONTENT_SUFFIX, slackUserIdOf } from './externalUserId.ts'
 import type { Change } from './store.ts'
-import type { Connection, Devices, MediaSnapshot, RemoteAttendee } from './types.ts'
+import type { Connection, Devices, LocalShare, MediaSnapshot, RemoteAttendee, ShareEndReason, ShareSource } from './types.ts'
 
 const NO_DEVICES: Devices = {
   microphones: [],
@@ -24,6 +24,7 @@ export const INITIAL_SNAPSHOT: MediaSnapshot = {
   noiseSuppression: 'unsupported',
   shares: [],
   localShare: undefined,
+  shareEnded: undefined,
 }
 
 /** A new call: what the last one left is cleared; devices and access carry over. */
@@ -34,6 +35,7 @@ export const startCall =
     devices: s.devices,
     microphoneAccess: s.microphoneAccess,
     noiseSuppression: s.noiseSuppression,
+    shareEnded: s.shareEnded,
     connection: { state: 'connecting' },
     local: { attendeeId, muted: false, speaking: false, sending: false },
   })
@@ -107,3 +109,12 @@ export const speakers =
       activeSpeaker: loudestFirst.find((id) => speaking.has(id)),
     }
   }
+
+/** The user's share runs, or no longer: `ended` says why it stopped, unless another took its place or its call ended. */
+export const setLocalShare =
+  (share: LocalShare | undefined, ended?: { readonly sourceId: string; readonly kind: ShareSource['kind']; readonly reason: ShareEndReason }): Change =>
+  (s) => ({
+    ...s,
+    localShare: share,
+    ...(ended === undefined ? {} : { shareEnded: { seq: (s.shareEnded?.seq ?? 0) + 1, ...ended } }),
+  })

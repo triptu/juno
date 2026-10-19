@@ -20,6 +20,8 @@ interface JunoTestHooks {
   readonly notificationSettingsOpened: () => number
   /** How many times Mute opened System Settings at Microphone while macOS blocked it. */
   readonly microphoneSettingsOpened: () => number
+  /** How many times the share sheet opened System Settings at Screen Recording. */
+  readonly screenRecordingSettingsOpened: () => number
   /** As if the Mac woke from sleep. */
   readonly wake: () => void
 }
