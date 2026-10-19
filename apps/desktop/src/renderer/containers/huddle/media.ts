@@ -16,7 +16,7 @@
  */
 import type { HuddleCall, HuddleCredentials, HuddleMediaEnd, HuddlePageReport, HuddleRegistration } from '@juno/contract'
 import type { Devices, EndReason, MediaSession, MediaSnapshot } from '@juno/huddle-media'
-import { connectionStateAtom, huddleCallValueAtom, leaveHuddle, registry, reportHuddleMedia, startHuddle } from '@juno/state'
+import { connectionStateAtom, huddleCallValueAtom, leaveHuddle, registry, reportHuddleMedia, showToast, startHuddle } from '@juno/state'
 import { watchHuddleEnds } from './toasts'
 
 /** Chime's nearest media region, which only the page may look up (research section 1). */
@@ -176,9 +176,13 @@ export function startHuddleMedia(): void {
     toggleHuddleMuted()
   })
   // The whole state again every time the engine connection opens, an engine restart included.
-  registry.subscribe(connectionStateAtom, (state) => {
-    if (state === 'connected') void report(true)
-  })
+  registry.subscribe(
+    connectionStateAtom,
+    (state) => {
+      if (state === 'connected') void report(true)
+    },
+    { immediate: true },
+  )
 }
 
 export type JoinOutcome = 'joined' | 'cancelled' | 'failed'
@@ -189,7 +193,11 @@ export async function joinHuddle(channelId: string): Promise<JoinOutcome> {
   // The session's chunk loads while Chime's region is looked up.
   const [, region] = await Promise.all([load(fakeMedia), fakeMedia ? Promise.resolve(FAKE_REGION) : nearestRegion()])
   const exit = await startHuddle(registry, channelId, region, generation)
-  if (exit._tag === 'Failure') return 'failed'
+  if (exit._tag === 'Failure') {
+    // Slack's refusals also end the call as `joinFailed`, which shows the same toast; this covers no answer at all.
+    showToast(registry, { text: "Couldn't join the huddle", action: { label: 'Try again', onAction: () => void joinHuddle(channelId) } })
+    return 'failed'
+  }
   const result = exit.value
   if (result._tag !== 'joined') return 'cancelled'
   pending = { attendeeId: result.attendeeId, credentials: result.credentials }
