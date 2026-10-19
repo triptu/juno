@@ -8,6 +8,6 @@ The engine side of huddles (`docs/plans/huddles.md`, SPEC 20). The `Huddle` serv
 - `attach.ts`: a sync's session and its end; `reads.ts`: room frames and `huddles/info` reads; `slack.ts`: the requests.
 - `Huddle.ts`: the service and its public types.
 
-The engine gives it a session per sync (`attach`) with the Slack client, where the pending leaves are stored and the channels to read; see `engine/src/huddle/`. The renderer runs the media session and reports to it through `huddle.media`.
+The engine gives it a session per sync (`attach`) with the Slack client, where the pending leaves are stored and the channels to read; see `engine/src/huddle/`. The renderer runs the media session (`apps/desktop/src/renderer/containers/huddle/media.ts`) and reports to it through `huddle.report`.
 
-It does not set the "In a huddle" profile status yet (`users.profile.set`); see the plan.
+`status.ts` keeps the "In a huddle" status as the official client does: `users.profile.set` with `huddle_state_expiration_ts` while the call is live, renewed every 240 s or so, and no clearing write on leave.

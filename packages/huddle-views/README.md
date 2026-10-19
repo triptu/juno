@@ -1,6 +1,6 @@
 # @juno/huddle-views
 
-The huddle views (SPEC section 20, inventory 22): React components built from `@juno/ui` that take view models and callbacks and nothing else. Containers in `apps/desktop/src/renderer/containers/huddle/` will wire the huddle atoms and the media session to them (`docs/plans/huddles.md`, phase 3). Depends on `@juno/ui` and `@juno/tokens` only, so its view models are its own (`src/model.ts`); a container maps the contract's huddle routes onto them.
+The huddle views (SPEC section 20, inventory 22): React components built from `@juno/ui` that take view models and callbacks and nothing else. Containers in `apps/desktop/src/renderer/containers/huddle/` wire the huddle atoms and the media session to them (`docs/plans/huddles.md`, phase 3). Depends on `@juno/ui` and `@juno/tokens` only, so its view models are its own (`src/model.ts`); a container maps the contract's huddle routes onto them.
 
 ## Public API
 
@@ -13,7 +13,7 @@ The huddle views (SPEC section 20, inventory 22): React components built from `@
 - `ScreenSourcePicker`: the Share screen sheet's panel, with the Screen Recording permission steps. The container places it in `SheetLayer` from `@juno/views`.
 - `statusLine`, `sharingLine`, `placeLabel` (`look.ts`): the copy rules the bar and the tab share. `muteShortcut` is ⌘⇧Space; the app menu owns the accelerator. The tab's glyph is Phosphor's `Headphones`.
 
-`src/index.ts` exports only what something imports today (`HuddleBar`, `HuddleDeviceMenu` and `HuddlePerson`, for the gallery), because knip's ratchet fails on an unused export. The integration adds each view's export when its container imports it. The tab page is split into `HuddlePage` (states and footer), `HuddlePageHeader` and `HuddleStage` (tiles, shares and the people line).
+`src/index.ts` exports only what something imports today (the bar, the page, the header control, the indicator, the device menu and the view models the containers map onto), because knip's ratchet fails on an unused export. `ScreenSourcePicker` gets its export with screen share (phase 4). The tab page is split into `HuddlePage` (states and footer), `HuddlePageHeader` and `HuddleStage` (tiles, shares and the people line).
 
 Each view has a `<View>.fixtures.tsx` next to it, registered in `src/fixtures.ts` and shown by the gallery as `@juno/huddle-views/fixtures`. `src/fixtures/data.ts` holds invented people and drawn screens; nothing comes from Slack.
 
