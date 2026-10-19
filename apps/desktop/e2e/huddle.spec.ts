@@ -6,7 +6,7 @@
  * Slack learns of a leave from Chime, so the test tells the fake when the
  * page's media stopped (`stopMedia`), as Chime would.
  */
-import type { Page } from '@playwright/test'
+import type { ElectronApplication, Page } from '@playwright/test'
 import { TEAM, type FakeSlack } from '@juno/fake-slack'
 import type { Juno } from './driver/juno'
 import { expect, test } from './fixtures'
@@ -26,6 +26,13 @@ const localMuted = (win: Page) => win.evaluate(() => (window as unknown as Media
 const attendee = (win: Page) => win.evaluate(() => (window as unknown as MediaWindow).__junoHuddleMedia.getSnapshot().local.attendeeId ?? null)
 const addRemote = (win: Page, userId: string) => win.evaluate((id) => (window as unknown as MediaWindow).__junoHuddleMedia.addRemote({ userId: id }), userId)
 const endMedia = (win: Page, reason: string) => win.evaluate((why) => (window as unknown as MediaWindow).__junoHuddleMedia.end(why), reason)
+
+/** Main's quit dialog under JUNO_E2E: recorded, and answered as the test says (`main/index.ts`). */
+interface QuitHooks {
+  readonly junoTest: { huddleQuitAsked: () => ReadonlyArray<{ title: string; detail: string; confirm: string }>; huddleQuitAnswer: (answer: 'confirm' | 'cancel') => void }
+}
+const quitAsked = (app: ElectronApplication) => app.evaluate(() => [...(globalThis as unknown as QuitHooks).junoTest.huddleQuitAsked()])
+const answerQuit = (app: ElectronApplication, answer: 'confirm' | 'cancel') => app.evaluate((_, given) => (globalThis as unknown as QuitHooks).junoTest.huddleQuitAnswer(given), answer)
 
 async function openEngMain(juno: Juno): Promise<void> {
   await juno.signIn()
@@ -123,4 +130,26 @@ test('join a running huddle, and Join here after joining on another device', asy
   await bar.getByRole('button', { name: 'Leave' }).click()
   await expect(bar).toBeHidden()
   await chimeDrops(win, fake, second!)
+})
+
+test('quitting in a huddle asks first: Cancel keeps the huddle, Quit leaves it', async ({ juno, fake, win, app, running }) => {
+  await openEngMain(juno)
+  await win.getByRole('button', { name: 'Start huddle' }).click()
+  const bar = win.getByRole('region', { name: 'Huddle' })
+  await expect(bar).toBeVisible()
+  await expect.poll(() => connection(win)).toBe('connected')
+  const attendeeId = await attendee(win)
+
+  // ⌘Q, the menu's Quit and the Dock's Quit all start the same app quit. Cancel keeps the huddle.
+  await answerQuit(app, 'cancel')
+  await app.evaluate(({ app: electron }) => electron.quit())
+  await expect.poll(() => quitAsked(app)).toEqual([{ title: 'Leave the huddle and quit?', detail: "You're in a huddle in #eng.", confirm: 'Quit' }])
+  await expect(bar).toBeVisible()
+  expect(await connection(win)).toBe('connected')
+  expect(fake.calls.filter((call) => call.method === 'rooms.leave')).toHaveLength(0)
+
+  // Quit leaves the huddle before Juno exits.
+  await answerQuit(app, 'confirm')
+  await running.close()
+  expect(fake.calls.find((call) => call.method === 'rooms.leave')?.args).toMatchObject({ channel_id: 'C0ENG', attendee_id: attendeeId })
 })
