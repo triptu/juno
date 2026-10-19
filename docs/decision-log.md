@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-19 08:56 · Tests · Observe child exits at spawn time in the heavy-queue test and release holders only after both requests are queued; late exit listeners could leave affected waiting forever while holding the Mac reservation. Bound both checks to ten seconds and clean up every child.
 - 10-19 08:47 · Tests · Keep the desktop smoke spec through the final affected-input filter when test tools change, and include script contents in its result-cache key; selecting it as a candidate alone did not run it.
 - 10-19 08:40 · Tests · Run SSH plans as independent unit, app and specs jobs using existing per-job sizes; keep app builds together and conformance off the unit lane. Keep Namespace on one machine, and keep split jobs on SSH so capacity waits cannot allocate several paid machines.
 - 10-19 08:37 · Tests · Keep repository paths through affected unit execution and start only their packages; import closures already select files, but package-relative filters also ran namesakes. Preserve whole-package and whole-suite config fallbacks.

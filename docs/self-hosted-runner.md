@@ -96,7 +96,10 @@ desktop, and all 48 files appeared: 42 passed and six intentionally skipped.
 The baseline Home title mismatch and AI-items timeout did not recur after.
 All four conformance files passed on both sides. The after run's remote plan
 passed; local lint caught the enlarged runner-test file, subsequently split
-into a shared harness. The final branch check verifies that correction.
+into a shared harness. The final branch check verifies that correction. It also exposed a missed
+child-exit event in the heavy-queue test, which could hold the Mac reservation
+forever. That harness now observes exits at spawn time, releases holders only
+after both requests are queued, and bounds both checks to ten seconds.
 
 The before run began around 08:25 IST at load average 1.27; the after run
 began at 08:41 at 7.98. Both started beside two other 4-core reservations.
