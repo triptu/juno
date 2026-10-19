@@ -10,8 +10,9 @@
  * makes sense with that workspace's session, which is when it is read.
  * Other engine state that must outlive a crash lives in prefs the same way
  * (`slackSchedule.ts`, `readCatchUp.ts`). No credentials are stored. A read
- * that fails, or a stored value that is not a list of records, is a failure
- * the service waits out, never an empty list: only a missing pref is one.
+ * that fails, or a stored value that is not a list of records (bad JSON and
+ * `null` included), is a typed failure the service waits out, never an
+ * empty list: only a missing pref is one.
  *
  * Main reports the live renderer page generations (`huddlePages`); the
  * service takes a page that is no longer listed as gone, with its media.
@@ -33,6 +34,19 @@ const Records = Schema.Array(Schema.Struct({
   /** The renderer page generation the credentials went to; null when none did. */
   generation: Schema.NullOr(Schema.String),
 }))
+
+/**
+ * The stored records: none when the pref is missing, and a failure for
+ * anything else that is not a list of records, bad JSON and `null`
+ * included. Read here rather than with `prefs.get`, which throws on bad JSON.
+ */
+const readRecords = Effect.gen(function* () {
+  const sql = yield* StoreReader
+  const rows = yield* sql<{ value_json: string }>`SELECT value_json FROM prefs WHERE key = ${PENDING_LEAVES_PREF}`
+  const row = rows[0]
+  if (row === undefined) return []
+  return yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Records))(row.value_json)
+})
 
 /** The conversations the user is in, to read running huddles for. */
 const memberChannels = Effect.gen(function* () {
@@ -62,8 +76,7 @@ export const HuddleSessions = Layer.effectDiscard(Effect.gen(function* () {
       ...(config.huddleStatusRenewMillis === undefined ? {} : { statusRenewMillis: config.huddleStatusRenewMillis }),
       slack: context,
       leaves: {
-        read: prefs.get(PENDING_LEAVES_PREF).pipe(
-          Effect.flatMap((raw) => Schema.decodeUnknownEffect(Records)(raw ?? [])),
+        read: readRecords.pipe(
           Effect.mapError((cause) => new HuddleStoreError({ cause })),
           Effect.provide(context),
         ),
