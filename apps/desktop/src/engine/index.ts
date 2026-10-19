@@ -103,7 +103,15 @@ parent.on('message', (event) => {
           onWake: (name, wake) => { if (wake === undefined) testWakes.delete(name); else testWakes.set(name, wake) },
         } } : {}),
         ...(fastTiming
-          ? { timing: Record.map(productionTiming, (millis) => millis / 20) }
+          ? { timing: {
+              ...Record.map(productionTiming, (millis) => millis / 20),
+              // As in the unit harness, explicit catch-ups replace periodic discovery.
+              sweepIntervalMillis: 0,
+              followPassMillis: 0,
+              // Electron and the fake run in separate real processes, on a shared runner.
+              socketHelloTimeoutMillis: productionTiming.socketHelloTimeoutMillis,
+              socketPongTimeoutMillis: productionTiming.socketPongTimeoutMillis,
+            } }
           : {}),
       })
       engine.then(
