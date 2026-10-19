@@ -1,26 +1,27 @@
 /**
  * The Chime media session: one huddle's audio with the Amazon Chime SDK, as
- * the spike joined it (`scripts/huddle-live-page.ts`). Audio only: no video is
- * received (`NoVideoDownlinkBandwidthPolicy`), so a camera someone turns on in
- * Slack costs nothing here.
+ * the spike joined it (`scripts/huddle-live-page.ts`), and others' shared
+ * screens. The only video received is content share
+ * (`ContentOnlyDownlinkPolicy`), so a camera someone turns on in Slack costs
+ * nothing here. The user's own camera and content share are never started.
  */
 import {
   ConsoleLogger,
   DefaultActiveSpeakerPolicy,
   LogLevel,
   MeetingSessionConfiguration,
-  NoVideoDownlinkBandwidthPolicy,
   type AudioInputDevice,
   type AudioVideoObserver,
   type Logger,
   type MeetingSessionStatus,
 } from 'amazon-chime-sdk-js'
 import { CONTENT_SUFFIX } from '../externalUserId.ts'
-import { INITIAL_SNAPSHOT, patchAttendee, presence, setConnection, speakers, startCall } from '../snapshot.ts'
+import { INITIAL_SNAPSHOT, patchAttendee, presence, setConnection, shareReady, speakers, startCall } from '../snapshot.ts'
 import { SnapshotStore } from '../store.ts'
 import type { Devices, EndReason, HuddleSound, JoinInfo, MediaSession, MicrophoneAccess } from '../types.ts'
 import { deviceList, inUse } from '../devices.ts'
 import { newCall, type Call } from './call.ts'
+import { ContentOnlyDownlinkPolicy } from './contentPolicy.ts'
 import { codeName, endReasonOf } from './endReason.ts'
 import { microphoneProblem } from './microphone.ts'
 import { playSoundUrl, type SoundUrls } from './sounds.ts'
@@ -80,8 +81,8 @@ class ChimeMediaSession implements MediaSession {
       return
     }
     configuration.reconnectTimeoutMs = RECONNECT_TIMEOUT_MS
-    configuration.videoDownlinkBandwidthPolicy = new NoVideoDownlinkBandwidthPolicy()
     const attendeeId = configuration.credentials?.attendeeId ?? ''
+    configuration.videoDownlinkBandwidthPolicy = new ContentOnlyDownlinkPolicy(attendeeId)
     this.#store.update(startCall(attendeeId))
 
     const attempt = { left: false }
@@ -89,7 +90,9 @@ class ChimeMediaSession implements MediaSession {
     const supported = await voiceFocusSupported(this.#logger)
     this.#starting = undefined
     if (attempt.left) return
-    const call = newCall(configuration, supported, this.#logger)
+    const call = newCall(configuration, supported, this.#logger, (id, ready) => {
+      if (!call.ended) this.#store.update(shareReady(id, ready))
+    })
     this.#call = call
     this.#store.update((s) => ({ ...s, noiseSuppression: supported ? (this.#noiseSuppression ? 'on' : 'off') : 'unsupported' }))
     this.#observe(call)
@@ -127,6 +130,11 @@ class ChimeMediaSession implements MediaSession {
     const timer = setTimeout(() => this.#end(call, 'left', 'LeaveTimeout'), LEAVE_TIMEOUT_MS)
     await call.stopped
     clearTimeout(timer)
+  }
+
+  showShare(attendeeId: string, element: HTMLVideoElement): () => void {
+    const call = this.#live()
+    return call === undefined ? () => {} : call.tiles.show(attendeeId, element)
   }
 
   setMuted(muted: boolean): void {
@@ -203,6 +211,10 @@ class ChimeMediaSession implements MediaSession {
         const code = status.statusCode()
         this.#end(call, endReasonOf(code, call), codeName(code))
       },
+      videoTileDidUpdate: (state) => {
+        if (!call.ended) call.tiles.tileDidUpdate(state)
+      },
+      videoTileWasRemoved: (tileId) => call.tiles.tileWasRemoved(tileId),
     }
     av.addObserver(observer)
 
@@ -288,6 +300,7 @@ class ChimeMediaSession implements MediaSession {
     call.ended = true
     this.#store.update(setConnection({ state: 'ended', reason, attendeeId: call.attendeeId, code }))
     for (const cleanup of call.cleanups) cleanup()
+    call.tiles.stop()
     call.av.unbindAudioElement()
     void call.av.stopAudioInput().catch(() => {})
     void call.voiceFocus?.destroy()

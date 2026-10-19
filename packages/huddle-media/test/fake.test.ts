@@ -69,7 +69,7 @@ describe('the fake media session', () => {
     media.addRemote({ userId: MAYA })
     media.startShare(MAYA)
     expect(media.getSnapshot().remotes).toHaveLength(1)
-    expect(media.getSnapshot().shares).toEqual([{ attendeeId: `fake-${MAYA}#content`, userId: MAYA }])
+    expect(media.getSnapshot().shares).toEqual([{ attendeeId: `fake-${MAYA}#content`, userId: MAYA, ready: false }])
     media.stopShare(MAYA)
     expect(media.getSnapshot().shares).toEqual([])
   })

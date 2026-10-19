@@ -90,15 +90,17 @@ export interface Devices {
 }
 
 /**
- * Phase 4, screen share (docs/plans/huddles.md section 5). Someone else's
- * shared screen; Slack allows two at once. The Chime session knows of a share
- * from its `#content` attendee but receives no video yet.
+ * Someone else's shared screen (docs/plans/huddles.md, phase 4); Slack allows
+ * two at once. It shows from the moment its `#content` attendee is present,
+ * before any video arrives, so the bar can say who shares at once.
  */
 export interface RemoteShare {
   /** The share's own Chime attendee id: the owner's id with `#content`. */
   readonly attendeeId: string
-  /** The Slack user id of the person sharing, when known. */
+  /** The Slack user id of the person sharing: from the share's `ExternalUserId`, else from the owner's attendee. */
   readonly userId: string | undefined
+  /** A video element bound with `showShare` has its first frame. False again once it is unbound or the video goes. */
+  readonly ready: boolean
 }
 
 /** Phase 4: what the user shares, started from a `chromeMediaSourceId`. Not built yet. */
@@ -116,7 +118,7 @@ export interface MediaSnapshot {
   readonly devices: Devices
   readonly microphoneAccess: MicrophoneAccess
   readonly noiseSuppression: NoiseSuppression
-  // Phase 4, screen share.
+  /** Others' shared screens, in the order they started. */
   readonly shares: ReadonlyArray<RemoteShare>
   readonly localShare: LocalShare | undefined
 }
@@ -155,6 +157,13 @@ export interface MediaSession {
   chooseSpeaker(id: string | null): Promise<void>
   /** Plays a short call sound, quietly, on the speaker in use or the one picked. Works in any state, after an end too. */
   playSound(sound: HuddleSound): void
+  /**
+   * Shows the share of `attendeeId` (a `RemoteShare`'s) in `element`, now or
+   * once its video arrives, until the returned function is called. A share no
+   * element shows is paused, so it costs no bandwidth or decoding. One
+   * element per share; a second call replaces the first.
+   */
+  showShare(attendeeId: string, element: HTMLVideoElement): () => void
   /** Returns the unsubscribe function. */
   subscribe(listener: () => void): () => void
   /** The same object until something changes. */

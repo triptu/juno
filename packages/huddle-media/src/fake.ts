@@ -6,8 +6,10 @@
  */
 import { inUse } from './devices.ts'
 import { CONTENT_SUFFIX } from './externalUserId.ts'
-import { INITIAL_SNAPSHOT, patchAttendee, presence, setConnection, speakers, startCall } from './snapshot.ts'
+import { watchFirstFrame } from './firstFrame.ts'
+import { INITIAL_SNAPSHOT, patchAttendee, presence, setConnection, shareReady, speakers, startCall } from './snapshot.ts'
 import { SnapshotStore } from './store.ts'
+import { createTestPattern, type TestPattern } from './testPattern.ts'
 import type { Devices, EndReason, HuddleSound, JoinInfo, MediaDevice, MediaSession, MicrophoneAccess } from './types.ts'
 
 export interface FakeMediaOptions {
@@ -26,6 +28,13 @@ export interface FakeRemote {
   readonly muted?: boolean
 }
 
+/** An element `showShare` was given, and the pattern playing in it while its share runs. */
+interface Shown {
+  readonly element: HTMLVideoElement
+  readonly unwatch: () => void
+  pattern: TestPattern | undefined
+}
+
 const FAKE_TEAM = 'T0FAKETEAM0'
 const FAKE_ROOM = 'R0FAKEROOM0'
 
@@ -35,6 +44,7 @@ export class FakeMediaSession implements MediaSession {
   readonly #noiseSupported: boolean
   /** Who speaks now, loudest first. */
   #speaking: ReadonlyArray<string> = []
+  readonly #shown = new Map<string, Shown>()
   /** The sounds `playSound` was asked for, in order, for a test to read. */
   readonly played: Array<HuddleSound> = []
 
@@ -72,6 +82,17 @@ export class FakeMediaSession implements MediaSession {
 
   playSound(sound: HuddleSound): void {
     this.played.push(sound)
+  }
+
+  /** Plays a drawn test pattern in `element` while the share runs. */
+  showShare(attendeeId: string, element: HTMLVideoElement): () => void {
+    this.#hide(attendeeId)
+    const shown: Shown = { element, unwatch: watchFirstFrame(element, (ready) => this.#store.update(shareReady(attendeeId, ready))), pattern: undefined }
+    this.#shown.set(attendeeId, shown)
+    this.#playShares()
+    return () => {
+      if (this.#shown.get(attendeeId) === shown) this.#hide(attendeeId)
+    }
   }
 
   setMuted(muted: boolean): void {
@@ -145,6 +166,7 @@ export class FakeMediaSession implements MediaSession {
     if (connection.state === 'idle' || connection.state === 'ended') return
     this.#speaking = []
     this.#store.update(setConnection({ state: 'ended', reason, attendeeId: local.attendeeId ?? '', code: `fake:${reason}` }))
+    this.#playShares()
   }
 
   setMicrophoneAccess(access: MicrophoneAccess): void {
@@ -163,13 +185,44 @@ export class FakeMediaSession implements MediaSession {
     this.#useDevices()
   }
 
-  /** Phase 4: someone starts sharing their screen. */
-  startShare(userId: string, attendeeId = `fake-${userId}`): void {
-    this.#store.update(presence(`${attendeeId}${CONTENT_SUFFIX}`, true, `${FAKE_TEAM}-${FAKE_ROOM}-${userId}`))
+  /** Someone starts sharing their screen. Returns the share's attendee id. A shown share plays a test pattern. */
+  startShare(userId: string, attendeeId = `fake-${userId}`): string {
+    const share = `${attendeeId}${CONTENT_SUFFIX}`
+    this.#store.update(presence(share, true, `${FAKE_TEAM}-${FAKE_ROOM}-${userId}`))
+    this.#playShares()
+    return share
   }
 
   stopShare(userId: string, attendeeId = `fake-${userId}`): void {
     this.#store.update(presence(`${attendeeId}${CONTENT_SUFFIX}`, false, ''))
+    this.#playShares()
+  }
+
+  /** Starts the pattern in each shown element whose share runs, and stops it where the share has gone. */
+  #playShares(): void {
+    const running = new Set(this.getSnapshot().shares.map((share) => share.attendeeId))
+    for (const [attendeeId, shown] of this.#shown) {
+      if (running.has(attendeeId) && shown.pattern === undefined) {
+        shown.pattern = createTestPattern(attendeeId)
+        shown.element.muted = true
+        shown.element.srcObject = shown.pattern.stream
+        void shown.element.play().catch(() => {})
+      } else if (!running.has(attendeeId) && shown.pattern !== undefined) {
+        shown.pattern.stop()
+        shown.pattern = undefined
+        shown.element.srcObject = null
+      }
+    }
+  }
+
+  #hide(attendeeId: string): void {
+    const shown = this.#shown.get(attendeeId)
+    if (shown === undefined) return
+    this.#shown.delete(attendeeId)
+    shown.unwatch()
+    shown.pattern?.stop()
+    shown.element.srcObject = null
+    this.#store.update(shareReady(attendeeId, false))
   }
 
   #useDevices(): void {
