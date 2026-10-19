@@ -1,6 +1,8 @@
 /**
  * Handlers for the huddle routes. The `Huddle` service maps Slack's errors
  * to the contract's; a start with no workspace open is `NotSignedIn`.
+ * `huddle.people` asks the sync to name anyone the store lacks; the answer
+ * lands in `users`, which runs the query again.
  */
 import { Effect, Result, Stream } from 'effect'
 import { HuddleRoutes, NotSignedIn } from '@juno/contract'
@@ -8,6 +10,7 @@ import { Huddle } from '@juno/huddle'
 import { StoreReader } from '@juno/store'
 import { EngineConfig } from '../config'
 import { serveLiveValue, serveWorkspaceValue } from '../protocol/live'
+import { SyncLink } from '../syncLink'
 import { personFrom, type UserRow } from '../topicRows'
 import { Workspace } from '../workspace'
 
@@ -18,6 +21,7 @@ export const HuddleHandlers = HuddleRoutes.toLayer(
     const huddle = yield* Huddle
     const workspace = yield* Workspace
     const config = yield* EngineConfig
+    const link = yield* SyncLink
     const measure = config.e2e || config.dev
     return {
       'huddle.call': () => serveLiveValue(runs(huddle.call), { measure }),
@@ -35,6 +39,8 @@ export const HuddleHandlers = HuddleRoutes.toLayer(
         const sql = yield* StoreReader
         const rows = yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id IN ${sql.in(ids)}`
         const byId = new Map(rows.map((row) => [row.id, row]))
+        const missing = ids.filter((id) => !byId.has(id))
+        if (missing.length > 0) yield* Effect.flatMap(link.fetcher, (fetcher) => fetcher?.wantUsers(missing) ?? Effect.void)
         return ids.map((id) => personFrom(id, byId.get(id)))
       })),
     }
