@@ -25,7 +25,12 @@ export default defineConfig({
   // Tests tagged @mac depend on macOS behaviour. pnpm remote runs on Linux and
   // skips them. Full runs include quarantined tests; selective runs skip them.
   grepInvert: excludedTags.length ? new RegExp(excludedTags.map((tag) => `${tag}\\b`).join('|')) : undefined,
-  reporter: [[process.env.CI ? 'github' : 'list'], ['../../scripts/test-results-reporter.mjs']],
+  reporter: [
+    [process.env.CI ? 'github' : 'list'],
+    ['../../scripts/test-results-reporter.mjs'],
+    // Per-test timing lines for `node scripts/e2e-timings.mjs`.
+    ...(process.env.JUNO_E2E_TIMINGS === '1' ? [['./e2e/timings.ts'] as const] : []),
+  ],
   use: {
     trace: 'retain-on-failure',
   },

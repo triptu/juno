@@ -923,7 +923,9 @@ export class Juno {
 
   /** Wait for a real job pass, including a pass that chooses not to call the model. */
   async workPass(name: Parameters<WorkHooks['workPass']>[0]): Promise<void> {
+    const started = performance.now()
     await this.app.evaluate((_electron, job) => (globalThis as unknown as { junoTest: WorkHooks }).junoTest.workPass(job), name)
+    if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: work-pass ${Math.round(performance.now() - started)} ms`)
   }
 
   /**
@@ -1020,7 +1022,9 @@ export class Juno {
    * changes would land in the test.
    */
   async expectEngineLive(timeout = 30_000): Promise<void> {
+    const started = performance.now()
     await expect(this.sidebar.root).toHaveAttribute('aria-busy', 'false', { timeout })
+    if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: engine-live ${Math.round(performance.now() - started)} ms`)
   }
 
   /** Reads one of the app's performance measures (`@juno/state/perf`), in milliseconds. */
