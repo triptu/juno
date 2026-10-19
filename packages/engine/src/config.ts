@@ -107,6 +107,8 @@ export interface EngineTimingConfig {
   readonly liveRetryBaseMillis: number
   /** Longest retry of a failed live query. */
   readonly liveRetryCapMillis: number
+  /** How often the "In a huddle" status is renewed while a call is live (±10%). */
+  readonly huddleStatusRenewMillis: number
 }
 
 export const productionTiming: EngineTimingConfig = {
@@ -150,6 +152,7 @@ export const productionTiming: EngineTimingConfig = {
   slackRetryCapMillis: 15_000,
   liveRetryBaseMillis: 500,
   liveRetryCapMillis: 30_000,
+  huddleStatusRenewMillis: 240_000,
 }
 
 export class EngineTiming extends Context.Reference<EngineTimingConfig>('juno/engine/EngineTiming', {

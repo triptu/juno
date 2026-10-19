@@ -21,6 +21,8 @@ import { AiSpend } from './aiSpend'
 import { ArtHandlers } from './art/handlers'
 import { ArtJob } from './art/job'
 import { HomeHandlers } from './home/handlers'
+import { HuddleHandlers } from './huddle/handlers'
+import { HuddleLive } from './huddle/session'
 import { AutomatedJob } from './home/automated'
 import { HomeJob } from './home/job'
 import { SearchHandlers } from './search/handlers'
@@ -101,7 +103,7 @@ export const Services = Layer.mergeAll(EnginePhases, ArtJob, TitleJob, HomeJob, 
   Layer.provideMerge(ActionWorker.layer),
   Layer.provideMerge(SyncRunner.layer),
   Layer.provideMerge(OwnerActivity.layer),
-  Layer.provideMerge(NotificationControl.layer.pipe(Layer.provideMerge(SocketEvents.layer))),
+  Layer.provideMerge(Layer.merge(NotificationControl.layer, HuddleLive).pipe(Layer.provideMerge(SocketEvents.layer))),
   Layer.provideMerge(AiProviderLive),
   Layer.provideMerge(AiCredentials.layer),
   Layer.provideMerge(AiSpend.layer),
@@ -115,8 +117,10 @@ export const Services = Layer.mergeAll(EnginePhases, ArtJob, TitleJob, HomeJob, 
   Layer.provideMerge(Status.layer),
 )
 
-/** One `toLayer` per feature, merged. Requires `Services`. */
-export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, MessagesHandlers, ReadsHandlers, ArtHandlers, NewChatHandlers, SendHandlers, HomeHandlers, AllTopicsHandlers, NotificationsHandlers, ViewsHandlers, FilesHandlers, MentionsHandlers, AiHandlers, AgentWritesHandlers)
+/** One `toLayer` per feature, merged. Requires `Services`. `Layer.mergeAll` takes at most 20, so later features merge after it. */
+export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, MessagesHandlers, ReadsHandlers, ArtHandlers, NewChatHandlers, SendHandlers, HomeHandlers, AllTopicsHandlers, NotificationsHandlers, ViewsHandlers, FilesHandlers, MentionsHandlers, AiHandlers, AgentWritesHandlers).pipe(
+  Layer.merge(HuddleHandlers),
+)
 
 /** The engine's side of the AgentHost port (ADR 0012): `JunoHost` over `Services`, with the engine phase from the status feature. */
 export const AgentHost = JunoHostLive.pipe(Layer.provide(Layer.effect(PhaseSource, Status.use((status) => Effect.succeed(status.phases)))))

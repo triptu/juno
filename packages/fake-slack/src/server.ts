@@ -15,6 +15,7 @@ import type { MethodName, RtmFrame } from '@juno/slack-schema'
 import { EdgeEmojisListOk, EdgeUsersInfoArgs, EdgeUsersInfoOk, encodeRtmFrame, isMethodName, Methods } from '@juno/slack-schema'
 import { parseCookies, parseFields, parseJson, parseMultipartParts, readBody, type FormFields } from './body.ts'
 import { mimetypeOf } from './files.ts'
+import type { EdgeHandlers } from './features/registry.ts'
 import { ApiError, type Handlers, type MethodContext } from './methods.ts'
 import { clientPage, signInPage } from './signin.ts'
 import { edgeUserObject, type Workspace } from './state.ts'
@@ -130,13 +131,15 @@ export class FakeServer {
   readonly workspace: Workspace
   readonly #control: (name: string, input: Record<string, unknown>) => unknown
   readonly #handlers: Handlers
+  readonly #edgeHandlers: EdgeHandlers
   readonly #http: Server
   readonly #wss = new WebSocketServer({ noServer: true })
   #baseUrl = ''
   #socketSerial = 0
 
-  constructor(workspace: Workspace, control: (name: string, input: Record<string, unknown>) => unknown, handlers: Handlers) {
+  constructor(workspace: Workspace, control: (name: string, input: Record<string, unknown>) => unknown, handlers: Handlers, edgeHandlers: EdgeHandlers = {}) {
     this.#handlers = handlers
+    this.#edgeHandlers = edgeHandlers
     this.workspace = workspace
     this.#control = control
     this.#http = createServer((request, response) => {
@@ -632,6 +635,16 @@ export class FakeServer {
     if (limit !== undefined) {
       response.setHeader('Retry-After', String(limit.retryAfter))
       return record(429, { ok: false, error: 'ratelimited' })
+    }
+    const feature = this.#edgeHandlers[method]
+    if (feature !== undefined) {
+      let answer: { readonly ok: true } | ApiError
+      try {
+        answer = feature(this.#context(), body)
+      } catch {
+        return record(200, { ok: false, error: 'invalid_arguments' })
+      }
+      return record(answer instanceof ApiError ? answer.status : 200, answer instanceof ApiError ? { ok: false, error: answer.error } : answer)
     }
     if (method === 'emojis/list') return record(200, Schema.encodeSync(EdgeEmojisListOk)({ ok: true, results: [...this.workspace.emoji.values()] }))
     if (method !== 'users/info') return record(200, { ok: false, error: 'unknown_method' })

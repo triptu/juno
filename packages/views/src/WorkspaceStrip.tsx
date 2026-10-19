@@ -1,6 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { Gear } from '@phosphor-icons/react/dist/icons/Gear'
 import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
+import { Headphones } from '@phosphor-icons/react/dist/icons/Headphones'
 import { House } from '@phosphor-icons/react/dist/icons/House'
 import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
@@ -14,7 +15,7 @@ import { Avatar, IconButton, Tab, TabStrip, TopicArt, type ActivateEvent, type P
 import { hueFor, initials } from './look'
 
 /** The icon a tab shows: the channel kind for a topic, the page's own icon otherwise. */
-export type WorkspaceTabIcon = 'hash' | 'lock' | 'user' | 'users' | 'home' | 'all-topics' | 'juno' | 'settings'
+export type WorkspaceTabIcon = 'hash' | 'lock' | 'user' | 'users' | 'home' | 'all-topics' | 'juno' | 'settings' | 'headphones'
 
 export interface WorkspaceTab {
   readonly id: string
@@ -72,6 +73,7 @@ const icons: Record<WorkspaceTabIcon, PhosphorIcon> = {
   'all-topics': ListBullets,
   juno: Sparkle,
   settings: Gear,
+  headphones: Headphones,
 }
 
 const keyboard: ActivateEvent = { metaKey: false, shiftKey: false, altKey: false, source: 'keyboard' }

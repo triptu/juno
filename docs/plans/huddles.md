@@ -38,7 +38,7 @@ From the research:
 2. **Join.** The engine calls `rooms.join` with `channel_id`, an optional `thread_ts` and `regions`. The answer holds `call.call_id` and `call.free_willy.{meeting, attendee}`.
 3. **Media.** The engine sends the meeting and attendee to the renderer. The renderer passes them to `new MeetingSessionConfiguration(meeting, attendee)` in the open-source Chime SDK and talks to Chime directly. Slack's session never leaves the engine.
 4. **Live state.** Other people joining, leaving and starting huddles arrive as `sh_room_join`, `sh_room_leave`, `sh_room_update` and `huddle_start` frames. Running huddles per channel come from `huddles/info` and `huddles.activeChannels` after each connect.
-5. **Leave.** The engine sends `rooms.leave` with `channel_id`, `call_id`, `attendee_id` and `reason=user_initiated`, without waiting for the answer, and the renderer stops the Chime session. On a workspace with `huddles_arch_v2` Slack answers `feature_not_enabled` and learns of the leave from Chime, so the Chime stop is the leave that counts there (research section 6).
+5. **Leave.** Leave stops the page's media and sends `rooms.leave` at once; the stored record is cleared only once the media is known stopped (and its request has gone out). `rooms.leave` carries `channel_id`, `call_id`, `attendee_id` and `reason=user_initiated`, and its answer is not awaited. On a workspace with `huddles_arch_v2` Slack answers `feature_not_enabled` and learns of the leave from Chime, so the Chime stop is the leave that counts there (research section 6).
 
 **Requests look like the official client's.** For the huddle methods Juno sends the same query parameters, form fields and `_x_reason` values as Slack's desktop client (for example `calls-api/joinRoom`). Today `packages/slack/src/client/api.ts` omits some parameters (`_x_desktop_ia`, `_x_gantry`, `_x_frontend_build_type` and others). The spike records a real `rooms.join` from Slack desktop in the test channel and copies its shape. The change goes in `api.ts`, the one place the file says it may go.
 
@@ -54,8 +54,8 @@ All new logic lives in three new packages. Existing code changes only at the reg
 
 | Package | Job | Depends on |
 | --- | --- | --- |
-| `@juno/huddle` | Engine side. The `Huddle` service: a state machine for the call (idle, joining, joined, leaving), `rooms.join` and `rooms.leave`, the leave that must happen, participants from room frames, running huddles per channel, status renewal every 4 minutes or so. Exports its handler layer. Decodes its own frames from the socket. | `slack`, `slack-schema`, `contract`, `domain` |
-| `@juno/huddle-media` | Renderer side. A `MediaSession` interface with two versions: Chime and a fake for e2e tests. Join with meeting and attendee, mute, devices, active speaker, volume, remote content share, local content share. A plain store (`subscribe`, `getSnapshot`), no Atom and no React. Loaded as a lazy chunk on join. | `amazon-chime-sdk-js`, `contract` (types only) |
+| `@juno/huddle` | Engine side. The `Huddle` service: a state machine for the call (idle, joining, joined, leaving), `rooms.join` and `rooms.leave`, the leave that must happen, participants from room frames, running huddles per channel, status renewal every 4 minutes or so. Decodes its own frames from the socket. Its route handlers and its attachment to `SocketEvents` are in `engine/src/huddle/`, since they use the engine's serve helpers and store. | `slack`, `slack-schema`, `contract` |
+| `@juno/huddle-media` | Renderer side. A `MediaSession` interface with two versions: Chime and a fake for e2e tests. Join with meeting and attendee, mute, devices, active speaker, volume, remote content share, local content share. A plain store (`subscribe`, `getSnapshot`), no Atom and no React. Loaded as a lazy chunk on join. | `amazon-chime-sdk-js` only (it needed nothing from `contract`) |
 | `@juno/huddle-views` | Dumb views with fixtures: `HuddleBar`, `HuddlePage`, the participant row, the shared-screen stage, the channel header button, the channel dot. | `ui`, `tokens` |
 
 Also new, but in existing places:
@@ -126,6 +126,9 @@ Four parallel tracks, then one integration task:
 
 - **A. Schemas and fakes.** `slack-schema/src/huddles.ts`, the fake-slack huddle module and its controls.
 - **B. Engine.** `@juno/huddle`, `contract/src/routes/huddle.ts`, `specs/huddle.qnt`, and unit tests for the pure rules (participant merge, the leave that must happen).
+  - The pending leave is stored in the workspace's user.db as the pref `huddle.pendingLeaves`.
+  - Each renderer page's media service asks main for a page generation when it starts (`huddle.register`); main gives them out in rising order. Main tells the engine which generations are live and the highest it gave out (`huddlePages`), at the engine's `ready` and on every change, and drops one when its page commits a new document, its renderer process goes, or it is destroyed. `huddle.start` carries the generation; the engine holds a Start back while its generation is above the highest main has reported, and hands nothing to a Start whose engine connection closed before Slack answered. The page sends its whole media state with `huddle.report` (the session it holds, the last credentials it received, connection, mute, the last session it ended and why, and a sequence number) on every change and every time its engine connection opens. The engine keeps the latest report per page with the connection it came on, and computes from it, main's report and each hand-off's connection whether an attendee's media is stopped. At boot it reads every workspace's stored leaves and sends no join until all are read. Leave stops the page's media and sends `rooms.leave` at once; the stored record is cleared only once the media is known stopped (and its request has gone out); no timeout assumes a stop.
+  - The "In a huddle" status, as the official client keeps it: while the call is live, `users.profile.set` with `profile` `{"huddle_state_expiration_ts": <now + 300 s>}` and `_x_reason` `increment-huddle-state-expiration-ts`, at once and then every 240 s ±10%. The client writes no other field (Slack sets `huddle_state` and `huddle_state_channel_id` itself) and sends no clearing write on leave, so the status lapses at its expiry.
 - **C. Media.** `@juno/huddle-media` with Chime and the fake. Region lookup, mute, devices, active speaker, Voice Focus.
 - **D. Views.** Finish the phase 1 views against the final routes.
 - **E. Integration.**
@@ -133,6 +136,7 @@ Four parallel tracks, then one integration task:
   - `state/src/huddle.ts` and the containers.
   - Main: `media.ts` (permission handlers), `NSMicrophoneUsageDescription`, the `com.apple.security.device.audio-input` entitlement, and a leave on quit.
   - e2e specs against the fake: start, join, mute from the bar, open the tab, someone else joins and leaves, leave, and quit during a huddle.
+  - Built on the branch `huddle-app` (2026-10-19) as an early build for the owner's feedback: all of the above except the quit e2e, with ⌘⇧Space in the page and the "joined on another device" toast with Join here. Not built yet: the quit and restart confirmation dialog, the Huddle menu and its ⌘K entries, the join and leave sounds, leaving after 10 minutes alone, Mute's link to System Settings while the microphone is blocked, the switch toast, and fetching people the store does not know.
 
 The owner then checks with real people in the test channel.
 
@@ -145,11 +149,14 @@ The owner then checks with real people in the test channel.
 
 `specs/huddle.qnt` models the call's lifecycle between the user, the engine, Slack and the socket. That means the user's join and leave, the `rooms.join` and `rooms.leave` requests and answers, room frames, socket reconnects, and an app quit or crash. The properties:
 
-- **No ghost.** Every attendee id Juno has received gets a `rooms.leave` and a stopped Chime session, even if the app quits or crashes. The engine stores the pending leave before it hands media the credentials, and sends any stored leave on the next start. With `huddles_arch_v2` the stored leave does nothing, and after a crash Chime drops the attendee on its own (research section 6).
+- **No ghost.** Every attendee id Juno has durably received gets a `rooms.leave` and a stopped Chime session, even if the app quits or crashes. The engine stores the pending leave before it hands media the credentials, and sends any stored leave on the next start. With `huddles_arch_v2` the stored leave does nothing, and after a crash Chime drops the attendee on its own (research section 6).
 - **One call.** At most one call is live at a time. Joining another huddle leaves the current one first.
 - **Leave during join.** A leave asked for while a join is in flight ends with no live call and a leave sent for the attendee the join returns.
-- **No stale leave.** A late `sh_room_leave` for an earlier attendee never ends the current call.
-- **Matching state.** After a reconnect, the running huddles shown match Slack's, once `huddles/info` has answered.
+- **No stale leave.** A late room frame for an earlier attendee or room never ends the current call. Live frames identify a user, not an attendee, so they trigger a refetch rather than ending local media.
+- **Matching state.** After a reconnect or `Overflowed`, the running huddles shown match Slack's once a fresh `huddles/info` answers and Slack stays quiet. Discard responses invalidated by a later gap or frame.
+- **Other device.** After the renderer reports `AudioJoinedFromAnotherDevice`, clear the current call and queued join intent. Do not reconnect media without a new user command.
+
+Cleanup assumes an eventual leave/quit/crash, restart and successful delivery. Receipt and the durable pending-leave write are one model step: a crash between HTTP receipt and persistence cannot preserve an unknown attendee id. The implementation must keep credentials private until that write commits. See `specs/README.md`, “Huddle lifecycle”, for the checked bounds and remaining assumptions.
 
 The checker runs in `pnpm specs:check` like the other specs.
 

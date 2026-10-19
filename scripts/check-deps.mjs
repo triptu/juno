@@ -91,6 +91,11 @@ const dirRules = [
       'The preload may import only electron and @juno/contract/channels (names and types, no runtime imports) so it stays small.',
   },
   {
+    dir: 'packages/huddle-media/src',
+    ban: ['@juno/state', 'react', 'react-dom', 'electron', NODE_BUILTIN, EFFECT_ANY],
+    reason: 'The media session is plain TypeScript outside React, loaded on join: no state, React, Effect or Electron (packages/huddle-media/README.md).',
+  },
+  {
     match: /(^|\/)([a-z]+-)?views\//,
     ban: ['@juno/state', '@juno/engine', '@juno/store', 'electron', NODE_BUILTIN, EFFECT_ANY],
     reason: 'Views are dumb: props in, callbacks out. No state, Effect, IPC or Electron (docs/architecture.md sections 1 and 8).',
@@ -102,8 +107,8 @@ const textRules = [
   { re: /\bsendSync\b/, reason: 'ipcRenderer.sendSync blocks the renderer. Use invoke (docs/performance.md 2.1).' },
   {
     re: /\b(?:window|globalThis)\.juno\b/,
-    reason: 'Views and ui do not reach the shell bridge. Containers pass callbacks.',
-    only: (rel) => /(^|\/)([a-z]+-)?views\//.test(rel) || rel.startsWith('packages/ui/'),
+    reason: 'Views, ui and the media session do not reach the shell bridge. Containers pass callbacks.',
+    only: (rel) => /(^|\/)([a-z]+-)?views\//.test(rel) || rel.startsWith('packages/ui/') || rel.startsWith('packages/huddle-media/'),
   },
 ]
 
@@ -167,6 +172,8 @@ const thirdParty = [
     spec: /^@earendil-works\/(?:pi-durable|pi-codemode|chord)(?:\/|$)/,
     allow: ['packages/agent/src/runtime/', 'packages/agent-testing/'],
   },
+  // The Chime SDK is about 2 MB minified: only the media session's lazy chunk and its tests load it.
+  { label: 'the Chime SDK', spec: /^amazon-chime-sdk-js(?:\/|$)/, allow: ['packages/huddle-media/src/chime/', 'packages/huddle-media/test/'], doc: 'packages/huddle-media/README.md' },
   { label: 'pi-mcp', spec: /^@earendil-works\/pi-mcp(?:\/|$)/, allow: ['packages/agent/src/mcp/', 'packages/agent-testing/'] },
   // koffi (ADR 0015): a native FFI module in main, for the private window-server call that tells
   // Juno the screen is shared, and for macOS's notification permission. Keep it to those files.

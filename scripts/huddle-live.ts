@@ -16,6 +16,7 @@
  *   --minutes N     stay in the huddle N minutes (default 5), a status line every 10 s
  *   --socket        also open the RTM socket, read-only, and print room frames by type and field names
  *   --headed        show the browser window, to hear the huddle on this Mac
+ *   --no-noise-suppression   join without Voice Focus
  *   --fake          run against an in-process fake Slack; stops after `rooms.join` (the fake has no Chime)
  *   --team T        the cached session of this team, when several are kept
  *
@@ -35,7 +36,7 @@ import { EdgeHuddlesInfoOk, type MethodArgs, type MethodName, type MethodOk } fr
 import { HttpTransport, SlackClient, SlackApi, SlackEdge, SlackSession, SlackSocket, slackConfigLayer, SocketHandshake, type SlackSessionShape } from '@juno/slack'
 import { openHuddlePage, type HuddlePage } from './huddle-live-browser.ts'
 import { callPlan, Guard, NAMES } from './huddle-live-guard.ts'
-import { log, MediaReport, printHuddles, printPaths, safeError } from './huddle-live-report.ts'
+import { factsFromFrame, factsFromInfo, factsFromJoin, log, MediaReport, printHuddles, printIdentityFacts, printPaths, safeError, type IdentityFacts } from './huddle-live-report.ts'
 import { readCachedSession } from './live-common.ts'
 
 const argv = process.argv.slice(2)
@@ -172,12 +173,16 @@ interface Open {
   socket?: Fiber.Fiber<void>
 }
 
+/** Kept in memory only, for `printIdentityFacts`: never printed. */
+const facts: IdentityFacts = {}
+
 /** Keeps the call id and attendee id of a join answer, for the leave. */
 function remember(joined: MethodOk<'rooms.join'> | undefined) {
   if (joined === undefined) return
   call.callId = joined.call.call_id
   const id = joined.call.free_willy?.attendee['AttendeeId']
   call.attendeeId = typeof id === 'string' ? id : undefined
+  factsFromJoin(facts, joined.call.free_willy?.attendee)
 }
 
 async function main(): Promise<number> {
@@ -232,9 +237,10 @@ async function run(t: Target, connection: Connection, open: Open): Promise<numbe
   if (free === undefined || call.attendeeId === undefined) return 1
 
   const media = new MediaReport(call.attendeeId, t.session.userId, () => wake())
-  open.page = await openHuddlePage({ headed: flags.has('--headed'), onEvent: (event) => media.on(event) })
+  open.page = await openHuddlePage({ headed: flags.has('--headed'), noiseSuppression: !flags.has('--no-noise-suppression'), onEvent: (event) => media.on(event) })
   if (useFake) {
     log('fake: not starting media (the fake has no Chime)')
+    factsFromInfo(facts, await connection.huddlesInfo('after the join'), guard.channel)
     return 0
   }
   if (stopRequested !== undefined) return 1
@@ -249,7 +255,7 @@ async function run(t: Target, connection: Connection, open: Open): Promise<numbe
     console.log(media.status(Date.now() - started, withSocket ? socketReport : undefined))
     if (!infoAfter && media.started) {
       infoAfter = true
-      await connection.huddlesInfo('after the join')
+      factsFromInfo(facts, await connection.huddlesInfo('after the join'), guard.channel)
     }
   }
   media.summary()
@@ -288,6 +294,7 @@ async function cleanup(connection: Connection, open: Open, self: string): Promis
       log('rooms.leave not sent: the join gave no call id or attendee id, so there is nothing to leave')
     }
   }
+  if (guard.joins > 0) printIdentityFacts(facts, call.callId)
   if (open.socket !== undefined) {
     await connection.runtime.runPromise(Fiber.interrupt(open.socket))
     log(`socket room frame types: ${[...socketReport.seenTypes].map(([type, n]) => `${type} x${n}`).join(', ') || 'none'}`)
@@ -358,6 +365,7 @@ function startSocket(runtime: ManagedRuntime.ManagedRuntime<SlackSocket, never>)
     socketReport.roomFrames++
     const mine = (guard.channel !== undefined && data.includes(guard.channel)) || (call.callId !== undefined && data.includes(call.callId))
     if (mine) socketReport.aboutThisRoom++
+    if (frame.type === 'sh_room_join' && mine) factsFromFrame(facts, frame)
     const seen = socketReport.seenTypes.get(frame.type) ?? 0
     socketReport.seenTypes.set(frame.type, seen + 1)
     if (seen === 0) printPaths(`socket frame ${frame.type} (${mine ? 'this room' : 'another room'})`, frame)

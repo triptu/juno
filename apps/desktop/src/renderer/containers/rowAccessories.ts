@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { TopicRow } from '@juno/contract'
+import { useHuddleAccessory } from './huddle/slots'
 
 /** A mark after a Main row's title, and what it says in the row's description. */
 export interface RowAccessory {
@@ -15,7 +16,7 @@ export interface RowAccessory {
  * nothing changes, so the row stays memoized. The first mark present shows.
  * The huddle glyph goes here.
  */
-const rowAccessories: ReadonlyArray<(row: TopicRow | undefined) => RowAccessory | undefined> = []
+const rowAccessories: ReadonlyArray<(row: TopicRow | undefined) => RowAccessory | undefined> = [useHuddleAccessory]
 
 export function useRowAccessory(row: TopicRow | undefined): RowAccessory | undefined {
   let shown: RowAccessory | undefined

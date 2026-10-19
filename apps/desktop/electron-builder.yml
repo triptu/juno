@@ -32,6 +32,9 @@ mac:
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   notarize: false
+  # The macOS microphone prompt's line, for huddles (SPEC 20).
+  extendInfo:
+    NSMicrophoneUsageDescription: Juno uses the microphone when you join a Slack huddle.
 npmRebuild: true
 asarUnpack:
   - "**/*.node"

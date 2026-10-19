@@ -32,6 +32,8 @@ const placeKind = (place: Place): string => {
       return 'Juno tab'
     case 'junoPage':
       return `Juno page ${place.page}`
+    case 'huddle':
+      return 'Huddle'
   }
 }
 

@@ -10,6 +10,7 @@ import { openInBrowser } from './browser'
 import type { CodexHome } from './codex'
 import { popupContextMenu } from './contextMenu'
 import type { EngineSupervisor } from './engine'
+import { watchHuddlePages } from './huddlePages'
 import type { ProviderStore } from './providers'
 import type { Updates } from './updates'
 import type { Launch } from './launch'
@@ -193,6 +194,11 @@ export function registerIpc({ updates, supervisor, agent, providers, codex, back
   handle(Channels.notificationsPermission, () => notifications.permission())
   handle(Channels.notificationsRequestPermission, () => notifications.requestPermission())
   handle(Channels.notificationsOpenSettings, () => notifications.openSettings())
+
+  // Huddle media generations for the engine (huddlePages.ts).
+  const huddlePages = watchHuddlePages(supervisor)
+  // Under JUNO_E2E the page runs the fake media session, so no test talks to Chime.
+  handle(Channels.huddleRegister, (_input, event) => ({ generation: huddlePages.register(event.sender.id), fakeMedia: e2e }))
 
   handle(Channels.sharingGet, () => sharing.get())
   handle(Channels.sharingSet, ({ hide }) => sharing.set(hide))

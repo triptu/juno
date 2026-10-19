@@ -1,0 +1,1 @@
+- 10-19 18:31 · huddle-css-budget · Raise the initial CSS budget from 150 KB to 155 KB for the huddle views. StyleX writes every style into the one initial stylesheet, lazy chunks' too, so the views' 3.1 KB cannot move out; the build is at 150.7 KB. Initial JS stays under 1,100 KB: the bar, the header control, the tab and the media service are lazy chunks.

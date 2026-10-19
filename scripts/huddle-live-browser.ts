@@ -18,7 +18,7 @@ import { log, safeError, type HuddleEvent } from './huddle-live-report.ts'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 interface PageGlobals {
-  junoJoin(meeting: unknown, attendee: unknown): Promise<string>
+  junoJoin(meeting: unknown, attendee: unknown, noiseSuppression: boolean): Promise<string>
   junoLeave(): Promise<void>
 }
 
@@ -30,7 +30,7 @@ export interface HuddlePage {
   close(): Promise<void>
 }
 
-export async function openHuddlePage(options: { readonly headed: boolean; readonly onEvent: (event: HuddleEvent) => void }): Promise<HuddlePage> {
+export async function openHuddlePage(options: { readonly headed: boolean; readonly noiseSuppression: boolean; readonly onEvent: (event: HuddleEvent) => void }): Promise<HuddlePage> {
   const dir = await mkdtemp(join(existsSync('/Volumes/AgentWork/tmp') ? '/Volumes/AgentWork/tmp' : tmpdir(), 'juno-huddle-'))
   const cleanups: Array<() => Promise<unknown>> = [() => rm(dir, { recursive: true, force: true })]
   const close = async () => {
@@ -74,7 +74,7 @@ export async function openHuddlePage(options: { readonly headed: boolean; readon
     return {
       join: async (meeting, attendee) => {
         joined = true
-        await page.evaluate(([m, a]) => (globalThis as unknown as PageGlobals).junoJoin(m, a).then(() => undefined), [meeting, attendee] as const)
+        await page.evaluate(([m, a, ns]) => (globalThis as unknown as PageGlobals).junoJoin(m, a, ns).then(() => undefined), [meeting, attendee, options.noiseSuppression] as const)
       },
       leave: async () => {
         if (!joined) return 'not started'

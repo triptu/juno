@@ -156,9 +156,11 @@ describe('reconnect', () => {
     expect(rows.find((r) => r.id === 'm:C0LAUNCH')).toMatchObject({ title: '#launch', unreadCount: 1 })
     expect(storedFollow(engine, 'C0LEADERSHIP', tsOf(finance))).toBe(0)
 
-    // The budget: the socket's URL is left out (its count depends on the backoff), everything else is exact.
-    const { 'api:client.getWebSocketURL': _socket, 'mutation-repair:conversations.history': repairMain = 0, 'mutation-repair:conversations.replies': repairThreads = 0, ...budget } = callMap(engine)
+    // The budget: the socket's URL (its count depends on the backoff) and the huddle read are left out, everything else is exact.
+    const { 'api:client.getWebSocketURL': _socket, 'edge:huddles/info': huddleReads, 'mutation-repair:conversations.history': repairMain = 0, 'mutation-repair:conversations.replies': repairThreads = 0, ...budget } = callMap(engine)
     expect({ repairMain, repairThreads }).toEqual({ repairMain: 1, repairThreads: 3 })
+    // Running huddles are read again after the gap, once; that read may land after this count.
+    expect(huddleReads ?? 0).toBeLessThanOrEqual(1)
     expect(budget).toEqual({
       'api:client.counts': 1,
       // One workspace snapshot also supplies the newly joined channel.

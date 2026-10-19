@@ -5,11 +5,12 @@
  */
 import { Suspense, type ReactElement } from 'react'
 import { chatCopy } from '@juno/agent-contract'
-import type { TopicDetail } from '@juno/contract'
+import { mainTopicOf, type TopicDetail } from '@juno/contract'
 import { registry, topicAtom, type Place } from '@juno/state'
 import type { WorkspaceTab, WorkspaceTabIcon } from '@juno/views'
 import { chunk } from './chunks'
 import { HomePage } from './Home'
+import { huddleTabTitle } from './huddle/title'
 import { JunoPageTab, JunoTab } from './juno/lazy'
 import { AllTopicsPage } from './navigation'
 import { TopicTab } from './TopicView'
@@ -18,6 +19,10 @@ import { TopicTab } from './TopicView'
 const settings = chunk(() => import('./Settings'))
 const SettingsTab = settings.component((module) => module.SettingsTab)
 export const loadSettingsTab = settings.load
+
+// The huddle page loads when a huddle tab first shows.
+const huddle = chunk(() => import('./huddle/Tab'))
+const HuddleTab = huddle.component((module) => module.HuddleTab)
 
 /** How the strip draws a tab, apart from its id and pin. */
 export type TabLook = Omit<WorkspaceTab, 'id' | 'pinned'>
@@ -65,9 +70,13 @@ const topicLook = (detail: TopicDetail | null | undefined): TabLook => ({
   ...tileOf(detail),
 })
 
-function topicLabel(topicId: string): string {
+function topicDetailOf(topicId: string): TopicDetail | null {
   const result = registry.get(topicAtom(topicId))
-  const detail = result._tag === 'Success' ? result.value : null
+  return result._tag === 'Success' ? result.value : null
+}
+
+function topicLabel(topicId: string): string {
+  const detail = topicDetailOf(topicId)
   if (detail === null) return 'Topic'
   return detail.kind === 'main' ? detail.channel.label : detail.title
 }
@@ -106,6 +115,15 @@ export const tabKinds: { readonly [K in Place['kind']]: TabKind<Extract<Place, {
       <JunoPageTab page={place.page} />
     </Suspense>
   )),
+  huddle: {
+    strip: (_, detail) => ({ title: huddleTabTitle(detail), icon: 'headphones' }),
+    label: (place) => huddleTabTitle(topicDetailOf(mainTopicOf(place.channelId))),
+    page: (place, tabId) => (
+      <Suspense key={`huddle:${place.channelId}`} fallback={null}>
+        <HuddleTab channelId={place.channelId} tabId={tabId} />
+      </Suspense>
+    ),
+  },
 }
 
 /** The entry for a place's kind. */

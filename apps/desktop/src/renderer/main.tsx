@@ -11,6 +11,7 @@ import { createRoot } from 'react-dom/client'
 import { TooltipLayer } from '@juno/views'
 import { App } from './App'
 import { clearCaretsLeftBehind } from './containers/caret'
+import { preloadHuddleHeader } from './containers/huddle/slots'
 
 mark('juno.start')
 
@@ -65,3 +66,8 @@ flushSync(() => {
   )
 })
 afterPaint(() => measure('juno.shell-paint', 'juno.start'))
+// The huddle media service starts after the first paint, as a chunk of its own; Chime loads only on join.
+afterPaint(() => {
+  void import('./containers/huddle/media').then((module) => module.startHuddleMedia())
+  preloadHuddleHeader()
+})

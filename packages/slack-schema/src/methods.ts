@@ -56,7 +56,7 @@ import {
   FilesInfoArgs,
   FilesInfoFields,
 } from './files.ts'
-import { RoomsJoinArgs, RoomsJoinFields, RoomsLeaveArgs, RoomsLeaveFields } from './huddles.ts'
+import { RoomsJoinArgs, RoomsJoinFields, RoomsLeaveArgs, RoomsLeaveFields, UsersProfileSetArgs, UsersProfileSetFields } from './huddles.ts'
 import { SearchMessagesArgs, SearchMessagesFields } from './search.ts'
 import { AuthTestArgs, AuthTestFields, UsergroupsListArgs, UsergroupsListFields } from './users.ts'
 import {
@@ -113,6 +113,7 @@ export const Methods = {
   'files.info': method(FilesInfoArgs, FilesInfoFields),
   'rooms.join': method(RoomsJoinArgs, RoomsJoinFields),
   'rooms.leave': method(RoomsLeaveArgs, RoomsLeaveFields),
+  'users.profile.set': method(UsersProfileSetArgs, UsersProfileSetFields),
 } as const
 
 export type Methods = typeof Methods

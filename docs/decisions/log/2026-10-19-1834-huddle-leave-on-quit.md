@@ -1,0 +1,1 @@
+- 10-19 18:34 · huddle-leave-on-quit · Quitting leaves the huddle from a finalizer on the engine's huddle layer, so the leave is queued as the engine stops and the session's work scope waits for it to go out. If the session closed first, the stored leave goes out on the next launch, as after a crash. The quit confirmation dialog is not built yet.

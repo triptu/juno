@@ -1,0 +1,27 @@
+{
+  "name": "@juno/huddle-media",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A huddle's media in the renderer: the MediaSession interface, its Chime implementation (a lazy chunk, loaded on join) and a fake for e2e tests and the gallery. Plain TypeScript with a subscribe and getSnapshot store; no React, Effect, Electron or window.juno.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./chime": "./src/chime/session.ts",
+    "./fake": "./src/fake.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "amazon-chime-sdk-js": "3.32.0"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "vitest": "5.0.4"
+  },
+  "juno": {
+    "allowedDeps": []
+  }
+}

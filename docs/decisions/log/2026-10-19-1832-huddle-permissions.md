@@ -1,0 +1,1 @@
+- 10-19 18:32 · huddle-permissions · The default session's permission handlers decide only `media`: the microphone for Juno's own page (asking macOS first), camera and screen capture refused until phase 4. Every other permission keeps Electron's default grant, as before the handlers existed, so clipboard and notifications behave as they did.
