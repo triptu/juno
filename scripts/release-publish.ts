@@ -12,14 +12,14 @@
  *
  * Flags:
  *   --notes <file>   the changelog lines for this version, one per line (required)
- *   --urgent         publish after typecheck, lint, unit tests and package smoke; request an immediate full keeper run
+ *   --urgent         publish after typecheck, lint, unit tests and package smoke; run a full run for it next
  *   --prerelease     publish as a pre-release: the app never offers it, and CHANGELOG.md is left alone
  *   --dry-run        check everything and print the plan; change nothing
  *   --dir <path>     the build folder (default apps/desktop/release)
  *   --repo <o/r>     the releases repository (default triptu/juno-releases)
  */
 import { execFileSync } from 'node:child_process'
-import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, rmSync, writeFileSync } from 'node:fs'
+import { closeSync, existsSync, mkdtempSync, openSync, readdirSync, readFileSync, readSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
@@ -109,7 +109,6 @@ try {
 if (signed && !urls.some((url) => url.endsWith('.zip'))) fail('a signed build needs a ZIP in latest-mac.yml for in-place updates')
 if (!signed && files.some((name) => name.endsWith('.zip'))) fail('an unsigned build must not upload a ZIP; rebuild with pnpm package')
 
-const sharedStatus = resolve(root, execFileSync('git', ['rev-parse', '--git-common-dir'], { cwd: root, encoding: 'utf8' }).trim(), '../.juno-status')
 if (!urgent) {
   const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
   if (execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim()) fail('commit or remove working-tree changes before publishing')
@@ -156,10 +155,8 @@ try {
   }
   gh(['release', 'edit', tag, '--repo', repo, '--draft=false', ...(values.prerelease ? [] : ['--latest'])])
   if (urgent) {
-    mkdirSync(sharedStatus, { recursive: true })
     const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
-    writeFileSync(join(sharedStatus, 'ci-keeper-request.json'), `${JSON.stringify({ kind: 'urgent-release-full-suite', tag, commit, requestedAt: new Date().toISOString(), command: `pnpm verify:main --ref ${commit}` }, null, 2)}\n`)
-    console.log(`release:publish: CI keeper request written; run pnpm verify:main --ref ${commit} now`)
+    console.log(`release:publish: no full run covers this urgent release; run pnpm verify:main --ref ${commit} next`)
   }
   console.log(`release:publish: published ${tag}`)
   if (!values.prerelease) syncReleasedVersion(root, version)
