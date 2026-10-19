@@ -1,6 +1,6 @@
 // Works out which tests a change can affect, and runs only those.
 //
-//   pnpm affected                 local Bun check, then the affected suites on one Namespace machine
+//   pnpm affected                 local Bun check, then the affected suites in one remote plan
 //   pnpm affected --plan          print the plan only
 //   pnpm affected --local         run the plan through the local root scripts
 //   pnpm affected --local-on-outage   run the remote steps here if Namespace stays

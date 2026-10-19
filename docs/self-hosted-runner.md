@@ -4,8 +4,9 @@ Configure the runner on each Mac in `~/.config/juno/runner.json`. Every agent
 then tries it before Namespace, without setting environment variables.
 An unreachable host falls back to Namespace. For `.local` hosts, SSH tries IPv4 first and falls back to dual stack if the transport cannot connect. The successful family is reused for the job. This avoids a five-second stall on the laptop's advertised but unreachable IPv6 address. Authentication and connected-host failures still stop the run. A reachable host with broken
 Docker, an SSH key error, an image-build failure, or failing tests returns an
-error without fallback. A job waits up to 60 seconds for free cores before
-falling back. Set `JUNO_REMOTE_MAX_VCPU=0` to forbid Namespace allocation and
+error without fallback. A standalone job waits up to 60 seconds for free cores before
+falling back. Split plan jobs stay on SSH and wait for capacity; an unreachable
+runner falls back to one Namespace plan before splitting. Set `JUNO_REMOTE_MAX_VCPU=0` to forbid Namespace allocation and
 wait for runner capacity without a deadline.
 
 Use an amd64 host with enough RAM for the configured jobs. An 8-core limit with
@@ -41,9 +42,27 @@ A standalone 4-core app job uses two desktop workers. Gallery-only jobs
 use three workers and shift parts at 3 cores, as they do at 4. Quint uses
 one simulation per two cores and one Apalache checker per four, at least one
 each. Wide unit-only plans retain their unit workers beside the spec lane.
-In a plan with app steps, 4 cores give the app two desktop or three
-gallery workers, the unit lane one worker in one package, and the spec lane
-one simulation plus one checker. Step environment settings still win.
+`test:plan` groups unit, app and specs steps into concurrent jobs, each with
+its own container and the standalone workers above. Conformance belongs to
+the specs job, so it no longer waits behind units or inherits their one-worker
+limit. App steps stay together and run in order, reusing each app build.
+A broad unit job (4 cores), desktop/gallery job (4) and conformance job (8)
+fit the 16-core host when it is free. Other jobs can delay admission; each
+reservation is released independently. There is one install per job against
+the shared store, and separate reports and spec caches per job.
+
+Once split, every job waits for SSH capacity without a deadline. None fall
+back independently to Namespace. `JUNO_RUNNER_PLAN=single` keeps the former
+single-container plan and its 60-second busy fallback. `JUNO_PLAN_SERIAL=1`
+also keeps one container and runs every step in order. In the former shared
+plan, 4 cores give the app two desktop or three gallery workers, the unit
+lane one worker in one package, and the spec-check lane one simulation plus
+one checker. Step environment settings still win. Explicit `--machine`
+sizing applies separately to each split job.
+
+Each child writes its own `run.log`; the parent writes `plan.log` with output
+from every job and the original step indices. Usage summaries count only
+child logs. Cancellation forwards to all jobs and waits for their cleanup.
 
 ## Laptop measurements
 

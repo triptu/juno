@@ -103,7 +103,11 @@ if (command.includes('docker build')) {
  let bytes = 0; process.stdin.on('data', chunk => { bytes += chunk.length });
  process.stdin.on('end', () => {
    fs.appendFileSync(process.env.TEST_CALLS, 'workspace ' + bytes + '\\n');
-   console.log('__juno_remote_started\\n__juno_remote_ready\\nremote: script time 1 s\\n' + marker + '7');
+   if (process.env.TEST_MODE === 'plan') {
+     const scripts = command.includes('test:gallery') ? ['test:gallery', 'test:desktop'] : command.includes('specs:conformance') ? ['specs:conformance'] : ['test'];
+     for (const [index, script] of scripts.entries()) console.log('plan: step ' + index + ' ' + script + ' exited with 0 after 1 s');
+   }
+   console.log('__juno_remote_started\\n__juno_remote_ready\\nremote: script time 1 s\\n' + marker + (process.env.TEST_MODE === 'plan' ? '0' : '7'));
  });
 } else if (command.includes('docker image inspect')) {
  if (command.includes('__juno_image_present')) console.log('__juno_image_missing');
@@ -172,7 +176,7 @@ test('SSH job sizes follow scripts and plan steps, with explicit sizes taking pr
       }
       writeFileSync(calls, '')
       const child = spawnSync(process.execPath, ['scripts/remote.mjs', ...flags, ...args], {
-        env: { ...env, TEST_MODE: 'healthy', TEST_CAPACITY: '16', JUNO_REMOTE_MACHINE: undefined, ...overrides }, encoding: 'utf8', timeout: 30_000,
+        env: { ...env, TEST_MODE: 'healthy', TEST_CAPACITY: '16', JUNO_RUNNER_PLAN: 'single', JUNO_REMOTE_MACHINE: undefined, ...overrides }, encoding: 'utf8', timeout: 30_000,
       })
       const path = /remote: output in (.+)\/run.log/.exec(child.stderr)?.[1]
       if (path) runs.push(path)
@@ -396,4 +400,30 @@ fi
     assert.equal(run({ JUNO_REMOTE_INSTALL: '' }).status, 0)
     assert.match(readFileSync(join(dir, 'calls'), 'utf8'), /install --frozen-lockfile --offline --reporter=silent/)
   } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+test('the remote CLI splits an SSH plan once, keeps one app job, and maps every result back', () => {
+  const { dir, calls, env } = runnerHarness()
+  const runs = []
+  try {
+    const child = spawnSync(process.execPath, ['scripts/remote.mjs', 'test:plan', 'test', '+', 'specs:conformance', '+', 'test:gallery', '+', 'test:desktop'], {
+      env: { ...env, TEST_MODE: 'plan', TEST_CAPACITY: '16', JUNO_RUNNER_PLAN: undefined, JUNO_PLAN_SERIAL: undefined }, encoding: 'utf8', timeout: 30_000,
+    })
+    for (const match of (child.stdout + child.stderr).matchAll(/remote: (?:plan )?output in (.+)\/(?:run|plan)\.log/g)) runs.push(match[1])
+    assert.equal(child.status, 0, child.stderr + child.stdout)
+    assert.match(child.stdout, /SSH plan in 3 jobs: unit, specs, app/)
+    const called = readFileSync(calls, 'utf8')
+    assert.equal((called.match(/workspace /g) ?? []).length, 3)
+    assert.doesNotMatch(called, /nsc/)
+    assert.equal((called.match(/reservation 4 cpus 4/g) ?? []).length, 2)
+    assert.equal((called.match(/reservation 8 cpus 8/g) ?? []).length, 1)
+    for (const [index, script] of ['test', 'specs:conformance', 'test:gallery', 'test:desktop'].entries()) assert.match(child.stdout, new RegExp(`^plan: step ${index} ${script} exited with 0 after 1 s$`, 'm'))
+    const group = /remote: plan output in (.+)/.exec(child.stderr)[1]
+    assert.ok(existsSync(group))
+    assert.equal(JSON.parse(/^remote: summary (.+)$/m.exec(readFileSync(group, 'utf8'))[1]).cores, undefined)
+    assert.ok(!existsSync(join(group, '..', 'run.log')), 'coordinator log must not double count child CPU usage')
+  } finally {
+    for (const path of runs) rmSync(path, { recursive: true, force: true })
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
