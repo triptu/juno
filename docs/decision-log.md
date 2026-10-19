@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-19 23:35 · composer-focus-on-open · Opening a topic (current tab, new tab, Back or Forward, or focusing the tab that shows it) focuses its composer once the draft has loaded, unless focus is already in another visible field; `pageFocus.ts` holds the request.
 - 10-19 23:06 · shared-message-files · A shared message's card draws the original's files, which Slack sends on the attachment (seen live), with the message's own file views; the engine adds them to the message's `files` and the card's body names them as `file` blocks. Slack's "[date] name: file" fallback shows only when the card has nothing else, and the sidebar reads "Shared message: Video".
 - 10-19 22:50 · forward-card-place · A forward's pending card carries its source's permalink, so it names the place as Slack's copy does and the row does not change when the copy lands. The engine builds it from the ready session's workspace url, which the top-level `SessionClient` now gives, so `send` still imports no other feature.
 - 10-19 22:50 · agent-text-cleanup · The CI keeper and release keeper roles are retired: no agent runs full suites, merges, DMG builds, flake triage or releases on a schedule, and Tushar handles CI, flakes, runners and the release gate. The docs, skill and script comments now say so; `release:publish --urgent` no longer writes a keeper request, and the status page reads its last green run from the `pnpm verify:main` records.

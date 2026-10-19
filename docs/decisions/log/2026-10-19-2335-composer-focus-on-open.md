@@ -1,0 +1,1 @@
+- 10-19 23:35 · composer-focus-on-open · Opening a topic (current tab, new tab, Back or Forward, or focusing the tab that shows it) focuses its composer once the draft has loaded, unless focus is already in another visible field; `pageFocus.ts` holds the request.
