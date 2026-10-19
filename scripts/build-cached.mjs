@@ -37,6 +37,8 @@ const files = git.status === 0 && git.stdout.length > 0
 const envFiles = [root, app].flatMap((dir) => readdirSync(dir).filter((name) => /^\.env(?:\.|$)/.test(name)).map((name) => join(dir, name)))
 const buildInputs = [...new Set([...files, ...envFiles])].filter((file) => {
   const path = relative(app, file)
+  const sourcePath = relative(root, file)
+  if (/^(?:packages|apps)\/[^/]+\/(?:test|tests)\//.test(sourcePath) || /^scripts\/.*\.test\.mjs$/.test(sourcePath)) return false
   return !path.startsWith('e2e/') && !/^[^/]+\.spec\.ts$|^playwright(?:\.[^/]*)?\.config\.ts$/.test(path)
 })
 const environment = Object.entries(process.env).filter(([name]) => /^(VITE_|ELECTRON_VITE_)/.test(name) || ['JUNO_UNMINIFIED', 'JUNO_COVERAGE', 'NODE_ENV'].includes(name)).toSorted(([a], [b]) => a.localeCompare(b))

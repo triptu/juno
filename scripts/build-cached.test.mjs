@@ -25,6 +25,21 @@ test('fresh archives reuse verified output and rebuild changed or damaged inputs
   mkdirSync(join(app, 'e2e'))
   writeFileSync(join(app, 'e2e', 'example.spec.ts'), 'test only')
   assert.doesNotMatch(run(app).stdout, /BUILT/)
+  for (const file of ['packages/engine/test/boot.test.ts', 'apps/desktop/test/session.test.ts', 'scripts/cache.test.mjs']) {
+    const target = join(source, file)
+    mkdirSync(resolve(target, '..'), { recursive: true })
+    writeFileSync(target, 'test only')
+    assert.doesNotMatch(run(app).stdout, /BUILT/)
+    writeFileSync(target, 'changed test')
+    assert.doesNotMatch(run(app).stdout, /BUILT/)
+  }
+  // Seeds and migrations affect snapshots even though the fake is a test dependency.
+  for (const file of ['packages/fake-slack/src/seed.ts', 'packages/store/src/migrations.ts', 'packages/sync/src/boot.ts']) {
+    const target = join(source, file)
+    mkdirSync(resolve(target, '..'), { recursive: true })
+    writeFileSync(target, 'source input')
+    assert.match(run(app).stdout, /BUILT/)
+  }
   const fresh = join(scratch, 'fresh')
   cpSync(source, fresh, { recursive: true })
   const freshApp = join(fresh, 'apps', 'desktop')
@@ -36,8 +51,7 @@ test('fresh archives reuse verified output and rebuild changed or damaged inputs
   writeFileSync(join(freshApp, 'out/result'), 'wrong')
   assert.match(run(freshApp).stdout, /restored/)
   assert.equal(readFileSync(join(freshApp, 'out/result'), 'utf8'), 'first')
-  const entry = readdirSync(join(cache, 'apps-desktop')).find((name) => !name.startsWith('.'))
-  writeFileSync(join(cache, 'apps-desktop', entry, 'result'), 'bad cache')
+  for (const entry of readdirSync(join(cache, 'apps-desktop')).filter((name) => !name.startsWith('.'))) writeFileSync(join(cache, 'apps-desktop', entry, 'result'), 'bad cache')
   rmSync(join(freshApp, 'out'), { recursive: true })
   assert.match(run(freshApp).stdout, /BUILT/)
   assert.equal(readFileSync(join(freshApp, 'out/result'), 'utf8'), 'first')
