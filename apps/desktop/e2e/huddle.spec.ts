@@ -137,7 +137,7 @@ test('someone shares their screen: the bar says so, the tab shows it, two can sh
   }
   // The faces sit after the status line: a longer line must not push them.
   const faces = '[data-huddle-bar] button [role="img"]'
-  const stack = bar.locator(faces)
+  const stack = win.locator(faces)
   await expect(stack).toHaveAccessibleName(/Maya Chen/)
   await expect(stack).toHaveAccessibleName(/Leo Park/)
 
