@@ -70,7 +70,7 @@ const files = new Set(git('ls-files', '--cached', '--others', '--exclude-standar
 /** What every suite installs and compiles with: a change reaches every unit test, and a sample of every e2e suite. */
 const dependencies = ['pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', 'tsconfig.base.json']
 /** The tools that plan and run the suites: a change runs the tool tests and one spec end to end (--wide: everything). */
-const tools = ['scripts/affected.mjs', 'scripts/affected-select.mjs', 'scripts/affected-run.mjs', 'scripts/affected-tests.mjs', 'scripts/test-areas.mjs', 'scripts/import-graph.mjs', 'scripts/coverage-map.mjs', 'scripts/remote.mjs', 'scripts/heavy.mjs', 'scripts/build-cached.mjs', 'scripts/without-run-as-node.mjs']
+const tools = ['scripts/affected.mjs', 'scripts/affected-select.mjs', 'scripts/affected-run.mjs', 'scripts/affected-tests.mjs', 'scripts/unit.mjs', 'scripts/plan.mjs', 'scripts/test-areas.mjs', 'scripts/import-graph.mjs', 'scripts/coverage-map.mjs', 'scripts/remote.mjs', 'scripts/heavy.mjs', 'scripts/build-cached.mjs', 'scripts/without-run-as-node.mjs']
 const toolChanged = changed.filter((file) => tools.includes(file) || file.startsWith('scripts/remote/'))
 const everythingChanged = [...changed.filter((file) => dependencies.includes(file)), ...(wide ? toolChanged : [])]
 
@@ -134,10 +134,9 @@ const unitItems = [...files]
     return { suite: 'test', id: file, inputs: new Set([...closure(file), ...config]), own: changed.some((path) => config.includes(path)) }
   })
 const unit = pending(unitItems)
-// vitest matches filters against paths inside each package. Two packages with a
-// test of the same name both run it, which only costs time.
-const filters = [...new Set(unit.map((item) => item.id.split('/').slice(2).join('/')))]
-if (unit.length > 0) plan.push({ script: 'test', args: unit.length === unitItems.length ? [] : ['--passWithNoTests', ...filters], items: unit, why: `${unit.length} vitest file(s)` })
+// Keep package identity all the way to Vitest. Relative filters used to run
+// namesakes in unrelated packages and start every package's test process.
+if (unit.length > 0) plan.push({ script: 'test', args: unit.length === unitItems.length ? [] : ['--files', ...unit.map((item) => item.id)], items: unit, why: `${unit.length} vitest file(s)` })
 
 // Specs. specs:check keeps its own cache of passing Quint runs. A narrow plan
 // adds it when the specs themselves changed, or what they run on (the lockfile
@@ -372,7 +371,7 @@ const interactions = batch ? [] : perfInteractionsChanged(changed)
 
 // --plan --json prints the plan for tools (a replay of past merges, for one).
 if (flag('--json')) {
-  console.log(JSON.stringify({ changed, steps: plan.map((step) => ({ script: step.script, args: step.args, env: step.env, local: step.local === true, items: step.items.map((item) => item.id), why: step.why })), desktopDropped, notes: desktopNotes, heavySkipped: skipTags }))
+  writeFileSync(1, JSON.stringify({ changed, steps: plan.map((step) => ({ script: step.script, args: step.args, env: step.env, local: step.local === true, items: step.items.map((item) => item.id), why: step.why })), desktopDropped, notes: desktopNotes, heavySkipped: skipTags }) + '\n')
   process.exit(0)
 }
 const scope = wide

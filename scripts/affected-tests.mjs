@@ -5,7 +5,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
-const globPattern = (glob) => new RegExp(`^${glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*\*\//g, '(?:.*/)?').replace(/\*/g, '[^/]*')}$`)
+const globPattern = (glob) => new RegExp(`^${glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*\*\/|\*/g, (part) => part === '**/' ? '(?:.*/)?' : '[^/]*')}$`)
 
 /**
  * Whether a repo path is a vitest file: in a package or app under `packages/`
