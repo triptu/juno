@@ -1,4 +1,4 @@
-import type { Attachment } from '@juno/slack-schema'
+import type { Attachment, File } from '@juno/slack-schema'
 
 /** Invented link previews, and a shared Slack message; every image is served by the fake. */
 export function unfurlFixtures(base: string): Readonly<Record<'xImage' | 'xText' | 'failed' | 'youtube' | 'github' | 'docs' | 'generic' | 'shared', Attachment>> {
@@ -26,17 +26,23 @@ export function unfurlFixtures(base: string): Readonly<Record<'xImage' | 'xText'
  * it: `is_share`, the source's `channel_id`, its permalink in `from_url` (with
  * `thread_ts` for a reply), the generic footer Slack was seen to send
  * (research, integration-shapes), and its words as rich text and as `text`.
- * `base` is the workspace URL.
+ * A message of only files has, as seen live, its `files` and no `text` or
+ * blocks, and a `fallback` of "[date] name: file". `base` is the workspace URL.
  */
-export function sharedMessage(base: string, channel: string, message: { readonly ts: string; readonly text?: string | undefined; readonly thread_ts?: string | undefined; readonly user?: string | undefined }, author: string): Attachment {
+export function sharedMessage(base: string, channel: string, message: { readonly ts: string; readonly text?: string | undefined; readonly thread_ts?: string | undefined; readonly user?: string | undefined; readonly files?: ReadonlyArray<File> | undefined }, author: string): Attachment {
   const reply = message.thread_ts !== undefined && message.thread_ts !== message.ts
   const text = message.text ?? ''
-  return {
+  const files = message.files ?? []
+  const card = {
     is_share: true, is_msg_unfurl: true, channel_id: channel,
     author_name: author, ...(message.user === undefined ? {} : { author_icon: `${base}/avatars/${message.user}.svg` }),
     from_url: `${base}/archives/${channel}/p${message.ts.replace('.', '')}${reply ? `?thread_ts=${message.thread_ts}&cid=${channel}` : ''}`,
-    ts: message.ts, footer: 'Thread in Slack conversation',
-    fallback: `${author}: ${text}`, text, mrkdwn_in: ['text'],
+    ts: message.ts, footer: 'Thread in Slack conversation', mrkdwn_in: ['text'],
+    ...(files.length === 0 ? {} : { files }),
+  }
+  if (text === '' && files.length > 0) return { ...card, fallback: `[${message.ts}] ${author}: ${files.map((file) => file.name ?? file.id).join(', ')}` }
+  return {
+    ...card, fallback: `${author}: ${text}`, text,
     message_blocks: [{ message: { blocks: [{ type: 'rich_text', elements: [{ type: 'rich_text_section', elements: [{ type: 'text', text }] }] }] } }],
   }
 }
