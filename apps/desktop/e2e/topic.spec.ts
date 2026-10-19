@@ -153,7 +153,7 @@ test('Main’s thread links, its title switcher, its Notify me and its header or
     await juno.tabs.expectCount(1)
   })
 
-  await test.step('Main’s Notify me is its channel’s, and the header is reached pill, title, ⋯, Juno', async () => {
+  await test.step('Main’s Notify me is its channel’s, and the header is reached pill, title, Start huddle, ⋯, Juno', async () => {
     await juno.sidebar.row(ENG_MAIN).open()
     await juno.topic.expectTitle('Main')
     const { labels } = await juno.topic.chooseInMenu('copy-link')
@@ -163,11 +163,11 @@ test('Main’s thread links, its title switcher, its Notify me and its header or
 
     await juno.topic.contextPill.focus()
     const order: string[] = []
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 5; i++) {
       order.push(await win.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.textContent ?? ''))
       await win.keyboard.press('Tab')
     }
-    expect(order).toEqual(['eng, public channel. Show in sidebar.', 'Main', 'More', 'Juno ⌘J'])
+    expect(order).toEqual(['eng, public channel. Show in sidebar.', 'Main', 'Start huddle', 'More', 'Juno ⌘J'])
     // Juno is on unless AI assist is off, so the header has its button.
     await expect(juno.topic.header.getByRole('button', { name: 'Juno ⌘J' })).toBeVisible()
   })
