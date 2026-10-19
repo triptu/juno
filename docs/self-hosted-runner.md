@@ -100,6 +100,81 @@ to all jobs and waits for cleanup.
 
 ## Laptop measurements
 
+### Dense-core pinning (2026-10-19)
+
+One run per state, sequentially, on the performance power profile. Baseline:
+quota capacity `16`. After: physical list `4-11`, memory caps and tmpfs above.
+Product sources and selected tests were unchanged. The toolchain image and
+dependency store were warm; both desktop and gallery built on each side.
+Script time includes builds and tests; wall time also includes transport,
+admission, install and reports. These are single observations, not a repeatable
+speedup claim. Restricting work to dense cores made these solo runs slower.
+
+| Work | Before script / wall | After script / wall | Before / after peak GiB |
+| --- | --- | --- | --- |
+| `test/messages.test.ts` | 10 / 14 s | 12 / 15 s | 0.66 / 0.55 |
+| Desktop, 10 specs, 60 tests | 83 / 86 s | 118 / 122 s | 2.08 / 2.35 |
+| Gallery shift, Chip | 24 / 27 s | 30 / 33 s | 1.73 / 1.47 |
+
+All passed without retries. Gallery had 46 test cases before and 45 after:
+the unchanged worker rules choose four shift parts at the legacy three-thread
+limit and three parts at the new four-thread allocation. The same Chip states
+and other shift checks ran. Desktop builds took 19.15 / 24.22 s; gallery builds
+12.68 / 16.58 s. CPU busy was 59 / 61% for units, 77 / 79% for desktop and
+74 / 55% for gallery, relative to each job's thread quota. Host load before the
+baseline was 0.60 and before the pinned desktop run 0.46, with no other runner
+containers. A quota thread and an SMT thread on a dense core do not provide
+the same throughput; this comparison changes both placement and storage.
+
+The pinned samples peaked at 4.1 / 197.7 / 5.2 MiB in `/tmp` and
+35.3 / 32.4 / 28.9 MiB in `/work` (unit / desktop / gallery), sampled every two
+seconds during the script. They leave room within each 2 GiB tmpfs. The memory
+caps also leave room above these container-lifetime peaks and the earlier full
+unit peak of 1.90 GiB; tmpfs and file cache count against them. The final affected plan measured wide units at 1.58 GiB, with 74.5 MiB in
+`/work` and 40.2 MiB in `/tmp`. Cached spec checks plus conformance peaked at
+2.02 GiB, with 282.8 / 79.5 MiB in `/work` / `/tmp`. The four-core spec budget
+of 12 GiB with 4 GiB per mount is conservative; uncached model checking was
+not measured in this pass.
+
+Two concurrent desktop runs each took 129 s script / 132 s wall, versus
+118 / 122 s solo: about 9% slower in script time, so they did not fully retain
+solo speed. Both completed successfully; one retried the sidebar first-sync
+layout-shift assertion, while the other passed all 60 cases without retries.
+Their builds took 26.23 and 25.87 s. Docker inspect and `/proc/self/status`
+confirmed disjoint CPU sets `4-5,16-17` and `6-7,18-19`, with four-thread quotas,
+6 GiB memory/swap limits and two 2 GiB tmpfs mounts per job. Peaks were
+2.18 / 2.30 GiB memory and 205.6 / 198.1 MiB in `/tmp`. A mid-run snapshot
+showed no memory-limit events, only 4.3 / 0.6 ms cumulative quota throttling,
+and dense-core clocks near 3.31 GHz. The shared cache, memory and power budget
+remain possible sources of contention; these observations do not isolate them.
+
+A real Docker sleep job was killed through its lease owner's PID. The next
+admission removed that container and reused the same physical cores. Linux
+shell tests also cover SIGTERM, SIGKILL, timeout, normal release, capacity
+waiting and concurrent disjoint allocations.
+
+Validation: `node --test scripts/remote/*.test.mjs` passed 43 checks on the Mac
+with six Linux-only skips; the focused Linux runner run passed all 18 checks.
+`pnpm affected` reused the current Bun typecheck cache and passed lint, health,
+repo tools, units, cached spec checks, conformance, gallery and desktop steps.
+Its overall exit was 1 because the measurement environment's
+`JUNO_REMOTE_MAX_VCPU=0` reached two Namespace-pool tests that expect allocation
+to be enabled. Both passed in a targeted rerun with that variable unset. No
+product or runner fix was needed for those two failures.
+
+Reproduce the sequential runs:
+
+```sh
+JUNO_REMOTE_MAX_VCPU=0 pnpm remote test --passWithNoTests test/messages.test.ts
+JUNO_REMOTE_MAX_VCPU=0 pnpm remote test:desktop e2e/app.spec.ts e2e/topic.spec.ts e2e/send.spec.ts e2e/theme.spec.ts e2e/mentions.spec.ts e2e/sidebar.spec.ts e2e/message-actions.spec.ts e2e/session.spec.ts e2e/mark-unread.spec.ts e2e/welcome.spec.ts
+JUNO_REMOTE_MAX_VCPU=0 pnpm remote --env GALLERY_SHIFT_ONLY=Chip test:gallery shift.spec.ts
+```
+
+For the paired desktop check, run that desktop command twice concurrently,
+adding `--env JUNO_REBUILD=1` after `remote` so both include a rebuild like the
+solo runs. Raw logs and Docker inspection are in `.remote/core-pinning/` in
+the `runner-core-pinning` worktree; each log also names its retained run folder.
+
 ### Affected plan shape (2026-10-19)
 
 One before/after observation of an outbox-plus-Chip selection, with unchanged
