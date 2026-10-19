@@ -1,5 +1,5 @@
 import { afterEach, expect, it } from 'vitest'
-import { largeSeed } from '@juno/fake-slack'
+import { mutationSeed } from './mutationSeed'
 import { millisToTs } from '@juno/domain'
 import { bootedEngine, readDb, restart, DAY } from './scenario'
 import { waitFor, type RunningEngine } from './harness'
@@ -14,7 +14,7 @@ function message(engine: RunningEngine, channel: string, ts: string) {
 }
 
 it('repairs offline mutations outside the top ten on the large seed, without opening the topic', async () => {
-  const engine = await bootedEngine(engines, { fakeOptions: { seed: largeSeed() }, timing: { followPassMillis: 3_600_000 } }, 120_000)
+  const engine = await bootedEngine(engines, { fakeOptions: { seed: mutationSeed() }, timing: { followPassMillis: 3_600_000 } }, 120_000)
   const target = readDb(engine, 'cache.db', (db) => db.prepare(`
     SELECT m.channel, m.thread_ts FROM messages m JOIN conversations c ON c.id = m.channel
     WHERE m.thread_ts IS NOT NULL AND m.thread_ts <> m.ts AND m.deleted = 0 AND m.partial = 0
@@ -61,7 +61,8 @@ it('repairs offline mutations outside the top ten on the large seed, without ope
   const total = engine.fake.calls.filter((c) => c.method !== 'client.getWebSocketURL').length
   const fallback = engine.fake.calls.filter((c) => c.args['_x_reason'] === 'recheck').length
   expect({ budget, total, repair: repairs.length, fallback }).toEqual({
-    budget: { 'client.counts': 1, 'conversations.history': 0, 'conversations.replies': 13,
+    // The ten fallback topics include one Main and nine threads on this seed.
+    budget: { 'client.counts': 1, 'conversations.history': 1, 'conversations.replies': 12,
       'search.modules.messages': 2, 'subscriptions.thread.getView': 1 },
     total: 18, repair: 3, fallback: 10,
   })

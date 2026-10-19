@@ -1,3 +1,5 @@
+import { controlledSleep } from './controlledClock'
+import { productionTiming } from '../src/config'
 // Sync end to end: the engine boots against the fake, the sidebar rows reach
 // the state atoms over the port, and socket events update them live.
 import { step } from './step'
@@ -12,7 +14,7 @@ import { viewsDelete, type TopicRow, type UndoCommand } from '@juno/contract'
 import { CONVERSATIONS, largeSeed, SELF_ID, startFakeSlack } from '@juno/fake-slack'
 import { prefs, Store, workspacePaths } from '@juno/store'
 import { runCommand, topicCountsAtom } from '@juno/state'
-import { sleep, startTestEngine, waitFor, type RunningEngine } from './harness'
+import { startTestEngine, waitFor, type RunningEngine } from './harness'
 import {
   apiCalls,
   bootedEngine as boot,
@@ -253,45 +255,51 @@ describe('cold boot', () => {
   })
 
   it('is usable after the quick steps, before any history, and fills in without a reload', async () => {
-    // Every history answer and every search (the preview search, then discovery) wait: the boot cannot get past its quick steps on its own.
-    const engine = await startTestEngine({
-      initial: (fake) => {
-        fake.holdNext({ method: 'conversations.history', times: 100 })
-        fake.holdNext({ method: 'search.modules.messages', times: 10 })
-        return fake.signIn()
-      },
-    })
-    engines.push(engine)
-    await engine.status('ready')
-    // The quick start is stored: the renderer shows the list from here on.
-    const window = await waitFor(() => {
-      const result = engine.registry.get(engine.topicsAtom())
-      return result._tag === 'Success' && result.value.meta.windowCovered === true ? result.value : undefined
-    }, 10_000, 'the quick start')
-    expect(apiCalls(engine, 'conversations.history')).toHaveLength(0)
-    const early = window.order.map((id) => window.rows.get(id)!)
-    // Followed threads from the first getView page, titled from their first words.
-    expect(early.some((row) => row.id.startsWith('t:') && row.title !== '')).toBe(true)
-    // DMs from client.counts alone: their time and an unread dot, no preview yet. Channels wait out of All until
-    // Automated's rules have read their history, so a bot channel never shows there first.
-    expect(early.find((row) => row.id === 'm:G0MAYALEO')!.preview.text).toBe('')
-    expect(early.some((row) => row.id === 'm:C0ALERTSPROD')).toBe(false)
-    // With history still held, the channels show after `HOLD_MILLIS`, from client.counts alone.
-    const held = await engine.rowsUntil((rows) => rows.some((row) => row.id === 'm:C0ALERTSPROD'), 'the channels after the hold')
-    expect(held.find((row) => row.id === 'm:C0ALERTSPROD')).toMatchObject({ unreadCount: 1, unreadExact: false, preview: { text: '' } })
+    const time = await controlledSleep(productionTiming.automatedHoldMillis)
+    try {
+      // Every history answer and every search (the preview search, then discovery) wait: the boot cannot get past its quick steps on its own.
+      const engine = await startTestEngine({
+        clock: time.clock,
+        timing: { automatedHoldMillis: productionTiming.automatedHoldMillis },
+        initial: (fake) => {
+          fake.holdNext({ method: 'conversations.history', times: 100 })
+          fake.holdNext({ method: 'search.modules.messages', times: 10 })
+          return fake.signIn()
+        },
+      })
+      engines.push(engine)
+      await engine.status('ready')
+      // The quick start is stored: the renderer shows the list from here on.
+      const window = await waitFor(() => {
+        const result = engine.registry.get(engine.topicsAtom())
+        return result._tag === 'Success' && result.value.meta.windowCovered === true ? result.value : undefined
+      }, 10_000, 'the quick start')
+      expect(apiCalls(engine, 'conversations.history')).toHaveLength(0)
+      const early = window.order.map((id) => window.rows.get(id)!)
+      // Followed threads from the first getView page, titled from their first words.
+      expect(early.some((row) => row.id.startsWith('t:') && row.title !== '')).toBe(true)
+      // DMs from client.counts alone: their time and an unread dot, no preview yet. Channels wait out of All until
+      // Automated's rules have read their history, so a bot channel never shows there first.
+      expect(early.find((row) => row.id === 'm:G0MAYALEO')!.preview.text).toBe('')
+      expect(early.some((row) => row.id === 'm:C0ALERTSPROD')).toBe(false)
+      // With history still held, the channels show after `HOLD_MILLIS`, from client.counts alone.
+      await time.advance(productionTiming.automatedHoldMillis)
+      const held = await engine.rowsUntil((rows) => rows.some((row) => row.id === 'm:C0ALERTSPROD'), 'the channels after the hold')
+      expect(held.find((row) => row.id === 'm:C0ALERTSPROD')).toMatchObject({ unreadCount: 1, unreadExact: false, preview: { text: '' } })
 
-    // History lands while the boot is still running: previews and exact counts arrive in the same list, and the
-    // bot channel is sorted into Automated as soon as its page is stored, before the boot ends.
-    engine.fake.release({ method: 'conversations.history' })
-    await engine.rowsUntil((rows) => rows.find((row) => row.id === 'm:G0MAYALEO')?.preview.text !== '', 'the DM preview from history')
-    await engine.rowsUntil((rows) => !rows.some((row) => row.id === 'm:C0ALERTSPROD'), 'the bot channel out of All')
-    // The discovery search runs before the boot ends, beside the held preview search: held, they keep the sync from
-    // reaching live.
-    const discoveryHeld = () => engine.fake.heldCalls({ method: 'search.modules.messages' }).some((args) => args['_x_reason'] === 'discovery')
-    await waitFor(() => (discoveryHeld() ? true : undefined), 10_000, 'the discovery search')
-    expect((await engine.phase('catching-up'))._tag).toBe('catching-up')
-    engine.fake.release()
-    await engine.phase('live')
+      // History lands while the boot is still running: previews and exact counts arrive in the same list, and the
+      // bot channel is sorted into Automated as soon as its page is stored, before the boot ends.
+      engine.fake.release({ method: 'conversations.history' })
+      await engine.rowsUntil((rows) => rows.find((row) => row.id === 'm:G0MAYALEO')?.preview.text !== '', 'the DM preview from history')
+      await engine.rowsUntil((rows) => !rows.some((row) => row.id === 'm:C0ALERTSPROD'), 'the bot channel out of All')
+      // The discovery search runs before the boot ends, beside the held preview search: held, they keep the sync from
+      // reaching live.
+      const discoveryHeld = () => engine.fake.heldCalls({ method: 'search.modules.messages' }).some((args) => args['_x_reason'] === 'discovery')
+      await waitFor(() => (discoveryHeld() ? true : undefined), 10_000, 'the discovery search')
+      expect((await engine.phase('catching-up'))._tag).toBe('catching-up')
+      engine.fake.release()
+      await engine.phase('live')
+    } finally { await time.close() }
   })
 
   it('reads DMs (unread first), then mentions, then unread followed threads, then other unread channels, before the bulk', async () => {
@@ -485,7 +493,8 @@ describe('realtime', () => {
       engine.fake.dropSocket()
       await engine.phase('offline')
       await engine.phase('live', 20_000)
-      await sleep(50)
+      await engine.syncIdle()
+      await waitFor(() => engine.fake.socketCount() === 1 ? true : undefined, undefined, 'the reconnected socket')
       expect(engine.fake.socketCount()).toBe(1)
     })
   })
@@ -1099,7 +1108,7 @@ describe('cold boot details (review M3 finding 10)', () => {
     await waitFor(() => (engine.fake.heldCount({ method: 'conversations.history' }) === 1 ? true : undefined), 20_000, 'the first history page held')
     const id = threadId(engine, 'C0ENG', 'checkout.spec')
     engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0SAM', text: '<@U0TUSHAR> can you take a look?', threadTs: tsOf(id) })
-    await sleep(100)
+    await engine.socketIdle()
     engine.fake.release()
     await engine.phase('live', 30_000)
     // The mention follows it, as in Slack (SPEC 5), and brings it in. Followed, it keeps Slack's unread state: every reply after Slack's pointer.

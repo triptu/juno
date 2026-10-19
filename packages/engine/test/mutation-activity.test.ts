@@ -1,5 +1,5 @@
 import { afterEach, expect, it } from 'vitest'
-import { largeSeed } from '@juno/fake-slack'
+import { mutationSeed } from './mutationSeed'
 import { millisToTs } from '@juno/domain'
 import { bootedEngine, readDb, DAY } from './scenario'
 import { waitFor, type RunningEngine } from './harness'
@@ -8,7 +8,7 @@ const engines: RunningEngine[] = []
 afterEach(async () => { for (const engine of engines.splice(0)) await engine.stop() })
 
 it('measures six live ten-minute intervals before a real offline edit on the large seed', async () => {
-  const engine = await bootedEngine(engines, { fakeOptions: { seed: largeSeed() }, timing: { sweepIntervalMillis: 500, followPassMillis: DAY }, recheckTopics: 0 }, 120_000)
+  const engine = await bootedEngine(engines, { fakeOptions: { seed: mutationSeed() }, timing: { sweepIntervalMillis: 500, followPassMillis: DAY }, recheckTopics: 0 }, 120_000)
   const targets = readDb(engine, 'cache.db', (db) => db.prepare(`SELECT m.channel, max(m.ts) AS ts
     FROM messages m JOIN conversations c ON c.id = m.channel WHERE c.is_member = 1 AND c.is_archived = 0
       AND m.deleted = 0 AND m.partial = 0 AND m.ts >= ? GROUP BY m.channel ORDER BY m.channel LIMIT 150`).all(millisToTs(Date.now() - DAY)))

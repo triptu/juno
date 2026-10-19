@@ -5,7 +5,7 @@ import { homeMarkDone, homeView, homeVisit, prefsSet, type HomeView } from '@jun
 import { SELF_ID } from '@juno/fake-slack'
 import { liveQuery, runCommand, type Registry } from '@juno/state'
 import { waitFor, WAIT_MS, type RunningEngine } from './harness'
-import { bootedEngine, threadId, valueOf } from './scenario'
+import { bootedEngine, restart, threadId, valueOf } from './scenario'
 
 const engines: Array<RunningEngine> = []
 const unmounts: Array<() => void> = []
@@ -41,8 +41,12 @@ describe('Home', () => {
   })
 
   it('with AI assist off, ranks what waits, where the user left off and what moved, and adds nothing from the assistant', async () => {
-    const engine = await bootedEngine(engines, { aiJobs: true })
-    valueOf(await runCommand(engine.registry, prefsSet, { key: 'aiAssist', value: false }))
+    // Persist AI assist off before any background job can title the fixture.
+    const setup = await bootedEngine(engines)
+    valueOf(await runCommand(setup.registry, prefsSet, { key: 'aiAssist', value: false }))
+    const engine = await restart(engines, setup, () => {}, { aiJobs: true })
+    await engine.workPass('title')
+    await engine.workPass('home')
 
     const first = await homeUntil(engine, (view) => view.items.length > 0, 'a waiting item')
     expect(first.firstName).toBe('Tushar')
