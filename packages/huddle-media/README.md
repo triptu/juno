@@ -1,6 +1,6 @@
 # @juno/huddle-media
 
-A huddle's audio in the renderer (`docs/plans/huddles.md`, phase 3, track C). The engine joins the huddle with `rooms.join` and hands the renderer `call.free_willy.{meeting, attendee}`; this package takes those to Chime and reports what happens as a plain store. It is plain TypeScript: no React, Effect, Electron or `window.juno` (`check-deps` holds it to that).
+A huddle's audio, and others' shared screens, in the renderer (`docs/plans/huddles.md`, phase 3, track C, and phase 4). The engine joins the huddle with `rooms.join` and hands the renderer `call.free_willy.{meeting, attendee}`; this package takes those to Chime and reports what happens as a plain store. It is plain TypeScript: no React, Effect, Electron or `window.juno` (`check-deps` holds it to that).
 
 ## Why it lives in the renderer
 
@@ -24,6 +24,7 @@ interface MediaSession {
   chooseMicrophone(id: string | null): Promise<void>  // null: same as system
   chooseSpeaker(id: string | null): Promise<void>
   playSound(sound: 'join' | 'leave'): void  // quietly, on the speaker in use; also after an end
+  showShare(attendeeId: string, element: HTMLVideoElement): () => void  // plays a share in the element until the returned unbind
   subscribe(listener: () => void): () => void
   getSnapshot(): MediaSnapshot
 }
@@ -38,7 +39,8 @@ The snapshot (`src/types.ts` has the comments):
 - `devices`: microphones and speakers, the system devices' names, the user's picks and the devices in use. A pick that is unplugged stays the pick; the system's device plays until it is back.
 - `microphoneAccess`: `unknown`, `prompt`, `granted`, `denied` (macOS or the page refuses it), `unavailable` (no microphone: Chime's `NotFoundError`, or Chromium lists no audio input at all) or `failed` (there is one, but it would not start). `src/chime/microphone.ts` has the rule.
 - `noiseSuppression`: `on`, `off` or `unsupported`.
-- Phase 4, screen share: `shares` (someone else's share: its `#content` attendee and the owner's user id) and `localShare` (always `undefined` for now). The Chime session fills `shares` from presence, so the bar can say who is sharing, but it receives no video yet.
+- `shares`: others' shared screens, in the order they started (Slack allows two). Each has its `#content` attendee id, the owner's Slack user id (from the share's own `ExternalUserId`, else from the owner's attendee) and `ready`: a frame shows in the element bound with `showShare`. A share is listed from the moment its attendee is present, before any video, so the bar can say who shares at once. The user's own `#content` attendee is never one of them.
+- `localShare`: always `undefined` until sharing your own screen is built.
 
 ## Rules
 
@@ -46,6 +48,7 @@ The snapshot (`src/types.ts` has the comments):
 - **The snapshot is immutable** and a new object only when something changed. Unchanged parts (an attendee, the device list) keep their identity, so rows can be memoised on them.
 - **Throttled.** Discrete changes (connection, presence, local mute, devices) publish at once. Speaking, the active speaker and remote mute come from Chime's active speaker detector and volume indicator and publish at most every 100 ms, about 10 snapshots a second.
 - **Single thread.** Everything runs on the renderer's main thread; listeners are called synchronously after each publish and must be cheap. Voice Focus runs in an audio worklet.
+- **Shares are shown, not owned.** The tab gives each share its own `<video>` with `showShare` and calls the unbind when it unmounts. A share no element shows is paused (Chime's `pauseVideoTile`, which asks Chime's server to stop that stream), so a share nobody looks at costs no bandwidth or decoding. `firstFrame.ts` decides `ready` the same way for both sessions.
 - **Lifetime.** The session owns one `<audio>` element, created with the session and never put in the page, and binds the call to it. `leave()` or Chime's own stop unbinds it, stops the microphone and frees Voice Focus. `leave()` is safe in any state, also while `join` is still starting.
 - **The engine learns of an end from the snapshot.** When Chime ends the call by itself (`another-device`, `connection-lost`, `meeting-ended`, `removed`, `full`, `failed`), only the renderer knows. The owner of the session watches for `connection.state === 'ended'` with a reason other than `left` and tells the engine, passing `attendeeId`, so the engine can send `rooms.leave` and clear its call. The attendee id makes a late end of an older call easy to ignore.
 
@@ -55,7 +58,7 @@ The snapshot (`src/types.ts` has the comments):
 
 ## Chime set-up
 
-- Audio only: `NoVideoDownlinkBandwidthPolicy`, so a camera someone turns on in Slack is never received.
+- **Video: shares only.** `ContentOnlyDownlinkPolicy` (`src/chime/contentPolicy.ts`) subscribes to the best stream of each other attendee's `#content` source and nothing else, so a camera someone turns on in Slack is never received. Modelled on the SDK's `AllHighestVideoBandwidthPolicy`; two shares need no bandwidth cap. Chime makes a tile per received share (`isContent`); `ContentTiles` (`src/chime/contentTiles.ts`) binds each to the element `showShare` gave and pauses the rest. Juno never starts the camera or its own content share.
 - `reconnectTimeoutMs` is 30 s, so a dropped connection ends as `connection-lost` after SPEC 20's 30 seconds. A first connection that never succeeds ends as `failed`.
 - Chime's logger is off: its lines carry urls and join tokens.
 - **Microphone.** When it cannot start (access off, no device, or it fails), the call goes on with a silent input and muted, so the user can listen. Unmuting is refused until access is back, and the user stays muted then (SPEC 20). A permission change or `listDevices()` tries again.
@@ -66,8 +69,8 @@ The integration has to allow, in the renderer's CSP: `connect-src` for Chime's `
 
 ## The fake
 
-`createFakeMediaSession({ autoConnect, microphones, speakers, microphoneAccess, noiseSuppression })` implements `MediaSession`; `join` connects at once unless `autoConnect` is false. The test drives the rest: `addRemote({ userId, attendeeId?, muted? })`, `removeRemote(id)`, `setSpeaking(id, on)` (the local attendee too; the latest to start is the active speaker), `setRemoteMuted(id, muted)`, `setConnection('connecting' | 'connected' | 'reconnecting')` (only `connected` sends), `setSending(on)`, `end(reason)`, `setMicrophoneAccess(access)`, `setDevices({ microphones, speakers })`, and for phase 4 `startShare(userId)` and `stopShare(userId)`. It plays no sound: `played` lists the sounds `playSound` was asked for, in order.
+`createFakeMediaSession({ autoConnect, microphones, speakers, microphoneAccess, noiseSuppression })` implements `MediaSession`; `join` connects at once unless `autoConnect` is false. The test drives the rest: `addRemote({ userId, attendeeId?, muted? })`, `removeRemote(id)`, `setSpeaking(id, on)` (the local attendee too; the latest to start is the active speaker), `setRemoteMuted(id, muted)`, `setConnection('connecting' | 'connected' | 'reconnecting')` (only `connected` sends), `setSending(on)`, `end(reason)`, `setMicrophoneAccess(access)`, `setDevices({ microphones, speakers })`, and `startShare(userId)` (returns the share's attendee id) and `stopShare(userId)`. A shown share plays a drawn test pattern (`src/testPattern.ts`: colour bars, its attendee id and a moving block, 15 frames a second from a canvas), so a test can check that video plays. It plays no sound: `played` lists the sounds `playSound` was asked for, in order.
 
 ## Tests
 
-`test/rules.test.ts` covers the pure rules (the `ExternalUserId` parse and the stop code mapping), `test/sounds.test.ts` the sound rule, `test/snapshot.test.ts` snapshot identity, and `test/fake.test.ts` drives the fake's timeline. The Chime session itself runs against real Chime only in `scripts/huddle-live.ts`, which now uses it.
+`test/rules.test.ts` covers the pure rules (the `ExternalUserId` parse, the stop code mapping and why the microphone would not start), `test/sounds.test.ts` the sound rule, `test/snapshot.test.ts` snapshot identity and the share rules, and `test/fake.test.ts` drives the fake's timeline. Watching shares runs end to end against the fake in `apps/desktop/e2e/huddle.spec.ts`. The Chime session itself runs against real Chime only in `scripts/huddle-live.ts`, which now uses it; content share against real Chime is checked by hand in a live call.
