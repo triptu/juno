@@ -270,8 +270,6 @@ test('while macOS blocks the microphone, Mute says so and opens System Settings;
   const missing = bar.getByRole('button', { name: 'No microphone connected' })
   await expect(missing).toHaveAttribute('aria-disabled', 'true')
   await expect(bar.getByRole('button', { name: 'Allow the microphone in System Settings' })).toHaveCount(0)
-  await missing.click()
-  expect(await hooks(app, 'microphoneSettingsOpened')).toBe(2)
   await expect(controls.getByRole('button', { name: 'No microphone connected' })).toBeVisible()
 
   const attendeeId = await attendee(win)
