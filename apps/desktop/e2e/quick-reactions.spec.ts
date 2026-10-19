@@ -1,3 +1,4 @@
+import type { Fixtures } from './fixtures'
 /**
  * Quick reactions (SPEC 7, 14): chosen in Settings › Appearance, up to
  * seven, added from the emoji picker, removed, and reordered by keyboard and
@@ -90,9 +91,15 @@ test('five quick reactions set in Settings show in the toolbar in order, react i
   }
 })
 
-test('Add opens the emoji picker over the page; a pick shows in the toolbar, and remove and reset come back to the default', async ({ juno, fake }) => {
+test('adds, removes and resets quick reactions, then enforces the seven-reaction limit', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
+  const context = { juno, fake }
+  await test.step('Add opens the emoji picker over the page; a pick shows in the toolbar, and remove and reset come back to the default', () => editQuickReactions(context))
+  await test.step('at seven, Add stays focusable, says "Up to 7" and opens nothing', () => limitQuickReactions(context))
+})
+
+async function editQuickReactions({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
   fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'The picker test message' })
   await juno.openSettings('Appearance')
   await expect.poll(() => pillNames(juno)).toEqual(['+1', 'white_check_mark', 'eyes'])
@@ -135,11 +142,9 @@ test('Add opens the emoji picker over the page; a pick shows in the toolbar, and
 
   const again = await hoveredMessage(juno, 'The picker test message')
   await expect.poll(() => toolbarLabels(again)).toEqual(['React 👍', 'React ✅', 'React 👀'])
-})
+}
 
-test('at seven, Add stays focusable, says "Up to 7" and opens nothing', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+async function limitQuickReactions({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   await juno.openSettings('Appearance')
   for (const name of ['tada', 'pray', 'rocket', 'fire']) await add(juno, name)
   await expect.poll(() => pillNames(juno)).toHaveLength(7)
@@ -150,4 +155,4 @@ test('at seven, Add stays focusable, says "Up to 7" and opens nothing', async ({
   // Playwright counts aria-disabled as disabled, so the press is forced.
   await full.click({ force: true })
   await expect(picker(juno)).toHaveCount(0)
-})
+}

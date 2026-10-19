@@ -110,8 +110,15 @@ test('two Juno tabs show the one chat: a message sent in one shows in both', asy
   await expect(juno.tabs.tab('Juno')).toHaveCount(2)
 })
 
-test('⌘J opens the panel beside a topic with its composer focused, and Esc in the empty composer closes it', async ({ juno }) => {
+test('opens and closes the panel, adapts to width, names its topic and keeps state per tab', async ({ juno }) => {
   await ready(juno)
+  await test.step('⌘J opens the panel beside a topic with its composer focused, and Esc in the empty composer closes it', () => openAndClosePanel(juno))
+  await test.step('the panel covers the topic when the topic would keep less than 480px', () => resizePanel(juno))
+  await test.step('the topic chip in the panel composer names the topic Juno sees', () => readTopicChip(juno))
+  await test.step('the panel is open in one tab and closed in another, and each keeps its state across a tab switch', () => keepPanelPerTab(juno))
+})
+
+async function openAndClosePanel(juno: Juno): Promise<void> {
   await setWindowWidth(juno, 1400)
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.expectTitle(POSTGRES)
@@ -137,10 +144,9 @@ test('⌘J opens the panel beside a topic with its composer focused, and Esc in 
   await junoNav(juno).click()
   await juno.tabs.menu('juno')
   await juno.tabs.expectActive('Juno')
-})
+}
 
-test('the panel covers the topic when the topic would keep less than 480px', async ({ juno }) => {
-  await ready(juno)
+async function resizePanel(juno: Juno): Promise<void> {
   await setWindowWidth(juno, 1100)
   await juno.sidebar.row(POSTGRES).open()
   await juno.tabs.menu('juno')
@@ -152,7 +158,31 @@ test('the panel covers the topic when the topic would keep less than 480px', asy
   expect(await width(page)).toBeLessThan(856)
   await setWindowWidth(juno, 1600)
   await expect.poll(() => panel.evaluate((el) => el.getBoundingClientRect().width)).toBe(440)
-})
+}
+
+async function readTopicChip(juno: Juno): Promise<void> {
+  await setWindowWidth(juno, 1400)
+  await juno.sidebar.row(POSTGRES).open()
+  const line = juno.win.locator('[data-panel-sees]')
+  await expect(line).toHaveText(/^eng · Draft plan is in the doc/)
+  await expect(line).toHaveAttribute('data-tooltip', /^Juno sees eng · Draft plan is in the doc/)
+}
+
+async function keepPanelPerTab(juno: Juno): Promise<void> {
+  await setWindowWidth(juno, 1400)
+  const panel = juno.win.locator('aside[data-juno-panel]')
+  await juno.sidebar.row(POSTGRES).open()
+  await expect(panel).toHaveCount(1)
+  // A second topic in a new tab: the panel is closed there.
+  await juno.sidebar.row(RINA).openInNewTab()
+  await juno.topic.expectTitle(RINA)
+  await expect(panel).toHaveCount(0)
+  // Back to the first tab: still open. And to the second: still closed.
+  await juno.tabs.select(POSTGRES)
+  await expect(panel).toHaveCount(1)
+  await juno.tabs.select('Rina finished the onsite')
+  await expect(panel).toHaveCount(0)
+}
 
 test('a message sent from the panel is about the topic, with the selection, and says so over the bubble', async ({ juno, model }) => {
   await ready(juno)
@@ -188,34 +218,6 @@ test('a message sent from the panel is about the topic, with the selection, and 
   const tab = JunoChatPane.tab(juno.win)
   await tab.ownerBubble('is this settled?').locator('[data-about]').click()
   await juno.topic.expectTitle(POSTGRES)
-})
-
-test('the topic chip in the panel composer names the topic Juno sees', async ({ juno }) => {
-  await ready(juno)
-  await setWindowWidth(juno, 1400)
-  await juno.sidebar.row(POSTGRES).open()
-  await juno.tabs.menu('juno')
-  const line = juno.win.locator('[data-panel-sees]')
-  await expect(line).toHaveText(/^eng · Draft plan is in the doc/)
-  await expect(line).toHaveAttribute('data-tooltip', /^Juno sees eng · Draft plan is in the doc/)
-})
-
-test('the panel is open in one tab and closed in another, and each keeps its state across a tab switch', async ({ juno }) => {
-  await ready(juno)
-  await setWindowWidth(juno, 1400)
-  const panel = juno.win.locator('aside[data-juno-panel]')
-  await juno.sidebar.row(POSTGRES).open()
-  await juno.tabs.menu('juno')
-  await expect(panel).toHaveCount(1)
-  // A second topic in a new tab: the panel is closed there.
-  await juno.sidebar.row(RINA).openInNewTab()
-  await juno.topic.expectTitle(RINA)
-  await expect(panel).toHaveCount(0)
-  // Back to the first tab: still open. And to the second: still closed.
-  await juno.tabs.select(POSTGRES)
-  await expect(panel).toHaveCount(1)
-  await juno.tabs.select('Rina finished the onsite')
-  await expect(panel).toHaveCount(0)
 })
 
 test('the panel opens at the newest message on its first frame, with no jump, when its chat has history to scroll', async ({ juno }) => {

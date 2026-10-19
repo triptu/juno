@@ -4,7 +4,7 @@
 // link, and ⌘-click opens it in the browser (a plain click opens the web
 // panel, web-panel.spec.ts).
 import type { Locator } from '@playwright/test'
-import { expect, test } from './fixtures'
+import { expect, test, type Fixtures } from './fixtures'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -48,9 +48,16 @@ function postedLinks(calls: ReadonlyArray<{ method: string; args: Json }>): Arra
   return found
 }
 
-test('URLs and domains sent from the composer show as links before and after the echo', async ({ juno, fake }) => {
+test('sends plain links, pastes linked words and edits links with the keyboard', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
+  const context = { juno, fake }
+  await test.step('URLs and domains sent from the composer show as links before and after the echo', () => sendPlainLinks(context))
+  await test.step('a URL pasted over selected words links them, is sent as Slack sends it, and Undo gives the plain paste', () => pasteLinkedWords(context))
+  await test.step('⌘K on selected words edits their link', () => editLinkedWords(context))
+})
+
+async function sendPlainLinks({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
@@ -78,12 +85,11 @@ test('URLs and domains sent from the composer show as links before and after the
   await expect(links.last()).toHaveAttribute('title', 'https://slack.com/help')
   await links.last().click({ modifiers: ['Meta'] })
   await expect.poll(() => juno.browserLinks()).toEqual(['https://slack.com/help'])
-})
+}
 
-test('a URL pasted over selected words links them, is sent as Slack sends it, and Undo gives the plain paste', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { topic } = juno
+async function pasteLinkedWords({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
+  const priorLinks = (await juno.browserLinks()).length
+const { topic } = juno
   await juno.sidebar.row(POSTGRES).open()
   await topic.expectTitle(POSTGRES)
 
@@ -111,7 +117,7 @@ test('a URL pasted over selected words links them, is sent as Slack sends it, an
 
   // ⌘-click on linked words opens them.
   await topic.composer.click({ modifiers: ['Meta'], position: await textPoint(topic.composer, 'docs') })
-  await expect.poll(() => juno.browserLinks()).toEqual(['https://example.com/docs'])
+  await expect.poll(async () => (await juno.browserLinks()).slice(priorLinks)).toEqual(['https://example.com/docs'])
 
   await topic.composer.press('Enter')
   await topic.expectSent('read the docs first')
@@ -124,11 +130,9 @@ test('a URL pasted over selected words links them, is sent as Slack sends it, an
   const link = topic.message('read the docs first').locator('[data-msg-text] a').first()
   await expect(link).toHaveText('the docs')
   await expect(link).toHaveAttribute('title', 'https://example.com/docs')
-})
+}
 
-test('⌘K on selected words edits their link', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+async function editLinkedWords({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
   const { topic } = juno
   await juno.sidebar.row(POSTGRES).open()
   await topic.expectTitle(POSTGRES)
@@ -183,7 +187,7 @@ test('⌘K on selected words edits their link', async ({ juno, fake }) => {
   await topic.linkEditor.remove.click()
   await expect(topic.composerLinks).toHaveCount(0)
   await expect(topic.composer).toHaveValue('one more thing')
-})
+}
 
 /** The point in the field over the middle of `words`, measured on the layer that draws its text. */
 async function textPoint(field: Locator, words: string): Promise<{ x: number; y: number }> {

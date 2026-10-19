@@ -1,12 +1,4 @@
-// ⌘K (spec section 10): open it with the shortcut and the Search button,
-// the two tabs, a conversation from Conversations, the commands (global
-// and the open topic's; the pages and Settings sections are in
-// `palette-pages.spec.ts`), and in Messages: recent topics on an empty query, a topic by its title, a message by its
-// text (landing on it), a channel's Main and "show its topics" (also from
-// its menu), a person's DM and Home addressed to someone never messaged, a
-// command, Slack's search for what the cache lacks, and all of it from the
-// keyboard.
-import { expect, test } from './fixtures'
+import { expect, test, type Fixtures } from './fixtures'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -14,9 +6,15 @@ const POSTGRES = 'Draft plan is in the doc'
 const ROADMAP = 'Proposal: cut offline mode and public'
 const WAL = 'We keep the old primary warm for 48h. Flip DNS back and replay from the WAL position we logged.'
 
-test('opens on Conversations with frequent ones, Tab switches to Messages and back, and it closes with Esc, ⌘K or a press outside', async ({ juno }) => {
+test('opens and dismisses the palette, switches search modes and opens conversations', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
+  const context = { juno }
+  await test.step('opens on Conversations with frequent ones, Tab switches to Messages and back, and it closes with Esc, ⌘K or a press outside', () => openPalette(context))
+  await test.step('a channel typed in Conversations opens its Main with Enter, a person their DM, and ⌘Enter a new tab', () => openConversations(context))
+})
+
+async function openPalette({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   const { palette, sidebar, tabs } = juno
 
   await palette.open()
@@ -57,11 +55,9 @@ test('opens on Conversations with frequent ones, Tab switches to Messages and ba
   await palette.press('Enter')
   await palette.expectClosed()
   await tabs.expectCount(1)
-})
+}
 
-test('a channel typed in Conversations opens its Main with Enter, a person their DM, and ⌘Enter a new tab', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+async function openConversations({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   const { palette, topic, tabs } = juno
 
   await palette.open()
@@ -83,7 +79,7 @@ test('a channel typed in Conversations opens its Main with Enter, a person their
   await palette.expectClosed()
   await tabs.expectCount(2)
   await topic.expectTitle('Main')
-})
+}
 
 test('commands: ">theme" switches the theme, and an open topic\'s commands resolve it', async ({ juno }) => {
   await juno.signIn()
