@@ -122,13 +122,14 @@ module huddle {
   action reconcile(bug: int): bool = all {
     s.up,
     val pageWent = s.engineLive != 0
-    val ends = s.current != 0 and engStopped(s, s.current) and bug != 6
+    val stoppedCurrent = s.current != 0 and engStopped(s, s.current)
+    val ends = stoppedCurrent and bug != 6
     val r = s.engReports.get(s.holder.get(s.current))
     s' = { ...s,
       wanted: if (ends or (s.wanted != 0 and pageWent and s.wantedPage < s.engineLive)) 0 else s.wanted,
       cancel: s.cancel or (s.request != 0 and ((pageWent and s.requestPage < s.engineLive) or ends)),
       current: if (ends) 0 else s.current,
-      otherDevice: s.otherDevice or (ends and r.ended == s.current and r.reason == "AudioJoinedFromAnotherDevice"),
+      otherDevice: s.otherDevice or (stoppedCurrent and r.ended == s.current and r.reason == "AudioJoinedFromAnotherDevice"),
       phase: if (ends) "leaving" else s.phase, label: "reconcile" }
   }
   pure def needsReconcile(st: State): bool =
