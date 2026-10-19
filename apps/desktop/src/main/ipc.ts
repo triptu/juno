@@ -197,7 +197,8 @@ export function registerIpc({ updates, supervisor, agent, providers, codex, back
 
   // Huddle media generations for the engine (huddlePages.ts).
   const huddlePages = watchHuddlePages(supervisor)
-  handle(Channels.huddleRegister, (_input, event) => huddlePages.register(event.sender.id))
+  // Under JUNO_E2E the page runs the fake media session, so no test talks to Chime.
+  handle(Channels.huddleRegister, (_input, event) => ({ generation: huddlePages.register(event.sender.id), fakeMedia: e2e }))
 
   handle(Channels.sharingGet, () => sharing.get())
   handle(Channels.sharingSet, ({ hide }) => sharing.set(hide))

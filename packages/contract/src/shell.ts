@@ -209,6 +209,13 @@ export const SharingSetting = Schema.Struct({ hide: Schema.Boolean, detection: S
 export type SharingSetting = typeof SharingSetting.Type
 
 /**
+ * A page's huddle media generation (routes/huddle.ts), and whether it runs the
+ * fake media session instead of Chime: only under JUNO_E2E, so no test talks to Chime.
+ */
+export const HuddleRegistration = Schema.Struct({ generation: Schema.Number, fakeMedia: Schema.Boolean })
+export type HuddleRegistration = typeof HuddleRegistration.Type
+
+/**
  * Whether macOS lets Juno post notifications (Settings › Notifications). `unknown` when main
  * could not ask: the page then offers Open Notification Settings anyway.
  */
@@ -290,7 +297,7 @@ export const ShellRoutes = {
   [Channels.launchSetSidebar]: { input: SidebarLayout, output: Schema.Void },
   [Channels.sharingGet]: { input: Schema.Void, output: SharingSetting },
   [Channels.sharingSet]: { input: Schema.Struct({ hide: Schema.Boolean }), output: SharingSetting },
-  [Channels.huddleRegister]: { input: Schema.Void, output: Schema.Number },
+  [Channels.huddleRegister]: { input: Schema.Void, output: HuddleRegistration },
   [Channels.contextMenuPopup]: { input: Schema.Struct({ items: ContextMenuItems, at: Schema.optionalKey(ContextMenuAt) }), output: Schema.NullOr(Schema.String) },
   [Channels.shellOpenExternal]: { input: Schema.Struct({ url: Schema.String }), output: Schema.Void },
   [Channels.shellOpenInSlack]: { input: SlackTarget, output: Schema.Void },

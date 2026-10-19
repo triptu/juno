@@ -325,7 +325,7 @@ export interface JunoBridge {
     readonly set: (hide: boolean) => Promise<unknown>
   }
   readonly huddle: {
-    /** Resolves with this page load's media generation, a number main gives out in rising order; the same one until the page goes. */
+    /** Resolves with a `HuddleRegistration`: this page load's media generation, a number main gives out in rising order, the same one until the page goes. */
     readonly register: () => Promise<unknown>
   }
   readonly contextMenu: {

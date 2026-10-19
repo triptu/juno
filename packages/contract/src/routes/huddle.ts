@@ -14,6 +14,7 @@
  *   and attendee, once. They are secrets; never log or store them.
  * - `huddle.leave` leaves. It never waits for Slack.
  * - `huddle.report` is a renderer page's whole media state.
+ * - `huddle.people` names the people a huddle lists, for its faces.
  *
  * A page generation names one load of a renderer page. The page's media
  * service gets one from main when it starts (`huddle.register`); main gives
@@ -25,6 +26,7 @@ import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
 import { NotSignedIn, Offline, RateLimited, Rejected } from '../errors'
 import { liveValueRoute } from '../live'
+import { Person } from '../refs'
 
 /**
  * `joining` from Start or Join until the media session has started,
@@ -149,4 +151,7 @@ export type HuddlePageReport = typeof HuddlePageReport.Type
 
 export const huddleReport = Rpc.make('huddle.report', { payload: { report: HuddlePageReport }, success: Schema.Void })
 
-export const HuddleRoutes = RpcGroup.make(huddleCall, huddleRunning, huddleStart, huddleLeave, huddleReport)
+/** The people with these user ids, in the same order; an unknown user reads "Someone" until Slack names them. */
+export const huddlePeople = liveValueRoute('huddle.people', { payload: { ids: Schema.Array(Schema.String) }, value: Schema.Array(Person) })
+
+export const HuddleRoutes = RpcGroup.make(huddleCall, huddleRunning, huddleStart, huddleLeave, huddleReport, huddlePeople)

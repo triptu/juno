@@ -5,8 +5,10 @@
 import { Effect, Result, Stream } from 'effect'
 import { HuddleRoutes, NotSignedIn } from '@juno/contract'
 import { Huddle } from '@juno/huddle'
+import { StoreReader } from '@juno/store'
 import { EngineConfig } from '../config'
-import { serveLiveValue } from '../protocol/live'
+import { serveLiveValue, serveWorkspaceValue } from '../protocol/live'
+import { personFrom, type UserRow } from '../topicRows'
 import { Workspace } from '../workspace'
 
 const runs = <A>(values: Stream.Stream<A>) => values.pipe(Stream.map((value) => Result.succeed({ value, queryMs: 0 })))
@@ -28,6 +30,13 @@ export const HuddleHandlers = HuddleRoutes.toLayer(
         }),
       'huddle.leave': () => huddle.leave,
       'huddle.report': ({ report }, { client }) => huddle.report(report, client.id),
+      'huddle.people': ({ ids }) => serveWorkspaceValue(workspace.changes, 'huddle.people', ['users'], Effect.gen(function* () {
+        if (ids.length === 0) return []
+        const sql = yield* StoreReader
+        const rows = yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id IN ${sql.in(ids)}`
+        const byId = new Map(rows.map((row) => [row.id, row]))
+        return ids.map((id) => personFrom(id, byId.get(id)))
+      })),
     }
   }),
 )
