@@ -283,10 +283,11 @@ export const leave = (core: Core) =>
     core.s = L.leave(core.s)
   }))
 
-/** A page's whole media state. The latest wins; a page main listed as gone is ignored. */
+/** A page's whole media state. The one with the highest `seq` wins, whatever order they come in; a page main listed as gone is ignored. */
 export const report = (core: Core, next: HuddlePageReport) =>
   step(core, Effect.sync(() => {
-    if (pageState(view(core), next.generation) !== 'gone') core.reports.set(next.generation, next)
+    const known = core.reports.get(next.generation)
+    if (pageState(view(core), next.generation) !== 'gone' && (known === undefined || next.seq > known.seq)) core.reports.set(next.generation, next)
   }))
 
 /** Main's report of the live page generations. */

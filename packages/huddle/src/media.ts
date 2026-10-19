@@ -7,9 +7,9 @@
  *   no credentials and is not refused. Once listed, a generation is `live`
  *   while listed and `gone` after.
  * - Each page reports its whole media state (`HuddlePageReport`) on every
- *   change and whenever its connection to the engine opens. The latest
- *   report per generation is kept; reports are idempotent and may arrive in
- *   any order with respect to everything else.
+ *   change and whenever its connection to the engine opens. The report with
+ *   the highest `seq` per generation is kept; reports are idempotent and may
+ *   arrive in any order.
  * - Hand-offs are numbered in this process, so a report can be placed after
  *   or before the hand-off of a given attendee by its `received`.
  *

@@ -64,9 +64,11 @@ export const joined = async (engine: RunningEngine, channelId: string, generatio
   return result
 }
 
-/** The page's whole media state. */
+let seq = 0
+
+/** The page's whole media state, numbered as the page numbers its reports. */
 export const report = async (engine: RunningEngine, state: Partial<HuddlePageReport> & { readonly generation?: string } = {}) =>
-  valueOf(await runCommand(engine.registry, huddleReport, { report: { generation: PAGE, holds: null, received: null, connection: 'connected', muted: false, ended: null, ...state } }))
+  valueOf(await runCommand(engine.registry, huddleReport, { report: { generation: PAGE, seq: ++seq, holds: null, received: null, connection: 'connected', muted: false, ended: null, ...state } }))
 
 /** The page started the session it was handed. */
 export const started = (engine: RunningEngine, attendeeId: string, generation = PAGE) => report(engine, { generation, holds: attendeeId, received: attendeeId })

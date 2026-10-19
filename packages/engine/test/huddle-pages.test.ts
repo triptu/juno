@@ -39,8 +39,10 @@ it('counts a page report sent before the stored leaves loaded, after an engine r
   const next = watchHuddles(await restart(track, engine, () => writeStoredLeaves(engine.userData, engine.fake.teamId, 'not json {')))
   pagesLive(next, PAGE)
   // The page lives on: it sees no call, stops its session, and says so when it connects to the new engine.
-  await report(next, { received: first.attendeeId, ended: { attendeeId: first.attendeeId, reason: 'left' } })
+  await report(next, { seq: 1_000, received: first.attendeeId, ended: { attendeeId: first.attendeeId, reason: 'left' } })
   next.fake.control('stopMedia', { attendeeId: first.attendeeId })
+  // An older report, from before the stop, arrives late: it does not undo the newer one.
+  await report(next, { seq: 999, holds: first.attendeeId, received: first.attendeeId })
   writeStoredLeaves(next.userData, next.fake.teamId, stored)
   await waitFor(() => (leftAttendees(next).includes(first.attendeeId) ? true : undefined), WAIT_MS, 'the stored leave sent')
   await cleared(next, 'cleared by the report that came before the load')

@@ -128,11 +128,13 @@ export const huddleLeave = Rpc.make('huddle.leave', { success: Schema.Void })
 /**
  * A page's whole media state, not a change. The page sends it on every
  * change and every time its connection to the engine opens (after an
- * engine restart too); the latest per generation wins, so a report may be
- * sent twice or arrive late.
+ * engine restart too). The one with the highest `seq` per generation wins,
+ * so a report may be sent twice or arrive late or out of order.
  */
 export const HuddlePageReport = Schema.Struct({
   generation: Schema.String,
+  /** Counts up with each report the page sends. */
+  seq: Schema.Int,
   /** The attendee whose media session the page has (connecting, connected or reconnecting), or null for none. */
   holds: Schema.NullOr(Schema.String),
   /** The attendee of the last credentials the page received, or null for none: places the report after that hand-off. */

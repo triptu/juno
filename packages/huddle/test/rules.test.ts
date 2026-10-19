@@ -85,7 +85,7 @@ interface ViewInput {
 /** The pages' state: main lists `live`, listed `gone` before; each page's latest report; this process's hand-offs in order. */
 const view = ({ live = [G1], gone = [], reports = [], handed = [], reported = true }: ViewInput = {}): MediaView => ({
   pages: { reported, live: new Set(live), seen: new Set([...live, ...gone]) },
-  reports: new Map(reports.map((r) => [r.generation, { holds: null, received: null, connection: 'connected', muted: false, ended: null, ...r }])),
+  reports: new Map(reports.map((r) => [r.generation, { seq: 1, holds: null, received: null, connection: 'connected', muted: false, ended: null, ...r }])),
   handed: new Map(handed.map((attendeeId, at) => [attendeeId, at + 1])),
 })
 /** G1 holds A1's session, after its hand-off. */
