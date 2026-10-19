@@ -58,10 +58,18 @@ interface Pages {
   maxIssued: number
 }
 
-/** A Start waiting for its answer, and the engine connection it came on. Removed when its caller goes. */
+/**
+ * A Start waiting for its answer, and the engine connection it came on.
+ * `state` moves once, from `waiting` to `delivered` (the answer handed the
+ * credentials over) or to `cancelled` (the caller went: its RPC was
+ * cancelled or its connection closed). The cancel does not take the lock,
+ * so it can land while an answer is being stored; the hand-off checks it
+ * after the store.
+ */
 interface Waiter {
   readonly deferred: Deferred.Deferred<HuddleStartResult, HuddleError>
   readonly connection: number
+  state: 'waiting' | 'delivered' | 'cancelled'
 }
 
 export interface Core {
@@ -172,8 +180,7 @@ const answered = (core: Core, to: Attached, intent: L.Intent, answer: Result.Res
       return
     }
     const { identity, credentials } = joined
-    // A Start whose connection closed while Slack answered gets nothing: no page has the credentials, so none is recorded as holding them.
-    const record = L.recordFor(core.s, view(core), identity, waiter !== undefined)
+    const record = L.recordFor(core.s, view(core), identity, waiter?.state === 'waiting')
     // The record is durable before the credentials leave this function (model `answerJoin`).
     const stored = yield* Effect.result(to.session.leaves.write([...L.storedIn(core.s, workspace), record]))
     if (Result.isFailure(stored)) {
@@ -183,11 +190,15 @@ const answered = (core: Core, to: Attached, intent: L.Intent, answer: Result.Res
       if (waiter !== undefined) yield* Deferred.die(waiter.deferred, stored.failure)
       return
     }
-    core.s = L.answerJoin(core.s, record, workspace)
-    if (record.generation !== null && waiter !== undefined) core.handed.set(identity.attendeeId, waiter.connection)
+    // The hand-off, in one step after the store: only a Start still waiting gets the credentials. One cancelled
+    // meanwhile gets nothing, so no page has them: the attendee is stopped and left at once, as for a dead page.
+    const delivered = record.generation !== null && waiter?.state === 'waiting'
+    if (delivered) waiter.state = 'delivered'
+    core.s = L.answerJoin(core.s, delivered ? record : { ...record, generation: null }, workspace)
+    if (delivered) core.handed.set(identity.attendeeId, waiter.connection)
     if (Result.isSuccess(answer)) core.running = applyJoined(core.running, identity.channelId, identity.callId, answer.success.huddle)
     yield* markDue(to, identity.channelId)
-    if (record.generation === null || waiter === undefined) return
+    if (!delivered) return
     yield* Deferred.succeed(waiter.deferred, { _tag: 'joined', channelId: identity.channelId, callId: identity.callId, attendeeId: identity.attendeeId, credentials })
   })
 
@@ -278,7 +289,7 @@ export function step<A, E>(core: Core, change: Effect.Effect<A, E>): Effect.Effe
 
 export const start = Effect.fn('Huddle.start')(function* (core: Core, channelId: string, region: string | null, generation: number, connection: number) {
   const deferred = yield* Deferred.make<HuddleStartResult, HuddleError>()
-  const ticket = yield* step(core, Effect.gen(function* () {
+  const waiter = yield* step(core, Effect.gen(function* () {
     if (core.attached === undefined) return yield* new Offline()
     // A page main counts as gone cannot run media. One above the highest it gave out waits for main.
     if (pageState(view(core), generation) === 'gone') {
@@ -286,14 +297,16 @@ export const start = Effect.fn('Huddle.start')(function* (core: Core, channelId:
       return undefined
     }
     const ticket = ++core.tickets
-    core.waiters.set(ticket, { deferred, connection })
+    const waiter: Waiter = { deferred, connection, state: 'waiting' }
+    core.waiters.set(ticket, waiter)
     core.s = L.choose(core.s, { channelId, region, generation, ticket })
-    return ticket
+    return waiter
   }))
-  // The caller's connection closed: its answer would reach no page, so the join hands it to none.
-  return yield* Deferred.await(deferred).pipe(Effect.onInterrupt(() => ticket === undefined ? Effect.void : step(core, Effect.sync(() => {
-    core.waiters.delete(ticket)
-  }))))
+  // The caller went (its RPC was cancelled or its connection closed): its answer would reach no page, so the join
+  // hands it to none. At once and without the lock, so it holds even while an answer is being stored.
+  return yield* Deferred.await(deferred).pipe(Effect.onInterrupt(() => Effect.sync(() => {
+    if (waiter !== undefined && waiter.state === 'waiting') waiter.state = 'cancelled'
+  })))
 })
 
 export const leave = (core: Core) =>
