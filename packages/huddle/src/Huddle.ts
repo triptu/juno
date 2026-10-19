@@ -12,19 +12,25 @@ import { Context, Data, Effect, Layer, Scope, Stream, SubscriptionRef } from 'ef
 import type { HuddleCall, HuddleError, HuddleMediaEvent, HuddleStartResult, RunningHuddles } from '@juno/contract'
 import type { SlackApi, SlackEdge, SocketEvent } from '@juno/slack'
 import { attach } from './attach'
-import { leave, makeCore, media, start } from './core'
-import type { Identity } from './lifecycle'
+import { leave, makeCore, media, pages, start } from './core'
+import type { Stored } from './lifecycle'
 
-/** The stored record failed to write: the credentials stay private and the attendee is left. */
+/** The store of pending leaves failed: a failed write keeps the credentials private and leaves at once; a failed read holds joins back. */
 export class HuddleStoreError extends Data.TaggedError('HuddleStoreError')<{ readonly cause: unknown }> {}
 
-/** Where the pending leaves of the session's workspace are stored. `write` replaces the whole list. */
+/**
+ * Where the pending leaves of the session's workspace are stored. `read`
+ * fails when the store cannot say (not for an empty list); `write` replaces
+ * the whole list.
+ */
 export interface LeaveStore {
-  readonly read: Effect.Effect<ReadonlyArray<Identity>>
-  readonly write: (records: ReadonlyArray<Identity>) => Effect.Effect<void, HuddleStoreError>
+  readonly read: Effect.Effect<ReadonlyArray<Stored>, HuddleStoreError>
+  readonly write: (records: ReadonlyArray<Stored>) => Effect.Effect<void, HuddleStoreError>
 }
 
 export interface HuddleSession {
+  /** Which workspace's store `leaves` is: its leaves go out only through its own session. */
+  readonly workspace: string
   /** The session's Slack client. */
   readonly slack: Context.Context<SlackApi | SlackEdge>
   readonly leaves: LeaveStore
@@ -42,11 +48,13 @@ export class Huddle extends Context.Service<Huddle, {
   readonly call: Stream.Stream<HuddleCall>
   /** Running huddles by channel: at subscribe time, then every change. */
   readonly running: Stream.Stream<RunningHuddles>
-  /** Start or join the huddle in `channelId`, leaving the current call first. Answers with the credentials once the leave is stored. */
-  readonly start: (channelId: string, region: string | null) => Effect.Effect<HuddleStartResult, HuddleError>
+  /** Start or join the huddle in `channelId`, leaving the current call first. Answers page `generation` with the credentials once the leave is stored. */
+  readonly start: (channelId: string, region: string | null, generation: string) => Effect.Effect<HuddleStartResult, HuddleError>
   readonly leave: Effect.Effect<void>
-  /** The renderer's report about its media session. */
+  /** A renderer page's report about its media session. */
   readonly media: (event: HuddleMediaEvent) => Effect.Effect<void>
+  /** Main's report of the live renderer page generations. */
+  readonly pages: (live: ReadonlyArray<string>) => Effect.Effect<void>
   /** Gives the service a session until the calling scope closes, and returns the listener for its socket. */
   readonly attach: (session: HuddleSession) => Effect.Effect<HuddleListener, never, Scope.Scope>
 }>()('juno/huddle/Huddle') {
@@ -55,9 +63,10 @@ export class Huddle extends Context.Service<Huddle, {
     return Huddle.of({
       call: SubscriptionRef.changes(core.callRef),
       running: SubscriptionRef.changes(core.runningRef),
-      start: (channelId, region) => start(core, channelId, region),
+      start: (channelId, region, generation) => start(core, channelId, region, generation),
       leave: leave(core),
       media: (event) => media(core, event),
+      pages: (live) => pages(core, live),
       attach: (session) => attach(core, session),
     })
   }))

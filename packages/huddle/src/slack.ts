@@ -8,7 +8,7 @@ import { NotSignedIn, Offline, RateLimited, Rejected, type HuddleCredentials, ty
 import { SlackApi, SlackEdge, type SlackApiError } from '@juno/slack'
 import { EdgeHuddlesInfoOk, type HuddleInfo, type MethodOk } from '@juno/slack-schema'
 import type { HuddleSession } from './Huddle'
-import type { Identity, Intent } from './lifecycle'
+import type { Identity, Intent, Stored } from './lifecycle'
 
 /** How many channel ids one `huddles/info` call takes. The official client's chunk size was not recorded. */
 export const INFO_CHUNK = 50
@@ -26,17 +26,35 @@ export const joinRequest = (session: HuddleSession, intent: Intent) =>
     ),
   ).pipe(Effect.provide(session.slack))
 
-/** `rooms.leave` as the official client's user leave sends it. Its answer is only logged. */
-export const leaveRequest = (session: HuddleSession, identity: Identity) =>
+/**
+ * `rooms.leave` as the official client's user leave sends it, in one
+ * exchange. `goesOut` runs as the request goes on the wire. Answers the
+ * error when Slack did not take the leave (a rate limit, before or after
+ * sending; the network; the session), else undefined: any answer from Slack,
+ * an error included, means it took it.
+ */
+export const leaveRequest = (session: HuddleSession, record: Stored, goesOut: Effect.Effect<void>): Effect.Effect<SlackApiError | undefined> =>
   SlackApi.use((api) =>
-    api.call('rooms.leave', { channel_id: identity.channelId, call_id: identity.callId, attendee_id: identity.attendeeId, reason: 'user_initiated' }, { reason: 'calls-api/leaveRoom' }),
+    api.call(
+      'rooms.leave',
+      { channel_id: record.channelId, call_id: record.callId, attendee_id: record.attendeeId, reason: 'user_initiated' },
+      { reason: 'calls-api/leaveRoom', singleAttempt: true, beforeSend: goesOut },
+    ),
   ).pipe(
     Effect.provide(session.slack),
-    Effect.asVoid,
-    Effect.catch((error) =>
-      error._tag === 'SlackRejected' && BENIGN_LEAVE_ERRORS.has(error.error)
-        ? Effect.logDebug('huddle: rooms.leave had nothing to do', { error: error.error })
-        : Effect.logWarning('huddle: rooms.leave failed', { error: error._tag === 'SlackRejected' ? error.error : error._tag })),
+    Effect.as(undefined),
+    Effect.catch((error) => {
+      switch (error._tag) {
+        case 'SlackRejected':
+          return BENIGN_LEAVE_ERRORS.has(error.error)
+            ? Effect.logDebug('huddle: rooms.leave had nothing to do', { error: error.error }).pipe(Effect.as(undefined))
+            : Effect.logWarning('huddle: rooms.leave answered an error', { error: error.error }).pipe(Effect.as(undefined))
+        case 'SlackDecodeError':
+          return Effect.logWarning('huddle: rooms.leave answer unreadable').pipe(Effect.as(undefined))
+        default:
+          return Effect.logWarning('huddle: rooms.leave not taken; it is sent again later', { error: error._tag }).pipe(Effect.as(error))
+      }
+    }),
   )
 
 /** The running huddles of `ids`, in chunks, two at a time. */
