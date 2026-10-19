@@ -734,7 +734,7 @@ Measured on 10-17 on this Mac, eight alternating runs of each while other agents
 
 ## Testing
 
-Juno merges first and tests in full afterwards. Agents run selective checks before reporting. The full suites run with `pnpm verify:main` ("Full runs"); nothing runs them on a schedule, and Tushar handles CI, flakes, runners and the release gate. Remote jobs share the laptop through tstack, including jobs from other projects.
+Juno merges first and tests in full afterwards. Agents run selective checks before reporting. The full suites run with `pnpm verify:main` ("Full runs"); nothing runs them on a schedule. An agent runs them when Tushar asks, and a release follows `.claude/skills/releasing/SKILL.md`. Remote jobs share the laptop through tstack, including jobs from other projects.
 
 **Agents.** Before reporting, an agent runs `pnpm affected`: the local Bun check and lint, then, as one remote plan with separate SSH jobs, the unit files its change reaches, the specs it added or changed, the specs it names with `--spec`, and at most 10 more desktop specs that cover the change most directly ("Affected tests"). Heavy tests run only when the change is in their area, and the Quint checks only when the code the specs model changed. `pnpm affected --plan` first shows what it would run and why. `--wide` runs every spec the change can reach, for the rare change that needs it. One remote run at a time per agent. To run a few unit test files by hand, use `pnpm remote test --passWithNoTests <files>` (paths relative to their package); one spec, `pnpm remote test:desktop <files>`.
 
@@ -1324,7 +1324,8 @@ or skip, and upload. The electron-builder total includes the DMG phase.
 ### Scheduled releases
 
 `pnpm release:scheduled` picks and publishes a release on the release Mac.
-Nothing runs it on a schedule now; Tushar runs it. Use
+Nothing runs it on a schedule. An agent runs it when Tushar asks for a release,
+following `.claude/skills/releasing/SKILL.md`, which also covers the update token. Use
 `pnpm release:scheduled --dry-run` to inspect the current refs, records and
 GitHub release without fetching, building, committing or publishing.
 
