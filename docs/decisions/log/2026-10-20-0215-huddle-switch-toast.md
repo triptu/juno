@@ -1,0 +1,1 @@
+- 10-20 02:15 · huddle-switch-toast · Switch, and any Start or Join while in another huddle, leaves the first with no confirmation, as SPEC 20 says, and the toast "Left the huddle in #design" shows when the engine's call moves to the new channel. The page reads that move from `huddle.call`, so the header, the tab and ⌘K all show it the same way.
