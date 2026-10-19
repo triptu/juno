@@ -142,7 +142,7 @@ The owner then checks with real people in the test channel.
 
 ### Phase 4: screen share
 
-- **Watch first.** Remote content share in the media package, the stage in the tab, and the bar showing who is sharing. No new permissions.
+- **Watch first.** Built on 2026-10-20 (branch `huddle-watch-share`): remote content share in the media package, the stage in the tab, and the bar showing who is sharing. No new permissions. Chime receives only others' `#content` streams that a tab shows (`ContentOnlyDownlinkPolicy`). Who shares comes from the `#content` attendee's presence, which arrives before the video; the engine does not read the room frames' `participants_screenshare_on`, whose meaning the research has not recorded. The fake media session plays a drawn test pattern for e2e.
 - **Share second.** A source picker built on `desktopCapturer.getSources` through main (thumbnails at 480 by 480 or smaller, Juno's own windows filtered out). Capture with `chromeMediaSource: 'desktop'`, the display-capture permission and the macOS Screen Recording prompt. Privacy mode may switch on while sharing; accepted. System audio stays out. A shared window is previewed in the user's own tab from the captured stream itself (no second capture); a shared screen is not (SPEC 20).
 
 ## 6. The Quint spec

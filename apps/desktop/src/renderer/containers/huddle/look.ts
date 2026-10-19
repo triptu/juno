@@ -1,11 +1,11 @@
 /**
  * The huddle containers' shared reads: the place a channel's huddle is in,
- * and the huddle's people as the views draw them.
+ * the huddle's people and others' shared screens as the views draw them.
  */
 import { useSyncExternalStore } from 'react'
 import type { HuddleCall, Person, TopicDetail } from '@juno/contract'
 import type { MediaSnapshot } from '@juno/huddle-media'
-import type { HuddleConnection, HuddlePerson, HuddlePlace } from '@juno/huddle-views'
+import type { HuddleConnection, HuddlePerson, HuddlePlace, HuddleShare } from '@juno/huddle-views'
 import { huddleChannelAtom, huddlePeopleOf, sessionProfileAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { initials } from '@juno/views'
@@ -49,6 +49,22 @@ export function useHuddlePeople(ids: ReadonlyArray<string>, selfId: string | und
   const ordered = selfId !== undefined && ids.includes(selfId) ? [selfId, ...ids.filter((id) => id !== selfId)] : ids
   const byId = new Map(people.map((person) => [person.id, person]))
   return ordered.map((id) => personOf(id, byId.get(id), id === selfId, inCall ? media : undefined))
+}
+
+/**
+ * Others' shared screens in the call the media session runs, in the order
+ * they started, each named by its owner's first name ("Maya's screen"). It
+ * loads until its video has a frame.
+ */
+export function useHuddleShares(media: MediaSnapshot | undefined): ReadonlyArray<HuddleShare> {
+  const shares = media?.shares ?? []
+  const people = useAtomValue(huddlePeopleOf(shares.flatMap((share) => (share.userId === undefined ? [] : [share.userId]))))
+  const names = new Map(people.map((person) => [person.id, person.name.split(' ')[0] || person.name]))
+  return shares.map((share) => ({
+    id: share.attendeeId,
+    ownerName: (share.userId === undefined ? undefined : names.get(share.userId)) ?? 'Someone',
+    ...(share.ready ? {} : { loading: true }),
+  }))
 }
 
 function personOf(id: string, person: Person | undefined, you: boolean, media: MediaSnapshot | undefined): HuddlePerson {

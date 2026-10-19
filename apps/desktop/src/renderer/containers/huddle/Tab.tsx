@@ -3,14 +3,15 @@
  * the controls while the user is in it, Join or Switch while it runs
  * without them, and the ended or failed page after.
  */
+import { useCallback, useState } from 'react'
 import { mainTopicOf, threadTopicOf, type HuddleCall, type RunningHuddle } from '@juno/contract'
-import { HuddlePage, type HuddlePageState } from '@juno/huddle-views'
+import { HuddlePage, HuddleShareVideo, type HuddlePageState } from '@juno/huddle-views'
 import { huddleCallValueAtom, huddleInChannelAtom, huddleLastRunAtom, type HuddleLastRun } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { openTopic } from '../navigation'
 import { Duration, useHuddleControls } from './controls'
-import { connectionOf, placeOf, useHuddleChannel, useHuddlePeople, useMediaSnapshot, useSelfId } from './look'
-import { joinHuddle } from './media'
+import { connectionOf, placeOf, useHuddleChannel, useHuddlePeople, useHuddleShares, useMediaSnapshot, useSelfId } from './look'
+import { joinHuddle, showHuddleShare } from './media'
 
 /** "24 minutes", "1 minute", "less than a minute". */
 function lastedOf(millis: number): string {
@@ -26,6 +27,14 @@ function failureOf(code: string | undefined): string {
 
 const retryable = (code: string | undefined) => code !== 'feature_not_enabled' && code !== 'huddles_disabled'
 
+/** A shared screen's video, bound to the media session while it is in the page. One ref per share, so a render never rebinds it. */
+function ShareVideo({ id }: { readonly id: string }) {
+  const onElement = useCallback((element: HTMLVideoElement | null) => (element === null ? undefined : showHuddleShare(id, element)), [id])
+  return <HuddleShareVideo onElement={onElement} />
+}
+
+const renderShare = (id: string) => <ShareVideo id={id} />
+
 export function HuddleTab({ channelId, tabId }: { readonly channelId: string; readonly tabId: string }) {
   const call = useAtomValue(huddleCallValueAtom)
   const running = useAtomValue(huddleInChannelAtom(channelId))
@@ -36,12 +45,19 @@ export function HuddleTab({ channelId, tabId }: { readonly channelId: string; re
   const inThis = call !== undefined && call.channelId === channelId && (call.phase === 'joining' || call.phase === 'joined')
   const people = useHuddlePeople(inThis ? call.participants : running?.participants ?? [], selfId, media, inThis)
   const lastRun = useAtomValue(huddleLastRunAtom(channelId))
+  const shares = useHuddleShares(inThis ? media : undefined)
+  const [expandedShare, setExpandedShare] = useState<string | undefined>(undefined)
+  const expanded = shares.some((share) => share.id === expandedShare) ? expandedShare : undefined
   const threadTs = running?.threadTs ?? null
   return (
     <HuddlePage
       place={placeOf(detail)}
       state={stateOf(call, running, inThis, controls, channelId, lastRun)}
       people={people}
+      shares={shares}
+      renderShare={renderShare}
+      {...(expanded === undefined ? {} : { expandedShare: expanded })}
+      onExpandShare={setExpandedShare}
       onPlace={() => openTopic(mainTopicOf(channelId))}
       {...(threadTs === null ? {} : { onOpenThread: () => openTopic(threadTopicOf(channelId, threadTs), { newTab: true, after: tabId }) })}
       devices={controls.devices}

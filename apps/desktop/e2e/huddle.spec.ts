@@ -6,18 +6,26 @@
  * Slack learns of a leave from Chime, so the test tells the fake when the
  * page's media stopped (`stopMedia`), as Chime would.
  */
-import type { ElectronApplication, Page } from '@playwright/test'
+import type { ElectronApplication, Locator, Page } from '@playwright/test'
 import { TEAM, type FakeSlack } from '@juno/fake-slack'
 import type { Juno } from './driver/juno'
 import { expect, test } from './fixtures'
 import { hooks } from './hooks'
+import { expectStableAnchor } from './shiftProbe'
 
 test.describe.configure({ timeout: 90_000 })
 
 /** The fake media session's surface the test drives (`FakeMediaSession`). */
 interface FakeMedia {
-  getSnapshot(): { readonly local: { readonly attendeeId: string | undefined; readonly muted: boolean }; readonly connection: { readonly state: string } }
+  getSnapshot(): {
+    readonly local: { readonly attendeeId: string | undefined; readonly muted: boolean }
+    readonly connection: { readonly state: string }
+    readonly shares: ReadonlyArray<{ readonly userId: string | undefined; readonly ready: boolean }>
+  }
   addRemote(remote: { readonly userId: string }): string
+  /** Someone starts or stops sharing their screen; a shown share plays a drawn test pattern. */
+  startShare(userId: string): string
+  stopShare(userId: string): void
   end(reason: string): void
   setMicrophoneAccess(access: string): void
   /** The call sounds the page asked for, in order. */
@@ -31,6 +39,18 @@ const attendee = (win: Page) => win.evaluate(() => (window as unknown as MediaWi
 const addRemote = (win: Page, userId: string) => win.evaluate((id) => (window as unknown as MediaWindow).__junoHuddleMedia.addRemote({ userId: id }), userId)
 const played = (win: Page) => win.evaluate(() => [...(window as unknown as MediaWindow).__junoHuddleMedia.played])
 const microphoneAccess = (win: Page, access: string) => win.evaluate((given) => (window as unknown as MediaWindow).__junoHuddleMedia.setMicrophoneAccess(given), access)
+const startShare = (win: Page, userId: string) => win.evaluate((id) => (window as unknown as MediaWindow).__junoHuddleMedia.startShare(id), userId)
+const stopShare = (win: Page, userId: string) => win.evaluate((id) => (window as unknown as MediaWindow).__junoHuddleMedia.stopShare(id), userId)
+const sharesReady = (win: Page) => win.evaluate(() => (window as unknown as MediaWindow).__junoHuddleMedia.getSnapshot().shares.map((share) => share.ready))
+/** The video plays and keeps getting new frames: more are decoded over 300 ms. */
+const playing = (video: Locator) =>
+  video.evaluate(async (element: HTMLVideoElement) => {
+    const frames = () => element.getVideoPlaybackQuality().totalVideoFrames
+    if (element.readyState < 2 || element.paused || element.videoWidth === 0) return false
+    const before = frames()
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    return frames() > before
+  })
 const endMedia = (win: Page, reason: string) => win.evaluate((why) => (window as unknown as MediaWindow).__junoHuddleMedia.end(why), reason)
 
 /** Main's quit dialog under JUNO_E2E: recorded, and answered as the test says (`main/index.ts`). */
@@ -111,6 +131,70 @@ test('start a huddle from the header, mute from the bar, open the tab and leave'
   await expect.poll(() => played(win)).toEqual(['join', 'join', 'join', 'leave'])
   // The tab stays, and shows the huddle without the user: Maya is still in it.
   await expect(win.getByRole('button', { name: 'Join huddle' })).toBeVisible({ timeout: 15_000 })
+})
+
+test('someone shares their screen: the bar says so, the tab shows it, two can share, and it goes when they stop', async ({ juno, fake, win }) => {
+  await openEngMain(juno)
+  await win.getByRole('button', { name: 'Start huddle' }).click()
+  const bar = win.getByRole('region', { name: 'Huddle' })
+  // The bar shows once the media session has loaded.
+  await expect(bar).toBeVisible()
+  await expect.poll(() => connection(win)).toBe('connected')
+  for (const user of ['U0MAYA', 'U0LEO']) {
+    fake.control('joinHuddle', { channel: 'C0ENG', user })
+    await addRemote(win, user)
+  }
+  // The faces sit after the status line: a longer line must not push them.
+  const faces = '[data-huddle-bar] button [role="img"]'
+  const stack = win.locator(faces)
+  await expect(stack).toHaveAccessibleName('Maya, Leo')
+
+  // Maya shares: the bar says so at once, and nothing in it moves or changes size.
+  const before = await bar.boundingBox()
+  await expectStableAnchor(win, faces, async () => {
+    await startShare(win, 'U0MAYA')
+    await expect(bar).toContainText('Maya is sharing')
+  })
+  expect(await bar.boundingBox()).toEqual(before)
+  // With no tab showing it, the share is not played.
+  expect(await sharesReady(win)).toEqual([false])
+
+  // The bar opens the tab, which shows her screen playing, named for her, in place of the tiles.
+  await bar.getByRole('button', { name: 'Open huddle in #eng' }).click()
+  await juno.tabs.expectActive('eng · Huddle')
+  const maya = win.getByRole('region', { name: "Maya's screen" })
+  await expect(maya.locator('video')).toBeVisible()
+  await expect.poll(() => playing(maya.locator('video'))).toBe(true)
+  await expect(maya).not.toContainText('Loading')
+  await expect(maya).toContainText("Maya's screen")
+  await expect(win.locator('[data-share]')).toHaveCount(1)
+
+  // Leo shares too: both screens show, and Expand gives one all the room until Esc.
+  await startShare(win, 'U0LEO')
+  await expect(bar).toContainText('Maya and Leo are sharing')
+  const leo = win.getByRole('region', { name: "Leo's screen" })
+  await expect.poll(() => playing(leo.locator('video'))).toBe(true)
+  await expect(maya).toBeVisible()
+  await leo.hover()
+  await leo.getByRole('button', { name: "Expand Leo's screen" }).click()
+  await expect(maya).toHaveCount(0)
+  await expect.poll(() => playing(leo.locator('video'))).toBe(true)
+  await win.keyboard.press('Escape')
+  await expect(maya).toBeVisible()
+  await expect.poll(() => playing(maya.locator('video'))).toBe(true)
+
+  // They stop: each screen goes, then the stage, and the tiles come back.
+  await stopShare(win, 'U0MAYA')
+  await expect(maya).toHaveCount(0)
+  await expect(bar).toContainText('Leo is sharing')
+  await stopShare(win, 'U0LEO')
+  await expect(win.locator('[data-share]')).toHaveCount(0)
+  await expect(bar).not.toContainText('sharing')
+  await expect(win.locator('[data-huddle-page]').getByRole('listitem', { name: 'Maya' })).toBeVisible()
+
+  const attendeeId = await attendee(win)
+  await bar.getByRole('button', { name: 'Leave' }).click()
+  await chimeDrops(win, fake, attendeeId!)
 })
 
 /** A Huddle menu item as main built it: its label and whether it is enabled. */

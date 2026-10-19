@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { INITIAL_SNAPSHOT, patchAttendee, presence, startCall } from '../src/snapshot.ts'
+import { INITIAL_SNAPSHOT, patchAttendee, presence, shareReady, startCall } from '../src/snapshot.ts'
 import { share, SnapshotStore } from '../src/store.ts'
 
 const ALICE = 'T0123456789-R0123456789-U0AAAAAAAAA'
@@ -45,5 +45,44 @@ describe('snapshot identity', () => {
     expect(next).toEqual({ a: [1, { b: 3 }], c: { d: 'x' } })
     expect(next.c).toBe(prev.c)
     expect(share(prev, { a: [1], c: { d: 'x' } })).toEqual({ a: [1], c: { d: 'x' } })
+  })
+})
+
+describe('screen shares', () => {
+  it('lists others\' shares in the order they started, with their owners', () => {
+    const store = storeWithTwo()
+    store.update(presence('b#content', true, `${BEN}#content`))
+    store.update(presence('a#content', true, ''))
+    expect(store.getSnapshot().shares).toEqual([
+      { attendeeId: 'b#content', userId: 'U0BBBBBBBBB', ready: false },
+      // No user in its own ExternalUserId: the owner's attendee names them.
+      { attendeeId: 'a#content', userId: 'U0AAAAAAAAA', ready: false },
+    ])
+    expect(store.getSnapshot().remotes).toHaveLength(2)
+  })
+
+  it('names a share\'s owner once their attendee arrives after it', () => {
+    const store = new SnapshotStore(INITIAL_SNAPSHOT)
+    store.update(startCall('self'))
+    store.update(presence('a#content', true, ''))
+    expect(store.getSnapshot().shares[0]?.userId).toBeUndefined()
+    store.update(presence('a', true, ALICE))
+    expect(store.getSnapshot().shares[0]?.userId).toBe('U0AAAAAAAAA')
+  })
+
+  it('never lists the user\'s own share', () => {
+    const store = storeWithTwo()
+    store.update(presence('self#content', true, ''))
+    expect(store.getSnapshot().shares).toEqual([])
+  })
+
+  it('keeps a share ready until its attendee leaves', () => {
+    const store = storeWithTwo()
+    store.update(presence('a#content', true, `${ALICE}#content`))
+    store.update(shareReady('a#content', true))
+    store.update(presence('a#content', true, `${ALICE}#content`))
+    expect(store.getSnapshot().shares[0]?.ready).toBe(true)
+    store.update(presence('a#content', false, ''))
+    expect(store.getSnapshot().shares).toEqual([])
   })
 })

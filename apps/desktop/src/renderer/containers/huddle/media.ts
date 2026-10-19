@@ -278,6 +278,11 @@ export function toggleHuddleMuted(): void {
   if (snapshot !== undefined && holding !== null) session?.setMuted(!snapshot.local.muted)
 }
 
+/** Shows someone's shared screen in `element` until the returned function is called. */
+export function showHuddleShare(attendeeId: string, element: HTMLVideoElement): () => void {
+  return session?.showShare(attendeeId, element) ?? (() => {})
+}
+
 /** Mute while macOS blocks the microphone: System Settings at Microphone (SPEC 20). */
 export function openMicrophoneSettings(): void {
   void window.juno.huddle.openMicrophoneSettings().catch(() => {})
