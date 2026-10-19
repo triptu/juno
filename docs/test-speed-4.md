@@ -190,3 +190,53 @@ one line. Removing two redundant header lines fixed it; a separate full lint run
 11 checks. The original affected invocation therefore retains exit 1, despite its test gates
 passing. It was not rerun. The later reply-card hold correction is covered by the full after-run
 and a fresh Bun typecheck and all 11 lint checks, both passing.
+
+## Where desktop time goes
+
+One full run with per-test timings, `pnpm remote --env JUNO_E2E_TIMINGS=1 test:desktop`, from
+`52dbdbb50` (main plus the timing reporter) at 23:00 IST on 10-19: two physical cores, three workers.
+`node scripts/e2e-timings.mjs <run.log>` sums the `e2e-timing:` lines `apps/desktop/e2e/timings.ts`
+prints. 400 passed, one failed (`topic.spec.ts` header order: the huddle button is new on main), one
+passed on retry (`layout-shift.spec.ts` cold sync), 45 skipped.
+
+| Where | Time | Share | Note |
+| --- | ---: | ---: | --- |
+| Remote wall time | 813 s | | |
+| Remote setup: snapshot, transfer, container, install | about 8 s | 1% of wall | Install 0 s from the store |
+| App build | 31.7 s | 4% of wall | Cold: a new file under `scripts/` changed the build key |
+| Playwright suite | 769 s | 95% of wall | First test at 0.8 s |
+| Worker idle at the end | 4, 9, 19 s | 1–2% | Busy 765, 760, 750 s of 769 s |
+| Summed test time | 2,276 s | 100% | 404 test runs including two retries |
+| Electron launch to first window | 376 s | 17% | 404 launches, median 0.89 s, p90 1.34 s |
+| Sign-in: button to signed-in window | 393 s | 17% | 388 sign-ins, median 1.00 s |
+| Sync wait after sign-in | 486 s | 21% | Median 1.19 s; engine busy until idle is 194 s of it (median 0.42 s) |
+| Close | 64 s | 3% | Median 0.15 s |
+| Fake Slack start | 15 s | 1% | Median 37 ms |
+| Test steps after setup | 942 s | 41% | Remainder |
+| Fixed waits (`waitForTimeout`) | 72 s | 3% | `mark-unread` 12 s, `presence` 8 s, `send-checks`, `ai-errors`, `break-pass-1017` 6 s each |
+| `expect.poll` and `toPass` | 135 s | 6% | `juno-agent/crash` 29 s, `send-checks` 10 s, `juno-agent/transfer` 9 s, `quick-start` 9 s |
+
+Fixed waits and polls are part of the setup or test-step rows; they are not added again. Launch,
+sign-in and sync together are 55% of summed test time. A warm relaunch on the same user data
+(local Mac, one worker) was ready 0.21–0.30 s after its window opened, against 0.93 s for sign-in
+plus sync on a fresh one, so most of the sign-in and sync cost is first sync, not boot.
+
+The 15 slowest specs, summed test time (and the part spent launching, signing in and syncing):
+`juno-agent/crash` 129 s (46 s), `realtime` 107 s (31 s), `send-checks` 74 s (38 s),
+`break-pass-1017` 74 s (42 s), `layout-shift` 65 s (49 s), `tabs` 57 s (30 s), `idle-cpu`
+54 s (4 s), `juno-agent/states` 54 s (41 s), `topic` 50 s (32 s), `juno-agent/chat` 49 s (31 s),
+`juno-agent/transfer` 47 s (18 s), `attachments` 44 s (30 s), `juno-agent/t3` 42 s (26 s),
+`palette` 41 s (28 s), `reaction-delivery` 40 s (15 s). The slowest single tests are the idle
+walk (54 s), the 429 storm (34 s) and the title-lines relaunch (24 s).
+
+Other cheap wins seen, with estimated savings (estimates, not measured):
+
+- The build key hashes all of `packages/` and `scripts/`, tests included, so a change to only a
+  unit test or a script rebuilds the app: about 30 s per remote desktop run after such a change.
+- Fixed waits sum to 72 s; replacing the five largest with waits on a condition would save
+  perhaps 30 s summed, about 10 s of wall time.
+- `juno-agent/crash` spends 29 s in polls; a signal for the agent's restart could save perhaps
+  10 s summed.
+- The sync wait spends about 0.7 s (median) after rows show beyond the engine going idle, in rows,
+  Home's greeting and parking the pointer. Not broken down further; worth a look.
+- Worker imbalance is small (19 s at most), so reordering specs would gain little.
