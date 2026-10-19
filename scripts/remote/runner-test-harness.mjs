@@ -18,9 +18,10 @@ if (command.includes('docker build')) {
  process.stdin.on('end', () => { fs.appendFileSync(process.env.TEST_CALLS, 'build ' + bytes + '\\n'); console.error('#1 DONE 0.1s'); });
 } else if (command.includes('__juno_runner_connected')) {
  if (process.env.TEST_MODE === 'broken') { console.error('Docker unavailable'); process.exit(1); }
- console.log('__juno_runner_connected\\njuno-runner-ready ' + (process.env.TEST_CAPACITY || '4'));
+ console.log('__juno_runner_connected\\njuno-runner-ready ' + (process.env.TEST_CAPACITY || '4') + (process.env.TEST_PINNED ? ' 1' : ''));
 } else if (command.includes('__juno_remote_exit_')) {
- fs.appendFileSync(process.env.TEST_CALLS, 'reservation ' + command.match(/ -- (\\d+) '/)[1] + ' cpus ' + command.match(/--cpus (\\d+)/)[1] + ' job-cores ' + command.match(/JUNO_RUNNER_JOB_CORES=(\\d+)/)[1] + '\\n');
+ const threads = process.env.TEST_PINNED ? Number(command.match(/ -- (\\d+) '/)[1]) * 2 : undefined;
+ fs.appendFileSync(process.env.TEST_CALLS, 'reservation ' + command.match(/ -- (\\d+) '/)[1] + ' cpus ' + (threads ?? command.match(/--cpus (\\d+)/)[1]) + ' job-cores ' + (threads ?? command.match(/JUNO_RUNNER_JOB_CORES=(\\d+)/)[1]) + '\\n');
  fs.appendFileSync(process.env.TEST_CALLS, 'wide-unit ' + command.match(/JUNO_RUNNER_WIDE_UNIT=(\\d+)/)[1] + '\\n');
  if (process.env.TEST_MODE === 'busy') { console.log('__juno_remote_started\\n__juno_remote_busy\\n__juno_remote_released'); process.exit(75); }
  fs.appendFileSync(process.env.TEST_CALLS, (command.includes('JUNO_REMOTE_INSTALL=1') && command.includes('PNPM_CONFIG_STORE_DIR=/cache/pnpm-store') && command.includes('--user') ? 'install with cache' : 'full image') + '\\n');

@@ -20,7 +20,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
-import { runnerConfig, checkRunner, runnerCommand, runnerJobSize, ensureRunnerImage, runnerCache } from './remote/runner.mjs'
+import { runnerConfig, checkRunner, runnerCommand, runnerJobSize, runnerContainerLimits, ensureRunnerImage, runnerCache } from './remote/runner.mjs'
 import { snapshot } from './remote/workspace.mjs'
 import { createWithStore, namespaceCache, namespaceStoreVolume, workspaceMounts } from './remote/namespace.mjs'
 import { imageTag, ensureImage, nsc, retry, quote, sleep } from './remote/image.mjs'
@@ -126,12 +126,13 @@ let backend = 'namespace'
 let runner
 let cpuLimit
 let wideUnit = false
+let pinned = false
 let cores = Number(/:(\d+)x/.exec(options.machine)?.[1])
 const transport = (command) => backend === 'ssh' ? ['ssh', [...runner.args, command]] : ['nsc', ['ssh', '-T', id, command]]
 const container = (image) => {
   const install = backend === 'namespace' || runner.build
   const cache = install ? `${backend === 'ssh' ? runnerCache() : namespaceCache()}; ` : ''
-  const cpu = backend === 'ssh' ? `--cpus ${cpuLimit} -e JUNO_RUNNER_JOB_CORES=${cpuLimit} -e JUNO_RUNNER_WIDE_UNIT=${wideUnit ? 1 : 0}` : ''
+  const cpu = backend === 'ssh' ? runnerContainerLimits({ cpus: cpuLimit, reserved: cores, wideUnit }, pinned, install) : ''
   const user = backend === 'ssh' && install ? '--user "$(id -u):$(id -g)"' : ''
   return `echo __juno_remote_started; ${cache}rm -rf ${outputDir} && mkdir -p ${outputDir} && chmod 777 ${outputDir} && s=$(date +%s) && ${backend === 'ssh' ? `docker image inspect ${image} >/dev/null` : `docker pull -q ${image} >/dev/null`} && echo "remote: image pulled in $(( $(date +%s) - s )) s" >&2 && echo __juno_remote_ready && docker run --name juno-${runId} --rm -i --init --ipc=host ${cpu} ${user} ${install ? workspaceMounts : ''} -v ${outputDir}:/out ${options.env.map((pair) => `-e ${quote(pair)}`).join(' ')} ${image} ` +
     `bash -c 'tar -xzf - -C /work && exec bash scripts/remote/run.sh "$@"' _ ${scriptArgs}; code=$?; [ -s ${outputDir}/reports.tgz ] && echo __juno_remote_reports; echo "${exitMarker}$code"`
@@ -245,7 +246,8 @@ try {
       const specsCached = carriesCache && process.env.SPECS_RUN_CACHE !== 'off'
         && !options.env.some((pair) => pair === 'SPECS_CACHE=off' || pair === 'SPECS_RUN_CACHE=off')
         && existsSync(specCache) && readdirSync(specCache).some((name) => name.endsWith('.json'))
-      const size = runnerJobSize({ ...options, specsCached }, health.cores)
+      const size = runnerJobSize({ ...options, specsCached }, health.cores, health.pinned)
+      pinned = Boolean(health.pinned)
       cores = size.reserved
       cpuLimit = size.cpus
       wideUnit = size.wideUnit

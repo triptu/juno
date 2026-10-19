@@ -9,63 +9,171 @@ falling back. Split plan jobs stay on SSH and wait for capacity; an unreachable
 runner falls back to one Namespace plan before splitting. Set `JUNO_REMOTE_MAX_VCPU=0` to forbid Namespace allocation and
 wait for runner capacity without a deadline.
 
-Use an amd64 host with enough RAM for the configured jobs. An 8-core limit with
-16 GB available to Linux is a reasonable starting point. The host's
-`~/.config/juno-runner/cores` file is the total capacity across all clients.
-Use the same Linux account from every client. Wide unit-only jobs reserve 4
-cores with a Docker CPU limit of 4: `test` without named files, `test` with
-more than 20 named files, and `specs:check` without a carried cache (or with
-caching disabled). The same rule applies to unit steps inside `test:plan`.
-The 20-file threshold keeps small affected slices cheap while giving broad
-package-spanning selections the full unit budget; it is a scheduling heuristic,
-not a measured runtime boundary. Narrow selections, `test:agent*`, and cached
-spec checks reserve 1 core with a limit of 2. Jobs containing
-`test:gallery` but no `test:desktop` or `test:e2e` reserve 3 cores with a limit
-of 3. Any desktop or e2e step, alone or in a plan, reserves 4 cores with a
-limit of 4, including app jobs that also run the gallery. Other scripts keep the
-8-core default. `--machine` or `JUNO_REMOTE_MACHINE` overrides both the
-reservation and limit. Default reservations shrink to fit a smaller host;
-explicit sizes fail if they exceed its capacity. Host admission counts reserved
-cores, independently of the CPU limit. Namespace, including fallback, keeps
-its 8x16 default and its existing pool.
+## Capacity and isolation
 
-Jobs release their reservation after Docker stops. Each job has its own container
-and output directory. A host lock protects reservations. Jobs stop after 3 hours.
+The host's `~/.config/juno-runner/cores` controls admission across every client
+using the same Linux account. It accepts two formats:
 
-Workers use the CPU limit in `JUNO_RUNNER_JOB_CORES`, since `nproc` can see
-all host threads despite Docker's CPU limit. A narrow unit job uses two
-Vitest workers in one package under its 2-core limit. A wide job runs two
-packages with four Vitest workers each under its 4-core limit.
-`JUNO_RUNNER_WIDE_UNIT=1` selects one worker per allocated core in each
-package. Narrow and app jobs keep their existing counts.
-A standalone 4-core app job uses two desktop workers. Gallery-only jobs
-use three workers and shift parts at 3 cores, as they do at 4. Quint uses
-one simulation per two cores and one Apalache checker per four, at least one
-each. Wide unit-only single-container plans retain their unit workers beside
-the spec lane.
-`test:plan` groups unit, app and specs steps into concurrent jobs, each with
-its own container and the standalone workers above. Conformance belongs to
-the specs job, so it no longer waits behind units or inherits their one-worker
-limit. App steps stay together and run in order, reusing each app build.
-A broad unit job (4 cores), desktop/gallery job (4) and conformance job (8)
-fit the 16-core host when it is free. Other jobs can delay admission; each
-reservation is released independently. There is one install per job against
-the shared store, and separate reports and spec caches per job.
+- A positive number, such as `16`, keeps quota-only admission and the existing
+  reservations. Existing clients and other hosts can keep this format.
+- A list or range, such as `4-11` or `4-5,8-11`, lends whole physical cores.
+  Name each core by its lowest sibling CPU number. Use `4-4` to lend just core
+  4; a bare `4` means quota capacity. The runner reads
+  `/sys/devices/system/cpu/cpu*/topology/thread_siblings_list` and includes every
+  sibling. It rejects duplicate, missing, offline and non-representative IDs.
+  This avoids package-local `core_id` values, which differ from `lscpu` on the
+  laptop. No sibling offset is hard-coded.
 
-Once split, every job waits for SSH capacity without a deadline. None fall
-back independently to Namespace. `JUNO_RUNNER_PLAN=single` keeps the former
-single-container plan and its 60-second busy fallback. `JUNO_PLAN_SERIAL=1`
-also keeps one container and runs every step in order. In the former shared
-plan, 4 cores give the app two desktop or three gallery workers, the unit
-lane one worker in one package, and the spec-check lane one simulation plus
-one checker. Step environment settings still win. Explicit `--machine`
-sizing applies separately to each split job.
+The owner's Ryzen AI 9 HX 370 has 12 physical cores and 24 threads. Cores 0–3
+(CPUs 0–3 and 12–15) are Zen 5, with 16 MiB shared L3 and a 5.16 GHz maximum.
+Cores 4–11 (CPUs 4–11 and 16–23) are Zen 5c, with 8 MiB shared L3 and a
+3.29 GHz maximum. Verified with `lscpu -e=CPU,CORE,CACHE,MAXMHZ` and sysfs on
+2026-10-19. The performance power profile is enabled. `4-11` lends only the
+eight dense cores; runner containers cannot execute on the four fast cores.
+The desktop may still use the dense cores: this is job affinity, not a host
+scheduler partition.
 
-Each child writes its own `run.log`; the parent writes `plan.log` with output
-from every job and the original step indices. Usage summaries count only
-child logs. Cancellation forwards to all jobs and waits for their cleanup.
+| Job | Physical cores | Laptop threads | Memory cap | Each tmpfs mount |
+| --- | --- | --- | --- | --- |
+| Narrow unit, `test:agent*`, cached spec check | 1 | 2 | 3 GiB | 2 GiB |
+| Wide unit, uncached spec check | 2 | 4 | 6 GiB | 2 GiB |
+| Desktop/e2e, gallery | 2 | 4 | 6 GiB | 2 GiB |
+| Conformance, other scripts | 4 | 8 | 12 GiB | 4 GiB |
+
+Wide means `test` without named files or with more than 20 files, or
+`specs:check` without a carried cache or with caching disabled. The threshold
+is an admission heuristic. Default sizes shrink to fit a smaller host.
+`--machine` and `JUNO_REMOTE_MACHINE` specify a thread budget in physical mode,
+rounded up to whole two-thread cores; explicit sizes fail if too large. Actual
+Docker CPU quotas and workers use the sibling count discovered on the host.
+Memory is 3 GiB per reserved physical core; eight lent cores bound the sum of
+job memory caps to 24 GiB. Tmpfs consumes this cap; it is not additional RAM.
+
+Pinned containers use `--cpuset-cpus`, `--cpus` equal to their allocated thread
+count, and equal `--memory`/`--memory-swap` limits (no container swap).
+`/tmp` and the disposable `/work` workspace are tmpfs, with `TMPDIR`, `TMP`
+and `TEMP` set to `/tmp`. Test SQLite databases, engine and Electron profiles,
+and local build output therefore live in RAM. Persistent dependency and build
+caches remain on disk, as do downloaded reports. Custom full-image overrides
+keep their baked `/work` and mount only `/tmp`. The image needs executable
+temporary storage for Electron and toolchain helpers. Numeric configs retain
+the former Docker arguments, without these memory or tmpfs limits.
+
+The host lock protects exact core sets in leases. Admission prefers adjacent
+free cores, then takes fragmented free cores if needed. Jobs release their
+lease only after their container stops. A later admission reaps a killed
+lease owner, stops its recorded timeout process group and removes its Docker
+container before reusing the cores. Every job still has a three-hour timeout.
+A launch waits until its supervisor is recorded, so a crash during admission
+cannot start an unrecorded container later. Live quota-only leases must drain
+before pinned jobs can start. Stop old clients and let existing jobs finish
+before changing the config under the host lock; old clients cannot read lists.
+
+Quota mode reserves 4 slots for wide units and desktop/e2e, 3 for gallery,
+1 for narrow units and cached specs, and 8 for other scripts. Narrow jobs have
+a two-thread CPU limit; other limits match their reservation. Namespace,
+including fallback, keeps its 8x16 default and existing pool.
+
+Workers use `JUNO_RUNNER_JOB_CORES`, the allocated thread count. Narrow units
+use two Vitest workers in one package; wide units use four workers in each of
+two packages at four threads. Standalone desktop jobs use three workers at
+four threads, and gallery jobs use three workers and shift parts. Sequential
+app plans retain two desktop workers. Quint uses one simulation per two
+threads and one Apalache checker per four, at least one each. Explicit worker
+settings take precedence.
+
+`test:plan` groups unit, app and specs steps into independent jobs, each with
+its own core set, container, install, reports and cache results. Conformance
+belongs to specs. App steps stay together and run in order, reusing builds.
+A wide unit job (2 physical cores), desktop/gallery job (2) and conformance
+job (4) fit the eight-core laptop allocation. Other clients can delay admission;
+each job releases its cores independently.
+
+Once split, every job waits for SSH capacity without a deadline; none falls
+back independently to Namespace. An unreachable runner falls back to one
+Namespace plan before splitting. `JUNO_RUNNER_PLAN=single` keeps one container
+and the 60-second busy fallback. `JUNO_PLAN_SERIAL=1` also keeps one container
+and runs every step in order. Explicit `--machine` sizing applies to each job.
+Each child writes `run.log`; the coordinator writes `plan.log` with original
+step indices. Usage summaries count only child logs. Cancellation forwards
+to all jobs and waits for cleanup.
 
 ## Laptop measurements
+
+### Dense-core pinning (2026-10-19)
+
+One run per state, sequentially, on the performance power profile. Baseline:
+quota capacity `16`. After: physical list `4-11`, memory caps and tmpfs above.
+Product sources and selected tests were unchanged. The toolchain image and
+dependency store were warm; both desktop and gallery built on each side.
+Script time includes builds and tests; wall time also includes transport,
+admission, install and reports. These are single observations, not a repeatable
+speedup claim. Restricting work to dense cores made these solo runs slower.
+
+| Work | Before script / wall | After script / wall | Before / after peak GiB |
+| --- | --- | --- | --- |
+| `test/messages.test.ts` | 10 / 14 s | 12 / 15 s | 0.66 / 0.55 |
+| Desktop, 10 specs, 60 tests | 83 / 86 s | 118 / 122 s | 2.08 / 2.35 |
+| Gallery shift, Chip | 24 / 27 s | 30 / 33 s | 1.73 / 1.47 |
+
+All passed without retries. Gallery had 46 test cases before and 45 after:
+the unchanged worker rules choose four shift parts at the legacy three-thread
+limit and three parts at the new four-thread allocation. The same Chip states
+and other shift checks ran. Desktop builds took 19.15 / 24.22 s; gallery builds
+12.68 / 16.58 s. CPU busy was 59 / 61% for units, 77 / 79% for desktop and
+74 / 55% for gallery, relative to each job's thread quota. Host load before the
+baseline was 0.60 and before the pinned desktop run 0.46, with no other runner
+containers. A quota thread and an SMT thread on a dense core do not provide
+the same throughput; this comparison changes both placement and storage.
+
+The pinned samples peaked at 4.1 / 197.7 / 5.2 MiB in `/tmp` and
+35.3 / 32.4 / 28.9 MiB in `/work` (unit / desktop / gallery), sampled every two
+seconds during the script. They leave room within each 2 GiB tmpfs. The memory
+caps also leave room above these container-lifetime peaks and the earlier full
+unit peak of 1.90 GiB; tmpfs and file cache count against them. The final affected plan measured wide units at 1.58 GiB, with 74.5 MiB in
+`/work` and 40.2 MiB in `/tmp`. Cached spec checks plus conformance peaked at
+2.02 GiB, with 282.8 / 79.5 MiB in `/work` / `/tmp`. The four-core spec budget
+of 12 GiB with 4 GiB per mount is conservative; uncached model checking was
+not measured in this pass.
+
+Two concurrent desktop runs each took 129 s script / 132 s wall, versus
+118 / 122 s solo: about 9% slower in script time, so they did not fully retain
+solo speed. Both completed successfully; one retried the sidebar first-sync
+layout-shift assertion, while the other passed all 60 cases without retries.
+Their builds took 26.23 and 25.87 s. Docker inspect and `/proc/self/status`
+confirmed disjoint CPU sets `4-5,16-17` and `6-7,18-19`, with four-thread quotas,
+6 GiB memory/swap limits and two 2 GiB tmpfs mounts per job. Peaks were
+2.18 / 2.30 GiB memory and 205.6 / 198.1 MiB in `/tmp`. A mid-run snapshot
+showed no memory-limit events, only 4.3 / 0.6 ms cumulative quota throttling,
+and dense-core clocks near 3.31 GHz. The shared cache, memory and power budget
+remain possible sources of contention; these observations do not isolate them.
+
+A real Docker sleep job was killed through its lease owner's PID. The next
+admission removed that container and reused the same physical cores. Linux
+shell tests also cover SIGTERM, SIGKILL, timeout, normal release, capacity
+waiting and concurrent disjoint allocations.
+
+Validation: `node --test scripts/remote/*.test.mjs` passed 43 checks on the Mac
+with six Linux-only skips; the focused Linux runner run passed all 18 checks.
+`pnpm affected` reused the current Bun typecheck cache and passed lint, health,
+repo tools, units, cached spec checks, conformance, gallery and desktop steps.
+Its overall exit was 1 because the measurement environment's
+`JUNO_REMOTE_MAX_VCPU=0` reached two Namespace-pool tests that expect allocation
+to be enabled. Both passed in a targeted rerun with that variable unset. No
+product or runner fix was needed for those two failures.
+
+Reproduce the sequential runs:
+
+```sh
+JUNO_REMOTE_MAX_VCPU=0 pnpm remote test --passWithNoTests test/messages.test.ts
+JUNO_REMOTE_MAX_VCPU=0 pnpm remote test:desktop e2e/app.spec.ts e2e/topic.spec.ts e2e/send.spec.ts e2e/theme.spec.ts e2e/mentions.spec.ts e2e/sidebar.spec.ts e2e/message-actions.spec.ts e2e/session.spec.ts e2e/mark-unread.spec.ts e2e/welcome.spec.ts
+JUNO_REMOTE_MAX_VCPU=0 pnpm remote --env GALLERY_SHIFT_ONLY=Chip test:gallery shift.spec.ts
+```
+
+For the paired desktop check, run that desktop command twice concurrently,
+adding `--env JUNO_REBUILD=1` after `remote` so both include a rebuild like the
+solo runs. Raw logs and Docker inspection are in `.remote/core-pinning/` in
+the `runner-core-pinning` worktree; each log also names its retained run folder.
 
 ### Affected plan shape (2026-10-19)
 
@@ -191,17 +299,11 @@ Run each command separately. Insert `--machine linux/amd64:8x16` immediately
 after `remote` for the 8-core comparison. These commands forbid Namespace
 fallback during measurement.
 
-The owner chose to lend 16 of the laptop's 24 threads in
-`~/.config/juno-runner/cores`, leaving eight for the desktop. Admission allows
-4 app plans, or 5 gallery jobs, or 4 wide unit jobs, or 16 narrow unit jobs
-at once, or mixtures with `4 * app + 3 * gallery + 4 * wide + narrow <= 16`.
-At the earlier measured slice peaks, four app plans
-use about 11.04 GiB, five gallery jobs 9.25 GiB, and sixteen narrow unit jobs
-19.36 GiB, below the roughly 24 GB job budget. The measured peaks remain
-2.76 GiB per app plan, 1.85 GiB per gallery slice and 1.21 GiB per unit slice;
-16 is the owner's choice, not a limit derived from these measurements. These
-are sequential slices, not concurrent full-suite throughput. Recheck memory
-on larger plans before raising the limit.
+Those quota-only measurements used capacity `16`, before physical-core pinning.
+They allowed 4 app, 5 gallery, 4 wide unit or 16 narrow jobs at once. The new
+`4-11` config allows four two-core jobs or eight one-core jobs, with disjoint
+sibling CPU sets and a combined memory cap of 24 GiB. The historical slice
+peaks above do not establish concurrent full-suite throughput.
 
 The [toolchain and store measurements](development.md#toolchain-and-store-measurements) compare cold installs, warm installs, lockfile changes and complete runs on both backends. The IPv4 fix and its fresh-shell checks are recorded there too.
 
@@ -285,8 +387,9 @@ printf '8\n' > ~/.config/juno-runner/cores
 ```
 
 Replace `<MAC_PUBLIC_KEY>` with the Mac's public key, never its private key.
-Choose a capacity no greater than `getconf _NPROCESSORS_ONLN`, with RAM for that
-many cores. Log out and back in to apply Docker group membership.
+For quota mode, choose a capacity no greater than `getconf _NPROCESSORS_ONLN`.
+For physical mode, choose representative CPUs from the host topology and allow
+3 GiB of job memory per lent physical core. Log out and back in to apply Docker group membership.
 
 Configure SSH on port 2222:
 

@@ -15,6 +15,9 @@ script_started=$SECONDS
 # Samples how busy the machine is every 2 s, to size the workers above.
 ( prev=($(head -1 /proc/stat)); previous_usage=$(awk '$1 == "usage_usec" { print $2 }' /sys/fs/cgroup/cpu.stat 2>/dev/null)
   while sleep 2; do
+    if [ "${JUNO_RUNNER_PINNED:-0}" = 1 ]; then
+      df -B1 --output=target,used /tmp /work | tail -n +2 >> /out/tmpfs.txt
+    fi
     awk '/^MemTotal:/ { total = $2 } /^MemAvailable:/ { available = $2 } END { print total - available, available }' /proc/meminfo >> /out/memory.txt
     if [ -n "${JUNO_RUNNER_JOB_CORES:-}" ]; then
       usage=$(awk '$1 == "usage_usec" { print $2 }' /sys/fs/cgroup/cpu.stat)
@@ -37,6 +40,9 @@ echo "remote: script time $(( SECONDS - script_started )) s" >&2
 kill $sampler 2>/dev/null
 if [ -n "${JUNO_RUNNER_JOB_CORES:-}" ] && [ -r /sys/fs/cgroup/memory.peak ]; then
   awk '{ printf "remote: peak container memory %.2f GB (includes file cache)\n", $1 / 1073741824 }' /sys/fs/cgroup/memory.peak >&2
+fi
+if [ -s /out/tmpfs.txt ]; then
+  awk '{ if ($2 > peak[$1]) peak[$1] = $2 } END { for (path in peak) printf "remote: sampled peak tmpfs %s %.1f MiB\n", path, peak[path] / 1048576 }' /out/tmpfs.txt >&2
 fi
 if [ -s /out/memory.txt ]; then
   sort -nr -k1,1 /out/memory.txt | head -1 | awk '{ printf "remote: peak memory used %.1f GB, available %.1f GB\n", $1 / 1048576, $2 / 1048576 }' >&2
