@@ -3,7 +3,7 @@
  *
  * The engine owns the call: Slack's requests, the leave that must be sent,
  * who is in each running huddle. The renderer owns the media session and
- * reports what it does with `huddle.media`. There is one call at a time.
+ * reports its state with `huddle.report`. There is one call at a time.
  *
  * - `huddle.call` is the current call, or how the last one ended.
  * - `huddle.running` is every running huddle Juno knows of, by channel id,
@@ -13,8 +13,7 @@
  *   for the new attendee is stored: the answer carries the Chime meeting
  *   and attendee, once. They are secrets; never log or store them.
  * - `huddle.leave` leaves. It never waits for Slack.
- * - `huddle.media` is the renderer's report, tagged with its page
- *   generation and the attendee id.
+ * - `huddle.report` is a renderer page's whole media state.
  *
  * A page generation names one load of a renderer page. The page's media
  * service makes one when it starts and registers it with main
@@ -61,7 +60,9 @@ export const HuddleCall = Schema.Struct({
   participants: Schema.Array(Schema.String),
   /** When the huddle started (not when the user joined), in epoch milliseconds. */
   startedAt: Schema.NullOr(Schema.Number),
-  /** The last mute state the media session reported for this attendee. */
+  /** The media session's connection while the page holds this attendee's session, else null. */
+  connection: Schema.NullOr(Schema.Literals(['connecting', 'connected', 'reconnecting'])),
+  /** The mute state the page reports for this attendee's session. */
   muted: Schema.Boolean,
   /** How the last call ended. Cleared by the next Start or Join. */
   ended: Schema.NullOr(HuddleEnd),
@@ -97,8 +98,9 @@ export type HuddleCredentials = typeof HuddleCredentials.Type
 
 /**
  * `joined`: start the media session with `credentials`, unless
- * `huddle.call` names another attendee by then. `cancelled`: a later
- * Start, Join or Leave replaced this one before Slack answered.
+ * `huddle.call` names another attendee by then; the page reports that it
+ * `received` them either way. `cancelled`: a later Start, Join or Leave
+ * replaced this one before Slack answered, or the page is gone.
  */
 export const HuddleStartResult = Schema.Union([
   Schema.TaggedStruct('joined', { channelId: Schema.String, callId: Schema.String, attendeeId: Schema.String, credentials: HuddleCredentials }),
@@ -112,7 +114,8 @@ export type HuddleError = typeof HuddleError.Type
 /**
  * `region` is Chime's nearest media region, which only the renderer may
  * look up; null when the lookup failed. `generation` is the asking page's:
- * the credentials go to it, and only its reports count for them.
+ * the credentials go to it once main has reported it live, and only its
+ * reports count for them. A generation main has not listed yet waits.
  */
 export const huddleStart = Rpc.make('huddle.start', {
   payload: { channelId: Schema.String, region: Schema.NullOr(Schema.String), generation: Schema.String },
@@ -123,17 +126,24 @@ export const huddleStart = Rpc.make('huddle.start', {
 export const huddleLeave = Rpc.make('huddle.leave', { success: Schema.Void })
 
 /**
- * What the media session of page `generation` did, for the attendee it ran
- * as. A report from a page other than the one holding the attendee's
- * credentials is ignored.
+ * A page's whole media state, not a change. The page sends it on every
+ * change and every time its connection to the engine opens (after an
+ * engine restart too); the latest per generation wins, so a report may be
+ * sent twice or arrive late.
  */
-export const HuddleMediaEvent = Schema.Union([
-  Schema.TaggedStruct('started', { generation: Schema.String, attendeeId: Schema.String }),
-  Schema.TaggedStruct('ended', { generation: Schema.String, attendeeId: Schema.String, reason: HuddleMediaEnd }),
-  Schema.TaggedStruct('muted', { generation: Schema.String, attendeeId: Schema.String, muted: Schema.Boolean }),
-])
-export type HuddleMediaEvent = typeof HuddleMediaEvent.Type
+export const HuddlePageReport = Schema.Struct({
+  generation: Schema.String,
+  /** The attendee whose media session the page has (connecting, connected or reconnecting), or null for none. */
+  holds: Schema.NullOr(Schema.String),
+  /** The attendee of the last credentials the page received, or null for none: places the report after that hand-off. */
+  received: Schema.NullOr(Schema.String),
+  connection: Schema.Literals(['connecting', 'connected', 'reconnecting']),
+  muted: Schema.Boolean,
+  /** The last session the page ended, and why. `left`: the engine's call no longer named it. */
+  ended: Schema.NullOr(Schema.Struct({ attendeeId: Schema.String, reason: HuddleMediaEnd })),
+})
+export type HuddlePageReport = typeof HuddlePageReport.Type
 
-export const huddleMedia = Rpc.make('huddle.media', { payload: { event: HuddleMediaEvent }, success: Schema.Void })
+export const huddleReport = Rpc.make('huddle.report', { payload: { report: HuddlePageReport }, success: Schema.Void })
 
-export const HuddleRoutes = RpcGroup.make(huddleCall, huddleRunning, huddleStart, huddleLeave, huddleMedia)
+export const HuddleRoutes = RpcGroup.make(huddleCall, huddleRunning, huddleStart, huddleLeave, huddleReport)
