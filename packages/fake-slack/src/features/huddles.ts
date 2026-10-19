@@ -19,6 +19,16 @@ interface Huddles {
   /** Counters, so a call id or an attendee id is never given twice. */
   calls: number
   attendees: number
+  /**
+   * `v2` (`huddles_arch_v2`, the owner's workspace): `rooms.leave` answers
+   * `feature_not_enabled` and changes nothing; an attendee leaves when its
+   * Chime session stops (`stopMedia`). `v1`: `rooms.leave` removes it.
+   */
+  arch: 'v1' | 'v2'
+  /** On v2, from the media stop to Slack's leave frame (the spike saw about a second). */
+  leaveDelayMs: number
+  /** On v2, how long a huddle with nobody left stays listed in `huddles/info`. */
+  emptyDelayMs: number
 }
 
 /** Keyed by workspace so two fakes never share huddles. */
@@ -27,7 +37,7 @@ const state = new WeakMap<Workspace, Huddles>()
 function huddlesOf(ws: Workspace): Huddles {
   const existing = state.get(ws)
   if (existing !== undefined) return existing
-  const created: Huddles = { byChannel: new Map(), calls: 0, attendees: 0 }
+  const created: Huddles = { byChannel: new Map(), calls: 0, attendees: 0, arch: 'v2', leaveDelayMs: 1_000, emptyDelayMs: 3_000 }
   state.set(ws, created)
   return created
 }
@@ -68,8 +78,22 @@ function leave(ws: Workspace, huddle: FakeHuddle, user: string): void {
   if (at < 0) return
   huddle.participants.splice(at, 1)
   const ended = huddle.participants.length === 0
-  if (ended) huddlesOf(ws).byChannel.delete(huddle.channel)
   emitRoom(ws, 'sh_room_leave', huddle, user, ended)
+  if (!ended) return
+  const huddles = huddlesOf(ws)
+  // As the spike saw on v2: listed with nobody in it for a few seconds, then gone.
+  const drop = () => {
+    if (huddles.byChannel.get(huddle.channel) === huddle && huddle.participants.length === 0) huddles.byChannel.delete(huddle.channel)
+  }
+  if (huddles.arch === 'v1') drop()
+  else setTimeout(drop, huddles.emptyDelayMs).unref()
+}
+
+/** Self's attendee leaves the meeting: self leaves the huddle once it holds no other attendee there. */
+function attendeeGone(ws: Workspace, huddle: FakeHuddle, attendeeId: string): boolean {
+  if (!huddle.attendees.delete(attendeeId)) return false
+  if (huddle.attendees.size === 0) leave(ws, huddle, ws.selfId)
+  return true
 }
 
 function running(fake: FakeSlack, channel: string): FakeHuddle {
@@ -129,10 +153,11 @@ export const huddlesFeature = {
       }
     },
     'rooms.leave': (ctx, args) => {
-      const huddle = huddlesOf(ctx.workspace).byChannel.get(args.channel_id)
+      const huddles = huddlesOf(ctx.workspace)
+      if (huddles.arch === 'v2') return new ApiError('feature_not_enabled')
+      const huddle = huddles.byChannel.get(args.channel_id)
       if (huddle === undefined || huddle.callId !== args.call_id) return new ApiError('room_not_found')
-      if (!huddle.attendees.delete(args.attendee_id)) return new ApiError('attendee_not_found')
-      if (huddle.attendees.size === 0) leave(ctx.workspace, huddle, ctx.workspace.selfId)
+      if (!attendeeGone(ctx.workspace, huddle, args.attendee_id)) return new ApiError('attendee_not_found')
       return {}
     },
   },
@@ -148,6 +173,26 @@ export const huddlesFeature = {
     },
   },
   controls: {
+    /** `arch`, and on v2 the two delays (see `Huddles`). */
+    setHuddleArch: (fake, input: { arch: 'v1' | 'v2'; leaveDelayMs?: number; emptyDelayMs?: number }) => {
+      const huddles = huddlesOf(fake.workspace)
+      huddles.arch = input.arch
+      if (input.leaveDelayMs !== undefined) huddles.leaveDelayMs = input.leaveDelayMs
+      if (input.emptyDelayMs !== undefined) huddles.emptyDelayMs = input.emptyDelayMs
+    },
+    /**
+     * Chime drops self's attendee: the media session stopped (a leave, a
+     * crash, another device). On v2 this is what removes it from the
+     * huddle, after `leaveDelayMs`; on v1 it does too, at once.
+     */
+    stopMedia: (fake, input: { attendeeId: string }) => {
+      const huddles = huddlesOf(fake.workspace)
+      const huddle = [...huddles.byChannel.values()].find((h) => h.attendees.has(input.attendeeId))
+      if (huddle === undefined) return false
+      if (huddles.arch === 'v1') return attendeeGone(fake.workspace, huddle, input.attendeeId)
+      setTimeout(() => attendeeGone(fake.workspace, huddle, input.attendeeId), huddles.leaveDelayMs).unref()
+      return true
+    },
     startHuddle: (fake, input: { channel: string; user?: string }) => join(fake.workspace, input.channel, input.user ?? 'U0MAYA').callId,
     joinHuddle: (fake, input: { channel: string; user?: string }) => {
       running(fake, input.channel)
