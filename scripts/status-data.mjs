@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { readRecords, statusFolder } from './release-gate.mjs'
 import { tag } from './status-areas.mjs'
 
 const read = (path) => {
@@ -84,18 +85,15 @@ export const readLanded = (root, limit = 30) => {
     })
 }
 
-// The CI keeper's log: the last cycle marked GREEN and the last DMG build.
-export const readKeeper = (root) => {
-  const text = read(join(root, '.juno-status/ci-keeper.md'))
-  let green
-  for (const section of text.split('\n### ').slice(1)) {
-    const heading = section.split('\n')[0]
-    if (/\bGREEN\b/.test(section)) {
-      green = { date: heading.split(',')[0], hash: /\b[0-9a-f]{8,40}\b/.exec(heading)?.[0] ?? '' }
-    }
+// The newest full run (pnpm verify:main) that passed, from the records the
+// release gate reads.
+export const readLastGreen = (root) => {
+  try {
+    const record = readRecords(statusFolder(root)).find((run) => run.passed === true)
+    return record ? { hash: record.commit, at: new Date(record.finishedAt) } : undefined
+  } catch {
+    return undefined
   }
-  const dmgHash = [...text.matchAll(/DMG built from ([0-9a-f]{7,40})/g)].at(-1)?.[1]
-  return { green, dmgHash }
 }
 
 // Changes on main's first-parent line after a commit, or -1 if unknown.

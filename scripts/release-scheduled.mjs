@@ -1,4 +1,5 @@
-// Run every six hours on the release Mac. --dry-run reads GitHub and local
+// Picks and publishes a release on the release Mac, at most one every six
+// hours. Nothing runs it on a schedule. --dry-run reads GitHub and local
 // verification records without fetching, building, committing or publishing.
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -27,7 +28,7 @@ try {
   }
   await scheduled()
 } catch (error) {
-  console.error(`release:scheduled: ${error.message}; keeper action needed`)
+  console.error(`release:scheduled: ${error.message}`)
   process.exitCode = 1
 } finally {
   if (locked) rmSync(lock, { recursive: true, force: true })
@@ -80,7 +81,7 @@ function publish(candidate, version, notes) {
   const checkout = join(worktreeFolder(main), name)
   const notesFile = join(status, `${name}-notes.md`)
   writeFileSync(notesFile, notes)
-  // Keep a failed checkout for the keeper. Never silently resume a partial publish.
+  // Keep a failed checkout for inspection. Never silently resume a partial publish.
   run('node', ['scripts/worktree.mjs', 'add', name, '--base', candidate])
   run('pnpm', ['release:version', version], checkout)
   run('git', ['add', 'apps/desktop/package.json'], checkout)

@@ -158,7 +158,7 @@ const named = values('--spec').map((spec) => {
   return found
 })
 
-// Heavy tests (@heavy) run only for an area a changed file (or a named spec) is in; the wide plan and the scheduled full run keep them all.
+// Heavy tests (@heavy) run only for an area a changed file (or a named spec) is in; the wide plan and a full run keep them all.
 const heavyActive = new Set(wide ? HEAVY_AREAS.map((area) => area.area) : heavyAreasChanged([...changed, ...named]))
 /** Playwright skips these tags (JUNO_SKIP_TAGS, read by each suite's config): the heavy areas this change does not reach. */
 const skipTags = HEAVY_AREAS.filter((area) => area.suite === 'desktop' && !heavyActive.has(area.area)).map((area) => area.tag)
@@ -381,9 +381,9 @@ for (const step of plan) {
   for (const [id, why] of step.reasons ?? []) console.log(`      ${id}: ${why[0]}${why.length > 1 ? ` (and ${why.length - 1} more)` : ''}`)
 }
 if (skipped > 0) console.log(`  (${skipped} item(s) skipped: they passed before with the same inputs; --no-cache runs them)`)
-if (desktopDropped.length > 0) console.log(`  (${desktopDropped.length} more desktop spec(s) ran a changed file less directly; the scheduled full run covers them, --wide or --max-specs runs them)`)
+if (desktopDropped.length > 0) console.log(`  (${desktopDropped.length} more desktop spec(s) ran a changed file less directly; a full run (pnpm verify:main) covers them, --wide or --max-specs runs them)`)
 for (const note of desktopNotes) console.log(`  (${note})`)
-if (!batch && skipTags.length > 0 && plan.some((step) => step.script === 'test:desktop')) console.log(`  (@heavy tests skipped: ${HEAVY_AREAS.filter((area) => area.suite === 'desktop' && !heavyActive.has(area.area)).map((area) => area.area).join(', ')}; no changed file is in their area. The scheduled full run and --wide run them)`)
+if (!batch && skipTags.length > 0 && plan.some((step) => step.script === 'test:desktop')) console.log(`  (@heavy tests skipped: ${HEAVY_AREAS.filter((area) => area.suite === 'desktop' && !heavyActive.has(area.area)).map((area) => area.area).join(', ')}; no changed file is in their area. A full run (pnpm verify:main) and --wide run them)`)
 if (plan.length === 0) console.log('  nothing to run')
 for (const entry of interactions)
   console.log(`  (${entry.interaction} has a perf budget and ${entry.files.length === 1 ? entry.files[0] : `${entry.files.length} of its files`} changed: on the Mac, pnpm perf -g "${entry.perf}"${entry.feel ? ` and pnpm test:feel ${entry.feel}` : ''})`)

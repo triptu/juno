@@ -23,8 +23,9 @@
 //   dmg        { commit, builtAt }  The commit the owner's DMG on ~/Desktop came from.
 //   updated    ISO time of the last write.
 //
-// Also read: docs/decision-log.md, main's git history, .juno-status/ci-keeper.md
-// (last green commit, DMG), .juno-status/health.json and the DMG on ~/Desktop.
+// Also read: docs/decision-log.md, main's git history, the full-run records under
+// .juno-status/verify-main (last green commit), .juno-status/health.json and the
+// DMG on ~/Desktop.
 // Areas of work are tagged by the keyword table in status-areas.mjs.
 
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -32,7 +33,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { areas } from './status-areas.mjs'
 import { clientScript } from './status-client.mjs'
-import { changesSince, readDecisions, readDmg, readJson, readKeeper, readLanded } from './status-data.mjs'
+import { changesSince, readDecisions, readDmg, readJson, readLanded, readLastGreen } from './status-data.mjs'
 
 const rootArg = process.argv.indexOf('--root')
 const root = rootArg > 0 ? resolve(process.argv[rootArg + 1]) : join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -42,7 +43,7 @@ const now = readJson(join(outDir, 'now.json')) ?? {}
 const health = readJson(join(outDir, 'health.json'))
 const decisions = readDecisions(root)
 const landed = readLanded(root)
-const keeper = readKeeper(root)
+const green = readLastGreen(root)
 const dmg = readDmg()
 const list = (value) => (Array.isArray(value) ? value : [])
 
@@ -91,16 +92,16 @@ const nextBody = nextItems.length
 
 // Build: last green commit, DMG, health.
 function dmgLine() {
-  const commit = now.dmg?.commit ?? keeper.dmgHash
+  const commit = now.dmg?.commit
   const builtAt = new Date(now.dmg?.builtAt ?? dmg?.at ?? Number.NaN)
   const when = Number.isNaN(builtAt.getTime()) ? '' : ist(builtAt, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
   const file = dmg ? `~/Desktop/${esc(dmg.name)}` : 'not on the Desktop'
   return `<div class="stat"><span class="label">DMG</span>${commit ? `from <code>${esc(String(commit).slice(0, 8))}</code> ` : ''}<span class="meta">${file}${when ? ` · built ${esc(when)}` : ''}</span></div>`
 }
-const greenAt = changesSince(root, keeper.green?.hash)
+const greenAt = changesSince(root, green?.hash)
 const buildParts = [
-  keeper.green
-    ? `<div class="stat"><span class="label">Last green</span><code>${esc(keeper.green.hash.slice(0, 8))}</code> <span class="meta">${esc(keeper.green.date)}${greenAt > 0 ? ` · main has ${greenAt} change${greenAt === 1 ? '' : 's'} since` : greenAt === 0 ? ' · main is at it' : ''}</span></div>`
+  green
+    ? `<div class="stat"><span class="label">Last green</span><code>${esc(green.hash.slice(0, 8))}</code> <span class="meta">${esc(ist(green.at, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))}${greenAt > 0 ? ` · main has ${greenAt} change${greenAt === 1 ? '' : 's'} since` : greenAt === 0 ? ' · main is at it' : ''}</span></div>`
     : '<div class="stat"><span class="label">Last green</span><span class="meta">none recorded</span></div>',
   dmgLine(),
 ]

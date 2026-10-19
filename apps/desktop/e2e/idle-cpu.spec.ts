@@ -12,7 +12,7 @@
 //
 // The portable heavy journey checks CPU and memory on a small seed in under
 // two minutes. App diagnostics are the primary way to catch idle spins in
-// the field. The Mac nightly keeps minute windows and fine process budgets.
+// the field. The @mac run keeps minute windows and fine process budgets.
 import { rm } from 'node:fs/promises'
 import type { Page } from '@playwright/test'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
