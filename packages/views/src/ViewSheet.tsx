@@ -1,5 +1,4 @@
 import * as stylex from '@stylexjs/stylex'
-import { Check } from '@phosphor-icons/react/dist/icons/Check'
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
 import { Prohibit } from '@phosphor-icons/react/dist/icons/Prohibit'
 import { useState, type FormEvent } from 'react'
@@ -218,7 +217,6 @@ export function ViewSheet({
                   leading={<Icon icon={kindIcon(row.kind)} size={13} />}
                   label={row.name}
                   {...(on && row.addedByJuno === true ? { sub: 'Added by Juno', subPlacement: 'end' as const } : {})}
-                  trailing={on ? <Icon icon={Check} size={13} /> : undefined}
                   onActivate={() => setActive(rowId(row.id))}
                   onSelect={() => onToggle(row)}
                 />
