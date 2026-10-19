@@ -200,7 +200,7 @@ test.describe('with a model slower than the typing pause', () => {
   })
 })
 
-test('with AI assist off, local checks still work and models stay off', async ({ juno, fake, slackApp, userData, running }) => {
+test('with AI assist off, local checks still work and models stay off', async ({ fake, slackApp, userData, running }) => {
   await running.close()
   const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
   db.prepare(`INSERT INTO prefs (key, value_json) VALUES ('aiAssist', 'false') ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json`).run()

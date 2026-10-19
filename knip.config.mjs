@@ -6,6 +6,8 @@ export default {
   ignoreIssues: {
     // Knip loads this configuration's default export itself.
     'knip.config.mjs': ['exports'],
+    // Playwright loads this opt-in reporter by its file name.
+    'apps/desktop/e2e/timings.ts': ['exports'],
     // This module asserts wire compatibility at compile time.
     'packages/engine/src/messages/body.ts': ['exports', 'types'],
     // createRequire is rooted at apps/desktop/package.json, which declares Playwright.
@@ -34,6 +36,7 @@ export default {
     'apps/desktop': {
       entry: [
         'build/*.cjs',
+        'e2e/timings.ts', // Loaded only when JUNO_E2E_TIMINGS enables the reporter.
         'src/main/index.ts',
         'src/engine/index.ts',
         'src/preload/index.ts',

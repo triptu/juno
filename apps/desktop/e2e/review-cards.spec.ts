@@ -88,7 +88,7 @@ test.describe('follow-ups that look done', () => {
 })
 
 test.describe('old drafts', () => {
-  syncedTest('a draft untouched for two weeks is proposed with its age and first line; Delete, Undo and Keep work per row', async ({ juno, fake, slackApp, userData, running }) => {
+  syncedTest('a draft untouched for two weeks is proposed with its age and first line; Delete, Undo and Keep work per row', async ({ fake, slackApp, userData, running }) => {
     await running.close()
 
     // Two drafts written 15 days ago, in topics that moved on since.

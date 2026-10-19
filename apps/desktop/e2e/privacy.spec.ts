@@ -106,7 +106,7 @@ test('View › Reload keeps privacy mode on', async ({ juno, app }) => {
   expect(await juno.privacy.menuLabel()).toBe('Show Message Text')
 })
 
-test('a launch.json field the app cannot read does not turn privacy mode off', async ({ juno, running, userData, fake, slackApp }) => {
+test('a launch.json field the app cannot read does not turn privacy mode off', async ({ running, userData, fake, slackApp }) => {
   await running.close()
   // An accent this version does not know, as after going back to an older version.
   await writeFile(join(userData, 'launch.json'), JSON.stringify({ theme: 'dark', privacy: true, accent: 'ultraviolet' }))
