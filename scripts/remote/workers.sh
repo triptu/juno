@@ -1,6 +1,5 @@
 # Sourced by run.sh. Explicit worker settings take precedence.
 # SSH workers scale with the CPU limit, since nproc can see the whole host.
-# Namespace containers have a machine to themselves.
 cores=${JUNO_RUNNER_JOB_CORES:-$(nproc)}
 at_least() { echo $(( $1 > $2 ? $1 : $2 )); }
 export GALLERY_BROWSER=chromium JUNO_HEAVY_SLOTS=1 JUNO_TEST_FILE_PARALLEL=1
@@ -34,7 +33,7 @@ export JUNO_VITEST_WORKERS=${JUNO_VITEST_WORKERS:-$vitest_workers}
 # one per core, below).
 desktop_workers=$(at_least $(( cores / 2 )) 2)
 if [ -n "${JUNO_RUNNER_JOB_CORES:-}" ]; then desktop_workers=$(at_least $(( cores / 2 )) 1); fi
-# On the standard 8x16 shape, eight workers ran all 380 tests in 266 s without a failure (10-17).
+# Larger allocations can run one desktop worker per thread.
 if [ "$cores" -ge 8 ]; then desktop_workers=$cores; fi
 # Standalone desktop runs can overlap one more app while another waits for I/O.
 # Plans retain their own lane budgets.

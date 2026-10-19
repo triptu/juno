@@ -1,4 +1,4 @@
-// Repeats test specs many times on remote machines to measure how
+// Repeats test specs many times in shared runner jobs to measure how
 // often it fails, and keeps the traces of the failures.
 //
 //   pnpm flake <spec...> [-g <title>] [--repeat 40] [--machines 2] [--workers n]
@@ -6,7 +6,7 @@
 //   pnpm flake apps/gallery/behaviour.spec.ts -g "rewritten Home" --repeat 50
 //   pnpm flake packages/engine/test/sidebar-state.test.ts -g "four people" --repeat 200
 //
-// The repeats are split across the machines (`pnpm remote --shards`), each
+// The repeats are split across runner jobs (`pnpm remote --shards`), each
 // running `--repeat-each` with no retries and its usual workers, so the tests
 // run under the same load as a normal remote run. Traces of failures land in
 // .remote/<run>/. Exits 1 if any repetition failed.
@@ -58,7 +58,7 @@ const env = options.workers ? ['--env', `JUNO_E2E_WORKERS=${options.workers}`, '
 // GALLERY_SHIFT_ONLY=MediaViewer pnpm flake apps/gallery/shift.spec.ts: the walk covers only those components.
 if (process.env.GALLERY_SHIFT_ONLY) env.push('--env', `GALLERY_SHIFT_ONLY=${process.env.GALLERY_SHIFT_ONLY}`)
 const args = [join(root, 'scripts/remote.mjs'), ...(options.machines > 1 ? ['--shards', String(options.machines)] : []), ...env, suite.script, ...runner]
-console.error(`flake: ${options.specs.join(' ')}${options.grep ? ` -g "${options.grep}"` : ''}, ${each} times on each of ${options.machines} machine(s)`)
+console.error(`flake: ${options.specs.join(' ')}${options.grep ? ` -g "${options.grep}"` : ''}, ${each} times on each of ${options.machines} job(s)`)
 
 const counts = { passed: 0, failed: 0, flaky: 0, skipped: 0 }
 const failures = []

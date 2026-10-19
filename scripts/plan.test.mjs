@@ -52,7 +52,7 @@ test('SSH jobs group app builds, isolate conformance from units, and retain step
   assert.deepEqual(runnerPlanJobs({ ...options, args: ['test:gallery', '+', 'test:desktop'] }, {}), [])
 })
 
-test('SSH job execution overlaps jobs, reports original indices, and fails missing steps without Namespace fallback', async () => {
+test('SSH job execution overlaps jobs, reports original indices, and fails missing steps when a job omits a result', async () => {
   const { existsSync, mkdtempSync, writeFileSync, readFileSync, rmSync } = await import('node:fs')
   const { join } = await import('node:path')
   const { runnerPlanJobs, runRunnerPlan } = await import('./remote/plan.mjs')
@@ -62,19 +62,20 @@ test('SSH job execution overlaps jobs, reports original indices, and fails missi
     const self = join(dir, 'remote.mjs')
     writeFileSync(self, `import {appendFileSync} from 'node:fs';
 const args=process.argv.slice(2); const kind=args.includes('test:gallery')?'app':'unit';
-appendFileSync(${JSON.stringify(join(dir, 'calls'))},JSON.stringify({kind,args,cap:process.env.JUNO_REMOTE_MAX_VCPU,time:Date.now(),event:'start'})+'\\n');
+appendFileSync(${JSON.stringify(join(dir, 'calls'))},JSON.stringify({kind,args,parent:process.env.JUNO_RUNNER_PARENT,time:Date.now(),event:'start'})+'\\n');
 setTimeout(()=>{console.log('plan: step 0 '+(kind==='app'?'test:gallery':'test')+' exited with 0 after 1 s'); appendFileSync(${JSON.stringify(join(dir, 'calls'))},JSON.stringify({kind,event:'end',time:Date.now()})+'\\n');process.exitCode=0},200);
 `)
-    const options = { script: 'test:plan', args: ['test', '+', 'test:gallery', '+', 'test:desktop'], env: ['CUSTOM=space value'], machine: 'linux/amd64:4x8', explicitMachine: true }
+    const options = { script: 'test:plan', args: ['test', '+', 'test:gallery', '+', 'test:desktop'], env: ['CUSTOM=space value'], cores: 2, wait: 60 }
     const logs = []
     assert.equal(await runRunnerPlan(runnerPlanJobs(options, {}), { self, root: dir, options, log: (line) => logs.push(line) }), 255)
     const calls = readFileSync(join(dir, 'calls'), 'utf8').trim().split('\n').map(JSON.parse)
     assert.deepEqual(calls.slice(0, 2).map((c) => c.event), ['start', 'start'])
     for (const call of calls.filter((c) => c.event === 'start')) {
-      assert.equal(call.cap, '0')
+      assert.equal(call.parent, '1')
       assert.ok(call.args.includes('CUSTOM=space value'))
       assert.ok(call.args.includes('JUNO_PLAN_SERIAL=1'))
-      assert.ok(call.args.includes('linux/amd64:4x8'))
+      assert.ok(call.args.includes('--cores'))
+      assert.ok(call.args.includes('2'))
     }
     assert.ok(logs.includes('plan: step 0 test exited with 0 after 1 s'))
     assert.ok(logs.includes('plan: step 1 test:gallery exited with 0 after 1 s'))

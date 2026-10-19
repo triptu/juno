@@ -15,7 +15,7 @@ export const areas = [
   ['Settings/privacy', /settings|privacy|keychain|notifications?|\bdnd\b|presence|onboarding|slack import|screen-share/gi],
   ['Perf', /\bperf|budget|p95|\d ?ms\b|frames?\b|bundle|lazy|startup|idle|scroll|\bKB\b|bun check/gi],
   ['Tests/CI', /\btests?\b|spec\.ts|\be2e\b|gallery|flak|ci-fix|ci keeper|ci-keeper|verify:main|\blint\b|typecheck|vitest|playwright|shift guard|affected|test-/gi],
-  ['Remote pool', /remote|\bpool\b|namespace|\bnsc\b|machines?\b|8x16|runner/gi],
+  ['Remote runner', /remote|machines?\b|runner/gi],
   ['Design system', /design tokens?|@juno\/tokens|primitive|stylex|\bicons?\b|duotone|\bfonts?\b|colou?rs?\b|dark mode|focus rings?|tooltip|popover|motion|animation|design review/gi],
   ['Docs', /\bdocs?\/|readme|decision log|SPEC\.md|\bADR\b|\.md\b/gi],
 ]

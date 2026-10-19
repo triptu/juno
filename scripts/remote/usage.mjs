@@ -1,4 +1,4 @@
-// Read-only cost summary of retained run logs in every registered worktree.
+// Read-only resource summary of retained run logs in every registered worktree.
 import { spawnSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
@@ -12,7 +12,7 @@ export function parseRun(text) {
   const summary = json('summary')
   const cpu = /CPU busy (\d+)% on average, \d+% at the median, over (\d+) s on (\d+) cores/.exec(text)
   return {
-    backend: summary?.backend ?? (/^remote: backend (.+)$/m.exec(text)?.[1] ?? 'namespace'),
+    backend: summary?.backend ?? (/^remote: backend (.+)$/m.exec(text)?.[1] ?? 'unknown'),
     script: run?.script ?? /^pnpm (\S+)/m.exec(text)?.[1] ?? 'unknown',
     code: summary?.code ?? Number(/remote: exited with (\d+)/.exec(text)?.[1] ?? NaN),
     cores: Number(/:(\d+)x/.exec(run?.machine ?? '')?.[1] ?? cpu?.[3] ?? NaN),
@@ -43,7 +43,7 @@ export function report(runs) {
     const known = group.filter((run) => typeof run.warm === 'boolean')
     lines.push(`${group[0].script} / ${group[0].backend} | ${group.length} (${group.filter((run) => run.code !== 0).length}) | ${[...new Set(group.map((run) => Number.isFinite(run.cores) ? run.cores : '?'))].toSorted().join(',')} | ${fmt(cpu.reduce((sum, run) => sum + run.busy * run.sampledSeconds, 0) / samples)} | ${fmt(median(group.map((run) => run.scriptSeconds)))} | ${fmt(median(group.map((run) => run.startupSeconds)))} | ${fmt(median(group.map((run) => run.wallSeconds)))} | ${scripted.length ? fmt(scripted.reduce((sum, run) => sum + run.scriptSeconds * run.cores / 60, 0)) : '?'} | ${measured.length ? fmt(measured.reduce((sum, run) => sum + run.cores * run.machineSeconds / 60, 0)) : '?'} (${measured.length}/${group.length}) | ${known.length ? fmt(100 * known.filter((run) => !run.warm).length / known.length) + '%' : '?'} (${known.length}/${group.length})`)
   }
-  lines.push('Script core-min uses explicit script time or the sampled duration as a lower bound for legacy logs. Held core-min counts measured machine-held time, including creation, reports and cleanup; excludes pool idle time and local queue/build time. SSH runs count host reservation time. Busy % is weighted by sampled seconds. Unknown legacy fields are ?, never zero. Failed and incomplete runs remain in totals.')
+  lines.push('Script core-min uses explicit script time or the sampled duration as a lower bound for legacy logs. Held core-min counts measured machine-held time, including creation, reports and cleanup; excludes local queue/build time. SSH runs count host reservation time. Busy % is weighted by sampled seconds. Unknown legacy fields are ?, never zero. Failed and incomplete runs remain in totals.')
   return lines.join('\n')
 }
 

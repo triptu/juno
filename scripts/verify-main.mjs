@@ -1,4 +1,4 @@
-// The scheduled full run: every suite against main, on one remote machine,
+// The scheduled full run: every suite against main, in separate SSH jobs,
 // then a short summary.
 //
 //   pnpm verify:main                 local main
@@ -10,7 +10,7 @@
 //
 // It checks main out into a temporary detached worktree, so nothing local is
 // sent, and runs `test`, `specs:check` (Apalache cached; --no-cache or --nightly bypasses it),
-// `specs:conformance`, `test:gallery` and `test:desktop` as one plan on one machine
+// `specs:conformance`, `test:gallery` and `test:desktop` as one plan with independent SSH jobs
 // (scripts/plan.mjs, through scripts/remote.mjs). The summary goes to
 // shared .juno-status/verify-main.md and .json, each suite's lines
 // to .juno-status/verify-main/<run>/<suite>.log. The exit code is 1 if any
@@ -85,7 +85,7 @@ function run(suite, command, args, cwd, env = {}) {
 function splitPlan(planned) {
   let text = ''
   try { text = readFileSync(planned.log, 'utf8') } catch { /* The run left no log. */ }
-  const lines = text.split('\n')
+  const lines = text.split('\n').map((line) => line.replace(/^\[runner:[^\]]+\] /, ''))
   return suites.map((suite, index) => {
     const prefix = `[${suite.name}] `
     const log = join(logDir, `${suite.name.replace(/[^\w-]/g, '_')}.log`)
@@ -142,7 +142,7 @@ function failures(log) {
   } catch {
     return []
   }
-  const lines = text.split('\n')
+  const lines = text.split('\n').map((line) => line.replace(/^\[runner:[^\]]+\] /, ''))
   const found = [
     ...lines.filter((line) => /^\s+\d+\) /.test(line)).map((line) => line.trim().replace(/\s*─+$/, '')),
     ...lines.filter((line) => /^did not run: |against a budget of/.test(line)).map((line) => line.trim()),

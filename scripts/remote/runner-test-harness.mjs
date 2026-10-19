@@ -1,51 +1,49 @@
-import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-// Exercise the public CLI through fake transports, including workspace streaming.
+// A protocol peer, not an allocator: real core and lease proofs run on the laptop.
 export function runnerHarness() {
-  const dir = mkdtempSync(join(tmpdir(), 'juno-runner-cli-'))
+  const dir = mkdtempSync(join(existsSync('/Volumes/AgentWork') ? '/Volumes/AgentWork' : tmpdir(), 'juno-runner-cli-'))
   const calls = join(dir, 'calls')
-  writeFileSync(join(dir, 'ssh'), `#!/usr/bin/env node
-const fs = require('node:fs');
-const command = process.argv.at(-1);
-fs.appendFileSync(process.env.TEST_CALLS, 'ssh\\n');
-if (process.env.TEST_MODE === 'unreachable') process.exit(255);
-if (process.env.TEST_MODE === 'auth') { console.error('Permission denied (publickey)'); process.exit(255); }
-if (command.includes('docker build')) {
- if (process.env.TEST_MODE === 'build-failed') { console.error('Docker build failed'); process.exit(1); }
- let bytes = 0; process.stdin.on('data', chunk => bytes += chunk.length);
- process.stdin.on('end', () => { fs.appendFileSync(process.env.TEST_CALLS, 'build ' + bytes + '\\n'); console.error('#1 DONE 0.1s'); });
-} else if (command.includes('__juno_runner_connected')) {
- if (process.env.TEST_MODE === 'broken') { console.error('Docker unavailable'); process.exit(1); }
- console.log('__juno_runner_connected\\njuno-runner-ready ' + (process.env.TEST_CAPACITY || '4') + (process.env.TEST_PINNED ? ' 1' : ''));
-} else if (command.includes('__juno_remote_exit_')) {
- const threads = process.env.TEST_PINNED ? Number(command.match(/ -- (\\d+) '/)[1]) * 2 : undefined;
- fs.appendFileSync(process.env.TEST_CALLS, 'reservation ' + command.match(/ -- (\\d+) '/)[1] + ' cpus ' + (threads ?? command.match(/--cpus (\\d+)/)[1]) + ' job-cores ' + (threads ?? command.match(/JUNO_RUNNER_JOB_CORES=(\\d+)/)[1]) + '\\n');
- fs.appendFileSync(process.env.TEST_CALLS, 'wide-unit ' + command.match(/JUNO_RUNNER_WIDE_UNIT=(\\d+)/)[1] + '\\n');
- if (process.env.TEST_MODE === 'busy') { console.log('__juno_remote_started\\n__juno_remote_busy\\n__juno_remote_released'); process.exit(75); }
- fs.appendFileSync(process.env.TEST_CALLS, (command.includes('JUNO_REMOTE_INSTALL=1') && command.includes('PNPM_CONFIG_STORE_DIR=/cache/pnpm-store') && command.includes('--user') ? 'install with cache' : 'full image') + '\\n');
- const marker = command.match(/__juno_remote_exit_[\\w-]+=/)[0];
- let bytes = 0; process.stdin.on('data', chunk => { bytes += chunk.length });
- process.stdin.on('end', () => {
-   fs.appendFileSync(process.env.TEST_CALLS, 'workspace ' + bytes + '\\n');
-   if (process.env.TEST_MODE === 'plan') {
-     const scripts = command.includes('test:gallery') ? ['test:gallery', 'test:desktop'] : command.includes('specs:conformance') ? ['specs:conformance'] : ['test'];
-     for (const [index, script] of scripts.entries()) console.log('plan: step ' + index + ' ' + script + ' exited with 0 after 1 s');
-   }
-   console.log('__juno_remote_started\\n__juno_remote_ready\\nremote: script time 1 s\\n' + marker + (process.env.TEST_MODE === 'plan' ? '0' : '7'));
+  mkdirSync(join(dir, 'scripts/runner'), { recursive: true })
+  writeFileSync(join(dir, 'scripts/runner/host.sh'), 'exec node "$TEST_HOST_JS" "$@"\n')
+  writeFileSync(join(dir, 'host.cjs'), `const fs = require('node:fs');
+const [sub, ...args] = process.argv.slice(2);
+const record = value => fs.appendFileSync(process.env.TEST_CALLS, JSON.stringify(value)+'\\n');
+record({sub,args});
+if(sub==='check') { console.log('os=Linux test\\narch=x86_64\\ndocker=28\\ncapacity=8 pinned 4,5,6,7,8,9,10,11'); process.exit(0); }
+if(sub==='fetch') { if(process.env.TEST_MODE==='fetch-failed') process.exit(70); process.stdout.write(fs.readFileSync(process.env.TEST_ARTIFACTS)); }
+else if(sub==='build') {
+ process.stdin.resume(); process.stdin.on('end',()=>process.exit(process.env.TEST_MODE==='build-failed'?70:0));
+} else if(sub==='run') {
+ const command=args.find(a=>a.startsWith('command=')).slice(8);
+ if(process.env.TEST_MODE==='busy') { console.error('__runner_busy\\n__runner_exit 75'); process.exit(75); }
+ let data=Buffer.alloc(0), uploaded=false;
+ process.stdin.on('data',chunk=>{
+  data=Buffer.concat([data,chunk]); const end=data.indexOf(10);
+  if(end<0 || uploaded || data.length-end-1<Number(data.subarray(0,end).toString())) return;
+  uploaded=true; record({upload:data.length-end-1,expected:Number(data.subarray(0,end).toString())});
+  console.log('remote: allocated threads=6');
+  if(process.env.TEST_MODE==='hang') return;
+  if(process.env.TEST_MODE==='lost') process.exit(0);
+  if(command.includes('test:plan')) {
+   const scripts=command.includes('specs:conformance')?['specs:conformance']:command.includes('test:gallery')?['test:gallery','test:desktop']:command.includes('test:desktop')?['test:desktop']:['test'];
+   scripts.forEach((s,i)=>console.log('plan: step '+i+' '+s+' exited with 0 after 1 s'));
+  }
+  const code=Number(process.env.TEST_CODE||0);
+  if(process.env.TEST_ARTIFACTS) console.error('__runner_artifacts');
+  console.error('__runner_exit '+code); process.exit(code);
  });
-} else if (command.includes('docker image inspect')) {
- if (command.includes('__juno_image_present')) console.log('__juno_image_missing');
- else if (['build', 'build-failed'].includes(process.env.TEST_MODE)) process.exit(1);
-} else { process.stdin.resume(); }
+ process.stdin.on('end',()=>process.exit(130));
+ process.on('SIGTERM',()=>{console.error('__runner_exit 130');process.exit(130)});
+}
 `)
-  writeFileSync(join(dir, 'nsc'), '#!/bin/sh\necho nsc >> "$TEST_CALLS"\necho not-json\n')
+  // Forward only the remote command, preserving its shell quoting.
+  writeFileSync(join(dir, 'ssh'), '#!/usr/bin/env node\nconst {spawn}=require("node:child_process"); if(process.env.TEST_MODE==="unreachable") process.exit(255); const c=spawn("sh",["-c",process.argv.at(-1)],{stdio:"inherit"}); c.on("exit",code=>process.exit(code??255));\n')
   writeFileSync(join(dir, 'git'), "#!/bin/sh\nprintf 'package.json\\0scripts/remote.mjs\\0scripts/remote/run.sh\\0'\n")
-  chmodSync(join(dir, 'git'), 0o755)
-  chmodSync(join(dir, 'ssh'), 0o755)
-  chmodSync(join(dir, 'nsc'), 0o755)
-  const env = { ...process.env, HOME: dir, TMPDIR: dir, TMP: dir, TEMP: dir, PATH: `${dir}:${process.env.PATH}`, TEST_CALLS: calls, JUNO_RUNNER_HOST: 'runner-test', JUNO_RUNNER_IMAGE: 'test/image:tag', JUNO_REMOTE_MAX_VCPU: '0' }
+  writeFileSync(join(dir, 'pnpm'), '#!/bin/sh\nprintf "local: %s\\n" "$*"\n')
+  for (const name of ['ssh', 'git', 'pnpm']) chmodSync(join(dir, name), 0o755)
+  const env = { ...process.env, HOME: dir, TMPDIR: dir, TMP: dir, TEMP: dir, PATH: `${dir}:${process.env.PATH}`, TSTACK_HOME: dir, TEST_HOST_JS: join(dir, 'host.cjs'), TEST_CALLS: calls, JUNO_RUNNER_HOST: 'runner-test', JUNO_RUNNER_IMAGE: 'test/image:tag', JUNO_RUNNER_PARENT: undefined, JUNO_RUNNER_PLAN: undefined, JUNO_PLAN_SERIAL: undefined, JUNO_REMOTE_MACHINE: undefined }
   return { dir, calls, env }
 }
-
