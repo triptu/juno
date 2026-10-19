@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test'
@@ -91,16 +91,39 @@ export async function openState(page: Page, route: Route, theme: Theme = 'light'
  * Each repeat (`--repeat-each`, as `pnpm flake` runs) has its own queue, so
  * every repeat walks every state. A claim is a directory: mkdir succeeds for
  * one process only.
+ *
+ * A retry walks again the states its test took on the first attempt; the
+ * other parts passed theirs. Without that list a retry found every state
+ * taken, walked none and passed (10-20).
  */
 export function claimQueue(name: string) {
-  const dir = join(tmpdir(), 'juno-gallery-shift', process.env.GALLERY_SHIFT_RUN ?? 'local', `${name}-${test.info().repeatEachIndex}`)
-  mkdirSync(dir, { recursive: true })
+  const { repeatEachIndex, retry, testId } = test.info()
+  const dir = join(tmpdir(), 'juno-gallery-shift', process.env.GALLERY_SHIFT_RUN ?? 'local', `${name}-${repeatEachIndex}`)
+  const claims = join(dir, `attempt-${retry}`)
+  mkdirSync(claims, { recursive: true })
   const claim = (key: string): boolean => {
     try {
-      mkdirSync(join(dir, encodeURIComponent(key)))
+      mkdirSync(join(claims, encodeURIComponent(key)))
       return true
     } catch {
       return false
+    }
+  }
+  // Written as each state is taken, so a retry after a timeout or a crash also has the state it stopped in.
+  const taken = join(dir, `${testId}.txt`)
+  if (retry > 0) {
+    const own = existsSync(taken) ? readFileSync(taken, 'utf8').split('\n').filter(Boolean) : []
+    let at = 0
+    return {
+      next: (routes: ReadonlyArray<Route>): Route | undefined => {
+        while (at < own.length) {
+          const found = routes.find((route) => route.route === own[at])
+          at++
+          if (found) return found
+        }
+        return undefined
+      },
+      claim,
     }
   }
   // Every state before the last one claimed here was taken by some part already.
@@ -109,7 +132,12 @@ export function claimQueue(name: string) {
     /** The next state of `routes` no part has taken yet, in order. Pass the same list each time. */
     next: (routes: ReadonlyArray<Route>): Route | undefined => {
       for (; from < routes.length; from++) {
-        if (claim(`state ${routes[from]!.route}`)) return routes[from++]
+        const route = routes[from]!
+        if (claim(`state ${route.route}`)) {
+          appendFileSync(taken, `${route.route}\n`)
+          from++
+          return route
+        }
       }
       return undefined
     },
