@@ -1107,6 +1107,7 @@ describe('cold boot details (review M3 finding 10)', () => {
     await engine.status('ready')
     await waitFor(() => (engine.fake.heldCount({ method: 'conversations.history' }) === 1 ? true : undefined), 20_000, 'the first history page held')
     const id = threadId(engine, 'C0ENG', 'checkout.spec')
+    await waitFor(() => engine.online() ? true : undefined, undefined, 'the socket online before the mention')
     engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0SAM', text: '<@U0TUSHAR> can you take a look?', threadTs: tsOf(id) })
     await engine.socketIdle()
     engine.fake.release()
