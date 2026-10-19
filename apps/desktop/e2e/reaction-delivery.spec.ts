@@ -21,7 +21,10 @@ async function setup(juno: Juno, fake: FakeSlack) {
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-test('reaction behind a retrying edit', async ({ juno, fake }) => {
+// This checks that a reaction beats the edit's real exponential retry backoff.
+const productionTiming = test.extend({ timing: 'production' })
+
+productionTiming('reaction behind a retrying edit', async ({ juno, fake }) => {
   const target = await setup(juno, fake)
   await juno.topic.send('Edit before reacting')
   await juno.topic.expectSent('Edit before reacting')
@@ -43,12 +46,11 @@ test('reaction behind a retrying edit', async ({ juno, fake }) => {
 test('reaction offline then online', async ({ juno, fake }) => {
   const target = await setup(juno, fake)
   fake.goOffline()
-  await pause(1000)
+  await juno.sidebar.expectSyncStatus("You're offline")
   await target.react()
   await expect(target.row.getByRole('button', { name: '1 👀, including you' })).toBeVisible()
   await expect(target.row.locator('[data-reaction-issue]')).toHaveCount(0)
   await expect(target.row.locator('[data-reaction-issue="waiting"]')).toBeVisible({ timeout: 5000 })
-  await pause(500)
   console.log(`offline pending: ${await target.row.locator('[data-reaction-issue]').allTextContents()}`)
   const start = Date.now()
   fake.goOnline()
@@ -71,7 +73,7 @@ test('reaction retries a transient failure', async ({ juno, fake }) => {
 test('reaction added then removed before it can send makes no Slack calls', async ({ juno, fake }) => {
   const target = await setup(juno, fake)
   fake.goOffline()
-  await pause(1000)
+  await juno.sidebar.expectSyncStatus("You're offline")
   const start = Date.now()
   await target.react()
   await target.row.getByRole('button', { name: '1 👀, including you' }).click()

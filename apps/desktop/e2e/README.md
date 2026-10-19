@@ -4,7 +4,7 @@ The app's end-to-end tests, against the fake Slack server. Fixtures, `launchApp`
 
 ## Scheduling and setup timings
 
-Ordinary fake-Slack launches use the engine unit harness's 1:20 scheduling scale. The engine host accepts it only with both e2e mode and a fake Slack URL; a normal launch keeps production defaults. `test.use({ timing: 'production' })` or `launchApp(dir, { timing: 'production' })` keeps real timing for a test of a window itself. Presence-spacing checks opt out. Paced sync launches, `perf.spec.ts`, `idle-cpu.spec.ts`, feel scenarios and tests tagged `@mac` keep production timing automatically.
+Ordinary fake-Slack launches use the engine unit harness's 1:20 scheduling scale. The engine host accepts it only with both e2e mode and a fake Slack URL; a normal launch keeps production defaults. `test.use({ timing: 'production' })` or `launchApp(dir, { timing: 'production' })` keeps real timing for a test of a window itself. Presence-spacing checks and the reaction-versus-edit-backoff check opt out. Paced sync launches, `perf.spec.ts`, `idle-cpu.spec.ts`, feel scenarios and tests tagged `@mac` keep production timing automatically.
 
 For a negative AI or Automated assertion, `await juno.workPass('title' | 'art' | 'home' | 'automated')` requests a pass through the job's existing serial consumer. The engine acknowledges only a pass started after that request, including a pass that chooses not to call the model. It fails after 10 seconds instead of accepting an unfinished pass. AI jobs still need `aiJobs: true`.
 
