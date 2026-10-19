@@ -131,6 +131,7 @@ export type ShareEndReason = 'stopped' | 'source-ended' | 'failed'
 export interface ShareEnd {
   /** Rises with each end, so two ends alike still read as two. */
   readonly seq: number
+  readonly sourceId: string
   readonly kind: 'screen' | 'window'
   readonly reason: ShareEndReason
 }

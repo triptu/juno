@@ -108,7 +108,7 @@ export class FakeMediaSession implements MediaSession {
     this.#endOwn()
     if (this.failNextShare) {
       this.failNextShare = false
-      this.#store.update(setLocalShare(undefined, { kind: source.kind, reason: 'failed' }))
+      this.#store.update(setLocalShare(undefined, { sourceId: source.sourceId, kind: source.kind, reason: 'failed' }))
       return
     }
     const pattern = createTestPattern(source.name)
@@ -119,7 +119,7 @@ export class FakeMediaSession implements MediaSession {
 
   stopSharing(): void {
     const own = this.#endOwn()
-    this.#store.update(setLocalShare(undefined, own === undefined ? undefined : { kind: own.kind, reason: 'stopped' }))
+    this.#store.update(setLocalShare(undefined, own === undefined ? undefined : { sourceId: own.sourceId, kind: own.kind, reason: 'stopped' }))
   }
 
   showOwnShare(element: HTMLVideoElement): () => void {
@@ -204,7 +204,7 @@ export class FakeMediaSession implements MediaSession {
   /** The shared window closes, or the user stops the capture from macOS. */
   endOwnSource(): void {
     const own = this.#endOwn()
-    if (own !== undefined) this.#store.update(setLocalShare(undefined, { kind: own.kind, reason: 'source-ended' }))
+    if (own !== undefined) this.#store.update(setLocalShare(undefined, { sourceId: own.sourceId, kind: own.kind, reason: 'source-ended' }))
   }
 
   setMicrophoneAccess(access: MicrophoneAccess): void {

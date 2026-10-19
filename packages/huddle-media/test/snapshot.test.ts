@@ -93,10 +93,10 @@ describe('the user\'s own share', () => {
   it('tells two ends alike apart, so each can say why', () => {
     const store = storeWithTwo()
     store.update(setLocalShare({ ...window, live: true }))
-    store.update(setLocalShare(undefined, { kind: 'window', reason: 'source-ended' }))
+    store.update(setLocalShare(undefined, { sourceId: window.sourceId, kind: 'window', reason: 'source-ended' }))
     const first = store.getSnapshot().shareEnded
     store.update(setLocalShare({ ...window, live: true }))
-    store.update(setLocalShare(undefined, { kind: 'window', reason: 'source-ended' }))
+    store.update(setLocalShare(undefined, { sourceId: window.sourceId, kind: 'window', reason: 'source-ended' }))
     expect(store.getSnapshot().shareEnded).not.toBe(first)
     expect(store.getSnapshot().shareEnded?.seq).toBe((first?.seq ?? 0) + 1)
   })

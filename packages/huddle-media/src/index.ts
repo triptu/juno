@@ -5,5 +5,5 @@
  * `import()` on join so the SDK stays out of the initial bundle; the fake is
  * `@juno/huddle-media/fake`.
  */
-export type { Devices, EndReason, LocalShare, MediaSession, MediaSnapshot, MicrophoneAccess, ShareEnd, ShareSource } from './types.ts'
+export type { Devices, EndReason, MediaSession, MediaSnapshot, MicrophoneAccess, ShareEnd, ShareSource } from './types.ts'
 export { huddleSounds, type SoundView } from './sounds.ts'

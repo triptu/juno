@@ -112,7 +112,7 @@ export const speakers =
 
 /** The user's share runs, or no longer: `ended` says why it stopped, unless another took its place or its call ended. */
 export const setLocalShare =
-  (share: LocalShare | undefined, ended?: { readonly kind: ShareSource['kind']; readonly reason: ShareEndReason }): Change =>
+  (share: LocalShare | undefined, ended?: { readonly sourceId: string; readonly kind: ShareSource['kind']; readonly reason: ShareEndReason }): Change =>
   (s) => ({
     ...s,
     localShare: share,
