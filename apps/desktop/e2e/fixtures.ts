@@ -7,7 +7,7 @@ import { startFakeSlack, writeSlackAppFixture, type Credentials, type FakeSlack 
 import { Juno } from './driver/juno'
 import { Slack } from './driver/slack'
 import { startDisplay } from './display'
-import { copySynced, fakeState, SyncedWorkspaces, type SyncedWorkspace } from './synced'
+import { copySynced, fakeState, syncedKey, SyncedWorkspaces, type SyncedWorkspace } from './synced'
 import { attachSendTrace, attachSidebarTrace, startSendTrace, startSidebarTrace } from './traces'
 
 /** What main exposes on `globalThis.junoTest` under JUNO_E2E. */
@@ -109,6 +109,12 @@ function coverageDir(): string | undefined {
   return resolve(__dirname, '../coverage/raw', spec.replaceAll('/', '__'), `${process.pid}-${launches++}`)
 }
 
+function launchTiming(options: LaunchOptions): 'fast' | 'production' {
+  const info = base.info()
+  const production = options.paced === true || /(?:perf|idle-cpu)\.spec\.ts$|[/\\]feel[/\\]/.test(info.file) || info.tags.includes('@mac')
+  return options.timing ?? (production ? 'production' : 'fast')
+}
+
 /**
  * Launches the built app (prepared by Playwright setup) on the given user-data
  * directory and waits for its first window. Launch the same directory twice
@@ -126,9 +132,7 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   }
   env.JUNO_USER_DATA = userData
   env.JUNO_E2E = '1'
-  const info = base.info()
-  const production = options.paced === true || /(?:perf|idle-cpu)\.spec\.ts$|[/\\]feel[/\\]/.test(info.file) || info.tags.includes('@mac')
-  env.JUNO_E2E_FAST_TIMING = (options.timing ?? (production ? 'production' : 'fast')) === 'fast' ? '1' : '0'
+  env.JUNO_E2E_FAST_TIMING = launchTiming(options) === 'fast' ? '1' : '0'
   delete env.JUNO_E2E_OPENROUTER_KEY
   env.JUNO_FAKE_AI_REQUIRES_KEY = options.fakeAiRequiresKey === true ? '1' : '0'
   if (options.fakeSlackUrl !== undefined) env.JUNO_FAKE_SLACK_URL = options.fakeSlackUrl
@@ -306,27 +310,32 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     if (!synced) return use(undefined)
     // AI jobs keep working after the first sync, so a copy would hold titles and art a fresh sign-in has not made yet.
     if (aiJobs) throw new Error('synced: true does not combine with aiJobs: true; sign in instead.')
-    const options: SyncOptions = { ...(timing === undefined ? {} : { timing }), ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }) }
-    const key = JSON.stringify(options)
+    const options: SyncOptions = { timing: launchTiming(timing === undefined ? {} : { timing }), ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }) }
+    const key = await syncedKey(options)
     let workspace = await syncedWorkspaces.get(key, (dir) => buildSynced(dir, options))
     let fake: FakeSlack
     try {
       fake = await matchingFake(workspace)
     } catch (error) {
       // Something else took the port since the build: build again on a new one.
-      if ((error as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw error
+      if (!(error instanceof Error) || !('code' in error) || error.code !== 'EADDRINUSE') throw error
       syncedWorkspaces.forget(key)
       workspace = await syncedWorkspaces.get(key, (dir) => buildSynced(dir, options))
       fake = await matchingFake(workspace)
     }
-    await use({ workspace, fake })
+    try {
+      if (fakeState(fake) !== workspace.fakeState || fake.server.sockets.size !== 0) throw new Error('The new fake does not match the synced snapshot, or already has a socket.')
+      await use({ workspace, fake })
+    } finally {
+      await fake.close()
+    }
   },
   fake: async ({ syncedStart }, use) => {
     const started = performance.now()
     const fake = syncedStart?.fake ?? await startFakeSlack()
     if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: fake ${Math.round(performance.now() - started)} ms`)
     await use(fake)
-    await fake.close()
+    if (syncedStart === undefined) await fake.close()
   },
   slackApp: async ({ fake }, use) => {
     const dir = await mkdtemp(join(tmpdir(), 'juno-slack-app-'))
@@ -357,7 +366,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
       try {
         await new Juno(running.app, running.win).waitForSync()
         // The app booted from a copy of another fake's sync; a difference would make every later step misleading.
-        if (fakeState(fake) !== syncedStart.workspace.fakeState) throw new Error('The fake no longer matches the synced workspace this test started from. Something in the test setup or the warm boot changed the fake; sign in instead (synced: false), or remove the difference.')
+        if (fakeState(fake) !== syncedStart.workspace.fakeState || fake.server.sockets.size !== 1) throw new Error('The fake no longer matches the synced workspace this test started from. Something in the test setup or the warm boot changed the fake; sign in instead (synced: false), or remove the difference.')
       } catch (error) {
         await running.close()
         throw error

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { cp, mkdtemp, readdir, rm } from 'node:fs/promises'
+import { cp, mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Credentials, FakeSlack } from '@juno/fake-slack'
@@ -16,6 +16,12 @@ export interface SyncedWorkspace {
   readonly sessions: ReadonlyArray<Credentials>
   /** `fakeState` of the fake once the app had synced. */
   readonly fakeState: string
+}
+
+/** The build marker covers all source (including seed, schema, migrations and sync), toolchain and output bytes. */
+export async function syncedKey(options: object): Promise<string> {
+  const build = await readFile(join(__dirname, '../out/.inputs-hash'), 'utf8')
+  return createHash('sha256').update(build).update(JSON.stringify(options)).digest('hex')
 }
 
 /**
