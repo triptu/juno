@@ -86,10 +86,16 @@ function fileKind(file: File): FileKind {
   return 'file'
 }
 
-/** A shared message's words, a bot attachment's title or text, or a link's domain. */
+/**
+ * A shared message's words or files, a bot attachment's title or text, or a
+ * link's domain. Slack's `fallback` ("[date] name: file") only when there is
+ * nothing else.
+ */
 function attachmentLabel(attachment: Attachment, lookups: Lookups): string {
   const shared = attachment.is_msg_unfurl === true || attachment.is_share === true || attachment.message_blocks !== undefined
-  const words = oneLine([attachment.title, attachment.text, attachment.pretext, attachment.fallback].map((part) => (part === undefined ? '' : previewText(bodyFromMrkdwn(part, lookups)))).find((part) => part !== '') ?? '')
+  const mrkdwn = (part: string | undefined) => (part === undefined ? '' : previewText(bodyFromMrkdwn(part, lookups)))
+  const files = (attachment.files ?? []).filter((file) => file.id !== '')
+  const words = oneLine([attachment.title, attachment.text, attachment.pretext].map(mrkdwn).find((part) => part !== '') || filesLabel(files) || mrkdwn(attachment.fallback))
   if (shared) return words === '' ? 'Shared message' : `Shared message: ${words}`
   if (words !== '') return words
   const url = attachment.from_url ?? attachment.original_url ?? attachment.title_link
