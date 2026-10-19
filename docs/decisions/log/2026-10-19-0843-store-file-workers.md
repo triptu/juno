@@ -1,0 +1,1 @@
+- 10-19 08:43 · store-file-workers · Allow Store files to overlap when JUNO_TEST_FILE_PARALLEL=1: every test owns its temporary directory and SQLite handles. Five alternating four-core samples reduced the six-file median from 5.29 s to 1.84 s; all twelve warmup and measured Store runs passed. Keep the shared Mac default serial.

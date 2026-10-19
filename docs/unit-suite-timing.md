@@ -1,5 +1,171 @@
 # Unit suite timing
 
+## Round 3: smaller repair fixtures and independent Store workers
+
+Measured on 2026-10-19 from main `f601148d2`, on the SSH laptop with a four-core CPU limit, four
+Vitest workers per package and two package jobs. Full runs below are single observations; they do
+not establish a distribution. They include the same 1,803 passing tests in 197 files and eight
+existing skips. Script time excludes installation and report transfer. No production source or fake
+Slack implementation changed.
+
+| Command or file | Before, s | After, s |
+| --- | ---: | ---: |
+| Full unit suite | 247 | 222 |
+| Conformance | 38 | 36 |
+| `mutation-activity` | 60.34 | 30.47 |
+| `mutation-repair-large` | 46.84 | 22.65 |
+| `sync` | 38.10 | 42.51 |
+| `send` | 19.66 | 14.27 |
+| `actions` | 13.17 | 13.77 |
+| Agent package | 79.68 | 77.13 |
+| Store package | 7.16 | 3.76 |
+
+File and package rows come from the full unit runs, with their normal overlap. The laptop has 24
+hardware threads. During the baseline it had three concurrent runner jobs and a load average of
+8.41; the unit container averaged 77% of its four-core limit. The final passing container averaged
+82% of its four-core limit (94% at the median), versus 77% and 91% before. The host was shared
+throughout; the full-run comparison is not an interleaved distribution. The runner-setting
+comparisons below are alternating samples within one job.
+
+### What the profiles found
+
+The five target files also ran serially with one worker and CPU sampling, apart from the
+uninstrumented full-suite measurements. `test/profile.ts` prints wall time, process CPU, boot phase
+timings and the twenty largest CPU samples when `JUNO_UNIT_PROFILE=1`. The phase intervals overlap
+engine work; do not add CPU to wall time or subtract every phase to infer a wait. CPU includes
+Node's helper threads and can exceed wall time. The following baseline samples are diagnostic, not
+performance budgets:
+
+| File | Body wall / process CPU, s | Fake and seed, s | Ready + live + follow waits, s | Largest work |
+| --- | ---: | ---: | ---: | --- |
+| `mutation-activity` | 60.68 / 59.22 | 3.70 | 28.64 | SQLite, fake request handling, timestamps, posting edits |
+| `mutation-repair-large` | 42.50 / 44.12 | 3.66 | 26.31 | SQLite, timestamps, thread indexing |
+| `sync` | 36.67 / 32.65 | 1.94 | 22.73 | SQLite; 51 engine constructions |
+| `send` | 17.97 / 12.46 | 0.60 | 7.39 | SQLite and a real retry wait |
+| `actions` | 13.43 / 10.28 | 0.51 | 6.20 | SQLite, a 2 s Retry-After and the 1 s idle observation |
+
+Main-thread idle samples were 4.16 s in `sync`, 7.14 s in `send`, 4.40 s in `actions` and 3.05 s in
+`mutation-activity`. Idle was below repair's twenty largest samples. These overlap the boot waits
+above: they show actual waiting rather than another additive phase. SQLite `all`, timestamp parsing
+and thread indexing account for the large real-work samples; ordinary `send` also waits on its retry
+schedule, and `actions` retains its explicit Retry-After and idle windows.
+
+Schema copies were 0.09–0.15 s summed per file and engine construction itself 0.03–0.17 s. Boot
+waits include actual decoding, queries, indexing and HTTP work. The after profiles reduced seed
+creation to 0.46–0.52 s, repair body wall time to 15.99 s and activity to 22.56 s. The remaining
+large-fixture cold sync still spent 11.7–12.7 s doing real work. Sync and ordinary boots remain
+CPU-heavy.
+
+CPU sampling made the existing production idle assertion in `actions` fail (0.90 event-loop
+utilization against 0.50). That diagnostic run is not a passing validation. The later diagnostic
+command excludes `[production timing]`; the full before/after runs retain that test and its
+assertion, timing and observation window. The first attempt to profile Agent through a
+`--setupFiles` CLI flag was rejected by Vitest before tests ran. Agent now has an opt-in config
+entry instead. Agent's eight-file timing run passed 92 tests: 6.23 s summed test wall time and 3.44
+s worker CPU. The crash case took 2.03 s wall but 0.07 s worker CPU while waiting for its real child
+processes; the other cases together used 3.37 s CPU in 4.20 s wall. Agent test bodies contain CPU
+work and waits for child processes. Child CPU is outside those worker marks. The full 47-file
+package still spends about four fifths of its time in test bodies.
+
+### Fixture size and assertions
+
+`mutationSeed.ts` keeps all 300 conversations, 1,000 threads, 400 people and 20,000 messages over
+seven days. These tests check repair scope across conversations. Activity still edits 150 different
+conversations in each of six ten-minute intervals and requires exactly two repair jobs and calls for
+the one real offline edit. Repair still chooses a cached thread outside the newest ten topics, edits
+one reply, deletes another, removes a reaction and verifies the unchanged root. It still requires
+three repair calls, ten fallback reads, one repaired conversation, update cursors, exactly eighteen
+total reconnect calls and no repair after the warm restart. The smaller seed's fallback is one Main
+and nine threads, so the exact method budget is one history and twelve replies, instead of zero
+history and thirteen replies. All original assertions remain exact. An AST inventory found 322
+assertion chains before and after across the seven reviewed files; only the clock read and exact
+method-budget expression changed. The inventory is retained in
+`.remote/unit-speed-3/assertion-inventory.json`. The separate performance fixtures retain 100,000
+messages.
+
+The send flush test advances each stored retry deadline with TestClock until the next lookup is more
+than six seconds away, then reconnects and proves it settled before that deadline. Socket liveness
+timers are set outside this virtual retry interval; socket timeout behaviour has its own tests. The
+fast retry ratios and attempt limits stay unchanged. Two remaining sync sleeps now wait for socket
+consumption or reconnect completion.
+
+### The two failures under load
+
+- `home.test.ts`, "with AI assist off, ranks what waits…": it enabled background jobs while booting,
+  then turned AI assist off. Under load the title job had already replaced the fixture's fallback
+  title. It now persists the preference with jobs disabled, restarts with jobs enabled and awaits
+  title and Home passes. Every original assertion, including the fallback title and absent AI
+  output, stays in place. - `sync.test.ts`, "is usable after the quick steps…": it assumed its
+  early-list assertion ran before Automated's 250 ms fast hold expired. `controlledSleep` holds only
+  the production 5,000 ms sleep on TestClock while other I/O timers stay live. The test asserts the
+  early list, advances that hold, then asserts the released list and completes history and
+  discovery. The machine's speed cannot expire the hold.
+
+An intermediate full after-run took 210 s but failed the art refusal test. That test counted one
+draw for a new thread while the title job could permit both a fallback draw and an AI-title redraw.
+It now holds the art debounce with `controlledSleep`, waits for titles and requests explicit art
+passes. The failed recipe, placeholder and exact one-new-call assertions remain intact. Its two
+local tests pass. This failed run is retained as `after-full-art-race.log` and is not the final
+comparison above.
+
+A second full after-run took 227 s and timed out in Home's setup with AI assist on. It inserted a
+three-message conversation with hours-old timestamps after AI jobs started. A score cached from its
+partial history remained fresh according to `staleStatement`: cache creation was newer than the
+conversation's old activity. The complete conversation now seeds in `initial`, before sign-in or AI
+startup. No production query or AI answer changed. All five Home/art smoke tests passed. The failed
+full run is retained as `after-full-home-race.log`. Lint also caught the art group's size limit; its
+assertions moved into `checkFailedArt` without changing their order or the test's name.
+
+Counterfactual local checks also failed as intended: enabling AI assist before Home's startup broke
+its fallback-title assertion, and leaving the reaction on the fake broke the smaller repair
+fixture's reaction-removal assertion. Both mutations were restored. A focused twelve-file engine
+selection, including Home, quick-start, art and all five timing targets, passed with both eight and
+twelve workers per package on four cores (63 s and 70 s for the complete selective unit commands).
+All original assertions and the production idle checks ran without retries.
+
+### Worker and import comparisons
+
+`node packages/agent/test/runner-matrix.mjs` reruns the comparison on one four-core SSH job. It
+alternates four Agent settings over the same eight files, then the whole six-file Store suite with
+and without file parallelism. Each setting has one warmup followed by five measured samples. All 36
+steps passed, without retries. The container averaged 50% CPU; median use was 45%.
+
+| Setting | Median, s | Range, s |
+| --- | ---: | ---: |
+| Agent, forks, isolated | 4.93 | 4.73–5.28 |
+| Agent, forks, reused workers | 5.01 | 4.54–5.24 |
+| Agent, threads, isolated | 4.98 | 4.96–5.45 |
+| Agent, threads, reused workers | 5.22 | 4.84–5.29 |
+| Store, serial files | 5.29 | 5.02–5.65 |
+| Store, parallel files | 1.84 | 1.65–2.07 |
+
+Agent keeps its existing pool and isolation: the ranges overlap and no setting improves the complete
+slice consistently. Store now follows `JUNO_TEST_FILE_PARALLEL`, like Engine. Each test already
+allocates a private `mkdtemp` directory and owns its database handles. Parallel files share neither
+files nor synchronous SQLite handles. The local serial default stays unchanged.
+
+Vitest's baseline full-run breakdown was Agent 79% tests / 16% imports / 5% transform; Engine 84% /
+13% / 3%; Store 50% / 40% / 9%. The first Agent matrix sample spent 32% in transforms, then 5–7% on
+later samples, with the existing package-specific filesystem module cache. A new dependency
+optimizer or cache setting would not address the dominant test-body work. No deps optimization,
+cache path or engine isolation setting changed.
+
+### Validation and raw evidence
+
+The final full unit run passed all 1,803 tests in 197 files, with the same eight
+skips. Both conformance runs passed 80 tests with twelve existing skips. The one
+`pnpm affected` run passed Bun checks over 4,091 files in eleven projects, all
+eleven lint checks, and its 100-file selective unit plan on the four-core SSH
+runner. The remote selective command took 195 s. Package TypeScript checks and
+the focused local Home, art, clock and seed checks also passed.
+
+Logs are in this worktree's ignored `.remote/unit-speed-3/` directory: `before-full.log`,
+`after-full.log`, `before-conformance.log`, `after-conformance.log`, `before-profile.log`,
+`after-profile.log`, `runner-matrix.log`, `loaded.log` (including Agent marks) and `affected.log`.
+The profiler logs are separate from the uninstrumented measurements. Local clock and seed smoke runs
+are retained there too, including rejected seed trials.
+---
+
 ## After merging main
 
 After merging main `3b1d5198b2` on 2026-10-19, the single requested `pnpm remote test` ran on the SSH laptop (`tushar-host.local`), with a two-CPU container limit. Script time was 401 s (409 s including preparation); engine time was 222.47 s. This is a different backend and CPU allocation from the Namespace measurements below.
