@@ -6,6 +6,9 @@ import type { Locator, Page } from '@playwright/test'
 import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 /** Records, from now on, whether the topic ever showed an empty or loading state. */
@@ -56,9 +59,6 @@ async function startThreadOn(juno: Juno, open: () => Promise<void>, text: string
 
 // Signed in once; each step starts its own thread, so the row counts are per topic.
 test('Start thread on a message with no replies, in a channel, a DM and a group DM, shows it as the root', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-
   await test.step('Start thread on a channel message with no replies shows it as the root, then the reply under it', async () => {
     const text = 'Yes, both rotations move together.'
     await startThreadOn(juno, () => juno.sidebar.row('#eng').open(), text, 'Calendar updated for both.')

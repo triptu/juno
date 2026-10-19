@@ -4,6 +4,9 @@
 // composer, in a question for Juno and once a person or channel is chosen.
 import { expect, test, type Fixtures } from './fixtures'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
@@ -13,8 +16,6 @@ const postedText = (fake: { readonly calls: ReadonlyArray<{ readonly method: str
   fake.calls.filter((call) => call.method === 'chat.postMessage').map((call) => String(call.args['text']))
 
 test('picks people, groups and channels, navigates suggestions and keeps a mention draft', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const context = { juno, fake }
   await test.step('mention a person in a reply: Backspace removes it whole, and it posts as <@U…> and shows as a mention', () => mentionPerson(context))
   await test.step('a user group is suggested after the people who match, and posts as Slack sends a group mention', () => mentionGroup(context))
@@ -163,8 +164,6 @@ async function keepMentionDraft({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>)
 }
 
 test('Home suggests people and channels inside a question for Juno and once a person or channel is chosen', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { write } = juno
 
   // Before a destination, a first @ is the "Send to" list's, and an @ inside the question suggests people.

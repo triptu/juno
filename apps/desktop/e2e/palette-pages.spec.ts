@@ -3,12 +3,13 @@
 // "settings" does, shows every row of it.
 import { expect, test } from './fixtures'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 // The pages in the order a first look needs: Memory of this chat is absent until the Juno page has opened.
 test('pages and Settings sections open from ⌘K', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { palette, settings, tabs } = juno
 
   await test.step('">" lists the pages; "Juno" opens the Juno tab, and then Memory of this chat is one of them', async () => {

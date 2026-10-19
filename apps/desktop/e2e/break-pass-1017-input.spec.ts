@@ -2,15 +2,13 @@
 // the edit field, and dark mode. Findings are in
 // docs/reviews/2026-10-17-break-pass.md.
 import { SELF_ID } from '@juno/fake-slack'
-import { expect, test } from './fixtures'
+import { expect, syncedTest, test } from './fixtures'
 
 test.describe.configure({ timeout: 120_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
 
-test('Home works from the keyboard alone: ⌘N, pick with Enter, write, Shift Tab to the chip, send', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('Home works from the keyboard alone: ⌘N, pick with Enter, write, Shift Tab to the chip, send', async ({ juno, fake }) => {
   // ⌘N opens Home's destination list with its search focused.
   await juno.tabs.menu('new-message')
   await expect(juno.write.search).toBeFocused()
@@ -69,9 +67,7 @@ test('dark mode leaves no light surface on Home, the switcher and Settings', asy
   expect(await lightSurfaces()).toEqual([])
 })
 
-test('Enter right after typing in the destination search picks the match', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('Enter right after typing in the destination search picks the match', async ({ juno, fake }) => {
   await juno.tabs.menu('new-message')
   // As a person types once the list shows its search.
   await expect(juno.write.search).toBeFocused()
@@ -88,9 +84,7 @@ test('Enter right after typing in the destination search picks the match', async
   await expect(juno.write.composer).toHaveValue('')
 })
 
-test('the inline edit field suggests emoji, and Esc there closes the list, not the edit', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('the inline edit field suggests emoji, and Esc there closes the list, not the edit', async ({ juno, fake }) => {
   await juno.sidebar.row('#eng').open()
   await juno.topic.send('Edit with emoji')
   await juno.topic.expectSent('Edit with emoji')
@@ -115,9 +109,7 @@ test('the inline edit field suggests emoji, and Esc there closes the list, not t
   await expect.poll(() => fake.messages('C0ENG').some((m) => m.text === 'Edit with emoji 🎉')).toBe(true)
 })
 
-test(':thumbs offers 👍 first, before any recent use', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest(':thumbs offers 👍 first, before any recent use', async ({ juno }) => {
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.composer.pressSequentially(':thumbs')
   await expect(juno.topic.suggestions.getByRole('option').first()).toHaveAccessibleName(':thumbsup:')

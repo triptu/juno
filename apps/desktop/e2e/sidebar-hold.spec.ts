@@ -6,6 +6,9 @@ import { expect, test } from './fixtures'
 import { pointAt, press, type Juno } from './driver/juno'
 import type { FakeSlack } from '@juno/fake-slack'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 // A failing test attaches the sidebar's order hold and topic list values (README, "Sidebar trace").
 test.use({ sidebarTrace: true })
 
@@ -49,8 +52,6 @@ async function expectMovedAbove(juno: Juno, movers: ReadonlyArray<string>, targe
 }
 
 test('under the pointer, new activity does not move rows, and a press opens the row pointed at', async ({ juno, win, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const target = (await recentIds(juno))[1]!
   const title = await titleOf(juno, target)
   await pointAt(win, rowOf(juno, target), { x: 40, y: 20 })
@@ -74,8 +75,6 @@ test('under the pointer, new activity does not move rows, and a press opens the 
 })
 
 test('with keyboard focus in the list, the arrows walk the held order', async ({ juno, win, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const before = await recentIds(juno)
   const target = before[2]!
   const movers = oldestThreads(before, 2)
@@ -107,8 +106,6 @@ test('with keyboard focus in the list, the arrows walk the held order', async ({
 })
 
 test('your own send moves its row at once while the list holds', async ({ juno, win, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const before = await recentIds(juno)
   const [, mine] = oldestThreads(before, 0)
   await pointAt(win, rowOf(juno, mine), { x: 40, y: 20 })

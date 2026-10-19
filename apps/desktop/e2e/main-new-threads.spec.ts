@@ -3,12 +3,13 @@
 // and clears when Main is read, without changing the row's height.
 import { expect, test } from './fixtures'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 test.use({ sidebarTrace: true })
 test.describe.configure({ timeout: 60_000 })
 
 test("a thread started in a channel shows on its Main row, your own does not, and reading Main clears it", async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const main = juno.sidebar.row('#eng')
   // #eng was read up to the Postgres plan; the staging bill thread started after it.
   await main.expectNewThreads(1)

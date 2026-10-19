@@ -5,13 +5,14 @@
  */
 import { expect, test } from './fixtures'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 const CONFIRMED = 'Confirmed, p95 back to 210ms.'
 
 test('hovering a reaction chip shows who reacted, and a click still toggles it', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.sidebar.row('#incidents').open()
   const { topic } = juno
   const root = topic.message('p95 on /v2/search jumped')

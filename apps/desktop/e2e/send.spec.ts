@@ -8,6 +8,9 @@ import { measureLayoutShift } from '@juno/testing/layout-shift'
 import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
@@ -35,8 +38,6 @@ function saved(userData: string, teamId: string): { readonly tabs: ReadonlyArray
 }
 
 test('a reply in a thread shows at once and settles in place, posted once', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { topic } = juno
   await juno.sidebar.row(POSTGRES).open()
   await topic.expectTitle(POSTGRES)
@@ -75,8 +76,6 @@ test('a reply in a thread shows at once and settles in place, posted once', asyn
 })
 
 test('a message in Main settles when the echo comes before the answer', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
@@ -90,8 +89,6 @@ test('a message in Main settles when the echo comes before the answer', async ({
 })
 
 test('a refused send stays in the row with Retry and Delete draft', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
@@ -110,8 +107,6 @@ test('a refused send stays in the row with Retry and Delete draft', async ({ jun
 })
 
 test('a draft is kept per topic across tab switches and a restart', async ({ juno, running, userData, fake, slackApp }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { topic, sidebar } = juno
   await sidebar.row(POSTGRES).open()
   await topic.composer.fill('Half a thought about the freeze')
@@ -143,8 +138,6 @@ test('a draft is kept per topic across tab switches and a restart', async ({ jun
 })
 
 test('the composer grows to about eight lines, then scrolls inside', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { topic } = juno
   await juno.sidebar.row(POSTGRES).open()
   const one = (await topic.composer.boundingBox())!.height
@@ -167,8 +160,6 @@ test('the composer grows to about eight lines, then scrolls inside', async ({ ju
 // stack then sends the request again by itself, so Slack runs it twice (ADR 0014). Juno keeps the
 // first copy it stores and deletes the other, which has the same client_msg_id.
 test('a post whose answer is lost is in Slack once', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
@@ -183,8 +174,6 @@ test('a post whose answer is lost is in Slack once', async ({ juno, fake }) => {
 })
 
 test('an edit whose answer is lost leaves one message with the new text', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.send('Edit me over a lost answer')
@@ -204,8 +193,6 @@ test('an edit whose answer is lost leaves one message with the new text', async 
 })
 
 test('a reaction whose answer is lost is added once and taken away once', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'React over a lost answer' })

@@ -7,7 +7,7 @@
 // viewed for a day closes by itself.
 import { startFakeSlack, topic300Seed } from '@juno/fake-slack'
 import { expectNoLayoutShift } from '@juno/testing/layout-shift'
-import { expect, launchApp, test } from './fixtures'
+import { expect, launchApp, syncedTest, test } from './fixtures'
 import { Juno } from './driver/juno'
 import { readUserDb, savedTabs, threadId } from './driver/userDb'
 
@@ -19,10 +19,7 @@ const ROADMAP = 'Proposal: cut offline mode and public'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
 
 // Each step but the last ends with Home in the only tab, as a fresh launch shows it.
-test('tabs open, focus and close from the sidebar, the keyboard and the app menu, and the last one closed leaves Home', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-
+syncedTest('tabs open, focus and close from the sidebar, the keyboard and the app menu, and the last one closed leaves Home', async ({ juno }) => {
   await test.step('opening, ⌘-click, focusing an open topic and closing to the neighbour', () => openFocusAndClose(juno))
   await test.step('closing a tab from the keyboard leaves focus in the strip', () => closeFromKeyboard(juno))
   await test.step('closing the last tab leaves Home; ⌘T and "+" open Home in a new tab, ready to write', () => newTabsOpenHome(juno))
@@ -139,9 +136,7 @@ async function appMenuMovesBetweenTabs(juno: Juno): Promise<void> {
   await tabs.expectActive(ROADMAP)
 }
 
-test('⌘W held down closes a tab per press, even when the tabs it lands on were put away', async ({ juno, running, userData, fake, slackApp, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('⌘W held down closes a tab per press, even when the tabs it lands on were put away', async ({ juno, running, userData, fake, slackApp, slack }) => {
   const { sidebar, tabs } = juno
   const topics = [POSTGRES, RINA, ROADMAP, OFFSITE, 'Unrelated: has anyone looked at the', 'p95 on /v2/search jumped to 1.8s', 'Two options for the thread list', 'Final copy for pricing is in']
   await sidebar.row(topics[0]!).open()
@@ -172,9 +167,7 @@ test('⌘W held down closes a tab per press, even when the tabs it lands on were
   }
 })
 
-test('tabs survive a restart', async ({ juno, running, userData, fake, slackApp, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('tabs survive a restart', async ({ juno, running, userData, fake, slackApp, slack }) => {
   const { sidebar, tabs } = juno
   await sidebar.row(POSTGRES).open()
   await sidebar.row(RINA).openInNewTab()
@@ -197,9 +190,7 @@ test('tabs survive a restart', async ({ juno, running, userData, fake, slackApp,
   }
 })
 
-test('tabs drag to a new place, move with ⌃⇧← and ⌃⇧→, and keep their order after a restart', async ({ juno, running, userData, fake, slackApp, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('tabs drag to a new place, move with ⌃⇧← and ⌃⇧→, and keep their order after a restart', async ({ juno, running, userData, fake, slackApp, slack }) => {
   const { sidebar, tabs } = juno
   await sidebar.row(POSTGRES).open()
   await sidebar.row(RINA).openInNewTab()
@@ -248,9 +239,7 @@ test('tabs drag to a new place, move with ⌃⇧← and ⌃⇧→, and keep thei
   }
 })
 
-test('a topic tab shows its art and a DM tab the person\'s photo', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('a topic tab shows its art and a DM tab the person\'s photo', async ({ juno }) => {
   const { sidebar, tabs } = juno
   await sidebar.row(POSTGRES).open()
   // A thread in the DM with Maya, and the DM itself.
@@ -338,9 +327,7 @@ test.describe('one topic in two tabs', () => {
   })
 })
 
-test('"+" sits one tab gap after the last tab, level with the tabs, and stays at the end of the strip when the tabs scroll', async ({ juno, app }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('"+" sits one tab gap after the last tab, level with the tabs, and stays at the end of the strip when the tabs scroll', async ({ juno, app }) => {
   const { sidebar, tabs } = juno
 
   // `strip` is the tablist, the scroller the tabs sit in.
@@ -379,9 +366,7 @@ test('"+" sits one tab gap after the last tab, level with the tabs, and stays at
   await expect(tabs.newTabButton).toBeInViewport()
 })
 
-test('a new tab asked for while a topic is still opening leaves that open in the old tab', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('a new tab asked for while a topic is still opening leaves that open in the old tab', async ({ juno }) => {
   const { sidebar, tabs } = juno
 
   // "+" is clicked in the same task as the press on the row, before the topic can paint.

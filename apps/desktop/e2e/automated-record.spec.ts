@@ -5,7 +5,7 @@
 // the conversations stays in All however much a bot replies in its threads;
 // and a channel people take over goes back out, which the card says, with
 // Dismiss to see it without opening the record.
-import { expect, test } from './fixtures'
+import { expect, syncedTest, test } from './fixtures'
 import type { Juno } from './driver/juno'
 
 // A failing test attaches the sidebar's order hold and topic list values (README, "Sidebar trace").
@@ -36,9 +36,7 @@ async function homeShowsRecord(juno: Juno): Promise<void> {
 /** The job has examined the changed rows, including a pass that keeps their placement. */
 const afterAPass = (juno: Juno) => juno.workPass('automated')
 
-test('a bot channel joined later moves by itself, the card says why, and Move back works with Undo', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('a bot channel joined later moves by itself, the card says why, and Move back works with Undo', async ({ juno, fake }) => {
   const { home, sidebar } = juno
 
   // The first sync's own sorting is setting up, not news.
@@ -117,9 +115,7 @@ test('a channel where people start the conversations stays in All, however much 
   await sidebar.row(AGENTS).expectAbsent()
 })
 
-test('a channel people take over goes back to All, and the card says people start most conversations there', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('a channel people take over goes back to All, and the card says people start most conversations there', async ({ juno, fake }) => {
   const { home, sidebar } = juno
   await sidebar.row(ALERTS).expectAbsent()
 

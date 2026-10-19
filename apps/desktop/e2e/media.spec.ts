@@ -3,7 +3,7 @@
 // message can carry a partial file (`file_access: "check_file_info"`); nothing in the message changes
 // later, so Juno re-reads the message and the card becomes the picture in place.
 import type { Page } from '@playwright/test'
-import { expect, test } from './fixtures'
+import { expect, syncedTest, test } from './fixtures'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -52,9 +52,7 @@ test('an old card stored before Slack made the thumbnail becomes the picture thr
   expect(await image.boundingBox()).toMatchObject({ width: 320, height: 240 })
 })
 
-test('reopening a topic retries an image after its background lookups ran out', async ({ juno, win, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('reopening a topic retries an image after its background lookups ran out', async ({ juno, win, fake }) => {
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
@@ -74,9 +72,7 @@ test('reopening a topic retries an image after its background lookups ran out', 
   await expect.poll(() => image.locator('img').evaluate((node: HTMLImageElement) => node.naturalWidth)).toBeGreaterThan(0)
 })
 
-test('images and videos in #eng show inline and open full screen, and a partial file becomes the picture', async ({ juno, win, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('images and videos in #eng show inline and open full screen, and a partial file becomes the picture', async ({ juno, win, fake }) => {
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')

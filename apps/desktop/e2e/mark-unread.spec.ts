@@ -5,6 +5,9 @@
 import type { CallRecord } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 90_000 })
 
 // No full stop: the AI title (the first sentence, cut short) replaces the message text once the title job runs.
@@ -21,8 +24,6 @@ const MARKS = ['conversations.mark', 'subscriptions.thread.mark']
 const lastMark = (calls: ReadonlyArray<CallRecord>) => calls.filter((call) => MARKS.includes(call.method)).at(-1)?.args
 
 test('a thread marked unread while open stays unread until you leave it', async ({ juno, slack, win }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const rina = juno.sidebar.row(RINA)
   await rina.open()
   await rina.expectRead()
@@ -62,8 +63,6 @@ test('a thread marked unread while open stays unread until you leave it', async 
 })
 
 test('a Main marked unread from the palette stays unread until you send in it', async ({ juno, slack, win }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const eng = juno.sidebar.row(ENG_MAIN)
   await eng.open()
   await eng.expectRead()

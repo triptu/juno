@@ -8,13 +8,11 @@ import { createServer, type IncomingHttpHeaders, type Server } from 'node:http'
 import { readFile } from 'node:fs/promises'
 import type { AddressInfo } from 'node:net'
 import { version as currentVersion } from '../package.json'
-import { expect, test } from './fixtures'
+import { expect, syncedTest, test } from './fixtures'
 
 const nextVersion = currentVersion.replace(/\d+$/, (patch) => String(Number(patch) + 1))
 
-test('Settings › About shows the build and keeps updates off in tests', async ({ juno, win }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('Settings › About shows the build and keeps updates off in tests', async ({ juno, win }) => {
   await juno.openSettings('About')
   await expect(juno.settings.root.getByText(/Juno 0\./)).toBeVisible()
   const updates = juno.settings.root.getByRole('checkbox', { name: 'Download updates automatically' })

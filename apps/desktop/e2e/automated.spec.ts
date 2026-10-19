@@ -5,7 +5,7 @@
 // menu ignores a noisy channel; a channel taken out by hand is never moved
 // back; and a deleted view stays deleted.
 import type { FakeSlack } from '@juno/fake-slack'
-import { expect, test } from './fixtures'
+import { expect, syncedTest, test } from './fixtures'
 import type { Juno } from './driver/juno'
 
 test.describe.configure({ timeout: 120_000 })
@@ -52,9 +52,7 @@ async function homeAsks(juno: Juno): Promise<void> {
 /** The job has examined the changed rows, including a pass that keeps their placement. */
 const afterAPass = (juno: Juno) => juno.workPass('automated')
 
-test('the view fills on the first sync, keeps the bot channels out of All, and its sheet says what Juno added', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('the view fills on the first sync, keeps the bot channels out of All, and its sheet says what Juno added', async ({ juno }) => {
   const { sidebar } = juno
 
   // An icon pill, with its name as the tooltip.
@@ -127,9 +125,7 @@ test("the question's menu ignores a noisy channel", async ({ juno, fake }) => {
   await juno.sidebar.row(RELEASES_MAIN).expectAbsent()
 })
 
-test('a channel taken out of Automated is never moved back, and a deleted view stays deleted', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('a channel taken out of Automated is never moved back, and a deleted view stays deleted', async ({ juno, fake }) => {
   const { sidebar } = juno
 
   await sidebar.selectView('Automated')

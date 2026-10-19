@@ -5,7 +5,7 @@ import { expectStableAnchor } from './shiftProbe'
 // mentioned in) and a channel's Main, so they stay in the sidebar under the
 // followed-threads rule as well as the older every-active-thread rule.
 import type { FakeSlack } from '@juno/fake-slack'
-import { expect, test, type Fixtures } from './fixtures'
+import { expect, syncedTest, test, type Fixtures } from './fixtures'
 import type { Juno } from './driver/juno'
 
 // A failing test attaches the sidebar's order hold and topic list values (README, "Sidebar trace").
@@ -31,9 +31,7 @@ async function postAbovePostgres(juno: Juno, fake: FakeSlack): Promise<void> {
   await expect.poll(() => juno.sidebar.titles('Recent').then((titles) => titles[0])).toBe('#incidents')
 }
 
-test('shows sidebar rows and unread people, then filters and clears the list', async ({ juno, slack, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('shows sidebar rows and unread people, then filters and clears the list', async ({ juno, slack, fake }) => {
   const context = { juno, slack, fake }
   await test.step('after sign-in the sidebar lists followed threads and Main, newest first, with tags and counts', () => initialRows(context))
   await test.step('the stack shows who wrote the unread replies, and nobody once the topic is read', () => unreadPeople(context))
@@ -213,9 +211,7 @@ test('during the first sync the list says Juno is getting the topics, then shows
   expect(await header.boundingBox()).toEqual(headerBox)
 })
 
-test('a reply from another client updates its row in place and moves it to the top', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('a reply from another client updates its row in place and moves it to the top', async ({ juno, fake }) => {
   const { sidebar } = juno
   const postgres = sidebar.row(POSTGRES)
   await postgres.expectVisible()
@@ -230,9 +226,7 @@ test('a reply from another client updates its row in place and moves it to the t
   // The time from the engine's write to pixels is measured in perf.spec.ts.
 })
 
-test('rows that scroll under a still pointer are not warmed; moving onto a row warms it', async ({ juno, win }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('rows that scroll under a still pointer are not warmed; moving onto a row warms it', async ({ juno, win }) => {
   const { sidebar } = juno
   const list = sidebar.list
   await sidebar.hoverList()
@@ -262,9 +256,7 @@ test('rows that scroll under a still pointer are not warmed; moving onto a row w
   await expect.poll(() => juno.lastMark('juno.prefetch')).not.toBe(before)
 })
 
-test("pressing a row selects it, the keyboard moves the selection, and Tab reaches the arrowed row's Resolve", async ({ juno, win, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest("pressing a row selects it, the keyboard moves the selection, and Tab reaches the arrowed row's Resolve", async ({ juno, win, fake }) => {
   const { sidebar } = juno
   await test.step('pressing a row selects it, and the keyboard moves the selection', async () => {
     const titles = await sidebar.titles('Recent')
@@ -321,9 +313,7 @@ test("pressing a row selects it, the keyboard moves the selection, and Tab reach
   })
 })
 
-test('zooming in from the View menu keeps the whole sidebar inside the window', async ({ juno, app, win }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('zooming in from the View menu keeps the whole sidebar inside the window', async ({ juno, app, win }) => {
   await juno.sidebar.row(POSTGRES).expectVisible()
 
   // The smallest window, then View > Zoom In eight times (about 200%).
@@ -350,9 +340,7 @@ test('zooming in from the View menu keeps the whole sidebar inside the window', 
   expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.getMinimumSize())).toEqual([720, 480])
 })
 
-test('Unread keeps read topics until no tab shows them', async ({ juno, win }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('Unread keeps read topics until no tab shows them', async ({ juno, win }) => {
   const { sidebar, tabs } = juno
   await sidebar.toggleUnread()
   const rina = sidebar.row(RINA)

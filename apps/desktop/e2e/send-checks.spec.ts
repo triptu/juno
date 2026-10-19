@@ -4,6 +4,9 @@ import { join } from 'node:path'
 import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 const ENG_MAIN = '#eng'
@@ -50,8 +53,6 @@ function grammarRows(userData: string, teamId: string): number {
 }
 
 test('a reply typed into Main is offered to its thread, and Post in thread posts it there', async ({ juno, fake, userData }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { topic } = juno
   const root = fake.messages('C0ENG').find((message) => (message.text ?? '').startsWith('Unrelated: has anyone looked at the staging bill'))!
   await juno.sidebar.row(ENG_MAIN).open()
@@ -79,8 +80,6 @@ test('a reply typed into Main is offered to its thread, and Post in thread posts
 // Send to Main goes first: the amber step's drafts start wrong-place checks of their own, and one asked
 // after the next draft was typed would pass for its answer.
 test("Send to Main sends a checked draft where it was typed, and hiring details in #eng's Main show the amber line", async ({ juno, fake, userData }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
@@ -104,8 +103,6 @@ test("Send to Main sends a checked draft where it was typed, and hiring details 
 })
 
 test('reviews local fixes, dismisses them and corrects a doubled word', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const context = { juno, fake }
   await test.step('local fixes send first and Review opens a draft without changing the sent message', () => reviewLocalFixes(context))
   await test.step('Dismiss removes the fix line without changing the message, and it stays away', () => dismissLocalFixes(context))
@@ -173,8 +170,6 @@ test.describe('with a model slower than the typing pause', () => {
   test.use({ fakeAiDelayMillis: 1_000 })
 
   test('Enter never waits for a slow model: before its answer the message sends at once, after it the bar shows', async ({ juno, fake, userData }) => {
-    await juno.signIn()
-    await juno.waitForSync()
     const { topic } = juno
     await juno.sidebar.row(ENG_MAIN).open()
     await topic.expectTitle('Main')
@@ -206,8 +201,6 @@ test.describe('with a model slower than the typing pause', () => {
 })
 
 test('with AI assist off, local checks still work and models stay off', async ({ juno, fake, slackApp, userData, running }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await running.close()
   const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
   db.prepare(`INSERT INTO prefs (key, value_json) VALUES ('aiAssist', 'false') ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json`).run()
@@ -242,8 +235,6 @@ test('with AI assist off, local checks still work and models stay off', async ({
 
 // The thread suggestion goes first, for the same reason: the audience step's drafts start wrong-place checks.
 test('Home checks a channel draft, posts in the suggested thread, and warns about the audience of the chosen channel', async ({ juno, fake, userData }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await test.step('Home checks a channel draft and can post in the suggested thread', async () => {
     await juno.tabs.newTabButton.click()
     await juno.write.pickConversation('eng', 'eng')
@@ -269,8 +260,6 @@ test('Home checks a channel draft, posts in the suggested thread, and warns abou
 })
 
 test('a message with a mention gets its fix line, and Review opens it as the field showed it', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { topic } = juno
   await juno.sidebar.row(POSTGRES).open()
   await topic.composer.pressSequentially('Thanks @ma')
@@ -287,8 +276,6 @@ test('a message with a mention gets its fix line, and Review opens it as the fie
 })
 
 test('Home sends local mistakes unchanged; the fix line waits on the message in its topic', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.tabs.newTabButton.click()
   await juno.write.pickConversation('eng', 'eng')
   await juno.write.write(TYPOS)
@@ -304,8 +291,6 @@ test('Home sends local mistakes unchanged; the fix line waits on the message in 
 
 // Lowercase i left alone by default is a clarity rule (packages/domain/test/checks.test.ts).
 test('Capital i, turned on in General, flags lowercase i', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.openSettings('General')
   const capital = juno.win.getByRole('checkbox', { name: 'Capital i', exact: true })
   await expect(capital).not.toBeChecked()
@@ -322,8 +307,6 @@ test('Capital i, turned on in General, flags lowercase i', async ({ juno, fake }
 })
 
 test('grammar offers its broken as an inline edit after sending, and asks nothing while typing', async ({ juno, fake, userData }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.composer.fill('its broken')
   // Past the typing pause: grammar has not been asked.
@@ -346,8 +329,6 @@ test.describe('with a grammar model that takes 5 seconds', () => {
   test.use({ fakeAiDelayMillis: 5_000 })
 
   test('Enter never waits, local doubled words show at once, and the grammar fix joins them when it comes', async ({ juno, fake }) => {
-    await juno.signIn()
-    await juno.waitForSync()
     await juno.sidebar.row(POSTGRES).open()
     const text = 'its broken, I think the the build is red'
     await juno.topic.send(text)
@@ -364,8 +345,6 @@ test.describe('with a grammar model that takes 5 seconds', () => {
   })
 
   test('a slow grammar answer shows its fix line after leaving the topic and coming back', async ({ juno, fake, userData }) => {
-    await juno.signIn()
-    await juno.waitForSync()
     await juno.sidebar.row(POSTGRES).open()
     const since = Date.now()
     await juno.topic.send('its broken')
@@ -380,8 +359,6 @@ test.describe('with a grammar model that takes 5 seconds', () => {
 })
 
 test('Wrong place and grammar can be turned off without disabling local checks', async ({ juno, fake, userData }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.openSettings('General')
   await juno.win.getByRole('checkbox', { name: 'Wrong place', exact: true }).uncheck()
   await juno.win.getByRole('checkbox', { name: 'Grammar (uses AI)', exact: true }).uncheck()

@@ -9,12 +9,13 @@ import { join } from 'node:path'
 import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 const RINA = 'Rina finished the onsite'
 const ALERTS_MAIN = '#alerts-prod'
 
 test('privacy mode blurs previews from the account menu, hides notification text, survives a relaunch and turns off from the footer', async ({ juno, slack, fake, slackApp, userData, running }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { sidebar, privacy, accountMenu } = juno
   const rina = sidebar.row(RINA)
   await rina.expectVisible()
@@ -94,8 +95,6 @@ test('privacy mode blurs previews from the account menu, hides notification text
 })
 
 test('View › Reload keeps privacy mode on', async ({ juno, app }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.privacy.toggleWithMenu()
   await expect(juno.privacy.footer).toBeVisible()
 
@@ -108,8 +107,6 @@ test('View › Reload keeps privacy mode on', async ({ juno, app }) => {
 })
 
 test('a launch.json field the app cannot read does not turn privacy mode off', async ({ juno, running, userData, fake, slackApp }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await running.close()
   // An accent this version does not know, as after going back to an older version.
   await writeFile(join(userData, 'launch.json'), JSON.stringify({ theme: 'dark', privacy: true, accent: 'ultraviolet' }))

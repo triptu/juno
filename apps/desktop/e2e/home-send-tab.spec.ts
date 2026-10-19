@@ -3,6 +3,9 @@
 // and only when no tab shows that topic yet.
 import { expect, test } from './fixtures'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 // A failing test attaches the send's path through the app and the fake's post calls (README, "Send trace").
 test.use({ sendTrace: true })
@@ -13,8 +16,6 @@ const POSTGRES = 'Draft plan is in the doc'
 const startsWith = (text: string) => expect.stringMatching(new RegExp(`^${text}`))
 
 test('a send to a Main opens it behind Home, right after it, once', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { write, tabs, sidebar } = juno
 
   // Home, then a topic in a second tab; back on Home.
@@ -47,8 +48,6 @@ test('a send to a Main opens it behind Home, right after it, once', async ({ jun
 })
 
 test('a reply in a thread from Home opens the thread behind Home, once', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { write, tabs, topic } = juno
 
   await write.pickConversation('eng', 'eng')
@@ -79,8 +78,6 @@ test('a reply in a thread from Home opens the thread behind Home, once', async (
 })
 
 test('a send from Home goes when another tab is chosen before its checks answer', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { write, tabs } = juno
   await tabs.menu('new-tab')
   await tabs.expectActiveAt('Home', 1)

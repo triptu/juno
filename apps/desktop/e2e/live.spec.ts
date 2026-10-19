@@ -3,15 +3,13 @@
 // unread until the user reaches the bottom.
 import { measureLayoutShift } from '@juno/testing/layout-shift'
 import { startFakeSlack, topic300Seed } from '@juno/fake-slack'
-import { expect, test } from './fixtures'
+import { expect, syncedTest, test } from './fixtures'
 
 test.describe.configure({ timeout: 90_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
 
-test('a reply that arrives while the topic is open at the bottom shows and keeps the row read', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('a reply that arrives while the topic is open at the bottom shows and keeps the row read', async ({ juno, slack }) => {
   const postgres = juno.sidebar.row(POSTGRES)
   await postgres.open()
   await juno.topic.expectAtBottom()
@@ -32,9 +30,7 @@ test('a reply that arrives while the topic is open at the bottom shows and keeps
   await postgres.expectRead()
 })
 
-test('a reply that arrives while the window is in the background stays unread until the window is back', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('a reply that arrives while the window is in the background stays unread until the window is back', async ({ juno, slack }) => {
   const postgres = juno.sidebar.row(POSTGRES)
   await postgres.open()
   await juno.topic.expectAtBottom()

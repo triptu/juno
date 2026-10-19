@@ -6,6 +6,9 @@
 import type { Locator } from '@playwright/test'
 import { expect, test, type Fixtures } from './fixtures'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
@@ -49,8 +52,6 @@ function postedLinks(calls: ReadonlyArray<{ method: string; args: Json }>): Arra
 }
 
 test('sends plain links, pastes linked words and edits links with the keyboard', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const context = { juno, fake }
   await test.step('URLs and domains sent from the composer show as links before and after the echo', () => sendPlainLinks(context))
   await test.step('a URL pasted over selected words links them, is sent as Slack sends it, and Undo gives the plain paste', () => pasteLinkedWords(context))

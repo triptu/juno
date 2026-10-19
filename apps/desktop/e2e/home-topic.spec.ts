@@ -4,6 +4,9 @@
 // changes.
 import { expect, test, type Fixtures } from './fixtures'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 /** #eng's Postgres thread, titled by its root's first words with AI off. */
@@ -11,8 +14,6 @@ const POSTGRES = 'Draft plan is in the doc'
 const REPLY = 'Dry run notes are in the staging channel'
 
 test('sends to a chosen thread and resets the topic chip when the destination changes', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const context = { juno, fake }
   await test.step('a thread chosen in the topic chip takes the send as a reply there, and the topic shows it', () => sendToThread(context))
   await test.step('the topic chip hides for Juno and goes back to Main when the destination changes', () => changeDestination(context))

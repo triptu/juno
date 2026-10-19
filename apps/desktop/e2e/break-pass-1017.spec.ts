@@ -4,7 +4,7 @@
 import { SELF_ID } from '@juno/fake-slack'
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
-import { expect, launchApp, test } from './fixtures'
+import { expect, launchApp, syncedTest, test } from './fixtures'
 import { Juno } from './driver/juno'
 
 test.describe.configure({ timeout: 120_000 })
@@ -50,9 +50,7 @@ async function setWindowSize(juno: Juno, width: number, height?: number): Promis
   }, [width, height] as const)
 }
 
-test('two tabs on one topic share its draft, and a send from one clears it in both', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('two tabs on one topic share its draft, and a send from one clears it in both', async ({ juno, fake }) => {
   await juno.sidebar.row(POSTGRES).open()
   await juno.sidebar.row(POSTGRES).openInNewTab()
   await expect(juno.tabs.tab(POSTGRES)).toHaveCount(2)
@@ -69,9 +67,7 @@ test('two tabs on one topic share its draft, and a send from one clears it in bo
   expect(fake.messages('C0ENG').filter((m) => m.text === 'Shared draft')).toHaveLength(1)
 })
 
-test('closing the last tab while its message sends posts it once and opens a new tab', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('closing the last tab while its message sends posts it once and opens a new tab', async ({ juno, fake }) => {
   await juno.sidebar.row('#eng').open()
   await juno.tabs.expectCount(1)
   fake.holdNext({ method: 'chat.postMessage', before: true })
@@ -113,9 +109,7 @@ test('⌘T during the first sync opens a usable Home', async ({ juno, fake }) =>
   await expect.poll(() => fake.messages('C0ENG').filter((m) => m.text === 'Written during sync').length).toBe(1)
 })
 
-test('Settings opened from ⌘, , the avatar menu and Notifications stays one tab at the asked section', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('Settings opened from ⌘, , the avatar menu and Notifications stays one tab at the asked section', async ({ juno }) => {
   await juno.sidebar.row(POSTGRES).open()
   await juno.sidebar.row(RINA).openInNewTab()
   // Everything opens in the current tab: Settings takes Rina's.
@@ -158,9 +152,7 @@ test('a Recent pick and its draft survive switching tabs before sending', async 
   await expect.poll(() => fake.messages('C0ENG').filter((m) => m.text === 'Picked then switched').length).toBe(1)
 })
 
-test('a relaunch keeps many tabs and their drafts', async ({ juno, running, userData, fake, slackApp }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('a relaunch keeps many tabs and their drafts', async ({ juno, running, userData, fake, slackApp }) => {
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.composer.fill('Draft one')
   await juno.sidebar.row(RINA).openInNewTab()
@@ -224,9 +216,7 @@ test('the topic switcher with many threads keeps the selected row in view and fi
   await expect(switcher.root).toBeHidden()
 })
 
-test('a send while the socket and network drop goes once when they are back', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('a send while the socket and network drop goes once when they are back', async ({ juno, fake }) => {
   await juno.sidebar.row('#eng').open()
   fake.goOffline()
   fake.dropSocket()
@@ -242,9 +232,7 @@ test('a send while the socket and network drop goes once when they are back', as
   await expect(juno.topic.message('Sent offline')).toHaveCount(1)
 })
 
-test('a narrow window keeps the tab strip and topic inside the window', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('a narrow window keeps the tab strip and topic inside the window', async ({ juno }) => {
   await setWindowSize(juno, 720, 480)
   await juno.sidebar.row(POSTGRES).open()
   for (const title of [RINA, ROADMAP, '#eng']) await juno.sidebar.row(title).openInNewTab()
@@ -256,9 +244,7 @@ test('a narrow window keeps the tab strip and topic inside the window', async ({
   await expect(juno.topic.contextPill).toBeInViewport()
 })
 
-test('each tab gets its composer focus back after a keyboard tab switch', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('each tab gets its composer focus back after a keyboard tab switch', async ({ juno }) => {
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.composer.click()
   await juno.topic.composer.pressSequentially('Typing in the topic')
@@ -273,9 +259,7 @@ test('each tab gets its composer focus back after a keyboard tab switch', async 
   await expect(juno.write.composer).toBeFocused()
 })
 
-test('a mouse press on a tab gives its page focus; the keyboard keeps focus in the strip', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('a mouse press on a tab gives its page focus; the keyboard keeps focus in the strip', async ({ juno }) => {
   await juno.sidebar.row(POSTGRES).open()
   await juno.sidebar.row(RINA).openInNewTab()
   // Never focused in this tab: the press focuses its composer.
@@ -294,9 +278,7 @@ test('a mouse press on a tab gives its page focus; the keyboard keeps focus in t
   await juno.tabs.expectFocused('Rina')
 })
 
-test('⌘T twice gives two Home tabs with their own drafts and destinations, and both survive a relaunch', async ({ juno, running, userData, fake, slackApp }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('⌘T twice gives two Home tabs with their own drafts and destinations, and both survive a relaunch', async ({ juno, running, userData, fake, slackApp }) => {
   await juno.sidebar.row(POSTGRES).open()
   await juno.tabs.menu('new-tab')
   await juno.write.write('First note for Juno')
@@ -334,9 +316,7 @@ test('⌘T twice gives two Home tabs with their own drafts and destinations, and
   }
 })
 
-test('a send from Home to a channel, a thread’s channel or a DM another tab shows leaves every tab where it was', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('a send from Home to a channel, a thread’s channel or a DM another tab shows leaves every tab where it was', async ({ juno, fake }) => {
   await juno.sidebar.row('#eng').open()
   await juno.sidebar.row('Maya', { exact: true }).openInNewTab()
   await juno.tabs.menu('new-tab')

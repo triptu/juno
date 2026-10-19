@@ -1,12 +1,10 @@
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { expect, launchApp, test } from './fixtures'
+import { expect, launchApp, syncedTest, test } from './fixtures'
 
 test.describe.configure({ timeout: 120_000 })
 
-test('a deleted message cannot be edited from its already open menu', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('a deleted message cannot be edited from its already open menu', async ({ juno, fake }) => {
   await juno.sidebar.row('#eng').open()
   await juno.topic.send('Delete under menu')
   await juno.topic.expectSent('Delete under menu')
@@ -22,9 +20,7 @@ test('a deleted message cannot be edited from its already open menu', async ({ j
   await juno.topic.expectSent('Still usable')
 })
 
-test('deleting the source of a Slack quote keeps the written reply', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('deleting the source of a Slack quote keeps the written reply', async ({ juno, fake }) => {
   await juno.sidebar.row('#eng').open()
   const message = fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Keep this quote' })
   const row = juno.topic.message('Keep this quote')
@@ -39,9 +35,7 @@ test('deleting the source of a Slack quote keeps the written reply', async ({ ju
   await expect.poll(() => fake.messages('C0ENG').some((m) => m.text?.includes('Keep this quote'))).toBe(true)
 })
 
-test('fast Enter presses send the draft once while the post waits', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('fast Enter presses send the draft once while the post waits', async ({ juno, fake }) => {
   await juno.sidebar.row('#eng').open()
   fake.holdNext({ method: 'chat.postMessage', before: true })
   await juno.topic.composer.fill('Only one copy')
@@ -56,9 +50,7 @@ test('fast Enter presses send the draft once while the post waits', async ({ jun
   expect(fake.messages('C0ENG').filter((m) => m.text === 'Only one copy')).toHaveLength(1)
 })
 
-test('long RTL and zero-width text leaves the composer usable', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('long RTL and zero-width text leaves the composer usable', async ({ juno, fake }) => {
   await juno.sidebar.row('#eng').open()
   const text = 'مرحبا\u200b עולם '.repeat(700) + 'End of long message'
   fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text })
@@ -99,9 +91,7 @@ test('a deleted sender and a live rename keep their messages readable', async ({
   await juno.topic.expectSent('Reply to the old message')
 })
 
-test('repeated window minimize and restore keeps the draft', async ({ juno, app }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('repeated window minimize and restore keeps the draft', async ({ juno, app }) => {
   await juno.sidebar.row('#eng').open()
   await juno.topic.composer.fill('Draft through window changes')
   await app.evaluate(({ BrowserWindow }) => {

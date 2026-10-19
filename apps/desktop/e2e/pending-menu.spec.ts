@@ -1,10 +1,11 @@
 import { expect, test } from './fixtures'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 test('Edit from a held menu follows a message that finishes sending', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.sidebar.row('#eng').open()
   await juno.topic.expectTitle('Main')
   fake.holdNext({ method: 'chat.postMessage', before: true })

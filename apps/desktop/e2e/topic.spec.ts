@@ -3,7 +3,7 @@
 // #channel chip, and prefetch.
 import { measureLayoutShift } from '@juno/testing/layout-shift'
 import { startFakeSlack, topic300Seed } from '@juno/fake-slack'
-import { expect, test, type Fixtures } from './fixtures'
+import { expect, syncedTest, test, type Fixtures } from './fixtures'
 
 test.describe.configure({ timeout: 90_000 })
 
@@ -14,10 +14,7 @@ const CHECKOUT = 'checkout.spec failed again on main.'
 const ENG_MAIN = '#eng'
 
 // The hover goes first, while the topic has never been opened.
-test('a read topic warms on hover, opens from the cache, and opens at the bottom', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-
+syncedTest('a read topic warms on hover, opens from the cache, and opens at the bottom', async ({ juno, slack }) => {
   await test.step('hovering a row warms the topic without asking Slack', async () => {
     slack.resetCalls()
     await juno.sidebar.row(POSTGRES).hover()
@@ -40,10 +37,7 @@ test('a read topic warms on hover, opens from the cache, and opens at the bottom
 })
 
 // Rina’s thread opens first, while it still has its 2 unread.
-test('Rina’s thread opens at the "N new" divider, and its ⋯ menu unfollows and follows it', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-
+syncedTest('Rina’s thread opens at the "N new" divider, and its ⋯ menu unfollows and follows it', async ({ juno, slack }) => {
   await test.step('a topic with unread messages opens at the "N new" divider and is marked read', async () => {
     const rina = juno.sidebar.row(RINA)
     await rina.expectUnread(2)
@@ -106,10 +100,7 @@ test('Rina’s thread opens at the "N new" divider, and its ⋯ menu unfollows a
 })
 
 // The switcher step ends on Main, where the header step starts.
-test('Main’s thread links, its title switcher, its Notify me and its header order', async ({ juno, win }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-
+syncedTest('Main’s thread links, its title switcher, its Notify me and its header order', async ({ juno, win }) => {
   await test.step('Main shows thread links; a link opens the thread in the tab, and the title switches to another thread', async () => {
     const main = juno.sidebar.row(ENG_MAIN)
     await main.expectNewThreads(1)
@@ -174,10 +165,7 @@ test('Main’s thread links, its title switcher, its Notify me and its header or
 })
 
 // The Follow step ends with ⌘Z, so the thread is unfollowed again for the Notify me step.
-test('Follow on an unfollowed thread from Main, then Notify me after it', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-
+syncedTest('Follow on an unfollowed thread from Main, then Notify me after it', async ({ juno, slack }) => {
   await test.step('an unfollowed thread opened from Main shows Follow in Resolve’s place; a click follows it with When it matters, no menu, and ⌘Z undoes it', async () => {
     await juno.sidebar.row(ENG_MAIN).open()
     await juno.topic.threadLink(/checkout\.spec failed/).open()
@@ -232,10 +220,7 @@ test('Follow on an unfollowed thread from Main, then Notify me after it', async 
 })
 
 // The chip step moves the scope from #eng, where the pill step left it, to #platform.
-test('the context pill and a #channel chip scope the sidebar', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-
+syncedTest('the context pill and a #channel chip scope the sidebar', async ({ juno }) => {
   await test.step('the context pill scopes the sidebar to its channel', async () => {
     await juno.sidebar.row(POSTGRES).open()
     await juno.topic.contextPill.click()
@@ -309,9 +294,7 @@ test('at the minimum window size the topic switcher stays inside the workspace',
   expect(list.x + list.width).toBeLessThanOrEqual(pane.x + pane.width)
 })
 
-test('shows header hover and press states and searches the topic switcher', async ({ juno, win }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('shows header hover and press states and searches the topic switcher', async ({ juno, win }) => {
   const context = { juno, win }
   await test.step('every control in the header answers hover and press', () => headerFeedback(context))
   await test.step('the switcher searches the channel’s topics, and ⌘ opens one in a new tab', () => searchSwitcher(context))

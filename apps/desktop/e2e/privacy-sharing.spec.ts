@@ -9,14 +9,15 @@ import type { Fixtures } from './fixtures'
 import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 // No full stop: the AI title (the first sentence, cut short) replaces the message text once the title job runs.
 const RINA = 'Rina finished the onsite'
 const SWITCH = 'Hide message text while sharing the screen'
 const ALWAYS_ON = "Another app is recording the screen all the time, so Juno can't tell when you share. Use ⌃⌘H to hide message text."
 
 test('hides text while sharing and respects manual privacy and the setting', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const context = { juno }
   await test.step('a share that starts while Juno runs hides message text and says why, and stopping shows it again', () => sharePrivacy(context))
   await test.step('a mode turned on by hand stays on after sharing stops, and the setting turns hiding off', () => manualPrivacy(context))
@@ -93,8 +94,6 @@ async function manualPrivacy({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
 }
 
 test('a capture running at launch hides nothing, and true then false then true hides the text', async ({ juno, running, userData, fake, slackApp }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   // Sharing turned the mode on when Juno quit; the next launch has it as the user left it, off.
   await juno.privacy.startSharing()
   await expect(juno.privacy.footer).toBeVisible()
@@ -125,8 +124,6 @@ test.describe('with a capture running at launch', () => {
   test.use({ screenShared: true })
 
   test('a capture that never stops says detection is not available, until it stops', async ({ juno }) => {
-    await juno.signIn()
-    await juno.waitForSync()
     await juno.openSettings('General')
     await expect(juno.settings.root.getByText(ALWAYS_ON)).toHaveCount(0)
 

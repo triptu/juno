@@ -10,6 +10,9 @@ import type { Locator } from '@playwright/test'
 import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 const CHOSEN = ['rocket', 'pray', '+1', 'eyes', 'tada']
@@ -43,8 +46,6 @@ async function hoveredMessage(juno: Juno, text: string): Promise<Locator> {
 }
 
 test('five quick reactions set in Settings show in the toolbar in order, react in one click, and survive a relaunch', async ({ juno, fake, slackApp, userData, running }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.openSettings('Appearance')
   await expect.poll(() => pillNames(juno)).toEqual(['+1', 'white_check_mark', 'eyes'])
 
@@ -92,8 +93,6 @@ test('five quick reactions set in Settings show in the toolbar in order, react i
 })
 
 test('adds, removes and resets quick reactions, then enforces the seven-reaction limit', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const context = { juno, fake }
   await test.step('Add opens the emoji picker over the page; a pick shows in the toolbar, and remove and reset come back to the default', () => editQuickReactions(context))
   await test.step('at seven, Add stays focusable, says "Up to 7" and opens nothing', () => limitQuickReactions(context))

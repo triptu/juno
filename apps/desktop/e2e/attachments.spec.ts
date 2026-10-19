@@ -7,14 +7,15 @@ import { expect, test, type Fixtures } from './fixtures'
 import { brief, chart, chip, chips, drop, paste, staged } from './attach'
 import { expectStableAnchor } from './shiftProbe'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 const ENG_MAIN = '#eng'
 const PROPOSAL = 'Proposal: cut offline mode'
 
 test('a pasted image goes with the message and shows in it at its final size', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
@@ -50,8 +51,6 @@ test('a pasted image goes with the message and shows in it at its final size', a
 // `file_thumbnail_generated` follows (research section 3, "Files"). The sent image shows its staged copy at its
 // final size from the first frame, then Slack's thumbnail in the same box.
 test('a sent image Slack has no thumbnails for yet shows at once from the local copy, then takes Slack\'s in the same box', async ({ juno, win, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
@@ -85,8 +84,6 @@ test('a sent image Slack has no thumbnails for yet shows at once from the local 
 })
 
 test('another person\'s image that arrives without thumbnails fills in after the refetch', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
@@ -104,8 +101,6 @@ test('another person\'s image that arrives without thumbnails fills in after the
 })
 
 test('a reply image takes Slack thumbnails after processing without a message update or file event', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { topic } = juno
   const root = fake.messages('C0ENG').find((message) => message.text?.startsWith('Draft plan is in the doc'))!
   await juno.sidebar.row('Draft plan is in the doc').open()
@@ -131,8 +126,6 @@ test('a reply image takes Slack thumbnails after processing without a message up
 })
 
 test('drops files in Main and replies and removes a chip before sending', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const context = { juno, fake }
   await test.step('a file dropped on the topic is sent on its own as a file row with Download', () => dropInMain(context))
   await test.step('a file dropped on a reply composer is attached once and shared in that thread', () => dropInReply(context))
@@ -203,8 +196,6 @@ async function removeBeforeSending({ juno, fake }: Pick<Fixtures, 'juno' | 'fake
 }
 
 test('a failed upload keeps the text and the file for Retry, and is sent once', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
@@ -227,8 +218,6 @@ test('a failed upload keeps the text and the file for Retry, and is sent once', 
 })
 
 test('Home keeps its files through a change of destination and sends them to the last one', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { tabs, write } = juno
   await tabs.newTabButton.click()
   await write.write('Brief for the launch')
@@ -249,8 +238,6 @@ test('Home keeps its files through a change of destination and sends them to the
 })
 
 test("a stored message's image opens in the viewer and its file downloads into Downloads", async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { topic } = juno
   await juno.sidebar.row(PROPOSAL).open()
   await test.step('an image opens in the viewer, and Esc closes it', async () => {
@@ -282,8 +269,6 @@ test("a stored message's image opens in the viewer and its file downloads into D
 // filmstrip along the bottom. ← and → move and stop at the ends, the strip shows the one clicked, and Esc closes
 // with focus back on the tile that opened it.
 test('several images open in the viewer at the one clicked, and the keys and the filmstrip move through them', async ({ juno, win, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')

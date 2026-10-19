@@ -5,6 +5,9 @@ import { brief, paste } from './attach'
 import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
@@ -14,8 +17,6 @@ async function setWindowSize(juno: Juno, width: number, height: number): Promise
 }
 
 test('a first @ and a name typed fast with Enter picks the person typed, not a row from before', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { write, win } = juno
 
   await write.composer.pressSequentially('@')
@@ -30,8 +31,6 @@ test('a first @ and a name typed fast with Enter picks the person typed, not a r
 })
 
 test('a Home draft shown again takes typing at its end', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { write, topic, sidebar, nav, win } = juno
 
   await write.write('A long thought')
@@ -45,8 +44,6 @@ test('a Home draft shown again takes typing at its end', async ({ juno }) => {
 })
 
 test('in the smallest window the destination list from ⌘N fits above the chip, its search in view', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { write, tabs, win } = juno
 
   await setWindowSize(juno, 720, 480)
@@ -68,8 +65,6 @@ test('in the smallest window the destination list from ⌘N fits above the chip,
 })
 
 test('holding Backspace to clear the text keeps the destination; a new Backspace in the empty field goes back to Juno', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { write, win } = juno
 
   await write.recentRow('Maya').click()
@@ -85,8 +80,6 @@ test('holding Backspace to clear the text keeps the destination; a new Backspace
 })
 
 test('text typed while a Home send waits for Slack stays in the field', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { write, win } = juno
 
   await write.pickConversation('jon', 'Jonas')
@@ -103,8 +96,6 @@ test('text typed while a Home send waits for Slack stays in the field', async ({
 })
 
 test('text pasted right after ⌘T goes into the new Home, in order with the keys typed around it', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { write, topic, sidebar, tabs, win } = juno
 
   await sidebar.row(POSTGRES).open()
@@ -126,8 +117,6 @@ test('text pasted right after ⌘T goes into the new Home, in order with the key
 })
 
 test('keys typed on the destination chip go into the field; arrows and Space still drive the chip', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { write, tabs, win } = juno
 
   await tabs.menu('new-message')
@@ -151,8 +140,6 @@ test('keys typed on the destination chip go into the field; arrows and Space sti
 })
 
 test('a file Juno cannot read, attached with Juno chosen, says so until a person or channel is chosen', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { write } = juno
   const note = write.root.locator('[data-attachment-note]')
 

@@ -4,6 +4,9 @@
 // the tab, and the row menu's actions work here with their undo.
 import { expect, test, type Fixtures } from './fixtures'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 90_000 })
 
 // Titles are the first six words of the root message, so a prefix is enough.
@@ -17,8 +20,6 @@ const DESIGN = 'Two options for the thread list'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
 
 test('lists quiet, resolved and never-followed topics, and a row opens its topic in the tab', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { sidebar, allTopics, tabs } = juno
 
   // A quiet topic and a thread nobody followed are not in the sidebar.
@@ -56,8 +57,6 @@ test('lists quiet, resolved and never-followed topics, and a row opens its topic
 })
 
 test('filters all topics by status, kind, text and place, then acts on rows with Undo', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const context = { juno, slack }
   await test.step('each filter narrows the list: status chips, kind, sort and text', () => filterTopics(context))
   await test.step('the place picker searches conversations by word, and a pick narrows the list', () => pickTopicPlace(context))

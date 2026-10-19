@@ -4,6 +4,9 @@
 // undone with the toast's Undo or ⌘Z (Edit › Undo).
 import { expect, test, type Fixtures } from './fixtures'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 90_000 })
 
 // Titles are the first six words of the root message, so a prefix is enough.
@@ -15,8 +18,6 @@ const ALERTS_MAIN = '#alerts-prod'
 const MARKS = ['conversations.mark', 'subscriptions.thread.mark']
 
 test('resolves and reopens topics, with Undo and pinned rows', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const context = { juno, slack }
   await test.step('Resolve hides the row and marks it read, Undo brings it back unread, and a new reply reopens it', () => resolveTopic(context))
   await test.step('a pinned topic stays in Pinned when resolved, and the header reopens it', () => resolvePinnedTopic(context))
@@ -84,8 +85,6 @@ async function resolvePinnedTopic({ juno }: Pick<Fixtures, 'juno'>): Promise<voi
 }
 
 test('Rename from a row edits the row, from the header edits the header, and clearing a title brings the old one back', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { sidebar } = juno
 
   // The row: the title becomes a field with its text selected; Enter saves.
@@ -126,9 +125,6 @@ test('Rename from a row edits the row, from the header edits the header, and cle
 
 // Each step undoes what it did. Marks go first, while Rina's thread still has its 2 unread.
 test('Mark as read and unread, Ignore, and the Slack links, each from the menu', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-
   await test.step('Mark as read and Mark as unread from the menu, each undone', async () => {
     const rina = juno.sidebar.row(RINA)
     await rina.expectUnread(2)

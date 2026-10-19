@@ -10,7 +10,7 @@
  * (`junoTest.notificationPermission`).
  */
 import { seedWorkspace, startFakeSlack, topic300Seed } from '@juno/fake-slack'
-import { expect, test } from './fixtures'
+import { expect, syncedTest, test } from './fixtures'
 import { watchFlashes } from './driver/flashes'
 import type { Juno } from './driver/juno'
 
@@ -19,10 +19,7 @@ const ROADMAP = 'Proposal: cut offline mode and public'
 const RINA = 'Rina finished the onsite'
 const LONG_THREAD = 'Review the rollout checklist 1.'
 
-test('Notify me on a channel lists it on the page, and removing it there has Undo', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-
+syncedTest('Notify me on a channel lists it on the page, and removing it there has Undo', async ({ juno }) => {
   // A bot channel: the Automated view holds it.
   await juno.sidebar.selectView('Automated')
   const alerts = juno.sidebar.row(ALERTS_MAIN)
@@ -50,10 +47,7 @@ test('Notify me on a channel lists it on the page, and removing it there has Und
   await expect(page.level('Never')).toContainText('alerts-prod')
 })
 
-test('a group DM notifies under its people\'s names, not Slack\'s internal name', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-
+syncedTest('a group DM notifies under its people\'s names, not Slack\'s internal name', async ({ juno, slack }) => {
   await juno.sidebar.row('Maya, Leo', { exact: true }).open()
   await juno.topic.chooseInMessageMenu('lunch friday?', 'notify-every', { onSender: true })
   await juno.expectToast('Leo: Every message')
@@ -63,10 +57,7 @@ test('a group DM notifies under its people\'s names, not Slack\'s internal name'
   await expect.poll(() => juno.osNotifications(), { timeout: 15_000 }).toContainEqual({ title: 'Maya, Leo', body: 'Moved it to 1pm' })
 })
 
-test('a DM set to Every message notifies, the click opens it at the message, and the menu says why', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-
+syncedTest('a DM set to Every message notifies, the click opens it at the message, and the menu says why', async ({ juno, slack }) => {
   // Maya's DM is on the page's Every message list once set from the person menu.
   slack.as('Maya').dm('Can you look at the hiring plan today?')
   await juno.sidebar.row('Maya', { exact: true }).open()
@@ -107,9 +98,7 @@ test('a DM set to Every message notifies, the click opens it at the message, and
   await expect(none).toHaveCount(0)
 })
 
-test('a topic on screen in a focused window does not notify, and unread mentions badge the dock', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('a topic on screen in a focused window does not notify, and unread mentions badge the dock', async ({ juno, slack }) => {
   await expect.poll(() => juno.dockBadge(), { timeout: 15_000 }).toBe('•')
 
   await juno.sidebar.selectView('Automated')
@@ -128,10 +117,7 @@ test('a topic on screen in a focused window does not notify, and unread mentions
 })
 
 // The defaults are read first, before any step changes a setting.
-test('Settings: Notifications and Appearance save, the test notification and permission line, and Ignored', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-
+syncedTest('Settings: Notifications and Appearance save, the test notification and permission line, and Ignored', async ({ juno }) => {
   await test.step('Settings › Notifications saves hours and what matters, and Appearance changes the density', () => notificationsAndAppearance(juno))
   await test.step('Send test notification posts one notification, and a line shows when macOS does not let Juno notify', () => testNotificationAndPermission(juno))
   await test.step('Settings › Ignored lists an ignored channel, and Stop ignoring has Undo', () => ignoredChannels(juno))

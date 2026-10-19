@@ -1,5 +1,8 @@
 import { expect, test, type Fixtures } from './fixtures'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
@@ -7,8 +10,6 @@ const ROADMAP = 'Proposal: cut offline mode and public'
 const WAL = 'We keep the old primary warm for 48h. Flip DNS back and replay from the WAL position we logged.'
 
 test('opens and dismisses the palette, switches search modes and opens conversations', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const context = { juno }
   await test.step('opens on Conversations with frequent ones, Tab switches to Messages and back, and it closes with Esc, ⌘K or a press outside', () => openPalette(context))
   await test.step('a channel typed in Conversations opens its Main with Enter, a person their DM, and ⌘Enter a new tab', () => openConversations(context))
@@ -82,8 +83,6 @@ async function openConversations({ juno }: Pick<Fixtures, 'juno'>): Promise<void
 }
 
 test('commands: ">theme" switches the theme, and an open topic\'s commands resolve it', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { palette, sidebar } = juno
 
   await test.step('">" lists the commands, and ">theme" then Dark switches the theme', async () => {
@@ -135,8 +134,6 @@ test('commands: ">theme" switches the theme, and an open topic\'s commands resol
 })
 
 test('finds a topic by its title and opens it; ⌘Enter opens one in a new tab', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { palette, topic, tabs } = juno
 
   await palette.openMessages()
@@ -161,8 +158,6 @@ test('finds a topic by its title and opens it; ⌘Enter opens one in a new tab',
 })
 
 test('finds a message by its text and lands on it in its thread, flashing it; the snippet hides in privacy mode', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { palette, topic, privacy } = juno
 
   await palette.openMessages()
@@ -202,8 +197,6 @@ test('finds a message by its text and lands on it in its thread, flashing it; th
 })
 
 test("a person's result opens your DM, or Home addressed to them when you have never messaged", async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { palette, topic, write, tabs } = juno
 
   await palette.openMessages()
@@ -227,8 +220,6 @@ test("a person's result opens your DM, or Home addressed to them when you have n
 })
 
 test('a command shows above the results with its confidence, and Enter runs it', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { palette } = juno
 
   await palette.openMessages()
@@ -246,8 +237,6 @@ test('a command shows above the results with its confidence, and Enter runs it',
 })
 
 test('channels from the keyboard and from their results: Main and "show its topics"', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { palette, sidebar, tabs } = juno
 
   await test.step('keyboard only: ⌘K, type, arrows, Enter and Esc', async () => {
@@ -315,8 +304,6 @@ test('channels from the keyboard and from their results: Main and "show its topi
 })
 
 test("Slack's search: its rows go under the local ones, and an older answer never replaces a newer query's", async ({ juno, slack, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { palette, topic } = juno
 
   await test.step("Slack's search adds what the cache lacks under the local rows, and opening it lands on the message", async () => {
@@ -375,8 +362,6 @@ test("Slack's search: its rows go under the local ones, and an older answer neve
 })
 
 test('a better local match arriving later does not change what Enter opens', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { palette, topic } = juno
   await palette.openMessages()
   await palette.expectResults()

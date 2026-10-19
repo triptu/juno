@@ -3,7 +3,7 @@
 // the unread dot, and the sidebar's resize and hide.
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { expect, launchApp, test } from './fixtures'
+import { expect, launchApp, syncedTest, test } from './fixtures'
 import { Juno } from './driver/juno'
 import { savedTabs, threadId } from './driver/userDb'
 
@@ -14,9 +14,7 @@ const RINA = 'Rina finished the onsite'
 const ROADMAP = 'Proposal: cut offline mode and public'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
 
-test('Back and Forward move through the topics one tab showed', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('Back and Forward move through the topics one tab showed', async ({ juno }) => {
   const { sidebar, tabs, topic, nav } = juno
 
   await nav.expectCanGo(false, false)
@@ -71,9 +69,7 @@ test('Back and Forward move through the topics one tab showed', async ({ juno })
   await nav.expectCanGo(true, true)
 })
 
-test('⌘⇧T reopens closed tabs, the last closed first, each with its history', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('⌘⇧T reopens closed tabs, the last closed first, each with its history', async ({ juno }) => {
   const { sidebar, tabs, topic, nav } = juno
 
   await sidebar.row(POSTGRES).open()
@@ -104,9 +100,7 @@ test('⌘⇧T reopens closed tabs, the last closed first, each with its history'
   await tabs.expectCount(3)
 })
 
-test('the tab menu pins, unpins and closes, and pins survive a restart', async ({ juno, running, userData, fake, slackApp, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('the tab menu pins, unpins and closes, and pins survive a restart', async ({ juno, running, userData, fake, slackApp, slack }) => {
   const { sidebar, tabs } = juno
 
   await sidebar.row(POSTGRES).open()
@@ -160,9 +154,7 @@ test('the tab menu pins, unpins and closes, and pins survive a restart', async (
   }
 })
 
-test('an inactive tab shows the unread dot until its topic is read', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('an inactive tab shows the unread dot until its topic is read', async ({ juno, slack }) => {
   const { sidebar, tabs } = juno
 
   await sidebar.row(POSTGRES).open()
@@ -184,9 +176,7 @@ test('an inactive tab shows the unread dot until its topic is read', async ({ ju
 })
 
 // @mac: on Linux the width is not restored after the relaunch at the end (macOS quit and menu path); the Mac runs it.
-test('the sidebar resizes by its edge, resets on double-click, and hides', { tag: '@mac' }, async ({ juno, running, userData, fake, slackApp }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('the sidebar resizes by its edge, resets on double-click, and hides', { tag: '@mac' }, async ({ juno, running, userData, fake, slackApp }) => {
   const { frame, nav, sidebar } = juno
 
   await frame.expectWidth(384)

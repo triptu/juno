@@ -4,6 +4,9 @@ import type { Locator } from '@playwright/test'
 import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 /** Where the field's first word is: its padding, then half a line down. */
@@ -22,8 +25,6 @@ const names = (labels: ReadonlyArray<string>): string[] => labels.map((label) =>
 
 // One topic for the three menus. Each step starts with an empty composer; the last counts menus from its own baseline.
 test('the text menu on the composer and selected text in #eng', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.sidebar.row('#eng').open()
 
   await test.step('the composer has Cut, Copy and Paste, and Paste pastes', () => pasteFromTheMenu(juno))

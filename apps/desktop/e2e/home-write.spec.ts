@@ -4,7 +4,7 @@
 // conversations.open, ⌘N and "+", and Home from the sidebar.
 import { SELF_ID } from '@juno/fake-slack'
 import { recordBoxes } from './shiftProbe'
-import { expect, test, type Fixtures } from './fixtures'
+import { expect, syncedTest, test, type Fixtures } from './fixtures'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -13,9 +13,7 @@ const OFFSITE = 'Can eng take the Wednesday afternoon'
 /** Shares no two words with any #eng thread, so the wrong-place check never stops the send, however soon it answers. */
 const DRAFT = 'Lunch order goes out at noon'
 
-test('writes from Home to people and channels, keeps text and read state, and opens a first DM', async ({ juno, fake, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('writes from Home to people and channels, keeps text and read state, and opens a first DM', async ({ juno, fake, slack }) => {
   const context = { juno, fake, slack }
   await test.step('a first @ suggests a person, Tab makes them the destination, and the send stays on Home with the field in place', () => sendToPerson(context))
   await test.step('a first # or @ stays text for Juno on Space or Esc, and Recent chooses a person', () => keepPrefixText(context))
@@ -157,9 +155,7 @@ async function startChannelThread({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'
   expect(fake.messages('C0ENG').find((message) => message.text === 'second')?.thread_ts).toBe(root.ts)
 }
 
-test('Home keeps its draft and destination when a topic opens over it, and Back brings them back', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('Home keeps its draft and destination when a topic opens over it, and Back brings them back', async ({ juno }) => {
   const { write, topic, sidebar, nav } = juno
 
   await write.recentRow('Maya').click()
@@ -171,9 +167,7 @@ test('Home keeps its draft and destination when a topic opens over it, and Back 
   await write.expectDestination('Maya')
 })
 
-test('New Message (⌘N) opens Home’s destination list, and a new Home when this one has a draft; "+" opens Home ready to write', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('New Message (⌘N) opens Home’s destination list, and a new Home when this one has a draft; "+" opens Home ready to write', async ({ juno }) => {
   const { write, tabs, sidebar, topic } = juno
 
   await sidebar.row(POSTGRES).open()
@@ -202,9 +196,7 @@ test('New Message (⌘N) opens Home’s destination list, and a new Home when th
   await write.expectDestination('Juno')
 })
 
-test('Home opens from the sidebar in the current tab; a plain open focuses its tab and ⌘-click opens another', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('Home opens from the sidebar in the current tab; a plain open focuses its tab and ⌘-click opens another', async ({ juno }) => {
   const { tabs, sidebar, topic, nav } = juno
   const home = juno.home.navItem
 
@@ -273,9 +265,7 @@ test('Recent lists people and channels by use, and choosing one sets where the m
   expect(fake.calls.filter((call) => call.method === 'chat.postMessage').map((call) => call.args['channel'])).toEqual(['C0ENG'])
 })
 
-test('a new thread whose root fails stays in the sidebar with Not sent and Retry, and a queued reply follows it', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('a new thread whose root fails stays in the sidebar with Not sent and Retry, and a queued reply follows it', async ({ juno, fake }) => {
   const { write, topic, sidebar } = juno
   await write.pickConversation('eng', 'eng')
   fake.forceError({ method: 'chat.postMessage', error: 'restricted_action', times: 1 })
@@ -296,9 +286,7 @@ test('a new thread whose root fails stays in the sidebar with Not sent and Retry
   expect(fake.messages('C0ENG').find((message) => message.text === 'second')?.thread_ts).toBe(root.ts)
 })
 
-test('closing Home with a draft shows "Draft closed", and Undo brings the tab back with its draft', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('closing Home with a draft shows "Draft closed", and Undo brings the tab back with its draft', async ({ juno }) => {
   const { write, tabs } = juno
 
   await write.recentRow('Maya').click()
@@ -316,9 +304,7 @@ test('closing Home with a draft shows "Draft closed", and Undo brings the tab ba
   await expect(write.composer).toBeFocused()
 })
 
-test('a send Slack refuses says why in a toast, and the draft and destination stay', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('a send Slack refuses says why in a toast, and the draft and destination stay', async ({ juno, fake }) => {
   const { write } = juno
 
   await write.pickConversation('jon', 'Jonas')

@@ -7,6 +7,9 @@ import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
 import { brief, chart, chip, chips, paste } from './attach'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 const ENG_MAIN = '#eng'
@@ -32,8 +35,6 @@ function holdFileRead(win: Page, { fail = false }: { readonly fail?: boolean } =
 const releaseFileRead = (win: Page) => win.evaluate(() => window.dispatchEvent(new Event('release-file-read')))
 
 test('Enter while a file is still being read sends at once, and the message goes when the file is ready', async ({ juno, win, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
@@ -58,8 +59,6 @@ test('Enter while a file is still being read sends at once, and the message goes
 })
 
 test('a file that cannot be read after Enter shows its message as not sent', async ({ juno, win, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
@@ -80,8 +79,6 @@ test('a file that cannot be read after Enter shows its message as not sent', asy
 })
 
 test('a choice on the send check bar sends while a newly attached file is still being read', async ({ juno, win, fake, userData }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')

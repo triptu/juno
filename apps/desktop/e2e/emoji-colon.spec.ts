@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures'
+import { expect, syncedTest, test } from './fixtures'
 import { test as agentTest } from './juno-agent/chat'
 
 const POSTGRES = 'Draft plan is in the doc'
@@ -7,9 +7,7 @@ const postedText = (fake: { readonly calls: ReadonlyArray<{ readonly method: str
 
 // Which emoji match and in what order, and that a colon inside a word starts no list, are domain rules
 // (packages/domain/test/composer-emoji.test.ts). Home's Tab pick is in mentions.spec.ts.
-test('colon suggestions insert Unicode in a reply and send it to Slack; in Main, Esc keeps the colon text and a closing colon converts it', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('colon suggestions insert Unicode in a reply and send it to Slack; in Main, Esc keeps the colon text and a closing colon converts it', async ({ juno, fake }) => {
   await juno.sidebar.row(POSTGRES).open()
   const { topic } = juno
   await topic.composer.pressSequentially('Looking good :smi')

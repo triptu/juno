@@ -6,6 +6,9 @@
 import type { Juno } from './driver/juno'
 import { expect, test } from './fixtures'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
@@ -20,8 +23,6 @@ async function newMessageAndType(juno: Juno): Promise<void> {
 }
 
 test('keys typed right after ⌘N from a topic reach the new Home tab', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { write, tabs, sidebar, topic } = juno
 
   await sidebar.row(POSTGRES).open()
@@ -39,8 +40,6 @@ test('keys typed right after ⌘N from a topic reach the new Home tab', async ({
 })
 
 test('keys typed right after ⌘N on Home reach its destination list', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { write, tabs } = juno
 
   await write.composer.focus()
@@ -53,8 +52,6 @@ test('keys typed right after ⌘N on Home reach its destination list', async ({ 
 })
 
 test('keys typed right after ⌘N on Home with a draft reach the new Home tab, and the draft is untouched', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { write, tabs } = juno
 
   await write.write(DRAFT)

@@ -6,6 +6,9 @@ import { expectNoLayoutShift } from '@juno/testing/layout-shift'
 import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
 
+// Starts signed in and synced (README, "Synced start").
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 90_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
@@ -28,8 +31,6 @@ async function focusTextField(win: Page) {
 }
 
 test('holding ⌥ over a row peeks at the topic without marking it, opening it or moving focus', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { sidebar, peek, tabs } = juno
   await sidebar.row(POSTGRES).open()
   await tabs.expectActive(POSTGRES)
@@ -64,8 +65,6 @@ test('holding ⌥ over a row peeks at the topic without marking it, opening it o
 })
 
 test('a peek closes when the pointer leaves the rows, and ⌥ peeks while a text field keeps focus', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await test.step('moving off the rows closes the peek', async () => {
     await juno.sidebar.row(RINA).peek()
     await juno.peek.expectShowing(RINA)
@@ -85,8 +84,6 @@ test('a peek closes when the pointer leaves the rows, and ⌥ peeks while a text
 })
 
 test('with Space as the peek key, Space peeks, ⌥ does not, and Space in a text field types a space', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.setPeekKey('space')
   // Closing Preferences left Home, whose composer has focus; Space peeks only outside a text field.
   await juno.win.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
@@ -117,8 +114,6 @@ test('with Space as the peek key, Space peeks, ⌥ does not, and Space in a text
 })
 
 test('holding ⌥ over a thread in a Main peeks at its replies without opening it', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { peek, tabs, topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')

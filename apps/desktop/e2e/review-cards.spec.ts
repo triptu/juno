@@ -6,7 +6,7 @@
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { SELF_ID } from '@juno/fake-slack'
-import { expect, launchApp, test } from './fixtures'
+import { expect, launchApp, syncedTest, test } from './fixtures'
 import { Juno } from './driver/juno'
 
 test.describe.configure({ timeout: 150_000 })
@@ -27,9 +27,7 @@ test.describe('follow-ups that look done', () => {
   // Promises come from the background AI jobs.
   test.use({ aiJobs: true })
 
-  test('a later link of yours proposes Mark done, with the message quoted; Undo and Not done put it back in Follow-up', async ({ juno, fake, win }) => {
-    await juno.signIn()
-    await juno.waitForSync()
+  syncedTest('a later link of yours proposes Mark done, with the message quoted; Undo and Not done put it back in Follow-up', async ({ juno, fake, win }) => {
     // The job finds the promise the user made to Sam.
     await expect.poll(() => freshHome(juno), { timeout: 60_000 }).toContain('followUp')
 
@@ -88,9 +86,7 @@ test.describe('follow-ups that look done', () => {
 })
 
 test.describe('old drafts', () => {
-  test('a draft untouched for two weeks is proposed with its age and first line; Delete, Undo and Keep work per row', async ({ juno, fake, slackApp, userData, running }) => {
-    await juno.signIn()
-    await juno.waitForSync()
+  syncedTest('a draft untouched for two weeks is proposed with its age and first line; Delete, Undo and Keep work per row', async ({ juno, fake, slackApp, userData, running }) => {
     await running.close()
 
     // Two drafts written 15 days ago, in topics that moved on since.

@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import type { Locator } from '@playwright/test'
 import { unfurlFixtures } from '@juno/fake-slack'
-import { expect, launchApp, test } from './fixtures'
+import { expect, launchApp, syncedTest, test } from './fixtures'
 import { Juno } from './driver/juno'
 
 /** Some photo under `scope` has loaded its bytes. */
@@ -89,9 +89,7 @@ test('photos built from the avatar hash load in a message row, a DM row and the 
   await juno.accountMenu.close()
 })
 
-test('users stored without a photo get one on the next launch, with no re-sync', async ({ juno, fake, slackApp, userData, running }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('users stored without a photo get one on the next launch, with no re-sync', async ({ juno, fake, slackApp, userData, running }) => {
   await running.close()
   // As a cache written before photos were built from the avatar hash.
   const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'))
