@@ -23,4 +23,10 @@ export class Clock {
   set(millis: number): void {
     this.#frozen = millis
   }
+
+  /** Unfreezes the clock: it reads real time again. */
+  resume(): void {
+    this.#frozen = undefined
+    this.#offset = 0
+  }
 }

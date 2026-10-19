@@ -31,6 +31,10 @@ export interface FakeSlackOptions {
   readonly now?: number
   /** Replace the default seed. */
   readonly seed?: (workspace: Workspace, avatarBase: string) => void
+  /** Run the seed as if the clock read this time (ms), then keep real time, so a seed made earlier can be made again. */
+  readonly seedTime?: number
+  /** Sessions to accept from the start, as `sessions()` listed them on another fake. */
+  readonly sessions?: ReadonlyArray<Credentials>
   /** Every Web API and edge call waits this long before it runs (`setLatency`). Default 0. */
   readonly latencyMillis?: number
   /** Enterprise Grid: the team carries this `enterprise_id`, in `auth.test`, `client.userBoot` and the client page. */
@@ -75,7 +79,7 @@ export class FakeSlack {
   static async start(options: FakeSlackOptions = {}): Promise<FakeSlack> {
     const registry = mergeFeatures(features)
     const handlers = registry.methods satisfies Handlers
-    const clock = new Clock(options.now)
+    const clock = new Clock(options.now ?? options.seedTime)
     const team = options.enterpriseId === undefined ? TEAM : { ...TEAM, enterprise_id: options.enterpriseId, enterprise_name: 'Juno Fake Org' }
     const workspace = new Workspace(clock, SELF_ID, team)
     let fake: FakeSlack | undefined
@@ -85,6 +89,8 @@ export class FakeSlack {
     }, handlers, registry.edge)
     const url = await server.listen(options.port ?? 0, options.host ?? '127.0.0.1')
     ;(options.seed ?? seedWorkspace)(workspace, `${url}/avatars`)
+    if (options.seedTime !== undefined && options.now === undefined) clock.resume()
+    for (const session of options.sessions ?? []) server.sessions.set(session.cookie, { cookie: session.cookie, token: session.token, userId: session.userId, expired: false })
     if (options.latencyMillis !== undefined) server.setLatency(options.latencyMillis)
     fake = new FakeSlack(workspace, server, url, registry.controls)
     return fake
@@ -101,6 +107,11 @@ export class FakeSlack {
   /** The default session, for tests that skip the sign-in page. */
   credentials(): Credentials {
     return this.#credentials(this.#session)
+  }
+
+  /** Every session the fake accepts, for `FakeSlackOptions.sessions`. */
+  sessions(): Credentials[] {
+    return [...this.server.sessions.values()].filter((session) => !session.expired).map((session) => this.#credentials(session))
   }
 
   /** A fresh session, as if the user signed in again. */
