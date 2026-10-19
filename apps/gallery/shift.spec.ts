@@ -180,7 +180,8 @@ for (let part = 0; part < shards; part++) {
   // Over every component the walk is @heavy (scripts/test-areas.mjs); limited with GALLERY_SHIFT_ONLY it is not.
   test(`no interaction shifts the layout, in any state of any component (part ${part + 1} of ${shards})`, { tag: only ? [] : ['@heavy', '@heavy-gallery'] }, async ({ browser }) => {
     // A part walks states until the queue is empty, at up to eight elements and six touches per state.
-    test.setTimeout(15 * 60_000)
+    // The full walk took 14.3 minutes on three cores; each state still has its own 30 s limit.
+    test.setTimeout((only ? 15 : 20) * 60_000)
     const pages = await walkPages(browser)
     // JUNO_SHARD=i/n (pnpm remote --shards n): this machine takes every n-th state.
     const routes = (await readRoutes(pages.page())).filter((route, index) => (!only || only.includes(route.component)) && (!shard || index % shard.total === shard.index))
