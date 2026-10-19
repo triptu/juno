@@ -30,12 +30,13 @@ import {
   ThreadSummary,
   type FetchOutcome,
 } from '@juno/contract'
-import { channelLabel, mainTopicId, parseTopicId, threadTopicId, type ChannelId, type Ts } from '@juno/domain'
+import { mainTopicId, parseTopicId, threadTopicId, type ChannelId, type Ts } from '@juno/domain'
 import type { SlackApiError } from '@juno/slack'
 import { Invalidation, liveQuery, StoreReader, type InvalidationKeys, type SqlError } from '@juno/store'
 import type { FetchReport } from '@juno/sync'
 import { pendingThread, resolveStartedThread } from '../startedThreads'
-import { parseIds, personFrom, userName, type UserRow } from '../topicRows'
+import { personFrom, type UserRow } from '../topicRows'
+import { placeLabel } from '../placeLabel'
 import { EngineConfig } from '../config'
 import { retryFirstRun, serveLiveList, serveLiveValue, timed, type Run } from '../protocol/live'
 import { SyncLink } from '../syncLink'
@@ -43,22 +44,6 @@ import { Workspace, type StoreServices } from '../workspace'
 import { channelThreads, topicDetail } from './detail'
 import { forgetLookups, listMessages, makeMessageCache } from './query'
 import type { WindowTarget } from './window'
-
-/** A conversation's label ("#eng", "Maya Chen"), or undefined when the store does not know it or you are not in it. */
-const placeLabel = (channel: string) =>
-  Effect.gen(function* () {
-    const sql = yield* StoreReader
-    const rows = yield* sql<{ kind: 'public' | 'private' | 'im' | 'mpim'; name: string | null; user_id: string | null; member_ids_json: string | null; is_member: number }>`SELECT kind, name, user_id, member_ids_json, is_member FROM conversations WHERE id = ${channel}`
-    const row = rows[0]
-    if (row === undefined || (row.kind !== 'public' && row.is_member === 0)) return undefined
-    const people = row.kind === 'im' ? (row.user_id === null ? [] : [row.user_id]) : row.kind === 'mpim' ? parseIds(row.member_ids_json) : []
-    const self = (yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`)[0]?.self_user_id
-    const others = people.filter((id) => id !== self)
-    const users = others.length === 0 ? [] : yield* sql<UserRow>`SELECT id, name, COALESCE(NULLIF(real_name, ''), NULLIF(display_name, '')) AS display_name, real_name, avatar_url FROM users WHERE id IN ${sql.in(others)}`
-    const nameOf = (id: string) => userName(id, users.find((user) => user.id === id))
-    if (row.kind === 'im') return others[0] === undefined ? row.name ?? channel : nameOf(others[0])
-    return channelLabel({ kind: row.kind, name: row.name ?? channel, memberNames: others.map(nameOf) })
-  })
 
 const encodeMessage = Schema.encodeSync(Schema.toCodecJson(MessageView))
 const encodeThread = Schema.encodeSync(Schema.toCodecJson(ThreadSummary))

@@ -6,6 +6,7 @@ import { messageBody, plainText, UNKNOWN_PERSON } from '@juno/richtext'
 import { SlackApi, SlackSession, type SocketEvent } from '@juno/slack'
 import { liveQuery, StoreReader, type ConversationRow } from '@juno/store'
 import { Clock, Context, Effect, Layer, Ref, Stream, SubscriptionRef } from 'effect'
+import { conversationLabel } from './placeLabel'
 import { HostLink } from './protocol/host'
 import { SocketEvents, type SessionStart, type SocketInput } from './socketEvents'
 
@@ -123,8 +124,10 @@ const frameHandler = (userId: string, sql: StoreReader['Service'], notifications
     const { settings } = yield* readSettings
     if (settings.channels[channel.id] !== 'every' && settings.people[user ?? ''] !== 'every' && settings.threads?.[topicId] !== 'every') return
   }
+  // A group DM is named by its people, as the sidebar names it, not by Slack's "mpdm-…" name.
+  const groupName = channel.kind === 'mpim' ? (yield* conversationLabel(channel.id))?.label : undefined
   yield* notifications.receive({ channel: { id: ChannelId.make(channel.id), kind: channel.kind,
-    name: channel.person_name ?? channel.name ?? (channel.kind === 'im' ? UNKNOWN_PERSON : channel.id), ignored: channel.ignored === 1 },
+    name: groupName ?? channel.person_name ?? channel.name ?? (channel.kind === 'im' ? UNKNOWN_PERSON : channel.id), ignored: channel.ignored === 1 },
     senderId: UserId.make(user ?? ''), ...(channel.sender_name === null ? {} : { senderName: channel.sender_name }), mentionsMe, mentionsMeDirectly, ts, text: plainText(body),
     topicId })
 })

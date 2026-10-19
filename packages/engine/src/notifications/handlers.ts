@@ -45,6 +45,7 @@ import {
 import { Candidate, Judgement, NotificationSettingsSchema, readSettings } from '@juno/notifications'
 import { liveQuery, prefs, StoreReader, transaction, type InvalidationKeys, type SqlError } from '@juno/store'
 import { NotificationControl } from '../notificationRuntime'
+import { conversationLabel } from '../placeLabel'
 import { Outbox } from '../outbox'
 import { SlackSchedule, slackScheduleView } from '../slackSchedule'
 import { retryFirstRun, serveLiveValue, timed, type Run } from '../protocol/live'
@@ -181,7 +182,7 @@ const whyUnseen = (topicId: string, channel: string, ts: string, settings: Notif
     const row = rows[0]
     const title = "Didn't notify you"
     if (row === undefined) return { notified: false, title, reason: 'Juno does not know this conversation yet.', action: { kind: 'none' } } satisfies Why
-    const where = channelLabel({ kind: row.kind, name: row.person ?? row.name ?? (row.kind === 'im' ? UNKNOWN_PERSON : channel) })
+    const where = row.kind === 'mpim' ? (yield* conversationLabel(channel))?.label ?? channel : channelLabel({ kind: row.kind, name: row.person ?? row.name ?? (row.kind === 'im' ? UNKNOWN_PERSON : channel) })
     if (row.ignored === 1) return { notified: false, title, reason: `${where} is ignored`, action: { kind: 'none' } } satisfies Why
     if (parsed?.kind === 'thread' && row.subscribed === 0) {
       return { notified: false, title, reason: 'This thread is set to Never', action: { kind: 'change', target: { kind: 'thread', id: topicId }, name: 'This thread' } } satisfies Why
