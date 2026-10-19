@@ -1,5 +1,4 @@
-import { _electron as electron, test as base, type ElectronApplication, type Page, type TestInfo } from '@playwright/test'
-import { spawn } from 'node:child_process'
+import { _electron as electron, test as base, type ElectronApplication, type Page } from '@playwright/test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, relative, resolve } from 'node:path'
@@ -7,6 +6,9 @@ import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 import { startFakeSlack, writeSlackAppFixture, type Credentials, type FakeSlack } from '@juno/fake-slack'
 import { Juno } from './driver/juno'
 import { Slack } from './driver/slack'
+import { startDisplay } from './display'
+import { copySynced, fakeState, SyncedWorkspaces, type SyncedWorkspace } from './synced'
+import { attachSendTrace, attachSidebarTrace, startSendTrace, startSidebarTrace } from './traces'
 
 /** What main exposes on `globalThis.junoTest` under JUNO_E2E. */
 export interface JunoTestHooks {
@@ -88,39 +90,6 @@ export interface LaunchOptions {
   readonly sidebarTrace?: boolean
   /** Record a send's path through the main window (`sendTrace.ts` in `@juno/state`; README, "Send trace"). */
   readonly sendTrace?: boolean
-}
-
-/** Puts an empty sidebar trace on the window, which turns the recording on (`@juno/state`'s `sidebarTrace.ts`). */
-const startSidebarTrace = () => {
-  const g = globalThis as { __junoSidebarTrace?: unknown }
-  g.__junoSidebarTrace ??= { hold: [], list: { values: 0, errors: 0 } }
-}
-
-/** A failing test's sidebar trace: attached, and printed on one line so a remote run's log has it. */
-async function attachSidebarTrace(win: Page, testInfo: TestInfo): Promise<void> {
-  const trace = await win.evaluate(() => (globalThis as { __junoSidebarTrace?: unknown }).__junoSidebarTrace).catch(() => undefined)
-  if (trace === undefined) return
-  await testInfo.attach('sidebar-trace', { body: JSON.stringify(trace, null, 1), contentType: 'application/json' })
-  console.log(`sidebar trace (${testInfo.titlePath.slice(1).join(' › ')}): ${JSON.stringify(trace)}`)
-}
-
-/** Puts an empty send trace on the window, which turns the recording on (`@juno/state`'s `sendTrace.ts`). */
-const startSendTrace = () => {
-  const g = globalThis as { __junoSendTrace?: unknown }
-  g.__junoSendTrace ??= { events: [] }
-}
-
-/** The fake's calls a send makes, with no text: when each came and how it was answered. */
-const POST_METHODS = new Set(['chat.postMessage', 'conversations.open', 'chat.update', 'chat.delete'])
-
-/** A failing test's send trace and the fake's post calls: attached, and printed on one line so a remote run's log has it. */
-async function attachSendTrace(win: Page, fake: FakeSlack, testInfo: TestInfo): Promise<void> {
-  const trace = await win.evaluate(() => (globalThis as { __junoSendTrace?: unknown }).__junoSendTrace).catch(() => undefined)
-  if (trace === undefined) return
-  const posts = fake.calls.filter((call) => POST_METHODS.has(call.method)).map((call) => ({ at: call.at, method: call.method, channel: call.args.channel, ok: call.ok, ...(call.error === undefined ? {} : { error: call.error }) }))
-  const body = { ...trace, posts }
-  await testInfo.attach('send-trace', { body: JSON.stringify(body, null, 1), contentType: 'application/json' })
-  console.log(`send trace (${testInfo.titlePath.slice(1).join(' › ')}): ${JSON.stringify(body)}`)
 }
 
 let launches = 0
@@ -256,6 +225,14 @@ export interface Fixtures {
   readonly sidebarTrace: boolean
   /** Record the `running` app's send trace and attach it, with the fake's post calls, to a failing test (`LaunchOptions.sendTrace`); `test.use({ sendTrace: true })` opts a file in. */
   readonly sendTrace: boolean
+  /**
+   * Start signed in to the default seed and synced, from a copy built once per worker, with a
+   * fake made to match it (README, "Synced start"); `test.use({ synced: true })` opts a file in.
+   * Tests of sign-in, first sync and boot keep the default, a real sign-in.
+   */
+  readonly synced: boolean
+  /** Under `synced`, the workspace the test starts from and the fake that matches it. */
+  readonly syncedStart: { readonly workspace: SyncedWorkspace; readonly fake: FakeSlack } | undefined
   /** A fake Slack per test. */
   readonly fake: FakeSlack
   /** A fixture Slack-app directory with one of the fake's sessions. */
@@ -269,28 +246,41 @@ export interface Fixtures {
   readonly slack: Slack
 }
 
-/**
- * Starts an X server of its own (Linux only) and returns its display, such
- * as `:12`. Workers that share one display stack their windows at the same
- * place, and when another test's window maps or closes over this one, X
- * sends crossing events at the real pointer, which Chromium takes as a
- * mouse move: hover jumps away from where the test put the mouse.
- */
-async function startDisplay(): Promise<{ readonly display: string; readonly stop: () => void }> {
-  const xvfb = spawn('Xvfb', ['-displayfd', '3', '-screen', '0', '1920x1080x24', '-nolisten', 'tcp'], { stdio: ['ignore', 'ignore', 'pipe', 'pipe'] })
-  let errors = ''
-  xvfb.stderr?.on('data', (chunk: Buffer) => (errors += chunk))
-  const number = await new Promise<string>((resolve, reject) => {
-    xvfb.stdio[3]?.on('data', (chunk: Buffer) => resolve(String(chunk).trim()))
-    xvfb.once('error', reject)
-    xvfb.once('exit', (code) => reject(new Error(`Xvfb exited with ${code}: ${errors}`)))
-  })
-  return { display: `:${number}`, stop: () => xvfb.kill() }
-}
-
 export interface WorkerFixtures {
   /** The X display this worker's apps open on; undefined on macOS. */
   readonly display: string | undefined
+  readonly syncedWorkspaces: SyncedWorkspaces
+}
+
+type SyncOptions = Pick<LaunchOptions, 'timing' | 'aiJobs' | 'fakeAiDelayMillis'>
+
+/** Signs in to a fresh default seed on `dir` and syncs, for `SyncedWorkspaces`. */
+async function buildSynced(dir: string, options: SyncOptions): Promise<Omit<SyncedWorkspace, 'dir'>> {
+  const started = performance.now()
+  const seedTime = Date.now()
+  const fake = await startFakeSlack({ seedTime })
+  const appDir = await mkdtemp(join(tmpdir(), 'juno-slack-app-'))
+  try {
+    const slackApp = await writeSlackApp(fake, appDir)
+    const running = await launchApp(dir, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, ...options })
+    try {
+      const juno = new Juno(running.app, running.win)
+      await juno.signIn()
+      await juno.waitForSync()
+    } finally {
+      await running.close()
+    }
+    if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: synced-build ${Math.round(performance.now() - started)} ms`)
+    return { port: Number(new URL(fake.url).port), seedTime, sessions: fake.sessions(), fakeState: fakeState(fake) }
+  } finally {
+    await fake.close()
+    await rm(appDir, { recursive: true, force: true })
+  }
+}
+
+/** A fake that makes the synced workspace's seed again, on its port, accepting its sessions. */
+function matchingFake(workspace: SyncedWorkspace): Promise<FakeSlack> {
+  return startFakeSlack({ port: workspace.port, seedTime: workspace.seedTime, sessions: workspace.sessions })
 }
 
 /** Launches the app once per test with a fresh user-data directory, against its own fake Slack. */
@@ -307,11 +297,36 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     },
     { scope: 'worker', auto: true },
   ],
-  // Playwright requires the destructuring pattern even with no dependencies.
-  // oxlint-disable-next-line no-empty-pattern
-  fake: async ({}, use) => {
+  syncedWorkspaces: [
+    // oxlint-disable-next-line no-empty-pattern
+    async ({}, use) => {
+      const workspaces = new SyncedWorkspaces()
+      await use(workspaces)
+      await workspaces.close()
+    },
+    { scope: 'worker' },
+  ],
+  synced: [false, { option: true }],
+  syncedStart: async ({ synced, syncedWorkspaces, timing, aiJobs, fakeAiDelayMillis }, use) => {
+    if (!synced) return use(undefined)
+    const options: SyncOptions = { aiJobs, ...(timing === undefined ? {} : { timing }), ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }) }
+    const key = JSON.stringify(options)
+    let workspace = await syncedWorkspaces.get(key, (dir) => buildSynced(dir, options))
+    let fake: FakeSlack
+    try {
+      fake = await matchingFake(workspace)
+    } catch (error) {
+      // Something else took the port since the build: build again on a new one.
+      if ((error as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw error
+      syncedWorkspaces.forget(key)
+      workspace = await syncedWorkspaces.get(key, (dir) => buildSynced(dir, options))
+      fake = await matchingFake(workspace)
+    }
+    await use({ workspace, fake })
+  },
+  fake: async ({ syncedStart }, use) => {
     const started = performance.now()
-    const fake = await startFakeSlack()
+    const fake = syncedStart?.fake ?? await startFakeSlack()
     if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: fake ${Math.round(performance.now() - started)} ms`)
     await use(fake)
     await fake.close()
@@ -321,9 +336,9 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     await use(await writeSlackApp(fake, dir))
     await rm(dir, { recursive: true, force: true })
   },
-  // oxlint-disable-next-line no-empty-pattern
-  userData: async ({}, use) => {
+  userData: async ({ syncedStart }, use) => {
     const userData = await tempUserData()
+    if (syncedStart !== undefined) await copySynced(syncedStart.workspace, userData)
     await use(userData)
     await rm(userData, { recursive: true, force: true })
   },
@@ -334,13 +349,23 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   updateServer: [undefined, { option: true }],
   sidebarTrace: [false, { option: true }],
   sendTrace: [false, { option: true }],
-  running: async ({ fake, slackApp, userData, aiJobs, fakeAiDelayMillis, screenShared, updateServer, sidebarTrace, sendTrace, timing }, use, testInfo) => {
+  running: async ({ fake, slackApp, userData, syncedStart, aiJobs, fakeAiDelayMillis, screenShared, updateServer, sidebarTrace, sendTrace, timing }, use, testInfo) => {
     const running = await launchApp(userData, {
       fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword,
       ...(timing === undefined ? {} : { timing }),
       aiJobs, screenShared, sidebarTrace, sendTrace, ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }),
       ...(updateServer === undefined ? {} : { updateServer }),
     })
+    if (syncedStart !== undefined) {
+      try {
+        await new Juno(running.app, running.win).waitForSync()
+        // The app booted from a copy of another fake's sync; a difference would make every later step misleading.
+        if (fakeState(fake) !== syncedStart.workspace.fakeState) throw new Error('The fake no longer matches the synced workspace this test started from. Something in the test setup or the warm boot changed the fake; sign in instead (synced: false), or remove the difference.')
+      } catch (error) {
+        await running.close()
+        throw error
+      }
+    }
     await use(running)
     if (sidebarTrace && testInfo.status !== testInfo.expectedStatus) await attachSidebarTrace(running.win, testInfo)
     if (sendTrace && testInfo.status !== testInfo.expectedStatus) await attachSendTrace(running.win, fake, testInfo)
@@ -360,6 +385,9 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     await use(new Slack(fake))
   },
 })
+
+/** A test that starts signed in and synced (`synced: true`), for a file whose other tests sign in themselves. */
+export const syncedTest = test.extend({ synced: true })
 
 /** Reads one of main's test hooks. */
 export function hooks<K extends keyof JunoTestHooks>(app: ElectronApplication, name: K): Promise<ReturnType<JunoTestHooks[K]>> {
