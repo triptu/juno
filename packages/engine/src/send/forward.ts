@@ -61,20 +61,22 @@ interface SourceRow {
   readonly bot_icon: string | null
   readonly text: string
   readonly blocks_json: string | null
+  readonly files_json: string | null
   readonly reply_count: number
 }
 
 /**
  * The source message as Slack's shared-message attachment shows it: the
- * author, the words as blocks and as mrkdwn, where it was posted, and its
- * permalink, from which the card names the place (`richtext` `sharedFrom`).
+ * author, the words as blocks and as mrkdwn, its files, where it was
+ * posted, and its permalink, from which the card names the place
+ * (`richtext` `sharedFrom`).
  * Undefined when the message is not stored, is deleted, or is a pending
  * row Slack does not have yet.
  */
 const sourceShare = (workspaceUrl: string, channel: string, ts: string): Effect.Effect<PendingShare | undefined, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
-    const source = (yield* sql<SourceRow>`SELECT ts, thread_ts, user_id, bot_name, bot_icon, text, blocks_json, reply_count
+    const source = (yield* sql<SourceRow>`SELECT ts, thread_ts, user_id, bot_name, bot_icon, text, blocks_json, files_json, reply_count
       FROM messages WHERE channel = ${channel} AND ts = ${ts} AND deleted = 0`)[0]
     if (source === undefined) return undefined
     const user =
@@ -98,6 +100,7 @@ const sourceShare = (workspaceUrl: string, channel: string, ts: string): Effect.
       fallback: `${name}: ${source.text}`,
       mrkdwn_in: ['text'],
       ...(source.blocks_json === null ? {} : { blocks: JSON.parse(source.blocks_json) as unknown }),
+      ...(source.files_json === null ? {} : { files: JSON.parse(source.files_json) as unknown }),
       footer: `${inThread ? 'Thread in' : 'Posted in'} ${where}`,
     }
     return { channel, ts: source.ts, attachment }
