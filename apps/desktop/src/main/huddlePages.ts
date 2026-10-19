@@ -8,8 +8,8 @@
  * it, so the engine may treat that generation's media as stopped. No
  * business logic.
  *
- * Generations start from this launch's clock in microseconds, so they rise
- * across launches too and a stored record never names a later page.
+ * Generations start from this launch's clock in microseconds and rise by
+ * one within the launch.
  */
 import { app, BrowserWindow } from 'electron'
 import type { EngineSupervisor } from './engine'
@@ -50,6 +50,9 @@ export function watchHuddlePages(supervisor: Pick<EngineSupervisor, 'send' | 'on
   return {
     /** Gives a page's media service its generation. A newer page of the same contents replaces the one before, which is gone by then. */
     register(contentsId: number): number {
+      // Only the order within one launch matters, and the clock is read once, at launch. The engine is this process's
+      // utility process and cannot outlive it, so every Start and report it gets names a generation from this counter; a stored record
+      // from an earlier launch is judged by whether main lists its page (media.ts), so a clock set back between launches is harmless.
       const generation = ++maxIssued
       live.set(contentsId, generation)
       // The engine holds back a Start from a generation above the highest it has heard of, so this report and the page's Start may come in either order.
