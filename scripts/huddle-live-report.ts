@@ -64,17 +64,14 @@ export function printHuddles(answer: unknown, self: string) {
 export type HuddleEvent =
   | { readonly kind: 'lifecycle'; readonly name: string; readonly detail?: string }
   | { readonly kind: 'presence'; readonly attendeeId: string; readonly present: boolean; readonly externalUserId: string; readonly dropped: boolean }
-  | { readonly kind: 'volume'; readonly attendeeId: string; readonly volume: number; readonly muted: boolean }
-  | { readonly kind: 'health'; readonly missedPongs: number; readonly noPacketsStats: number; readonly noAudioSentStats: number }
+  /** Chime's active speaker detection started or stopped counting this attendee as speaking. */
+  | { readonly kind: 'speaking'; readonly attendeeId: string; readonly speaking: boolean }
   | { readonly kind: 'error'; readonly where: string; readonly name: string }
 
 export interface RoomFrameCounts {
   readonly roomFrames: number
   readonly aboutThisRoom: number
 }
-
-/** Chime's volume indicator is 0 to 1; below this counts as silence. */
-const SILENCE = 0.05
 
 /** Folds the page's events into log lines and a status line every 10 s. Holds `ExternalUserId` values in memory only. */
 export class MediaReport {
@@ -85,11 +82,13 @@ export class MediaReport {
   readonly #onStop: () => void
   readonly #present = new Map<string, string>()
   readonly #shapes = new Set<string>()
-  #remotePeak = 0
-  #ownPeak = 0
+  /** Who speaks now. A steady tone stays in here, so the status line reads it as well as the starts. */
+  readonly #speakingNow = new Set<string>()
+  /** Spoke since the last status line. */
+  #remoteSpoke = false
+  #ownSpoke = false
   #everHeard = false
   #everSent = false
-  #lastHealth = ''
 
   constructor(selfAttendee: string, selfUser: string, onStop: () => void) {
     this.#self = selfAttendee
@@ -109,21 +108,20 @@ export class MediaReport {
         return
       case 'presence':
         return this.#presence(event)
-      case 'volume':
+      case 'speaking':
+        if (!event.speaking) {
+          this.#speakingNow.delete(event.attendeeId)
+          return
+        }
+        this.#speakingNow.add(event.attendeeId)
         if (event.attendeeId === this.#self) {
-          this.#ownPeak = Math.max(this.#ownPeak, event.volume)
-          this.#everSent ||= event.volume > SILENCE
+          this.#ownSpoke = true
+          this.#everSent = true
         } else {
-          this.#remotePeak = Math.max(this.#remotePeak, event.volume)
-          this.#everHeard ||= event.volume > SILENCE
+          this.#remoteSpoke = true
+          this.#everHeard = true
         }
         return
-      case 'health': {
-        const line = `missed pongs ${event.missedPongs}, stats without packets ${event.noPacketsStats}, without audio sent ${event.noAudioSentStats}`
-        if (line !== this.#lastHealth && (event.missedPongs > 0 || event.noPacketsStats > 2 || event.noAudioSentStats > 2)) log(`chime health: ${line}`)
-        this.#lastHealth = line
-        return
-      }
       case 'error':
         log(`page error in ${event.where}: ${event.name}`)
     }
@@ -152,11 +150,11 @@ export class MediaReport {
     const line =
       `  [${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}] connected ${this.started && !this.stopped ? 'yes' : 'no'}` +
       ` | remote attendees ${this.#remoteCount()}` +
-      ` | remote audio ${this.#remotePeak > SILENCE ? 'above silence' : 'silent'} (peak ${this.#remotePeak.toFixed(2)})` +
-      ` | own audio at Chime ${this.#ownPeak > SILENCE ? 'yes' : 'no'} (peak ${this.#ownPeak.toFixed(2)})` +
+      ` | remote speaking ${this.#remoteSpoke || [...this.#speakingNow].some((id) => id !== this.#self) ? 'yes' : 'no'}` +
+      ` | own audio at Chime ${this.#ownSpoke || this.#speakingNow.has(this.#self) ? 'yes' : 'no'}` +
       ` | room frames ${socket === undefined ? 'socket off' : `${socket.aboutThisRoom} for this room, ${socket.roomFrames} in all`}`
-    this.#remotePeak = 0
-    this.#ownPeak = 0
+    this.#remoteSpoke = false
+    this.#ownSpoke = false
     return line
   }
 

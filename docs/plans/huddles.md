@@ -55,7 +55,7 @@ All new logic lives in three new packages. Existing code changes only at the reg
 | Package | Job | Depends on |
 | --- | --- | --- |
 | `@juno/huddle` | Engine side. The `Huddle` service: a state machine for the call (idle, joining, joined, leaving), `rooms.join` and `rooms.leave`, the leave that must happen, participants from room frames, running huddles per channel, status renewal every 4 minutes or so. Decodes its own frames from the socket. Its route handlers and its attachment to `SocketEvents` are in `engine/src/huddle/`, since they use the engine's serve helpers and store. | `slack`, `slack-schema`, `contract` |
-| `@juno/huddle-media` | Renderer side. A `MediaSession` interface with two versions: Chime and a fake for e2e tests. Join with meeting and attendee, mute, devices, active speaker, volume, remote content share, local content share. A plain store (`subscribe`, `getSnapshot`), no Atom and no React. Loaded as a lazy chunk on join. | `amazon-chime-sdk-js`, `contract` (types only) |
+| `@juno/huddle-media` | Renderer side. A `MediaSession` interface with two versions: Chime and a fake for e2e tests. Join with meeting and attendee, mute, devices, active speaker, volume, remote content share, local content share. A plain store (`subscribe`, `getSnapshot`), no Atom and no React. Loaded as a lazy chunk on join. | `amazon-chime-sdk-js` only (it needed nothing from `contract`) |
 | `@juno/huddle-views` | Dumb views with fixtures: `HuddleBar`, `HuddlePage`, the participant row, the shared-screen stage, the channel header button, the channel dot. | `ui`, `tokens` |
 
 Also new, but in existing places:
