@@ -7,11 +7,13 @@
  * empty list: joins wait, and the read is tried again. Detaching (sign-out,
  * quit) leaves the call (model `quit`) and waits a little for a join in
  * flight and the leaves it gives the client. The records stay stored for
- * the workspace's next session, and stay in memory with what is known of
- * their media, so no join overlaps a page that may still run one.
+ * the workspace's next session, and stay in memory, so no join overlaps a
+ * page that may still run their media. Whether that media stopped is
+ * computed from the pages' state (`media.ts`), so a page's report that came
+ * before the load still counts.
  */
 import { Effect, Queue, Result, Scope } from 'effect'
-import { gone, publish, settleWaiters, step, type Attached, type Core } from './core'
+import { publish, settleWaiters, step, type Attached, type Core } from './core'
 import type { HuddleSession } from './Huddle'
 import * as L from './lifecycle'
 import { listener, reader } from './reads'
@@ -49,7 +51,7 @@ const load = (core: Core, to: Attached) =>
       const stored = yield* Effect.result(to.session.leaves.read)
       if (Result.isSuccess(stored)) {
         return yield* step(core, Effect.sync(() => {
-          core.s = L.restart(core.s, stored.success, to.session.workspace, gone(core))
+          core.s = L.restart(core.s, stored.success, to.session.workspace)
           to.loaded = true
         }))
       }
@@ -72,7 +74,7 @@ export const attach = Effect.fn('Huddle.attach')(function* (core: Core, session:
   yield* step(core, Effect.sync(() => {
     core.attached = to
     core.running = new Map()
-    core.s = L.restart(core.s, [], session.workspace, gone(core))
+    core.s = L.restart(core.s, [], session.workspace)
   }))
   yield* Scope.addFinalizer(scope, detach(core, to))
   yield* Effect.forkIn(load(core, to), work)

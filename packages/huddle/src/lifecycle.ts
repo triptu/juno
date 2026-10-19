@@ -9,15 +9,15 @@
  * Model variables and where they live here:
  * - `wanted`, `request`, `cancel`, `current`: the same names.
  * - `pending` (durable): `pending[].record`, stored in its workspace's
- *   user.db. `unsent` is `dispatch !== 'dispatched'`; `stopped` is `stopped`.
- * - `media`: the attendees a renderer page may be running: every pending
- *   record not `stopped`, the current call's among them. A record names the
- *   page generation its credentials went to; only that generation's reports,
- *   or main saying that page is gone, stop it.
+ *   user.db. `unsent` is `dispatch !== 'dispatched'`.
+ * - `media` and `stopped`: not kept here. Whether an attendee's media is
+ *   stopped is computed from the pages' current state (`media.ts`), so
+ *   reports, page ends and loads may come in any order.
  * - `otherDevice`, `quitting`: the same names.
  * - `phase`: derived for the UI by `phaseOf`.
  */
-import type { HuddleEnd, HuddleMediaEnd, HuddlePhase } from '@juno/contract'
+import type { HuddleEnd, HuddlePhase } from '@juno/contract'
+import { endReason, holding, mediaStopped, pageState, type MediaView } from './media'
 
 /** What `rooms.join` returned: enough to leave. The Chime credentials are not kept here. */
 export interface Identity {
@@ -44,8 +44,6 @@ export interface Pending {
   readonly record: Stored
   readonly workspace: string
   readonly dispatch: Dispatch
-  /** No media session runs for this attendee. */
-  readonly stopped: boolean
 }
 
 export interface Intent {
@@ -60,28 +58,22 @@ export interface Intent {
 export interface Current {
   readonly identity: Identity
   readonly generation: string
-  /** The renderer said its media session started. */
-  readonly started: boolean
 }
 
 export interface Lifecycle {
-  /** A Start or Join not yet sent: it waits for the pending leaves. */
+  /** A Start or Join not yet sent: it waits for the pending leaves, and for main to list its page. */
   readonly wanted: Intent | undefined
   /** The `rooms.join` in flight. Only one at a time. */
   readonly request: Intent | undefined
-  /** The request in flight was replaced or left: its answer is cleaned up, never used. */
+  /** The request in flight was replaced, left, or its page went: its answer is cleaned up, never used. */
   readonly cancel: boolean
   readonly current: Current | undefined
   readonly pending: ReadonlyArray<Pending>
   /** Chime moved the user to another device. No join until a new Start or Join. */
   readonly otherDevice: boolean
   readonly quitting: boolean
-  readonly muted: boolean
   readonly ended: HuddleEnd | undefined
 }
-
-/** Whether main said a renderer page generation is gone (its media torn down with it). */
-export type Gone = (generation: string) => boolean
 
 export const initial: Lifecycle = {
   wanted: undefined,
@@ -91,7 +83,6 @@ export const initial: Lifecycle = {
   pending: [],
   otherDevice: false,
   quitting: false,
-  muted: false,
   ended: undefined,
 }
 
@@ -100,9 +91,7 @@ const sameAttendee = (a: string | undefined, b: string | undefined) => a !== und
 /** The attendee whose media may run: the current call's. Every other attendee's session must stop. */
 export const currentAttendee = (s: Lifecycle): string | undefined => s.current?.identity.attendeeId
 
-/** Whether a report from `generation` about `attendeeId` is about the current call. */
-const isCurrent = (s: Lifecycle, generation: string, attendeeId: string) =>
-  s.current !== undefined && s.current.generation === generation && s.current.identity.attendeeId === attendeeId
+const currentRecord = (current: Current): Stored => ({ ...current.identity, generation: current.generation })
 
 /** Where the call is, or is about to be. */
 export const callChannel = (s: Lifecycle): string | undefined =>
@@ -113,16 +102,6 @@ const endedBy = (s: Lifecycle, reason: HuddleEnd['reason']): HuddleEnd | undefin
   const channelId = callChannel(s)
   return channelId === undefined ? s.ended : { channelId, reason }
 }
-
-/** Ends the current call, whose media stopped (model `reportStop`). A queued join goes too. */
-const endCurrent = (s: Lifecycle, reason: HuddleMediaEnd): Lifecycle => ({
-  ...s,
-  current: undefined,
-  wanted: undefined,
-  cancel: s.request !== undefined,
-  otherDevice: reason === 'anotherDevice',
-  ended: endedBy(s, reason),
-})
 
 const update = (s: Lifecycle, attendeeId: string, change: (p: Pending) => Pending): Lifecycle => ({
   ...s,
@@ -136,7 +115,6 @@ export const choose = (s: Lifecycle, intent: Intent): Lifecycle => ({
   cancel: s.request !== undefined,
   current: undefined,
   otherDevice: false,
-  muted: false,
   ended: undefined,
 })
 
@@ -150,36 +128,55 @@ export const leave = (s: Lifecycle): Lifecycle => ({
 })
 
 /**
- * Model `requestJoin`'s guard: a wanted join, none in flight, the session's
- * stored leaves loaded, none of them left, every attendee of another
- * workspace stopped, and no eviction since the last Start. After a restart
- * the stored records are `pending`, so they go out before any new join.
+ * What the pages' state means for the call (model `reportStop` and the
+ * page-gone rules): the current call ends once its media stopped, a queued
+ * Start of a page that is gone is dropped, and a join in flight for one is
+ * cancelled. Run after every change.
  */
-export const canRequest = (s: Lifecycle, workspace: string, loaded: boolean): s is Lifecycle & { readonly wanted: Intent } =>
+export const reconcile = (s: Lifecycle, view: MediaView): Lifecycle => {
+  let next = s
+  if (next.wanted !== undefined && pageState(view, next.wanted.generation) === 'gone') next = { ...next, wanted: undefined }
+  if (next.request !== undefined && !next.cancel && pageState(view, next.request.generation) === 'gone') next = { ...next, cancel: true }
+  if (next.current !== undefined && mediaStopped(view, currentRecord(next.current))) {
+    const reason = endReason(view, currentRecord(next.current))
+    next = { ...next, current: undefined, wanted: undefined, cancel: next.request !== undefined, otherDevice: reason === 'anotherDevice', ended: endedBy(next, reason) }
+  }
+  return next
+}
+
+/**
+ * Model `requestJoin`'s guard: a wanted join from a page main lists, none
+ * in flight, the session's stored leaves loaded, none of them left, every
+ * attendee of another workspace stopped, and no eviction since the last
+ * Start. After a restart the stored records are `pending`, so they go out
+ * before any new join.
+ */
+export const canRequest = (s: Lifecycle, view: MediaView, workspace: string, loaded: boolean): s is Lifecycle & { readonly wanted: Intent } =>
   s.wanted !== undefined && s.request === undefined && loaded && !s.otherDevice && !s.quitting &&
-  s.pending.every((p) => p.workspace !== workspace && p.stopped)
+  pageState(view, s.wanted.generation) === 'live' &&
+  s.pending.every((p) => p.workspace !== workspace && mediaStopped(view, p.record))
 
 /** Model `requestJoin`. */
 export const requestJoin = (s: Lifecycle & { readonly wanted: Intent }): Lifecycle => ({ ...s, request: s.wanted, wanted: undefined, cancel: false })
 
-/** The record `answerJoin` stores for an answer: a cancelled one is never handed out, so no page holds it. */
-export const recordFor = (s: Lifecycle, identity: Identity): Stored => ({
+/**
+ * The record `answerJoin` stores for an answer. It goes to the asking page
+ * only if the join was not cancelled and main still lists the page; else no
+ * page ever had its media, and it is left at once.
+ */
+export const recordFor = (s: Lifecycle, view: MediaView, identity: Identity): Stored => ({
   ...identity,
-  generation: s.cancel || s.request === undefined ? null : s.request.generation,
+  generation: !s.cancel && s.request !== undefined && pageState(view, s.request.generation) === 'live' ? s.request.generation : null,
 })
 
-/**
- * Model `answerJoin`, after `record` was stored. A cancelled answer becomes
- * a leave at once; otherwise it is the current call, and media is not
- * running yet.
- */
+/** Model `answerJoin`, after `record` was stored. A record no page holds is a leave at once; otherwise it is the current call. */
 export const answerJoin = (s: Lifecycle, record: Stored, workspace: string): Lifecycle => {
   const { generation, ...identity } = record
   return {
     ...s,
     request: undefined,
-    pending: [...s.pending, { record, workspace, dispatch: 'queued', stopped: generation === null }],
-    current: generation === null ? undefined : { identity, generation, started: false },
+    pending: [...s.pending, { record, workspace, dispatch: 'queued' }],
+    current: generation === null ? undefined : { identity, generation },
   }
 }
 
@@ -190,34 +187,6 @@ export const joinError = (s: Lifecycle, code: string): Lifecycle => ({
   ended: s.cancel || s.request === undefined ? s.ended : { channelId: s.request.channelId, reason: 'joinFailed', code },
   cancel: false,
 })
-
-/** The second half of model `startMedia`: the page holding the current credentials started its session. Any other start is stale. */
-export const mediaStarted = (s: Lifecycle, generation: string, attendeeId: string): Lifecycle =>
-  s.current !== undefined && isCurrent(s, generation, attendeeId) ? { ...s, current: { ...s.current, started: true } } : s
-
-/**
- * Model `forcedStop` then `reportStop`: the page holding an attendee's
- * credentials says its session ended, whether the engine asked (`left`) or
- * not. For the current call it also ends the call and any queued join.
- * A report from another page, or about an earlier attendee, ends nothing.
- */
-export const mediaEnded = (s: Lifecycle, generation: string, attendeeId: string, reason: HuddleMediaEnd): Lifecycle => {
-  const stopped = update(s, attendeeId, (p) => (p.record.generation === generation ? { ...p, stopped: true } : p))
-  return isCurrent(s, generation, attendeeId) ? endCurrent(stopped, reason) : stopped
-}
-
-export const mediaMuted = (s: Lifecycle, generation: string, attendeeId: string, muted: boolean): Lifecycle =>
-  isCurrent(s, generation, attendeeId) ? { ...s, muted } : s
-
-/**
- * Main said renderer pages are gone: a destroyed or unloaded page has torn
- * down its WebRTC, so the attendees it held are stopped. The only stop the
- * engine assumes.
- */
-export const pagesGone = (s: Lifecycle, gone: Gone): Lifecycle => {
-  const stopped = { ...s, pending: s.pending.map((p) => (!p.stopped && p.record.generation !== null && gone(p.record.generation) ? { ...p, stopped: true } : p)) }
-  return s.current !== undefined && gone(s.current.generation) ? endCurrent(stopped, 'connectionLost') : stopped
-}
 
 /** Model `sendLeave`'s guard: leaves of this workspace not yet given to the client, never the current call's. */
 export const toSend = (s: Lifecycle, workspace: string): ReadonlyArray<Stored> =>
@@ -230,21 +199,23 @@ export const sending = (s: Lifecycle, attendeeId: string): Lifecycle => update(s
 export const dispatched = (s: Lifecycle, attendeeId: string): Lifecycle => update(s, attendeeId, (p) => ({ ...p, dispatch: 'dispatched' }))
 
 /**
- * The leave was refused before Slack took it. It must go out again, after
- * a pause; a record already cleared comes back (its media was stopped).
+ * Model `leaveAnswer` refused: Slack did not take the leave. It must go out
+ * again, after a pause; a record already cleared comes back.
  */
 export const refused = (s: Lifecycle, record: Stored, workspace: string): Lifecycle =>
   s.pending.some((p) => p.record.attendeeId === record.attendeeId)
     ? update(s, record.attendeeId, (p) => ({ ...p, dispatch: 'waiting' }))
-    : { ...s, pending: [...s.pending, { record, workspace, dispatch: 'waiting', stopped: true }] }
+    : { ...s, pending: [...s.pending, { record, workspace, dispatch: 'waiting' }] }
 
 /** The pause after a refusal is over. */
 export const retry = (s: Lifecycle, attendeeId: string): Lifecycle =>
   update(s, attendeeId, (p) => (p.dispatch === 'waiting' ? { ...p, dispatch: 'queued' } : p))
 
-/** Model `clearLeave`'s guard: dispatched and stopped. The answer to the leave is not awaited. */
-export const toClear = (s: Lifecycle, workspace: string): ReadonlyArray<Stored> =>
-  s.pending.filter((p) => p.workspace === workspace && p.dispatch === 'dispatched' && p.stopped && !sameAttendee(p.record.attendeeId, currentAttendee(s))).map((p) => p.record)
+/** Model `clearLeave`'s guard: dispatched and its media stopped. The answer to the leave is not awaited. */
+export const toClear = (s: Lifecycle, view: MediaView, workspace: string): ReadonlyArray<Stored> =>
+  s.pending
+    .filter((p) => p.workspace === workspace && p.dispatch === 'dispatched' && !sameAttendee(p.record.attendeeId, currentAttendee(s)) && mediaStopped(view, p.record))
+    .map((p) => p.record)
 
 /** Model `clearLeave`. */
 export const clearLeave = (s: Lifecycle, attendeeIds: ReadonlySet<string>): Lifecycle => ({
@@ -269,8 +240,7 @@ export const quit = (s: Lifecycle): Lifecycle => ({
 /**
  * After a session ended: no request is out, and leaves of its workspace
  * not yet on the wire are queued for its next session. Every record stays,
- * with what is known of its media, so the stop barrier holds across a
- * workspace change.
+ * so the stop barrier holds across a workspace change.
  */
 export const detached = (s: Lifecycle, workspace: string): Lifecycle => ({
   ...quit(s),
@@ -280,27 +250,31 @@ export const detached = (s: Lifecycle, workspace: string): Lifecycle => ({
 })
 
 /**
- * Model `restart`: the stored records of a session that starts, merged with
- * what this process already knows. A record new to this process has not
- * been sent here; it is stopped only if no page held it, or main said its
- * page is gone.
+ * Model `restart`, once the stored records are loaded: they are merged
+ * with what this process already knows. A record new to this process has
+ * not been sent here.
  */
-export const restart = (s: Lifecycle, stored: ReadonlyArray<Stored>, workspace: string, gone: Gone): Lifecycle => {
+export const restart = (s: Lifecycle, stored: ReadonlyArray<Stored>, workspace: string): Lifecycle => {
   const known = new Set(s.pending.map((p) => p.record.attendeeId))
-  const loaded = stored
-    .filter((record) => !known.has(record.attendeeId))
-    .map((record): Pending => ({ record, workspace, dispatch: 'queued', stopped: record.generation === null || gone(record.generation) }))
+  const loaded = stored.filter((record) => !known.has(record.attendeeId)).map((record): Pending => ({ record, workspace, dispatch: 'queued' }))
   return { ...s, quitting: false, pending: [...s.pending, ...loaded] }
 }
 
+/** The holding page's report while the current call's session is up, for the UI. */
+export const currentMedia = (s: Lifecycle, view: MediaView) =>
+  s.current === undefined ? undefined : holding(view, s.current.generation, s.current.identity.attendeeId)
+
 /**
  * The phase the UI shows. `joining` covers a wanted join waiting for an
- * earlier leave; `leaving` covers a cancelled request still out and media
- * not yet stopped.
+ * earlier leave or for its page to be listed; `leaving` covers a cancelled
+ * request still out and media not yet stopped.
  */
-export const phaseOf = (s: Lifecycle): HuddlePhase => {
-  if (s.current !== undefined) return s.current.started ? 'joined' : 'joining'
+export const phaseOf = (s: Lifecycle, view: MediaView): HuddlePhase => {
+  if (s.current !== undefined) {
+    const media = currentMedia(s, view)
+    return media !== undefined && media.connection !== 'connecting' ? 'joined' : 'joining'
+  }
   if (s.wanted !== undefined || (s.request !== undefined && !s.cancel)) return 'joining'
-  if (s.request !== undefined || s.pending.some((p) => !p.stopped)) return 'leaving'
+  if (s.request !== undefined || s.pending.some((p) => !mediaStopped(view, p.record))) return 'leaving'
   return 'idle'
 }

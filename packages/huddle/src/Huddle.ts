@@ -3,6 +3,7 @@
  * notes" in specs/README.md).
  *
  * - `lifecycle.ts`: the model's actions as pure rules.
+ * - `media.ts`: the pages' media, as current state.
  * - `core.ts`: the state, the lock, and the I/O the rules call for.
  * - `attach.ts`: a sync's session, and its end.
  * - `reads.ts`: running huddles from room frames and `huddles/info`.
@@ -10,10 +11,10 @@
  * - `status.ts`: the "In a huddle" status while the call is live.
  */
 import { Context, Data, Effect, Layer, Scope, Stream, SubscriptionRef } from 'effect'
-import type { HuddleCall, HuddleError, HuddleMediaEvent, HuddleStartResult, RunningHuddles } from '@juno/contract'
+import type { HuddleCall, HuddleError, HuddlePageReport, HuddleStartResult, RunningHuddles } from '@juno/contract'
 import type { SlackApi, SlackEdge, SocketEvent } from '@juno/slack'
 import { attach } from './attach'
-import { leave, makeCore, media, pages, start } from './core'
+import { leave, makeCore, pages, report, start } from './core'
 import type { Stored } from './lifecycle'
 
 /** The store of pending leaves failed: a failed write keeps the credentials private and leaves at once; a failed read holds joins back. */
@@ -54,8 +55,8 @@ export class Huddle extends Context.Service<Huddle, {
   /** Start or join the huddle in `channelId`, leaving the current call first. Answers page `generation` with the credentials once the leave is stored. */
   readonly start: (channelId: string, region: string | null, generation: string) => Effect.Effect<HuddleStartResult, HuddleError>
   readonly leave: Effect.Effect<void>
-  /** A renderer page's report about its media session. */
-  readonly media: (event: HuddleMediaEvent) => Effect.Effect<void>
+  /** A renderer page's whole media state. */
+  readonly report: (report: HuddlePageReport) => Effect.Effect<void>
   /** Main's report of the live renderer page generations. */
   readonly pages: (live: ReadonlyArray<string>) => Effect.Effect<void>
   /** Gives the service a session until the calling scope closes, and returns the listener for its socket. */
@@ -68,7 +69,7 @@ export class Huddle extends Context.Service<Huddle, {
       running: SubscriptionRef.changes(core.runningRef),
       start: (channelId, region, generation) => start(core, channelId, region, generation),
       leave: leave(core),
-      media: (event) => media(core, event),
+      report: (next) => report(core, next),
       pages: (live) => pages(core, live),
       attach: (session) => attach(core, session),
     })

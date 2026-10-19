@@ -26,7 +26,7 @@ export const HuddleHandlers = HuddleRoutes.toLayer(
           return yield* huddle.start(channelId, region, generation)
         }),
       'huddle.leave': () => huddle.leave,
-      'huddle.media': ({ event }) => huddle.media(event),
+      'huddle.report': ({ report }) => huddle.report(report),
     }
   }),
 )

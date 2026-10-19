@@ -20,11 +20,12 @@
  * Leave or while the session closes.
  */
 import { Deferred, Effect, Fiber, Queue, Result, Semaphore, SubscriptionRef, type Scope } from 'effect'
-import { Offline, Rejected, type HuddleCall, type HuddleError, type HuddleMediaEvent, type HuddleStartResult, type RunningHuddles } from '@juno/contract'
+import { Offline, Rejected, type HuddleCall, type HuddleError, type HuddlePageReport, type HuddleStartResult, type RunningHuddles } from '@juno/contract'
 import type { SlackApiError } from '@juno/slack'
 import type { MethodOk } from '@juno/slack-schema'
 import type { HuddleSession } from './Huddle'
 import * as L from './lifecycle'
+import { noMedia, pageState, type MediaView } from './media'
 import { applyJoined, toRunningHuddles, type Running } from './running'
 import { codeOf, joinedFrom, joinRequest, leaveRequest, toHuddleError } from './slack'
 import { keepStatus } from './status'
@@ -50,16 +51,11 @@ export interface Attached {
   loaded: boolean
 }
 
-/**
- * Renderer page generations as main reports them. A generation is gone
- * once main has reported and does not list it, unless this process saw it
- * in a Start but not yet in a report (main's report may come after).
- */
+/** Renderer page generations as main reports them (`media.ts`). */
 interface Pages {
   reported: boolean
   live: ReadonlySet<string>
   readonly seen: Set<string>
-  readonly used: Set<string>
 }
 
 export interface Core {
@@ -71,6 +67,10 @@ export interface Core {
   leavesInFlight: number
   readonly waiters: Map<number, Deferred.Deferred<HuddleStartResult, HuddleError>>
   readonly pages: Pages
+  /** The latest whole-state report of each page not known to be gone. */
+  readonly reports: Map<string, HuddlePageReport>
+  /** The hand-offs of this process, by attendee, in order. */
+  readonly handed: Map<string, number>
   /** Refusals in a row per attendee, for the pause before the next try. */
   readonly attempts: Map<string, number>
   readonly callRef: SubscriptionRef.SubscriptionRef<HuddleCall>
@@ -79,23 +79,23 @@ export interface Core {
   status: { readonly attendeeId: string; readonly fiber: Fiber.Fiber<never> } | undefined
 }
 
-export const gone = (core: Core): L.Gone => (generation) => {
-  const { reported, live, seen, used } = core.pages
-  return reported && !live.has(generation) && (seen.has(generation) || !used.has(generation))
-}
+/** The pages' current state, for the rules. */
+export const view = (core: Core): MediaView => ({ pages: core.pages, reports: core.reports, handed: core.handed })
 
-const toCall = (s: L.Lifecycle, running: Running): HuddleCall => {
+const toCall = (s: L.Lifecycle, media: MediaView, running: Running): HuddleCall => {
   const channelId = L.callChannel(s) ?? null
   const entry = channelId === null ? undefined : running.get(channelId)
   const identity = s.current?.identity
+  const session = L.currentMedia(s, media)
   return {
-    phase: L.phaseOf(s),
+    phase: L.phaseOf(s, media),
     channelId,
     callId: identity?.callId ?? null,
     attendeeId: identity?.attendeeId ?? null,
     participants: entry?.participants ?? [],
     startedAt: entry?.startedAt ?? null,
-    muted: s.muted,
+    connection: session?.connection ?? null,
+    muted: session?.muted ?? false,
     ended: s.ended ?? null,
   }
 }
@@ -109,9 +109,11 @@ export const makeCore = Effect.gen(function* () {
     tickets: 0,
     leavesInFlight: 0,
     waiters: new Map(),
-    pages: { reported: false, live: new Set(), seen: new Set(), used: new Set() },
+    pages: { reported: false, live: new Set(), seen: new Set() },
+    reports: new Map(),
+    handed: new Map(),
     attempts: new Map(),
-    callRef: yield* SubscriptionRef.make(toCall(L.initial, new Map())),
+    callRef: yield* SubscriptionRef.make(toCall(L.initial, noMedia, new Map())),
     runningRef: yield* SubscriptionRef.make<RunningHuddles>({}),
     status: undefined,
   }
@@ -119,7 +121,7 @@ export const makeCore = Effect.gen(function* () {
 })
 
 export const publish = (core: Core) =>
-  Effect.suspend(() => SubscriptionRef.set(core.callRef, toCall(core.s, core.running))).pipe(
+  Effect.suspend(() => SubscriptionRef.set(core.callRef, toCall(core.s, view(core), core.running))).pipe(
     Effect.andThen(Effect.suspend(() => SubscriptionRef.set(core.runningRef, toRunningHuddles(core.running)))),
   )
 
@@ -161,7 +163,7 @@ const answered = (core: Core, to: Attached, intent: L.Intent, answer: Result.Res
       return
     }
     const { identity, credentials } = joined
-    const record = L.recordFor(core.s, identity)
+    const record = L.recordFor(core.s, view(core), identity)
     // The record is durable before the credentials leave this function (model `answerJoin`).
     const stored = yield* Effect.result(to.session.leaves.write([...L.storedIn(core.s, workspace), record]))
     if (Result.isFailure(stored)) {
@@ -172,6 +174,7 @@ const answered = (core: Core, to: Attached, intent: L.Intent, answer: Result.Res
       return
     }
     core.s = L.answerJoin(core.s, record, workspace)
+    if (record.generation !== null) core.handed.set(identity.attendeeId, core.handed.size + 1)
     if (Result.isSuccess(answer)) core.running = applyJoined(core.running, identity.channelId, identity.callId, answer.success.huddle)
     yield* markDue(to, identity.channelId)
     if (record.generation === null || waiter === undefined) return
@@ -219,7 +222,8 @@ const sendLeave = (core: Core, to: Attached, record: L.Stored) =>
 /** Keeps the status while the call is live (its media started), and stops it when the call ends or changes. Never waits. */
 const followStatus = (core: Core, to: Attached | undefined) =>
   Effect.gen(function* () {
-    const live = core.s.current?.started === true ? core.s.current.identity.attendeeId : undefined
+    const connection = L.currentMedia(core.s, view(core))?.connection
+    const live = connection === 'connected' || connection === 'reconnecting' ? core.s.current?.identity.attendeeId : undefined
     if (core.status?.attendeeId === live) return
     const before = core.status
     core.status = undefined
@@ -230,6 +234,8 @@ const followStatus = (core: Core, to: Attached | undefined) =>
 /** What the rules call for after a change. Runs under the lock. */
 const drive = (core: Core) =>
   Effect.gen(function* () {
+    const media = view(core)
+    core.s = L.reconcile(core.s, media)
     const to = core.attached
     if (to !== undefined) {
       const workspace = to.session.workspace
@@ -238,12 +244,12 @@ const drive = (core: Core) =>
         core.leavesInFlight += 1
         yield* Effect.forkIn(sendLeave(core, to, record), to.work)
       }
-      const clear = L.toClear(core.s, workspace)
+      const clear = L.toClear(core.s, media, workspace)
       if (to.loaded && clear.length > 0) {
         const next = L.clearLeave(core.s, new Set(clear.map((record) => record.attendeeId)))
         if (yield* store(core, to, next)) core.s = next
       }
-      if (L.canRequest(core.s, workspace, to.loaded)) {
+      if (L.canRequest(core.s, media, workspace, to.loaded)) {
         const intent = core.s.wanted
         core.s = L.requestJoin(core.s)
         yield* Effect.forkIn(join(core, to, intent), to.work)
@@ -263,9 +269,8 @@ export const start = Effect.fn('Huddle.start')(function* (core: Core, channelId:
   const waiter = yield* Deferred.make<HuddleStartResult, HuddleError>()
   yield* step(core, Effect.gen(function* () {
     if (core.attached === undefined) return yield* new Offline()
-    // A page main already called gone cannot run media.
-    if (gone(core)(generation)) return yield* Deferred.succeed(waiter, { _tag: 'cancelled' })
-    core.pages.used.add(generation)
+    // A page main already listed as gone cannot run media. One not listed yet waits for main.
+    if (pageState(view(core), generation) === 'gone') return yield* Deferred.succeed(waiter, { _tag: 'cancelled' })
     const ticket = ++core.tickets
     core.waiters.set(ticket, waiter)
     core.s = L.choose(core.s, { channelId, region, generation, ticket })
@@ -278,21 +283,10 @@ export const leave = (core: Core) =>
     core.s = L.leave(core.s)
   }))
 
-/** A report from a page main called gone is ignored: that page's media is already counted as stopped. */
-export const media = (core: Core, event: HuddleMediaEvent) =>
+/** A page's whole media state. The latest wins; a page main listed as gone is ignored. */
+export const report = (core: Core, next: HuddlePageReport) =>
   step(core, Effect.sync(() => {
-    if (gone(core)(event.generation)) return
-    switch (event._tag) {
-      case 'started':
-        core.s = L.mediaStarted(core.s, event.generation, event.attendeeId)
-        return
-      case 'ended':
-        core.s = L.mediaEnded(core.s, event.generation, event.attendeeId, event.reason)
-        return
-      case 'muted':
-        core.s = L.mediaMuted(core.s, event.generation, event.attendeeId, event.muted)
-        return
-    }
+    if (pageState(view(core), next.generation) !== 'gone') core.reports.set(next.generation, next)
   }))
 
 /** Main's report of the live page generations. */
@@ -301,5 +295,5 @@ export const pages = (core: Core, live: ReadonlyArray<string>) =>
     core.pages.reported = true
     core.pages.live = new Set(live)
     for (const generation of live) core.pages.seen.add(generation)
-    core.s = L.pagesGone(core.s, gone(core))
+    for (const generation of core.reports.keys()) if (pageState(view(core), generation) === 'gone') core.reports.delete(generation)
   }))
