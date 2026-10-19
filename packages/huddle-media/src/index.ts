@@ -5,4 +5,4 @@
  * `import()` on join so the SDK stays out of the initial bundle; the fake is
  * `@juno/huddle-media/fake`.
  */
-export type { MediaSnapshot } from './types.ts'
+export type { Devices, EndReason, MediaSession, MediaSnapshot } from './types.ts'

@@ -28,6 +28,7 @@ import { holdKeys } from '@juno/views'
 import {
   activateTab,
   activeTab,
+  huddlePlace,
   attachmentsAtom,
   allTopicsLayoutAtom,
   flushSidebar,
@@ -480,6 +481,11 @@ export function takeJunoSwitchStart(): number | undefined {
   const at = switchStartedAt
   switchStartedAt = undefined
   return at
+}
+
+/** The huddle tab of a channel (SPEC 20): a plain open focuses the one that shows it, else opens it in the current tab. */
+export function openHuddle(channelId: string, options: OpenOptions = {}): void {
+  show((tabs) => openPlace(tabs, huddlePlace(channelId), options), undefined)
 }
 
 /** The Juno tab (SPEC 13). A plain open focuses a tab that shows it; each Juno tab shows the one chat. */

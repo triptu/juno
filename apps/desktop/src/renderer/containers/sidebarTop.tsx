@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import { HuddleBarSlot } from './huddle/slots'
 
 /**
  * The bars at the top of the sidebar, under the title bar and above Juno,
@@ -7,4 +8,4 @@ import type { ReactElement } from 'react'
  * feature is idle, so the Sidebar container never re-renders for it. The
  * huddle bar goes here.
  */
-export const sidebarTop: ReadonlyArray<ReactElement> = []
+export const sidebarTop: ReadonlyArray<ReactElement> = [<HuddleBarSlot key="huddle" />]

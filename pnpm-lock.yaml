@@ -253,6 +253,12 @@ importers:
       '@juno/fake-slack':
         specifier: workspace:*
         version: link:../../packages/fake-slack
+      '@juno/huddle-media':
+        specifier: workspace:*
+        version: link:../../packages/huddle-media
+      '@juno/huddle-views':
+        specifier: workspace:*
+        version: link:../../packages/huddle-views
       '@juno/slack':
         specifier: workspace:*
         version: link:../../packages/slack
