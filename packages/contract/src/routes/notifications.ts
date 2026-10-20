@@ -140,6 +140,13 @@ export const notificationsSetHours = Rpc.make('notifications.setHours', {
   error: NotSignedIn,
 })
 
+/** Sets one day without resending the other days from a possibly older page. */
+export const notificationsSetDay = Rpc.make('notifications.setDay', {
+  payload: { which: Schema.Literals(['notifications', 'presence']), day: Weekday, enabled: Schema.Boolean },
+  success: Schema.Void,
+  error: NotSignedIn,
+})
+
 export const notificationsSetMatters = Rpc.make('notifications.setMatters', {
   payload: { text: Schema.String.check(Schema.isMaxLength(2000)) },
   success: Schema.Void,
@@ -179,6 +186,7 @@ export const NotificationsRoutes = RpcGroup.make(
   notificationsStatus,
   notificationsWhy,
   notificationsSetHours,
+  notificationsSetDay,
   notificationsSetMatters,
   notificationsSetLevel,
   notificationsSetPresence,

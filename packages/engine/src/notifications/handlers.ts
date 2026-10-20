@@ -20,7 +20,7 @@ import {
   NotificationsRoutes,
   NotSignedIn,
   type CommandResult,
-  type NotificationSettingsView,
+  type Hours, type NotificationSettingsView,
   type NotificationsPage,
   type NotificationStatus,
   type NotifyTag,
@@ -272,6 +272,15 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
         }).pipe(Effect.orDie),
       ).pipe(writes.withPermit)
 
+    const changeHours = (which: 'notifications' | 'presence', change: (hours: Hours) => Hours) =>
+      Effect.gen(function* () {
+        yield* updateSettings((settings) => (which === 'notifications'
+          ? { ...settings, notificationHours: change(settings.notificationHours) }
+          : { ...settings, presenceHours: change(settings.presenceHours) }))
+        // Only hours the owner set reach Slack's schedule (`../slackSchedule.ts`).
+        if (which === 'notifications') yield* inWorkspace(slackSchedule.hoursSet.pipe(Effect.orDie))
+      })
+
     const settingsView = Effect.map(readSettings, ({ settings, aiAssist }): NotificationSettingsView => ({ ...levelsOf(settings), aiAssist }))
 
     const status = Effect.gen(function* () {
@@ -343,12 +352,11 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
             return row === undefined ? yield* whyUnseen(topicId, channel, ts, settings) : whyOfRow(row, settings, aiAssist)
           }).pipe(Effect.orDie),
         ),
-      'notifications.setHours': ({ which, hours }) =>
-        Effect.gen(function* () {
-          yield* updateSettings((settings) => (which === 'notifications' ? { ...settings, notificationHours: { ...settings.notificationHours, ...hours } } : { ...settings, presenceHours: { ...settings.presenceHours, ...hours } }))
-          // Only hours the owner set reach Slack's schedule (`../slackSchedule.ts`).
-          if (which === 'notifications') yield* inWorkspace(slackSchedule.hoursSet.pipe(Effect.orDie))
-        }),
+      'notifications.setHours': ({ which, hours }) => changeHours(which, (saved) => ({ ...saved, ...hours })),
+      'notifications.setDay': ({ which, day, enabled }) => changeHours(which, (saved) => ({
+        ...saved,
+        days: enabled ? [...saved.days.filter((other) => other !== day), day].toSorted((a, b) => a - b) : saved.days.filter((other) => other !== day),
+      })),
       'notifications.setMatters': ({ text }) => updateSettings((settings) => ({ ...settings, matters: text.trim() })).pipe(Effect.asVoid),
       'notifications.setLevel': ({ target, choice }) => setLevel(target, choice),
       'notifications.setPresence': ({ presence }) =>

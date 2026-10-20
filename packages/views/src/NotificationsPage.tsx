@@ -27,6 +27,7 @@ export interface NotificationsPageProps {
   readonly held: number
   /** The messages that notified today, newest first. */
   readonly today: ReadonlyArray<TodayRow>
+  readonly onDayChange: (which: HoursKind, day: Hours['days'][number], enabled: boolean) => void
   readonly onHoursChange: (which: HoursKind, hours: Partial<Hours>) => void
   /** Slack's own schedule, its switch and Restore. */
   readonly slack: SlackScheduleProps
@@ -63,7 +64,7 @@ const channelIcons: Record<Extract<NotifyTag, { kind: 'channel' }>['channelKind'
  * says so, with the way to turn it on.
  */
 export function NotificationsPage(props: NotificationsPageProps) {
-  const { notificationHours, presenceHours, matters, aiAssist, every, never, interrupted, held, today, onHoursChange, slack, onMattersSave, onRemove, permission, onSendTest, onOpenSettings, onAllow, showWhy = false } = props
+  const { notificationHours, presenceHours, matters, aiAssist, every, never, interrupted, held, today, onHoursChange, onDayChange, slack, onMattersSave, onRemove, permission, onSendTest, onOpenSettings, onAllow, showWhy = false } = props
   return (
     <Page width="settings">
       <PageHeader title="Notifications" subtitle="During your notification hours, Juno lets through what needs you and holds the rest. Everything is in Juno whenever you open it." />
@@ -72,8 +73,8 @@ export function NotificationsPage(props: NotificationsPageProps) {
 
       <Section heading="Hours">
         <Surface kind="group">
-          <HoursRow which="notifications" title="Notifications" sub="Outside these hours, messages stay in Juno without notifying you." hours={notificationHours} onChange={onHoursChange} />
-          <HoursRow which="presence" title="Active in Slack" sub="Outside these hours you show as away." hours={presenceHours} onChange={onHoursChange} />
+          <HoursRow which="notifications" title="Notifications" sub="Outside these hours, messages stay in Juno without notifying you." hours={notificationHours} onChange={onHoursChange} onDayChange={onDayChange} />
+          <HoursRow which="presence" title="Active in Slack" sub="Outside these hours you show as away." hours={presenceHours} onChange={onHoursChange} onDayChange={onDayChange} />
           <div {...stylex.props(styles.note)}>
             <Text variant="meta" tone="muted" as="p">
               Juno switches your status while it's open. If it's closed when your active hours start, you stay away until you open it.
@@ -163,7 +164,7 @@ function TestRow({ permission, onSendTest, onOpenSettings }: Pick<NotificationsP
   )
 }
 
-function HoursRow({ which, title, sub, hours, onChange }: { readonly which: HoursKind; readonly title: string; readonly sub: string; readonly hours: Hours; readonly onChange: NotificationsPageProps['onHoursChange'] }) {
+function HoursRow({ which, title, sub, hours, onChange, onDayChange }: { readonly which: HoursKind; readonly title: string; readonly sub: string; readonly hours: Hours; readonly onChange: NotificationsPageProps['onHoursChange']; readonly onDayChange: NotificationsPageProps['onDayChange'] }) {
   const set = (patch: Partial<Hours>) => onChange(which, patch)
   const from = String(Math.floor(hours.from / HALF_HOUR) * HALF_HOUR)
   const to = String(Math.floor(hours.to / HALF_HOUR) * HALF_HOUR)
@@ -173,7 +174,7 @@ function HoursRow({ which, title, sub, hours, onChange }: { readonly which: Hour
       wrap
       trailing={
         <span {...stylex.props(styles.controls)}>
-          <DayToggles days={hours.days} label={`${title} days`} onChange={(days) => set({ days })} />
+          <DayToggles days={hours.days} label={`${title} days`} onChange={(day, enabled) => onDayChange(which, day, enabled)} />
           {/* The times stay together when the controls wrap. */}
           <span {...stylex.props(styles.times)}>
             <Select size={32} label={`${title} from`} options={times} value={from} onChange={(event) => set({ from: Number(event.currentTarget.value) })} />

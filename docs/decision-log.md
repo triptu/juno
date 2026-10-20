@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-20 15:15 · notification-day-fields · Each hours day button sends its day and desired on/off value through `notifications.setDay`. It uses the same settings write lock and Slack schedule handling as hour edits, so two quick day changes cannot replace each other with an old days array.
 - 10-20 15:06 · tidy-up-fields · Tidy up controls send field patches through `tidyUp.set`. The engine reads and merges inside one writer transaction, so separate controls cannot overwrite each other with stale page values. Other Settings rows write independent preferences or keep pending edits already.
 - 10-20 15:05 · notification-hours-fields · Hours controls send only the edited fields. The engine merges them with the saved hours under its settings write lock, so a rapid second edit cannot restore stale values from the page. The fast reopen persistence test keeps its original interactions.
 - 10-20 13:58 · incoming-huddle-pulse · The pulse is an accent glow on the card's accent edge whose opacity breathes over 2.4 s until the card goes, as a Web Animation reading `--duration-pulse`; reduced motion never starts it and shows the accent edge only. Why: only opacity animates, so only the compositor works, and with no keyframes, animation rules or a dark override the card adds about 200 bytes to the initial style sheet, which main had at 154.3 of 155 KB.
