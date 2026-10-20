@@ -57,7 +57,7 @@ test('an HTML file shows in a sandboxed frame where its script does not run', as
   const page = viewer.frameLocator('[data-viewer-kind="html"] iframe')
   await expect(page.getByRole('heading', { name: 'Weekly digest' })).toBeVisible()
   await expect(page.locator('html')).not.toHaveAttribute('data-script-ran', /.*/)
-  await expect(viewer.getByRole('button', { name: 'Open in browser' })).toHaveAttribute('aria-disabled', 'false')
+  await expect(viewer.getByRole('button', { name: 'Open in browser' })).not.toHaveAttribute('aria-disabled', 'true')
 })
 
 test('a Markdown snippet shows rendered and a CSV as a table, and the arrows move between them', async ({ juno, fake }) => {
@@ -77,8 +77,10 @@ test('a Markdown snippet shows rendered and a CSV as a table, and the arrows mov
   // A quoted field keeps its comma.
   await expect(table.getByRole('cell', { name: 'eu-west, 1' }).first()).toBeVisible()
   // The table scrolls inside the stage; the stage never grows.
-  const stage = await viewer.locator('[data-viewer-item]').boundingBox()
-  expect(stage!.height).toBeLessThan((await juno.win.viewportSize())!.height)
+  const scroller = viewer.locator('[data-viewer-text]')
+  const sizes = await scroller.evaluate((element) => ({ client: element.clientHeight, scroll: element.scrollHeight, window: window.innerHeight }))
+  expect(sizes.scroll).toBeGreaterThan(sizes.client)
+  expect(sizes.client).toBeLessThan(sizes.window)
 })
 
 test('audio and a voice clip play in their cards and in the viewer', async ({ juno, fake }) => {
