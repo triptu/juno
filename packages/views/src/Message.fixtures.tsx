@@ -2,6 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { layout } from '@juno/tokens/tokens.stylex'
 import { defineFixtures, hueForId, scene, type Fixture, type FixtureFrame } from '@juno/ui'
 import { codeBlocks } from './fixtures/code'
+import { tableMessages } from './fixtures/tables'
 import { failedSend, hostile, longFirstLine, main, mentions, sending, thread } from './fixtures/messages'
 import { NOW } from './fixtures/topics'
 import { noopActions } from './fixtures/actions'
@@ -80,6 +81,14 @@ export default defineFixtures(
     // Code blocks: tagged (the tag line is not shown), detected, a stack trace left plain, and a long one.
     Code: {
       'code-blocks': one(codeBlocks[0]!, { startsGroup: true }),
+    },
+    // Tables: a status table with mentions, a link, code and an empty cell; a wide one that scrolls in its box; a tall one cut at ten rows; and a table alone.
+    Table: {
+      status: one(tableMessages[0]!, { startsGroup: true }),
+      wide: one(tableMessages[1]!, { startsGroup: true }),
+      tall: one(tableMessages[2]!, { startsGroup: true }),
+      'table-only': one(tableMessages[3]!, { startsGroup: true }),
+      'hover-toolbar': one(tableMessages[0]!, { startsGroup: true, actions: noopActions }, { hover: '[data-message-row]' }),
     },
     // A send still on its way looks like the message it becomes; past --delay-pending it dims.
     Send: {
