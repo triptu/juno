@@ -356,7 +356,7 @@ const styles = stylex.create({
   inlineCode: {
     fontFamily: text['--text-code-family'],
     fontSize: text['--text-code-size'],
-    fontVariantLigatures: text['--text-code-ligatures'],
+    fontVariantLigatures: 'none',
     paddingInline: spacing['--space-1'],
     borderRadius: radii['--radius-xs'],
     backgroundColor: colors['--secondary-default'],

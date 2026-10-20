@@ -739,8 +739,6 @@ export const text = stylex.defineVars({
   '--text-code-weight': '400',
   '--text-code-leading': '1.6',
   '--text-code-tracking': '0',
-  // Code shows as typed: no ligatures, so => -> ++ keep their characters (decision 10-20, reversible here).
-  '--text-code-ligatures': 'none',
 })
 
 /* -------------------------------------------------------------------------- */

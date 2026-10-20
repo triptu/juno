@@ -159,16 +159,16 @@ textarea {
    Scoped to the code element: a bare ::highlight() matches every element,
    and Chromium then works out highlight styles for each one it restyles
    (every restyle about 70% slower, ADR 0017). */
-pre > code::highlight(syntax-keyword) { color: var(--syntax-keyword); }
-pre > code::highlight(syntax-string) { color: var(--syntax-string); }
-pre > code::highlight(syntax-number) { color: var(--syntax-number); }
-pre > code::highlight(syntax-comment) { color: var(--syntax-comment); }
-pre > code::highlight(syntax-function) { color: var(--syntax-function); }
-pre > code::highlight(syntax-type) { color: var(--syntax-type); }
-pre > code::highlight(syntax-constant) { color: var(--syntax-constant); }
-pre > code::highlight(syntax-property) { color: var(--syntax-property); }
-pre > code::highlight(syntax-tag) { color: var(--syntax-tag); }
-pre > code::highlight(syntax-punctuation) { color: var(--syntax-punctuation); }
-pre > code::highlight(syntax-meta) { color: var(--syntax-meta); }
-pre > code::highlight(syntax-inserted) { color: var(--syntax-inserted); }
-pre > code::highlight(syntax-deleted) { color: var(--syntax-deleted); }
+code::highlight(syntax-keyword) { color: var(--syntax-keyword); }
+code::highlight(syntax-string) { color: var(--syntax-string); }
+code::highlight(syntax-number) { color: var(--syntax-number); }
+code::highlight(syntax-comment) { color: var(--syntax-comment); }
+code::highlight(syntax-function) { color: var(--syntax-function); }
+code::highlight(syntax-type) { color: var(--syntax-type); }
+code::highlight(syntax-constant) { color: var(--syntax-constant); }
+code::highlight(syntax-property) { color: var(--syntax-property); }
+code::highlight(syntax-tag) { color: var(--syntax-tag); }
+code::highlight(syntax-punctuation) { color: var(--syntax-punctuation); }
+code::highlight(syntax-meta) { color: var(--syntax-meta); }
+code::highlight(syntax-inserted) { color: var(--syntax-inserted); }
+code::highlight(syntax-deleted) { color: var(--syntax-deleted); }

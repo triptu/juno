@@ -300,7 +300,7 @@ Checked before that on 10-15 against the row's text (gallery `TopicRow/Tile/art-
 
 ### 1.10 Code colours
 
-The `syntax` group: one colour per token kind of `@juno/highlight`, for code blocks (SPEC 7, "Code blocks"). `paintCode` puts each token in the CSS highlight of its kind, and `global.css` colours it: `pre > code::highlight(syntax-keyword) { color: var(--syntax-keyword) }`, scoped to the code element because a bare `::highlight()` makes Chromium work out highlight styles for every element it restyles. The set is calm: muted hues at even lightness, so a block reads as text with a little colour. Tokens set colour only, never weight or style, so a coloured block has the plain block's lines. Comments use the muted grey; punctuation uses the subtle grey.
+The `syntax` group: one colour per token kind of `@juno/highlight`, for code blocks (SPEC 7, "Code blocks"). `paintCode` puts each token in the CSS highlight of its kind, and `global.css` colours it: `code::highlight(syntax-keyword) { color: var(--syntax-keyword) }`, scoped to the code element because a bare `::highlight()` makes Chromium work out highlight styles for every element it restyles. The set is calm: muted hues at even lightness, so a block reads as text with a little colour. Tokens set colour only, never weight or style, so a coloured block has the plain block's lines. Comments use the muted grey; punctuation uses the subtle grey.
 
 Contrast is measured on the code block's background, `--background` (light `hsla(48, 50%, 98%)`, dark `#1B1916`).
 
@@ -334,7 +334,7 @@ The text's own colour (`--foreground-default`) is 15.6:1 in light and 14.7:1 in 
 
 Bundle Figtree (variable, `@fontsource-variable/figtree` 5.3.0, Latin subset 20 KB), Instrument Serif 400 regular + italic, JetBrains Mono 400/500 locally; no Google Fonts import.
 
-Code (blocks and inline code, in messages and Juno's bubbles) turns JetBrains Mono's ligatures off with `--text-code-ligatures: none`, so `=>`, `->` and `++` show as typed. Set it to `normal` to bring them back.
+Code (blocks and inline code, in messages and Juno's bubbles) turns JetBrains Mono's ligatures off (`fontVariantLigatures: 'none'` in the code type variant in `@juno/ui` and in the inline code styles of `MessageBody` and `JunoRichText`), so `=>`, `->` and `++` show as typed. Remove those three lines to bring them back.
 
 Root text settings: `font-size: 14.5px; line-height: 1.5; letter-spacing: 0; -webkit-font-smoothing: antialiased`. The prototype root used 0.01em for Inter (`colors_and_type.css` says 0.02em); Figtree's sidebearings are wide enough on their own, so the root and every sans role use 0.
 
