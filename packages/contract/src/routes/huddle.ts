@@ -15,6 +15,8 @@
  * - `huddle.leave` leaves. It never waits for Slack.
  * - `huddle.report` is a renderer page's whole media state.
  * - `huddle.people` names the people a huddle lists, for its faces.
+ * - `huddle.incoming` is the huddles that started where the user is, which
+ *   the sidebar's card offers to join; `huddle.dismiss` hides one.
  *
  * A page generation names one load of a renderer page. The page's media
  * service gets one from main when it starts (`huddle.register`); main gives
@@ -156,4 +158,32 @@ export const huddleReport = Rpc.make('huddle.report', { payload: { report: Huddl
 /** The people with these user ids, in the same order; an unknown user reads "Someone" until Slack names them. */
 export const huddlePeople = liveValueRoute('huddle.people', { payload: { ids: Schema.Array(Schema.String) }, value: Schema.Array(Person) })
 
-export const HuddleRoutes = RpcGroup.make(huddleCall, huddleRunning, huddleStart, huddleLeave, huddleReport, huddlePeople)
+/**
+ * How an incoming huddle may interrupt (SPEC 20, "Incoming huddles"):
+ * `ring` pulses the card, rings and posts the OS notification; `quiet`
+ * shows the card only, as the notification rules hold it.
+ */
+export const HuddleAlert = Schema.Literals(['ring', 'quiet'])
+export type HuddleAlert = typeof HuddleAlert.Type
+
+/** A huddle that started in a conversation the user is in, by someone else, while the user is not in it. */
+export const IncomingHuddle = Schema.Struct({
+  channelId: Schema.String,
+  callId: Schema.String,
+  /** Who started it. */
+  startedBy: Schema.String,
+  /** User ids in the huddle, in the order they joined. */
+  participants: Schema.Array(Schema.String),
+  alert: HuddleAlert,
+  /** Until when the ring plays, in epoch milliseconds; null when it does not ring. */
+  ringUntil: Schema.NullOr(Schema.Number),
+})
+export type IncomingHuddle = typeof IncomingHuddle.Type
+
+/** The incoming huddles, newest first. */
+export const huddleIncoming = liveValueRoute('huddle.incoming', { value: Schema.Array(IncomingHuddle) })
+
+/** Hides an incoming huddle's card and stops its ring. The huddle goes on. */
+export const huddleDismiss = Rpc.make('huddle.dismiss', { payload: { callId: Schema.String }, success: Schema.Void })
+
+export const HuddleRoutes = RpcGroup.make(huddleCall, huddleRunning, huddleStart, huddleLeave, huddleReport, huddlePeople, huddleIncoming, huddleDismiss)

@@ -12,4 +12,6 @@ The engine gives it a session per sync (`attach`) with the Slack client, where t
 
 `alone.ts` is the rule for leaving a call the user has been alone in for 10 minutes (SPEC 20, "The only one left"). `core.ts` keeps one timer for it, checked on every publish, and the leave ends the call as `alone`, so the page shows its toast.
 
+`incoming.ts` is the rule for incoming huddles (SPEC 20, "Incoming huddles"): which running huddles someone else just started where the user is, and when each card goes. The engine decides how each may interrupt and posts its notification (`engine/src/huddle/incoming.ts`).
+
 `status.ts` keeps the "In a huddle" status as the official client does: `users.profile.set` with `huddle_state_expiration_ts` while the call is live, renewed every 240 s or so, and no clearing write on leave.

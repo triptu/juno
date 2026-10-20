@@ -301,3 +301,26 @@ export function nextHoursStart(at: number, hours: Hours): number | undefined {
   }
   return undefined
 }
+
+/** What an incoming huddle may do (SPEC 20, "Incoming huddles"): ring, show its card quietly, or nothing. */
+export type HuddleAlertDecision = 'ring' | 'quiet' | 'none'
+
+/**
+ * How a huddle someone started may interrupt, by the order messages follow:
+ * an ignored conversation shows nothing; Every message on the conversation
+ * or the person who started it rings, even outside notification hours; Never
+ * on either, or outside notification hours, shows the card without a ring
+ * or an OS notification. Otherwise it rings. Juno's judgement plays no part:
+ * a huddle is live, so it is decided at once.
+ */
+export function decideHuddleAlert(
+  huddle: { readonly channelId: string; readonly startedBy: string; readonly ignored: boolean; readonly at: LocalTime },
+  settings: NotificationSettings,
+): HuddleAlertDecision {
+  if (huddle.ignored) return 'none'
+  const channelLevel = settings.channels[huddle.channelId]
+  const personLevel = settings.people[huddle.startedBy]
+  if (channelLevel === 'every' || personLevel === 'every') return 'ring'
+  if (channelLevel === 'never' || personLevel === 'never') return 'quiet'
+  return inHours(huddle.at, settings.notificationHours) ? 'ring' : 'quiet'
+}
