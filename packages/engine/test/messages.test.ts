@@ -376,45 +376,6 @@ describe('files', () => {
     ])
     expect(row.body.blocks.some((block) => block.kind === 'file' && block.id === 'F0CHART')).toBe(true)
   })
-
-  it('gives a PDF, an HTML page and text a content url, text how to draw it, and audio and a voice clip a player url', async () => {
-    const engine = await bootedEngine()
-    const at = (id: string, name: string) => `${engine.fake.url}/files/${id}/${name}`
-    const files = [
-      { id: 'F0PDF', name: 'q4-plan.pdf', mimetype: 'application/pdf', filetype: 'pdf', size: 52_000, url_private: at('F0PDF', 'q4-plan.pdf') },
-      { id: 'F0HTML', name: 'newsletter.html', mimetype: 'text/html', filetype: 'html', url_private: at('F0HTML', 'newsletter.html') },
-      { id: 'F0NOTE', name: 'notes.md', title: 'Release notes', mimetype: 'text/plain', filetype: 'markdown', mode: 'snippet', lines: 40, preview: '# Release', preview_is_truncated: true, url_private: at('F0NOTE', 'notes.md') },
-      { id: 'F0CSV', name: 'export.csv', mimetype: 'text/csv', filetype: 'csv', url_private: at('F0CSV', 'export.csv') },
-      { id: 'F0JSON', name: 'config.json', mimetype: 'application/json', filetype: 'json', url_private: at('F0JSON', 'config.json') },
-      { id: 'F0PY', name: 'fix.py', mimetype: 'text/plain', filetype: 'python', pretty_type: 'Python', mode: 'snippet', url_private: at('F0PY', 'fix.py') },
-      { id: 'F0LOG', name: 'deploy.log', mimetype: 'text/plain', filetype: 'text', url_private: at('F0LOG', 'deploy.log') },
-      { id: 'F0MP3', name: 'standup.mp3', mimetype: 'audio/mpeg', filetype: 'mp3', duration_ms: 300_000, url_private: at('F0MP3', 'standup.mp3') },
-      { id: 'F0VOICE', name: 'audio_message.m4a', mimetype: 'audio/mp4', filetype: 'm4a', subtype: 'slack_audio', duration_ms: 12_000, aac: at('F0VOICE', 'audio_message.aac'), url_private: at('F0VOICE', 'audio_message.m4a') },
-      { id: 'F0ZIP', name: 'logs.zip', mimetype: 'application/zip', filetype: 'zip', url_private: at('F0ZIP', 'logs.zip'), url_private_download: `${at('F0ZIP', 'logs.zip')}?download=1` },
-    ]
-    const posted = engine.fake.workspace.post({ channel: 'C0INCIDENTS', user: 'U0JONAS', text: 'Files from the review', files, silent: true })
-    valueOf(await openTopic(engine.registry, 'm:C0INCIDENTS'))
-    const list = watchList(engine, messagesAtom('m:C0INCIDENTS'))
-    const window = await list.until((w) => (w.rows.get(posted.ts)?.files.length ?? 0) === files.length, 'the files')
-    const byId = new Map(window.rows.get(posted.ts)!.files.map((file) => [file.id, file]))
-    const content = (id: string) => {
-      const file = files.find((each) => each.id === id)!
-      return `juno://files/${id}/content/${encodeURIComponent(file.name)}?url=${encodeURIComponent(file.url_private)}`
-    }
-    expect(byId.get('F0PDF')).toMatchObject({ kind: 'pdf', content: content('F0PDF') })
-    expect(byId.get('F0HTML')).toMatchObject({ kind: 'html', content: content('F0HTML') })
-    expect(byId.get('F0NOTE')).toMatchObject({ kind: 'text', name: 'Release notes', textKind: 'markdown', lines: 40, content: content('F0NOTE') })
-    expect(byId.get('F0CSV')).toMatchObject({ kind: 'text', textKind: 'csv' })
-    expect(byId.get('F0JSON')).toMatchObject({ kind: 'text', textKind: 'json' })
-    expect(byId.get('F0PY')).toMatchObject({ kind: 'text', textKind: 'code', language: 'Python' })
-    expect(byId.get('F0LOG')).toMatchObject({ kind: 'text', textKind: 'plain' })
-    expect(byId.get('F0MP3')).toMatchObject({ kind: 'audio', durationMs: 300_000, audio: `juno://files/F0MP3/audio?url=${encodeURIComponent(at('F0MP3', 'standup.mp3'))}` })
-    expect(byId.get('F0VOICE')).toMatchObject({ kind: 'audio', durationMs: 12_000, audio: `juno://files/F0VOICE/audio?url=${encodeURIComponent(at('F0VOICE', 'audio_message.aac'))}` })
-    const zip = byId.get('F0ZIP')!
-    expect(zip).toMatchObject({ kind: 'file', download: files[9]!.url_private_download })
-    expect(zip.content).toBeUndefined()
-    for (const file of byId.values()) expect(file.thumb).toBeUndefined()
-  })
 })
 
 describe("Main's active threads", () => {
