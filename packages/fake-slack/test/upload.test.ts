@@ -242,3 +242,23 @@ describe('late and partial files', () => {
     expect(poster.headers.get('content-type')).toBe('image/png')
   })
 })
+
+describe('injectFiles', () => {
+  it('posts the files the viewer opens, each served with its type, a snippet with its preview and a voice clip with aac', async () => {
+    const kinds = ['pdf', 'html', 'markdown', 'csv', 'json', 'audio', 'voice', 'zip'] as const
+    const posted = fake.control('injectFiles', { channel: 'C0ENG', text: 'Files', files: kinds.map((kind) => ({ kind })) }) as { files: ReadonlyArray<Record<string, unknown> & { url_private: string; mimetype: string }> }
+    expect(posted.files.map((file) => file['mimetype'])).toEqual(['application/pdf', 'text/html', 'text/plain', 'text/csv', 'application/json', 'audio/wav', 'audio/wav', 'application/zip'])
+    expect(posted.files[2]).toMatchObject({ mode: 'snippet', filetype: 'markdown', preview_is_truncated: true, preview: expect.stringContaining('# Release') })
+    expect(posted.files[5]).toMatchObject({ duration_ms: 300_000 })
+    expect(posted.files[6]).toMatchObject({ subtype: 'slack_audio', aac: expect.stringContaining('?aac=1') })
+    const cookie = { cookie: `d=${fake.credentials().cookie}` }
+    for (const file of posted.files) {
+      const response = await fetch(file.url_private, { headers: cookie })
+      expect(response.headers.get('content-type')).toBe(file.mimetype)
+      await response.arrayBuffer()
+    }
+    const pdf = Buffer.from(await (await fetch(posted.files[0]!.url_private, { headers: cookie })).arrayBuffer()).toString('latin1')
+    expect(pdf.startsWith('%PDF-')).toBe(true)
+    expect(pdf).toContain('/Count 12')
+  })
+})
