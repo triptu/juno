@@ -29,6 +29,7 @@ import { readHome, type HomeRun } from './query'
 const DRAFT_REVIEWS = 'draft_reviews'
 
 const KEYS: InvalidationKeys = [
+  'huddle_history',
   'topics',
   'topic_overlay',
   'topic_reads',
@@ -152,6 +153,10 @@ export const HomeHandlers = HomeRoutes.toLayer(
 
     return {
       'home.view': () => view(),
+      'home.huddleSeen': ({ callId }) => write(Effect.gen(function* () {
+        yield* (yield* StoreWriter)`UPDATE huddle_history SET seen = 1 WHERE call_id = ${callId}`
+        yield* (yield* Invalidation).invalidate(['huddle_history'])
+      })),
       'home.visit': ({ id }) =>
         write(
           Effect.gen(function* () {

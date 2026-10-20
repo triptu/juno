@@ -422,7 +422,7 @@ const readEmoji = (sql: SqlClient.SqlClient, cache: MessageCache, names: Iterabl
         if (target !== undefined) {
           aliases.set(row.name, target)
           if (!cache.emoji.has(target)) next.push(target)
-        } else if (row.url !== null) {
+        } else if (row.url) {
           cache.emoji.set(row.name, row.url)
         }
       }

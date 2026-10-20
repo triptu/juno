@@ -14,7 +14,6 @@ export { markupLayout, toggleMarkup, type MarkupEdit, type MarkupLayout, type Ma
 export { findLinks, linkOf } from './links'
 export type { MentionTargets } from './outgoing'
 export {
-  customEmojiLookup,
   emojiCatalog,
   PICKER_EMOJI,
   QUICK_REACTIONS,
@@ -26,3 +25,5 @@ export {
 } from './emoji'
 
 export { messageTitle } from './title'
+
+export { customEmojiLookup, workspaceEmoji, type CustomEmojiRow } from './custom-emoji'

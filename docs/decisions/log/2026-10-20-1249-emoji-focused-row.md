@@ -1,0 +1,1 @@
+- 10-20 12:49 · Tushar · Keep the focused emoji row mounted during wheel scrolling, so focus, arrow navigation and Escape remain in the picker.

@@ -1,0 +1,1 @@
+- 10-20 14:40 · Tushar · Measure the 20,000-emoji preload after first paint separately from cold open, including Schema decoding, alias resolution and catalog preparation on the renderer main thread.

@@ -20,6 +20,7 @@ export const opensReview = (kind: HomeItemKind): boolean => kind === 'tidyUp' ||
 
 /** The meta line: plain data, the same with and without AI. */
 export function metaOf(item: HomeItem, now: number): string {
+  if (item.kind === 'missedHuddle') return [`${item.durationMinutes ?? 1} min`, item.at === undefined ? undefined : relativeTime(item.at, now)].filter(Boolean).join(' · ')
   if (item.kind === 'ask') return item.ask?.connection !== undefined ? junoAskCopy.learn.metaConnection(item.ask.connection) : junoAskCopy.learn.meta(item.ask?.sources ?? [])
   if (item.kind === 'automated') return item.reason === undefined ? 'To Automated' : `To Automated · ${item.reason}`
   if (opensReview(item.kind)) return placesLine(item.topics.map((topic) => topic.place))

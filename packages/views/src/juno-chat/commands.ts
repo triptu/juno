@@ -4,7 +4,7 @@
  * the card RPCs without importing views).
  */
 import type { MouseEvent, ReactNode } from 'react'
-import type { AskAnswer, AskId, BubbleId, CardCommand, CardId, ChatMessageId, OpId, OpenTarget, OwnerFile, ReplyTarget } from '@juno/agent-contract'
+import type { AskAnswer, AskId, BubbleId, CardCommand, CardId, ChatMessageId, OpId, Reaction, OpenTarget, OwnerFile, ReplyTarget } from '@juno/agent-contract'
 import type { ActivateEvent } from '@juno/ui'
 
 export type { CardCommand } from '@juno/agent-contract'
@@ -22,6 +22,8 @@ export type GroupLabelAction = 'why' | 'pauseSchedule' | 'muteUpdates'
 
 /** Every callback the chat list and its rows share. Created once by the container; rows are memoised on it. */
 export interface ChatActions {
+  /** The container draws badges from the workspace data already loaded by the picker. Stable for the chat's life. */
+  readonly renderReactions?: (reactions: ReadonlyArray<Reaction>, corner: 'start' | 'end') => ReactNode
   readonly onCard: (id: CardId, command: CardCommand) => void
   /** A topic, a chat message (citation), a Slack message (source), a URL, or a page. `metaKey` asks for a new tab. */
   readonly onOpen: (target: OpenTarget, event: ActivateEvent) => void

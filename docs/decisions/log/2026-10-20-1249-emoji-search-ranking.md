@@ -1,0 +1,1 @@
+- 10-20 12:49 · Tushar · Use the composer ranking for the picker: exact names and aliases, standard matches, custom prefixes, then custom substrings. Recent and common priors break ties. Workspace aliases of standard emoji find the standard glyph.

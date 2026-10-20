@@ -1,3 +1,4 @@
+import missedHuddles from './202610201700_missed_huddles'
 import type { Effect } from 'effect'
 import type { SqlClient } from 'effect/sql'
 import dropForYouCards from './202610160200_drop_for_you_cards'
@@ -69,4 +70,5 @@ export const userMigrations: Record<string, Effect.Effect<void, unknown, SqlClie
   '202610182200_no_ai_title_version': noAiTitleVersion,
   '202610182230_agent_approvals': agentApprovals,
   '202610191200_forwards': forwards,
+  '202610201700_missed_huddles': missedHuddles,
 }

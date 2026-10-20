@@ -1,0 +1,1 @@
+- 10-20 14:40 · Tushar · Remove the generated emoji decoder and its tooling: twelve alternating cold processes per side measured normal Schema at 11.9 ms median and generated at 7.2 ms, below the 5 ms saving threshold. Picker fixtures supply prepared data, and settings preserve string URLs without a juno-scheme filter.

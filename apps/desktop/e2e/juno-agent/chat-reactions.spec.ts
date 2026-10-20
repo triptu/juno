@@ -192,3 +192,17 @@ test('a Juno bubble takes a quick reaction and any emoji from the picker, and it
   await juno.tabs.expectActive('Juno')
   await expectWholeEverywhere(JunoChatPane.tab(juno.win), 'tab-wide-dark')
 })
+
+
+test('a Juno custom reaction is stored by name and drawn as an image', async ({ juno, model }) => {
+  await ready(juno)
+  await juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
+  const panel = JunoChatPane.tab(juno.win)
+  await expect(panel.composer).toBeFocused()
+  await panel.send('custom reaction target')
+  await panel.expectJuno('You said: custom reaction target')
+  await panel.reactWithPicker('You said: custom reaction target', 'hello_juno', 'juno_wave')
+  const badge = panel.junoBubble('You said: custom reaction target').getByLabel('Reacted juno_wave')
+  await expect(badge.locator('img')).toBeVisible()
+  await expect.poll(() => model.inputs().some((input) => input.startsWith('<reaction') && input.includes('emoji="juno_wave"'))).toBe(true)
+})
