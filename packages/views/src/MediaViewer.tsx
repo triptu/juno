@@ -6,7 +6,7 @@ import { Copy } from '@phosphor-icons/react/dist/icons/Copy'
 import { DownloadSimple } from '@phosphor-icons/react/dist/icons/DownloadSimple'
 import { Eye } from '@phosphor-icons/react/dist/icons/Eye'
 import { X } from '@phosphor-icons/react/dist/icons/X'
-import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type RefObject } from 'react'
 import type { FileView } from '@juno/contract'
 import { colors, layout, motion, radii, spacing, z } from '@juno/tokens/tokens.stylex'
 import { IconButton, Surface, Text } from '@juno/ui'
@@ -31,6 +31,10 @@ export interface MediaViewerProps {
   readonly now: number
   /** Esc, Close, or a click on the backdrop. */
   readonly onClose: () => void
+  /** What had focus when it opened, taken in the open handler before the topic under it turns inert. Focus goes back to it on close. */
+  readonly opener?: Element | null | undefined
+  /** Another item is shown, at this index: kept so a remount opens at it. */
+  readonly onShowItem?: ((index: number) => void) | undefined
   /** With it, and a `download` url on the item, the header has Download. */
   readonly onDownload?: ((file: FileView) => void) | undefined
   /** With it, and a `download` url on the item, the header has Quick Look: the macOS preview window. */
@@ -60,27 +64,12 @@ export interface MediaViewerProps {
  * the topic under it inert, so Tab goes from its controls on to the sidebar
  * and the tab strip. A hidden tab keeps it open at its item.
  */
-export function MediaViewer({ viewing, now, onClose, onDownload, onQuickLook, onOpenInBrowser, onCopyImage, loadText }: MediaViewerProps) {
+export function MediaViewer({ viewing, now, opener, onClose, onShowItem, onDownload, onQuickLook, onOpenInBrowser, onCopyImage, loadText }: MediaViewerProps) {
   const { items } = viewing
-  const root = useRef<HTMLDivElement>(null)
   const [index, setIndex] = useState(() => Math.min(Math.max(0, viewing.index), items.length - 1))
   const file = items[index]!
   const several = items.length > 1
-  // What had focus when it opened. State, so a tab hidden and shown again keeps it.
-  const [opener] = useState(() => document.activeElement)
-  const focused = useRef(false)
-  const closing = useRef(false)
-
-  // A hidden tab runs this cleanup and then the effect again when it shows: focus moves only on the first open and after a close.
-  useEffect(() => {
-    if (!focused.current) {
-      focused.current = true
-      root.current?.querySelector<HTMLElement>('[data-viewer-close]')?.focus()
-    }
-    return () => {
-      if (closing.current && opener instanceof HTMLElement && opener.isConnected) opener.focus()
-    }
-  }, [opener])
+  const { root, close } = useViewerFocus(opener, onClose)
 
   // The neighbours' full images are fetched ahead, so moving to them shows them sharp at once.
   useEffect(() => {
@@ -92,10 +81,10 @@ export function MediaViewer({ viewing, now, onClose, onDownload, onQuickLook, on
     }
   }, [items, index])
 
-  const go = (next: number) => setIndex(Math.min(Math.max(0, next), items.length - 1))
-  const close = () => {
-    closing.current = true
-    onClose()
+  const go = (next: number) => {
+    const shown = Math.min(Math.max(0, next), items.length - 1)
+    setIndex(shown)
+    onShowItem?.(shown)
   }
   // A click on the dim around the picture, the bar or the strip closes; one on the picture or a button does not.
   const onBackdrop = (event: MouseEvent<HTMLDivElement>) => {
@@ -162,6 +151,32 @@ function onViewerKey(event: KeyboardEvent<HTMLDivElement>, index: number, count:
     event.stopPropagation()
     go(move)
   }
+}
+
+/**
+ * Focus on Close when the viewer first opens, and back on `opener` after a
+ * close. A hidden tab runs the cleanup and then the effect again when it
+ * shows, so neither moves focus then. Returns the viewer's root and its close.
+ */
+function useViewerFocus(opener: Element | null | undefined, onClose: () => void): { readonly root: RefObject<HTMLDivElement | null>; readonly close: () => void } {
+  const root = useRef<HTMLDivElement>(null)
+  const focused = useRef(false)
+  const closing = useRef(false)
+
+  useEffect(() => {
+    if (!focused.current) {
+      focused.current = true
+      root.current?.querySelector<HTMLElement>('[data-viewer-close]')?.focus()
+    }
+    return () => {
+      if (closing.current && opener instanceof HTMLElement && opener.isConnected) opener.focus()
+    }
+  }, [opener])
+  const close = () => {
+    closing.current = true
+    onClose()
+  }
+  return { root, close }
 }
 
 interface ViewerBarProps extends Pick<MediaViewerProps, 'onClose' | 'onDownload' | 'onQuickLook' | 'onOpenInBrowser' | 'onCopyImage'> {
