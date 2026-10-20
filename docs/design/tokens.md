@@ -298,6 +298,30 @@ Checked on 10-17 for the calm roles, and before them the two-tone ones (`docs/de
 
 Checked before that on 10-15 against the row's text (gallery `TopicRow/Tile/art-and-pebbles`, light and dark). On the sidebar, the title is 15.2:1 in light and 15.5:1 in dark, and the preview 4.8:1 and 6.9:1. The art's ink is 7.6 to 7.8:1 in light and 9.1 to 9.3:1 in dark, the same lightness step from the sidebar in both themes. The pebble bands are 1.25 to 2.15:1 in light and 1.5 to 2.9:1 in dark: further from the sidebar in lightness than in light, but still clearly quieter than the drawings and the text. Lower dark ramps (ground at 0.27 to 0.30) were tried side by side and only read murkier, so the values stay.
 
+### 1.10 Code colours
+
+The `syntax` group: one colour per token kind of `@juno/highlight`, for code blocks (SPEC 7, "Code blocks"). `paintCode` puts each token in the CSS highlight of its kind, and `global.css` colours it: `::highlight(syntax-keyword) { color: var(--syntax-keyword) }`. The set is calm: muted hues at even lightness, so a block reads as text with a little colour. Tokens set colour only, never weight or style, so a coloured block has the plain block's lines. Comments use the muted grey; punctuation uses the subtle grey.
+
+Contrast is measured on the code block's background, `--background` (light `hsla(48, 50%, 98%)`, dark `#1B1916`).
+
+| Token | Light | :1 | Dark | :1 |
+| --- | --- | --- | --- | --- |
+| `--syntax-keyword` | `hsla(322, 38%, 36%)` | 7.6 | `hsla(322, 45%, 76%)` | 8.7 |
+| `--syntax-string` | `hsla(128, 34%, 28%)` | 7.2 | `hsla(100, 32%, 66%)` | 9.0 |
+| `--syntax-number` | `hsla(24, 70%, 34%)` | 6.3 | `hsla(30, 70%, 66%)` | 8.5 |
+| `--syntax-comment` | `hsla(48, 5%, 42%)` | 4.9 | `hsla(48, 6%, 60%)` | 6.4 |
+| `--syntax-function` | `hsla(214, 52%, 38%)` | 6.8 | `hsla(212, 70%, 76%)` | 9.2 |
+| `--syntax-type` | `hsla(180, 52%, 25%)` | 6.9 | `hsla(176, 38%, 62%)` | 8.7 |
+| `--syntax-constant` | `hsla(262, 38%, 44%)` | 7.1 | `hsla(262, 55%, 78%)` | 8.3 |
+| `--syntax-property` | `hsla(200, 58%, 30%)` | 7.2 | `hsla(198, 52%, 70%)` | 9.1 |
+| `--syntax-tag` | `hsla(4, 55%, 38%)` | 7.3 | `hsla(8, 62%, 72%)` | 7.6 |
+| `--syntax-punctuation` | `hsla(48, 8%, 35%)` | 6.3 | `hsla(48, 8%, 66%)` | 7.8 |
+| `--syntax-meta` | `hsla(36, 30%, 34%)` | 6.2 | `hsla(40, 26%, 64%)` | 7.8 |
+| `--syntax-inserted` | `hsla(140, 50%, 26%)` | 7.0 | `hsla(130, 38%, 62%)` | 8.3 |
+| `--syntax-deleted` | `hsla(358, 58%, 38%)` | 7.5 | `hsla(0, 62%, 72%)` | 7.0 |
+
+The text's own colour (`--foreground-default`) is 15.6:1 in light and 14.7:1 in dark, so every coloured token stays clearly quieter than plain code text in light and close to it in dark.
+
 ## 2. Typography
 
 ### 2.1 Families

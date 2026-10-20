@@ -152,3 +152,20 @@ textarea {
     scroll-behavior: auto !important;
   }
 }
+
+/* Code colours. @juno/highlight's paintCode puts each token of a code block
+   in the CSS highlight of its kind; these rules colour them with the
+   --syntax-* tokens. Colour only, so a coloured block keeps its lines. */
+::highlight(syntax-keyword) { color: var(--syntax-keyword); }
+::highlight(syntax-string) { color: var(--syntax-string); }
+::highlight(syntax-number) { color: var(--syntax-number); }
+::highlight(syntax-comment) { color: var(--syntax-comment); }
+::highlight(syntax-function) { color: var(--syntax-function); }
+::highlight(syntax-type) { color: var(--syntax-type); }
+::highlight(syntax-constant) { color: var(--syntax-constant); }
+::highlight(syntax-property) { color: var(--syntax-property); }
+::highlight(syntax-tag) { color: var(--syntax-tag); }
+::highlight(syntax-punctuation) { color: var(--syntax-punctuation); }
+::highlight(syntax-meta) { color: var(--syntax-meta); }
+::highlight(syntax-inserted) { color: var(--syntax-inserted); }
+::highlight(syntax-deleted) { color: var(--syntax-deleted); }
