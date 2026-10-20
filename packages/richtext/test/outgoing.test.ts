@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Block } from '@juno/slack-schema'
+import type { Block, RichTextInline } from '@juno/slack-schema'
 import { composeOutgoing, editMarkup, type MentionTargets } from '../src/index'
 
 const targets: MentionTargets = {
@@ -341,7 +341,8 @@ describe('editing a sent message', () => {
   const roundTrip = (typed: string) => {
     const sent = composeOutgoing(typed, targets)
     const shown = editMarkup({ text: sent.text, blocks: sent.blocks as ReadonlyArray<Block> }, lookups)
-    const links = sent.blocks.flatMap((block) => block.elements).flatMap((el) => ('elements' in el ? el.elements : [])).flatMap((el) => (el.type === 'link' && el.text !== undefined ? [{ text: el.text, url: el.url }] : []))
+    const inlines = sent.blocks.flatMap((block) => block.elements).flatMap((el): ReadonlyArray<RichTextInline> => (el.type === 'rich_text_section' || el.type === 'rich_text_quote' ? el.elements : []))
+    const links = inlines.flatMap((el) => (el.type === 'link' && el.text !== undefined ? [{ text: el.text, url: el.url }] : []))
     return { sent, shown, saved: composeOutgoing(shown, { ...targets, links }) }
   }
   const cases: ReadonlyArray<{ readonly name: string; readonly typed: string; readonly shown: string }> = [

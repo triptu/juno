@@ -18,7 +18,7 @@
  * (`<http://example.com|example.com>`); a link the composer put on some
  * words arrives as `<url|label>` and goes as `{ type: "link", url, text }`.
  */
-import type { RichTextBlock, RichTextElement, RichTextInline } from '@juno/slack-schema'
+import type { RichTextBlock, RichTextElement, RichTextInline, RichTextStyle } from '@juno/slack-schema'
 import { emojiUnicode, isKnownEmoji } from './emoji'
 import { unescapeMrkdwn } from './from-mrkdwn'
 import { findLinks } from './links'
@@ -165,7 +165,10 @@ function tokenizeText(line: string, targets: MentionTargets): Token[] {
   return final
 }
 
-function toElement(token: Token): RichTextInline {
+/** The elements the composer sends, each of which can carry a style. */
+type Sent = Exclude<RichTextInline, { readonly type: 'color' | 'unknown' }>
+
+function toElement(token: Token): Sent {
   switch (token.kind) {
     case 'text':
       return { type: 'text', text: token.text }
@@ -235,7 +238,7 @@ function joinLines(lines: ReadonlyArray<ReadonlyArray<RichTextInline>>): RichTex
 
 type Style = { bold?: true; italic?: true; strike?: true; code?: true }
 const STYLES = ['bold', 'italic', 'strike', 'code'] as const
-const styleKey = (style: Style | undefined) => (style === undefined ? '' : STYLES.filter((name) => style[name]).join('+'))
+const styleKey = (style: RichTextStyle | undefined) => (style === undefined ? '' : STYLES.filter((name) => style[name]).join('+'))
 
 /**
  * A line's elements with its markup applied (`lineMarkup`): the markers go,
@@ -268,7 +271,7 @@ function styledElements(tokens: ReadonlyArray<Token>): RichTextInline[] {
     if (dropped[i] === 1) continue
     const token = tokens[owner[i]!]!
     const style = ordered(styles[i])
-    const element: RichTextInline = token.kind === 'text' ? { type: 'text', text: line[i]! } : token.kind === 'emoji' && style?.code === true ? { type: 'text', text: `:${token.name}:` } : toElement(token)
+    const element: Sent = token.kind === 'text' ? { type: 'text', text: line[i]! } : token.kind === 'emoji' && style?.code === true ? { type: 'text', text: `:${token.name}:` } : toElement(token)
     const last = out[out.length - 1]
     if (element.type === 'text' && last?.type === 'text' && styleKey(last.style) === styleKey(style)) {
       out[out.length - 1] = { ...last, text: last.text + element.text }
