@@ -5,6 +5,7 @@ import { colors, radii, spacing, text, weights, sizes } from '@juno/tokens/token
 import { Chip, CodeBlock, Divider, focusRing, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { AttachmentCard, AttachmentFields, AttachmentImage, SharedFileLines, SharedPlace, type FileBlock } from './AttachmentCard'
 import { MessageLink as Link, type LinkInfo } from './MessageLink'
+import { PersonLink } from './personLink'
 import { slackDate } from './time'
 
 export interface MessageBodyProps {
@@ -192,15 +193,20 @@ function Inline({ inline, now, hueOf, onChannel, onLink, linkInfo, tabIndex, qui
       return <Link url={inline.url} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} quiet={quiet}>{styled(inline.text, inline.style)}</Link>
     // Chip text sits in <bdi> so "@Name" keeps its own direction inside a
     // right-to-left paragraph (otherwise the "@" jumps to the other end).
+    // A chip opens your DM with them, as a click on a sender does (`PersonLink`).
     case 'user':
-      return inline.isMe ? (
-        <Chip variant="mention" size="inline" title="Mentions you">
-          <bdi>@{inline.name}</bdi>
-        </Chip>
-      ) : (
-        <Chip variant="person" size="inline" hue={hueOf(inline.id)} data-person={inline.id} data-person-name={inline.name}>
-          <bdi>@{inline.name}</bdi>
-        </Chip>
+      return (
+        <PersonLink id={inline.unreachable === true ? undefined : inline.id} label={inline.isMe ? 'yourself' : inline.name} part="chip" tabIndex={tabIndex}>
+          {inline.isMe ? (
+            <Chip variant="mention" size="inline">
+              <bdi>@{inline.name}</bdi>
+            </Chip>
+          ) : (
+            <Chip variant="person" size="inline" hue={hueOf(inline.id)} data-person={inline.id} data-person-name={inline.name}>
+              <bdi>@{inline.name}</bdi>
+            </Chip>
+          )}
+        </PersonLink>
       )
     case 'channel':
       return (

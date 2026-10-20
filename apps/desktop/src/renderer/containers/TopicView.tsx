@@ -8,7 +8,7 @@ import { useMessageActions, type ComposerHandle, type MessageActionsOutput } fro
 import { showPersonMenu } from './notifyActions'
 import { takeComposerFocus } from './pageFocus'
 import { scopeToChannel, showChannelMenu } from './placeMenus'
-import { messageLinkInfo, openMessageLink } from './slackLinks'
+import { messageLinkInfo, openMessageLink, openPerson } from './slackLinks'
 import { attach } from './attachments'
 import { TopicComposer } from './TopicComposer'
 import { downloadMessageFile, useTopicFiles } from './topic/files'
@@ -40,6 +40,7 @@ function openThread(id: string, event: ActivateEvent): void {
 }
 
 const personMenu = (person: { readonly id: string; readonly name: string }) => void showPersonMenu(person)
+const openPersonDm = (id: string, event: ActivateEvent) => void openPerson(id, event)
 
 const retry = (clientMsgId: string) => void retryMessage(registry, clientMsgId)
 const discard = (clientMsgId: string) => void discardMessage(registry, clientMsgId)
@@ -206,6 +207,7 @@ function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps)
       onOpenThread={readOnly ? openThreadInNewTab : openThread}
       onPrefetchThread={warmTopic}
       onChannel={scopeToChannel}
+      onPerson={openPersonDm}
       onLink={openMessageLink}
       linkInfo={messageLinkInfo}
       onDownload={downloadMessageFile}

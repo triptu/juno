@@ -8,6 +8,7 @@ import { Message, placeToolbar, type MessageActions, type MessageProps } from '.
 import type { LinkInfo } from './MessageLink'
 import { inField } from './fieldMenu'
 import { NewDivider } from './NewDivider'
+import { PersonLinks } from './personLink'
 import { messageTime } from './time'
 
 /** One row as the container holds it: the message and its sender from the window's refs. */
@@ -82,6 +83,12 @@ export interface MessageListProps {
   /** The pointer came onto a Main message that has a thread: warm the thread, which a peek or an open may read next. */
   readonly onPrefetchThread?: (id: string) => void
   readonly onChannel?: (id: string) => void
+  /**
+   * A click, or Enter, on a sender's name or avatar or an @person chip: your
+   * DM with them (SPEC 7, "Messages"), with ⌘ in a background tab. Created
+   * once. Without it people open nothing. Right-click is still `onPersonMenu`.
+   */
+  readonly onPerson?: (id: string, event: ActivateEvent) => void
   readonly onLink?: (url: string, event: ActivateEvent) => void
   /** Which links open inside Juno, and where they go (`MessageBody`). */
   readonly linkInfo?: LinkInfo
@@ -231,6 +238,7 @@ export function MessageList({
   onOpenThread,
   onPrefetchThread,
   onChannel,
+  onPerson,
   onLink,
   linkInfo,
   onToggleReaction,
@@ -294,6 +302,7 @@ export function MessageList({
         ) : null}
         {notDrawnAbove > 0 ? <div aria-hidden {...stylex.props(styles.notDrawn(notDrawnAbove))} /> : null}
         {items.length === 0 ? <Empty main={main} status={status} /> : null}
+        <PersonLinks value={onPerson}>
         {items.map((item, index) => {
           const atDivider = index === dividerIndex && index > 0
           // A row's header and margin never depend on its place in the window, so a page added above
@@ -334,6 +343,7 @@ export function MessageList({
             </Row>
           )
         })}
+        </PersonLinks>
       </div>
     </ScrollArea>
   )

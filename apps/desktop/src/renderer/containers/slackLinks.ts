@@ -13,6 +13,8 @@
  *   shows the topic is used instead of a second one.
  * - A conversation Juno does not have, or one Slack refuses, opens in the
  *   browser (or in Slack, for a `slack://` link) with a toast saying why.
+ * - A click on a person in a message opens them as a link to them does
+ *   (`openPerson`).
  */
 import type { ActivateEvent, LinkInfo } from '@juno/views'
 import {
@@ -108,17 +110,27 @@ function openLinked(topicId: string, ts: string | undefined, event: ActivateEven
 
 const NO_CONVERSATION = 'Juno cannot reach that conversation'
 
+/**
+ * A person, from a link to them or a click on them in a message (SPEC 7 and
+ * 8): your DM with them at its Main, as a link to a topic opens it, or Home
+ * addressed to them when you have never messaged them. False when Juno does
+ * not know them.
+ */
+export async function openPerson(user: string, event: ActivateEvent): Promise<boolean> {
+  const found = await locatePerson(registry, user)
+  const person = found._tag === 'Success' ? found.value : undefined
+  if (person?.person === undefined) return false
+  if (person.mainId !== undefined) openLinked(person.mainId, undefined, event)
+  else newMessage({ key: `u:${user}`, name: person.person.name, kind: 'im', tint: 'dm', person: person.person, empty: true })
+  return true
+}
+
 async function openSlackLink(url: string, match: SlackLinkMatch, event: ActivateEvent): Promise<void> {
   const { target } = match
   switch (target.kind) {
-    case 'person': {
-      const found = await locatePerson(registry, target.user)
-      const person = found._tag === 'Success' ? found.value : undefined
-      if (person?.person === undefined) return openOutside(url, match, 'Juno does not know that person')
-      if (person.mainId !== undefined) return openLinked(person.mainId, undefined, event)
-      newMessage({ key: `u:${target.user}`, name: person.person.name, kind: 'im', tint: 'dm', person: person.person, empty: true })
+    case 'person':
+      if (!(await openPerson(target.user, event))) openOutside(url, match, 'Juno does not know that person')
       return
-    }
     case 'channel': {
       const located = await locateMessage(registry, target.channel, undefined)
       if (located._tag !== 'Success' || located.value.place === undefined) return openOutside(url, match, NO_CONVERSATION)

@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { memo, type FocusEvent, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
+import { memo, useContext, type FocusEvent, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import type { FileView, MessageView, Person, QuickReaction, ReactionIssue } from '@juno/contract'
 import { colors, density, layout, motion, opacity, radii, sizes, spacing, text, tints, z } from '@juno/tokens/tokens.stylex'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
@@ -13,6 +13,7 @@ import { HoverToolbar } from './HoverToolbar'
 import { hueFor, initials } from './look'
 import { MessageBody } from './MessageBody'
 import type { LinkInfo } from './MessageLink'
+import { PersonLink, PersonLinks } from './personLink'
 import { Reactions } from './Reactions'
 import { TextButton } from './juno-chat/TextButton'
 import { ThreadLink } from './ThreadLink'
@@ -223,6 +224,9 @@ export const Message = memo(function Message({
   const name = sender?.name ?? message.senderId ?? 'Unknown'
   const hue = sender === undefined ? hueOf(message.senderId ?? message.ts) : hueFor(sender.color, sender.id)
   const header = startsGroup || message.groupStart
+  // The sender opens their DM (`PersonLinks`), unless Juno has nothing to open for them (an app with no DM).
+  const opens = useContext(PersonLinks) === undefined || sender?.unreachable === true ? undefined : sender?.id
+  const label = message.fromMe ? 'yourself' : name
   const focus = (event: FocusEvent<HTMLDivElement>) => {
     if (actions !== undefined) placeToolbar(event.currentTarget)
     if (event.target === event.currentTarget) onFocus?.(message.ts)
@@ -297,7 +301,9 @@ export const Message = memo(function Message({
     >
       <span data-sender={header ? '' : undefined} {...stylex.props(styles.gutter, !header && styles.gutterContinuation)}>
         {header ? (
-          <Avatar label={sender === undefined ? '?' : initials(name)} name={name} size={32} hue={hue} {...(sender?.avatarUrl === undefined ? {} : { src: sender.avatarUrl })} />
+          <PersonLink id={opens} label={label} part="avatar">
+            <Avatar label={sender === undefined ? '?' : initials(name)} name={name} size={32} hue={hue} {...(sender?.avatarUrl === undefined ? {} : { src: sender.avatarUrl })} />
+          </PersonLink>
         ) : (
           <Text variant="tag" tone="muted" numeric as="time" title={fullTime(message.at)} sx={styles.gutterTime}>
             {clockTime(message.at)}
@@ -307,9 +313,12 @@ export const Message = memo(function Message({
       <span {...stylex.props(styles.content, pending === 'sending' && styles.sending)}>
         {header ? (
           <span data-message-header="" {...stylex.props(styles.header)}>
-            <Text variant="messageName" tone="default" truncate tooltipWhenTruncated dir="auto" as="span" sx={styles.name} data-sender="" data-person-name={name}>
-              {name}
-            </Text>
+            <PersonLink id={opens} label={label} part="name" tabIndex={tabbable ? 0 : -1}>
+              {/* Selectable, so a drag that starts on the name selects, as in Slack. The link's tooltip names them in full, so a cut-off name needs no title of its own. */}
+              <Text variant="messageName" tone="default" truncate tooltipWhenTruncated={opens === undefined} selectable dir="auto" as="span" sx={styles.name} data-sender="" data-person-name={name}>
+                {name}
+              </Text>
+            </PersonLink>
             <Text variant="meta" tone="muted" numeric as="time" title={fullTime(message.at)} sx={styles.time}>
               {time}
             </Text>
