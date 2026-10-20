@@ -21,7 +21,7 @@ import { CommandResult, DraftRestore, FollowUpRestore } from './topics'
  * `ask` is a proactive ask from Juno (SPEC 13.6), which the renderer adds
  * from the agent; the engine never lists one.
  */
-export const HomeItemKind = Schema.Literals(['waiting', 'mentioned', 'resume', 'moved', 'followUp', 'ask', 'automated', 'tidyUp', 'doneFollowUps', 'oldDrafts', 'unfollow', 'ignore', 'automatedMoves'])
+export const HomeItemKind = Schema.Literals(['waiting', 'mentioned', 'missedHuddle', 'resume', 'moved', 'followUp', 'ask', 'automated', 'tidyUp', 'doneFollowUps', 'oldDrafts', 'unfollow', 'ignore', 'automatedMoves'])
 export type HomeItemKind = typeof HomeItemKind.Type
 
 /**
@@ -152,6 +152,8 @@ export const HomeItem = Schema.Struct({
   at: Schema.optionalKey(Schema.Number),
   /** Moved a lot: the new messages since the user last read the topic. */
   newCount: Schema.optionalKey(Schema.Int),
+  huddleId: Schema.optionalKey(Schema.String),
+  durationMinutes: Schema.optionalKey(Schema.Int),
   /** Follow-up: the user's message the promise was found in, for Mark done. */
   messageTs: Schema.optionalKey(Schema.String),
   /** Automated: the conversation asked about, for Move, Keep in All and its menu. Its Main is `topics[0]`. Mentioned: the ignored channel, for its menu. */
@@ -272,4 +274,6 @@ export const draftsKeep = Rpc.make('drafts.keep', { payload: shownDraft, success
 /** Puts a draft back as it was, with its time, unless a newer one was typed since. */
 export const draftsRestore = Rpc.make('drafts.restore', { payload: DraftRestore, success: CommandResult, error: NotSignedIn })
 
-export const HomeRoutes = RpcGroup.make(homeView, homeVisit, homeMarkDone, homeMovesShown, homeMovesSeen, followUpsMarkDone, followUpsNotDone, followUpsRestore, draftsDiscard, draftsKeep, draftsRestore)
+export const homeHuddleSeen = Rpc.make('home.huddleSeen', { payload: { callId: Schema.String }, success: Schema.Void, error: NotSignedIn })
+
+export const HomeRoutes = RpcGroup.make(homeHuddleSeen, homeView, homeVisit, homeMarkDone, homeMovesShown, homeMovesSeen, followUpsMarkDone, followUpsNotDone, followUpsRestore, draftsDiscard, draftsKeep, draftsRestore)
