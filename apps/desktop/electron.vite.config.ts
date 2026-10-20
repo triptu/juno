@@ -189,6 +189,10 @@ const reactCompiler = [
 export default defineConfig({
   main: {
     plugins: [externalize, runtimeImports(), codemodeFiles()],
+    // `ws` loads the optional native `bufferutil` in a try. Bundled, that require
+    // becomes an empty stub, so masking a frame of 48 bytes or more threw
+    // "mask is not a function". This keeps `ws` on its own JavaScript masking.
+    define: { 'process.env.WS_NO_BUFFER_UTIL': JSON.stringify('1') },
     build: {
       minify,
       sourcemap,

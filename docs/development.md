@@ -664,6 +664,12 @@ At the end of each UI milestone, run these reviews in parallel and turn the find
   Electron 44 has no install script: `apps/desktop/node_modules/electron/dist` appears
   the first time something requires `electron` (`node -e "require('electron')"` in
   `apps/desktop` fetches it).
+- **`ws` in the bundled engine.** `ws` loads the optional native `bufferutil` inside a
+  try. In the main build that require became an empty stub, so `ws` called a missing
+  `mask` and died on every outgoing socket frame of 48 bytes or more (a `tickle` is 47,
+  so only `presence_sub` showed it, 10-21). `electron.vite.config.ts` defines
+  `process.env.WS_NO_BUFFER_UTIL` for the main build, which keeps `ws` on its own
+  JavaScript masking. Engine tests under plain Node never saw it.
 - **pnpm 12 minimum release age.** It refused `effect@4.0.3` as too new and wrote an
   exclusion into `pnpm-workspace.yaml`. Expect the same for other day-old releases
   (it did it again for `vitest@5.0.4`).
