@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-21 05:25 · implementation · Wait for the pending read intent to reach the sidebar before testing an older read frame, and assert the durable pointer after that frame; the socket barrier does not drain live queries.
 - 10-21 05:19 · implementation · Launch the packaged smoke's temporary fake-Slack profile with Chromium's mock keychain after a process sample confirmed cookie-keychain access blocked sign-in; production launches retain the real keychain.
 - 10-21 05:14 · implementation · Keep highlight in the desktop's build-time dependencies and reject workspace runtime dependencies during the build; packaged Electron cannot load their TypeScript source from node_modules.
 - 10-21 04:46 · implementation · Report Slack decode failures with schema-owned field names, array indexes and fixed issue kinds; replace dynamic record keys with unknown and keep response values out of errors and logs.

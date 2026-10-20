@@ -186,9 +186,11 @@ describe('marks from other clients (specs/readstate.qnt)', () => {
     engine.fake.holdNext({ method: 'conversations.mark' })
     const pending = markRead(engine, ALERTS_MAIN)
     await waitFor(() => (engine.fake.heldCount({ method: 'conversations.mark' }) === 1 ? true : undefined), 10_000, 'the held mark')
+    await rowWhen(engine, ALERTS_MAIN, (r) => r.unreadCount === 0, 'local read intent visible')
     // A frame stamped before Juno's mark, from another client that had read three messages.
     engine.fake.emitFrame({ type: 'channel_marked', channel: ALERTS, ts: messages.at(-7)!.ts, event_ts: messages.at(-1)!.ts })
     await engine.socketIdle()
+    expect(storedPointer(engine, ALERTS_MAIN)).toBe(latestMain(engine, ALERTS))
     expect((await engine.rows(scoped(ALERTS_MAIN))).find((r) => r.id === ALERTS_MAIN)?.unreadCount).toBe(0)
     engine.fake.release()
     valueOf(await pending)
