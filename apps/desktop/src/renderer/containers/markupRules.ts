@@ -15,9 +15,12 @@ export interface Press {
   readonly field: HTMLTextAreaElement
 }
 
+/** The app's shortcuts take ⌘ on the Mac and Ctrl elsewhere, as the menu's `CommandOrControl` does (the test machines run Linux). */
+const MAC = navigator.platform.startsWith('Mac')
+
 /** The formatting key `press` is, as in Slack (spec section 8): ⌘B, ⌘I, ⌘⇧X, ⌘⇧C and ⌘⇧9. */
 function styleOf(press: Press): MarkupStyle | 'quote' | undefined {
-  if (!press.metaKey || press.ctrlKey || press.altKey) return undefined
+  if ((MAC ? !press.metaKey || press.ctrlKey : !press.ctrlKey || press.metaKey) || press.altKey) return undefined
   const key = press.key.toLowerCase()
   if (!press.shiftKey) return key === 'b' ? 'bold' : key === 'i' ? 'italic' : undefined
   if (key === 'x') return 'strike'

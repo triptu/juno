@@ -13,11 +13,15 @@ const POSTGRES = 'Draft plan is in the doc'
 
 type Json = Record<string, unknown>
 
-/** The `rich_text` elements and the `text` of the last `chat.postMessage`. */
+/**
+ * The `rich_text` elements and the `text` of the last `chat.postMessage`.
+ * The call goes as multipart form data, which writes a line break in a
+ * field as CRLF, as Slack's own client's calls do.
+ */
 function lastPost(calls: ReadonlyArray<{ method: string; args: Json }>): { readonly elements: unknown; readonly text: unknown } {
   const posted = calls.filter((call) => call.method === 'chat.postMessage').at(-1)
   const blocks: unknown = typeof posted?.args['blocks'] === 'string' ? JSON.parse(posted.args['blocks']) : posted?.args['blocks']
-  return { elements: (blocks as ReadonlyArray<{ elements: unknown }> | undefined)?.[0]?.elements, text: posted?.args['text'] }
+  return { elements: (blocks as ReadonlyArray<{ elements: unknown }> | undefined)?.[0]?.elements, text: String(posted?.args['text']).replace(/\r\n/g, '\n') }
 }
 
 test('sends Slack markup as rich text styles and formats a selection with ⌘B', async ({ juno, fake }) => {

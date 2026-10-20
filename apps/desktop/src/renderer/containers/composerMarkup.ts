@@ -24,7 +24,7 @@ export function useComposerMarkup(on: boolean) {
     format: (text: string, opaque: ReadonlyArray<{ readonly start: number; readonly end: number }> = []): { readonly format?: MarkupLayout } =>
       !on ? {} : { format: ready && rules !== undefined ? rules.markupLayout(text, opaque) : PLAIN },
     onKey: (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
-      if (!on || !event.metaKey || event.nativeEvent.isComposing) return false
+      if (!on || !(event.metaKey || event.ctrlKey) || event.nativeEvent.isComposing) return false
       const { key, code, metaKey, shiftKey, ctrlKey, altKey, currentTarget: field } = event
       const press = { key, code, metaKey, shiftKey, ctrlKey, altKey, field }
       if (rules === undefined) {
