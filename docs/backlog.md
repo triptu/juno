@@ -2,7 +2,7 @@
 
 Small items noticed during work that are not yet assigned to a milestone. The change that finishes an item removes it in the same commit. Before starting an item, confirm on `origin/main` that it is still open, because this list drifts from the code.
 
-- Image-row report: confirm the owner's reported image displays in the running app after the `files.info` fallback; the cause on that live session remains unproven.
+- Image-row report: on 2026-10-20 a pasted screenshot still showed as a card with the generic file icon on both sides of a DM, so the stored copy's `mimetype` was not `image/*`. Juno now types a file from its name while Slack's `mimetype` is empty and keeps asking until it is set. Confirm live: on the owner's Mac, read the stored `files_json` of such a message (`mimetype` and `filetype` values) and, in a self-DM upload with the socket open, whether the echo's file has an empty `mimetype`; record the answer in research section 10, "Files".
 - Identity-provider sign-in (Google, Okta) leaves slack.com and is blocked by the sign-in window allow-list. The Slack-app import covers it for now.
 - `pnpm smoke:live` always imports from the Slack app; it cannot reuse `secrets.bin` outside Electron.
 - After the body-sniff sign-in fallback, `secrets.bin` keeps `userId: ''` until a later sign-in.

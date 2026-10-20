@@ -1,0 +1,1 @@
+- 10-20 13:35 · late-files · A file's kind comes from `mimetype`, then Slack's `filetype`, then the name's extension, in one domain rule; a copy with no known `mimetype` is not ready and is asked about like one without thumbnails, and the fake leaves a held upload's type empty. The live cause stays unproven: the probes recorded key names, not whether the values were empty.

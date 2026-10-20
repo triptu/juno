@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-20 13:35 · late-files · A file's kind comes from `mimetype`, then Slack's `filetype`, then the name's extension, in one domain rule; a copy with no known `mimetype` is not ready and is asked about like one without thumbnails, and the fake leaves a held upload's type empty. The live cause stays unproven: the probes recorded key names, not whether the values were empty.
 - 10-20 12:39 · Tushar · Use the alert decision for the dock dot, with unread DMs and group DMs that count in All also qualifying. Share the sidebar exclusions; a mention can qualify in a kept-out conversation. Apply sender and conversation levels equally to badges and alerts.
 - 10-20 12:39 · Engine · Cache per-message notification attention during the existing unread-body parse, then query badge existence through indexes. Compile notification decisions through the domain rule and cache settings between preference changes, so SQL does not duplicate alert precedence or return all unread messages.
 - 10-20 12:39 · Tushar · Ask macOS for notifications once on the first Home or topic view after setup, and persist the attempt before requesting. Existing installs follow the same rule. Development asks only through Settings.
