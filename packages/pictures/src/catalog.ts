@@ -8,9 +8,12 @@
  */
 import type { Picture } from './index'
 import { IMPRESSIONISTS } from './catalog/impressionists.ts'
-import { EUROPE } from './catalog/europe.ts'
-import { ASIA } from './catalog/asia.ts'
-import { ISLAMIC_AND_NATURE } from './catalog/islamicAndNature.ts'
+import { OLD_MASTERS } from './catalog/oldMasters.ts'
+import { EUROPE_AND_AMERICA } from './catalog/europeAndAmerica.ts'
+import { EAST_ASIA } from './catalog/eastAsia.ts'
+import { SOUTH_ASIA } from './catalog/southAsia.ts'
+import { ISLAMIC } from './catalog/islamic.ts'
+import { NATURE } from './catalog/nature.ts'
 import { SPACE } from './catalog/space.ts'
 
-export const PICTURES: ReadonlyArray<Picture> = [...IMPRESSIONISTS, ...EUROPE, ...ASIA, ...ISLAMIC_AND_NATURE, ...SPACE]
+export const PICTURES: ReadonlyArray<Picture> = [...IMPRESSIONISTS, ...OLD_MASTERS, ...EUROPE_AND_AMERICA, ...EAST_ASIA, ...SOUTH_ASIA, ...ISLAMIC, ...NATURE, ...SPACE]
