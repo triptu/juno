@@ -1,8 +1,15 @@
 /**
  * Home's thoughts (SPEC 12, "A thought"): quotes and facts, loaded as their
- * own chunk (`homeThoughts.ts`). Every quote is real and correctly
- * attributed, every fact true and stable; `source` says where to check it
- * and is never shown. When in doubt, leave an entry out.
+ * own chunk (`homeThoughts.ts`).
+ *
+ * A thought observes; it never advises. No imperatives, no "you must", no
+ * self-help or motivation. It should make the reader think "huh" or "wow",
+ * or notice something, and never feel pushed. A fact states what happened
+ * or what is so.
+ *
+ * Every quote is real and correctly attributed, every fact true, stable and
+ * checkable; `source` says where to check it and is never shown. When in
+ * doubt, leave an entry out.
  */
 import type { ThoughtEntry } from './homeThoughts'
 
@@ -12,20 +19,11 @@ export const HOME_THOUGHTS: ReadonlyArray<ThoughtEntry> = [
   { text: 'A schedule defends from chaos and whim. It is a net for catching days.', by: 'Annie Dillard', theme: 'focus', source: 'The Writing Life, 1989' },
   { text: 'Beauty and grace are performed whether or not we will or sense them. The least we can do is try to be there.', by: 'Annie Dillard', theme: 'focus', source: 'Pilgrim at Tinker Creek, 1974' },
   { text: 'Attention is the beginning of devotion.', by: 'Mary Oliver', theme: 'focus', source: '"Upstream", in Upstream: Selected Essays, 2016' },
-  { text: 'Instructions for living a life: / Pay attention. / Be astonished. / Tell about it.', by: 'Mary Oliver', theme: 'focus', source: '"Sometimes", in Red Bird, 2008' },
-  { text: "First forget inspiration. Habit is more dependable. Habit will sustain you whether you're inspired or not.", by: 'Octavia E. Butler', theme: 'focus', source: '"Furor Scribendi", in Bloodchild and Other Stories, 1995' },
-  { text: "If you find a book you really want to read but it hasn't been written yet, then you must write it.", by: 'Toni Morrison', theme: 'focus', source: 'Talk to the Ohio Arts Council, reported in The Cincinnati Enquirer, 27 September 1981' },
-  { text: "Hold every hour in your grasp. Lay hold of to-day's task, and you will not need to depend so much upon to-morrow's.", by: 'Seneca', theme: 'focus', source: 'Moral Letters to Lucilius, Letter 1 (trans. Richard M. Gummere, 1917)' },
   { text: 'Everywhere means nowhere.', by: 'Seneca', theme: 'focus', source: 'Moral Letters to Lucilius, Letter 2 (trans. Richard M. Gummere, 1917)' },
   { text: 'It is not that we have a short space of time, but that we waste much of it.', by: 'Seneca', theme: 'focus', source: 'On the Shortness of Life (trans. John W. Basore, 1932)' },
-  { text: 'Confine thyself to the present.', by: 'Marcus Aurelius', theme: 'focus', source: 'Meditations, VII.29 (trans. George Long, 1862)' },
-  { text: 'Attend to the matter which is before thee, whether it is an opinion or an act or a word.', by: 'Marcus Aurelius', theme: 'focus', source: 'Meditations, VIII.22 (trans. George Long, 1862)' },
-  { text: "If you do not work on an important problem, it's unlikely you'll do important work.", by: 'Richard Hamming', theme: 'focus', source: '"You and Your Research", talk at Bell Communications Research, 1986' },
-  { text: 'The prepared mind sooner or later finds something important and does it.', by: 'Richard Hamming', theme: 'focus', source: '"You and Your Research", talk at Bell Communications Research, 1986' },
   { text: 'If you are deeply immersed and committed to a topic, day after day after day, your subconscious has nothing to do but work on your problem.', by: 'Richard Hamming', theme: 'focus', source: '"You and Your Research", talk at Bell Communications Research, 1986' },
   { text: 'I have discovered that all the unhappiness of men arises from one single fact, that they cannot stay quietly in their own chamber.', by: 'Blaise Pascal', theme: 'focus', source: 'Pensées, 139 (trans. W. F. Trotter, 1910)' },
   { text: 'All things excellent are as difficult as they are rare.', by: 'Baruch Spinoza', theme: 'focus', source: 'Ethics, Part V, 1677 (trans. R. H. M. Elwes, 1883)' },
-  { text: 'The journey of a thousand li commenced with a single step.', by: 'Lao Tzu', theme: 'focus', source: 'Tao Te Ching, ch. 64 (trans. James Legge, 1891)' },
   { text: 'Our life is frittered away by detail.', by: 'Henry David Thoreau', theme: 'focus', source: 'Walden, 1854' },
   { text: 'As if you could kill time without injuring eternity.', by: 'Henry David Thoreau', theme: 'focus', source: 'Walden, 1854' },
   { text: 'My experience is what I agree to attend to. Only those items which I notice shape my mind.', by: 'William James', theme: 'focus', source: 'The Principles of Psychology, ch. XI, 1890' },
@@ -36,15 +34,10 @@ export const HOME_THOUGHTS: ReadonlyArray<ThoughtEntry> = [
   { text: 'The challenge of simplification is so fascinating that, if we do our job properly, we shall have the greatest fun in the world.', by: 'Edsger W. Dijkstra', theme: 'focus', source: '"On the nature of Computing Science" (EWD896), 1984' },
   { text: "You can't write or program well in units of an hour. That's barely enough time to get started.", by: 'Paul Graham', theme: 'focus', source: '"Maker\'s Schedule, Manager\'s Schedule", 2009' },
   { text: 'The danger of a distraction depends not on how long it is, but on how much it scrambles your brain.', by: 'Paul Graham', theme: 'focus', source: '"Holding a Program in One\'s Head", 2007' },
-  { text: "Great work happens by focusing consistently on something you're genuinely interested in.", by: 'Paul Graham', theme: 'focus', source: '"How to Do Great Work", 2023' },
   { text: 'Good design is as little design as possible.', by: 'Dieter Rams', theme: 'focus', source: '"Ten principles for good design", late 1970s' },
-  { text: 'Inspiration is for amateurs—the rest of us just show up and get to work.', by: 'Chuck Close', theme: 'focus', source: "Interview with Joe Fig, 2006, in Inside the Painter's Studio, 2009" },
   { text: "For the great doesn't happen through impulse alone, and is a succession of little things that are brought together.", by: 'Vincent van Gogh', theme: 'focus', source: 'Letter to Theo van Gogh, 22 October 1882 (trans. Van Gogh Museum, Letters project, 2009)' },
   { text: "I have used the word 'attention', which I borrow from Simone Weil, to express the idea of a just and loving gaze directed upon an individual reality.", by: 'Iris Murdoch', theme: 'focus', source: 'The Sovereignty of Good, 1970' },
   { text: 'Attention is the rarest and purest form of generosity.', by: 'Simone Weil', theme: 'focus', source: 'Letter to Joë Bousquet, 13 April 1942 ("L\'attention est la forme la plus rare et la plus pure de la générosité")' },
-  { text: 'All you have to do is write one true sentence. Write the truest sentence that you know.', by: 'Ernest Hemingway', theme: 'focus', source: 'A Moveable Feast, 1964' },
-  { text: "If you don't have time to read, you don't have the time (or the tools) to write. Simple as that.", by: 'Stephen King', theme: 'focus', source: 'On Writing: A Memoir of the Craft, 2000' },
-  { text: 'Almost all good writing begins with terrible first efforts. You need to start somewhere.', by: 'Anne Lamott', theme: 'focus', source: 'Bird by Bird, 1994' },
   { text: "Focus—the ability to concentrate all your limited talents on whatever's critical at the moment.", by: 'Haruki Murakami', theme: 'focus', source: 'What I Talk About When I Talk About Running (trans. Philip Gabriel, 2008)' },
   { text: 'We can only see a short distance ahead, but we can see plenty there that needs to be done.', by: 'Alan Turing', theme: 'focus', source: '"Computing Machinery and Intelligence", Mind, 1950' },
   { text: "Still—in a way—nobody sees a flower—really—it is so small—we haven't time—and to see takes time…", by: "Georgia O'Keeffe", theme: 'focus', source: 'Exhibition catalogue, An American Place, New York, 1939' },
@@ -55,14 +48,11 @@ export const HOME_THOUGHTS: ReadonlyArray<ThoughtEntry> = [
   { text: 'I am interested in mathematics only as a creative art.', by: 'G. H. Hardy', theme: 'focus', source: "A Mathematician's Apology, 1940" },
 
   // Thinking deeply
-  { text: 'The first principle is that you must not fool yourself—and you are the easiest person to fool.', by: 'Richard Feynman', theme: 'thinking', source: '"Cargo Cult Science", Caltech commencement address, 1974' },
   { text: 'What I cannot create, I do not understand.', by: 'Richard Feynman', theme: 'thinking', source: 'Written on his Caltech blackboard, found at his death in 1988' },
   { text: "I think it's much more interesting to live not knowing than to have answers which might be wrong.", by: 'Richard Feynman', theme: 'thinking', source: 'BBC Horizon interview, 1981, in The Pleasure of Finding Things Out, 1999' },
   { text: 'I have steadily endeavoured to keep my mind free so as to give up any hypothesis… as soon as facts are shown to be opposed to it.', by: 'Charles Darwin', theme: 'thinking', source: 'Autobiography, written 1876, published 1887' },
   { text: 'Man is but a reed, the most feeble thing in nature; but he is a thinking reed.', by: 'Blaise Pascal', theme: 'thinking', source: 'Pensées, 347 (trans. W. F. Trotter, 1910)' },
-  { text: 'Let us endeavour, then, to think well; this is the principle of morality.', by: 'Blaise Pascal', theme: 'thinking', source: 'Pensées, 347 (trans. W. F. Trotter, 1910)' },
   { text: 'When I play with my cat who knows whether I do not make her more sport than she makes me?', by: 'Michel de Montaigne', theme: 'thinking', source: 'Essays, II.12, "Apology for Raimond Sebond" (trans. Charles Cotton, 1685)' },
-  { text: 'Do not feel absolutely certain of anything.', by: 'Bertrand Russell', theme: 'thinking', source: '"A Liberal Decalogue", The New York Times Magazine, 1951' },
   { text: 'Philosophy is to be studied, not for the sake of any definite answers to its questions… but rather for the sake of the questions themselves…', by: 'Bertrand Russell', theme: 'thinking', source: 'The Problems of Philosophy, 1912' },
   { text: 'The only thing that makes life possible is permanent, intolerable uncertainty: not knowing what comes next.', by: 'Ursula K. Le Guin', theme: 'thinking', source: 'The Left Hand of Darkness, 1969' },
   { text: 'What I propose, therefore, is very simple: it is nothing more than to think what we are doing.', by: 'Hannah Arendt', theme: 'thinking', source: 'The Human Condition, Prologue, 1958' },
@@ -76,9 +66,6 @@ export const HOME_THOUGHTS: ReadonlyArray<ThoughtEntry> = [
   { text: 'If any man is able to convince me and show me that I do not think or act right, I will gladly change…', by: 'Marcus Aurelius', theme: 'thinking', source: 'Meditations, VI.21 (trans. George Long, 1862)' },
   { text: 'Such as are thy habitual thoughts, such also will be the character of thy mind; for the soul is dyed by the thoughts.', by: 'Marcus Aurelius', theme: 'thinking', source: 'Meditations, V.16 (trans. George Long, 1862)' },
   { text: 'I feel, my dear Lucilius, that I am being not only reformed, but transformed.', by: 'Seneca', theme: 'thinking', source: 'Moral Letters to Lucilius, Letter 6 (trans. Richard M. Gummere, 1917)' },
-  { text: 'Welcome those whom you yourself can improve. The process is mutual; for men learn while they teach.', by: 'Seneca', theme: 'thinking', source: 'Moral Letters to Lucilius, Letter 7 (trans. Richard M. Gummere, 1917)' },
-  { text: 'For to be possessed of a vigorous mind is not enough; the prime requisite is rightly to apply it.', by: 'René Descartes', theme: 'thinking', source: 'Discourse on Method, 1637 (trans. John Veitch, 1850)' },
-  { text: 'Read not to contradict and confute; nor to believe and take for granted; nor to find talk and discourse; but to weigh and consider.', by: 'Francis Bacon', theme: 'thinking', source: '"Of Studies", Essays, 1625' },
   { text: 'If a man will begin with certainties, he shall end in doubts; but if he will be content to begin with doubts, he shall end in certainties.', by: 'Francis Bacon', theme: 'thinking', source: 'The Advancement of Learning, 1605' },
   { text: 'The unexamined life is not worth living.', by: 'Socrates', theme: 'thinking', source: 'Plato, Apology, 38a (trans. Benjamin Jowett, 1871)' },
   { text: 'Philosophy begins in wonder.', by: 'Socrates', theme: 'thinking', source: 'Plato, Theaetetus, 155d (trans. Benjamin Jowett, 1871)' },
@@ -102,8 +89,6 @@ export const HOME_THOUGHTS: ReadonlyArray<ThoughtEntry> = [
   { text: 'Those who cannot feel the littleness of great things in themselves are apt to overlook the greatness of little things in others.', by: 'Okakura Kakuzō', theme: 'thinking', source: 'The Book of Tea, 1906' },
   { text: 'We may say most aptly, that the Analytical Engine weaves algebraical patterns just as the Jacquard-loom weaves flowers and leaves.', by: 'Ada Lovelace', theme: 'thinking', source: 'Notes to her translation of Menabrea\'s "Sketch of the Analytical Engine", 1843' },
   { text: 'Reading maketh a full man; conference a ready man; and writing an exact man.', by: 'Francis Bacon', theme: 'thinking', source: '"Of Studies", Essays, 1625' },
-  { text: 'A major 2013 review of study methods rated practice testing and spaced practice the most useful. Rereading and highlighting were rated low.', theme: 'thinking', source: "Dunlosky et al., 'Improving Students' Learning With Effective Learning Techniques', Psychological Science in the Public Interest, 2013" },
-  { text: 'The longer you need to remember something, the longer the best gap between study sessions.', theme: 'thinking', source: "Cepeda et al., 'Distributed practice in verbal recall tasks', Psychological Bulletin, 2006" },
   { text: 'Students who practised recalling a passage remembered more of it a week later than those who reread it, though rereading looked better after five minutes.', theme: 'thinking', source: "Roediger and Karpicke, 'Test-Enhanced Learning', Psychological Science, 2006" },
   { text: 'In 1885 Hermann Ebbinghaus published pioneering experiments on memory, with himself as the only subject. Most of what he forgot, he lost within the first day.', theme: 'thinking', source: "Ebbinghaus, 'Über das Gedächtnis' (1885); English translation by Ruger and Bussenius, 1913" },
   { text: 'Working memory holds only about four chunks of information at a time.', theme: 'thinking', source: "Cowan, 'The magical number 4 in short-term memory', Behavioral and Brain Sciences, 2001" },
@@ -112,8 +97,6 @@ export const HOME_THOUGHTS: ReadonlyArray<ThoughtEntry> = [
   { text: 'After brain surgery in 1953, the patient known as H.M. could no longer form new memories of facts and events, yet he could still learn new motor skills.', theme: 'thinking', source: "Squire, 'The legacy of patient H.M. for neuroscience', Neuron, 2009" },
   { text: 'REM sleep, the stage most linked to vivid dreams, was discovered only in 1953.', theme: 'thinking', source: 'Aserinsky and Kleitman, Science 118, 1953' },
   { text: 'Sleep after learning helps the brain stabilise and strengthen new memories.', theme: 'thinking', source: "Diekelmann and Born, 'The memory function of sleep', Nature Reviews Neuroscience, 2010" },
-  { text: 'Sleep scientists recommend that adults regularly sleep 7 or more hours a night.', theme: 'thinking', source: 'Watson et al., AASM and Sleep Research Society consensus statement, Sleep, 2015' },
-  { text: 'After about 17 hours awake, performance drops to the level of a 0.05 percent blood alcohol level. After 24 hours, it is like 0.10 percent.', theme: 'thinking', source: "Dawson and Reid, 'Fatigue, alcohol and performance impairment', Nature, 1997; CDC NIOSH, 'Long Work Hours: Impairment'" },
   { text: 'Your brain is about 2 percent of your body weight but uses about 20 percent of its energy.', theme: 'thinking', source: "Raichle and Gusnard, 'Appraising the brain's energy budget', PNAS, 2002" },
   { text: 'Cells throughout your body keep a roughly 24-hour clock. How it works, first worked out in fruit flies, won the 2017 Nobel Prize in medicine.', theme: 'thinking', source: 'Nobel Prize in Physiology or Medicine 2017, nobelprize.org' },
   { text: 'Chess masters recall real game positions far better than novices, but do little better when the pieces are placed at random.', theme: 'thinking', source: "Chase and Simon, 'Perception in chess', Cognitive Psychology, 1973" },
@@ -157,7 +140,6 @@ export const HOME_THOUGHTS: ReadonlyArray<ThoughtEntry> = [
   { text: 'Viewed from the distance of the moon, the astonishing thing about the earth, catching the breath, is that it is alive.', by: 'Lewis Thomas', theme: 'wonder', source: '"The World\'s Biggest Membrane", The Lives of a Cell, 1974' },
   { text: 'If there is magic on this planet, it is contained in water.', by: 'Loren Eiseley', theme: 'wonder', source: '"The Flow of the River", The Immense Journey, 1957' },
   { text: 'There are some who can live without wild things, and some who cannot.', by: 'Aldo Leopold', theme: 'wonder', source: 'A Sand County Almanac, 1949, foreword' },
-  { text: 'Look round at the courses of the stars, as if thou wert going along with them…', by: 'Marcus Aurelius', theme: 'wonder', source: 'Meditations, VII.47, trans. George Long (1862)' },
   { text: 'The vast loneliness up here of the moon is awe inspiring, and it makes you realize just what you have back there on earth.', by: 'Jim Lovell', theme: 'wonder', source: 'Apollo 8 air-to-ground transcript, 24 December 1968' },
   { text: 'What is it that breathes fire into the equations and makes a universe for them to describe?', by: 'Stephen Hawking', theme: 'wonder', source: 'A Brief History of Time, 1988' },
   { text: 'There are more things in heaven and earth, Horatio, / Than are dreamt of in your philosophy.', by: 'William Shakespeare', theme: 'wonder', source: 'Hamlet, Act 1, Scene 5, c. 1600' },
@@ -262,34 +244,23 @@ export const HOME_THOUGHTS: ReadonlyArray<ThoughtEntry> = [
   { text: 'Nothing, Lucilius, is ours, except time.', by: 'Seneca', theme: 'life', source: 'Moral Letters to Lucilius, Letter 1, trans. Richard M. Gummere (1917)' },
   { text: 'While we are postponing, life speeds by.', by: 'Seneca', theme: 'life', source: 'Moral Letters to Lucilius, Letter 1, trans. Richard M. Gummere (1917)' },
   { text: 'Very little indeed is necessary for living a happy life.', by: 'Marcus Aurelius', theme: 'life', source: 'Meditations, VII.67, trans. George Long (1862)' },
-  { text: 'Short is the little which remains to thee of life. Live as on a mountain.', by: 'Marcus Aurelius', theme: 'life', source: 'Meditations, X.15, trans. George Long (1862)' },
   { text: 'There is no shortage of good days. It is good lives that are hard to come by.', by: 'Annie Dillard', theme: 'life', source: 'The Writing Life, 1989' },
-  { text: 'Tell me, what is it you plan to do / with your one wild and precious life?', by: 'Mary Oliver', theme: 'life', source: '"The Summer Day", House of Light, 1990' },
-  { text: 'You only have to let the soft animal of your body / love what it loves.', by: 'Mary Oliver', theme: 'life', source: '"Wild Geese", Dream Work, 1986' },
-  { text: 'Write it on your heart that every day is the best day in the year.', by: 'Ralph Waldo Emerson', theme: 'life', source: '"Works and Days", Society and Solitude, 1870' },
   { text: 'That you are here—that life exists and identity, / That the powerful play goes on, and you may contribute a verse.', by: 'Walt Whitman', theme: 'life', source: '"O Me! O Life!", Leaves of Grass, 1891–92 edition' },
   { text: 'Hope is the thing with feathers / That perches in the soul…', by: 'Emily Dickinson', theme: 'life', source: 'Poems, Second Series, 1891' },
-  { text: 'Do not say, "It is morning," and dismiss it with a name of yesterday. See it for the first time as a new-born child that has no name.', by: 'Rabindranath Tagore', theme: 'life', source: 'Stray Birds, 235, 1916' },
   { text: 'Work is love made visible.', by: 'Kahlil Gibran', theme: 'life', source: 'The Prophet, 1923, "On Work"' },
-  { text: 'And forget not that the earth delights to feel your bare feet and the winds long to play with your hair.', by: 'Kahlil Gibran', theme: 'life', source: 'The Prophet, 1923, "On Clothes"' },
-  { text: 'And let today embrace the past with remembrance and the future with longing.', by: 'Kahlil Gibran', theme: 'life', source: 'The Prophet, 1923, "On Time"' },
   { text: 'It is good to have an end to journey towards; but it is the journey that matters, in the end.', by: 'Ursula K. Le Guin', theme: 'life', source: 'The Left Hand of Darkness, 1969, ch. 15' },
   { text: 'We die. That may be the meaning of life. But we do language. That may be the measure of our lives.', by: 'Toni Morrison', theme: 'life', source: 'Nobel Lecture, 1993' },
   { text: 'I cannot pretend I am without fear. But my predominant feeling is one of gratitude.', by: 'Oliver Sacks', theme: 'life', source: '"My Own Life", The New York Times, 2015' },
-  { text: 'And the point is, to live everything. Live the questions now.', by: 'Rainer Maria Rilke', theme: 'life', source: 'Letters to a Young Poet, letter of 16 July 1903, trans. M. D. Herter Norton (1934)' },
   { text: 'What I regret most in my life are failures of kindness.', by: 'George Saunders', theme: 'life', source: 'Convocation address, Syracuse University, 2013' },
-  { text: 'Be joyful / though you have considered all the facts.', by: 'Wendell Berry', theme: 'life', source: '"Manifesto: The Mad Farmer Liberation Front", The Country of Marriage, 1973' },
   { text: 'For a time / I rest in the grace of the world, and am free.', by: 'Wendell Berry', theme: 'life', source: '"The Peace of Wild Things", Openings, 1968' },
   { text: 'The world is too much with us; late and soon, / Getting and spending, we lay waste our powers…', by: 'William Wordsworth', theme: 'life', source: '"The world is too much with us", Poems, in Two Volumes, 1807' },
   { text: 'We are such stuff / As dreams are made on; and our little life / Is rounded with a sleep.', by: 'William Shakespeare', theme: 'life', source: 'The Tempest, Act 4, Scene 1, c. 1611' },
-  { text: 'We should be careful / Of each other, we should be kind / While there is still time.', by: 'Philip Larkin', theme: 'life', source: '"The Mower", written 1979; Collected Poems, 1988' },
   { text: "The struggle itself toward the heights is enough to fill a man's heart. One must imagine Sisyphus happy.", by: 'Albert Camus', theme: 'life', source: "The Myth of Sisyphus, 1942, trans. Justin O'Brien (1955)" },
   { text: 'Extreme busyness, whether at school or college, kirk or market, is a symptom of deficient vitality…', by: 'Robert Louis Stevenson', theme: 'life', source: '"An Apology for Idlers", Virginibus Puerisque, 1881' },
   { text: 'There is no duty we so much underrate as the duty of being happy.', by: 'Robert Louis Stevenson', theme: 'life', source: '"An Apology for Idlers", Virginibus Puerisque, 1881' },
   { text: 'The growing good of the world is partly dependent on unhistoric acts…', by: 'George Eliot', theme: 'life', source: 'Middlemarch, 1871–72, Finale' },
   { text: 'Life seems neither long nor short, and we take no more heed to save time or make haste than do the trees and stars.', by: 'John Muir', theme: 'life', source: 'My First Summer in the Sierra, 1911' },
   { text: 'I leave no trace of wings in the air, but I am glad I have had my flight.', by: 'Rabindranath Tagore', theme: 'life', source: 'Fireflies, 1928' },
-  { text: 'We will grieve not, rather find / Strength in what remains behind…', by: 'William Wordsworth', theme: 'life', source: '"Ode: Intimations of Immortality", Poems, in Two Volumes, 1807' },
   { text: 'The sunlight on your skin left the Sun about 8 minutes 19 seconds ago.', theme: 'life', source: 'Calculated: 1 AU (149,597,870.7 km) ÷ the speed of light = 499 s; IAU 2012 Resolution B2, NIST' },
   { text: 'When you look at the Moon, you see it as it was about 1.3 seconds ago.', theme: 'life', source: "NASA, 'Moon Fact Sheet' (384,400 km / speed of light)" },
   { text: 'The light you see from the Andromeda Galaxy left it more than 2 million years ago, long before our species existed.', theme: 'life', source: "NASA, 'Messier 31 (The Andromeda Galaxy)'; Max Planck Society, 'The first of our kind' (2017)" },
