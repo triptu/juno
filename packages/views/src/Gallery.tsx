@@ -85,20 +85,7 @@ export function Gallery({ pictures, sources, current, filter, onFilter, onOpen, 
         <Text variant="body" tone="subtle" as="p" sx={styles.lead}>
           The pictures Home shows when you are caught up, each with its story. Paintings, prints and nature studies in the public domain, and images from Hubble, Webb and NASA.
         </Text>
-        <div {...stylex.props(styles.pills)}>
-          <PillRow aria-label="Show">
-            {[{ kind: 'all' as const, name: 'All', count: pictures.length }, ...GALLERY_SECTIONS.map((section) => ({ ...section, count: pictures.filter((picture) => picture.kind === section.kind).length }))].map((pill) => (
-              <FilterPill key={pill.kind}>
-                <Button variant="filter" pressed={filter === pill.kind} {...activateHandlers<HTMLButtonElement>(() => onFilter(pill.kind))}>
-                  {pill.name}
-                  <Text variant="inherit" tone="muted" numeric sx={styles.count}>
-                    {pill.count}
-                  </Text>
-                </Button>
-              </FilterPill>
-            ))}
-          </PillRow>
-        </div>
+        <GalleryPills pictures={pictures} filter={filter} onFilter={onFilter} />
         {sections.map((section) =>
           section.pictures.length === 0 ? null : (
             <section key={section.kind} aria-label={section.name} {...stylex.props(styles.section)}>
@@ -108,38 +95,63 @@ export function Gallery({ pictures, sources, current, filter, onFilter, onOpen, 
                 </Text>
               ) : null}
               <ul {...stylex.props(styles.row)}>
-                {section.pictures.map((picture) => {
-                  const src = sources[picture.id]
-                  return (
-                    <li key={picture.id} data-gallery-picture={picture.id} data-gallery-missing={src === undefined ? '' : undefined} {...stylex.props(styles.tile, styles.share(picture.ratio))}>
-                      <button
-                        type="button"
-                        aria-label={`${picture.title}, ${picture.artist}, ${picture.date}`}
-                        aria-current={picture.id === current ? 'true' : undefined}
-                        {...activateHandlers<HTMLButtonElement>((event) => onOpen(picture.id, event))}
-                        {...stylex.props(styles.open, pictureLift)}
-                      >
-                        <span {...stylex.props(styles.frame, picture.id === current && styles.current)}>
-                          <PictureImage src={src} ratio={picture.ratio} />
-                        </span>
-                        <span aria-hidden {...stylex.props(styles.words)}>
-                          <Text variant="ui" weight="medium" tone="default" truncate tooltipWhenTruncated>
-                            {picture.title}
-                          </Text>
-                          <Text variant="meta" tone="muted" truncate tooltipWhenTruncated>
-                            {picture.artist}, {picture.date}
-                          </Text>
-                        </span>
-                      </button>
-                    </li>
-                  )
-                })}
+                {section.pictures.map((picture) => (
+                  <GalleryTile key={picture.id} picture={picture} src={sources[picture.id]} current={picture.id === current} onOpen={onOpen} />
+                ))}
               </ul>
             </section>
           ),
         )}
       </div>
     </div>
+  )
+}
+
+/** All, then each kind, with its count. */
+function GalleryPills({ pictures, filter, onFilter }: Pick<GalleryProps, 'pictures' | 'filter' | 'onFilter'>) {
+  const pills = [{ kind: 'all' as const, name: 'All', count: pictures.length }, ...GALLERY_SECTIONS.map((section) => ({ ...section, count: pictures.filter((picture) => picture.kind === section.kind).length }))]
+  return (
+    <div {...stylex.props(styles.pills)}>
+      <PillRow aria-label="Show">
+        {pills.map((pill) => (
+          <FilterPill key={pill.kind}>
+            <Button variant="filter" pressed={filter === pill.kind} {...activateHandlers<HTMLButtonElement>(() => onFilter(pill.kind))}>
+              {pill.name}
+              <Text variant="inherit" tone="muted" numeric sx={styles.count}>
+                {pill.count}
+              </Text>
+            </Button>
+          </FilterPill>
+        ))}
+      </PillRow>
+    </div>
+  )
+}
+
+/** One picture on the wall: its box at its shape, its title and "artist, date" under it. */
+function GalleryTile({ picture, src, current, onOpen }: { readonly picture: PictureCardView; readonly src: string | undefined; readonly current: boolean; readonly onOpen: GalleryProps['onOpen'] }) {
+  return (
+    <li data-gallery-picture={picture.id} data-gallery-missing={src === undefined ? '' : undefined} {...stylex.props(styles.tile, styles.share(picture.ratio))}>
+      <button
+        type="button"
+        aria-label={`${picture.title}, ${picture.artist}, ${picture.date}`}
+        aria-current={current ? 'true' : undefined}
+        {...activateHandlers<HTMLButtonElement>((event) => onOpen(picture.id, event))}
+        {...stylex.props(styles.open, pictureLift)}
+      >
+        <span {...stylex.props(styles.frame, current && styles.current)}>
+          <PictureImage src={src} ratio={picture.ratio} />
+        </span>
+        <span aria-hidden {...stylex.props(styles.words)}>
+          <Text variant="ui" weight="medium" tone="default" truncate tooltipWhenTruncated>
+            {picture.title}
+          </Text>
+          <Text variant="meta" tone="muted" truncate tooltipWhenTruncated>
+            {picture.artist}, {picture.date}
+          </Text>
+        </span>
+      </button>
+    </li>
   )
 }
 

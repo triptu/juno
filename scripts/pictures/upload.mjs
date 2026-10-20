@@ -5,7 +5,7 @@
 // r2.dev URL only when needed, and uploads only files the bucket lacks or that changed.
 //
 //   pnpm dlx wrangler login            (once, in a browser)
-//   node scripts/pictures/upload.mjs [--out /Volumes/AgentWork/pictures] [--dry-run]
+//   pnpm pictures:upload [--out /Volumes/AgentWork/pictures] [--dry-run]
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'

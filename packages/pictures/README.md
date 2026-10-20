@@ -11,7 +11,7 @@ Home's pictures (SPEC 12, "A picture" and "Pictures and the gallery"): the bundl
 
 1. Artworks must be public domain or CC0 (Met, Art Institute of Chicago, Rijksmuseum, National Gallery of Art, Cleveland, Smithsonian, or Wikimedia Commons with the PD tag read on the file page). NASA images are public domain; ESA/Hubble and ESA/Webb images are CC BY 4.0 and show the credit ESA asks for.
 2. Write a caption (one sentence, at most 160 characters) and three to five facts, each at most 320 characters, each with the source that states it. Plain English, no hype, no metaphors; leave a fact out when in doubt, and keep popular myths out.
-3. Add the original's download URL to `scripts/pictures/sources.json`, run `node scripts/pictures/build.mjs --only <id>` for its two files and its `ratio`, then `node scripts/pictures/upload.mjs` (`scripts/pictures/README.md`).
+3. Add the original's download URL to `scripts/pictures/sources.json`, run `pnpm pictures:build --only <id>` for its two files and its `ratio`, then `pnpm pictures:upload` (`scripts/pictures/README.md`).
 
 ## Tests
 

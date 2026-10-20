@@ -78,12 +78,19 @@ export const PICTURE_KINDS: ReadonlyArray<PictureKind> = ['painting', 'print', '
 /** Whether a picture suits late night: every space image, and pictures marked for it. */
 export const suitsNight = (picture: Picture): boolean => picture.kind === 'space' || picture.night === true
 
+/**
+ * Whether a picture suits Home's box: a panorama or a very tall picture
+ * would be a thin strip there, so it is in the gallery only.
+ */
+export const fitsHome = (picture: Picture): boolean => picture.ratio >= 0.55 && picture.ratio <= 2.6
+
 /** Late night as Home's scene counts it (the home README, "Picking a scene"): 22:00 to 4:59. */
 export const isLateNight = (now: Date): boolean => now.getHours() >= 22 || now.getHours() < 5
 
 /**
- * The next picture: one not seen yet, at `random` (0 to 1) among them, and
- * late at night one that suits the night while one is left. Once every
+ * The next picture for Home: one that fits Home's box and is not seen yet,
+ * at `random` (0 to 1) among them, and late at night one that suits the
+ * night while one is left. Once every
  * picture has been seen the list starts over, without the ones in `avoid`
  * (the one showing now), so the same picture never shows twice in a row.
  * Returns the picture and the seen ids after it.
@@ -94,16 +101,18 @@ export function pickPicture(
   random: number,
   options: { readonly night: boolean; readonly avoid?: ReadonlyArray<string> },
 ): { readonly picture: Picture; readonly seen: ReadonlyArray<string> } | undefined {
-  const known = new Set(list.map((picture) => picture.id))
+  const fitting = list.filter(fitsHome)
+  const candidates = fitting.length > 0 ? fitting : list
+  const known = new Set(candidates.map((picture) => picture.id))
   const kept = seen.filter((id) => known.has(id))
   const seenSet = new Set(kept)
-  let pool = list.filter((picture) => !seenSet.has(picture.id))
+  let pool = candidates.filter((picture) => !seenSet.has(picture.id))
   let after = kept
   if (pool.length === 0) {
     const avoided = new Set(options.avoid ?? [])
-    pool = list.filter((picture) => !avoided.has(picture.id))
+    pool = candidates.filter((picture) => !avoided.has(picture.id))
     after = []
-    if (pool.length === 0) pool = [...list]
+    if (pool.length === 0) pool = [...candidates]
   }
   if (options.night) {
     const night = pool.filter(suitsNight)

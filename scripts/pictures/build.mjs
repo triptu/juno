@@ -3,14 +3,14 @@
 // scripts/pictures/README.md), ready for upload.ts:
 //
 //   <out>/<id>-small.webp  fitted in Home's box at 2x (640 by 432), aiming under 60 KB
-//   <out>/<id>-large.webp  2400 px on the long edge (never larger than the original)
+//   <out>/<id>-large.webp  2400 px on the long edge (never larger than the original), aiming under 900 KB
 //
 // Originals come from each picture's open-licence file in sources.json and are kept in
 // <out>/originals, so a second run downloads nothing. Needs cwebp (`brew install webp`)
 // and macOS `sips`. Prints each picture's width over height and fails when the catalog's
 // `ratio` differs from the file's by more than 0.01.
 //
-//   node scripts/pictures/build.mjs [--out /Volumes/AgentWork/pictures] [--only id1,id2]
+//   pnpm pictures:build [--out /Volumes/AgentWork/pictures] [--only id1,id2]
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -25,7 +25,7 @@ const sources = JSON.parse(readFileSync(join(here, 'sources.json'), 'utf8'))
 const USER_AGENT = 'JunoPictures/1.0 (https://github.com/triptu; picture build)'
 
 const SMALL = { width: 640, height: 432, quality: 78, budget: 60 * 1024 }
-const LARGE = { edge: 2400, quality: 80 }
+const LARGE = { edge: 2400, quality: 80, budget: 900 * 1024 }
 
 mkdirSync(join(out, 'originals'), { recursive: true })
 
@@ -78,7 +78,10 @@ for (const picture of PICTURES) {
     while (small > SMALL.budget && quality > 50) small = webp(input, join(out, `${picture.id}-small.webp`), sw, sh, (quality -= 6))
     // Large: the long edge at most 2400 and never upscaled.
     const scale = Math.min(1, LARGE.edge / Math.max(width, height))
-    const large = webp(input, join(out, `${picture.id}-large.webp`), Math.round(width * scale), Math.round(height * scale), LARGE.quality)
+    const [lw, lh] = [Math.round(width * scale), Math.round(height * scale)]
+    let largeQuality = LARGE.quality
+    let large = webp(input, join(out, `${picture.id}-large.webp`), lw, lh, largeQuality)
+    while (large > LARGE.budget && largeQuality > 56) large = webp(input, join(out, `${picture.id}-large.webp`), lw, lh, (largeQuality -= 8))
     report.push({ id: picture.id, ratio: Number(ratio.toFixed(4)), small: Math.round(small / 1024), large: Math.round(large / 1024), original: `${width}x${height}` })
   } catch (error) {
     failed = true
