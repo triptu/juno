@@ -20,16 +20,11 @@ for (const [index, shape] of shapes.entries()) {
     expect(composeEdit(editMarkup(original, lookups) + '!', original, lookups).blocks[0]?.elements[0]).toEqual(shape)
   })
 }
-it('preserves untouched styled fragments in the same paragraph', () => {
-  const blocks: RichTextBlock[] = [{ type: 'rich_text', elements: [shapes[1]!] }]
-  expect(composeEdit(editMarkup({ blocks }) + '!', { blocks }).blocks[0]?.elements).toEqual([
-    { type: 'rich_text_section', elements: [{ type: 'text', text: 'foo' }, { type: 'text', text: 'bar', style: { bold: true } }, { type: 'text', text: 'baz!' }] },
-  ])
-})
-for (const index of [0, 2, 3]) {
-  it(`round trips escaped Slack shape ${index} without provenance`, () => {
-    const blocks: RichTextBlock[] = [{ type: 'rich_text', elements: [shapes[index]!] }]
-    expect(composeOutgoing(editMarkup({ blocks })).blocks).toEqual(blocks)
+for (const [index, shape] of shapes.entries()) {
+  it(`parses changed Slack paragraph ${index} as new markup`, () => {
+    const blocks: RichTextBlock[] = [{ type: 'rich_text', elements: [shape] }]
+    const input = editMarkup({ blocks }, lookups) + '!'
+    expect(composeEdit(input, { blocks }, lookups).blocks).toEqual(composeOutgoing(input).blocks)
   })
 }
 it('round trips generated Slack blocks including styles markup cannot express', () => {
@@ -40,17 +35,17 @@ it('round trips generated Slack blocks including styles markup cannot express', 
     const elements: RichTextInline[] = Array.from({ length: 1 + next(8) }, () => ({ type: 'text', text: texts[next(texts.length)]!, style: { bold: next(2) === 1, italic: next(2) === 1, code: next(2) === 1 } }))
     const blocks: RichTextBlock[] = [{ type: 'rich_text', elements: [{ type: 'rich_text_section', elements }, shapes[next(shapes.length)]!] }]
     expect(composeEdit(editMarkup({ blocks }, lookups), { blocks }, lookups).blocks).toEqual(blocks)
+    const changed = editMarkup({ blocks: [{ type: 'rich_text', elements: [{ type: 'rich_text_section', elements }] }] }, lookups) + '!'
+    expect(composeEdit(changed, { blocks: [{ type: 'rich_text', elements: [{ type: 'rich_text_section', elements }] }] }, lookups).blocks).toEqual(composeOutgoing(changed).blocks)
     const withTrailer: RichTextBlock[] = [{ type: 'rich_text', elements: [...blocks[0]!.elements, { type: 'rich_text_section', elements: [{ type: 'text', text: 'trailer' }] }] }]
     const edited = composeEdit(editMarkup({ blocks: withTrailer }, lookups) + '!', { blocks: withTrailer }, lookups)
     expect(edited.blocks[0]?.elements.slice(0, -1)).toEqual(blocks[0]!.elements)
   }
 })
 
-it('keeps an untouched word-fragment style between two edits in one paragraph', () => {
+it('reparses the whole paragraph when both ends change', () => {
   const blocks: RichTextBlock[] = [{ type: 'rich_text', elements: [shapes[1]!] }]
-  expect(composeEdit('Foo*bar*baZ', { blocks }).blocks[0]?.elements).toEqual([
-    { type: 'rich_text_section', elements: [{ type: 'text', text: 'Foo' }, { type: 'text', text: 'bar', style: { bold: true } }, { type: 'text', text: 'baZ' }] },
-  ])
+  expect(composeEdit('Foo*bar*baZ', { blocks }).blocks).toEqual(composeOutgoing('Foo*bar*baZ').blocks)
 })
 it('keeps an unchanged Slack paragraph between two changed paragraphs', () => {
   const blocks: RichTextBlock[] = [{ type: 'rich_text', elements: [

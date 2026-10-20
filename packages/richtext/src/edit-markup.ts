@@ -1,12 +1,12 @@
 /**
  * A message as the edit field starts with it (spec section 8): its
  * `rich_text` written back as the composer's markup, so the styles show in
- * the field and saving it unchanged sends them again (`composeOutgoing`).
+ * the field and saving it unchanged sends them again (`composeEdit`).
  * Mentions read as "@Maya Chen" and "#eng", which the edit's
  * `MentionTargets` turn back into mentions; a link reads as its words,
  * which `MentionTargets.links` links again.
  */
-import type { RichTextElement, RichTextInline, RichTextStyle } from '@juno/slack-schema'
+import type { RichTextElement, RichTextInline } from '@juno/slack-schema'
 import type { Lookups } from './model'
 import { plainText, messageBody, type MessageContent } from './body'
 import { channelInline, dateInline, emojiInline, inlineText, usergroupInline, userInline } from './inline'
@@ -14,10 +14,6 @@ import { MARKER_OF, type MarkupStyle } from './markup'
 
 /** Markers open in this order, so code is always innermost: nothing inside code is markup. */
 const ORDER: ReadonlyArray<MarkupStyle> = ['bold', 'italic', 'strike', 'code']
-
-function stylesOf(style: RichTextStyle | undefined): ReadonlySet<MarkupStyle> {
-  return new Set(ORDER.filter((name) => style?.[name] === true))
-}
 
 /** What an element reads as in the field. */
 function fieldText(element: RichTextInline, lookups: Lookups): string {
@@ -45,21 +41,21 @@ function fieldText(element: RichTextInline, lookups: Lookups): string {
   }
 }
 
-/**
- * Inline elements as markup. Each element carries its own markers; spaces at an element's edges go outside its markers, where markers
- * count. A style over a line break closes before it and opens again after.
- */
+/** Adjacent equal styles share markers, including mentions, links and emoji. */
 export function inlineMarkup(elements: ReadonlyArray<RichTextInline>, lookups: Lookups): string {
-  return elements.map((element) => {
-    const styles = stylesOf('style' in element ? element.style : undefined)
-    return fieldText(element, lookups).split('\n').map((line) => {
-      const core = line.trim()
-      if (core === '') return line
-      const markers = ORDER.filter((name) => styles.has(name)).map((name) => MARKER_OF[name])
-      const escaped = element.type === 'link' && element.text === undefined ? core : core.replace(styles.has('code') ? /[\\`]/g : /[\\*_~`>]/g, '\\$&')
-      return line.slice(0, line.length - line.trimStart().length) + markers.join('') + escaped + markers.toReversed().join('') + line.slice(line.trimEnd().length)
-    }).join('\n')
-  }).join('')
+  const runs: Array<{ markers: string; text: string }> = []
+  for (const element of elements) {
+    const style = 'style' in element ? element.style : undefined
+    const markers = ORDER.filter((name) => style?.[name] === true).map((name) => MARKER_OF[name]).join('')
+    const previous = runs.at(-1)
+    if (previous?.markers === markers) previous.text += fieldText(element, lookups)
+    else runs.push({ markers, text: fieldText(element, lookups) })
+  }
+  return runs.map(({ markers, text }) => text.split('\n').map((line) => {
+    const core = line.trim()
+    if (core === '') return line
+    return line.slice(0, line.length - line.trimStart().length) + markers + core + [...markers].reverse().join('') + line.slice(line.trimEnd().length)
+  }).join('\n')).join('')
 }
 
 export function elementMarkup(element: RichTextElement, lookups: Lookups): string | undefined {
@@ -73,7 +69,7 @@ export function elementMarkup(element: RichTextElement, lookups: Lookups): strin
         .map((line) => `> ${line}`)
         .join('\n')
     case 'rich_text_preformatted':
-      return `\`\`\`\n${element.elements.map((el) => fieldText(el, lookups)).join('').replace(/[\\`]/g, '\\$&')}\n\`\`\``
+      return `\`\`\`\n${element.elements.map((el) => fieldText(el, lookups)).join('')}\n\`\`\``
     case 'rich_text_list':
       return element.elements.map((item) => inlineMarkup(item.elements, lookups)).join('\n')
     case 'rich_text_divider':

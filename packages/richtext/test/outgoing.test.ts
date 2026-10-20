@@ -349,8 +349,8 @@ describe('editing a sent message', () => {
   const cases: ReadonlyArray<{ readonly name: string; readonly typed: string; readonly shown: string }> = [
     { name: 'each style', typed: '*bold* _it_ ~gone~ `code`', shown: '*bold* _it_ ~gone~ `code`' },
     { name: 'nested styles', typed: '*bold _and italic_* then _*both*_', shown: '*bold* *_and italic_* then *_both_*' },
-    { name: 'markers that did not count', typed: 'snake_case_name and 2*3*4 and *', shown: 'snake\\_case\\_name and 2\\*3\\*4 and \\*' },
-    { name: 'a mention and a link inside styles', typed: '*ask <@U0MAYA|Maya>* about _https://example.com/a_b_', shown: '*ask* *@Maya Chen* about _https://example.com/a_b_' },
+    { name: 'markers that did not count', typed: 'snake_case_name and 2*3*4 and *', shown: 'snake_case_name and 2*3*4 and *' },
+    { name: 'a mention and a link inside styles', typed: '*ask <@U0MAYA|Maya>* about _https://example.com/a_b_', shown: '*ask @Maya Chen* about _https://example.com/a_b_' },
     { name: 'linked words', typed: '~<https://example.com/plan|the plan>~ is done', shown: '~the plan~ is done' },
     { name: 'a mention in code', typed: 'ping `<@U0MAYA|Maya>`', shown: 'ping `@Maya Chen`' },
     { name: 'a code block and a quote with styles', typed: 'see\n```\nmake *all*\n```\n> *ship* it\nok', shown: 'see\n```\nmake *all*\n```\n> *ship* it\nok' },

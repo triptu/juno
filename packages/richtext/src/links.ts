@@ -70,7 +70,7 @@ function wrappingMarkers(text: string, start: number): string {
   let wrapping = ''
   for (let i = 0; i < prefix.length; i++) {
     const marker = prefix[i]!
-    if (!MARKERS.includes(marker) || prefix[i - 1] === '\\' || prefix[i - 1] === marker || prefix[i + 1] === marker) continue
+    if (!MARKERS.includes(marker) || prefix[i - 1] === marker || prefix[i + 1] === marker) continue
     if (wrapping.includes(marker)) wrapping = wrapping.replace(marker, '')
     else if ((i === 0 || !/[\p{L}\p{N}\p{M}]/u.test(prefix[i - 1]!)) && !/\s/.test(prefix[i + 1] ?? '')) wrapping += marker
   }

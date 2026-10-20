@@ -86,16 +86,6 @@ const FREE = 0
 const OPAQUE = 1
 /** A code span's backticks or content. */
 const CODE = 2
-const ESCAPED = 3
-
-/** Backslash escapes markup punctuation without changing the text that is sent. */
-const ESCAPE = /\\([\\*_~`>])/g
-const escapedAt = (text: string, at: number): boolean => {
-  let slashes = 0
-  while (at > 0 && text[--at] === '\\') slashes++
-  return slashes % 2 === 1
-}
-
 /** The first entry of the sorted `list` at or after `min`, or -1. */
 function firstFrom(list: ReadonlyArray<number>, min: number): number {
   let low = 0
@@ -122,13 +112,6 @@ export function lineMarkup(text: string, from = 0, to = text.length, opaque: Rea
   for (const link of findLinks(line)) block(from + link.start, from + link.end)
   for (const m of line.matchAll(SHORTCODE)) block(from + m.index, from + m.index + m[0].length)
 
-  const escapes: MarkupRange[] = []
-  for (const match of line.matchAll(ESCAPE)) {
-    const at = from + match.index
-    if (kind[at - from] !== FREE) continue
-    kind.fill(ESCAPED, at - from, at + 2 - from)
-    escapes.push({ start: at, end: at + 1 })
-  }
   const inside = (i: number) => i >= from && i < to
   const free = (i: number) => inside(i) && kind[i - from] === FREE
   const isWord = (i: number) => {
@@ -138,7 +121,7 @@ export function lineMarkup(text: string, from = 0, to = text.length, opaque: Rea
   }
   const isSpace = (i: number) => !inside(i) || (kind[i - from] === FREE && SPACE.test(text[i]!))
   const spans: MarkupSpan[] = []
-  const markers: MarkupRange[] = [...escapes]
+  const markers: MarkupRange[] = []
 
   // Code first: nothing inside it is markup.
   const tick = (i: number) => free(i) && text[i] === '`' && !(free(i - 1) && text[i - 1] === '`') && !(free(i + 1) && text[i + 1] === '`')
@@ -152,10 +135,6 @@ export function lineMarkup(text: string, from = 0, to = text.length, opaque: Rea
       }
     }
     if (close < 0) continue
-    for (let at = markers.length - 1; at >= 0; at--) {
-      const escape = markers[at]!
-      if (escape.start > i && escape.end <= close && !/[\\`]/.test(text[escape.end]!)) markers.splice(at, 1)
-    }
     kind.fill(CODE, i - from, close + 1 - from)
     spans.push({ start: i + 1, end: close, style: 'code' })
     markers.push({ start: i, end: i + 1 }, { start: close, end: close + 1 })
@@ -234,9 +213,7 @@ export function markupPieces(text: string): ReadonlyArray<MarkupPiece> {
 /** The code block that opens on the line from `at` to `end`, if it closes. */
 function codeBlockFrom(text: string, at: number, end: number): Extract<MarkupPiece, { kind: 'code' }> | undefined {
   for (let open = text.indexOf(FENCE, at); open >= 0 && open < end; open = text.indexOf(FENCE, open + 1)) {
-    if (escapedAt(text, open)) continue
-    let close = text.indexOf(FENCE, open + FENCE.length)
-    while (close >= 0 && escapedAt(text, close)) close = text.indexOf(FENCE, close + FENCE.length)
+    const close = text.indexOf(FENCE, open + FENCE.length)
     if (close < 0) return undefined
     let start = open + FENCE.length
     let stop = close
@@ -314,10 +291,7 @@ export function toggleMarkup(text: string, selection: MarkupRange, style: Markup
     return { start, end, insert: marker + marker, selection: { start: start + 1, end: start + 1 } }
   }
   const selected = text.slice(start, end)
-  if (style === 'code' && selected.includes('\n')) {
-    if (text.slice(start - 4, start) === `${FENCE}\n` && text.slice(end, end + 4) === `\n${FENCE}`) return { start: start - 4, end: end + 4, insert: selected, selection: { start: start - 4, end: end - 4 } }
-    return { start, end, insert: `${FENCE}\n${selected}\n${FENCE}`, selection: { start: start + 4, end: end + 4 } }
-  }
+  if (style === 'code' && selected.includes('\n')) return toggleCodeBlock(text, selection)
   const from = start + (selected.length - selected.trimStart().length)
   const to = end - (selected.length - selected.trimEnd().length)
   if (to <= from) return undefined
@@ -340,6 +314,16 @@ export function toggleMarkup(text: string, selection: MarkupRange, style: Markup
   if (text[from - 1] === marker && text[to] === marker) return { start: from - 1, end: to + 1, insert: words, selection: { start: from - 1, end: to - 1 } }
   if (words.length >= 2 && words.startsWith(marker) && words.endsWith(marker)) return { start: from, end: to, insert: words.slice(1, -1), selection: { start: from, end: to - 2 } }
   return { start: from, end: to, insert: marker + words + marker, selection: { start: from + 1, end: to + 1 } }
+}
+
+function toggleCodeBlock(text: string, { start, end }: MarkupRange): MarkupEdit | undefined {
+  while (start < end && text[start] === '\n') start++
+  while (end > start && text[end - 1] === '\n') end--
+  if (start === end) return undefined
+  const selected = text.slice(start, end)
+  if (text.slice(start - 4, start) === `${FENCE}\n` && text.slice(end, end + 4) === `\n${FENCE}`) return { start: start - 4, end: end + 4, insert: selected, selection: { start: start - 4, end: end - 4 } }
+  const after = end < text.length && text[end] !== '\n' ? '\n' : ''
+  return { start, end, insert: `${FENCE}\n${selected}\n${FENCE}${after}`, selection: { start: start + 4, end: end + 4 } }
 }
 
 function toggleQuote(text: string, selection: MarkupRange): MarkupEdit {
