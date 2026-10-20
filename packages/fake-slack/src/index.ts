@@ -327,6 +327,11 @@ export class FakeSlack {
     this.server.release(input.method)
   }
 
+  /** Picture files the engine asked Juno's picture store for (`/pictures/<name>`, SPEC 12, "A picture"), oldest first. */
+  pictureRequests(): ReadonlyArray<string> {
+    return this.server.pictureRequests
+  }
+
   heldCount(input: { method?: string } = {}): number {
     return this.server.heldCount(input.method)
   }

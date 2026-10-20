@@ -2508,6 +2508,11 @@ export class HomePane {
     return this.root.locator('[data-home-thought]')
   }
 
+  /** The picture in the caught-up scene's place (SPEC 12, "A picture"). */
+  get picture(): Locator {
+    return this.root.locator('[data-home-picture]')
+  }
+
   async expectShown(): Promise<void> {
     await expect(this.greeting).toBeVisible()
   }
