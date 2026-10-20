@@ -32,19 +32,22 @@ function commonRank(row: EmojiMatch, quick: ReadonlyArray<EmojiPrior>): number {
   return common < 0 ? -1 : quick.length + common
 }
 
-/**
- * Exact names and aliases first, then standard emoji, custom prefixes and custom substrings.
- * Recent use and the common prior break ties within each group. The picker can request the full result list.
- */
+/** Exact names, recent use, common emoji, prefixes, then substrings; source breaks otherwise equal ties. */
 export function matchEmoji<E extends EmojiMatch>(rows: ReadonlyArray<E>, query: string, recent: ReadonlyArray<string>, quick: ReadonlyArray<EmojiPrior>, limit = EMOJI_ROWS_MAX): ReadonlyArray<E> {
   const names = (row: E) => row.keys ?? [row.name, ...row.aliases ?? []]
-  const tier = (row: E) => names(row).includes(query) ? 0 : row.url === undefined ? 1 : names(row).some((name) => name.startsWith(query)) ? 2 : 3
   const prior = (row: E) => {
     const at = recent.findIndex((name) => names(row).includes(name))
     if (at >= 0) return at
     const common = commonRank(row, quick)
     return common < 0 ? Infinity : recent.length + common
   }
-  return rows.filter((row) => names(row).some((name) => name.includes(query)))
-    .toSorted((a, b) => tier(a) - tier(b) || prior(a) - prior(b) || 0).slice(0, limit)
+  return rows.flatMap((row) => {
+    const matching = names(row).filter((name) => name.includes(query))
+    if (matching.length === 0) return []
+    const prefixes = matching.filter((name) => name.startsWith(query))
+    const order = (prefixes.length > 0 ? prefixes : matching).reduce((a, b) => a < b ? a : b)
+    return [{ row, exact: matching.includes(query) ? 0 : 1, prior: prior(row), prefix: prefixes.length > 0 ? 0 : 1, order }]
+  }).toSorted((a, b) => a.exact - b.exact || a.prior - b.prior || a.prefix - b.prefix
+    || Number(a.row.url !== undefined) - Number(b.row.url !== undefined) || (a.order < b.order ? -1 : a.order > b.order ? 1 : 0))
+    .slice(0, limit).map(({ row }) => row)
 }
