@@ -39,6 +39,8 @@ import {
   type Ts,
   type UserId,
   type Me,
+  fileMediaKind,
+  fileTextKind,
 } from '@juno/domain'
 import { editMarkup, emojiUnicode, messageBody, splitEmojiName, type Lookups, type MessageBody, type MessageContent, type UsergroupName } from '@juno/richtext'
 import { syncState, StoreReader, type SqlClient, type SqlError } from '@juno/store'
@@ -687,9 +689,15 @@ interface SlackFile {
   readonly name?: string | null
   readonly title?: string | null
   readonly mimetype?: string
+  readonly filetype?: string
+  readonly pretty_type?: string
+  readonly subtype?: string
   readonly size?: number
   readonly mode?: string
   readonly file_access?: string
+  readonly lines?: number
+  readonly duration_ms?: number
+  readonly aac?: string
   readonly original_w?: number
   readonly original_h?: number
   readonly thumb_360?: string
@@ -752,7 +760,7 @@ function videoOf(file: SlackFile): Pick<FileView, 'thumb' | 'video' | 'width' | 
 function pendingFiles(row: PendingRow): ReadonlyArray<FileView> {
   const files = parseJson<ReadonlyArray<PendingFile>>(row.file_ids_json) ?? []
   return files.map((file) => {
-    const kind = fileKind(file.mimetype)
+    const kind = fileMediaKind({ mimetype: file.mimetype, name: file.name })
     const src = uploadsUrl(file.stagedName)
     const sized = kind === 'image' && file.width !== undefined && file.height !== undefined && !file.stagedName.endsWith('.bin')
     return {
@@ -773,13 +781,32 @@ function pendingFiles(row: PendingRow): ReadonlyArray<FileView> {
   })
 }
 
-function fileKind(mimetype: string | undefined): FileView['kind'] {
-  if (mimetype === undefined) return 'file'
-  if (mimetype.startsWith('image/')) return 'image'
-  if (mimetype.startsWith('video/')) return 'video'
-  if (mimetype.startsWith('audio/')) return 'audio'
-  if (mimetype === 'application/pdf') return 'pdf'
-  return 'file'
+/**
+ * What the viewer needs for a file that is not a picture: an audio file's
+ * player url (a voice clip's `aac` when Slack made one) and length, and a
+ * pdf, html or text file's content url, with how to draw text. A snippet's
+ * `preview` may be cut short, so the viewer always reads the content url.
+ */
+function documentOf(file: SlackFile, kind: FileView['kind']): Partial<FileView> {
+  if (file.id === undefined) return {}
+  const id = encodeURIComponent(file.id)
+  if (kind === 'audio') {
+    const play = file.aac ?? file.url_private
+    return {
+      ...(play === undefined ? {} : { audio: `juno://files/${id}/audio?url=${encodeURIComponent(play)}` }),
+      ...(file.duration_ms === undefined ? {} : { durationMs: file.duration_ms }),
+    }
+  }
+  if ((kind !== 'pdf' && kind !== 'html' && kind !== 'text') || file.url_private === undefined) return {}
+  const content = `juno://files/${id}/content?url=${encodeURIComponent(file.url_private)}`
+  if (kind !== 'text') return { content }
+  const text = fileTextKind(file)
+  return {
+    content,
+    textKind: text.kind,
+    ...(text.language === undefined ? {} : { language: text.language }),
+    ...(file.lines === undefined ? {} : { lines: file.lines }),
+  }
 }
 
 /** A sent image's staged copy, while Slack has no thumbnails for it (`uploaded_files`). */
@@ -820,7 +847,7 @@ function filesOf(files: ReadonlyArray<SlackFile> | undefined, local: ReadonlyMap
       out.push({ id: file.id, name: '', kind: 'deleted' })
       continue
     }
-    const kind = fileKind(file.mimetype)
+    const kind = fileMediaKind(file)
     const slack = kind === 'image' ? thumbOf(file) : undefined
     const staged = kind === 'image' && slack === undefined ? local.get(file.id) : undefined
     if (staged !== undefined) {
@@ -864,6 +891,7 @@ function filesOf(files: ReadonlyArray<SlackFile> | undefined, local: ReadonlyMap
       ...(file.original_w === undefined || file.original_h === undefined ? {} : { width: file.original_w, height: file.original_h }),
       ...(thumb === undefined ? {} : { thumb }),
       ...(full === undefined ? {} : { full: `juno://files/${encodeURIComponent(file.id)}/full?url=${encodeURIComponent(full)}` }),
+      ...documentOf(file, kind),
       ...(file.url_private_download === undefined ? {} : { download: file.url_private_download }),
     })
   }

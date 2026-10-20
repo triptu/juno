@@ -36,6 +36,7 @@ export { AllRoutes } from './routes/index'
 export * from './shell'
 export * from './audience'
 export * from './composer'
+export * from './fileText'
 export * from './menus'
 export * from './ids'
 

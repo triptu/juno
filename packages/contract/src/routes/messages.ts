@@ -93,13 +93,19 @@ export const FileThumb = Schema.Struct({
 })
 export type FileThumb = typeof FileThumb.Type
 
-export const FileKind = Schema.Literals(['image', 'video', 'audio', 'pdf', 'file', 'deleted'])
+export const FileKind = Schema.Literals(['image', 'video', 'audio', 'pdf', 'html', 'text', 'file', 'deleted'])
 export type FileKind = typeof FileKind.Type
 
+/** How the viewer draws a `text` file (`@juno/domain` `fileTextKind`). */
+export const FileTextKind = Schema.Literals(['markdown', 'csv', 'json', 'code', 'plain'])
+export type FileTextKind = typeof FileTextKind.Type
+
 /**
- * A file on a message, for the file card. An image has `thumb` when Slack
- * made one; an image without dimensions, or any other file, is a card of
- * fixed height. `deleted` is a file Slack no longer serves.
+ * A file on a message. An image has `thumb` when Slack made one; an image
+ * without dimensions is a card of fixed height. `audio`, `pdf`, `html` and
+ * `text` files are cards that open in the media viewer; `file` is a card
+ * with Quick Look. `deleted` is a file Slack no longer serves. `@juno/domain`
+ * `fileMediaKind` decides the kind.
  */
 export const FileView = Schema.Struct({
   id: Schema.String,
@@ -116,6 +122,18 @@ export const FileView = Schema.Struct({
   full: Schema.optionalKey(Schema.String),
   /** A video the viewer plays, a `juno://files/<id>/video` url main streams from Slack. `thumb` is its poster. */
   video: Schema.optionalKey(Schema.String),
+  /** An audio file or voice clip the player plays, a `juno://files/<id>/audio` url main streams from Slack. */
+  audio: Schema.optionalKey(Schema.String),
+  /** An audio file's length, when Slack gives it. */
+  durationMs: Schema.optionalKey(Schema.Number),
+  /** A pdf, html or text file as Slack serves it, a `juno://files/<id>/content` url, for the viewer. */
+  content: Schema.optionalKey(Schema.String),
+  /** How the viewer draws a `text` file. */
+  textKind: Schema.optionalKey(FileTextKind),
+  /** The language of a `code` text file, as a reader names it ("Python"). */
+  language: Schema.optionalKey(Schema.String),
+  /** Lines in a text file, when Slack counted them (a snippet). */
+  lines: Schema.optionalKey(Schema.Int),
   /** Slack's download url, which main fetches on the Slack session. Absent for a file still being sent. */
   download: Schema.optionalKey(Schema.String),
 })
