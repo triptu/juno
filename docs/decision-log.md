@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-20 11:57 · person-click-dm · A click on a sender's name or avatar, or an @person chip, opens your DM with them through the Slack person-link path (`openPerson`); it opens on click, not mouse down, so a drag from the name still selects, and an app with no DM or an unknown sender carries `unreachable` from the engine and opens nothing.
 - 10-20 11:12 · sidebar-first-key · Hold the character that starts sidebar type-ahead along with later keys, so opening a topic and typing before its composer mounts keeps the whole draft.
 - 10-20 11:06 · daily-full-run · A scheduled task runs the full suites on main once a day; the agent that runs it commits the refreshed coverage map and merges it.
 - 10-20 02:41 · screen-recording-asked · macOS tells an app only whether it may record the screen, not whether it has asked, so main remembers in a small file in userData (`screen-recording-asked`) that the share sheet's Continue showed the prompt. Before that the sheet says "Allow screen recording"; after, "Screen recording is off for Juno" with Open System Settings. Screen capture needs no entitlement or usage string; main allows it only for Juno's own page. When a shared window's capture ends, main says whether the window is still listed, so the "window closed" toast never shows for a capture stopped from macOS.
