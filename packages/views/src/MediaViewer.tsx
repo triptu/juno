@@ -4,18 +4,20 @@ import { CaretLeft } from '@phosphor-icons/react/dist/icons/CaretLeft'
 import { CaretRight } from '@phosphor-icons/react/dist/icons/CaretRight'
 import { Copy } from '@phosphor-icons/react/dist/icons/Copy'
 import { DownloadSimple } from '@phosphor-icons/react/dist/icons/DownloadSimple'
+import { Eye } from '@phosphor-icons/react/dist/icons/Eye'
 import { X } from '@phosphor-icons/react/dist/icons/X'
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import type { FileView } from '@juno/contract'
 import { colors, layout, motion, radii, spacing, z } from '@juno/tokens/tokens.stylex'
 import { IconButton, Surface, Text } from '@juno/ui'
 import { Filmstrip } from './Filmstrip'
-import type { MediaFile } from './MediaGrid'
+import { isMedia, type MediaFile } from './MediaGrid'
 import { fullTime, messageTime } from './time'
+import { ViewerDocument, type LoadFileText } from './ViewerDocument'
 
-/** What the viewer shows: a message's images and videos, the one opened, and who sent them when. */
+/** What the viewer shows: every file of a message it can show (`viewableOf`), the one opened, and who sent them when. */
 export interface MediaViewing {
-  readonly items: ReadonlyArray<MediaFile>
+  readonly items: ReadonlyArray<FileView>
   readonly index: number
   /** The sender's name, as the message shows it. */
   readonly sender: string
@@ -31,16 +33,22 @@ export interface MediaViewerProps {
   readonly onClose: () => void
   /** With it, and a `download` url on the item, the header has Download. */
   readonly onDownload?: ((file: FileView) => void) | undefined
-  /** With it, and a `download` url on the item, the header has Open: the default app (Preview for images). */
-  readonly onOpenFile?: ((file: FileView) => void) | undefined
+  /** With it, and a `download` url on the item, the header has Quick Look: the macOS preview window. */
+  readonly onQuickLook?: ((file: FileView) => void) | undefined
+  /** With it, an HTML file has Open in browser. */
+  readonly onOpenInBrowser?: ((file: FileView) => void) | undefined
+  /** Reads a text file's content for the viewer. Without it a text file says it could not be loaded. */
+  readonly loadText?: LoadFileText | undefined
   /** With it, an image has Copy image. */
   readonly onCopyImage?: ((file: FileView) => void) | undefined
 }
 
 /**
- * A message's images and videos over the tab's topic (inventory 6): a dim
- * backdrop, the current item fitted inside the topic in a box sized from its
- * own dimensions, a header with its name, the sender and time and its
+ * A message's images, videos and the other files it can show (SPEC section
+ * 8, "Other files") over the tab's topic (inventory 6): a dim backdrop, the
+ * current picture fitted inside the topic in a box sized from its own
+ * dimensions, or a PDF, HTML or text file in a frame that fills the stage
+ * and scrolls inside it, or an audio player; a header with its name, the sender and time and its
  * actions, and along the bottom a filmstrip of every item, the current one
  * marked. ← and →, the side arrows and the strip move through them; Home and
  * End go to the ends. The thumbnail shows at once and the full image fades in
@@ -52,7 +60,7 @@ export interface MediaViewerProps {
  * the topic under it inert, so Tab goes from its controls on to the sidebar
  * and the tab strip. A hidden tab keeps it open at its item.
  */
-export function MediaViewer({ viewing, now, onClose, onDownload, onOpenFile, onCopyImage }: MediaViewerProps) {
+export function MediaViewer({ viewing, now, onClose, onDownload, onQuickLook, onOpenInBrowser, onCopyImage, loadText }: MediaViewerProps) {
   const { items } = viewing
   const root = useRef<HTMLDivElement>(null)
   const [index, setIndex] = useState(() => Math.min(Math.max(0, viewing.index), items.length - 1))
@@ -93,7 +101,7 @@ export function MediaViewer({ viewing, now, onClose, onDownload, onOpenFile, onC
   const onBackdrop = (event: MouseEvent<HTMLDivElement>) => {
     if (event.target === event.currentTarget) close()
   }
-  const meta = [viewing.sender, messageTime(viewing.at, now), ...(several ? [`${index + 1} of ${items.length}`] : [])].join(' · ')
+  const meta = [viewing.sender, messageTime(viewing.at, now), ...(file.language === undefined ? [] : [file.language]), ...(several ? [`${index + 1} of ${items.length}`] : [])].join(' · ')
   return (
     <div
       ref={root}
@@ -105,12 +113,18 @@ export function MediaViewer({ viewing, now, onClose, onDownload, onOpenFile, onC
       {...stylex.props(styles.backdrop)}
     >
       <div onClick={onBackdrop} {...stylex.props(styles.bar)}>
-        <ViewerBar file={file} items={items} meta={meta} at={viewing.at} onClose={close} onDownload={onDownload} onOpenFile={onOpenFile} onCopyImage={onCopyImage} />
+        <ViewerBar file={file} items={items} meta={meta} at={viewing.at} onClose={close} onDownload={onDownload} onQuickLook={onQuickLook} onOpenInBrowser={onOpenInBrowser} onCopyImage={onCopyImage} />
       </div>
       <div onClick={onBackdrop} {...stylex.props(styles.stage)}>
         <div onClick={onBackdrop} {...stylex.props(styles.fit)}>
-          {/* Keyed by item: a new one fades in, and its full image starts unloaded. */}
-          <Item key={index} file={file} position={index + 1} />
+          {/* Keyed by item: a new one fades in, its full image starts unloaded and a text file is read again. */}
+          {isMedia(file) ? (
+            <Item key={index} file={file} position={index + 1} />
+          ) : (
+            <div key={index} data-viewer-item={index + 1} data-viewer-kind={file.kind} {...stylex.props(styles.frame, ...documentBox(file))}>
+              <ViewerDocument file={file} now={now} loadText={loadText} />
+            </div>
+          )}
         </div>
         {several ? (
           <>
@@ -133,7 +147,7 @@ export function MediaViewer({ viewing, now, onClose, onDownload, onOpenFile, onC
   )
 }
 
-/** Esc closes; ← → Home End move (not while a video has focus: it keeps its own keys). */
+/** Esc closes; ← → Home End move (not while a player or a text file has focus: they keep their own keys). */
 function onViewerKey(event: KeyboardEvent<HTMLDivElement>, index: number, count: number, go: (next: number) => void, onClose: () => void): void {
   if (event.key === 'Escape') {
     event.preventDefault()
@@ -141,8 +155,8 @@ function onViewerKey(event: KeyboardEvent<HTMLDivElement>, index: number, count:
     onClose()
     return
   }
-  const inVideo = event.target instanceof HTMLVideoElement
-  const move = inVideo ? undefined : { ArrowLeft: index - 1, ArrowRight: index + 1, Home: 0, End: count - 1 }[event.key]
+  const ownKeys = event.target instanceof HTMLMediaElement || (event.target instanceof HTMLElement && event.target.hasAttribute('data-viewer-text'))
+  const move = ownKeys ? undefined : { ArrowLeft: index - 1, ArrowRight: index + 1, Home: 0, End: count - 1 }[event.key]
   if (move !== undefined) {
     event.preventDefault()
     event.stopPropagation()
@@ -150,18 +164,20 @@ function onViewerKey(event: KeyboardEvent<HTMLDivElement>, index: number, count:
   }
 }
 
-interface ViewerBarProps extends Pick<MediaViewerProps, 'onClose' | 'onDownload' | 'onOpenFile' | 'onCopyImage'> {
-  readonly file: MediaFile
-  readonly items: ReadonlyArray<MediaFile>
+interface ViewerBarProps extends Pick<MediaViewerProps, 'onClose' | 'onDownload' | 'onQuickLook' | 'onOpenInBrowser' | 'onCopyImage'> {
+  readonly file: FileView
+  readonly items: ReadonlyArray<FileView>
   readonly meta: string
   readonly at: number
 }
 
 /** The name, the sender and time, and the actions. The same buttons for every item, so the bar never moves; one that does not apply to this item is dimmed. */
-function ViewerBar({ file, items, meta, at, onClose, onDownload, onOpenFile, onCopyImage }: ViewerBarProps) {
+function ViewerBar({ file, items, meta, at, onClose, onDownload, onQuickLook, onOpenInBrowser, onCopyImage }: ViewerBarProps) {
   const canDownload = file.download !== undefined
   const anyDownload = items.some((item) => item.download !== undefined)
   const anyImage = items.some((item) => item.kind === 'image')
+  const isPage = file.kind === 'html' && canDownload
+  const anyPage = items.some((item) => item.kind === 'html' && item.download !== undefined)
   return (
     <Surface kind="toolbar" padding="xs" sx={styles.barSurface}>
       <span {...stylex.props(styles.heading)}>
@@ -175,8 +191,11 @@ function ViewerBar({ file, items, meta, at, onClose, onDownload, onOpenFile, onC
       {anyDownload && onDownload !== undefined ? (
         <IconButton icon={DownloadSimple} label="Download" size={28} iconSize={16} dimmed={!canDownload} onClick={() => canDownload && onDownload(file)} />
       ) : null}
-      {anyDownload && onOpenFile !== undefined ? (
-        <IconButton icon={ArrowSquareOut} label="Open in default app" size={28} iconSize={16} dimmed={!canDownload} onClick={() => canDownload && onOpenFile(file)} />
+      {anyDownload && onQuickLook !== undefined ? (
+        <IconButton icon={Eye} label="Quick Look" size={28} iconSize={16} dimmed={!canDownload} onClick={() => canDownload && onQuickLook(file)} />
+      ) : null}
+      {anyPage && onOpenInBrowser !== undefined ? (
+        <IconButton icon={ArrowSquareOut} label="Open in browser" size={28} iconSize={16} dimmed={!isPage} onClick={() => isPage && onOpenInBrowser(file)} />
       ) : null}
       {anyImage && onCopyImage !== undefined ? (
         <IconButton icon={Copy} label="Copy image" size={28} iconSize={16} dimmed={file.kind !== 'image'} onClick={() => file.kind === 'image' && onCopyImage(file)} />
@@ -203,6 +222,13 @@ function Item({ file, position }: { readonly file: MediaFile; readonly position:
       ) : null}
     </div>
   )
+}
+
+/** A document's frame: a PDF and a CSV as wide as the stage, HTML and other text at reading width, audio a card of the bar's width. */
+function documentBox(file: FileView) {
+  if (file.kind === 'audio') return [styles.audioCard]
+  if (file.kind === 'pdf' || file.textKind === 'csv') return [styles.document, styles.paper]
+  return [styles.document, styles.paper, styles.reading]
 }
 
 const enter = stylex.keyframes({
@@ -274,6 +300,24 @@ const styles = stylex.create({
     animationName: enter,
     animationDuration: motion['--duration-fast'],
     animationTimingFunction: motion['--ease-out'],
+  },
+  // As large as the stage: a document's size is the topic's, never its own.
+  document: {
+    flexGrow: 1,
+    flexShrink: 1,
+    alignSelf: 'stretch',
+    minWidth: 0,
+  },
+  reading: {
+    maxWidth: layout['--reading-width'],
+  },
+  paper: {
+    backgroundColor: colors['--background'],
+  },
+  audioCard: {
+    width: layout['--viewer-bar-width'],
+    maxWidth: '100%',
+    backgroundColor: colors['--surface-default'],
   },
   // As large as the picture, or as the stage allows, at the picture's aspect ratio: known before any bytes arrive.
   fitted: (width: number, height: number) => ({

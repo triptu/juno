@@ -6,7 +6,7 @@ import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
 import { Avatar, focusRing, Icon, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { SharedFileLines, type FileBlock } from './AttachmentCard'
 import { Files } from './FileCard'
-import { mediaOf } from './MediaGrid'
+import { viewableOf } from './MediaGrid'
 import type { MediaViewing } from './MediaViewer'
 import type { MenuAnchor } from './header/HeaderControls'
 import { HoverToolbar } from './HoverToolbar'
@@ -90,10 +90,12 @@ export interface MessageProps {
   readonly onRetry?: (clientMsgId: string) => void
   /** Delete draft on a failed send, with its `clientMsgId`. */
   readonly onDiscard?: (clientMsgId: string) => void
-  /** An image or video was opened: the media viewer, at it, with the message's others. */
+  /** A file the viewer shows was opened: the media viewer, at it, with the message's others. */
   readonly onOpenMedia?: ((viewing: MediaViewing) => void) | undefined
   /** Download on a file card. */
   readonly onDownload?: ((file: FileView) => void) | undefined
+  /** Quick Look on a card of a file the viewer cannot show. */
+  readonly onQuickLook?: ((file: FileView) => void) | undefined
   /** How far a sending message's files have uploaded, 0 to 1. */
   readonly progress?: number | undefined
 }
@@ -218,6 +220,7 @@ export const Message = memo(function Message({
   onDiscard,
   onOpenMedia,
   onDownload,
+  onQuickLook,
   progress,
 }: MessageProps) {
   const name = sender?.name ?? message.senderId ?? 'Unknown'
@@ -233,7 +236,7 @@ export const Message = memo(function Message({
     onOpenMedia === undefined
       ? undefined
       : (file: FileView) => {
-          const items = mediaOf(message.files)
+          const items = viewableOf(message.files)
           onOpenMedia({ items, index: Math.max(0, items.findIndex((each) => each === file)), sender: name, at: message.at })
         }
   // A shared message's files are drawn in its card; the rest under the body.
@@ -248,7 +251,7 @@ export const Message = memo(function Message({
           const missing = blocks.filter((block) => !files.some((file) => file.id === block.id))
           return (
             <>
-              <Files files={files} onOpenMedia={openMedia} onDownload={onDownload} tabbable={tabbable} flush />
+              <Files files={files} onOpenMedia={openMedia} onDownload={onDownload} onQuickLook={onQuickLook} tabbable={tabbable} flush />
               {missing.length === 0 ? null : <SharedFileLines files={missing} />}
             </>
           )
@@ -338,6 +341,7 @@ export const Message = memo(function Message({
           files={own}
           onOpenMedia={openMedia}
           onDownload={onDownload}
+          onQuickLook={onQuickLook}
           tabbable={tabbable}
           progress={pending === 'sending' ? progress : undefined}
         />

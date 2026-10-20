@@ -11,7 +11,7 @@ import { scopeToChannel, showChannelMenu } from './placeMenus'
 import { messageLinkInfo, openMessageLink } from './slackLinks'
 import { attach } from './attachments'
 import { TopicComposer } from './TopicComposer'
-import { downloadMessageFile, useTopicFiles } from './topic/files'
+import { downloadMessageFile, quickLookMessageFile, useTopicFiles } from './topic/files'
 import { useTopicHeader } from './topic/header'
 import { useOlderPages } from './topic/older'
 import { listStatus, markRead, useDivider, useMarkRead, useTopicFetch, useWindowFocused, windowShown } from './topic/opening'
@@ -209,6 +209,7 @@ function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps)
       onLink={openMessageLink}
       linkInfo={messageLinkInfo}
       onDownload={downloadMessageFile}
+      onQuickLook={quickLookMessageFile}
       {...(files.uploadProgress === undefined ? {} : { uploadProgress: files.uploadProgress })}
       {...(readOnly ? {} : rowActions(list, messageActions, files.setViewing))}
     />

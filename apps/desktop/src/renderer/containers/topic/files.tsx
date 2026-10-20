@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useState } from 'react'
 import type { FileView } from '@juno/contract'
-import { copyImage, downloadFile, openFile, uploadProgressAtom } from '@juno/state'
+import { copyImage, downloadFile, openFile, quickLookFile, readFileText, uploadProgressAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import type { MediaViewing } from '@juno/views'
 import { chunk } from '../chunks'
@@ -21,8 +21,13 @@ export function downloadMessageFile(file: FileView): void {
   if (file.download !== undefined) void downloadFile({ url: file.download, name: file.name })
 }
 
-/** Open in the viewer: main saves the file into a temporary folder and opens it in the default app. */
-function openMessageFile(file: FileView): void {
+/** Quick Look on a card or in the viewer: main saves the file into a temporary folder and shows it in the macOS preview window. */
+export function quickLookMessageFile(file: FileView): void {
+  if (file.download !== undefined) void quickLookFile({ url: file.download, name: file.name })
+}
+
+/** Open in browser for an HTML file in the viewer: main saves it into a temporary folder and opens it in the default app. */
+function openInBrowser(file: FileView): void {
   if (file.download !== undefined) void openFile({ url: file.download, name: file.name })
 }
 
@@ -49,8 +54,10 @@ export function useTopicFiles() {
           now={viewing.now}
           onClose={() => setOpen(undefined)}
           onDownload={downloadMessageFile}
-          onOpenFile={openMessageFile}
+          onQuickLook={quickLookMessageFile}
+          onOpenInBrowser={openInBrowser}
           onCopyImage={copyMessageImage}
+          loadText={readFileText}
         />
       </Suspense>
     )

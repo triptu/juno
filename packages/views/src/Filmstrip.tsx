@@ -1,16 +1,18 @@
 /**
- * The media viewer's filmstrip (`MediaViewer`): every image and video of the
- * message along the bottom, in order, the current one marked.
+ * The media viewer's filmstrip (`MediaViewer`): every file of the message
+ * the viewer shows along the bottom, in order, the current one marked. A
+ * picture shows its thumbnail; any other file its kind's icon.
  */
 import * as stylex from '@stylexjs/stylex'
 import { Play } from '@phosphor-icons/react/dist/icons/Play'
 import { useEffect, useRef } from 'react'
 import { accent, colors, layout, motion, opacity, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import type { FileView } from '@juno/contract'
 import { Icon } from '@juno/ui'
-import type { MediaFile } from './MediaGrid'
+import { fileCardIcon } from './FileCard'
 
 interface FilmstripProps {
-  readonly items: ReadonlyArray<MediaFile>
+  readonly items: ReadonlyArray<FileView>
   readonly index: number
   readonly onShow: (index: number) => void
 }
@@ -22,7 +24,7 @@ export function Filmstrip({ items, index, onShow }: FilmstripProps) {
     strip.current?.children[index]?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }, [index])
   return (
-    <div ref={strip} role="group" aria-label="All pictures in this message" data-filmstrip="" {...stylex.props(styles.strip)}>
+    <div ref={strip} role="group" aria-label={items.every((item) => item.thumb !== undefined) ? 'All pictures in this message' : 'All files in this message'} data-filmstrip="" {...stylex.props(styles.strip)}>
       {items.map((item, at) => (
         <button
           key={at}
@@ -34,7 +36,13 @@ export function Filmstrip({ items, index, onShow }: FilmstripProps) {
           onClick={() => onShow(at)}
           {...stylex.props(styles.stripItem, at === index && styles.stripCurrent)}
         >
-          <img src={item.thumb.src} alt="" draggable={false} decoding="async" loading="lazy" {...stylex.props(styles.stripImage)} />
+          {item.thumb === undefined ? (
+            <span {...stylex.props(styles.stripIcon)}>
+              <Icon icon={fileCardIcon(item)} size={18} />
+            </span>
+          ) : (
+            <img src={item.thumb.src} alt="" draggable={false} decoding="async" loading="lazy" {...stylex.props(styles.stripImage)} />
+          )}
           {at === index ? <span {...stylex.props(styles.stripRing)} /> : null}
           {item.kind === 'video' ? (
             <span {...stylex.props(styles.stripPlay)}>
@@ -100,6 +108,14 @@ const styles = stylex.create({
     width: '100%',
     height: '100%',
     objectFit: 'cover',
+  },
+  stripIcon: {
+    position: 'absolute',
+    inset: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: colors['--foreground-subtle'],
   },
   stripPlay: {
     position: 'absolute',
