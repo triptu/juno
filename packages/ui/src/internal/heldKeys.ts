@@ -52,14 +52,16 @@ function onPaste(event: ClipboardEvent): void {
   held.push({ paste: copy })
 }
 
-/** Starts holding keys, or keeps the hold that is on. */
-export function holdKeys(): void {
+/** Starts holding keys, including a key whose handler started the hold after capture. */
+export function holdKeys(initial?: KeyboardEvent): void {
   clearTimeout(timer)
   timer = setTimeout(releaseKeys, HOLD_MS)
-  if (held !== undefined) return
-  held = []
-  window.addEventListener('keydown', onKeyDown, true)
-  window.addEventListener('paste', onPaste, true)
+  if (held === undefined) {
+    held = []
+    window.addEventListener('keydown', onKeyDown, true)
+    window.addEventListener('paste', onPaste, true)
+  }
+  if (initial !== undefined) onKeyDown(initial)
 }
 
 /**

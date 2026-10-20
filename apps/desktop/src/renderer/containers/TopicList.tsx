@@ -70,10 +70,10 @@ function emptyKind(ready: boolean, filter: TopicListFilter, syncing: boolean, em
 // a new function (performance.md 5.1).
 
 /** A key typed on a row goes to the composer, once the composer on screen is the selected topic's. */
-function typeOnSelectedRow(): void {
+function typeOnSelectedRow(event: KeyboardEvent): void {
   const tab = activeTab(registry.get(tabsAtom))
   const shown = tab === undefined ? undefined : tabTopic(tab)
-  typeOnRow(shown !== undefined && shown === registry.get(selectedTopicAtom))
+  typeOnRow(shown !== undefined && shown === registry.get(selectedTopicAtom), event)
 }
 
 /** Mouse down on a row (or Enter): opens the topic in the current tab, or a new one with ⌘. */

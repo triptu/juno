@@ -49,10 +49,10 @@ export interface TopicListProps {
   readonly onTouch?: () => void
   /**
    * A character was typed on a focused row. The owner moves focus to where
-   * the text goes (the open topic's composer) in the same keydown, so the
-   * key lands there.
+   * the text goes (the open topic's composer) in the same keydown, or holds
+   * this event with later keys until the field is ready.
    */
-  readonly onTypeOnRow?: () => void
+  readonly onTypeOnRow?: (event: globalThis.KeyboardEvent) => void
 }
 
 const labels: Record<TopicListSectionId, string> = { pinned: 'Pinned', recent: 'Recent' }
@@ -104,7 +104,7 @@ export function TopicList({
       role="group"
       aria-label="Topics"
       scrollbar="hover"
-      onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => (typedOnRow(event) ? onTypeOnRow?.() : moveFocus(event))}
+      onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => (typedOnRow(event) ? onTypeOnRow?.(event.nativeEvent) : moveFocus(event))}
       onFocus={onFocus}
       onBlur={onBlur}
       onPointerEnter={(event: PointerEvent<HTMLElement>) => pointerMoved(event) && engage('pointer', true)}
