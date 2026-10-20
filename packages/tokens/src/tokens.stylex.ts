@@ -105,6 +105,11 @@ export const colors = stylex.defineVars({
   // Status. Warning and info are only ever mixed into tints, never used as
   // text on their own (2.1:1 and 3.9:1).
   '--danger': '#C41E3A',
+  // A control in a state the user must not miss, such as a muted microphone:
+  // filled with --danger, its glyph in --background (5.6:1 light, 6.6:1 dark).
+  // Hover mixes in the text colour, so it goes darker on paper and lighter
+  // on ink. Press is the press scale alone, as on the other island controls.
+  '--danger-fill-hover': 'color-mix(in oklch, var(--danger) 88%, var(--foreground-default))',
   '--success': '#00674F',
   // The active presence dot: a clear green, 3:1 against the menu it sits in.
   // --success is too deep for a 6px dot (it reads grey, 1.8:1 in dark).

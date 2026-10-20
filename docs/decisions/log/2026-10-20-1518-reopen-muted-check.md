@@ -1,0 +1,1 @@
+- 10-20 15:18 · reopen-muted-check · Reopen is the filled check in `--icon-tint-neutral` (the muted grey) in the topic header, so its disc does not outweigh the stroked icons beside it; the palette's Reopen uses the same filled check in place of the arrow.

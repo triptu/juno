@@ -1,0 +1,1 @@
+- 10-20 15:19 · huddle-tab-join-pill · The huddle tab's Thread is an icon alone (`chats-circle`, tooltip and name "Thread"), as Resolve is. When you are not in the call, Join huddle or Switch to this huddle is one 32px pill with the green filled headphones inside the controls' 40px island, in place of a large primary button.

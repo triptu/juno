@@ -55,12 +55,13 @@ export function HuddleControls({
     <>
       <span {...stylex.props(styles.group)}>
         <Fills shape={shape}>
+          {/* Whenever nobody can hear you, Mute is red with the slashed microphone, so muted reads at a glance. */}
           {microphone === 'blocked' ? (
-            <IconButton icon={MicrophoneSlash} label={microphoneCopy.blocked.tooltip} size={size} iconSize={iconSize} radius={radius} variant="island" onClick={onOpenMicSettings} />
+            <IconButton icon={MicrophoneSlash} label={microphoneCopy.blocked.tooltip} size={size} iconSize={iconSize} radius={radius} variant="island" alert onClick={onOpenMicSettings} />
           ) : microphone !== undefined ? (
-            <IconButton icon={MicrophoneSlash} label={microphoneCopy[microphone].tooltip} size={size} iconSize={iconSize} radius={radius} variant="island" dimmed />
+            <IconButton icon={MicrophoneSlash} label={microphoneCopy[microphone].tooltip} size={size} iconSize={iconSize} radius={radius} variant="island" alert dimmed />
           ) : (
-            <IconButton icon={muted ? MicrophoneSlash : Microphone} label="Mute" shortcut={muteShortcut} size={size} iconSize={iconSize} radius={radius} variant="island" pressed={muted} onClick={onMute} />
+            <IconButton icon={muted ? MicrophoneSlash : Microphone} label="Mute" shortcut={muteShortcut} size={size} iconSize={iconSize} radius={radius} variant="island" pressed={muted} alert={muted} onClick={onMute} />
           )}
           {canShare ? (
             shareFull && !sharing ? (
@@ -117,16 +118,18 @@ interface TextControlProps {
   /** The tab's control island draws it one size up, as its icon buttons. Default 28. */
   readonly size?: 28 | 32
   readonly icon: PhosphorIcon
+  /** The green filled headphones of Join, as the header's Join has them: a huddle runs here. */
+  readonly live?: boolean
   readonly label: string
   readonly onClick: () => void
 }
 
-/** A text button with the island controls' fills: Leave, and the tab header's Thread. */
-export function TextControl({ shape, size = 28, icon, label, onClick }: TextControlProps) {
+/** A text button with the island controls' fills: Leave, and the tab's Join huddle. */
+export function TextControl({ shape, size = 28, icon, live = false, label, onClick }: TextControlProps) {
   return (
     <button type="button" onClick={onClick} {...stylex.props(islandText.base, focusRing.outside, shape === 'bar' ? styles.textBar : styles.textIsland, size === 32 && styles.text32)}>
-      <span {...stylex.props(islandText.icon)}>
-        <Icon icon={icon} size={size === 32 ? 16 : 14} />
+      <span {...stylex.props(islandText.icon, live && styles.live)}>
+        <Icon icon={icon} size={size === 32 ? 16 : 14} {...(live ? { weight: 'fill' as const } : {})} />
       </span>
       {label}
     </button>
@@ -149,6 +152,7 @@ const styles = stylex.create({
     '--secondary-hover': colors['--huddle-bar-pressed'],
     '--secondary-active': colors['--huddle-bar-pressed-hover'],
   },
+  live: { color: colors['--huddle-live'] },
   textBar: { borderRadius: radii['--radius-lg'] },
   textIsland: { borderRadius: radii['--radius-pill'] },
   // One size up from 28: the height, the inset and the type step together.
