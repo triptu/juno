@@ -57,6 +57,17 @@ test('a ts block shows coloured tokens and no tag line, and a prose block stays 
     number: ['3'],
     comment: ['//', 'at', 'most'],
   })
+  // A keyword shows in the keyword colour, not the code's own: this fails if the ::highlight rules go.
+  const colours = await message.locator('[data-test-code="tagged"] code').evaluate((code) => {
+    const probe = document.createElement('span')
+    probe.style.color = 'var(--syntax-keyword)'
+    code.append(probe)
+    const keyword = getComputedStyle(probe).color
+    probe.remove()
+    return { highlight: getComputedStyle(code, '::highlight(syntax-keyword)').color, keyword, text: getComputedStyle(code).color }
+  })
+  expect(colours.highlight).toBe(colours.keyword)
+  expect(colours.highlight).not.toBe(colours.text)
   // The prose block keeps the text colour throughout.
   expect(await juno.win.evaluate(colouredRuns, '[data-test-code="prose"]')).toEqual({})
   await expect(message.locator('[data-code-language]')).toHaveCount(1)
