@@ -225,6 +225,10 @@ export default defineConfig({
       preloadFonts([/figtree-latin-wght-normal-[^/]*\.woff2$/, /instrument-serif-latin-400-normal-[^/]*\.woff2$/]),
       stylex.vite({
         useCSSLayers: true,
+        // The plugin writes its sheet after Vite has minified the CSS, so it
+        // minifies the sheet itself: about 21 KB of the first stylesheet was
+        // line breaks and indents (10-21).
+        lightningcssOptions: { minify: minify !== false },
         unstable_moduleResolution: { type: 'commonJS', rootDir: repoRoot },
       }),
       react({ babel: { plugins: [reactCompiler] } }),
