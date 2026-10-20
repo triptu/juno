@@ -1482,7 +1482,19 @@ require a full Mac run. Keep timing gates on a quiet Mac and inspect its load.
 Results live in the main checkout's shared `.juno-status`: the latest
 `verify-main.json` and `.md`, permanent per-commit JSON under
 `verify-main/commits/<commit>/<run>.json`, and logs under `verify-main/<run>/`.
-The summary includes tests that passed on retry. A failed suite exits 1. The command refreshes the coverage
-map in the invoking checkout; commit that map after a run on main.
+The summary includes tests that passed on retry. A failed suite or coordinator
+exits 1, including report collection failures after successful steps. The command
+refreshes the coverage map in the invoking checkout; commit that map after a run
+on main.
 
-On 2026-10-18, one full run at `6c15fbb4` before and one at `d0ecf4ab` after this lane/cache change used separate 8x16 machines. Wall time was 1,418 s before and 1,453 s after. The old unit-then-spec lane took 222 + 281 = 503 s; the new parallel unit and spec lanes took 378 and 364 s, so both finished by 378 s. Both full runs failed for the same unrelated reasons: the gallery's `RemoveCard/remove/click-then-working` shift state consumed about 13 minutes and its part timed out at 15 minutes (gallery 938 s before, 950 s after), and `updates.spec.ts` expected version `0.1.1`–`0.1.6` while the app was `0.1.7` (desktop 413 s before, 427 s after). The gallery timeout dominated total time, so the 125 s shorter unit/spec path did not reduce this pair of full runs. The gallery hang was fixed on main after these runs.
+On 2026-10-20, the successful baseline at `f5d3854e4` took 2,079.332 s
+wall time. One split-job candidate at `4260ce84e`, after merging main at
+`67cffc883`, took 1,330.647 s, including a 748 s allocator wait for specs.
+Step times were unit 192 → 265 s, Quint 347 → 418 s, conformance 15 → 19 s,
+gallery 1,139 → 1,055 s and desktop 933 → 1,317 s. Gallery passed 312 tests
+against 297 before; desktop passed 457 against 418. Both had no flakes or
+failures. Four gallery workers peaked at 3.90 GiB under the existing 6 GiB
+cap, so that setting stays. This is one observed pair across intervening app
+and flake fixes, not a controlled worker benchmark. Desktop now dominates.
+[Full-run measurements](test-speed-5.md) record each job's wall time, queues,
+guard controls, coverage merge and the unimplemented selective-state estimate.
