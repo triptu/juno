@@ -295,13 +295,13 @@ function LoadedComposer({
     <Composer
       value={text}
       {...mentions}
-      onFieldKey={(event) => markup.onKey(event) || mentions.onFieldKey(event)}
+      onFieldKey={(event) => markup.onKey(event, marks) || mentions.onFieldKey(event)}
       marks={marks}
       {...markup.format(text, marks)}
       onPasteText={links.onPasteText}
       onFieldClick={links.onFieldClick}
       {...(links.popover === undefined ? {} : { popover: links.popover })}
-      onSend={send}
+      onSend={() => markup.send(send, field.current)}
       placeholder={placeholder}
       inputRef={field}
       sending={waiting}

@@ -1,8 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
-import { useCallback, useEffect, useLayoutEffect, useRef, type ReactNode, type Ref, type RefObject, type TextareaHTMLAttributes, type UIEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, type Ref, type RefObject, type TextareaHTMLAttributes, type UIEvent } from 'react'
 import { accent, colors, layout, radii, spacing, text } from '@juno/tokens/tokens.stylex'
 import { chunk } from './chunks'
-import { layerStyles, markLook } from './internal/textareaLayer'
 import { variants as typeVariants } from './internal/type'
 import type { HueName } from './internal/hue'
 
@@ -79,19 +78,21 @@ export interface TextareaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaE
  * where the field's caret and selection expect it. The layer follows the
  * field's scroll.
  */
-// The layer's drawing of `format`, loaded when idle once a field has it.
+// Line and chip drawing loads as soon as a layered field mounts.
 let lines: typeof import('./TextareaLines') | undefined
 const lineDrawing = chunk(() => import('./TextareaLines').then((module) => (lines = module)))
 
+export const prepareTextareaFormatting = () => lineDrawing.load()
+
 export function Textarea({ variant = 'inline', maxHeight = 'composer', label, rows, marks, format, anchorAt, onScroll, ref, ...rest }: TextareaProps) {
+  'use no memo' // The value changes on every keystroke; keep the wrapper small and drawing in its chunk.
   const layered = marks !== undefined || format !== undefined
   const formatted = format !== undefined
   const linesReady = lineDrawing.useReady()
   useEffect(() => {
-    if (!formatted) return
-    const idle = requestIdleCallback(() => void lineDrawing.load(), { timeout: 5_000 })
-    return () => cancelIdleCallback(idle)
-  }, [formatted])
+    if (!layered) return
+    void lineDrawing.load()
+  }, [layered])
   const layer = useRef<HTMLDivElement>(null)
   const own = useRef<HTMLTextAreaElement | null>(null)
   // Text the field opens with (a saved draft, a message to edit) takes typing at its end, not before it.
@@ -126,8 +127,8 @@ export function Textarea({ variant = 'inline', maxHeight = 'composer', label, ro
   if (!layered) return field
   return (
     <div {...stylex.props(styles.marked)}>
-      <div ref={layer} aria-hidden data-textarea-layer="" {...stylex.props(variants.inline, styles.layer)}>
-        {linesReady && lines !== undefined && formatted ? lines.drawnLines(rest.value ?? '', marks ?? [], format, anchorAt) : drawn(rest.value ?? '', marks ?? [], anchorAt)}
+      <div ref={layer} dir={rest.dir} aria-hidden data-textarea-layer="" {...stylex.props(variants.inline, styles.layer)}>
+        {linesReady && lines !== undefined ? (formatted ? lines.drawnLines(rest.value ?? '', marks ?? [], format, anchorAt) : lines.drawn(rest.value ?? '', marks ?? [], anchorAt)) : (rest.value ?? '') + (rest.value?.endsWith('\n') ? '\u200b' : '')}
       </div>
       {field}
     </div>
@@ -139,41 +140,6 @@ function setRef(ref: Ref<HTMLTextAreaElement> | undefined, node: HTMLTextAreaEle
   else if (ref !== undefined && ref !== null) (ref as RefObject<HTMLTextAreaElement | null>).current = node
 }
 
-/** The text as runs: plain text, chips, and the anchor character. A trailing newline keeps its empty line. */
-function drawn(value: string, marks: ReadonlyArray<TextareaMark>, anchorAt: number | undefined): ReactNode[] {
-  const out: ReactNode[] = []
-  let at = 0
-  const plain = (end: number) => {
-    if (end <= at) return
-    if (anchorAt !== undefined && anchorAt >= at && anchorAt < end) {
-      if (anchorAt > at) out.push(value.slice(at, anchorAt))
-      out.push(
-        <span key="anchor" {...stylex.props(layerStyles.anchor)}>
-          {value[anchorAt]}
-        </span>,
-      )
-      if (anchorAt + 1 < end) out.push(value.slice(anchorAt + 1, end))
-    } else {
-      out.push(value.slice(at, end))
-    }
-    at = end
-  }
-  for (const mark of marks) {
-    if (mark.start < at || mark.end > value.length) continue
-    plain(mark.start)
-    // The anchor inside a mark is the mark: the link editor lines up under linked words.
-    const anchored = anchorAt !== undefined && anchorAt >= mark.start && anchorAt < mark.end
-    out.push(
-      <span key={mark.start} data-mark={mark.look} {...stylex.props(markLook(mark), anchored && layerStyles.anchor)}>
-        {value.slice(mark.start, mark.end)}
-      </span>,
-    )
-    at = mark.end
-  }
-  plain(value.length)
-  if (value.endsWith('\n')) out.push('\u200b')
-  return out
-}
 
 const styles = stylex.create({
   base: {

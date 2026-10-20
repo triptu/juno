@@ -12,7 +12,7 @@ export function EditField({ value, onChange, onSave, onCancel }: Pick<InlineEdit
     <InlineEdit
       value={value}
       onChange={emoji.onChange}
-      onSave={onSave}
+      onSave={() => markup.send(onSave, field.current)}
       onCancel={onCancel}
       fieldRef={field}
       onFieldKey={(event) => markup.onKey(event) || emoji.onFieldKey(event)}

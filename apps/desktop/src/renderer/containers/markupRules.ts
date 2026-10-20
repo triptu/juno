@@ -1,5 +1,6 @@
 // Slack's markup rules and keys, in a chunk of their own (`composerMarkup.ts`).
 import { toggleMarkup, type MarkupStyle } from '@juno/contract'
+export { prepareTextareaFormatting } from '@juno/views'
 import { editField } from './suggestionKeys'
 
 export { markupLayout } from '@juno/contract'
@@ -13,6 +14,10 @@ export interface Press {
   readonly ctrlKey: boolean
   readonly altKey: boolean
   readonly field: HTMLTextAreaElement
+  readonly value: string
+  readonly start: number
+  readonly end: number
+  readonly atomic: ReadonlyArray<{ readonly start: number; readonly end: number }>
 }
 
 /** The app's shortcuts take ⌘ on the Mac and Ctrl elsewhere, as the menu's `CommandOrControl` does (the test machines run Linux). */
@@ -34,7 +39,8 @@ export function formatKey(press: Press): boolean {
   const style = styleOf(press)
   if (style === undefined) return false
   const { field } = press
-  const edit = toggleMarkup(field.value, { start: field.selectionStart, end: field.selectionEnd }, style)
+  if (document.activeElement !== field || field.value !== press.value) return true
+  const edit = toggleMarkup(press.value, { start: press.start, end: press.end }, style, press.atomic)
   if (edit === undefined) return true
   editField(field, edit.start, edit.end, edit.insert)
   field.setSelectionRange(edit.selection.start, edit.selection.end)
