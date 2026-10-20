@@ -1,0 +1,1 @@
+- 10-20 11:12 · sidebar-first-key · Hold the character that starts sidebar type-ahead along with later keys, so opening a topic and typing before its composer mounts keeps the whole draft.

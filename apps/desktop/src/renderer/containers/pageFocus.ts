@@ -79,13 +79,13 @@ export function pageComposer(): HTMLElement | undefined {
  * open topic's: focus moves there and the key lands in it. Otherwise the
  * key and those after it are held until the topic's composer mounts.
  */
-export function typeOnRow(ready: boolean): void {
+export function typeOnRow(ready: boolean, event: KeyboardEvent): void {
   const composer = ready ? pageComposer() : undefined
   if (composer !== undefined) {
     composer.focus({ preventScroll: true })
     return
   }
-  holdKeys()
+  holdKeys(event)
   typedAheadUntil = performance.now() + TYPE_AHEAD_MS
 }
 
