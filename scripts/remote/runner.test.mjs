@@ -89,6 +89,8 @@ test('split plans allow queued jobs to wait and keep an explicit wait override',
   for (const job of jobs) assert.ok(job.args.includes('wait=3600'))
   assert.equal(f.run(args, { JUNO_RUNNER_WAIT: '120' }).status, 0)
   for (const job of f.calls().filter((call) => call.sub === 'run').slice(2)) assert.ok(job.args.includes('wait=120'))
+  assert.equal(f.run(['test:plan', 'test:gallery']).status, 0)
+  assert.ok(f.calls().filter((call) => call.sub === 'run').at(-1).args.includes('wait=60'))
 })
 
 test('--local runs root commands sequentially without requiring tstack or SSH', (t) => {
@@ -107,6 +109,7 @@ test('workers use allocated threads and preserve explicit worker overrides', () 
   }
   assert.equal(run('1'), '1 1 1')
   assert.equal(run('2'), '2 1 1')
+  assert.equal(run('4'), '2 4 2')
   assert.equal(run('6'), '3 4 3')
   assert.equal(run('6', { JUNO_VITEST_WORKERS: '1', GALLERY_WORKERS: '2', SPECS_JOBS: '1' }), '1 2 1')
 })

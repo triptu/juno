@@ -23,6 +23,8 @@ if [ -n "${JUNO_RUNNER_JOB_CORES:-}" ]; then
   fi
   gallery_workers=$(at_least $(( cores * 3 / 4 )) 1)
   if [ "$cores" -eq 3 ]; then gallery_workers=3; fi
+  # Four threads on the usual two physical cores overlap the frame waits.
+  if [ "$cores" -eq 4 ]; then gallery_workers=4; fi
 fi
 # The standalone gallery spends part of each touch waiting for animation frames.
 if [ "$cores" -eq 3 ] && [ "$1" = test:gallery ]; then gallery_workers=4; fi
