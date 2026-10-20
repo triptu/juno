@@ -22,7 +22,7 @@ export function HuddleRingSection({ huddleRing, onHuddleRingChange }: HuddleRing
           label="Ring for huddles"
           checked={huddleRing}
           onChange={(event) => onHuddleRingChange(event.currentTarget.checked)}
-          description="A soft ring for up to 30 seconds when someone starts a huddle where you are. Off, the card and the notification still show. Juno can't tell when Focus is on, so the ring plays through it."
+          description="A soft ring for up to 30 seconds when someone starts a huddle. It plays even during Focus."
         />
       </Surface>
     </Section>

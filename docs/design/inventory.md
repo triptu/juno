@@ -638,7 +638,7 @@ The Backup folder path is measured in its rendered font and cut in the middle to
 
 **Huddles** (no sub)
 
-- One group card, padding `12 14` (as Slack on your phone): the switch **Ring for huddles** (a `Checkbox` with `role="switch"`, on by default) with the description "A soft ring for up to 30 seconds when someone starts a huddle where you are. Off, the card and the notification still show. Juno can't tell when Focus is on, so the ring plays through it." It saves at once (`notifications.setHuddleRing`, stored with the notification settings) and applies to the next incoming huddle (SPEC 20, "Incoming huddles"). The section is `HuddleRingSection` in `@juno/views`; fixtures `HuddleRingSection` › `on` and `off`.
+- One group card, padding `12 14` (as Slack on your phone): the switch **Ring for huddles** (a `Checkbox` with `role="switch"`, on by default) with the description "A soft ring for up to 30 seconds when someone starts a huddle. It plays even during Focus." It saves at once (`notifications.setHuddleRing`, stored with the notification settings) and applies to the next incoming huddle (SPEC 20, "Incoming huddles"). The section is `HuddleRingSection` in `@juno/views`; fixtures `HuddleRingSection` › `on` and `off`.
 
 **Today** (no sub)
 
