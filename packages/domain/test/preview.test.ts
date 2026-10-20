@@ -14,6 +14,8 @@ describe('preview text', () => {
 
   it('labels a message that is only files by what they are', () => {
     expect(messagePreviewText({ text: '', files: [image('F1')] })).toBe('Image')
+    // A fresh upload Slack has not typed yet: its name says what it is.
+    expect(messagePreviewText({ text: '', files: [{ id: 'F0NEW', name: 'shot.png', mimetype: '', filetype: '' }] })).toBe('Image')
     expect(messagePreviewText({ text: '', files: [image('F1'), image('F2')] })).toBe('2 images')
     expect(messagePreviewText({ text: '', files: [video] })).toBe('Video')
     expect(messagePreviewText({ text: '', files: [video, { ...video, id: 'F0VID2' }] })).toBe('2 videos')
