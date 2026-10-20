@@ -2,7 +2,7 @@ import type { RichTextElement } from '@juno/slack-schema'
 import { SELF_ID, TEAM } from '../fixtures.ts'
 import { NEVER_READ, type Workspace } from '../state.ts'
 
-export const CODE_BLOCKS_CHANNEL = 'C0PERFCODE'
+const CODE_BLOCKS_CHANNEL = 'C0PERFCODE'
 
 /** How many messages, each with one code block, the seed posts. */
 export const CODE_BLOCK_COUNT = 50
