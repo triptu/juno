@@ -1,26 +1,23 @@
 import * as stylex from '@stylexjs/stylex'
-import { createContext, useContext, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
+import { createContext, useContext, type ReactNode } from 'react'
 import { colors, radii, sizes } from '@juno/tokens/tokens.stylex'
-import { focusRing, type ActivateEvent } from '@juno/ui'
+import type { BodyInline } from '@juno/contract'
+import { Chip, focusRing, type HueName } from '@juno/ui'
 
 /**
- * What a click on a person in a message does: the list's `onPerson`, given
- * once for all its rows, so a chip deep in a body needs no prop. Without it
- * people open nothing and look as plain text does.
+ * What a person in a message opens: `MessageList`'s `onPerson`. Elsewhere,
+ * as in the Forward sheet, people look as plain text does.
  */
-export const PersonLinks = createContext<((id: string, event: ActivateEvent) => void) | undefined>(undefined)
+export const PersonLinks = createContext<((id: string, behind: boolean) => void) | undefined>(undefined)
 
-/** A press that moves this far before it lets go selects text instead of opening the person, px. */
-const DRAG = 4
-
-/** Where the last press on a person went down, to tell a click from a short drag that selects. */
-let pressedAt = { x: 0, y: 0 }
+/** Whether the last press on a message list moved far enough to be a drag selection (`MessageList` tracks it). */
+export const press = { dragged: false }
 
 interface PersonLinkProps {
-  /** The person; undefined when Juno has nothing to open for them (an app with no DM), which draws `children` alone. */
+  /** The person; undefined when Juno has nothing to open for them (an app with no DM). */
   readonly id: string | undefined
-  /** "Maya Chen", or "yourself": the tooltip says "Message Maya Chen". */
-  readonly label: string
+  /** "Maya Chen", or "yourself": the tooltip says "Message Maya Chen". None where the person has a tooltip of their own (@you). */
+  readonly label?: string | undefined
   /** The sender's name or avatar, or a chip. The avatar, which the name already covers, is no Tab stop. */
   readonly part: 'name' | 'avatar' | 'chip'
   /** The row's links' tabindex: a Tab stop only on the row Tab reaches. */
@@ -30,42 +27,47 @@ interface PersonLinkProps {
 
 /**
  * A person in a message that opens your DM with them (SPEC 7, "People"): a
- * sender's name or avatar, or an @person chip. Unlike a row it opens on
- * click, not on mouse down, so a drag that starts on it still selects text;
- * a press that moved before it let go opens nothing. Enter and Space open it
- * from the keyboard, ⌘ with either for a background tab.
+ * sender's name or avatar, or an @person chip. On one click, not at the end
+ * of a drag (also one that came back) or on a double-click; on Enter or
+ * Space from the keyboard; ⌘ opens it behind the current tab.
  */
 export function PersonLink({ id, label, part, tabIndex = -1, children }: PersonLinkProps) {
   'use no memo'
-  const onPerson = useContext(PersonLinks)
-  if (onPerson === undefined || id === undefined) return children
-  const open = (event: MouseEvent | KeyboardEvent, source: ActivateEvent['source']) => {
-    event.stopPropagation()
-    onPerson(id, { metaKey: event.metaKey, shiftKey: event.shiftKey, altKey: event.altKey, source })
-  }
+  const open = useContext(PersonLinks)
+  if (open === undefined || id === undefined) return children
   return (
     <span
-      role="button"
-      tabIndex={part === 'avatar' ? undefined : tabIndex}
-      aria-hidden={part === 'avatar' || undefined}
-      data-tooltip={`Message ${label}`}
+      // The name is the button for assistive tech and the keyboard; the avatar is the same target for the pointer only.
+      {...(part === 'avatar' ? {} : { role: 'button', tabIndex })}
+      data-tooltip={label && `Message ${label}`}
       data-opens-person=""
-      onPointerDown={(event: PointerEvent) => {
-        pressedAt = { x: event.clientX, y: event.clientY }
-      }}
-      onClick={(event) => {
-        if (event.detail === 0) open(event, 'keyboard')
-        else if (Math.hypot(event.clientX - pressedAt.x, event.clientY - pressedAt.y) < DRAG) open(event, 'pointer')
-      }}
+      onClick={(event) => event.detail === 1 && !press.dragged && open(id, event.metaKey)}
       onKeyDown={(event) => {
-        if ((event.key !== 'Enter' && event.key !== ' ') || event.target !== event.currentTarget) return
+        if (event.key !== 'Enter' && event.key !== ' ') return
         event.preventDefault()
-        if (!event.repeat) open(event, 'keyboard')
+        if (!event.repeat) open(id, event.metaKey)
       }}
       {...stylex.props(styles[part], part !== 'avatar' && styles.underline, part !== 'avatar' && focusRing.outside)}
     >
       {children}
     </span>
+  )
+}
+
+/**
+ * An @person chip, which opens your DM with them, yours for "@you", as a
+ * click on a sender does. Its text sits in <bdi> so "@Name" keeps its own
+ * direction inside a right-to-left paragraph.
+ */
+export function PersonChip({ inline, hue, tabIndex }: { readonly inline: Extract<BodyInline, { kind: 'user' }>; readonly hue: HueName; readonly tabIndex: 0 | -1 }) {
+  'use no memo'
+  const own = inline.isMe
+  return (
+    <PersonLink id={inline.unreachable === true ? undefined : inline.id} label={own ? undefined : inline.name} part="chip" tabIndex={tabIndex}>
+      <Chip variant={own ? 'mention' : 'person'} size="inline" {...(own ? { title: 'Mentions you' } : { hue, 'data-person': inline.id, 'data-person-name': inline.name })}>
+        <bdi>@{inline.name}</bdi>
+      </Chip>
+    </PersonLink>
   )
 }
 

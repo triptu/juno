@@ -79,7 +79,8 @@ function toPeek(key: string, at: number): Peeking | undefined {
  * topic shows in a popover beside the sidebar; held over a Main message
  * that has a thread, the thread shows below (or above) the message. Moving
  * to another row or threaded message switches it; releasing the key,
- * moving off them, another key, a click or leaving the window closes it.
+ * moving off them, another key, a click or leaving the window closes it;
+ * a press on a person in a thread peek leaves it open for their click.
  * A thread peek stays open while the pointer is on it. The wheel over the
  * rows (or the Main) scrolls the peek, not what is under the pointer.
  *
@@ -176,11 +177,13 @@ export const Peek = memo(function Peek() {
       scroller.scrollBy({ top: event.deltaY, behavior: 'instant' })
     }
     window.addEventListener('pointerover', onPointerOver, true)
-    window.addEventListener('pointerdown', close, true)
+    // A press on a person in a thread peek opens their DM on its click (SPEC 7, "People"), so it leaves the peek open.
+    const onPress = (event: PointerEvent) => (event.target instanceof Element && event.target.closest(`${PEEK} [data-opens-person]`)) || close()
+    window.addEventListener('pointerdown', onPress, true)
     window.addEventListener('wheel', onWheel, { capture: true, passive: false })
     return () => {
       window.removeEventListener('pointerover', onPointerOver, true)
-      window.removeEventListener('pointerdown', close, true)
+      window.removeEventListener('pointerdown', onPress, true)
       window.removeEventListener('wheel', onWheel, true)
     }
   }, [open])

@@ -8,7 +8,7 @@ import { Message, placeToolbar, type MessageActions, type MessageProps } from '.
 import type { LinkInfo } from './MessageLink'
 import { inField } from './fieldMenu'
 import { NewDivider } from './NewDivider'
-import { PersonLinks } from './personLink'
+import { PersonLinks, press } from './personLink'
 import { messageTime } from './time'
 
 /** One row as the container holds it: the message and its sender from the window's refs. */
@@ -85,10 +85,10 @@ export interface MessageListProps {
   readonly onChannel?: (id: string) => void
   /**
    * A click, or Enter, on a sender's name or avatar or an @person chip: your
-   * DM with them (SPEC 7, "Messages"), with ⌘ in a background tab. Created
+   * DM with them (SPEC 7, "People"), `behind` the current tab with ⌘. Created
    * once. Without it people open nothing. Right-click is still `onPersonMenu`.
    */
-  readonly onPerson?: (id: string, event: ActivateEvent) => void
+  readonly onPerson?: (id: string, behind: boolean) => void
   readonly onLink?: (url: string, event: ActivateEvent) => void
   /** Which links open inside Juno, and where they go (`MessageBody`). */
   readonly linkInfo?: LinkInfo
@@ -130,6 +130,7 @@ const DRAG_SELECTION = 4
  * focus and the keyboard are untouched: a focused row still shows its toolbar.
  */
 function watchSelectionDrag(event: PointerEvent<HTMLDivElement>): void {
+  press.dragged = false
   if (event.button !== 0 || event.pointerType !== 'mouse' || !(event.target instanceof Element) || event.target.closest('button, a, input, textarea, [role="toolbar"]') !== null) return
   const list = event.currentTarget.closest<HTMLElement>('[data-scroll-area]')
   if (list === null) return
@@ -137,7 +138,7 @@ function watchSelectionDrag(event: PointerEvent<HTMLDivElement>): void {
   let dragging = false
   const move = (next: globalThis.PointerEvent) => {
     if (dragging || Math.hypot(next.clientX - from.x, next.clientY - from.y) < DRAG_SELECTION) return
-    dragging = true
+    dragging = press.dragged = true
     list.toggleAttribute('data-selecting', true)
     list.style.setProperty('--row-hover-toolbar', 'none')
   }
@@ -275,7 +276,7 @@ export function MessageList({
         aria-label="Messages"
         aria-busy={status === 'loading' || status === 'pending'}
         onKeyDown={(event) => onKeyDown(event, onRowKey)}
-        onPointerDown={actions === undefined ? undefined : watchSelectionDrag}
+        onPointerDown={watchSelectionDrag}
         onPointerOver={
           onPrefetchThread === undefined
             ? undefined

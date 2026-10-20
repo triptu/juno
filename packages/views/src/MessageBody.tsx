@@ -1,11 +1,11 @@
 import * as stylex from '@stylexjs/stylex'
-import { use, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import type { BodyBlock, BodyInline, MessageBody as MessageBodyModel } from '@juno/contract'
 import { colors, radii, spacing, text, weights, sizes } from '@juno/tokens/tokens.stylex'
 import { Chip, CodeBlock, Divider, focusRing, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { AttachmentCard, AttachmentFields, AttachmentImage, SharedFileLines, SharedPlace, type FileBlock } from './AttachmentCard'
 import { MessageLink as Link, type LinkInfo } from './MessageLink'
-import { PersonLink, PersonLinks } from './personLink'
+import { PersonChip } from './personLink'
 import { slackDate } from './time'
 
 export interface MessageBodyProps {
@@ -191,24 +191,8 @@ function Inline({ inline, now, hueOf, onChannel, onLink, linkInfo, tabIndex, qui
       return styled(inline.text, inline.style)
     case 'link':
       return <Link url={inline.url} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} quiet={quiet}>{styled(inline.text, inline.style)}</Link>
-    // Chip text sits in <bdi> so "@Name" keeps its own direction inside a
-    // right-to-left paragraph (otherwise the "@" jumps to the other end).
-    // A chip opens your DM with them, as a click on a sender does (`PersonLink`).
     case 'user':
-      return (
-        <PersonLink id={inline.unreachable === true ? undefined : inline.id} label={inline.isMe ? 'yourself' : inline.name} part="chip" tabIndex={tabIndex}>
-          {inline.isMe ? (
-            // Where it opens your self-DM, its tooltip says so instead.
-            <Chip variant="mention" size="inline" {...(use(PersonLinks) === undefined ? { title: 'Mentions you' } : {})}>
-              <bdi>@{inline.name}</bdi>
-            </Chip>
-          ) : (
-            <Chip variant="person" size="inline" hue={hueOf(inline.id)} data-person={inline.id} data-person-name={inline.name}>
-              <bdi>@{inline.name}</bdi>
-            </Chip>
-          )}
-        </PersonLink>
-      )
+      return <PersonChip inline={inline} hue={hueOf(inline.id)} tabIndex={tabIndex} />
     case 'channel':
       return (
         <button
