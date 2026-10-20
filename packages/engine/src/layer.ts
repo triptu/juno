@@ -27,6 +27,8 @@ import { AutomatedJob } from './home/automated'
 import { HomeJob } from './home/job'
 import { SearchHandlers } from './search/handlers'
 import { PrefsHandlers } from './prefs/handlers'
+import { PresenceHandlers } from './presence/handlers'
+import { OthersPresence } from './presence/service'
 import { MessagesHandlers } from './messages/handlers'
 import { MentionsHandlers } from './mentions/handlers'
 import { NewChatHandlers } from './newchat/handlers'
@@ -102,7 +104,7 @@ export const Services = Layer.mergeAll(EnginePhases, ArtJob, TitleJob, HomeJob, 
   Layer.provideMerge(UploadProgress.layer),
   Layer.provideMerge(ActionWorker.layer),
   Layer.provideMerge(SyncRunner.layer),
-  Layer.provideMerge(OwnerActivity.layer),
+  Layer.provideMerge(Layer.merge(OwnerActivity.layer, OthersPresence.layer)),
   Layer.provideMerge(Layer.merge(NotificationControl.layer, HuddleLive).pipe(Layer.provideMerge(SocketEvents.layer))),
   Layer.provideMerge(AiProviderLive),
   Layer.provideMerge(AiCredentials.layer),
@@ -120,6 +122,7 @@ export const Services = Layer.mergeAll(EnginePhases, ArtJob, TitleJob, HomeJob, 
 /** One `toLayer` per feature, merged. Requires `Services`. `Layer.mergeAll` takes at most 20, so later features merge after it. */
 export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, MessagesHandlers, ReadsHandlers, ArtHandlers, NewChatHandlers, SendHandlers, HomeHandlers, AllTopicsHandlers, NotificationsHandlers, ViewsHandlers, FilesHandlers, MentionsHandlers, AiHandlers, AgentWritesHandlers).pipe(
   Layer.merge(HuddleHandlers),
+  Layer.merge(PresenceHandlers),
 )
 
 /** The engine's side of the AgentHost port (ADR 0012): `JunoHost` over `Services`, with the engine phase from the status feature. */

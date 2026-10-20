@@ -16,12 +16,13 @@ import { MentionsRoutes } from './mentions'
 import { MessagesRoutes } from './messages'
 import { NewChatRoutes } from './newChat'
 import { NotificationsRoutes } from './notifications'
+import { PresenceRoutes } from './presence'
 import { ReadsRoutes } from './reads'
 import { SendRoutes } from './send'
 import { SessionRoutes } from './session'
 import { TopicsRoutes } from './topics'
 import { ViewsRoutes } from './views'
 
-export const AllRoutes = EngineRoutes.merge(SessionRoutes).merge(TopicsRoutes).merge(SearchRoutes).merge(PrefsRoutes).merge(MessagesRoutes).merge(ReadsRoutes).merge(ArtRoutes).merge(NewChatRoutes).merge(SendRoutes).merge(HomeRoutes).merge(AllTopicsRoutes).merge(NotificationsRoutes).merge(ViewsRoutes).merge(FilesRoutes).merge(MentionsRoutes).merge(AiRoutes).merge(AgentWritesRoutes).merge(HuddleRoutes)
+export const AllRoutes = EngineRoutes.merge(SessionRoutes).merge(TopicsRoutes).merge(SearchRoutes).merge(PrefsRoutes).merge(MessagesRoutes).merge(ReadsRoutes).merge(ArtRoutes).merge(NewChatRoutes).merge(SendRoutes).merge(HomeRoutes).merge(AllTopicsRoutes).merge(NotificationsRoutes).merge(ViewsRoutes).merge(FilesRoutes).merge(MentionsRoutes).merge(AiRoutes).merge(AgentWritesRoutes).merge(HuddleRoutes).merge(PresenceRoutes)
 
 export type AllRoutes = typeof AllRoutes
