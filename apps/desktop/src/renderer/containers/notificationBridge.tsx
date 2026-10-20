@@ -10,16 +10,17 @@ import type { NotificationTarget } from '@juno/contract'
 import { activeTab, currentPlace, notificationContentShown, junoAvailableAtom, notificationSettingsAtom, onNotificationOpen, setViewing, tabsAtom, tabTopic, whyPopoverAtom } from '@juno/state'
 import { useAtomMount, useAtomValue } from '@juno/state/react'
 import { WhyPopover } from '@juno/views'
-import { openTopicAt } from './navigation'
+import { openHuddle, openTopicAt } from './navigation'
 import { tellJunoAbout } from './juno/actions'
 import { messageQuote } from './juno/topicContext'
 import { changeFromWhy, closeWhy } from './notifyActions'
 
 /**
  * A clicked notification: the topic at its message, which flashes, also in a
- * tab that already shows it.
+ * tab that already shows it; or an incoming huddle's tab.
  */
 function open(target: NotificationTarget): void {
+  if (target._tag === 'huddle') return openHuddle(target.channelId)
   const source = target.source
   openTopicAt(source.topicId, source.ts, { flash: true })
 }
