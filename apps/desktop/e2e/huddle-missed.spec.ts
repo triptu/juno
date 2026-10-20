@@ -22,7 +22,7 @@ test('a dismissed huddle appears after it ends; opening it clears it across a re
     await revisit(juno)
     return juno.home.title('missedHuddle').allTextContents()
   }).toEqual(['Missed huddle with Maya'])
-  await expect(juno.home.meta('missedHuddle')).toContainText('1 min')
+  await expect(juno.home.meta('missedHuddle')).toContainText('Lasted under a minute')
   await juno.home.openItem('missedHuddle')
   await juno.topic.expectTitle('Maya')
   await revisit(juno)
