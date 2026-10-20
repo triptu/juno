@@ -300,7 +300,7 @@ Checked before that on 10-15 against the row's text (gallery `TopicRow/Tile/art-
 
 ### 1.10 Code colours
 
-The `syntax` group: one colour per token kind of `@juno/highlight`, for code blocks (SPEC 7, "Code blocks"). `paintCode` puts each token in the CSS highlight of its kind, and `global.css` colours it: `::highlight(syntax-keyword) { color: var(--syntax-keyword) }`. The set is calm: muted hues at even lightness, so a block reads as text with a little colour. Tokens set colour only, never weight or style, so a coloured block has the plain block's lines. Comments use the muted grey; punctuation uses the subtle grey.
+The `syntax` group: one colour per token kind of `@juno/highlight`, for code blocks (SPEC 7, "Code blocks"). `paintCode` puts each token in the CSS highlight of its kind, and `global.css` colours it: `pre > code::highlight(syntax-keyword) { color: var(--syntax-keyword) }`, scoped to the code element because a bare `::highlight()` makes Chromium work out highlight styles for every element it restyles. The set is calm: muted hues at even lightness, so a block reads as text with a little colour. Tokens set colour only, never weight or style, so a coloured block has the plain block's lines. Comments use the muted grey; punctuation uses the subtle grey.
 
 Contrast is measured on the code block's background, `--background` (light `hsla(48, 50%, 98%)`, dark `#1B1916`).
 

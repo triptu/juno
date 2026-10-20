@@ -155,17 +155,20 @@ textarea {
 
 /* Code colours. @juno/highlight's paintCode puts each token of a code block
    in the CSS highlight of its kind; these rules colour them with the
-   --syntax-* tokens. Colour only, so a coloured block keeps its lines. */
-::highlight(syntax-keyword) { color: var(--syntax-keyword); }
-::highlight(syntax-string) { color: var(--syntax-string); }
-::highlight(syntax-number) { color: var(--syntax-number); }
-::highlight(syntax-comment) { color: var(--syntax-comment); }
-::highlight(syntax-function) { color: var(--syntax-function); }
-::highlight(syntax-type) { color: var(--syntax-type); }
-::highlight(syntax-constant) { color: var(--syntax-constant); }
-::highlight(syntax-property) { color: var(--syntax-property); }
-::highlight(syntax-tag) { color: var(--syntax-tag); }
-::highlight(syntax-punctuation) { color: var(--syntax-punctuation); }
-::highlight(syntax-meta) { color: var(--syntax-meta); }
-::highlight(syntax-inserted) { color: var(--syntax-inserted); }
-::highlight(syntax-deleted) { color: var(--syntax-deleted); }
+   --syntax-* tokens. Colour only, so a coloured block keeps its lines.
+   Scoped to the code element: a bare ::highlight() matches every element,
+   and Chromium then works out highlight styles for each one it restyles
+   (every restyle about 70% slower, ADR 0017). */
+pre > code::highlight(syntax-keyword) { color: var(--syntax-keyword); }
+pre > code::highlight(syntax-string) { color: var(--syntax-string); }
+pre > code::highlight(syntax-number) { color: var(--syntax-number); }
+pre > code::highlight(syntax-comment) { color: var(--syntax-comment); }
+pre > code::highlight(syntax-function) { color: var(--syntax-function); }
+pre > code::highlight(syntax-type) { color: var(--syntax-type); }
+pre > code::highlight(syntax-constant) { color: var(--syntax-constant); }
+pre > code::highlight(syntax-property) { color: var(--syntax-property); }
+pre > code::highlight(syntax-tag) { color: var(--syntax-tag); }
+pre > code::highlight(syntax-punctuation) { color: var(--syntax-punctuation); }
+pre > code::highlight(syntax-meta) { color: var(--syntax-meta); }
+pre > code::highlight(syntax-inserted) { color: var(--syntax-inserted); }
+pre > code::highlight(syntax-deleted) { color: var(--syntax-deleted); }
