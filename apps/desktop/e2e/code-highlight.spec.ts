@@ -9,14 +9,17 @@ test.use({ synced: true })
 
 test.describe.configure({ timeout: 120_000 })
 
-/** The text of every coloured run inside `selector`, by its kind (`keyword`, `string`, ...). */
+/**
+ * The words of every coloured run inside `selector`, by its kind (`keyword`,
+ * `string`, ...). Whitespace joins a neighbouring run, so runs are split into words.
+ */
 function colouredRuns(selector: string): Record<string, string[]> {
   const root = document.querySelector(selector)
   const runs: Record<string, string[]> = {}
   for (const [name, highlight] of CSS.highlights) {
     for (const range of highlight as Highlight) {
       if (!(range instanceof Range) || root === null || !root.contains(range.startContainer)) continue
-      ;(runs[name.replace(/^syntax-/, '')] ??= []).push(range.toString())
+      ;(runs[name.replace(/^syntax-/, '')] ??= []).push(...range.toString().split(/\s+/).filter((word) => word !== ''))
     }
   }
   return runs
@@ -49,10 +52,10 @@ test('a ts block shows coloured tokens and no tag line, and a prose block stays 
   await message.locator('pre').first().evaluate((element) => element.setAttribute('data-test-code', 'tagged'))
   await message.locator('pre').last().evaluate((element) => element.setAttribute('data-test-code', 'prose'))
   await expect.poll(() => juno.win.evaluate(colouredRuns, '[data-test-code="tagged"]')).toMatchObject({
-    keyword: expect.arrayContaining(['export', 'const']),
+    keyword: ['export', 'const', 'const'],
     string: ["'retry'"],
     number: ['3'],
-    comment: ['// at most'],
+    comment: ['//', 'at', 'most'],
   })
   // The prose block keeps the text colour throughout.
   expect(await juno.win.evaluate(colouredRuns, '[data-test-code="prose"]')).toEqual({})
