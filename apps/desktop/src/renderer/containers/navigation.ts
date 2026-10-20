@@ -371,19 +371,24 @@ function openTopicFresh(id: string, options: OpenOptions, target: string | undef
 
 /**
  * A new tab with Home, its field focused; with `list`, its destination list
- * open; with `conversation`, that destination chosen.
+ * open; with `conversation`, that destination chosen. `behind` the current
+ * tab, which keeps focus, instead (⌘ on a person never messaged, SPEC 7).
  */
-function openHomeTab(list: boolean, conversation?: PickConversation): void {
+function openHomeTab(list: boolean, conversation?: PickConversation, behind = false): void {
   // The new tab mounts a moment later. Until its composer takes focus, keys typed after ⌘T must not land in
   // the field the old tab had focused; they are held, and Home types them into its field or search.
-  holdKeys()
-  if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+  if (!behind) {
+    holdKeys()
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+  }
   // A new tab does not replace the current one, so an open still waiting there is not cancelled.
   show((tabs) => {
-    const next = openPlace(tabs, homePlace, { newTab: true })
-    if (next.active !== undefined) {
-      if (conversation !== undefined) setHomeDraft(registry, next.active, pickConversation(emptyHomeDraft, conversation))
-      requestHomeFocus(registry, next.active, list)
+    const next = openPlace(tabs, homePlace, { newTab: true, background: behind })
+    // The new tab, in front or behind.
+    const tab = next.tabs.find((each) => !tabs.tabs.includes(each))?.id
+    if (tab !== undefined) {
+      if (conversation !== undefined) setHomeDraft(registry, tab, pickConversation(emptyHomeDraft, conversation))
+      if (!behind) requestHomeFocus(registry, tab, list)
     }
     return next
   }, undefined, false)
@@ -399,9 +404,11 @@ export function openNewTab(): void {
  * is Home, else a tab that shows Home, else a new one, and a new one too
  * when that Home already has a draft, so nothing written is disturbed. The
  * destination list opens; with `conversation` (⌘K's result for a person
- * never messaged) that destination is chosen instead.
+ * never messaged) that destination is chosen instead. `behind` (⌘ on a person
+ * never messaged) opens a new Home tab behind this one.
  */
-export function newMessage(conversation?: PickConversation): void {
+export function newMessage(conversation?: PickConversation, behind = false): void {
+  if (behind) return openHomeTab(false, conversation, true)
   const tabs = registry.get(tabsAtom)
   const current = activeTab(tabs)
   const home = current !== undefined && currentPlace(current).kind === 'home' ? current : tabShowingPlace(tabs, homePlace)

@@ -96,15 +96,15 @@ function openOutside(url: string, match: SlackLinkMatch, why: string): void {
   showToast(registry, { text: `${why} · Opened in the browser` })
 }
 
-/** A topic, in a new tab (behind the current one with ⌘), or the tab that already shows it; at `ts` when given, which flashes. */
-function openLinked(topicId: string, ts: string | undefined, event: ActivateEvent): void {
+/** A topic, in a new tab (`behind` the current one, with ⌘), or the tab that already shows it; at `ts` when given, which flashes. */
+function openLinked(topicId: string, ts: string | undefined, behind: boolean): void {
   const shown = tabShowing(registry.get(tabsAtom), topicId) !== undefined
   if (ts === undefined) {
-    if (event.metaKey && !shown) openTopicInBackground(topicId)
+    if (behind && !shown) openTopicInBackground(topicId)
     else openTopic(topicId, { newTab: !shown })
     return
   }
-  if (event.metaKey && !shown) openTopicAtInBackground(topicId, ts)
+  if (behind && !shown) openTopicAtInBackground(topicId, ts)
   else openTopicAt(topicId, ts, { newTab: !shown, flash: true })
 }
 
@@ -113,15 +113,15 @@ const NO_CONVERSATION = 'Juno cannot reach that conversation'
 /**
  * A person, from a link to them or a click on them in a message (SPEC 7 and
  * 8): your DM with them at its Main, as a link to a topic opens it, or Home
- * addressed to them when you have never messaged them. False when Juno does
- * not know them.
+ * addressed to them when you have never messaged them; with ⌘, either opens
+ * behind the current tab. False when Juno does not know them.
  */
-export async function openPerson(user: string, event: ActivateEvent): Promise<boolean> {
+export async function openPerson(user: string, behind: boolean): Promise<boolean> {
   const found = await locatePerson(registry, user)
   const person = found._tag === 'Success' ? found.value : undefined
   if (person?.person === undefined) return false
-  if (person.mainId !== undefined) openLinked(person.mainId, undefined, event)
-  else newMessage({ key: `u:${user}`, name: person.person.name, kind: 'im', tint: 'dm', person: person.person, empty: true })
+  if (person.mainId !== undefined) openLinked(person.mainId, undefined, behind)
+  else newMessage({ key: `u:${user}`, name: person.person.name, kind: 'im', tint: 'dm', person: person.person, empty: true }, behind)
   return true
 }
 
@@ -129,12 +129,12 @@ async function openSlackLink(url: string, match: SlackLinkMatch, event: Activate
   const { target } = match
   switch (target.kind) {
     case 'person':
-      if (!(await openPerson(target.user, event))) openOutside(url, match, 'Juno does not know that person')
+      if (!(await openPerson(target.user, event.metaKey))) openOutside(url, match, 'Juno does not know that person')
       return
     case 'channel': {
       const located = await locateMessage(registry, target.channel, undefined)
       if (located._tag !== 'Success' || located.value.place === undefined) return openOutside(url, match, NO_CONVERSATION)
-      return openLinked(located.value.topicId, undefined, event)
+      return openLinked(located.value.topicId, undefined, event.metaKey)
     }
     case 'message': {
       const topic = await messageTopic(target)
@@ -143,7 +143,7 @@ async function openSlackLink(url: string, match: SlackLinkMatch, event: Activate
         const loaded = await loadOlderMessages(registry, topic.topicId, justAfter(target.ts))
         if (loaded._tag === 'Success' && loaded.value.outcome === 'rejected') return openOutside(url, match, NO_CONVERSATION)
       }
-      return openLinked(topic.topicId, target.ts, event)
+      return openLinked(topic.topicId, target.ts, event.metaKey)
     }
   }
 }
