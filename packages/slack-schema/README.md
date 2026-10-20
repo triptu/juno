@@ -5,7 +5,7 @@ One Slack vocabulary. Effect Schemas for every payload Juno reads or sends, and 
 ## Public API
 
 - Method definitions: `Methods`, `MethodName`, `isMethodName`. Each method has an args schema and an ok-response schema.
-- Payload schemas by area: `boot`, `conversations`, `users`, `message` and `blocks`, `threads`, `chat`, `search`, `files`, and socket frames in `rtm` (`RtmFrame`, `encodeRtmFrame`).
+- Payload schemas by area: `boot`, `conversations`, `users`, `message` and `blocks` (`rich_text` in full, the layout blocks bots use, and `table` with its rows of `rich_text`, `raw_text` or `null` cells, `column_settings`, `caption` and `is_caption_visible`), `threads`, `chat`, `search`, `files`, and socket frames in `rtm` (`RtmFrame`, `encodeRtmFrame`).
 - `Ts` and its helpers: `isTs`, `compareTs`, `maxTs`, `minTs`, `tsToMillis`, `millisToTs`. A `Ts` is a string of the form `<seconds>.<6 digits>`; compare it with these helpers, never as a number or with `<`.
 
 The getView envelope keeps `threads` as unknown entries. Consumers decode each with `ThreadView`, so one unfamiliar thread cannot reject the page.

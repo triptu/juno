@@ -1,9 +1,10 @@
 /**
  * Message `blocks`. `rich_text` is what the official client sends and renders,
- * so it is modelled in full. Bots use `section`, `context`, `header`, `image`
- * and `divider`, modelled minimally. Anything else decodes to the `unknown`
- * variant with the raw object kept, so rendering can show a placeholder and
- * nothing is lost on a round trip.
+ * so it is modelled in full, as is `table`, whose cells are `rich_text`.
+ * Bots use `section`, `context`, `header`, `image` and `divider`, modelled
+ * minimally. Anything else decodes to the `unknown` variant with the raw
+ * object kept, so rendering can show a placeholder and nothing is lost on a
+ * round trip.
  *
  * Source: docs/research/slack-data-access.md section 5.
  */
@@ -168,11 +169,40 @@ export const ImageBlock = S.Struct({
   slack_file: opt(S.Unknown),
 })
 
+/**
+ * A cell of a `table` block: a `rich_text` block (what recorded messages
+ * carry), a `raw_text` or `raw_number` cell with plain `text`, or `null` for
+ * an empty one. Anything else is `unknown`, so one odd cell keeps the table.
+ */
+export const TableRawCell = S.Struct({ type: S.Literals(['raw_text', 'raw_number']), text: S.String })
+export const TableCell = S.Union([RichTextBlock, TableRawCell, S.Null, UnknownVariant])
+export type TableCell = typeof TableCell.Type
+
+/** One column's settings. `align` stays a string so a value Slack adds later keeps the table. */
+export const TableColumnSetting = S.Struct({ align: opt(S.String), is_wrapped: opt(S.Boolean) })
+export type TableColumnSetting = typeof TableColumnSetting.Type
+
+/**
+ * A table (research section 5, "Tables"). `rows` are arrays of cells; Slack's
+ * client draws the first row as the header. `column_settings` is by column,
+ * `null` for a column with the defaults. `caption` labels the table and shows
+ * only with `is_caption_visible`.
+ */
+export const TableBlock = S.Struct({
+  type: S.Literal('table'),
+  block_id: opt(S.String),
+  rows: S.Array(S.Array(TableCell)),
+  column_settings: opt(S.Array(S.NullOr(TableColumnSetting))),
+  caption: opt(S.String),
+  is_caption_visible: opt(S.Boolean),
+})
+
 export type SectionBlock = typeof SectionBlock.Type
 export type DividerBlock = typeof DividerBlock.Type
 export type HeaderBlock = typeof HeaderBlock.Type
 export type ContextBlock = typeof ContextBlock.Type
 export type ImageBlock = typeof ImageBlock.Type
+export type TableBlock = typeof TableBlock.Type
 
 export const Block = S.Union([
   RichTextBlock,
@@ -181,6 +211,7 @@ export const Block = S.Union([
   HeaderBlock,
   ContextBlock,
   ImageBlock,
+  TableBlock,
   UnknownVariant,
 ])
 export type Block = typeof Block.Type
