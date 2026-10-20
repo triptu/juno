@@ -20,12 +20,21 @@ test.skip(process.env['JUNO_SCREENS'] !== '1', 'set JUNO_SCREENS=1 to write the 
 
 function quietSeed(workspace: Workspace, avatarBase: string): void {
   const now = workspace.clock.now()
-  for (const [id, name] of [[SELF_ID, 'Sam Ortiz'], ['U0LEO', 'Leo Park'], ['U0MAYA', 'Maya Chen']] as const) {
+  const people = [['U0LEO', 'Leo Park'], ['U0MAYA', 'Maya Chen'], ['U0ANA', 'Ana Ruiz'], ['U0KAI', 'Kai Sato'], ['U0NOOR', 'Noor Haddad']] as const
+  for (const [id, name] of [[SELF_ID, 'Sam Ortiz'], ...people] as const) {
     workspace.addUser({ id, team_id: TEAM.id, name, real_name: name, profile: { display_name: name, image_72: `${avatarBase}/${id}.svg` } })
   }
-  for (const [id, name] of [['C0GEN', 'general'], ['C0ENG', 'eng'], ['C0DES', 'design']] as const) {
-    workspace.addConversation({ id, name, kind: 'public', members: new Set([SELF_ID, 'U0LEO', 'U0MAYA']), created: now - 90 * DAY, topic: '', purpose: '', isOpen: true, archived: false })
+  const members = new Set([SELF_ID, ...people.map(([id]) => id)])
+  // Five of each, so Recent's two columns are full, as on a workspace in use.
+  for (const [id, name] of [['C0GEN', 'general'], ['C0ENG', 'eng'], ['C0DES', 'design'], ['C0OPS', 'ops'], ['C0REL', 'releases']] as const) {
+    workspace.addConversation({ id, name, kind: 'public', members, created: now - 90 * DAY, topic: '', purpose: '', isOpen: true, archived: false })
     const last = workspace.post({ channel: id, user: 'U0LEO', text: 'Notes are in the doc.', at: now - 2 * 60 * 60_000, silent: true })
+    workspace.reads.set(id, last.ts)
+  }
+  for (const [user] of people) {
+    const id = `D${user.slice(1)}`
+    workspace.addConversation({ id, name: '', kind: 'im', members: new Set([SELF_ID, user]), created: now - 90 * DAY, topic: '', purpose: '', isOpen: true, archived: false })
+    const last = workspace.post({ channel: id, user, text: 'Thanks, that works.', at: now - 3 * 60 * 60_000, silent: true })
     workspace.reads.set(id, last.ts)
   }
 }
@@ -112,4 +121,9 @@ quiet('Home caught up before and after the picture, the story and the gallery, l
   await win.locator('[data-picture-page]').getByRole('button', { name: 'All pictures' }).click()
   await expect(win.locator('[data-gallery]')).toBeVisible()
   await shoot(win, 'home-art-gallery-dark')
+
+  // A large window, taller than a laptop screen allows a real one: the same box, the column centred in more room.
+  await juno.setTheme('Light')
+  await win.setViewportSize({ width: 1728, height: 1080 })
+  await homeWith('monet-impression-sunrise', 'home-art-after-large-light')
 })
