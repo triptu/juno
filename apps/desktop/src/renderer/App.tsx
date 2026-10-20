@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useLayoutEffect } from 'react'
 import { accentAtom, closeSidebarSheet, densityAtom, topicTitleLinesAtom, junoSetupPendingAtom, openSidebarSheet, persistAccent, persistTheme, privacyAtom, registry, reportAppStateAtom, resolvedThemeAtom, sessionUnknownAtom, signedInAtom, themeAtom, type Accent, type Density, type ResolvedTheme, type Theme } from '@juno/state'
 import { useAtom, useAtomValue } from '@juno/state/react'
-import { AppearanceSettings, applyPrivacy, applyTheme, SheetOpenContext, Shell, type AccentName, type DensityName, type ThemeName, type ThemePreference } from '@juno/views'
+import { AppearanceSettings, applyPrivacy, applyTheme, CodeHighlighterContext, SheetOpenContext, Shell, type AccentName, type DensityName, type ThemeName, type ThemePreference } from '@juno/views'
 import { chunk } from './containers/chunks'
 import { Frame } from './containers/Frame'
 import { followFullScreen } from './containers/fullScreen'
@@ -11,6 +11,7 @@ import { Session } from './containers/Session'
 import { Sidebar } from './containers/Sidebar'
 import { Workspace } from './containers/Workspace'
 import { applyTopicTitleLines } from './containers/topicTitleLines'
+import { codeHighlighter } from './highlight/codeHighlighter'
 
 // Warm the setup page while signed out, after the sign-in frame has painted.
 const setup = chunk(() => import('./containers/SetUpJuno'))
@@ -93,10 +94,12 @@ export function App() {
   if (signedIn !== undefined) {
     return (
       <SheetOpenContext.Provider value={sheetOpen}>
-        <PrivacyRoot />
-        <Frame sidebar={<Sidebar />} peek={<Peek />}>
-          <Workspace />
-        </Frame>
+        <CodeHighlighterContext value={codeHighlighter}>
+          <PrivacyRoot />
+          <Frame sidebar={<Sidebar />} peek={<Peek />}>
+            <Workspace />
+          </Frame>
+        </CodeHighlighterContext>
       </SheetOpenContext.Provider>
     )
   }

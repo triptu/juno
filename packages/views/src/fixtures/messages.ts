@@ -26,7 +26,8 @@ export const date = (timestamp: number, format: string, fallback: string): BodyI
 
 export const p = (...children: ReadonlyArray<BodyInline | string>): BodyBlock => ({ kind: 'paragraph', children: children.map((child) => (typeof child === 'string' ? t(child) : child)) })
 export const quote = (...children: ReadonlyArray<BodyInline | string>): BodyBlock => ({ kind: 'quote', children: children.map((child) => (typeof child === 'string' ? t(child) : child)) })
-export const code = (text: string): BodyBlock => ({ kind: 'code', text })
+/** A code block; `language` is set when its first line was a tag (richtext has already taken that line out). */
+export const code = (text: string, language?: string): BodyBlock => (language === undefined ? { kind: 'code', text } : { kind: 'code', text, language })
 export const list = (style: 'bullet' | 'ordered' | 'checked' | 'unchecked', items: ReadonlyArray<string>, indent = 0): BodyBlock => ({
   kind: 'list',
   style,
@@ -253,6 +254,57 @@ export const hostile = window([
   { ago: 35, from: undefined, kind: 'unloaded', text: '' },
   { ago: 30, from: people.sam, blocks: [heading('Decision'), p('We go with option B.'), divider, p(t('Struck', { strike: true }), ' ', t('italic', { italic: true }), ' ', t('inline code', { code: true }), ' ', t('bold', { bold: true }))] },
   { ago: 25, from: people.leo, blocks: [list('bullet', ['Top level']), list('bullet', ['Nested once'], 1), list('bullet', ['Nested twice'], 2), list('ordered', ['First', 'Second'])] },
+])
+
+/**
+ * One message with code blocks as people paste them: one tagged with its
+ * language on the first line (the engine hands it over as `language`,
+ * without that line), one whose language is detected, a stack trace that
+ * stays plain, and a long tagged one that scrolls in its box.
+ */
+export const codeBlocks = window([
+  {
+    ago: 12,
+    from: people.leo,
+    blocks: [
+      p('The retry wrapper, with the backoff capped:'),
+      code(
+        `export async function withRetry<A>(run: () => Promise<A>, tries = 3): Promise<A> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await run()
+    } catch (error) {
+      // Give up after the last try.
+      if (attempt >= tries) throw error
+      await sleep(Math.min(250 * 2 ** attempt, 4_000))
+    }
+  }
+}`,
+        'typescript',
+      ),
+      p('The query that finds the stuck jobs:'),
+      code(`SELECT id, kind, attempts
+FROM jobs
+WHERE state = 'running' AND started_at < now() - interval '15 minutes'
+ORDER BY started_at
+LIMIT 50;`),
+      p('What the worker logged before it stopped:'),
+      code(`TypeError: Cannot read properties of undefined (reading 'id')
+    at handle (/srv/worker/jobs.js:88:31)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)`),
+      p('And the whole migration script, for reference:'),
+      code(
+        `import sqlite3
+
+def migrate(path: str) -> None:
+    """Move every topic to the new table."""
+    db = sqlite3.connect(path)
+${Array.from({ length: 40 }, (_, index) => `    db.execute("UPDATE topics SET rev = rev + 1 WHERE shard = ?", (${index},))  # shard ${index + 1}`).join('\n')}
+    db.commit()`,
+        'python',
+      ),
+    ],
+  },
 ])
 
 /** A sender whose name is longer than a message header, and messages whose first line fills the row. */

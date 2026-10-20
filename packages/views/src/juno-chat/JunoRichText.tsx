@@ -2,8 +2,8 @@ import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import type { JunoBlock, JunoInline } from '@juno/agent-contract'
 import { colors, radii, spacing, text, weights } from '@juno/tokens/tokens.stylex'
-import { CodeBlock } from '@juno/ui'
 import type { ChatActions } from './commands'
+import { HighlightedCodeBlock } from '../CodeHighlight'
 import { InlineLink } from './InlineLink'
 import { messageTime } from '../time'
 
@@ -44,7 +44,7 @@ function Block({ block, now, actions }: { readonly block: JunoBlock; readonly no
       )
     }
     case 'codeBlock':
-      return <CodeBlock>{block.text}</CodeBlock>
+      return <HighlightedCodeBlock text={block.text} language={block.language} />
   }
 }
 

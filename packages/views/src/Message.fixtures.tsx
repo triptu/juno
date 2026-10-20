@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { layout } from '@juno/tokens/tokens.stylex'
 import { defineFixtures, hueForId, scene, type Fixture, type FixtureFrame } from '@juno/ui'
-import { failedSend, hostile, longFirstLine, main, mentions, sending, thread } from './fixtures/messages'
+import { codeBlocks, failedSend, hostile, longFirstLine, main, mentions, sending, thread } from './fixtures/messages'
 import { NOW } from './fixtures/topics'
 import { noopActions } from './fixtures/actions'
 import { InlineEdit } from './InlineEdit'
@@ -75,6 +75,10 @@ export default defineFixtures(
       unloaded: one(unloaded),
       // The name is cut off: hovering it shows the full name as the tooltip.
       'long-name': one(longLine, { startsGroup: true }, { width: 420 }),
+    },
+    // Code blocks: tagged (the tag line is not shown), detected, a stack trace left plain, and a long one.
+    Code: {
+      'code-blocks': one(codeBlocks[0]!, { startsGroup: true }),
     },
     // A send still on its way looks like the message it becomes; past --delay-pending it dims.
     Send: {
