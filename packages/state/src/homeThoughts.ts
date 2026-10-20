@@ -14,7 +14,7 @@
 import * as Atom from 'effect/reactivity/Atom'
 import type { Registry } from './client'
 
-export type ThoughtTheme = 'focus' | 'thinking' | 'wonder' | 'life'
+export type ThoughtTheme = 'focus' | 'thinking' | 'wonder' | 'life' | 'made' | 'art'
 
 /** What Home shows: the line, and who said it when it is a quote. */
 export interface HomeThought {
