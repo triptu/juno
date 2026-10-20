@@ -5,7 +5,7 @@ import { useAtomValue } from '@juno/state/react'
 import { NotificationsPage as NotificationsPageView, type HoursKind } from '@juno/views'
 import { setNotifyLevel } from './notifyActions'
 
-function changeHours(which: HoursKind, hours: Hours): void {
+function changeHours(which: HoursKind, hours: Partial<Hours>): void {
   setHours(registry, which, hours)
 }
 

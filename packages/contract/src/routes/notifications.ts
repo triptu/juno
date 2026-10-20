@@ -135,7 +135,7 @@ export const notificationsWhy = Rpc.make('notifications.why', {
 })
 
 export const notificationsSetHours = Rpc.make('notifications.setHours', {
-  payload: { which: Schema.Literals(['notifications', 'presence']), hours: Hours },
+  payload: { which: Schema.Literals(['notifications', 'presence']), hours: Hours.mapFields(({ days, from, to }) => ({ days: Schema.optionalKey(days), from: Schema.optionalKey(from), to: Schema.optionalKey(to) })) },
   success: Schema.Void,
   error: NotSignedIn,
 })

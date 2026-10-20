@@ -27,7 +27,7 @@ export interface NotificationsPageProps {
   readonly held: number
   /** The messages that notified today, newest first. */
   readonly today: ReadonlyArray<TodayRow>
-  readonly onHoursChange: (which: HoursKind, hours: Hours) => void
+  readonly onHoursChange: (which: HoursKind, hours: Partial<Hours>) => void
   /** Slack's own schedule, its switch and Restore. */
   readonly slack: SlackScheduleProps
   /** On blur, with the text as typed. */
@@ -164,7 +164,7 @@ function TestRow({ permission, onSendTest, onOpenSettings }: Pick<NotificationsP
 }
 
 function HoursRow({ which, title, sub, hours, onChange }: { readonly which: HoursKind; readonly title: string; readonly sub: string; readonly hours: Hours; readonly onChange: NotificationsPageProps['onHoursChange'] }) {
-  const set = (patch: Partial<Hours>) => onChange(which, { ...hours, ...patch })
+  const set = (patch: Partial<Hours>) => onChange(which, patch)
   const from = String(Math.floor(hours.from / HALF_HOUR) * HALF_HOUR)
   const to = String(Math.floor(hours.to / HALF_HOUR) * HALF_HOUR)
   return (

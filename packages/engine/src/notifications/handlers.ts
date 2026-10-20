@@ -345,7 +345,7 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
         ),
       'notifications.setHours': ({ which, hours }) =>
         Effect.gen(function* () {
-          yield* updateSettings((settings) => (which === 'notifications' ? { ...settings, notificationHours: hours } : { ...settings, presenceHours: hours }))
+          yield* updateSettings((settings) => (which === 'notifications' ? { ...settings, notificationHours: { ...settings.notificationHours, ...hours } } : { ...settings, presenceHours: { ...settings.presenceHours, ...hours } }))
           // Only hours the owner set reach Slack's schedule (`../slackSchedule.ts`).
           if (which === 'notifications') yield* inWorkspace(slackSchedule.hoursSet.pipe(Effect.orDie))
         }),
