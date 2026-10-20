@@ -450,7 +450,7 @@ export const shadows = stylex.defineVars({
   // The huddle bar: a hairline highlight inside its top edge, as glass catches light, over the card's shadow.
   '--huddle-bar-shadow': 'inset 0 1px 0 0 oklch(1 0 0 / 0.7), 0 1px 2px 0 oklch(0 0 0 / 0.03), 0 6px 20px -4px oklch(0 0 0 / 0.07)',
   // An incoming huddle's card: a soft accent glow outside its accent edge, which pulses.
-  '--huddle-incoming-glow': '0 0 0 3px oklch(from var(--hl) l c h / 0.32), 0 0 14px 2px oklch(from var(--hl) l c h / 0.26)',
+  '--huddle-incoming-glow': '0 0 0 3px oklch(from var(--hl) l c h / 0.42), 0 0 14px 2px oklch(from var(--hl) l c h / 0.32)',
   '--peek-shadow': '0 0 0 1px oklch(0 0 0 / 0.12), 0 2px 6px -1px oklch(0 0 0 / 0.08), 0 14px 36px -8px oklch(0 0 0 / 0.18)',
   '--pop-shadow': '0 2px 6px -1px oklch(0 0 0 / 0.05), 0 14px 36px -8px oklch(0 0 0 / 0.13)',
   // The Juno panel floating over the page: a hairline ring, a tight contact
