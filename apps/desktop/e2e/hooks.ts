@@ -13,7 +13,7 @@ interface JunoTestHooks {
   readonly agentHost: () => string | undefined
   readonly agentPid: () => number | undefined
   /** The OS notifications main showed, recorded instead of shown. */
-  readonly notifications: () => Array<{ readonly title: string; readonly body: string }>
+  readonly notifications: () => Array<{ readonly title: string; readonly body: string; readonly silent?: true }>
   readonly clickNotification: (index?: number) => void
   readonly dockBadge: () => string
   /** How many times Open Notification Settings opened System Settings. */

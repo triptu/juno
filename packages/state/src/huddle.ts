@@ -7,7 +7,7 @@
 import { Option } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
-import { huddleCall, huddleLeave, huddlePeople, huddleReport, huddleRunning, huddleStart, mainTopicOf, type HuddleCall, type HuddlePageReport, type Person, type RunningHuddle, type TopicDetail } from '@juno/contract'
+import { huddleCall, huddleDismiss, huddleIncoming, huddleLeave, huddlePeople, huddleReport, huddleRunning, huddleStart, mainTopicOf, type HuddleCall, type HuddlePageReport, type IncomingHuddle, type Person, type RunningHuddle, type TopicDetail } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
 import { topicAtom } from './messages'
@@ -17,6 +17,17 @@ export const huddleCallAtom = liveQuery(huddleCall)(undefined)
 
 /** Every running huddle Juno knows of, by channel id. */
 export const huddleRunningAtom = liveQuery(huddleRunning)(undefined)
+
+/** The huddles someone just started where the user is, newest first (SPEC 20, "Incoming huddles"). */
+export const huddleIncomingAtom = liveQuery(huddleIncoming)(undefined)
+
+const noIncoming: ReadonlyArray<IncomingHuddle> = []
+
+/** The incoming huddles once the engine has said, else none. */
+export const huddleIncomingValueAtom = Atom.make((get): ReadonlyArray<IncomingHuddle> => {
+  const result = get(huddleIncomingAtom)
+  return AsyncResult.isSuccess(result) ? result.value : noIncoming
+})
 
 /** The call once the engine has said, else undefined. */
 export const huddleCallValueAtom = Atom.make((get): HuddleCall | undefined => {
@@ -84,5 +95,7 @@ export const startHuddle = (registry: Registry, channelId: string, region: strin
   runCommand(registry, huddleStart, { channelId, region, generation })
 
 export const leaveHuddle = (registry: Registry) => runCommand(registry, huddleLeave, undefined)
+
+export const dismissHuddle = (registry: Registry, callId: string) => runCommand(registry, huddleDismiss, { callId })
 
 export const reportHuddleMedia = (registry: Registry, report: HuddlePageReport) => runCommand(registry, huddleReport, { report })

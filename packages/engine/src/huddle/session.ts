@@ -31,6 +31,7 @@ import { conversationLabel } from '../placeLabel'
 import { HostLink } from '../protocol/host'
 import { SocketEvents, type SessionServices, type SocketListener } from '../socketEvents'
 import { Workspace } from '../workspace'
+import { IncomingHuddles } from './incoming'
 
 export const PENDING_LEAVES_PREF = 'huddle.pendingLeaves'
 
@@ -126,5 +127,5 @@ export const HuddleSessions = Layer.effectDiscard(Effect.gen(function* () {
   }))
 }))
 
-/** The service and its session attachment. Requires `SocketEvents`. */
-export const HuddleLive = HuddleSessions.pipe(Layer.provideMerge(Huddle.layer))
+/** The service, its session attachment and the incoming huddles. Requires `SocketEvents`. */
+export const HuddleLive = Layer.merge(HuddleSessions, IncomingHuddles.layer).pipe(Layer.provideMerge(Huddle.layer))

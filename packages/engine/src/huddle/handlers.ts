@@ -13,12 +13,14 @@ import { serveLiveValue, serveWorkspaceValue } from '../protocol/live'
 import { SyncLink } from '../syncLink'
 import { personFrom, type UserRow } from '../topicRows'
 import { Workspace } from '../workspace'
+import { IncomingHuddles } from './incoming'
 
 const runs = <A>(values: Stream.Stream<A>) => values.pipe(Stream.map((value) => Result.succeed({ value, queryMs: 0 })))
 
 export const HuddleHandlers = HuddleRoutes.toLayer(
   Effect.gen(function* () {
     const huddle = yield* Huddle
+    const incoming = yield* IncomingHuddles
     const workspace = yield* Workspace
     const config = yield* EngineConfig
     const link = yield* SyncLink
@@ -33,6 +35,8 @@ export const HuddleHandlers = HuddleRoutes.toLayer(
           return yield* huddle.start(channelId, region, generation, client.id)
         }),
       'huddle.leave': () => huddle.leave,
+      'huddle.incoming': () => serveLiveValue(runs(incoming.incoming), { measure }),
+      'huddle.dismiss': ({ callId }) => incoming.dismiss(callId),
       'huddle.report': ({ report }, { client }) => huddle.report(report, client.id),
       'huddle.people': ({ ids }) => serveWorkspaceValue(workspace.changes, 'huddle.people', ['users'], Effect.gen(function* () {
         if (ids.length === 0) return []
