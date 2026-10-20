@@ -115,6 +115,7 @@ async function editQuickReactions({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'
     return box.height > 300 && hit !== null && panel.contains(hit)
   })
   expect(bottomIsPicker).toBe(true)
+  await picker(juno).getByRole('textbox', { name: 'Search emoji' }).fill('+1')
   await expect(picker(juno).getByRole('button', { name: ':+1:, added' }).first()).toHaveAttribute('aria-disabled', 'true')
 
   // Esc closes it and gives focus back to Add.
