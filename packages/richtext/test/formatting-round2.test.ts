@@ -38,3 +38,10 @@ it.each([
   const edit = toggleMarkup(text, { start, end }, 'code')!
   expect(text.slice(0, edit.start) + edit.insert + text.slice(edit.end)).toBe(expected)
 })
+
+it('keeps repeated unchanged paragraphs in order between two edits', () => {
+  const first: RichTextElement = { type: 'rich_text_section', elements: [{ type: 'link', text: 'plan', url: 'https://example.com/first' }] }
+  const second: RichTextElement = { type: 'rich_text_section', elements: [{ type: 'link', text: 'plan', url: 'https://example.com/second' }] }
+  const source = original([paragraph('before'), first, second, paragraph('after')])
+  expect(composeEdit('Before\nplan\nplan\nAfter', source).blocks[0]?.elements).toEqual([paragraph('Before'), first, second, paragraph('After')])
+})

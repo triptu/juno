@@ -15,17 +15,16 @@ function change(before: string, after: string) {
   return { start, end, newEnd, delta: after.length - before.length }
 }
 
-/** Prefix and suffix positions disambiguate repeated paragraphs; middle matches must be unique. */
-function unchangedRange(start: number, shown: string, input: string, diff: ReturnType<typeof change>) {
+/** Prefix and suffix keep their positions; whole blocks between edits match in their original order. */
+function unchangedRange(start: number, shown: string, input: string, diff: ReturnType<typeof change>, cursor: number) {
   let at: number
   if (start + shown.length <= diff.start) at = start
   else if (start >= diff.end) at = start + diff.delta
   else {
     if (shown === '') return undefined
-    at = input.indexOf(shown, diff.start)
+    at = input.indexOf(shown, Math.max(cursor, diff.start))
+    while (at >= 0 && ((at > 0 && input[at - 1] !== '\n') || (at + shown.length < input.length && input[at + shown.length] !== '\n'))) at = input.indexOf(shown, at + 1)
     if (at < 0 || at + shown.length > diff.newEnd) return undefined
-    const next = input.indexOf(shown, at + 1)
-    if (next >= 0 && next + shown.length <= diff.newEnd) return undefined
   }
   const end = at + shown.length
   if ((at > 0 && input[at - 1] !== '\n') || (end < input.length && input[end] !== '\n')) return undefined
@@ -44,7 +43,7 @@ export function composeEdit(input: string, original: MessageContent, lookups: Lo
   const keep = (element: RichTextElement, start: number): void => {
     const shown = elementMarkup(element, lookups)
     if (shown === undefined) { out.push(element); return }
-    const range = unchangedRange(start, shown, input, diff)
+    const range = unchangedRange(start, shown, input, diff, inputAt)
     if (range !== undefined && range.start >= inputAt && !code.some((piece) => piece.start < range.start && piece.end > range.start)) {
       parse(input.slice(inputAt, range.start).replace(/^\n|\n$/g, ''))
       out.push(element)

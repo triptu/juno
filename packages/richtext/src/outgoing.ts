@@ -167,7 +167,7 @@ function tokenizeText(line: string, targets: MentionTargets): Token[] {
 }
 
 /** The elements the composer sends, each of which can carry a style. */
-type Sent = RichTextInline
+type Sent = Exclude<RichTextInline, { readonly type: 'color' | 'unknown' }>
 
 function toElement(token: Token): Sent {
   switch (token.kind) {
@@ -278,7 +278,7 @@ function styledElements(tokens: ReadonlyArray<Token>): RichTextInline[] {
       out[out.length - 1] = { ...last, text: last.text + element.text }
       continue
     }
-    out.push(style === undefined || element.type === 'color' || element.type === 'unknown' ? element : { ...element, style: { ...('style' in element ? element.style : {}), ...style } })
+    out.push(style === undefined ? element : { ...element, style })
   }
   return out
 }
