@@ -1,16 +1,13 @@
 import * as stylex from '@stylexjs/stylex'
 import { CaretRight } from '@phosphor-icons/react/dist/icons/CaretRight'
 import type { ReactNode } from 'react'
-import { colors, layout, motion, radii, shadows, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { sizes } from '@juno/tokens/tokens.stylex'
 import { activateHandlers, focusRing, Icon, Text, type ActivateEvent } from '@juno/ui'
+import { barCard } from './barCard'
 import { HuddleControls } from './HuddleControls'
 import { placeIcons, placeLabel, statusLine } from './look'
 import type { HuddleConnection, HuddleControlsActions, HuddleControlsState, HuddlePerson, HuddlePlace } from './model'
 import { PeopleStack } from './Speaking'
-
-// Hover styles only apply on devices with a real pointer. Local because
-// StyleX cannot read constants from other modules.
-const HOVER = '@media (hover: hover)'
 
 export interface HuddleBarProps extends HuddleControlsState, HuddleControlsActions {
   readonly place: HuddlePlace
@@ -45,25 +42,25 @@ export function HuddleBar({ place, connection, duration, people, sharers = [], s
   // A notice keeps its share of the room; the duration gives way first.
   const notice = status !== duration
   return (
-    <section aria-label="Huddle" data-huddle-bar="" {...stylex.props(styles.root)}>
-      <div {...stylex.props(styles.card)}>
-        <button type="button" aria-label={`Open huddle in ${placeLabel(place)}`} {...activateHandlers<HTMLButtonElement>(onOpen)} {...stylex.props(styles.open, focusRing.outside)}>
-          <span {...stylex.props(styles.placeIcon)}>
+    <section aria-label="Huddle" data-huddle-bar="" {...stylex.props(barCard.root)}>
+      <div {...stylex.props(barCard.card)}>
+        <button type="button" aria-label={`Open huddle in ${placeLabel(place)}`} {...activateHandlers<HTMLButtonElement>(onOpen)} {...stylex.props(barCard.open, focusRing.outside)}>
+          <span {...stylex.props(barCard.placeIcon)}>
             <Icon icon={placeIcons[place.kind]} size={16} />
           </span>
-          <Text variant="ui" weight="medium" tone="default" truncate tooltipWhenTruncated dir="auto" sx={styles.name}>
+          <Text variant="ui" weight="medium" tone="default" truncate tooltipWhenTruncated dir="auto" sx={barCard.name}>
             {place.name}
           </Text>
           <Text variant="meta" tone="subtle" numeric truncate tooltipWhenTruncated sx={[styles.status, notice && styles.keeping]}>
             {status}
           </Text>
-          <span {...stylex.props(styles.spacer)} />
+          <span {...stylex.props(barCard.spacer)} />
           {people.length > 0 ? <PeopleStack people={people} dim={connection === 'reconnecting'} ring="background" /> : null}
-          <span {...stylex.props(styles.caret)}>
+          <span {...stylex.props(barCard.caret)}>
             <Icon icon={CaretRight} size={12} weight="bold" />
           </span>
         </button>
-        <span role="status" {...stylex.props(styles.announce)}>
+        <span role="status" {...stylex.props(barCard.announce)}>
           {notice ? status : (announcement ?? '')}
         </span>
         <div role="group" aria-label="Huddle controls" {...stylex.props(styles.controls)}>
@@ -75,83 +72,6 @@ export function HuddleBar({ place, connection, duration, people, sharers = [], s
 }
 
 const styles = stylex.create({
-  // The sidebar's inset at the sides, and 4px above and below, so with the nav's own 4px it sits 8px over Juno.
-  root: {
-    flexShrink: 0,
-    width: '100%',
-    minWidth: 0,
-    boxSizing: 'border-box',
-    paddingInline: layout['--sidebar-inset'],
-    paddingBlock: spacing['--space-1'],
-    userSelect: 'none',
-  },
-  // A frosted card in the accent: a tinted fill with a sheen from the top, a hairline highlight inside the top
-  // edge and an accent edge, so it stands apart from the sidebar and you can find the call quickly. No
-  // backdrop blur: nothing scrolls or moves behind it. 4px around two 28px rows, 2px between them, as between the controls.
-  // 12 = the controls' 8 + the 4 around them.
-  card: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing['--space-0-5'],
-    padding: spacing['--space-1'],
-    borderWidth: '1px',
-    borderStyle: 'solid',
-    borderColor: colors['--huddle-bar-edge'],
-    borderRadius: radii['--radius-xl'],
-    backgroundColor: colors['--huddle-bar'],
-    backgroundImage: colors['--huddle-bar-sheen'],
-    boxShadow: shadows['--huddle-bar-shadow'],
-    WebkitAppRegion: 'no-drag',
-  },
-  // Its glyph sits 6px in, over the Mute glyph's 6px inside its 28px button.
-  // The faces' ring (the `background` one) takes the fill under them, so it cuts their overlap in the bar's
-  // tint. Not --surface-default: the faces' own fills are mixed with it.
-  // Muted falls under 4.5:1 on the light tint, so "+N" and the caret take subtle (4.78:1 or more).
-  open: {
-    '--foreground-muted': colors['--foreground-subtle'],
-    appearance: 'none',
-    display: 'flex',
-    alignItems: 'center',
-    gap: spacing['--space-2'],
-    width: '100%',
-    minWidth: 0,
-    height: sizes['--control-28'],
-    margin: 0,
-    paddingBlock: 0,
-    paddingInlineStart: spacing['--space-1-5'],
-    paddingInlineEnd: spacing['--space-2'],
-    boxSizing: 'border-box',
-    borderWidth: 0,
-    borderRadius: radii['--radius-lg'],
-    color: colors['--foreground-default'],
-    textAlign: 'start',
-    cursor: 'default',
-    backgroundColor: {
-      default: 'transparent',
-      ':hover': { default: null, [HOVER]: colors['--huddle-bar-hover'] },
-      ':active': { default: colors['--huddle-bar-hover'], [HOVER]: colors['--huddle-bar-hover'] },
-    },
-    '--background': {
-      default: colors['--huddle-bar'],
-      ':hover': { default: null, [HOVER]: colors['--huddle-bar-hover'] },
-      ':active': { default: colors['--huddle-bar-hover'], [HOVER]: colors['--huddle-bar-hover'] },
-    },
-    transitionProperty: 'scale, background-color',
-    transitionDuration: { default: motion['--duration-fast'], '@media (prefers-reduced-motion: reduce)': '0ms' },
-    transitionTimingFunction: motion['--ease-out'],
-    scale: { default: '1', ':active': motion['--press-scale'] },
-  },
-  placeIcon: {
-    display: 'inline-flex',
-    flexShrink: 0,
-    color: colors['--foreground-subtle'],
-  },
-  // The name keeps its room first; a long status line shortens before it does.
-  name: {
-    flexGrow: 0,
-    flexShrink: 1,
-    minWidth: 0,
-  },
   status: {
     flexGrow: 0,
     flexShrink: 4,
@@ -159,24 +79,6 @@ const styles = stylex.create({
   },
   // While the status line is a notice (Reconnecting…, a microphone problem, who shares), it shortens with the name, by their widths.
   keeping: { flexShrink: 1 },
-  // Heard, not seen: what changed, never the ticking duration.
-  announce: {
-    position: 'absolute',
-    width: '1px', // tokens-allow: the visually hidden pattern
-    height: '1px', // tokens-allow: the visually hidden pattern
-    margin: 0,
-    overflow: 'hidden',
-    clipPath: 'inset(50%)',
-    whiteSpace: 'nowrap',
-  },
-  spacer: {
-    flexGrow: 1,
-  },
-  caret: {
-    display: 'inline-flex',
-    flexShrink: 0,
-    color: colors['--foreground-muted'],
-  },
   controls: {
     display: 'flex',
     alignItems: 'center',
