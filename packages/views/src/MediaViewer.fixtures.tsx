@@ -1,4 +1,3 @@
-import * as stylex from '@stylexjs/stylex'
 import type { FileView } from '@juno/contract'
 import { defineFixtures, scene } from '@juno/ui'
 import type { MediaFile } from './MediaGrid'
@@ -7,6 +6,7 @@ import { downloadable, PENDING_PICTURE } from './fixtures/messages'
 import { NOW, people } from './fixtures/topics'
 import { MediaViewer, type MediaViewing } from './MediaViewer'
 import { MessageList } from './MessageList'
+import { TopicView } from './TopicView'
 
 const noop = () => {}
 
@@ -16,27 +16,14 @@ const media = (files: ReadonlyArray<FileView>) => files as ReadonlyArray<MediaFi
 /** As the message behind it (`albumOf`) says: its sender and its time. */
 const viewing = (items: ReadonlyArray<FileView>, index = 0): MediaViewing => ({ items: media(items), index, sender: people.priya.name, at: NOW - 20 * 60_000 })
 
-
-/** The viewer over a topic's list. The frame holds the fixed viewer, as the window does in the app. */
+/** The viewer over a topic, in its `viewer` slot, as a tab shows it. */
 function OverList({ open }: { readonly open: MediaViewing }) {
   return (
-    <div {...stylex.props(styles.window)}>
+    <TopicView header={null} viewer={<MediaViewer viewing={open} now={NOW} onClose={noop} onDownload={noop} onOpenFile={noop} onCopyImage={noop} />}>
       <MessageList items={albumOf(open.items.length)} main={false} now={NOW} onOpenMedia={noop} onDownload={noop} />
-      <MediaViewer viewing={open} now={NOW} onClose={noop} onDownload={noop} onOpenFile={noop} onCopyImage={noop} />
-    </div>
+    </TopicView>
   )
 }
-
-const styles = stylex.create({
-  // Paint containment makes this box the fixed viewer's containing block, so it stays in the frame.
-  window: {
-    display: 'flex',
-    flexDirection: 'column',
-    width: '100%',
-    height: '100%',
-    contain: 'layout paint',
-  },
-})
 
 export default defineFixtures(
   MediaViewer,
