@@ -47,11 +47,20 @@ export type NotificationSource = typeof NotificationSource.Type
 
 export const NotificationTarget = Schema.Union([
   Schema.TaggedStruct('message', { source: NotificationSource }),
+  /** An incoming huddle: its huddle tab. */
+  Schema.TaggedStruct('huddle', { channelId: Schema.String }),
 ])
 export type NotificationTarget = typeof NotificationTarget.Type
 
 /** One OS notification. The id is stable, so main shows a repeated one once. */
-export const OsNotification = Schema.Struct({ id: Schema.String, title: Schema.String, body: Schema.String, target: NotificationTarget })
+export const OsNotification = Schema.Struct({
+  id: Schema.String,
+  title: Schema.String,
+  body: Schema.String,
+  target: NotificationTarget,
+  /** No sound from macOS: an incoming huddle's ring is Juno's own. */
+  silent: Schema.optionalKey(Schema.Boolean),
+})
 export type OsNotification = typeof OsNotification.Type
 
 /** main -> engine over parentPort. A `port` message carries the port in `ports[0]`. */

@@ -29,6 +29,8 @@ export interface RoomFrame {
   /** Epoch milliseconds, when the frame gives a usable time. */
   readonly startedAt: number | undefined
   readonly threadTs: string | undefined
+  /** Who started the huddle. */
+  readonly createdBy: string | undefined
   readonly eventTs: string | undefined
 }
 
@@ -64,6 +66,7 @@ export function decodeRoomFrame(raw: unknown): RoomFrame | undefined {
     ended: frame.room.has_ended === true || participants.length === 0,
     startedAt: secondsToMillis(frame.room.date_start) ?? undefined,
     threadTs: frame.room.thread_root_ts,
+    createdBy: frame.room.created_by,
     eventTs: frame.event_ts,
   }
 }
@@ -92,6 +95,7 @@ export function applyRoomFrame(running: Running, frame: RoomFrame): Running {
     participants: frame.participants,
     startedAt: frame.startedAt ?? entry?.startedAt ?? null,
     threadTs: frame.threadTs ?? entry?.threadTs ?? null,
+    createdBy: frame.createdBy ?? entry?.createdBy ?? null,
     eventTs: frame.eventTs,
   })
 }
@@ -115,6 +119,7 @@ export function applyInfo(running: Running, channels: Iterable<string>, huddles:
         participants: huddle.active_members ?? [],
         startedAt: secondsToMillis(huddle.start_date),
         threadTs: huddle.thread_root_ts ?? null,
+        createdBy: huddle.created_by ?? (entry?.callId === huddle.call_id ? entry.createdBy : null),
         // A frame of this huddle older than the last one applied stays out after a read.
         eventTs: entry?.callId === huddle.call_id ? entry.eventTs : undefined,
       })
@@ -134,6 +139,7 @@ export function applyJoined(running: Running, channelId: string, callId: string,
     participants: huddle.participants,
     startedAt: secondsToMillis(huddle.date_start) ?? (same ? entry.startedAt : null),
     threadTs: huddle.thread_root_ts ?? (same ? entry.threadTs : null),
+    createdBy: huddle.created_by ?? (same ? entry.createdBy : null),
     eventTs: same ? entry.eventTs : undefined,
   })
 }
@@ -141,6 +147,6 @@ export function applyJoined(running: Running, channelId: string, callId: string,
 /** The contract's value: one record keyed by channel id. */
 export function toRunningHuddles(running: Running): RunningHuddles {
   const out: Record<string, RunningHuddle> = {}
-  for (const [channel, { callId, participants, startedAt, threadTs }] of running) out[channel] = { callId, participants, startedAt, threadTs }
+  for (const [channel, { callId, participants, startedAt, threadTs, createdBy }] of running) out[channel] = { callId, participants, startedAt, threadTs, createdBy }
   return out
 }

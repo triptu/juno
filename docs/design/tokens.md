@@ -587,6 +587,7 @@ A field Textarea (a note or pin under edit on What Juno remembers) grows the sam
 | `--shadow-lg` | `0 8px 24px 0 rgba(27,28,21,.10)` | `0 8px 24px 0 rgba(0,0,0,.50)` | css | Toast |
 | `--card-ring` | `0 1px 2px 0 oklch(0 0 0 / .03), 0 6px 20px -4px oklch(0 0 0 / .07)` | `0 1px 2px 0 oklch(0 0 0 / .3), 0 6px 20px -4px oklch(0 0 0 / .35)` | options D1 | Cards: settled hint, Juno cards, settings groups. The name is historical; there is no ring any more |
 | `--huddle-bar-shadow` | `inset 0 1px 0 0 oklch(1 0 0 / .7)`, then `--card-ring` | `inset 0 1px 0 0 oklch(1 0 0 / .08)`, then `--card-ring` | huddles 10-18 | The huddle bar: a hairline highlight inside its top edge, as glass catches light, over the card's shadow |
+| `--huddle-incoming-glow` | `0 0 0 3px` the accent at 0.42, `0 0 14px 2px` at 0.32 | the same | huddles 10-20 | The glow outside an incoming huddle's accent edge, whose opacity pulses, `ease-in-out`. One value for both themes, to keep the initial style sheet under its budget |
 | `--pop-shadow` | `0 2px 6px -1px oklch(0 0 0 / .05), 0 14px 36px -8px oklch(0 0 0 / .13)` | `0 2px 6px -1px oklch(0 0 0 / .3), 0 14px 36px -8px oklch(0 0 0 / .5)` | options D1 | Menus, popovers, palette, hover toolbar |
 | `--peek-shadow` | `0 0 0 1px oklch(0 0 0 / .12), 0 2px 6px -1px oklch(0 0 0 / .08), 0 14px 36px -8px oklch(0 0 0 / .18)` | Same as dark `--pop-shadow` | review 10-18 | Peek: a hairline shadow ring and soft elevation; the transparent border and geometry stay unchanged |
 | `--tab-shadow` | `0 -1px 3px -1px oklch(0 0 0 / .08)` | `0 -1px 3px -1px oklch(0 0 0 / .5)` | 10-16 | The active tab lifted out of the strip: up and sideways only, so nothing falls on the page it joins |
@@ -626,6 +627,7 @@ Three ideas (`friendly-layer.md` §5): instant for the things you do constantly,
 | `--duration-exit` | 150ms | Every exit |
 | `--delay-pending` | 800ms | How long a send may take before its pending row dims |
 | `--stagger` | 80ms | Between the parts of an empty state as they enter |
+| `--duration-pulse` | 2400ms | One breath of an incoming huddle's glow (huddles 10-20), read from the root by its Web Animation. Not shortened for reduced motion: the card does not start the pulse there |
 | `--ease-out` | `cubic-bezier(0.2, 0, 0, 1)` | Presses, toggles, entrances, exits |
 | `--ease-spring` | `cubic-bezier(0.34, 1.4, 0.64, 1)` | The three pops only; overshoots about 8% |
 | `--press-scale` | 0.96 | On `:active`, never when disabled |

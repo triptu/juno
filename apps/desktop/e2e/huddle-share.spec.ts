@@ -19,7 +19,7 @@ const endOwnSource = (win: Page) => win.evaluate(() => (window as unknown as Med
 async function startWithMaya(juno: Juno, fake: FakeSlack, win: Page) {
   await openEngMain(juno)
   await startHuddleFromMenu(juno)
-  const bar = win.getByRole('region', { name: 'Huddle' })
+  const bar = win.getByRole('region', { name: 'Huddle', exact: true })
   await expect(bar).toBeVisible()
   await expect.poll(() => connection(win)).toBe('connected')
   fake.control('joinHuddle', { channel: 'C0ENG', user: 'U0MAYA' })
@@ -29,7 +29,7 @@ async function startWithMaya(juno: Juno, fake: FakeSlack, win: Page) {
 
 async function leave(win: Page, fake: FakeSlack) {
   const attendeeId = await attendee(win)
-  await win.getByRole('region', { name: 'Huddle' }).getByRole('button', { name: 'Leave' }).click()
+  await win.getByRole('region', { name: 'Huddle', exact: true }).getByRole('button', { name: 'Leave' }).click()
   await chimeDrops(win, fake, attendeeId!)
 }
 

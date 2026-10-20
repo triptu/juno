@@ -23,9 +23,16 @@ export interface ShownNotification {
   readonly onClick: (listener: () => void) => void
 }
 
+export interface NotificationOptions {
+  readonly title: string
+  readonly body: string
+  /** No sound from macOS: an incoming huddle rings in Juno. */
+  readonly silent?: boolean
+}
+
 export interface NotifierDeps {
-  /** Electron's `new Notification({ title, body })`, or a fake. */
-  readonly create: (options: { readonly title: string; readonly body: string }) => ShownNotification
+  /** Electron's `new Notification({ title, body, silent })`, or a fake. */
+  readonly create: (options: NotificationOptions) => ShownNotification
   /** `app.dock.setBadge`. */
   readonly setBadge: (text: string) => void
   /** Brings the app window forward and hands it the target. */
@@ -34,7 +41,7 @@ export interface NotifierDeps {
   readonly focus: () => void
   /** To the engine over parentPort. */
   readonly send: (message: MainToEngine) => void
-  /** Privacy mode is on: the body, which quotes the message, is left out (SPEC section 5, Privacy mode). */
+  /** Privacy mode is on: a message's body, which quotes it, is left out (SPEC section 5, Privacy mode). A huddle's says only who started it. */
   readonly privacy: () => boolean
 }
 
@@ -93,11 +100,11 @@ export class Notifier {
 
   private show(notification: OsNotification): void {
     if (this.shown.has(notification.id)) return
-    const body = this.deps.privacy() ? HIDDEN_BODY : notification.body
-    this.post(notification.id, { title: notification.title, body }, () => this.deps.open(notification.target))
+    const body = this.deps.privacy() && notification.target._tag === 'message' ? HIDDEN_BODY : notification.body
+    this.post(notification.id, { title: notification.title, body, ...(notification.silent === true ? { silent: true } : {}) }, () => this.deps.open(notification.target))
   }
 
-  private post(id: string, options: { readonly title: string; readonly body: string }, onClick: () => void): void {
+  private post(id: string, options: NotificationOptions, onClick: () => void): void {
     const shown = this.deps.create(options)
     shown.onClick(() => {
       this.shown.delete(id)

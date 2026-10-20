@@ -20,7 +20,7 @@ const room = (over: Record<string, unknown> = {}) => ({
 describe('room frames', () => {
   it('decodes a room frame from an unknown socket frame, and nothing else', () => {
     expect(decodeRoomFrame(room())).toEqual({
-      channelId: 'C1', roomId: 'R2', participants: ['U0ME', 'U0MAYA'], ended: false, startedAt: 1_790_000_000_000, threadTs: undefined, eventTs: '20.000002',
+      channelId: 'C1', roomId: 'R2', participants: ['U0ME', 'U0MAYA'], ended: false, startedAt: 1_790_000_000_000, threadTs: undefined, createdBy: undefined, eventTs: '20.000002',
     })
     expect(decodeRoomFrame({ type: 'huddle_invite_cancel', channel_id: 'C1' })).toBeUndefined()
     expect(decodeRoomFrame({ type: 'sh_room_join', user: 'U0MAYA' })).toBeUndefined()

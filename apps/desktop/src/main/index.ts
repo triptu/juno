@@ -117,7 +117,7 @@ const huddleQuit = createHuddleQuit(e2e, appWindow)
 supervisor.onFailed(() => { huddleQuit.engineFailed(); dockBadge.set('') })
 
 /** Under JUNO_E2E notifications are recorded, not shown; a test clicks them through `junoTest`. */
-const notificationsForTests: Array<{ readonly title: string; readonly body: string; click: () => void }> = []
+const notificationsForTests: Array<{ readonly title: string; readonly body: string; readonly silent?: boolean; click: () => void }> = []
 let badgeForTests = ''
 
 /** A clicked notification: the app window comes forward, or opens. */
@@ -129,7 +129,7 @@ function focusWindow(): BrowserWindow {
   return window
 }
 
-/** A clicked message notification: the window comes forward and the renderer opens the target. */
+/** A clicked message or huddle notification: the window comes forward and the renderer opens the target. */
 function openTarget(target: NotificationTarget): void {
   focusWindow().webContents.send(Events.notificationOpen, target)
 }
@@ -141,7 +141,7 @@ const notifier = new Notifier({
       notificationsForTests.push(recorded)
       return { show: () => {}, close: () => {}, onClick: (f) => { recorded.click = f } }
     }
-    const shown = new Notification({ title: options.title, body: options.body })
+    const shown = new Notification({ title: options.title, body: options.body, silent: options.silent === true })
     return { show: () => shown.show(), close: () => shown.close(), onClick: (f) => shown.on('click', f) }
   },
   setBadge: (text) => dockBadge.set(text),
@@ -367,7 +367,7 @@ if (e2e) {
       agentHost: () => agent.host?.host,
       agentPid: () => agent.pid,
       ...processes.testHooks,
-      notifications: () => notificationsForTests.map(({ title, body }) => ({ title, body })),
+      notifications: () => notificationsForTests.map(({ title, body, silent }) => ({ title, body, ...(silent === true ? { silent } : {}) })),
       clickNotification: (index = 0) => notificationsForTests[index]?.click(),
       dockBadge: () => badgeForTests,
       clearDockBadge: () => dockBadge.set(''),

@@ -368,3 +368,13 @@ export function subscribeMedia(listener: () => void): () => void {
 export function mediaSnapshot(): MediaSnapshot | undefined {
   return session?.getSnapshot()
 }
+
+/** Where the ring plays: the speaker picked for huddles, or the system's (null). */
+export function pickedSpeaker(): string | null {
+  return readPicks().speaker
+}
+
+/** Whether this page runs the fake media session, as under JUNO_E2E. */
+export async function fakeMedia(): Promise<boolean> {
+  return (await register()).fakeMedia
+}

@@ -50,6 +50,7 @@ export const RoomsJoinHuddle = S.Struct({
   participants: opt(S.Array(S.String)),
   date_start: opt(S.Number),
   thread_root_ts: opt(S.String),
+  created_by: opt(S.String),
 })
 export type RoomsJoinHuddle = typeof RoomsJoinHuddle.Type
 
@@ -84,6 +85,8 @@ export const HuddleInfo = S.Struct({
   active_members: opt(S.Array(S.String)),
   start_date: opt(S.Number),
   thread_root_ts: opt(S.String),
+  /** Who started it: a user id. */
+  created_by: opt(S.String),
 })
 export type HuddleInfo = typeof HuddleInfo.Type
 
@@ -103,6 +106,8 @@ export const RoomFrameRoom = S.Struct({
   date_start: opt(S.Number),
   has_ended: opt(S.Boolean),
   thread_root_ts: opt(S.String),
+  /** Who started the huddle: a user id. */
+  created_by: opt(S.String),
 })
 export type RoomFrameRoom = typeof RoomFrameRoom.Type
 

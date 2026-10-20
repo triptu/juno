@@ -8,6 +8,7 @@ import HuddleDeviceMenu from './HuddleDeviceMenu.fixtures'
 import HuddleHeaderButton from './HuddleHeaderButton.fixtures'
 import HuddleIndicator from './HuddleIndicator.fixtures'
 import HuddlePage from './HuddlePage.fixtures'
+import IncomingHuddleCard from './IncomingHuddleCard.fixtures'
 import ScreenSourcePicker from './ScreenSourcePicker.fixtures'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -17,5 +18,6 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   HuddleHeaderButton,
   HuddleIndicator,
   HuddlePage,
+  IncomingHuddleCard,
   ScreenSourcePicker,
 }

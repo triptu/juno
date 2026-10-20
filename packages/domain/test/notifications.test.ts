@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  decideHuddleAlert,
   decideNotification,
   defaultNotificationSettings,
   inHours,
@@ -181,5 +182,27 @@ describe('calendar notification starts', () => {
   })
   it('uses the day on which an overnight window starts', () => {
     expect(nextHoursStart(monday.getTime(), { days: [1], from: 1320, to: 120 })).toBe(new Date(2026, 9, 12, 22).getTime())
+  })
+})
+
+describe('incoming huddle', () => {
+  const huddle = (channelId: string, startedBy: string, when: LocalTime, ignored = false) => decideHuddleAlert({ channelId, startedBy, ignored, at: when }, settings)
+
+  it('rings inside notification hours and is quiet outside them', () => {
+    expect(huddle('C0PRODUCT', 'U0LEO', at(MON, 10))).toBe('ring')
+    expect(huddle('C0PRODUCT', 'U0LEO', at(MON, 19))).toBe('quiet')
+    expect(huddle('C0PRODUCT', 'U0LEO', at(SAT, 10))).toBe('quiet')
+  })
+
+  it('follows Every message and Never on the conversation or the person who started it, Every message first', () => {
+    expect(huddle('C0INCIDENTS', 'U0LEO', at(SAT, 23))).toBe('ring')
+    expect(huddle('C0PRODUCT', mayaId, at(SAT, 23))).toBe('ring')
+    expect(huddle(eng.id, 'U0LEO', at(MON, 10))).toBe('quiet')
+    expect(huddle('C0PRODUCT', 'U0SAM', at(MON, 10))).toBe('quiet')
+    expect(huddle(eng.id, mayaId, at(MON, 10))).toBe('ring')
+  })
+
+  it('shows nothing for an ignored conversation', () => {
+    expect(huddle('C0INCIDENTS', mayaId, at(MON, 10), true)).toBe('none')
   })
 })

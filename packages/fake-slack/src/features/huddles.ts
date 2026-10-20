@@ -10,6 +10,8 @@ interface FakeHuddle {
   readonly callId: string
   readonly channel: string
   readonly dateStart: number
+  /** Who started it: the first to join. */
+  readonly createdBy: string
   readonly participants: Array<string>
   readonly attendees: Set<string>
 }
@@ -52,24 +54,24 @@ function emitRoom(ws: Workspace, type: ShRoomFrame['type'], huddle: FakeHuddle, 
     type,
     ...(user === undefined ? {} : { user }),
     huddle: { channel_id: huddle.channel },
-    room: { id: huddle.callId, channels: [huddle.channel], participants: ended ? [] : [...huddle.participants], date_start: huddle.dateStart, has_ended: ended },
+    room: { id: huddle.callId, channels: [huddle.channel], participants: ended ? [] : [...huddle.participants], date_start: huddle.dateStart, has_ended: ended, created_by: huddle.createdBy },
     event_ts: ws.eventTs(),
   })
   ws.emit({ type: 'unknown', raw } as RtmFrame)
 }
 
-function start(ws: Workspace, channel: string): FakeHuddle {
+function start(ws: Workspace, channel: string, user: string): FakeHuddle {
   const huddles = huddlesOf(ws)
   const existing = huddles.byChannel.get(channel)
   if (existing !== undefined) return existing
   huddles.calls += 1
-  const huddle: FakeHuddle = { callId: `R${String(huddles.calls).padStart(9, '0')}`, channel, dateStart: Math.floor(ws.clock.now() / 1000), participants: [], attendees: new Set() }
+  const huddle: FakeHuddle = { callId: `R${String(huddles.calls).padStart(9, '0')}`, channel, dateStart: Math.floor(ws.clock.now() / 1000), createdBy: user, participants: [], attendees: new Set() }
   huddles.byChannel.set(channel, huddle)
   return huddle
 }
 
 function join(ws: Workspace, channel: string, user: string): FakeHuddle {
-  const huddle = start(ws, channel)
+  const huddle = start(ws, channel, user)
   if (!huddle.participants.includes(user)) huddle.participants.push(user)
   emitRoom(ws, 'sh_room_join', huddle, user)
   return huddle
@@ -133,7 +135,7 @@ export const huddlesFeature = {
       const huddles = huddlesOf(ws)
       huddles.attendees += 1
       const attendeeId = `fake-attendee-${huddles.attendees}`
-      const huddle = start(ws, conversation.id)
+      const huddle = start(ws, conversation.id, ws.selfId)
       huddle.attendees.add(attendeeId)
       join(ws, conversation.id, ws.selfId)
       const host = 'fake-chime.invalid'
@@ -156,7 +158,7 @@ export const huddlesFeature = {
             attendee: { AttendeeId: attendeeId, ExternalUserId: `${ws.team.id}-${huddle.callId}-${ws.selfId}`, JoinToken: 'fake-join-token' },
           },
         },
-        huddle: { id: huddle.callId, channels: [conversation.id], participants: [...huddle.participants], date_start: huddle.dateStart },
+        huddle: { id: huddle.callId, channels: [conversation.id], participants: [...huddle.participants], date_start: huddle.dateStart, created_by: huddle.createdBy },
       }
     },
     'users.profile.set': (ctx, args) => {
@@ -178,7 +180,7 @@ export const huddlesFeature = {
       const byChannel = huddlesOf(ctx.workspace).byChannel
       const huddles = args.channel_ids.flatMap((channel) => {
         const huddle = byChannel.get(channel)
-        return huddle === undefined ? [] : [{ call_id: huddle.callId, channel_id: channel, active_members: [...huddle.participants], start_date: huddle.dateStart }]
+        return huddle === undefined ? [] : [{ call_id: huddle.callId, channel_id: channel, active_members: [...huddle.participants], start_date: huddle.dateStart, created_by: huddle.createdBy }]
       })
       return Schema.encodeSync(EdgeHuddlesInfoOk)({ ok: true, huddles })
     },

@@ -1,15 +1,15 @@
 /**
  * The huddle's entries in the seams that load with the app: the sidebar
- * bar's slot, the share sheet's place over the window, the topic header's
- * control and the row glyph. They read only small atoms, so nothing
- * re-renders while no huddle runs; the bar, the share sheet, the header
- * control and the tab are lazy chunks.
+ * bar's slot, the incoming huddle's card, the share sheet's place over the
+ * window, the topic header's control and the row glyph. They read only
+ * small atoms, so nothing re-renders while no huddle runs; the bar, the
+ * card, the share sheet, the header control and the tab are lazy chunks.
  */
 import { Suspense, useEffect, useSyncExternalStore } from 'react'
 import { useAtomValue } from '@juno/state/react'
 import type { HuddleCall, TopicDetail, TopicRow } from '@juno/contract'
 import { HuddleIndicator, huddleIndicatorLabel } from '@juno/huddle-views'
-import { huddleCallValueAtom, huddleCountAtom } from '@juno/state'
+import { huddleCallValueAtom, huddleCountAtom, huddleIncomingValueAtom } from '@juno/state'
 import { SheetLayer } from '@juno/views'
 import { chunk, usePreloaded } from '../chunks'
 import type { RowAccessory } from '../rowAccessories'
@@ -17,6 +17,8 @@ import { closeSharePicker, sharePickerOpen, subscribeSharePicker } from './share
 
 const bar = chunk(() => import('./Bar'))
 const LazyBar = bar.component((module) => module.default)
+const incoming = chunk(() => import('./Incoming'))
+const LazyIncoming = incoming.component((module) => module.default)
 const picker = chunk(() => import('./SharePicker'))
 const LazyPicker = picker.component((module) => module.default)
 const header = chunk(() => import('./Header'))
@@ -33,6 +35,19 @@ export function HuddleBarSlot() {
   return (
     <Suspense fallback={null}>
       <LazyBar call={call} />
+    </Suspense>
+  )
+}
+
+/** The incoming huddle's card and ring, while someone has just started a huddle where the user is. */
+export function IncomingHuddleSlot() {
+  const list = useAtomValue(huddleIncomingValueAtom)
+  const wanted = list.length > 0
+  usePreloaded(incoming, wanted)
+  if (!wanted) return null
+  return (
+    <Suspense fallback={null}>
+      <LazyIncoming incoming={list} />
     </Suspense>
   )
 }

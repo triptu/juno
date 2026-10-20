@@ -1,0 +1,1 @@
+- 10-20 13:54 · incoming-huddle-in-call · While the user is in a huddle, an incoming card sits under the bar and offers Switch, as the header does; it does not ring and its notification is silent. Why: a card above would move the bar under the pointer, and a ring would play over the call.

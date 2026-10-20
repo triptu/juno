@@ -1,0 +1,1 @@
+- 10-20 13:57 · incoming-huddle-join · The card's Join joins without opening the huddle tab, as the header's Join does; its first row opens the tab. Dismissed huddles are kept in the engine's memory for the session, not stored. Why: one behaviour for every Join; a dismissed huddle is minutes old at most.
