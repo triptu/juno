@@ -12,17 +12,20 @@ export const writeHuddle = (channel: string, room: RoomFrameRoom, selfId: string
   if (start <= 0 || Math.max(start, (room.date_end ?? 0) * 1000) < now - WEEK || start > now || room.created_by === undefined) return
   const joined = room.created_by === selfId || room.participants?.includes(selfId) === true || room.participant_history?.includes(selfId) === true
   const ended = room.has_ended === true && (room.date_end ?? 0) > 0 ? room.date_end! * 1000 : null
+  const thread = room.thread_root_ts ?? room.canvas_thread_ts ?? threadTs ?? null
   yield* sql`INSERT INTO huddle_history (call_id, channel, started_by, started_at, ended_at, thread_ts, joined, history_known)
-    VALUES (${room.id}, ${channel}, ${room.created_by}, ${start}, ${ended}, ${room.thread_root_ts ?? room.canvas_thread_ts ?? threadTs ?? null}, ${joined ? 1 : 0}, ${ended !== null && room.participant_history !== undefined ? 1 : 0})
+    VALUES (${room.id}, ${channel}, ${room.created_by}, ${start}, ${ended}, ${thread}, ${joined ? 1 : 0}, ${ended !== null && room.participant_history !== undefined ? 1 : 0})
     ON CONFLICT (call_id) DO UPDATE SET
       ended_at = COALESCE(huddle_history.ended_at, excluded.ended_at),
       thread_ts = COALESCE(excluded.thread_ts, huddle_history.thread_ts),
       joined = MAX(huddle_history.joined, excluded.joined),
       history_known = MAX(huddle_history.history_known, excluded.history_known)`
-  if (joined) yield* sql`UPDATE huddle_history SET seen = 1 WHERE channel = ${channel} AND started_at <= ${start}`
+  if (joined) yield* sql`UPDATE huddle_history SET seen = 1 WHERE channel = ${channel}
+    AND (call_id = ${room.id} OR started_at < ${start} OR (started_at = ${start} AND thread_ts < ${thread}))`
   // A later join may have arrived before this older room's history page.
   yield* sql`UPDATE huddle_history SET seen = 1 WHERE call_id = ${room.id} AND EXISTS
-    (SELECT 1 FROM huddle_history later WHERE later.channel = ${channel} AND later.joined = 1 AND later.started_at >= ${start})`
+    (SELECT 1 FROM huddle_history later WHERE later.channel = ${channel} AND later.joined = 1 AND (later.call_id = ${room.id} OR later.started_at > ${start}
+      OR (later.started_at = ${start} AND later.thread_ts > ${thread})))`
   yield* sql`DELETE FROM huddle_history WHERE COALESCE(ended_at, started_at) < ${now - WEEK}`
   yield* (yield* Invalidation).invalidate(['huddle_history'])
 })

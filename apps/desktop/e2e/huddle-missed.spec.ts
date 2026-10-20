@@ -89,3 +89,18 @@ test('Never hides a missed huddle, Every message restores it, and ignoring the c
   await juno.topic.expectTitle('product')
   await expect(juno.topic.root.getByRole('heading', { name: 'Main', exact: true })).toBeVisible()
 })
+
+
+test('a later missed huddle is not cleared by an earlier join in the same second', async ({ juno, fake }) => {
+  fake.workspace.clock.set(Date.now() - 60_000)
+  fake.control('startHuddle', { channel: 'D0MAYA', user: 'U0MAYA' })
+  fake.control('joinHuddle', { channel: 'D0MAYA', user: SELF_ID })
+  fake.control('endHuddle', { channel: 'D0MAYA' })
+  fake.control('startHuddle', { channel: 'D0MAYA', user: 'U0MAYA' })
+  fake.control('endHuddle', { channel: 'D0MAYA' })
+  fake.workspace.clock.resume()
+  await juno.signIn()
+  await juno.waitForSync()
+  await revisit(juno)
+  await expect(juno.home.title('missedHuddle')).toHaveText('Missed huddle with Maya')
+})
