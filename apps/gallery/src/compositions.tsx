@@ -4,10 +4,14 @@
  *
  * `HuddleInSidebar` puts the huddle bar (`@juno/huddle-views`) in the real
  * sidebar's (`@juno/views`) `top` slot, under the title bar.
+ *
+ * `TopicHeaderInPage` puts the huddle control (`@juno/huddle-views`) in the
+ * topic header (`@juno/views`) of the Workspace's Header pages, as the
+ * app's container decides it.
  */
 import * as stylex from '@stylexjs/stylex'
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react'
-import { HuddleBar, HuddleDeviceMenu, type HuddleBarProps, type HuddlePerson } from '@juno/huddle-views'
+import { HuddleBar, HuddleDeviceMenu, HuddleHeaderButton, type HuddleBarProps, type HuddleHeaderMode, type HuddlePerson } from '@juno/huddle-views'
 import { defineFixtures, scene, type FixtureFrame, type FixtureSet } from '@juno/ui'
 import { fixtures as views } from '@juno/views/fixtures'
 
@@ -67,6 +71,30 @@ const inSidebar = (props: Partial<HuddleBarProps> = {}, frame?: FixtureFrame) =>
 
 const frame: FixtureFrame = { width: 384, height: 720, padded: false, surface: 'subtle' }
 
+interface HeaderPageProps {
+  /** A state of the Workspace's Header group. */
+  readonly page: string
+  readonly huddle?: HuddleHeaderMode
+}
+
+type Element<P> = ReactElement<P & { readonly children?: ReactNode }>
+
+// The Workspace's page with the huddle control in its topic header's `actions`.
+function HeaderPage({ page, huddle }: HeaderPageProps) {
+  const state = views['Workspace']?.groups.find((group) => group.id === 'header')?.states.find((entry) => entry.key === page)
+  const workspace = state?.fixture.render?.()
+  if (!isValidElement(workspace)) return null
+  const topic = (workspace as Element<object>).props.children
+  if (huddle === undefined || !isValidElement(topic)) return workspace
+  const view = topic as Element<{ header?: ReactNode }>
+  const header = view.props.header
+  if (!isValidElement(header)) return workspace
+  const control = <HuddleHeaderButton mode={huddle} people={people.slice(0, 3)} place="#eng" current="#design" onClick={noop} />
+  return cloneElement(workspace as Element<object>, {}, cloneElement(view, { header: cloneElement(header as Element<{ actions?: ReactNode }>, { actions: control }) }))
+}
+
+const headerPage = (page: string, huddle?: HuddleHeaderMode) => scene<HeaderPageProps>(() => <HeaderPage page={page} {...(huddle === undefined ? {} : { huddle })} />, { width: 1100, height: 640, padded: false })
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const compositions: Readonly<Record<string, FixtureSet<any>>> = {
   HuddleInSidebar: defineFixtures(
@@ -84,6 +112,20 @@ export const compositions: Readonly<Record<string, FixtureSet<any>>> = {
       },
     },
     frame,
+  ),
+  TopicHeaderInPage: defineFixtures(
+    HeaderPage,
+    {
+      Header: {
+        'dm-thread': headerPage('dm-thread', 'start'),
+        'dm-main': headerPage('dm-main', 'start'),
+        'channel-main': headerPage('channel-main', 'start'),
+        'channel-main-huddle': headerPage('channel-main', 'join'),
+        'thread-resolve': headerPage('thread-resolve'),
+        'thread-follow': headerPage('thread-follow'),
+      },
+    },
+    { width: 1100, height: 640, padded: false },
   ),
 }
 

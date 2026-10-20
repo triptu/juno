@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import type { TopicDetail } from '@juno/contract'
+import type { MessageListItem } from './MessageList'
 import { defineFixtures, scene, type FixtureFrame } from '@juno/ui'
 import { ComposerSlot } from './ComposerSlot'
-import { details, main, mainDividerBefore, thread } from './fixtures/messages'
+import { details, dmMain, dmThread, main, mainDividerBefore, thread } from './fixtures/messages'
 import { art, NOW, people } from './fixtures/topics'
 import { MessageList } from './MessageList'
 import { TopicHeader } from './TopicHeader'
@@ -26,6 +28,7 @@ const tabs = {
   density: { id: 'C0DESIGNREV:1759900000.000900', title: 'Thread list density', icon: 'hash', tile: { kind: 'art', topicId: 't:C0DESIGNREV:1759900000.000900', recipe: art.people } } satisfies WorkspaceTab,
   // Its art is not drawn yet: the placeholder shape.
   hiring: { id: 'C0HIRING:1760000000.000300', title: 'Rina Sato · Staff backend', icon: 'lock', tile: { kind: 'art', topicId: 't:C0HIRING:1760000000.000300' } } satisfies WorkspaceTab,
+  mayaMain: { id: 'D0MAYA:main', title: 'Maya Chen', icon: 'user', tile: mayaTile } satisfies WorkspaceTab,
   maya: { id: 'D0MAYA:1759990000.000500', title: 'Offsite: Wednesday afternoon slot', icon: 'user', tile: mayaTile } satisfies WorkspaceTab,
   // A person with no photo: initials.
   dev: { id: 'D0DEV:main', title: 'Dev Patel', icon: 'user', tile: { kind: 'person', ...people.dev } } satisfies WorkspaceTab,
@@ -75,6 +78,25 @@ const engPanelPage = (
     <MessageList items={main} main now={NOW} dividerBefore={mainDividerBefore} onOpenThread={noop} onChannel={noop} onLink={noop} />
   </TopicView>
 )
+
+/** A topic page as the app draws it: a thread gets Resolve and Follow, a Main neither. */
+const topicPage = (detail: TopicDetail, items: ReadonlyArray<MessageListItem>, placeholder: string) => {
+  const isMain = detail.kind === 'main'
+  return (
+    <TopicView header={<TopicHeader detail={detail} onMenu={noop} onPill={noop} juno={{ open: false, onToggle: noop }} {...(isMain ? {} : { onResolve: noop, onFollow: noop })} />} composer={<ComposerSlot placeholder={placeholder} />}>
+      <MessageList items={items} main={isMain} now={NOW} onOpenThread={noop} onChannel={noop} onLink={noop} />
+    </TopicView>
+  )
+}
+
+/** The header's right island over real conversations: a DM's thread and Main, #eng's Main, a thread to resolve and one to follow. */
+const headerPages = {
+  dmThread: topicPage(details.offsite, dmThread, 'Reply'),
+  dmMain: topicPage(details.mayaMain, dmMain, 'Message Maya Chen'),
+  channelMain: topicPage(details.engMain, main, 'Message #eng'),
+  threadResolve: topicPage(details.postgres, thread, 'Reply'),
+  threadFollow: topicPage({ ...details.postgres, subscribed: false, status: 'unsubscribed' }, thread, 'Reply'),
+}
 
 const panelItems = [
   day(0),
@@ -183,6 +205,14 @@ export default defineFixtures(
       'sidebar-hidden-minimum-window': workspace({ tabs: browserTabs, activeId: tabs.postgres.id, leading: sidebarControls }, postgresPage, { width: 720, height: 480 }),
       'thirty-seven-tabs': workspace({ tabs: thirtySeven, ...(lastTab === undefined ? {} : { activeId: lastTab }) }, postgresPage),
       'thirty-seven-tabs-minimum-window': workspace({ tabs: thirtySeven, ...(lastTab === undefined ? {} : { activeId: lastTab }) }, postgresPage, { width: 720, height: 480 }),
+    },
+    // The topic header's right island on real conversations (the gallery's TopicHeaderInPage adds the huddle control).
+    Header: {
+      'dm-thread': workspace({ tabs: [tabs.maya, tabs.postgres], activeId: tabs.maya.id }, headerPages.dmThread, { width: 1100, height: 640 }),
+      'dm-main': workspace({ tabs: [tabs.mayaMain, tabs.postgres], activeId: tabs.mayaMain.id }, headerPages.dmMain, { width: 1100, height: 640 }),
+      'channel-main': workspace({ tabs: [tabs.eng, tabs.postgres], activeId: tabs.eng.id }, headerPages.channelMain, { width: 1100, height: 640 }),
+      'thread-resolve': workspace({ tabs: [tabs.eng, tabs.postgres], activeId: tabs.postgres.id }, headerPages.threadResolve, { width: 1100, height: 640 }),
+      'thread-follow': workspace({ tabs: [tabs.eng, tabs.postgres], activeId: tabs.postgres.id }, headerPages.threadFollow, { width: 1100, height: 640 }),
     },
     // Each tab's icon: the topic's art, the DM person's photo, the page's glyph. Inactive ones dim with their title.
     'Tab icons': {
