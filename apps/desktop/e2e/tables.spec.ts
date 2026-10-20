@@ -1,7 +1,8 @@
 // Tables in messages (spec section 7, "Tables"): a Slack `table` block shows
 // its cells, the first row as the header; a table wider than the message
-// scrolls sideways inside its own box and never widens the message; and a
-// message that is only a table reads "Table: " and its first row in the sidebar.
+// scrolls sideways inside its own box, its far edge shaded, and never widens
+// the message; and a message that is only a table reads "Table: " and its
+// first row in the sidebar.
 import { tableBlock } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 
@@ -62,8 +63,12 @@ test('a table shows its cells, scrolls sideways in its own box, and reads as a t
   expect(widths.bodyContent).toBe(widths.body)
   const scroller = juno.topic.scroller
   const listScroll = await scroller.evaluate((element) => element.scrollLeft)
+  // While there is more to the right, the far edge is shaded; at the end it is not.
+  const edge = box.locator('[data-table-edge]')
+  await expect(edge).toHaveCSS('opacity', '1')
   await box.evaluate((element) => { element.scrollLeft = element.scrollWidth })
   await expect.poll(() => box.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0)
   await expect(table.getByRole('columnheader', { name: 'Notes' })).toBeInViewport()
+  await expect(edge).toHaveCSS('opacity', '0')
   expect(await scroller.evaluate((element) => element.scrollLeft)).toBe(listScroll)
 })
