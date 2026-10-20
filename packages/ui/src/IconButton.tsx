@@ -191,7 +191,6 @@ const styles = stylex.create({
     backgroundColor: {
       default: colors['--danger'],
       ':hover': { default: null, [HOVER]: colors['--danger-fill-hover'] },
-      ':active': { default: colors['--danger-fill-active'], [HOVER]: colors['--danger-fill-active'] },
     },
   },
   pair: {
