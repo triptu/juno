@@ -91,6 +91,7 @@ export const darkShadows = stylex.createTheme(shadows, {
   '--shadow-lg': '0 8px 24px 0 rgba(0, 0, 0, 0.50)',
   '--card-ring': '0 1px 2px 0 oklch(0 0 0 / 0.3), 0 6px 20px -4px oklch(0 0 0 / 0.35)',
   '--huddle-bar-shadow': 'inset 0 1px 0 0 oklch(1 0 0 / 0.08), 0 1px 2px 0 oklch(0 0 0 / 0.3), 0 6px 20px -4px oklch(0 0 0 / 0.35)',
+  '--huddle-incoming-glow': '0 0 0 3px oklch(from var(--hl) l c h / 0.4), 0 0 16px 2px oklch(from var(--hl) l c h / 0.3)',
   '--peek-shadow': '0 2px 6px -1px oklch(0 0 0 / 0.3), 0 14px 36px -8px oklch(0 0 0 / 0.5)',
   '--pop-shadow': '0 2px 6px -1px oklch(0 0 0 / 0.3), 0 14px 36px -8px oklch(0 0 0 / 0.5)',
   // On ink a dark ring cannot separate; a faint light edge inside does, as on macOS.

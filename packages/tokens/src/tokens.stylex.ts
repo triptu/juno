@@ -423,6 +423,8 @@ export const shadows = stylex.defineVars({
   '--card-ring': '0 1px 2px 0 oklch(0 0 0 / 0.03), 0 6px 20px -4px oklch(0 0 0 / 0.07)',
   // The huddle bar: a hairline highlight inside its top edge, as glass catches light, over the card's shadow.
   '--huddle-bar-shadow': 'inset 0 1px 0 0 oklch(1 0 0 / 0.7), 0 1px 2px 0 oklch(0 0 0 / 0.03), 0 6px 20px -4px oklch(0 0 0 / 0.07)',
+  // An incoming huddle's card: a soft accent glow outside its accent edge, which pulses.
+  '--huddle-incoming-glow': '0 0 0 3px oklch(from var(--hl) l c h / 0.28), 0 0 14px 2px oklch(from var(--hl) l c h / 0.22)',
   '--peek-shadow': '0 0 0 1px oklch(0 0 0 / 0.12), 0 2px 6px -1px oklch(0 0 0 / 0.08), 0 14px 36px -8px oklch(0 0 0 / 0.18)',
   '--pop-shadow': '0 2px 6px -1px oklch(0 0 0 / 0.05), 0 14px 36px -8px oklch(0 0 0 / 0.13)',
   // The Juno panel floating over the page: a hairline ring, a tight contact
@@ -762,6 +764,10 @@ export const motion = stylex.defineVars({
     [REDUCED_MOTION]: '0ms',
   },
   '--ease-out': 'cubic-bezier(0.2, 0, 0, 1)',
+  // A loop that swells and settles: the incoming huddle's pulse.
+  '--ease-in-out': 'cubic-bezier(0.45, 0, 0.55, 1)',
+  // One breath of the incoming huddle's pulse. Reduced motion stops the pulse instead.
+  '--duration-pulse': '2400ms',
   // Overshoots by about 8%. The three pops only.
   '--ease-spring': 'cubic-bezier(0.34, 1.4, 0.64, 1)',
   '--press-scale': {
