@@ -746,7 +746,7 @@ Agents run selective checks before reporting. A scheduled task runs the full sui
 
 **Flakes.** Remote Playwright runs retry once. Tests that pass only on retry remain listed as flaky in the console and full-run summary. A failed test fails the gate. Fix intermittent failures without weakening assertions or running retry loops to obtain green results. Use `pnpm flake` to investigate them ("Hunting a flaky test" below).
 
-**Remote plan shape**: `pnpm affected` and `pnpm verify:main` use separate unit, app and specs jobs on the SSH runner. The app job builds the desktop app once and does not shard desktop e2e. See "Remote runs" and "Machine shapes".
+**Remote plan shape**: `pnpm affected` and `pnpm verify:main` use separate unit, gallery, desktop and specs jobs on the SSH runner. The desktop job builds the app once and does not shard desktop e2e. See "Remote runs" and "Machine shapes".
 
 **Test selection by coverage** (landed 10-17): `pnpm affected` picks desktop e2e specs by a coverage map that `pnpm verify:main` refreshes, and gallery behaviour specs by the components they open. See "Desktop specs by coverage".
 
@@ -923,14 +923,16 @@ tstack owns reservations, pinned containers, leases, heartbeats and cleanup.
 See [Juno runner configuration](self-hosted-runner.md); use `/tstack:runner`
 for machine setup, lessons and troubleshooting.
 
-Jobs wait up to 60 seconds for capacity (`--wait <seconds>` or
+Standalone jobs wait up to 60 seconds for capacity; split plans default to one hour so a job can wait for another job in the plan to release its cores (`--wait <seconds>` or
 `JUNO_RUNNER_WAIT` changes this). An unavailable or full runner fails. Use
 `pnpm remote --local <script>` or `pnpm affected --local` to run the steps on
 this Mac through the heavy lock. No automatic local fallback is enabled.
 Namespace, if needed again, is available only through `/tstack:runner`.
 
-`test:plan` splits unit, app and specs steps into independent SSH jobs. App
-steps run in order and share builds; conformance stays with specs. Each job
+`test:plan` splits unit, gallery, desktop and specs steps into independent SSH jobs.
+Steps within each job run in order; conformance stays with specs. Gallery and
+desktop can overlap within the existing allocator limit. Each uses the verified
+persistent build cache for its own output; they do not share a workspace. Each job
 gets a separate install and report directory, and releases its cores when it
 finishes. `JUNO_RUNNER_PLAN=single` keeps one job; `JUNO_PLAN_SERIAL=1` also
 runs every step in order. `KEY=VALUE` before a step overrides its environment.
@@ -1461,7 +1463,9 @@ Use `fake.holdNext({ method, reason: 'open' })`, assert the call is held, then `
 `pnpm verify:main --ref origin/main` runs every suite on main; fetch main first.
 The scheduled task runs it once a day on main. It checks out that commit in a temporary worktree on the scratch volume and
 runs unit tests, Quint checks, conformance, gallery and desktop tests as
-one plan of separate SSH jobs on the laptop. Heavy sync tests stay in
+one plan of separate unit, specs, gallery and desktop SSH jobs on the laptop.
+Gallery and desktop each request two physical cores; desktop can start when
+unit releases its two cores, without increasing Juno's lent allocation. Heavy sync tests stay in
 this run. Random Quint simulations run each time; deterministic Apalache and
 typecheck results use the cache. Changes to sync or outbox code also trigger selective protocol checks.
 

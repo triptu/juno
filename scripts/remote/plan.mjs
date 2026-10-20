@@ -10,7 +10,7 @@ export function runnerPlanJobs(options, env = process.env) {
   const steps = parsePlan(options.args)
   const groups = new Map()
   for (const [index, step] of steps.entries()) {
-    const kind = appSuites.includes(step.script) ? 'app' : step.script.startsWith('specs:') ? 'specs' : 'unit'
+    const kind = step.script === 'test:gallery' ? 'gallery' : appSuites.includes(step.script) ? 'desktop' : step.script.startsWith('specs:') ? 'specs' : 'unit'
     if (!groups.has(kind)) groups.set(kind, [])
     groups.get(kind).push({ ...step, index })
   }
@@ -42,7 +42,7 @@ export async function runRunnerPlan(jobs, { self, root, options, log }) {
     const results = new Map()
     for (const stream of [child.stdout, child.stderr]) createInterface({ input: stream }).on('line', (line) => {
       const result = /^plan: step (\d+) (\S+) exited with (\d+)(.*)$/.exec(line)
-      if (result) results.set(Number(result[1]), { code: Number(result[3]), suffix: result[4] })
+      if (result && steps[Number(result[1])]?.script === result[2]) results.set(Number(result[1]), { code: Number(result[3]), suffix: result[4] })
       else log(`[runner:${kind}] ${line}`)
     })
     child.on('error', (error) => log(`[runner:${kind}] ${error.message}`))
