@@ -6,7 +6,8 @@
  * to the renderer, which opens the topic at the message. `badge` sets the
  * dock's dot while any eligible item is unread. `test` shows Settings ›
  * Notifications' test notification the same way; its click only brings
- * Juno forward.
+ * Juno forward. An incoming huddle's notification also bounces the dock
+ * icon once, unless Juno is the frontmost app (SPEC 20, "Incoming huddles").
  *
  * The renderer says which topic it shows and whether its window has focus;
  * main passes that to the engine, which suppresses a notification for the
@@ -35,6 +36,8 @@ export interface NotifierDeps {
   readonly create: (options: NotificationOptions) => ShownNotification
   /** `app.dock.setBadge`. */
   readonly setBadge: (text: string) => void
+  /** `app.dock.bounce('informational')`, unless Juno is the frontmost app. */
+  readonly bounce: () => void
   /** Brings the app window forward and hands it the target. */
   readonly open: (target: NotificationTarget) => void
   /** Brings the app window forward, or opens it. */
@@ -102,6 +105,7 @@ export class Notifier {
     if (this.shown.has(notification.id)) return
     const body = this.deps.privacy() && notification.target._tag === 'message' ? HIDDEN_BODY : notification.body
     this.post(notification.id, { title: notification.title, body, ...(notification.silent === true ? { silent: true } : {}) }, () => this.deps.open(notification.target))
+    if (notification.target._tag === 'huddle') this.deps.bounce()
   }
 
   private post(id: string, options: NotificationOptions, onClick: () => void): void {

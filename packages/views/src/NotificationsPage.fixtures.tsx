@@ -29,6 +29,8 @@ export const notificationsBase: NotificationsPageProps = {
   slack: { schedule: { enabled: true, canRestore: true, changedInSlack: false, waitingForHours: false }, onChange: noop, onRestore: noop },
   onMattersSave: noop,
   onRemove: noop,
+  huddleRing: true,
+  onHuddleRingChange: noop,
   permission: { authorization: 'allowed', badges: 'enabled' },
   onSendTest: noop,
   onOpenSettings: noop,

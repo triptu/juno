@@ -635,6 +635,10 @@ The Backup folder path is measured in its rendered font and cut in the middle to
 - Both lists empty: one row "Every channel and person is set to When it matters." 13 muted, padding 14.
 - Hint below the card, margin-top 8, 12 muted: "Right-click a channel or person to change how it notifies you."
 
+**Huddles** (no sub)
+
+- One group card, padding `12 14` (as Slack on your phone): the switch **Ring for huddles** (a `Checkbox` with `role="switch"`, on by default) with the description "A soft ring for up to 30 seconds when someone starts a huddle where you are. Off, the card and the notification still show. Juno can't tell when Focus is on, so the ring plays through it." It saves at once (`notifications.setHuddleRing`, stored with the notification settings) and applies to the next incoming huddle (SPEC 20, "Incoming huddles"). The section is `HuddleRingSection` in `@juno/views`; fixtures `HuddleRingSection` › `on` and `off`.
+
 **Today** (no sub)
 
 - One line, margin-top 8, 14 subtle: "**4** messages interrupted you. Juno held **23**." (counts 600 tabular) · ghost button **Show why** 28px. Zero: "Nothing has interrupted you today."
@@ -964,5 +968,6 @@ When someone starts a huddle where the user is (SPEC 20, "Incoming huddles"). A 
 - **Row 2**, padding-start 6, gap 4: `headphones` 14 fill in `--huddle-live` in a 16 slot under the place glyph, 4 more after it; "Maya started a huddle" (a DM: "Started a huddle"; meta 12.5 subtle, ellipsis, takes the room); Dismiss (`x` 16, ghost `IconButton` 28, radius 8); Join (`Button primary sm`, `headphones` fill + "Join", named "Join the huddle in #eng"). While the user is in another huddle: "Switch", named "Switch to the huddle in #eng", tooltip "Leave the huddle in #design and join this one".
 - **Pulse:** while it may ring (not held quiet by the notification rules), a glow on the edge (`--huddle-incoming-glow`: a 3px accent ring over the edge and a 14px soft accent shadow, on an element over the card's padding box) whose opacity goes 0.15 → 1 → 0.15 over `--duration-pulse` (2.4 s), `ease-in-out`, until the card goes. It is a Web Animation of opacity alone, so the style sheet carries no keyframes and only the compositor works. Reduced motion: the animation never starts and the glow stays hidden; the accent edge stays. A quiet card has the edge and no glow.
 - **Announced** once, politely: "Maya started a huddle in #eng".
+- **Ring and Dock:** the engine sets `ringUntil`, and the container plays the ring until then; Ring for huddles off (§13) leaves it null and keeps the pulse. Main bounces the Dock icon once (`app.dock.bounce('informational')`) when it posts the huddle's notification and no Juno window has focus; it never touches the Dock badge.
 - One card at a time, the newest; the next shows when it goes. It comes and goes in one frame, as the bar does.
 
