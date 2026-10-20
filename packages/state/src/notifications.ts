@@ -11,6 +11,7 @@ import {
   notificationsRestoreSlackSchedule,
   notificationsSetHours,
   notificationsSetHuddleRing,
+  notificationsSetDay,
   notificationsSetMatters,
   notificationsSetPresence,
   notificationsSetSlackSchedule,
@@ -91,8 +92,12 @@ export async function loadWhy(registry: Registry, topicId: string, ts: string): 
   return Exit.isSuccess(exit) ? exit.value : undefined
 }
 
-export function setHours(registry: Registry, which: 'notifications' | 'presence', hours: Hours): void {
+export function setHours(registry: Registry, which: 'notifications' | 'presence', hours: Partial<Hours>): void {
   void runCommand(registry, notificationsSetHours, { which, hours })
+}
+
+export function setHoursDay(registry: Registry, which: 'notifications' | 'presence', day: Hours['days'][number], enabled: boolean): void {
+  void runCommand(registry, notificationsSetDay, { which, day, enabled })
 }
 
 export function setMatters(registry: Registry, text: string): void {

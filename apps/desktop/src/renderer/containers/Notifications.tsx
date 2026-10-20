@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import type { Hours, NotificationPermission, NotifyTag } from '@juno/contract'
-import { getNotificationPermission, notificationSettingsAtom, notificationsPageAtom, openNotificationSettings, registry, requestNotificationPermission, restoreSlackSchedule, sendTestNotification, setHours, setHuddleRing, setMatters, setSlackSchedule } from '@juno/state'
+import { getNotificationPermission, notificationSettingsAtom, notificationsPageAtom, openNotificationSettings, registry, requestNotificationPermission, restoreSlackSchedule, sendTestNotification, setHours, setHoursDay, setHuddleRing, setMatters, setSlackSchedule } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { NotificationsPage as NotificationsPageView, type HoursKind } from '@juno/views'
 import { setNotifyLevel } from './notifyActions'
 
-function changeHours(which: HoursKind, hours: Hours): void {
+function changeHours(which: HoursKind, hours: Partial<Hours>): void {
   setHours(registry, which, hours)
 }
 
@@ -88,6 +88,7 @@ export function NotificationsPage() {
       held={lists.held}
       today={lists.today}
       onHoursChange={changeHours}
+      onDayChange={(which, day, enabled) => setHoursDay(registry, which, day, enabled)}
       slack={{ schedule: lists.slackSchedule, onChange: changeSlackSchedule, onRestore: restoreSlack }}
       onMattersSave={saveMatters}
       onRemove={remove}
