@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Hours, NotificationPermission, NotifyTag } from '@juno/contract'
-import { getNotificationPermission, notificationSettingsAtom, notificationsPageAtom, openNotificationSettings, registry, requestNotificationPermission, restoreSlackSchedule, sendTestNotification, setHours, setHoursDay, setHuddleRing, setMatters, setSlackSchedule } from '@juno/state'
+import { getNotificationPermission, notificationSettingsAtom, notificationsPageAtom, openNotificationSettings, registry, requestNotificationPermission, restoreSlackSchedule, sendTestNotification, setHours, setHoursDay, setHuddleRing, setMatters, setShowPresence, setSlackSchedule, showPresenceAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { NotificationsPage as NotificationsPageView, type HoursKind } from '@juno/views'
 import { setNotifyLevel } from './notifyActions'
@@ -19,6 +19,10 @@ function restoreSlack(): void {
 
 function changeHuddleRing(enabled: boolean): void {
   setHuddleRing(registry, enabled)
+}
+
+function changeShowPresence(enabled: boolean): void {
+  setShowPresence(registry, enabled)
 }
 
 function saveMatters(text: string): void {
@@ -65,16 +69,17 @@ function useNotificationPermission(): readonly [NotificationPermission | undefin
 }
 
 /**
- * The Notifications page (SPEC 14): the settings and the page's lists and
- * today from the engine, and macOS's permission from main. Nothing shows
- * until the settings and the permission arrive, which are local and come
- * at once.
+ * The Notifications page (SPEC 14): the settings, Show when people are
+ * active and the page's lists and today from the engine, and macOS's
+ * permission from main. Nothing shows until the settings, that preference
+ * and the permission arrive, which are local and come at once.
  */
 export function NotificationsPage() {
   const settings = useAtomValue(notificationSettingsAtom)
   const page = useAtomValue(notificationsPageAtom)
+  const showPresence = useAtomValue(showPresenceAtom)
   const [permission, allow] = useNotificationPermission()
-  if (settings._tag !== 'Success' || permission === undefined) return null
+  if (settings._tag !== 'Success' || showPresence === undefined || permission === undefined) return null
   const lists = page._tag === 'Success' ? page.value : { every: [], never: [], interrupted: 0, held: 0, today: [], slackSchedule: undefined }
   return (
     <NotificationsPageView
@@ -94,6 +99,8 @@ export function NotificationsPage() {
       onRemove={remove}
       huddleRing={settings.value.huddleRing}
       onHuddleRingChange={changeHuddleRing}
+      showPresence={showPresence}
+      onShowPresenceChange={changeShowPresence}
       permission={permission}
       onSendTest={sendTestNotification}
       onOpenSettings={openNotificationSettings}

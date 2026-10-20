@@ -29,6 +29,37 @@ test('a row says its unread count and a mention in words, not only in tooltips',
   await expect(row(page, 'Postgres 16')).toHaveAccessibleDescription('Dev: Booked 2–4pm. Will post results here.')
 })
 
+test('an active DM partner gets the presence dot on the photo’s corner, ringed in the row’s fill, plain and selected', async ({ page }) => {
+  /** The dot's ring and the fill behind it: the nearest ancestor background that is not transparent. */
+  const colours = (dot: ReturnType<Page['locator']>) => dot.evaluate((node) => {
+    let fill = 'rgba(0, 0, 0, 0)'
+    for (let element = node.parentElement; element !== null && fill === 'rgba(0, 0, 0, 0)'; element = element.parentElement) fill = getComputedStyle(element).backgroundColor
+    return { ring: getComputedStyle(node).borderTopColor, fill }
+  })
+
+  await open(page, 'TopicRow', 'tile/dm-main-photo')
+  await expect(page.locator('[data-presence]')).toHaveCount(0)
+
+  await open(page, 'TopicRow', 'tile/dm-main-active')
+  const maya = row(page, 'Maya Chen')
+  const dot = maya.locator('[data-presence="active"]')
+  await expect(dot).toBeVisible()
+  await expect(maya).toHaveAccessibleDescription(/^active\. /)
+  const photo = (await maya.locator('[data-kind="person"]').boundingBox())!
+  const box = (await dot.boundingBox())!
+  // On the photo's bottom right corner, overlapping it.
+  expect(box.x + box.width).toBeGreaterThan(photo.x + photo.width - 1)
+  expect(box.y + box.height).toBeGreaterThan(photo.y + photo.height - 1)
+  expect(box.x).toBeLessThan(photo.x + photo.width)
+  expect(box.y).toBeLessThan(photo.y + photo.height)
+  const plain = await colours(dot)
+  expect(plain.ring).toBe(plain.fill)
+
+  await open(page, 'TopicRow', 'tile/dm-main-active-selected')
+  const selected = await colours(page.locator('[data-presence="active"]'))
+  expect(selected.ring).toBe(selected.fill)
+})
+
 test('a title cut off by the row shows in full on hover, and one that fits shows no tooltip', async ({ page }) => {
   await open(page, 'TopicRow', 'content/long-title')
   const long = page.locator('[data-row-part="title"]')

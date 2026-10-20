@@ -32,6 +32,8 @@ export const notificationsBase: NotificationsPageProps = {
   onRemove: noop,
   huddleRing: true,
   onHuddleRingChange: noop,
+  showPresence: true,
+  onShowPresenceChange: noop,
   permission: { authorization: 'allowed', badges: 'enabled' },
   onSendTest: noop,
   onOpenSettings: noop,

@@ -29,6 +29,7 @@ import CommandPalette from './CommandPalette.fixtures'
 import NewDivider from './NewDivider.fixtures'
 import NewMessagesPill from './NewMessagesPill.fixtures'
 import HuddleRingSection from './HuddleRingSection.fixtures'
+import PresenceSection from './PresenceSection.fixtures'
 import NotificationsPage from './NotificationsPage.fixtures'
 import UpdateSettings from './UpdateSettings.fixtures'
 import SettingsPage from './SettingsPage.fixtures'
@@ -131,6 +132,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   NewMessagesPill,
   SendCheckBar,
   HuddleRingSection,
+  PresenceSection,
   NotificationsPage,
   TabExpirySetting,
   TopicSwitcher,

@@ -16,6 +16,7 @@ import {
   Icon,
   IconButton,
   pointerMoved,
+  PresenceDot,
   Text,
   tooltip,
   TopicArt,
@@ -58,6 +59,8 @@ export interface TopicRowProps {
   readonly accessory?: ReactNode
   /** What `accessory` says, added to the row's description ("huddle with 3 people"). */
   readonly accessoryLabel?: string
+  /** A DM's Main only: Slack shows the person as active, drawn as the presence dot on their photo. */
+  readonly partnerActive?: boolean
 }
 
 const HOVER = '@media (hover: hover)'
@@ -100,6 +103,7 @@ export const TopicRow = memo(function TopicRow({
   newThreads = 0,
   accessory,
   accessoryLabel,
+  partnerActive = false,
 }: TopicRowProps) {
   const titleId = useId()
   const previewId = useId()
@@ -116,7 +120,8 @@ export const TopicRow = memo(function TopicRow({
   const threadsLabel = threads === 1 ? '1 new thread' : `${threads} new threads`
   const unreadLabel = row.unreadExact ? `${row.unreadCount} unread` : `${row.unreadCount} or more unread`
   const mark = main && accessory !== undefined && accessory !== null
-  const state = rowState(row, unreadLabel, threads > 0 ? threadsLabel : undefined, main ? accessoryLabel : undefined)
+  const active = partnerActive && main && row.channel.kind === 'im'
+  const state = rowState(row, unreadLabel, threads > 0 ? threadsLabel : undefined, main ? accessoryLabel : undefined, active)
   const people: ReadonlyArray<AvatarStackPerson> = row.participants.map((person) => stackPerson(person))
   const hasPeople = people.length > 0
   const resolvable = row.canResolveOnHover && !renaming
@@ -231,6 +236,7 @@ export const TopicRow = memo(function TopicRow({
     >
       <span {...stylex.props(styles.tile, main && styles.mainTile, quiet && styles.quietTile)}>
         <Tile row={row} />
+        {active ? <PresenceDot active surface={selected ? 'rowSelected' : 'row'} /> : null}
       </span>
       <span {...stylex.props(styles.body)}>
         <span {...stylex.props(styles.line1)}>
@@ -345,9 +351,10 @@ function isTwoLine(row: Pick<TopicRowModel, 'kind'>): boolean {
   return row.kind === 'main'
 }
 
-/** What the tags and icons say, for the row's description: "2 unread, mentions you." */
-function rowState(row: TopicRowModel, unreadLabel: string, threadsLabel: string | undefined, accessoryLabel: string | undefined): string | undefined {
+/** What the tags and icons say, for the row's description: "active, 2 unread, mentions you." */
+function rowState(row: TopicRowModel, unreadLabel: string, threadsLabel: string | undefined, accessoryLabel: string | undefined, active: boolean): string | undefined {
   const parts = [
+    active ? 'active' : undefined,
     row.unreadCount > 0 ? unreadLabel : undefined,
     row.mentionsMe ? 'mentions you' : undefined,
     threadsLabel,
@@ -417,7 +424,9 @@ const styles = stylex.create({
     },
     '--foreground-muted': colors['--foreground-muted-on-fill'],
   },
+  // Positioned, so a DM's presence dot sits on the photo's corner.
   tile: {
+    position: 'relative',
     display: 'inline-flex',
     flexShrink: 0,
     zoom: density['--density-row-tile-zoom'],
