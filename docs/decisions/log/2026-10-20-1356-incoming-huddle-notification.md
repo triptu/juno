@@ -1,0 +1,1 @@
+- 10-20 13:56 · incoming-huddle-notification · The OS notification is titled with the place, says who started it, is silent (Juno rings), and opens the huddle's tab. No Join button: Electron shows notification buttons on macOS only for a signed app with alert-style notifications, which would also make every message notification stay on screen.

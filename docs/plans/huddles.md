@@ -21,13 +21,14 @@ In scope:
 - **The sidebar bar.** Row 1: where the huddle is, who is in it, how long it has run. Row 2: mute, screen share (once phase 4 lands), leave, and open the tab. It shows only while the user is in a huddle.
 - **The huddle tab.** A new tab kind. Participants with speaking and muted state, the controls, and the shared screen when someone shares.
 - **Screen share.** First, watch what others share (up to two at once, as Slack allows). Then share your own screen or window. Juno's own capture may switch on privacy mode through `screenWatch`; the owner accepts that.
+- **Incoming huddles.** A card at the top of the sidebar, a soft ring and a macOS notification when someone starts a huddle where the user is (SPEC 20, "Incoming huddles"). Built on 2026-10-20 from the running list, so it needs no new socket event: `@juno/huddle`'s `incoming.ts` has the rules, `engine/src/huddle/incoming.ts` decides each by the notification settings and posts the notification, and the renderer's `containers/huddle/Incoming.tsx` and `ring.ts` show the card and ring.
 - **The huddle's chat.** It is already a Slack thread (`huddle_thread`), so it shows as a topic. Opening it from the tab is a link to that topic.
 
 Out of scope:
 
 - **Video.** Camera, tiles and background effects.
 - **Everything carried in Slack's protobuf peer messages:** reactions, raised hands, drawing on a shared screen, mute requests, music, the awareness channel, transcript catch-up. Juno does not send or read them.
-- Recording and AI notes, captions, knocks, external guests, scheduled huddles, multi-device join, ringing for incoming invites, a separate huddle window, the post-call survey.
+- Recording and AI notes, captions, knocks, external guests, scheduled huddles, multi-device join, a separate huddle window, the post-call survey.
 - **A performance budget for a live call.** The idle budgets in `performance.md` do not apply while a huddle runs. We first make it work, then measure. The budgets that still apply: cold start, tab switch and sidebar frames must not regress when no huddle runs, and the Chime SDK loads only on join (the initial bundle is at 1,068 KB of 1,100 KB).
 
 ## 2. How it works

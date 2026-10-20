@@ -1,0 +1,1 @@
+- 10-20 13:58 · incoming-huddle-pulse · The pulse is a glow outside the card's accent edge whose opacity breathes over 2.4 s until the card goes; reduced motion shows the accent edge only. Why: only opacity animates, on its own element, so it costs the compositor and no layout or paint.

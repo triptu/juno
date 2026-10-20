@@ -888,7 +888,7 @@ A shared Slack message's footer starts with its place (`SharedPlace`, SPEC 7, "S
 
 ## 22. Huddles
 
-**Shows:** gallery `HuddleBar`, `HuddleInSidebar` (the bar in the real sidebar), `HuddlePage`, `HuddleHeaderButton`, `HuddleIndicator`, `HuddleDeviceMenu`, `ScreenSourcePicker`. SPEC section 20 decides behaviour. Views: `@juno/huddle-views`. [designed 10-18, not wired]
+**Shows:** gallery `HuddleBar`, `HuddleInSidebar` (the bar in the real sidebar), `IncomingHuddleCard`, `HuddlePage`, `HuddleHeaderButton`, `HuddleIndicator`, `HuddleDeviceMenu`, `ScreenSourcePicker`. SPEC section 20 decides behaviour. Views: `@juno/huddle-views`. [designed 10-18, not wired]
 
 ### 22.1 Sidebar bar (`HuddleBar`)
 
@@ -948,4 +948,17 @@ A `Surface kind="popover"` dialog in a `SheetLayer`, at most 600 wide (`--source
 | Quit dialog | Leave the huddle and quit? · You're in a huddle in #eng. · Quit · Cancel |
 | Menu bar | Huddle › Show Huddle · Mute Microphone / Unmute Microphone ⌘⇧Space · Share Screen… / Stop Sharing · Leave Huddle |
 | ⌘K | Mute · Unmute · Share screen… · Stop sharing · Leave huddle · Show huddle · Start huddle · Join huddle |
-| Screen reader | Muted · Unmuted · Maya joined · Maya left · Huddle with 3 people |
+| Incoming card | Maya started a huddle · Started a huddle (a DM) · Dismiss · Join · Switch (tooltip "Leave the huddle in #design and join this one") |
+| OS notification | #eng / Maya started a huddle · Maya / Started a huddle |
+| Screen reader | Muted · Unmuted · Maya joined · Maya left · Huddle with 3 people · Maya started a huddle in #eng |
+
+### 22.8 Incoming huddle card (`IncomingHuddleCard`)
+
+When someone starts a huddle where the user is (SPEC 20, "Incoming huddles"). A `section` named "Incoming huddle" in the sidebar's top slot, under the bar while the user is in a call. The bar's material and size: `--huddle-bar` under `--huddle-bar-sheen`, `--huddle-bar-shadow`, radius 12, padding 4, two 28px rows 2 apart, 66px tall; but a 1px `--hl` edge in place of `--huddle-bar-edge`, so it reads apart from a call.
+
+- **Row 1** (one `button`, "Open huddle in #eng"): as the bar's first row, without the status line: the place glyph 16 subtle, the name (ui 13.5/500, ellipsis), a flexible gap, everyone in the huddle as 18px faces (at most 4, then "+N"), `caret-right` 12. Opens the huddle's tab on mouse down, ⌘ for a new tab.
+- **Row 2**, padding-start 6, gap 4: `headphones` 14 fill in `--huddle-live` in a 16 slot under the place glyph, 4 more after it; "Maya started a huddle" (a DM: "Started a huddle"; meta 12.5 subtle, ellipsis, takes the room); Dismiss (`x` 16, `IconButton` 28, radius 8, island, rest transparent, hover `--huddle-bar-hover`, press `--huddle-bar-pressed`); Join (`Button primary sm`, `headphones` fill + "Join", named "Join the huddle in #eng"). While the user is in another huddle: "Switch", named "Switch to the huddle in #eng", tooltip "Leave the huddle in #design and join this one".
+- **Pulse:** while it may ring (not held quiet by the notification rules), a glow outside the edge (`--huddle-incoming-glow`: a 3px accent ring and a 14px soft accent shadow) whose opacity goes 0.15 → 1 → 0.15 over `--duration-pulse` (2.4 s), `--ease-in-out`, until the card goes. Only opacity animates, on its own element. Reduced motion: no glow and no animation; the accent edge stays. A quiet card has the edge and no glow.
+- **Announced** once, politely: "Maya started a huddle in #eng".
+- One card at a time, the newest; the next shows when it goes. It comes and goes in one frame, as the bar does.
+

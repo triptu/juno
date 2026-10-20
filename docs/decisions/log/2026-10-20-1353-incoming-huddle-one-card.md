@@ -1,0 +1,1 @@
+- 10-20 13:53 · incoming-huddle-one-card · With two incoming huddles, one card shows, the newest; the next shows when it goes. Why: two stacked cards push the sidebar down by 140px and compete; the rows' headphones still show both.
