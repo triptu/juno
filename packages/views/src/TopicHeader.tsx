@@ -1,12 +1,11 @@
-import { ArrowCounterClockwise } from '@phosphor-icons/react/dist/icons/ArrowCounterClockwise'
 import { Bell } from '@phosphor-icons/react/dist/icons/Bell'
 import { CheckCircle } from '@phosphor-icons/react/dist/icons/CheckCircle'
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import type { TopicDetail } from '@juno/contract'
 import { layout } from '@juno/tokens/tokens.stylex'
-import { ContextPill, Popover, type ContextTint } from '@juno/ui'
-import { HeaderTitleButton, IslandButton, JunoToggle, MoreButton, type MenuAnchor } from './header/HeaderControls'
+import { ContextPill, IconButton, Popover, type ContextTint } from '@juno/ui'
+import { HeaderTitleButton, JunoToggle, MoreButton, type MenuAnchor } from './header/HeaderControls'
 import { HeaderIslands } from './header/HeaderIslands'
 import { kindIcon } from './look'
 import { RenameField } from './RenameField'
@@ -33,7 +32,7 @@ export interface TopicHeaderProps {
    * it such a thread shows Resolve.
    */
   readonly onFollow?: () => void
-  /** A Main's controls from features, such as the huddle control: first in the right island, before ⋯. Not shown on a thread. */
+  /** Controls from features, such as the huddle control: first in the right island. The feature decides on which topics it shows. */
   readonly actions?: ReactNode
   /** The Juno panel's toggle. Hidden when absent (AI assist off). */
   readonly juno?: { readonly open: boolean; readonly onToggle: () => void }
@@ -59,11 +58,10 @@ const tints: Record<TopicDetail['channel']['kind'], ContextTint> = {
  * topic, with no bar. Left: the context pill (the channel's name; its kind
  * is the tint, the icon, the tooltip and the accessible name) and the
  * title, which opens the topic switcher, hung under the left island; a
- * right-click on it opens the topic's menu. Right: a Main's `actions`, or
- * Resolve or Reopen on a thread, or Follow on a thread you do not follow,
- * then ⋯ (the topic's menu) and Juno. Follow and Resolve keep the wider of their two widths,
- * so following moves nothing. The islands line up with the reading column,
- * and under 480px Follow and Resolve show as icons. Rename turns the title
+ * right-click on it opens the topic's menu. Right: features' `actions` (the
+ * huddle control), then Resolve or Reopen on a thread, or Follow on a thread
+ * you do not follow, as icon buttons, then Juno and ⋯ (the topic's menu)
+ * last. The islands line up with the reading column. Rename turns the title
  * into a field in place.
  */
 export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename, onPill, onPillMenu, onResolve, onFollow, actions, juno }: TopicHeaderProps) {
@@ -73,14 +71,12 @@ export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename
   // "eng, public channel", "Maya and Leo, group DM": only the first letter steps down, so DM stays DM.
   const pillName = `${channel.name}, ${kind.charAt(0).toLowerCase()}${kind.slice(1)}`
 
-  // Follow can turn into Resolve or Reopen, and back on ⌘Z or Never, so each reserves the other's label.
-  const canFollow = !main && onFollow !== undefined
-  const resolveLabel = detail.resolved ? 'Reopen' : 'Resolve'
+  // Icons alone, with the word as the tooltip and the name. Reopen is the filled check: the thread is done, and a click undoes that.
   const resolve =
-    canFollow && !detail.subscribed ? (
-      <IslandButton icon={Bell} label="Follow" reserve={resolveLabel} onClick={() => onFollow()} />
+    !main && onFollow !== undefined && !detail.subscribed ? (
+      <IconButton icon={Bell} label="Follow" size={28} iconSize={16} radius="full" variant="island" onClick={() => onFollow()} />
     ) : main || onResolve === undefined ? null : (
-      <IslandButton icon={detail.resolved ? ArrowCounterClockwise : CheckCircle} label={resolveLabel} {...(canFollow ? { reserve: 'Follow' } : {})} onClick={onResolve} />
+      <IconButton icon={CheckCircle} label={detail.resolved ? 'Reopen' : 'Resolve'} size={28} iconSize={16} radius="full" variant="island" {...(detail.resolved ? { iconWeight: 'fill' as const } : {})} onClick={onResolve} />
     )
   const junoButton = juno === undefined ? null : <JunoToggle pressed={juno.open} onToggle={juno.onToggle} />
 
@@ -125,10 +121,10 @@ export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename
       }
       right={
         <>
-          {main ? actions : null}
+          {actions}
           {resolve}
-          <MoreButton expanded={menuOpen} onOpen={onMenu} />
           {junoButton}
+          <MoreButton expanded={menuOpen} onOpen={onMenu} />
         </>
       }
       {...(switcher === undefined

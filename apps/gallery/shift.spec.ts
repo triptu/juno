@@ -789,17 +789,19 @@ test.describe('Topic header', () => {
     expect(under).toBe(true)
   })
 
-  test('under 480px Resolve keeps its name as an icon, and ⋯ stays a 28px icon beside it', async ({ page }) => {
-    await open(page, 'TopicHeader', 'narrow/thread-336')
-    const resolve = page.getByRole('button', { name: 'Resolve', exact: true })
-    await expect(resolve).toBeVisible()
-    expect(Math.round((await resolve.boundingBox())!.width)).toBe(28)
+  test('Resolve is a 28px icon at every width, named and with its word as the tooltip, and ⋯ is the same size', async ({ page }) => {
+    for (const state of ['narrow/thread-336', 'narrow/thread-480', 'thread/public']) {
+      await open(page, 'TopicHeader', state)
+      const resolve = page.getByRole('button', { name: 'Resolve', exact: true })
+      await expect(resolve).toBeVisible()
+      await expect(resolve).toHaveText('', { useInnerText: true })
+      await expect(resolve).toHaveAttribute('data-tooltip', 'Resolve')
+      expect(Math.round((await resolve.boundingBox())!.width)).toBe(28)
+    }
     await open(page, 'TopicHeader', 'narrow/main-336')
     const more = page.getByRole('button', { name: 'More', exact: true })
     await expect(more).toBeVisible()
     expect(Math.round((await more.boundingBox())!.width)).toBe(28)
-    await open(page, 'TopicHeader', 'narrow/thread-480')
-    await expect(page.getByRole('button', { name: 'Resolve', exact: true })).toHaveText('Resolve', { useInnerText: true })
   })
 })
 
@@ -824,7 +826,7 @@ test.describe('Topic header Follow', () => {
       expect(after.width).toBeCloseTo(before.width, 1)
     }
     await open(page, 'TopicHeader', 'follow/follow')
-    await expect(page.getByRole('button', { name: 'Follow', exact: true })).toHaveText('Follow', { useInnerText: true })
+    await expect(page.getByRole('button', { name: 'Follow', exact: true })).toHaveAttribute('data-tooltip', 'Follow')
   })
 })
 
