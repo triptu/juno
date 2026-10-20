@@ -51,3 +51,5 @@ Home's Recent reads recent own sends through the partial `messages_sender_ts (us
 `started_threads` in user.db maps a root sent from Home: its outbox ID and pending topic ID to its acknowledged Slack root timestamp. The mapping survives reconciliation and keeps pending replies and saved tab views addressable.
 
 `messages.attention` is a derived cache projection for the badge existence query. Sync derives it from unread rich-text bodies while reindexing. It is reused only for the same message content and mention context; a trigger clears it when content changes. It is not a Slack field.
+
+`huddle_history` in user.db keeps recent room facts with local joined and seen marks. End and join evidence only accumulates; rereading Slack history never clears an acknowledgement.

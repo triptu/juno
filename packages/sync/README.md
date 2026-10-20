@@ -168,3 +168,5 @@ any counts could be merged; the retry kept using the old cursor.
 
 Unchanged counts fields and server-version certificates do not write to the
 cache. This keeps the existing quiet-sweep no-write guarantee with partial rows.
+
+`write/huddles.ts` projects room frames and message room objects into durable `huddle_history`. Explicit ended-room participant history from full messages or room frames establishes a missed huddle; unknown history and partial search matches do not. Joins and ends accumulate without changing message, follow or read protocols.

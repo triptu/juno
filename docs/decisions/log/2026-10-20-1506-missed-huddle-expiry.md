@@ -1,0 +1,1 @@
+- 10-20 15:06 · missed-huddle-expiry · An unseen missed huddle expires seven days after ending; normal Slack sync supplies recovery, with no extra history scan for Home.

@@ -225,3 +225,7 @@ These need a running Slack client or Juno build but no writes to other people's 
 4. In `chrome://webrtc-internals` during the test huddle, confirm the ICE servers (Chime TURN hosts, port 3478 or 22466) and that the remote endpoint is a Chime media host.
 5. Only if peer messages come into scope later: read the protobuf descriptors from `shared-client` with REA (`trace_javascript_semantics` on the `lP` schema module).
 6. Done on 2026-10-19 except two-way audio (section 6). In a Juno prototype, call `rooms.join` with the user's session and the request shape recorded in step 1, and pass the result to the open-source Chime SDK. If the server rejects it, compare request params with step 1. Keep this to a private test channel made for it, with the owner's phone as the second participant. This is phase 2 of `docs/plans/huddles.md`; it also settles the Chime origin question, the `ExternalUserId` format and the real frame shapes.
+
+## Missed-huddle recovery
+
+The message room fields above can provide evidence of an offline miss when `has_ended`, `date_end`, `created_by` and `participant_history` are present. This is an inference from the recorded shapes, not a claim that every historical message supplies complete participation. Juno leaves missing history unknown. `huddles/info` only lists running rooms and cannot recover ended ones. Local acknowledgements and observed joins must survive relaunch independently of Slack’s message.

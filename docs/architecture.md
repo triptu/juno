@@ -266,6 +266,7 @@ topic_reads     (topic_id PK, last_read_ts, marked_unread, local_write_ack_ts, l
 main_groups     (id PK, channel, title, created_at)
 main_group_msgs (group_id, ts, PK)
 ignored_channels(channel PK, ignored_at)
+huddle_history  (call_id PK, channel, started_by, started_at, ended_at, thread_ts, joined, history_known, seen)
 pending_messages(client_msg_id PK, channel, thread_ts, text, blocks_json, file_ids_json, created_at, ts /*unused*/,
                  state 'queued'|'sending'|'unknown'|'failed', attempts, next_at, last_error)
 sent_posts      (client_msg_id PK, channel, user_id, ts /*first copy stored*/, sent_at)  -- ADR 0014, kept a week

@@ -2499,7 +2499,7 @@ export class PrivacyMode {
   }
 }
 
-export type HomeItemKind = 'waiting' | 'mentioned' | 'resume' | 'moved' | 'followUp' | 'ask' | 'automated' | 'tidyUp' | 'automatedMoves' | 'doneFollowUps' | 'oldDrafts' | 'unfollow' | 'ignore'
+export type HomeItemKind = 'waiting' | 'mentioned' | 'missedHuddle' | 'resume' | 'moved' | 'followUp' | 'ask' | 'automated' | 'tidyUp' | 'automatedMoves' | 'doneFollowUps' | 'oldDrafts' | 'unfollow' | 'ignore'
 
 /** Home (SPEC section 12): the greeting and the rows, in the visible page. Its composer is `HomeWritePane`. */
 export class HomePane {

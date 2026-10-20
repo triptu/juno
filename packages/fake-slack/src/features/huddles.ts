@@ -13,6 +13,8 @@ interface FakeHuddle {
   /** Who started it: the first to join. */
   readonly createdBy: string
   readonly participants: Array<string>
+  readonly history: Array<string>
+  readonly threadTs: string
   readonly attendees: Set<string>
 }
 
@@ -50,11 +52,22 @@ const encodeFrame = Schema.encodeSync(ShRoomFrame)
 
 /** Sends a room frame as Slack does: the whole room after the change. `RtmFrame` carries it as an unknown frame. */
 function emitRoom(ws: Workspace, type: ShRoomFrame['type'], huddle: FakeHuddle, user: string | undefined, ended = false): void {
+  const room = { id: huddle.callId, channels: [huddle.channel], participants: ended ? [] : [...huddle.participants],
+    participant_history: [...huddle.history], date_start: huddle.dateStart,
+    ...(ended ? { date_end: Math.floor(ws.clock.now() / 1000) } : {}),
+    has_ended: ended, created_by: huddle.createdBy, thread_root_ts: huddle.threadTs }
+  const message = ws.find(huddle.channel, huddle.threadTs)
+  if (message !== undefined) {
+    const updated = { ...message, subtype: 'sh_room_created', room }
+    const list = ws.all(huddle.channel)
+    list[list.indexOf(message)] = updated
+    ws.emit({ ts: ws.eventTs(), type: 'message', subtype: 'message_changed', channel: huddle.channel, message: updated, event_ts: ws.eventTs() })
+  }
   const raw = encodeFrame({
     type,
     ...(user === undefined ? {} : { user }),
     huddle: { channel_id: huddle.channel },
-    room: { id: huddle.callId, channels: [huddle.channel], participants: ended ? [] : [...huddle.participants], date_start: huddle.dateStart, has_ended: ended, created_by: huddle.createdBy },
+    room,
     event_ts: ws.eventTs(),
   })
   ws.emit({ type: 'unknown', raw } as RtmFrame)
@@ -65,13 +78,15 @@ function start(ws: Workspace, channel: string, user: string): FakeHuddle {
   const existing = huddles.byChannel.get(channel)
   if (existing !== undefined) return existing
   huddles.calls += 1
-  const huddle: FakeHuddle = { callId: `R${String(huddles.calls).padStart(9, '0')}`, channel, dateStart: Math.floor(ws.clock.now() / 1000), createdBy: user, participants: [], attendees: new Set() }
+  const message = ws.post({ channel, user, text: '', silent: true })
+  const huddle: FakeHuddle = { callId: `R${String(huddles.calls).padStart(9, '0')}`, channel, dateStart: Math.floor(ws.clock.now() / 1000), createdBy: user, participants: [], history: [], threadTs: message.ts, attendees: new Set() }
   huddles.byChannel.set(channel, huddle)
   return huddle
 }
 
 function join(ws: Workspace, channel: string, user: string): FakeHuddle {
   const huddle = start(ws, channel, user)
+  if (!huddle.history.includes(user)) huddle.history.push(user)
   if (!huddle.participants.includes(user)) huddle.participants.push(user)
   emitRoom(ws, 'sh_room_join', huddle, user)
   return huddle
