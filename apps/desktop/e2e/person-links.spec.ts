@@ -48,7 +48,8 @@ test('a sender or @person opens your DM with them, in a new tab or the one that 
   })
 
   await test.step('a click on the name opens a new tab on the DM, with a tooltip saying so', async () => {
-    await expect(topic.message(FIRST).locator('[data-message-header] [data-opens-person]')).toHaveAttribute('data-tooltip', 'Message Maya')
+    await name(FIRST).hover()
+    await expect(win.getByRole('tooltip')).toHaveText('Message Maya')
     await name(FIRST).click()
     await tabs.expectCount(2)
     await tabs.expectActive('Maya')
