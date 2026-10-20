@@ -91,7 +91,7 @@ The seven selected feel scenarios passed, including launch, relaunch during sess
 
 ### Workspace emoji picker (2026-10-20)
 
-`pnpm perf -g 'emoji picker with 20,000'` measures ten cold subscriptions in fresh renderers, with 20,000 image owners using distinct URLs plus an alias. It disables the image cache and holds fake image responses until the click. Timing starts at the earlier of the cold subscription and the click, and ends after the first frame with six loaded visible custom images. Workspace stays last; fewer than 200 cells mount. The budget is 50 ms p95. These app timings use the harness’s nearest-rank p50 and p95.
+`pnpm perf -g 'emoji picker with 20,000'` measures ten cold subscriptions in fresh renderers, with 20,000 image owners using distinct URLs plus an alias. It disables the image cache and holds fake image responses until the click. Timing starts at the earlier of the cold subscription and the click, and ends after the first frame with six loaded visible custom images. Workspace stays last; fewer than 200 cells mount. The budget is 50 ms p95. The final start bundle is **1,068.1 KB JS and 154.1 KB CSS**, within the 1,100 KB and 155 KB limits. These app timings use the harness’s nearest-rank p50 and p95.
 
 Before removing the generated decoder, this measured **42.8 ms median, 44.9 ms p95**. The normal Schema decoder with immediate standard emoji and CSS placeholders measures **41.9 ms median, 47.4 ms p95**, range 39.2–47.4 ms, ten opens, load 2.7. Two earlier diagnostic runs exceeded the budget; the trace showed cold text shaping and compositor waits. The neutral placeholder now uses a CSS outline rather than a fallback font glyph.
 

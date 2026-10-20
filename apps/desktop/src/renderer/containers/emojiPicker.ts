@@ -14,7 +14,11 @@ export const EmojiPickerPanel = emojiPicker.component((module) => module.default
 let pickerLoaded = false
 const loadPicker = () => {
   const started = mark('juno.emoji-preload')
-  void emojiPicker.load().then((module) => module.workspaceEmojiReady).then(() => measure('juno.emoji-preload', started))
+  void emojiPicker.load().then(async () => {
+    const { workspaceEmojiReady } = await import('@juno/state/emoji')
+    await workspaceEmojiReady
+    measure('juno.emoji-preload', started)
+  })
 }
 export function preloadPicker(): void {
   if (pickerLoaded) return

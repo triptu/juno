@@ -8,7 +8,6 @@ import { emojiCatalog } from '@juno/contract'
 import { emojiPickerDataAtom, standardEmojiPickerData, warmWorkspaceEmoji } from '@juno/state/emoji'
 import { useAtomValue } from '@juno/state/react'
 import { EmojiPicker } from '@juno/views'
-export { workspaceEmojiReady } from '@juno/state/emoji'
 
 warmWorkspaceEmoji(emojiCatalog)
 

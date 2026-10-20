@@ -10,7 +10,6 @@ export default {
     'apps/desktop/e2e/timings.ts': ['exports'],
     // This module asserts wire compatibility at compile time.
     'packages/engine/src/messages/body.ts': ['exports', 'types'],
-    // The runtime import uses .mjs; this companion only describes it to TypeScript.
     // createRequire is rooted at apps/desktop/package.json, which declares Playwright.
     'scripts/build-icons.mjs': ['unlisted'],
   },
