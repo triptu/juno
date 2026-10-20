@@ -109,6 +109,11 @@ export class SidebarRow {
     return this.root.getByRole('button', { name: new RegExp(`^Resolve ${escapeRegExp(this.title)}`) })
   }
 
+  /** The presence dot on a DM's photo, while Slack shows the person active. */
+  get presenceDot(): Locator {
+    return this.root.locator('[data-presence="active"]')
+  }
+
   /** The row's tile: `data-topic-art` is `art` once the topic has a drawing, `placeholder` for the pebble. */
   get art(): Locator {
     return this.root.locator('[data-topic-art]')
@@ -633,6 +638,11 @@ export class NotificationsPage {
   async writeMatters(text: string): Promise<void> {
     await this.matters.fill(text)
     await this.matters.blur()
+  }
+
+  /** Show when people are active. */
+  get showPresence(): Locator {
+    return this.root.getByRole('switch', { name: 'Show when people are active' })
   }
 
   /** The Every message or Never row. */
