@@ -95,7 +95,7 @@ async function onlyTheBridge(win: Page): Promise<void> {
     shell: ['openExternal', 'openInSlack', 'editUndo', 'downloadFile', 'openFile'],
     clipboard: ['writeText', 'writeImage'],
     menu: ['onCommand'],
-    notifications: ['setViewing', 'onOpen', 'test', 'permission', 'requestPermission', 'openSettings'],
+    notifications: ['contentShown', 'setViewing', 'onOpen', 'test', 'permission', 'requestPermission', 'openSettings'],
     webPanel: ['show', 'setBounds', 'hide', 'close', 'onState'],
   })
 }
