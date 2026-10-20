@@ -2,14 +2,13 @@ import * as stylex from '@stylexjs/stylex'
 import { CaretRight } from '@phosphor-icons/react/dist/icons/CaretRight'
 import { Headphones } from '@phosphor-icons/react/dist/icons/Headphones'
 import { X } from '@phosphor-icons/react/dist/icons/X'
-import { accent, colors, motion, radii, shadows, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { activateHandlers, Button, focusRing, Icon, IconButton, Text, tooltip, type ActivateEvent } from '@juno/ui'
+import { useEffect, useRef } from 'react'
+import { accent, colors, radii, shadows, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { activateHandlers, Button, focusRing, Icon, IconButton, rootDuration, Text, tooltip, type ActivateEvent } from '@juno/ui'
 import { barCard } from './barCard'
 import { placeIcons, placeLabel } from './look'
 import type { HuddlePerson, HuddlePlace } from './model'
 import { PeopleStack } from './Speaking'
-
-const REDUCED = '@media (prefers-reduced-motion: reduce)'
 
 export interface IncomingHuddleCardProps {
   readonly place: HuddlePlace
@@ -47,7 +46,7 @@ export function IncomingHuddleCard({ place, starter, people, current, pulse, onO
   return (
     <section aria-label="Incoming huddle" data-incoming-huddle="" {...stylex.props(barCard.root)}>
       <div {...stylex.props(barCard.card, styles.edge)}>
-        {pulse ? <span aria-hidden data-pulse="" {...stylex.props(styles.glow)} /> : null}
+        {pulse ? <Glow /> : null}
         <button type="button" aria-label={`Open huddle in ${where}`} {...activateHandlers<HTMLButtonElement>(onOpen)} {...stylex.props(barCard.open, focusRing.outside)}>
           <span {...stylex.props(barCard.placeIcon)}>
             <Icon icon={placeIcons[place.kind]} size={16} />
@@ -83,11 +82,24 @@ export function IncomingHuddleCard({ place, starter, people, current, pulse, onO
   )
 }
 
-const breathe = stylex.keyframes({
-  '0%': { opacity: 0.15 },
-  '50%': { opacity: 1 },
-  '100%': { opacity: 0.15 },
-})
+/** One breath of the glow: low, full, low. */
+const BREATH: Keyframe[] = [{ opacity: 0.15 }, { opacity: 1 }, { opacity: 0.15 }]
+
+/**
+ * The pulse: a glow around the edge whose opacity breathes, a Web Animation
+ * over `--duration-pulse`, so only the compositor works each frame and the
+ * style sheet carries no keyframes. With reduced motion it does not run and
+ * the glow stays hidden; the accent edge remains.
+ */
+function Glow() {
+  const glow = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    if (glow.current === null || matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const breathing = glow.current.animate(BREATH, { duration: rootDuration('--duration-pulse'), easing: 'ease-in-out', iterations: Infinity })
+    return () => breathing.cancel()
+  }, [])
+  return <span ref={glow} aria-hidden data-pulse="" {...stylex.props(styles.glow)} />
+}
 
 const styles = stylex.create({
   // The accent itself for the edge, so an incoming huddle reads apart from a call.
@@ -95,20 +107,14 @@ const styles = stylex.create({
     position: 'relative',
     borderColor: accent['--hl'],
   },
-  // The pulse: a glow around the edge whose opacity breathes, so only the compositor works each frame.
-  // It sits on the padding box, so its ring covers the 1px edge. With reduced motion it does not show; the
-  // accent edge stays.
+  // Hidden until its animation runs. It sits on the padding box, so its ring covers the 1px edge.
   glow: {
     position: 'absolute',
     inset: 0,
     borderRadius: radii['--radius-xl'],
     boxShadow: shadows['--huddle-incoming-glow'],
     pointerEvents: 'none',
-    opacity: { default: null, [REDUCED]: 0 },
-    animationName: { default: breathe, [REDUCED]: 'none' },
-    animationDuration: motion['--duration-pulse'],
-    animationTimingFunction: 'ease-in-out',
-    animationIterationCount: 'infinite',
+    opacity: 0,
   },
   // The headphones sit under the place glyph, 6px in, as the first row's.
   actions: {
