@@ -68,12 +68,30 @@ interface CachedBody {
   readonly mentionsMe: boolean
 }
 
+/** A user as the message list reads them. `app_dm` is 1 for an app or bot whose DM Juno has. */
+type MessageUser = UserRow & { readonly is_bot: 0 | 1; readonly app_dm: 0 | 1 }
+
+/**
+ * Juno has nothing to open for this user (SPEC 7, "Messages"): one the store
+ * does not know, or an app or bot with no DM. A person with no DM still opens
+ * Home addressed to them. Undefined: not read yet.
+ */
+const unreachable = (user: MessageUser | null | undefined): boolean => user === null || (user?.is_bot === 1 && user.app_dm === 0)
+
+/** `person` with its `unreachable` flag set to `flag`, the same object when it already is. */
+function reach(person: Person, flag: boolean): Person {
+  if ((person.unreachable === true) === flag) return person
+  if (flag) return { ...person, unreachable: true }
+  const { unreachable: _unreachable, ...rest } = person
+  return rest
+}
+
 /** What one `messages.list` subscription keeps between runs. See the module comment. */
 export interface MessageCache {
   rows: Map<string, CachedRow>
   bodies: Map<string, CachedBody>
   /** Users read so far, `null` for an id with no row. */
-  users: Map<string, UserRow | null>
+  users: Map<string, MessageUser | null>
   /** Conversations read so far, `null` for an id with no row. */
   channels: Map<string, ChannelRow | null>
   /** User groups read so far, `null` for an id with no row. */
@@ -248,6 +266,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       ...(selfId === undefined ? {} : { me: selfId }),
       ...(me?.usergroupIds === undefined ? {} : { myUsergroups: me.usergroupIds }),
       user,
+      unreachable: (id: string) => unreachable(cache.users.get(id)),
       channel: (id: string) => {
         const row = cache.channels.get(id)
         if (row === undefined) wanted.channels.add(id)
@@ -356,13 +375,14 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       nextRows.set(row.ts, { key, row: view })
       out.push(view)
       if (view.senderId !== undefined && !people.has(view.senderId)) {
+        // A post with its own name or icon (a webhook, an app) is drawn as that sender, which has no DM.
         const person = row.bot_name !== null || row.bot_icon !== null
-          ? personFrom(view.senderId, { id: view.senderId, name: row.bot_name ?? row.user_id, display_name: row.bot_name, real_name: null, avatar_url: row.bot_icon ?? cache.users.get(row.user_id ?? '')?.avatar_url ?? null })
-          : personFrom(view.senderId, cache.users.get(view.senderId), cache.people.get(view.senderId))
+          ? reach(personFrom(view.senderId, { id: view.senderId, name: row.bot_name ?? row.user_id, display_name: row.bot_name, real_name: null, avatar_url: row.bot_icon ?? cache.users.get(row.user_id ?? '')?.avatar_url ?? null }), true)
+          : reach(personFrom(view.senderId, cache.users.get(view.senderId), cache.people.get(view.senderId)), unreachable(cache.users.get(view.senderId)))
         people.set(view.senderId, person)
       }
       for (const reaction of view.reactions) {
-        for (const id of reaction.users ?? []) if (!people.has(id)) people.set(id, personFrom(id, cache.users.get(id), cache.people.get(id)))
+        for (const id of reaction.users ?? []) if (!people.has(id)) people.set(id, reach(personFrom(id, cache.users.get(id), cache.people.get(id)), unreachable(cache.users.get(id))))
       }
     }
     cache.rows = nextRows
@@ -375,7 +395,11 @@ const readUsers = (sql: SqlClient.SqlClient, cache: MessageCache, ids: Iterable<
     const missing = [...ids].filter((id) => !cache.users.has(id))
     if (missing.length === 0) return
     for (const id of missing) cache.users.set(id, null)
-    for (const user of yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id IN ${sql.in(missing)}`) cache.users.set(user.id, user)
+    // An app's DM is read with it, as `people.locate` finds it: only a DM with a Main opens.
+    for (const user of yield* sql<MessageUser>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url, is_bot,
+      CASE WHEN is_bot = 1 THEN EXISTS (SELECT 1 FROM conversations d WHERE d.kind = 'im' AND d.user_id = users.id AND d.is_member = 1
+        AND EXISTS (SELECT 1 FROM topic_index t WHERE t.topic_id = 'm:' || d.id)) ELSE 0 END AS app_dm
+      FROM users WHERE id IN ${sql.in(missing)}`) cache.users.set(user.id, user)
   })
 
 const readChannels = (sql: SqlClient.SqlClient, cache: MessageCache, ids: Iterable<string>) =>

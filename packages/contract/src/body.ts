@@ -29,7 +29,8 @@ export type BroadcastRange = typeof BroadcastRange.Type
 export const BodyInline = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('text'), text: Schema.String, style: Schema.optionalKey(BodyInlineStyle) }),
   Schema.Struct({ kind: Schema.Literal('link'), url: Schema.String, text: Schema.String, style: Schema.optionalKey(BodyInlineStyle) }),
-  Schema.Struct({ kind: Schema.Literal('user'), id: Schema.String, name: Schema.String, isMe: Schema.Boolean }),
+  // `unreachable`: Juno has nothing to open for them, an app with no DM or a user the store does not know (SPEC 7, "Messages").
+  Schema.Struct({ kind: Schema.Literal('user'), id: Schema.String, name: Schema.String, isMe: Schema.Boolean, unreachable: Schema.optionalKey(Schema.Literal(true)) }),
   Schema.Struct({ kind: Schema.Literal('channel'), id: Schema.String, name: Schema.String }),
   Schema.Struct({ kind: Schema.Literal('usergroup'), id: Schema.String, handle: Schema.String, name: Schema.optionalKey(Schema.String), isMine: Schema.Boolean }),
   Schema.Struct({ kind: Schema.Literal('broadcast'), range: BroadcastRange }),

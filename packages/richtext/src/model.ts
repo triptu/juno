@@ -18,7 +18,8 @@ export type BroadcastRange = 'here' | 'channel' | 'everyone'
 export type Inline =
   | { readonly kind: 'text'; readonly text: string; readonly style?: InlineStyle }
   | { readonly kind: 'link'; readonly url: string; readonly text: string; readonly style?: InlineStyle }
-  | { readonly kind: 'user'; readonly id: string; readonly name: string; readonly isMe: boolean }
+  /** A person. `unreachable` when Juno has nothing to open for them (`Lookups.unreachable`). */
+  | { readonly kind: 'user'; readonly id: string; readonly name: string; readonly isMe: boolean; readonly unreachable?: true }
   | { readonly kind: 'channel'; readonly id: string; readonly name: string }
   /** A user group. `name` is the group's full name, for a tooltip; `isMine` when the user belongs to it. */
   | { readonly kind: 'usergroup'; readonly id: string; readonly handle: string; readonly name?: string; readonly isMine: boolean }
@@ -89,6 +90,8 @@ export interface Lookups {
   readonly me?: string
   /** Display name for a user id, without "@". */
   readonly user?: (id: string) => string | undefined
+  /** Juno has nothing to open for this user: an app with no DM, or a user the store does not know. Sets `unreachable` on user mentions. */
+  readonly unreachable?: (id: string) => boolean
   /** Channel name for a channel id, without "#". */
   readonly channel?: (id: string) => string | undefined
   /** The kind and name of any conversation by id, DMs included: where a shared message came from. */
