@@ -109,7 +109,7 @@ export function stubRoot(channel: string, threadTs: string, reply: Pick<Message,
 
 const sameRow = (a: MessageRow, b: MessageRow): boolean => {
   for (const key of Object.keys(a) as Array<keyof MessageRow>) {
-    if (key === 'version') continue
+    if (key === 'version' || key === 'attention' || key === 'attention_context') continue
     if (a[key] !== b[key]) return false
   }
   return true

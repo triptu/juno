@@ -12,6 +12,14 @@ const event = (at: number) => ({ kind: 'event' as const, eventTs: ts(at) })
 const partial = (at: number) => ({ kind: 'partial' as const, requestedAt: ts(at) })
 
 describe('mergeMessage', () => {
+  it('does not rewrite an unchanged Slack message because it has cached notification attention', () => {
+    const incoming = message({ ts: ts(1) })
+    const stored = { ...toMessageRow(C, incoming), attention: 2, attention_context: '{"userId":"U0SELF"}' }
+    const merged = mergeMessage(stored, incoming, C, page(2))
+    expect(merged.changed).toBe(false)
+    expect(merged.row.version).toBe(stored.version)
+  })
+
   it('keeps bot identity through partial and older content, and accepts newer edits', () => {
     const original = message({ ts: ts(1), bot_id: 'B0TEST', username: 'Build helper', bot_profile: { id: 'B0TEST', icons: { image_72: 'https://example.test/build.png' } }, edited: { ts: ts(3) } })
     const stored = toMessageRow(C, original)
