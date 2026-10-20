@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { CaretLeft } from '@phosphor-icons/react/dist/icons/CaretLeft'
 import { CaretRight } from '@phosphor-icons/react/dist/icons/CaretRight'
 import { ImageSquare } from '@phosphor-icons/react/dist/icons/ImageSquare'
-import { useId, useState, type MouseEvent } from 'react'
+import { useId, type MouseEvent } from 'react'
 import { accent, colors, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { activateHandlers, Button, IconButton, Text, type ActivateEvent } from '@juno/ui'
 import { PictureImage, type PictureCardView } from './PictureImage'
@@ -41,12 +41,11 @@ export interface PicturePageProps {
  * The picture page (SPEC 12, "Pictures and the gallery"): the picture as
  * large as the page allows, and beside it a column like a museum label:
  * the title, the artist, the date and medium, where it is, a caption, the
- * facts, and the credit with each fact's source. Below about 900px of
+ * facts, the credit, and each fact's source. Below about 900px of
  * width the label goes under the picture and the page scrolls.
  */
 export function PicturePage({ picture, src, onAllPictures, onStep, onOpenLink }: PicturePageProps) {
   const titleId = useId()
-  const [sourcesOpen, setSourcesOpen] = useState(false)
   const link = (url: string) => (event: MouseEvent) => {
     event.preventDefault()
     onOpenLink(url)
@@ -96,24 +95,22 @@ export function PicturePage({ picture, src, onAllPictures, onStep, onOpenLink }:
                 Source
               </a>
             </Text>
-            <button type="button" aria-expanded={sourcesOpen} onClick={() => setSourcesOpen(!sourcesOpen)} {...stylex.props(styles.link, styles.textButton)}>
+            <Text variant="meta" tone="muted" as="h2" sx={styles.sourcesHeading}>
               Sources
-            </button>
-            {sourcesOpen ? (
-              <ol data-picture-sources="" {...stylex.props(styles.sources)}>
-                {picture.facts.map((fact) => (
-                  <li key={fact.text}>
-                    {fact.url === undefined ? (
-                      fact.source
-                    ) : (
-                      <a href={fact.url} onClick={link(fact.url)} {...stylex.props(styles.link)}>
-                        {fact.source}
-                      </a>
-                    )}
-                  </li>
-                ))}
-              </ol>
-            ) : null}
+            </Text>
+            <ol data-picture-sources="" {...stylex.props(styles.sources)}>
+              {picture.facts.map((fact) => (
+                <li key={fact.text}>
+                  {fact.url === undefined ? (
+                    fact.source
+                  ) : (
+                    <a href={fact.url} onClick={link(fact.url)} {...stylex.props(styles.link)}>
+                      {fact.source}
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ol>
           </footer>
         </div>
       </div>
@@ -220,14 +217,7 @@ const styles = stylex.create({
     outlineWidth: sizes['--focus-ring-width'],
     outlineColor: accent['--focus-ring'],
   },
-  textButton: {
-    padding: 0,
-    borderWidth: 0,
-    backgroundColor: 'transparent',
-    fontFamily: text['--text-meta-family'],
-    fontSize: text['--text-meta-size'],
-    lineHeight: text['--text-meta-leading'],
-  },
+  sourcesHeading: { margin: 0, marginTop: spacing['--space-3'] },
   sources: {
     display: 'flex',
     flexDirection: 'column',
