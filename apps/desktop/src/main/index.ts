@@ -13,7 +13,7 @@ import { appMcpCredentials } from './mcpCredentials'
 import { createSupervisor } from './engine'
 import { createEngineTestHooks } from './engineTestHooks'
 import { createHuddleQuit } from './huddleQuit'
-import { copiedForTests, copyImage, downloadFile, downloadsForTests, openedForTests, openFile } from './files'
+import { copiedForTests, copyImage, downloadFile, downloadsForTests, openedForTests, openFile, quickLook, quickLookedForTests } from './files'
 import { browserLinksForTests, contextMenuForTests, folderForTests, registerIpc, logsForTests, huddleSettingsForTests, slackLinksForTests, webPanelForTests } from './ipc'
 import { CUSTOM_ITEM, macKeychain, memoryKeychain, OPENROUTER_ITEM } from './keychain'
 import { ProviderStore } from './providers'
@@ -248,6 +248,7 @@ app.whenReady().then(() => {
     supervisor,
     downloadFile: (file) => downloadFile(file, fakeSlackOrigin, e2e),
     openFile: (file) => openFile(file, fakeSlackOrigin, e2e),
+    quickLook: (file, window) => quickLook(file, window, fakeSlackOrigin, e2e),
     copyImage: (src) => copyImage(src, fakeSlackOrigin, e2e),
     processes,
     setViewing: (topicId) => notifier.setViewing(topicId),
@@ -362,6 +363,7 @@ if (e2e) {
       webPanel: () => webPanelForTests(appWindow()),
       downloads: downloadsForTests,
       opened: openedForTests,
+      quickLooked: quickLookedForTests,
       copiedImages: () => copiedForTests.images,
       agentState: () => agent.currentState,
       agentHost: () => agent.host?.host,

@@ -133,6 +133,9 @@ const bridge: JunoBridge = {
     downloadFile: ({ url, name }) => ipcRenderer.invoke(Channels.shellDownloadFile, { url, name }),
     openFile: ({ url, name }) => ipcRenderer.invoke(Channels.shellOpenFile, { url, name }),
   },
+  files: {
+    quickLook: ({ url, name }) => ipcRenderer.invoke(Channels.filesQuickLook, { url, name }),
+  },
   clipboard: {
     writeText: (text) => ipcRenderer.invoke(Channels.clipboardWriteText, { text }),
     writeImage: (src) => ipcRenderer.invoke(Channels.clipboardWriteImage, { src }),

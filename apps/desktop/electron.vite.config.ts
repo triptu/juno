@@ -10,7 +10,9 @@ import stylex from '@stylexjs/unplugin'
 /**
  * Injects the renderer's Content Security Policy (architecture section 14).
  * Production allows only bundled code and styles; images may come from the
- * juno: scheme, Slack's CDN and Gravatar. A huddle's media session talks to
+ * juno: scheme, Slack's CDN and Gravatar. The media viewer plays audio and
+ * video, frames a PDF or HTML file and reads a text file from the juno:
+ * scheme (main's `juno://files`). A huddle's media session talks to
  * Chime (`*.chime.aws`: the nearest region, signalling and its event
  * ingest), and Chime's Voice Focus loads its scripts, workers and wasm from
  * `*.sdkassets.chime.aws` (packages/huddle-media/README.md). Dev
@@ -32,7 +34,9 @@ function contentSecurityPolicy(): Plugin {
         dev ? "style-src 'self' 'unsafe-inline'" : "style-src 'self'",
         "font-src 'self'",
         "img-src 'self' juno: https://*.slack-edge.com https://secure.gravatar.com data:",
-        `connect-src 'self'${dev ? ' ws://localhost:*' : ''} ${CHIME}`,
+        "media-src 'self' juno:",
+        "frame-src juno:",
+        `connect-src 'self' juno:${dev ? ' ws://localhost:*' : ''} ${CHIME}`,
       ].join('; ')
       return [
         {
