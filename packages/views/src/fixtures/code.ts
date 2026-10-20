@@ -3,8 +3,8 @@ import { people } from './topics'
 
 /**
  * One message with code blocks as people paste them: one tagged with its
- * language on the first line (the engine hands it over as `language`,
- * without that line), one whose language is detected, a stack trace that
+ * language on the first line (the engine marks it with `language` and
+ * `tagLine`, and the view leaves that line out), one whose language is detected, a stack trace that
  * stays plain, and a long tagged one that scrolls in its box.
  */
 export const codeBlocks = window([
@@ -14,7 +14,8 @@ export const codeBlocks = window([
     blocks: [
       p('The retry wrapper, with the backoff capped:'),
       code(
-        `export async function withRetry<A>(run: () => Promise<A>, tries = 3): Promise<A> {
+        `ts
+export async function withRetry<A>(run: () => Promise<A>, tries = 3): Promise<A> {
   for (let attempt = 1; ; attempt++) {
     try {
       return await run()
@@ -39,7 +40,8 @@ LIMIT 50;`),
     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)`),
       p('And the whole migration script, for reference:'),
       code(
-        `import sqlite3
+        `python
+import sqlite3
 
 def migrate(path: str) -> None:
     """Move every topic to the new table."""

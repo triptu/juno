@@ -32,8 +32,12 @@ export type ListStyle = 'bullet' | 'ordered' | 'checked' | 'unchecked'
 export type ContentBlock =
   | { readonly kind: 'paragraph'; readonly children: ReadonlyArray<Inline> }
   | { readonly kind: 'quote'; readonly children: ReadonlyArray<Inline> }
-  /** `language` names the code's language when its first line was a tag (```ts); that line is not in `text`. */
-  | { readonly kind: 'code'; readonly text: string; readonly language?: string }
+  /**
+   * `text` is the code as written. When its first line is only a language
+   * tag (```ts), `language` names it and `tagLine` says to show the code
+   * without that line.
+   */
+  | { readonly kind: 'code'; readonly text: string; readonly language?: string; readonly tagLine?: true }
   | {
       readonly kind: 'list'
       readonly style: ListStyle

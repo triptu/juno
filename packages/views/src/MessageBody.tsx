@@ -116,7 +116,7 @@ function Block({ block, now, hueOf, onChannel, onLink, linkInfo, tabIndex, rende
     case 'code':
       return (
         <div {...stylex.props(styles.code)}>
-          <HighlightedCodeBlock text={block.text} language={block.language} />
+          <HighlightedCodeBlock text={block.tagLine ? block.text.slice(block.text.indexOf('\n') + 1) : block.text} language={block.language} />
         </div>
       )
     case 'list': {

@@ -61,8 +61,9 @@ export type BodyListStyle = typeof BodyListStyle.Type
 const ContentBlock = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('paragraph'), children: Schema.Array(BodyInline) }),
   Schema.Struct({ kind: Schema.Literal('quote'), children: Schema.Array(BodyInline) }),
-  // `language`: a highlight.js grammar name, when the block's first line named one (richtext's `codeBlock`).
-  Schema.Struct({ kind: Schema.Literal('code'), text: Schema.String, language: Schema.optionalKey(Schema.String) }),
+  // `text` is the code as written. When its first line is only a language tag, `language` is its highlight.js
+  // grammar name and `tagLine` says the view leaves that line out (richtext's `codeBlock`).
+  Schema.Struct({ kind: Schema.Literal('code'), text: Schema.String, language: Schema.optionalKey(Schema.String), tagLine: Schema.optionalKey(Schema.Literal(true)) }),
   Schema.Struct({
     kind: Schema.Literal('list'),
     style: BodyListStyle,
