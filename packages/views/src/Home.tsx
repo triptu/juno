@@ -18,7 +18,7 @@ export interface HomeThoughtView {
 
 export interface HomeProps {
   readonly scene: HomeSceneName
-  /** "Morning, Tushar.", or "All caught up." */
+  /** "Morning, Tushar.", or "All caught up." Not shown with a picture, which says it instead. */
   readonly title: string
   /** Under the greeting only while the first sync runs: `HomeSyncLine`, "Syncing with Slack." or "Syncing 30 of 143 conversations." */
   readonly line?: ReactNode
@@ -58,7 +58,7 @@ export interface HomeProps {
    * over them and goes when a row lands, so the greeting never moves.
    */
   readonly thought?: HomeThoughtView
-  /** In the caught-up scene's place, already on this Mac (SPEC 12, "A picture"). */
+  /** In the caught-up scene's place, already on this Mac (SPEC 12, "A picture"). Home then has no greeting line. */
   readonly picture?: HomePictureView
   /** Opens the picture with its story; fires on mouse down, `event.metaKey` asks for a new tab. */
   readonly onOpenPicture?: (event: ActivateEvent) => void
@@ -75,10 +75,11 @@ export interface HomeProps {
  */
 export function Home({ scene, title, line, items, done, now, enter = true, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, onDismiss, onAsk, loading = false, reservedItems = 0, composer, waiting = false, welcome, thought, picture, onOpenPicture, onPictureMissing }: HomeProps) {
   const headingId = useId()
+  const pictured = picture !== undefined && onOpenPicture !== undefined
   const shownThought = thought === undefined || items.length > 0 || loading ? undefined : thought
   const itemsShown = items.length > 0 || reservedItems > 0
-  // Each shown part enters one stagger step after the one above it: the scene, the greeting, then these.
-  const thoughtStep = 2
+  // Each shown part enters one stagger step after the one above it: the scene, the greeting (none with a picture), then these.
+  const thoughtStep = pictured ? 1 : 2
   const itemsStep = thoughtStep + (shownThought === undefined ? 0 : 1)
   const welcomeStep = itemsStep + (itemsShown ? 1 : 0)
   const part = (step: number) => (enter ? [styles.rise, styles.delay(step)] : [])
@@ -87,9 +88,14 @@ export function Home({ scene, title, line, items, done, now, enter = true, onOpe
       <div {...stylex.props(styles.scroll)}>
         {waiting ? null : <div {...stylex.props(styles.column, welcome !== undefined && styles.columnWelcome)}>
           <div {...stylex.props(welcome !== undefined && styles.sceneGives, ...part(0))}>
-            {picture === undefined || onOpenPicture === undefined ? <HomeScene name={scene} /> : <HomePicture picture={picture} onOpen={onOpenPicture} {...(onPictureMissing === undefined ? {} : { onMissing: onPictureMissing })} />}
+            {pictured ? <HomePicture picture={picture} onOpen={onOpenPicture} {...(onPictureMissing === undefined ? {} : { onMissing: onPictureMissing })} /> : <HomeScene name={scene} />}
           </div>
-          <div {...stylex.props(styles.greeting, welcome !== undefined && styles.greetingGives, ...part(1))}>
+          {pictured ? (
+            // The picture says Home is caught up; the heading is for screen readers only.
+            <h2 id={headingId} {...stylex.props(styles.hiddenTitle)}>
+              Home
+            </h2>
+          ) : <div {...stylex.props(styles.greeting, welcome !== undefined && styles.greetingGives, ...part(1))}>
             <h2 id={headingId} {...stylex.props(styles.title)}>
               {title}
             </h2>
@@ -98,14 +104,14 @@ export function Home({ scene, title, line, items, done, now, enter = true, onOpe
                 {line}
               </Text>
             )}
-          </div>
+          </div>}
           {shownThought === undefined ? null : reservedItems > 0 ? (
             // Over the reserved slots, out of the flow: a row that lands takes its place and nothing moves.
             <div {...stylex.props(styles.thoughtAnchor)}>
               <HomeThought thought={shownThought} sx={[styles.thoughtOver, ...part(thoughtStep)]} />
             </div>
           ) : (
-            <HomeThought thought={shownThought} sx={part(thoughtStep)} />
+            <HomeThought thought={shownThought} sx={[pictured && styles.thoughtAfterPicture, ...part(thoughtStep)]} />
           )}
           {itemsShown ? (
             <ul aria-labelledby={headingId} {...stylex.props(styles.items, welcome !== undefined && styles.itemsWelcome, reservedItems > 0 && styles.itemSlots(reservedItems), ...part(itemsStep))}>
@@ -326,6 +332,17 @@ const styles = stylex.create({
     marginTop: spacing['--space-3-5'],
     textAlign: 'center',
     userSelect: 'text',
+  },
+  // With a picture and no greeting: the gap the rows keep under the greeting, so the plaque stays with its picture.
+  thoughtAfterPicture: { marginTop: spacing['--space-8'] },
+  hiddenTitle: {
+    position: 'absolute',
+    width: '1px', // tokens-allow: the visually hidden pattern
+    height: '1px', // tokens-allow: the visually hidden pattern
+    margin: 0,
+    overflow: 'hidden',
+    clipPath: 'inset(50%)',
+    whiteSpace: 'nowrap',
   },
   // In the flow with no height, so the thought over the reserved slots changes no layout.
   thoughtAnchor: { position: 'relative', width: '100%', maxWidth: layout['--home-width'], height: 0 },

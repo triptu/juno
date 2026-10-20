@@ -52,9 +52,12 @@ quiet('A caught-up Home shows a picture once it is on disk, opens its story, and
   await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true)
   const plaque = await home.picture.locator('p').textContent()
   const title = plaque!.split(' · ')[0]!
-  // The greeting is under the picture.
-  const [box, greeting] = await Promise.all([home.picture.boundingBox(), home.greeting.boundingBox()])
-  expect(greeting!.y).toBeGreaterThan(box!.y + box!.height)
+  // The picture says Home is caught up: no greeting line, the thought under the plaque, and a heading for screen readers.
+  await expect(home.root).not.toContainText('All caught up.')
+  await expect(home.root.getByRole('heading', { name: 'Home' })).toBeAttached()
+  await expect(home.thought).toBeVisible()
+  const [box, thought] = await Promise.all([home.picture.boundingBox(), home.thought.boundingBox()])
+  expect(thought!.y).toBeGreaterThan(box!.y + box!.height)
 
   // Clicking it opens the picture with its story in the tab.
   await home.picture.getByRole('button', { name: `Open ${title}` }).click()

@@ -1007,7 +1007,7 @@ export const sizes = stylex.defineVars({
   '--home-picture-width': '320px',
   '--home-picture-height': '216px',
   '--home-picture-height-min': '144px',
-  '--home-picture-room': '580px',
+  '--home-picture-room': '540px',
   // The gallery's rows of pictures, each at its own shape, and the picture page's label column.
   '--gallery-row': '150px',
   '--picture-label-width': '380px',
