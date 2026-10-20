@@ -105,6 +105,9 @@ export const RoomFrameRoom = S.Struct({
   participants: opt(S.Array(S.String)),
   date_start: opt(S.Number),
   has_ended: opt(S.Boolean),
+  date_end: opt(S.Number),
+  participant_history: opt(S.Array(S.String)),
+  canvas_thread_ts: opt(S.String),
   thread_root_ts: opt(S.String),
   /** Who started the huddle: a user id. */
   created_by: opt(S.String),

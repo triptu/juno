@@ -10,6 +10,7 @@ import { compareTs, mainTopicId, threadTopicId, tsToMillis, type ChannelId, type
 import { isReply, type Message } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction, type MessageRow, type SqlError } from '@juno/store'
 import { Clock, Effect, Queue } from 'effect'
+import { writeHuddle } from './write/huddles'
 import { filesToFetch } from './files'
 import { reindexOptions, wantUsers, type SyncContext } from './context'
 import { mergeMessage, mergeRootCounters, stubRoot, type MergeSource } from './merge'
@@ -29,6 +30,7 @@ export const mergeOne = (
   serverVersion?: Ts,
 ): Effect.Effect<ReadonlyArray<MessageRow>, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
+    if (message.room !== undefined) yield* writeHuddle(channel, message.room, ctx.me.userId, message.thread_ts ?? message.ts)
     const existing = yield* readMessage(channel, message.ts)
     const merged = mergeMessage(existing, message, channel, source)
     const touched: Array<MessageRow> = [merged.row]
