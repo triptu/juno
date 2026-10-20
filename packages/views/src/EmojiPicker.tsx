@@ -9,7 +9,7 @@ import { ScrollArea, Surface, Text, TextField } from '@juno/ui'
 export interface EmojiPickerProps {
   /** All standard emoji, by category (from @juno/contract's emojiCatalog). */
   readonly catalog: ReadonlyArray<EmojiCategory>
-  /** The workspace's custom emoji, shown as their own category first when non-empty. */
+  /** The workspace's custom emoji, shown as their own category after the standard categories when non-empty. */
   readonly custom?: ReadonlyArray<{ readonly name: string; readonly url: string; readonly aliases?: ReadonlyArray<string> }>
   /** Recently used names (Slack names), shown first as "Frequently used" when non-empty. */
   readonly recent?: ReadonlyArray<string>
@@ -58,7 +58,7 @@ export function EmojiPicker({ catalog, custom = EMPTY, recent = EMPTY, selected 
 
   const standard = useMemo(() => catalog.map((category) => ({ heading: category.name, items: category.emoji.map(standardItem) })), [catalog])
   const customItems = useMemo(() => custom.filter((emoji) => emoji.url !== '' && !failed.has(emoji.name)).map((emoji) => ({ name: emoji.name, url: emoji.url, keys: [emoji.name, ...(emoji.aliases ?? [])].join(' ').toLowerCase() })), [custom, failed])
-  // In catalog order, custom first as in the browse grid.
+  // Search keeps workspace matches first, independently of the browse order.
   const all = useMemo(() => [...customItems, ...standard.flatMap((category) => category.items)], [customItems, standard])
 
   const browse = useMemo((): ReadonlyArray<Section> => {
@@ -73,8 +73,8 @@ export function EmojiPicker({ catalog, custom = EMPTY, recent = EMPTY, selected 
     })
     return [
       ...(recentItems.length > 0 ? [{ key: 'recent', heading: 'Frequently used', items: recentItems }] : []),
-      ...(customItems.length > 0 ? [{ key: 'custom', heading: 'Workspace', items: customItems }] : []),
       ...standard.map((category) => ({ key: category.heading, ...category })),
+      ...(customItems.length > 0 ? [{ key: 'custom', heading: 'Workspace', items: customItems }] : []),
     ]
   }, [all, recent, customItems, standard])
 

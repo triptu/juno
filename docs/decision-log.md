@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-20 12:27 · Tushar · Put Workspace after all standard emoji categories so large workspaces do not push the standard catalog out of reach. Search and Frequently used keep their existing order. The picker has no category navigation. Seed eight distinct custom images and one alias for realistic gallery and end-to-end coverage.
 - 10-20 11:49 · workspace-emoji-picker · Reaction pickers share the existing workspace emoji query. Each image owner appears once with aliases in its search keys; picks use the owner name, including stored Juno chat reactions. TanStack Virtual windows browse and search rows so large workspaces mount only nearby emoji, with lazy image loading. Pickers wrap URLs after the workspace snapshot crosses the port, and the engine wraps reaction chip URLs, through the existing authenticated thumbnail handler so private images load without enlarging the emoji snapshot.
 - 10-20 11:12 · sidebar-first-key · Hold the character that starts sidebar type-ahead along with later keys, so opening a topic and typing before its composer mounts keeps the whole draft.
 - 10-20 11:06 · daily-full-run · A scheduled task runs the full suites on main once a day; the agent that runs it commits the refreshed coverage map and merges it.

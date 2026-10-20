@@ -14,6 +14,7 @@ import { WebSocketServer, type WebSocket } from 'ws'
 import type { MethodName, RtmFrame } from '@juno/slack-schema'
 import { EdgeEmojisListOk, EdgeUsersInfoArgs, EdgeUsersInfoOk, encodeRtmFrame, isMethodName, Methods } from '@juno/slack-schema'
 import { parseCookies, parseFields, parseJson, parseMultipartParts, readBody, type FormFields } from './body.ts'
+import { WORKSPACE_EMOJI } from './emoji.ts'
 import { mimetypeOf } from './files.ts'
 import type { EdgeHandlers } from './features/registry.ts'
 import { ApiError, type Handlers, type MethodContext } from './methods.ts'
@@ -523,10 +524,17 @@ export class FakeServer {
       }
       return this.#file(path.split('/')[2] ?? '', url.searchParams.get('download') === '1', url.searchParams.get('thumb') === 'video', response)
     }
-    if (path.startsWith('/avatars/') && method === 'GET') {
+    if ((path.startsWith('/avatars/') || path.startsWith('/emoji/')) && method === 'GET') {
       const cookie = parseCookies(request.headers.cookie)['d']
       const session = cookie === undefined ? undefined : this.sessions.get(cookie)
       if (session === undefined || session.expired) return json(response, 401, { ok: false, error: 'not_authed' })
+      if (path.startsWith('/emoji/')) {
+        const svg = WORKSPACE_EMOJI[path.slice('/emoji/'.length).replace(/\.svg$/, '')]
+        if (svg === undefined) return json(response, 404, { ok: false, error: 'emoji_not_found' })
+        response.writeHead(200, { 'content-type': 'image/svg+xml', 'cache-control': 'public, max-age=3600' })
+        response.end(svg)
+        return
+      }
       // `<id>.svg`, or `<team>-<user>-<avatar_hash>-<size>` as `team.avatar_base_url` photos are spelled.
       const name = path.slice('/avatars/'.length)
       return this.#avatar(/^T[A-Z0-9]+-[UW][A-Z0-9]+-[^-]+-\d+$/.test(name) ? name.split('-')[1]! : name.replace(/\.svg$/, ''), response)

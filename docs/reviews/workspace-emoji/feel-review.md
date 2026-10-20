@@ -1,13 +1,14 @@
 # Workspace emoji verification
 
-Run on 2026-10-20 against the implementation in `3854f67fe` and `6e50f1fe7`, on an Apple M2 Mac.
+Checked on 2026-10-20 on an Apple M2 Mac, after moving Workspace below the standard categories.
 
-`pnpm perf -g 'emoji picker with 2,000 workspace emoji'` passed. Ten opens measured click to the first frame containing a custom emoji. Median was 9.8 ms, p95 was 34.1 ms, and the range was 8.6–34.1 ms, against the existing 50 ms budget. The one-minute load average was 3.0. The timed result is the finished picker grid, including its first workspace query. Images finish loading asynchronously. The test checks that fewer than 200 buttons mount, the full search list has its expected scroll extent, keyboard focus crosses unmounted rows, scrolling stays inside the picker, and an emoji at the end of the set is searchable.
+`pnpm perf -g 'emoji picker with 2,000 workspace emoji'` passed. Ten opens measured click to the first frame containing the picker grid, including its first workspace query. Median was 16.1 ms, p95 was 29.0 ms, and the range was 8.7–29.0 ms, against the existing 50 ms budget. The one-minute load average was 5.3. Workspace starts offscreen; its rows do not mount until scrolled into view. Images load asynchronously outside the timed region. The test checks fewer than 200 mounted buttons, scrolling to Workspace, full search extent, keyboard focus across unmounted rows, scrolling inside the picker and searching the last custom emoji. This measures the finished browsing grid, not image download time, and is not a speed comparison with the earlier Workspace-first layout.
 
-`pnpm test:feel -g 'react to a Juno bubble'` passed all four checks over 52 recorded frames. The quick reactions stay at their anchor from frame 9, the badge arrives without moving the bubble, and no layout shift or flicker appears in the filmstrip. The recording lasts 869 ms with load 7.6. This existing scenario covers standard quick reactions; the fake-Slack desktop tests cover custom picks and their image badges.
+The local gallery check passed in both themes. It verifies Workspace follows every standard category, offscreen custom rows remain unmounted, all eight distinct images load after scrolling and the alias has no separate cell. The screenshots show the full picker scrolled to Workspace:
 
-The three reaction desktop specs passed all 12 tests against fake Slack. These cover a name and alias pick sent to `reactions.add`, loaded picker and chip images, missing images, recent use, Settings selection, and a Juno reaction stored and sent to the model by name. The focused picker gallery run passed all 45 checks after native sticky headers replaced virtualized headings. Existing emoji and output-parser tests passed all 20 checks.
+- `/Volumes/AgentWork/juno-workspace-light.png`
+- `/Volumes/AgentWork/juno-workspace-dark.png`
 
-The first affected run could not acquire remote runner capacity. Its local fallback found a cold-boot call-count failure (two `api.getFlannelHttpUrl` calls instead of one); the focused rerun of that spec passed all 45 tests. The initial gallery header jump and two desktop test assumptions were corrected and rechecked.
+`pnpm affected --max-specs 0` passed typecheck, all 11 lint checks, the affected unit tests, 126 gallery checks and all 12 reaction desktop tests. Cached checks from the earlier feature verification were retained. No final-run tests were flaky. The desktop flows cover alias search, canonical `reactions.add` names, authenticated picker and chip images, missing images, recent use, Settings selection and Juno reactions stored by name.
 
-The final `pnpm affected --max-specs 0` passed typecheck, all 11 lint checks, the affected unit tests, 276 gallery checks and all 12 reaction desktop tests. This final run covers the changed desktop specs; the earlier broader desktop selection had 71 passing cases. No tests were flaky in the final run.
+The earlier `pnpm test:feel -g 'react to a Juno bubble'` passed four checks over 52 recorded frames, with no layout shift or flicker. That scenario covers standard quick reactions, whose behavior is unchanged by this follow-up.

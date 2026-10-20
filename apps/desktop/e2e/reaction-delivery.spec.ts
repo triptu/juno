@@ -142,6 +142,7 @@ test('workspace emoji are searchable by name and alias, react by name and show t
   await picker.getByRole('textbox', { name: 'Search emoji' }).fill('missing_image')
   await expect(picker.getByText('No match.', { exact: true })).toBeVisible()
   await picker.getByRole('textbox', { name: 'Search emoji' }).fill('')
+  await picker.getByRole('group', { name: 'Workspace', exact: true }).evaluate((node) => node.scrollIntoView({ block: 'start' }))
   const image = picker.locator('[data-emoji="juno_wave"] img')
   await expect(image).toBeVisible()
   await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true)
