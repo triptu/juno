@@ -7,6 +7,7 @@
 import { bodyFromMrkdwn, messageBody, previewText, readableText, type Lookups, type MessageContent } from '@juno/richtext'
 import type { Attachment, File } from '@juno/slack-schema'
 import { firstName, type ConversationKind } from './channel'
+import { fileMediaKind } from './files'
 
 /** A message as the preview reads it. */
 export interface PreviewMessage extends MessageContent {
@@ -80,10 +81,8 @@ function fileKind(file: File): FileKind {
   if (file.subtype === 'slack_video') return 'video'
   if (file.mode === 'snippet') return 'snippet'
   if (file.filetype === 'quip' || file.filetype === 'canvas') return 'canvas'
-  const mimetype = file.mimetype ?? ''
-  if (mimetype.startsWith('image/')) return 'image'
-  if (mimetype.startsWith('video/')) return 'video'
-  return 'file'
+  const kind = fileMediaKind(file)
+  return kind === 'image' || kind === 'video' ? kind : 'file'
 }
 
 /**

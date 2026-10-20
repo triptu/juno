@@ -25,6 +25,7 @@ import { Effect } from 'effect'
 import { pendingRowId, type FileView, type MessageView, type Person, type ReactionIssue, type ReactionView, type ThreadLink } from '@juno/contract'
 import {
   channelLabelBare,
+  fileMediaKind,
   hashId,
   messageMentionsMe,
   resolveTitle,
@@ -687,6 +688,7 @@ interface SlackFile {
   readonly name?: string | null
   readonly title?: string | null
   readonly mimetype?: string
+  readonly filetype?: string
   readonly size?: number
   readonly mode?: string
   readonly file_access?: string
@@ -752,7 +754,7 @@ function videoOf(file: SlackFile): Pick<FileView, 'thumb' | 'video' | 'width' | 
 function pendingFiles(row: PendingRow): ReadonlyArray<FileView> {
   const files = parseJson<ReadonlyArray<PendingFile>>(row.file_ids_json) ?? []
   return files.map((file) => {
-    const kind = fileKind(file.mimetype)
+    const kind = fileMediaKind(file)
     const src = uploadsUrl(file.stagedName)
     const sized = kind === 'image' && file.width !== undefined && file.height !== undefined && !file.stagedName.endsWith('.bin')
     return {
@@ -771,15 +773,6 @@ function pendingFiles(row: PendingRow): ReadonlyArray<FileView> {
         : {}),
     }
   })
-}
-
-function fileKind(mimetype: string | undefined): FileView['kind'] {
-  if (mimetype === undefined) return 'file'
-  if (mimetype.startsWith('image/')) return 'image'
-  if (mimetype.startsWith('video/')) return 'video'
-  if (mimetype.startsWith('audio/')) return 'audio'
-  if (mimetype === 'application/pdf') return 'pdf'
-  return 'file'
 }
 
 /** A sent image's staged copy, while Slack has no thumbnails for it (`uploaded_files`). */
@@ -820,7 +813,8 @@ function filesOf(files: ReadonlyArray<SlackFile> | undefined, local: ReadonlyMap
       out.push({ id: file.id, name: '', kind: 'deleted' })
       continue
     }
-    const kind = fileKind(file.mimetype)
+    // Slack fills a fresh upload's `mimetype` in as it processes the file; the name says what it is meanwhile (`@juno/domain` `files.ts`).
+    const kind = fileMediaKind(file)
     const slack = kind === 'image' ? thumbOf(file) : undefined
     const staged = kind === 'image' && slack === undefined ? local.get(file.id) : undefined
     if (staged !== undefined) {
