@@ -109,6 +109,8 @@ export class Workspace {
   readonly historyInvalid = new Map<string, Ts>()
   readonly changedAt = new Map<string, number>()
   readonly subscriptions = new Map<string, Subscription>()
+  /** Unmeasured malformed-row scenarios, in-process tests only. Keyed by root timestamp. */
+  readonly threadViewRowOverrides = new Map<string, unknown>()
   readonly files = new Map<string, StoredFile>()
   /** Files uploaded while this is set start without thumbnails (`holdThumbnails`). */
   holdThumbnails = false

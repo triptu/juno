@@ -50,6 +50,7 @@ import { applyPage, mainTopicOf, threadTopicOf } from './pages'
 import { recheck, type RecheckOptions } from './recheck'
 import { reindexTopics } from './reindex'
 import { threadViewPageUnchanged } from './threadViews'
+import { decodeThreadViewPage } from './threadViewDecode'
 import { fillUsers, nameFirst } from './users'
 import {
   addSyncedRange,
@@ -224,6 +225,7 @@ const loadThreadViews = (
   Effect.gen(function* () {
     const api = yield* SlackApi
     const listed = new Set<string>()
+    let identitiesComplete = true
     let firstRequestedAt: Ts | undefined
     let current: Ts | undefined
     const batched: Array<{ readonly view: ThreadView; readonly requestedAt: Ts }> = []
@@ -244,16 +246,20 @@ const loadThreadViews = (
         return yield* pageResult.failure
       }
       const page = pageResult.success
-      for (const view of page.threads) listed.add(`${view.root_msg.channel}:${view.root_msg.ts}`)
-      const observations = page.threads.map((view) => ({ view, requestedAt }))
+      const decoded = yield* decodeThreadViewPage(page.threads)
+      for (const identity of decoded.listed) listed.add(identity)
+      identitiesComplete &&= decoded.identitiesComplete
+      const observations = decoded.views.map((view) => ({ view, requestedAt }))
       if (options.batchPages === true) batched.push(...observations)
       else yield* applyThreadViewObservations(ctx, observations, options.lane)
       if (current === undefined && options.afterFirstPage !== undefined) yield* options.afterFirstPage
-      const last = page.threads.at(-1)
-      const lastActivity = last?.root_msg.latest_reply ?? last?.root_msg.ts
+      const lastActivity = decoded.lastActivity
       if (lastActivity === undefined) {
         // An empty page that says there is more has no cursor to go on: the list is incomplete, nothing is probed.
-        if (page.has_more) return yield* Effect.logWarning('sync: getView stopped without a cursor')
+        if (page.has_more) {
+          if (batched.length > 0) yield* applyThreadViewObservations(ctx, batched, options.lane)
+          return yield* Effect.logWarning('sync: getView stopped without a cursor')
+        }
         coveredFrom = undefined
         break
       }
@@ -262,11 +268,15 @@ const loadThreadViews = (
         break
       }
       if (compareTs(lastActivity, options.until) < 0) break
+      if (current !== undefined && compareTs(lastActivity, current) >= 0) {
+        if (batched.length > 0) yield* applyThreadViewObservations(ctx, batched, options.lane)
+        return yield* Effect.logWarning('sync: getView stopped without a cursor')
+      }
       current = lastActivity
       yield* Effect.yieldNow
     }
     if (batched.length > 0) yield* applyThreadViewObservations(ctx, batched, options.lane)
-    if (options.probe) yield* probeUnlisted(ctx, listed, coveredFrom, firstRequestedAt)
+    if (options.probe && identitiesComplete) yield* probeUnlisted(ctx, listed, coveredFrom, firstRequestedAt)
   })
 
 /**
@@ -468,8 +478,19 @@ const discoverOrLog = (sweep: Effect.Effect<void, SlackApiError | SqlError, Boot
 const covered = (channel: string, start: Ts, latest: Ts): Effect.Effect<boolean, SqlError, StoreWriter> =>
   Effect.map(latestSyncedRange(channel), (range) => range !== undefined && compareTs(range.from_ts, start) <= 0 && compareTs(range.to_ts, latest) >= 0)
 
-/** Everything Slack knows about the workspace, into an empty cache (architecture 5.2). */
-export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, BootError, BootServices> =>
+/** A thread-list failure leaves the rest of first sync usable and a full follow pass due after live. */
+const coldThreadViews = (ctx: SyncContext, until: Ts, quickStart: Effect.Effect<void, BootError, BootServices>) =>
+  loadThreadViews(ctx, { until, probe: true, lane: 'interactive', afterFirstPage: quickStart }).pipe(
+    Effect.as(true),
+    Effect.catchIf((error) => error._tag !== 'SlackAuthRequired' && error._tag !== 'SqlError', (error) => Effect.gen(function* () {
+      yield* Effect.logWarning('sync: getView deferred after boot', { cause: error })
+      yield* quickStart
+      return false
+    })),
+  )
+
+/** Everything Slack knows about the workspace, into an empty cache. Returns whether the thread list loaded. */
+export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<boolean, BootError, BootServices> =>
   Effect.gen(function* () {
     yield* phase({ _tag: 'booting', first: true })
     const startedAt = yield* Clock.currentTimeMillis
@@ -493,7 +514,7 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
       Effect.andThen(Deferred.succeed(quickStarted, undefined)),
       Effect.asVoid,
     )
-    const threads = loadThreadViews(ctx, { until: start, probe: true, lane: 'interactive', afterFirstPage: quickStart })
+    const threads = coldThreadViews(ctx, start, quickStart)
     // Once rows show, the newest messages of the workspace give the busiest channels a preview before their history lands.
     const previewsDone = yield* Deferred.make<void>()
     const previews = Deferred.await(quickStarted).pipe(
@@ -529,24 +550,25 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<void, Bo
       Effect.flatMap((at) => transaction(setSyncState(HOME_READY_KEY, { at }))),
     )
     const pages = Effect.gen(function* () {
-      yield* Effect.all([threads.pipe(Effect.ensuring(Deferred.succeed(threadsDone, undefined))), history], { concurrency: 2, discard: true })
+      const [threadsLoaded] = yield* Effect.all([threads.pipe(Effect.ensuring(Deferred.succeed(threadsDone, undefined))), history], { concurrency: 2 })
       yield* fillUsers(ctx)
       // Discovery finds replies inside the window to roots older than it: Main's activity, which windowed history cannot see.
-      return yield* discoverOrLog(discoverSince(ctx, windowStart, counts.entries, { seedReadBefore: bootTs }))
+      return { threadsLoaded, discovered: yield* discoverOrLog(discoverSince(ctx, windowStart, counts.entries, { seedReadBefore: bootTs })) }
     })
     // Independent methods, so they run side by side: getView pages, history and then discovery, and replies for thread previews.
     const rest = Effect.map(Effect.all([pages, loadThreadPreviews(ctx, bootTs, threadsDone, landed, historyDone)], { concurrency: 2 }), ([found]) => found)
     // The preview search runs beside the whole boot, so a slow one delays nothing; the boot is recorded after both.
-    const [discovered] = yield* Effect.all([rest, previews, homeReady], { concurrency: 3 })
+    const [result] = yield* Effect.all([rest, previews, homeReady], { concurrency: 3 })
     yield* fillUsers(ctx)
     const state: BootState = {
       quietDays,
       completedAt: yield* Clock.currentTimeMillis,
       ...(counts.fetched === undefined ? {} : { countsLastFetched: counts.fetched }),
       // A failed discovery leaves the gap for the next sweep to search again.
-      lastSyncAt: discovered ? startedAt : windowStart,
+      lastSyncAt: result.discovered ? startedAt : windowStart,
     }
     yield* transaction(Effect.andThen(saveRepairMarkers(counts.entries), setSyncState(BOOT_KEY, state)))
+    return result.threadsLoaded
   })
 
 export interface CatchUpOptions {
