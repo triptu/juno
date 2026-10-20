@@ -211,8 +211,10 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
       mentionsFromCounts = !isDm && (counts[0]?.mention_count ?? 0) > 0 && counts[0]?.has_unreads === 1
     }
 
+    const attentionContext = JSON.stringify(options.me)
     const messages: Array<IndexMessage> = live.map((row) => ({
       ts: row.ts as Ts,
+      ...(row.attention_context === attentionContext && (row.attention === 0 || row.attention === 1 || row.attention === 2) ? { attention: row.attention } : {}),
       ...(row.user_id === null ? {} : { userId: row.user_id as UserId }),
       ...(row.subtype === null ? {} : { subtype: row.subtype }),
       text: row.text,
@@ -226,14 +228,23 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
         return row.files_json === null ? undefined : (JSON.parse(row.files_json) as ReadonlyArray<File>)
       },
     }))
-    let indexed = indexTopic({ messages, reads, me: options.me, lookups, senderName, historyComplete })
+    let indexed = indexTopic({ messages, reads, me: options.me, lookups, senderName, historyComplete, includeAttention: true })
     if (asked.size > 0) {
       const requested = [...asked]
       asked.clear()
       // Stored people the first pass did not load: run the rule again with their names.
-      if ((yield* loadUsers(requested)) > 0) indexed = indexTopic({ messages, reads, me: options.me, lookups, senderName, historyComplete })
+      if ((yield* loadUsers(requested)) > 0) indexed = indexTopic({ messages, reads, me: options.me, lookups, senderName, historyComplete, includeAttention: true })
       // Only a person with no `users` row is missing. Asking for a stored one would re-index this topic and ask again, without end.
       for (const userId of requested) if (!users.has(userId)) options.onMissingUser?.(userId, id)
+    }
+
+    const attention = new Map<string, number>(indexed?.attention?.map((item) => [item.ts, item.kind]))
+    // Reuse annotations for unchanged content and membership. Each unread body is parsed only when that cache is missing.
+    for (const value of [0, 1, 2]) {
+      const changed = live.filter((row) => attention.get(row.ts) === value && (row.attention !== value || row.attention_context !== attentionContext)).map((row) => row.ts)
+      for (let offset = 0; offset < changed.length; offset += 200) {
+        yield* sql`UPDATE messages SET attention = ${value}, attention_context = ${attentionContext} WHERE channel = ${channel} AND ts IN ${sql.in(changed.slice(offset, offset + 200))}`
+      }
     }
 
     const existing = (yield* sql<TopicIndexRow>`SELECT * FROM topic_index WHERE topic_id = ${id}`)[0]

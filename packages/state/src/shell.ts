@@ -1,7 +1,7 @@
 /** Atoms backed by main through the bridge, not the engine. */
 import { Effect, Schema } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
-import { AccentSchema, AppInfo, DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, DEFAULT_THEME, DensitySchema, NotificationPermission, NotificationTarget, PrivacyState, SharingSetting, SIDEBAR_WIDTH, ThemeSchema, type Accent, type Density, type TopicTitleLines, type ResolvedTheme, type SidebarLayout, type SlackTarget, type Theme } from '@juno/contract'
+import { AccentSchema, AppInfo, DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, DEFAULT_THEME, DensitySchema, NotificationPermission, unknownNotificationPermission, NotificationTarget, PrivacyState, SharingSetting, SIDEBAR_WIDTH, ThemeSchema, type Accent, type Density, type TopicTitleLines, type ResolvedTheme, type SidebarLayout, type SlackTarget, type Theme } from '@juno/contract'
 import type { ContextMenuAt, ContextMenuItem, JunoBridge, MenuCommand } from '@juno/contract/channels'
 
 export type { Accent, Density, TopicTitleLines, ResolvedTheme, Theme } from '@juno/contract'
@@ -239,7 +239,7 @@ export function sendTestNotification(): void {
 const decodePermission = Schema.decodeUnknownOption(NotificationPermission)
 const permissionOf = (raw: unknown): NotificationPermission => {
   const decoded = decodePermission(raw)
-  return decoded._tag === 'Some' ? decoded.value : 'unknown'
+  return decoded._tag === 'Some' ? decoded.value : unknownNotificationPermission
 }
 
 /** Whether macOS lets Juno notify; `unknown` if main could not tell. */
@@ -255,4 +255,9 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
 /** Opens System Settings at Juno's notifications. */
 export function openNotificationSettings(): void {
   window.juno.notifications.openSettings().catch(() => {})
+}
+
+/** A Home or topic view is visible after setup. Main decides whether this install should ask once. */
+export function notificationContentShown(): void {
+  window.juno.notifications.contentShown().catch(() => {})
 }

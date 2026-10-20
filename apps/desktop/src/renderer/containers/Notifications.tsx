@@ -55,7 +55,7 @@ function useNotificationPermission(): readonly [NotificationPermission | undefin
     void requestNotificationPermission().then((next) => {
       lastPermission = next
       setPermission(next)
-      if (next === 'notDetermined') openNotificationSettings()
+      if (next.authorization === 'notDetermined') openNotificationSettings()
     })
   return [permission, allow]
 }

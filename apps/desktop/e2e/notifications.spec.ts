@@ -98,7 +98,7 @@ syncedTest('a DM set to Every message notifies, the click opens it at the messag
   await expect(none).toHaveCount(0)
 })
 
-syncedTest('a topic on screen in a focused window does not notify, and unread mentions badge the dock', async ({ juno, slack }) => {
+syncedTest('a topic on screen in a focused window does not notify, and unread topics badge the dock', async ({ juno, slack }) => {
   await expect.poll(() => juno.dockBadge(), { timeout: 15_000 }).toBe('•')
 
   await juno.sidebar.selectView('Automated')
@@ -171,23 +171,30 @@ async function testNotificationAndPermission(juno: Juno): Promise<void> {
   await expect.poll(async () => (await juno.osNotifications()).filter((shown) => shown.title === test.title && shown.body === test.body)).toHaveLength(1)
 
   // Denied: the line and Open Notification Settings, read again when the window regains focus.
-  await juno.setNotificationPermission('denied')
+  await juno.setNotificationPermission({ authorization: 'denied', badges: 'disabled' })
   await juno.win.evaluate(() => window.dispatchEvent(new Event('focus')))
   await expect(line).toContainText("macOS is not showing Juno's notifications.")
   await line.getByRole('button', { name: 'Open Notification Settings' }).click()
   await expect.poll(() => juno.notificationSettingsOpened()).toBe(1)
 
+  // Alerts may be allowed while app icon badges alone are off.
+  await juno.setNotificationPermission({ authorization: 'allowed', badges: 'disabled' })
+  await juno.win.evaluate(() => window.dispatchEvent(new Event('focus')))
+  await expect(line).toContainText('Dock badges are off for Juno.')
+  await line.getByRole('button', { name: 'Open Notification Settings' }).click()
+  await expect.poll(() => juno.notificationSettingsOpened()).toBe(2)
+
   // Turned on in System Settings: back in Juno, the line goes.
-  await juno.setNotificationPermission('allowed')
+  await juno.setNotificationPermission({ authorization: 'allowed', badges: 'enabled' })
   await juno.win.evaluate(() => window.dispatchEvent(new Event('focus')))
   await expect(line).toHaveCount(0)
 
   // Not asked yet: the action asks macOS instead, and the line goes once allowed.
-  await juno.setNotificationPermission('notDetermined')
+  await juno.setNotificationPermission({ authorization: 'notDetermined', badges: 'unknown' })
   await juno.win.evaluate(() => window.dispatchEvent(new Event('focus')))
   await line.getByRole('button', { name: 'Allow notifications' }).click()
   await expect(line).toHaveCount(0)
-  expect(await juno.notificationSettingsOpened()).toBe(1)
+  expect(await juno.notificationSettingsOpened()).toBe(2)
 }
 
 async function ignoredChannels(juno: Juno): Promise<void> {

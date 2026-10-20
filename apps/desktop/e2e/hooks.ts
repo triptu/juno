@@ -17,6 +17,7 @@ interface JunoTestHooks {
   readonly clickNotification: (index?: number) => void
   readonly dockBadge: () => string
   /** How many times Open Notification Settings opened System Settings. */
+  readonly notificationRequests: () => number
   readonly notificationSettingsOpened: () => number
   /** How many times Mute opened System Settings at Microphone while macOS blocked it. */
   readonly microphoneSettingsOpened: () => number

@@ -65,6 +65,7 @@ import { StoreReader, syncState, type SqlError } from '@juno/store'
 import { BOOT_KEY, QUICK_START_KEY } from '@juno/sync'
 import { Effect } from 'effect'
 import type { ListRun } from '../protocol/live'
+import { countsStatement, IN_ALL, OPEN_RULE, THREAD_RULE } from '../sidebarUnread'
 import {
   artRefOf,
   channelInfoOf,
@@ -216,13 +217,6 @@ export interface ListRow extends JoinedRow {
   readonly new_threads: number
 }
 
-/**
- * Spec section 5, "Which threads": a thread row is a candidate when followed
- * in Slack, or when it carries an unread mention of the user and Slack has
- * said nothing about it (an explicit unfollow is `unsubscribed`, hidden).
- */
-const THREAD_RULE = ` AND (i.kind <> 'thread' OR s.subscribed = 1 OR (s.subscribed IS NULL AND i.mentions_me = 1 AND i.unread_count > 0))`
-
 export const kindClause = (kind: ListFilter['kind']): string =>
   kind === 'channels' ? ` AND c.kind IN ('public', 'private')` : kind === 'dms' ? ` AND c.kind IN ('im', 'mpim')` : ''
 
@@ -233,8 +227,7 @@ export const kindClause = (kind: ListFilter['kind']): string =>
  * (`automated_holds`, a probe by key). Correlated, so it never changes how
  * SQLite walks `topic_index`.
  */
-const KEPT_OUT = ` AND NOT EXISTS (SELECT 1 FROM sidebar_view_channels vc JOIN sidebar_views v ON v.id = vc.view_id WHERE vc.channel = i.channel AND v.keep_out_of_all = 1)
-  AND NOT EXISTS (SELECT 1 FROM automated_holds h WHERE h.channel = i.channel)`
+const KEPT_OUT = ` AND ${IN_ALL}`
 
 /**
  * Which conversations the filter shows, after membership and the ignored
@@ -250,14 +243,6 @@ function placeClause(filter: ListFilter, drive: boolean): { readonly sql: string
   if (filter.view !== undefined) return { sql: ` AND ${drive ? '' : '+'}i.channel IN (SELECT channel FROM sidebar_view_channels WHERE view_id = ?)`, params: [filter.view] }
   return { sql: `${kindClause(filter.kind)}${KEPT_OUT}`, params: [] }
 }
-
-/**
- * The rows `topicStatus` calls `open` or `resolved`-then-reopened, in SQL,
- * for the activity window only: there the prefilter matches the pure rule
- * (quiet cannot apply inside the window), so the window's row count says
- * whether the older statements can still add a row.
- */
-const OPEN_RULE = ` AND (o.resolved_at IS NULL OR (o.resolved_activity_ts IS NOT NULL AND i.last_activity_ts > o.resolved_activity_ts))`
 
 /**
  * The four statements, as SQL text with positional parameters, so the plan
@@ -299,28 +284,6 @@ export function listStatements(filter: ListFilter, cutoff: string, limit: number
       params: [...scopeParams, cutoff, cutoff, ...rest.params, limit],
     },
   ]
-}
-
-/**
- * The counts statement: unread topics the sidebar would show, per
- * conversation, with how many of them carry an unread mention. An unread
- * topic is never quiet, so it shows when it is pinned, or when it is open
- * (not unsubscribed, not resolved without later activity) and passes the
- * thread rule; the same rule as `sidebarPlacement`. `countTopics` sums it
- * per group and per view.
- */
-export function countsStatement(scope: string | undefined): { readonly sql: string; readonly params: ReadonlyArray<unknown> } {
-  return {
-    sql: `SELECT i.channel AS channel, c.kind AS kind, count(*) AS n, sum(i.mentions_me) AS mentions FROM topic_index i
-      JOIN conversations c ON c.id = i.channel
-      LEFT JOIN ignored_channels ig ON ig.channel = i.channel
-      LEFT JOIN topic_overlay o ON o.topic_id = i.topic_id
-      LEFT JOIN thread_subs s ON i.kind = 'thread' AND s.channel = i.channel AND s.thread_ts = i.root_ts
-      WHERE i.unread_count > 0 AND i.last_activity_ts > '0' AND c.is_member = 1 AND c.is_archived = 0 AND ig.channel IS NULL
-        AND (o.pinned_at IS NOT NULL OR (1${OPEN_RULE}${THREAD_RULE}))${scope === undefined ? '' : ' AND i.channel = ?'}
-      GROUP BY i.channel`,
-    params: scope === undefined ? [] : [scope],
-  }
 }
 
 /** Every view's conversations, in pill order, with the view's Keep these out of All. */
@@ -646,14 +609,10 @@ export const countTopics = (scope: string | undefined): Effect.Effect<TopicCount
   Effect.gen(function* () {
     const sql = yield* StoreReader
     const statement = countsStatement(scope)
-    const rows = yield* sql.unsafe<{ channel: string; kind: 'public' | 'private' | 'im' | 'mpim'; n: number; mentions: number }>(statement.sql, statement.params)
+    const rows = yield* sql.unsafe<{ channel: string; kind: 'public' | 'private' | 'im' | 'mpim'; n: number; mentions: number; in_all: number }>(statement.sql, statement.params)
     const members = yield* sql.unsafe<{ view_id: string; keep_out: number; channel: string }>(VIEW_MEMBERS)
-    const keptOut = new Set<string>()
-    // A channel the first sync holds out of All is not counted in its dots either.
-    if (scope === undefined) for (const held of yield* sql<{ channel: string }>`SELECT channel FROM automated_holds`) keptOut.add(held.channel)
     const viewsOf = new Map<string, Array<string>>()
     for (const member of members) {
-      if (member.keep_out === 1 && scope === undefined) keptOut.add(member.channel)
       const views = viewsOf.get(member.channel)
       if (views === undefined) viewsOf.set(member.channel, [member.view_id])
       else views.push(member.view_id)
@@ -663,7 +622,7 @@ export const countTopics = (scope: string | undefined): Effect.Effect<TopicCount
     const mentioned = new Set<string>()
     for (const row of rows) {
       if (row.mentions > 0) for (const view of viewsOf.get(row.channel) ?? []) mentioned.add(view)
-      if (keptOut.has(row.channel)) continue
+      if (scope === undefined && row.in_all === 0) continue
       if (isDm(row.kind)) dmsUnread += row.n
       else channelsUnread += row.n
     }

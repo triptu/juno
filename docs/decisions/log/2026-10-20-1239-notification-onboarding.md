@@ -1,0 +1,1 @@
+- 10-20 12:39 · Tushar · Ask macOS for notifications once on the first Home or topic view after setup, and persist the attempt before requesting. Existing installs follow the same rule. Development asks only through Settings.

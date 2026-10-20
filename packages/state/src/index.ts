@@ -174,6 +174,7 @@ export {
   persistDensity,
   getSharingSetting,
   getNotificationPermission,
+  notificationContentShown,
   onFullScreen,
   onSharingPrivacy,
   openNotificationSettings,

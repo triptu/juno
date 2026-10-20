@@ -9,7 +9,7 @@ import { runCommand } from '@juno/state'
 import { Exit } from 'effect'
 import { bootedEngine, readDb } from '../../../packages/engine/test/scenario'
 import { waitFor, type RunningEngine } from '../../../packages/engine/test/harness'
-import { DOCK_BADGE, HIDDEN_BODY, Notifier } from '../src/main/notifier'
+import { HIDDEN_BODY, Notifier } from '../src/main/notifier'
 
 const engines: RunningEngine[] = []
 afterEach(async () => {
@@ -57,7 +57,7 @@ function connect(engine: RunningEngine) {
   }
 }
 
-it('shows what the engine decides, opens the message on click, hides the topic on screen and badges unread mentions', async () => {
+it('shows what the engine decides, opens the message on click, hides the topic on screen and badges unread topics', async () => {
   const engine = await bootedEngine(engines)
   const main = connect(engine)
 
@@ -87,12 +87,13 @@ it('shows what the engine decides, opens the message on click, hides the topic o
   expect(main.shown[1]).toMatchObject({ title: 'Maya', body: HIDDEN_BODY })
   main.setPrivacy(false)
 
-  // Reading every topic that mentions you clears the badge; a new mention brings it back.
-  const mentioned = readDb(engine, 'cache.db', (db) => db.prepare('SELECT topic_id FROM topic_index WHERE mentions_me = 1 AND unread_count > 0').all()) as Array<{ topic_id: string }>
+  // Reading all unread topics clears the badge; a new mention brings it back.
+  const mentioned = readDb(engine, 'cache.db', (db) => db.prepare('SELECT topic_id FROM topic_index WHERE unread_count > 0').all()) as Array<{ topic_id: string }>
   expect(mentioned.length).toBeGreaterThan(0)
-  expect(main.badge()).toBe(DOCK_BADGE)
+  expect(main.badge()).toBe('•')
   for (const { topic_id } of mentioned) await runCommand(engine.registry, readsMarkRead, { id: topic_id })
   await waitFor(() => (main.badge() === '' ? true : undefined), 15_000, 'the badge to clear')
+  await runCommand(engine.registry, notificationsSetLevel, { target: { kind: 'channel', id: 'C0ENG' }, choice: 'every' })
   engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: '<@U0TUSHAR> can you review the plan?' })
-  await waitFor(() => (main.badge() === DOCK_BADGE ? true : undefined), 15_000, 'the dock badge')
+  await waitFor(() => (main.badge() === '•' ? true : undefined), 15_000, 'the dock badge')
 })

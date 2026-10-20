@@ -5,18 +5,22 @@
  */
 import { messageBody, messageTitle, type Lookups } from '@juno/richtext'
 import { compareTs, type Ts, type UserId } from './ids'
-import { messageMentionsMeDirectly, type Me } from './mentions'
+import { messageMentionsMe, messageMentionsMeDirectly, type Me } from './mentions'
 import { messagePreviewText, type PreviewMessage } from './preview'
 import type { ReadState } from './reads'
 import type { TopicActivity, TopicPreview } from './topic'
 
 export interface IndexMessage extends PreviewMessage {
+  /** Cached for this exact content and mention context by the store. */
+  readonly attention?: 0 | 1 | 2
   readonly ts: Ts
   readonly userId?: UserId
   readonly deleted?: boolean
 }
 
 export interface IndexInput {
+  /** Include per-message attention while parsing unread bodies, for the mirror's notification projection. */
+  readonly includeAttention?: boolean
   /** Any order; tombstones are skipped. */
   readonly messages: ReadonlyArray<IndexMessage>
   readonly reads: ReadState
@@ -30,6 +34,7 @@ export interface IndexInput {
 }
 
 export interface IndexedTopic {
+  readonly attention?: ReadonlyArray<{ readonly ts: Ts; readonly kind: 0 | 1 | 2 }>
   readonly activity: TopicActivity
   readonly preview?: TopicPreview
   readonly rootText?: string
@@ -52,7 +57,20 @@ export function indexTopic(input: IndexInput): IndexedTopic | undefined {
   const { lastReadTs, markedUnread } = input.reads
   const unread = live.filter((m) => m.userId !== input.me.userId && (lastReadTs === undefined || compareTs(m.ts, lastReadTs) > 0))
   const unreadCount = Math.max(unread.length, markedUnread ? 1 : 0)
-  const mentionsMe = unread.some((m) => messageMentionsMeDirectly(messageBody(m, input.lookups), input.me))
+  const attention: Array<{ readonly ts: Ts; readonly kind: 0 | 1 | 2 }> = []
+  let mentionsMe = false
+  for (const message of unread) {
+    if (input.includeAttention && message.attention !== undefined) {
+      mentionsMe ||= message.attention === 2
+      attention.push({ ts: message.ts, kind: message.attention })
+      continue
+    }
+    const body = messageBody(message, input.lookups)
+    const direct = messageMentionsMeDirectly(body, input.me)
+    mentionsMe ||= direct
+    if (input.includeAttention) attention.push({ ts: message.ts, kind: direct ? 2 : messageMentionsMe(body, input.me) ? 1 : 0 })
+    if (mentionsMe && !input.includeAttention) break
+  }
 
   // The people talking in what you have not read: senders of the latest unread messages, never you. A read topic has none.
   const participants: UserId[] = []
@@ -65,6 +83,7 @@ export function indexTopic(input: IndexInput): IndexedTopic | undefined {
   const preview: TopicPreview = { sender, text: messagePreviewText(latest, input.lookups) }
 
   return {
+    ...(input.includeAttention ? { attention } : {}),
     activity: {
       lastActivityTs: latest.ts,
       messageCount: live.length,
