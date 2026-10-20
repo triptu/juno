@@ -1012,7 +1012,7 @@ test.describe('topic view', () => {
     test.setTimeout(300_000)
     fake = await startFakeSlack({
       seed: (workspace, avatars) => {
-        topic300Seed()(workspace, avatars)
+        topic300Seed({ tables: true })(workspace, avatars)
         codeBlocksSeed()(workspace, avatars)
       },
     })

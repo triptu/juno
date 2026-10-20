@@ -19,8 +19,11 @@ const wideTable = (i: number) => tableBlock([
   ...['us-east-1', 'eu-west-1', 'ap-south-1'].map((region, row) => [region, `${(i + 1) * 1000 + row}`, `${i + row}`, '0.15%', '38 ms', '212 ms', '480 ms', '61%', '7.2 GB', '24']),
 ], [null, { align: 'right' }, { align: 'right' }, { align: 'right' }])
 
-/** Two 300-row windows, each with exactly 60 images, 30 code blocks and 15 tables. */
-export function topic300Seed(): (workspace: Workspace, avatarBase: string) => Topic300Summary {
+/**
+ * Two 300-row windows, each with exactly 60 images and 30 code blocks, and
+ * with `tables` 15 tables too (the scroll perf scenario's).
+ */
+export function topic300Seed({ tables = false }: { readonly tables?: boolean } = {}): (workspace: Workspace, avatarBase: string) => Topic300Summary {
   return (workspace, avatarBase) => {
     const now = workspace.clock.now()
     const users = [SELF_ID, 'U0PERFLEO', 'U0PERFMAYA']
@@ -37,7 +40,7 @@ export function topic300Seed(): (workspace: Workspace, avatarBase: string) => To
       for (let i = 0; i < 300; i++) {
         const text = `Review the rollout checklist ${i + 1}. The next step is ready for review.`
         const code = i % 10 === 3
-        const table = i % 20 === 7 ? (i % 40 === 7 ? wideTable(i) : statusTable(i)) : undefined
+        const table = tables && i % 20 === 7 ? (i % 40 === 7 ? wideTable(i) : statusTable(i)) : undefined
         const url = `${avatarBase}/../files/F${channel}${i}/image.svg`
         const file: File = { id: `F${channel}${i}`, name: `diagram-${i}.svg`, mimetype: 'image/svg+xml', original_w: 800, original_h: 600, thumb_360_w: 360, thumb_360_h: 270, thumb_360: url, url_private: url }
         if (i % 5 === 0) {
