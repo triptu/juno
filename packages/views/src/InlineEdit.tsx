@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { useLayoutEffect, useRef, type KeyboardEvent, type RefObject } from 'react'
 import { layout, spacing } from '@juno/tokens/tokens.stylex'
-import { Button, Surface, Textarea } from '@juno/ui'
+import { Button, Surface, Textarea, type TextareaFormat } from '@juno/ui'
 import { mentionProps, type ComposerMention } from './Composer'
 
 export interface InlineEditProps {
@@ -21,6 +21,8 @@ export interface InlineEditProps {
   readonly onFieldKey?: (event: KeyboardEvent<HTMLTextAreaElement>) => boolean
   /** The caret moved without the text changing. */
   readonly onCaret?: (caret: number) => void
+  /** Slack's markup in the text, drawn as it will look, as in the composer. */
+  readonly format?: TextareaFormat
 }
 
 /**
@@ -29,9 +31,10 @@ export interface InlineEditProps {
  * the end. Enter saves, Shift Enter adds a line, Esc cancels; Cancel and
  * Save under it do the same. The field grows with its text like the
  * composer, up to the composer's height. `:emoji:` suggestions open above
- * it as in the composer, and take their keys first.
+ * it as in the composer, and take their keys first. Markup shows as it
+ * will look, as in the composer.
  */
-export function InlineEdit({ value, onChange, onSave, onCancel, fieldRef, mention, onFieldKey, onCaret }: InlineEditProps) {
+export function InlineEdit({ value, onChange, onSave, onCancel, fieldRef, mention, onFieldKey, onCaret, format }: InlineEditProps) {
   const own = useRef<HTMLTextAreaElement>(null)
   const field = fieldRef ?? own
   // Focus once, with the caret after the text, before the first paint.
@@ -65,6 +68,7 @@ export function InlineEdit({ value, onChange, onSave, onCancel, fieldRef, mentio
           onChange={(event) => onChange(event.currentTarget.value, event.currentTarget.selectionStart)}
           onKeyDown={onKeyDown}
           {...mentionProps(undefined, mention, onCaret)}
+          {...(format === undefined ? {} : { format })}
           dir="auto"
         />
       </Surface>

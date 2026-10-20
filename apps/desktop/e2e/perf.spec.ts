@@ -126,7 +126,7 @@ test('frame floor: input with no work to the next frame', async ({ juno, win }) 
   stats('frame floor, pointerdown with no work to next frame presented', await win.evaluate(() => (window as unknown as { __floor: number[] }).__floor))
 })
 
-test('keystroke controls: composer, bare input and palette', async ({ juno, win }) => {
+test('keystroke controls: composer, composer with a long draft, bare input and palette', async ({ juno, win }) => {
   test.setTimeout(120_000)
   await juno.signIn()
   await juno.waitForSync()
@@ -152,13 +152,17 @@ test('keystroke controls: composer, bare input and palette', async ({ juno, win 
   const control = report('bare input', await nativeControl(win, 'typing-bare-input', (input) => typeRounds(input)()))
   const budget = characterBudget(control.p95, interval)
   console.log(`character budget: bare input p95 ${control.p95.toFixed(1)} ms + one refresh interval ${interval.toFixed(1)} ms = ${budget.toFixed(1)} ms`)
-  for (const surface of ['composer', 'palette']) {
+  // A long draft full of Slack markup: the field draws its look again on each keystroke (spec section 8).
+  const markup = `${Array.from({ length: 30 }, (_, i) => `> *Point ${i}* with _some_ \`code\` and ~old~ words, then more text so that the line wraps`).join('\n')}\n\`\`\`\n${'const total = await sum(rows)\n'.repeat(20)}\`\`\`\n`
+  for (const surface of ['composer', 'composer with a long draft', 'palette']) {
     if (surface === 'palette') await juno.palette.open()
-    const input = surface === 'composer' ? juno.topic.composer : juno.palette.input
-    await input.fill('')
+    const input = surface === 'palette' ? juno.palette.input : juno.topic.composer
+    const draft = surface === 'composer with a long draft' ? markup : ''
+    await input.fill(draft)
     await input.focus()
-    const presented = report(surface, await typingReading(win, input, `typing-${surface}`, typeRounds(input)))
-    await expect(input).toHaveValue('deployment'.repeat(4))
+    await input.evaluate((field: HTMLTextAreaElement | HTMLInputElement) => field.setSelectionRange(field.value.length, field.value.length))
+    const presented = report(surface, await typingReading(win, input, `typing-${surface.replace(/ /g, '-')}`, typeRounds(input)))
+    await expect(input).toHaveValue(draft + 'deployment'.repeat(4))
     expect.soft(presented.p95, `${surface}: input to character presented, within one frame of the bare input`).toBeLessThanOrEqual(budget)
   }
   expect(await hidden()).toBe(0)
