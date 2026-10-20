@@ -37,13 +37,16 @@ function whenNearScreen(element: Element, near: () => void): () => void {
 }
 
 export const codeHighlighter: CodeHighlighter = {
+  // Every block waits until it is near the screen, even one whose colours are
+  // known: a topic that opens again does not paint its blocks off screen.
   paint(element, code, language) {
-    // Known colours go on before the row paints, so a row that mounts again never shows plain.
-    const known = painter?.paintKnown(element, code, language)
-    if (known !== undefined) return known
     let live = true
     let stop: (() => void) | undefined
     const unwatch = whenNearScreen(element, () => {
+      if (painter !== undefined) {
+        stop = painter.paint(element, code, language)
+        return
+      }
       void import('./painter').then((module) => {
         painter = module
         if (live) stop = module.paint(element, code, language)
