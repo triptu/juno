@@ -2,6 +2,7 @@
 import type { Block as SlackBlock, RichTextElement, RichTextInline, RichTextListStyle, TextObject } from '@juno/slack-schema'
 import type { ContentBlock as Block, Inline, ListStyle, Lookups } from './model'
 import { channelInline, dateInline, emojiInline, inlineText, linkedRuns, normalize, textRuns, toStyle, usergroupInline, userInline } from './inline'
+import { codeBlock } from './code'
 import { mrkdwnBlocks, mrkdwnInlines } from './from-mrkdwn'
 
 /**
@@ -74,7 +75,7 @@ function blockFromElement(el: RichTextElement, lookups: Lookups): Block | undefi
     case 'rich_text_preformatted': {
       // Code keeps its newlines and ignores styles.
       const text = inlineText(inlinesFromElements(el.elements, lookups))
-      return text.length === 0 ? undefined : { kind: 'code', text }
+      return text.length === 0 ? undefined : codeBlock(text)
     }
     case 'rich_text_list': {
       const items = el.elements.map((section) => inlinesFromElements(section.elements, lookups))
