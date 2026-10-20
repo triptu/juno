@@ -17,6 +17,7 @@ export {
 export { readCatchUpAtom, mirrorReadsAtom, shouldMarkRead } from './reads'
 export { quietDaysAtom, setQuietDays } from './quietWindow'
 export { isPeekKey, peekKeyAtom, setPeekKey } from './peek'
+export { openViewerAtom } from './mediaViewer'
 export { closeWelcome, showWelcome, tickWelcome, welcomeAtom, type Welcome } from './welcome'
 export { setTabExpiry, startTabExpiry, tabExpiryAtom } from './tabExpiry'
 export { quickReactionsAtom, setQuickReactions } from './quickReactions'

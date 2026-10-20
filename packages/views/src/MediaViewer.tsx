@@ -5,7 +5,7 @@ import { CaretRight } from '@phosphor-icons/react/dist/icons/CaretRight'
 import { Copy } from '@phosphor-icons/react/dist/icons/Copy'
 import { DownloadSimple } from '@phosphor-icons/react/dist/icons/DownloadSimple'
 import { X } from '@phosphor-icons/react/dist/icons/X'
-import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type RefObject } from 'react'
 import type { FileView } from '@juno/contract'
 import { colors, layout, motion, radii, spacing, z } from '@juno/tokens/tokens.stylex'
 import { IconButton, Surface, Text } from '@juno/ui'
@@ -29,6 +29,10 @@ export interface MediaViewerProps {
   readonly now: number
   /** Esc, Close, or a click on the backdrop. */
   readonly onClose: () => void
+  /** What had focus when it opened, taken in the open handler before the topic under it turns inert. Focus goes back to it on close. */
+  readonly opener?: Element | null | undefined
+  /** Another item is shown, at this index: kept so a remount opens at it. */
+  readonly onShowItem?: ((index: number) => void) | undefined
   /** With it, and a `download` url on the item, the header has Download. */
   readonly onDownload?: ((file: FileView) => void) | undefined
   /** With it, and a `download` url on the item, the header has Open: the default app (Preview for images). */
@@ -38,33 +42,26 @@ export interface MediaViewerProps {
 }
 
 /**
- * A message's images and videos over the whole window (inventory 6): a dim
- * backdrop, the current item fitted inside the window in a box sized from its
+ * A message's images and videos over the tab's topic (inventory 6): a dim
+ * backdrop, the current item fitted inside the topic in a box sized from its
  * own dimensions, a header with its name, the sender and time and its
  * actions, and along the bottom a filmstrip of every item, the current one
  * marked. ← and →, the side arrows and the strip move through them; Home and
  * End go to the ends. The thumbnail shows at once and the full image fades in
  * over it when it arrives, so nothing moves while it loads; a new item fades
  * in (`--duration-fast`, none with reduced motion), and its neighbours'
- * full images are fetched ahead. Opens in one frame with focus on Close,
- * keeps Tab inside, and gives focus back to what had it when it closes.
- * Mount it outside the message rows: their paint containment would clip a
- * fixed element.
+ * full images are fetched ahead. Opens in one frame with focus on Close and
+ * gives focus back to what had it when it closes. It is not modal: mount it
+ * in `TopicView`'s `viewer` slot, which fills the topic with it and makes
+ * the topic under it inert, so Tab goes from its controls on to the sidebar
+ * and the tab strip. A hidden tab keeps it open at its item.
  */
-export function MediaViewer({ viewing, now, onClose, onDownload, onOpenFile, onCopyImage }: MediaViewerProps) {
+export function MediaViewer({ viewing, now, opener, onClose, onShowItem, onDownload, onOpenFile, onCopyImage }: MediaViewerProps) {
   const { items } = viewing
-  const root = useRef<HTMLDivElement>(null)
   const [index, setIndex] = useState(() => Math.min(Math.max(0, viewing.index), items.length - 1))
   const file = items[index]!
   const several = items.length > 1
-
-  useEffect(() => {
-    const opener = document.activeElement
-    root.current?.querySelector<HTMLElement>('[data-viewer-close]')?.focus()
-    return () => {
-      if (opener instanceof HTMLElement && opener.isConnected) opener.focus()
-    }
-  }, [])
+  const { root, close } = useViewerFocus(opener, onClose)
 
   // The neighbours' full images are fetched ahead, so moving to them shows them sharp at once.
   useEffect(() => {
@@ -76,25 +73,28 @@ export function MediaViewer({ viewing, now, onClose, onDownload, onOpenFile, onC
     }
   }, [items, index])
 
-  const go = (next: number) => setIndex(Math.min(Math.max(0, next), items.length - 1))
+  const go = (next: number) => {
+    const shown = Math.min(Math.max(0, next), items.length - 1)
+    setIndex(shown)
+    onShowItem?.(shown)
+  }
   // A click on the dim around the picture, the bar or the strip closes; one on the picture or a button does not.
   const onBackdrop = (event: MouseEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget) onClose()
+    if (event.target === event.currentTarget) close()
   }
   const meta = [viewing.sender, messageTime(viewing.at, now), ...(several ? [`${index + 1} of ${items.length}`] : [])].join(' · ')
   return (
     <div
       ref={root}
       role="dialog"
-      aria-modal="true"
       aria-label={file.name}
       data-media-viewer=""
-      onKeyDown={(event) => onViewerKey(event, index, items.length, go, onClose)}
+      onKeyDown={(event) => onViewerKey(event, index, items.length, go, close)}
       onClick={onBackdrop}
       {...stylex.props(styles.backdrop)}
     >
       <div onClick={onBackdrop} {...stylex.props(styles.bar)}>
-        <ViewerBar file={file} items={items} meta={meta} at={viewing.at} onClose={onClose} onDownload={onDownload} onOpenFile={onOpenFile} onCopyImage={onCopyImage} />
+        <ViewerBar file={file} items={items} meta={meta} at={viewing.at} onClose={close} onDownload={onDownload} onOpenFile={onOpenFile} onCopyImage={onCopyImage} />
       </div>
       <div onClick={onBackdrop} {...stylex.props(styles.stage)}>
         <div onClick={onBackdrop} {...stylex.props(styles.fit)}>
@@ -122,7 +122,7 @@ export function MediaViewer({ viewing, now, onClose, onDownload, onOpenFile, onC
   )
 }
 
-/** Esc closes; ← → Home End move (not while a video has focus: it keeps its own keys); Tab goes round the viewer's controls. */
+/** Esc closes; ← → Home End move (not while a video has focus: it keeps its own keys). */
 function onViewerKey(event: KeyboardEvent<HTMLDivElement>, index: number, count: number, go: (next: number) => void, onClose: () => void): void {
   if (event.key === 'Escape') {
     event.preventDefault()
@@ -136,20 +136,33 @@ function onViewerKey(event: KeyboardEvent<HTMLDivElement>, index: number, count:
     event.preventDefault()
     event.stopPropagation()
     go(move)
-    return
   }
-  if (event.key !== 'Tab') return
-  const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button, video'))
-  const first = controls[0]
-  const last = controls[controls.length - 1]
-  if (first === undefined || last === undefined) return
-  if (event.shiftKey && document.activeElement === first) {
-    event.preventDefault()
-    last.focus()
-  } else if (!event.shiftKey && document.activeElement === last) {
-    event.preventDefault()
-    first.focus()
+}
+
+/**
+ * Focus on Close when the viewer first opens, and back on `opener` after a
+ * close. A hidden tab runs the cleanup and then the effect again when it
+ * shows, so neither moves focus then. Returns the viewer's root and its close.
+ */
+function useViewerFocus(opener: Element | null | undefined, onClose: () => void): { readonly root: RefObject<HTMLDivElement | null>; readonly close: () => void } {
+  const root = useRef<HTMLDivElement>(null)
+  const focused = useRef(false)
+  const closing = useRef(false)
+
+  useEffect(() => {
+    if (!focused.current) {
+      focused.current = true
+      root.current?.querySelector<HTMLElement>('[data-viewer-close]')?.focus()
+    }
+    return () => {
+      if (closing.current && opener instanceof HTMLElement && opener.isConnected) opener.focus()
+    }
+  }, [opener])
+  const close = () => {
+    closing.current = true
+    onClose()
   }
+  return { root, close }
 }
 
 interface ViewerBarProps extends Pick<MediaViewerProps, 'onClose' | 'onDownload' | 'onOpenFile' | 'onCopyImage'> {
@@ -213,12 +226,11 @@ const enter = stylex.keyframes({
 })
 
 const styles = stylex.create({
+  // Fills the topic (`TopicView`'s `viewer` slot), over its header islands.
   backdrop: {
-    position: 'fixed',
+    position: 'absolute',
     inset: 0,
     zIndex: z['--z-viewer'],
-    // Over the title bars' drag strips, which would otherwise take the press (as the palette's overlay).
-    WebkitAppRegion: 'no-drag',
     display: 'flex',
     flexDirection: 'column',
     backgroundColor: colors['--overlay-viewer'],
@@ -228,7 +240,7 @@ const styles = stylex.create({
     display: 'flex',
     justifyContent: 'center',
     flexShrink: 0,
-    paddingTop: layout['--titlebar-height'],
+    paddingTop: spacing['--space-3'],
     paddingInline: spacing['--space-6'],
     paddingBottom: spacing['--space-3'],
   },
@@ -259,7 +271,7 @@ const styles = stylex.create({
     paddingInline: spacing['--space-16'],
     paddingBottom: spacing['--space-4'],
   },
-  // Its size is what the window leaves, never the picture's.
+  // Its size is what the topic leaves, never the picture's.
   fit: {
     flexGrow: 1,
     minWidth: 0,

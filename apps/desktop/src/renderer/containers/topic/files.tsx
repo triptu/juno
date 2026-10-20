@@ -1,6 +1,6 @@
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import type { FileView } from '@juno/contract'
-import { copyImage, downloadFile, openFile, uploadProgressAtom } from '@juno/state'
+import { copyImage, downloadFile, openFile, openViewerAtom, registry, uploadProgressAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import type { MediaViewing } from '@juno/views'
 import { chunk } from '../chunks'
@@ -32,27 +32,51 @@ function copyMessageImage(file: FileView): void {
   if (src !== undefined) void copyImage(src)
 }
 
-/** A topic's files: those dragged over it, the uploads in progress, and the message's media open in the viewer. */
-export function useTopicFiles() {
+/** The viewer open in `view`, at the item it shows. */
+function TopicViewer({ view, opener }: { readonly view: string; readonly opener: Element | null }) {
+  const open = useAtomValue(openViewerAtom(view))
+  if (open === undefined) return null
+  const { now, ...viewing } = open
+  return (
+    <Suspense fallback={null}>
+      <MediaViewerPanel
+        viewing={viewing}
+        now={now}
+        opener={opener}
+        onClose={() => registry.set(openViewerAtom(view), undefined)}
+        onShowItem={(index) => registry.set(openViewerAtom(view), { ...open, index })}
+        onDownload={downloadMessageFile}
+        onOpenFile={openMessageFile}
+        onCopyImage={copyMessageImage}
+      />
+    </Suspense>
+  )
+}
+
+/**
+ * A topic's files: those dragged over it, the uploads in progress, and the
+ * message's media open in the viewer. The open viewer is kept per topic
+ * view (`openViewerAtom`), so the tab shows it again when its topic mounts
+ * again.
+ */
+export function useTopicFiles(view: string) {
   const [dropping, setDropping] = useState(false)
-  const [viewing, setOpen] = useState<{ readonly viewing: MediaViewing; readonly now: number } | undefined>(undefined)
+  // What had focus at the open, taken before the topic turns inert under the viewer; on a cold load its chunk mounts later.
+  const [opener, setOpener] = useState<Element | null>(null)
+  // The view now: a new thread's id changes once Slack acknowledges it, without a remount.
+  const current = useRef(view)
+  useEffect(() => {
+    current.current = view
+  }, [view])
   // Created once, like every row callback; the time in the viewer's header is reckoned from the moment it opened.
-  const [setViewing] = useState(() => (next: MediaViewing) => setOpen({ viewing: next, now: Date.now() }))
+  const [setViewing] = useState(() => (next: MediaViewing) => {
+    setOpener(document.activeElement)
+    registry.set(openViewerAtom(current.current), { ...next, now: Date.now() })
+  })
+  const open = useAtomValue(openViewerAtom(view), (viewer) => viewer !== undefined)
   const progress = useAtomValue(uploadProgressAtom)
   useEffect(preloadViewer, [])
   const uploadProgress = progress._tag === 'Success' && Object.keys(progress.value).length > 0 ? progress.value : undefined
-  const viewer =
-    viewing === undefined ? null : (
-      <Suspense fallback={null}>
-        <MediaViewerPanel
-          viewing={viewing.viewing}
-          now={viewing.now}
-          onClose={() => setOpen(undefined)}
-          onDownload={downloadMessageFile}
-          onOpenFile={openMessageFile}
-          onCopyImage={copyMessageImage}
-        />
-      </Suspense>
-    )
+  const viewer = open ? <TopicViewer view={view} opener={opener} /> : null
   return { dropping, setDropping, setViewing, uploadProgress, viewer }
 }
