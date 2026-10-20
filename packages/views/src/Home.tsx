@@ -139,6 +139,29 @@ function HomeThought({ thought, sx }: { readonly thought: HomeThoughtView; reado
   )
 }
 
+/** A row's tile: an icon for the cards that have one, else the topic's; a missed huddle's carries the headphones. */
+function RowTile({ item }: { readonly item: HomeItem }) {
+  const topic = item.topics[0]
+  const tileIcon = TILE_ICONS[item.kind]
+  if (tileIcon !== undefined || topic === undefined) {
+    return (
+      <span {...stylex.props(styles.iconTile)}>
+        <Icon icon={tileIcon ?? TILE_ICONS.tidyUp!} size={18} />
+      </span>
+    )
+  }
+  if (item.kind !== 'missedHuddle') return <PlaceTile tile={tileOf(topic)} />
+  // The running huddle's green headphones on the tile's corner, so the row reads as a huddle before its title.
+  return (
+    <span {...stylex.props(styles.markedTile)}>
+      <PlaceTile tile={tileOf(topic)} />
+      <span aria-hidden data-huddle-mark="" {...stylex.props(styles.huddleMark)}>
+        <Icon icon={Headphones} size={12} weight="fill" />
+      </span>
+    </span>
+  )
+}
+
 /** A row's own props, and the callbacks Home passes down. */
 type HomeRowProps = { readonly item: HomeItem; readonly done: boolean } & Pick<HomeProps, 'now' | 'onOpen' | 'onMarkDone' | 'onResolveAll' | 'onReview' | 'onSort' | 'onItemMenu' | 'onDismiss' | 'onAsk'>
 
@@ -152,24 +175,9 @@ const preventNavigation = (event: MouseEvent) => event.preventDefault()
  */
 function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, onDismiss, onAsk }: HomeRowProps) {
   const topic = item.topics[0]
-  const tileIcon = TILE_ICONS[item.kind]
   const body = (
     <>
-      {tileIcon !== undefined || topic === undefined ? (
-        <span {...stylex.props(styles.iconTile)}>
-          <Icon icon={tileIcon ?? TILE_ICONS.tidyUp!} size={18} />
-        </span>
-      ) : item.kind === 'missedHuddle' ? (
-        // The running huddle's green headphones on the tile's corner, so the row reads as a huddle before its title.
-        <span {...stylex.props(styles.markedTile)}>
-          <PlaceTile tile={tileOf(topic)} />
-          <span aria-hidden data-huddle-mark="" {...stylex.props(styles.huddleMark)}>
-            <Icon icon={Headphones} size={12} weight="fill" />
-          </span>
-        </span>
-      ) : (
-        <PlaceTile tile={tileOf(topic)} />
-      )}
+      <RowTile item={item} />
       <span {...stylex.props(styles.text)}>
         {/* An assistant title, and a follow-up's promise, can quote the messages; the plain one only says what kind of thing waits. */}
         <Text variant="ui" weight="medium" tone="default" topicTitle tooltipWhenTruncated data-home-title="" data-sensitive={item.aiTitle === undefined && item.kind !== 'followUp' ? undefined : ''}>
