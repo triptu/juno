@@ -3,10 +3,10 @@
  * `EmojiPickerPanel`, so the catalog is not in the first bundle.
  */
 import { emojiCatalog, type QuickReaction } from '@juno/contract'
-import { EmojiPicker } from '@juno/views'
+import { EmojiPicker, type EmojiPickerProps } from '@juno/views'
 
 interface QuickReactionPickerProps {
-  readonly custom: ReadonlyArray<{ readonly name: string; readonly url: string }>
+  readonly custom: NonNullable<EmojiPickerProps['custom']>
   readonly recent: ReadonlyArray<string>
   /** The quick reactions already chosen: shown as chosen, not picked again. */
   readonly selected: ReadonlySet<string>

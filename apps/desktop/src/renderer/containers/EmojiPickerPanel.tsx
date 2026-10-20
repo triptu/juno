@@ -5,6 +5,7 @@
  */
 import { emojiCatalog } from '@juno/contract'
 import { EmojiPicker } from '@juno/views'
+import { useWorkspaceEmoji } from './workspaceEmoji'
 
 export interface EmojiPickerPanelProps {
   readonly recent: ReadonlyArray<string>
@@ -20,5 +21,6 @@ const unicodeOf = (name: string) => {
 }
 
 export default function EmojiPickerPanel({ recent, onPick, onClose }: EmojiPickerPanelProps) {
-  return <EmojiPicker catalog={emojiCatalog} recent={recent} onPick={(name) => onPick(name, unicodeOf(name))} onClose={onClose} />
+  const { custom } = useWorkspaceEmoji()
+  return <EmojiPicker custom={custom} catalog={emojiCatalog} recent={recent} onPick={(name) => onPick(name, unicodeOf(name))} onClose={onClose} />
 }

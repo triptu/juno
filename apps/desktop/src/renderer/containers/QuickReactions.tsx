@@ -5,12 +5,13 @@
  * emoji, from the picker's own chunk, with the chosen ones marked.
  */
 import { Suspense, useMemo, useState } from 'react'
-import { composerEmojiAtom, quickReactionsAtom, registry, setQuickReactions } from '@juno/state'
+import { quickReactionsAtom, registry, setQuickReactions } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { QuickReactionsSetting } from '@juno/views'
 import { chunk } from './chunks'
-import { frequentEmoji } from './recentEmoji'
-import { customEmoji, type QuickReaction } from '@juno/contract'
+import { frequentEmoji, noteRecentEmoji } from './recentEmoji'
+import { useWorkspaceEmoji } from './workspaceEmoji'
+import type { QuickReaction } from '@juno/contract'
 
 const pickerChunk = chunk(() => import('./QuickReactionPicker'))
 const QuickReactionPicker = pickerChunk.component((module) => module.default)
@@ -22,8 +23,7 @@ export function QuickReactions() {
   if (shown !== undefined && sameNames(shown, saved)) setShown(undefined)
   const reactions = shown ?? saved
   const [open, setOpen] = useState(false)
-  const workspace = useAtomValue(composerEmojiAtom(open))
-  const custom = useMemo(() => (workspace._tag === 'Success' ? customEmoji(workspace.value) : []), [workspace])
+  const { custom } = useWorkspaceEmoji(open)
   const selected = useMemo(() => new Set(reactions.map((reaction) => reaction.name)), [reactions])
 
   const change = (next: ReadonlyArray<QuickReaction>) => {
@@ -33,6 +33,7 @@ export function QuickReactions() {
     })
   }
   const add = (reaction: QuickReaction) => {
+    noteRecentEmoji(reaction.name)
     setOpen(false)
     if (!reactions.some((other) => other.name === reaction.name)) change([...reactions, reaction])
   }

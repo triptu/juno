@@ -144,3 +144,28 @@ export function customEmojiLookup(emojis: ReadonlyArray<CustomEmojiRow>): (name:
     return undefined
   }
 }
+
+/** Picker entries use the image owner's name, with aliases searchable on that entry. */
+export function workspaceEmoji(rows: ReadonlyArray<CustomEmojiRow>): ReadonlyArray<{ readonly name: string; readonly url: string; readonly aliases: ReadonlyArray<string> }> {
+  const lookup = customEmojiLookup(rows)
+  const byName = new Map(rows.map((row) => [row.name, row]))
+  const entries = new Map<string, { name: string; url: string; aliases: string[] }>()
+  for (const row of rows) {
+    const url = lookup(row.name)
+    if (!url) continue
+    let target = row
+    // The lookup already rejected cycles and missing targets.
+    while (!target.url && target.alias_for) {
+      const next = byName.get(target.alias_for)
+      if (next === undefined) break
+      target = next
+    }
+    let entry = entries.get(target.name)
+    if (entry === undefined) {
+      entry = { name: target.name, url, aliases: [] }
+      entries.set(target.name, entry)
+    }
+    if (row.name !== target.name) entry.aliases.push(row.name)
+  }
+  return [...entries.values()].toSorted((a, b) => a.name.localeCompare(b.name))
+}

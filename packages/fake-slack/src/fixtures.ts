@@ -499,6 +499,9 @@ export function seedWorkspace(workspace: Workspace, avatarBase: string): void {
   const minute = 60_000
   const at = (ago: number) => now - ago * minute
   // Avatars are served at `<base>/avatars`, files at `<base>/files`.
+  workspace.emoji.set('juno_wave', { name: 'juno_wave', value: `${avatarBase}/U0MAYA.svg` })
+  workspace.emoji.set('hello_juno', { name: 'hello_juno', value: 'alias:juno_wave' })
+  workspace.emoji.set('juno_shipit', { name: 'juno_shipit', value: `${avatarBase}/U0LEO.svg` })
   const baseUrl = avatarBase.replace(/\/avatars$/, '')
 
   for (const person of PEOPLE) workspace.addUser(userObject(person, avatarBase))

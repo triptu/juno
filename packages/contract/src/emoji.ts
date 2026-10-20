@@ -3,7 +3,7 @@
  * emoji picker. The data lives in `@juno/richtext`; this re-export lets
  * the renderer reach it through the contract.
  */
-export { emojiCatalog, type EmojiCategory } from '@juno/domain'
+export { workspaceEmoji, customEmojiLookup, emojiCatalog, type EmojiCategory } from '@juno/domain'
 
 /** A one-click reaction in the message toolbar: a standard emoji (`unicode`) or a custom one (`url`). */
 export interface QuickReaction {

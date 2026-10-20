@@ -53,7 +53,7 @@ export const JunoBubble = memo(function JunoBubble({ item, now, actions, enter =
           <Text variant="bodySmall" tone="default" selectable dir="auto" as="div" sx={[rowStyles.bubbleText, styles.blocks]}>
             <JunoRichText body={item.body} now={now} actions={actions} />
           </Text>
-          <ReactionBadge reactions={item.reactions} corner="end" />
+          <ReactionBadge emojiUrl={actions.emojiUrl} reactions={item.reactions} corner="end" />
         </div>
         {compact ? null : (
           <Text variant="tag" tone="muted" numeric as="time" title={fullTime(item.at)} sx={rowStyles.time}>

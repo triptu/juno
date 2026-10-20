@@ -38,7 +38,7 @@ export const CardRow = memo(function CardRow({ item, now, actions }: CardRowProp
         {...stylex.props(rowStyles.anchor, styles.card)}
       >
         {renderCard(card, actions, now)}
-        <ReactionBadge reactions={item.reactions} corner="end" />
+        <ReactionBadge emojiUrl={actions.emojiUrl} reactions={item.reactions} corner="end" />
       </div>
       <RowActions target={{ _tag: 'card', id: card.id }} actions={actions} />
     </div>

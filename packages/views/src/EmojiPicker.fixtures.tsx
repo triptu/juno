@@ -11,7 +11,7 @@ const blob = (fill: string) =>
   )}`
 
 const custom = [
-  { name: 'party-blob', url: blob('#E39A3B') },
+  { name: 'party-blob', aliases: ['celebrate-blob'], url: blob('#E39A3B') },
   { name: 'blob-wave', url: blob('#6BAF5F') },
   { name: 'blob-thinking', url: blob('#5B8DD6') },
   { name: 'ship-it', url: blob('#C86BD6') },
@@ -25,11 +25,14 @@ const picker = (overrides: Partial<EmojiPickerProps> = {}, frame?: FixtureFrame)
 export default defineFixtures(EmojiPicker, {
   Browse: {
     default: picker(),
+    workspace: picker({ custom }),
+    'workspace-2000': picker({ custom: Array.from({ length: 2000 }, (_, i) => ({ name: `workspace_${i}`, url: custom[i % custom.length]!.url })) }),
     'recent-and-custom': picker({ recent, custom }),
     'hover-emoji': picker({ recent, custom }, { hover: 'button[data-emoji]' }),
   },
   Search: {
     matches: picker({ custom, initialQuery: 'party' }),
+    alias: picker({ custom, initialQuery: 'celebrate-blob' }),
     'no-match': picker({ custom, initialQuery: 'zzqx' }),
   },
 })

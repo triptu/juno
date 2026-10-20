@@ -10,6 +10,7 @@ import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { OwnerImage, RemoveSheet, SheetLayer, type ActivateEvent, type ChatActions, type ChatMenuTarget, type OwnerImageFile, type ReactionTarget } from '@juno/views'
 import { openSlackMessage, openTopic } from '../navigation'
+import { useWorkspaceEmoji } from '../workspaceEmoji'
 import { openWebLink } from '../slackLinks'
 import { junoCommands } from './actions'
 import { scrollToRow } from './chatScroll'
@@ -111,6 +112,7 @@ interface ActionsInput {
 
 /** Callbacks every row gets, stable for the chat's life (performance 5.1); they read the latest state through refs. */
 export function useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote, openPicker, setRemoval, openPage }: ActionsInput): ChatActions {
+  const { url: emojiUrl } = useWorkspaceEmoji()
   const itemsRef = useRef(items)
   const openPageRef = useRef(openPage)
   useLayoutEffect(() => {
@@ -155,8 +157,9 @@ export function useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote
         })
       },
       renderOwnerImage,
+      emojiUrl,
     }),
-    [scrollRef, pinnedRef, inputRef, setQuote, openPicker, setRemoval],
+    [scrollRef, pinnedRef, inputRef, setQuote, openPicker, setRemoval, emojiUrl],
   )
 }
 

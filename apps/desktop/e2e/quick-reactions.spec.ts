@@ -155,3 +155,14 @@ async function limitQuickReactions({ juno }: Pick<Fixtures, 'juno'>): Promise<vo
   await full.click({ force: true })
   await expect(picker(juno)).toHaveCount(0)
 }
+
+
+test('a workspace alias adds its real emoji to quick reactions', async ({ juno }) => {
+  await juno.openSettings('Appearance')
+  await add(juno, 'hello_juno')
+  await expect.poll(() => pillNames(juno)).toEqual(['+1', 'white_check_mark', 'eyes', 'juno_wave'])
+  await expect(juno.settings.root.locator('[data-quick-reaction="juno_wave"] img')).toBeVisible()
+  await juno.settings.root.getByRole('button', { name: 'Add reaction' }).click()
+  await expect(picker(juno).getByRole('heading', { name: 'Frequently used', exact: true })).toBeVisible()
+  await expect(picker(juno).getByRole('button', { name: ':juno_wave:, added', exact: true }).first()).toHaveAttribute('aria-disabled', 'true')
+})

@@ -22,6 +22,8 @@ export type GroupLabelAction = 'why' | 'pauseSchedule' | 'muteUpdates'
 
 /** Every callback the chat list and its rows share. Created once by the container; rows are memoised on it. */
 export interface ChatActions {
+  /** Workspace image for a stored custom reaction name. */
+  readonly emojiUrl?: (name: string) => string | undefined
   readonly onCard: (id: CardId, command: CardCommand) => void
   /** A topic, a chat message (citation), a Slack message (source), a URL, or a page. `metaKey` asks for a new tab. */
   readonly onOpen: (target: OpenTarget, event: ActivateEvent) => void

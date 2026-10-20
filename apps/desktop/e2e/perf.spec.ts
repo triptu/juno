@@ -1492,3 +1492,49 @@ test('quick start: first sign-in to sidebar rows on the large seed, 300 ms per c
   }
   within('quick start, slowest of three', stats('quick start, sign-in to sidebar rows', samples).p95, 5_000)
 })
+
+
+test('emoji picker with 2,000 workspace emoji', async ({ juno, fake }) => {
+  test.setTimeout(120_000)
+  for (let i = 0; i < 1998; i++) fake.addEmoji({ name: `perf_emoji_${String(i).padStart(4, '0')}`, url: `${fake.url}/avatars/U0MAYA.svg` })
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row('#eng').open()
+  const row = juno.topic.list.locator('[data-message-row]').last()
+  const hidden = await countHidden(juno.win)
+  const samples: number[] = []
+  for (let i = 0; i < 10; i++) {
+    await row.hover()
+    await row.getByRole('button', { name: 'More reactions' }).hover()
+    samples.push(await firstOpen(juno.win, 'click', '[data-emoji="juno_wave"]', () => press(juno.win)))
+    const picker = juno.win.getByRole('dialog', { name: 'Emoji' })
+    await expect(picker.getByRole('heading', { name: 'Workspace', exact: true })).toBeVisible()
+    expect(await picker.locator('[data-emoji]').count()).toBeLessThan(200)
+    if (i === 0) {
+      const path = test.info().outputPath('workspace-emoji-picker.png')
+      await picker.screenshot({ path })
+      await test.info().attach('Workspace emoji picker', { path, contentType: 'image/png' })
+    }
+    await juno.win.keyboard.press('Escape')
+  }
+  const timing = stats('emoji picker with 2,000 workspace emoji, input to first frame', samples)
+  within('emoji picker with 2,000 workspace emoji', timing.p95, 50)
+  await row.hover()
+  await row.getByRole('button', { name: 'More reactions' }).click()
+  const picker = juno.win.getByRole('dialog', { name: 'Emoji' })
+  await picker.getByRole('textbox', { name: 'Search emoji' }).fill('perf_emoji_')
+  await expect(picker.locator('[data-emoji="perf_emoji_0000"]')).toBeVisible()
+  expect(await picker.locator('[data-scroll-area]').evaluate((element) => element.scrollHeight)).toBeGreaterThan(7000)
+  await picker.getByRole('textbox', { name: 'Search emoji' }).press('ArrowDown')
+  for (let i = 0; i < 15; i++) await juno.win.keyboard.press('ArrowDown')
+  await expect(picker.locator('[data-emoji="perf_emoji_0135"]')).toBeFocused()
+  await picker.locator('[data-scroll-area]').hover()
+  await juno.win.mouse.wheel(0, 2000)
+  await expect.poll(() => picker.locator('[data-scroll-area]').evaluate((element) => element.scrollTop)).toBeGreaterThan(1000)
+  await expect(picker).toBeVisible()
+  expect(await picker.locator('[data-emoji]').count()).toBeLessThan(200)
+  await picker.getByRole('textbox', { name: 'Search emoji' }).fill('perf_emoji_1997')
+  await expect(picker.getByRole('button', { name: ':perf_emoji_1997:', exact: true })).toBeVisible()
+  await juno.win.keyboard.press('Escape')
+  expect(await hidden(), 'frames must be presented while measuring').toBe(0)
+})
