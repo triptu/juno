@@ -1,0 +1,1 @@
+- 10-20 16:21 · missed-huddle-lasted · A missed huddle's meta line on Home reads "Lasted 12 min · 18m": "Lasted" tells its length from Home's usual age. A huddle shorter than a minute reads "Lasted under a minute" (the engine sends 0 minutes for it), and one over an hour "Lasted 1 hr 12 min". Why: two bare durations side by side read as one number.

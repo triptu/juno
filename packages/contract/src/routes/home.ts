@@ -152,7 +152,9 @@ export const HomeItem = Schema.Struct({
   at: Schema.optionalKey(Schema.Number),
   /** Moved a lot: the new messages since the user last read the topic. */
   newCount: Schema.optionalKey(Schema.Int),
+  /** Missed huddle: its call, which opening the row marks seen. */
   huddleId: Schema.optionalKey(Schema.String),
+  /** Missed huddle: how long it lasted, in whole minutes; 0 is under a minute. */
   durationMinutes: Schema.optionalKey(Schema.Int),
   /** Follow-up: the user's message the promise was found in, for Mark done. */
   messageTs: Schema.optionalKey(Schema.String),

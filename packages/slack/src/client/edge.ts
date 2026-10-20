@@ -9,7 +9,7 @@
  * go through `call` with their own schema once Juno needs them; `emojis/list`
  * is the next one (architecture 5.2 step 6).
  */
-import { Clock, Context, Effect, Layer, Ref, Schema as S } from 'effect'
+import { Clock, Context, Effect, Layer, Ref, Schema as S, Semaphore } from 'effect'
 import { ErrorResponse } from '@juno/slack-schema'
 import { EdgeUsersInfoOk, type EdgeUsersInfoArgs } from '@juno/slack-schema'
 import { decodeResponse, SlackApi, withRetries } from './api.ts'
@@ -49,9 +49,11 @@ export class SlackEdge extends Context.Service<SlackEdge, SlackEdgeShape>()('jun
       const queue = yield* RequestQueue
       const api = yield* SlackApi
       const cached = yield* Ref.make<{ url: string; expiresAt: number } | undefined>(undefined)
+      // Calls that start together wait for one fetch instead of each asking Slack.
+      const fetching = yield* Semaphore.make(1)
 
       // On the lane of the call that needs it: an interactive lookup must not wait behind the background backfill.
-      const baseUrl = (lane: Lane) => Effect.gen(function* () {
+      const baseUrl = (lane: Lane) => fetching.withPermits(1)(Effect.gen(function* () {
         const now = yield* Clock.currentTimeMillis
         const current = yield* Ref.get(cached)
         if (current !== undefined && current.expiresAt > now) return current.url
@@ -59,7 +61,7 @@ export class SlackEdge extends Context.Service<SlackEdge, SlackEdgeShape>()('jun
         const url = answer.url.replace(/\/+$/, '')
         yield* Ref.set(cached, { url, expiresAt: now + (answer.ttl_seconds ?? 3600) * 1000 })
         return url
-      })
+      }))
 
       const call = <A extends { ok: true }>(
         method: string,

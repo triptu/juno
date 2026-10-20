@@ -175,7 +175,7 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
     for (const { huddle, row } of yield* readMissedHuddles(now)) {
       if (notificationIsMuted(undefined, settings.channels[row.channel], settings.people[huddle.started_by])) continue
       add({ id: `missedHuddle:${huddle.call_id}`, kind: 'missedHuddle', title: '', huddleId: huddle.call_id,
-        at: huddle.ended_at, durationMinutes: Math.max(1, Math.round((huddle.ended_at - huddle.started_at) / 60_000)),
+        at: huddle.ended_at, durationMinutes: huddle.ended_at - huddle.started_at < 60_000 ? 0 : Math.round((huddle.ended_at - huddle.started_at) / 60_000),
       }, [row])
     }
 
