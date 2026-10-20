@@ -148,6 +148,7 @@ export {
   notificationStatusAtom,
   restoreSlackSchedule,
   setHours,
+  setHuddleRing,
   setMatters,
   setPresence,
   setSlackSchedule,

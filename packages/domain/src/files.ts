@@ -1,22 +1,14 @@
 /**
  * What a Slack file is, decided in one place: the message's preview label
- * (`filesLabel`), the engine's `FileView` and the media viewer all read it
- * from here (SPEC section 8, "Images and the media viewer" and "Other
- * files"). The rules read Slack's `mimetype`, `filetype`, `mode`,
- * `subtype` and the file's name, in that order of trust.
+ * (`filesLabel`), the sync's readiness check, the engine's `FileView` and the
+ * media viewer all read it from here (SPEC section 8, "Images and the media
+ * viewer" and "Other files"). Slack fills a fresh upload's type in as it
+ * processes the file, so the type is read from `mimetype` when Slack has
+ * one, else from Slack's short `filetype`, else from the name's extension. A
+ * pasted screenshot named `x.png` is an image from its first copy, before
+ * Slack says so. A tombstone, a clip recorded in Slack (`subtype`) and a
+ * snippet (`mode`) say what they are before any type does.
  */
-
-/** The fields of a Slack file these rules read. A decoded `@juno/slack-schema` `File` satisfies it. */
-export interface FileFacts {
-  readonly name?: string | null
-  readonly title?: string | null
-  readonly mimetype?: string
-  readonly filetype?: string
-  readonly pretty_type?: string
-  readonly mode?: string
-  readonly subtype?: string
-  readonly file_access?: string
-}
 
 /**
  * How a file shows: `image` and `video` as pictures; `audio`, `pdf`, `html`
@@ -27,6 +19,60 @@ export type FileMediaKind = 'image' | 'video' | 'audio' | 'pdf' | 'html' | 'text
 
 /** How the viewer draws a text file: Markdown rendered, CSV as a table, JSON and code in monospace, plain text wrapped. */
 export type FileTextKind = 'markdown' | 'csv' | 'json' | 'code' | 'plain'
+
+/** The fields of a file the kind is read from; every one may be missing. A decoded `@juno/slack-schema` `File` satisfies it. */
+export interface TypedFile {
+  readonly mimetype?: string | undefined
+  readonly filetype?: string | undefined
+  readonly name?: string | null | undefined
+  readonly title?: string | null | undefined
+  readonly pretty_type?: string | undefined
+  readonly mode?: string | undefined
+  readonly subtype?: string | undefined
+  readonly file_access?: string | undefined
+}
+
+/** `mimetype` when Slack has worked it out: set and not empty. */
+export function knownMimetype(file: TypedFile): string | undefined {
+  const type = file.mimetype?.trim().toLowerCase()
+  return type === undefined || type === '' ? undefined : type
+}
+
+/** The kind a file shows as; `file` when nothing says more. The generic binary type says nothing, so the name decides. */
+export function fileMediaKind(file: TypedFile): FileMediaKind {
+  if (file.mode === 'tombstone' || file.file_access === 'file_not_found') return 'deleted'
+  if (file.subtype === 'slack_audio') return 'audio'
+  if (file.subtype === 'slack_video') return 'video'
+  if (file.mode === 'snippet') return 'text'
+  const mimetype = essence(knownMimetype(file))
+  if (mimetype !== undefined && mimetype !== 'application/octet-stream') return kindOfMimetype(mimetype)
+  const filetype = file.filetype?.trim().toLowerCase()
+  if (filetype !== undefined && filetype !== '') return KINDS_BY_TYPE[filetype] ?? 'file'
+  return KINDS_BY_TYPE[extensionOf(file.name) ?? extensionOf(file.title) ?? ''] ?? 'file'
+}
+
+function essence(mimetype: string | undefined): string | undefined {
+  return mimetype?.split(';')[0]!.trim()
+}
+
+/** Text types that are not for reading: an invite, a contact card. */
+const NOT_TEXT_MIMETYPES = new Set(['text/calendar', 'text/vcard', 'text/x-vcard', 'text/rtf'])
+const TEXT_MIMETYPES = new Set(['application/json', 'application/xml', 'application/x-yaml', 'application/yaml', 'application/javascript', 'application/x-sh', 'application/sql', 'application/toml'])
+
+function kindOfMimetype(mimetype: string): FileMediaKind {
+  if (mimetype === 'application/pdf') return 'pdf'
+  if (mimetype === 'text/html') return 'html'
+  if (NOT_TEXT_MIMETYPES.has(mimetype)) return 'file'
+  if (mimetype.startsWith('text/') || TEXT_MIMETYPES.has(mimetype) || mimetype.endsWith('+json') || mimetype.endsWith('+xml')) return 'text'
+  const family = mimetype.split('/')[0]
+  return family === 'image' || family === 'video' || family === 'audio' ? family : 'file'
+}
+
+function extensionOf(name: string | null | undefined): string | undefined {
+  if (name === undefined || name === null) return undefined
+  const dot = name.lastIndexOf('.')
+  return dot === -1 ? undefined : name.slice(dot + 1).trim().toLowerCase()
+}
 
 /** Slack's `filetype` for code, and the language a reader knows it by when Slack sends no `pretty_type`. */
 const CODE_FILETYPES: Readonly<Record<string, string>> = {
@@ -114,49 +160,14 @@ const CODE_EXTENSIONS: Readonly<Record<string, string>> = {
   zsh: 'shell',
 }
 
-/** Text a reader opens as is: logs, notes and the like. */
-const PLAIN_EXTENSIONS = new Set(['txt', 'text', 'log', 'env', 'ini', 'cfg', 'conf'])
-const TEXT_MIMETYPES = new Set(['application/json', 'application/xml', 'application/x-yaml', 'application/yaml', 'application/javascript', 'application/x-sh', 'application/sql', 'application/toml'])
-/** `text/` types that are not for reading: an invite, a contact card. */
-const NOT_TEXT_MIMETYPES = new Set(['text/calendar', 'text/vcard', 'text/x-vcard', 'text/rtf'])
-
-function extensionOf(file: FileFacts): string {
-  const name = file.name || file.title || ''
-  const dot = name.lastIndexOf('.')
-  return dot <= 0 ? '' : name.slice(dot + 1).toLowerCase()
-}
-
-function mimetypeOf(file: FileFacts): string {
-  return (file.mimetype ?? '').split(';')[0]!.trim().toLowerCase()
-}
-
-/** Whether the file is text the viewer can show, from its type, Slack's filetype or its name. */
-function isText(file: FileFacts): boolean {
-  if (file.mode === 'snippet') return true
-  const mimetype = mimetypeOf(file)
-  if (NOT_TEXT_MIMETYPES.has(mimetype)) return false
-  if (mimetype.startsWith('text/') || TEXT_MIMETYPES.has(mimetype) || mimetype.endsWith('+json') || mimetype.endsWith('+xml')) return true
-  const filetype = file.filetype ?? ''
-  if (['text', 'markdown', 'csv', 'tsv', 'json'].includes(filetype) || filetype in CODE_FILETYPES) return true
-  if (mimetype !== '' && mimetype !== 'application/octet-stream') return false
-  const extension = extensionOf(file)
-  return PLAIN_EXTENSIONS.has(extension) || extension in CODE_EXTENSIONS || ['md', 'markdown', 'csv', 'tsv', 'json'].includes(extension)
-}
-
-/** How a file shows in the message and the viewer. */
-export function fileMediaKind(file: FileFacts): FileMediaKind {
-  if (file.mode === 'tombstone' || file.file_access === 'file_not_found') return 'deleted'
-  if (file.subtype === 'slack_audio') return 'audio'
-  if (file.subtype === 'slack_video') return 'video'
-  const mimetype = mimetypeOf(file)
-  if (file.mode !== 'snippet') {
-    if (mimetype.startsWith('image/')) return 'image'
-    if (mimetype.startsWith('video/')) return 'video'
-    if (mimetype.startsWith('audio/')) return 'audio'
-    if (mimetype === 'application/pdf' || file.filetype === 'pdf') return 'pdf'
-    if (mimetype === 'text/html' || file.filetype === 'html' || (mimetype === '' && ['html', 'htm'].includes(extensionOf(file)))) return 'html'
-  }
-  return isText(file) ? 'text' : 'file'
+/** Slack's short `filetype` values and common extensions, by kind. */
+const KINDS_BY_TYPE: Readonly<Record<string, FileMediaKind>> = {
+  png: 'image', jpg: 'image', jpeg: 'image', gif: 'image', webp: 'image', bmp: 'image', tif: 'image', tiff: 'image', heic: 'image', heif: 'image', svg: 'image', avif: 'image',
+  mp4: 'video', mov: 'video', m4v: 'video', webm: 'video', mkv: 'video', avi: 'video', mpg: 'video', mpeg: 'video',
+  mp3: 'audio', m4a: 'audio', wav: 'audio', aac: 'audio', ogg: 'audio', flac: 'audio', aiff: 'audio',
+  pdf: 'pdf',
+  html: 'html', htm: 'html',
+  ...Object.fromEntries([...Object.keys(CODE_FILETYPES), ...Object.keys(CODE_EXTENSIONS), 'text', 'txt', 'log', 'markdown', 'md', 'csv', 'tsv', 'json', 'env', 'ini', 'cfg', 'conf'].map((type) => [type, 'text' as const])),
 }
 
 /**
@@ -164,10 +175,10 @@ export function fileMediaKind(file: FileFacts): FileMediaKind {
  * the meta line: Slack's `pretty_type` ("Python"), else a name for its
  * `filetype`.
  */
-export function fileTextKind(file: FileFacts): { readonly kind: FileTextKind; readonly language?: string } {
-  const mimetype = mimetypeOf(file)
-  const filetype = file.filetype ?? ''
-  const extension = extensionOf(file)
+export function fileTextKind(file: TypedFile): { readonly kind: FileTextKind; readonly language?: string } {
+  const mimetype = essence(knownMimetype(file)) ?? ''
+  const filetype = file.filetype?.trim().toLowerCase() ?? ''
+  const extension = extensionOf(file.name) ?? extensionOf(file.title) ?? ''
   if (filetype === 'markdown' || mimetype === 'text/markdown' || extension === 'md' || extension === 'markdown') return { kind: 'markdown' }
   if (filetype === 'csv' || filetype === 'tsv' || mimetype === 'text/csv' || mimetype === 'text/tab-separated-values' || extension === 'csv' || extension === 'tsv') return { kind: 'csv' }
   if (filetype === 'json' || mimetype === 'application/json' || mimetype.endsWith('+json') || extension === 'json') return { kind: 'json' }
@@ -179,7 +190,7 @@ export function fileTextKind(file: FileFacts): { readonly kind: FileTextKind; re
 /** The kind a message's preview names a file by: "Voice clip", "Snippet: notes", "Canvas: plan". */
 export type FileLabelKind = 'image' | 'video' | 'voice' | 'snippet' | 'canvas' | 'deleted' | 'file'
 
-export function fileLabelKind(file: FileFacts): FileLabelKind {
+export function fileLabelKind(file: TypedFile): FileLabelKind {
   if (file.subtype === 'slack_audio' && file.mode !== 'tombstone' && file.file_access !== 'file_not_found') return 'voice'
   const kind = fileMediaKind(file)
   if (kind === 'deleted' || kind === 'image' || kind === 'video') return kind

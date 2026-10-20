@@ -57,7 +57,7 @@ const SETTINGS_KEYS: InvalidationKeys = ['prefs']
 const PAGE_KEYS: InvalidationKeys = ['prefs', 'notification_log', 'conversations', 'users', 'team']
 const TODAY_LIMIT = 50
 
-const levelsOf = (settings: NotificationSettings) => ({ ...settings, threads: settings.threads ?? {} })
+const levelsOf = (settings: NotificationSettings) => ({ ...settings, threads: settings.threads ?? {}, huddleRing: settings.huddleRing !== false })
 
 /** Every channel and person on a list, with their names. Unknown ids show as they are. */
 const tagsFor = (settings: NotificationSettings, level: 'every' | 'never') =>
@@ -350,6 +350,7 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
           if (which === 'notifications') yield* inWorkspace(slackSchedule.hoursSet.pipe(Effect.orDie))
         }),
       'notifications.setMatters': ({ text }) => updateSettings((settings) => ({ ...settings, matters: text.trim() })).pipe(Effect.asVoid),
+      'notifications.setHuddleRing': ({ enabled }) => updateSettings((settings) => ({ ...settings, huddleRing: enabled })).pipe(Effect.asVoid),
       'notifications.setLevel': ({ target, choice }) => setLevel(target, choice),
       'notifications.setPresence': ({ presence }) =>
         Effect.gen(function* () {

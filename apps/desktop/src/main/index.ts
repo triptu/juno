@@ -3,7 +3,7 @@ import { flushAllCoverage, recordWindowCoverage } from '../coverage'
 import { app, BrowserWindow, Notification, powerMonitor, shell } from 'electron'
 import { Events, type NotificationTarget, type PrivacyState } from '@juno/contract'
 import { join } from 'node:path'
-import { createDockBadge } from './dockBadge'
+import { createDockBadge, createDockBounce } from './dockBadge'
 import { testNotificationPermission } from './notificationTestHooks'
 import { createActivityWatch } from './activity'
 import { createAgentSupervisor } from './agent'
@@ -119,6 +119,7 @@ supervisor.onFailed(() => { huddleQuit.engineFailed(); dockBadge.set('') })
 /** Under JUNO_E2E notifications are recorded, not shown; a test clicks them through `junoTest`. */
 const notificationsForTests: Array<{ readonly title: string; readonly body: string; readonly silent?: boolean; click: () => void }> = []
 let badgeForTests = ''
+const dockBounce = createDockBounce(e2e, () => BrowserWindow.getFocusedWindow() !== null, () => app.dock?.bounce('informational'))
 
 /** A clicked notification: the app window comes forward, or opens. */
 function focusWindow(): BrowserWindow {
@@ -145,6 +146,7 @@ const notifier = new Notifier({
     return { show: () => shown.show(), close: () => shown.close(), onClick: (f) => shown.on('click', f) }
   },
   setBadge: (text) => dockBadge.set(text),
+  bounce: dockBounce.bounce,
   open: openTarget,
   focus: () => void focusWindow(),
   send: (message) => supervisor.send(message),
@@ -373,7 +375,7 @@ if (e2e) {
       clickNotification: (index = 0) => notificationsForTests[index]?.click(),
       dockBadge: () => badgeForTests,
       clearDockBadge: () => dockBadge.set(''),
-      ...huddleQuit.testHooks,
+      ...huddleQuit.testHooks, ...dockBounce.testHooks,
       notificationPermission: permissionForTests.set,
       notificationSettingsOpened: () => notificationSettingsOpenedForTests,
       notificationRequests: permissionForTests.requests,

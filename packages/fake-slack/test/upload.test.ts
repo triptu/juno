@@ -195,7 +195,7 @@ describe('late and partial files', () => {
     expect((await client.ok('files.info', { file })).file).toMatchObject({ id: file, thumb_360: expect.any(String) })
   })
 
-  it('holdThumbnails sends an image without thumbnails until releaseThumbnails, then file_thumbnail_generated', async () => {
+  it('holdThumbnails sends an image without a type or thumbnails until releaseThumbnails, then file_thumbnail_generated', async () => {
     const socket = await client.connect()
     await socket.next(isType('hello'))
     fake.holdThumbnails()
@@ -203,7 +203,7 @@ describe('late and partial files', () => {
     await client.ok('files.completeUpload', { files: [{ id: file }] })
     await client.ok('files.share', { files: [file], channel: 'C0ENG', comment: 'Held', client_msg_id: 'uuid-held-1' })
     const echo = await socket.next(postedWith('uuid-held-1'))
-    expect(echo.files?.[0]).toMatchObject({ id: file, mimetype: 'image/png' })
+    expect(echo.files?.[0]).toMatchObject({ id: file, name: 'shot.png', mimetype: '', filetype: '', size: expect.any(Number) })
     expect(echo.files?.[0]?.thumb_360).toBeUndefined()
     expect(echo.files?.[0]?.original_w).toBeUndefined()
     expect((await client.ok('files.info', { file })).file.thumb_360).toBeUndefined()
@@ -214,7 +214,7 @@ describe('late and partial files', () => {
     fake.releaseThumbnails()
     const generated = await socket.next(isType('file_thumbnail_generated'))
     expect(generated).toMatchObject({ file_id: file })
-    expect((await client.ok('files.info', { file })).file).toMatchObject({ original_w: 640, original_h: 400, thumb_360: expect.any(String) })
+    expect((await client.ok('files.info', { file })).file).toMatchObject({ mimetype: 'image/png', filetype: 'png', original_w: 640, original_h: 400, thumb_360: expect.any(String) })
     const history = await client.ok('conversations.history', { channel: 'C0ENG', limit: 2 })
     expect(history.messages.map((m) => m.files?.[0]?.original_w)).toEqual([400, 640])
   })

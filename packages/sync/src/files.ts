@@ -10,10 +10,17 @@
  * is not ready, and writes the processed copy into every stored message that carries it
  * (`run/files.ts`, `write/files.ts`).
  *
+ * Slack also fills a fresh upload's type in as it processes the file: a copy
+ * with no `mimetype`, or an empty one, is not complete, and its
+ * kind is read from Slack's `filetype` or the name meanwhile (`fileMediaKind`
+ * in `@juno/domain`), so a pasted screenshot is an image from its first copy.
+ *
  * What a message shows only ever gets fuller: a later copy without a file's
  * thumbnails, poster or playback url keeps the stored ones, and a partial
  * copy never replaces a complete one (`keepFuller`).
  */
+import { fileMediaKind, knownMimetype, type TypedFile } from '@juno/domain'
+
 export type FileJson = { readonly [key: string]: unknown }
 
 /** The keys that make an image or video show inline. */
@@ -30,14 +37,23 @@ export const hasThumbs = (file: FileJson): boolean =>
 /** A video's poster frame with its size, which the list lays the player out from. */
 const hasPoster = (file: FileJson): boolean => typeof file['thumb_video'] === 'string' && typeof file['thumb_video_w'] === 'number' && typeof file['thumb_video_h'] === 'number'
 
-/** A copy that says what the file is: not Slack's partial `check_file_info` shape. */
-const isComplete = (file: FileJson): boolean => file['file_access'] !== 'check_file_info' && typeof file['mimetype'] === 'string'
+/** A copy that says what the file is: Slack has worked out its type, and it is not the partial `check_file_info` shape. */
+const isComplete = (file: FileJson): boolean => file['file_access'] !== 'check_file_info' && knownMimetype(typed(file)) !== undefined
 
 const mediaKind = (file: FileJson): 'image' | 'video' | undefined => {
-  const type = file['mimetype']
-  if (typeof type !== 'string') return undefined
-  return type.startsWith('image/') ? 'image' : type.startsWith('video/') ? 'video' : undefined
+  const kind = fileMediaKind(typed(file))
+  return kind === 'image' || kind === 'video' ? kind : undefined
 }
+
+/** The type fields of a stored file, as strings or nothing. */
+const typed = (file: FileJson): TypedFile => ({
+  mimetype: str(file['mimetype']),
+  filetype: str(file['filetype']),
+  name: str(file['name']),
+  title: str(file['title']),
+})
+
+const str = (value: unknown): string | undefined => (typeof value === 'string' ? value : undefined)
 
 /** Everything the list needs to show the file: complete, and an image's thumbnails or a video's poster. */
 export const isReady = (file: FileJson): boolean => {
