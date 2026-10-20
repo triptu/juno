@@ -1,0 +1,1 @@
+- 10-20 15:15 · notification-day-fields · Each hours day button sends its day and desired on/off value through `notifications.setDay`. It uses the same settings write lock and Slack schedule handling as hour edits, so two quick day changes cannot replace each other with an old days array.

@@ -1,0 +1,1 @@
+- 10-20 15:05 · notification-hours-fields · Hours controls send only the edited fields. The engine merges them with the saved hours under its settings write lock, so a rapid second edit cannot restore stale values from the page. The fast reopen persistence test keeps its original interactions.
