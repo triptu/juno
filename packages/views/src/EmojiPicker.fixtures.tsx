@@ -1,3 +1,5 @@
+import * as stylex from '@stylexjs/stylex'
+import { sizes } from '@juno/tokens/tokens.stylex'
 import { emojiCatalog } from '@juno/contract'
 import { useState } from 'react'
 import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
@@ -45,5 +47,10 @@ function RegressionPicker() {
   const [picked, setPicked] = useState('')
   const [glyph, setGlyph] = useState('')
   const [open, setOpen] = useState(true)
-  return <>{open ? <EmojiPicker catalog={emojiCatalog} custom={[...custom, { name: 'thumbsup_parrot', url: custom[0]!.url }, { name: 'broken_image', url: '/broken-emoji.svg' }, { name: 'broken_neighbor', url: custom[1]!.url }, { name: '+1', unicode: '👍', aliases: ['approval'] }, { name: 'tada', url: custom[3]!.url }]} recent={['hello_juno', 'eyes']} selected={new Set(['hello_juno', 'eyes'])} onPick={(name, unicode) => { setPicked(name); setGlyph(unicode ?? '') }} onClose={() => setOpen(false)} /> : null}<output aria-label="Picked emoji">{picked}</output><output aria-label="Picked glyph">{glyph}</output></>
+  return <>{open ? <EmojiPicker catalog={emojiCatalog} custom={[...custom, { name: 'thumbsup_parrot', url: custom[0]!.url }, { name: 'broken_image', url: '/broken-emoji.svg' }, { name: 'broken_neighbor', url: custom[1]!.url }, { name: '+1', unicode: '👍', aliases: ['approval'] }, { name: 'tada', url: custom[3]!.url }]} recent={['hello_juno', 'eyes']} selected={new Set(['hello_juno', 'eyes'])} onPick={(name, unicode) => { setPicked(name); setGlyph(unicode ?? '') }} onClose={() => setOpen(false)} /> : null}<output aria-label="Picked emoji" {...stylex.props(styles.feedback)}>{picked}</output><output aria-label="Picked glyph" {...stylex.props(styles.feedback)}>{glyph}</output></>
 }
+
+const styles = stylex.create({
+  // Accessible callback feedback for the tests, outside the picker’s layout.
+  feedback: { position: 'absolute', insetBlockStart: 0, insetInlineStart: 0, width: sizes['--icon-16'], height: sizes['--icon-16'], overflow: 'hidden', clipPath: 'inset(50%)', whiteSpace: 'nowrap' },
+})
