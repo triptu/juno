@@ -38,6 +38,8 @@ export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEle
   /** Opens a page and that page is the current tab: `aria-current="page"`, the nav's accent tint and the filled icon, as an active NavItem. */
   readonly current?: boolean
   readonly dimmed?: boolean
+  /** A state the user must not miss, such as a muted microphone: filled with the danger red, over any variant and `pressed`. */
+  readonly alert?: boolean
   /** No tooltip, when the label would repeat visible text. */
   readonly noTooltip?: boolean
 }
@@ -92,6 +94,7 @@ export function IconButton({
   expanded,
   current = false,
   dimmed = false,
+  alert = false,
   noTooltip = false,
   type = 'button',
   disabled,
@@ -124,6 +127,7 @@ export function IconButton({
         pressed === true && pressedStyles[variant],
         expanded === true && pressed !== true && openStyles[variant],
         current && styles.current,
+        alert && styles.alert,
         (dimmed || disabled) && interactive.dimmed,
       )}
     >
@@ -180,6 +184,14 @@ const styles = stylex.create({
     backgroundColor: {
       default: accent['--hl-nav'],
       ':hover': { default: null, [HOVER]: accent['--hl-nav'] },
+    },
+  },
+  alert: {
+    color: colors['--background'],
+    backgroundColor: {
+      default: colors['--danger'],
+      ':hover': { default: null, [HOVER]: colors['--danger-fill-hover'] },
+      ':active': { default: colors['--danger-fill-active'], [HOVER]: colors['--danger-fill-active'] },
     },
   },
   pair: {
