@@ -4,10 +4,10 @@
  * The composer sends plain text with the people, user groups and channels
  * its suggestions picked already encoded as `<@U…|Maya>`,
  * `<!subteam^S…|@design-team>` and `<#C…|eng>`
- * (`encodeMentions` in `@juno/domain`), "> " quote lines, and ":shortcode:"
- * emoji. An edit's text names them as "@Maya Chen" and "#eng" instead, with
+ * (`encodeMentions` in `@juno/domain`), "> " quote lines, ":shortcode:"
+ * emoji, and Slack's markup for styles and code (`markup.ts`). An edit's text names them as "@Maya Chen" and "#eng" instead, with
  * `MentionTargets` saying who they are. This turns either into one
- * `rich_text` block (sections and quotes) and a mrkdwn `text` fallback with
+ * `rich_text` block (sections, quotes and code blocks) and a mrkdwn `text` fallback with
  * `<@U…>` / `<!subteam^S…>` / `<#C…|name>` encodings. A group goes as
  * Slack's client sends it (research section 3, "User groups"): a
  * `usergroup` element and the bare `<!subteam^S…>`.
@@ -22,6 +22,7 @@ import type { RichTextBlock, RichTextElement, RichTextInline } from '@juno/slack
 import { emojiUnicode, isKnownEmoji } from './emoji'
 import { unescapeMrkdwn } from './from-mrkdwn'
 import { findLinks } from './links'
+import { lineMarkup, markupPieces } from './markup'
 
 export interface MentionTargets {
   /** People the composer may have inserted, with their display name. */
@@ -220,23 +221,87 @@ function joinLines(lines: ReadonlyArray<ReadonlyArray<RichTextInline>>): RichTex
   lines.forEach((line, i) => {
     if (i > 0) {
       const last = out[out.length - 1]
-      if (last && last.type === 'text') out[out.length - 1] = { ...last, text: last.text + '\n' }
+      if (last && last.type === 'text' && !last.style) out[out.length - 1] = { ...last, text: last.text + '\n' }
       else out.push({ type: 'text', text: '\n' })
     }
     for (const el of line) {
       const last = out[out.length - 1]
-      if (el.type === 'text' && last && last.type === 'text' && !el.style && !last.style) out[out.length - 1] = { ...last, text: last.text + el.text }
+      if (el.type === 'text' && last && last.type === 'text' && styleKey(el.style) === styleKey(last.style)) out[out.length - 1] = { ...last, text: last.text + el.text }
       else out.push(el)
     }
   })
   return out
 }
 
-const QUOTE_LINE = /^>\s?/
+type Style = { bold?: true; italic?: true; strike?: true; code?: true }
+const STYLES = ['bold', 'italic', 'strike', 'code'] as const
+const styleKey = (style: Style | undefined) => (style === undefined ? '' : STYLES.filter((name) => style[name]).join('+'))
+
+/**
+ * A line's elements with its markup applied (`lineMarkup`): the markers go,
+ * and each text run, mention, link and emoji takes the styles around it.
+ * The parser reads each mention, link and emoji as one opaque character.
+ * In code an emoji stays its shortcode, as Slack shows it there.
+ */
+function styledElements(tokens: ReadonlyArray<Token>): RichTextInline[] {
+  let line = ''
+  const owner: number[] = []
+  tokens.forEach((token, index) => {
+    const text = token.kind === 'text' ? token.text : '\uFFFC'
+    line += text
+    for (let i = 0; i < text.length; i++) owner.push(index)
+  })
+  const { spans, markers } = lineMarkup(line)
+  const styles: Array<Style | undefined> = Array.from({ length: line.length }, () => undefined)
+  // Keys in one order, whatever order the markers opened in.
+  for (const span of spans) for (let i = span.start; i < span.end; i++) styles[i] = { ...styles[i], [span.style]: true }
+  const ordered = (style: Style | undefined): Style | undefined => {
+    if (style === undefined) return undefined
+    const out: Style = {}
+    for (const name of STYLES) if (style[name]) out[name] = true
+    return out
+  }
+  const dropped = new Uint8Array(line.length)
+  for (const marker of markers) dropped.fill(1, marker.start, marker.end)
+  const out: RichTextInline[] = []
+  for (let i = 0; i < line.length; i++) {
+    if (dropped[i] === 1) continue
+    const token = tokens[owner[i]!]!
+    const style = ordered(styles[i])
+    const element: RichTextInline = token.kind === 'text' ? { type: 'text', text: line[i]! } : token.kind === 'emoji' && style?.code === true ? { type: 'text', text: `:${token.name}:` } : toElement(token)
+    const last = out[out.length - 1]
+    if (element.type === 'text' && last?.type === 'text' && styleKey(last.style) === styleKey(style)) {
+      out[out.length - 1] = { ...last, text: last.text + element.text }
+      continue
+    }
+    out.push(style === undefined ? element : { ...element, style })
+  }
+  return out
+}
+
+/** Text in a code block: only what the composer encoded (picked mentions, linked words) is an element. */
+function codeElements(code: string): { readonly elements: RichTextInline[]; readonly mrkdwn: string } {
+  const tokens: Token[] = []
+  let last = 0
+  for (const m of code.matchAll(WIRE_TOKEN)) {
+    if (m.index > last) tokens.push({ kind: 'text', text: code.slice(last, m.index) })
+    tokens.push(...tokenizeLine(m[0], {}))
+    last = m.index + m[0].length
+  }
+  if (last < code.length) tokens.push({ kind: 'text', text: code.slice(last) })
+  return { elements: tokens.map(toElement), mrkdwn: tokens.map(toMrkdwn).join('') }
+}
 
 /**
  * Converts composer text. Empty or whitespace-only input gives no blocks
  * and an empty `text`, which callers treat as "nothing to send".
+ *
+ * Slack's markup is sent as Slack's client sends it with "Format messages
+ * with markup" on (`markup.ts`, research section 5): styled runs as `text`,
+ * mention, link and emoji elements with a `style`, code blocks as
+ * `rich_text_preformatted` with `border: 0`, and "> " lines as
+ * `rich_text_quote`. The `text` fallback keeps the markup as typed, and a
+ * code block as "```code```".
  */
 export function composeOutgoing(input: string, targets: MentionTargets = {}): OutgoingMessage {
   const text = input.replace(/\r\n?/g, '\n').replace(/\s+$/, '')
@@ -256,13 +321,20 @@ export function composeOutgoing(input: string, targets: MentionTargets = {}): Ou
     quote = []
   }
 
-  for (const rawLine of text.split('\n')) {
-    const isQuote = QUOTE_LINE.test(rawLine)
-    const line = isQuote ? rawLine.replace(QUOTE_LINE, '') : rawLine
+  for (const piece of markupPieces(text)) {
+    if (piece.kind === 'code') {
+      flushSection()
+      flushQuote()
+      const code = codeElements(text.slice(piece.content.start, piece.content.end))
+      elements.push({ type: 'rich_text_preformatted', elements: code.elements, border: 0 })
+      mrkdwnLines.push(`\`\`\`${code.mrkdwn}\`\`\``)
+      continue
+    }
+    const line = text.slice(piece.quote?.end ?? piece.start, piece.end)
     const tokens = tokenizeLine(line, targets)
-    const els = tokens.map(toElement)
+    const els = styledElements(tokens)
     const mrkdwn = tokens.map(toMrkdwn).join('')
-    if (isQuote) {
+    if (piece.quote !== undefined) {
       flushSection()
       quote.push(els)
       mrkdwnLines.push(`&gt; ${mrkdwn}`)

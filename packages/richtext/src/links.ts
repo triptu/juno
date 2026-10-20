@@ -27,6 +27,8 @@ const LINK_RE = new RegExp(
 
 /** What may not come right before a link: it would be the middle of a word, a path or an address. */
 const NOT_BEFORE = /[\p{L}\p{N}_@./\-:]/u
+/** Markup markers (`markup.ts`): a link may start right after one that starts a word, and is not closed by it. */
+const MARKERS = '*_~`'
 
 export interface FoundLink {
   readonly start: number
@@ -39,13 +41,17 @@ export interface FoundLink {
   readonly hasScheme: boolean
 }
 
-/** Drops punctuation that ends the sentence, not the URL, and a closing bracket the URL did not open. */
-function trimEnd(url: string): string {
+/**
+ * Drops punctuation that ends the sentence, not the URL, a closing bracket
+ * the URL did not open, and a markup marker (`*`, `_`, `~`, `` ` ``) that
+ * closes one in `wrapping`, the markers right before the URL.
+ */
+function trimEnd(url: string, wrapping: string): string {
   let out = url
   for (;;) {
     const last = out[out.length - 1]
     if (last === undefined) return out
-    if (/[.,;:!?'"’”*_~]/.test(last)) {
+    if (/[.,;:!?'"’”]/.test(last) || (MARKERS.includes(last) && wrapping.includes(last))) {
       out = out.slice(0, -1)
       continue
     }
@@ -58,13 +64,21 @@ function trimEnd(url: string): string {
   }
 }
 
+/** The markup markers right before `start`, when they start a word: "*_" in "see *_https://…". */
+function wrappingMarkers(text: string, start: number): string {
+  let at = start
+  while (at > 0 && MARKERS.includes(text[at - 1]!)) at--
+  return at > 0 && NOT_BEFORE.test(text[at - 1]!) ? '' : text.slice(at, start)
+}
+
 /** The links in `text`, in order. */
 export function findLinks(text: string): ReadonlyArray<FoundLink> {
   const out: FoundLink[] = []
   for (const m of text.matchAll(LINK_RE)) {
     const start = m.index
-    if (start > 0 && NOT_BEFORE.test(text[start - 1]!)) continue
-    const found = trimEnd(m[0])
+    const wrapping = wrappingMarkers(text, start)
+    if (start > 0 && wrapping === '' && NOT_BEFORE.test(text[start - 1]!)) continue
+    const found = trimEnd(m[0], wrapping)
     // A scheme with nothing after it is not a link.
     if (/^(?:https?:\/\/|mailto:)$/i.test(found)) continue
     const hasScheme = /^(?:https?:\/\/|mailto:)/i.test(found)
