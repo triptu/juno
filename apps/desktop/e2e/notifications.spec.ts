@@ -158,6 +158,41 @@ async function notificationsAndAppearance(juno: Juno): Promise<void> {
   await expect(page.matters).toHaveValue('The launch and hiring.')
 }
 
+syncedTest('Notification day buttons keep rapid changes', async ({ juno }) => {
+  await juno.openNotifications()
+  const page = juno.notifications
+  const saturday = page.day('Notifications', 'Saturday')
+  const sunday = page.day('Notifications', 'Sunday')
+  await expect(saturday).toHaveAttribute('aria-pressed', 'false')
+  await expect(sunday).toHaveAttribute('aria-pressed', 'false')
+  // Both events use the same saved model, before either command can update the page.
+  await saturday.or(sunday).evaluateAll((nodes) => {
+    for (const node of nodes) if (node instanceof HTMLButtonElement) node.click()
+  })
+  await juno.tabs.close('Settings')
+  await juno.openNotifications()
+  await expect(saturday).toHaveAttribute('aria-pressed', 'true')
+  await expect(sunday).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.day('Active in Slack', 'Saturday')).toHaveAttribute('aria-pressed', 'false')
+})
+
+syncedTest('Tidy up saves rapid changes to separate controls', async ({ juno }) => {
+  await juno.openSettings('Tidy up')
+  const checks = juno.settings.root.getByRole('checkbox', { name: /^(Threads|Direct messages)$/ })
+  await expect(checks).toHaveCount(2)
+  await expect(juno.settings.root.getByRole('checkbox', { name: 'Threads', exact: true })).toBeChecked()
+  await expect(juno.settings.root.getByRole('checkbox', { name: 'Direct messages', exact: true })).toBeChecked()
+  // Activate both before a saved page model can arrive, as two quick user changes can do.
+  await checks.evaluateAll((nodes) => {
+    for (const node of nodes) if (node instanceof HTMLInputElement) node.click()
+  })
+  await juno.tabs.close('Settings')
+  await juno.openSettings('Tidy up')
+  await expect(juno.settings.root.getByRole('checkbox', { name: 'Threads', exact: true })).not.toBeChecked()
+  await expect(juno.settings.root.getByRole('checkbox', { name: 'Direct messages', exact: true })).not.toBeChecked()
+  await expect(juno.settings.root.getByRole('radio', { name: '4 hours', exact: true })).toHaveAttribute('aria-checked', 'true')
+})
+
 async function testNotificationAndPermission(juno: Juno): Promise<void> {
   await juno.openNotifications()
   const page = juno.notifications

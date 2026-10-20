@@ -276,4 +276,12 @@ export const draftsRestore = Rpc.make('drafts.restore', { payload: DraftRestore,
 
 export const homeHuddleSeen = Rpc.make('home.huddleSeen', { payload: { callId: Schema.String }, success: Schema.Void, error: NotSignedIn })
 
-export const HomeRoutes = RpcGroup.make(homeHuddleSeen, homeView, homeVisit, homeMarkDone, homeMovesShown, homeMovesSeen, followUpsMarkDone, followUpsNotDone, followUpsRestore, draftsDiscard, draftsKeep, draftsRestore)
+/** Changes only the edited Tidy up fields; the engine merges them with the saved preference. */
+export const tidyUpSet = Rpc.make('tidyUp.set', {
+  payload: { patch: TidyUpPrefs.mapFields(({ quiet, threads, dms, followUps, drafts, unfollow, ignore }) => ({
+    quiet: Schema.optionalKey(quiet), threads: Schema.optionalKey(threads), dms: Schema.optionalKey(dms),
+    followUps: Schema.optionalKey(followUps), drafts: Schema.optionalKey(drafts), unfollow: Schema.optionalKey(unfollow), ignore: Schema.optionalKey(ignore),
+  })) }, success: Schema.Void, error: NotSignedIn,
+})
+
+export const HomeRoutes = RpcGroup.make(homeHuddleSeen, tidyUpSet, homeView, homeVisit, homeMarkDone, homeMovesShown, homeMovesSeen, followUpsMarkDone, followUpsNotDone, followUpsRestore, draftsDiscard, draftsKeep, draftsRestore)

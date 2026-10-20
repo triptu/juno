@@ -82,7 +82,10 @@ const askedWith = (model: ScriptedModel, text: string) => model.requests.filter(
 /** Maya and the owner exchange messages in their DM, both ways, so she qualifies for a file. */
 async function exchangeWithMaya(juno: Juno, slack: Slack): Promise<void> {
   slack.as('Maya').dm('Are you around to plan the offsite?')
+  // The new activity moves the row; wait before the driver measures its click position.
+  await juno.sidebar.expectTop('Maya')
   await juno.sidebar.row('Maya', { exact: true }).open()
+  await juno.tabs.expectActive('Maya')
   await juno.topic.expectMessage('Are you around to plan the offsite?')
   await juno.topic.send('yes, give me five minutes')
   slack.as('Maya').dm('Wednesday slot then?')

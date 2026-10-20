@@ -12,7 +12,7 @@ export type DayNumber = 0 | 1 | 2 | 3 | 4 | 5 | 6
 export interface DayTogglesProps {
   /** The days that are on. */
   readonly days: ReadonlyArray<DayNumber>
-  readonly onChange: (days: ReadonlyArray<DayNumber>) => void
+  readonly onChange: (day: DayNumber, enabled: boolean) => void
   /** Names the group: "Notification days". */
   readonly label: string
 }
@@ -34,7 +34,7 @@ const order: ReadonlyArray<{ readonly day: DayNumber; readonly letter: string; r
  * its day.
  */
 export function DayToggles({ days, onChange, label }: DayTogglesProps) {
-  const toggle = (day: DayNumber) => onChange(days.includes(day) ? days.filter((other) => other !== day) : [...days, day].toSorted((a, b) => a - b))
+  const toggle = (day: DayNumber) => onChange(day, !days.includes(day))
   return (
     <div role="group" aria-label={label} {...stylex.props(styles.group)}>
       {order.map(({ day, letter, name }) => {
