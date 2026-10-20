@@ -8,7 +8,7 @@
  *   fake Slack under JUNO_E2E).
  *   `juno://files/<file id>/video?url=…` and `/audio?url=…` stream a video
  *   or an audio file for the player, passing its `Range` on, so it can seek.
- *   `juno://files/<file id>/content?url=…` streams a PDF, HTML or text file
+ *   `juno://files/<file id>/content/<name>?url=…` streams a PDF, HTML or text file
  *   for the viewer with the type Slack answers (text with a charset). Any
  *   answer but a PDF carries a sandbox policy that allows no scripts and no
  *   network, so an HTML file in the viewer's frame cannot run code or load
@@ -74,7 +74,8 @@ function isSignInPage(url: URL): boolean {
 export async function serveThumbnail(request: URL, extraOrigin: string | undefined, range?: string | null, origin?: string | null): Promise<Response> {
   let url = thumbnailUrl(request, extraOrigin)
   if (url === undefined) return new Response('Not found', { status: 404 })
-  const variant = request.host === 'files' ? request.pathname.slice(request.pathname.lastIndexOf('/') + 1) : ''
+  // `/<file id>/<variant>`, and for `content` the file's name after it.
+  const variant = request.host === 'files' ? (request.pathname.split('/')[2] ?? '') : ''
   const streamed = STREAMED[variant]
   const content = variant === 'content'
   try {

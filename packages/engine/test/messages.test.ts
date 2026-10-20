@@ -397,7 +397,10 @@ describe('files', () => {
     const list = watchList(engine, messagesAtom('m:C0INCIDENTS'))
     const window = await list.until((w) => (w.rows.get(posted.ts)?.files.length ?? 0) === files.length, 'the files')
     const byId = new Map(window.rows.get(posted.ts)!.files.map((file) => [file.id, file]))
-    const content = (id: string) => `juno://files/${id}/content?url=${encodeURIComponent(files.find((file) => file.id === id)!.url_private)}`
+    const content = (id: string) => {
+      const file = files.find((each) => each.id === id)!
+      return `juno://files/${id}/content/${encodeURIComponent(file.name)}?url=${encodeURIComponent(file.url_private)}`
+    }
     expect(byId.get('F0PDF')).toMatchObject({ kind: 'pdf', content: content('F0PDF') })
     expect(byId.get('F0HTML')).toMatchObject({ kind: 'html', content: content('F0HTML') })
     expect(byId.get('F0NOTE')).toMatchObject({ kind: 'text', name: 'Release notes', textKind: 'markdown', lines: 40, content: content('F0NOTE') })

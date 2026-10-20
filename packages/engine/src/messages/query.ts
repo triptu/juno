@@ -798,7 +798,8 @@ function documentOf(file: SlackFile, kind: FileView['kind']): Partial<FileView> 
     }
   }
   if ((kind !== 'pdf' && kind !== 'html' && kind !== 'text') || file.url_private === undefined) return {}
-  const content = `juno://files/${id}/content?url=${encodeURIComponent(file.url_private)}`
+  // The name last, so Chromium's PDF viewer titles the file by it.
+  const content = `juno://files/${id}/content/${encodeURIComponent(file.name || file.title || 'file')}?url=${encodeURIComponent(file.url_private)}`
   if (kind !== 'text') return { content }
   const text = fileTextKind(file)
   return {

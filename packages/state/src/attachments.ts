@@ -177,7 +177,7 @@ export async function readFileText(url: string, signal?: AbortSignal): Promise<{
   }
 }
 
-function textDecoder(charset: string | undefined): TextDecoder {
+function textDecoder(charset: string | undefined) {
   try {
     return new TextDecoder(charset ?? 'utf-8')
   } catch {

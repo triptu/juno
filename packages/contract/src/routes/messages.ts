@@ -126,7 +126,7 @@ export const FileView = Schema.Struct({
   audio: Schema.optionalKey(Schema.String),
   /** An audio file's length, when Slack gives it. */
   durationMs: Schema.optionalKey(Schema.Number),
-  /** A pdf, html or text file as Slack serves it, a `juno://files/<id>/content` url, for the viewer. */
+  /** A pdf, html or text file as Slack serves it, a `juno://files/<id>/content/<name>` url, for the viewer. */
   content: Schema.optionalKey(Schema.String),
   /** How the viewer draws a `text` file. */
   textKind: Schema.optionalKey(FileTextKind),
