@@ -1,7 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
-import { useCallback, useLayoutEffect, useRef, type ReactNode, type Ref, type RefObject, type TextareaHTMLAttributes, type UIEvent } from 'react'
-import { accent, colors, layout, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
-import { chipVariants, personHues } from './Chip'
+import { useCallback, useEffect, useLayoutEffect, useRef, type ReactNode, type Ref, type RefObject, type TextareaHTMLAttributes, type UIEvent } from 'react'
+import { accent, colors, layout, radii, spacing, text } from '@juno/tokens/tokens.stylex'
+import { chunk } from './chunks'
+import { layerStyles, markLook } from './internal/textareaLayer'
 import { variants as typeVariants } from './internal/type'
 import type { HueName } from './internal/hue'
 
@@ -23,7 +24,7 @@ export interface TextareaRange {
 
 /** Slack's markup in the text, drawn as it will look (`markupLayout` in `@juno/richtext`). */
 export interface TextareaFormat {
-  /** Styled runs, without their markers. */
+  /** Styled runs, without their markers, except that a code run takes in its backticks or fences. */
   readonly spans: ReadonlyArray<TextareaRange & { readonly style: 'bold' | 'italic' | 'strike' | 'code' }>
   /** Marker characters, drawn dimmed. */
   readonly markers: ReadonlyArray<TextareaRange>
@@ -35,12 +36,6 @@ export interface TextareaFormat {
 
 /** The `field` variant's growth limit: 8 lines of ui text (13.5 × 1.5), its 6px insets and its border. */
 const FIELD_MAX_HEIGHT = '176px' // tokens-allow: One component's growth limit.
-
-/** How much the bold stroke thickens a stem: about the body text's 400 to the messages' 600 (measured, see the decision log). */
-const BOLD_STROKE = '0.035em' // tokens-allow: A glyph stroke, not a size.
-
-/** The anchor name of the character at `anchorAt`, for a popover placed with CSS anchor positioning. */
-const TEXTAREA_ANCHOR = '--textarea-anchor'
 
 export interface TextareaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'style' | 'className' | 'value'> {
   /**
@@ -77,16 +72,26 @@ export interface TextareaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaE
  * `field-sizing: content`, so no layout is read on a keystroke.
  *
  * With `marks` or `format` the field's own text is transparent and a layer
- * under it draws the same text in the same box, one block per line, with
- * the marked runs as chips and the markup styled. Nothing it draws changes
- * a glyph's width: chips and code give their inset back with a negative
- * margin, bold is a stroke, italic is the slant the browser draws for a
- * font with no italic face (the field's has none), and code keeps the
- * field's font. So every glyph sits where the field's caret and selection
- * expect it. The layer follows the field's scroll.
+ * under it draws the same text in the same box, with the marked runs as
+ * chips and the markup styled (`TextareaLines`). Nothing it draws changes a
+ * glyph's width: chips give their inset back with a negative margin, and
+ * the markup's looks keep the field's font and widths. So every glyph sits
+ * where the field's caret and selection expect it. The layer follows the
+ * field's scroll.
  */
+// The layer's drawing of `format`, loaded when idle once a field has it.
+let lines: typeof import('./TextareaLines') | undefined
+const lineDrawing = chunk(() => import('./TextareaLines').then((module) => (lines = module)))
+
 export function Textarea({ variant = 'inline', maxHeight = 'composer', label, rows, marks, format, anchorAt, onScroll, ref, ...rest }: TextareaProps) {
   const layered = marks !== undefined || format !== undefined
+  const formatted = format !== undefined
+  const linesReady = lineDrawing.useReady()
+  useEffect(() => {
+    if (!formatted) return
+    const idle = requestIdleCallback(() => void lineDrawing.load(), { timeout: 5_000 })
+    return () => cancelIdleCallback(idle)
+  }, [formatted])
   const layer = useRef<HTMLDivElement>(null)
   const own = useRef<HTMLTextAreaElement | null>(null)
   // Text the field opens with (a saved draft, a message to edit) takes typing at its end, not before it.
@@ -122,7 +127,7 @@ export function Textarea({ variant = 'inline', maxHeight = 'composer', label, ro
   return (
     <div {...stylex.props(styles.marked)}>
       <div ref={layer} aria-hidden data-textarea-layer="" {...stylex.props(variants.inline, styles.layer)}>
-        {drawnLines(rest.value ?? '', marks ?? [], format, anchorAt)}
+        {linesReady && lines !== undefined && formatted ? lines.drawnLines(rest.value ?? '', marks ?? [], format, anchorAt) : drawn(rest.value ?? '', marks ?? [], anchorAt)}
       </div>
       {field}
     </div>
@@ -134,116 +139,40 @@ function setRef(ref: Ref<HTMLTextAreaElement> | undefined, node: HTMLTextAreaEle
   else if (ref !== undefined && ref !== null) (ref as RefObject<HTMLTextAreaElement | null>).current = node
 }
 
-/** A run drawn in a box of its own: a chip or link, or inline code with its markers. */
-interface Box {
-  readonly start: number
-  readonly end: number
-  readonly mark?: TextareaMark
-}
-
-const ZERO_WIDTH_SPACE = '\u200b'
-
-/**
- * The text as the layer draws it: a block per line, so a quote or a code
- * block can tint the whole line. A line's runs are chips and inline code
- * boxes over plain text, and the styled runs, markers and the anchor
- * character inside them. An empty line holds a zero-width space, so it
- * keeps its height.
- */
-function drawnLines(value: string, marks: ReadonlyArray<TextareaMark>, format: TextareaFormat | undefined, anchorAt: number | undefined): ReactNode[] {
-  const lines: ReactNode[] = []
-  const quoted = new Set(format?.quotes.map((range) => range.start))
-  let start = 0
-  let afterQuote = false
-  for (const [index, line] of value.split('\n').entries()) {
-    const end = start + line.length
-    const block = format?.codeBlocks.find((range) => range.start <= start && end <= range.end)
-    const quote = quoted.has(start)
-    const drawn = runs(value, start, end, marks, format, block !== undefined, anchorAt)
-    lines.push(
-      <div
-        key={index}
-        {...stylex.props(
-          quote && styles.quote,
-          quote && !afterQuote && styles.first,
-          quote && !quoted.has(end + 1) && styles.last,
-          block !== undefined && styles.codeBlock,
-          block !== undefined && block.start === start && styles.first,
-          block !== undefined && block.end === end && styles.last,
-        )}
-      >
-        {drawn.length === 0 ? ZERO_WIDTH_SPACE : drawn}
-      </div>,
+/** The text as runs: plain text, chips, and the anchor character. A trailing newline keeps its empty line. */
+function drawn(value: string, marks: ReadonlyArray<TextareaMark>, anchorAt: number | undefined): ReactNode[] {
+  const out: ReactNode[] = []
+  let at = 0
+  const plain = (end: number) => {
+    if (end <= at) return
+    if (anchorAt !== undefined && anchorAt >= at && anchorAt < end) {
+      if (anchorAt > at) out.push(value.slice(at, anchorAt))
+      out.push(
+        <span key="anchor" {...stylex.props(layerStyles.anchor)}>
+          {value[anchorAt]}
+        </span>,
+      )
+      if (anchorAt + 1 < end) out.push(value.slice(anchorAt + 1, end))
+    } else {
+      out.push(value.slice(at, end))
+    }
+    at = end
+  }
+  for (const mark of marks) {
+    if (mark.start < at || mark.end > value.length) continue
+    plain(mark.start)
+    // The anchor inside a mark is the mark: the link editor lines up under linked words.
+    const anchored = anchorAt !== undefined && anchorAt >= mark.start && anchorAt < mark.end
+    out.push(
+      <span key={mark.start} data-mark={mark.look} {...stylex.props(markLook(mark), anchored && layerStyles.anchor)}>
+        {value.slice(mark.start, mark.end)}
+      </span>,
     )
-    afterQuote = quote
-    start = end + 1
+    at = mark.end
   }
-  return lines
-}
-
-/** One line's runs, from `start` to `end`. */
-function runs(value: string, start: number, end: number, marks: ReadonlyArray<TextareaMark>, format: TextareaFormat | undefined, inBlock: boolean, anchorAt: number | undefined): ReactNode[] {
-  const within = <T extends TextareaRange>(ranges: ReadonlyArray<T> | undefined) => (ranges ?? []).filter((range) => range.end > start && range.start < end)
-  const spans = within(format?.spans)
-  const markers = within(format?.markers)
-  // Inline code is a box from its opening marker to its closing one; in a code block the line is the box.
-  const codeBoxes: Box[] = inBlock
-    ? []
-    : spans
-        .filter((span) => span.style === 'code')
-        .map((span) => ({
-          start: Math.max(start, markers.find((marker) => marker.end === span.start)?.start ?? span.start),
-          end: Math.min(end, markers.find((marker) => marker.start === span.end)?.end ?? span.end),
-        }))
-  const markBoxes: Box[] = marks.filter((mark) => mark.start >= start && mark.end <= end).map((mark) => ({ start: mark.start, end: mark.end, mark }))
-  const boxes = [...codeBoxes, ...markBoxes].toSorted((a, b) => a.start - b.start || b.end - a.end)
-
-  // Plain text between boxes: a span for each change of style, marker or anchor.
-  const text = (from: number, to: number, inMark: boolean): ReactNode[] => {
-    const cuts = new Set([from, to])
-    for (const range of [...spans, ...markers]) for (const at of [range.start, range.end]) if (at > from && at < to) cuts.add(at)
-    if (!inMark && anchorAt !== undefined && anchorAt >= from && anchorAt < to) cuts.add(anchorAt).add(anchorAt + 1)
-    const points = [...cuts].toSorted((a, b) => a - b)
-    const out: ReactNode[] = []
-    for (let i = 0; i + 1 < points.length; i++) {
-      const a = points[i]!
-      const b = points[i + 1]!
-      const has = (style: string) => spans.some((span) => span.style === style && span.start <= a && span.end >= b)
-      const marker = markers.some((range) => range.start <= a && range.end >= b)
-      const anchor = !inMark && anchorAt === a
-      const looks = [has('bold') && styles.bold, has('italic') && styles.italic, has('strike') && styles.strike, marker && styles.marker, anchor && styles.anchor]
-      const piece = value.slice(a, b)
-      out.push(looks.some(Boolean) ? <span key={a} {...stylex.props(...looks)}>{piece}</span> : piece)
-    }
-    return out
-  }
-
-  const nodes = (from: number, to: number, inside: ReadonlyArray<Box>, inMark: boolean): ReactNode[] => {
-    const out: ReactNode[] = []
-    let at = from
-    for (const box of inside) {
-      if (box.start < at || box.end > to) continue
-      out.push(...text(at, box.start, inMark))
-      const inner = inside.filter((other) => other !== box && other.start >= box.start && other.end <= box.end)
-      const mark = box.mark
-      if (mark === undefined) {
-        out.push(<span key={`code-${box.start}`} {...stylex.props(styles.code)}>{nodes(box.start, box.end, inner, inMark)}</span>)
-      } else {
-        // The anchor inside a mark is the mark: the link editor lines up under linked words.
-        const anchored = anchorAt !== undefined && anchorAt >= mark.start && anchorAt < mark.end
-        const look = mark.look === 'link' ? styles.link : [styles.chip, mark.look === 'channel' ? chipVariants.filled : personHues[mark.hue ?? 'rose']]
-        out.push(
-          <span key={mark.start} data-mark={mark.look} {...stylex.props(look, anchored && styles.anchor)}>
-            {nodes(box.start, box.end, inner, true)}
-          </span>,
-        )
-      }
-      at = box.end
-    }
-    out.push(...text(at, to, inMark))
-    return out
-  }
-  return nodes(start, end, boxes, false)
+  plain(value.length)
+  if (value.endsWith('\n')) out.push('\u200b')
+  return out
 }
 
 const styles = stylex.create({
@@ -290,67 +219,6 @@ const styles = stylex.create({
     scrollbarColor: 'transparent transparent',
     pointerEvents: 'none',
     userSelect: 'none',
-  },
-  // The chip's inset is given back by its margin, so no glyph moves.
-  chip: {
-    borderRadius: radii['--radius-tag'],
-    paddingInline: spacing['--space-0-5'],
-    marginInline: `calc(-1 * ${spacing['--space-0-5']})`,
-  },
-  anchor: {
-    anchorName: TEXTAREA_ANCHOR,
-  },
-  // A stroke drawn under the fill thickens each glyph without moving the next one.
-  bold: {
-    WebkitTextStrokeWidth: BOLD_STROKE,
-    WebkitTextStrokeColor: 'currentColor',
-    paintOrder: 'stroke fill',
-  },
-  // The field's font has no italic face, so this is the browser's slant of the upright one, at the same widths.
-  italic: {
-    fontStyle: 'italic',
-  },
-  strike: {
-    textDecorationLine: 'line-through',
-  },
-  marker: {
-    color: colors['--foreground-muted'],
-  },
-  // Inline code: the code tint around the run and its backticks, its inset given back as a chip's is.
-  code: {
-    borderRadius: radii['--radius-xs'],
-    paddingInline: spacing['--space-0-5'],
-    marginInline: `calc(-1 * ${spacing['--space-0-5']})`,
-    backgroundColor: colors['--secondary-default'],
-  },
-  // A code block's lines: one tinted block, reaching into the layer's inset.
-  codeBlock: {
-    paddingInline: spacing['--space-1'],
-    marginInline: `calc(-1 * ${spacing['--space-1']})`,
-    backgroundColor: colors['--secondary-default'],
-  },
-  // As messages draw a quote (inventory 6.3): the soft fill and the subtle colour, reaching into the layer's inset.
-  quote: {
-    paddingInline: spacing['--space-1'],
-    marginInline: `calc(-1 * ${spacing['--space-1']})`,
-    backgroundColor: colors['--quote-fill'],
-    color: colors['--foreground-subtle'],
-  },
-  // The first and last line of a code block or a run of quote lines round their outer corners.
-  first: {
-    borderStartStartRadius: radii['--radius-xs'],
-    borderStartEndRadius: radii['--radius-xs'],
-  },
-  last: {
-    borderEndStartRadius: radii['--radius-xs'],
-    borderEndEndRadius: radii['--radius-xs'],
-  },
-  // As links in messages are drawn, with no change of width.
-  link: {
-    color: accent['--hl-text'],
-    textDecorationLine: 'underline',
-    textDecorationColor: colors['--link-underline'],
-    textUnderlineOffset: sizes['--link-underline-offset'],
   },
 })
 

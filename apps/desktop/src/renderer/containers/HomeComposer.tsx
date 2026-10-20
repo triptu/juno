@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { encodeMentions, markupLayout, type PickConversation, type PickConversations } from '@juno/contract'
+import { encodeMentions, type PickConversation, type PickConversations } from '@juno/contract'
 import {
   attachmentsAtom,
   emptyHomeDraft,
@@ -23,7 +23,7 @@ import { afterPaint, mark } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { AttachmentNote, Composer, destinationLabel, holdKeys, notSentText, releaseKeys, SendToList, sendToRowId, type ComposerMention } from '@juno/views'
 import { takeAttachments, useAttachments } from './attachments'
-import { formatKey } from './formatKeys'
+import { useComposerMarkup } from './composerMarkup'
 import { useHomeSendChecks } from './homeSendChecks'
 import { isPeople, WriteTop } from './homeWriteTop'
 import { junoCommands } from './juno/actions'
@@ -354,6 +354,7 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
     skipLeading: draft.conversation === undefined,
   })
   const toSlack = draft.conversation !== undefined
+  const markup = useComposerMarkup(toSlack)
 
   const onFieldKey = (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
     if (event.nativeEvent.isComposing) return false
@@ -364,7 +365,7 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
       destination.choose(undefined)
       return true
     }
-    if (toSlack && formatKey(event)) return true
+    if (markup.onKey(event)) return true
     return mentions.onFieldKey(event)
   }
 
@@ -372,7 +373,7 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
     <Composer
       value={draft.draft}
       marks={mentions.marks}
-      {...(toSlack ? { format: markupLayout(draft.draft, mentions.marks) } : {})}
+      {...markup.format(draft.draft, mentions.marks)}
       onCaret={mentions.onCaret}
       {...(mentions.mention === undefined ? {} : { mention: mentions.mention })}
       {...(sendToList === undefined ? {} : { mention: sendToList })}

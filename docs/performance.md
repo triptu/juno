@@ -90,6 +90,8 @@ A module is placed whole in one chunk. When the start bundle uses any export of 
 | Sidebar sync status cards (offline, rate limited, stopped, first-sync progress) | 9.5 KB | Idle after the sidebar mounts, and at once when a notice comes first. The footer shows only once they have loaded, so it never shows empty. |
 | Message edit field | 2.6 KB | Idle after a topic mounts, and when ↑ selects a message. |
 | Composer link editor | 1.7 KB | Idle after a composer mounts, and at once on ⌘K. |
+| Composer markup rules and formatting keys (`containers/markupRules.ts`) | 5.1 KB | Idle after a composer mounts, and at once on a formatting key, which acts when they arrive. Until then the field draws plain text. |
+| The field's drawing of markup, a block per line (`TextareaLines` in `@juno/ui`) | 1.6 KB | Idle once a field has `format`. Until then the layer draws the text as it draws chips; every glyph is in the same place either way. |
 
 Each part shown after input uses `usePreloaded` (`containers/chunks.ts`), which says when the chunk has loaded; the caller draws the part only then, so nothing suspends and nothing shows half-drawn.
 

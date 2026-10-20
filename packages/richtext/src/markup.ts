@@ -61,7 +61,7 @@ export type MarkupPiece =
 
 /** The markup of a whole text, as the field draws it. */
 export interface MarkupLayout {
-  /** Styled runs, code blocks' content included. */
+  /** Styled runs without their markers, except that code (a span or a block) takes in its backticks or fences, since the field tints them too. */
   readonly spans: ReadonlyArray<MarkupSpan>
   /** Marker characters: style markers, fences, and quote lines' ">". */
   readonly markers: ReadonlyArray<MarkupRange>
@@ -235,7 +235,7 @@ export function markupLayout(text: string, opaque: ReadonlyArray<MarkupRange> = 
     if (piece.kind === 'code') {
       codeBlocks.push({ start: piece.start, end: piece.end })
       markers.push({ start: piece.start, end: piece.start + FENCE.length }, { start: piece.end - FENCE.length, end: piece.end })
-      spans.push({ start: piece.content.start, end: piece.content.end, style: 'code' })
+      spans.push({ start: piece.start, end: piece.end, style: 'code' })
       continue
     }
     let from = piece.start
@@ -246,7 +246,7 @@ export function markupLayout(text: string, opaque: ReadonlyArray<MarkupRange> = 
       from = piece.quote.end
     }
     const line = lineMarkup(text, from, piece.end, opaque)
-    spans.push(...line.spans)
+    spans.push(...line.spans.map((span) => (span.style === 'code' ? { ...span, start: span.start - 1, end: span.end + 1 } : span)))
     markers.push(...line.markers)
   }
   return { spans, markers, codeBlocks, quotes }

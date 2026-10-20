@@ -45,8 +45,8 @@ describe('the field’s look', () => {
     expect(layout.spans.map((span) => [span.style, slice(span)])).toEqual([
       ['bold', 'hi'],
       ['italic', '<@U1>'],
-      ['code', 'x'],
-      ['code', 'code'],
+      ['code', '`x`'],
+      ['code', '```\ncode\n```'],
     ])
     expect(layout.markers.map(slice)).toEqual(['*', '*', '_', '_', '>', '`', '`', '```', '```'])
     expect(layout.quotes.map(slice)).toEqual(['> `x`'])

@@ -1,12 +1,12 @@
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react'
-import { audienceCheck, decodeDraft, encodeDraft, markupLayout, moveLinks, type MentionPick, type SendTarget, type TopicDetail } from '@juno/contract'
+import { audienceCheck, decodeDraft, encodeDraft, moveLinks, type MentionPick, type SendTarget, type TopicDetail } from '@juno/contract'
 import { aiAssistOnAtom, checkMessage, draftAtom, precheckMessage, registry, saveDraft, sendCheckPrefsAtom, sendMessage, showToast } from '@juno/state'
 import { mark } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { AudienceWarning, Composer, ComposerSlot } from '@juno/views'
 import { takeAttachments, useAttachments } from './attachments'
 import { useComposerLinks } from './composerLinks'
-import { formatKey } from './formatKeys'
+import { useComposerMarkup } from './composerMarkup'
 import { useMentions } from './mentions'
 import type { ComposerHandle } from './messageActions'
 import { preloadBar, sendCheck, SendCheckPanel } from './sendCheckChunk'
@@ -62,7 +62,7 @@ export function withQuote(draft: string, text: string): string {
  * people details. Typing @ or # suggests people and user groups, or
  * channels (`useMentions`). A URL pasted over words links them (`useComposerLinks`).
  * Slack's markup shows as it will look, and ⌘B, ⌘I, ⌘⇧X, ⌘⇧C and ⌘⇧9 put it
- * on the selection (`formatKey`).
+ * on the selection (`useComposerMarkup`).
  * The draft and the send carry the picked people and channels and the
  * linked words encoded as Slack does (`encodeDraft`), while the checks read
  * the text as shown. A file still staging goes with the send: the message
@@ -286,6 +286,7 @@ function LoadedComposer({
     groups: true,
   })
 
+  const markup = useComposerMarkup(true)
   // Links are drawn where no picked name is.
   const linkMarks = links.shown(text, picks).map((link) => ({ start: link.start, end: link.end, look: 'link' as const }))
   const marks = [...mentions.marks.filter((mark) => !linkMarks.some((link) => mark.start < link.end && mark.end > link.start)), ...linkMarks].toSorted((a, b) => a.start - b.start)
@@ -294,9 +295,9 @@ function LoadedComposer({
     <Composer
       value={text}
       {...mentions}
-      onFieldKey={(event) => formatKey(event) || mentions.onFieldKey(event)}
+      onFieldKey={(event) => markup.onKey(event) || mentions.onFieldKey(event)}
       marks={marks}
-      format={markupLayout(text, marks)}
+      {...markup.format(text, marks)}
       onPasteText={links.onPasteText}
       onFieldClick={links.onFieldClick}
       {...(links.popover === undefined ? {} : { popover: links.popover })}
