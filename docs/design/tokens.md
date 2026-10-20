@@ -608,7 +608,7 @@ Floating surfaces have `border: 1px solid transparent` plus the shadow, never a 
 | `--z-picker` | 10 | Picker overlay |
 | `--z-menu` | 20 | Avatar menu, New chat pickers |
 | `--z-palette` | 30 | ⌘K overlay and panel |
-| `--z-viewer` | 30 | Image viewer, over the whole window (never open with the palette) |
+| `--z-viewer` | 30 | Media viewer, over its tab's topic, inside the topic's own stacking context |
 | `--z-selection` | 35 | Floating Quote button |
 | `--z-context` | 40 | Context menus |
 | `--z-toast` | 45 | Toast |

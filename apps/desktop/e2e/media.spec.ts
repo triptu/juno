@@ -137,3 +137,42 @@ syncedTest('images and videos in #eng show inline and open full screen, and a pa
     await expect(row.locator('[data-file-card]')).toHaveCount(0)
   })
 })
+
+// The viewer covers only its tab's topic, so the sidebar and the tab strip stay usable while it is open, and each
+// tab keeps its own viewer at its own item while another tab shows (SPEC 8, "Opening").
+syncedTest('the viewer covers only its tab, and each tab keeps its own picture open', async ({ juno, win, fake }) => {
+  const { sidebar, tabs, topic } = juno
+  await sidebar.row(ENG_MAIN).open()
+  await topic.expectTitle('Main')
+  fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Rack photos', media: [{ name: 'rack-front.png', width: 900, height: 600 }, { name: 'rack-back.png', width: 900, height: 600 }] })
+  await topic.message('Rack photos').getByRole('button', { name: 'Open rack-front.png' }).click()
+  const viewer = win.getByRole('dialog')
+  await expect(viewer.locator('[data-viewer-item]')).toHaveAttribute('data-viewer-item', '1')
+  await win.keyboard.press('ArrowRight')
+  await expect(viewer.locator('[data-viewer-item]')).toHaveAttribute('data-viewer-item', '2')
+  await expect(viewer).not.toHaveAttribute('aria-modal')
+  // The dialog fills the topic, not the window.
+  const view = win.locator('[data-topic-view]').filter({ visible: true })
+  expect(await viewer.boundingBox()).toEqual(await view.boundingBox())
+  expect((await viewer.boundingBox())!.y).toBeGreaterThan(0)
+
+  // The sidebar is not under the viewer: ⌘-click opens another topic in a new tab, with no viewer there.
+  await sidebar.row('#product').openInNewTab()
+  await tabs.expectCount(2)
+  await tabs.expectActive('product')
+  await expect(viewer).toHaveCount(0)
+  fake.injectMedia({ channel: 'C0PRODUCT', user: 'U0MAYA', text: 'Pricing page mock', media: [{ name: 'pricing.png', width: 800, height: 800 }] })
+  await topic.message('Pricing page mock').getByRole('button', { name: 'Open pricing.png' }).click()
+  await expect(viewer.locator('[data-viewer-name]')).toHaveText('pricing.png')
+
+  // Back through the strip: the first tab still shows its picture at the same item, and the second keeps its own.
+  await tabs.select('eng')
+  await tabs.expectActive('eng')
+  await expect(viewer).toHaveCount(1)
+  await expect(viewer.locator('[data-viewer-name]')).toHaveText('rack-back.png')
+  await expect(viewer.locator('[data-viewer-item]')).toHaveAttribute('data-viewer-item', '2')
+  await win.keyboard.press('Escape')
+  await expect(viewer).toHaveCount(0)
+  await tabs.select('product')
+  await expect(viewer.locator('[data-viewer-name]')).toHaveText('pricing.png')
+})

@@ -223,7 +223,8 @@ function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps)
       header={header}
       pill={pill.show ? <NewMessagesPill count={pill.count} onJump={jump} /> : undefined}
       composer={<TopicComposer key={id} detail={id === detail.id ? detail : { ...detail, id }} onSent={sent} handle={composer} takeFocus={(field) => takeComposerFocus(view, field)} onArrowUpEmpty={messageActions.selectNewest} dropping={files.dropping} />}
-      floating={<>{messageActions.floating}{files.viewer}</>}
+      floating={messageActions.floating}
+      viewer={files.viewer}
       onFiles={(dropped) => attach(id, dropped)}
       onDragFiles={files.setDropping}
     >
