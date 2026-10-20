@@ -14,7 +14,7 @@
  * those returns the undo that puts the row back as it was stored.
  */
 import { AiProvider, tasks } from '@juno/ai'
-import { HomeRoutes, NotSignedIn, type CommandResult, type UndoCommand } from '@juno/contract'
+import { HomeRoutes, NotSignedIn, TIDY_UP_PREF, tidyUpPrefsOf, type CommandResult, type UndoCommand } from '@juno/contract'
 import { Invalidation, keys, liveQuery, prefs, StoreReader, StoreWriter, transaction, type InvalidationKeys, type SqlError } from '@juno/store'
 import { Clock, Effect, Stream } from 'effect'
 import { retryFirstRun, serveLiveValue, timed } from '../protocol/live'
@@ -152,6 +152,11 @@ export const HomeHandlers = HomeRoutes.toLayer(
 
     return {
       'home.view': () => view(),
+      'tidyUp.set': ({ patch }) => write(Effect.gen(function* () {
+        const sql = yield* StoreWriter
+        const saved = tidyUpPrefsOf(yield* prefs.get(TIDY_UP_PREF).pipe(Effect.provideService(StoreReader, sql)))
+        yield* prefs.set(TIDY_UP_PREF, { ...saved, ...patch })
+      })).pipe(Effect.uninterruptible),
       'home.visit': ({ id }) =>
         write(
           Effect.gen(function* () {

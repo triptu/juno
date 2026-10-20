@@ -19,7 +19,7 @@ export interface SettingsTidyUpProps {
   readonly tabExpiry: TabExpiryName
   readonly onTabExpiryChange: (expiry: TabExpiryName) => void
   readonly prefs: TidyUpPrefs
-  readonly onChange: (prefs: TidyUpPrefs) => void
+  readonly onChange: (prefs: Partial<TidyUpPrefs>) => void
   /** Tidy up needs AI assist: off, the settings stay and say why nothing is suggested. */
   readonly aiAssist: boolean
 }
@@ -62,15 +62,15 @@ export function SettingsTidyUp({ quietDays, onQuietDaysChange, tabExpiry, onTabE
             <Text variant="ui" tone="default" weight="medium">
               Suggest once a topic is quiet for
             </Text>
-            <Segmented options={quietOptions} value={prefs.quiet} onChange={(quiet) => onChange({ ...prefs, quiet })} label="Suggest once a topic is quiet for" />
+            <Segmented options={quietOptions} value={prefs.quiet} onChange={(quiet) => onChange({ quiet })} label="Suggest once a topic is quiet for" />
           </div>
           <div {...stylex.props(styles.row, styles.top)}>
             <Text variant="ui" tone="default" weight="medium">
               Suggest
             </Text>
             <span {...stylex.props(styles.checks)}>
-              <Checkbox label="Threads" checked={prefs.threads} onChange={(event) => onChange({ ...prefs, threads: event.currentTarget.checked })} />
-              <Checkbox label="Direct messages" checked={prefs.dms} onChange={(event) => onChange({ ...prefs, dms: event.currentTarget.checked })} />
+              <Checkbox label="Threads" checked={prefs.threads} onChange={(event) => onChange({ threads: event.currentTarget.checked })} />
+              <Checkbox label="Direct messages" checked={prefs.dms} onChange={(event) => onChange({ dms: event.currentTarget.checked })} />
             </span>
           </div>
         </Surface>
@@ -81,25 +81,25 @@ export function SettingsTidyUp({ quietDays, onQuietDaysChange, tabExpiry, onTabE
             label="Follow-ups that look done"
             description="A later message of yours in the same topic, with a file, a link, or words like “Here's”, seems to keep a promise. Needs AI assist."
             checked={prefs.followUps}
-            onChange={(event) => onChange({ ...prefs, followUps: event.currentTarget.checked })}
+            onChange={(event) => onChange({ followUps: event.currentTarget.checked })}
           />
           <Checkbox
             label="Old drafts"
             description="A draft untouched for two weeks, in a topic that moved on since."
             checked={prefs.drafts}
-            onChange={(event) => onChange({ ...prefs, drafts: event.currentTarget.checked })}
+            onChange={(event) => onChange({ drafts: event.currentTarget.checked })}
           />
           <Checkbox
             label="Threads you never open"
             description="A followed thread with two weeks of replies you have not read. Unfollow applies in Slack."
             checked={prefs.unfollow}
-            onChange={(event) => onChange({ ...prefs, unfollow: event.currentTarget.checked })}
+            onChange={(event) => onChange({ unfollow: event.currentTarget.checked })}
           />
           <Checkbox
             label="Channels you never read"
             description="A channel you have not read in 30 days, with more than 50 messages since. Ignore is only in Juno."
             checked={prefs.ignore}
-            onChange={(event) => onChange({ ...prefs, ignore: event.currentTarget.checked })}
+            onChange={(event) => onChange({ ignore: event.currentTarget.checked })}
           />
         </Surface>
       </Section>
