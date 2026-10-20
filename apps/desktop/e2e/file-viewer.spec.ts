@@ -67,6 +67,11 @@ test('a Markdown snippet shows rendered and a CSV as a table, and the arrows mov
   await expect(viewer.locator('[data-viewer-text]').getByText('Release 4.2', { exact: true })).toBeVisible()
   await expect(viewer.locator('[data-viewer-text]').getByText('Questions go to the release thread.')).toBeVisible()
   await expect(viewer.locator('[data-viewer-meta]')).toHaveText(/ · 1 of 2$/)
+  // Its links are in the tab order and open as a message's do: ⌘-click in the browser.
+  const link = viewer.locator('[data-viewer-text]').getByRole('link', { name: 'the tracker' })
+  await expect(link).not.toHaveAttribute('tabindex', '-1')
+  await link.click({ modifiers: ['Meta'] })
+  await expect.poll(() => juno.browserLinks()).toContain('https://example.com/tracker')
 
   await juno.win.keyboard.press('ArrowRight')
   await expect(viewer.locator('[data-viewer-name]')).toHaveText('cluster-metrics.csv')

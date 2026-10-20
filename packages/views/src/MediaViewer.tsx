@@ -13,7 +13,7 @@ import { IconButton, Surface, Text } from '@juno/ui'
 import { Filmstrip } from './Filmstrip'
 import { isMedia, type MediaFile } from './MediaGrid'
 import { fullTime, messageTime } from './time'
-import { ViewerDocument, type LoadFileText } from './ViewerDocument'
+import { ViewerDocument, type DocumentLinks, type LoadFileText } from './ViewerDocument'
 
 /** What the viewer shows: every file of a message it can show (`viewableOf`), the one opened, and who sent them when. */
 export interface MediaViewing {
@@ -25,7 +25,8 @@ export interface MediaViewing {
   readonly at: number
 }
 
-export interface MediaViewerProps {
+/** `onLink` and `linkInfo` are for the links of a Markdown file, as a message's links. */
+export interface MediaViewerProps extends DocumentLinks {
   readonly viewing: MediaViewing
   /** For the time in the header ("9:12", "Yesterday"). */
   readonly now: number
@@ -64,7 +65,7 @@ export interface MediaViewerProps {
  * the topic under it inert, so Tab goes from its controls on to the sidebar
  * and the tab strip. A hidden tab keeps it open at its item.
  */
-export function MediaViewer({ viewing, now, opener, onClose, onShowItem, onDownload, onQuickLook, onOpenInBrowser, onCopyImage, loadText }: MediaViewerProps) {
+export function MediaViewer({ viewing, now, opener, onClose, onShowItem, onDownload, onQuickLook, onOpenInBrowser, onCopyImage, loadText, onLink, linkInfo }: MediaViewerProps) {
   const { items } = viewing
   const [index, setIndex] = useState(() => Math.min(Math.max(0, viewing.index), items.length - 1))
   const file = items[index]!
@@ -111,7 +112,7 @@ export function MediaViewer({ viewing, now, opener, onClose, onShowItem, onDownl
             <Item key={index} file={file} position={index + 1} />
           ) : (
             <div key={index} data-viewer-item={index + 1} data-viewer-kind={file.kind} {...stylex.props(styles.frame, ...documentBox(file))}>
-              <ViewerDocument file={file} now={now} loadText={loadText} />
+              <ViewerDocument file={file} now={now} loadText={loadText} onLink={onLink} linkInfo={linkInfo} />
             </div>
           )}
         </div>

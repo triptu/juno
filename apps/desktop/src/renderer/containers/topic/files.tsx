@@ -4,6 +4,7 @@ import { copyImage, downloadFile, openFile, openViewerAtom, quickLookFile, readF
 import { useAtomValue } from '@juno/state/react'
 import type { MediaViewing } from '@juno/views'
 import { chunk } from '../chunks'
+import { messageLinkInfo, openMessageLink } from '../slackLinks'
 
 const viewer = chunk(() => import('../MediaViewerPanel'))
 const MediaViewerPanel = viewer.component((module) => module.default)
@@ -55,6 +56,8 @@ function TopicViewer({ view, opener }: { readonly view: string; readonly opener:
         onOpenInBrowser={openInBrowser}
         onCopyImage={copyMessageImage}
         loadText={readFileText}
+        onLink={openMessageLink}
+        linkInfo={messageLinkInfo}
       />
     </Suspense>
   )

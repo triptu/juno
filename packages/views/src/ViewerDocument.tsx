@@ -8,10 +8,11 @@ import * as stylex from '@stylexjs/stylex'
 import { useContext, useEffect, useRef, useState } from 'react'
 import { bodyFromMarkdown, csvRows, type FileView } from '@juno/contract'
 import { colors, radii, spacing, text } from '@juno/tokens/tokens.stylex'
-import { hueForId, Icon, Text } from '@juno/ui'
+import { hueForId, Icon, Text, type ActivateEvent } from '@juno/ui'
 import { CodeHighlighterContext } from './CodeHighlight'
 import { duration, fileIcon } from './FileCard'
 import { MessageBody } from './MessageBody'
+import type { LinkInfo } from './MessageLink'
 
 /** A text file as the container read it: its text, and whether it was cut short. */
 export interface FileText {
@@ -25,14 +26,20 @@ export type LoadFileText = (url: string, signal: AbortSignal) => Promise<FileTex
 /** Rows of a CSV file the table shows; the rest wait for Download. */
 const CSV_MAX_ROWS = 1000
 
-interface ViewerDocumentProps {
+/** A link in a Markdown file was clicked, and which links open inside Juno: the topic's, as its messages have them. */
+export interface DocumentLinks {
+  readonly onLink?: ((url: string, event: ActivateEvent) => void) | undefined
+  readonly linkInfo?: LinkInfo | undefined
+}
+
+interface ViewerDocumentProps extends DocumentLinks {
   readonly file: FileView
   readonly now: number
   readonly loadText: LoadFileText | undefined
 }
 
 /** What one file shows inside the viewer's frame, which `MediaViewer` sizes to the stage. */
-export function ViewerDocument({ file, now, loadText }: ViewerDocumentProps) {
+export function ViewerDocument({ file, now, loadText, onLink, linkInfo }: ViewerDocumentProps) {
   if (file.kind === 'audio') {
     return (
       <div {...stylex.props(styles.audio)}>
@@ -55,13 +62,13 @@ export function ViewerDocument({ file, now, loadText }: ViewerDocumentProps) {
   if (file.kind === 'pdf') return <iframe src={file.content} title={file.name} {...stylex.props(styles.embed)} />
   // No scripts, forms, popups or top navigation; main's answer adds a policy that allows no network.
   if (file.kind === 'html') return <iframe src={file.content} title={file.name} sandbox="" referrerPolicy="no-referrer" {...stylex.props(styles.embed, styles.page)} />
-  return <TextFile file={file} now={now} loadText={loadText} />
+  return <TextFile file={file} now={now} loadText={loadText} onLink={onLink} linkInfo={linkInfo} />
 }
 
 type Loaded = { readonly state: 'loading' } | { readonly state: 'failed' } | ({ readonly state: 'ready' } & FileText)
 
 /** A text file, read when it opens: blank while it loads, then drawn by its kind. */
-function TextFile({ file, now, loadText }: { readonly file: FileView; readonly now: number; readonly loadText: LoadFileText | undefined }) {
+function TextFile({ file, now, loadText, onLink, linkInfo }: { readonly file: FileView; readonly now: number; readonly loadText: LoadFileText | undefined } & DocumentLinks) {
   const [loaded, setLoaded] = useState<Loaded>({ state: 'loading' })
   const content = file.content
   useEffect(() => {
@@ -89,7 +96,8 @@ function TextFile({ file, now, loadText }: { readonly file: FileView; readonly n
     <div tabIndex={0} data-viewer-text="" data-sensitive="" {...stylex.props(styles.scroller)}>
       {file.textKind === 'markdown' ? (
         <div {...stylex.props(styles.markdown)}>
-          <MessageBody body={bodyFromMarkdown(loaded.text)} now={now} hueOf={hueForId} />
+          {/* Its links are in the tab order, as in a page. */}
+          <MessageBody body={bodyFromMarkdown(loaded.text)} now={now} hueOf={hueForId} onLink={onLink} linkInfo={linkInfo} tabbable />
         </div>
       ) : file.textKind === 'csv' ? (
         <CsvTable text={loaded.text} cut={cut} />
