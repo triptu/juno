@@ -222,6 +222,8 @@ export default defineConfig({
       stylex.vite({
         useCSSLayers: true,
         unstable_moduleResolution: { type: 'commonJS', rootDir: repoRoot },
+        // Vite minifies the other CSS but not the sheet StyleX writes; minified, it parses faster and fits its budget.
+        lightningcssOptions: { minify: true },
       }),
       react({ babel: { plugins: [reactCompiler] } }),
     ],

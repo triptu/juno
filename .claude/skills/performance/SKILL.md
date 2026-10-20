@@ -15,7 +15,7 @@ The bar: the app must feel native and insanely fast. Input paints on the next fr
 - Cold start → sidebar rows from the local cache: 800 ms p50. Shell visible: 400 ms p50.
 - Scroll: no frame over 8.3 ms of main-thread work, zero long animation frames (> 50 ms).
 - Engine: one query run 5 ms, one event transaction 5 ms, no sync block over 50 ms after boot.
-- Memory, large workspace: renderer 250 MB private, engine 300 MB. Renderer JS 1.1 MB, CSS 158 KB.
+- Memory, large workspace: renderer 250 MB private, engine 300 MB. Renderer JS 1.1 MB, CSS 135 KB (minified).
 - Live query messages: snapshot ≤ 200 KB, delta ≤ 32 KB, encode and decode ≤ 5 ms each.
 
 ## Non-negotiable rules
@@ -61,7 +61,7 @@ The bar: the app must feel native and insanely fast. Input paints on the next fr
 ## Measure changes to a measured path
 
 - Instrument with `@juno/state/perf.ts` marks (`juno.topic-open`, `juno.tab-switch`, ...) so the DevTools "Juno" track and the harness see the change.
-- Bundle: `pnpm build` runs `scripts/check-bundle-size.mjs` (initial JS 1.1 MB, CSS 158 KB). Phosphor icons ship every weight in one module; `phosphorWeights` in `apps/desktop/electron.vite.config.ts` drops thin and light at build time (about 66 KB, measured 10-15), and duotone from every icon `packages/ui/src/duotone.ts` does not import (about 37 KB, 10-17), so a new `IconWeight` must be added to its list too, and a new duotone icon goes in `duotone.ts`.
+- Bundle: `pnpm build` runs `scripts/check-bundle-size.mjs` (initial JS 1.1 MB, CSS 135 KB minified). Phosphor icons ship every weight in one module; `phosphorWeights` in `apps/desktop/electron.vite.config.ts` drops thin and light at build time (about 66 KB, measured 10-15), and duotone from every icon `packages/ui/src/duotone.ts` does not import (about 37 KB, 10-17), so a new `IconWeight` must be added to its list too, and a new duotone icon goes in `duotone.ts`.
 - New per-row, per-frame or startup work (`pnpm affected --plan` names matching scenarios from `PERF_INTERACTIONS` in `scripts/test-areas.mjs`): compare manually with the last `pnpm verify:main --with-mac` result and run the matching scenario with `pnpm perf -g "<name>"` (`apps/desktop/e2e/perf.spec.ts`, queued on the heavy-job lock). It fails over budget. To find the cost, add `JUNO_PERF_TRACE=<dir> JUNO_UNMINIFIED=1` and read the result with `node scripts/perf-trace.mjs` (`docs/performance.md` 7.3). Drive clicks with the driver's `press`: a pointerup in the next frame defers the measure's end by a frame.
 - For a change to a measured interaction, run its matching `pnpm test:feel -g "<name>"` scenario and look at its filmstrip (`apps/desktop/feel-report/index.html`).
 - Query change: run the plan test and the engine benchmark.
