@@ -9,12 +9,13 @@ import { colors, spacing } from '@juno/tokens/tokens.stylex'
 import { Avatar, Button, Chip, DayToggles, ListRow, Page, PageHeader, Popover, Section, Select, Surface, Text, Textarea, type PhosphorIcon } from '@juno/ui'
 import { hueFor, initials } from './look'
 import { PermissionLine } from './PermissionLine'
+import { HuddleRingSection, type HuddleRingProps } from './HuddleRingSection'
 import { SlackScheduleSection, type SlackScheduleProps } from './SlackScheduleSection'
 import { clockLabel, hourLabel } from './time'
 
 export type HoursKind = 'notifications' | 'presence'
 
-export interface NotificationsPageProps {
+export interface NotificationsPageProps extends HuddleRingProps {
   readonly notificationHours: Hours
   readonly presenceHours: Hours
   /** "What matters to you", as saved. */
@@ -27,7 +28,8 @@ export interface NotificationsPageProps {
   readonly held: number
   /** The messages that notified today, newest first. */
   readonly today: ReadonlyArray<TodayRow>
-  readonly onHoursChange: (which: HoursKind, hours: Hours) => void
+  readonly onDayChange: (which: HoursKind, day: Hours['days'][number], enabled: boolean) => void
+  readonly onHoursChange: (which: HoursKind, hours: Partial<Hours>) => void
   /** Slack's own schedule, its switch and Restore. */
   readonly slack: SlackScheduleProps
   /** On blur, with the text as typed. */
@@ -57,13 +59,13 @@ const channelIcons: Record<Extract<NotifyTag, { kind: 'channel' }>['channelKind'
 /**
  * The Notifications page (SPEC 14, inventory 13): two sets of hours, whether
  * Slack's own schedule follows them, what matters in the owner's words, the
- * channels and people set to Every message or Never, one line for today
- * with Show why, and a test notification. Everything else is said to Juno or set from a channel's or
- * person's menu. While macOS does not let Juno notify, a line at the top
+ * channels and people set to Every message or Never, Ring for huddles, one
+ * line for today with Show why, and a test notification. Everything else is
+ * said to Juno or set from a channel's or person's menu. While macOS does not let Juno notify, a line at the top
  * says so, with the way to turn it on.
  */
 export function NotificationsPage(props: NotificationsPageProps) {
-  const { notificationHours, presenceHours, matters, aiAssist, every, never, interrupted, held, today, onHoursChange, slack, onMattersSave, onRemove, permission, onSendTest, onOpenSettings, onAllow, showWhy = false } = props
+  const { notificationHours, presenceHours, matters, aiAssist, every, never, interrupted, held, today, onHoursChange, onDayChange, slack, onMattersSave, onRemove, huddleRing, onHuddleRingChange, permission, onSendTest, onOpenSettings, onAllow, showWhy = false } = props
   return (
     <Page width="settings">
       <PageHeader title="Notifications" subtitle="During your notification hours, Juno lets through what needs you and holds the rest. Everything is in Juno whenever you open it." />
@@ -72,8 +74,8 @@ export function NotificationsPage(props: NotificationsPageProps) {
 
       <Section heading="Hours">
         <Surface kind="group">
-          <HoursRow which="notifications" title="Notifications" sub="Outside these hours, messages stay in Juno without notifying you." hours={notificationHours} onChange={onHoursChange} />
-          <HoursRow which="presence" title="Active in Slack" sub="Outside these hours you show as away." hours={presenceHours} onChange={onHoursChange} />
+          <HoursRow which="notifications" title="Notifications" sub="Outside these hours, messages stay in Juno without notifying you." hours={notificationHours} onChange={onHoursChange} onDayChange={onDayChange} />
+          <HoursRow which="presence" title="Active in Slack" sub="Outside these hours you show as away." hours={presenceHours} onChange={onHoursChange} onDayChange={onDayChange} />
           <div {...stylex.props(styles.note)}>
             <Text variant="meta" tone="muted" as="p">
               Juno switches your status while it's open. If it's closed when your active hours start, you stay away until you open it.
@@ -126,6 +128,8 @@ export function NotificationsPage(props: NotificationsPageProps) {
         </Text>
       </Section>
 
+      <HuddleRingSection huddleRing={huddleRing} onHuddleRingChange={onHuddleRingChange} />
+
       <Section heading="Today">
         <Today interrupted={interrupted} held={held} rows={today} initiallyOpen={showWhy} />
       </Section>
@@ -163,8 +167,8 @@ function TestRow({ permission, onSendTest, onOpenSettings }: Pick<NotificationsP
   )
 }
 
-function HoursRow({ which, title, sub, hours, onChange }: { readonly which: HoursKind; readonly title: string; readonly sub: string; readonly hours: Hours; readonly onChange: NotificationsPageProps['onHoursChange'] }) {
-  const set = (patch: Partial<Hours>) => onChange(which, { ...hours, ...patch })
+function HoursRow({ which, title, sub, hours, onChange, onDayChange }: { readonly which: HoursKind; readonly title: string; readonly sub: string; readonly hours: Hours; readonly onChange: NotificationsPageProps['onHoursChange']; readonly onDayChange: NotificationsPageProps['onDayChange'] }) {
+  const set = (patch: Partial<Hours>) => onChange(which, patch)
   const from = String(Math.floor(hours.from / HALF_HOUR) * HALF_HOUR)
   const to = String(Math.floor(hours.to / HALF_HOUR) * HALF_HOUR)
   return (
@@ -173,7 +177,7 @@ function HoursRow({ which, title, sub, hours, onChange }: { readonly which: Hour
       wrap
       trailing={
         <span {...stylex.props(styles.controls)}>
-          <DayToggles days={hours.days} label={`${title} days`} onChange={(days) => set({ days })} />
+          <DayToggles days={hours.days} label={`${title} days`} onChange={(day, enabled) => onDayChange(which, day, enabled)} />
           {/* The times stay together when the controls wrap. */}
           <span {...stylex.props(styles.times)}>
             <Select size={32} label={`${title} from`} options={times} value={from} onChange={(event) => set({ from: Number(event.currentTarget.value) })} />

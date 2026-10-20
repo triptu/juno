@@ -13,6 +13,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { Store, StoreReader, workspacePathsFromDir, type StoreError } from '@juno/store'
 import { reactionsStatement, rootStatement, threadsStatements, threadTitlesStatement, windowStatements, type WindowTarget } from '../src/messages/window'
+import { missedHuddleStatement } from '../src/home/huddles'
 import { homeStatements } from '../src/home/query'
 import { suggestedStatements } from '../src/home/suggested'
 import { staleStatement } from '../src/home/job'
@@ -216,6 +217,7 @@ describe('query plans', () => {
         automatedStatements.moved(),
         movesStatements.unseen(),
         homeStatements.mains(['C0ALERTS', 'C0DEPLOYS']),
+        missedHuddleStatement(Date.now()),
       ]
       for (const statement of statements) {
         const lines = yield* plan(statement.sql, statement.params)

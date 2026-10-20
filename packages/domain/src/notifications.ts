@@ -52,6 +52,8 @@ export interface NotificationSettings {
   readonly people: Readonly<Record<string, NotifyLevel>>
   /** By thread topic id. Missing means no thread overrides. */
   readonly threads?: Readonly<Record<string, NotifyLevel>>
+  /** Ring for huddles: an incoming huddle that would ring plays its sound. Missing means on. */
+  readonly huddleRing?: boolean
 }
 
 const weekdays: ReadonlyArray<Weekday> = [1, 2, 3, 4, 5]
@@ -302,22 +304,22 @@ export function nextHoursStart(at: number, hours: Hours): number | undefined {
   return undefined
 }
 
-/** What an incoming huddle may do (SPEC 20, "Incoming huddles"): ring, show its card quietly, or nothing. */
-export type HuddleAlertDecision = 'ring' | 'quiet' | 'none'
+/** What an incoming huddle may do (SPEC 20, "Incoming huddles"): ring and notify, or show its card quietly. */
+export type HuddleAlertDecision = 'ring' | 'quiet'
 
 /**
- * How a huddle someone started may interrupt, by the order messages follow:
- * an ignored conversation shows nothing; Every message on the conversation
- * or the person who started it rings, even outside notification hours; Never
- * on either, or outside notification hours, shows the card without a ring
- * or an OS notification. Otherwise it rings. Juno's judgement plays no part:
- * a huddle is live, so it is decided at once.
+ * How a huddle someone started may interrupt, by the order messages follow,
+ * with one difference: an ignored conversation is decided like any other,
+ * since a huddle is rare and starts for a reason. Every message on the
+ * conversation or the person who started it rings, even outside
+ * notification hours; Never on either, or outside notification hours,
+ * shows the card without a ring or an OS notification. Otherwise it rings.
+ * Juno's judgement plays no part: a huddle is live, so it is decided at once.
  */
 export function decideHuddleAlert(
-  huddle: { readonly channelId: string; readonly startedBy: string; readonly ignored: boolean; readonly at: LocalTime },
+  huddle: { readonly channelId: string; readonly startedBy: string; readonly at: LocalTime },
   settings: NotificationSettings,
 ): HuddleAlertDecision {
-  if (huddle.ignored) return 'none'
   const channelLevel = settings.channels[huddle.channelId]
   const personLevel = settings.people[huddle.startedBy]
   if (channelLevel === 'every' || personLevel === 'every') return 'ring'

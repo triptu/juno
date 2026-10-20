@@ -9,6 +9,7 @@
 import { Schema as S } from 'effect'
 import { Blocks } from './blocks.ts'
 import { Ts } from './ts.ts'
+import { RoomFrameRoom } from './huddles.ts'
 
 const opt = S.optionalKey
 
@@ -156,6 +157,7 @@ export const UserProfileLite = S.Struct({
 
 /** Every message field. Spread into the schemas below so `root` does not need recursion. */
 export const MessageFields = {
+  room: opt(RoomFrameRoom),
   type: opt(S.String),
   subtype: opt(S.String),
   channel: opt(S.String),

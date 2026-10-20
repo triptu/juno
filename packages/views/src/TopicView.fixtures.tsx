@@ -5,7 +5,7 @@ import { TopicSwitcher } from './TopicSwitcher'
 import { ComposerSlot } from './ComposerSlot'
 import { details, emojiOnly, me, message, engTopics, hostile, main, mainDividerBefore, mentions, rtl, thread, threadDividerBefore, withFiles } from './fixtures/messages'
 import { NOW } from './fixtures/topics'
-import type { EmojiCategory } from '@juno/contract'
+import { prepareEmojiPicker, type EmojiCategory } from '@juno/contract'
 import { EmojiPicker } from './EmojiPicker'
 import { noopActions } from './fixtures/actions'
 import { Floating, SelectionToolbar } from './Floating'
@@ -217,7 +217,7 @@ export default defineFixtures(
         list: { actions: noopActions },
         floating: (
           <Floating x={820} y={180} placement="below-end" layer="picker">
-            <EmojiPicker catalog={pickerCatalog} recent={['+1', 'white_check_mark', 'eyes']} onPick={noop} onClose={noop} />
+            <EmojiPicker data={prepareEmojiPicker(pickerCatalog, [])} recent={['+1', 'white_check_mark', 'eyes']} onPick={noop} onClose={noop} />
           </Floating>
         ),
       }),

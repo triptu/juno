@@ -104,7 +104,7 @@ Every Lucide import in `packages/ui`, `packages/views` and `apps` today, plus th
 | `Inbox` | `Tray` | Browse "All topics" row; duotone in the empty Browse state |
 | `ListFilter` | `FunnelSimple` | |
 | `EyeOff` | `EyeSlash` | stealth tab and pill |
-| `RotateCcw` (planned) | `ArrowCounterClockwise` | Reopen |
+| `RotateCcw` (planned) | `CheckCircle` fill | Reopen, in the header and the palette |
 | `Ban` (planned) | `Prohibit` | Ignore channel |
 | `ChevronRight` (planned) | `CaretRight` | bold, thread link |
 | `SpellCheck` (planned) | `TextAa` | clarity check |

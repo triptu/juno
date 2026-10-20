@@ -1,0 +1,1 @@
+- 10-20 14:40 · Tushar · Failed emoji images retain their cell and use a small neutral placeholder, with the complete name in its tooltip and accessible label.

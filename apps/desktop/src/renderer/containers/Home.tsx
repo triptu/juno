@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
-import { viewsSortChannel, type HomeItem } from '@juno/contract'
-import { closeWelcome, fillHome, fillThought, freezeHome, homeGreeting, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, markMovesSeen, markMovesShown, peekKeyAtom, prepareThought, registry, resolveAllTopics, runAction, showHome, showToast, syncProgressAtom, welcomeAtom, type Welcome } from '@juno/state'
+import { homeHuddleSeen, viewsSortChannel, type HomeItem } from '@juno/contract'
+import { closeWelcome, fillHome, fillThought, freezeHome, homeGreeting, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, markMovesSeen, markMovesShown, peekKeyAtom, prepareThought, registry, resolveAllTopics, runAction, runCommand, showHome, showToast, syncProgressAtom, welcomeAtom, type Welcome } from '@juno/state'
 import { homeAsksAtom, junoPageActions } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
 import { junoAskCopy } from '@juno/agent-contract'
@@ -208,7 +208,14 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
       done={shown.used}
       now={shown.now}
       enter={shown.enter}
-      onOpen={openItem}
+      onOpen={(topicId, event) => {
+        const item = view.items.find((entry) => entry.kind === 'missedHuddle' && entry.topics.some((topic) => topic.id === topicId))
+        if (item?.huddleId !== undefined) {
+          markHomeItemUsed(registry, key, item.id)
+          void runCommand(registry, homeHuddleSeen, { callId: item.huddleId })
+        }
+        openItem(topicId, event)
+      }}
       onMarkDone={markDone}
       onResolveAll={resolveAll}
       onReview={review}

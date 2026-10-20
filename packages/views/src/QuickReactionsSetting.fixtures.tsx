@@ -1,11 +1,10 @@
-import { DEFAULT_QUICK_REACTIONS, emojiCatalog } from '@juno/contract'
+import { DEFAULT_QUICK_REACTIONS, emojiCatalog, prepareEmojiPicker } from '@juno/contract'
 import { defineFixtures, fixture } from '@juno/ui'
 import { EmojiPicker } from './EmojiPicker'
 import { fiveQuickReactions, sevenQuickReactions } from './fixtures/quickReactions'
 import { QuickReactionsSetting } from './QuickReactionsSetting'
 
 const noop = () => {}
-const chosen = (reactions: ReadonlyArray<{ readonly name: string }>) => new Set(reactions.map((reaction) => reaction.name))
 
 export default defineFixtures(
   QuickReactionsSetting,
@@ -23,7 +22,7 @@ export default defineFixtures(
           reactions: fiveQuickReactions,
           onChange: noop,
           onAdd: noop,
-          picker: <EmojiPicker catalog={emojiCatalog} recent={fiveQuickReactions.map((reaction) => reaction.name)} selected={chosen(fiveQuickReactions)} onPick={noop} onClose={noop} />,
+          picker: <EmojiPicker data={prepareEmojiPicker(emojiCatalog, [])} recent={fiveQuickReactions.map((reaction) => reaction.name)} selected={fiveQuickReactions} onPick={noop} onClose={noop} />,
         },
         { height: 480 },
       ),

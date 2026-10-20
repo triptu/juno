@@ -1,0 +1,1 @@
+- 10-20 12:49 · Tushar · Resolve saved Settings aliases when marking chosen emoji in browse and search, so an alias cannot be added again through its canonical name.

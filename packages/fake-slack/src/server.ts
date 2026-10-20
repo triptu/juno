@@ -14,6 +14,7 @@ import { WebSocketServer, type WebSocket } from 'ws'
 import type { MethodName, RtmFrame } from '@juno/slack-schema'
 import { EdgeEmojisListOk, EdgeUsersInfoArgs, EdgeUsersInfoOk, encodeRtmFrame, isMethodName, Methods } from '@juno/slack-schema'
 import { parseCookies, parseFields, parseJson, parseMultipartParts, readBody, type FormFields } from './body.ts'
+import { WORKSPACE_EMOJI } from './emoji.ts'
 import { mimetypeOf } from './files.ts'
 import type { EdgeHandlers } from './features/registry.ts'
 import { ApiError, type Handlers, type MethodContext } from './methods.ts'
@@ -105,6 +106,8 @@ interface GateWaiter {
 }
 
 export class FakeServer {
+  #emojiImageGate: Promise<void> | undefined
+  #releaseEmojiImageGate: (() => void) | undefined
   readonly sessions = new Map<string, Session>()
   readonly calls: CallRecord[] = []
   readonly sockets = new Set<WebSocket>()
@@ -169,6 +172,7 @@ export class FakeServer {
   }
 
   async close(): Promise<void> {
+    this.releaseEmojiImages()
     this.release()
     this.releaseFrames(undefined, true)
     this.dropSockets()
@@ -339,6 +343,18 @@ export class FakeServer {
   }
 
   // Held frames
+
+  /** Hold custom image bodies until the picker opens, without a browser routing interceptor. */
+  holdEmojiImages(): void {
+    this.releaseEmojiImages()
+    this.#emojiImageGate = new Promise((resolve) => { this.#releaseEmojiImageGate = resolve })
+  }
+
+  releaseEmojiImages(): void {
+    this.#releaseEmojiImageGate?.()
+    this.#releaseEmojiImageGate = undefined
+    this.#emojiImageGate = undefined
+  }
 
   /** File downloads answer after `ms`, so images arrive late. 0 turns it off. */
   delayFiles(ms: number): void {
@@ -523,7 +539,15 @@ export class FakeServer {
       }
       return this.#file(path.split('/')[2] ?? '', url.searchParams.get('download') === '1', url.searchParams.get('thumb') === 'video', response)
     }
-    if (path.startsWith('/avatars/') && method === 'GET') {
+    if ((path.startsWith('/avatars/') || path.startsWith('/emoji/')) && method === 'GET') {
+      if (path.startsWith('/emoji/')) {
+        if (this.#emojiImageGate !== undefined) await this.#emojiImageGate
+        const svg = WORKSPACE_EMOJI[path.slice('/emoji/'.length).replace(/\.svg$/, '')]
+        if (svg === undefined) return json(response, 404, { ok: false, error: 'emoji_not_found' })
+        response.writeHead(200, { 'content-type': 'image/svg+xml', 'cache-control': 'public, max-age=3600' })
+        response.end(svg)
+        return
+      }
       const cookie = parseCookies(request.headers.cookie)['d']
       const session = cookie === undefined ? undefined : this.sessions.get(cookie)
       if (session === undefined || session.expired) return json(response, 401, { ok: false, error: 'not_authed' })
