@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
-import type { MentionChannel, MentionGroup, MentionPerson } from '@juno/contract'
+import { markupLayout, type MentionChannel, type MentionGroup, type MentionPerson } from '@juno/contract'
 import { defineFixtures, fixture, scene, type TextareaMark } from '@juno/ui'
 import { AttachButton } from './AttachButton'
 import { AttachmentChips } from './AttachmentChips'
@@ -155,6 +155,28 @@ const picked: ReadonlyArray<TextareaMark> = [
   { start: 32, end: 41, look: 'channel' },
 ]
 
+const MARKUP = [
+  '*Ship it* _today_, ~not~ Friday. Run `pnpm test` first and ask *@Maya* about _example.com/plan_.',
+  '> *Quoted* with `code`',
+  '> and a second line',
+  '```',
+  'const done = await ship()',
+  'return done',
+  '```',
+  'snake_case_name and 2*3*4 stay as typed.',
+].join('\n')
+const markupMarks: ReadonlyArray<TextareaMark> = [
+  { start: MARKUP.indexOf('@Maya'), end: MARKUP.indexOf('@Maya') + 5, look: 'person', hue: 'claret' },
+  { start: MARKUP.indexOf('example.com'), end: MARKUP.indexOf('example.com') + 16, look: 'link' },
+]
+
+/** The field with Slack's markup in it, drawn as it will look; it takes typing, for checking the caret against the drawn text. */
+function MarkupField({ initial, marks = [] }: { readonly initial: string; readonly marks?: ReadonlyArray<TextareaMark> }) {
+  const [value, setValue] = useState(initial)
+  const shown = value === initial ? marks : []
+  return <Composer {...base} value={value} onChange={setValue} placeholder="Message #eng" marks={shown} format={markupLayout(value, shown)} />
+}
+
 export default defineFixtures(
   Composer,
   {
@@ -247,6 +269,13 @@ export default defineFixtures(
       'in-the-field': fixture({ ...base, value: LINKED, placeholder: 'Reply', marks: linked }),
       'editor-new': scene(() => <LinkEditorOpen url="" />, { height: 200 }),
       'editor-existing': scene(() => <LinkEditorOpen url="https://example.com/docs" />, { height: 200 }),
+    },
+    // Spec section 8: Slack's markup as it will look, in the field's own font.
+    Markup: {
+      mixed: scene(() => <MarkupField initial={MARKUP} marks={markupMarks} />, { height: 280 }),
+      styles: scene(() => <MarkupField initial="*bold* _italic_ ~strike~ `code` and *_both_*" />),
+      'code-block': scene(() => <MarkupField initial={'Before\n```\nmake build\nmake test\n```\nAfter'} />, { height: 200 }),
+      quote: scene(() => <MarkupField initial={'> Can we ship Friday?\n> Or Monday\nFriday works.'} />, { height: 160 }),
     },
     Emoji: {
       'suggestions-open': scene(() => <div {...stylex.props(styles.column)}><Composer {...base} value=":smi" placeholder="Reply" marks={[]}

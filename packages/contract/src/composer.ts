@@ -1,5 +1,5 @@
 /**
- * The composer's @, # and colon emoji rules and its links (spec section 8): `@juno/domain` rules the
+ * The composer's @, # and colon emoji rules, its links and its markup (spec section 8): `@juno/domain` rules the
  * renderer runs on each keystroke, reached here because the renderer does
  * not import domain (as with `audience.ts`).
  */
@@ -28,4 +28,9 @@ export {
   emojiQueryAt,
   matchEmoji,
   mergeEmoji,
+  markupLayout,
+  toggleMarkup,
+  type MarkupEdit,
+  type MarkupLayout,
+  type MarkupStyle,
 } from '@juno/domain'
