@@ -6,7 +6,7 @@ import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import { ListChecks } from '@phosphor-icons/react/dist/icons/ListChecks'
 import { NotePencil } from '@phosphor-icons/react/dist/icons/NotePencil'
 import { Robot } from '@phosphor-icons/react/dist/icons/Robot'
-import { chatCopy } from '@juno/agent-contract'
+import { junoAskCopy } from '@juno/agent-contract'
 import type { AutomatedPlace, HomeItem, HomeItemKind } from '@juno/contract'
 import type { PhosphorIcon } from '@juno/ui'
 import { placesLine } from './settled'
@@ -20,7 +20,7 @@ export const opensReview = (kind: HomeItemKind): boolean => kind === 'tidyUp' ||
 
 /** The meta line: plain data, the same with and without AI. */
 export function metaOf(item: HomeItem, now: number): string {
-  if (item.kind === 'ask') return item.ask?.connection !== undefined ? chatCopy.ask.learn.metaConnection(item.ask.connection) : chatCopy.ask.learn.meta(item.ask?.sources ?? [])
+  if (item.kind === 'ask') return item.ask?.connection !== undefined ? junoAskCopy.learn.metaConnection(item.ask.connection) : junoAskCopy.learn.meta(item.ask?.sources ?? [])
   if (item.kind === 'automated') return item.reason === undefined ? 'To Automated' : `To Automated · ${item.reason}`
   if (opensReview(item.kind)) return placesLine(item.topics.map((topic) => topic.place))
   const topic = item.topics[0]
@@ -48,8 +48,8 @@ export function rowButtons(item: HomeItem, onMarkDone: (itemId: string) => void,
     return onAsk === undefined
       ? []
       : [
-          { label: chatCopy.ask.learn.notNow, run: () => onAsk(item.id, 'dismiss') },
-          { label: chatCopy.ask.learn.start, run: () => onAsk(item.id, 'start'), primary: true },
+          { label: junoAskCopy.learn.notNow, run: () => onAsk(item.id, 'dismiss') },
+          { label: junoAskCopy.learn.start, run: () => onAsk(item.id, 'start'), primary: true },
         ]
   }
   return (

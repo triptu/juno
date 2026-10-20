@@ -16,7 +16,7 @@
  * decides between the panel and the tab once a topic open asked for
  * before it has landed (`afterNavigation`).
  */
-import { chatCopy, MemoryPersonId, type About, type Selection } from '@juno/agent-contract'
+import { personFileMissing, MemoryPersonId, type About, type Selection } from '@juno/agent-contract'
 import {
   activeTab,
   currentPlace,
@@ -142,7 +142,7 @@ export function askJunoAbout(about: Exclude<About, { _tag: 'topic' }>): void {
  */
 export async function showWhatJunoKnows(person: { readonly id: string; readonly name: string }): Promise<void> {
   const known = await hasPersonFile(registry, person.id)
-  if (known === false) return showToast(registry, { text: chatCopy.docs.people.noFile(person.name) })
+  if (known === false) return showToast(registry, { text: personFileMissing(person.name) })
   registry.set(memoryPersonAtom, known === true ? MemoryPersonId.make(person.id) : undefined)
   openJunoPage('remembers')
 }

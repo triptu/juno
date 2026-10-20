@@ -9,7 +9,7 @@
  * and from there to the chat model only.
  */
 import {
-  chatCopy,
+  filesLeftCopy,
   cutText,
   fitImage,
   JUNO_IMAGE_LIMITS,
@@ -175,9 +175,9 @@ export function useJunoFiles(key: string, files: ReadonlyArray<Attachment>, acti
   return { readsImages, note: leftNote(all, where), hasFiles: taken.length > 0 }
 }
 
-/** The line under the files a send to Juno leaves (`chatCopy.composer.filesLeft`). `home` can name a person or channel. */
+/** The line under the files a send to Juno leaves (`filesLeftCopy`). `home` can name a person or channel. */
 export function leftNote(left: ReadonlySet<JunoLeft>, where: 'home' | 'chat'): string | undefined {
-  const copy = chatCopy.composer.filesLeft
+  const copy = filesLeftCopy
   const lines = [
     left.has('images') ? copy.images : undefined,
     left.has('other') ? (where === 'home' ? copy.other : copy.otherHere) : undefined,

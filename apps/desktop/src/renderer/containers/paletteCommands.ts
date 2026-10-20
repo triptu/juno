@@ -27,7 +27,7 @@ import {
   themeAtom,
   type OpenOptions,
 } from '@juno/state'
-import { chatCopy } from '@juno/agent-contract'
+import { junoPageTitles } from '@juno/agent-contract'
 import { accentLabels, settingsSections, type PaletteIconName, type PaletteItem } from '@juno/views'
 import { muteShortcut } from '@juno/huddle-views'
 import { currentCall, joinHuddle, leaveCurrentHuddle, mediaSnapshot, shareFull, showCurrentHuddle, toggleHuddleMuted, toggleSharing } from './huddle/media'
@@ -119,7 +119,7 @@ function pageRows(): ReadonlyArray<CommandRow> {
   const page = { group: 'pages', family: 'pages go', opensTab: true } as const
   const juno = { ...page, family: 'pages go juno' } as const
   const junoPage = (id: 'scheduled' | 'remembers' | 'memory' | 'activity', words: string) =>
-    row(`page-${id}`, 'juno', chatCopy.pageTitles[id], `juno ${words}`, (options) => openJunoPage(id, options), juno)
+    row(`page-${id}`, 'juno', junoPageTitles[id], `juno ${words}`, (options) => openJunoPage(id, options), juno)
   return [
     row('page-home', 'home', 'Home', 'start greeting', openHome, page),
     row('page-all-topics', 'all-topics', 'All topics', 'everything browse list threads', openAllTopics, page),
