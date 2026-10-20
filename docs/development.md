@@ -979,6 +979,8 @@ Measure the failure rate before a fix and prove the fix with the same count and 
 
 Causes found so far (2026-10-20):
 
+- **A sidebar click measured before a caused move.** The People flow injected a DM and opened its row before waiting for the activity reorder. A replay that delivered the DM between `SidebarRow.select`'s box measurement and mouse move clicked `m:C0HIRING` and opened that same topic in all three runs. The app used the row under the pointer. The test now waits for Maya at the top of Recent before the driver measures her row, and checks the active tab before the message. A caller that causes a reorder must wait for its expected order (`expectTop`) before a coordinate-based row open.
+
 - **Settings edits built from an old page.** Each hours control sent a complete hours object from the last engine answer, so pressing Saturday could restore the old start time over a recent edit. Tidy up controls did the same with their shared preference. Both pages now send only edited fields, and each hours day button sends only its own day; the engine merges hours under its settings lock and Tidy up inside one writer transaction. Keep rapid-edit persistence checks fast, without waiting for a save between controls.
 
 - **A host port started before its listener.** The agent started its Electron port as soon as main handed it over, before the RPC worker attached its message listener. The engine's one-time ready frame could be lost in that gap, leaving `host.hello` waiting forever and both chat tests timing out at agent readiness. The adapter now starts the port only after attaching the listener, so Electron keeps the frame queued.
