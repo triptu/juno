@@ -68,15 +68,31 @@ interface CachedBody {
   readonly mentionsMe: boolean
 }
 
-/** A user as the message list reads them. `app_dm` is 1 for an app or bot whose DM Juno has. */
-type MessageUser = UserRow & { readonly is_bot: 0 | 1; readonly app_dm: 0 | 1 }
+/**
+ * A user as the message list reads them. For an app or a deactivated
+ * person, `dm` is their DM and `dm_main` the same once it has a Main, which
+ * is what a click opens; null for anyone else.
+ */
+type MessageUser = UserRow & { readonly is_bot: 0 | 1; readonly deleted: 0 | 1; readonly dm: string | null; readonly dm_main: string | null }
+
+/** The users `ids` names, with the DM of each app and deactivated person (`MessageUser`), through `conversations_im_user`. */
+export function messageUsersStatement(ids: ReadonlyArray<string>): { readonly sql: string; readonly params: ReadonlyArray<unknown> } {
+  const dm = `SELECT d.id FROM conversations d WHERE d.kind = 'im' AND d.user_id = u.id AND d.is_member = 1`
+  return {
+    sql: `SELECT u.id, u.name, u.display_name, u.real_name, u.avatar_url, u.avatar_small_url, u.avatar_large_url, u.is_bot, u.deleted,
+      CASE WHEN u.is_bot = 1 OR u.deleted = 1 THEN (${dm} LIMIT 1) END AS dm,
+      CASE WHEN u.is_bot = 1 OR u.deleted = 1 THEN (${dm} AND EXISTS (SELECT 1 FROM topic_index t WHERE t.topic_id = 'm:' || d.id) LIMIT 1) END AS dm_main
+      FROM users u WHERE u.id IN (${ids.map(() => '?').join(', ')})`,
+    params: ids,
+  }
+}
 
 /**
- * Juno has nothing to open for this user (SPEC 7, "Messages"): one the store
- * does not know, or an app or bot with no DM. A person with no DM still opens
- * Home addressed to them. Undefined: not read yet.
+ * Juno has nothing to open for this user (SPEC 7, "People"): one the store
+ * does not know, or an app or deactivated person whose DM has no Main. A
+ * person with no DM still opens Home addressed to them. Undefined: not read yet.
  */
-const unreachable = (user: MessageUser | null | undefined): boolean => user === null || (user?.is_bot === 1 && user.app_dm === 0)
+const unreachable = (user: MessageUser | null | undefined): boolean => user === null || ((user?.is_bot === 1 || user?.deleted === 1) && user.dm_main === null)
 
 /** `person` with its `unreachable` flag set to `flag`, the same object when it already is. */
 function reach(person: Person, flag: boolean): Person {
@@ -103,6 +119,8 @@ export interface MessageCache {
   /** Bumped whenever the lookup maps are dropped; a body parsed in an older epoch is parsed again. */
   epoch: number
   people: Map<string, Person>
+  /** Set by the subscription: forget the lookups and run again once this Main exists. */
+  watchMain?: (topicId: string) => void
   selfId: string | undefined
   membership: string
 }
@@ -375,9 +393,10 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       nextRows.set(row.ts, { key, row: view })
       out.push(view)
       if (view.senderId !== undefined && !people.has(view.senderId)) {
-        // A post with its own name or icon (a webhook, an app) is drawn as that sender, which has no DM.
+        // A post with its own name or icon (an app, a webhook) is drawn as that sender, and opens the DM of the app user behind it.
+        const app = cache.users.get(row.user_id ?? '')
         const person = row.bot_name !== null || row.bot_icon !== null
-          ? reach(personFrom(view.senderId, { id: view.senderId, name: row.bot_name ?? row.user_id, display_name: row.bot_name, real_name: null, avatar_url: row.bot_icon ?? cache.users.get(row.user_id ?? '')?.avatar_url ?? null }), true)
+          ? { ...personFrom(view.senderId, { id: view.senderId, name: row.bot_name ?? row.user_id, display_name: row.bot_name, real_name: null, avatar_url: row.bot_icon ?? app?.avatar_url ?? null }), ...(unreachable(app) ? { unreachable: true as const } : { user: row.user_id! }) }
           : reach(personFrom(view.senderId, cache.users.get(view.senderId), cache.people.get(view.senderId)), unreachable(cache.users.get(view.senderId)))
         people.set(view.senderId, person)
       }
@@ -395,11 +414,12 @@ const readUsers = (sql: SqlClient.SqlClient, cache: MessageCache, ids: Iterable<
     const missing = [...ids].filter((id) => !cache.users.has(id))
     if (missing.length === 0) return
     for (const id of missing) cache.users.set(id, null)
-    // An app's DM is read with it, as `people.locate` finds it: only a DM with a Main opens.
-    for (const user of yield* sql<MessageUser>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url, is_bot,
-      CASE WHEN is_bot = 1 THEN EXISTS (SELECT 1 FROM conversations d WHERE d.kind = 'im' AND d.user_id = users.id AND d.is_member = 1
-        AND EXISTS (SELECT 1 FROM topic_index t WHERE t.topic_id = 'm:' || d.id)) ELSE 0 END AS app_dm
-      FROM users WHERE id IN ${sql.in(missing)}`) cache.users.set(user.id, user)
+    const statement = messageUsersStatement(missing)
+    for (const user of yield* sql.unsafe<MessageUser>(statement.sql, statement.params)) {
+      cache.users.set(user.id, user)
+      // A DM with no Main yet opens nothing until its Main arrives; the list hears of that one row (`watchMain`).
+      if (user.dm !== null && user.dm_main === null) cache.watchMain?.(`m:${user.dm}`)
+    }
   })
 
 const readChannels = (sql: SqlClient.SqlClient, cache: MessageCache, ids: Iterable<string>) =>

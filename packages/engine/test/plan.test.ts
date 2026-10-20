@@ -10,6 +10,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { Store, StoreReader, workspacePathsFromDir, type StoreError } from '@juno/store'
 import { reactionsStatement, rootStatement, threadsStatements, threadTitlesStatement, windowStatements, type WindowTarget } from '../src/messages/window'
+import { messageUsersStatement } from '../src/messages/query'
 import { homeStatements } from '../src/home/query'
 import { suggestedStatements } from '../src/home/suggested'
 import { staleStatement } from '../src/home/job'
@@ -133,6 +134,15 @@ describe('query plans', () => {
         const lines = yield* plan(statement.sql, statement.params)
         assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
       }
+    }).pipe(Effect.provide(freshStore)),
+  )
+
+  it.effect("messages.list finds an app's or a deactivated person's DM through the DM index", () =>
+    Effect.gen(function* () {
+      const statement = messageUsersStatement(['U0GRAFANA', 'U0MAYA'])
+      const lines = yield* plan(statement.sql, statement.params)
+      assert.isFalse(lines.some((line) => /^SCAN (d|conversations)\b/.test(line)), lines.join('\n'))
+      assert.isTrue(lines.some((line) => line.includes('conversations_im_user')), lines.join('\n'))
     }).pipe(Effect.provide(freshStore)),
   )
 

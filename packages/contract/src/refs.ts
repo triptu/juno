@@ -22,8 +22,10 @@ export const Person = Schema.Struct({
   avatarUrl: Schema.optionalKey(Schema.String),
   /** The ui hue for the initials when there is no photo. */
   color: ChannelColor,
-  /** Juno has nothing to open for them: an app or bot with no DM, or a user the store does not know. Their name and photo in a message open nothing. */
+  /** Juno has nothing to open for them: an app or deactivated person with no DM, or a user the store does not know. Their name and photo in a message open nothing. */
   unreachable: Schema.optionalKey(Schema.Literal(true)),
+  /** A post drawn under its own name or icon (`id` is then the post's): the app user behind it, whose DM a click opens. */
+  user: Schema.optionalKey(Schema.String),
 })
 export type Person = typeof Person.Type
 

@@ -1,4 +1,5 @@
 import mutationRepair from './202610190100_mutation_repair'
+import dmPartnerIndex from './202610201300_dm_partner_index'
 import avatarSizes from './202610171000_avatar_sizes'
 import usergroups from './202610171200_usergroups'
 import partialMessages from './202610171300_partial_messages'
@@ -51,4 +52,5 @@ export const cacheMigrations: Record<string, Effect.Effect<void, unknown, SqlCli
   '202610171300_partial_messages': partialMessages,
   '202610172300_automated_holds': automatedHolds,
   '202610190100_mutation_repair': mutationRepair,
+  '202610201300_dm_partner_index': dmPartnerIndex,
 }

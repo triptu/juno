@@ -58,9 +58,9 @@ const settings = (sql: SqlClient.SqlClient, now: number) =>
 
 const readUsers = (sql: SqlClient.SqlClient, ids: ReadonlySet<string>) =>
   Effect.gen(function* () {
-    const users = new Map<string, UserRow>()
+    const users = new Map<string, UserRow & { deleted: 0 | 1 }>()
     if (ids.size === 0) return users
-    for (const user of yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id IN ${sql.in([...ids])}`) users.set(user.id, user)
+    for (const user of yield* sql<UserRow & { deleted: 0 | 1 }>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url, deleted FROM users WHERE id IN ${sql.in([...ids])}`) users.set(user.id, user)
     return users
   })
 
@@ -143,6 +143,7 @@ export const topicDetail = (id: string, target: WindowTarget, now: number): Effe
       ...(target.kind === 'thread' ? { rootTs: target.threadTs } : {}),
       ...(threadCount === undefined ? {} : { threadCount }),
       ...(art === undefined || art.recipe === '' ? {} : { art: art.recipe }),
+      ...(partnerId !== undefined && users.get(partnerId)?.deleted === 1 ? { deactivated: true as const } : {}),
     }
   })
 
