@@ -2,8 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
 import type { ReactNode } from 'react'
 import { layout, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
-import { ContextPill, HeaderBand, Surface, Text } from '@juno/ui'
-import { TextControl } from './HuddleControls'
+import { ContextPill, HeaderBand, IconButton, Surface, Text } from '@juno/ui'
 import { placeIcons, placeKindLabels, placeTints } from './look'
 import type { HuddlePlace } from './model'
 
@@ -19,7 +18,7 @@ export interface HuddlePageHeaderProps {
 
 /**
  * The tab's header islands (SPEC 20): the place pill, the title and the
- * status line on the left, Thread on the right, at the tab's 24px edges so
+ * status line on the left, Thread (an icon, as the topic header's Resolve) on the right, at the tab's 24px edges so
  * they line up with the shares.
  */
 export function HuddlePageHeader({ place, status, spoken, onPlace, onOpenThread }: HuddlePageHeaderProps) {
@@ -49,7 +48,7 @@ export function HuddlePageHeader({ place, status, spoken, onPlace, onOpenThread 
         </Surface>
         {onOpenThread === undefined ? null : (
           <Surface kind="island" data-island="right" sx={styles.right}>
-            <TextControl shape="island" icon={ChatsCircle} label="Thread" onClick={onOpenThread} />
+            <IconButton icon={ChatsCircle} label="Thread" size={28} iconSize={16} radius="full" variant="island" onClick={onOpenThread} />
           </Surface>
         )}
       </div>
