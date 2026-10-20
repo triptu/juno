@@ -26,8 +26,18 @@ const code = {
     `kubectl get pods -n prod | grep api\nkubectl logs -f deploy/api -n prod --tail=100`,
     `#!/usr/bin/env bash\nset -euo pipefail\nfor f in *.log; do\n  gzip "$f"\ndone`,
     `aws s3 cp ./dist s3://acme-assets/app --recursive`,
+    `go test ./...`,
+    `make build`,
+    `git rebase -i HEAD~3`,
+    `source .venv/bin/activate`,
+    `export NODE_ENV=production`,
+    `ls -la | grep log`,
   ],
   shell: [`$ pnpm install\n$ pnpm --filter @juno/desktop build`],
+  diff: [
+    `--- a/src/retry.ts\n+++ b/src/retry.ts\n@@ -1,4 +1,4 @@\n export async function retry(run: () => Promise<void>): Promise<void> {\n-  const tries: number = 3\n+  const tries: number = 5\n   for (let i = 0; i < tries; i++) await run()\n }`,
+    `@@ -10,3 +10,3 @@ export function title(topic: Topic): string {\n-  return topic.name\n+  return topic.title ?? topic.name\n }`,
+  ],
 } as const
 
 const plain = {
@@ -45,6 +55,19 @@ const plain = {
   'a letter': `Dear all,\n\nPlease find the updated numbers below. Revenue was up 12% this quarter.\n\nThanks,\nPriya`,
   'braces around a note': `{ this is not json, just braces around a note }`,
   'one word': `ERR_CONNECTION_REFUSED`,
+  // Short phrases whose first word is also a shell command.
+  'source of truth': `source of truth`,
+  'go ahead': `go ahead`,
+  'make sense': `make sense`,
+  'make it so': `make it so`,
+  'open question': `open question`,
+  'find out more': `find out more`,
+  'head of product': `head of product`,
+  'kill the noise': `kill the noise`,
+  'which one': `which one?`,
+  'touch base tomorrow': `touch base tomorrow`,
+  'cat pictures': `cat pictures`,
+  'a command word with prose after it': `make sure the build is green before Friday`,
 }
 
 describe('language detection', () => {

@@ -133,21 +133,51 @@ const LOG_LINE = /^(\[?\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}|\[?\d{2}:\d{2}:\d{2}|[A-
 
 const COMMANDS = [
   'git', 'npm', 'npx', 'pnpm', 'yarn', 'bun', 'bunx', 'node', 'deno', 'curl', 'wget', 'kubectl', 'helm', 'docker', 'podman',
-  'brew', 'apt', 'apt-get', 'yum', 'dnf', 'sudo', 'ssh', 'scp', 'rsync', 'cd', 'ls', 'cat', 'echo', 'grep', 'rg',
+  'brew', 'apt', 'apt-get', 'yum', 'dnf', 'ssh', 'scp', 'rsync', 'cd', 'ls', 'cat', 'echo', 'grep', 'rg',
   'find', 'sed', 'awk', 'mkdir', 'rm', 'mv', 'cp', 'chmod', 'chown', 'tar', 'gzip', 'make', 'cargo', 'go', 'pip', 'pip3',
   'python', 'python3', 'uv', 'poetry', 'terraform', 'aws', 'gcloud', 'az', 'gh', 'psql', 'redis-cli', 'systemctl',
   'journalctl', 'kill', 'pkill', 'source', 'touch', 'ln', 'unzip', 'open', 'xcode-select', 'defaults', 'launchctl', 'which',
   'tail', 'head', 'jq', 'xargs', 'ps', 'lsof', 'ping', 'dig', 'openssl', 'tsc', 'vitest', 'jest', 'eslint', 'prettier',
 ]
-/**
- * A line that is a shell command: an optional `$ ` prompt and `sudo`, then
- * a known command and an argument or nothing, or an `export NAME=`.
- */
-const COMMAND_LINE = new RegExp(`^\\s*(\\$\\s+)?((sudo\\s+)?(${COMMANDS.map((c) => c.replace(/[-]/g, '\\-')).join('|')})(\\s+\\S|\\s*$)|export\\s+[A-Za-z_]\\w*=)`)
+/** Commands that are also English words: "go ahead", "make sense" and "source of truth" are not commands. */
+const WORD_COMMANDS = new Set([
+  'source', 'go', 'make', 'open', 'find', 'head', 'tail', 'kill', 'which', 'touch', 'cat', 'cd', 'echo', 'ln', 'rm', 'cp', 'mv',
+  'apt', 'bun', 'node', 'uv', 'ping', 'dig', 'defaults', 'tar', 'yarn', 'brew', 'helm', 'python', 'python3', 'pip', 'pip3',
+  'jest', 'deno', 'ps', 'poetry',
+])
+/** Subcommands that make a line a command: `make build`, `go test`, `brew install`. */
+const SUBCOMMANDS = new Set([
+  'install', 'i', 'add', 'remove', 'uninstall', 'run', 'build', 'test', 'start', 'dev', 'lint', 'check', 'init', 'update',
+  'upgrade', 'status', 'commit', 'push', 'pull', 'fetch', 'clone', 'checkout', 'switch', 'rebase', 'merge', 'log', 'diff',
+  'stash', 'reset', 'branch', 'exec', 'get', 'apply', 'describe', 'delete', 'logs', 'compose', 'mod', 'fmt', 'plan', 'list',
+  'show', 'clean', 'ci', 'publish', 'login', 'auth', 'version', 'release', 'serve', 'watch', 'bench', 'dlx', 'tidy', 'vet',
+])
+const COMMAND_START = new RegExp(`^\\s*(\\$\\s+)?(sudo\\s+)?(${COMMANDS.map((c) => c.replace(/[-]/g, '\\-')).join('|')})(?=\\s|$)(.*)$`)
+/** What only a command line has: a flag, a path, a file name, a pipe or redirect, a variable or an assignment. */
+const SHELL_SHAPE = /(^|\s)-{1,2}[A-Za-z0-9]|[~.]?\/|\w\.\w|\||&&|\s>{1,2}\s|\$|=/
 const PROMPT_LINE = /^\s*\$\s+\S/
 const COMMENT_LINE = /^\s*#/
 /** A line that goes on in the next one. */
 const CONTINUES = /(\\|\||&&)\s*$/
+
+/**
+ * A line that is a shell command: a known command, and something only a
+ * command has. A prompt (`$ `), a flag, a path, a pipe or an `=` will do.
+ * So will a known subcommand (`git status`), but after a command that is
+ * also an English word, only in a line of three words or fewer
+ * (`make build`, not "go check it out"). A non-word command (`kubectl`)
+ * needs any argument. `export` counts only as `export NAME=`.
+ */
+function isCommandLine(line: string): boolean {
+  if (/^\s*(\$\s+)?export\s+[A-Za-z_]\w*=/.test(line)) return true
+  const match = COMMAND_START.exec(line)
+  if (match === null) return false
+  const [, prompt, , command, rest = ''] = match
+  const args = rest.trim().split(/\s+/).filter((arg) => arg !== '')
+  if (prompt !== undefined || SHELL_SHAPE.test(rest)) return true
+  if (!WORD_COMMANDS.has(command!)) return args.length > 0
+  return args.length > 0 && args.length <= 2 && SUBCOMMANDS.has(args[0]!)
+}
 
 /** A plain word, with the punctuation prose puts around it. */
 const WORD = /^[("'“]?[A-Za-z][a-z']*[)"'”,.!?:;]?$/
@@ -162,6 +192,23 @@ function readsAsProse(text: string): boolean {
   return tokens.filter((token) => WORD.test(token)).length / tokens.length >= 0.8
 }
 
+/** A block of a few plain words: "source of truth", "go ahead". Short blocks meet a higher bar. */
+function isPhrase(text: string): boolean {
+  const tokens = text.split(/\s+/).filter((token) => token !== '')
+  return tokens.length < 5 && tokens.every((token) => WORD.test(token))
+}
+
+/**
+ * A unified diff: file headers (`---` and `+++`) or a hunk (`@@ -1,4 +1,4 @@`),
+ * and changed lines. Its structure wins over the language of its lines.
+ */
+function isDiff(text: string): boolean {
+  if (/^diff --git /m.test(text)) return true
+  const headers = /^--- \S/m.test(text) && /^\+\+\+ \S/m.test(text)
+  const hunk = /^@@ -\d+(,\d+)? \+\d+(,\d+)? @@/m.test(text)
+  return (headers || hunk) && /^[+-](?!(--|\+\+) )/m.test(text)
+}
+
 /**
  * The language of an untagged code block, as a highlight.js grammar name,
  * or undefined when the text is not clearly code in one known language.
@@ -170,6 +217,7 @@ export function detectLanguage(code: string): string | undefined {
   const text = code.length > SAMPLE ? code.slice(0, SAMPLE) : code
   const lines = text.split('\n').filter((line) => line.trim() !== '')
   if (lines.length === 0) return undefined
+  if (isDiff(text)) return 'diff'
   if (PLAIN_SHAPES.some((shape) => shape.test(text))) return undefined
   if (lines.filter((line) => LOG_LINE.test(line)).length * 2 >= lines.length) return undefined
 
@@ -191,7 +239,7 @@ export function detectLanguage(code: string): string | undefined {
     return lines.some((line) => PROMPT_LINE.test(line)) ? 'shell' : 'bash'
   }
 
-  if (top < MIN_SCORE || top < second * MIN_LEAD) return undefined
+  if (isPhrase(text) || top < MIN_SCORE || top < second * MIN_LEAD) return undefined
   if (top < MIN_SCORE_PROSE && readsAsProse(text)) return undefined
   return best
 }
@@ -205,7 +253,7 @@ function isCommands(lines: ReadonlyArray<string>): boolean {
       continue
     }
     if (COMMENT_LINE.test(line)) continue
-    if (!COMMAND_LINE.test(line)) return false
+    if (!isCommandLine(line)) return false
     commands++
     continued = CONTINUES.test(line)
   }
