@@ -318,6 +318,32 @@ export const hues = stylex.defineVars({
 })
 
 /**
+ * Code colours, one per token kind of `@juno/highlight`. Calm: muted hues
+ * at even lightness, so a block reads as text with a little colour, not a
+ * poster. Every value is at least 4.5:1 on the code block's background
+ * (`--background`): light 4.9 (comment) to 7.6, dark 6.4 to 9.2
+ * (`docs/design/tokens.md` 1.10). Colour only: no weight or style, so a
+ * coloured block has exactly the plain block's lines. Read by the
+ * `::highlight(syntax-*)` rules in global.css.
+ * @public
+ */
+export const syntax = stylex.defineVars({
+  '--syntax-keyword': 'hsla(322, 38%, 36%, 1)',
+  '--syntax-string': 'hsla(128, 34%, 28%, 1)',
+  '--syntax-number': 'hsla(24, 70%, 34%, 1)',
+  '--syntax-comment': 'hsla(48, 5%, 42%, 1)',
+  '--syntax-function': 'hsla(214, 52%, 38%, 1)',
+  '--syntax-type': 'hsla(180, 52%, 25%, 1)',
+  '--syntax-constant': 'hsla(262, 38%, 44%, 1)',
+  '--syntax-property': 'hsla(200, 58%, 30%, 1)',
+  '--syntax-tag': 'hsla(4, 55%, 38%, 1)',
+  '--syntax-punctuation': 'hsla(48, 8%, 35%, 1)',
+  '--syntax-meta': 'hsla(36, 30%, 34%, 1)',
+  '--syntax-inserted': 'hsla(140, 50%, 26%, 1)',
+  '--syntax-deleted': 'hsla(358, 58%, 38%, 1)',
+})
+
+/**
  * Topic art (docs/design/topic-art/v2, colour from v3). Eight hues, each with
  * four roles the recipe may name and five Tide tones for the placeholder. The
  * renderer in `@juno/topic-art` writes these as `var(--art-<hue>-<role>)` and

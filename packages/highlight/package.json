@@ -1,0 +1,29 @@
+{
+  "name": "@juno/highlight",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Code colours as a pure function: a code block's language tag line, language detection, and highlight.js grammars turned into a flat list of coloured tokens; and the one DOM step that paints them with CSS highlights.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./highlight": "./src/highlight.ts",
+    "./paint": "./src/paint.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "highlight.js": "11.11.1",
+    "lowlight": "3.3.0"
+  },
+  "devDependencies": {
+    "@types/hast": "3.0.4",
+    "typescript": "7.0.2",
+    "vitest": "5.0.4"
+  },
+  "juno": {
+    "allowedDeps": []
+  }
+}

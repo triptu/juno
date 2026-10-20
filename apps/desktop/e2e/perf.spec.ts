@@ -9,7 +9,7 @@
 //   JUNO_PERF_TRACE=<dir>      also write traces and CPU profiles (scripts/perf-trace.mjs)
 import { rm } from 'node:fs/promises'
 import type { Locator, Page } from '@playwright/test'
-import { largeSeed, startFakeSlack, topic300Seed, TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL, type FakeSlack } from '@juno/fake-slack'
+import { codeBlocksSeed, CODE_BLOCK_COUNT, largeSeed, startFakeSlack, topic300Seed, TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL, type FakeSlack } from '@juno/fake-slack'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
 import { expect, hooks, launchApp, tempUserData, test, writeSlackApp, type RunningApp, type SlackAppFixture } from './fixtures'
 import { privateMemory, stats } from './perfStats'
@@ -962,7 +962,8 @@ test('topic open, uncached: a thread whose replies were never fetched, to the he
 })
 
 // The M4 gate (performance 3.4) on the topic300 seed: a 300-message thread
-// and a 300-message Main, 20 % images and 10 % code blocks. One synced
+// and a 300-message Main, 20 % images and 10 % code blocks, plus #perf-code
+// (codeBlocksSeed: 50 distinct code blocks of 40 to 100 lines). One synced
 // user-data directory; every scenario launches the app warm on it.
 test.describe('topic view', () => {
   let fake: FakeSlack
@@ -971,6 +972,7 @@ test.describe('topic view', () => {
   let slackApp: SlackAppFixture
   const THREAD = 'Review the rollout checklist 1'
   const MAIN = '#perf-main'
+  const CODE = '#perf-code'
 
   const launch = (agent = false): Promise<RunningApp> => launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, agent })
 
@@ -1000,7 +1002,12 @@ test.describe('topic view', () => {
 
   test.beforeAll(async () => {
     test.setTimeout(300_000)
-    fake = await startFakeSlack({ seed: (workspace, avatars) => void topic300Seed()(workspace, avatars) })
+    fake = await startFakeSlack({
+      seed: (workspace, avatars) => {
+        topic300Seed()(workspace, avatars)
+        codeBlocksSeed()(workspace, avatars)
+      },
+    })
     userData = await tempUserData()
     slackDir = await tempUserData()
     slackApp = await writeSlackApp(fake, slackDir)
@@ -1012,7 +1019,7 @@ test.describe('topic view', () => {
       await juno.expectEngineLive(120_000)
       // Read both once, so later opens are at the bottom of a cached, read topic. Main's oldest messages are
       // the user's, so its first open is at the "N new" divider after them, not at the bottom.
-      for (const title of [THREAD, MAIN]) {
+      for (const title of [THREAD, MAIN, CODE]) {
         await juno.sidebar.row(title).open()
         await juno.topic.toLatest()
         await juno.sidebar.row(title).expectRead()
@@ -1098,6 +1105,52 @@ test.describe('topic view', () => {
         }
       })
       within('tab switch mounted, p95', stats('tab switch, mounted (juno.tab-switch)', mounted).p95, oneFrame)
+    } finally {
+      await running.close()
+    }
+  })
+
+  // A topic that is mostly code, opened again once the colours of all its blocks are known. Only blocks near the
+  // screen are painted (ADR 0017), so it keeps the cached open's budget.
+  test('topic reopen: 50 code blocks whose colours are known', async () => {
+    test.setTimeout(300_000)
+    const { running, juno } = await ready()
+    const shown = () => running.win.evaluate(() => {
+      const view = [...document.querySelectorAll<HTMLElement>('[data-topic-view]')].find((node) => node.offsetParent !== null)
+      return { blocks: view?.querySelectorAll('pre').length ?? 0, painted: view?.querySelectorAll('[data-code-language]').length ?? 0 }
+    })
+    try {
+      await juno.sidebar.row(CODE).open()
+      await juno.topic.expectAtBottom()
+      // Bring every block near the screen once, so the painter knows all their colours.
+      await juno.topic.scroller.evaluate(async (scroller) => {
+        const frame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+        for (let top = scroller.scrollHeight; top > 0; top -= 400) {
+          scroller.scrollTop = top
+          await frame()
+        }
+        scroller.scrollTop = 0
+        await frame()
+      })
+      await expect.poll(async () => (await shown()).painted, { timeout: 15_000 }).toBeGreaterThan(0)
+      const samples: number[] = []
+      const painted: number[] = []
+      for (let i = 0; i < 10; i++) {
+        for (const title of [THREAD, CODE]) {
+          const before = (await juno.measures('juno.topic-open')).length
+          await pressRow(juno, title)
+          const ms = await nextMeasure(juno, 'juno.topic-open', before)
+          if (title !== CODE) continue
+          samples.push(ms)
+          await expect.poll(async () => (await shown()).painted, { timeout: 5_000 }).toBeGreaterThan(0)
+          painted.push((await shown()).painted)
+        }
+      }
+      const { blocks } = await shown()
+      console.log(`code topic reopen: ${blocks} blocks mounted, ${Math.min(...painted)} to ${Math.max(...painted)} painted`)
+      expect(blocks).toBe(CODE_BLOCK_COUNT)
+      expect(Math.max(...painted)).toBeLessThan(CODE_BLOCK_COUNT / 2)
+      within('topic reopen with 50 code blocks, p95', stats('topic reopen, 50 code blocks with known colours, press to rows painted (juno.topic-open)', samples).p95, 50)
     } finally {
       await running.close()
     }

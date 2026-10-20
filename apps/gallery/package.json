@@ -13,6 +13,7 @@
     "test:e2e": "node ../../scripts/build-cached.mjs dist vite build && playwright test --project=behaviour"
   },
   "dependencies": {
+    "@juno/highlight": "workspace:*",
     "@juno/huddle-views": "workspace:*",
     "@juno/tokens": "workspace:*",
     "@juno/ui": "workspace:*",
@@ -36,6 +37,7 @@
   },
   "juno": {
     "allowedDeps": [
+      "@juno/highlight",
       "@juno/huddle-views",
       "@juno/tokens",
       "@juno/ui",

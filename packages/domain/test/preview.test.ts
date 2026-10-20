@@ -12,6 +12,12 @@ describe('preview text', () => {
     expect(messagePreviewText({ text: 'Here is the mock', files: [image('F1')] })).toBe('Here is the mock')
   })
 
+  it('shows a code block without its language tag line', () => {
+    const tagged = { type: 'rich_text_preformatted', elements: [{ type: 'text', text: 'ts\nconst tries = 3\nretry(tries)' }] } as const
+    expect(messagePreviewText({ text: '```ts\nconst tries = 3\nretry(tries)```', blocks: [{ type: 'rich_text', elements: [tagged] }] })).toBe('const tries = 3 retry(tries)')
+    expect(messagePreviewText({ text: '```ts\nconst tries = 3\n```' })).toBe('const tries = 3')
+  })
+
   it('labels a message that is only files by what they are', () => {
     expect(messagePreviewText({ text: '', files: [image('F1')] })).toBe('Image')
     expect(messagePreviewText({ text: '', files: [image('F1'), image('F2')] })).toBe('2 images')

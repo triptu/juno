@@ -4,7 +4,7 @@
  * sidebar and All topics show the same line, so a conversation reads the
  * same in both.
  */
-import { bodyFromMrkdwn, messageBody, plainText, previewText, type Lookups, type MessageContent } from '@juno/richtext'
+import { bodyFromMrkdwn, messageBody, previewText, readableText, type Lookups, type MessageContent } from '@juno/richtext'
 import type { Attachment, File } from '@juno/slack-schema'
 import { firstName, type ConversationKind } from './channel'
 
@@ -33,7 +33,7 @@ export function messagePreviewText(message: PreviewMessage, lookups: Lookups = {
   }
   if (message.subtype === 'huddle_thread') return 'Huddle'
   // Only a quote: show what it quotes rather than nothing.
-  const quoted = oneLine(plainText(body).replace(/^> ?/gm, ''))
+  const quoted = oneLine(readableText(body).replace(/^> ?/gm, ''))
   if (quoted !== '') return quoted
   return 'Message'
 }

@@ -13,6 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@juno/highlight": "workspace:*",
     "@juno/slack-schema": "workspace:*"
   },
   "devDependencies": {
@@ -22,6 +23,7 @@
   },
   "juno": {
     "allowedDeps": [
+      "@juno/highlight",
       "@juno/slack-schema"
     ]
   }

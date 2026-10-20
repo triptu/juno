@@ -1,6 +1,7 @@
 export { AccountMenu, type AccountMenuAction } from './AccountMenu'
 export { AppearanceSettings } from './AppearanceSettings'
 export { AppInfoView } from './AppInfoView'
+export { CodeHighlighterContext, type CodeHighlighter } from './CodeHighlight'
 export { CommandPalette, type PaletteIconName, type PaletteItem, type PaletteSection, type PaletteTab } from './CommandPalette'
 export { AttachButton } from './AttachButton'
 export { AttachmentChips, type AttachmentChipsProps } from './AttachmentChips'

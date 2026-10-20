@@ -116,7 +116,8 @@ pnpm workspaces, every package shipped as TypeScript source. The owner wants eac
 ```mermaid
 flowchart TD
   slack_schema[slack-schema]
-  richtext --> slack_schema
+  highlight
+  richtext --> slack_schema & highlight
   domain --> richtext & slack_schema
   contract --> domain
   slack --> slack_schema
@@ -135,11 +136,11 @@ flowchart TD
   ui --> tokens & topic_art
   views --> ui & tokens & contract
   state --> contract
-  desktop[apps/desktop] --> engine & state & views & contract & tokens & slack
+  desktop[apps/desktop] --> engine & state & views & contract & tokens & slack & highlight
   huddle_views[huddle-views] --> ui & tokens
   huddle_media[huddle-media]
   desktop --> huddle_views & huddle_media
-  gallery[apps/gallery] --> views & ui & tokens
+  gallery[apps/gallery] --> views & ui & tokens & highlight
   gallery -.tests.-> testing[testing]
   agent_contract[agent-contract] --> agent_cards[agent-cards]
   agent --> agent_memory[agent-memory] & agent_cards & agent_contract & ai_failure
@@ -165,6 +166,7 @@ The bottom block is Juno Agent (section 10, ADR 0012). Its one edge outside the 
 | `@juno/sync` | Slack ↔ store | boot, discovery, backfill, merge rules, event application, read-state mirroring, outbox and its worker, reconnect reconciliation, `reindexTopics` calls | render, call AI |
 | `@juno/files` | authenticated bytes | upload staging and the upload flow, file metadata rows, thumbnail URL resolution, download requests to main | touch the renderer |
 | `@juno/topic-art` | no model text reaches a page | the topic art vocabulary: the whitelist parser for the model's recipe, the renderer that rebuilds SVG from the checked recipe with the `art` tokens' CSS variables, the Tide pebble placeholder | import anything |
+| `@juno/highlight` | code colours are a pure function | the language tags and the tag-line rule (root), language detection and highlight.js grammars → coloured tokens (`/highlight`, about 150 KB, loaded only in the renderer's highlight worker and the gallery), and the one DOM step that paints tokens as CSS highlights (`/paint`) | import Effect, React or another `@juno` package |
 | `@juno/ai-failure` | one reading of a provider's error | the error kinds (`classifyFailure`), whether a kind is worth a retry or a fallback, and whether a failed request was billed | import anything |
 | `@juno/ai` | provider isolation | `AiProvider` with `PiAiProvider` and `FakeAiProvider`, task table (prompts, output schemas, tier) | touch the store |
 | `@juno/assistant` | AI policy | when tasks run, `ai_cache`, budget, concurrency, the off switch, Home items, the Juno chat with tools and cards | call OpenRouter directly |
@@ -192,9 +194,10 @@ The bottom block is Juno Agent (section 10, ADR 0012). Its one edge outside the 
 What `check-deps` fails on, beyond the graph (all of it runs in `pnpm lint`):
 
 - **Undeclared imports** of a `@juno/*` package in `src`, `test` or `e2e`.
-- **Package rules.** `ui`, `tokens`, `domain` and `richtext` import no `effect` (`domain` and `richtext` may import `{ Schema }`); `ui` does not import `state`; only `apps/desktop` imports `electron`.
+- **Package rules.** `ui`, `tokens`, `domain`, `richtext` and `highlight` import no `effect` (`domain` and `richtext` may import `{ Schema }`); `ui` does not import `state`; only `apps/desktop` imports `electron`. `richtext` imports `@juno/highlight`'s root only, for the code block's tag rule.
 - **Directory rules.** `apps/desktop/src/renderer` imports no `engine`, `store`, `slack`, `electron` or Node built-in. `src/main` imports no `state`, `views`, `ui`, `engine`, `store`, `slack` or React. `src/engine` imports no UI. `src/preload` imports only `electron` and `@juno/contract/channels`. Any `views/` or `*-views/` directory (including `packages/views` and `packages/huddle-views`) imports no `state`, `engine`, `store`, `electron`, Node built-in or `effect`, and neither it nor `ui` mentions `window.juno`.
 - **Unstable Effect modules** (list in the effect skill) only from the files that wrap them: `effect/reactivity` Atom, AtomRegistry, AtomRpc and AsyncResult in `state/src` (and one engine test); `Reactivity` in `store/src/invalidation.ts`; `@effect/atom-react` in `state/src/react.ts`; `effect/rpc` in `contract/src`, `engine/src/protocol`, `state/src`, `agent-contract/src`, `agent/src/host` and `agent/src/serve` (and two tests); `effect/workers` in `state/src/transport.ts`, `engine/src/protocol/runner.ts`, `agent/src/host/port.ts` and `agent/src/serve/runner.ts`; `effect/sql` and `@effect/sql-sqlite-node` in `store`. Every other unstable module is allowed nowhere until someone adds a wrapper and an entry in the script.
+- **The code highlighter.** `highlight.js` and `lowlight` are imported only by `packages/highlight/src/highlight.ts`, and that module (`@juno/highlight/highlight`) only by the renderer's `highlight/highlight.worker.ts` and the gallery's `main.tsx`; nothing in `packages/highlight/src` re-exports it. Nothing imports the worker module (the painter starts it by URL), and the renderer imports `highlight/painter` only with `import()`.
 - **The media session.** `huddle-media/src` imports no `state`, React, `effect`, Electron or Node built-in and does not mention `window.juno`; only `huddle-media/src/chime/` (and its tests) import `amazon-chime-sdk-js`.
 - **Juno Agent.** No `agent-*` package imports or declares `electron` or a Slack package; `@juno/agent` also stays away from `store`, `sync`, `engine`, `state` and the UI packages. `@earendil-works/pi-durable` and `chord` are imported only in `agent/src/runtime/`, `pi-mcp` only in `agent/src/mcp/`, `pi-ai` and `@openai/codex-sdk` only in `agent/src/providers/` (and `pi-ai` in `@juno/ai`); `agent-testing` may import all of them. `agent-memory` and `agent-cards` import only `{ Schema }` from `effect`. `src/agent` in the desktop app imports no engine, store, sync, Slack or UI code, and `src/main` and `src/engine` do not import `@juno/agent`.
 - **Engine feature folders.** A folder in `engine/src` other than `protocol` may not import another feature folder or `layer`, `startEngine` or `index`.
@@ -514,6 +517,8 @@ The theme is applied in one place: `applyTheme(theme, accent, density)` in `pack
 ## 9. Message rendering, emoji and files
 
 `@juno/richtext` is the owner the review found missing. It converts incoming `blocks` (preferring `rich_text`) and mrkdwn `text` as fallback into `MessageBody` (blocks: paragraph, quote, code, list, heading, divider, file; inlines: text with styles, `link`, `user`, `channel`, `usergroup`, `broadcast`, `emoji`, `date`, `break`), resolves mention ids to names through a lookup the caller passes, strips quotes for previews, and converts composer text with `@Name` and `#channel` tokens plus `> ` lines into outgoing `rich_text` blocks. It ships a shortcode-to-unicode table for `:thumbsup:` in text and for reaction names; custom emoji come from the `emoji` table. The picker in v1 is the fixed set of 12. All of this has table-driven tests with real redacted payloads from the live smoke. Its input types come from `@juno/slack-schema`, so a decoded `Message` renders with no cast; element kinds the schema does not model (`file`, `canvas`, `message_mention`, future ones) decode to `{ type: 'unknown', raw }` and richtext keeps their `text` or `fallback`. A preview with nothing left after stripping quotes shows the sender alone, never a dangling colon. Dates carry the Slack timestamp, format, readable fallback and optional URL. Message `files` become file blocks with id, name, mimetype and optional positive width and height (original dimensions first, thumbnail dimensions second). Legacy attachments append their fallback text, or title, text and fields when no fallback is present. `customEmojiLookup` resolves URLs and alias chains from the emoji table; cycles and missing aliases keep the shortcode.
+
+Code blocks (SPEC 7, "Code blocks"): `richtext` reads a first line that is only a language tag (```` ```ts ````) as the block's `language` and marks it `tagLine`. `text` keeps the line, so the edit field, the fallback text and edits sent to Slack keep the tag; the view leaves it out, so the plain block the renderer draws first already has its final lines. Colours are worked out in the renderer, off its main thread: `HighlightedCodeBlock` in `views` hands its element to a `CodeHighlighter` from `CodeHighlighterContext`. The desktop's (`renderer/highlight/`) loads the painter chunk when a block mounts; the painter waits for the block to come within 200 px of the screen, then asks a module worker running `highlightCode` (`@juno/highlight/highlight`: the language from the tag, else `detectLanguage`, else plain) and keeps the last 300 answers. A block whose colours are known still waits until it is near the screen. The worker gets one block at a time; at most 64 wait, a block that unmounts leaves the queue, and one not answered in 3 s stays plain while a new worker takes the rest. The painter puts the tokens on the page with the CSS Custom Highlight API (`paintCode`): one `Highlight` per token kind, coloured by `code::highlight(syntax-*)` rules in `global.css` from the `syntax` tokens (scoped: a bare `::highlight()` slowed every restyle). The block's DOM, layout and React state never change. Juno bubbles take the same path with their fence's info string as the language. Decision 0017 has the measurements.
 
 Files (owner decision 4, `@juno/files`):
 
