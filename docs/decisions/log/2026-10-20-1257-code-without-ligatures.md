@@ -1,0 +1,1 @@
+- 10-20 12:57 · code-without-ligatures · Code blocks and inline code, in messages and Juno's bubbles, show without font ligatures (owner), so `=>`, `->` and `++` read as typed. Reversible: `--text-code-ligatures` in `@juno/tokens` is `none`; `normal` brings them back.

@@ -334,6 +334,8 @@ The text's own colour (`--foreground-default`) is 15.6:1 in light and 14.7:1 in 
 
 Bundle Figtree (variable, `@fontsource-variable/figtree` 5.3.0, Latin subset 20 KB), Instrument Serif 400 regular + italic, JetBrains Mono 400/500 locally; no Google Fonts import.
 
+Code (blocks and inline code, in messages and Juno's bubbles) turns JetBrains Mono's ligatures off with `--text-code-ligatures: none`, so `=>`, `->` and `++` show as typed. Set it to `normal` to bring them back.
+
 Root text settings: `font-size: 14.5px; line-height: 1.5; letter-spacing: 0; -webkit-font-smoothing: antialiased`. The prototype root used 0.01em for Inter (`colors_and_type.css` says 0.02em); Figtree's sidebearings are wide enough on their own, so the root and every sans role use 0.
 
 **Metrics differences to expect**

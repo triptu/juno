@@ -181,6 +181,7 @@ export const variants = stylex.create({
     fontWeight: text['--text-code-weight'],
     lineHeight: text['--text-code-leading'],
     letterSpacing: text['--text-code-tracking'],
+    fontVariantLigatures: text['--text-code-ligatures'],
   },
 })
 
