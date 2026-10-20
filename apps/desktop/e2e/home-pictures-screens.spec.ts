@@ -20,7 +20,7 @@ test.skip(process.env['JUNO_SCREENS'] !== '1', 'set JUNO_SCREENS=1 to write the 
 
 function quietSeed(workspace: Workspace, avatarBase: string): void {
   const now = workspace.clock.now()
-  for (const [id, name] of [[SELF_ID, 'Tushar'], ['U0LEO', 'Leo Park'], ['U0MAYA', 'Maya Chen']] as const) {
+  for (const [id, name] of [[SELF_ID, 'Sam Ortiz'], ['U0LEO', 'Leo Park'], ['U0MAYA', 'Maya Chen']] as const) {
     workspace.addUser({ id, team_id: TEAM.id, name, real_name: name, profile: { display_name: name, image_72: `${avatarBase}/${id}.svg` } })
   }
   for (const [id, name] of [['C0GEN', 'general'], ['C0ENG', 'eng'], ['C0DES', 'design']] as const) {

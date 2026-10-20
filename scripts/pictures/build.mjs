@@ -22,7 +22,7 @@ const args = Object.fromEntries(process.argv.slice(2).flatMap((arg, at, all) => 
 const out = args.out ?? (existsSync('/Volumes/AgentWork') ? '/Volumes/AgentWork/pictures' : join(here, '.out'))
 const only = args.only === undefined ? undefined : new Set(args.only.split(','))
 const sources = JSON.parse(readFileSync(join(here, 'sources.json'), 'utf8'))
-const USER_AGENT = 'JunoPictures/1.0 (https://github.com/triptu; picture build)'
+const USER_AGENT = 'Juno-pictures-build/1.0 (https://github.com/triptu/juno)'
 
 const SMALL = { width: 640, height: 432, quality: 78, budget: 60 * 1024 }
 const LARGE = { edge: 2400, quality: 80, budget: 900 * 1024 }

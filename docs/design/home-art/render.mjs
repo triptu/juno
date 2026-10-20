@@ -2,10 +2,12 @@
 // time. Run from this folder: node render.mjs [--only key1,key2]
 // Playwright comes from the gallery's dependencies; a worktree without
 // node_modules falls back to the main checkout.
+import { execFileSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import fs from 'node:fs'
 import path from 'node:path'
-const candidates = [path.resolve('../../../apps/gallery/package.json'), '/Users/tushar/.t3/projects/juno/apps/gallery/package.json']
+const mainCheckout = path.dirname(execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8' }).trim())
+const candidates = [path.resolve('../../../apps/gallery/package.json'), path.join(mainCheckout, 'apps/gallery/package.json')]
 const galleryPkg = candidates.find((p) => fs.existsSync(path.join(path.dirname(p), 'node_modules')))
 const { chromium } = createRequire(galleryPkg)('@playwright/test')
 

@@ -11,10 +11,10 @@ test.describe.configure({ timeout: 150_000 })
 const DAY = 24 * 60 * 60 * 1000
 const SWITCH = 'Show a picture when you are caught up'
 
-/** Tushar and Leo in #general, everything read: Home is caught up. */
+/** Sam and Leo in #general, everything read: Home is caught up. */
 function quietSeed(workspace: Workspace, avatarBase: string): void {
   const now = workspace.clock.now()
-  for (const [id, name] of [[SELF_ID, 'Tushar'], ['U0LEO', 'Leo Park']] as const) {
+  for (const [id, name] of [[SELF_ID, 'Sam Ortiz'], ['U0LEO', 'Leo Park']] as const) {
     workspace.addUser({ id, team_id: TEAM.id, name, real_name: name, profile: { display_name: name, image_72: `${avatarBase}/${id}.svg` } })
   }
   workspace.addConversation({ id: 'C0QUIET', name: 'general', kind: 'public', members: new Set([SELF_ID, 'U0LEO']), created: now - 90 * DAY, topic: '', purpose: '', isOpen: true, archived: false })
