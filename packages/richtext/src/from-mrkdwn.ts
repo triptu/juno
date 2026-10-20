@@ -7,6 +7,7 @@
  * Lines that start with `&gt;` are quotes.
  */
 import type { ContentBlock as Block, Inline, InlineStyle, Lookups } from './model'
+import { codeBlock } from './code'
 import { channelInline, dateInline, emojiInline, normalize, usergroupInline, userInline } from './inline'
 
 export function unescapeMrkdwn(text: string): string {
@@ -198,7 +199,7 @@ export function mrkdwnBlocks(text: string, lookups: Lookups = {}): Block[] {
         }
       }
       const code = unescapeMrkdwn(codeLines.join('\n')).replace(/^\n+|\n+$/g, '')
-      if (code.length > 0) blocks.push({ kind: 'code', text: code })
+      if (code.length > 0) blocks.push(codeBlock(code))
       i++
       continue
     }

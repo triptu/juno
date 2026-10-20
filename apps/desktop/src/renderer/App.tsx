@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useLayoutEffect } from 'react'
 import { accentAtom, closeSidebarSheet, densityAtom, topicTitleLinesAtom, junoSetupPendingAtom, openSidebarSheet, privacyAtom, registry, reportAppStateAtom, resolvedThemeAtom, sessionUnknownAtom, signedInAtom, type Accent, type Density, type ResolvedTheme, type Theme } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { applyPrivacy, applyTheme, SheetOpenContext, Shell, type AccentName, type DensityName, type ThemeName, type ThemePreference } from '@juno/views'
+import { applyPrivacy, applyTheme, CodeHighlighterContext, SheetOpenContext, Shell, type AccentName, type DensityName, type ThemeName, type ThemePreference } from '@juno/views'
 import { chunk, usePreloaded } from './containers/chunks'
 import { Frame } from './containers/Frame'
 import { followFullScreen } from './containers/fullScreen'
@@ -10,6 +10,7 @@ import { followSharingPrivacy } from './containers/privacy'
 import { Sidebar } from './containers/Sidebar'
 import { Workspace } from './containers/Workspace'
 import { applyTopicTitleLines } from './containers/topicTitleLines'
+import { codeHighlighter } from './highlight/codeHighlighter'
 
 const signedOut = chunk(() => import('./containers/SignedOut'))
 const SignedOut = signedOut.component((module) => module.SignedOut)
@@ -85,10 +86,12 @@ export function App() {
   if (signedIn !== undefined) {
     return (
       <SheetOpenContext.Provider value={sheetOpen}>
-        <PrivacyRoot />
-        <Frame sidebar={<Sidebar />} peek={<Peek />}>
-          <Workspace />
-        </Frame>
+        <CodeHighlighterContext value={codeHighlighter}>
+          <PrivacyRoot />
+          <Frame sidebar={<Sidebar />} peek={<Peek />}>
+            <Workspace />
+          </Frame>
+        </CodeHighlighterContext>
       </SheetOpenContext.Provider>
     )
   }

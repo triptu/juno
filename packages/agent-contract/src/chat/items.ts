@@ -160,7 +160,8 @@ export const JunoBlock = Schema.Union([
   Schema.TaggedStruct('paragraph', { inlines: Schema.Array(JunoInline) }),
   Schema.TaggedStruct('heading', { inlines: Schema.Array(JunoInline) }),
   Schema.TaggedStruct('list', { ordered: Schema.Boolean, start: Schema.optionalKey(Schema.Number), items: Schema.Array(Schema.Array(JunoInline)) }),
-  Schema.TaggedStruct('codeBlock', { text: Schema.String }),
+  // `language` is the fence's info string as the model wrote it (```ts), for the code's colours.
+  Schema.TaggedStruct('codeBlock', { text: Schema.String, language: Schema.optionalKey(Schema.String) }),
 ])
 export type JunoBlock = typeof JunoBlock.Type
 

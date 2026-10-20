@@ -2,7 +2,8 @@ import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import type { BodyBlock, BodyInline, MessageBody as MessageBodyModel } from '@juno/contract'
 import { colors, radii, spacing, text, weights, sizes } from '@juno/tokens/tokens.stylex'
-import { Chip, CodeBlock, Divider, focusRing, Text, type ActivateEvent, type HueName } from '@juno/ui'
+import { Chip, Divider, focusRing, Text, type ActivateEvent, type HueName } from '@juno/ui'
+import { HighlightedCodeBlock } from './CodeHighlight'
 import { AttachmentCard, AttachmentFields, AttachmentImage, SharedFileLines, SharedPlace, type FileBlock } from './AttachmentCard'
 import { MessageLink as Link, type LinkInfo } from './MessageLink'
 import { slackDate } from './time'
@@ -115,7 +116,7 @@ function Block({ block, now, hueOf, onChannel, onLink, linkInfo, tabIndex, rende
     case 'code':
       return (
         <div {...stylex.props(styles.code)}>
-          <CodeBlock>{block.text}</CodeBlock>
+          <HighlightedCodeBlock text={block.tagLine ? block.text.slice(block.text.indexOf('\n') + 1) : block.text} language={block.language} />
         </div>
       )
     case 'list': {
@@ -355,6 +356,7 @@ const styles = stylex.create({
   inlineCode: {
     fontFamily: text['--text-code-family'],
     fontSize: text['--text-code-size'],
+    fontVariantLigatures: 'none',
     paddingInline: spacing['--space-1'],
     borderRadius: radii['--radius-xs'],
     backgroundColor: colors['--secondary-default'],

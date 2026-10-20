@@ -11,7 +11,7 @@
  */
 import { Clock, Effect } from 'effect'
 import { NotFound, NotSignedIn, Rejected, type MessageActionError, type MessageRef } from '@juno/contract'
-import { composeOutgoing, type MentionTargets } from '@juno/richtext'
+import { composeEdit, type MessageContent, type MentionTargets } from '@juno/richtext'
 import { StoreWriter, transaction, type Invalidation, type SqlError } from '@juno/store'
 import { resolveFailedAction, queueDelete, queueEdit, queueReaction, resolveTarget, storedMe, type ActionRefusal, type MessageRef as StoreRef } from '@juno/sync'
 import { userName, type UserRow } from '../topicRows'
@@ -95,7 +95,17 @@ export const editMessage = (message: MessageRef, text: string): Effect.Effect<vo
             : target.kind === 'stored'
               ? yield* mentionTargets(target.row.text, target.row.blocks_json)
               : yield* mentionTargets(target.post.text, target.post.blocksJson)
-        const outgoing = composeOutgoing(text, targets)
+        const originalText = target?.kind === 'stored' ? target.row.text : target?.post.text
+        const blocksJson = target?.kind === 'stored' ? target.row.blocks_json : target?.post.blocksJson
+        const blocks: MessageContent['blocks'] = blocksJson == null ? [] : JSON.parse(blocksJson)
+        const sql = yield* StoreWriter
+        const groupIds = idsIn(/"usergroup_id":"([^"]+)"/g, [blocksJson ?? null])
+        const groups = groupIds.length === 0 ? [] : yield* sql<{ id: string; handle: string; name: string | null }>`SELECT id, handle, name FROM usergroups WHERE id IN ${sql.in(groupIds)}`
+        const outgoing = composeEdit(text, { text: originalText ?? '', blocks }, {
+          user: (id) => targets.people?.find((person) => person.id === id)?.name,
+          channel: (id) => targets.channels?.find((channel) => channel.id === id)?.name,
+          usergroup: (id) => { const group = groups.find((row) => row.id === id); return group === undefined ? undefined : { handle: group.handle, name: group.name ?? group.handle } },
+        }, targets)
         return yield* queueEdit({ ref, text: outgoing.text, blocksJson: JSON.stringify(outgoing.blocks), selfId, now })
       }),
     )

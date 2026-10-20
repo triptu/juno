@@ -4,7 +4,19 @@ import './gallery.css'
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { highlightCode } from '@juno/highlight/highlight'
+import { paintCode } from '@juno/highlight/paint'
+import { CodeHighlighterContext, type CodeHighlighter } from '@juno/views'
 import { App } from './App'
+
+// Colours on this thread, before the first paint, so a screenshot never
+// catches a block before its colours. The app works them out in a worker.
+const highlighter: CodeHighlighter = {
+  paint: (element, code, language) => {
+    const result = highlightCode(code, language)
+    return result === undefined ? () => {} : paintCode(element, result)
+  },
+}
 
 const container = document.getElementById('root')
 if (!container) throw new Error('Missing #root element')
@@ -19,7 +31,9 @@ const sample = 'Aa–āő'
 void Promise.allSettled(faces.map((font) => document.fonts.load(font, sample))).then(() =>
   createRoot(container).render(
     <StrictMode>
-      <App />
+      <CodeHighlighterContext value={highlighter}>
+        <App />
+      </CodeHighlighterContext>
     </StrictMode>,
   ),
 )

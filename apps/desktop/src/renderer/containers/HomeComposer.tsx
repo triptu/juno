@@ -5,7 +5,6 @@ import {
   emptyHomeDraft,
   errorOf,
   homeDraftAtom,
-  homeFocusAtom,
   junoAvailableAtom,
   pickConversation,
   pickConversationsAtom,
@@ -14,15 +13,15 @@ import {
   sendTarget,
   setHomeDraft,
   showToast,
-  tabsAtom,
   untouched,
   type HomeDraft,
 } from '@juno/state'
 import { junoNavAtom, junoReadsImagesAtom } from '@juno/state/agent'
-import { afterPaint, mark } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { AttachmentNote, Composer, destinationLabel, holdKeys, notSentText, releaseKeys, SendToList, sendToRowId, type ComposerMention } from '@juno/views'
 import { takeAttachments, useAttachments } from './attachments'
+import { useComposerMarkup } from './composerMarkup'
+import { useFocusOnShow, useFocusRequest } from './homeFocus'
 import { useHomeSendChecks } from './homeSendChecks'
 import { isPeople, WriteTop } from './homeWriteTop'
 import { junoCommands } from './juno/actions'
@@ -37,12 +36,6 @@ import type { Destination } from './sendChecks'
 function typeIn(field: HTMLTextAreaElement | null, text: string): void {
   field?.focus()
   if (field !== null && field === document.activeElement) document.execCommand('insertText', false, text)
-}
-
-/** Focus is on an open menu's anchor or in its panel, outside this Home. */
-function inOpenMenu(active: Element | null, field: HTMLElement | null): boolean {
-  const menu = active?.closest('[aria-expanded="true"], [role="dialog"], [role="menu"]')
-  return menu != null && field?.closest('[data-home]')?.contains(menu) !== true
 }
 
 /** A first @ or # with what follows it, and nothing else typed yet. */
@@ -149,42 +142,6 @@ function sendToMention(sendTo: ReturnType<typeof useSendTo>, listId: string): Co
     list: <SendToList kind={sendTo.trigger === '@' ? 'person' : 'channel'} rows={sendTo.rows} id={listId} activeKey={sendTo.activeKey} onActivate={sendTo.choose} onPick={sendTo.pick} />,
     onDismiss: sendTo.dismiss,
   }
-}
-
-/**
- * ⌘N, ⌘T and "+" ask this Home to focus its field, and with ⌘N to open its
- * destination list. Keys typed since the shortcut were held
- * (`holdKeys`); they are typed into the field or the search once it has
- * focus, which for a search not yet mounted is when it mounts.
- */
-function useFocusRequest(tabId: string, field: () => HTMLElement | null | undefined, openList: () => void, search: () => HTMLElement | null | undefined): void {
-  const request = useAtomValue(homeFocusAtom)
-  const active = useAtomValue(tabsAtom, (tabs) => tabs.active === tabId)
-  // Taken during render, so the list is open in the same frame; the focus moves once it has painted.
-  const [taken, setTaken] = useState<number | undefined>(undefined)
-  const due = request?.tabId === tabId && active && request.seq !== taken ? request : undefined
-  if (due !== undefined) {
-    setTaken(due.seq)
-    if (due.list) openList()
-  }
-  useEffect(() => {
-    const request = registry.get(homeFocusAtom)
-    if (taken === undefined || request?.seq !== taken) return
-    registry.set(homeFocusAtom, undefined)
-    // With the list, focus goes to its search: its own autoFocus can run while a new tab is still hidden, and
-    // moving focus to the field would close the list.
-    const target = request.list ? search : field
-    target()?.focus()
-    if (target() === document.activeElement) return releaseKeys()
-    const root = field()?.closest('[data-home]')
-    const onFocus = () => {
-      if (target() !== document.activeElement) return
-      root?.removeEventListener('focusin', onFocus)
-      releaseKeys()
-    }
-    root?.addEventListener('focusin', onFocus)
-    return () => root?.removeEventListener('focusin', onFocus)
-  }, [taken, field, search])
 }
 
 /** The people and channels picked with @ and # in a question for Juno, so Juno reads their ids. */
@@ -309,7 +266,9 @@ export interface HomeComposerProps {
  * an empty field goes back to Juno. A send to a person or channel goes to
  * its Main (a channel's starts a thread), and Home stays: the field
  * empties, the destination goes back to Juno and a toast says where it
- * went. A send to Juno opens the Juno chat with the question.
+ * went. A send to Juno opens the Juno chat with the question. Slack's
+ * markup and its keys work once a person or channel is chosen; a question
+ * for Juno is plain text.
  */
 export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerProps) {
   const draft = useAtomValue(homeDraftAtom(tabId))
@@ -327,14 +286,7 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
   const sendTo = useSendTo(draft, (conversation) => destination.choose(conversation, true))
   useFocusRequest(tabId, field, destination.openList, search)
 
-  // Shown again: the field takes focus, so keys typed after ⌘T or a click on Home reach it. Not from
-  // an open menu elsewhere: the account menu opened while Home still loaded would close.
-  useLayoutEffect(() => {
-    if (!inOpenMenu(document.activeElement, inputRef.current)) focusField()
-    afterPaint(() => {
-      if (inputRef.current === document.activeElement) mark('juno.composer-ready')
-    })
-  }, [focusField])
+  useFocusOnShow(inputRef, focusField)
 
   const { sending, send } = useSend(tabId, files.files.length > 0, junoOn, destination.openList)
   const sendToList = sendToMention(sendTo, listId)
@@ -351,6 +303,7 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
     skipLeading: draft.conversation === undefined,
   })
   const toSlack = draft.conversation !== undefined
+  const markup = useComposerMarkup(toSlack)
 
   const onFieldKey = (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
     if (event.nativeEvent.isComposing) return false
@@ -361,6 +314,7 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
       destination.choose(undefined)
       return true
     }
+    if (markup.onKey(event, mentions.marks)) return true
     return mentions.onFieldKey(event)
   }
 
@@ -368,6 +322,7 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
     <Composer
       value={draft.draft}
       marks={mentions.marks}
+      {...markup.format(draft.draft, mentions.marks)}
       onCaret={mentions.onCaret}
       {...(mentions.mention === undefined ? {} : { mention: mentions.mention })}
       {...(sendToList === undefined ? {} : { mention: sendToList })}

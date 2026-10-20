@@ -349,6 +349,17 @@ describe('mrkdwn text', () => {
     expect(bodyFromMrkdwn('```one liner```', lookups).blocks).toEqual([{ kind: 'code', text: 'one liner' }])
   })
 
+  it('reads a first line that is only a language tag as the code language, and keeps it in the text', () => {
+    expect(bodyFromMrkdwn('```ts\nconst a = 1\n```', lookups).blocks).toEqual([{ kind: 'code', text: 'ts\nconst a = 1', language: 'typescript', tagLine: true }])
+    const body = messageBody({ blocks: richText([{ type: 'rich_text_preformatted', elements: [{ type: 'text', text: 'python\nprint(1)' }] }]) }, lookups)
+    expect(body.blocks).toEqual([{ kind: 'code', text: 'python\nprint(1)', language: 'python', tagLine: true }])
+    // The fallback text and the edit field have the code as written.
+    expect(plainText(body)).toBe('python\nprint(1)')
+    // A lone tag word, or a first line with more on it, is the code itself.
+    expect(bodyFromMrkdwn('```python```', lookups).blocks).toEqual([{ kind: 'code', text: 'python' }])
+    expect(bodyFromMrkdwn('```ts is fine\nreally```', lookups).blocks).toEqual([{ kind: 'code', text: 'ts is fine\nreally' }])
+  })
+
   it('keeps newlines as breaks inside a paragraph', () => {
     expect(bodyFromMrkdwn('a\nb', lookups).blocks).toEqual([{ kind: 'paragraph', children: [{ kind: 'text', text: 'a' }, { kind: 'break' }, { kind: 'text', text: 'b' }] }])
   })

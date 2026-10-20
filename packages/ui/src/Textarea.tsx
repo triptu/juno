@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
-import { useCallback, useLayoutEffect, useRef, type ReactNode, type Ref, type RefObject, type TextareaHTMLAttributes, type UIEvent } from 'react'
-import { accent, colors, layout, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
-import { chipVariants, personHues } from './Chip'
+import { useCallback, useEffect, useLayoutEffect, useRef, type Ref, type RefObject, type TextareaHTMLAttributes, type UIEvent } from 'react'
+import { accent, colors, layout, radii, spacing, text } from '@juno/tokens/tokens.stylex'
+import { chunk } from './chunks'
 import { variants as typeVariants } from './internal/type'
 import type { HueName } from './internal/hue'
 
@@ -16,11 +16,25 @@ export interface TextareaMark {
   readonly hue?: HueName
 }
 
+export interface TextareaRange {
+  readonly start: number
+  readonly end: number
+}
+
+/** Slack's markup in the text, drawn as it will look (`markupLayout` in `@juno/richtext`). */
+export interface TextareaFormat {
+  /** Styled runs, without their markers, except that a code run takes in its backticks or fences. */
+  readonly spans: ReadonlyArray<TextareaRange & { readonly style: 'bold' | 'italic' | 'strike' | 'code' }>
+  /** Marker characters, drawn dimmed. */
+  readonly markers: ReadonlyArray<TextareaRange>
+  /** Code blocks, fences included: the lines wholly inside one are drawn as one tinted block. */
+  readonly codeBlocks: ReadonlyArray<TextareaRange>
+  /** Quote lines, drawn as messages draw a quote. */
+  readonly quotes: ReadonlyArray<TextareaRange>
+}
+
 /** The `field` variant's growth limit: 8 lines of ui text (13.5 × 1.5), its 6px insets and its border. */
 const FIELD_MAX_HEIGHT = '176px' // tokens-allow: One component's growth limit.
-
-/** The anchor name of the character at `anchorAt`, for a popover placed with CSS anchor positioning. */
-const TEXTAREA_ANCHOR = '--textarea-anchor'
 
 export interface TextareaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'style' | 'className' | 'value'> {
   /**
@@ -42,7 +56,13 @@ export interface TextareaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaE
    * by a layer under the field, which keeps its caret, selection and input.
    */
   readonly marks?: ReadonlyArray<TextareaMark>
-  /** With `marks`: the character at this offset is the `TEXTAREA_ANCHOR`. */
+  /**
+   * For `inline`: Slack's markup, drawn by the same layer as `marks`. Every
+   * look keeps each glyph's width: bold is a stroke, italic the field
+   * font's slant, code a tint in the field font.
+   */
+  readonly format?: TextareaFormat
+  /** With `marks` or `format`: the character at this offset is the `TEXTAREA_ANCHOR`. */
   readonly anchorAt?: number
 }
 
@@ -50,13 +70,27 @@ export interface TextareaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaE
  * A multi-line input. The inline variant grows with its content through
  * `field-sizing: content`, so no layout is read on a keystroke.
  *
- * With `marks` the field's own text is transparent and a layer under it
- * draws the same text in the same box, with the marked runs as chips. The
- * chips keep the text's weight and take no width (their inset is given
- * back with a negative margin), so every glyph sits where the field's
- * caret and selection expect it. The layer follows the field's scroll.
+ * With `marks` or `format` the field's own text is transparent and a layer
+ * under it draws the same text in the same box, with the marked runs as
+ * chips and the markup styled (`TextareaLines`). Nothing it draws changes a
+ * glyph's width: chips give their inset back with a negative margin, and
+ * the markup's looks keep the field's font and widths. So every glyph sits
+ * where the field's caret and selection expect it. The layer follows the
+ * field's scroll.
  */
-export function Textarea({ variant = 'inline', maxHeight = 'composer', label, rows, marks, anchorAt, onScroll, ref, ...rest }: TextareaProps) {
+// Line and chip drawing loads as soon as a layered field mounts.
+let lines: typeof import('./TextareaLines') | undefined
+const lineDrawing = chunk(() => import('./TextareaLines').then((module) => (lines = module)))
+
+export function Textarea({ variant = 'inline', maxHeight = 'composer', label, rows, marks, format, anchorAt, onScroll, ref, ...rest }: TextareaProps) {
+  'use no memo' // The value changes on every keystroke; keep the wrapper small and drawing in its chunk.
+  const layered = marks !== undefined || format !== undefined
+  const formatted = format !== undefined
+  const linesReady = lineDrawing.useReady()
+  useEffect(() => {
+    if (!layered) return
+    void lineDrawing.load()
+  }, [layered])
   const layer = useRef<HTMLDivElement>(null)
   const own = useRef<HTMLTextAreaElement | null>(null)
   // Text the field opens with (a saved draft, a message to edit) takes typing at its end, not before it.
@@ -77,7 +111,7 @@ export function Textarea({ variant = 'inline', maxHeight = 'composer', label, ro
       aria-label={label}
       rows={rows ?? (variant === 'card' ? 2 : 1)}
       {...rest}
-      {...(marks === undefined
+      {...(!layered
         ? { onScroll }
         : {
             onScroll: (event: UIEvent<HTMLTextAreaElement>) => {
@@ -85,14 +119,14 @@ export function Textarea({ variant = 'inline', maxHeight = 'composer', label, ro
               onScroll?.(event)
             },
           })}
-      {...stylex.props(styles.base, variants[variant], variant === 'field' && typeVariants.ui, variant === 'inline' && maxHeights[maxHeight], marks !== undefined && styles.inkless)}
+      {...stylex.props(styles.base, variants[variant], variant === 'field' && typeVariants.ui, variant === 'inline' && maxHeights[maxHeight], layered && styles.inkless)}
     />
   )
-  if (marks === undefined) return field
+  if (!layered) return field
   return (
     <div {...stylex.props(styles.marked)}>
-      <div ref={layer} aria-hidden data-textarea-layer="" {...stylex.props(variants.inline, styles.layer)}>
-        {drawn(rest.value ?? '', marks, anchorAt)}
+      <div ref={layer} dir={rest.dir} aria-hidden data-textarea-layer="" {...stylex.props(variants.inline, styles.layer)}>
+        {linesReady && lines !== undefined ? (formatted ? lines.drawnLines(rest.value ?? '', marks ?? [], format, anchorAt) : lines.drawn(rest.value ?? '', marks ?? [], anchorAt)) : (rest.value ?? '') + (rest.value?.endsWith('\n') ? '\u200b' : '')}
       </div>
       {field}
     </div>
@@ -104,42 +138,6 @@ function setRef(ref: Ref<HTMLTextAreaElement> | undefined, node: HTMLTextAreaEle
   else if (ref !== undefined && ref !== null) (ref as RefObject<HTMLTextAreaElement | null>).current = node
 }
 
-/** The text as runs: plain text, chips, and the anchor character. A trailing newline keeps its empty line. */
-function drawn(value: string, marks: ReadonlyArray<TextareaMark>, anchorAt: number | undefined): ReactNode[] {
-  const out: ReactNode[] = []
-  let at = 0
-  const plain = (end: number) => {
-    if (end <= at) return
-    if (anchorAt !== undefined && anchorAt >= at && anchorAt < end) {
-      if (anchorAt > at) out.push(value.slice(at, anchorAt))
-      out.push(
-        <span key="anchor" {...stylex.props(styles.anchor)}>
-          {value[anchorAt]}
-        </span>,
-      )
-      if (anchorAt + 1 < end) out.push(value.slice(anchorAt + 1, end))
-    } else {
-      out.push(value.slice(at, end))
-    }
-    at = end
-  }
-  for (const mark of marks) {
-    if (mark.start < at || mark.end > value.length) continue
-    plain(mark.start)
-    // The anchor inside a mark is the mark: the link editor lines up under linked words.
-    const anchored = anchorAt !== undefined && anchorAt >= mark.start && anchorAt < mark.end
-    const look = mark.look === 'link' ? styles.link : [styles.chip, mark.look === 'channel' ? chipVariants.filled : personHues[mark.hue ?? 'rose']]
-    out.push(
-      <span key={mark.start} data-mark={mark.look} {...stylex.props(look, anchored && styles.anchor)}>
-        {value.slice(mark.start, mark.end)}
-      </span>,
-    )
-    at = mark.end
-  }
-  plain(value.length)
-  if (value.endsWith('\n')) out.push('​')
-  return out
-}
 
 const styles = stylex.create({
   base: {
@@ -174,6 +172,7 @@ const styles = stylex.create({
     },
   },
   layer: {
+    unicodeBidi: 'plaintext',
     position: 'absolute',
     inset: 0,
     boxSizing: 'border-box',
@@ -185,22 +184,6 @@ const styles = stylex.create({
     scrollbarColor: 'transparent transparent',
     pointerEvents: 'none',
     userSelect: 'none',
-  },
-  // The chip's inset is given back by its margin, so no glyph moves.
-  chip: {
-    borderRadius: radii['--radius-tag'],
-    paddingInline: spacing['--space-0-5'],
-    marginInline: `calc(-1 * ${spacing['--space-0-5']})`,
-  },
-  anchor: {
-    anchorName: TEXTAREA_ANCHOR,
-  },
-  // As links in messages are drawn, with no change of width.
-  link: {
-    color: accent['--hl-text'],
-    textDecorationLine: 'underline',
-    textDecorationColor: colors['--link-underline'],
-    textUnderlineOffset: sizes['--link-underline-offset'],
   },
 })
 

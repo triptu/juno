@@ -26,7 +26,8 @@ export const date = (timestamp: number, format: string, fallback: string): BodyI
 
 export const p = (...children: ReadonlyArray<BodyInline | string>): BodyBlock => ({ kind: 'paragraph', children: children.map((child) => (typeof child === 'string' ? t(child) : child)) })
 export const quote = (...children: ReadonlyArray<BodyInline | string>): BodyBlock => ({ kind: 'quote', children: children.map((child) => (typeof child === 'string' ? t(child) : child)) })
-export const code = (text: string): BodyBlock => ({ kind: 'code', text })
+/** A code block. With `language`, the text's first line is its tag, which the view does not show. */
+export const code = (text: string, language?: string): BodyBlock => (language === undefined ? { kind: 'code', text } : { kind: 'code', text, language, tagLine: true })
 export const list = (style: 'bullet' | 'ordered' | 'checked' | 'unchecked', items: ReadonlyArray<string>, indent = 0): BodyBlock => ({
   kind: 'list',
   style,

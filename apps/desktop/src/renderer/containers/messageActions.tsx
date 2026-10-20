@@ -135,6 +135,7 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
             <Suspense fallback={null}>
               <EditField
                 value={editing.text}
+                body={rowMessage(editing.ts)?.body}
                 onChange={(text) => setEditing((current) => (current === undefined || current.savedRev !== undefined ? current : { ...current, text }))}
                 onCancel={() => {
                   setEditing(undefined)

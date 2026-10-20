@@ -28,7 +28,7 @@ const warnings = []
 const schemaOnlyEffect = new Set(['@juno/domain', '@juno/richtext', '@juno/agent-memory', '@juno/agent-cards'])
 // Packages whose src must not import effect at all.
 // (@juno/views and @juno/huddle-views are covered by the `views` directory rule below.)
-const noEffect = new Set(['@juno/ui', '@juno/tokens', '@juno/domain', '@juno/richtext', '@juno/agent-memory', '@juno/agent-cards'])
+const noEffect = new Set(['@juno/ui', '@juno/tokens', '@juno/domain', '@juno/richtext', '@juno/highlight', '@juno/agent-memory', '@juno/agent-cards'])
 // Packages whose src must not import @juno/state.
 const noState = new Set(['@juno/ui', '@juno/notifications'])
 // The only package allowed to import electron.
@@ -188,6 +188,23 @@ const thirdParty = [
 // Juno's memory of the owner is context, never authority (SPEC 13.8): the code that decides
 // permissions, cards, grants, the auto-review and the owner's rules never reads it.
 const memoryDocs = 'packages/agent/src/memory-docs/'
+
+// The code highlighter (ADR 0017). highlight.js and its 29 grammars are about 150 KB and load only in
+// the renderer's highlight worker: `packages/highlight/src/highlight.ts` is the one module that imports
+// them, and only the worker entry (and the gallery, a separate review app) imports that module. Nothing
+// imports the worker module itself (the painter starts it by URL), and the painter is a lazy chunk.
+const highlighterModule = 'packages/highlight/src/highlight.ts'
+const highlighterImporters = ['apps/desktop/src/renderer/highlight/highlight.worker.ts', 'apps/gallery/src/main.tsx']
+function highlighterErrors(rel, spec, clause, dynamic) {
+  const doc = 'Keep the grammars to the highlight worker (packages/highlight/README.md, ADR 0017).'
+  if (/^(?:highlight\.js|lowlight)(?:\/|$)/.test(spec) && rel !== highlighterModule) return `imports ${spec}; only ${highlighterModule} may. ${doc}`
+  if (spec === '@juno/highlight/highlight' && !highlighterImporters.includes(rel)) return `imports ${spec}; only ${highlighterImporters.join(' and ')} may. ${doc}`
+  if (rel.startsWith('packages/highlight/src/') && /^\.\/highlight(?:\.ts)?$/.test(spec)) return `imports ${spec}: a re-export would carry the grammars into every importer. ${doc}`
+  if (/(?:^|\/)highlight\.worker(?:\.ts)?$/.test(spec)) return `imports ${spec}; the worker module is started by URL from painter.ts, never imported. ${doc}`
+  const typeOnly = /^type\s/.test(clause.trim())
+  if (rel.startsWith('apps/desktop/src/renderer/') && /(?:^|\/)highlight\/painter(?:\.ts)?$|^\.\/painter(?:\.ts)?$/.test(spec) && !dynamic && !typeOnly) return `imports ${spec} statically; the painter is a lazy chunk, loaded with import(). ${doc}`
+  return undefined
+}
 const noMemoryReaders = ['packages/agent/src/policy/', 'packages/agent/src/grants/', 'packages/agent/src/review/', 'packages/agent/src/actions/', 'packages/agent/src/mcp/reviewed.ts', 'packages/agent/src/mcp/manager.ts']
 
 // Engine feature folders (docs/architecture.md section 3): a folder under packages/engine/src
@@ -273,12 +290,12 @@ function importsOf(text) {
   const patterns = [
     { re: /\b(?:import|export)\s+((?:type\s+)?[^'"`;]*?)\s*\bfrom\s*['"]([^'"\n]+)['"]/g, clause: 1, spec: 2 },
     { re: /\bimport\s*['"]([^'"\n]+)['"]/g, clause: null, spec: 1 },
-    { re: /\bimport\s*\(\s*['"]([^'"\n]+)['"]\s*\)/g, clause: null, spec: 1 },
+    { re: /\bimport\s*\(\s*['"]([^'"\n]+)['"]\s*\)/g, clause: null, spec: 1, dynamic: true },
     { re: /\brequire\s*\(\s*['"]([^'"\n]+)['"]\s*\)/g, clause: null, spec: 1 },
   ]
-  for (const { re, clause, spec } of patterns) {
+  for (const { re, clause, spec, dynamic = false } of patterns) {
     for (const match of text.matchAll(re)) {
-      found.push({ spec: match[spec], clause: clause === null ? '' : match[clause] })
+      found.push({ spec: match[spec], clause: clause === null ? '' : match[clause], dynamic })
     }
   }
   return found
@@ -400,8 +417,10 @@ for (const pkg of packages) {
       }
     }
 
-    for (const { spec, clause } of importsOf(text)) {
+    for (const { spec, clause, dynamic } of importsOf(text)) {
       const target = packageOf(spec)
+      const highlighterError = highlighterErrors(rel, spec, clause, dynamic)
+      if (highlighterError !== undefined) errors.push(`${where}: ${highlighterError}`)
       const isEffect = spec === 'effect' || spec.startsWith('effect/') || spec.startsWith('@effect/')
 
       if (target === 'electron' && pkg.name !== electronOwner) {

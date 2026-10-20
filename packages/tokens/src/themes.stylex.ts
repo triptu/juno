@@ -11,7 +11,7 @@
  * and the app can switch back to it.
  */
 import * as stylex from '@stylexjs/stylex'
-import { accent, accentSwatches, art, colors, density, hues, iconTints, shadows, tints } from './tokens.stylex'
+import { accent, accentSwatches, art, colors, density, hues, iconTints, shadows, syntax, tints } from './tokens.stylex'
 
 export const darkColors = stylex.createTheme(colors, {
   // A warm-neutral near-black (OKLCH hue 85, chroma 0.006), so dark is the
@@ -150,6 +150,23 @@ export const darkHues = stylex.createTheme(hues, {
 })
 
 
+/** Code colours on ink: the same hues, lighter, at 6.4:1 (comment) to 9.2:1 on `--background`. */
+export const darkSyntax = stylex.createTheme(syntax, {
+  '--syntax-keyword': 'hsla(322, 45%, 76%, 1)',
+  '--syntax-string': 'hsla(100, 32%, 66%, 1)',
+  '--syntax-number': 'hsla(30, 70%, 66%, 1)',
+  '--syntax-comment': 'hsla(48, 6%, 60%, 1)',
+  '--syntax-function': 'hsla(212, 70%, 76%, 1)',
+  '--syntax-type': 'hsla(176, 38%, 62%, 1)',
+  '--syntax-constant': 'hsla(262, 55%, 78%, 1)',
+  '--syntax-property': 'hsla(198, 52%, 70%, 1)',
+  '--syntax-tag': 'hsla(8, 62%, 72%, 1)',
+  '--syntax-punctuation': 'hsla(48, 8%, 66%, 1)',
+  '--syntax-meta': 'hsla(40, 26%, 64%, 1)',
+  '--syntax-inserted': 'hsla(130, 38%, 62%, 1)',
+  '--syntax-deleted': 'hsla(0, 62%, 72%, 1)',
+})
+
 /**
  * Topic art on ink. A step lighter than round 2: the fill at L 0.41 to
  * 0.455 reads as a quiet surface, not a hole, and the line (0.775 to 0.80)
@@ -237,7 +254,7 @@ export const darkArt = stylex.createTheme(art, {
 })
 
 /** Everything that changes in dark mode. Spread into stylex.props(). */
-export const dark = [darkColors, darkShadows, darkAccentSwatches, darkIconTints, darkTints, darkHues, darkArt] as const
+export const dark = [darkColors, darkShadows, darkAccentSwatches, darkIconTints, darkTints, darkHues, darkArt, darkSyntax] as const
 
 /*
  * Accent themes. Each sets the fill, the text on it, the accent text, and
