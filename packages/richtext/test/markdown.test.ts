@@ -36,3 +36,20 @@ describe('markdown files', () => {
     expect(bodyFromMarkdown('![chart](https://example.com/c.png)').blocks).toEqual([{ kind: 'paragraph', children: [{ kind: 'link', url: 'https://example.com/c.png', text: 'chart' }] }])
   })
 })
+
+describe('markdown files that never close what they open', () => {
+  it.each([
+    ['brackets', '['],
+    ['links without a target', '[a]('],
+    ['autolinks', '<http://a'],
+    ['backticks', '`a'],
+    ['emphasis', '**a '],
+    ['underscores', '_a '],
+  ])('reads 200 KB of unclosed %s in well under a second', (_, unit) => {
+    const text = unit.repeat(Math.ceil(200_000 / unit.length))
+    const started = Date.now()
+    const body = bodyFromMarkdown(text)
+    expect(Date.now() - started).toBeLessThan(500)
+    expect(body.blocks).toHaveLength(1)
+  })
+})

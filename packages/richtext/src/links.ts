@@ -64,9 +64,13 @@ function trimEnd(url: string, wrapping: string): string {
   }
 }
 
-/** The markup markers right before `start`, when they start a word: "*_" in "see *_https://…". */
+/** How far back a link's wrapping markers are looked for, so a long line of links is read in linear time. */
+const WRAP_LOOKBACK = 256
+
+/** The markup markers right before `start`, when they start a word: "*_" in "see *_https://…". Only the line's last `WRAP_LOOKBACK` characters count. */
 function wrappingMarkers(text: string, start: number): string {
-  const prefix = text.slice(text.lastIndexOf('\n', start - 1) + 1, start)
+  const near = text.slice(Math.max(0, start - WRAP_LOOKBACK), start)
+  const prefix = near.slice(near.lastIndexOf('\n') + 1)
   let wrapping = ''
   for (let i = 0; i < prefix.length; i++) {
     const marker = prefix[i]!

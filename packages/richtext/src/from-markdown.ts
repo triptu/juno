@@ -88,10 +88,24 @@ export function bodyFromMarkdown(markdown: string): MessageBody {
 }
 
 const PUNCTUATION = /[!-/:-@[-`{-~]/
+const SPACE = /\s/
+const WORD = /[\p{L}\p{N}]/u
+/** Emphasis inside emphasis this deep is read as text, so a line is scanned at most this many times. */
+const MAX_DEPTH = 3
+const MARKERS = ['**', '__', '~~', '*', '_'] as const
+/** The longest link target or autolink read, so a far-off `)` or `>` is never read up to again and again. */
+const MAX_TARGET = 2048
 
-/** Markdown's inline forms in one line of text. */
-export function markdownInlines(text: string, style: InlineStyle = {}): Array<Inline> {
+/**
+ * Markdown's inline forms in one line of text, in one pass. Every search
+ * ahead (a closing backtick run, `]`, `)`, `>` or emphasis marker) is
+ * remembered, so a later search from inside the part already searched
+ * answers at once: a line of unclosed brackets or markers stays linear.
+ */
+export function markdownInlines(text: string, style: InlineStyle = {}, depth = 0): Array<Inline> {
   const out: Array<Inline> = []
+  const find = searcher(text)
+  const close = closer(text)
   let plain = ''
   const pushPlain = () => {
     if (plain === '') return
@@ -107,44 +121,51 @@ export function markdownInlines(text: string, style: InlineStyle = {}): Array<In
   let at = 0
   while (at < text.length) {
     const char = text[at]!
-    const rest = text.slice(at)
     if (char === '\\' && PUNCTUATION.test(text[at + 1] ?? '')) {
       plain += text[at + 1]
       at += 2
       continue
     }
     if (char === '`') {
-      const run = /^`+/.exec(rest)![0]
-      const close = text.indexOf(run, at + run.length)
-      if (close !== -1) {
+      let end = at
+      while (text[end] === '`') end++
+      const run = text.slice(at, end)
+      const closed = find(run, end)
+      if (closed === -1) {
+        // The whole run is text: none of its shorter runs can close either.
+        plain += run
+        at = end
+        continue
+      }
+      pushPlain()
+      out.push(textInline(text.slice(end, closed).trim() || ' ', { ...style, code: true }))
+      at = closed + run.length
+      continue
+    }
+    const link = char === '[' || (char === '!' && text[at + 1] === '[') ? linkAt(text, char === '!' ? at + 1 : at, find) : undefined
+    if (link !== undefined) {
+      pushPlain()
+      out.push(linkInline(link.url, link.label || link.url, style))
+      at = link.end
+      continue
+    }
+    if (char === '<') {
+      const auto = autolinkAt(text, at, find)
+      if (auto !== undefined) {
         pushPlain()
-        out.push(textInline(text.slice(at + run.length, close).trim() || ' ', { ...style, code: true }))
-        at = close + run.length
+        out.push(linkInline(auto, auto, style))
+        at += auto.length + 2
         continue
       }
     }
-    const link = /^!?\[([^\]]*)\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)/.exec(rest)
-    if (link !== null && /^(?:https?:|mailto:)/i.test(link[2]!)) {
-      pushPlain()
-      out.push(linkInline(link[2]!, link[1] || link[2]!, style))
-      at += link[0].length
-      continue
-    }
-    const auto = /^<((?:https?:\/\/|mailto:)[^>\s]+)>/i.exec(rest)
-    if (auto !== null) {
-      pushPlain()
-      out.push(linkInline(auto[1]!, auto[1]!, style))
-      at += auto[0].length
-      continue
-    }
-    const marker = /^(\*\*|__|~~|\*|_)/.exec(rest)?.[1]
+    const marker = depth < MAX_DEPTH ? MARKERS.find((each) => text.startsWith(each, at)) : undefined
     if (marker !== undefined && opens(text, at, marker)) {
-      const close = closing(text, at + marker.length, marker)
-      if (close !== -1) {
+      const closed = close(marker, at + marker.length)
+      if (closed !== -1) {
         pushPlain()
         const next: InlineStyle = marker === '~~' ? { ...style, strike: true } : marker.length === 2 ? { ...style, bold: true } : { ...style, italic: true }
-        out.push(...markdownInlines(text.slice(at + marker.length, close), next))
-        at = close + marker.length
+        out.push(...markdownInlines(text.slice(at + marker.length, closed), next, depth + 1))
+        at = closed + marker.length
         continue
       }
     }
@@ -155,25 +176,73 @@ export function markdownInlines(text: string, style: InlineStyle = {}): Array<In
   return out
 }
 
+/**
+ * `text.indexOf(needle, from)` that remembers its last answer for each
+ * needle: a search from inside the stretch it already searched answers
+ * without scanning, so searches from a moving start scan the text once.
+ */
+function searcher(text: string): (needle: string, from: number) => number {
+  const last = new Map<string, { readonly from: number; readonly at: number }>()
+  return (needle, from) => {
+    const hit = last.get(needle)
+    if (hit !== undefined && from >= hit.from && (hit.at === -1 || from <= hit.at)) return hit.at
+    const at = text.indexOf(needle, from)
+    last.set(needle, { from, at })
+    return at
+  }
+}
+
+/** `[label](url)` or `[label](url "title")` with `[` at `open`, for an http, https or mailto url. */
+function linkAt(text: string, open: number, find: (needle: string, from: number) => number): { readonly label: string; readonly url: string; readonly end: number } | undefined {
+  const bracket = find(']', open + 1)
+  if (bracket === -1 || text[bracket + 1] !== '(') return undefined
+  const paren = find(')', bracket + 2)
+  if (paren === -1 || paren - bracket > MAX_TARGET) return undefined
+  const inside = /^\s*<?([^\s>]+)>?(?:\s+"[^"]*")?\s*$/.exec(text.slice(bracket + 2, paren))
+  const url = inside?.[1]
+  if (url === undefined || !/^(?:https?:|mailto:)/i.test(url)) return undefined
+  return { label: text.slice(open + 1, bracket), url, end: paren + 1 }
+}
+
+/** The url of `<https://…>` or `<mailto:…>` at `at`. */
+function autolinkAt(text: string, at: number, find: (needle: string, from: number) => number): string | undefined {
+  const end = find('>', at + 1)
+  if (end === -1 || end - at > MAX_TARGET) return undefined
+  const url = text.slice(at + 1, end)
+  return /^(?:https?:\/\/|mailto:)\S+$/i.test(url) ? url : undefined
+}
+
 /** A marker opens with text right after it, and `_` only at a word's start. */
 function opens(text: string, at: number, marker: string): boolean {
   const after = text[at + marker.length]
-  if (after === undefined || /\s/.test(after)) return false
-  return !(marker[0] === '_' && at > 0 && /[\p{L}\p{N}]/u.test(text[at - 1]!))
+  if (after === undefined || SPACE.test(after)) return false
+  return !(marker[0] === '_' && at > 0 && WORD.test(text[at - 1]!))
 }
 
-/** The nearest same marker with text right before it, and for `_` no letter after it. */
-function closing(text: string, from: number, marker: string): number {
-  for (let at = text.indexOf(marker, from + 1); at !== -1; at = text.indexOf(marker, at + 1)) {
-    if (/\s/.test(text[at - 1]!)) continue
-    if (marker.length === 1 && text[at + 1] === marker) {
-      at++
-      continue
+/**
+ * The nearest same marker after `from` with text right before it, and for
+ * `_` no letter after it. Whether a marker can close does not depend on
+ * where the search started, so the answer from `from` stands for any later
+ * start up to it; remembering it keeps a line of unclosed markers linear.
+ */
+function closer(text: string): (marker: string, from: number) => number {
+  const last = new Map<string, { readonly from: number; readonly at: number }>()
+  return (marker, from) => {
+    const hit = last.get(marker)
+    if (hit !== undefined && from >= hit.from && (hit.at === -1 || from < hit.at)) return hit.at
+    let at = text.indexOf(marker, from + 1)
+    for (; at !== -1; at = text.indexOf(marker, at + 1)) {
+      if (SPACE.test(text[at - 1]!)) continue
+      if (marker.length === 1 && text[at + 1] === marker) {
+        at++
+        continue
+      }
+      if (marker[0] === '_' && WORD.test(text[at + marker.length] ?? '')) continue
+      break
     }
-    if (marker[0] === '_' && /[\p{L}\p{N}]/u.test(text[at + marker.length] ?? '')) continue
+    last.set(marker, { from, at })
     return at
   }
-  return -1
 }
 
 function textInline(text: string, style: InlineStyle): Inline {
