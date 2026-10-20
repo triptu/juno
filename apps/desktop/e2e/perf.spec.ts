@@ -970,7 +970,7 @@ test('topic open, uncached: a thread whose replies were never fetched, to the he
 })
 
 // The M4 gate (performance 3.4) on the topic300 seed: a 300-message thread
-// and a 300-message Main, 20 % images and 10 % code blocks, plus #perf-code
+// and a 300-message Main, 20 % images, 10 % code blocks and 5 % tables, plus #perf-code
 // (codeBlocksSeed: 50 distinct code blocks of 40 to 100 lines). One synced
 // user-data directory; every scenario launches the app warm on it.
 test.describe('topic view', () => {
