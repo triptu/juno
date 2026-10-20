@@ -97,5 +97,3 @@ export type { ViewIconName } from '@juno/ui'
 export { UpdateSettings, type UpdateOffer, type WhatsNew } from './UpdateSettings'
 export { chunk } from '@juno/ui'
 export { WebPanel } from './WebPanel'
-
-export { prepareTextareaFormatting } from '@juno/ui'

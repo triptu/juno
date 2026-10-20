@@ -301,7 +301,7 @@ function LoadedComposer({
       onPasteText={links.onPasteText}
       onFieldClick={links.onFieldClick}
       {...(links.popover === undefined ? {} : { popover: links.popover })}
-      onSend={() => markup.send(send, field.current)}
+      onSend={send}
       placeholder={placeholder}
       inputRef={field}
       sending={waiting}

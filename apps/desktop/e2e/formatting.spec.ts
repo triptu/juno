@@ -109,41 +109,58 @@ async function boldSelection({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   await expect(topic.composer).toHaveValue('ship it today')
 }
 
-for (const action of ['selection', 'focus', 'composition', 'send'] as const) {
+for (const action of ['selection', 'focus', 'composition', 'send', 'failed-send', 'twice', 'twice-other', 'mac-control', 'fallback'] as const) {
   test(`a cold formatting chunk respects ${action}`, async ({ juno, fake }) => {
     let release!: () => void
     const held = new Promise<void>((resolve) => { release = resolve })
-    await juno.win.route(/\/markupRules-[^/]+\.js/, async (route) => { await held; await route.continue() })
+    const sending = action === 'send' || action === 'failed-send'
+    await juno.win.route(action === 'fallback' ? /\/(?:markupRules|TextareaLines)-[^/]+\.js/ : /\/markupRules-[^/]+\.js/, async (route) => { if (action === 'failed-send') return route.abort(); await held; await route.continue() })
     try {
       await juno.win.reload({ waitUntil: 'domcontentloaded' })
       await juno.waitForSync()
       await juno.sidebar.row(POSTGRES).open()
       const field = juno.topic.composer
-      await field.fill(action === 'send' ? '*bold*' : '*loaded* first second')
+      await field.fill(sending ? '*bold*' : '*loaded* first second')
       await field.evaluate((el: HTMLTextAreaElement) => { el.focus(); el.setSelectionRange(9, 14) })
-      if (action === 'send') {
-        await juno.win.evaluate(() => {
-          const observer = new MutationObserver(() => {
-            if (document.querySelector('[data-testid="textarea-bold"]')?.textContent !== 'bold') return
-            document.body.dataset['sawBold'] = 'true'
-            observer.disconnect()
-          })
-          observer.observe(document.body, { childList: true, subtree: true })
-        })
+      if (sending) {
         await field.press('Enter')
-        expect(fake.calls.filter((call) => call.method === 'chat.postMessage')).toHaveLength(0)
+        await expect.poll(() => fake.calls.filter((call) => call.method === 'chat.postMessage').length).toBe(1)
+        await field.fill('next draft')
+      } else if (action === 'mac-control') {
+        const taken = await field.evaluate((el) => {
+          if (!navigator.platform.startsWith('Mac')) return false
+          return !el.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', code: 'KeyB', ctrlKey: true, bubbles: true, cancelable: true }))
+        })
+        expect(taken).toBe(false)
+      } else if (action === 'fallback') {
+        await field.fill('hello\nשלום')
+        const layer = juno.win.locator('[data-textarea-layer]')
+        await expect(layer).toHaveCSS('unicode-bidi', 'plaintext')
+        expect(await layer.evaluate((el) => {
+          const range = document.createRange()
+          range.setStart(el.firstChild!, 6)
+          range.setEnd(el.firstChild!, 7)
+          const box = range.getBoundingClientRect()
+          const caret = document.caretPositionFromPoint(box.x + box.width * 0.75, box.y + box.height / 2)?.offset
+          return caret === 6 || caret === 7
+        })).toBe(true)
       } else {
         await field.press('ControlOrMeta+b')
+        if (action === 'twice-other') await field.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(15, 21))
+        if (action === 'twice' || action === 'twice-other') await field.press('ControlOrMeta+i')
         if (action === 'selection') await field.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(15, 21))
         if (action === 'focus') await field.evaluate((el: HTMLTextAreaElement) => el.blur())
         if (action === 'composition') await field.dispatchEvent('compositionstart', { data: 'あ' })
       }
       release()
-      if (action === 'send') {
+      if (sending) {
         await juno.topic.expectSent('bold')
-        await expect(juno.win.locator('body')).toHaveAttribute('data-saw-bold', 'true')
+        await expect(field).toHaveValue('next draft')
         expect(lastPost(fake.calls).elements).toEqual([{ type: 'rich_text_section', elements: [{ type: 'text', text: 'bold', style: { bold: true } }] }])
-      } else if (action === 'selection') await expect(field).toHaveValue('*loaded* *first* second')
+      } else if (action === 'twice-other') await expect(field).toHaveValue('*loaded* *first* _second_')
+      else if (action === 'twice') await expect(field).toHaveValue('*loaded* *_first_* second')
+      else if (action === 'mac-control' || action === 'fallback') return
+      else if (action === 'selection') await expect(field).toHaveValue('*loaded* *first* second')
       else {
         // The original bold run proves the grammar and drawing have both loaded.
         await field.focus()
@@ -210,4 +227,40 @@ test('formatting keeps picked mentions and linked words', async ({ juno, fake })
   await topic.composer.press('Enter')
   await expect.poll(() => fake.calls.filter((call) => call.method === 'chat.postMessage').length).toBe(2)
   expect(lastPost(fake.calls).elements).toEqual([{ type: 'rich_text_section', elements: [{ type: 'link', text: 'plan', url: 'https://example.com/plan', style: { bold: true } }] }])
+})
+
+
+test('inline edit formatting expands partial mentions and links', async ({ juno, fake }) => {
+  await juno.sidebar.row(POSTGRES).open()
+  const composer = juno.topic.composer
+  await composer.pressSequentially('@ma')
+  await expect(juno.topic.suggestion('Maya')).toBeVisible()
+  await composer.press('Enter')
+  await composer.pressSequentially('plan')
+  await composer.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(6, 10))
+  await composer.evaluate((el) => {
+    const data = new DataTransfer()
+    data.setData('text/plain', 'https://example.com/plan')
+    el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
+  })
+  await composer.press('Enter')
+  await expect.poll(() => fake.calls.filter((call) => call.method === 'chat.postMessage').length).toBe(1)
+  await juno.topic.expectSent('Maya')
+  await composer.press('ArrowUp')
+  await juno.topic.message('Maya').press('e')
+  const field = juno.topic.list.getByRole('textbox', { name: 'Edit message' })
+  await expect(field).toHaveValue('@Maya plan')
+  await field.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(2, 4))
+  await field.press('ControlOrMeta+i')
+  await expect(field).toHaveValue('_@Maya_ plan')
+  await field.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(9, 10))
+  await field.press('ControlOrMeta+b')
+  await expect(field).toHaveValue('_@Maya_ *plan*')
+  await field.press('Enter')
+  await expect.poll(() => fake.calls.filter((call) => call.method === 'chat.update').length).toBe(1)
+  const update = fake.calls.find((call) => call.method === 'chat.update')!
+  expect(lastPost([{ method: 'chat.postMessage', args: update.args }]).elements).toEqual([{ type: 'rich_text_section', elements: [
+    { type: 'user', user_id: 'U0MAYA', style: { italic: true } }, { type: 'text', text: ' ' },
+    { type: 'link', text: 'plan', url: 'https://example.com/plan', style: { bold: true } },
+  ] }])
 })

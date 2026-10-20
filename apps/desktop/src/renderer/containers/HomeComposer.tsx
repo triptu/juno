@@ -332,7 +332,7 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
       }}
       onFieldKey={onFieldKey}
       onSend={() => {
-        if (!sending && !files.files.some((file) => file.state === 'staging')) markup.send(checks.send, inputRef.current)
+        if (!sending && !files.files.some((file) => file.state === 'staging')) checks.send()
       }}
       placeholder={placeholderOf(draft, junoOn, jobLine)}
       sending={sending || checks.waiting}

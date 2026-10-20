@@ -82,8 +82,6 @@ export interface TextareaProps extends Omit<TextareaHTMLAttributes<HTMLTextAreaE
 let lines: typeof import('./TextareaLines') | undefined
 const lineDrawing = chunk(() => import('./TextareaLines').then((module) => (lines = module)))
 
-export const prepareTextareaFormatting = () => lineDrawing.load()
-
 export function Textarea({ variant = 'inline', maxHeight = 'composer', label, rows, marks, format, anchorAt, onScroll, ref, ...rest }: TextareaProps) {
   'use no memo' // The value changes on every keystroke; keep the wrapper small and drawing in its chunk.
   const layered = marks !== undefined || format !== undefined
@@ -174,6 +172,7 @@ const styles = stylex.create({
     },
   },
   layer: {
+    unicodeBidi: 'plaintext',
     position: 'absolute',
     inset: 0,
     boxSizing: 'border-box',

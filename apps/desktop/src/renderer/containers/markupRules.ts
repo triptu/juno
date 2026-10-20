@@ -1,6 +1,5 @@
 // Slack's markup rules and keys, in a chunk of their own (`composerMarkup.ts`).
 import { toggleMarkup, type MarkupStyle } from '@juno/contract'
-export { prepareTextareaFormatting } from '@juno/views'
 import { editField } from './suggestionKeys'
 
 export { markupLayout } from '@juno/contract'
@@ -34,15 +33,34 @@ function styleOf(press: Press): MarkupStyle | 'quote' | undefined {
   return press.code === 'Digit9' ? 'quote' : undefined
 }
 
-/** A formatting key puts the markers on the selection or takes them off, as one edit typed into the field, so ⌘Z undoes it. True when `press` was one. */
-export function formatKey(press: Press): boolean {
+/** A formatting key puts the markers on the selection or takes them off, as one edit typed into the field, so ⌘Z undoes it. Returns the edit for rebasing queued selections. */
+export function formatKey(press: Press) {
   const style = styleOf(press)
-  if (style === undefined) return false
+  if (style === undefined) return undefined
   const { field } = press
-  if (document.activeElement !== field || field.value !== press.value) return true
+  if (document.activeElement !== field || field.value !== press.value) return undefined
   const edit = toggleMarkup(press.value, { start: press.start, end: press.end }, style, press.atomic)
-  if (edit === undefined) return true
+  if (edit === undefined) return undefined
   editField(field, edit.start, edit.end, edit.insert)
   field.setSelectionRange(edit.selection.start, edit.selection.end)
-  return true
+  return edit
+}
+
+/** Rebase later keydown selections through earlier formatting edits in the same cold batch. */
+export function formatKeys(captured: ReadonlyArray<Press>): void {
+  const presses = [...captured]
+  for (let i = 0; i < presses.length; i++) {
+    const press = presses[i]!
+    const edit = formatKey(press)
+    if (edit === undefined) continue
+    const value = press.field.value
+    const delta = edit.insert.length - (edit.end - edit.start)
+    const position = (at: number) => at <= edit.start ? at : at >= edit.end ? at + delta : edit.selection.start + at - press.start
+    for (let j = i + 1; j < presses.length; j++) {
+      const next = presses[j]!
+      if (next.value !== press.value) continue
+      const range = next.start === press.start && next.end === press.end ? edit.selection : { start: position(next.start), end: position(next.end) }
+      presses[j] = { ...next, ...range, value, atomic: next.atomic.map((range) => range.start === edit.start && range.end === edit.end ? edit.selection : { start: position(range.start), end: position(range.end) }) }
+    }
+  }
 }
