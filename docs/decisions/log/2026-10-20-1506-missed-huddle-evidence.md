@@ -1,0 +1,1 @@
+- 10-20 15:06 · missed-huddle-evidence · Dismissed and offline huddles count as missed only when an ended room explicitly supplies participant history without self; self-started and ever-joined huddles do not. Ignored channels count, with Every message overriding Never on the conversation or starter.

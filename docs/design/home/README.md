@@ -61,6 +61,7 @@ Each item has the topic's art (40px; Tidy up has a broom tile), a title line (13
 
 | Kind | Rule (AI off) | Title, AI off | Title, AI on (example) |
 | --- | --- | --- | --- |
+| Missed huddle | An ended huddle whose participant history excludes you, including an offline or dismissed one | `Missed huddle with Maya` or `Missed huddle in #eng` | Same factual title |
 | Waiting on you | An unread message in a followed thread or group DM that mentions you and ends in a question mark, or any unread question in a one-to-one DM, with no message from you after it | `<Name> asked you something` | `Elena wants a call on Rina's competing offer by Friday` |
 | Pick up where you left off | The last topic you had open for more than a minute, if it has unread messages | `Pick up where you left off` | `Pick up where you left off: Dev wants the Postgres 16 cutover window` |
 | Moved a lot | A followed topic with the most new messages since you last opened it, at least 8 | `Moved a lot since you looked` | `Maya's proposal grew 14 replies, leaning toward cutting offline mode` |
@@ -85,12 +86,14 @@ The eight scenes in `scenes.png`: morning, midday, evening, late night, Friday, 
 
 ## Items: how they are chosen and capped
 
+Missed huddles rank after mentions. At most one appears, within the three-row cap. Opening the row opens its conversation and clears it; joining a later huddle there clears older misses. Unseen misses expire seven days after ending. Ignored channels count, with the incoming huddle’s Every message and Never precedence.
+
 - Candidates come from the local cache only: followed topics, read state, the last-opened log and mentions. No network call, no AI call, before first paint.
-- Rank: waiting on you first, then pick up where you left off, then moved a lot, then follow-ups, then Automated, then tidy up, then follow-ups that look done and old drafts (SPEC §12). At most one of each kind; tidy up is one row for several topics. "Followed" is a thread Slack follows or a DM; a channel's Main is a stream, not a followed topic, so it never shows as Moved a lot.
+- Rank: waiting on you first, then mentions in ignored channels, then missed huddles, then pick up where you left off, then moved a lot, then follow-ups, then Automated, then tidy up, then follow-ups that look done and old drafts (SPEC §12). At most one of each kind; tidy up is one row for several topics. "Followed" is a thread Slack follows or a DM; a channel's Main is a stream, not a followed topic, so it never shows as Moved a lot.
 - Cap at three. If the window is shorter than 600px, cap at two.
 - Each item is one topic, except tidy up. A topic appears once; if it qualifies for two kinds, the higher kind wins.
 - Opening an item opens the topic in the current tab like any row, with ⌘-click for a new tab. Opening it marks it read under the normal rule, so it leaves the list on the next visit.
-- Resolved, unfollowed and muted topics never appear.
+- Resolved, unfollowed and muted topics do not supply message rows. Missed huddles use the conversation regardless of its followed or resolved state, with the notification rules above.
 - Items do not refresh while the home is on screen. They are computed at mount, and recomputed on the next mount, so a row never disappears under the pointer. During the first sync, before and after Home is ready, rows are only added, into empty slots (see "Performance").
 
 ## Accessibility

@@ -382,6 +382,7 @@ On a cold visit, a second line under the greeting says "Syncing with Slack.", th
 - **What wants you.** Each item is one row with a title line and a plain meta line. The row's tile is the topic's, as its row in the sidebar draws it: a DM's Main is the person's photo, a group DM's Main the pair of members, every other topic its art; the review sheets' rows draw the same. The meta line names the place once: a Main's title is its place, so a DM reads "Maya Chen · 7h", not the name twice. A topic whose effective Notify me level is **Never** is muted and does not appear on Home. An Every message setting at any applicable level overrides Never, as in section 14; a DM uses its conversation and person levels. The kinds, ranked:
   - **Waiting on you.** A message that asks you something and has no reply from you.
   - **Mentioned in an ignored channel.** "Maya mentioned you in #deploys": the newest unread topic in an ignored channel that mentions you by name or a group you are in, with the thread's title and the time on the meta line. Clicking it opens the topic; right-clicking it opens the channel's menu. @here and @channel are not counted.
+  - **Missed huddle.** The newest huddle in a conversation you are in that ended without you joining. "Missed huddle with Maya" or "Missed huddle in #eng", with duration and time below ("12 min · 18m"). It uses the conversation’s tile and opens that conversation. At most one, after mentions and before Pick up where you left off, within the usual three rows. Ignored channels count. Never on the conversation or starter hides it unless Every message overrides it. Offline and dismissed incoming cards count; a huddle you started or joined on any device does not. Opening this row or joining a later huddle there clears it. It expires seven days after it ends. Home appearing does not clear it, and it does not move or appear during a settled visit.
   - **Pick up where you left off.** The last topic you had open, when it has new messages.
   - **Moved a lot.** A followed topic with many new messages since you looked.
   - **Follow-up** (AI on). Something you said you would do, with Mark done.
@@ -857,6 +858,14 @@ When someone starts a huddle in a DM, group DM or channel you are in, Juno makes
 - **While you are in a huddle**, the card shows under the bar, so it never moves the bar, and offers **Switch** with the tooltip "Leave the huddle in #design and join this one", as the header does. It does not ring, and the notification is silent.
 - **Ring.** A short, soft, low sound, three warm notes rising, plays every 3.2 seconds until you join, dismiss it, or 30 seconds after Juno heard of it. It plays on the speaker you picked for huddles, at the call sounds' volume. It is in the family of the join and leave sounds, an octave lower and slower, so it invites rather than alarms.
 - **Notification.** macOS shows a notification titled with the place ("#eng", "Maya") and "Maya started a huddle" ("Started a huddle" in a DM). It has no sound, since Juno rings. Clicking it brings Juno forward at the huddle's tab, where Join huddle is. It has no Join button: macOS shows notification buttons only for a signed app whose notifications are alerts that stay on screen, and Juno's builds are not signed.
+
+### Missed huddles
+
+A huddle that ends without you joining can appear on Home (section 12). Dismissing the incoming card only stops the interruption; it does not clear the later missed row. Huddles found after being offline count too, even though old running huddles have no incoming card. Notification hours and the ring setting do not hide a missed row. Ignored channels count; Every message overrides Never on the conversation or starter, as for incoming huddles.
+
+Home opens the conversation and clears that huddle. Joining a later huddle in the same conversation, here or on another device, clears older misses there. An unseen miss stays for seven days after its end. There is no extra notification, badge or section.
+
+Slack’s saved huddle message can supply the room’s start, end, creator and participant history after a relaunch. Juno uses that history only when the ended room explicitly includes it; absent history does not prove you missed the huddle. The running-only `huddles/info` response cannot recover ended huddles. Juno keeps its acknowledgements and observed joins on this Mac so a reread does not restore a cleared row. Recovery is limited to the history Slack returns during normal sync; no extra history scan runs for Home.
 
 ### Microphone and speaker
 
