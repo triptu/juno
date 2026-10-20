@@ -39,13 +39,13 @@ test('workspace emoji and aliases show images and send shortcodes', async ({ jun
   await juno.waitForSync()
   await juno.sidebar.row(POSTGRES).open()
   const { topic } = juno
-  await topic.composer.pressSequentially(':juno_he')
+  await topic.composer.pressSequentially(':juno_hello')
   const option = topic.suggestions.getByRole('option', { name: ':juno_hello:', exact: true })
   await expect(option.locator('img')).toBeVisible()
   await topic.composer.press('Tab')
-  await expect(topic.composer).toHaveValue(':juno_hello: ')
+  await expect(topic.composer).toHaveValue(':juno_wave: ')
   await topic.composer.press('Enter')
-  await expect.poll(() => postedText(fake).at(-1)).toBe(':juno_hello:')
+  await expect.poll(() => postedText(fake).at(-1)).toBe(':juno_wave:')
 })
 
 agentTest('the Juno panel composer suggests emoji too', async ({ juno }) => {

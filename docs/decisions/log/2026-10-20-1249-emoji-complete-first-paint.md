@@ -1,0 +1,1 @@
+- 10-20 12:49 · Tushar · The picker paints only after its complete workspace data is ready, so Frequently used never grows after the first paint. Do not reserve blank space.

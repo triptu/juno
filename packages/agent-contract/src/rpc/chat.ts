@@ -4,7 +4,7 @@ import { Revision } from '@juno/agent-cards'
 import { CardBinding } from './identity'
 import { BubbleId, CardId, ChatMessageId, OpId } from '../chat/ids'
 import { JUNO_IMAGE_LIMITS, JUNO_TEXT_LIMITS, JunoFileInput } from '../chat/files'
-import { Emoji, ReplyTarget, RemoveSheet } from '../chat/items'
+import { Reaction, ReplyTarget, RemoveSheet } from '../chat/items'
 import { ChatPage, ChatSummary } from '../chat/page'
 import { ChatMention, SendContext } from '../chat/place'
 import { Accepted, AgentCommandError, PageLimit, operation } from './common'
@@ -60,7 +60,7 @@ export const chatReact = Rpc.make('agent.chat.react', {
   payload: {
     ...operation,
     target: Schema.Union([Schema.TaggedStruct('bubble', { id: BubbleId }), Schema.TaggedStruct('card', { id: CardId })]),
-    emoji: Schema.NullOr(Emoji),
+    emoji: Schema.NullOr(Reaction.fields.emoji),
   },
   success: Accepted, error: AgentCommandError,
 })

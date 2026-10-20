@@ -84,9 +84,14 @@ export const mentionsChannels = liveValueRoute('mentions.channels', {
   value: Schema.Array(MentionChannel),
 })
 
+export const WorkspaceEmojiRows = Schema.Array(Schema.Struct({ name: Schema.String, url: Schema.NullOr(Schema.String), alias_for: Schema.NullOr(Schema.String) }))
+
 /** Workspace emoji loaded once, then filtered locally by the composer. */
+export const WorkspaceEmojiValue = Schema.fromJsonString(WorkspaceEmojiRows)
+
 export const mentionsEmoji = liveValueRoute('mentions.emoji', {
-  value: Schema.Array(Schema.Struct({ name: Schema.String, url: Schema.NullOr(Schema.String), alias_for: Schema.NullOr(Schema.String) })),
+  // State validates the table JSON with WorkspaceEmojiValue after it crosses the port.
+  value: Schema.String,
 })
 
 export const MentionsRoutes = RpcGroup.make(mentionsPeople, mentionsGroups, mentionsChannels, mentionsEmoji)

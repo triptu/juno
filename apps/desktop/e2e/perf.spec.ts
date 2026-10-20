@@ -8,18 +8,26 @@
 //   pnpm perf -g "topic view"  some of them
 //   JUNO_PERF_TRACE=<dir>      also write traces and CPU profiles (scripts/perf-trace.mjs)
 import { rm } from 'node:fs/promises'
+import { DatabaseSync } from 'node:sqlite'
+import { loadavg } from 'node:os'
+import { join } from 'node:path'
 import type { Locator, Page } from '@playwright/test'
 import { codeBlocksSeed, CODE_BLOCK_COUNT, largeSeed, startFakeSlack, topic300Seed, TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL, type FakeSlack } from '@juno/fake-slack'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
 import { expect, hooks, launchApp, tempUserData, test, writeSlackApp, type RunningApp, type SlackAppFixture } from './fixtures'
 import { privateMemory, stats } from './perfStats'
-import { traced } from './perfTrace'
+import { recordTrace, traced } from './perfTrace'
 import { scrollReading } from './perfScroll'
 import { selectionDragReading } from './perfSelection'
 import { HEAVY_MEMORY_BUDGETS, heavyUse, memoryDump, readMemory } from './perfMemory'
 import { typingReading } from './perfTyping'
 import { answer } from './juno-agent/chat'
+import { savedTabs } from './driver/userDb'
 import { Juno, press, type SidebarFilterName } from './driver/juno'
+
+declare global {
+  interface Window { __emojiBenchmarkReleaseImages: () => Promise<void> }
+}
 
 test.skip(process.env['JUNO_PERF'] !== '1', 'set JUNO_PERF=1 to measure')
 
@@ -1548,4 +1556,138 @@ test('quick start: first sign-in to sidebar rows on the large seed, 300 ms per c
     }
   }
   within('quick start, slowest of three', stats('quick start, sign-in to sidebar rows', samples).p95, 5_000)
+})
+
+
+function coldEmojiOpen(win: Page) {
+  return win.evaluate(() => new Promise<{ duration: number; started: number; clicked: number }>((resolve, reject) => {
+    const deadline = setTimeout(() => { observer.disconnect(); reject(new Error('Settings Add reaction did not appear')) }, 5000)
+    const observer = new MutationObserver(() => {
+      const add = Array.from(document.querySelectorAll('button')).find((button) => button.getAttribute('aria-label') === 'Add reaction' && button.getClientRects().length > 0)
+      if (add === undefined) return
+      observer.disconnect()
+      requestAnimationFrame(() => setTimeout(() => {
+        const clicked = performance.now()
+        if (performance.getEntriesByName('juno.emoji-ready').length > 0) { reject(new Error('Emoji subscription warmed before the cold open')); return }
+        const subscribed = performance.getEntriesByName('juno.emoji-subscribe')[0]?.startTime
+        const started = Math.min(clicked, subscribed ?? clicked)
+        add.click()
+        void window.__emojiBenchmarkReleaseImages()
+        const tick = () => {
+          const picker = document.querySelector('[data-emoji-picker]')
+          if (performance.now() - started > 5000) { reject(new Error(`Cold picker did not load its visible images: ${picker?.textContent}`)); return }
+          const images = Array.from(picker?.querySelectorAll('img') ?? [])
+          if (images.length >= 6 && images.every((image) => image.complete && image.naturalWidth > 0)) setTimeout(() => { clearTimeout(deadline); const end = performance.now(); performance.measure('juno.emoji-cold-open', { start: started, end }); resolve({ duration: end - started, started, clicked }) }, 0)
+          else requestAnimationFrame(tick)
+        }
+        requestAnimationFrame(tick)
+      }, 0))
+    })
+    observer.observe(document.body, { subtree: true, childList: true })
+  }))
+}
+
+test('emoji picker with 20,000 workspace emoji, cold subscription and loaded images', async ({ juno, fake, running, userData, slackApp }) => {
+  test.setTimeout(240_000)
+  const images = [...fake.workspace.emoji.values()].flatMap((emoji) => typeof emoji.value === 'string' && !emoji.value.startsWith('alias:') ? [emoji.value] : [])
+  const custom = Array.from({ length: 20_000 - images.length }, (_, i) => ({ name: `perf_emoji_${String(i).padStart(5, '0')}`, url: `${images[i % images.length]}?emoji=${i}` }))
+  for (const emoji of custom) fake.addEmoji(emoji)
+  await juno.signIn()
+  await juno.waitForSync()
+  await running.close()
+  const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
+  db.prepare('INSERT INTO prefs (key, value_json) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json').run('quickReactions', JSON.stringify(custom.slice(0, 6).map((emoji) => ({ ...emoji, unicode: `:${emoji.name}:` }))))
+  db.close()
+  const samples: number[] = []
+  const preloadWork: number[] = []
+  for (let i = 0; i < 10; i++) {
+    await expect.poll(() => loadavg()[0], { timeout: 120_000, intervals: [1000] }).toBeLessThanOrEqual(8)
+    const app = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
+    try {
+      const second = new Juno(app.app, app.win)
+      await second.waitForSync()
+      // Let process startup settle; Home must still have no emoji subscription.
+      await app.win.waitForTimeout(500)
+      fake.holdEmojiImages()
+      await app.win.exposeFunction('__emojiBenchmarkReleaseImages', () => fake.releaseEmojiImages())
+      const cdp = await app.win.context().newCDPSession(app.win)
+      await cdp.send('Network.clearBrowserCache')
+      await cdp.send('Network.setCacheDisabled', { cacheDisabled: true })
+      const requestedImages = new Set<string>()
+      app.win.on('request', (request) => { if (request.url().includes('/emoji/')) requestedImages.add(request.url()) })
+      expect(await app.win.evaluate(() => performance.getEntriesByName('juno.emoji-subscribe').length), 'a new renderer must have no warm emoji subscription').toBe(0)
+      // Click just after Settings first paints, while its workspace query is still cold.
+      // Include the entire subscription if idle preload started it before that click.
+      const reading = coldEmojiOpen(app.win)
+      const open = async () => { await second.openSettings('Appearance'); await reading }
+      if (i === 0 && process.env.JUNO_PERF_TRACE !== undefined) await traced(app.win, 'emoji-cold-open', open)
+      else await open()
+      const measured = await reading
+      const subscription = await app.win.evaluate(() => ({ start: performance.getEntriesByName('juno.emoji-subscribe')[0]!.startTime, duration: performance.getEntriesByName('juno.emoji-ready')[0]!.duration, resolve: performance.getEntriesByName('juno.emoji-resolve', 'measure')[0]!.duration, prepare: performance.getEntriesByName('juno.emoji-prepare', 'measure')[0]!.duration, decode: performance.getEntriesByName('juno.emoji-decode', 'measure')[0]!.duration, catalog: performance.getEntriesByName('juno.emoji-catalog', 'measure')[0]!.duration }))
+      expect(subscription.start, 'subscription starts inside the timed cold open').toBeGreaterThanOrEqual(measured.started)
+      expect(requestedImages.size, 'visible images fetched in this fresh renderer').toBeGreaterThanOrEqual(6)
+      samples.push(measured.duration)
+      preloadWork.push(subscription.decode + subscription.resolve + subscription.prepare + subscription.catalog)
+      console.log(`cold emoji open ${i + 1}: ${measured.duration.toFixed(1)} ms, subscription and preparation ${subscription.duration.toFixed(1)} ms (decode ${subscription.decode.toFixed(1)}, resolve ${subscription.resolve.toFixed(1)}, prepare ${subscription.prepare.toFixed(1)}, catalog ${subscription.catalog.toFixed(1)})`)
+      const picker = app.win.getByRole('dialog', { name: 'Emoji' })
+      expect(await picker.locator('[data-emoji]').count()).toBeLessThan(200)
+      if (i === 0) {
+        await picker.getByRole('group', { name: 'Workspace', exact: true }).evaluate((node) => node.scrollIntoView({ block: 'start' }))
+        await expect(picker.locator('[data-emoji="juno_check"]')).toBeVisible()
+        await picker.getByRole('textbox').fill('perf_emoji_')
+        await expect(picker.locator('[data-emoji="perf_emoji_00000"]')).toBeVisible()
+        await picker.getByRole('textbox').press('ArrowDown')
+        await picker.locator('[data-scroll-area]').hover()
+        await app.win.mouse.wheel(0, 4000)
+        await expect.poll(() => picker.locator('[data-scroll-area]').evaluate((node) => node.scrollTop)).toBeGreaterThan(1000)
+        await app.win.keyboard.press('ArrowRight')
+        await expect(picker.locator('[data-emoji="perf_emoji_00001"]')).toBeFocused()
+        await picker.getByRole('textbox').fill('perf_emoji_19991')
+        await expect(picker.locator('[data-emoji="perf_emoji_19991"]')).toBeVisible()
+      }
+      await app.win.keyboard.press('Escape')
+      await second.home.open()
+      await expect.poll(() => { const tabs = savedTabs(userData, fake.teamId); return tabs?.tabs[tabs.active]?.place }).toBe('home')
+      await cdp.detach()
+    } finally {
+      fake.releaseEmojiImages()
+      await app.close()
+    }
+  }
+  const timing = stats('20,000 distinct workspace URLs, cold subscription, click to loaded visible images', samples)
+  stats('emoji preload synchronous renderer work (decode, resolve and catalog preparation)', preloadWork)
+  within('emoji picker cold open with loaded images', timing.p95, 50)
+})
+
+// Trace the idle preload without ever opening a picker: scripts/perf-trace.mjs
+// sums main-thread work, including module evaluation, inside juno.emoji-preload.
+test('20,000 workspace emoji preload after first paint', async ({ juno, fake, running, userData, slackApp }) => {
+  test.setTimeout(120_000)
+  for (let i = 0; i < 20_000; i++) fake.addEmoji({ name: `preload_${i}`, url: `${fake.url}/emoji/juno_wave.svg?emoji=${i}` })
+  await juno.signIn()
+  await juno.waitForSync()
+  await running.close()
+  const app = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
+  try {
+    const second = new Juno(app.app, app.win)
+    await second.waitForSync()
+    expect(await app.win.evaluate(() => performance.getEntriesByName('juno.emoji-subscribe').length)).toBe(0)
+    await recordTrace(app.win, 'emoji-preload', async () => {
+      await second.sidebar.row('#eng').open()
+      await expect.poll(() => app.win.evaluate(() => performance.getEntriesByName('juno.emoji-preload', 'measure').length)).toBe(1)
+    })
+    const timing = await app.win.evaluate(() => {
+      const preload = performance.getEntriesByName('juno.emoji-preload', 'measure')[0]!
+      const topic = performance.getEntriesByName('juno.topic-open', 'measure').at(-1)!
+      const ready = performance.getEntriesByName('juno.emoji-ready', 'measure')[0] as PerformanceMeasure
+      const detail = ready.detail as { devtools: { properties: Array<[string, unknown]> } }
+      return { preload: preload.duration, start: preload.startTime, painted: topic.startTime + topic.duration, count: detail.devtools.properties.find(([key]) => key === 'emojiCount')?.[1] }
+    })
+    expect(timing.start, 'preload begins after the topic first paints').toBeGreaterThanOrEqual(timing.painted)
+    expect(timing.count).toBeGreaterThanOrEqual(20_000)
+    await expect(app.win.getByRole('dialog', { name: 'Emoji' })).toHaveCount(0)
+    console.log(`20,000 emoji idle preload: ${timing.preload.toFixed(1)} ms elapsed; inspect juno.emoji-preload for main-thread cost`)
+  } finally {
+    await app.close()
+  }
 })
