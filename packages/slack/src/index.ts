@@ -18,6 +18,7 @@ import { SlackSocket, SocketHandshake } from './client/socket.ts'
 import { HttpTransport } from './client/transport.ts'
 
 export { SlackApi, type SlackApiShape } from './client/api.ts'
+export { decodeIssueDetails, isSchemaPath } from './client/decodeIssue.ts'
 export { scaledPacing, slackConfigLayer, type SlackConfigOverrides } from './client/config.ts'
 export { SlackEdge } from './client/edge.ts'
 export { SlackAuthRequired, SlackDecodeError, SlackRejected, type SlackApiError } from './client/errors.ts'

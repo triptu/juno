@@ -1,0 +1,1 @@
+- 10-21 04:46 · implementation · Report Slack decode failures with schema-owned field names, array indexes and fixed issue kinds; replace dynamic record keys with unknown and keep response values out of errors and logs.

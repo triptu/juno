@@ -3,6 +3,7 @@ import { appendFile, mkdir, rename, stat, open } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { Logger } from 'effect'
+import { isSchemaPath } from '@juno/slack'
 import { LOG_EVENTS } from './logEvents'
 
 export const LOG_LIMIT = 5 * 1024 * 1024
@@ -30,6 +31,12 @@ export function safeDetails(value: unknown, depth = 0, seen = new Set<unknown>()
     if (typeof tag === 'string' && SLACK_ERRORS.has(tag)) {
       const method: unknown = Reflect.get(value, 'method')
       if (typeof method === 'string' && method.length <= 80 && method.trim() === method && /^[a-z]+(?:\.[a-zA-Z]+)+$/.test(method)) parts.push(`method=${method}`)
+      if (tag === 'SlackDecodeError') {
+        const path: unknown = Reflect.get(value, 'schemaPath')
+        const kind: unknown = Reflect.get(value, 'issueKind')
+        if (isSchemaPath(path)) parts.push(`schemaPath=${path}`)
+        if (kind === 'missing' || kind === 'wrong_type' || kind === 'invalid') parts.push(`issueKind=${kind}`)
+      }
       if (tag === 'SlackRejected') {
         const code: unknown = Reflect.get(value, 'error')
         if (typeof code === 'string' && code.trim() === code && /^[a-z_]{1,64}$/.test(code)) parts.push(`code=${code}`)
