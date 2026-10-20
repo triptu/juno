@@ -12,7 +12,7 @@ brew install webp            # cwebp; sips comes with macOS
 pnpm pictures:build
 ```
 
-It downloads each original from `sources.json` into `<out>/originals` (once), writes the two WebP files to `<out>` (`/Volumes/AgentWork/pictures` when that volume is mounted, else `scripts/pictures/.out`), prints each picture's sizes and width over height, and fails when the catalog's `ratio` is off. `--only id1,id2` builds a few.
+It downloads each original from `sources.json` into `<out>/originals` (once), writes the two WebP files to `<out>` (`/Volumes/AgentWork/pictures-juno-art` when that volume is mounted, else `scripts/pictures/.out`), prints each picture's sizes and width over height, and fails when the catalog's `ratio` is off. `--only id1,id2` builds a few.
 
 ## Uploading
 

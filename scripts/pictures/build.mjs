@@ -10,7 +10,7 @@
 // and macOS `sips`. Prints each picture's width over height and fails when the catalog's
 // `ratio` differs from the file's by more than 0.01.
 //
-//   pnpm pictures:build [--out /Volumes/AgentWork/pictures] [--only id1,id2]
+//   pnpm pictures:build [--out /Volumes/AgentWork/pictures-juno-art] [--only id1,id2]
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -19,7 +19,7 @@ import { PICTURES } from '../../packages/pictures/src/catalog.ts'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const args = Object.fromEntries(process.argv.slice(2).flatMap((arg, at, all) => (arg.startsWith('--') ? [[arg.slice(2), all[at + 1]]] : [])))
-const out = args.out ?? (existsSync('/Volumes/AgentWork') ? '/Volumes/AgentWork/pictures' : join(here, '.out'))
+const out = args.out ?? (existsSync('/Volumes/AgentWork') ? '/Volumes/AgentWork/pictures-juno-art' : join(here, '.out'))
 const only = args.only === undefined ? undefined : new Set(args.only.split(','))
 const sources = JSON.parse(readFileSync(join(here, 'sources.json'), 'utf8'))
 const USER_AGENT = 'Juno-pictures-build/1.0 (https://github.com/triptu/juno)'

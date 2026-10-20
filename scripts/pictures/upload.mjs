@@ -5,7 +5,7 @@
 // r2.dev URL only when needed, and uploads only files the bucket lacks or that changed.
 //
 //   pnpm dlx wrangler login            (once, in a browser)
-//   pnpm pictures:upload [--out /Volumes/AgentWork/pictures] [--dry-run]
+//   pnpm pictures:upload [--out /Volumes/AgentWork/pictures-juno-art] [--dry-run]
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url'
 const BUCKET = 'juno-art'
 const here = dirname(fileURLToPath(import.meta.url))
 const args = Object.fromEntries(process.argv.slice(2).flatMap((arg, at, all) => (arg.startsWith('--') ? [[arg.slice(2), all[at + 1]?.startsWith('--') === false ? all[at + 1] : 'true']] : [])))
-const out = args.out ?? (existsSync('/Volumes/AgentWork') ? '/Volumes/AgentWork/pictures' : join(here, '.out'))
+const out = args.out ?? (existsSync('/Volumes/AgentWork') ? '/Volumes/AgentWork/pictures-juno-art' : join(here, '.out'))
 const dryRun = args['dry-run'] === 'true'
 
 const wrangler = (...rest) => {
