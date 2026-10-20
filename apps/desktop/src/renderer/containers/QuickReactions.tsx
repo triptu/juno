@@ -4,13 +4,13 @@
  * Add opens the message toolbar's emoji picker with the workspace's custom
  * emoji, from the picker's own chunk, with the chosen ones marked.
  */
-import { Suspense, useMemo, useState } from 'react'
-import { composerEmojiAtom, quickReactionsAtom, registry, setQuickReactions } from '@juno/state'
+import { useState } from 'react'
+import { quickReactionsAtom, registry, setQuickReactions } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { QuickReactionsSetting } from '@juno/views'
-import { chunk } from './chunks'
+import { chunk, usePreloaded } from './chunks'
 import { frequentEmoji } from './recentEmoji'
-import { customEmoji, type QuickReaction } from '@juno/contract'
+import type { QuickReaction } from '@juno/contract'
 
 const pickerChunk = chunk(() => import('./QuickReactionPicker'))
 const QuickReactionPicker = pickerChunk.component((module) => module.default)
@@ -22,9 +22,7 @@ export function QuickReactions() {
   if (shown !== undefined && sameNames(shown, saved)) setShown(undefined)
   const reactions = shown ?? saved
   const [open, setOpen] = useState(false)
-  const workspace = useAtomValue(composerEmojiAtom(open))
-  const custom = useMemo(() => (workspace._tag === 'Success' ? customEmoji(workspace.value) : []), [workspace])
-  const selected = useMemo(() => new Set(reactions.map((reaction) => reaction.name)), [reactions])
+  const ready = usePreloaded(pickerChunk, open)
 
   const change = (next: ReadonlyArray<QuickReaction>) => {
     setShown(next)
@@ -34,7 +32,7 @@ export function QuickReactions() {
   }
   const add = (reaction: QuickReaction) => {
     setOpen(false)
-    if (!reactions.some((other) => other.name === reaction.name)) change([...reactions, reaction])
+    if (!reactions.some((other) => other.name === reaction.name && (other.url === undefined) === (reaction.url === undefined))) change([...reactions, reaction])
   }
 
   return (
@@ -43,10 +41,8 @@ export function QuickReactions() {
       onChange={change}
       onAdd={() => setOpen((was) => !was)}
       onClosePicker={() => setOpen(false)}
-      picker={open ? (
-        <Suspense fallback={null}>
-          <QuickReactionPicker custom={custom} recent={frequentEmoji([])} selected={selected} onPick={add} onClose={() => setOpen(false)} />
-        </Suspense>
+      picker={open && ready ? (
+        <QuickReactionPicker recent={frequentEmoji(reactions)} selected={reactions} onPick={add} onClose={() => setOpen(false)} />
       ) : undefined}
     />
   )

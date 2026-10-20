@@ -121,26 +121,3 @@ export function reactionDisplay(
   if (url !== undefined) return { kind: 'image', url }
   return { kind: 'name', value: name }
 }
-
-/** One row of the `emoji` table: an image url, or the name it is an alias for. */
-export interface CustomEmojiRow {
-  readonly name: string
-  readonly url?: string | null
-  readonly alias_for?: string | null
-}
-
-/** A workspace lookup, including aliases. Missing targets and cycles keep their shortcode. */
-export function customEmojiLookup(emojis: ReadonlyArray<CustomEmojiRow>): (name: string) => string | undefined {
-  const byName = new Map(emojis.map((emoji) => [emoji.name, emoji]))
-  return (name) => {
-    const seen = new Set<string>()
-    let current: string | null | undefined = name
-    while (current && !seen.has(current)) {
-      seen.add(current)
-      const emoji = byName.get(current)
-      if (emoji?.url) return emoji.url
-      current = emoji?.alias_for
-    }
-    return undefined
-  }
-}

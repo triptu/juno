@@ -1,0 +1,1 @@
+- 10-20 14:40 · Tushar · Already chosen emoji resolve aliases within their standard or workspace kind, so a workspace image cannot mark a colliding standard glyph chosen.
