@@ -23,6 +23,19 @@ async function postFiles({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>, text: 
   return row
 }
 
+/**
+ * Esc as the keyboard sends it, through main (`webContents.sendInputEvent`).
+ * Playwright's keys go straight to the page and skip `before-input-event`,
+ * the only place a key pressed inside a frame can be seen.
+ */
+async function pressEscape({ juno }: Pick<Fixtures, 'juno'>) {
+  await juno.app.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows().find((each) => each.isVisible())!
+    window.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' })
+    window.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' })
+  })
+}
+
 async function openCard({ juno }: Pick<Fixtures, 'juno'>, row: ReturnType<Fixtures['juno']['topic']['message']>, name: string) {
   const open = row.getByRole('button', { name: `Open ${name}` })
   await open.scrollIntoViewIfNeeded()
@@ -45,7 +58,10 @@ test('a PDF opens in Chromium’s PDF viewer from the content main serves as a P
     return { type: response.headers.get('content-type'), start: new TextDecoder().decode((await response.arrayBuffer()).slice(0, 5)) }
   }, src!)
   expect(answer).toEqual({ type: 'application/pdf', start: '%PDF-' })
-  await juno.win.keyboard.press('Escape')
+  // Esc closes it from inside Chromium's PDF viewer too.
+  await frame.click({ position: { x: 400, y: 300 } })
+  await expect.poll(() => juno.win.evaluate(() => document.activeElement?.tagName)).toBe('IFRAME')
+  await pressEscape({ juno })
   await expect(viewer).toHaveCount(0)
 })
 
@@ -58,6 +74,10 @@ test('an HTML file shows in a sandboxed frame where its script does not run', as
   await expect(page.getByRole('heading', { name: 'Weekly digest' })).toBeVisible()
   await expect(page.locator('html')).not.toHaveAttribute('data-script-ran', /.*/)
   await expect(viewer.getByRole('button', { name: 'Open in browser' })).not.toHaveAttribute('aria-disabled', 'true')
+  // Esc closes it from inside the page too, which keeps its keys from the app.
+  await page.locator('body').click()
+  await pressEscape({ juno })
+  await expect(viewer).toHaveCount(0)
 })
 
 test('a Markdown snippet shows rendered and a CSV as a table, and the arrows move between them', async ({ juno, fake }) => {

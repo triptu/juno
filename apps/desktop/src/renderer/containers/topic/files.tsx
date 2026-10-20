@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import type { FileView } from '@juno/contract'
-import { copyImage, downloadFile, openFile, openViewerAtom, quickLookFile, readFileText, registry, uploadProgressAtom } from '@juno/state'
+import { copyImage, downloadFile, onMenuCommand, openFile, openViewerAtom, quickLookFile, readFileText, registry, uploadProgressAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import type { MediaViewing } from '@juno/views'
 import { chunk } from '../chunks'
@@ -15,6 +15,23 @@ function preloadViewer(): void {
   if (viewerLoaded) return
   viewerLoaded = true
   window.requestIdleCallback(() => void viewer.load())
+}
+
+/**
+ * Esc while a PDF or HTML file's frame in the viewer has focus: the frame
+ * keeps its keys from the page, so main reports the key (`frame.escape`)
+ * and the viewer gets it as if it had been pressed on the frame. Once for
+ * the app, whatever the number of topics.
+ */
+let frameEscape = false
+function listenFrameEscape(): void {
+  if (frameEscape) return
+  frameEscape = true
+  onMenuCommand((command) => {
+    const frame = document.activeElement
+    if (command !== 'frame.escape' || !(frame instanceof HTMLIFrameElement) || frame.closest('[data-media-viewer]') === null) return
+    frame.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+  })
 }
 
 /** Download on a file row or in the viewer: main saves it into ~/Downloads and shows it in Finder. */
@@ -86,6 +103,7 @@ export function useTopicFiles(view: string) {
   const open = useAtomValue(openViewerAtom(view), (viewer) => viewer !== undefined)
   const progress = useAtomValue(uploadProgressAtom)
   useEffect(preloadViewer, [])
+  useEffect(listenFrameEscape, [])
   const uploadProgress = progress._tag === 'Success' && Object.keys(progress.value).length > 0 ? progress.value : undefined
   const viewer = open ? <TopicViewer view={view} opener={opener} /> : null
   return { dropping, setDropping, setViewing, uploadProgress, viewer }
