@@ -3,7 +3,7 @@ import { Headphones } from '@phosphor-icons/react/dist/icons/Headphones'
 import type { KeyboardEvent, ReactNode } from 'react'
 import { colors, layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Button, EmptyState, Surface } from '@juno/ui'
-import { HuddleControls } from './HuddleControls'
+import { HuddleControls, TextControl } from './HuddleControls'
 import { HuddlePageHeader } from './HuddlePageHeader'
 import { ShareStage } from './HuddleStage'
 import { PeopleTiles } from './PeopleTiles'
@@ -130,7 +130,7 @@ export function HuddlePage({ place, state, people, shares = [], renderShare, ren
   )
 }
 
-/** The controls in an island, or Join, where a topic's composer sits. Nothing once the huddle is over. */
+/** The controls in an island, or Join huddle in the same island, where a topic's composer sits. Nothing once the huddle is over. */
 function PageFooter({ state, devices }: { readonly state: HuddlePageState; readonly devices: ReactNode }) {
   if (state.kind === 'ended' || state.kind === 'failed') return null
   return (
@@ -140,9 +140,10 @@ function PageFooter({ state, devices }: { readonly state: HuddlePageState; reado
           <ControlsRow state={state} devices={devices} />
         </Surface>
       ) : (
-        <Button variant="primary" size="lg" iconStart={Headphones} onClick={state.onJoin}>
-          {state.switching === true ? 'Switch to this huddle' : 'Join huddle'}
-        </Button>
+        // The same island and 32px pill as the controls, so joining swaps what is in the island and moves nothing around it.
+        <Surface kind="island" sx={styles.controlsIsland}>
+          <TextControl shape="island" size={32} icon={Headphones} live label={state.switching === true ? 'Switch to this huddle' : 'Join huddle'} onClick={state.onJoin} />
+        </Surface>
       )}
     </footer>
   )

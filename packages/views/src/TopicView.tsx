@@ -13,6 +13,8 @@ export interface TopicViewProps {
   readonly composer?: ReactNode
   /** Over the list, outside its rows: the emoji picker, the selection's Quote button (`Floating`). Positioned from the list area's top left. */
   readonly floating?: ReactNode
+  /** The media viewer, over the whole topic: header, list and composer. While it shows they are inert. */
+  readonly viewer?: ReactNode
   /** Files dropped anywhere on the topic go to its composer. */
   readonly onFiles?: (files: ReadonlyArray<File>) => void
   /** Files are being dragged over the topic, or no longer are: the composer shows it. */
@@ -27,9 +29,11 @@ const carriesFiles = (event: DragEvent<HTMLElement>) => event.dataTransfer.types
  * composer, with the header's islands floating over its top and the pill
  * over its bottom edge. Neither takes part in the list's layout, so a header
  * change never moves a message. The header comes first in the DOM, so it
- * is first in the Tab order.
+ * is first in the Tab order. The viewer covers only this topic, so the
+ * sidebar, the tab strip and the Juno panel stay usable, and each tab keeps
+ * its own viewer open while another tab shows.
  */
-export function TopicView({ header, children, pill, composer, floating, onFiles, onDragFiles }: TopicViewProps) {
+export function TopicView({ header, children, pill, composer, floating, viewer, onFiles, onDragFiles }: TopicViewProps) {
   const drops =
     onFiles === undefined
       ? {}
@@ -58,13 +62,17 @@ export function TopicView({ header, children, pill, composer, floating, onFiles,
         }
   return (
     <div data-topic-view="" {...drops} {...stylex.props(styles.root)}>
-      <div data-topic-middle="" {...stylex.props(styles.middle)}>
-        {header}
-        {children}
-        {pill !== undefined ? <div {...stylex.props(styles.pill)}>{pill}</div> : null}
-        {floating}
+      {/* No box of its own: it only makes the topic under the viewer inert, out of the Tab order and the pointer's reach. */}
+      <div inert={viewer != null} {...stylex.props(styles.content)}>
+        <div data-topic-middle="" {...stylex.props(styles.middle)}>
+          {header}
+          {children}
+          {pill !== undefined ? <div {...stylex.props(styles.pill)}>{pill}</div> : null}
+          {floating}
+        </div>
+        {composer}
       </div>
-      {composer}
+      {viewer}
     </div>
   )
 }
@@ -72,7 +80,10 @@ export function TopicView({ header, children, pill, composer, floating, onFiles,
 const styles = stylex.create({
   // Fills whatever holds it (the workspace page, a gallery frame) and
   // keeps its own height to that, so the list scrolls instead of growing.
+  // Positioned and isolated, so the viewer covers this topic and stays under the Juno panel when that covers the page.
   root: {
+    position: 'relative',
+    isolation: 'isolate',
     display: 'flex',
     flexDirection: 'column',
     flexGrow: 1,
@@ -81,6 +92,9 @@ const styles = stylex.create({
     minWidth: 0,
     minHeight: 0,
     backgroundColor: colors['--background'],
+  },
+  content: {
+    display: 'contents',
   },
   middle: {
     position: 'relative',

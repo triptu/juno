@@ -165,7 +165,7 @@ function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps)
   const { readAtOpen, at, dividerBefore } = useDivider(id, detail.lastReadTs, detail.markedUnread === true, list, readOnly)
   const loading = useTopicFetch(detail.id, view)
   const showWindow = windowShown(position.positioned, list, readAtOpen, loading.fetchState)
-  const files = useTopicFiles()
+  const files = useTopicFiles(view)
   useOpenPosition(position, view, readOnly, list, showWindow)
   const flash = useMessageFlash(position, detail.id, readOnly, list)
   useHeldPosition(position, list)
@@ -226,7 +226,8 @@ function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps)
       header={header}
       pill={pill.show ? <NewMessagesPill count={pill.count} onJump={jump} /> : undefined}
       composer={detail.deactivated ? <Suspense><DeactivatedNote name={detail.channel.label} /></Suspense> : <TopicComposer key={id} detail={id === detail.id ? detail : { ...detail, id }} onSent={sent} handle={composer} takeFocus={(field) => takeComposerFocus(view, field)} onArrowUpEmpty={messageActions.selectNewest} dropping={files.dropping} />}
-      floating={<>{messageActions.floating}{files.viewer}</>}
+      floating={messageActions.floating}
+      viewer={files.viewer}
       onFiles={(dropped) => attach(id, dropped)}
       onDragFiles={files.setDropping}
     >
