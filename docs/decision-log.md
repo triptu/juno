@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-20 15:36 · missed-huddle-order · Joining clears only older huddles in the same conversation. When Slack gives equal whole-second start times, compare the huddle thread timestamps; without that evidence, keep the other miss rather than clear a possibly newer call.
 - 10-20 15:06 · missed-huddle-clear · Opening a missed-huddle row clears that call and opens its conversation; joining a later huddle in that conversation clears older misses, including joins on another device. Merely showing Home does not clear it.
 - 10-20 15:06 · missed-huddle-evidence · Dismissed and offline huddles count as missed only when an ended room explicitly supplies participant history without self; self-started and ever-joined huddles do not. Ignored channels count, with Every message overriding Never on the conversation or starter.
 - 10-20 15:06 · missed-huddle-expiry · An unseen missed huddle expires seven days after ending; normal Slack sync supplies recovery, with no extra history scan for Home.

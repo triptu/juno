@@ -1,0 +1,1 @@
+- 10-20 15:36 · missed-huddle-order · Joining clears only older huddles in the same conversation. When Slack gives equal whole-second start times, compare the huddle thread timestamps; without that evidence, keep the other miss rather than clear a possibly newer call.
