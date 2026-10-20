@@ -46,7 +46,8 @@ test('packaged app signs in and starts both utility processes @mac', async () =>
     for (let pass = 0; pass < 6; pass++) {
       await rm(join(userData, 'DevToolsActivePort'), { force: true })
       const started = performance.timeOrigin + performance.now()
-      const child = spawn(executable, ['--remote-debugging-port=0'], { env, stdio: 'ignore' })
+      // This throwaway fake-Slack profile must not wait on the owner's macOS cookie keychain.
+      const child = spawn(executable, ['--remote-debugging-port=0', '--use-mock-keychain'], { env, stdio: 'ignore' })
       let exited = false
       const closed = once(child, 'exit').then(([code, signal]) => { exited = true; return { code, signal } })
       try {

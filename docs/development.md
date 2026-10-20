@@ -421,6 +421,8 @@ results are in research section 10, "Live probe".
 
 ### Keychain prompts
 
+The packaged smoke uses Chromium's `--use-mock-keychain` with its temporary fake-Slack profile, so cookie storage cannot wait on a macOS permission dialog. Installed apps use the real keychain.
+
 Goal: at most one macOS prompt on a first run. Every keychain access from
 launch through the first sign-in and sync, in order:
 
@@ -675,10 +677,12 @@ At the end of each UI milestone, run these reviews in parallel and turn the find
   from the package directory. Node 24 prints an ExperimentalWarning for `node:sqlite`;
   it is harmless.
 - **Workspace packages and `effect` in main and preload.** `externalizeDepsPlugin`
-  externalises every dependency, and workspace packages ship TypeScript, so
-  `electron.vite.config.ts` excludes `@juno/contract`, `@juno/engine`, `@juno/state`
-  and `effect` to bundle them. Bundling `effect` cut the launch to first window from
-  416 ms to 314 ms. Add a workspace package that main or the engine imports to that list.
+  externalises production dependencies. Keep workspace packages and `effect` in
+  the desktop manifest's `devDependencies` so they are bundled. Workspace packages
+  ship TypeScript; packaged Electron cannot load that source from `node_modules`.
+  `electron.vite.config.ts` rejects workspace packages in production dependencies
+  and checks that every external import has a packaged runtime dependency.
+  Bundling `effect` cut the launch to first window from 416 ms to 314 ms.
 - **`app.getVersion()` in tests.** Launching Electron with the script path makes it
   report Electron's own version. The fixture launches the package directory, like
   `electron .`, and `package.json` has `productName: "Juno"`.
