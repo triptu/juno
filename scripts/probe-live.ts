@@ -612,6 +612,72 @@ async function linksOnly(call: Call): Promise<unknown> {
   }
 }
 
+const styleKey = (style: unknown) => (style !== null && typeof style === 'object' ? Object.keys(style).filter((k) => (style as Json)[k] === true).toSorted().join('+') : '')
+const styleMarkers: Record<string, readonly [string, string]> = { bold: ['*', '*'], italic: ['_', '_'], strike: ['~', '~'], code: ['`', '`'] }
+
+/** The census of one `rich_text` block's elements for `--only styles`: true when any is styled, a code block or a quote. */
+function containerStyles(elements: ReadonlyArray<Json>, mrkdwn: string, add: (key: string) => void): boolean {
+  let has = false
+  elements.forEach((container, index) => {
+    const kind = String(container['type'])
+    const kids = (container['elements'] as Array<Json> | undefined) ?? []
+    if (kind === 'rich_text_preformatted' || kind === 'rich_text_quote') {
+      has = true
+      add(`${kind} keys ${Object.keys(container).toSorted().join(',')}`)
+      if (container['border'] !== undefined) add(`${kind} border ${String(container['border'])}`)
+      add(`${kind} child types ${[...new Set(kids.map((k) => String(k['type'])))].toSorted().join(',')}`)
+      const first = kids[0]
+      const last = kids.at(-1)
+      if (typeof first?.['text'] === 'string' && first['text'].startsWith('\n')) add(`${kind} first text starts with newline`)
+      if (typeof last?.['text'] === 'string' && last['text'].endsWith('\n')) add(`${kind} last text ends with newline`)
+      if (kids.some((k) => k['style'] !== undefined)) add(`${kind} has styled children ${[...new Set(kids.map((k) => styleKey(k['style'])).filter((k) => k !== ''))].join(' ')}`)
+      const before = elements[index - 1]
+      const beforeLast = ((before?.['elements'] as Array<Json> | undefined) ?? []).at(-1)
+      if (before !== undefined) add(`${kind} after ${String(before['type'])}${typeof beforeLast?.['text'] === 'string' && beforeLast['text'].endsWith('\n') ? ' ending with newline' : ''}`)
+      const after = elements[index + 1]
+      const afterFirst = ((after?.['elements'] as Array<Json> | undefined) ?? [])[0]
+      if (after !== undefined) add(`${kind} before ${String(after['type'])}${typeof afterFirst?.['text'] === 'string' && afterFirst['text'].startsWith('\n') ? ' starting with newline' : ''}`)
+      if (kind === 'rich_text_preformatted') {
+        const body = kids.map((k) => (typeof k['text'] === 'string' ? k['text'] : '')).join('')
+        if (mrkdwn.includes('```' + body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '```')) add('preformatted in text as ```body```')
+        else if (mrkdwn.includes('```\n')) add('preformatted in text with a newline after the opening fence')
+        else add('preformatted in text in another form')
+      }
+    }
+    if (kind === 'rich_text_quote' && !/(^|\n)&gt; ?/.test(mrkdwn)) add('quote but no &gt; line in text')
+    if (kind === 'rich_text_quote' && /(^|\n)&gt; /.test(mrkdwn)) add('quote as "&gt; " in text')
+    if (kind === 'rich_text_quote' && /(^|\n)&gt;[^ ]/.test(mrkdwn)) add('quote as "&gt;" without space in text')
+    for (const kid of [...kids, ...kids.flatMap((k) => (k['elements'] as Array<Json> | undefined) ?? [])]) {
+      const key = styleKey(kid['style'])
+      if (key === '') continue
+      has = true
+      add(`style ${String(kid['type'])} ${key}`)
+      if (kid['type'] !== 'text' || typeof kid['text'] !== 'string') continue
+      const text = kid['text']
+      if (/^\s/.test(text)) add(`styled text starts with whitespace ${key}`)
+      if (/\s$/.test(text)) add(`styled text ends with whitespace ${key}`)
+      if (text.includes('\n')) add(`styled text holds a newline ${key}`)
+      const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      const names = key.split('+')
+      if (names.length === 1) {
+        const [open, close] = styleMarkers[names[0]!] ?? ['', '']
+        add(`${key} in text ${mrkdwn.includes(open + escaped + close) ? 'wrapped in its markers' : mrkdwn.includes(escaped) ? 'present without its markers' : 'absent'}`)
+      } else {
+        const at = mrkdwn.indexOf(escaped)
+        add(`${key} in text ${at < 0 ? 'absent' : 'with ' + JSON.stringify(mrkdwn.slice(Math.max(0, at - 3), at).replace(/[^*_~`]/g, '.')) + ' before'}`)
+      }
+    }
+    for (const kid of kids) {
+      if (kid['type'] === 'text' && kid['style'] === undefined && typeof kid['text'] === 'string') {
+        if (/(^|[\s(])\*[^*\s][^*\n]*\*(?=$|[\s).,!?])/.test(kid['text'])) add('unstyled text holding *words*')
+        if (/(^|[\s(])_[^_\s][^_\n]*_(?=$|[\s).,!?])/.test(kid['text'])) add('unstyled text holding _words_')
+        if (/`[^`\n]+`/.test(kid['text'])) add('unstyled text holding `words`')
+      }
+    }
+  })
+  return has
+}
+
 /** `--only styles`: how Slack's own clients encode bold, italic, strike, code, code blocks and quotes. Counts only. */
 async function stylesOnly(call: Call): Promise<unknown> {
   const auth = await call('auth.test', {}, 'styles')
@@ -627,8 +693,6 @@ async function stylesOnly(call: Call): Promise<unknown> {
   const ids = [...new Set([...(selfDm === undefined ? [] : [String(selfDm['id'])]), ...recent])]
   const tally = new Map<string, number>()
   const add = (key: string) => tally.set(key, (tally.get(key) ?? 0) + 1)
-  const styleKey = (style: unknown) => (style !== null && typeof style === 'object' ? Object.keys(style).filter((k) => (style as Json)[k] === true).toSorted().join('+') : '')
-  const markers: Record<string, readonly [string, string]> = { bold: ['*', '*'], italic: ['_', '_'], strike: ['~', '~'], code: ['`', '`'] }
   let messages = 0
   let fromClients = 0
   let styled = 0
@@ -646,63 +710,7 @@ async function stylesOnly(call: Call): Promise<unknown> {
         if (block['type'] !== 'rich_text') continue
         blocksType++
         const elements = (block['elements'] as Array<Json> | undefined) ?? []
-        elements.forEach((container, index) => {
-          const kind = String(container['type'])
-          const kids = (container['elements'] as Array<Json> | undefined) ?? []
-          if (kind === 'rich_text_preformatted' || kind === 'rich_text_quote') {
-            has = true
-            add(`${kind} keys ${Object.keys(container).toSorted().join(',')}`)
-            if (container['border'] !== undefined) add(`${kind} border ${String(container['border'])}`)
-            add(`${kind} child types ${[...new Set(kids.map((k) => String(k['type'])))].toSorted().join(',')}`)
-            const first = kids[0]
-            const last = kids.at(-1)
-            if (typeof first?.['text'] === 'string' && first['text'].startsWith('\n')) add(`${kind} first text starts with newline`)
-            if (typeof last?.['text'] === 'string' && last['text'].endsWith('\n')) add(`${kind} last text ends with newline`)
-            if (kids.some((k) => k['style'] !== undefined)) add(`${kind} has styled children ${[...new Set(kids.map((k) => styleKey(k['style'])).filter((k) => k !== ''))].join(' ')}`)
-            const before = elements[index - 1]
-            const beforeLast = ((before?.['elements'] as Array<Json> | undefined) ?? []).at(-1)
-            if (before !== undefined) add(`${kind} after ${String(before['type'])}${typeof beforeLast?.['text'] === 'string' && beforeLast['text'].endsWith('\n') ? ' ending with newline' : ''}`)
-            const after = elements[index + 1]
-            const afterFirst = ((after?.['elements'] as Array<Json> | undefined) ?? [])[0]
-            if (after !== undefined) add(`${kind} before ${String(after['type'])}${typeof afterFirst?.['text'] === 'string' && afterFirst['text'].startsWith('\n') ? ' starting with newline' : ''}`)
-            if (kind === 'rich_text_preformatted') {
-              const body = kids.map((k) => (typeof k['text'] === 'string' ? k['text'] : '')).join('')
-              if (mrkdwn.includes('```' + body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '```')) add('preformatted in text as ```body```')
-              else if (mrkdwn.includes('```\n')) add('preformatted in text with a newline after the opening fence')
-              else add('preformatted in text in another form')
-            }
-          }
-          if (kind === 'rich_text_quote' && !/(^|\n)&gt; ?/.test(mrkdwn)) add('quote but no &gt; line in text')
-          if (kind === 'rich_text_quote' && /(^|\n)&gt; /.test(mrkdwn)) add('quote as "&gt; " in text')
-          if (kind === 'rich_text_quote' && /(^|\n)&gt;[^ ]/.test(mrkdwn)) add('quote as "&gt;" without space in text')
-          for (const kid of [...kids, ...kids.flatMap((k) => (k['elements'] as Array<Json> | undefined) ?? [])]) {
-            const key = styleKey(kid['style'])
-            if (key === '') continue
-            has = true
-            add(`style ${String(kid['type'])} ${key}`)
-            if (kid['type'] !== 'text' || typeof kid['text'] !== 'string') continue
-            const text = kid['text']
-            if (/^\s/.test(text)) add(`styled text starts with whitespace ${key}`)
-            if (/\s$/.test(text)) add(`styled text ends with whitespace ${key}`)
-            if (text.includes('\n')) add(`styled text holds a newline ${key}`)
-            const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-            const names = key.split('+')
-            if (names.length === 1) {
-              const [open, close] = markers[names[0]!] ?? ['', '']
-              add(`${key} in text ${mrkdwn.includes(open + escaped + close) ? 'wrapped in its markers' : mrkdwn.includes(escaped) ? 'present without its markers' : 'absent'}`)
-            } else {
-              const at = mrkdwn.indexOf(escaped)
-              add(`${key} in text ${at < 0 ? 'absent' : 'with ' + JSON.stringify(mrkdwn.slice(Math.max(0, at - 3), at).replace(/[^*_~`]/g, '.')) + ' before'}`)
-            }
-          }
-          for (const kid of kids) {
-            if (kid['type'] === 'text' && kid['style'] === undefined && typeof kid['text'] === 'string') {
-              if (/(^|[\s(])\*[^*\s][^*\n]*\*(?=$|[\s).,!?])/.test(kid['text'])) add('unstyled text holding *words*')
-              if (/(^|[\s(])_[^_\s][^_\n]*_(?=$|[\s).,!?])/.test(kid['text'])) add('unstyled text holding _words_')
-              if (/`[^`\n]+`/.test(kid['text'])) add('unstyled text holding `words`')
-            }
-          }
-        })
+        if (containerStyles(elements, mrkdwn, add)) has = true
       }
       if (has) styled++
     }

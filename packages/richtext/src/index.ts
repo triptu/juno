@@ -7,7 +7,7 @@ export { bodyFromMrkdwn, messageBody, plainText, previewLine, previewText, type 
 
 export { composeOutgoing } from './outgoing'
 export { editMarkup } from './edit-markup'
-export { lineMarkup, markupLayout, markupPieces, toggleMarkup, type LineMarkup, type MarkupEdit, type MarkupLayout, type MarkupPiece, type MarkupRange, type MarkupSpan, type MarkupStyle } from './markup'
+export { markupLayout, toggleMarkup, type MarkupEdit, type MarkupLayout, type MarkupStyle } from './markup'
 export { findLinks, linkOf } from './links'
 export type { MentionTargets } from './outgoing'
 export {

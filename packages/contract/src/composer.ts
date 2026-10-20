@@ -30,7 +30,6 @@ export {
   mergeEmoji,
   markupLayout,
   toggleMarkup,
-  type MarkupEdit,
   type MarkupLayout,
   type MarkupStyle,
 } from '@juno/domain'

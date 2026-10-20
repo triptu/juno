@@ -27,7 +27,7 @@ export * from './automated'
 // The standard emoji, for the renderer's picker through @juno/contract.
 export { emojiCatalog, UNKNOWN_PERSON, type EmojiCategory } from '@juno/richtext'
 // Slack's markup in the composer: the field's look and the formatting keys, for the renderer through @juno/contract.
-export { markupLayout, toggleMarkup, type MarkupEdit, type MarkupLayout, type MarkupStyle } from '@juno/richtext'
+export { markupLayout, toggleMarkup, type MarkupLayout, type MarkupStyle } from '@juno/richtext'
 export * from './composer-mentions'
 export * from './composer-emoji'
 export * from './composer-links'
