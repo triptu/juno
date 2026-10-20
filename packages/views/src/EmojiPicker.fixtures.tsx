@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { sizes } from '@juno/tokens/tokens.stylex'
-import { emojiCatalog } from '@juno/contract'
+import { emojiCatalog, prepareEmojiPicker } from '@juno/contract'
 import { useState } from 'react'
 import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
 import { EmojiPicker, type EmojiPickerProps } from './EmojiPicker'
@@ -24,21 +24,21 @@ const custom = [
 const recent = ['+1', 'white_check_mark', 'eyes', 'tada', 'juno_wave', 'heart', 'joy', 'pray', 'rocket', 'fire', '100']
 
 const picker = (overrides: Partial<EmojiPickerProps> = {}, frame?: FixtureFrame) =>
-  fixture<EmojiPickerProps>({ catalog: emojiCatalog, onPick: noop, onClose: noop, ...overrides }, frame)
+  fixture<EmojiPickerProps>({ data: prepareEmojiPicker(emojiCatalog, []), onPick: noop, onClose: noop, ...overrides }, frame)
 
 export default defineFixtures(EmojiPicker, {
   Browse: {
     default: picker(),
     regression: scene(() => <RegressionPicker />),
-    workspace: picker({ custom }),
-    'workspace-2000': picker({ custom: Array.from({ length: 2000 }, (_, i) => ({ name: `workspace_${i}`, url: custom[i % custom.length]!.url })) }),
-    'recent-and-custom': picker({ recent, custom }),
-    'hover-emoji': picker({ recent, custom }, { hover: 'button[data-emoji]' }),
+    workspace: picker({ data: prepareEmojiPicker(emojiCatalog, custom) }),
+    'workspace-2000': picker({ data: prepareEmojiPicker(emojiCatalog, Array.from({ length: 2000 }, (_, i) => ({ name: `workspace_${i}`, url: custom[i % custom.length]!.url }))) }),
+    'recent-and-custom': picker({ recent, data: prepareEmojiPicker(emojiCatalog, custom) }),
+    'hover-emoji': picker({ recent, data: prepareEmojiPicker(emojiCatalog, custom) }, { hover: 'button[data-emoji]' }),
   },
   Search: {
-    matches: picker({ custom, initialQuery: 'juno_party' }),
-    alias: picker({ custom, initialQuery: 'hello_juno' }),
-    'no-match': picker({ custom, initialQuery: 'zzqx' }),
+    matches: picker({ data: prepareEmojiPicker(emojiCatalog, custom), initialQuery: 'juno_party' }),
+    alias: picker({ data: prepareEmojiPicker(emojiCatalog, custom), initialQuery: 'hello_juno' }),
+    'no-match': picker({ data: prepareEmojiPicker(emojiCatalog, custom), initialQuery: 'zzqx' }),
   },
 })
 
@@ -47,7 +47,7 @@ function RegressionPicker() {
   const [picked, setPicked] = useState('')
   const [glyph, setGlyph] = useState('')
   const [open, setOpen] = useState(true)
-  return <>{open ? <EmojiPicker catalog={emojiCatalog} custom={[...custom, { name: 'thumbsup_parrot', url: custom[0]!.url }, { name: 'broken_image', url: '/broken-emoji.svg' }, { name: 'broken_neighbor', url: custom[1]!.url }, { name: '+1', unicode: '👍', aliases: ['approval'] }, { name: 'tada', url: custom[3]!.url }]} recent={['hello_juno', 'eyes']} selected={new Set(['hello_juno', 'eyes'])} onPick={(name, unicode) => { setPicked(name); setGlyph(unicode ?? '') }} onClose={() => setOpen(false)} /> : null}<output aria-label="Picked emoji" {...stylex.props(styles.feedback)}>{picked}</output><output aria-label="Picked glyph" {...stylex.props(styles.feedback)}>{glyph}</output></>
+  return <>{open ? <EmojiPicker data={prepareEmojiPicker(emojiCatalog, [...custom, { name: 'thumbsup_parrot', url: custom[0]!.url }, { name: 'broken_image', url: '/broken-emoji.svg' }, { name: 'broken_neighbor', url: custom[1]!.url }, { name: '+1', unicode: '👍', aliases: ['approval'] }, { name: 'tada', url: custom[3]!.url }])} recent={['hello_juno', 'eyes']} selected={[{ name: 'hello_juno', url: custom[0]!.url }, { name: 'eyes' }, { name: 'tada' }]} onPick={(name, unicode) => { setPicked(name); setGlyph(unicode ?? '') }} onClose={() => setOpen(false)} /> : null}<output aria-label="Picked emoji" {...stylex.props(styles.feedback)}>{picked}</output><output aria-label="Picked glyph" {...stylex.props(styles.feedback)}>{glyph}</output></>
 }
 
 const styles = stylex.create({

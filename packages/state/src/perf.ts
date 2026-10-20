@@ -34,6 +34,9 @@ export type PerfName =
   | 'juno.emoji-ready'
   | 'juno.emoji-resolve'
   | 'juno.emoji-prepare'
+  | 'juno.emoji-decode'
+  | 'juno.emoji-catalog'
+  | 'juno.emoji-preload'
   /** Mark: a topic was warmed by hover, focus or keyboard selection (performance.md 4.2). */
   | 'juno.prefetch'
   /** From the peek key's keydown to the first frame with the peeked topic's messages. */

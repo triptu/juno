@@ -11,6 +11,7 @@ import { Effect, Schema } from 'effect'
 import { WorkspaceEmojiValue, mentionsChannels, mentionsEmoji, mentionsGroups, mentionsPeople, type MentionChannel, type MentionPerson } from '@juno/contract'
 import { registry } from './client'
 import { liveQuery } from './atoms'
+import { mark, measure } from './perf'
 
 const peopleFamily = liveQuery(mentionsPeople)
 const groupsFamily = liveQuery(mentionsGroups)
@@ -70,6 +71,10 @@ export function onFirstMentionAnswer(
 
 /** Read workspace emoji only while a colon query needs them. */
 const emojiFamily = liveQuery(mentionsEmoji)
-const emojiRows = Atom.make((get) => AsyncResult.flatMap(get(emojiFamily(undefined)), (json) =>
-  AsyncResult.fromExit(Effect.runSyncExit(Schema.decodeUnknownEffect(WorkspaceEmojiValue)(json)))))
+const emojiRows = Atom.make((get) => AsyncResult.flatMap(get(emojiFamily(undefined)), (json) => {
+  const started = mark('juno.emoji-decode')
+  const answer = AsyncResult.fromExit(Effect.runSyncExit(Schema.decodeUnknownEffect(WorkspaceEmojiValue)(json)))
+  measure('juno.emoji-decode', started, { replace: true })
+  return answer
+}))
 export const composerEmojiAtom = (open: boolean) => open ? emojiRows : closed

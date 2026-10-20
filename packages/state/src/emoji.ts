@@ -1,15 +1,12 @@
 /** Loaded with the picker chunk, after the first list paint. One subscription per app. */
 import * as Atom from 'effect/reactivity/Atom'
-import { Schema } from 'effect'
-import { WorkspaceEmojiValue, emojiCatalog, prepareEmojiPicker, workspaceEmoji, type PreparedEmojiPicker, type EmojiCategory } from '@juno/contract'
+import { emojiCatalog, prepareEmojiPicker, workspaceEmoji, type PreparedEmojiPicker, type EmojiCategory } from '@juno/contract'
 import { mark, measure } from './perf'
 import { registry } from './client'
 import { composerEmojiAtom } from './mentions'
-import { install } from './emojiCodec.generated.mjs'
-
-// Static compiler output keeps the cold decoder fast without dynamic code in the renderer.
-install([WorkspaceEmojiValue.ast])
-Schema.decodeUnknownSync(WorkspaceEmojiValue)('[]')
+const catalogStarted = mark('juno.emoji-catalog')
+export const standardEmojiPickerData = prepareEmojiPicker(emojiCatalog, [])
+measure('juno.emoji-catalog', catalogStarted)
 
 export const workspaceEmojiDataAtom = Atom.make((get) => {
   const answer = get(composerEmojiAtom(true))
@@ -41,7 +38,7 @@ export function warmWorkspaceEmoji(catalog: ReadonlyArray<EmojiCategory>): void 
     if (value === undefined) return
     prepared = value.data
     ready()
-    if (!measured) { measure('juno.emoji-ready', started); measured = true }
+    if (!measured) { measure('juno.emoji-ready', started, { detail: { emojiCount: value.data.customItems.length } }); measured = true }
   }, { immediate: true })
 }
 

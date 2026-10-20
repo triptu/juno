@@ -5,9 +5,10 @@ import { useState } from 'react'
  * topic or the Juno chat has painted, before the first open.
  */
 import { emojiCatalog } from '@juno/contract'
-import { emojiPickerDataAtom, warmWorkspaceEmoji } from '@juno/state/emoji'
+import { emojiPickerDataAtom, standardEmojiPickerData, warmWorkspaceEmoji } from '@juno/state/emoji'
 import { useAtomValue } from '@juno/state/react'
 import { EmojiPicker } from '@juno/views'
+export { workspaceEmojiReady } from '@juno/state/emoji'
 
 warmWorkspaceEmoji(emojiCatalog)
 
@@ -23,5 +24,5 @@ export default function EmojiPickerPanel({ recent, onPick, onClose }: EmojiPicke
   if (snapshot === undefined && current !== undefined) setSnapshot(current)
   // Table changes take effect on the next open, so cells never move under a pending click.
   const answer = snapshot ?? current
-  return answer === undefined ? null : <EmojiPicker data={answer.data} custom={answer.custom} catalog={emojiCatalog} recent={recent} onPick={onPick} onClose={onClose} />
+  return <EmojiPicker data={answer?.data ?? standardEmojiPickerData} recent={recent} onPick={onPick} onClose={onClose} />
 }

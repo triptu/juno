@@ -3,7 +3,7 @@
  * emoji picker. The data lives in `@juno/richtext`; this re-export lets
  * the renderer reach it through the contract.
  */
-export { prepareEmojiPicker, type PreparedEmojiPicker, type PickerItem, type PickerCustomEmoji, workspaceEmoji, emojiCatalog, type EmojiCategory } from '@juno/domain'
+export { prepareEmojiPicker, type PreparedEmojiPicker, type PickerItem, workspaceEmoji, emojiCatalog, type EmojiCategory } from '@juno/domain'
 
 /** A one-click reaction in the message toolbar: a standard emoji (`unicode`) or a custom one (`url`). */
 export interface QuickReaction {
@@ -42,7 +42,7 @@ export function quickReactionsFrom(value: unknown): ReadonlyArray<QuickReaction>
     const { name, unicode, url } = entry as Record<string, unknown>
     if (typeof name !== 'string' || name === '' || typeof unicode !== 'string' || seen.has(name)) continue
     seen.add(name)
-    const image = typeof url === 'string' && !url.startsWith('juno:') ? url : undefined
+    const image = typeof url === 'string' ? url : undefined
     reactions.push(image === undefined ? { name, unicode } : { name, unicode, url: image })
     if (reactions.length === MAX_QUICK_REACTIONS) break
   }

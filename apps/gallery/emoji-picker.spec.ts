@@ -66,7 +66,10 @@ test('failed images retain their cell and do not move later emoji', async ({ pag
   const neighbour = picker.locator('[data-emoji="broken_neighbor"]')
   const neighbourBefore = await neighbour.boundingBox()
   release()
-  await expect(cell).toHaveText(':broken_image:')
+  await expect(cell.locator('[data-emoji-placeholder]')).toBeVisible()
+  await expect(cell).toHaveText('')
+  await expect(cell).toHaveAccessibleName(':broken_image:')
+  await expect(cell).toHaveAttribute('title', ':broken_image:')
   expect(await cell.boundingBox()).toEqual(before)
   expect(await neighbour.boundingBox()).toEqual(neighbourBefore)
 })
@@ -96,4 +99,21 @@ test('an image with a standard name keeps a separate cell and picks the workspac
   await cells.filter({ has: page.locator('img') }).click()
   await expect(page.getByRole('status', { name: 'Picked emoji' })).toHaveText('tada')
   await expect(page.getByRole('status', { name: 'Picked glyph' })).toHaveText('')
+})
+
+
+test('picker search puts smile before substring matches', async ({ page }) => {
+  const picker = await regression(page)
+  await picker.getByRole('textbox').fill(':smi')
+  await expect(picker.locator('[data-emoji-results] [data-emoji]').first()).toHaveAttribute('data-emoji', 'smile')
+  await picker.getByRole('textbox').press('Enter')
+  await expect(page.getByRole('status', { name: 'Picked glyph' })).toHaveText('😄')
+})
+
+test('chosen state distinguishes a standard glyph from a workspace image with the same name', async ({ page }) => {
+  const picker = await regression(page)
+  await picker.getByRole('textbox').fill('tada')
+  const cells = picker.locator('[data-emoji="tada"]')
+  await expect(cells.filter({ hasNot: page.locator('img') })).toHaveAttribute('aria-disabled', 'true')
+  await expect(cells.filter({ has: page.locator('img') })).not.toHaveAttribute('aria-disabled', 'true')
 })

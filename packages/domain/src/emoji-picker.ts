@@ -32,6 +32,7 @@ function prepare(catalog: ReadonlyArray<EmojiCategory>, custom: ReadonlyArray<Pi
   const names = new Map<string, Item>()
   for (const category of standard) for (const item of category.items) for (const name of item.keys) names.set(name, item)
   const customItems: Item[] = []
+  const workspaceAliases = new Map<string, Item>()
   for (const emoji of custom) {
     if (emoji.url === undefined) {
       const item = names.get(emoji.name)
@@ -44,12 +45,13 @@ function prepare(catalog: ReadonlyArray<EmojiCategory>, custom: ReadonlyArray<Pi
     }
     const item: Item = hasSearchData(emoji) ? emoji : { name: emoji.name, url: emoji.url, aliases: emoji.aliases, keys: [emoji.name, ...emoji.aliases ?? []].map((name) => name.toLowerCase()) }
     customItems.push(item)
-    for (const alias of item.aliases ?? []) names.set(alias.toLowerCase(), item)
+    for (const alias of item.aliases ?? []) workspaceAliases.set(alias.toLowerCase(), item)
   }
   // Canonical workspace names are sorted. Keep only aliases in the map instead
   // of allocating another entry for every image in a large workspace.
   if (customItems.some((item, index) => index > 0 && customItems[index - 1]!.keys[0]! > item.keys[0]!)) customItems.sort((a, b) => a.keys[0]! < b.keys[0]! ? -1 : a.keys[0]! > b.keys[0]! ? 1 : 0)
-  const byName = { get(name: string): Item | undefined {
+  const byName = { get(name: string, kind?: 'standard' | 'workspace'): Item | undefined {
+    if (kind === 'standard') return names.get(name)
     let low = 0
     let high = customItems.length - 1
     while (low <= high) {
@@ -60,7 +62,7 @@ function prepare(catalog: ReadonlyArray<EmojiCategory>, custom: ReadonlyArray<Pi
       if (key < name) low = middle + 1
       else high = middle - 1
     }
-    return names.get(name)
+    return workspaceAliases.get(name) ?? (kind === 'workspace' ? undefined : names.get(name))
   } }
   return { standard, customItems, byName, all: [...standard.flatMap((category) => category.items), ...customItems] }
 }

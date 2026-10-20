@@ -117,7 +117,6 @@ const textRules = [
 // allow a new place, add it here and record why in the effect skill. `spec` matches the import
 // specifier; `names` matches named imports from the root 'effect' module.
 const unstable = [
-  { label: 'schema compilers', spec: /^effect\/schema(?:\/|$)/, allow: ['packages/state/src/emojiCodec.generated.mjs'] },
   {
     label: 'Atom, AtomRegistry, AtomRpc and AsyncResult from effect/reactivity',
     spec: /^effect\/reactivity(?:\/(?!Reactivity$).+)?$/,

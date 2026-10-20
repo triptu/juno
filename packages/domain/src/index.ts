@@ -34,7 +34,7 @@ export * from './composer-links'
 export { frequentDestinations, rankConversations } from './frequent'
 export { indexSubject, matchSubject, rankSearchResults, searchWords, type IndexedSubject, type SubjectMatch } from './conversation-search'
 
-export { prepareEmojiPicker, type PreparedEmojiPicker, type PickerItem, type PickerCustomEmoji } from './emoji-picker'
+export { prepareEmojiPicker, type PreparedEmojiPicker, type PickerItem } from './emoji-picker'
 
 export { customEmoji } from './custom-emoji'
 export { matchEmoji, mergeEmoji } from './emoji-ranking'

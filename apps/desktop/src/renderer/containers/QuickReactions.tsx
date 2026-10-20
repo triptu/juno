@@ -4,12 +4,12 @@
  * Add opens the message toolbar's emoji picker with the workspace's custom
  * emoji, from the picker's own chunk, with the chosen ones marked.
  */
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { quickReactionsAtom, registry, setQuickReactions } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { QuickReactionsSetting } from '@juno/views'
 import { chunk, usePreloaded } from './chunks'
-import { frequentEmoji, noteRecentEmoji } from './recentEmoji'
+import { frequentEmoji } from './recentEmoji'
 import type { QuickReaction } from '@juno/contract'
 
 const pickerChunk = chunk(() => import('./QuickReactionPicker'))
@@ -23,7 +23,6 @@ export function QuickReactions() {
   const reactions = shown ?? saved
   const [open, setOpen] = useState(false)
   const ready = usePreloaded(pickerChunk, open)
-  const selected = useMemo(() => new Set(reactions.map((reaction) => reaction.name)), [reactions])
 
   const change = (next: ReadonlyArray<QuickReaction>) => {
     setShown(next)
@@ -32,9 +31,8 @@ export function QuickReactions() {
     })
   }
   const add = (reaction: QuickReaction) => {
-    noteRecentEmoji(reaction.name)
     setOpen(false)
-    if (!reactions.some((other) => other.name === reaction.name)) change([...reactions, reaction])
+    if (!reactions.some((other) => other.name === reaction.name && (other.url === undefined) === (reaction.url === undefined))) change([...reactions, reaction])
   }
 
   return (
@@ -44,7 +42,7 @@ export function QuickReactions() {
       onAdd={() => setOpen((was) => !was)}
       onClosePicker={() => setOpen(false)}
       picker={open && ready ? (
-        <QuickReactionPicker recent={frequentEmoji(reactions)} selected={selected} onPick={add} onClose={() => setOpen(false)} />
+        <QuickReactionPicker recent={frequentEmoji(reactions)} selected={reactions} onPick={add} onClose={() => setOpen(false)} />
       ) : undefined}
     />
   )

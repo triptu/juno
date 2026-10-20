@@ -2,16 +2,12 @@ import * as stylex from '@stylexjs/stylex'
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
 import { useDeferredValue, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
-import { matchEmoji, prepareEmojiPicker, type EmojiCategory, type PickerItem as Item, type PickerCustomEmoji, type PreparedEmojiPicker } from '@juno/contract'
+import { matchEmoji, type PickerItem as Item, type PreparedEmojiPicker } from '@juno/contract'
 import { accent, colors, layout, motion, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { ScrollArea, Surface, Text, TextField } from '@juno/ui'
 
 export interface EmojiPickerProps {
-  /** All standard emoji, by category (from @juno/contract's emojiCatalog). */
-  readonly catalog: ReadonlyArray<EmojiCategory>
-  readonly data?: PreparedEmojiPicker
-  /** The workspace's custom emoji, shown as their own category after the standard categories when non-empty. */
-  readonly custom?: ReadonlyArray<PickerCustomEmoji>
+  readonly data: PreparedEmojiPicker
   /** Recently used names (Slack names), shown first as "Frequently used" when non-empty. */
   readonly recent?: ReadonlyArray<string>
   /** A Slack emoji name: "+1", "partying_face", a custom name. */
@@ -19,7 +15,7 @@ export interface EmojiPickerProps {
   /** Esc. */
   readonly onClose: () => void
   /** Names already chosen (Settings' quick reactions): drawn as chosen and not picked again. */
-  readonly selected?: ReadonlySet<string>
+  readonly selected?: ReadonlyArray<{ readonly name: string; readonly url?: string }>
   /** The search to open with. For fixtures; the app opens the picker empty. */
   readonly initialQuery?: string
 }
@@ -40,7 +36,7 @@ const EMPTY: ReadonlyArray<never> = []
 const NONE: ReadonlySet<string> = new Set()
 
 /** A windowed grid: only nearby rows mount, including in a large workspace or search. */
-export function EmojiPicker({ catalog, data, custom = EMPTY, recent = EMPTY, selected = NONE, onPick, onClose, initialQuery = '' }: EmojiPickerProps) {
+export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, onClose, initialQuery = '' }: EmojiPickerProps) {
   const [query, setQuery] = useState(initialQuery)
   const [failed, setFailed] = useState<ReadonlySet<string>>(NONE)
   const [focused, setFocused] = useState<number | undefined>(undefined)
@@ -49,30 +45,39 @@ export function EmojiPicker({ catalog, data, custom = EMPTY, recent = EMPTY, sel
   const pendingFocus = useRef<number | undefined>(undefined)
   const scrollerRef = useRef<HTMLElement>(null)
 
-  const { standard, customItems, all, byName } = data ?? prepareEmojiPicker(catalog, custom)
-  const selectedItems = useMemo(() => new Set([...selected].map((name) => byName.get(name.toLowerCase()))), [selected, byName])
-  const isChosen = (item: Item) => selectedItems.has(item)
-
-  const browse = useMemo((): ReadonlyArray<Section> => {
-    const seen = new Set<Item>()
-    const recentItems = recent.flatMap((name) => {
-      const item = byName.get(name.toLowerCase())
-      if (item === undefined || seen.has(item)) return []
-      seen.add(item)
+  const { standard, customItems, all, byName } = data
+  const selectedItems = useMemo(() => new Set(selected.map((reaction) => {
+    const item = byName.get(reaction.name.toLowerCase(), reaction.url === undefined ? 'standard' : 'workspace')
+    return item === undefined ? `${reaction.url === undefined ? 'standard' : 'workspace'}:${reaction.name}` : itemKey(item)
+  })), [selected, byName])
+  const isChosen = (item: Item) => selectedItems.has(itemKey(item))
+  // A known recent name is a real cell from the first paint. Fill its image
+  // later without adding or removing slots during this open.
+  const [recentSlots] = useState<ReadonlyArray<Item>>(() => {
+    const seen = new Set<string>()
+    return recent.flatMap((name) => {
+      const item = byName.get(name.toLowerCase()) ?? { name, keys: [name.toLowerCase()] }
+      const key = itemKey(item)
+      if (seen.has(key)) return []
+      seen.add(key)
       return [item]
     })
+  })
+
+  const browse = useMemo((): ReadonlyArray<Section> => {
+    const recentItems = recentSlots.map((item) => byName.get(item.name.toLowerCase()) ?? item)
     return [
       ...(recentItems.length > 0 ? [{ key: 'recent', heading: 'Frequently used', items: recentItems }] : []),
       ...standard.map((category) => ({ key: category.heading, ...category })),
       ...(customItems.length > 0 ? [{ key: 'custom', heading: 'Workspace', items: customItems }] : []),
     ]
-  }, [byName, recent, customItems, standard])
+  }, [byName, recentSlots, customItems, standard])
 
   const results = useMemo((): ReadonlyArray<Section> | undefined => {
     if (search === '') return undefined
-    const matches = matchEmoji(all, search, [], [], Infinity)
+    const matches = matchEmoji(all, search, recent, [], Infinity)
     return [{ key: 'results', items: matches }]
-  }, [all, search])
+  }, [all, search, recent])
 
   const sections = results ?? browse
   const grid = useMemo(() => {
@@ -144,7 +149,7 @@ export function EmojiPicker({ catalog, data, custom = EMPTY, recent = EMPTY, sel
     if (event.key === 'Enter') {
       // The live query, not the deferred one, so Enter right after typing picks what was typed.
       const typed = normalize(query)
-      const match = typed === '' ? undefined : matchEmoji(all, typed, [], [], Infinity).find((item) => !isChosen(item))
+      const match = typed === '' ? undefined : matchEmoji(all, typed, recent, [], Infinity).find((item) => !isChosen(item))
       if (match === undefined) return
       event.preventDefault()
       onPick(match.name, match.unicode)
@@ -213,7 +218,7 @@ export function EmojiPicker({ catalog, data, custom = EMPTY, recent = EMPTY, sel
                       const chosen = isChosen(item)
                       return (
                         <button
-                          key={itemKey(item)}
+                          key={row.section === 'recent' ? itemKey(recentSlots[row.start + index]!) : itemKey(item)}
                           type="button"
                           tabIndex={row.first + index === tabStop ? 0 : -1}
                           data-emoji={item.name}
@@ -223,7 +228,7 @@ export function EmojiPicker({ catalog, data, custom = EMPTY, recent = EMPTY, sel
                           title={chosen ? `:${item.name}: is added` : `:${item.name}:`}
                           {...stylex.props(styles.cell, chosen && styles.chosen)}
                         >
-                          {item.url === undefined ? item.unicode : failed.has(itemKey(item)) ? <span {...stylex.props(styles.fallback)}>{`:${item.name}:`}</span> : (
+                          {item.unicode !== undefined ? item.unicode : item.url === undefined || failed.has(itemKey(item)) ? <span aria-hidden="true" {...stylex.props(styles.fallback)}><span data-emoji-placeholder="" {...stylex.props(styles.placeholder)} /></span> : (
                             <img src={item.url} alt="" draggable={false} loading="lazy" decoding="async" onError={() => setFailed((names) => new Set(names).add(itemKey(item)))} {...stylex.props(styles.image)} />
                           )}
                         </button>
@@ -241,7 +246,7 @@ export function EmojiPicker({ catalog, data, custom = EMPTY, recent = EMPTY, sel
   )
 }
 
-const itemKey = (item: Item) => `${item.url === undefined ? 'standard' : 'workspace'}:${item.name}`
+const itemKey = (item: Item) => `${item.unicode === undefined ? 'workspace' : 'standard'}:${item.name}`
 
 /** Search text as a name: lowercase, no colons, spaces as underscores (":Party face" finds partying_face). */
 function normalize(query: string): string {
@@ -382,7 +387,8 @@ const styles = stylex.create({
     height: GLYPH,
     objectFit: 'contain',
   },
-  fallback: { width: GLYPH, height: GLYPH, overflow: 'hidden', whiteSpace: 'nowrap', fontSize: text['--text-meta-size'], lineHeight: GLYPH },
+  fallback: { width: GLYPH, height: GLYPH, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  placeholder: { width: sizes['--icon-12'], height: sizes['--icon-12'], boxSizing: 'border-box', border: `1px solid ${colors['--foreground-muted']}`, borderRadius: radii['--radius-inline'] },
   noMatch: {
     paddingBlock: spacing['--space-3-5'],
     paddingInline: spacing['--space-2-5'],

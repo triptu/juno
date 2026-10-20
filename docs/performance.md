@@ -89,6 +89,18 @@ The seven selected feel scenarios passed, including launch, relaunch during sess
 
 `pnpm affected --spec e2e/session.spec.ts,e2e/layout-shift.spec.ts,e2e/notifications.spec.ts` passed typecheck, lint, 741 unit tests, 201 gallery tests and 90 desktop tests (three platform skips). The remote plan ran once. No new unit tests were added.
 
+### Workspace emoji picker (2026-10-20)
+
+`pnpm perf -g 'emoji picker with 20,000'` measures ten cold subscriptions in fresh renderers, with 20,000 image owners using distinct URLs plus an alias. It disables the image cache and holds fake image responses until the click. Timing starts at the earlier of the cold subscription and the click, and ends after the first frame with six loaded visible custom images. Workspace stays last; fewer than 200 cells mount. The budget is 50 ms p95. These app timings use the harness’s nearest-rank p50 and p95.
+
+Before removing the generated decoder, this measured **42.8 ms median, 44.9 ms p95**. The normal Schema decoder with immediate standard emoji and CSS placeholders measures **41.9 ms median, 47.4 ms p95**, range 39.2–47.4 ms, ten opens, load 2.7. Two earlier diagnostic runs exceeded the budget; the trace showed cold text shaping and compositor waits. The neutral placeholder now uses a CSS outline rather than a fallback font glyph.
+
+The picker chunk and its retained workspace subscription preload on idle after first paint. Alias resolution, sorting and search keys are built once per table change. Known recent names have visible cells immediately; their images fill in later. Neither a query failure nor a decode failure delays standard emoji. The same ten cold samples measured the synchronous renderer phases (`juno.emoji-catalog`, `juno.emoji-decode`, `juno.emoji-resolve`, `juno.emoji-prepare`) at **14.7 ms median, 16.0 ms p95**, range 14.4–16.0 ms. These exclude IPC wait, chunk evaluation and popup layout.
+
+`pnpm perf -g '20,000 workspace emoji preload'` traces the complete idle preload, without opening the picker, and checks that it starts after the topic paints and prepares at least 20,000 images. With `JUNO_PERF_TRACE=<dir>`, `node scripts/perf-trace.mjs <dir>/emoji-preload.trace.json juno.emoji-preload` reports main-thread activity across chunk evaluation and data readiness; this includes any concurrent topic work. One separate profiled cold preload measured **43.7 ms elapsed and 32.1 ms of main-thread activity**; the ten unprofiled synchronous-phase samples above are the repeatable data-work cost.
+
+A separate decoder comparison alternated twelve fresh Node 26.11.1 processes per side on the same 20,000-row JSON with distinct URLs. Normal Schema decoding measured **11.9 ms median**, range 10.0–15.8 ms; generated decoding measured **7.2 ms median**, range 6.5–11.8 ms. Every sample checked the full decoded length and final URL. Timed regions include JSON parsing and validation; generated registration happens before timing, so this is an upper bound on its net benefit. The median saving was **4.7 ms**, below the 5 ms cutoff, so the generated decoder, generator, lint step and unstable compiler import were removed. Production uses the normal contract Schema decoder.
+
 ### Startup bundle split (2026-10-16)
 
 `pnpm --filter @juno/desktop build`, against `origin/main` at `404ffb34`, measured initial JS at **999.7 KB → 969.3 KB** (gzip **324.0 KB → 313.9 KB**). This frees 30.4 KB without changing the 1,000 KB budget. CSS is 124.1 KB (35.4 KB gzip), from 124.0 KB.

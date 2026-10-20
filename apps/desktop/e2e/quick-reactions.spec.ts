@@ -116,9 +116,7 @@ async function editQuickReactions({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'
     return box.height > 300 && hit !== null && panel.contains(hit)
   })
   expect(bottomIsPicker).toBe(true)
-  await picker(juno).getByRole('group', { name: 'People & body' }).evaluate((node) => node.scrollIntoView({ block: 'start' }))
-  await picker(juno).getByRole('button', { name: ':+1:, added' }).first().scrollIntoViewIfNeeded()
-  await expect(picker(juno).getByRole('button', { name: ':+1:, added' }).first()).toHaveAttribute('aria-disabled', 'true')
+  await expect(picker(juno).getByRole('group', { name: 'Frequently used' }).getByRole('button', { name: ':+1:, added' })).toHaveAttribute('aria-disabled', 'true')
 
   // Esc closes it and gives focus back to Add.
   await juno.win.keyboard.press('Escape')
@@ -169,4 +167,13 @@ test('a workspace alias adds its real emoji to quick reactions', async ({ juno, 
   await juno.settings.root.getByRole('button', { name: 'Add reaction' }).click()
   await expect(picker(juno).getByRole('heading', { name: 'Frequently used', exact: true })).toBeVisible()
   await expect(picker(juno).getByRole('button', { name: ':juno_wave:, added', exact: true }).first()).toHaveAttribute('aria-disabled', 'true')
+})
+
+
+test('choosing a quick reaction in Settings does not record recent use', async ({ juno }) => {
+  await juno.openSettings('Appearance')
+  await add(juno, 'juno_wave')
+  await juno.settings.root.getByRole('button', { name: 'Remove juno_wave' }).click()
+  await juno.settings.root.getByRole('button', { name: 'Add reaction' }).click()
+  await expect(picker(juno).getByRole('group', { name: 'Frequently used' }).locator('[data-emoji="juno_wave"]')).toHaveCount(0)
 })
