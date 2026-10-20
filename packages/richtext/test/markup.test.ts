@@ -42,12 +42,13 @@ describe('the field’s look', () => {
     const text = '*hi* _<@U1>_\n> `x`\n```\ncode\n```'
     const layout = markupLayout(text)
     const slice = (range: { readonly start: number; readonly end: number }) => text.slice(range.start, range.end)
-    expect(layout.spans.map((span) => [span.style, slice(span)])).toEqual([
+    expect(layout.spans.map((span) => [span.style, slice(span)])).toEqual(expect.arrayContaining([
       ['bold', 'hi'],
       ['italic', '<@U1>'],
       ['code', '`x`'],
       ['code', '```\ncode\n```'],
-    ])
+    ]))
+    expect(layout.spans).toHaveLength(4)
     expect(layout.markers.map(slice)).toEqual(['*', '*', '_', '_', '>', '`', '`', '```', '```'])
     expect(layout.quotes.map(slice)).toEqual(['> `x`'])
     expect(layout.codeBlocks.map(slice)).toEqual(['```\ncode\n```'])

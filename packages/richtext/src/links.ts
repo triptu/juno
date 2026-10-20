@@ -66,9 +66,15 @@ function trimEnd(url: string, wrapping: string): string {
 
 /** The markup markers right before `start`, when they start a word: "*_" in "see *_https://…". */
 function wrappingMarkers(text: string, start: number): string {
-  let at = start
-  while (at > 0 && MARKERS.includes(text[at - 1]!)) at--
-  return at > 0 && NOT_BEFORE.test(text[at - 1]!) ? '' : text.slice(at, start)
+  const prefix = text.slice(text.lastIndexOf('\n', start - 1) + 1, start)
+  let wrapping = ''
+  for (let i = 0; i < prefix.length; i++) {
+    const marker = prefix[i]!
+    if (!MARKERS.includes(marker) || prefix[i - 1] === '\\' || prefix[i - 1] === marker || prefix[i + 1] === marker) continue
+    if (wrapping.includes(marker)) wrapping = wrapping.replace(marker, '')
+    else if ((i === 0 || !/[\p{L}\p{N}\p{M}]/u.test(prefix[i - 1]!)) && !/\s/.test(prefix[i + 1] ?? '')) wrapping += marker
+  }
+  return wrapping
 }
 
 /** The links in `text`, in order. */

@@ -25,6 +25,8 @@ import { findLinks } from './links'
 import { lineMarkup, markupPieces } from './markup'
 
 export interface MentionTargets {
+  /** Original edit elements whose source did not change; local placeholders, never sent. */
+  readonly preserved?: ReadonlyArray<{ readonly text: string; readonly element: RichTextInline }>
   /** People the composer may have inserted, with their display name. */
   readonly people?: ReadonlyArray<{ readonly id: string; readonly name: string }>
   /** Channels the composer may have inserted, by name without "#". */
@@ -41,6 +43,7 @@ export interface OutgoingMessage {
 }
 
 type Token =
+  | { readonly kind: 'preserved'; readonly element: RichTextInline }
   | { readonly kind: 'text'; readonly text: string }
   | { readonly kind: 'user'; readonly id: string; readonly name: string }
   | { readonly kind: 'usergroup'; readonly id: string }
@@ -63,6 +66,10 @@ const EMOJI_RE = /:([a-z0-9_+\-']+(?:::skin-tone-[2-6])?):/g
 const WIRE_TOKEN = /<@([UW][A-Z0-9]+)(?:\|([^>]*))?>|<#([CG][A-Z0-9]+)(?:\|([^>]*))?>|<((?:https?:\/\/|mailto:)[^|>\s]+)\|([^>]+)>|<!subteam\^([A-Z0-9]+)(?:\|[^>]*)?>/g
 
 function tokenizeLine(line: string, targets: MentionTargets): Token[] {
+  for (const item of targets.preserved ?? []) {
+    const at = line.indexOf(item.text)
+    if (at >= 0) return [...tokenizeLine(line.slice(0, at), targets), { kind: 'preserved', element: item.element }, ...tokenizeLine(line.slice(at + item.text.length), targets)]
+  }
   const out: Token[] = []
   let last = 0
   for (const m of line.matchAll(WIRE_TOKEN)) {
@@ -79,7 +86,8 @@ function tokenizeLine(line: string, targets: MentionTargets): Token[] {
 
 /** The URLs, addresses and domains in `line`, and an edit's linked words, before mentions and emoji are looked for. */
 function tokenizeLinks(line: string, targets: MentionTargets): Token[] {
-  const found: Array<{ readonly start: number; readonly end: number; readonly token: Token }> = findLinks(line).map((link) => ({
+  const code = lineMarkup(line).spans.filter((span) => span.style === 'code')
+  const found: Array<{ readonly start: number; readonly end: number; readonly token: Token }> = findLinks(line).filter((link) => !code.some((span) => span.start <= link.start && span.end >= link.end)).map((link) => ({
     start: link.start,
     end: link.end,
     token: link.hasScheme ? { kind: 'link', url: link.url } : { kind: 'link', url: link.url, text: link.text },
@@ -126,14 +134,14 @@ function tokenizeText(line: string, targets: MentionTargets): Token[] {
   if (names.length === 0) {
     out.push({ kind: 'text', text: line })
   } else {
-    const re = new RegExp(`(${names.map((n) => escapeRegExp(n.text)).join('|')})(?![\\w-])`, 'gi')
+    const re = new RegExp(`(${names.map((n) => escapeRegExp(n.text)).join('|')})(?![\\p{L}\\p{N}-])`, 'giu')
     let last = 0
     for (const m of line.matchAll(re)) {
       const start = m.index
       const matched = m[0]
       // Only at a word start: not inside an email or a word.
       const before = line[start - 1] ?? ' '
-      if (/[\w@#-]/.test(before)) continue
+      if (/[\p{L}\p{N}@#-]/u.test(before)) continue
       if (start > last) out.push({ kind: 'text', text: line.slice(last, start) })
       const token = byText.get(matched.toLowerCase())
       out.push(token ?? { kind: 'text', text: matched })
@@ -166,10 +174,12 @@ function tokenizeText(line: string, targets: MentionTargets): Token[] {
 }
 
 /** The elements the composer sends, each of which can carry a style. */
-type Sent = Exclude<RichTextInline, { readonly type: 'color' | 'unknown' }>
+type Sent = RichTextInline
 
 function toElement(token: Token): Sent {
   switch (token.kind) {
+    case 'preserved':
+      return token.element
     case 'text':
       return { type: 'text', text: token.text }
     case 'user':
@@ -201,6 +211,8 @@ function escapeText(text: string): string {
 
 function toMrkdwn(token: Token): string {
   switch (token.kind) {
+    case 'preserved':
+      return ''
     case 'text':
       return escapeText(token.text)
     case 'user':
@@ -273,11 +285,11 @@ function styledElements(tokens: ReadonlyArray<Token>): RichTextInline[] {
     const style = ordered(styles[i])
     const element: Sent = token.kind === 'text' ? { type: 'text', text: line[i]! } : token.kind === 'emoji' && style?.code === true ? { type: 'text', text: `:${token.name}:` } : toElement(token)
     const last = out[out.length - 1]
-    if (element.type === 'text' && last?.type === 'text' && styleKey(last.style) === styleKey(style)) {
+    if (token.kind !== 'preserved' && element.type === 'text' && last?.type === 'text' && styleKey(last.style) === styleKey(style)) {
       out[out.length - 1] = { ...last, text: last.text + element.text }
       continue
     }
-    out.push(style === undefined ? element : { ...element, style })
+    out.push(style === undefined || element.type === 'color' || element.type === 'unknown' ? element : { ...element, style: { ...('style' in element ? element.style : {}), ...style } })
   }
   return out
 }
@@ -287,11 +299,11 @@ function codeElements(code: string): { readonly elements: RichTextInline[]; read
   const tokens: Token[] = []
   let last = 0
   for (const m of code.matchAll(WIRE_TOKEN)) {
-    if (m.index > last) tokens.push({ kind: 'text', text: code.slice(last, m.index) })
+    if (m.index > last) tokens.push({ kind: 'text', text: code.slice(last, m.index).replace(/\\([\\`])/g, '$1') })
     tokens.push(...tokenizeLine(m[0], {}))
     last = m.index + m[0].length
   }
-  if (last < code.length) tokens.push({ kind: 'text', text: code.slice(last) })
+  if (last < code.length) tokens.push({ kind: 'text', text: code.slice(last).replace(/\\([\\`])/g, '$1') })
   return { elements: tokens.map(toElement), mrkdwn: tokens.map(toMrkdwn).join('') }
 }
 

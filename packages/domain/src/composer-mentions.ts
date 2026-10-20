@@ -52,10 +52,10 @@ export function mentionTokens(text: string, picks: ReadonlyArray<MentionPick>): 
   for (let i = 0; i < text.length; i++) {
     const ch = text[i]
     if (ch !== '@' && ch !== '#') continue
-    if (i > 0 && WORD_BEFORE.test(text[i - 1]!)) continue
+    if (i > 0 && WORD_BEFORE.test(text[i - 1]!) && !(text[i - 1] === '_' && (i === 1 || !WORD_BEFORE.test(text[i - 2]!)))) continue
     for (const candidate of byLength) {
       const end = i + candidate.text.length
-      if (!text.startsWith(candidate.text, i) || (end < text.length && WORD_AFTER.test(text[end]!))) continue
+      if (!text.startsWith(candidate.text, i) || (end < text.length && WORD_AFTER.test(text[end]!) && !(text[end] === '_' && (end + 1 === text.length || !WORD_AFTER.test(text[end + 1]!))))) continue
       tokens.push({ start: i, end, pick: candidate.pick })
       i = end - 1
       break

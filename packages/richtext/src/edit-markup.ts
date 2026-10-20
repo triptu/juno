@@ -46,54 +46,23 @@ function fieldText(element: RichTextInline, lookups: Lookups): string {
 }
 
 /**
- * Inline elements as markup. Markers open and close around runs of the same
- * styles; spaces at a run's edges go outside its markers, where markers
+ * Inline elements as markup. Each element carries its own markers; spaces at an element's edges go outside its markers, where markers
  * count. A style over a line break closes before it and opens again after.
  */
 export function inlineMarkup(elements: ReadonlyArray<RichTextInline>, lookups: Lookups): string {
-  let out = ''
-  const open: MarkupStyle[] = []
-  let spaces = ''
-  const closeTo = (keep: (style: MarkupStyle) => boolean) => {
-    while (open.length > 0 && !open.every(keep)) out += MARKER_OF[open.pop()!]
-  }
-  const write = (text: string, styles: ReadonlySet<MarkupStyle>) => {
-    const core = text.trim()
-    if (core === '') {
-      spaces += text
-      return
-    }
-    // Code is innermost: a style that opens closes code first.
-    const opening = ORDER.filter((name) => styles.has(name) && !open.includes(name))
-    closeTo((name) => styles.has(name) && !(name === 'code' && opening.length > 0))
-    out += spaces + text.slice(0, text.length - text.trimStart().length)
-    spaces = ''
-    for (const name of ORDER) {
-      if (!styles.has(name) || open.includes(name)) continue
-      out += MARKER_OF[name]
-      open.push(name)
-    }
-    out += core
-    spaces = text.slice(text.trimEnd().length)
-  }
-  for (const element of elements) {
+  return elements.map((element) => {
     const styles = stylesOf('style' in element ? element.style : undefined)
-    fieldText(element, lookups)
-      .split('\n')
-      .forEach((part, index) => {
-        if (index > 0) {
-          closeTo(() => false)
-          out += `${spaces}\n`
-          spaces = ''
-        }
-        if (part !== '') write(part, styles)
-      })
-  }
-  closeTo(() => false)
-  return out + spaces
+    return fieldText(element, lookups).split('\n').map((line) => {
+      const core = line.trim()
+      if (core === '') return line
+      const markers = ORDER.filter((name) => styles.has(name)).map((name) => MARKER_OF[name])
+      const escaped = element.type === 'link' && element.text === undefined ? core : core.replace(styles.has('code') ? /[\\`]/g : /[\\*_~`>]/g, '\\$&')
+      return line.slice(0, line.length - line.trimStart().length) + markers.join('') + escaped + markers.toReversed().join('') + line.slice(line.trimEnd().length)
+    }).join('\n')
+  }).join('')
 }
 
-function elementMarkup(element: RichTextElement, lookups: Lookups): string | undefined {
+export function elementMarkup(element: RichTextElement, lookups: Lookups): string | undefined {
   switch (element.type) {
     case 'rich_text_section':
     case 'rich_text_header':
@@ -104,7 +73,7 @@ function elementMarkup(element: RichTextElement, lookups: Lookups): string | und
         .map((line) => `> ${line}`)
         .join('\n')
     case 'rich_text_preformatted':
-      return `\`\`\`\n${element.elements.map((el) => fieldText(el, lookups)).join('')}\n\`\`\``
+      return `\`\`\`\n${element.elements.map((el) => fieldText(el, lookups)).join('').replace(/[\\`]/g, '\\$&')}\n\`\`\``
     case 'rich_text_list':
       return element.elements.map((item) => inlineMarkup(item.elements, lookups)).join('\n')
     case 'rich_text_divider':
