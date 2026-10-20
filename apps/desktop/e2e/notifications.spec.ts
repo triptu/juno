@@ -172,26 +172,26 @@ async function testNotificationAndPermission(juno: Juno): Promise<void> {
   await expect.poll(async () => (await juno.osNotifications()).filter((shown) => shown.title === test.title && shown.body === test.body)).toHaveLength(1)
 
   // Denied: the line and Open Notification Settings, read again when the window regains focus.
-  await juno.setNotificationPermission('denied')
+  await juno.setNotificationPermission({ authorization: 'denied', badges: 'disabled' })
   await juno.win.evaluate(() => window.dispatchEvent(new Event('focus')))
   await expect(line).toContainText("macOS is not showing Juno's notifications.")
   await line.getByRole('button', { name: 'Open Notification Settings' }).click()
   await expect.poll(() => juno.notificationSettingsOpened()).toBe(1)
 
   // Alerts may be allowed while app icon badges alone are off.
-  await juno.setNotificationPermission('badgesDisabled')
+  await juno.setNotificationPermission({ authorization: 'allowed', badges: 'disabled' })
   await juno.win.evaluate(() => window.dispatchEvent(new Event('focus')))
   await expect(line).toContainText('Dock badges are off for Juno.')
   await line.getByRole('button', { name: 'Open Notification Settings' }).click()
   await expect.poll(() => juno.notificationSettingsOpened()).toBe(2)
 
   // Turned on in System Settings: back in Juno, the line goes.
-  await juno.setNotificationPermission('allowed')
+  await juno.setNotificationPermission({ authorization: 'allowed', badges: 'enabled' })
   await juno.win.evaluate(() => window.dispatchEvent(new Event('focus')))
   await expect(line).toHaveCount(0)
 
   // Not asked yet: the action asks macOS instead, and the line goes once allowed.
-  await juno.setNotificationPermission('notDetermined')
+  await juno.setNotificationPermission({ authorization: 'notDetermined', badges: 'unknown' })
   await juno.win.evaluate(() => window.dispatchEvent(new Event('focus')))
   await line.getByRole('button', { name: 'Allow notifications' }).click()
   await expect(line).toHaveCount(0)
@@ -355,7 +355,7 @@ badgeTest('dock dot follows unread DMs, group DMs and mentions through reads, wa
 
 // Permission must be requested by badging itself, without sending a test or message notification.
 badgeTest('the first dock badge asks for authorization before any notification is shown', async ({ juno }) => {
-  await juno.setNotificationPermission('notDetermined')
+  await juno.setNotificationPermission({ authorization: 'notDetermined', badges: 'unknown' })
   await juno.signIn()
   await juno.waitForSync()
   await expect.poll(() => hooks(juno.app, 'notificationRequests')).toBe(1)

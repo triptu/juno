@@ -95,6 +95,7 @@ export const Channels = {
   shellEditUndo: 'shell.editUndo',
   /** The topic the window shows, or null. Main adds whether the window is focused and tells the engine. */
   notificationsViewing: 'notifications.viewing',
+  notificationsContentShown: 'notifications.contentShown',
   /** Settings › Notifications' Send test notification: one notification through the notifier. */
   notificationsTest: 'notifications.test',
   /** Whether macOS lets Juno post notifications, as a `NotificationPermission`. */
@@ -304,6 +305,7 @@ export interface JunoBridge {
     readonly onCommand: (listener: (command: MenuCommand) => void) => () => void
   }
   readonly notifications: {
+    readonly contentShown: () => Promise<unknown>
     /** The topic the window shows now, or null for a page or nothing. */
     readonly setViewing: (topicId: string | null) => Promise<unknown>
     /** Calls `listener` with the target of each clicked notification, undecoded. Returns the unsubscribe. */

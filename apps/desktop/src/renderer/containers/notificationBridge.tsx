@@ -7,7 +7,7 @@
  */
 import { useEffect } from 'react'
 import type { NotificationTarget } from '@juno/contract'
-import { activeTab, junoAvailableAtom, notificationSettingsAtom, onNotificationOpen, setViewing, tabsAtom, tabTopic, whyPopoverAtom } from '@juno/state'
+import { activeTab, currentPlace, notificationContentShown, junoAvailableAtom, notificationSettingsAtom, onNotificationOpen, setViewing, tabsAtom, tabTopic, whyPopoverAtom } from '@juno/state'
 import { useAtomMount, useAtomValue } from '@juno/state/react'
 import { WhyPopover } from '@juno/views'
 import { openTopicAt } from './navigation'
@@ -35,6 +35,12 @@ export function useNotificationBridge(): void {
     return tab === undefined ? undefined : tabTopic(tab)
   })
 
+  const content = useAtomValue(tabsAtom, (tabs) => {
+    const tab = activeTab(tabs)
+    const kind = tab === undefined ? undefined : currentPlace(tab).kind
+    return kind === 'home' || kind === 'topic'
+  })
+  useEffect(() => { if (content) notificationContentShown() }, [content])
   useEffect(() => onNotificationOpen(open), [])
 
   useEffect(() => {

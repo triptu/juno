@@ -1,44 +1,35 @@
-/** Keep the current badge and apply it again after macOS authorization, focus or wake. */
-import type { NotificationPermission } from '@juno/contract'
+/** Keep the current badge. Automatic permission is tied to the first post-setup content view. */
 import type { PermissionBridge } from './notificationPermission'
 
-export function createDockBadge(permission: PermissionBridge, show: (text: string) => void) {
-  let text = ''
-  let refreshing: Promise<void> | undefined
-  let requested = false
-  const refresh = (): Promise<void> => text === '' ? Promise.resolve() : refreshing ??= (async () => {
-    const status = await permission.read()
-    // Ask on the first unread badge, even if no banner notification has ever been shown.
-    if (text !== '' && status === 'notDetermined' && !requested) {
-      requested = true
-      await permission.request()
-    }
-    // Unread state may have changed while the owner answered the prompt.
-    show(text)
-  })().finally(() => { refreshing = undefined })
-  return {
-    set: (next: string) => {
-      text = next
-      show(text)
-      if (text !== '') void refresh()
-    },
-    refresh,
-  }
+export interface AutomaticNotificationPermission {
+  readonly enabled: boolean
+  readonly asked: () => boolean
+  /** Persist before requesting, so a dismissal or interrupted request is not repeated next launch. */
+  readonly remember: () => Promise<void>
 }
 
-/** macOS stand-in for fake-server flows. Never used outside JUNO_E2E. */
-export function testNotificationPermission() {
-  let status: NotificationPermission = 'allowed'
-  let requests = 0
+export function createDockBadge(permission: PermissionBridge, show: (text: string) => void, automatic: AutomaticNotificationPermission) {
+  let text = ''
+  let asking: Promise<void> | undefined
+  const refresh = () => { show(text) }
+  const request = async () => {
+    if (!automatic.asked()) await automatic.remember()
+    const status = await permission.request()
+    refresh()
+    return status
+  }
   return {
-    preload: () => {},
-    read: () => Promise.resolve(status),
-    request: () => {
-      requests += 1
-      if (status === 'notDetermined') status = 'allowed'
-      return Promise.resolve(status)
+    set: (next: string) => { text = next; refresh() },
+    refresh,
+    request,
+    contentShown: (): Promise<void> => {
+      if (!automatic.enabled || automatic.asked()) return Promise.resolve()
+      return asking ??= (async () => {
+        await automatic.remember()
+        const status = await permission.read()
+        if (status.authorization === 'notDetermined') await request()
+        refresh()
+      })().finally(() => { asking = undefined })
     },
-    set: (next: NotificationPermission) => { status = next },
-    requests: () => requests,
   }
 }

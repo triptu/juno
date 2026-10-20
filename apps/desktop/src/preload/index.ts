@@ -147,6 +147,7 @@ const bridge: JunoBridge = {
     },
   },
   notifications: {
+    contentShown: () => ipcRenderer.invoke(Channels.notificationsContentShown),
     setViewing: (topicId) => ipcRenderer.invoke(Channels.notificationsViewing, { topicId }),
     onOpen: (listener) => {
       const forward = (_event: unknown, target: unknown) => listener(target)

@@ -3,7 +3,8 @@ import { flushAllCoverage, recordWindowCoverage } from '../coverage'
 import { app, BrowserWindow, Notification, powerMonitor, shell } from 'electron'
 import { Events, type NotificationTarget, type PrivacyState } from '@juno/contract'
 import { join } from 'node:path'
-import { createDockBadge, testNotificationPermission } from './dockBadge'
+import { createDockBadge } from './dockBadge'
+import { testNotificationPermission } from './notificationTestHooks'
 import { createActivityWatch } from './activity'
 import { createAgentSupervisor } from './agent'
 import { appBackupSecrets } from './backupSecrets'
@@ -113,7 +114,7 @@ const supervisor = createSupervisor({
   },
 })
 const huddleQuit = createHuddleQuit(e2e, appWindow)
-supervisor.onFailed(() => huddleQuit.engineFailed())
+supervisor.onFailed(() => { huddleQuit.engineFailed(); dockBadge.set('') })
 
 /** Under JUNO_E2E notifications are recorded, not shown; a test clicks them through `junoTest`. */
 const notificationsForTests: Array<{ readonly title: string; readonly body: string; click: () => void }> = []
@@ -165,16 +166,17 @@ const activity = createActivityWatch({
 // A new engine hears at once, not at the next poll.
 supervisor.onReady(() => activity.poll())
 
-/**
- * Whether macOS lets Juno notify (notificationPermission.ts). Under JUNO_E2E a test sets it
- * (`junoTest.notificationPermission`); a request then answers allowed, as if the user clicked Allow.
- */
+/** Native notification permission, or the e2e stand-in. */
 const permissionForTests = testNotificationPermission()
 let notificationSettingsOpenedForTests = 0
 const notificationPermission = e2e ? permissionForTests : createNotificationPermission(loadPermissionBridge)
 const dockBadge = createDockBadge(notificationPermission, (text) => {
   badgeForTests = text
   if (!e2e) app.dock?.setBadge(text)
+}, {
+  enabled: app.isPackaged || (e2e && process.env.JUNO_E2E_DEV_NOTIFICATIONS !== '1'),
+  asked: () => launch.notificationPermissionAsked === true,
+  remember: async () => { updateLaunch({ notificationPermissionAsked: true }); await launchFile.pending() },
 })
 const refreshDockBadge = () => void dockBadge.refresh()
 
@@ -250,13 +252,10 @@ app.whenReady().then(() => {
     processes,
     setViewing: (topicId) => notifier.setViewing(topicId),
     notifications: {
+      contentShown: () => dockBadge.contentShown(),
       test: () => notifier.test(),
       permission: notificationPermission.read,
-      requestPermission: async () => {
-        const permission = await notificationPermission.request()
-        refreshDockBadge()
-        return permission
-      },
+      requestPermission: dockBadge.request,
       openSettings: openNotificationSettings,
     },
     agent,
@@ -371,6 +370,7 @@ if (e2e) {
       notifications: () => notificationsForTests.map(({ title, body }) => ({ title, body })),
       clickNotification: (index = 0) => notificationsForTests[index]?.click(),
       dockBadge: () => badgeForTests,
+      clearDockBadge: () => dockBadge.set(''),
       ...huddleQuit.testHooks,
       notificationPermission: permissionForTests.set,
       notificationSettingsOpened: () => notificationSettingsOpenedForTests,

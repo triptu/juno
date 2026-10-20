@@ -17,6 +17,7 @@ import { AccentSchema, DEFAULT_THEME, DensitySchema, TopicTitleLinesSchema, Read
 export const Launch = Schema.Struct({
   theme: ThemeSchema,
   autoUpdate: Schema.optionalKey(Schema.Boolean),
+  notificationPermissionAsked: Schema.optionalKey(Schema.Boolean),
   // Optional so a launch.json written before accents existed still decodes.
   accent: Schema.optionalKey(AccentSchema),
   density: Schema.optionalKey(DensitySchema),

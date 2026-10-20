@@ -146,7 +146,7 @@ function TestRow({ permission, onSendTest, onOpenSettings }: Pick<NotificationsP
         divider={false}
         trailing={
           <span {...stylex.props(styles.controls)}>
-            {permission === 'unknown' ? (
+            {permission.authorization === 'unknown' ? (
               <Button variant="ghost" size="sm" tone="subtle" onClick={onOpenSettings}>
                 Open Notification Settings
               </Button>

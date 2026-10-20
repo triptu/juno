@@ -29,7 +29,7 @@ export const notificationsBase: NotificationsPageProps = {
   slack: { schedule: { enabled: true, canRestore: true, changedInSlack: false, waitingForHours: false }, onChange: noop, onRestore: noop },
   onMattersSave: noop,
   onRemove: noop,
-  permission: 'allowed',
+  permission: { authorization: 'allowed', badges: 'enabled' },
   onSendTest: noop,
   onOpenSettings: noop,
   onAllow: noop,
@@ -49,10 +49,10 @@ export default defineFixtures(
       off: fixture({ ...notificationsBase, slack: { ...notificationsBase.slack, schedule: { enabled: false, canRestore: false, changedInSlack: false, waitingForHours: false } } }),
     },
     Permission: {
-      'badges-off': fixture({ ...notificationsBase, permission: 'badgesDisabled' }),
-      denied: fixture({ ...notificationsBase, permission: 'denied' }),
-      'not-determined': fixture({ ...notificationsBase, permission: 'notDetermined' }),
-      unknown: fixture({ ...notificationsBase, permission: 'unknown' }),
+      'badges-off': fixture({ ...notificationsBase, permission: { authorization: 'allowed', badges: 'disabled' } }),
+      denied: fixture({ ...notificationsBase, permission: { authorization: 'denied', badges: 'disabled' } }),
+      'not-determined': fixture({ ...notificationsBase, permission: { authorization: 'notDetermined', badges: 'unknown' } }),
+      unknown: fixture({ ...notificationsBase, permission: { authorization: 'unknown', badges: 'unknown' } }),
     },
     Empty: {
       'nothing-set': fixture({ ...notificationsBase, matters: '', every: [], never: [], interrupted: 0, held: 0, today: [] }),

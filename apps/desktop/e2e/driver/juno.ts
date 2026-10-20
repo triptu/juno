@@ -1,3 +1,4 @@
+import type { NotificationPermission } from '@juno/contract'
 /**
  * The user-language driver for Juno (architecture 13). Tests read as what a
  * person does: `juno.signIn()`, `juno.sidebar.row('Postgres').hover()`.
@@ -991,8 +992,10 @@ export class Juno {
   }
 
   /** What macOS says about Juno's notifications from now on (main's seam); `allowed` at launch. */
-  async setNotificationPermission(permission: 'allowed' | 'badgesDisabled' | 'denied' | 'notDetermined' | 'unknown'): Promise<void> {
-    await this.app.evaluate((_electron, value) => (globalThis as unknown as { junoTest: { notificationPermission: (p: string) => void } }).junoTest.notificationPermission(value), permission)
+  async setNotificationPermission(permission: NotificationPermission): Promise<void> {
+    await this.app.evaluate((_electron, value) => {
+      ;(globalThis as unknown as { junoTest: { notificationPermission: (p: NotificationPermission) => void } }).junoTest.notificationPermission(value)
+    }, permission)
   }
 
   /** How many times Open Notification Settings opened System Settings. */
@@ -1005,7 +1008,7 @@ export class Juno {
     await this.app.evaluate((_electron, value) => (globalThis as unknown as { junoTest: { systemIdle: (s: number) => void } }).junoTest.systemIdle(value), seconds)
   }
 
-  /** The dock's badge text: "•" with unread mentions, else empty. */
+  /** The dock's badge text: "•" with eligible unread items, else empty. */
   dockBadge(): Promise<string> {
     return this.app.evaluate(() => (globalThis as unknown as { junoTest: { dockBadge: () => string } }).junoTest.dockBadge())
   }
