@@ -30,7 +30,7 @@ export const mergeOne = (
   serverVersion?: Ts,
 ): Effect.Effect<ReadonlyArray<MessageRow>, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
-    if (message.room !== undefined) yield* writeHuddle(channel, message.room, ctx.me.userId, message.thread_ts ?? message.ts)
+    if (source.kind !== 'partial' && message.room !== undefined) yield* writeHuddle(channel, message.room, ctx.me.userId, message.thread_ts ?? message.ts)
     const existing = yield* readMessage(channel, message.ts)
     const merged = mergeMessage(existing, message, channel, source)
     const touched: Array<MessageRow> = [merged.row]
