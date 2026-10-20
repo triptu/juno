@@ -115,6 +115,8 @@ export class FakeServer {
   readonly received: ReceivedFrame[] = []
   /** Open sockets of the self user. */
   readonly #selfSockets = new Set<WebSocket>()
+  /** Each socket's `presence_sub` ids. Each `presence_sub` replaces the socket's list. */
+  readonly #presenceSubs = new Map<WebSocket, ReadonlySet<string>>()
   #lastTickleAt: number | undefined
   readonly #rateLimits = new Map<string, RateLimitRule>()
   readonly #failures = new Map<string, FailureRule>()
@@ -477,6 +479,7 @@ export class FakeServer {
       clearInterval(repeat)
       this.sockets.delete(ws)
       this.#selfSockets.delete(ws)
+      this.#presenceSubs.delete(ws)
     })
     ws.on('message', (raw) => {
       let frame: Record<string, unknown>
@@ -500,13 +503,33 @@ export class FakeServer {
         else ws.send(JSON.stringify(encodeRtmFrame(pong)))
       } else if (frame['type'] === 'presence_sub' && Array.isArray(frame['ids'])) {
         const users = frame['ids'].filter((id): id is string => typeof id === 'string' && this.workspace.users.has(id))
-        const self = users.filter((id) => id === this.workspace.selfId && this.workspace.manualPresence === 'away')
-        const others = users.filter((id) => !self.includes(id))
-        if (others.length > 0) ws.send(JSON.stringify(encodeRtmFrame({ type: 'presence_change', presence: 'active', users: others })))
-        if (self.length > 0) ws.send(JSON.stringify(encodeRtmFrame({ type: 'presence_change', presence: 'away', users: self })))
+        this.#presenceSubs.set(ws, new Set(users))
+        // The current presence of every subscribed user, one batch per value.
+        const active = users.filter((id) => this.#presenceOf(id) === 'active')
+        const away = users.filter((id) => this.#presenceOf(id) === 'away')
+        if (active.length > 0) ws.send(JSON.stringify(encodeRtmFrame({ type: 'presence_change', presence: 'active', users: active })))
+        if (away.length > 0) ws.send(JSON.stringify(encodeRtmFrame({ type: 'presence_change', presence: 'away', users: away })))
       }
     })
     ws.send(JSON.stringify(encodeRtmFrame({ type: 'hello', region: 'fake', host_id: 'fake-1', fast_reconnect: false, start: true })))
+  }
+
+  /** Tells each socket subscribed to any of `users` that they are now `presence`, in one batch per socket. */
+  presenceChanged(users: ReadonlyArray<string>, presence: 'active' | 'away'): void {
+    for (const [socket, subscribed] of this.#presenceSubs) {
+      const batch = users.filter((id) => subscribed.has(id))
+      if (batch.length > 0 && socket.readyState === socket.OPEN) socket.send(JSON.stringify(encodeRtmFrame({ type: 'presence_change', presence, users: batch })))
+    }
+  }
+
+  /** The ids the open sockets subscribed to with their last `presence_sub`, merged. */
+  presenceSubscriptions(): ReadonlyArray<string> {
+    return [...new Set([...this.#presenceSubs.values()].flatMap((ids) => [...ids]))]
+  }
+
+  #presenceOf(id: string): 'active' | 'away' {
+    if (id === this.workspace.selfId) return this.selfPresence()
+    return this.workspace.presence.get(id) ?? 'away'
   }
 
   /**

@@ -503,6 +503,20 @@ export class FakeSlack {
     this.server.expireSessions()
   }
 
+  /**
+   * Other users go active or away, as colleagues would see them. Sockets
+   * subscribed to them with `presence_sub` get one `presence_change` batch.
+   */
+  setPresence(input: { users: ReadonlyArray<string>; presence: 'active' | 'away' }): void {
+    for (const id of input.users) this.workspace.presence.set(id, input.presence)
+    this.server.presenceChanged(input.users, input.presence)
+  }
+
+  /** The ids the open sockets subscribed to with their last `presence_sub`. */
+  presenceSubscriptions(): ReadonlyArray<string> {
+    return this.server.presenceSubscriptions()
+  }
+
   advanceClock(input: { millis: number }): number {
     this.workspace.clock.advance(input.millis)
     return this.now()
