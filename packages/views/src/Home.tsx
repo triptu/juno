@@ -1,5 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { CaretRight } from '@phosphor-icons/react/dist/icons/CaretRight'
+import { Headphones } from '@phosphor-icons/react/dist/icons/Headphones'
 import { useId, type MouseEvent, type ReactNode } from 'react'
 import type { AutomatedPlace, HomeItem } from '@juno/contract'
 import { accent, colors, layout, motion, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
@@ -157,6 +158,14 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, 
       {tileIcon !== undefined || topic === undefined ? (
         <span {...stylex.props(styles.iconTile)}>
           <Icon icon={tileIcon ?? TILE_ICONS.tidyUp!} size={18} />
+        </span>
+      ) : item.kind === 'missedHuddle' ? (
+        // The running huddle's green headphones on the tile's corner, so the row reads as a huddle before its title.
+        <span {...stylex.props(styles.markedTile)}>
+          <PlaceTile tile={tileOf(topic)} />
+          <span aria-hidden data-huddle-mark="" {...stylex.props(styles.huddleMark)}>
+            <Icon icon={Headphones} size={12} weight="fill" />
+          </span>
         </span>
       ) : (
         <PlaceTile tile={tileOf(topic)} />
@@ -416,6 +425,25 @@ const styles = stylex.create({
     borderRadius: radii['--radius-xl'],
     backgroundColor: colors['--secondary-default'],
     color: colors['--foreground-subtle'],
+  },
+  markedTile: {
+    position: 'relative',
+    display: 'inline-flex',
+    flexShrink: 0,
+  },
+  // A 12px glyph in a 16px circle of the page colour, at the tile's bottom right as the presence dot sits.
+  huddleMark: {
+    position: 'absolute',
+    right: `calc(-1 * ${spacing['--space-0-5']})`,
+    bottom: `calc(-1 * ${spacing['--space-0-5']})`,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: sizes['--icon-16'],
+    height: sizes['--icon-16'],
+    borderRadius: radii['--radius-full'],
+    backgroundColor: colors['--background'],
+    color: colors['--huddle-live'],
   },
   text: {
     display: 'flex',
