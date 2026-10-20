@@ -991,7 +991,7 @@ export class Juno {
   }
 
   /** What macOS says about Juno's notifications from now on (main's seam); `allowed` at launch. */
-  async setNotificationPermission(permission: 'allowed' | 'denied' | 'notDetermined' | 'unknown'): Promise<void> {
+  async setNotificationPermission(permission: 'allowed' | 'badgesDisabled' | 'denied' | 'notDetermined' | 'unknown'): Promise<void> {
     await this.app.evaluate((_electron, value) => (globalThis as unknown as { junoTest: { notificationPermission: (p: string) => void } }).junoTest.notificationPermission(value), permission)
   }
 

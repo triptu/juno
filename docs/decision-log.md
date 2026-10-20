@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-20 11:52 · Tushar · Keep the dock badge as `•` and broaden it to unread DMs, group DMs and mentions elsewhere, using the sidebar's unread eligibility across views, Slack mutes and Juno's notification levels. More unread items keep the same dot. It clears when no eligible item remains. The domain's `dockBadgeActive` owns this policy so it can change in one place.
 - 10-20 11:12 · sidebar-first-key · Hold the character that starts sidebar type-ahead along with later keys, so opening a topic and typing before its composer mounts keeps the whole draft.
 - 10-20 11:06 · daily-full-run · A scheduled task runs the full suites on main once a day; the agent that runs it commits the refreshed coverage map and merges it.
 - 10-20 02:41 · screen-recording-asked · macOS tells an app only whether it may record the screen, not whether it has asked, so main remembers in a small file in userData (`screen-recording-asked`) that the share sheet's Continue showed the prompt. Before that the sheet says "Allow screen recording"; after, "Screen recording is off for Juno" with Open System Settings. Screen capture needs no entitlement or usage string; main allows it only for Juno's own page. When a shared window's capture ends, main says whether the window is still listed, so the "window closed" toast never shows for a capture stopped from macOS.

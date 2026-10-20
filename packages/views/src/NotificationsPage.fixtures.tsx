@@ -49,6 +49,7 @@ export default defineFixtures(
       off: fixture({ ...notificationsBase, slack: { ...notificationsBase.slack, schedule: { enabled: false, canRestore: false, changedInSlack: false, waitingForHours: false } } }),
     },
     Permission: {
+      'badges-off': fixture({ ...notificationsBase, permission: 'badgesDisabled' }),
       denied: fixture({ ...notificationsBase, permission: 'denied' }),
       'not-determined': fixture({ ...notificationsBase, permission: 'notDetermined' }),
       unknown: fixture({ ...notificationsBase, permission: 'unknown' }),

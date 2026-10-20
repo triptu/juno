@@ -19,7 +19,7 @@ import { shell } from 'electron'
 import type { NotificationPermission } from '@juno/contract'
 
 export interface PermissionBridge {
-  /** `getNotificationSettingsWithCompletionHandler:`, as allowed, denied or not determined. */
+  /** `getNotificationSettingsWithCompletionHandler:`, including whether app icon badges are disabled. */
   readonly read: () => Promise<NotificationPermission>
   /** `requestAuthorizationWithOptions:completionHandler:` (alert, sound, badge), then reads again. */
   readonly request: () => Promise<NotificationPermission>
@@ -122,13 +122,15 @@ export async function loadPermissionBridge(): Promise<PermissionBridge | undefin
     const center: bigint | null = centerClass ? sendId(centerClass, selector('currentNotificationCenter')) : null
     if (!center) return undefined
     const authorizationStatus = selector('authorizationStatus')
+    const badgeSetting = selector('badgeSetting')
     const getSettings = selector('getNotificationSettingsWithCompletionHandler:')
     const requestAuthorization = selector('requestAuthorizationWithOptions:completionHandler:')
 
     const reads = waiters<NotificationPermission>(READ_MS, 'unknown')
     const requests = waiters<void>(REQUEST_MS, undefined)
     const settingsBlock = globalBlock(koffi, malloc, isa, (_block: bigint, settings: bigint) => {
-      reads.answer(settings ? fromStatus(Number(sendLong(settings, authorizationStatus))) : 'unknown')
+      const permission = settings ? fromStatus(Number(sendLong(settings, authorizationStatus))) : 'unknown'
+      reads.answer(permission === 'allowed' && Number(sendLong(settings, badgeSetting)) === 1 ? 'badgesDisabled' : permission)
     }, 'void SettingsBlock(void *block, void *settings)')
     const requestBlock = globalBlock(koffi, malloc, isa, () => requests.answer(), 'void RequestBlock(void *block, bool granted, void *error)')
 

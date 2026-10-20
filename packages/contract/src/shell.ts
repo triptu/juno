@@ -249,7 +249,7 @@ export type ShareSources = typeof ShareSources.Type
  * Whether macOS lets Juno post notifications (Settings › Notifications). `unknown` when main
  * could not ask: the page then offers Open Notification Settings anyway.
  */
-export const NotificationPermission = Schema.Literals(['allowed', 'denied', 'notDetermined', 'unknown'])
+export const NotificationPermission = Schema.Literals(['allowed', 'badgesDisabled', 'denied', 'notDetermined', 'unknown'])
 export type NotificationPermission = typeof NotificationPermission.Type
 
 /** A download: `saved` once the file is in ~/Downloads and shown in Finder, `failed` when Slack did not send it. */

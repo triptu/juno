@@ -1,5 +1,5 @@
 /** Shared session composition and host seam for the notifications feature. */
-import { ChannelId, UserId, isDm, messageMentionsMe, messageMentionsMeDirectly, type Me, type Presence } from '@juno/domain'
+import { ChannelId, UserId, dockBadgeActive, isDm, messageMentionsMe, messageMentionsMeDirectly, type Me, type Presence, type BadgeTopic } from '@juno/domain'
 import { makeNotifications, readSettings, type Notifier, type Notifications } from '@juno/notifications'
 import { AiProvider } from '@juno/ai'
 import { messageBody, plainText, UNKNOWN_PERSON } from '@juno/richtext'
@@ -7,6 +7,7 @@ import { SlackApi, SlackSession, type SocketEvent } from '@juno/slack'
 import { liveQuery, StoreReader, type ConversationRow } from '@juno/store'
 import { Clock, Context, Effect, Layer, Ref, Stream, SubscriptionRef } from 'effect'
 import { conversationLabel } from './placeLabel'
+import { UNREAD_FROM } from './sidebarUnread'
 import { HostLink } from './protocol/host'
 import { SocketEvents, type SessionStart, type SocketInput } from './socketEvents'
 
@@ -15,8 +16,8 @@ const run = (effect: Effect.Effect<void, unknown> | undefined) => effect === und
 
 export interface NotificationHost {
   readonly notifier: Notifier
-  /** Whether any topic has an unread mention, on every change. Main shows the dock badge. */
-  readonly badge?: (mentions: boolean) => Effect.Effect<void>
+  /** Unread DMs, group DMs and mentioned topics, on every change. Main shows the dock badge. */
+  readonly badge?: (unread: boolean) => Effect.Effect<void>
 }
 
 export class NotificationControl extends Context.Service<NotificationControl, {
@@ -74,7 +75,7 @@ export const hostNotificationHost = Layer.effect(NotificationHost, Effect.gen(fu
       show: ({ id, title, body, target }) => link.send({ _tag: 'notify', notification: { id, title, body, target: { _tag: 'message', source: target.source } } }),
       viewing: (topicId) => Effect.map(Ref.get(viewing), (shown) => shown === topicId),
     },
-    badge: (mentions) => link.send({ _tag: 'badge', mentions }),
+    badge: (unread) => link.send({ _tag: 'badge', unread }),
   }
   return host
 }))
@@ -156,14 +157,15 @@ const sessionNotifications = (control: NotificationControl['Service'], host: Not
     last = result.success
     return safe(notifications.settingsChanged)
   }))
-  // The dock badge: any unread topic that mentions you, outside ignored channels. The partial unread index bounds the read.
+  // The sidebar's unread eligibility, across every view, followed by the one dock badge policy.
   const badge = host.badge
   if (badge !== undefined) {
     let shown: boolean | undefined
-    yield* Effect.forkScoped(Stream.runForEach(liveQuery(['topics', 'ignored_channels'], Effect.gen(function* () {
-      const rows = yield* sql<{ id: string }>`SELECT topic_id AS id FROM topic_index INDEXED BY topic_index_unread
-        WHERE unread_count > 0 AND mentions_me = 1 AND channel NOT IN (SELECT channel FROM ignored_channels) LIMIT 1`
-      return rows.length > 0
+    yield* Effect.forkScoped(Stream.runForEach(liveQuery(['topics', 'ignored_channels', 'conversations', 'topic_overlay', 'thread_subs', 'prefs', 'team'], Effect.gen(function* () {
+      const rows = yield* sql.unsafe<Omit<BadgeTopic, 'mentionsMe'> & { mentionsMe: number }>(`SELECT i.topic_id AS id, i.channel, c.kind, c.user_id AS person, i.mentions_me AS mentionsMe ${UNREAD_FROM} AND (c.kind IN ('im', 'mpim') OR i.mentions_me = 1)`)
+      const { settings } = yield* readSettings
+      const team = yield* sql<{ muted: unknown }>`SELECT json_extract(prefs_json, '$.muted_channels') AS muted FROM team LIMIT 1`
+      return dockBadgeActive(rows.map((row) => ({ ...row, mentionsMe: row.mentionsMe === 1 })), settings, new Set((typeof team[0]?.muted === 'string' ? team[0].muted : '').split(',').filter(Boolean)))
     })), (result) => {
       if (result._tag === 'Failure' || result.success === shown) return Effect.void
       shown = result.success

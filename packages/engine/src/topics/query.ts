@@ -65,6 +65,7 @@ import { StoreReader, syncState, type SqlError } from '@juno/store'
 import { BOOT_KEY, QUICK_START_KEY } from '@juno/sync'
 import { Effect } from 'effect'
 import type { ListRun } from '../protocol/live'
+import { countsStatement, OPEN_RULE, THREAD_RULE } from '../sidebarUnread'
 import {
   artRefOf,
   channelInfoOf,
@@ -216,13 +217,6 @@ export interface ListRow extends JoinedRow {
   readonly new_threads: number
 }
 
-/**
- * Spec section 5, "Which threads": a thread row is a candidate when followed
- * in Slack, or when it carries an unread mention of the user and Slack has
- * said nothing about it (an explicit unfollow is `unsubscribed`, hidden).
- */
-const THREAD_RULE = ` AND (i.kind <> 'thread' OR s.subscribed = 1 OR (s.subscribed IS NULL AND i.mentions_me = 1 AND i.unread_count > 0))`
-
 export const kindClause = (kind: ListFilter['kind']): string =>
   kind === 'channels' ? ` AND c.kind IN ('public', 'private')` : kind === 'dms' ? ` AND c.kind IN ('im', 'mpim')` : ''
 
@@ -250,14 +244,6 @@ function placeClause(filter: ListFilter, drive: boolean): { readonly sql: string
   if (filter.view !== undefined) return { sql: ` AND ${drive ? '' : '+'}i.channel IN (SELECT channel FROM sidebar_view_channels WHERE view_id = ?)`, params: [filter.view] }
   return { sql: `${kindClause(filter.kind)}${KEPT_OUT}`, params: [] }
 }
-
-/**
- * The rows `topicStatus` calls `open` or `resolved`-then-reopened, in SQL,
- * for the activity window only: there the prefilter matches the pure rule
- * (quiet cannot apply inside the window), so the window's row count says
- * whether the older statements can still add a row.
- */
-const OPEN_RULE = ` AND (o.resolved_at IS NULL OR (o.resolved_activity_ts IS NOT NULL AND i.last_activity_ts > o.resolved_activity_ts))`
 
 /**
  * The four statements, as SQL text with positional parameters, so the plan
@@ -301,27 +287,7 @@ export function listStatements(filter: ListFilter, cutoff: string, limit: number
   ]
 }
 
-/**
- * The counts statement: unread topics the sidebar would show, per
- * conversation, with how many of them carry an unread mention. An unread
- * topic is never quiet, so it shows when it is pinned, or when it is open
- * (not unsubscribed, not resolved without later activity) and passes the
- * thread rule; the same rule as `sidebarPlacement`. `countTopics` sums it
- * per group and per view.
- */
-export function countsStatement(scope: string | undefined): { readonly sql: string; readonly params: ReadonlyArray<unknown> } {
-  return {
-    sql: `SELECT i.channel AS channel, c.kind AS kind, count(*) AS n, sum(i.mentions_me) AS mentions FROM topic_index i
-      JOIN conversations c ON c.id = i.channel
-      LEFT JOIN ignored_channels ig ON ig.channel = i.channel
-      LEFT JOIN topic_overlay o ON o.topic_id = i.topic_id
-      LEFT JOIN thread_subs s ON i.kind = 'thread' AND s.channel = i.channel AND s.thread_ts = i.root_ts
-      WHERE i.unread_count > 0 AND i.last_activity_ts > '0' AND c.is_member = 1 AND c.is_archived = 0 AND ig.channel IS NULL
-        AND (o.pinned_at IS NOT NULL OR (1${OPEN_RULE}${THREAD_RULE}))${scope === undefined ? '' : ' AND i.channel = ?'}
-      GROUP BY i.channel`,
-    params: scope === undefined ? [] : [scope],
-  }
-}
+export { countsStatement } from '../sidebarUnread'
 
 /** Every view's conversations, in pill order, with the view's Keep these out of All. */
 export const VIEW_MEMBERS = `SELECT v.id AS view_id, v.keep_out_of_all AS keep_out, vc.channel AS channel

@@ -4,7 +4,7 @@
  * The engine decides; main only shows. `notify` shows one notification,
  * once per id, and a click brings the window forward and hands the target
  * to the renderer, which opens the topic at the message. `badge` sets the
- * dock's `•` while any topic has an unread mention. `test` shows Settings ›
+ * dock's dot while any eligible DM or mention is unread. `test` shows Settings ›
  * Notifications' test notification the same way; its click only brings
  * Juno forward.
  *
@@ -44,8 +44,6 @@ export const HIDDEN_BODY = 'Message hidden'
 /** Notifications kept alive for their click handler. Electron drops the handler of one it no longer references. */
 const KEPT = 20
 
-export const DOCK_BADGE = '•'
-
 /** Settings › Notifications' test notification. Not a message, so privacy mode leaves it as it is. */
 export const TEST_NOTIFICATION = { title: 'Juno', body: 'Notifications from Juno look like this.' } as const
 
@@ -62,7 +60,7 @@ export class Notifier {
         this.show(message.notification)
         return true
       case 'badge':
-        this.deps.setBadge(message.mentions ? DOCK_BADGE : '')
+        this.deps.setBadge(message.unread ? '•' : '')
         return true
       default:
         return false
