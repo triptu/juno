@@ -33,7 +33,7 @@ function copyMessageImage(file: FileView): void {
 }
 
 /** The viewer open in `view`, at the item it shows. */
-function TopicViewer({ view }: { readonly view: string }) {
+function TopicViewer({ view, opener }: { readonly view: string; readonly opener: Element | null }) {
   const open = useAtomValue(openViewerAtom(view))
   if (open === undefined) return null
   const { now, ...viewing } = open
@@ -42,6 +42,7 @@ function TopicViewer({ view }: { readonly view: string }) {
       <MediaViewerPanel
         viewing={viewing}
         now={now}
+        opener={opener}
         onClose={() => registry.set(openViewerAtom(view), undefined)}
         onShowItem={(index) => registry.set(openViewerAtom(view), { ...open, index })}
         onDownload={downloadMessageFile}
@@ -60,12 +61,17 @@ function TopicViewer({ view }: { readonly view: string }) {
  */
 export function useTopicFiles(view: string) {
   const [dropping, setDropping] = useState(false)
+  // What had focus at the open, taken before the topic turns inert under the viewer; on a cold load its chunk mounts later.
+  const [opener, setOpener] = useState<Element | null>(null)
   // Created once, like every row callback; the time in the viewer's header is reckoned from the moment it opened.
-  const [setViewing] = useState(() => (next: MediaViewing) => registry.set(openViewerAtom(view), { ...next, now: Date.now() }))
+  const [setViewing] = useState(() => (next: MediaViewing) => {
+    setOpener(document.activeElement)
+    registry.set(openViewerAtom(view), { ...next, now: Date.now() })
+  })
   const open = useAtomValue(openViewerAtom(view), (viewer) => viewer !== undefined)
   const progress = useAtomValue(uploadProgressAtom)
   useEffect(preloadViewer, [])
   const uploadProgress = progress._tag === 'Success' && Object.keys(progress.value).length > 0 ? progress.value : undefined
-  const viewer = open ? <TopicViewer view={view} /> : null
+  const viewer = open ? <TopicViewer view={view} opener={opener} /> : null
   return { dropping, setDropping, setViewing, uploadProgress, viewer }
 }

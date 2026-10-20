@@ -29,6 +29,8 @@ export interface MediaViewerProps {
   readonly now: number
   /** Esc, Close, or a click on the backdrop. */
   readonly onClose: () => void
+  /** What had focus when it opened, taken in the open handler before the topic under it turns inert. Focus goes back to it on close. */
+  readonly opener?: Element | null | undefined
   /** Another item is shown, at this index: kept so a remount opens at it. */
   readonly onShowItem?: ((index: number) => void) | undefined
   /** With it, and a `download` url on the item, the header has Download. */
@@ -54,12 +56,12 @@ export interface MediaViewerProps {
  * the topic under it inert, so Tab goes from its controls on to the sidebar
  * and the tab strip. A hidden tab keeps it open at its item.
  */
-export function MediaViewer({ viewing, now, onClose, onShowItem, onDownload, onOpenFile, onCopyImage }: MediaViewerProps) {
+export function MediaViewer({ viewing, now, opener, onClose, onShowItem, onDownload, onOpenFile, onCopyImage }: MediaViewerProps) {
   const { items } = viewing
   const [index, setIndex] = useState(() => Math.min(Math.max(0, viewing.index), items.length - 1))
   const file = items[index]!
   const several = items.length > 1
-  const { root, close } = useViewerFocus(onClose)
+  const { root, close } = useViewerFocus(opener, onClose)
 
   // The neighbours' full images are fetched ahead, so moving to them shows them sharp at once.
   useEffect(() => {
@@ -138,14 +140,12 @@ function onViewerKey(event: KeyboardEvent<HTMLDivElement>, index: number, count:
 }
 
 /**
- * Focus on Close when the viewer first opens, and back on what had focus when it opened after a
+ * Focus on Close when the viewer first opens, and back on `opener` after a
  * close. A hidden tab runs the cleanup and then the effect again when it
  * shows, so neither moves focus then. Returns the viewer's root and its close.
  */
-function useViewerFocus(onClose: () => void): { readonly root: RefObject<HTMLDivElement | null>; readonly close: () => void } {
+function useViewerFocus(opener: Element | null | undefined, onClose: () => void): { readonly root: RefObject<HTMLDivElement | null>; readonly close: () => void } {
   const root = useRef<HTMLDivElement>(null)
-  // What had focus when it opened. State, so a tab hidden and shown again keeps it.
-  const [opener] = useState(() => document.activeElement)
   const focused = useRef(false)
   const closing = useRef(false)
 
