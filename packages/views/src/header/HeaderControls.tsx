@@ -4,7 +4,7 @@ import { DotsThree } from '@phosphor-icons/react/dist/icons/DotsThree'
 import type { KeyboardEvent, MouseEvent, ReactNode, Ref } from 'react'
 import { menuKeys } from '@juno/contract/channels'
 import { colors, layout, motion, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
-import { focusRing, Icon, IconButton, SparkleDuotone, Text, tooltip, type PhosphorIcon } from '@juno/ui'
+import { focusRing, Icon, IconButton, SparkleDuotone, Text } from '@juno/ui'
 
 /** Where a menu opened from the header goes, in CSS pixels from the window's top left. */
 export interface MenuAnchor {
@@ -15,9 +15,6 @@ export interface MenuAnchor {
 // Hover styles only apply on devices with a real pointer. Local because
 // StyleX cannot read constants from other modules.
 const HOVER = '@media (hover: hover)'
-// The header's narrow form (inventory 5): a container query on the header
-// layer, which is as wide as its area. Container queries cannot read tokens.
-const NARROW = '@container (width < 480px)'
 /** The menu opens this far under the left island, left-aligned with the title. */
 const MENU_GAP = 6
 /** Far above the pill's 1, so the title takes all the shortening until it reaches its floor. */
@@ -88,47 +85,6 @@ export function HeaderTitleButton({ title, leading, expanded, onOpen, popup = 'm
         </span>
       </button>
     </Wrapper>
-  )
-}
-
-export interface IslandButtonProps {
-  readonly icon: PhosphorIcon
-  /** The visible text in a roomy header, and the accessible name in both forms. */
-  readonly label: string
-  /** A label this button can turn into (Follow and Resolve): the roomy label keeps the wider of the two widths, so the swap moves nothing. */
-  readonly reserve?: string
-  /** `at` is under the right island, at the button's left edge, where a menu it opens goes. */
-  readonly onClick: (at: MenuAnchor) => void
-}
-
-/**
- * A text button in the right island: Follow, Resolve, Reopen. In a narrow
- * header it becomes a 28px icon button by CSS alone; its accessible name
- * never changes.
- */
-export function IslandButton({ icon, label, reserve, onClick }: IslandButtonProps) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      {...tooltip(label)}
-      onClick={(event) => onClick(underRightIsland(event.currentTarget))}
-      {...stylex.props(styles.reset, focusRing.outside, styles.island, styles.iconOnlyWhenNarrow)}
-    >
-      <span {...stylex.props(styles.islandIcon)}>
-        <Icon icon={icon} size={14} />
-      </span>
-      {reserve === undefined ? (
-        <span {...stylex.props(styles.roomy)}>{label}</span>
-      ) : (
-        <span {...stylex.props(styles.roomyStack)}>
-          <span {...stylex.props(styles.stacked)}>{label}</span>
-          <span aria-hidden="true" {...stylex.props(styles.stacked, styles.reserved)}>
-            {reserve}
-          </span>
-        </span>
-      )}
-    </button>
   )
 }
 
@@ -227,47 +183,5 @@ const styles = stylex.create({
     display: 'inline-flex',
     flexShrink: 0,
     color: colors['--foreground-muted'],
-  },
-  island: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-    gap: spacing['--space-1-5'],
-    height: sizes['--control-28'],
-    minWidth: sizes['--control-28'],
-    paddingBlock: 0,
-    paddingInline: spacing['--space-2-5'],
-    boxSizing: 'border-box',
-    borderRadius: radii['--radius-pill'],
-    fontSize: text['--text-meta-size'],
-    fontWeight: weights['--weight-medium'],
-    whiteSpace: 'nowrap',
-    fontVariantNumeric: 'tabular-nums',
-    backgroundColor: {
-      default: 'transparent',
-      ':hover': { default: null, [HOVER]: colors['--secondary-default'] },
-    },
-  },
-  iconOnlyWhenNarrow: {
-    paddingInline: { default: spacing['--space-2-5'], [NARROW]: 0 },
-  },
-  islandIcon: {
-    display: 'inline-flex',
-    color: colors['--foreground-subtle'],
-  },
-  roomy: {
-    display: { default: 'inline', [NARROW]: 'none' },
-  },
-  // Both labels in one cell: the cell is as wide as the wider, and only the shown one is painted.
-  roomyStack: {
-    display: { default: 'inline-grid', [NARROW]: 'none' },
-    justifyItems: 'center',
-  },
-  stacked: {
-    gridArea: '1 / 1',
-  },
-  reserved: {
-    visibility: 'hidden',
   },
 })

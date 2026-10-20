@@ -5,7 +5,7 @@ import { MonitorArrowUp } from '@phosphor-icons/react/dist/icons/MonitorArrowUp'
 import { PhoneX } from '@phosphor-icons/react/dist/icons/PhoneX'
 import { SlidersHorizontal } from '@phosphor-icons/react/dist/icons/SlidersHorizontal'
 import type { ReactNode } from 'react'
-import { colors, radii, spacing } from '@juno/tokens/tokens.stylex'
+import { colors, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { focusRing, Icon, IconButton, Popover, type PhosphorIcon } from '@juno/ui'
 import { islandText } from './islandText'
 import { microphoneCopy } from './look'
@@ -15,9 +15,10 @@ import type { HuddleControlsActions, HuddleControlsState } from './model'
 export const muteShortcut = '⌘⇧Space'
 
 /**
- * `bar`: the sidebar bar's row, rounded rectangles that nest in its 12px
- * corners. `island`: the tab's control island at the bottom, round, as the
- * header islands' controls are.
+ * `bar`: the sidebar bar's row, 28px rounded rectangles that nest in its
+ * 12px corners. `island`: the tab's control island at the bottom, round, as
+ * the header islands' controls are, one size up (32px) since it is the
+ * tab's main control.
  */
 export type ControlsShape = 'bar' | 'island'
 
@@ -48,22 +49,24 @@ export function HuddleControls({
   onLeave,
 }: HuddleControlsProps) {
   const radius = shape === 'bar' ? 'lg' : 'full'
+  const size = shape === 'bar' ? 28 : 32
+  const iconSize = shape === 'bar' ? 16 : 18
   return (
     <>
       <span {...stylex.props(styles.group)}>
         <Fills shape={shape}>
           {microphone === 'blocked' ? (
-            <IconButton icon={MicrophoneSlash} label={microphoneCopy.blocked.tooltip} size={28} iconSize={16} radius={radius} variant="island" onClick={onOpenMicSettings} />
+            <IconButton icon={MicrophoneSlash} label={microphoneCopy.blocked.tooltip} size={size} iconSize={iconSize} radius={radius} variant="island" onClick={onOpenMicSettings} />
           ) : microphone !== undefined ? (
-            <IconButton icon={MicrophoneSlash} label={microphoneCopy[microphone].tooltip} size={28} iconSize={16} radius={radius} variant="island" dimmed />
+            <IconButton icon={MicrophoneSlash} label={microphoneCopy[microphone].tooltip} size={size} iconSize={iconSize} radius={radius} variant="island" dimmed />
           ) : (
-            <IconButton icon={muted ? MicrophoneSlash : Microphone} label="Mute" shortcut={muteShortcut} size={28} iconSize={16} radius={radius} variant="island" pressed={muted} onClick={onMute} />
+            <IconButton icon={muted ? MicrophoneSlash : Microphone} label="Mute" shortcut={muteShortcut} size={size} iconSize={iconSize} radius={radius} variant="island" pressed={muted} onClick={onMute} />
           )}
           {canShare ? (
             shareFull && !sharing ? (
-              <IconButton icon={MonitorArrowUp} label="Two people are sharing already" size={28} iconSize={16} radius={radius} variant="island" dimmed />
+              <IconButton icon={MonitorArrowUp} label="Two people are sharing already" size={size} iconSize={iconSize} radius={radius} variant="island" dimmed />
             ) : (
-              <IconButton icon={MonitorArrowUp} label={sharing ? 'Stop sharing' : 'Share screen'} size={28} iconSize={16} radius={radius} variant="island" pressed={sharing} onClick={onShare} />
+              <IconButton icon={MonitorArrowUp} label={sharing ? 'Stop sharing' : 'Share screen'} size={size} iconSize={iconSize} radius={radius} variant="island" pressed={sharing} onClick={onShare} />
             )
           ) : null}
         </Fills>
@@ -79,8 +82,8 @@ export function HuddleControls({
               <IconButton
                 icon={SlidersHorizontal}
                 label="Microphone and speaker"
-                size={28}
-                iconSize={16}
+                size={size}
+                iconSize={iconSize}
                 radius={radius}
                 variant="island"
                 aria-haspopup="menu"
@@ -111,17 +114,19 @@ function Fills({ shape, children }: { readonly shape: ControlsShape; readonly ch
 
 interface TextControlProps {
   readonly shape: ControlsShape
+  /** The tab's control island draws it one size up, as its icon buttons. Default 28. */
+  readonly size?: 28 | 32
   readonly icon: PhosphorIcon
   readonly label: string
   readonly onClick: () => void
 }
 
-/** A 28px text button with the island controls' fills: Leave, and the tab header's Thread. */
-export function TextControl({ shape, icon, label, onClick }: TextControlProps) {
+/** A text button with the island controls' fills: Leave, and the tab header's Thread. */
+export function TextControl({ shape, size = 28, icon, label, onClick }: TextControlProps) {
   return (
-    <button type="button" onClick={onClick} {...stylex.props(islandText.base, focusRing.outside, shape === 'bar' ? styles.textBar : styles.textIsland)}>
+    <button type="button" onClick={onClick} {...stylex.props(islandText.base, focusRing.outside, shape === 'bar' ? styles.textBar : styles.textIsland, size === 32 && styles.text32)}>
       <span {...stylex.props(islandText.icon)}>
-        <Icon icon={icon} size={14} />
+        <Icon icon={icon} size={size === 32 ? 16 : 14} />
       </span>
       {label}
     </button>
@@ -129,7 +134,7 @@ export function TextControl({ shape, icon, label, onClick }: TextControlProps) {
 }
 
 function LeaveButton({ shape, onLeave }: { readonly shape: ControlsShape; readonly onLeave: () => void }) {
-  return <TextControl shape={shape} icon={PhoneX} label="Leave" onClick={onLeave} />
+  return <TextControl shape={shape} size={shape === 'bar' ? 28 : 32} icon={PhoneX} label="Leave" onClick={onLeave} />
 }
 
 const styles = stylex.create({
@@ -146,4 +151,11 @@ const styles = stylex.create({
   },
   textBar: { borderRadius: radii['--radius-lg'] },
   textIsland: { borderRadius: radii['--radius-pill'] },
+  // One size up from 28: the height, the inset and the type step together.
+  text32: {
+    height: sizes['--control-32'],
+    minWidth: sizes['--control-32'],
+    paddingInline: spacing['--space-3'],
+    fontSize: text['--text-ui-size'],
+  },
 })

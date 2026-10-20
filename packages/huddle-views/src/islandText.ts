@@ -6,9 +6,8 @@ import { colors, motion, sizes, spacing, text, weights } from '@juno/tokens/toke
 const HOVER = '@media (hover: hover)'
 
 /**
- * A 28px text button with the island controls' fills, as `IslandButton` in
- * `@juno/views` draws it (this package cannot import it): Leave, Thread and
- * the header's Join. The owner adds the radius and any padding of its own.
+ * A 28px text button with the island controls' fills, as the header islands'
+ * controls in `@juno/views` have them: Leave, Thread and the header's Join. The owner adds the radius and any padding of its own.
  */
 export const islandText = stylex.create({
   base: {
