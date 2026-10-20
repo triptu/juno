@@ -13,7 +13,7 @@ import { appMcpCredentials } from './mcpCredentials'
 import { createSupervisor } from './engine'
 import { createEngineTestHooks } from './engineTestHooks'
 import { createHuddleQuit } from './huddleQuit'
-import { copyImage, downloadFile, fileTestHooks, openFile, quickLook } from './files'
+import { clearTemporaryFiles, copyImage, downloadFile, fileTestHooks, openFile, quickLook } from './files'
 import { browserLinksForTests, contextMenuForTests, folderForTests, registerIpc, logsForTests, huddleSettingsForTests, slackLinksForTests, webPanelForTests } from './ipc'
 import { CUSTOM_ITEM, macKeychain, memoryKeychain, OPENROUTER_ITEM } from './keychain'
 import { ProviderStore } from './providers'
@@ -234,6 +234,7 @@ app.whenReady().then(() => {
   // packaged app does not have, so the start-up scenarios would measure something that never ships.
   if (process.platform === 'darwin' && !app.isPackaged && !e2e) app.dock?.setIcon(join(__dirname, '../../build/icon.png'))
   serveAppScheme(join(__dirname, '../renderer'), fakeSlackUrl === undefined ? undefined : new URL(fakeSlackUrl).origin)
+  void clearTemporaryFiles(e2e)
   registerMediaPermissions()
   powerMonitor.on('resume', () => { notifier.wake(); refreshDockBadge() })
   app.on('browser-window-focus', refreshDockBadge)

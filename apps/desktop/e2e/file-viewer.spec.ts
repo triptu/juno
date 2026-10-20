@@ -133,6 +133,10 @@ test('Quick Look on a zip asks main to show it in the preview window, and nothin
   await expect.poll(looked, { timeout: 15_000 }).toHaveLength(1)
   const [shown] = await looked()
   expect(shown!.name).toBe('build-logs.zip')
-  expect(shown!.path).toMatch(/Juno\/[^/]+\/build-logs\.zip$/)
+  expect(shown!.path).toMatch(/Temp\/[0-9a-f]{16}\/build-logs\.zip$/)
+  // Again, into the same folder: the copy is replaced, not added to.
+  await row.getByRole('button', { name: 'Quick Look build-logs.zip' }).click()
+  await expect.poll(looked, { timeout: 15_000 }).toHaveLength(2)
+  expect((await looked())[1]!.path).toBe(shown!.path)
   expect(await juno.app.evaluate(() => (globalThis as unknown as { junoTest: { downloads: string[] } }).junoTest.downloads.length)).toBe(0)
 })

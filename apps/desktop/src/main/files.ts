@@ -23,10 +23,10 @@
  * - `copyImage`: the viewer's Copy image, from a `juno://files` or
  *   `juno://uploads` url, onto the clipboard as an image.
  */
-import { randomUUID } from 'node:crypto'
+import { createHash } from 'node:crypto'
 import { app, clipboard, ClipboardItem, nativeImage, session as electronSession, shell, type BrowserWindow, type DownloadItem } from 'electron'
-import { existsSync, mkdirSync } from 'node:fs'
-import { readdir, readFile } from 'node:fs/promises'
+import { existsSync, mkdirSync, rmSync } from 'node:fs'
+import { readdir, readFile, rm } from 'node:fs/promises'
 import { join, parse } from 'node:path'
 import type { DownloadResult } from '@juno/contract'
 import { SLACK_PARTITION } from './signInWindow'
@@ -219,12 +219,12 @@ export function downloadFile(file: { readonly url: string; readonly name: string
 export const openedForTests: string[] = []
 
 /**
- * Open in browser in the viewer: the Slack file saved under its name into a
- * folder of its own in the temporary folder, then opened in the default app
- * (the browser, for an HTML file).
+ * Open in browser in the viewer: the Slack file saved under its name into
+ * its folder in the temporary folder (`fileFolder`), then opened in the
+ * default app (the browser, for an HTML file).
  */
 export function openFile(file: { readonly url: string; readonly name: string }, extraOrigin: string | undefined, e2e: boolean): Promise<DownloadResult> {
-  return saveFile(file, temporaryFolder(), extraOrigin, (path) => {
+  return saveFile(file, fileFolder(file.url, e2e), extraOrigin, (path) => {
     if (e2e) openedForTests.push(path)
     else void shell.openPath(path)
   })
@@ -235,20 +235,38 @@ const quickLookedForTests: Array<{ readonly path: string; readonly name: string 
 
 /**
  * Quick Look on a card or in the viewer: the Slack file saved under its
- * name into a folder of its own in the temporary folder, then shown in the
- * macOS preview window over `window`, as Finder's space bar shows it. Nothing
- * goes into Downloads and no app opens.
+ * name into its folder in the temporary folder (`fileFolder`), then shown in
+ * the macOS preview window over `window`, as Finder's space bar shows it.
+ * Nothing goes into Downloads and no app opens. Electron does not say when
+ * the preview closes, so the copy stays until the next start
+ * (`clearTemporaryFiles`).
  */
 export function quickLook(file: { readonly url: string; readonly name: string }, window: BrowserWindow | undefined, extraOrigin: string | undefined, e2e: boolean): Promise<DownloadResult> {
-  return saveFile(file, temporaryFolder(), extraOrigin, (path) => {
+  return saveFile(file, fileFolder(file.url, e2e), extraOrigin, (path) => {
     if (e2e) quickLookedForTests.push({ path, name: file.name })
     else window?.previewFile(path, file.name)
   })
 }
 
-/** A new folder for one file under the temporary folder's `Juno`, so two files of one name never meet. */
-function temporaryFolder(): string {
-  return join(app.getPath('temp'), 'Juno', randomUUID())
+/** Where Quick Look and Open in browser keep their copies: `Juno` in the temporary folder, or under JUNO_E2E the test's own `<userData>/Temp`. */
+function temporaryRoot(e2e: boolean): string {
+  return e2e ? join(app.getPath('userData'), 'Temp') : join(app.getPath('temp'), 'Juno')
+}
+
+/**
+ * One folder for each Slack file, named from its url, emptied before each
+ * copy: opening a file again replaces its copy, and two files of one name
+ * never meet.
+ */
+function fileFolder(url: string, e2e: boolean): string {
+  const folder = join(temporaryRoot(e2e), createHash('sha256').update(url).digest('hex').slice(0, 16))
+  rmSync(folder, { recursive: true, force: true })
+  return folder
+}
+
+/** Deletes the copies Quick Look and Open in browser left in the temporary folder. At start, before any is made. */
+export function clearTemporaryFiles(e2e: boolean): Promise<void> {
+  return rm(temporaryRoot(e2e), { recursive: true, force: true }).catch(() => {})
 }
 
 /** Under JUNO_E2E, how many images Copy image put on the clipboard. */
