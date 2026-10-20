@@ -1,6 +1,6 @@
 /** Entry points: a Slack message in, a `MessageBody` out, plus text views of a body. */
 import type { Message } from '@juno/slack-schema'
-import type { Block, Lookups, MessageBody } from './model'
+import type { Block, Inline, Lookups, MessageBody } from './model'
 import { bodyFromBlocks } from './from-blocks'
 import { mrkdwnBlocks } from './from-mrkdwn'
 import { attachmentBlock, fileBlock } from './attachments'
@@ -33,10 +33,12 @@ export function bodyFromMrkdwn(text: string, lookups: Lookups = {}): MessageBody
 
 /**
  * The whole body as plain text, quotes included. Mentions read as "@Name",
- * channels as "#name", emoji as unicode or ":name:". For search and checks.
+ * channels as "#name", emoji as unicode or ":name:". A table is one line per
+ * row with its cells split by tabs, as a spreadsheet takes a paste. For
+ * copy, search, Ask Juno and checks.
  */
 export function plainText(body: MessageBody): string {
-  return bodyText(body, true, false)
+  return bodyText(body, { quotes: true, shown: false, tables: true })
 }
 
 /**
@@ -46,18 +48,41 @@ export function plainText(body: MessageBody): string {
  * and what goes back to Slack.
  */
 export function readableText(body: MessageBody): string {
-  return bodyText(body, true, true)
+  return bodyText(body, { quotes: true, shown: true, tables: true })
 }
 
 /** A code block's text as the view shows it: without its tag line. */
 const shownCode = (block: { readonly text: string; readonly tagLine?: true }) => (block.tagLine ? block.text.slice(block.text.indexOf('\n') + 1) : block.text)
 
-function bodyText(body: MessageBody, quotes: boolean, shown: boolean): string {
+/**
+ * A table as a spreadsheet takes it: one line per row, cells split by tabs.
+ * A tab or line break inside a cell becomes a space, so every cell stays in its column.
+ */
+function tableText(rows: ReadonlyArray<ReadonlyArray<ReadonlyArray<Inline>>>): string {
+  return rows.map((row) => row.map((cell) => cellText(cell)).join('\t')).join('\n')
+}
+
+const cellText = (cell: ReadonlyArray<Inline>) => inlineText(cell).replace(/[\t\n]+/g, ' ').trim()
+
+interface TextOptions {
+  /** Quote blocks are included, as "> " lines. */
+  readonly quotes: boolean
+  /** Code as the view shows it, without its tag line. */
+  readonly shown: boolean
+  /** Tables are included as tab-separated rows. */
+  readonly tables: boolean
+}
+
+function bodyText(body: MessageBody, options: TextOptions): string {
+  const { quotes, shown, tables } = options
   const parts: string[] = []
   for (const block of body.blocks) {
     switch (block.kind) {
       case 'attachment':
-        parts.push(inlineText(block.title), bodyText({ blocks: block.blocks }, quotes, shown), inlineText(block.footer))
+        parts.push(inlineText(block.title), bodyText({ blocks: block.blocks }, options), inlineText(block.footer))
+        break
+      case 'table':
+        if (tables) parts.push(tableText(block.rows))
         break
       case 'fields':
         parts.push(...block.items.map((item) => inlineText(item)))
@@ -97,11 +122,38 @@ function bodyText(body: MessageBody, quotes: boolean, shown: boolean): string {
 
 /**
  * One-line text for a sidebar row: quote blocks dropped, breaks collapsed
- * to spaces, whitespace squeezed, a code block's tag line left out. Empty
+ * to spaces, whitespace squeezed, a code block's tag line left out. Tables
+ * are left out too; a message whose only words are in a table reads
+ * "Table: " and its first row with words, cells split by commas
+ * ("Table: Service, Status, Owner"), or "Table" when no cell has any. Empty
  * when the message was only a quote.
  */
 export function previewText(body: MessageBody): string {
-  return bodyText(body, false, true).replace(/\s+/g, ' ').trim()
+  const text = oneLine(bodyText(body, { quotes: false, shown: true, tables: false }))
+  if (text !== '') return text
+  const table = firstTable(body.blocks)
+  if (table === undefined) return ''
+  for (const row of table.rows) {
+    const cells = row.map((cell) => oneLine(inlineText(cell))).filter((cell) => cell !== '')
+    if (cells.length > 0) return `Table: ${cells.join(', ')}`
+  }
+  return 'Table'
+}
+
+const oneLine = (text: string) => text.replace(/\s+/g, ' ').trim()
+
+type TableBlock = Extract<Block, { kind: 'table' }>
+
+/** The first table, in a shared message's card too. */
+function firstTable(blocks: ReadonlyArray<Block>): TableBlock | undefined {
+  for (const block of blocks) {
+    if (block.kind === 'table') return block
+    if (block.kind === 'attachment') {
+      const inner = firstTable(block.blocks)
+      if (inner !== undefined) return inner
+    }
+  }
+  return undefined
 }
 
 /**

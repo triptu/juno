@@ -1,6 +1,6 @@
 /** Slack `blocks` → `MessageBody`. `rich_text` is rendered faithfully; layout blocks get a plain rendering. */
-import type { Block as SlackBlock, RichTextElement, RichTextInline, RichTextListStyle, TextObject } from '@juno/slack-schema'
-import type { ContentBlock as Block, Inline, ListStyle, Lookups } from './model'
+import type { Block as SlackBlock, RichTextElement, RichTextInline, RichTextListStyle, TableBlock, TableCell, TableColumnSetting, TextObject } from '@juno/slack-schema'
+import type { ContentBlock as Block, Inline, ListStyle, Lookups, TableColumn } from './model'
 import { channelInline, dateInline, emojiInline, inlineText, linkedRuns, normalize, textRuns, toStyle, usergroupInline, userInline } from './inline'
 import { codeBlock } from './code'
 import { mrkdwnBlocks, mrkdwnInlines } from './from-mrkdwn'
@@ -130,8 +130,50 @@ function blocksFromMessageBlock(block: SlackBlock, lookups: Lookups): Block[] {
       return [{ kind: 'divider' }]
     case 'image':
       return block.image_url ? [{ kind: 'image', url: block.image_url, alt: block.alt_text }] : paragraphOf(textRuns(block.alt_text))
+    case 'table':
+      return tableBlocks(block, lookups)
     case 'unknown':
       return unknownBlocks(block.raw, lookups)
+  }
+}
+
+/** A table, its short rows filled with empty cells so every column lines up. No rows, no table. */
+function tableBlocks(block: TableBlock, lookups: Lookups): Block[] {
+  const rows = block.rows.map((row) => row.map((cell) => cellInlines(cell, lookups)))
+  const width = Math.max(0, ...rows.map((row) => row.length))
+  if (width === 0) return []
+  const columns = (block.column_settings ?? []).slice(0, width).map(tableColumn)
+  const caption = block.caption?.trim() ?? ''
+  return [{
+    kind: 'table',
+    rows: rows.map((row) => row.length === width ? row : [...row, ...Array.from({ length: width - row.length }, () => [])]),
+    ...(columns.some((column) => column.align !== undefined || column.wrap !== undefined) ? { columns } : {}),
+    ...(caption === '' ? {} : { caption, ...(block.is_caption_visible === true ? { showCaption: true as const } : {}) }),
+  }]
+}
+
+function tableColumn(setting: TableColumnSetting | null): TableColumn {
+  const align = setting?.align === 'center' || setting?.align === 'right' ? setting.align : undefined
+  return { ...(align === undefined ? {} : { align }), ...(setting?.is_wrapped === true ? { wrap: true as const } : {}) }
+}
+
+/** A cell's content as one run of inlines: its paragraphs, list items and code one per line. */
+function cellInlines(cell: TableCell, lookups: Lookups): Inline[] {
+  if (cell === null) return []
+  switch (cell.type) {
+    case 'raw_text':
+    case 'raw_number':
+      return normalize(textRuns(cell.text))
+    case 'unknown':
+      return normalize(textRuns(unknownText(cell.raw)))
+    case 'rich_text': {
+      const lines = blocksFromMessageBlock(cell, lookups).flatMap((child) => {
+        if (child.kind === 'list') return child.items
+        if (child.kind === 'code') return [textRuns(child.text, { code: true })]
+        return 'children' in child ? [child.children] : []
+      })
+      return lines.flatMap((line, index) => (index === 0 ? line : [{ kind: 'break' as const }, ...line]))
+    }
   }
 }
 

@@ -59,6 +59,13 @@ export type BodyInline = typeof BodyInline.Type
 export const BodyListStyle = Schema.Literals(['bullet', 'ordered', 'checked', 'unchecked'])
 export type BodyListStyle = typeof BodyListStyle.Type
 
+/** A table column's settings; absent fields are Slack's defaults, left aligned on one line. */
+export const BodyTableColumn = Schema.Struct({
+  align: Schema.optionalKey(Schema.Literals(['center', 'right'])),
+  wrap: Schema.optionalKey(Schema.Literal(true)),
+})
+export type BodyTableColumn = typeof BodyTableColumn.Type
+
 const ContentBlock = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('paragraph'), children: Schema.Array(BodyInline) }),
   Schema.Struct({ kind: Schema.Literal('quote'), children: Schema.Array(BodyInline) }),
@@ -88,6 +95,18 @@ const ContentBlock = Schema.Union([
     mimetype: Schema.String,
     width: Schema.optionalKey(Schema.Number),
     height: Schema.optionalKey(Schema.Number),
+  }),
+  /**
+   * A Slack table: rows of cells of the same length, each cell a run of
+   * inlines, the first row its header. `columns` holds Slack's settings by
+   * column index; `caption` names the table, shown above it with `showCaption`.
+   */
+  Schema.Struct({
+    kind: Schema.Literal('table'),
+    rows: Schema.Array(Schema.Array(Schema.Array(BodyInline))),
+    columns: Schema.optionalKey(Schema.Array(BodyTableColumn)),
+    caption: Schema.optionalKey(Schema.String),
+    showCaption: Schema.optionalKey(Schema.Literal(true)),
   }),
 ])
 export const BodyBlock = Schema.Union([
