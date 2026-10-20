@@ -1,5 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { CaretRight } from '@phosphor-icons/react/dist/icons/CaretRight'
+import { Headphones } from '@phosphor-icons/react/dist/icons/Headphones'
 import { useId, type MouseEvent, type ReactNode } from 'react'
 import type { AutomatedPlace, HomeItem } from '@juno/contract'
 import { accent, colors, layout, motion, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
@@ -138,6 +139,29 @@ function HomeThought({ thought, sx }: { readonly thought: HomeThoughtView; reado
   )
 }
 
+/** A row's tile: an icon for the cards that have one, else the topic's; a missed huddle's carries the headphones. */
+function RowTile({ item }: { readonly item: HomeItem }) {
+  const topic = item.topics[0]
+  const tileIcon = TILE_ICONS[item.kind]
+  if (tileIcon !== undefined || topic === undefined) {
+    return (
+      <span {...stylex.props(styles.iconTile)}>
+        <Icon icon={tileIcon ?? TILE_ICONS.tidyUp!} size={18} />
+      </span>
+    )
+  }
+  if (item.kind !== 'missedHuddle') return <PlaceTile tile={tileOf(topic)} />
+  // The running huddle's green headphones on the tile's corner, so the row reads as a huddle before its title.
+  return (
+    <span {...stylex.props(styles.markedTile)}>
+      <PlaceTile tile={tileOf(topic)} />
+      <span aria-hidden data-huddle-mark="" {...stylex.props(styles.huddleMark)}>
+        <Icon icon={Headphones} size={12} weight="fill" />
+      </span>
+    </span>
+  )
+}
+
 /** A row's own props, and the callbacks Home passes down. */
 type HomeRowProps = { readonly item: HomeItem; readonly done: boolean } & Pick<HomeProps, 'now' | 'onOpen' | 'onMarkDone' | 'onResolveAll' | 'onReview' | 'onSort' | 'onItemMenu' | 'onDismiss' | 'onAsk'>
 
@@ -151,16 +175,9 @@ const preventNavigation = (event: MouseEvent) => event.preventDefault()
  */
 function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, onDismiss, onAsk }: HomeRowProps) {
   const topic = item.topics[0]
-  const tileIcon = TILE_ICONS[item.kind]
   const body = (
     <>
-      {tileIcon !== undefined || topic === undefined ? (
-        <span {...stylex.props(styles.iconTile)}>
-          <Icon icon={tileIcon ?? TILE_ICONS.tidyUp!} size={18} />
-        </span>
-      ) : (
-        <PlaceTile tile={tileOf(topic)} />
-      )}
+      <RowTile item={item} />
       <span {...stylex.props(styles.text)}>
         {/* An assistant title, and a follow-up's promise, can quote the messages; the plain one only says what kind of thing waits. */}
         <Text variant="ui" weight="medium" tone="default" topicTitle tooltipWhenTruncated data-home-title="" data-sensitive={item.aiTitle === undefined && item.kind !== 'followUp' ? undefined : ''}>
@@ -416,6 +433,25 @@ const styles = stylex.create({
     borderRadius: radii['--radius-xl'],
     backgroundColor: colors['--secondary-default'],
     color: colors['--foreground-subtle'],
+  },
+  markedTile: {
+    position: 'relative',
+    display: 'inline-flex',
+    flexShrink: 0,
+  },
+  // A 12px glyph in a 16px circle of the page colour, at the tile's bottom right as the presence dot sits.
+  huddleMark: {
+    position: 'absolute',
+    right: `calc(-1 * ${spacing['--space-0-5']})`,
+    bottom: `calc(-1 * ${spacing['--space-0-5']})`,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: sizes['--icon-16'],
+    height: sizes['--icon-16'],
+    borderRadius: radii['--radius-full'],
+    backgroundColor: colors['--background'],
+    color: colors['--huddle-live'],
   },
   text: {
     display: 'flex',
