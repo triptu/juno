@@ -1013,6 +1013,16 @@ export class Juno {
     return this.app.evaluate(() => (globalThis as unknown as { junoTest: { dockBadge: () => string } }).junoTest.dockBadge())
   }
 
+  /** How many times the dock icon bounced (main counts them under JUNO_E2E). */
+  dockBounces(): Promise<number> {
+    return this.app.evaluate(() => (globalThis as unknown as { junoTest: { dockBounces: () => number } }).junoTest.dockBounces())
+  }
+
+  /** Whether Juno is the frontmost app, as main's dock bounce reads it. Juno starts frontmost. */
+  async setFrontmost(frontmost: boolean): Promise<void> {
+    await this.app.evaluate((_electron, value) => (globalThis as unknown as { junoTest: { frontmost: (f: boolean) => void } }).junoTest.frontmost(value), frontmost)
+  }
+
   /** The why popover (inventory 15.4), by its title. */
   whyPopover(title: string | RegExp): Locator {
     return this.win.getByRole('dialog', { name: title })

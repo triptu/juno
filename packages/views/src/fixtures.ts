@@ -28,6 +28,7 @@ import MessageList from './MessageList.fixtures'
 import CommandPalette from './CommandPalette.fixtures'
 import NewDivider from './NewDivider.fixtures'
 import NewMessagesPill from './NewMessagesPill.fixtures'
+import HuddleRingSection from './HuddleRingSection.fixtures'
 import NotificationsPage from './NotificationsPage.fixtures'
 import UpdateSettings from './UpdateSettings.fixtures'
 import SettingsPage from './SettingsPage.fixtures'
@@ -129,6 +130,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   NewDivider,
   NewMessagesPill,
   SendCheckBar,
+  HuddleRingSection,
   NotificationsPage,
   TabExpirySetting,
   TopicSwitcher,

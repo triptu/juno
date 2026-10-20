@@ -1,0 +1,1 @@
+- 10-20 15:00 · huddle-ignored-rings · A huddle in an ignored channel gets the card, ring and notification like any other conversation; the ignored list no longer holds incoming huddles. Why: Tushar decided huddles are rare and do not start for no reason.

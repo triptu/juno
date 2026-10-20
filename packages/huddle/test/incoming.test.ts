@@ -11,7 +11,7 @@ const inCall = (channelId: string): HuddleCall => ({ ...idle, phase: 'joined', c
 
 const offered = (running: RunningHuddles, call: HuddleCall = idle) => {
   const looked = lookAt(noIncoming, running, SELF, NOW)
-  return settle(offer(looked.state, looked.fresh.map((fresh) => incomingOf(fresh, 'ring', call, NOW))), running, call, SELF)
+  return settle(offer(looked.state, looked.fresh.map((fresh) => incomingOf(fresh, 'ring', true, call, NOW))), running, call, SELF)
 }
 
 describe('incoming huddles', () => {
@@ -40,11 +40,16 @@ describe('incoming huddles', () => {
     expect(settle(state, { C1: huddle(), C2: huddle({ callId: 'R9' }) }, inCall('C2'), SELF).list[0]?.ringUntil).toBeNull()
   })
 
+  it('does not ring with Ring for huddles off, and still lists it to notify', () => {
+    const looked = lookAt(noIncoming, { C1: huddle() }, SELF, NOW)
+    expect(looked.fresh.map((fresh) => incomingOf(fresh, 'ring', false, idle, NOW))).toMatchObject([{ alert: 'ring', ringUntil: null }])
+  })
+
   it('lists the newest first, and drops one on a join, an end, a new call there or a dismiss', () => {
     const first = offered({ C1: huddle() })
     const running = { C1: huddle(), C2: huddle({ callId: 'R2' }) }
     const looked = lookAt(first, running, SELF, NOW)
-    const both = offer(looked.state, looked.fresh.map((fresh) => incomingOf(fresh, 'quiet', idle, NOW)))
+    const both = offer(looked.state, looked.fresh.map((fresh) => incomingOf(fresh, 'quiet', true, idle, NOW)))
     expect(both.list.map((entry) => entry.callId)).toEqual(['R2', 'R1'])
     expect(both.list[0]?.ringUntil).toBeNull()
     expect(settle(both, running, { ...inCall('C1'), phase: 'joining' }, SELF).list.map((entry) => entry.callId)).toEqual(['R2'])

@@ -9,12 +9,13 @@ import { colors, spacing } from '@juno/tokens/tokens.stylex'
 import { Avatar, Button, Chip, DayToggles, ListRow, Page, PageHeader, Popover, Section, Select, Surface, Text, Textarea, type PhosphorIcon } from '@juno/ui'
 import { hueFor, initials } from './look'
 import { PermissionLine } from './PermissionLine'
+import { HuddleRingSection, type HuddleRingProps } from './HuddleRingSection'
 import { SlackScheduleSection, type SlackScheduleProps } from './SlackScheduleSection'
 import { clockLabel, hourLabel } from './time'
 
 export type HoursKind = 'notifications' | 'presence'
 
-export interface NotificationsPageProps {
+export interface NotificationsPageProps extends HuddleRingProps {
   readonly notificationHours: Hours
   readonly presenceHours: Hours
   /** "What matters to you", as saved. */
@@ -57,13 +58,13 @@ const channelIcons: Record<Extract<NotifyTag, { kind: 'channel' }>['channelKind'
 /**
  * The Notifications page (SPEC 14, inventory 13): two sets of hours, whether
  * Slack's own schedule follows them, what matters in the owner's words, the
- * channels and people set to Every message or Never, one line for today
- * with Show why, and a test notification. Everything else is said to Juno or set from a channel's or
- * person's menu. While macOS does not let Juno notify, a line at the top
+ * channels and people set to Every message or Never, Ring for huddles, one
+ * line for today with Show why, and a test notification. Everything else is
+ * said to Juno or set from a channel's or person's menu. While macOS does not let Juno notify, a line at the top
  * says so, with the way to turn it on.
  */
 export function NotificationsPage(props: NotificationsPageProps) {
-  const { notificationHours, presenceHours, matters, aiAssist, every, never, interrupted, held, today, onHoursChange, slack, onMattersSave, onRemove, permission, onSendTest, onOpenSettings, onAllow, showWhy = false } = props
+  const { notificationHours, presenceHours, matters, aiAssist, every, never, interrupted, held, today, onHoursChange, slack, onMattersSave, onRemove, huddleRing, onHuddleRingChange, permission, onSendTest, onOpenSettings, onAllow, showWhy = false } = props
   return (
     <Page width="settings">
       <PageHeader title="Notifications" subtitle="During your notification hours, Juno lets through what needs you and holds the rest. Everything is in Juno whenever you open it." />
@@ -125,6 +126,8 @@ export function NotificationsPage(props: NotificationsPageProps) {
           Right-click a channel or person to change how it notifies you.
         </Text>
       </Section>
+
+      <HuddleRingSection huddleRing={huddleRing} onHuddleRingChange={onHuddleRingChange} />
 
       <Section heading="Today">
         <Today interrupted={interrupted} held={held} rows={today} initiallyOpen={showWhy} />

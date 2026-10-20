@@ -36,6 +36,7 @@ function connect(engine: RunningEngine) {
     setBadge: (text) => {
       badge = text
     },
+    bounce: () => {},
     open: (target) => opened.push(target),
     focus: () => {},
     send: (message: MainToEngine) => engine.main.host.deliver(message),

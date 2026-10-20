@@ -11,6 +11,7 @@ export const NotificationSettingsSchema = Schema.Struct({
   channels: Schema.Record(Schema.String, Schema.Literals(['every', 'never'])),
   people: Schema.Record(Schema.String, Schema.Literals(['every', 'never'])),
   threads: Schema.optionalKey(Schema.Record(Schema.String, Schema.Literals(['every', 'never']))),
+  huddleRing: Schema.optionalKey(Schema.Boolean),
 })
 
 export const readSettings = Effect.gen(function* () {
