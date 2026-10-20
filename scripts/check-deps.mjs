@@ -28,7 +28,7 @@ const warnings = []
 const schemaOnlyEffect = new Set(['@juno/domain', '@juno/richtext', '@juno/agent-memory', '@juno/agent-cards'])
 // Packages whose src must not import effect at all.
 // (@juno/views and @juno/huddle-views are covered by the `views` directory rule below.)
-const noEffect = new Set(['@juno/ui', '@juno/tokens', '@juno/domain', '@juno/richtext', '@juno/agent-memory', '@juno/agent-cards'])
+const noEffect = new Set(['@juno/ui', '@juno/tokens', '@juno/domain', '@juno/richtext', '@juno/highlight', '@juno/agent-memory', '@juno/agent-cards'])
 // Packages whose src must not import @juno/state.
 const noState = new Set(['@juno/ui', '@juno/notifications'])
 // The only package allowed to import electron.
@@ -174,6 +174,13 @@ const thirdParty = [
   },
   // The Chime SDK is about 2 MB minified: only the media session's lazy chunk and its tests load it.
   { label: 'the Chime SDK', spec: /^amazon-chime-sdk-js(?:\/|$)/, allow: ['packages/huddle-media/src/chime/', 'packages/huddle-media/test/'], doc: 'packages/huddle-media/README.md' },
+  // highlight.js and its grammars are about 150 KB: only the renderer's highlight worker, the gallery and the package's own tests load them.
+  {
+    label: 'the code highlighter',
+    spec: /^(?:@juno\/highlight\/highlight|highlight\.js|lowlight)(?:\/|$)/,
+    allow: ['packages/highlight/', 'apps/desktop/src/renderer/highlight/highlight.worker.ts', 'apps/gallery/src/main.tsx'],
+    doc: 'packages/highlight/README.md',
+  },
   { label: 'pi-mcp', spec: /^@earendil-works\/pi-mcp(?:\/|$)/, allow: ['packages/agent/src/mcp/', 'packages/agent-testing/'] },
   // koffi (ADR 0015): a native FFI module in main, for the private window-server call that tells
   // Juno the screen is shared, and for macOS's notification permission. Keep it to those files.
