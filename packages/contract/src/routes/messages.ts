@@ -86,11 +86,7 @@ export type ReactionIssue = typeof ReactionIssue.Type
  * main serves it from the Slack session (architecture 9) and fetches only
  * Slack file hosts.
  */
-export const FileThumb = Schema.Struct({
-  src: Schema.String,
-  width: Schema.Int,
-  height: Schema.Int,
-})
+export const FileThumb = Schema.Struct({ src: Schema.String, width: Schema.Int, height: Schema.Int })
 export type FileThumb = typeof FileThumb.Type
 
 export const FileKind = Schema.Literals(['image', 'video', 'audio', 'pdf', 'html', 'text', 'file', 'deleted'])

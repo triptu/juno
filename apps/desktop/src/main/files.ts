@@ -191,7 +191,7 @@ export async function serveUpload(request: URL, userData: string): Promise<Respo
 }
 
 /** Under JUNO_E2E, saved downloads are recorded here and not shown in Finder. */
-export const downloadsForTests: string[] = []
+const downloadsForTests: string[] = []
 
 /** A free path for `name` in `folder`: "plan.pdf", then "plan (1).pdf", as Finder names copies. */
 export function freePath(folder: string, name: string, exists: (path: string) => boolean = existsSync): string {
@@ -231,7 +231,7 @@ export function openFile(file: { readonly url: string; readonly name: string }, 
 }
 
 /** Under JUNO_E2E, the files Quick Look would have shown, by path and the name it would show. */
-export const quickLookedForTests: Array<{ readonly path: string; readonly name: string }> = []
+const quickLookedForTests: Array<{ readonly path: string; readonly name: string }> = []
 
 /**
  * Quick Look on a card or in the viewer: the Slack file saved under its
@@ -252,7 +252,15 @@ function temporaryFolder(): string {
 }
 
 /** Under JUNO_E2E, how many images Copy image put on the clipboard. */
-export const copiedForTests = { images: 0 }
+const copiedForTests = { images: 0 }
+
+/** Main's file test hooks (`junoTest`): what Download, Open in browser and Quick Look would have saved, and the images copied. */
+export const fileTestHooks = {
+  downloads: downloadsForTests,
+  opened: openedForTests,
+  quickLooked: quickLookedForTests,
+  copiedImages: () => copiedForTests.images,
+}
 
 /** Copy image in the viewer: the bytes behind a `juno://files` or `juno://uploads` url, onto the clipboard. */
 export async function copyImage(src: string, extraOrigin: string | undefined, e2e: boolean): Promise<'copied' | 'failed'> {

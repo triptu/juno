@@ -13,7 +13,7 @@ import { appMcpCredentials } from './mcpCredentials'
 import { createSupervisor } from './engine'
 import { createEngineTestHooks } from './engineTestHooks'
 import { createHuddleQuit } from './huddleQuit'
-import { copiedForTests, copyImage, downloadFile, downloadsForTests, openedForTests, openFile, quickLook, quickLookedForTests } from './files'
+import { copyImage, downloadFile, fileTestHooks, openFile, quickLook } from './files'
 import { browserLinksForTests, contextMenuForTests, folderForTests, registerIpc, logsForTests, huddleSettingsForTests, slackLinksForTests, webPanelForTests } from './ipc'
 import { CUSTOM_ITEM, macKeychain, memoryKeychain, OPENROUTER_ITEM } from './keychain'
 import { ProviderStore } from './providers'
@@ -363,10 +363,7 @@ if (e2e) {
       slackLinks: slackLinksForTests,
       browserLinks: browserLinksForTests,
       webPanel: () => webPanelForTests(appWindow()),
-      downloads: downloadsForTests,
-      opened: openedForTests,
-      quickLooked: quickLookedForTests,
-      copiedImages: () => copiedForTests.images,
+      ...fileTestHooks,
       agentState: () => agent.currentState,
       agentHost: () => agent.host?.host,
       agentPid: () => agent.pid,
