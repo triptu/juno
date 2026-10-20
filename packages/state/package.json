@@ -20,6 +20,7 @@
     "@effect/atom-react": "4.0.3",
     "@juno/agent-contract": "workspace:*",
     "@juno/contract": "workspace:*",
+    "@juno/pictures": "workspace:*",
     "effect": "4.0.3"
   },
   "peerDependencies": {
@@ -37,7 +38,8 @@
   "juno": {
     "allowedDeps": [
       "@juno/agent-contract",
-      "@juno/contract"
+      "@juno/contract",
+      "@juno/pictures"
     ],
     "testDeps": [
       "@juno/agent",

@@ -96,6 +96,8 @@ export const darkShadows = stylex.createTheme(shadows, {
   // On ink a dark ring cannot separate; a faint light edge inside does, as on macOS.
   '--panel-shadow': 'inset 0 0 0 1px oklch(1 0 0 / 0.06), 0 0 0 1px oklch(0 0 0 / 0.5), 0 1px 2px 0 oklch(0 0 0 / 0.3), 0 8px 24px -6px oklch(0 0 0 / 0.4), 0 24px 56px -12px oklch(0 0 0 / 0.5)',
   '--tab-shadow': '0 -1px 3px -1px oklch(0 0 0 / 0.5)',
+  // A faint light line, so a dark space image keeps its edge on the dark page.
+  '--picture-edge': 'inset 0 0 0 1px oklch(1 0 0 / 0.07)',
 })
 
 /** The accent picker's swatches in dark: the dark fills of the accent themes below. */

@@ -6,7 +6,7 @@
 import { Suspense, type ReactElement } from 'react'
 import { junoPageTitles } from '@juno/agent-contract'
 import { mainTopicOf, type TopicDetail } from '@juno/contract'
-import { registry, topicAtom, type Place } from '@juno/state'
+import { pictureTitle, registry, topicAtom, type Place } from '@juno/state'
 import type { WorkspaceTab, WorkspaceTabIcon } from '@juno/views'
 import { chunk } from './chunks'
 import { HomePage } from './Home'
@@ -19,6 +19,10 @@ import { TopicTab } from './TopicView'
 const settings = chunk(() => import('./Settings'))
 const SettingsTab = settings.component((module) => module.SettingsTab)
 export const loadSettingsTab = settings.load
+
+// The gallery and the picture page load when a gallery tab first shows (SPEC 12, "Pictures and the gallery").
+const gallery = chunk(() => import('./Gallery'))
+const GalleryTab = gallery.component((module) => module.GalleryTab)
 
 // The huddle page loads when a huddle tab first shows.
 const huddle = chunk(() => import('./huddle/Tab'))
@@ -113,6 +117,11 @@ export const tabKinds: { readonly [K in Place['kind']]: TabKind<Extract<Place, {
   junoPage: pageKind((place) => junoPageTitles[place.page], 'juno', (place) => (
     <Suspense key={place.page} fallback={null}>
       <JunoPageTab page={place.page} />
+    </Suspense>
+  )),
+  gallery: pageKind((place) => (place.pictureId === undefined ? 'Gallery' : pictureTitle(place.pictureId) ?? 'Gallery'), 'gallery', (place, tabId) => (
+    <Suspense key={place.pictureId ?? 'gallery'} fallback={null}>
+      <GalleryTab pictureId={place.pictureId} tabId={tabId} />
     </Suspense>
   )),
   huddle: {

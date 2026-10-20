@@ -16,7 +16,9 @@ import Composer from './Composer.fixtures'
 import ComposerSlot from './ComposerSlot.fixtures'
 import EmojiPicker from './EmojiPicker.fixtures'
 import EngineStatusView, { engineNoticeFixtures, syncProgressFixtures } from './EngineStatusView.fixtures'
+import Gallery from './Gallery.fixtures'
 import Home from './Home.fixtures'
+import PicturePage from './PicturePage.fixtures'
 import SettledReview from './SettledReview.fixtures'
 import AutomatedReview from './AutomatedReview.fixtures'
 import ReviewCards from './ReviewCards.fixtures'
@@ -108,7 +110,9 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   NoProvider,
   EngineStatusView,
   MediaViewer,
+  Gallery,
   Home,
+  PicturePage,
   SettledReview,
   AutomatedReview,
   ReviewCards,

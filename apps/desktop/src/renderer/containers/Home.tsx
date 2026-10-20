@@ -1,13 +1,13 @@
 import { Suspense, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { viewsSortChannel, type HomeItem } from '@juno/contract'
-import { closeWelcome, fillHome, fillThought, freezeHome, homeGreeting, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, markMovesSeen, markMovesShown, peekKeyAtom, prepareThought, registry, resolveAllTopics, runAction, showHome, showToast, syncProgressAtom, welcomeAtom, type Welcome } from '@juno/state'
+import { closeWelcome, fillHome, fillThought, forgetPicture, freezeHome, homeGreeting, homePicturesOnAtom, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, markMovesSeen, markMovesShown, peekKeyAtom, pictureUrl, preparePicture, prepareThought, registry, resolveAllTopics, runAction, showHome, showToast, syncProgressAtom, welcomeAtom, type Welcome } from '@juno/state'
 import { homeAsksAtom, junoPageActions } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
 import { junoAskCopy } from '@juno/agent-contract'
 import { Home, HomeSyncLine, WelcomeCard, type ActivateEvent } from '@juno/views'
 import { chunk, usePreloaded } from './chunks'
 import { HomeComposer } from './HomeComposer'
-import { openJuno, openTopic } from './navigation'
+import { openGallery, openJuno, openTopic } from './navigation'
 import { showChannelMenu } from './placeMenus'
 
 const noop = () => {}
@@ -18,6 +18,15 @@ const HomeReview = reviewSheets.component((module) => module.HomeReview)
 
 function openItem(topicId: string, event: ActivateEvent): void {
   openTopic(topicId, { newTab: event.metaKey })
+}
+
+/** Home's picture, read from disk, and what opening it and a missing file do. */
+function pictureProps(picture: { readonly id: string; readonly title: string; readonly artist: string; readonly date: string; readonly ratio: number }) {
+  return {
+    picture: { src: pictureUrl(picture.id, 'small'), title: picture.title, artist: picture.artist, date: picture.date, ratio: picture.ratio },
+    onOpenPicture: (event: ActivateEvent) => openGallery(picture.id, { newTab: event.metaKey }),
+    onPictureMissing: () => forgetPicture(picture.id),
+  }
 }
 
 /**
@@ -153,6 +162,19 @@ function useThought(key: string, pending: boolean): void {
   }, [key, pending])
 }
 
+/**
+ * Home's picture (SPEC 12, "A picture"): when idle after Home paints, the next picture is picked and downloaded,
+ * so the next caught-up Home has it on disk in its first frame.
+ */
+function usePicture(): void {
+  const on = useAtomValue(homePicturesOnAtom)
+  useEffect(() => {
+    if (!on) return
+    const idle = requestIdleCallback(() => void preparePicture(registry, new Date()), { timeout: 5_000 })
+    return () => cancelIdleCallback(idle)
+  }, [on])
+}
+
 /** The syncing line with the first sync's count. Its own component, so a new count redraws the line and not Home. */
 function SyncLine({ line }: { readonly line: string }) {
   return <HomeSyncLine line={line} progress={useAtomValue(syncProgressAtom)} />
@@ -180,6 +202,8 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
   const welcome = useWelcome(shown?.now)
   useMovesShown(shown?.view.items, shown?.now)
   useThought(key, shown?.thought === 'pending')
+  usePicture()
+  const picturesOn = useAtomValue(homePicturesOnAtom)
 
   const asks = useAtomValue(homeAsksAtom)
   // Nothing yet, not ready, ready while history still lands, or done: Home is taken again at each step.
@@ -219,6 +243,7 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
       composer={<HomeComposer tabId={tabId} />}
       welcome={welcome}
       {...(shown.thought === undefined || shown.thought === 'pending' ? {} : { thought: shown.thought })}
+      {...(shown.picture === undefined || !picturesOn ? {} : pictureProps(shown.picture))}
     />
     {reviewing === undefined || !reviewReady ? null : (
       <Suspense fallback={null}>

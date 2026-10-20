@@ -32,7 +32,7 @@ import { accentLabels, settingsSections, type PaletteIconName, type PaletteItem 
 import { muteShortcut } from '@juno/huddle-views'
 import { currentCall, joinHuddle, leaveCurrentHuddle, mediaSnapshot, shareFull, showCurrentHuddle, toggleHuddleMuted, toggleSharing } from './huddle/media'
 import { closeJunoPanel, openPanel } from './juno/actions'
-import { openAllTopics, openHome, openJuno, openJunoPage, newMessage, openNewTab, openSettings, openTopic, showTheTour } from './navigation'
+import { openAllTopics, openGallery, openHome, openJuno, openJunoPage, newMessage, openNewTab, openSettings, openTopic, showTheTour } from './navigation'
 import { messageBeforePalette } from './paletteActions'
 import { setPrivacy } from './privacy'
 import { isLinkable, labelOf, runTopicAction, topicOf, type ActionTopic } from './topicActions'
@@ -123,6 +123,7 @@ function pageRows(): ReadonlyArray<CommandRow> {
   return [
     row('page-home', 'home', 'Home', 'start greeting', openHome, page),
     row('page-all-topics', 'all-topics', 'All topics', 'everything browse list threads', openAllTopics, page),
+    row('page-gallery', 'gallery', 'Gallery', 'pictures art paintings space images', (options) => openGallery(undefined, options), page),
     row('page-juno', 'juno', 'Juno', 'ai assistant chat ask', openJuno, juno),
     junoPage('scheduled', 'schedule reminders later'),
     junoPage('remembers', 'memory remember facts'),

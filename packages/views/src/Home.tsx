@@ -4,6 +4,7 @@ import { useId, type MouseEvent, type ReactNode } from 'react'
 import type { AutomatedPlace, HomeItem } from '@juno/contract'
 import { accent, colors, layout, motion, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { activateHandlers, Button, Icon, Text, type ActivateEvent } from '@juno/ui'
+import { HomePicture, type HomePictureView } from './HomePicture'
 import { HomeScene, type HomeSceneName } from './HomeScene'
 import { metaOf, opensReview, rowButtons, TILE_ICONS, type HomeAskAnswer } from './homeRows'
 import { PlaceTile } from './PlaceTile'
@@ -57,6 +58,12 @@ export interface HomeProps {
    * over them and goes when a row lands, so the greeting never moves.
    */
   readonly thought?: HomeThoughtView
+  /** In the caught-up scene's place, already on this Mac (SPEC 12, "A picture"). */
+  readonly picture?: HomePictureView
+  /** Opens the picture with its story; fires on mouse down, `event.metaKey` asks for a new tab. */
+  readonly onOpenPicture?: (event: ActivateEvent) => void
+  /** The picture's file would not load; the box shows the caught-up scene. */
+  readonly onPictureMissing?: () => void
 }
 
 /**
@@ -66,7 +73,7 @@ export interface HomeProps {
  * under the chosen line limit. The column scrolls on its own, so the
  * composer never moves.
  */
-export function Home({ scene, title, line, items, done, now, enter = true, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, onDismiss, onAsk, loading = false, reservedItems = 0, composer, waiting = false, welcome, thought }: HomeProps) {
+export function Home({ scene, title, line, items, done, now, enter = true, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, onDismiss, onAsk, loading = false, reservedItems = 0, composer, waiting = false, welcome, thought, picture, onOpenPicture, onPictureMissing }: HomeProps) {
   const headingId = useId()
   const shownThought = thought === undefined || items.length > 0 || loading ? undefined : thought
   const itemsShown = items.length > 0 || reservedItems > 0
@@ -80,7 +87,7 @@ export function Home({ scene, title, line, items, done, now, enter = true, onOpe
       <div {...stylex.props(styles.scroll)}>
         {waiting ? null : <div {...stylex.props(styles.column, welcome !== undefined && styles.columnWelcome)}>
           <div {...stylex.props(welcome !== undefined && styles.sceneGives, ...part(0))}>
-            <HomeScene name={scene} />
+            {picture === undefined || onOpenPicture === undefined ? <HomeScene name={scene} /> : <HomePicture picture={picture} onOpen={onOpenPicture} {...(onPictureMissing === undefined ? {} : { onMissing: onPictureMissing })} />}
           </div>
           <div {...stylex.props(styles.greeting, welcome !== undefined && styles.greetingGives, ...part(1))}>
             <h2 id={headingId} {...stylex.props(styles.title)}>

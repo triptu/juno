@@ -96,6 +96,8 @@ export {
   tabTopic,
   topicPlace,
   huddlePlace,
+  galleryPlace,
+  replaceInTab,
   updateTabs,
   setHomeDraft,
   type OpenOptions,
@@ -255,6 +257,9 @@ export {
 } from './home'
 export { homeGreeting } from './homeScene'
 export { homeThoughtsOnAtom, prepareThought, setHomeThoughtsOn } from './homeThoughts'
+export type { Picture } from '@juno/pictures'
+export { forgetPicture, homePicturesOnAtom, lastPictureId, pictureTitle, pictureUrl, preparePicture, setHomePicturesOn } from './homePictures'
+export { ensurePicture, loadPictures, pictureFilesAtom, readPictureFiles } from './pictureFiles'
 export { actOnSuggested } from './suggested'
 export {
   appendUnseen,

@@ -8,6 +8,7 @@ import { DestinationChip, TopicChip } from './DestinationPickers'
 import { homeItems, rewritten } from './fixtures/home'
 import { engTopics } from './fixtures/messages'
 import { recentConversations } from './fixtures/newChat'
+import { pictureCards } from './fixtures/pictures'
 import { PrivacyOn } from './fixtures/privacy'
 import { atMa, DRAFT, eng, hashEn, maya, MULTILINE, recentChannels, recentPeople } from './fixtures/recents'
 import { art, NOW } from './fixtures/topics'
@@ -99,6 +100,13 @@ const quote = { text: 'How we spend our days is, of course, how we spend our liv
 const longQuote = { text: 'The first principle is that you must not fool yourself—and you are the easiest person to fool.', by: 'Richard Feynman' }
 const fact = { text: 'In 1885 Hermann Ebbinghaus published pioneering experiments on memory, with himself as the only subject. Most of what he forgot, he lost within the first day.' }
 const narrow: FixtureFrame = { width: 560, height: 720, padded: false }
+
+/** Home's picture (SPEC 12, "A picture"): a card from the fixtures, as Home gets it from disk. */
+const picture = (id: string) => {
+  const card = pictureCards.find((entry) => entry.id === id)!
+  return { picture: { src: card.src, title: card.title, artist: card.artist, date: card.date, ratio: card.ratio }, onOpenPicture: noop }
+}
+const caughtUp = { scene: 'caughtUp', title: 'All caught up.', items: [] } as const
 
 const card = (done: ReadonlyArray<WelcomeHintName> = [], hidden = false) => <WelcomeCard done={done} peekKey="option" onClose={noop} hidden={hidden} />
 /** The minimum window with the sidebar shown: the container shows one row while the card does. */
@@ -213,6 +221,20 @@ export default defineFixtures(
       'thought-filling': state({ scene: 'midday', title: 'Hello, Tushar.', items: [], reservedItems: 3, thought: fact, composer: write({ syncing: true }) }),
       'thought-gives-way': state({ scene: 'midday', title: 'Hello, Tushar.', items: [homeItems.waiting], reservedItems: 3, thought: fact, composer: write({ syncing: true }) }),
       'no-name': state({ scene: 'midday', title: 'Hello.', items: [homeItems.waiting] }),
+    },
+    // A picture in the caught-up scene's place: the same box for every shape, resting on its plaque line.
+    Picture: {
+      wide: state({ ...caughtUp, ...picture('monet-impression-sunrise'), thought: quote }),
+      tall: state({ ...caughtUp, ...picture('kota-radha-krishna'), thought: quote }),
+      panorama: state({ ...caughtUp, ...picture('webb-cosmic-cliffs'), thought: fact }),
+      // A long title: the plaque line takes an ellipsis, with the whole line as its tooltip.
+      'long-title': state({ ...caughtUp, ...picture('hiroshige-sudden-shower'), thought: quote }, narrow),
+      'short-window': state({ ...caughtUp, ...picture('monet-impression-sunrise'), thought: quote }, { width: 720, height: 600, padded: false }),
+      'minimum-window': state({ ...caughtUp, ...picture('monet-impression-sunrise'), thought: fact }, minimum),
+      // The file would not load: the box keeps its size and shows the caught-up scene.
+      missing: state({ ...caughtUp, picture: { src: '/__fixture/missing-picture.webp', title: 'Irises', artist: 'Vincent van Gogh', date: '1889', ratio: 1.29 }, onOpenPicture: noop, thought: quote }),
+      hover: state({ ...caughtUp, ...picture('monet-impression-sunrise'), thought: quote }, { hover: '[data-home-picture] button' }),
+      focus: state({ ...caughtUp, ...picture('monet-impression-sunrise'), thought: quote }, { focus: '[data-home-picture] button' }),
     },
     // The chip keeps its hover fill from hover through press to open, so opening changes no colour (gallery trigger-open spec).
     Open: {

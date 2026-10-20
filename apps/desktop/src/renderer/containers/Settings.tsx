@@ -1,13 +1,13 @@
 import { memo, Suspense, useEffect, useState } from 'react'
 import { prefsGet, prefsSet, MIRROR_READS_PREF, readsCatchUp, type IgnorableChannel, type SendCheckPref, type SettingsSection, type SharingSetting } from '@juno/contract'
-import { tidyUpPrefsAtom, setTidyUpPrefs, aiActivityAtom, copyText, nowAtom, getSharingSetting, setSharingSetting, quietDaysAtom, setQuietDays, sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, homeThoughtsOnAtom, setHomeThoughtsOn, topicTitleLinesAtom, persistTopicTitleLines, type TopicTitleLines, ignorableChannelsAtom, ignoreChannel, ignoredChannelsAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setPeekKey, setTabExpiry, setWebPanelOn, tabExpiryAtom, themeAtom, webPanelOnAtom, type Accent, type Density, type Theme } from '@juno/state'
+import { tidyUpPrefsAtom, setTidyUpPrefs, aiActivityAtom, copyText, nowAtom, getSharingSetting, setSharingSetting, quietDaysAtom, setQuietDays, sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, homeThoughtsOnAtom, setHomeThoughtsOn, homePicturesOnAtom, setHomePicturesOn, topicTitleLinesAtom, persistTopicTitleLines, type TopicTitleLines, ignorableChannelsAtom, ignoreChannel, ignoredChannelsAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setPeekKey, setTabExpiry, setWebPanelOn, tabExpiryAtom, themeAtom, webPanelOnAtom, type Accent, type Density, type Theme } from '@juno/state'
 import { junoPageActions, junoSettingsAtom } from '@juno/state/agent'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { AiActivityPage, IgnoreChannelRow, SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored, SettingsPage, SettingsTidyUp } from '@juno/views'
 import { AppInfo } from './AppInfo'
 import { Diagnostics } from './Diagnostics'
 import { JunoBackup, JunoConnections, JunoSettings } from './juno/lazy'
-import { openSettings, showTheTour } from './navigation'
+import { openGallery, openSettings, showTheTour } from './navigation'
 import { NotificationsPage } from './Notifications'
 import { QuickReactions } from './QuickReactions'
 import { Updates } from './Updates'
@@ -106,11 +106,12 @@ function General() {
   }
   const [sharing, setSharing] = useSharingSetting()
   const homeThoughts = useAtomValue(homeThoughtsOnAtom)
+  const homePictures = useAtomValue(homePicturesOnAtom)
   return <SettingsGeneral hideWhileSharing={sharing.hide} sharingDetection={sharing.detection} onHideWhileSharingChange={setSharing} mirrorReads={shown ?? served} onMirrorReadsChange={changeMirror}
     catchUp={catchUp._tag === 'Success' ? catchUp.value : undefined}
     onCatchUp={() => void runCommand(registry, readsCatchUp, undefined)}
     checks={checks} grammarUnavailable={grammarUnavailable} onCheckChange={changeCheck}
-    peekKey={peekKey} onPeekKeyChange={(key) => setPeekKey(registry, key)} homeThoughts={homeThoughts} onHomeThoughtsChange={(on) => setHomeThoughtsOn(registry, on)} webPanel={shownWebPanel ?? servedWebPanel} onWebPanelChange={changeWebPanel} classifier={classifier} onClassifierChange={changeClassifier} />
+    peekKey={peekKey} onPeekKeyChange={(key) => setPeekKey(registry, key)} homeThoughts={homeThoughts} onHomeThoughtsChange={(on) => setHomeThoughtsOn(registry, on)} homePictures={homePictures} onHomePicturesChange={(on) => setHomePicturesOn(registry, on)} onOpenGallery={() => openGallery()} webPanel={shownWebPanel ?? servedWebPanel} onWebPanelChange={changeWebPanel} classifier={classifier} onClassifierChange={changeClassifier} />
 }
 
 /**

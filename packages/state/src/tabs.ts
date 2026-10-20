@@ -60,6 +60,8 @@ export type Place =
   | { readonly kind: 'junoPage'; readonly page: JunoTabPage }
   /** The huddle of a channel or DM, one tab per channel. */
   | { readonly kind: 'huddle'; readonly channelId: string }
+  /** The gallery of Home's pictures, or one picture with its story (SPEC 12, "Pictures and the gallery"). */
+  | { readonly kind: 'gallery'; readonly pictureId?: string }
 
 export const homePlace: Place = { kind: 'home' }
 export const allTopicsPlace: Place = { kind: 'allTopics' }
@@ -68,6 +70,7 @@ export const junoPlace: Place = { kind: 'juno' }
 export const junoPagePlace = (page: JunoTabPage): Place => ({ kind: 'junoPage', page })
 export const topicPlace = (topicId: string): Place => ({ kind: 'topic', topicId })
 export const huddlePlace = (channelId: string): Place => ({ kind: 'huddle', channelId })
+export const galleryPlace = (pictureId?: string): Place => (pictureId === undefined ? { kind: 'gallery' } : { kind: 'gallery', pictureId })
 
 /** The places a tab showed, oldest first, and the one it shows. */
 export interface TabHistory {
@@ -130,6 +133,7 @@ const samePlace = (a: Place, b: Place) =>
   a.kind === 'topic' ? b.kind === 'topic' && a.topicId === b.topicId
   : a.kind === 'junoPage' ? b.kind === 'junoPage' && a.page === b.page
   : a.kind === 'huddle' ? b.kind === 'huddle' && a.channelId === b.channelId
+  : a.kind === 'gallery' ? b.kind === 'gallery' && a.pictureId === b.pictureId
   : a.kind === b.kind
 
 export const activeTab = (tabs: Tabs): Tab | undefined => tabs.tabs.find((tab) => tab.id === tabs.active)
@@ -232,6 +236,15 @@ export function openSettingsSection(tabs: Tabs, section: SettingsSection, option
   const shown = currentPlace(tab)
   const next = shown.kind === 'settings' && shown.section === section ? tab : { ...tab, history: { ...tab.history, entries: tab.history.entries.with(tab.history.index, settingsPlace(section)) } }
   return activateTab(next === tab ? tabs : { ...tabs, tabs: tabs.tabs.with(at, next) }, tab.id)
+}
+
+/** `place` in place of what tab `tabId` shows, with no new history entry: a picture page's ‹ and › step through the gallery, and Back still leaves it. */
+export function replaceInTab(tabs: Tabs, tabId: string, place: Place): Tabs {
+  const at = tabs.tabs.findIndex((tab) => tab.id === tabId)
+  if (at < 0) return tabs
+  const tab = tabs.tabs[at]!
+  if (samePlace(currentPlace(tab), place)) return tabs
+  return { ...tabs, tabs: tabs.tabs.with(at, { ...tab, history: { ...tab.history, entries: tab.history.entries.with(tab.history.index, place) } }) }
 }
 
 /** Replace an acknowledged topic throughout history without replacing its mounted view. */
@@ -425,6 +438,7 @@ const PlaceJson = Schema.Union([
   Schema.Struct({ kind: Schema.Literals(['notifications', 'preferences']) }),
   Schema.Struct({ kind: Schema.Literal('junoPage'), page: JunoPage }),
   Schema.Struct({ kind: Schema.Literal('huddle'), channelId: Schema.String }),
+  Schema.Struct({ kind: Schema.Literal('gallery'), pictureId: Schema.optionalKey(Schema.String) }),
 ])
 
 /** A saved place as it reads today: the pages that became sections of Settings open there. */

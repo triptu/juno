@@ -35,6 +35,7 @@
     "@juno/fake-slack": "workspace:*",
     "@juno/huddle-media": "workspace:*",
     "@juno/huddle-views": "workspace:*",
+    "@juno/pictures": "workspace:*",
     "@juno/slack": "workspace:*",
     "@juno/state": "workspace:*",
     "@juno/testing": "workspace:*",
@@ -76,6 +77,7 @@
     "testDeps": [
       "@juno/agent-testing",
       "@juno/fake-slack",
+      "@juno/pictures",
       "@juno/testing"
     ]
   }
