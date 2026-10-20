@@ -69,8 +69,7 @@ section[data-key] { display: inline-flex; gap: 24px; flex-wrap: wrap; padding: 2
 .pic-wrap.hover .pic { box-shadow: 0 1px 2px 0 rgba(27,28,21,.08), 0 12px 32px -6px rgba(27,28,21,.26); }
 .plaque { margin-top: 10px; font: 400 12.5px/1.35 'Figtree Variable'; color: var(--foreground-muted); text-align: center; white-space: nowrap; }
 .plaque b { font-weight: 500; color: var(--foreground-subtle); }
-.greeting { margin-top: 18px; font: 400 36px/1.15 'Instrument Serif'; }
-.thought { margin-top: 14px; max-width: 480px; text-align: center; }
+.thought { margin-top: 32px; max-width: 480px; text-align: center; }
 .thought p { margin: 0; font: 400 18px/1.45 'Instrument Serif'; color: var(--foreground-subtle); text-wrap: balance; }
 .thought .by { margin-top: 6px; font: 400 12.5px/1.35 'Figtree Variable'; color: var(--foreground-muted); }
 
@@ -140,7 +139,7 @@ section[data-key] { display: inline-flex; gap: 24px; flex-wrap: wrap; padding: 2
 </template>
 
 <h1 class="sheet">Home's picture, its story and the gallery</h1>
-<p class="sheet">Mock for review. The picture takes the caught-up scene's place in a fixed box; the plaque line, greeting and thought follow as today. Clicking the picture opens it in the tab, larger, with its story. The gallery is a page of its own.</p>
+<p class="sheet">Mock for review. The picture takes the caught-up scene's place in a fixed box; the plaque line and the thought follow, with no greeting line: the picture says you are caught up. Clicking the picture opens it in the tab, larger, with its story. The gallery is a page of its own.</p>
 
 <script>
 const ICON = {
@@ -170,7 +169,6 @@ const home = ({ theme, img, title, artist, date, thought, by, hover }) => `
     <div class="home-col">
       <div class="pic-box"><div class="pic-wrap${hover ? ' hover' : ''}"><img class="pic" src="img/${img}.webp"></div></div>
       <div class="plaque"><b>${title}</b> · ${artist}, ${date}</div>
-      <div class="greeting">All caught up.</div>
       <div class="thought"><p>${thought}</p>${by ? `<div class="by">— ${by}</div>` : ''}</div>
     </div>
     ${composer}

@@ -1,0 +1,1 @@
+- 10-21 04:37 · home-picture-no-greeting · Tushar: Home with a picture has no greeting line; the picture says you are caught up. The thought sits 32 below the plaque, the box takes its full 216 at 1200 by 800 (`--home-picture-room` 580 to 540), and a hidden "Home" heading names the page for screen readers. Without a picture Home still says "All caught up."

@@ -1,6 +1,6 @@
 # Home's picture, its story and the gallery
 
-When Home says "All caught up.", a picture takes the caught-up scene's place: a painting, a print, a nature study, or an image from Hubble, Webb or another NASA mission. Clicking it opens the picture larger with its story. The gallery is a page that shows every picture. SPEC section 12, "A picture" and "Pictures and the gallery", decides the behaviour; this folder holds the design and the reasons for it.
+When Home is caught up, a picture takes the caught-up scene's place: a painting, a print, a nature study, or an image from Hubble, Webb or another NASA mission. Clicking it opens the picture larger with its story. The gallery is a page that shows every picture. SPEC section 12, "A picture" and "Pictures and the gallery", decides the behaviour; this folder holds the design and the reasons for it.
 
 Files:
 
@@ -18,17 +18,18 @@ Home is the one place in Juno where there is nothing to do. A picture there is s
 
 ![Home, caught up, by day](home-day.png)
 
-- **Where.** In the caught-up scene's place, over the greeting. The greeting and the thought stay as they are. Only Home that says "All caught up." shows a picture; a Home with rows, or one waiting on the first sync, keeps its scene.
-- **A fixed box.** 320 by 216, the same for every picture, so the greeting is always in the same place. The picture is fitted inside it and sits on the box's bottom edge, so a wide picture and a tall one both rest on the line under them. Nothing in the column depends on the picture's shape.
+- **Where.** In the caught-up scene's place. Only a caught-up Home shows a picture; a Home with rows, or one waiting on the first sync, keeps its scene and its greeting.
+- **No greeting.** With a picture, Home does not say "All caught up.": the picture says it, and the 36px serif line between the plaque and the thought crowded the picture. The thought sits 32 under the plaque (the gap Home's rows keep under the greeting), so the plaque reads as the picture's label and the thought as its own line. The block is centred in the space above Recent. A hidden heading, "Home", names the page for screen readers. Without a picture on disk, or with the picture turned off, Home shows the scene and "All caught up." as before.
+- **A fixed box.** 320 by 216, the same for every picture, so the thought is always in the same place. The picture is fitted inside it and sits on the box's bottom edge, so a wide picture and a tall one both rest on the line under them. Nothing in the column depends on the picture's shape.
 - **No frame.** A thin edge and a soft shadow, as a print hung on a wall. A drawn frame or a mat looked like a skeuomorphic widget at this size and made the column busier; the shadow is enough to separate it from the page. In dark the shadow is deeper and the edge is a faint light line, so a dark space image still has an edge.
 - **The plaque.** One line under the picture, as a museum label: the title in the subtle tone, then the artist and the date in the muted tone ("The Beach at Sainte-Adresse · Claude Monet, 1867"). It tells you what you are looking at without opening anything, and it is the one line of text the picture adds. It ellipsises in a narrow window; the full line is the tooltip.
-- **Size.** The scene is 120 by 83; the picture box is about 2.7 times its width. At 320 a painting is big enough to see, and the column still fits a 1200 by 760 window with Recent and the composer. On a shorter window the box gives up height, down to 144, so the column still fits above Recent and the field; the size depends on the window, never on the picture.
+- **Size.** The scene is 120 by 83; the picture box is about 2.7 times its width. At 320 a painting is big enough to see, and the column still fits a 1200 by 800 window at the full 216 with Recent and the composer. On a shorter window the box gives up height, down to 144, so the column still fits above Recent and the field; the size depends on the window, never on the picture.
 - **Only from disk.** The picture shows only when it is already on this Mac. Otherwise Home shows the caught-up scene, as it does today. So Home never waits for the network and never fills in a picture after its first frame. The small picture is read from disk; the box is there in the first frame and the picture appears in it without moving anything.
 - **Shape.** A panorama or a very tall picture would be a thin strip in the box, so Home takes only pictures between 0.55 and 2.6 times as wide as high; the gallery shows them all.
 - **Night.** Late at night (22:00 to 4:59, the scene rule's night) the next picture is a space image while one is left that has not been shown.
 - **Interaction.** The picture is a button ("Open The Beach at Sainte-Adresse"). Hover deepens the shadow; press shows in the next frame; focus shows the ring. A plain click opens the picture page in the tab, so Back returns to Home; ⌘-click opens it in a new tab.
 
-Rejected: a full-bleed or blurred wallpaper behind the greeting (SPEC 12 keeps Home calm, and text over a painting needs a scrim that changes with every picture); a picture beside the greeting (needs a breakpoint, as variant B in `docs/design/home/` did); a picture under the thought (the composer's Recent sits there, and it moved the greeting with every picture's height).
+Rejected: "All caught up." between the plaque and the thought (the first build; Tushar found it spoiled that part of the screen); a full-bleed or blurred wallpaper behind the greeting (SPEC 12 keeps Home calm, and text over a painting needs a scrim that changes with every picture); a picture beside the greeting (needs a breakpoint, as variant B in `docs/design/home/` did); a picture under the thought (the composer's Recent sits there, and it moved the greeting with every picture's height).
 
 ## The picture and its story
 
