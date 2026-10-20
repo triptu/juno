@@ -129,9 +129,11 @@ function thumbs(url: string, width: number, height: number): Partial<File> {
 /** The file object Slack puts on a message and in upload answers. */
 export function fileObject(baseUrl: string, stored: StoredFile, isPublic = false): File {
   const url = `${baseUrl}/files/${stored.id}/${encodeURIComponent(stored.name)}`
-  const type = typeOf(stored.name, stored.mimetype)
-  // Live, a fresh upload's echo has no thumbnails and no size until Slack has made them.
-  const size = stored.bytes === undefined || stored.thumbsHeld === true ? undefined : imageSize(stored.bytes)
+  // Live, a fresh upload's echo has no thumbnails and no size until Slack has made them. The fake also leaves the type
+  // empty until then, as Slack's file object does before processing (research section 10, "Files"; not yet seen live).
+  const held = stored.thumbsHeld === true
+  const type = held ? { mimetype: '', filetype: '', pretty: '' } : typeOf(stored.name, stored.mimetype)
+  const size = stored.bytes === undefined || held ? undefined : imageSize(stored.bytes)
   const seconds = Math.floor(stored.created / 1000)
   return {
     id: stored.id,
@@ -139,7 +141,7 @@ export function fileObject(baseUrl: string, stored: StoredFile, isPublic = false
     timestamp: seconds,
     name: stored.name,
     title: stored.title ?? stored.name,
-    mimetype: stored.mimetype,
+    mimetype: type.mimetype,
     filetype: type.filetype,
     pretty_type: type.pretty,
     user: stored.user,
@@ -152,7 +154,7 @@ export function fileObject(baseUrl: string, stored: StoredFile, isPublic = false
     permalink: url,
     ...(size === undefined ? {} : { original_w: size.width, original_h: size.height, ...thumbs(url, size.width, size.height) }),
     // A video: its poster and the url it plays from, as live (research section 10, "Videos"); not until Slack has made them.
-    ...(stored.poster === undefined || stored.thumbsHeld === true ? {} : { thumb_video: `${url}?thumb=video`, thumb_video_w: stored.poster.width, thumb_video_h: stored.poster.height, mp4: url }),
+    ...(stored.poster === undefined || held ? {} : { thumb_video: `${url}?thumb=video`, thumb_video_w: stored.poster.width, thumb_video_h: stored.poster.height, mp4: url }),
     ...(stored.mimetype.startsWith('video/') ? { hls: `${url}?hls=1`, duration_ms: 12000 } : {}),
     ...(stored.mimetype === 'text/markdown' ? { preview: 'A short invented project note.', lines: 1 } : {}),
   }
