@@ -79,6 +79,8 @@ export const RunningHuddle = Schema.Struct({
   startedAt: Schema.NullOr(Schema.Number),
   /** The huddle's thread, once Slack has made it. */
   threadTs: Schema.NullOr(Schema.String),
+  /** Who started it, when Slack says. */
+  createdBy: Schema.NullOr(Schema.String),
 })
 export type RunningHuddle = typeof RunningHuddle.Type
 
