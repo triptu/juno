@@ -53,7 +53,7 @@ The first name comes from the Slack profile. If there is none, drop the name and
 
 ### The thought
 
-With no items, one quote or fact sits under the greeting (SPEC §12, "A thought"): serif 18px in `--foreground-subtle`, a quote's "— Name" under it in the meta style and `--foreground-muted`. It comes from the bundled list in `packages/state/src/homeThoughtList.ts`, where each entry keeps its source. To add one, check the quote against its primary source (book, essay, speech, letter, with the year; Quote Investigator for anything famous) or the fact against a reference such as a NASA page or an encyclopedia article, and leave it out when in doubt.
+With no items, one quote or fact sits under the greeting (SPEC §12, "A thought"): serif 18px in `--foreground-subtle`, a quote's "— Name" under it in the meta style and `--foreground-muted`. It comes from the bundled list in `packages/state/src/homeThoughtList.ts`, where each entry keeps its source. A thought observes and never advises: no imperatives and no self-help. To add one, check the quote against its primary source (book, essay, speech, letter, with the year; Quote Investigator for anything famous) or the fact against a reference such as a NASA page or an encyclopedia article, and leave it out when in doubt.
 
 ### Item templates
 

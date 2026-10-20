@@ -13,6 +13,7 @@ import { HoverToolbar } from './HoverToolbar'
 import { hueFor, initials } from './look'
 import { MessageBody } from './MessageBody'
 import type { LinkInfo } from './MessageLink'
+import { PersonLink } from './personLink'
 import { Reactions } from './Reactions'
 import { TextButton } from './juno-chat/TextButton'
 import { ThreadLink } from './ThreadLink'
@@ -226,6 +227,9 @@ export const Message = memo(function Message({
   const name = sender?.name ?? message.senderId ?? 'Unknown'
   const hue = sender === undefined ? hueOf(message.senderId ?? message.ts) : hueFor(sender.color, sender.id)
   const header = startsGroup || message.groupStart
+  // The sender opens their DM (`PersonLink`), or the app user's behind a post under its own name; nothing when Juno has none.
+  const opens = sender?.unreachable === true ? undefined : (sender?.user ?? sender?.id)
+  const label = message.fromMe ? 'yourself' : name
   const focus = (event: FocusEvent<HTMLDivElement>) => {
     if (actions !== undefined) placeToolbar(event.currentTarget)
     if (event.target === event.currentTarget) onFocus?.(message.ts)
@@ -300,7 +304,9 @@ export const Message = memo(function Message({
     >
       <span data-sender={header ? '' : undefined} {...stylex.props(styles.gutter, !header && styles.gutterContinuation)}>
         {header ? (
-          <Avatar label={sender === undefined ? '?' : initials(name)} name={name} size={32} hue={hue} {...(sender?.avatarUrl === undefined ? {} : { src: sender.avatarUrl })} />
+          <PersonLink id={opens} label={label} part="avatar">
+            <Avatar label={sender === undefined ? '?' : initials(name)} name={name} size={32} hue={hue} {...(sender?.avatarUrl === undefined ? {} : { src: sender.avatarUrl })} />
+          </PersonLink>
         ) : (
           <Text variant="tag" tone="muted" numeric as="time" title={fullTime(message.at)} sx={styles.gutterTime}>
             {clockTime(message.at)}
@@ -310,9 +316,11 @@ export const Message = memo(function Message({
       <span {...stylex.props(styles.content, pending === 'sending' && styles.sending)}>
         {header ? (
           <span data-message-header="" {...stylex.props(styles.header)}>
-            <Text variant="messageName" tone="default" truncate tooltipWhenTruncated dir="auto" as="span" sx={styles.name} data-sender="" data-person-name={name}>
-              {name}
-            </Text>
+            <PersonLink id={opens} label={label} part="name" tabIndex={tabbable ? 0 : -1}>
+              <Text variant="messageName" tone="default" truncate tooltipWhenTruncated dir="auto" as="span" sx={styles.name} data-sender="" data-person-name={name}>
+                {name}
+              </Text>
+            </PersonLink>
             <Text variant="meta" tone="muted" numeric as="time" title={fullTime(message.at)} sx={styles.time}>
               {time}
             </Text>

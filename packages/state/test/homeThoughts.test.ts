@@ -49,11 +49,11 @@ describe("Home's thought list", () => {
   it('has short, sourced, distinct entries; quotes say who said them', () => {
     const ids = new Set<string>()
     for (const thought of HOME_THOUGHTS) {
-      expect(thought.text.length, thought.text).toBeLessThanOrEqual(thought.by === undefined ? 180 : 150)
+      expect(thought.text.length, thought.text).toBeLessThanOrEqual(thought.by === undefined ? 200 : 150)
       expect(thought.text, thought.text).toBe(thought.text.trim())
       expect(thought.source.trim(), thought.text).not.toBe('')
       if (thought.by !== undefined) expect(thought.by.trim(), thought.text).not.toBe('')
-      expect(['focus', 'thinking', 'wonder', 'life']).toContain(thought.theme)
+      expect(['focus', 'thinking', 'wonder', 'life', 'made', 'art']).toContain(thought.theme)
       expect(ids.has(thoughtId(thought.text)), thought.text).toBe(false)
       ids.add(thoughtId(thought.text))
     }

@@ -25,7 +25,8 @@ export interface TextProps extends Omit<HTMLAttributes<HTMLElement>, 'style' | '
    * With `truncate` or `clamp`: while the text is cut off, hovering it shows
    * the full text as the native tooltip; when it fits, there is none. One
    * size read on pointer enter, nothing on render, so a row costs nothing
-   * until it is hovered. Do not combine with `title`.
+   * until it is hovered. Inside an element with its own tooltip
+   * (`data-tooltip`) there is none, so two never show. Do not combine with `title`.
    */
   readonly tooltipWhenTruncated?: boolean
   /** Tabular figures; use for times, counts and table numbers. */
@@ -49,7 +50,7 @@ function titleWhenTruncated(event: PointerEvent<HTMLElement>) {
 
 function setTitle(node: HTMLElement) {
   // Privacy mode: a blurred line's tooltip would show it in full (SPEC section 5).
-  if (node.closest('[data-sensitive]') !== null && document.documentElement.hasAttribute('data-privacy')) node.removeAttribute('title')
+  if ((node.closest('[data-sensitive]') !== null && document.documentElement.hasAttribute('data-privacy')) || node.closest('[data-tooltip]') !== null) node.removeAttribute('title')
   else if (node.scrollWidth > node.clientWidth || node.scrollHeight > node.clientHeight) node.title = node.textContent ?? ''
   else node.removeAttribute('title')
 }

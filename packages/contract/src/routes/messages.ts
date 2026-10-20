@@ -285,6 +285,8 @@ export const TopicDetail = Schema.Struct({
   threadCount: Schema.optionalKey(Schema.Int),
   /** The topic's art as a recipe, as on `TopicRow.art`; the header and the tab draw it at 20 and 16px. Absent means the Tide placeholder. */
   art: Schema.optionalKey(Schema.String),
+  /** A DM, or a thread in one, with a person whose account is deactivated: it can be read, not written to (SPEC 7, "People"). */
+  deactivated: Schema.optionalKey(Schema.Literal(true)),
 })
 export type TopicDetail = typeof TopicDetail.Type
 
@@ -389,7 +391,8 @@ export const messagesLocate = Rpc.make('messages.locate', {
 
 /**
  * A person a Slack profile link names (SPEC 8, "Links"): your DM with them
- * when you have one. `person` is absent when the store does not know them.
+ * when you have one. `person` is absent when the store does not know them,
+ * or they are deactivated and you have no DM with them.
  */
 export const peopleLocate = Rpc.make('people.locate', {
   payload: { user: Schema.String },

@@ -127,6 +127,17 @@ export const MessagesHandlers = MessagesRoutes.toLayer(
             Effect.sync(() => invalidation.subscribeUnsafe(['users', 'conversations', 'usergroups', 'emoji'], () => forgetLookups(cache))),
             (cancel) => Effect.sync(cancel),
           )
+          // An app's or a deactivated person's DM with no Main yet: when that one Main row is written, look again and run
+          // again, so their name starts to open it. Only those rows; the list does not listen to every topic.
+          const watched = new Map<string, () => void>()
+          cache.watchMain = (topicId) => {
+            if (watched.has(topicId)) return
+            watched.set(topicId, invalidation.subscribeUnsafe({ topics: [topicId] }, () => {
+              forgetLookups(cache)
+              Effect.runSync(invalidation.invalidate({ messages: [payload.id] }))
+            }))
+          }
+          yield* Effect.addFinalizer(() => Effect.sync(() => watched.forEach((cancel) => cancel())))
           return Effect.flatMap(resolveStartedThread(payload.id), id => listMessages(targetOf(id)!, range, cache))
         })
         return serveLiveList(runs(keys, setup), { encodeRow: encodeMessage, measure }).pipe(retryFirstRun('messages.list'), Stream.orDie)
@@ -176,10 +187,12 @@ export const MessagesHandlers = MessagesRoutes.toLayer(
           if (open === undefined) return yield* new NotSignedIn()
           return yield* Effect.gen(function* () {
             const sql = yield* StoreReader
-            const users = yield* sql<UserRow>`SELECT id, name, COALESCE(NULLIF(real_name, ''), NULLIF(display_name, '')) AS display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id = ${user} AND deleted = 0`
+            const users = yield* sql<UserRow & { deleted: 0 | 1 }>`SELECT id, name, COALESCE(NULLIF(real_name, ''), NULLIF(display_name, '')) AS display_name, real_name, avatar_url, avatar_small_url, avatar_large_url, deleted FROM users WHERE id = ${user}`
             if (users[0] === undefined) return {}
             const dms = yield* sql<{ id: string }>`SELECT d.id FROM conversations d WHERE d.kind = 'im' AND d.user_id = ${user} AND d.is_member = 1
               AND EXISTS (SELECT 1 FROM topic_index t WHERE t.topic_id = 'm:' || d.id) ORDER BY d.id LIMIT 1`
+            // A deactivated person's DM can still be read; with none, there is nothing to open.
+            if (dms[0] === undefined && users[0].deleted === 1) return {}
             return { person: personFrom(user, users[0]), ...(dms[0] === undefined ? {} : { mainId: mainTopicId(dms[0].id as ChannelId) }) }
           }).pipe(Effect.provide(open.context), Effect.orDie)
         }),
