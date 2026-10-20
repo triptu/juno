@@ -1,11 +1,11 @@
 import * as stylex from '@stylexjs/stylex'
-import type { ReactNode } from 'react'
+import { use, type ReactNode } from 'react'
 import type { BodyBlock, BodyInline, MessageBody as MessageBodyModel } from '@juno/contract'
 import { colors, radii, spacing, text, weights, sizes } from '@juno/tokens/tokens.stylex'
 import { Chip, CodeBlock, Divider, focusRing, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { AttachmentCard, AttachmentFields, AttachmentImage, SharedFileLines, SharedPlace, type FileBlock } from './AttachmentCard'
 import { MessageLink as Link, type LinkInfo } from './MessageLink'
-import { PersonLink } from './personLink'
+import { PersonLink, PersonLinks } from './personLink'
 import { slackDate } from './time'
 
 export interface MessageBodyProps {
@@ -198,7 +198,8 @@ function Inline({ inline, now, hueOf, onChannel, onLink, linkInfo, tabIndex, qui
       return (
         <PersonLink id={inline.unreachable === true ? undefined : inline.id} label={inline.isMe ? 'yourself' : inline.name} part="chip" tabIndex={tabIndex}>
           {inline.isMe ? (
-            <Chip variant="mention" size="inline">
+            // Where it opens your self-DM, its tooltip says so instead.
+            <Chip variant="mention" size="inline" {...(use(PersonLinks) === undefined ? { title: 'Mentions you' } : {})}>
               <bdi>@{inline.name}</bdi>
             </Chip>
           ) : (

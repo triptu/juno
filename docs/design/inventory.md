@@ -340,7 +340,7 @@ Scroll container `[data-scroll]` with contained scroll; inner column max-width 8
 
 - **@person**: weight 600, padding 0 3, radius 4, bg `--hl-soft`, fg default. **@you**: bg `--hl-mention`, fg `--hl-mention-fg` (the accent fill, deeper in light for coral, teal and cyan; 6:1 or better, tokens.md 1.3). In your own bubble: `color-mix(currentColor 16%, transparent)`.
 - **#channel**: same look as @person; clicking scopes the sidebar to that channel (stops propagation).
-- [built 10-20] An @person or @you chip opens your DM with them on click, ⌘-click behind (SPEC 7, "People"): the chip sits in a span that underlines on hover, takes the focus ring and the "Message Maya" tooltip, and is a Tab stop with the row's links. A chip for an app with no DM is drawn as before (`unreachable` on the inline). @you in a message has no "Mentions you" title; its tooltip is "Message yourself".
+- [built 10-20] An @person or @you chip opens your DM with them on click, ⌘-click behind (SPEC 7, "People"): the chip sits in a span that underlines on hover, takes the focus ring and the "Message Maya" tooltip, and is a Tab stop with the row's links. A chip for an app with no DM is drawn as before (`unreachable` on the inline). @you's tooltip is then "Message yourself" in place of its "Mentions you" title.
 - Tokens are matched against known names ("@Maya Chen", "@Maya", "#eng"); longest first.
 
 ### 6.3 Quote block
