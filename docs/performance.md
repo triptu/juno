@@ -51,8 +51,43 @@ Every budget is a p95 over the runs of the scenario in section 8 unless marked p
 | Scheduled sync sweep, large seed, no Slack changes | Fewer than 12,000 SQL statements and less than 1 % of one core averaged over its 60 s window | The limit is one fifth of the 60,388-statement baseline. `idle-cpu.spec.ts` reports the scheduled sweep separately from the replacement idle window. Section 8.12 records the statement trace and the Mac reading. |
 | Memory after the scroll and memory scenario (large workspace, the sidebar's scroll sweeps) | Renderer private 250 MB, JS heap 120 MB; engine private 300 MB; main 80 MB | `app.getAppMetrics()` and `process.getProcessMemoryInfo().private`, which on macOS is the physical footprint; `perf.spec.ts` reads it with `footprint` for main, the renderer and the engine and holds each to these budgets. On 10-18: main 51 to 53 MB, renderer 167 to 227 MB, engine 76 to 94 MB (8.10). Three repetitions of a scenario must not grow the renderer heap by more than 5 %. |
 | Memory after heavy use (large workspace: 20 topics opened, 50 tab switches, 2 minutes of mixed scrolling, the Juno panel opened and closed), read after 30 s idle | Renderer private 300 MB; engine private 300 MB; main 80 MB | `memory after heavy use` (`e2e/perfMemory.ts`). The renderer has 50 MB more here (owner, 10-18): its overage over 250 MB is Chromium's allocators keeping the pages freed after a scrolling peak, which nothing in the app holds; five fixes were tried and none removed it (8.11). On 10-18: main 51 to 63 MB, renderer 265 to 294 MB, engine 113 to 125 MB. |
-| Renderer bundle | Initial JS ≤ 1.1 MB uncompressed (1.0 MB until 10-16, raised once React DOM and Effect alone were about 650 KB of it; warm start and topic open stay the real gates), CSS ≤ 155 KB (150 KB until 10-19, raised for the huddle views: StyleX puts every style in the one initial stylesheet, lazy chunks' too); secondary surfaces are lazy chunks; the default New chat frame and composer stay eager | The built shell ships 1,089.1 KB of JS and 150.7 KB of CSS with huddles (2026-10-19; 1,082.9 KB and 147.6 KB on `origin/main` then: the bar, the header control, the tab and the media service are lazy chunks, and the Chime SDK loads only on join); 1,067.7 KB of JS (361.0 KB gzip) and 145.0 KB of CSS with Home's thought (2026-10-18; 1,063.6 KB and 144.5 KB at `8eeb40f1` before it: the thought's logic and view are 4.1 KB, its list is a lazy chunk); 1,058.5 KB of JS (358.1 KB gzip) and 144.4 KB of CSS, minified, at `627f74b1` (2026-10-18); 1,054.6 KB of JS (356.6 KB gzip) and 143.3 KB of CSS earlier that day, after Home's review sheets became their own chunk and `SheetLayer` left `BackupSheets.tsx`, which had pulled the Backup sheets into the start bundle: 1,092.4 KB before; 990.7 KB on 10-17, 969.3 KB on 10-16, 1,054.6 KB before the 10-17 split). `scripts/check-bundle-size.mjs` runs at the end of `pnpm build` and fails over budget. Measure before adding a dependency. |
+| Renderer bundle | Initial JS ≤ 1.1 MB uncompressed (1.0 MB until 10-16, raised once React DOM and Effect alone were about 650 KB of it; warm start and topic open stay the real gates), CSS ≤ 155 KB (150 KB until 10-19, raised for the huddle views: StyleX puts every style in the one initial stylesheet, lazy chunks' too); secondary surfaces are lazy chunks; the default New chat frame and composer stay eager | The built shell ships 1,067.4 KB of JS (361.2 KB gzip) and 151.6 KB of CSS after the 10-20 startup split (below); 1,089.1 KB of JS and 150.7 KB of CSS with huddles (2026-10-19; 1,082.9 KB and 147.6 KB on `origin/main` then: the bar, the header control, the tab and the media service are lazy chunks, and the Chime SDK loads only on join); 1,067.7 KB of JS (361.0 KB gzip) and 145.0 KB of CSS with Home's thought (2026-10-18; 1,063.6 KB and 144.5 KB at `8eeb40f1` before it: the thought's logic and view are 4.1 KB, its list is a lazy chunk); 1,058.5 KB of JS (358.1 KB gzip) and 144.4 KB of CSS, minified, at `627f74b1` (2026-10-18); 1,054.6 KB of JS (356.6 KB gzip) and 143.3 KB of CSS earlier that day, after Home's review sheets became their own chunk and `SheetLayer` left `BackupSheets.tsx`, which had pulled the Backup sheets into the start bundle: 1,092.4 KB before; 990.7 KB on 10-17, 969.3 KB on 10-16, 1,054.6 KB before the 10-17 split). `scripts/check-bundle-size.mjs` runs at the end of `pnpm build` and fails over budget. Measure before adding a dependency. |
 | Live query message size | Snapshot ≤ 200 KB; any delta ≤ 32 KB; encode and decode ≤ 5 ms each side | From architecture 2.6, criterion 5. Larger means the window or the view model is wrong. |
+
+### Startup bundle headroom (2026-10-20)
+
+`JUNO_COVERAGE=1 pnpm build` against `origin/main` at `05a0bcf76` measured initial JS at **1,097,997 → 1,067,448 bytes** (1,098.0 → 1,067.4 KB; gzip 372.2 → 361.2 KB). The unchanged 1,100,000-byte budget has 32,552 bytes free. CSS stays at 151.6 KB. `scripts/check-bundle-size.mjs` supplies these totals: the scripts and module preloads in the built `index.html`, uncompressed. Hidden source maps do not change those bytes.
+
+Source-map attribution of the minified entry, rounded to KB:
+
+| Package | Before | After |
+| --- | ---: | ---: |
+| React DOM | 211.3 | 211.3 |
+| Effect | 189.7 | 189.7 |
+| Views | 181.6 | 173.7 |
+| Desktop containers | 144.1 | 141.7 |
+| Phosphor icons | 101.5 | 101.5 |
+| UI primitives | 93.9 | 89.2 |
+| State | 71.7 | 71.7 |
+| Agent contract | 33.0 | 17.4 |
+| Contract | 27.6 | 27.6 |
+
+The largest eager app modules were Juno's fixed copy (16.3 KB), Message (12.9 KB), TopicRow (11.9 KB), MessageBody (11.2 KB), Sidebar (10.6 KB) and HomeComposer (10.1 KB). Messages, sidebar rows and Home's composer belong to the first screen and stay eager. Settings, the media viewer, huddles and the Juno UI already had lazy boundaries.
+
+Two changes free the room:
+
+- `shellCopy.ts` holds only the labels Home, topic actions and tab titles need. The rest of `chatCopy` loads with the existing Juno and setup chunks, warmed on idle. Previously a few labels kept the whole object in the entry.
+- `SignedOut.tsx` loads sign-in and its appearance controls together through `chunk()` and `usePreloaded`. It warms on idle after the shell mounts, or immediately when the session is known to be signed out, and shows only once ready. The entry no longer contains AppearanceSettings (3.9 KB), Session (2.4 KB), SignInView (1.8 KB), SignInPage (1.4 KB), SessionView (0.7 KB), Segmented (1.8 KB), Swatch (1.6 KB) or Logo (1.3 KB). The account menu shares Session through its own preloaded chunk.
+
+These module sizes are attribution, not independent removal savings: shared code and generated glue make the build's total reduction the authoritative number. Home and topic frames and composers stay eager.
+
+The focused `pnpm perf` run passed seven of eight scenarios on this Mac (60 Hz, 24.7 ms for a one-frame budget). It ran through the exclusive lock with reported loads of 2.6–4.0. First opens in a relaunched app measured account menu 15.6 ms, topic switcher 6.5 ms, emoji picker 26.9 ms and Settings 16.9 ms (one sample each). Other p95 readings: Home 19.1 ms, Home after idle 27.2 ms, new tab with Home 20.3 ms, palette open 19.0 ms, Juno panel 19.0 ms (first open 20.8 ms), and Activity 18.3 ms. Juno chat send was 24.0 ms, its first reply 156.2 ms, and continuous scroll work 5.0 ms with no long frames. Selection drag work was 4.1 ms with and without the panel, with no long frames.
+
+Warm start missed the 500 ms median gate: 539.3 ms to sidebar rows over five launches, range 510.5–602.1 ms. Shell median was 412.9 ms. A separate unchanged-main check also missed it (520.2 ms median, range 483.9–938.5 ms), but its load rose from 4.5 to 9.1 and it reported contention. An earlier main check had load 9.2 too. Those comparisons do not establish whether startup regressed. No startup speedup is claimed, and the startup check remains red.
+
+The seven selected feel scenarios passed, including launch, relaunch during session checking, Home after idle, account and topic popovers, palette and the Juno tab and panel. The launch filmstrip has its composer from frame 1 and zero Home frames without it. That run started at load 6.7 but later reached 15.9, so it supplies visual and geometry checks, not a timing comparison.
+
+`pnpm affected --spec e2e/session.spec.ts,e2e/layout-shift.spec.ts,e2e/notifications.spec.ts` passed typecheck, lint, 741 unit tests, 201 gallery tests and 90 desktop tests (three platform skips). The remote plan ran once. No new unit tests were added.
 
 ### Startup bundle split (2026-10-16)
 
@@ -93,7 +128,7 @@ A module is placed whole in one chunk. When the start bundle uses any export of 
 
 Each part shown after input uses `usePreloaded` (`containers/chunks.ts`), which says when the chunk has loaded; the caller draws the part only then, so nothing suspends and nothing shows half-drawn.
 
-Left eager: message content (media grid, file cards, attachments, reactions, the hover toolbar on every row), Home and its composer, the sidebar and its icon sets, and the signed-out page with its appearance block.
+Left eager: message content (media grid, file cards, attachments, reactions, the hover toolbar on every row), Home and its composer, and the sidebar and its icon sets.
 
 **Duotone weights.** Every Phosphor icon ships its duotone weight, which only the Juno sparkle draws in the app. `phosphorWeights` now drops it from every icon `packages/ui/src/duotone.ts` does not import: 36.9 KB uncompressed, 3.7 KB gzip, since the duotone paths repeat the other weights. A missed icon would draw nothing, so it cannot be asked for elsewhere: `IconWeight` has no duotone, a duotone icon is a wrapped icon from `duotone.ts` (`SparkleDuotone`, typed `DuotoneIcon`, which `Card`'s `kindIcon` requires), the build reads that file's imports for its list, and `scripts/check-duotone.mjs` (in `pnpm lint`) fails on the weight's name as a string anywhere else and on an icon wrapped there without that import.
 

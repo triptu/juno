@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { Quotes } from '@phosphor-icons/react/dist/icons/Quotes'
 import type { MouseEvent, ReactNode } from 'react'
-import { chatCopy } from '@juno/agent-contract'
+import { junoPanelCopy } from '@juno/agent-contract'
 import { menuKeys } from '@juno/contract/channels'
 import { spacing, z } from '@juno/tokens/tokens.stylex'
 import { Button, SparkleDuotone, Surface, tooltip } from '@juno/ui'
@@ -68,8 +68,8 @@ export function SelectionToolbar({ onQuote, onAskJuno }: SelectionToolbarProps) 
         Quote
       </Button>
       {onAskJuno === undefined ? null : (
-        <Button variant="ghost" size="sm" tone="subtle" iconStart={SparkleDuotone} data-selection-ask-juno="" aria-keyshortcuts="Meta+J" {...tooltip(chatCopy.panel.askJunoTip, menuKeys('juno.toggle'))} {...pressProps(onAskJuno)}>
-          {chatCopy.panel.askJuno}
+        <Button variant="ghost" size="sm" tone="subtle" iconStart={SparkleDuotone} data-selection-ask-juno="" aria-keyshortcuts="Meta+J" {...tooltip(junoPanelCopy.askJunoTip, menuKeys('juno.toggle'))} {...pressProps(onAskJuno)}>
+          {junoPanelCopy.askJuno}
         </Button>
       )}
     </Surface>

@@ -10,12 +10,10 @@
  * SPEC §17 applies: sentence case, verb-first buttons, no emoji.
  */
 import { filesLeftCopy } from './files'
+import { junoAskCopy, junoPageTitles, junoPanelCopy, personFileMissing, listedSources } from './shellCopy'
 
 /** "$2.00", "$0.35". Two decimals, always. */
 const usd = (amount: number): string => `$${amount.toFixed(2)}`
-
-/** "Littlebird", "Littlebird and Notion", "Littlebird, Notion and Drive". */
-const listed = (names: ReadonlyArray<string>): string => (names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`)
 
 const priceUsd = (amount: number) => Number.isInteger(amount) ? `$${amount}` : usd(amount)
 
@@ -40,15 +38,7 @@ export const chatCopy = {
     remove: 'Remove',
   },
   /** A Juno page's tab title, as the Juno menu names it (SPEC 13.10). */
-  pageTitles: {
-    scheduled: 'Scheduled',
-    remembers: 'What Juno remembers',
-    memory: 'Memory of this chat',
-    activity: 'Activity',
-    connections: 'Connections',
-    settings: 'Settings',
-    review: 'Review',
-  },
+  pageTitles: junoPageTitles,
   /** The Juno header's switcher (SPEC 13.10): the chat's row, and the menu's name. */
   switcher: { chat: 'Chat', label: 'Juno pages' },
   /** The Juno panel (SPEC 7, inventory 12.1). */
@@ -61,9 +51,7 @@ export const chatCopy = {
     /** The selection chip's accessible name: "Selection, Maya: the deploy failed…". */
     selectionLabel: (quoted: string) => `Selection, ${quoted}`,
     removeSelection: 'Remove selection',
-    /** The selection toolbar's button beside Quote (SPEC 7, Quoting). */
-    askJuno: 'Ask Juno',
-    askJunoTip: 'Ask Juno about the selection',
+    ...junoPanelCopy,
   },
   list: {
     newMessage: 'New message',
@@ -402,7 +390,7 @@ export const chatCopy = {
       deleteFile: 'Delete file',
       deleteTitle: (name: string) => `Delete what Juno knows about ${name}?`,
       deleteBody: 'Every note in this file goes. Juno won\'t start a file on them again unless you ask.',
-      noFile: (name: string) => `Juno has no file on ${name} yet. It starts one once you message with them, or when you ask.`,
+      noFile: personFileMissing,
     },
   },
   /** Juno's proactive asks (SPEC 13.6), in the chat and as a Home card. */
@@ -410,15 +398,10 @@ export const chatCopy = {
     /** The card's header line. */
     label: 'Juno asks',
     learn: {
-      title: { setup: 'Let Juno learn how you work', connection: (name: string) => `Let Juno learn from ${name}` },
+      ...junoAskCopy.learn,
       body: (sources: ReadonlyArray<string>) =>
-        `Juno reads ${listed(['your own Slack messages', ...sources])}. It keeps short notes about your work, the people you work with, your projects and how you write. You can edit or delete them in What Juno remembers.`,
+        `Juno reads ${listedSources(['your own Slack messages', ...sources])}. It keeps short notes about your work, the people you work with, your projects and how you write. You can edit or delete them in What Juno remembers.`,
       bodyConnection: (name: string) => `Juno reads ${name} and adds what it learns about you to its notes. You can edit or delete them in What Juno remembers.`,
-      /** Home's meta line. */
-      meta: (sources: ReadonlyArray<string>) => `Reads ${listed(['your Slack messages', ...sources])}`,
-      metaConnection: (name: string) => `Reads ${name}`,
-      start: 'Start',
-      notNow: 'Not now',
       stop: 'Stop',
       tryAgain: 'Try again',
       open: 'Open',
@@ -428,7 +411,6 @@ export const chatCopy = {
       /** After a line for a pass that ended early: " · Kept 4 notes". */
       kept: (written: number) => (written === 0 ? '' : ` · Kept ${written === 1 ? '1 note' : `${written} notes`}`),
       dismissed: 'Dismissed',
-      started: 'Juno is learning how you work',
     },
   },
   pages: {

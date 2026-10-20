@@ -3,7 +3,7 @@ import { viewsSortChannel, type HomeItem } from '@juno/contract'
 import { closeWelcome, fillHome, fillThought, freezeHome, homeGreeting, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, markMovesSeen, markMovesShown, peekKeyAtom, prepareThought, registry, resolveAllTopics, runAction, showHome, showToast, syncProgressAtom, welcomeAtom, type Welcome } from '@juno/state'
 import { homeAsksAtom, junoPageActions } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
-import { chatCopy } from '@juno/agent-contract'
+import { junoAskCopy } from '@juno/agent-contract'
 import { Home, HomeSyncLine, WelcomeCard, type ActivateEvent } from '@juno/views'
 import { chunk, usePreloaded } from './chunks'
 import { HomeComposer } from './HomeComposer'
@@ -97,7 +97,7 @@ function itemActions(key: string, items: ReadonlyArray<HomeItem>, setReviewing: 
     if (answer === 'open') return openJuno()
     markHomeItemUsed(registry, key, itemId)
     void pageActions.answerAsk(id, answer).then((outcome) => {
-      if (answer === 'start' && outcome === 'ok') showToast(registry, { text: chatCopy.ask.learn.started })
+      if (answer === 'start' && outcome === 'ok') showToast(registry, { text: junoAskCopy.learn.started })
     })
   }
   return { markDone, resolveAll, review, dismiss, sort, itemMenu, ask }

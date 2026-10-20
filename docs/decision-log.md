@@ -4,6 +4,8 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-20 12:46 · start-bundle-sign-in · Load sign-in and its appearance controls as a chunk, warmed on idle after the shell paints and loaded immediately when a signed-out session is known. Show the whole page once ready, without a Suspense fallback delay; signed-in Home and topic frames stay eager.
+- 10-20 12:45 · start-bundle-copy · Keep the copy Home, topic actions and tab titles use in a separate module, so their imports do not keep every Juno page's copy in the startup bundle. Juno's existing idle preload loads the remaining copy with its UI.
 - 10-20 12:39 · Tushar · Use the alert decision for the dock dot, with unread DMs and group DMs that count in All also qualifying. Share the sidebar exclusions; a mention can qualify in a kept-out conversation. Apply sender and conversation levels equally to badges and alerts.
 - 10-20 12:39 · Engine · Cache per-message notification attention during the existing unread-body parse, then query badge existence through indexes. Compile notification decisions through the domain rule and cache settings between preference changes, so SQL does not duplicate alert precedence or return all unread messages.
 - 10-20 12:39 · Tushar · Ask macOS for notifications once on the first Home or topic view after setup, and persist the attempt before requesting. Existing installs follow the same rule. Development asks only through Settings.
