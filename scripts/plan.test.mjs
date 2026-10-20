@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { lanes, parsePlan, sideBySide } from './plan.mjs'
+import { planOutcomes } from './verify-plan.mjs'
 
 test('a plan splits on + and reads KEY=VALUE before each script', () => {
   const steps = parsePlan(['test', '--passWithNoTests', 'a.test.ts', '+', 'GALLERY_SHIFT_ONLY=Chip,Tab', 'test:gallery', '+', 'test:desktop', 'e2e/topic.spec.ts', 'X=1'])
@@ -81,4 +82,27 @@ setTimeout(()=>{console.log('plan: step 0 '+(kind==='app'?'test:gallery':'test')
     assert.ok(logs.includes('plan: step 1 test:gallery exited with 0 after 1 s'))
     assert.ok(logs.includes('plan: step 2 test:desktop exited with 255 (job did not finish this step)'))
   } finally { rmSync(dir, { recursive: true, force: true }) }
+})
+
+const suites = [{ name: 'test:gallery' }, { name: 'test:desktop' }]
+const passed = ['plan: step 0 test:gallery exited with 0 after 12 s', 'plan: step 1 test:desktop exited with 0 after 23 s']
+const planned = { code: 0, seconds: 30, log: 'plan.log' }
+
+test('split steps retain their times and a failing step fails the full run', () => {
+  assert.deepEqual(planOutcomes(passed, suites, planned).map((result) => result.seconds), [12, 23])
+  const results = planOutcomes([passed[0], passed[1].replace('with 0', 'with 7')], suites, { ...planned, code: 7 })
+  assert.equal(results.every((result) => result.code === 0), false)
+  assert.equal(results[1].code, 7)
+})
+
+test('missing results and a result for the wrong script cannot pass', () => {
+  for (const lines of [[passed[0]], [passed[0], passed[1].replace('test:desktop', 'test:gallery')]]) {
+    assert.equal(planOutcomes(lines, suites, planned)[1].code, 1)
+  }
+})
+
+test('a report download or coordinator failure after successful steps fails the full run', () => {
+  const results = planOutcomes(passed, suites, { ...planned, code: 255 })
+  assert.equal(results.every((result) => result.code === 0), false)
+  assert.deepEqual(results[2], { ...planned, suite: 'plan', code: 255 })
 })

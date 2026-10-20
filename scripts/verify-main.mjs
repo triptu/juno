@@ -30,6 +30,7 @@ import { fileURLToPath } from 'node:url'
 import { writeRecord } from './verify-records.mjs'
 import { statusFolder } from './release-gate.mjs'
 import { testResults } from './test-results-reporter.mjs'
+import { planOutcomes } from './verify-plan.mjs'
 import { scratchFolder } from './worktree-folder.mjs'
 import { formatMap, MAP_PATH, mergePartials } from './coverage-map.mjs'
 
@@ -86,12 +87,14 @@ function splitPlan(planned) {
   let text = ''
   try { text = readFileSync(planned.log, 'utf8') } catch { /* The run left no log. */ }
   const lines = text.split('\n').map((line) => line.replace(/^\[runner:[^\]]+\] /, ''))
-  return suites.map((suite, index) => {
+  const outcomes = planOutcomes(lines, suites, planned)
+  return outcomes.map((outcome) => {
+    if (outcome.suite === 'plan') return outcome
+    const suite = suites.find((suite) => suite.name === outcome.suite)
     const prefix = `[${suite.name}] `
     const log = join(logDir, `${suite.name.replace(/[^\w-]/g, '_')}.log`)
     writeFileSync(log, lines.filter((line) => line.startsWith(prefix) || !line.startsWith('[')).map((line) => line.startsWith(prefix) ? line.slice(prefix.length) : line).join('\n'))
-    const result = lines.map((line) => new RegExp(`^plan: step ${index} \\S+ exited with (\\d+) after (\\d+) s`).exec(line)).find(Boolean)
-    return { suite: suite.name, code: result ? Number(result[1]) : planned.code || 1, seconds: result ? Number(result[2]) : planned.seconds, log }
+    return { ...outcome, log }
   })
 }
 
