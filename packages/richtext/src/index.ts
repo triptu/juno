@@ -5,6 +5,8 @@ export { UNKNOWN_PERSON } from './inline'
 export { unescapeMrkdwn } from './from-mrkdwn'
 export { bodyFromMrkdwn, messageBody, plainText, previewLine, previewText, readableText, type MessageContent } from './body'
 
+export { bodyFromMarkdown } from './from-markdown'
+
 export { composeOutgoing } from './outgoing'
 export { composeEdit } from './edit-outgoing'
 export { editMarkup } from './edit-markup'

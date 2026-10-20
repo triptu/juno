@@ -7,6 +7,7 @@
 import { bodyFromMrkdwn, messageBody, previewText, readableText, type Lookups, type MessageContent } from '@juno/richtext'
 import type { Attachment, File } from '@juno/slack-schema'
 import { firstName, type ConversationKind } from './channel'
+import { fileLabelKind } from './files'
 
 /** A message as the preview reads it. */
 export interface PreviewMessage extends MessageContent {
@@ -43,7 +44,7 @@ export function messagePreviewText(message: PreviewMessage, lookups: Lookups = {
  * "Snippet: name", "Canvas: name", "File: report.pdf", or "3 files" for a mix.
  */
 export function filesLabel(files: ReadonlyArray<File>): string {
-  const kinds = files.map(fileKind)
+  const kinds = files.map(fileLabelKind)
   const first = kinds[0]
   if (first === undefined) return ''
   const same = kinds.every((kind) => kind === first)
@@ -70,20 +71,6 @@ export function filesLabel(files: ReadonlyArray<File>): string {
     case 'file':
       return name === '' ? 'File' : `File: ${name}`
   }
-}
-
-type FileKind = 'image' | 'video' | 'voice' | 'snippet' | 'canvas' | 'deleted' | 'file'
-
-function fileKind(file: File): FileKind {
-  if (file.mode === 'tombstone' || file.file_access === 'file_not_found') return 'deleted'
-  if (file.subtype === 'slack_audio') return 'voice'
-  if (file.subtype === 'slack_video') return 'video'
-  if (file.mode === 'snippet') return 'snippet'
-  if (file.filetype === 'quip' || file.filetype === 'canvas') return 'canvas'
-  const mimetype = file.mimetype ?? ''
-  if (mimetype.startsWith('image/')) return 'image'
-  if (mimetype.startsWith('video/')) return 'video'
-  return 'file'
 }
 
 /**
