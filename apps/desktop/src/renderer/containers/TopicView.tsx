@@ -11,7 +11,7 @@ import { scopeToChannel, showChannelMenu } from './placeMenus'
 import { messageLinkInfo, openMessageLink, openPerson } from './slackLinks'
 import { attach } from './attachments'
 import { TopicComposer } from './TopicComposer'
-import { downloadMessageFile, useTopicFiles } from './topic/files'
+import { downloadMessageFile, quickLookMessageFile, useTopicFiles } from './topic/files'
 import { useTopicHeader } from './topic/header'
 import { useOlderPages } from './topic/older'
 import { listStatus, markRead, useDivider, useMarkRead, useTopicFetch, useWindowFocused, windowShown } from './topic/opening'
@@ -155,6 +155,9 @@ function rowActions(list: MessageWindow, messageActions: MessageActionsOutput, o
   }
 }
 
+/** Download and Quick Look on a file card, one object for the app's life (performance 5.1). */
+const FILE_ACTIONS = { onDownload: downloadMessageFile, onQuickLook: quickLookMessageFile } as const
+
 function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps) {
   const list = useAtomValue(messageListAtom(view))
   useReactionFailureToast(list)
@@ -211,7 +214,7 @@ function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps)
       onPerson={openPersonDm}
       onLink={openMessageLink}
       linkInfo={messageLinkInfo}
-      onDownload={downloadMessageFile}
+      {...FILE_ACTIONS}
       {...(files.uploadProgress === undefined ? {} : { uploadProgress: files.uploadProgress })}
       {...(readOnly ? {} : rowActions(list, messageActions, files.setViewing))}
     />

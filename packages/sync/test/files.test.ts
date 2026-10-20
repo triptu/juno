@@ -27,3 +27,13 @@ describe('files Slack has not finished processing', () => {
     expect(JSON.parse(keepFuller(json([processed]), json([laterWithoutThumbs]))!)).toEqual([processed])
   })
 })
+
+describe('a voice clip', () => {
+  // Slack serves a clip recorded in Slack as `video/mp4` with no poster; it is audio, so nothing is missing.
+  const clip = { id: 'F2', name: 'audio_message.mp4', title: 'Audio clip', mimetype: 'video/mp4', filetype: 'mp4', subtype: 'slack_audio', mode: 'hosted', aac: 'https://files.example/F2.aac', url_private: 'https://files.example/F2' }
+
+  it('is ready without a poster, and is not asked about again', () => {
+    expect(isReady(clip)).toBe(true)
+    expect(filesToFetch(json([clip]))).toEqual([])
+  })
+})

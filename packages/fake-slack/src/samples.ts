@@ -48,12 +48,22 @@ function escapePdf(text: string): string {
 
 /** A one-page PDF with a title and a few lines of text, cross-reference table included. */
 export function samplePdf(title: string, lines: ReadonlyArray<string>): Buffer {
-  const text = [`BT /F1 20 Tf 72 720 Td (${escapePdf(title)}) Tj ET`, ...lines.map((line, i) => `BT /F1 12 Tf 72 ${684 - i * 18} Td (${escapePdf(line)}) Tj ET`)].join('\n')
+  return samplePdfPages([{ title, lines }])
+}
+
+/** A PDF with one page per entry, each with a title and lines of text. */
+export function samplePdfPages(pages: ReadonlyArray<{ readonly title: string; readonly lines: ReadonlyArray<string> }>): Buffer {
+  const font = 3 + pages.length * 2
   const objects = [
     '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
-    `<< /Length ${Buffer.byteLength(text, 'latin1')} >>\nstream\n${text}\nendstream`,
+    `<< /Type /Pages /Kids [${pages.map((_, i) => `${3 + i * 2} 0 R`).join(' ')}] /Count ${pages.length} >>`,
+    ...pages.flatMap(({ title, lines }, i) => {
+      const text = [`BT /F1 20 Tf 72 720 Td (${escapePdf(title)}) Tj ET`, ...lines.map((line, n) => `BT /F1 12 Tf 72 ${684 - n * 18} Td (${escapePdf(line)}) Tj ET`)].join('\n')
+      return [
+        `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${font} 0 R >> >> /Contents ${4 + i * 2} 0 R >>`,
+        `<< /Length ${Buffer.byteLength(text, 'latin1')} >>\nstream\n${text}\nendstream`,
+      ]
+    }),
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
   ]
   let out = '%PDF-1.4\n'

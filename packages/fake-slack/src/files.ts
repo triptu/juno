@@ -27,6 +27,11 @@ const TYPES: Readonly<Record<string, FileType>> = {
   json: { mimetype: 'application/json', filetype: 'json', pretty: 'JSON' },
   zip: { mimetype: 'application/zip', filetype: 'zip', pretty: 'Zip' },
   mp4: { mimetype: 'video/mp4', filetype: 'mp4', pretty: 'Video' },
+  html: { mimetype: 'text/html', filetype: 'html', pretty: 'HTML' },
+  log: { mimetype: 'text/plain', filetype: 'text', pretty: 'Plain Text' },
+  wav: { mimetype: 'audio/wav', filetype: 'wav', pretty: 'WAV' },
+  mp3: { mimetype: 'audio/mpeg', filetype: 'mp3', pretty: 'MP3' },
+  m4a: { mimetype: 'audio/mp4', filetype: 'm4a', pretty: 'M4A' },
 }
 
 const BINARY: FileType = { mimetype: 'application/octet-stream', filetype: 'binary', pretty: 'Binary' }
@@ -157,6 +162,9 @@ export function fileObject(baseUrl: string, stored: StoredFile, isPublic = false
     ...(stored.poster === undefined || held ? {} : { thumb_video: `${url}?thumb=video`, thumb_video_w: stored.poster.width, thumb_video_h: stored.poster.height, mp4: url }),
     ...(stored.mimetype.startsWith('video/') ? { hls: `${url}?hls=1`, duration_ms: 12000 } : {}),
     ...(stored.mimetype === 'text/markdown' ? { preview: 'A short invented project note.', lines: 1 } : {}),
+    // A voice clip: the transcoded copy the player reads, as live (research section 3, "Files on a message"); the fake serves the same bytes.
+    ...(stored.extra?.subtype === 'slack_audio' ? { aac: `${url}?aac=1` } : {}),
+    ...stored.extra,
   }
 }
 

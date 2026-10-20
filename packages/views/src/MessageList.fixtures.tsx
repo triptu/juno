@@ -26,7 +26,7 @@ import {
   p,
   withFiles,
 } from './fixtures/messages'
-import { albumOf, mediaAndPdf, mixedMedia, singleImage, singleVideo } from './fixtures/media'
+import { albumOf, mediaAndPdf, mixedMedia, singleAudio, singleImage, singleVideo, withDocuments } from './fixtures/media'
 import { NOW, people } from './fixtures/topics'
 import { noopActions } from './fixtures/actions'
 import { sevenQuickReactions } from './fixtures/quickReactions'
@@ -220,6 +220,10 @@ export default defineFixtures(
       'grid-6': state({ items: albumOf(6), main: false, onOpenMedia: noop }),
       // The pictures make the grid where the first is; the PDF keeps its card.
       'grid-and-pdf': state({ items: mediaAndPdf, main: false, onOpenMedia: noop, onDownload: noop }),
+      // Cards the viewer opens, each with Download, and a zip with Quick Look.
+      documents: state({ items: withDocuments, main: false, onOpenMedia: noop, onDownload: noop, onQuickLook: noop }),
+      // A lone audio file: a player in its card.
+      audio: state({ items: singleAudio, main: false, onOpenMedia: noop, onDownload: noop }),
       'focus-tile': state({ items: albumOf(6), main: false, onOpenMedia: noop }, { focus: '[data-thumbnail]' }),
     },
     Send: {

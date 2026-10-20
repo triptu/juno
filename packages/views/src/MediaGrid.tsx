@@ -21,8 +21,15 @@ export type MediaFile = FileView & { readonly thumb: FileThumb }
 
 export const isMedia = (file: FileView): file is MediaFile => file.thumb !== undefined && (file.kind === 'image' || file.kind === 'video')
 
-/** A message's images and videos, in Slack's order: what its grid and the viewer's filmstrip show. */
+/** A message's images and videos, in Slack's order: what its grid shows. */
 export const mediaOf = (files: ReadonlyArray<FileView>): ReadonlyArray<MediaFile> => files.filter(isMedia)
+
+/** A file the viewer shows other than as a picture: audio it plays, a PDF, HTML or text file it reads (SPEC section 8, "Other files"). */
+export const isDocument = (file: FileView): boolean =>
+  file.kind === 'audio' ? file.audio !== undefined : (file.kind === 'pdf' || file.kind === 'html' || file.kind === 'text') && file.content !== undefined
+
+/** Every file of a message the viewer can show, in Slack's order: what its filmstrip and arrows move through. */
+export const viewableOf = (files: ReadonlyArray<FileView>): ReadonlyArray<FileView> => files.filter((file) => isMedia(file) || isDocument(file))
 export interface MediaGridProps {
   readonly media: ReadonlyArray<MediaFile>
   readonly onOpen: ((file: FileView) => void) | undefined

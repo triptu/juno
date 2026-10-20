@@ -61,6 +61,8 @@ export interface StoredFile {
   thumbsHeld?: boolean
   /** A video's poster frame, a PNG, served at `?thumb=video`. */
   poster?: { readonly bytes: Buffer; readonly width: number; readonly height: number }
+  /** Fields Slack sends for this kind of file on top of the common ones: a snippet's `mode` and `preview`, a clip's `subtype` and `duration_ms` (`injectFiles`). */
+  extra?: Partial<File>
 }
 
 export interface PostInput {

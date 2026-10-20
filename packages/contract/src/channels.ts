@@ -87,6 +87,8 @@ export const Channels = {
   shellDownloadFile: 'shell.downloadFile',
   /** Saves a Slack file into a temporary folder on the Slack session and opens it in the default app. */
   shellOpenFile: 'shell.openFile',
+  /** Saves a Slack file into a temporary folder on the Slack session and shows it in Quick Look. */
+  filesQuickLook: 'files.quickLook',
   /** Puts the image behind a `juno://files` or `juno://uploads` url on the clipboard. */
   clipboardWriteImage: 'clipboard.writeImage',
   /** Puts text on the clipboard. */
@@ -294,6 +296,10 @@ export interface JunoBridge {
     readonly downloadFile: (file: { readonly url: string; readonly name: string }) => Promise<unknown>
     /** Only Slack file urls open; main answers `saved` once the default app was asked to open it, or `failed`. */
     readonly openFile: (file: { readonly url: string; readonly name: string }) => Promise<unknown>
+  }
+  readonly files: {
+    /** Only Slack file urls; main answers `saved` once the preview window was asked to show it, or `failed`. */
+    readonly quickLook: (file: { readonly url: string; readonly name: string }) => Promise<unknown>
   }
   readonly clipboard: {
     readonly writeText: (text: string) => Promise<unknown>

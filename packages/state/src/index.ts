@@ -283,6 +283,8 @@ export {
   settleLocal,
   downloadFile,
   openFile,
+  quickLookFile,
+  readFileText,
   copyImage,
   readyFiles,
   sendableFiles,

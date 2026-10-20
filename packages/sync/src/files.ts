@@ -45,12 +45,14 @@ const mediaKind = (file: FileJson): 'image' | 'video' | undefined => {
   return kind === 'image' || kind === 'video' ? kind : undefined
 }
 
-/** The type fields of a stored file, as strings or nothing. */
+/** The fields of a stored file its kind is read from, as strings or nothing: a voice clip's `subtype` and a snippet's `mode` say more than its type. */
 const typed = (file: FileJson): TypedFile => ({
   mimetype: str(file['mimetype']),
   filetype: str(file['filetype']),
   name: str(file['name']),
   title: str(file['title']),
+  subtype: str(file['subtype']),
+  mode: str(file['mode']),
 })
 
 const str = (value: unknown): string | undefined => (typeof value === 'string' ? value : undefined)

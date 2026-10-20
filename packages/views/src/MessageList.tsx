@@ -97,10 +97,12 @@ export interface MessageListProps {
   readonly onRetry?: (clientMsgId: string) => void
   /** Delete draft on a failed send. */
   readonly onDiscard?: (clientMsgId: string) => void
-  /** An image or video was opened: the media viewer. Created once, like every row callback. */
+  /** A file the viewer shows was opened: the media viewer. Created once, like every row callback. */
   readonly onOpenMedia?: (viewing: MediaViewing) => void
   /** Download on a file card. Created once. */
   readonly onDownload?: (file: FileView) => void
+  /** Quick Look on a card of a file the viewer cannot show. Created once. */
+  readonly onQuickLook?: (file: FileView) => void
   /** Upload progress of the messages being sent with files, by `clientMsgId`, 0 to 1. */
   readonly uploadProgress?: Readonly<Record<string, number>>
   /** Right-click or the context-menu key on a message: its menu, at the pointer. `onSender` on the sender's name or avatar (the person menu). */
@@ -247,6 +249,7 @@ export function MessageList({
   onDiscard,
   onOpenMedia,
   onDownload,
+  onQuickLook,
   uploadProgress,
   onMessageMenu,
   onPersonMenu,
@@ -338,6 +341,7 @@ export function MessageList({
                 onDiscard={onDiscard}
                 onOpenMedia={onOpenMedia}
                 onDownload={onDownload}
+                onQuickLook={onQuickLook}
                 progress={item.message.clientMsgId === undefined ? undefined : uploadProgress?.[item.message.clientMsgId]}
                 onFocus={setFocusedTs}
               />

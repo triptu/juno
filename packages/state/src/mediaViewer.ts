@@ -7,12 +7,9 @@
 import * as Atom from 'effect/reactivity/Atom'
 import type { FileView } from '@juno/contract'
 
-/** An image or video with a thumbnail, as the viewer shows it. */
-type ViewerFile = FileView & { readonly thumb: NonNullable<FileView['thumb']> }
-
-/** A message's images and videos open in the viewer. */
+/** A message's files open in the viewer: its pictures, and audio, PDF, HTML and text files. */
 interface OpenViewer {
-  readonly items: ReadonlyArray<ViewerFile>
+  readonly items: ReadonlyArray<FileView>
   /** The item shown. */
   readonly index: number
   /** The message's sender, as the message shows it. */

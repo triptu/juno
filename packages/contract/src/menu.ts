@@ -29,6 +29,8 @@ export type MenuCommand =
   | 'palette.toggle'
   | 'edit.undo'
   | 'settings.open'
+  /** Esc, from main, which sees every key: a key pressed in a frame (the media viewer's PDF or HTML file) never reaches the page. No menu item. */
+  | 'frame.escape'
   /** Help › Show the Tour. No shortcut. */
   | 'tour.show'
   /** Huddle › Show Huddle: the huddle tab, focused or opened. */
