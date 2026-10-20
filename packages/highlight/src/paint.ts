@@ -38,9 +38,8 @@ export function paintCode(element: HTMLElement, code: HighlightedCode): () => vo
     starts.push(length)
     length += (node as Text).data.length
   }
-  let total = 0
-  for (const token of code.tokens) total += token.text.length
-  if (total !== length) return nothing
+  // The element must still show the text the tokens were worked out for.
+  if (nodes.map((node) => node.data).join('') !== code.tokens.map((token) => token.text).join('')) return nothing
 
   // The text node holding character `at`, from the one before it.
   let index = 0
