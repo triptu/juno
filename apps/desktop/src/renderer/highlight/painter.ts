@@ -1,7 +1,9 @@
 /**
- * The lazy half of the code highlighter: the worker client, the colours
- * kept for recent blocks, and the step that puts them on the page. Loaded
- * with the first code block near the screen (`codeHighlighter.ts`).
+ * The lazy half of the code highlighter: the wait for a block to come near
+ * the screen, the worker client, the colours kept for recent blocks, and
+ * the step that puts them on the page. Loaded with the first code block
+ * that mounts (`codeHighlighter.ts`); the worker starts with the first one
+ * near the screen.
  *
  * The worker gets one block at a time. Blocks wait in a bounded queue; a
  * block that unmounts leaves it, so nothing holds a detached element. A
@@ -50,6 +52,33 @@ let failures = 0
 let next = 0
 
 const nothing = () => {}
+
+/** Blocks start colouring this far before they scroll into view. */
+const NEAR = '200px 0px'
+
+let observer: IntersectionObserver | undefined
+const watched = new Map<Element, () => void>()
+
+/** Calls `near` once when `element` comes within `NEAR` of the screen. Returns a function that stops waiting. */
+function whenNearScreen(element: Element, near: () => void): () => void {
+  observer ??= new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue
+        const call = watched.get(entry.target)
+        watched.delete(entry.target)
+        observer?.unobserve(entry.target)
+        call?.()
+      }
+    },
+    { rootMargin: NEAR },
+  )
+  watched.set(element, near)
+  observer.observe(element)
+  return () => {
+    if (watched.delete(element)) observer?.unobserve(element)
+  }
+}
 
 function remember(key: string, value: HighlightedCode | null) {
   known.delete(key)
@@ -125,19 +154,26 @@ function request(code: string, language: string | undefined, done: Done): () => 
 }
 
 /**
- * Colours a block that is near the screen: at once when its colours are
- * known, else when the worker answers. Returns a function that takes the
- * colours off or stops waiting.
+ * Colours a block once it is near the screen, even one whose colours are
+ * known, so a topic that opens again does not paint its blocks off screen:
+ * at once when the colours are known, else when the worker answers.
+ * Returns a function that takes the colours off or stops waiting.
  */
 export function paint(element: HTMLElement, code: string, language: string | undefined): () => void {
-  const value = known.get(keyOf(code, language))
-  if (value !== undefined) return value === null ? nothing : paintCode(element, value)
+  if (language === 'plaintext') return nothing
   let stop = nothing
-  const cancel = request(code, language, (result) => {
-    if (result !== undefined) stop = paintCode(element, result)
+  const unwatch = whenNearScreen(element, () => {
+    const value = known.get(keyOf(code, language))
+    if (value !== undefined) {
+      if (value !== null) stop = paintCode(element, value)
+      return
+    }
+    stop = request(code, language, (result) => {
+      if (result !== undefined) stop = paintCode(element, result)
+    })
   })
   return () => {
-    cancel()
+    unwatch()
     stop()
   }
 }
