@@ -48,10 +48,10 @@ export async function openState(page: Page, route: Route, theme: Theme = 'light'
   // Wait for code, not data: loading and pending-image fixtures intentionally never settle. Some chunks start in an idle
   // callback with a 5 s deadline (the destination lists), so on a busy machine the load begins only then.
   await expect(page.locator('[data-chunk-pending]')).toHaveCount(0, { timeout: 15_000 })
-  await page.evaluate(() => document.fonts.ready)
   // Let the frame's images load or fail: a failed unfurl image removes its box (AttachmentCard), and on a busy machine
   // the error can land after the state looks drawn. The held Avatar photo and lazy images out of view are not waited for.
   await page.evaluate(async (frameName) => {
+    await document.fonts.ready
     const frame = document.querySelector(`[data-fixture-frame="${frameName}"]`)
     const inView = (img: HTMLImageElement) => {
       const box = img.getBoundingClientRect()
@@ -67,12 +67,14 @@ export async function openState(page: Page, route: Route, theme: Theme = 'light'
     await Promise.race([Promise.all(settled), new Promise((resolve) => setTimeout(resolve, 10_000))])
     // Two frames, so React has drawn what the load or error changed.
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
-  }, route.route)
-  await page.waitForFunction(() => !document.documentElement.hasAttribute('data-theme-switching'))
-  // Let entrances (toasts, popovers) finish. An endless animation (a spinner) never does, so it is not waited for;
-  // the cap is for a finite one that runs long.
-  await page.evaluate(() =>
-    Promise.race([
+    // Usually already applied. Keep the check beside readiness, avoiding another driver round trip.
+    const deadline = performance.now() + 15_000
+    while (document.documentElement.hasAttribute('data-theme-switching')) {
+      if (performance.now() >= deadline) throw new Error('Gallery theme did not settle within 15 s')
+      await new Promise((resolve) => requestAnimationFrame(resolve))
+    }
+    // Let entrances finish, with the same cap for long finite motion. Endless spinners are not waited for.
+    await Promise.race([
       Promise.all(
         document
           .getAnimations()
@@ -80,8 +82,8 @@ export async function openState(page: Page, route: Route, theme: Theme = 'light'
           .map((animation) => animation.finished.catch(() => {})),
       ),
       new Promise((resolve) => setTimeout(resolve, 600)),
-    ]),
-  )
+    ])
+  }, route.route)
 }
 
 /**

@@ -1,0 +1,1 @@
+- 10-20 14:57 · split-gallery-job · Run gallery and desktop in separate allocator jobs within Juno's existing lent cores, keeping unit and specs jobs and original step results. Split plans wait up to one hour by default so desktop can wait for unit to release capacity; explicit wait settings still win. Why: serial app suites put both full browser walks on the critical path.

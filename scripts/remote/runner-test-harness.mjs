@@ -28,7 +28,7 @@ else if(sub==='build') {
   if(process.env.TEST_MODE==='hang') return;
   if(process.env.TEST_MODE==='lost') process.exit(0);
   if(command.includes('test:plan')) {
-   const scripts=command.includes('specs:conformance')?['specs:conformance']:command.includes('test:gallery')?['test:gallery','test:desktop']:command.includes('test:desktop')?['test:desktop']:['test'];
+   const scripts=command.includes('specs:conformance')?['specs:conformance']:command.includes('test:gallery')?['test:gallery']:command.includes('test:desktop')?['test:desktop']:['test'];
    scripts.forEach((s,i)=>console.log('plan: step '+i+' '+s+' exited with 0 after 1 s'));
   }
   const code=Number(process.env.TEST_CODE||0);

@@ -32,7 +32,7 @@ pnpm remote test --passWithNoTests test/messages.test.ts
 pnpm remote test:plan test --passWithNoTests test/messages.test.ts + test:desktop e2e/app.spec.ts
 ```
 
-Every job waits up to 60 seconds for capacity. `--wait <seconds>` or
+Standalone jobs wait up to 60 seconds for capacity; split plans default to one hour so queued jobs can wait for capacity released by their siblings. `--wait <seconds>` or
 `JUNO_RUNNER_WAIT` changes the wait, including for each job in a split plan.
 An unreachable or full runner fails with a message explaining that `--local`
 runs the steps on this Mac through the heavy lock. There is no automatic local
@@ -61,11 +61,12 @@ Workers use tstack's actual `RUNNER_THREADS`, exposed in Juno's log as
 `remote: allocated threads=N`, rather than assuming two threads per core.
 At four allocated threads, wide units use four Vitest workers in each of two
 packages, standalone desktop uses three workers (two in sequential app plans),
-and gallery uses three workers. Quint uses one simulation per two threads and
+and gallery uses four workers. Quint uses one simulation per two threads and
 one Apalache checker per four, at least one each. Explicit worker settings win.
 
-`test:plan` groups unit, app and specs steps into separate jobs. Conformance
-belongs to specs. App steps run in order and reuse app builds. Each job has
+`test:plan` groups unit, gallery, desktop and specs steps into separate jobs.
+Conformance belongs to specs. Gallery and desktop overlap within the existing
+lent allocation and restore their own verified persistent builds. Each job has
 its own workspace, install, results and independently released core set.
 `JUNO_RUNNER_PLAN=single` keeps one job; `JUNO_PLAN_SERIAL=1` also runs its steps
 in order. `--cores` and `--wait` apply to each job. `--shards n` is an explicit
