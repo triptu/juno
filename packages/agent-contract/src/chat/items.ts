@@ -17,7 +17,7 @@ import { OwnerFile } from './files'
 import { BubbleId, CardId, ChatMessageId, OpId, RunId, ScheduleId } from './ids'
 import { About, JobRef } from './place'
 
-/** Exactly one emoji, any emoji. A reaction is content, so it shows as the emoji itself. */
+/** Exactly one Unicode emoji, including joined and skin-tone sequences. */
 export const isEmoji = (text: string): boolean => {
   const graphemes = [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text)]
   return graphemes.length === 1 && /\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20E3/u.test(text)
@@ -33,7 +33,9 @@ export const THUMBS_UP = '👍'
  * per item. A reaction is never a click: it approves nothing and pins
  * nothing.
  */
-export const Reaction = Schema.Struct({ by: Schema.Literals(['owner', 'juno']), emoji: Emoji })
+const WorkspaceEmojiName = Schema.String.check(Schema.makeFilter((name: string) => /^[\p{Ll}\p{Lm}\p{Lo}\p{M}\p{N}_+-]+$/u.test(name) || 'a workspace emoji name', { title: 'Workspace emoji name' }))
+
+export const Reaction = Schema.Struct({ by: Schema.Literals(['owner', 'juno']), emoji: Schema.Union([Emoji, WorkspaceEmojiName]) })
 export type Reaction = typeof Reaction.Type
 
 /** What a reply points at. The owner replies to a Juno bubble or card; Juno replies to an owner message. */

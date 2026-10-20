@@ -1,0 +1,1 @@
+- 10-20 14:40 · Tushar · Emoji pickers show standard emoji immediately despite delayed or failed workspace data. Locally known recent names have visible cells immediately; their images fill those cells, and Workspace arrives last.

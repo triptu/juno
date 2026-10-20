@@ -1,0 +1,1 @@
+- 10-20 12:49 · Tushar · Omit workspace entries without a URL when building the data. A failed image download keeps its cell and shows its shortcode in the same box; later cells never shift under the pointer.

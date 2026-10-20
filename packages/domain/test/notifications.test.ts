@@ -186,7 +186,7 @@ describe('calendar notification starts', () => {
 })
 
 describe('incoming huddle', () => {
-  const huddle = (channelId: string, startedBy: string, when: LocalTime, ignored = false) => decideHuddleAlert({ channelId, startedBy, ignored, at: when }, settings)
+  const huddle = (channelId: string, startedBy: string, when: LocalTime) => decideHuddleAlert({ channelId, startedBy, at: when }, settings)
 
   it('rings inside notification hours and is quiet outside them', () => {
     expect(huddle('C0PRODUCT', 'U0LEO', at(MON, 10))).toBe('ring')
@@ -200,9 +200,5 @@ describe('incoming huddle', () => {
     expect(huddle(eng.id, 'U0LEO', at(MON, 10))).toBe('quiet')
     expect(huddle('C0PRODUCT', 'U0SAM', at(MON, 10))).toBe('quiet')
     expect(huddle(eng.id, mayaId, at(MON, 10))).toBe('ring')
-  })
-
-  it('shows nothing for an ignored conversation', () => {
-    expect(huddle('C0INCIDENTS', mayaId, at(MON, 10), true)).toBe('none')
   })
 })

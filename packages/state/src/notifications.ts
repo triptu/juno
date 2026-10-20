@@ -10,6 +10,7 @@ import {
   notificationsPage,
   notificationsRestoreSlackSchedule,
   notificationsSetHours,
+  notificationsSetHuddleRing,
   notificationsSetMatters,
   notificationsSetPresence,
   notificationsSetSlackSchedule,
@@ -96,6 +97,11 @@ export function setHours(registry: Registry, which: 'notifications' | 'presence'
 
 export function setMatters(registry: Registry, text: string): void {
   void runCommand(registry, notificationsSetMatters, { text })
+}
+
+/** Ring for huddles (SPEC 20, "Incoming huddles"). */
+export function setHuddleRing(registry: Registry, enabled: boolean): void {
+  void runCommand(registry, notificationsSetHuddleRing, { enabled })
 }
 
 /** Set yourself away or active: holds until the next switch in the active hours. */

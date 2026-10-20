@@ -1,0 +1,1 @@
+- 10-20 12:27 · Tushar · Put Workspace after all standard emoji categories so large workspaces do not push the standard catalog out of reach. Search and Frequently used keep their existing order. The picker has no category navigation. Seed eight distinct custom images and one alias for realistic gallery and end-to-end coverage.

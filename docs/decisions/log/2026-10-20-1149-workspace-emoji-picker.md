@@ -1,0 +1,1 @@
+- 10-20 11:49 · workspace-emoji-picker · Reaction pickers share the existing workspace emoji query. Each image owner appears once with aliases in its search keys; picks use the owner name, including stored Juno chat reactions. TanStack Virtual windows browse and search rows so large workspaces mount only nearby emoji, with lazy image loading.

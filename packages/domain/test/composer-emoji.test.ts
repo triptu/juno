@@ -7,6 +7,7 @@ const custom = (name: string): EmojiChoice => ({ id: name, name, insert: `:${nam
 
 describe('the colon query being typed', () => {
   it('follows a colon at a word start, up to the caret, lowercased', () => {
+    expect(emojiQueryAt(':ありがとう', 6)?.text).toBe('ありがとう')
     expect(emojiQueryAt(':smi', 4)).toEqual({ start: 0, end: 4, text: 'smi' })
     expect(emojiQueryAt('Looking good :SMI', 17)).toEqual({ start: 13, end: 17, text: 'smi' })
     expect(emojiQueryAt('ok (:+1', 7)?.text).toBe('+1')
@@ -32,8 +33,8 @@ describe('workspace emoji', () => {
       { name: 'loop_a', url: null, alias_for: 'loop_b' },
       { name: 'loop_b', url: null, alias_for: 'loop_a' },
     ])).toEqual([
-      { name: 'wave', url: 'https://emoji.example/wave.png' },
-      { name: 'wave_hello', url: 'https://emoji.example/wave.png' },
+      { name: 'wave', canonical: 'wave', url: 'https://emoji.example/wave.png' },
+      { name: 'wave_hello', canonical: 'wave', url: 'https://emoji.example/wave.png' },
     ])
   })
 
@@ -57,7 +58,19 @@ describe('matching', () => {
   ]
 
   it('puts names that start with the query before names that contain it', () => {
-    expect(names(matchEmoji(rows, 'smi', [], []))).toEqual(['smile', 'smiley', 'smirk', 'sweat_smile'])
+    const unordered = [glyph('a_smile', 'A'), glyph('smile_z', 'Z')]
+    expect(names(matchEmoji(unordered, 'smi', [], []))).toEqual(['smile_z', 'a_smile'])
+  })
+
+  it('offers smile for :smi before alphabetically earlier substrings', () => {
+    const catalog = [glyph('kissing_smiling_eyes', '😙'), { ...glyph('face_with_hand_over_mouth', '🤭'), aliases: ['smiling_face_with_smiling_eyes_and_hand_covering_mouth'] }, ...rows]
+    expect(names(matchEmoji(catalog, 'smi', [], []))[0]).toBe('smile')
+  })
+
+  it('offers a recently used workspace emoji for :part before standard matches', () => {
+    const catalog = [...Array.from({ length: 10 }, (_, i) => glyph(`part_${i}`, 'X')), custom('party_parrot')]
+    expect(names(matchEmoji(catalog, 'part', ['party_parrot'], []))[0]).toBe('party_parrot')
+    expect(names(matchEmoji(catalog, 'part_0', ['party_parrot'], []))[0]).toBe('part_0')
   })
 
   it('offers the common emoji before name order, so thumbs offers 👍 first', () => {

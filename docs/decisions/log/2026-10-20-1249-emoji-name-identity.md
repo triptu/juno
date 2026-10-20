@@ -1,0 +1,1 @@
+- 10-20 12:49 · Tushar · Keep standard and workspace cell identities distinct, and pass the clicked cell glyph explicitly so an image pick always stores its name. Accept lowercase Unicode letters, combining marks and numbers in Juno workspace reaction names, alongside Slack separators.

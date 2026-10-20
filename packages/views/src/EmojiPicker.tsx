@@ -1,103 +1,142 @@
 import * as stylex from '@stylexjs/stylex'
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
-import { memo, useDeferredValue, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
-import type { EmojiCategory } from '@juno/contract'
+import { useDeferredValue, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
+import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
+import { matchEmoji, type PickerItem as Item, type PreparedEmojiPicker } from '@juno/contract'
 import { accent, colors, layout, motion, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { ScrollArea, Surface, Text, TextField } from '@juno/ui'
 
 export interface EmojiPickerProps {
-  /** All standard emoji, by category (from @juno/contract's emojiCatalog). */
-  readonly catalog: ReadonlyArray<EmojiCategory>
-  /** The workspace's custom emoji, shown as their own category first when non-empty. */
-  readonly custom?: ReadonlyArray<{ readonly name: string; readonly url: string }>
+  readonly data: PreparedEmojiPicker
   /** Recently used names (Slack names), shown first as "Frequently used" when non-empty. */
   readonly recent?: ReadonlyArray<string>
   /** A Slack emoji name: "+1", "partying_face", a custom name. */
-  readonly onPick: (name: string) => void
+  readonly onPick: (name: string, unicode?: string) => void
   /** Esc. */
   readonly onClose: () => void
   /** Names already chosen (Settings' quick reactions): drawn as chosen and not picked again. */
-  readonly selected?: ReadonlySet<string>
+  readonly selected?: ReadonlyArray<{ readonly name: string; readonly url?: string }>
   /** The search to open with. For fixtures; the app opens the picker empty. */
   readonly initialQuery?: string
 }
 
-/** One cell: a standard emoji (`unicode`) or a custom one (`url`). */
-interface Item {
-  readonly name: string
-  readonly unicode?: string
-  readonly url?: string
-  /** Every name and alias, lowercase, space separated, for search. */
-  readonly keys: string
-}
-
 interface Section {
   readonly key: string
-  /** None for the chunks of a search result. */
+  /** None for search results. */
   readonly heading?: string
   readonly items: ReadonlyArray<Item>
 }
 
 const COLUMNS = 9
-/** Search results render in blocks of this many full rows, so off-screen blocks cost nothing. */
-const RESULT_CHUNK = COLUMNS * 8
+// Grid geometry mirrors --control-32 and the tag heading's padding and line height.
+const ROW_HEIGHT = 32
+const HEADER_HEIGHT = 30
 
 const EMPTY: ReadonlyArray<never> = []
 const NONE: ReadonlySet<string> = new Set()
 
-/**
- * The full emoji picker (SPEC 7): a search field, then every emoji by
- * category in a scrolling grid, custom emoji and recent ones first. A panel
- * only: the container positions it (outside the message row, whose paint
- * containment would clip it).
- *
- * About 1,900 buttons. Each category is a section with
- * `content-visibility: auto`, so only the ones on screen are laid out and
- * painted, and the sections are memoized, so typing in search does not
- * rebuild them. The browse grid stays mounted (hidden) while searching, so
- * clearing the search is instant. One click handler on the scroller reads
- * the button's `data-emoji`; the arrows move focus through the grid.
- */
-export function EmojiPicker({ catalog, custom = EMPTY, recent = EMPTY, selected = NONE, onPick, onClose, initialQuery = '' }: EmojiPickerProps) {
+/** A windowed grid: only nearby rows mount, including in a large workspace or search. */
+export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, onClose, initialQuery = '' }: EmojiPickerProps) {
   const [query, setQuery] = useState(initialQuery)
+  const [failed, setFailed] = useState<ReadonlySet<string>>(NONE)
+  const [focused, setFocused] = useState<number | undefined>(undefined)
   const search = normalize(useDeferredValue(query))
-  const browseRef = useRef<HTMLDivElement>(null)
-  const resultsRef = useRef<HTMLDivElement>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
+  const pendingFocus = useRef<number | undefined>(undefined)
   const scrollerRef = useRef<HTMLElement>(null)
 
-  const standard = useMemo(() => catalog.map((category) => ({ heading: category.name, items: category.emoji.map(standardItem) })), [catalog])
-  const customItems = useMemo(() => custom.map((emoji) => ({ name: emoji.name, url: emoji.url, keys: emoji.name.toLowerCase() })), [custom])
-  // In catalog order, custom first as in the browse grid.
-  const all = useMemo(() => [...customItems, ...standard.flatMap((category) => category.items)], [customItems, standard])
-
-  const browse = useMemo((): ReadonlyArray<Section> => {
-    const byName = new Map<string, Item>()
-    for (const item of all) for (const key of item.keys.split(' ')) if (!byName.has(key)) byName.set(key, item)
+  const { standard, customItems, all, byName } = data
+  const selectedItems = useMemo(() => new Set(selected.map((reaction) => {
+    const item = byName.get(reaction.name.toLowerCase(), reaction.url === undefined ? 'standard' : 'workspace')
+    return item === undefined ? `${reaction.url === undefined ? 'standard' : 'workspace'}:${reaction.name}` : itemKey(item)
+  })), [selected, byName])
+  const isChosen = (item: Item) => selectedItems.has(itemKey(item))
+  // A known recent name is a real cell from the first paint. Fill its image
+  // later without adding or removing slots during this open.
+  const [recentSlots] = useState<ReadonlyArray<Item>>(() => {
     const seen = new Set<string>()
-    const recentItems = recent.flatMap((name) => {
-      const item = byName.get(name.toLowerCase())
-      if (item === undefined || seen.has(item.name)) return []
-      seen.add(item.name)
+    return recent.flatMap((name) => {
+      const item = byName.get(name.toLowerCase()) ?? { name, keys: [name.toLowerCase()] }
+      const key = itemKey(item)
+      if (seen.has(key)) return []
+      seen.add(key)
       return [item]
     })
+  })
+
+  const browse = useMemo((): ReadonlyArray<Section> => {
+    const recentItems = recentSlots.map((item) => byName.get(item.name.toLowerCase()) ?? item)
     return [
       ...(recentItems.length > 0 ? [{ key: 'recent', heading: 'Frequently used', items: recentItems }] : []),
-      ...(customItems.length > 0 ? [{ key: 'custom', heading: 'Custom', items: customItems }] : []),
       ...standard.map((category) => ({ key: category.heading, ...category })),
+      ...(customItems.length > 0 ? [{ key: 'custom', heading: 'Workspace', items: customItems }] : []),
     ]
-  }, [all, recent, customItems, standard])
+  }, [byName, recentSlots, customItems, standard])
 
   const results = useMemo((): ReadonlyArray<Section> | undefined => {
     if (search === '') return undefined
-    const matches = all.filter((item) => item.keys.includes(search))
-    const chunks: Section[] = []
-    for (let start = 0; start < matches.length; start += RESULT_CHUNK) {
-      chunks.push({ key: String(start), items: matches.slice(start, start + RESULT_CHUNK) })
-    }
-    return chunks
-  }, [all, search])
+    const matches = matchEmoji(all, search, recent, [], Infinity)
+    return [{ key: 'results', items: matches }]
+  }, [all, search, recent])
 
-  const active = () => (results === undefined ? browseRef.current : resultsRef.current)
+  const sections = results ?? browse
+  const grid = useMemo(() => {
+    const rows: Array<{ key: string; heading: string } | { key: string; section: string; items: ReadonlyArray<Item>; start: number; first: number }> = []
+    const groups: Array<{ section: Section; top: number; height: number; first: number; row: number }> = []
+    let top = 0
+    let count = 0
+    for (const section of sections) {
+      const height = (section.heading === undefined ? 0 : HEADER_HEIGHT) + Math.ceil(section.items.length / COLUMNS) * ROW_HEIGHT
+      groups.push({ section, top, height, first: count, row: rows.length + (section.heading === undefined ? 0 : 1) })
+      top += height
+      if (section.heading !== undefined) {
+        rows.push({ key: section.key, heading: section.heading })
+      }
+      for (let start = 0; start < section.items.length; start += COLUMNS) {
+        rows.push({ key: `${section.key}:${start}`, section: section.key, items: section.items, start, first: count + start })
+      }
+      count += section.items.length
+    }
+    const groupAt = (index: number) => groups.find((group) => index >= group.first && index < group.first + group.section.items.length)
+    const rowAt = (index: number) => { const group = groupAt(index); return group === undefined ? undefined : group.row + Math.floor((index - group.first) / COLUMNS) }
+    const itemAt = (index: number) => { const group = groupAt(index); return group?.section.items[index - group.first] }
+    return { rows, groups, count, rowAt, itemAt }
+  }, [sections])
+  // oxlint-disable-next-line react/incompatible-library
+  const virtualizer = useVirtualizer({
+    count: grid.rows.length,
+    getScrollElement: () => scrollerRef.current,
+    estimateSize: (index) => 'heading' in grid.rows[index]! ? HEADER_HEIGHT : ROW_HEIGHT,
+    getItemKey: (index) => grid.rows[index]!.key,
+    overscan: 3,
+    rangeExtractor: (range) => {
+      const indexes = defaultRangeExtractor(range)
+      const row = focused === undefined ? undefined : grid.rowAt(focused)
+      return row === undefined || indexes.includes(row) ? indexes : [...indexes, row].toSorted((a, b) => a - b)
+    },
+    scrollPaddingStart: HEADER_HEIGHT,
+  })
+  const visibleRows = virtualizer.getVirtualItems()
+  const firstRow = visibleRows.find((row) => row.index >= (virtualizer.range?.startIndex ?? 0) && 'items' in grid.rows[row.index]!)
+  const first = firstRow === undefined ? undefined : grid.rows[firstRow.index]
+  const tabStop = focused ?? (first !== undefined && 'items' in first ? first.first : 0)
+  const focusCell = (index: number) => {
+    const cell = gridRef.current?.querySelector<HTMLElement>(`[data-cell="${index}"]`)
+    if (cell) { pendingFocus.current = undefined; cell.focus(); return }
+    pendingFocus.current = index
+    virtualizer.scrollToIndex(grid.rowAt(index) ?? 0, { align: 'auto' })
+  }
+  useLayoutEffect(() => {
+    const index = pendingFocus.current
+    if (index === undefined) return
+    const cell = gridRef.current?.querySelector<HTMLElement>(`[data-cell="${index}"]`)
+    if (cell) { pendingFocus.current = undefined; cell.focus() }
+  })
+  useLayoutEffect(() => {
+    pendingFocus.current = undefined
+    setFocused(undefined)
+    virtualizer.scrollToOffset(0)
+  }, [search, virtualizer])
 
   const onPanelKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key !== 'Escape') return
@@ -110,32 +149,32 @@ export function EmojiPicker({ catalog, custom = EMPTY, recent = EMPTY, selected 
     if (event.key === 'Enter') {
       // The live query, not the deferred one, so Enter right after typing picks what was typed.
       const typed = normalize(query)
-      const first = typed === '' ? undefined : all.find((item) => item.keys.includes(typed) && !selected.has(item.name))
-      if (first === undefined) return
+      const match = typed === '' ? undefined : matchEmoji(all, typed, recent, [], Infinity).find((item) => !isChosen(item))
+      if (match === undefined) return
       event.preventDefault()
-      onPick(first.name)
+      onPick(match.name, match.unicode)
     } else if (event.key === 'ArrowDown') {
-      const first = active()?.querySelector<HTMLElement>('button[data-emoji]')
-      if (first == null) return
+      if (grid.count === 0) return
       event.preventDefault()
-      first.focus()
+      focusCell(0)
     }
   }
 
   const onGridKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    const container = active()
     const from = event.target
-    if (container === null || !(from instanceof HTMLElement) || from.dataset['emoji'] === undefined) return
-    const target = neighbour(container, from, event.key)
+    if (!(from instanceof HTMLElement) || from.dataset['cell'] === undefined) return
+    const index = pendingFocus.current ?? Number(from.dataset['cell'])
+    const target = neighbour(sections, index, event.key)
     if (target === undefined) return
     event.preventDefault()
-    ;(target ?? container.closest('[data-emoji-picker]')?.querySelector('input'))?.focus()
+    if (target === null) scrollerRef.current?.closest('[data-emoji-picker]')?.querySelector('input')?.focus()
+    else focusCell(target)
   }
 
   const onGridClick = (event: MouseEvent<HTMLElement>) => {
     const button = (event.target as Element).closest<HTMLElement>('button[data-emoji]')
-    const name = button?.dataset['emoji']
-    if (name !== undefined && !selected.has(name)) onPick(name)
+    const item = grid.itemAt(Number(button?.dataset['cell']))
+    if (item !== undefined && !isChosen(item)) onPick(item.name, item.unicode)
   }
 
   return (
@@ -156,72 +195,58 @@ export function EmojiPicker({ catalog, custom = EMPTY, recent = EMPTY, selected 
           onKeyDown={onFieldKeyDown}
         />
       </div>
-      <ScrollArea ref={scrollerRef} scrollbar="hover" sx={styles.scroller} onClick={onGridClick} onKeyDown={onGridKeyDown}>
-        <div ref={browseRef} hidden={results !== undefined}>
-          {browse.map((section, index) => (
-            <EmojiSection key={section.key} section={section} selected={selected} tabStop={results === undefined && index === 0} />
+      <ScrollArea ref={scrollerRef} scrollbar="hover" sx={styles.scroller} onClick={onGridClick} onKeyDown={onGridKeyDown} onFocusCapture={(event) => {
+        const cell = (event.target as HTMLElement).dataset['cell']
+        if (cell !== undefined) setFocused(Number(cell))
+      }} onBlurCapture={(event) => {
+        if (!(event.relatedTarget instanceof HTMLElement) || event.relatedTarget.dataset['cell'] === undefined) setFocused(undefined)
+      }}>
+        <div ref={gridRef} data-emoji-results={results === undefined ? undefined : ''} {...stylex.props(styles.window(virtualizer.getTotalSize()))}>
+          {grid.groups.map(({ section, top, height }) => (
+            <div key={section.key} role="group" aria-label={section.heading} data-emoji-section="" {...stylex.props(styles.group(height))}>
+              {section.heading === undefined ? null : (
+                <div {...stylex.props(styles.heading)}>
+                  <Text variant="tag" tone="muted" as="h3" sx={styles.headingText}>{section.heading}</Text>
+                </div>
+              )}
+              {visibleRows.map((virtual) => {
+                const row = grid.rows[virtual.index]!
+                if (!('items' in row) || row.section !== section.key) return null
+                return (
+                  <div key={virtual.key} {...stylex.props(styles.virtualRow(virtual.start - top, virtual.size), styles.grid)}>
+                    {row.items.slice(row.start, row.start + COLUMNS).map((item, index) => {
+                      const chosen = isChosen(item)
+                      return (
+                        <button
+                          key={row.section === 'recent' ? itemKey(recentSlots[row.start + index]!) : itemKey(item)}
+                          type="button"
+                          tabIndex={row.first + index === tabStop ? 0 : -1}
+                          data-emoji={item.name}
+                          data-cell={row.first + index}
+                          aria-label={chosen ? `:${item.name}:, added` : `:${item.name}:`}
+                          aria-disabled={chosen || undefined}
+                          title={chosen ? `:${item.name}: is added` : `:${item.name}:`}
+                          {...stylex.props(styles.cell, chosen && styles.chosen)}
+                        >
+                          {item.unicode !== undefined ? item.unicode : item.url === undefined || failed.has(itemKey(item)) ? <span aria-hidden="true" {...stylex.props(styles.fallback)}><span data-emoji-placeholder="" {...stylex.props(styles.placeholder)} /></span> : (
+                            <img src={item.url} alt="" draggable={false} loading="lazy" decoding="async" onError={() => setFailed((names) => new Set(names).add(itemKey(item)))} {...stylex.props(styles.image)} />
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </div>
           ))}
         </div>
-        {results === undefined ? null : (
-          <div ref={resultsRef} data-emoji-results="" {...stylex.props(styles.results)}>
-            {results.map((section, index) => (
-              <EmojiSection key={section.key} section={section} selected={selected} tabStop={index === 0} />
-            ))}
-            {results.length === 0 ? (
-              <Text variant="ui" tone="muted" as="div" sx={styles.noMatch}>
-                No match.
-              </Text>
-            ) : null}
-          </div>
-        )}
+        {results !== undefined && grid.count === 0 ? <Text variant="ui" tone="muted" as="div" sx={styles.noMatch}>No match.</Text> : null}
       </ScrollArea>
     </Surface>
   )
 }
 
-/** A heading (none for search results) and its grid. Memoized: typing in search leaves it alone. */
-const EmojiSection = memo(function EmojiSection({ section, selected, tabStop }: { readonly section: Section; readonly selected: ReadonlySet<string>; readonly tabStop: boolean }) {
-  return (
-    <div role="group" data-emoji-section="" aria-label={section.heading} {...stylex.props(styles.section, styles.rows(String(Math.ceil(section.items.length / COLUMNS))), section.heading === undefined && styles.bare)}>
-      {section.heading === undefined ? null : (
-        <div {...stylex.props(styles.heading)}>
-          <Text variant="tag" tone="muted" as="h3" sx={styles.headingText}>
-            {section.heading}
-          </Text>
-        </div>
-      )}
-      <div {...stylex.props(styles.grid)}>
-        {section.items.map((item, index) => {
-          const chosen = selected.has(item.name)
-          return (
-            <button
-              key={item.name}
-              type="button"
-              // One tab stop for the whole grid; the arrows move within it.
-              tabIndex={tabStop && index === 0 ? 0 : -1}
-              data-emoji={item.name}
-              aria-label={chosen ? `:${item.name}:, added` : `:${item.name}:`}
-              aria-disabled={chosen || undefined}
-              title={chosen ? `:${item.name}: is added` : `:${item.name}:`}
-              {...stylex.props(styles.cell, chosen && styles.chosen)}
-            >
-              {item.url === undefined ? (
-                item.unicode
-              ) : (
-                <img src={item.url} alt="" draggable={false} loading="lazy" decoding="async" {...stylex.props(styles.image)} />
-              )}
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
-})
-
-function standardItem(emoji: EmojiCategory['emoji'][number]): Item {
-  const names = emoji.aliases === undefined ? emoji.name : [emoji.name, ...emoji.aliases].join(' ')
-  return { name: emoji.name, unicode: emoji.unicode, keys: names.toLowerCase() }
-}
+const itemKey = (item: Item) => `${item.unicode === undefined ? 'workspace' : 'standard'}:${item.name}`
 
 /** Search text as a name: lowercase, no colons, spaces as underscores (":Party face" finds partying_face). */
 function normalize(query: string): string {
@@ -231,39 +256,38 @@ function normalize(query: string): string {
 /**
  * Where an arrow key moves focus from `from`: the next or previous emoji,
  * or the same column one row up or down, across section edges. `null` means
- * the search field (up from the first row); `undefined` means the key is not
- * an arrow. Reads the DOM order only, never layout.
+ * the search field; `undefined` means the key is not an arrow.
+ * Uses the complete section order, including rows outside the viewport.
  */
-function neighbour(container: HTMLElement, from: HTMLElement, key: string): HTMLElement | null | undefined {
-  const sections = Array.from(container.querySelectorAll('[data-emoji-section]'), (section) =>
-    Array.from(section.querySelectorAll<HTMLElement>('button[data-emoji]')),
-  ).filter((cells) => cells.length > 0)
-  const s = sections.findIndex((cells) => cells.includes(from))
-  const cells = sections[s]
+function neighbour(sections: ReadonlyArray<Section>, from: number, key: string): number | null | undefined {
+  const groups = sections.filter((section) => section.items.length > 0)
+  let start = 0
+  const s = groups.findIndex((section) => {
+    if (from < start + section.items.length) return true
+    start += section.items.length
+    return false
+  })
+  const cells = groups[s]?.items
   if (cells === undefined) return undefined
-  const i = cells.indexOf(from)
+  const i = from - start
   const column = i % COLUMNS
-  const previous = sections[s - 1]
-  const next = sections[s + 1]
+  const previous = groups[s - 1]?.items
+  const next = groups[s + 1]?.items
   switch (key) {
-    case 'ArrowLeft':
-      return cells[i - 1] ?? previous?.at(-1) ?? from
-    case 'ArrowRight':
-      return cells[i + 1] ?? next?.[0] ?? from
+    case 'ArrowLeft': return Math.max(0, from - 1)
+    case 'ArrowRight': return Math.min(groups.reduce((count, group) => count + group.items.length, 0) - 1, from + 1)
     case 'ArrowUp': {
-      if (i >= COLUMNS) return cells[i - COLUMNS]
+      if (i >= COLUMNS) return from - COLUMNS
       if (previous === undefined) return null
       const lastRow = Math.floor((previous.length - 1) / COLUMNS) * COLUMNS
-      return previous[Math.min(lastRow + column, previous.length - 1)]
+      return start - previous.length + Math.min(lastRow + column, previous.length - 1)
     }
     case 'ArrowDown': {
-      if (i + COLUMNS < cells.length) return cells[i + COLUMNS]
-      // A partial last row below: its last cell.
-      if (Math.floor(i / COLUMNS) < Math.floor((cells.length - 1) / COLUMNS)) return cells.at(-1)
-      return next === undefined ? from : next[Math.min(column, next.length - 1)]
+      if (i + COLUMNS < cells.length) return from + COLUMNS
+      if (Math.floor(i / COLUMNS) < Math.floor((cells.length - 1) / COLUMNS)) return start + cells.length - 1
+      return next === undefined ? from : start + cells.length + Math.min(column, next.length - 1)
     }
-    default:
-      return undefined
+    default: return undefined
   }
 }
 
@@ -296,22 +320,14 @@ const styles = stylex.create({
     paddingBottom: spacing['--space-2'],
     scrollPaddingTop: HEADING_HEIGHT,
   },
-  results: {
-    paddingTop: spacing['--space-1'],
-  },
-  // Off-screen sections skip layout and paint. The estimate is the heading
-  // plus the section's rows, so the scrollbar is right before they render.
-  section: {
-    contentVisibility: 'auto',
-    containIntrinsicSize: `auto calc(${HEADING_HEIGHT} + var(--emoji-rows) * ${sizes['--control-32']})`,
-  },
-  rows: (rows: string) => ({ '--emoji-rows': rows }),
-  bare: {
-    containIntrinsicSize: `auto calc(var(--emoji-rows) * ${sizes['--control-32']})`,
-  },
+  window: (height: number) => ({ position: 'relative', height }),
+  virtualRow: (top: number, height: number) => ({ position: 'absolute', top, height, width: '100%', boxSizing: 'border-box' }),
+  group: (height: number) => ({ position: 'relative', height }),
   heading: {
     position: 'sticky',
     top: 0,
+    height: HEADING_HEIGHT,
+    boxSizing: 'border-box',
     zIndex: 1,
     paddingTop: spacing['--space-2'],
     paddingBottom: spacing['--space-1'],
@@ -371,6 +387,8 @@ const styles = stylex.create({
     height: GLYPH,
     objectFit: 'contain',
   },
+  fallback: { width: GLYPH, height: GLYPH, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  placeholder: { width: sizes['--icon-12'], height: sizes['--icon-12'], boxSizing: 'border-box', border: `1px solid ${colors['--foreground-muted']}`, borderRadius: radii['--radius-inline'] },
   noMatch: {
     paddingBlock: spacing['--space-3-5'],
     paddingInline: spacing['--space-2-5'],

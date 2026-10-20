@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { Emoji, endGroupsAtDividers, OpenTarget, selectionSnippet, selectionSource, selectionTooltip, type Selection, sendMessageStatus, type BubbleId, type ChatItem, type GroupPosition, type ProposedMessage, type RunId } from '../src/index'
+import { Emoji, Reaction, endGroupsAtDividers, OpenTarget, selectionSnippet, selectionSource, selectionTooltip, type Selection, sendMessageStatus, type BubbleId, type ChatItem, type GroupPosition, type ProposedMessage, type RunId } from '../src/index'
 
 const decodeOpen = Schema.decodeUnknownSync(OpenTarget)
 
@@ -93,5 +93,15 @@ describe('endGroupsAtDividers', () => {
     expect(groups(endGroupsAtDividers(items))).toEqual(['single', 'newDivider', 'first', 'last'])
     const plain = [bubble(0, 'first'), bubble(1, 'last')]
     expect(endGroupsAtDividers(plain)).toBe(plain)
+  })
+})
+
+
+describe('workspace reaction names', () => {
+  it('accepts lowercase Unicode letters, combining marks, numbers and Slack separators', () => {
+    for (const emoji of ['juno_wave', 'party-parrot', 'café', 'ありがとう', 'शाबाश', 'صحيح', 'yay2', '+1']) expect(Schema.decodeUnknownSync(Reaction)({ by: 'owner', emoji }).emoji).toBe(emoji)
+  })
+  it('refuses uppercase names, spaces, colons and punctuation', () => {
+    for (const emoji of ['Hello', 'hello there', ':hello:', 'hello!', '']) expect(() => Schema.decodeUnknownSync(Reaction)({ by: 'owner', emoji })).toThrow()
   })
 })
