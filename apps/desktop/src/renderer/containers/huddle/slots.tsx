@@ -1,9 +1,9 @@
 /**
  * The huddle's entries in the seams that load with the app: the sidebar
  * bar's slot, the incoming huddle's card, the share sheet's place over the
- * window, the Main header's control and the row glyph. They read only small
- * atoms, so nothing re-renders while no huddle runs; the bar, the card, the
- * share sheet, the header control and the tab are lazy chunks.
+ * window, the topic header's control and the row glyph. They read only
+ * small atoms, so nothing re-renders while no huddle runs; the bar, the
+ * card, the share sheet, the header control and the tab are lazy chunks.
  */
 import { Suspense, useEffect, useSyncExternalStore } from 'react'
 import { useAtomValue } from '@juno/state/react'
@@ -75,7 +75,7 @@ function SharePickerLayer() {
 /** Loads the header control's chunk; the app root calls it after the first paint. */
 export const preloadHuddleHeader = (): void => void header.load()
 
-/** Start, Join, Switch or In huddle, first in a Main's right island. Nothing shows until its chunk is here. */
+/** The huddle control first in a topic header's right island (Header.tsx decides which). Nothing shows until its chunk is here. */
 export function HuddleHeaderAction({ detail }: { readonly detail: TopicDetail }) {
   const ready = usePreloaded(header, true)
   return ready ? <LazyHeader detail={detail} /> : null

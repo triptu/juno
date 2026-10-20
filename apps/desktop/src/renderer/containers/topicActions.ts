@@ -62,6 +62,7 @@ import { openSettings, openTopic, openTopicFromList } from './navigation'
 import { runViewMenuAction, viewChoices } from './viewActions'
 import { choiceFor, nativeMenu, setNotifyLevel, showPersonMenu, showWhy } from './notifyActions'
 import { showWhatJunoKnows } from './juno/actions'
+import { huddleMenuItem, joinHuddleFromMenu } from './huddle/menuItem'
 
 /** What the actions read from a sidebar row or the header's detail. Copy Slack link and Open in Slack need the detail's root. */
 export type ActionTopic = Pick<TopicDetail, 'id' | 'kind' | 'title' | 'channel' | 'unreadCount' | 'pinned' | 'resolved' | 'subscribed'> & {
@@ -169,6 +170,7 @@ export async function showTopicMenu(topic: ActionTopic, from: RenameTarget['wher
   const drawable = canRedraw(registry)
   const settings = currentNotificationSettings(registry) ?? (await loadNotificationSettings(registry))
   const notify = notifyTarget(topic)
+  const huddle = huddleMenuItem(topic.channel)
   const state = {
     kind: topic.kind,
     channel: topic.channel,
@@ -179,6 +181,7 @@ export async function showTopicMenu(topic: ActionTopic, from: RenameTarget['wher
     canDraw: settings?.aiAssist === true && (await drawable),
     // Add to view (inventory 15.8) is on Main: the row's channel or DM.
     ...(topic.kind === 'main' ? { views: viewChoices(topic.channel.id) } : {}),
+    ...(huddle === undefined ? {} : { huddle }),
     ...(dmPartner(topic) !== undefined && registry.get(junoAvailableAtom) ? { knowsAbout: dmPartner(topic)!.name } : {}),
   }
   const chosen = (await popupContextMenu(nativeMenu(topicMenuItems(state), (id) => isLinkable(topic) || (id !== 'copy-link' && id !== 'open-in-slack')), at)) as TopicMenuAction | undefined
@@ -201,6 +204,8 @@ export function runTopicAction(topic: ActionTopic, chosen: TopicMenuAction, from
   switch (chosen) {
     case 'open-new-tab':
       return from === 'row' ? openTopicFromList(id, { newTab: true }) : openTopic(id, { newTab: true })
+    case 'huddle':
+      return joinHuddleFromMenu(topic.channel.id)
     case 'rename':
       return registry.set(renamingAtom, { id, where: from })
     case 'redraw':

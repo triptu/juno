@@ -1157,6 +1157,8 @@ const DIVIDER_OFFSET = 148
 /** The ids of the topic menu's items (inventory 15.1). */
 export type TopicMenuItem =
   | 'open-new-tab'
+  // Start huddle or Join huddle, in a channel's topics (SPEC 20).
+  | 'huddle'
   | 'rename'
   | 'redraw'
   | 'mark-read'

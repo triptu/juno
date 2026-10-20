@@ -345,6 +345,7 @@ export const details = {
   postgres: detail({ id: 'C0ENG:1760000000.000100', title: 'Postgres 16 migration plan', titleSource: 'ai', channel: channels.eng, unreadCount: 4, mentionsMe: true, lastReadTs: thread[9]?.message.ts ?? '', rootTs: thread[0]?.message.ts ?? '' }),
   hiring: detail({ id: 'C0HIRING:1760000000.000300', title: 'Rina Sato · Staff backend', titleSource: 'ai', channel: channels.hiring, messageCount: 4, unreadCount: 2, mentionsMe: true }),
   offsite: detail({ id: 'D0MAYA:1759990000.000500', title: 'Offsite: Wednesday afternoon slot', titleSource: 'manual', channel: channels.maya, pinned: true, messageCount: 3 }),
+  mayaMain: detail({ id: 'D0MAYA:main', kind: 'main', title: 'Maya Chen', titleSource: 'channel', channel: channels.maya, messageCount: 214, threadCount: 3 }),
   lunch: detail({ id: 'G0MAYALEO:main', kind: 'main', title: 'Maya, Leo', titleSource: 'channel', channel: channels.group, messageCount: 3, threadCount: 0 }),
   engMain: detail({ id: 'C0ENG:main', kind: 'main', title: '#eng', titleSource: 'channel', channel: channels.eng, messageCount: 412, unreadCount: 3, lastReadTs: main[7]?.message.ts ?? '', threadCount: 12 }),
   mohammed: detail({ id: 'D0MOHAMMED:1759990000.001100', title: 'هل يمكننا مراجعة خطة الترحيل غدًا قبل الاجتماع الأسبوعي', channel: channels.mohammed, messageCount: 4 }),

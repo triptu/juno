@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { Headphones } from '@phosphor-icons/react/dist/icons/Headphones'
 import type { KeyboardEvent, ReactNode } from 'react'
-import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
+import { colors, layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Button, EmptyState, Surface } from '@juno/ui'
 import { HuddleControls } from './HuddleControls'
 import { HuddlePageHeader } from './HuddlePageHeader'
@@ -136,7 +136,7 @@ function PageFooter({ state, devices }: { readonly state: HuddlePageState; reado
   return (
     <footer {...stylex.props(styles.footer)}>
       {state.kind === 'in' ? (
-        <Surface kind="island" role="group" aria-label="Huddle controls">
+        <Surface kind="island" role="group" aria-label="Huddle controls" sx={styles.controlsIsland}>
           <ControlsRow state={state} devices={devices} />
         </Surface>
       ) : (
@@ -187,6 +187,11 @@ const styles = stylex.create({
     paddingTop: spacing['--space-3'],
     paddingBottom: spacing['--space-4'],
     paddingInline: spacing['--space-6'],
+  },
+  // The island around 32px controls: 40 tall with the same 4px inset all round (3px plus the 1px ring).
+  controlsIsland: {
+    height: sizes['--control-40'],
+    paddingInline: `calc((${sizes['--control-40']} - ${sizes['--control-32']}) / 2 - 1px)`, // tokens-allow: Subtract the 1px surface border from the inset.
   },
   controlsInner: {
     display: 'inline-flex',

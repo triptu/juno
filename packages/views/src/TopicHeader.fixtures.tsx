@@ -29,7 +29,7 @@ const switcher = (currentId: string, query = '') => ({
 /** The same threads, not followed (Notify me is Never). */
 const unfollowed = <D extends TopicHeaderProps['detail']>(detail: D): D => ({ ...detail, subscribed: false, status: 'unsubscribed' })
 
-/** A stand-in for a feature's control in a Main's `actions` slot (the huddle control is drawn in `@juno/huddle-views`). */
+/** A stand-in for a feature's control in the `actions` slot (the huddle control is drawn in `@juno/huddle-views`). */
 const action = <IconButton icon={Headphones} label="Start huddle" size={28} iconSize={16} radius="full" variant="island" />
 
 // The header lies over the top of its area; the frame is that area's top, the band's height.
@@ -47,8 +47,9 @@ export default defineFixtures(
     Main: {
       'channel-main': state({ detail: details.engMain }),
       'group-dm-main': state({ detail: details.lunch }),
-      // The `actions` slot comes first in the right island.
+      // The `actions` slot comes first in the right island, on a Main and on a thread (a DM's huddle control).
       'main-actions': state({ detail: details.engMain, actions: action }),
+      'thread-actions': state({ detail: details.offsite, actions: action }),
       'main-actions-336': state({ detail: details.engMain, actions: action }, narrow),
     },
     // The title opens the switcher under the left island: the channel's Main and threads, the resolved ones last.
@@ -70,7 +71,7 @@ export default defineFixtures(
       'resolved-336': state({ detail: { ...details.hiring, resolved: true, status: 'resolved' } }, narrow),
     },
     // A thread you do not follow shows Follow in Resolve's place; a click follows it, with no menu.
-    // Follow keeps Resolve's width, so following moves nothing.
+    // Both are 28px icons, so following moves nothing.
     Follow: {
       follow: state({ detail: unfollowed(details.postgres) }),
       followed: state({ detail: details.postgres }),
@@ -105,13 +106,13 @@ export default defineFixtures(
       'emoji-title': state({ detail: details.unicorn }),
       wide: state({ detail: details.engMain }, { width: 1600, height: 68 }),
     },
-    // The workspace at the minimum window size (720 by 480) is 336px wide: Resolve is an icon, Threads its count.
+    // The workspace at the minimum window size (720 by 480) is 336px wide: a thread's pill is its icon alone.
     Narrow: {
       'thread-336': state({ detail: details.hiring }, narrow),
       'long-336': state({ detail: details.long }, narrow),
       'direct-message-336': state({ detail: details.offsite }, narrow),
       'main-336': state({ detail: details.engMain }, narrow),
-      // Just above the switch: the full labels.
+      // Just above the switch: the pill's name.
       'thread-480': state({ detail: details.hiring }, { width: 480, height: 68 }),
     },
     // Every control in the islands has the same hover, keyboard focus and press.
