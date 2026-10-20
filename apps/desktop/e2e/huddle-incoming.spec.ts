@@ -2,8 +2,11 @@
  * An incoming huddle (SPEC 20, "Incoming huddles") as the user meets it,
  * against the fake Slack: someone starts a huddle where the user is, the
  * card shows at the top of the sidebar, rings and posts a notification;
- * Join joins, Dismiss hides it, and it goes when the huddle ends. The ring
- * is recorded, not played, under JUNO_E2E (`window.__junoHuddleRing`).
+ * Join joins, Dismiss hides it, and it goes when the huddle ends. An
+ * ignored channel rings like any other, Ring for huddles off keeps the card
+ * and notification without the ring, and the dock bounces only while Juno
+ * is not frontmost. The ring is recorded, not played, under JUNO_E2E
+ * (`window.__junoHuddleRing`), and main counts the dock's bounces.
  *
  * Notification hours depend on the clock, so the channels that ring are set
  * to Every message, which rings at any hour; #product is set to Never, which
@@ -58,6 +61,7 @@ test('someone starts a huddle: the card rings, Join joins, Dismiss hides it, and
   await expect(card).toContainText('Started a huddle')
   expect((await bar.boundingBox())!.y).toBeLessThan((await card.boundingBox())!.y)
   expect(await rings(win)).toBe(before)
+  expect(await ringing(win)).toBe(false)
   await expect.poll(() => juno.osNotifications()).toContainEqual({ title: 'Maya', body: 'Started a huddle', silent: true })
 
   // Dismiss hides it; the huddle goes on, and the DM's row still shows it running.
@@ -65,17 +69,19 @@ test('someone starts a huddle: the card rings, Join joins, Dismiss hides it, and
   await expect(card).toBeHidden()
   await expect(juno.sidebar.row('Maya', { exact: true }).root.locator('[data-huddle-indicator]')).toBeVisible()
 
-  // Leave the call. A huddle in a channel set to Never shows its card quietly: no pulse, no ring, no notification.
+  // Leave the call. A huddle in a channel set to Never shows its card quietly: no pulse, no ring, no notification, and no bounce even with Juno in the background.
   const attendeeId = await attendee(win)
   await bar.getByRole('button', { name: 'Leave' }).click()
   await expect(bar).toBeHidden()
   await chimeDrops(win, fake, attendeeId!)
   const shown = (await juno.osNotifications()).length
+  await juno.setFrontmost(false)
   fake.control('startHuddle', { channel: 'C0PRODUCT', user: 'U0LEO' })
   await expect(card.getByRole('button', { name: 'Open huddle in #product' })).toBeVisible()
   await expect(card).toContainText('Leo started a huddle')
   await expect(card.locator('[data-pulse]')).toHaveCount(0)
   expect(await ringing(win)).toBe(false)
+  expect(await juno.dockBounces()).toBe(0)
 
   // The huddle ends: the card goes.
   fake.control('endHuddle', { channel: 'C0PRODUCT' })
@@ -106,4 +112,45 @@ test('a huddle the user started on another device shows no card', async ({ juno,
   await card.getByRole('button', { name: 'Dismiss' }).click()
   await expect(card).toBeHidden()
   expect((await juno.osNotifications()).map((notification) => notification.title)).toEqual(['#product'])
+})
+
+test('an ignored channel rings like any other, the dock bounces while Juno is behind, and Ring for huddles off keeps it silent', async ({ juno, fake, win }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row('#eng').chooseInMenu('notify-every')
+  await juno.expectToast('#eng: Every message')
+  await juno.sidebar.selectView('Automated')
+  await juno.sidebar.row('#alerts-prod').chooseInMenu('notify-every')
+  await juno.expectToast('#alerts-prod: Every message')
+  await juno.sidebar.row('#alerts-prod').chooseInMenu('ignore-channel')
+  await juno.expectToast('Ignoring #alerts-prod')
+
+  // With Juno behind another app, Maya starts a huddle in the ignored #alerts-prod: it rings, notifies and bounces the dock once.
+  await juno.setFrontmost(false)
+  fake.control('startHuddle', { channel: 'C0ALERTSPROD', user: 'U0MAYA' })
+  const card = win.getByRole('region', { name: 'Incoming huddle' })
+  await expect(card.getByRole('button', { name: 'Open huddle in #alerts-prod' })).toBeVisible()
+  await expect(card.locator('[data-pulse]')).toHaveCount(1)
+  await expect.poll(() => ringing(win)).toBe(true)
+  await expect.poll(() => juno.osNotifications()).toContainEqual({ title: '#alerts-prod', body: 'Maya started a huddle', silent: true })
+  await expect.poll(() => juno.dockBounces()).toBe(1)
+  await card.getByRole('button', { name: 'Dismiss' }).click()
+  await expect(card).toBeHidden()
+  await expect.poll(() => ringing(win)).toBe(false)
+
+  // Ring for huddles is on by default. Off, with Juno frontmost, Leo's huddle in #eng shows its card, pulse and notification, with no ring and no bounce.
+  await juno.setFrontmost(true)
+  await juno.openNotifications()
+  const ring = win.getByRole('switch', { name: 'Ring for huddles' })
+  await expect(ring).toBeChecked()
+  await ring.click()
+  await expect(ring).not.toBeChecked()
+  const before = await rings(win)
+  fake.control('startHuddle', { channel: 'C0ENG', user: 'U0LEO' })
+  await expect(card.getByRole('button', { name: 'Open huddle in #eng' })).toBeVisible()
+  await expect(card.locator('[data-pulse]')).toHaveCount(1)
+  await expect.poll(() => juno.osNotifications()).toContainEqual({ title: '#eng', body: 'Leo started a huddle', silent: true })
+  expect(await rings(win)).toBe(before)
+  expect(await ringing(win)).toBe(false)
+  expect(await juno.dockBounces()).toBe(1)
 })

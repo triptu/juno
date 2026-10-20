@@ -10,6 +10,7 @@
  * - `notifications.why` answers the message menu's why item.
  * - The setters write the settings. `notifications.setLevel` returns an
  *   undo (ADR 0010); on a thread it also follows or unfollows it (SPEC 5).
+ * - `notifications.setHuddleRing` is Ring for huddles (SPEC 20).
  * - `notifications.setPresence` is Set yourself away or active. It holds
  *   until the next switch in the active hours.
  * - `notifications.setSlackSchedule` and `notifications.restoreSlackSchedule`
@@ -41,6 +42,8 @@ export const NotificationSettingsView = Schema.Struct({
   threads: Schema.Record(Schema.String, NotifyLevel),
   /** Off: DMs and mentions notify, and What matters to you is not read. */
   aiAssist: Schema.Boolean,
+  /** Ring for huddles. Off: an incoming huddle shows its card and notification without the sound. */
+  huddleRing: Schema.Boolean,
 })
 export type NotificationSettingsView = typeof NotificationSettingsView.Type
 
@@ -146,6 +149,13 @@ export const notificationsSetMatters = Rpc.make('notifications.setMatters', {
   error: NotSignedIn,
 })
 
+/** Ring for huddles on or off. */
+export const notificationsSetHuddleRing = Rpc.make('notifications.setHuddleRing', {
+  payload: { enabled: Schema.Boolean },
+  success: Schema.Void,
+  error: NotSignedIn,
+})
+
 /** Sets a Notify me choice. On a thread, Every message and When it matters follow it and Never unfollows it. */
 export const notificationsSetLevel = Rpc.make('notifications.setLevel', {
   payload: { target: NotifyTargetSchema, choice: NotifyChoiceSchema },
@@ -180,6 +190,7 @@ export const NotificationsRoutes = RpcGroup.make(
   notificationsWhy,
   notificationsSetHours,
   notificationsSetMatters,
+  notificationsSetHuddleRing,
   notificationsSetLevel,
   notificationsSetPresence,
   notificationsSetSlackSchedule,
