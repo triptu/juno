@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import type { FileView } from '@juno/contract'
 import { copyImage, downloadFile, openFile, openViewerAtom, registry, uploadProgressAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
@@ -63,10 +63,15 @@ export function useTopicFiles(view: string) {
   const [dropping, setDropping] = useState(false)
   // What had focus at the open, taken before the topic turns inert under the viewer; on a cold load its chunk mounts later.
   const [opener, setOpener] = useState<Element | null>(null)
+  // The view now: a new thread's id changes once Slack acknowledges it, without a remount.
+  const current = useRef(view)
+  useEffect(() => {
+    current.current = view
+  }, [view])
   // Created once, like every row callback; the time in the viewer's header is reckoned from the moment it opened.
   const [setViewing] = useState(() => (next: MediaViewing) => {
     setOpener(document.activeElement)
-    registry.set(openViewerAtom(view), { ...next, now: Date.now() })
+    registry.set(openViewerAtom(current.current), { ...next, now: Date.now() })
   })
   const open = useAtomValue(openViewerAtom(view), (viewer) => viewer !== undefined)
   const progress = useAtomValue(uploadProgressAtom)
