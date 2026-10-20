@@ -1,10 +1,10 @@
 # Huddles plan
 
-October 2026. Started 2026-10-18. Inputs: `docs/research/slack-huddles.md`, architecture sections 2, 3, 6, 7 and 15, `performance.md`, `docs/research/screen-share-detection.md`, and the code on `main` at `3d7b9c9d`. Not started; the owner says when.
+October 2026. Started 2026-10-18. Inputs: `docs/research/slack-huddles.md`, architecture sections 2, 3, 6, 7 and 15, `performance.md`, `docs/research/screen-share-detection.md`, and the code on `main` at `3d7b9c9d`. Phases 0 to 4 are built and on `main`; incoming huddles followed on 2026-10-20. SPEC 20 describes the product as built.
 
 ## How we work
 
-- One step at a time, with no wide fan-out. Each step is a small set of small commits on the branch `t3/scope-slack-huddles`.
+- One step at a time, with no wide fan-out. Each step is a small set of small commits on its own branch, merged to `main`.
 - Design is finished and signed off first, so the build can go on while the owner is away.
 - Codex (GPT-6-Astra) reviews anything we are not confident in: the Quint spec, the engine's call lifecycle, the socket-events seam and the request-shape change. Claude reviews UI and design.
 - The spike (phase 2) needs the owner: a private test channel and their phone as the second participant.
@@ -17,8 +17,8 @@ Order of importance: audio, then screen share. Video is out of scope for now.
 
 In scope:
 
-- **Audio.** Start a huddle in a channel or DM, join a running one, leave. Mute and unmute. Choose the microphone and speaker. Who is in the huddle, who is speaking, who is muted. Chime's Voice Focus noise suppression. The "in a huddle" profile status. A dot on channels with a huddle running.
-- **The sidebar bar.** Row 1: where the huddle is, who is in it, how long it has run. Row 2: mute, screen share (once phase 4 lands), leave, and open the tab. It shows only while the user is in a huddle.
+- **Audio.** Start a huddle in a channel or DM, join a running one, leave. Mute and unmute. Choose the microphone and speaker. Who is in the huddle, who is speaking, who is muted. Chime's Voice Focus noise suppression. The "in a huddle" profile status. Green headphones on the Main row of a channel with a huddle running.
+- **The sidebar bar.** Row 1: where the huddle is, who is in it, how long it has run. Row 1 opens the tab. Row 2: mute, screen share, the device menu and leave. It shows only while the user is in a huddle.
 - **The huddle tab.** A new tab kind. Participants with speaking and muted state, the controls, and the shared screen when someone shares.
 - **Screen share.** First, watch what others share (up to two at once, as Slack allows). Then share your own screen or window. Juno's own capture may switch on privacy mode through `screenWatch`; the owner accepts that.
 - **Incoming huddles.** A card at the top of the sidebar, a soft ring and a macOS notification when someone starts a huddle where the user is (SPEC 20, "Incoming huddles"). Built on 2026-10-20 from the running list, so it needs no new socket event: `@juno/huddle`'s `incoming.ts` has the rules, `engine/src/huddle/incoming.ts` decides each by the notification settings and posts the notification, and the renderer's `containers/huddle/Incoming.tsx` and `ring.ts` show the card and ring.
@@ -29,7 +29,7 @@ Out of scope:
 - **Video.** Camera, tiles and background effects.
 - **Everything carried in Slack's protobuf peer messages:** reactions, raised hands, drawing on a shared screen, mute requests, music, the awareness channel, transcript catch-up. Juno does not send or read them.
 - Recording and AI notes, captions, knocks, external guests, scheduled huddles, multi-device join, a separate huddle window, the post-call survey.
-- **A performance budget for a live call.** The idle budgets in `performance.md` do not apply while a huddle runs. We first make it work, then measure. The budgets that still apply: cold start, tab switch and sidebar frames must not regress when no huddle runs, and the Chime SDK loads only on join (the initial bundle is at 1,068 KB of 1,100 KB).
+- **A performance budget for a live call.** The idle budgets in `performance.md` do not apply while a huddle runs. We first make it work, then measure. The budgets that still apply: cold start, tab switch and sidebar frames must not regress when no huddle runs, and the Chime SDK loads only on join (the initial bundle is at 1,067 KB of 1,100 KB on 2026-10-20).
 
 ## 2. How it works
 
@@ -57,7 +57,7 @@ All new logic lives in three new packages. Existing code changes only at the reg
 | --- | --- | --- |
 | `@juno/huddle` | Engine side. The `Huddle` service: a state machine for the call (idle, joining, joined, leaving), `rooms.join` and `rooms.leave`, the leave that must happen, participants from room frames, running huddles per channel, status renewal every 4 minutes or so. Decodes its own frames from the socket. Its route handlers and its attachment to `SocketEvents` are in `engine/src/huddle/`, since they use the engine's serve helpers and store. | `slack`, `slack-schema`, `contract` |
 | `@juno/huddle-media` | Renderer side. A `MediaSession` interface with two versions: Chime and a fake for e2e tests. Join with meeting and attendee, mute, devices, active speaker, volume, remote content share, local content share. A plain store (`subscribe`, `getSnapshot`), no Atom and no React. Loaded as a lazy chunk on join. | `amazon-chime-sdk-js` only (it needed nothing from `contract`) |
-| `@juno/huddle-views` | Dumb views with fixtures: `HuddleBar`, `HuddlePage`, the participant row, the shared-screen stage, the channel header button, the channel dot. | `ui`, `tokens` |
+| `@juno/huddle-views` | Dumb views with fixtures: `HuddleBar`, `HuddlePage`, the participant tiles, the shared-screen stage, `HuddleHeaderButton`, `HuddleIndicator` (the row's headphones), `IncomingHuddleCard`, the device menu and the share sheet. | `ui`, `tokens` |
 
 Also new, but in existing places:
 
@@ -68,7 +68,7 @@ Also new, but in existing places:
 - `fake-slack`: `rooms.join` returns a fake meeting, plus `rooms.leave`, room frames and the controls `startHuddle`, `joinHuddle` and `leaveHuddle` for other users. The e2e tests use the fake `MediaSession`, so no test talks to Chime.
 - `specs/huddle.qnt` (section 6).
 
-## 4. Seams refactor (proposed, before huddles)
+## 4. Seams refactor (done before huddles)
 
 Today a feature like this touches about 15 existing files. Most of those touches are fine: one line in `engine/src/layer.ts`, one in `contract/src/routes/index.ts`, one in `slack-schema` `Methods`. Four seams are not. Each is a hand-written switch or a single hook that every new feature has to edit:
 
@@ -87,7 +87,7 @@ Each seam is a small task on its own, with no behaviour change. Seams 1 and 2 ed
 
 ### Phase 0: seams refactor
 
-Four tasks, one per seam, in parallel once the hot files are free. Existing e2e tests cover them; no new tests.
+Done. Four tasks, one per seam. Existing e2e tests cover them; no new tests. The seams are listed in architecture section 15, "Seams".
 
 ### Phase 1: design
 
@@ -179,4 +179,3 @@ These are recorded in the decision log on 2026-10-18:
 - Juno's own screen share may turn on privacy mode.
 - A Quint spec for the call lifecycle.
 
-Open for the owner: whether to do the seams refactor (section 4) before huddles.

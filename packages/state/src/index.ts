@@ -150,6 +150,7 @@ export {
   restoreSlackSchedule,
   setHours,
   setHuddleRing,
+  setHoursDay,
   setMatters,
   setPresence,
   setSlackSchedule,
