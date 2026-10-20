@@ -123,8 +123,10 @@ function preloadFonts(patterns: ReadonlyArray<RegExp>): Plugin {
 // the build is started from.
 const repoRoot = resolve(__dirname, '../..')
 
-// Build-time dependencies are bundled. Only dependencies in the desktop manifest
+// Build-time dependencies are bundled. Only production dependencies in the desktop manifest
 // remain external and are copied by electron-builder. Keep that boundary checked.
+const workspaceRuntime = Object.keys(dependencies).filter((name) => name.startsWith('@juno/'))
+if (workspaceRuntime.length > 0) throw new Error(`Workspace packages must be build-time dependencies: ${workspaceRuntime.join(', ')}`)
 const externalize = externalizeDepsPlugin()
 function runtimeImports(): Plugin {
   return {
