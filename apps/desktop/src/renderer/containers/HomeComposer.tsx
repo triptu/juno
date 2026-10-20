@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { encodeMentions, type PickConversation, type PickConversations } from '@juno/contract'
+import { encodeMentions, markupLayout, type PickConversation, type PickConversations } from '@juno/contract'
 import {
   attachmentsAtom,
   emptyHomeDraft,
@@ -23,6 +23,7 @@ import { afterPaint, mark } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { AttachmentNote, Composer, destinationLabel, holdKeys, notSentText, releaseKeys, SendToList, sendToRowId, type ComposerMention } from '@juno/views'
 import { takeAttachments, useAttachments } from './attachments'
+import { formatKey } from './formatKeys'
 import { useHomeSendChecks } from './homeSendChecks'
 import { isPeople, WriteTop } from './homeWriteTop'
 import { junoCommands } from './juno/actions'
@@ -309,7 +310,9 @@ export interface HomeComposerProps {
  * an empty field goes back to Juno. A send to a person or channel goes to
  * its Main (a channel's starts a thread), and Home stays: the field
  * empties, the destination goes back to Juno and a toast says where it
- * went. A send to Juno opens the Juno chat with the question.
+ * went. A send to Juno opens the Juno chat with the question. Slack's
+ * markup and its keys work once a person or channel is chosen; a question
+ * for Juno is plain text.
  */
 export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerProps) {
   const draft = useAtomValue(homeDraftAtom(tabId))
@@ -361,6 +364,7 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
       destination.choose(undefined)
       return true
     }
+    if (toSlack && formatKey(event)) return true
     return mentions.onFieldKey(event)
   }
 
@@ -368,6 +372,7 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
     <Composer
       value={draft.draft}
       marks={mentions.marks}
+      {...(toSlack ? { format: markupLayout(draft.draft, mentions.marks) } : {})}
       onCaret={mentions.onCaret}
       {...(mentions.mention === undefined ? {} : { mention: mentions.mention })}
       {...(sendToList === undefined ? {} : { mention: sendToList })}
