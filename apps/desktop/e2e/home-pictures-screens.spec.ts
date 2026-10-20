@@ -89,6 +89,13 @@ quiet('Home caught up before and after the picture, the story and the gallery, l
   await expect(win.locator('[data-gallery]')).toBeVisible()
   await shoot(win, 'home-art-gallery-light')
 
+  // A wider window, as on a laptop screen: the label sits beside the picture.
+  await juno.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1440, 900))
+  await win.locator('[data-gallery-picture]').first().getByRole('button').click()
+  await expect(win.locator('[data-picture-page] h1')).toBeVisible()
+  await shoot(win, 'home-art-story-wide-light')
+  await juno.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1200, 800))
+
   await juno.setTheme('Dark')
   await homeWith('hokusai-great-wave', 'home-art-after-dark')
   await home.picture.getByRole('button').click()
@@ -98,6 +105,10 @@ quiet('Home caught up before and after the picture, the story and the gallery, l
   await home.picture.getByRole('button').click()
   await expect(win.locator('[data-picture-page] h1')).toBeVisible()
   await shoot(win, 'home-art-story-space-dark')
+  await juno.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1440, 900))
+  await expect(win.locator('[data-picture-page] h1')).toBeVisible()
+  await shoot(win, 'home-art-story-space-wide-dark')
+  await juno.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1200, 800))
   await win.locator('[data-picture-page]').getByRole('button', { name: 'All pictures' }).click()
   await expect(win.locator('[data-gallery]')).toBeVisible()
   await shoot(win, 'home-art-gallery-dark')
