@@ -86,5 +86,6 @@ test('Never hides a missed huddle, Every message restores it, and ignoring the c
   await juno.sidebar.row('#product').chooseInMenu('ignore-channel')
   await expect.poll(async () => { await revisit(juno); return juno.home.title('missedHuddle').allTextContents() }).toEqual(['Missed huddle in #product'])
   await juno.home.openItem('missedHuddle')
-  await juno.topic.expectTitle('#product')
+  await juno.topic.expectTitle('product')
+  await expect(juno.topic.root.getByRole('heading', { name: 'Main', exact: true })).toBeVisible()
 })
