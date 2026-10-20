@@ -1,0 +1,1 @@
+- 10-21 04:47 · others-presence · A DM's Main row shows your avatar's presence dot on the person's photo while Slack shows them active (away shows nothing, message avatars never), from one `presence_sub` of the 100 DMs with the latest activity, kept in memory; Settings › Notifications has "Show when people are active", on by default, and off sends no subscription.
