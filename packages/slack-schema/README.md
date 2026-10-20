@@ -8,6 +8,8 @@ One Slack vocabulary. Effect Schemas for every payload Juno reads or sends, and 
 - Payload schemas by area: `boot`, `conversations`, `users`, `message` and `blocks`, `threads`, `chat`, `search`, `files`, and socket frames in `rtm` (`RtmFrame`, `encodeRtmFrame`).
 - `Ts` and its helpers: `isTs`, `compareTs`, `maxTs`, `minTs`, `tsToMillis`, `millisToTs`. A `Ts` is a string of the form `<seconds>.<6 digits>`; compare it with these helpers, never as a number or with `<`.
 
+The getView envelope keeps `threads` as unknown entries. Consumers decode each with `ThreadView`, so one unfamiliar thread cannot reject the page.
+
 Decoding is tolerant. Unknown keys are dropped. Unknown block elements and socket frame types decode to `{ type: 'unknown', raw }`, so a new Slack feature degrades instead of failing a whole message. Encoding is used by `@juno/fake-slack`, so the fake cannot drift from what the client expects.
 
 ## Must not

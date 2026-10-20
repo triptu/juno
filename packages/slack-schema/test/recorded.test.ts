@@ -8,7 +8,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { decodeRtmFrame, isMethodName, Methods } from '@juno/slack-schema'
+import { decodeRtmFrame, isMethodName, Methods, ThreadView } from '@juno/slack-schema'
 
 const dir = join(import.meta.dirname, 'fixtures', 'recorded')
 const read = (file: string): unknown => JSON.parse(readFileSync(file, 'utf8'))
@@ -63,7 +63,8 @@ describe('recorded responses', () => {
   it('subscriptions.thread.getView roots say where they live and how far they were read', () => {
     const view = Schema.decodeUnknownSync(Methods['subscriptions.thread.getView'].ok)(read(join(dir, 'subscriptions.thread.getView.json')))
     expect(view.threads.length).toBeGreaterThan(0)
-    for (const thread of view.threads) {
+    for (const raw of view.threads) {
+      const thread = Schema.decodeUnknownSync(ThreadView)(raw)
       expect(thread.root_msg.channel).toMatch(/^[CDG]/)
       expect(thread.root_msg.thread_ts).toBe(thread.root_msg.ts)
       expect(thread.root_msg.reply_count).toBeGreaterThan(0)

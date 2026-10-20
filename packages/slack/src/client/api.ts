@@ -47,6 +47,7 @@ import {
 import { RequestQueue, type Lane } from './queue.ts'
 import { apiBaseFromWorkspace, SlackSession, slackRoute } from './session.ts'
 import { HttpTransport, type HttpResponse } from './transport.ts'
+import { decodeIssueDetails } from './decodeIssue.ts'
 
 export interface CallOptions<E = never> {
   /** Default `interactive`. */
@@ -211,7 +212,7 @@ export const decodeResponse = <A extends { ok: boolean }>(
       catch: () => new SlackTransportError({ method, status: 200, message: 'response is not JSON', retryable: true }),
     })
     const decoded = yield* S.decodeUnknownEffect(schema)(json).pipe(
-      Effect.mapError((error) => new SlackDecodeError({ method, message: error.message.slice(0, 300) })),
+      Effect.mapError((error) => new SlackDecodeError({ method, message: 'response does not match schema', ...decodeIssueDetails(error.issue) })),
     )
     if (decoded.ok) return decoded as Extract<A, { ok: true }>
     const error = (decoded as unknown as { error: string; warning?: string; needed?: string; provided?: string }).error

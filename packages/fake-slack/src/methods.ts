@@ -339,7 +339,7 @@ export const coreMethods = {
     })
     const state = ws.threadCounts(index)
     return {
-      threads: page,
+      threads: page.map((view) => ws.threadViewRowOverrides.has(view.root_msg.ts) ? ws.threadViewRowOverrides.get(view.root_msg.ts) : view),
       has_more: views.length > limit,
       total_unread_replies: Object.values(state.unread_count_by_channel ?? {}).reduce((a, b) => a + b, 0),
       ...(args.fetch_threads_state === true ? { threads_state: state } : {}),

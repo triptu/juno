@@ -53,6 +53,8 @@ export const LOG_EVENTS = new Set([
   "sync: Automated holds not set",
   "sync: Automated not sorted",
   "sync: boot failed, retrying",
+  "sync: getView thread skipped",
+  "sync: getView deferred after boot",
   "sync: catch-up failed",
   "sync: coverage not reset",
   "sync: discovery failed",
