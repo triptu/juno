@@ -49,6 +49,11 @@ describe('topic row menu', () => {
     ])
   })
 
+  it("puts a channel's huddle item after Open in new tab", () => {
+    expect(labels(topicMenuItems({ ...base, huddle: 'start' })).slice(0, 3)).toEqual(['Open in new tab', 'Start huddle', '—'])
+    expect(labels(topicMenuItems({ ...base, huddle: 'join' }))[1]).toBe('Join huddle')
+  })
+
   it('has no Rename for Main, and no Ignore for DMs', () => {
     const main = labels(topicMenuItems({ ...base, kind: 'main' }))
     expect(main).not.toContain('Rename')
@@ -130,6 +135,11 @@ describe('channel menu', () => {
     ])
     expect(labels(channelMenuItems({ channel: maya, hasMain: true }))).toEqual(['Show its topics', 'Open Main', '—', 'Mark channel as read', 'Mark channel as unread'])
     expect(labels(channelMenuItems({ channel: eng, hasMain: false }))).not.toContain('Open Main')
+  })
+
+  it('offers Start huddle, or Join huddle while one runs, after Open Main', () => {
+    expect(labels(channelMenuItems({ channel: eng, hasMain: true, huddle: 'start' })).slice(0, 4)).toEqual(['Show its topics', 'Open Main', 'Start huddle', '—'])
+    expect(labels(channelMenuItems({ channel: eng, hasMain: true, huddle: 'join' }))).toContain('Join huddle')
   })
 
 })

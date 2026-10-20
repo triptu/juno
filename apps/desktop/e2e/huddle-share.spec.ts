@@ -8,7 +8,7 @@ import type { FakeSlack } from '@juno/fake-slack'
 import type { Juno } from './driver/juno'
 import { expect, test } from './fixtures'
 import { hooks } from './hooks'
-import { addRemote, attendee, chimeDrops, closeShareWindow, connection, huddleMenuItem, openEngMain, ownShare, playing, screenRecording, startShare, type MediaWindow } from './huddleFake'
+import { addRemote, attendee, chimeDrops, closeShareWindow, connection, huddleMenuItem, openEngMain, ownShare, playing, screenRecording, startHuddleFromMenu, startShare, type MediaWindow } from './huddleFake'
 import { expectStableAnchor } from './shiftProbe'
 
 test.describe.configure({ timeout: 90_000 })
@@ -18,7 +18,7 @@ const endOwnSource = (win: Page) => win.evaluate(() => (window as unknown as Med
 /** Starts a huddle in #eng with Maya in it, and returns the bar. */
 async function startWithMaya(juno: Juno, fake: FakeSlack, win: Page) {
   await openEngMain(juno)
-  await win.getByRole('button', { name: 'Start huddle' }).click()
+  await startHuddleFromMenu(juno)
   const bar = win.getByRole('region', { name: 'Huddle' })
   await expect(bar).toBeVisible()
   await expect.poll(() => connection(win)).toBe('connected')

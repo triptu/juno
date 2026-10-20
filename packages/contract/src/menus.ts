@@ -18,6 +18,7 @@ export {
   viewPillMenuItems,
   whyLabel,
   type ChannelMenuAction,
+  type HuddleMenuItem,
   type ViewChoice,
   type ViewMenuAction,
   type ViewPillAction,

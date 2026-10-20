@@ -119,7 +119,7 @@ export const compositions: Readonly<Record<string, FixtureSet<any>>> = {
       Header: {
         'dm-thread': headerPage('dm-thread', 'start'),
         'dm-main': headerPage('dm-main', 'start'),
-        'channel-main': headerPage('channel-main', 'start'),
+        'channel-main': headerPage('channel-main'),
         'channel-main-huddle': headerPage('channel-main', 'join'),
         'thread-resolve': headerPage('thread-resolve'),
         'thread-follow': headerPage('thread-follow'),

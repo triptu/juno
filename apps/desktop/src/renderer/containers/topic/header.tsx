@@ -14,7 +14,7 @@ const switcher = chunk(() => import('./Switcher'))
 const Switcher = switcher.component((module) => module.default)
 
 /**
- * The topic's header: title, place pill, a Main's feature controls
+ * The topic's header: title, place pill, feature controls
  * (`topicHeaderActions`), Resolve or Follow, the Juno toggle, the native
  * menu and the switcher. Its state lives in the topic, as a hook, so
  * the topic renders as it did when this was inline.
@@ -53,7 +53,7 @@ export function useTopicHeader(detail: TopicDetail, readOnly: boolean, drawnAll:
       onPillMenu={() => void showChannelMenu(detail.channel)}
       {...(agentOn ? { juno: { open: panelOpen, onToggle: toggleJunoPanel } } : {})}
       {...(renaming ? { rename: { onSave: (title: string) => renameTopic(detail.id, title), onCancel: cancelRename } } : {})}
-      {...(main && topicHeaderActions.length > 0 ? { actions: topicHeaderActions.map((Action, index) => <Action key={index} detail={detail} />) } : {})}
+      {...(topicHeaderActions.length > 0 ? { actions: topicHeaderActions.map((Action, index) => <Action key={index} detail={detail} />) } : {})}
       {...(main ? {} : { onResolve: () => toggleResolved(detail.id), onFollow: () => followThread(detail) })}
       switcher={{ open: switcherOpen, onOpen: setSwitcherOpen, content: switcherOpen ? <Switcher detail={detail} onClose={() => setSwitcherOpen(false)} /> : null }}
     />

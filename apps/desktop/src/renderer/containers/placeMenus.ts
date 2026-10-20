@@ -9,6 +9,7 @@
 import { channelMenuItems, isViewMenuAction, notifyChoiceOf, type ChannelMenuAction, type ContextMenuAt, type NotifyAction, type NotifyTargetView, type RowChannel } from '@juno/contract'
 import { currentNotificationSettings, ignoreChannel, junoAvailableAtom, loadNotificationSettings, popupContextMenu, registry, sidebarFilterAtom } from '@juno/state'
 import { markFilterChange } from './filterMark'
+import { huddleMenuItem, joinHuddleFromMenu } from './huddle/menuItem'
 import { askJunoAbout } from './juno/actions'
 import { openTopic } from './navigation'
 import { choiceFor, nativeMenu, setNotifyLevel } from './notifyActions'
@@ -36,12 +37,14 @@ export function scopeToChannel(channel: string): void {
 export async function showChannelMenu(channel: MenuChannel, at?: ContextMenuAt): Promise<ChannelMenuAction | undefined> {
   const settings = currentNotificationSettings(registry) ?? (await loadNotificationSettings(registry))
   const target: NotifyTargetView = { kind: 'channel', id: channel.id }
+  const huddle = huddleMenuItem(channel)
   const items = channelMenuItems({
     channel: { id: channel.id as never, kind: channel.kind, name: channel.name },
     hasMain: channel.mainId !== undefined,
     notify: choiceFor(settings, target),
     views: viewChoices(channel.id),
     askJuno: registry.get(junoAvailableAtom),
+    ...(huddle === undefined ? {} : { huddle }),
   })
   const chosen = (await popupContextMenu(nativeMenu(items, (id) => !pending.has(id)), at)) as ChannelMenuAction | undefined
   if (chosen !== undefined) await runChannelAction(chosen, channel, target)
@@ -54,6 +57,8 @@ async function runChannelAction(chosen: ChannelMenuAction, channel: MenuChannel,
   switch (chosen) {
     case 'show-topics':
       return scopeToChannel(channel.id)
+    case 'huddle':
+      return joinHuddleFromMenu(channel.id)
     case 'open-main':
       if (channel.mainId !== undefined) openTopic(channel.mainId)
       return

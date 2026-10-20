@@ -64,6 +64,7 @@ syncedTest('Rina’s thread opens at the "N new" divider, and its ⋯ menu unfol
     const never = await juno.topic.chooseInMenu('notify-never')
     expect(never.labels).toEqual([
       'Open in new tab',
+      'Start huddle',
       '-',
       'Rename',
       'Redraw art',
@@ -90,7 +91,7 @@ syncedTest('Rina’s thread opens at the "N new" divider, and its ⋯ menu unfol
 
     // Every message follows it again, and it comes back; a right-click on the title shows the same menu, under the left island at the title's left edge.
     const every = await juno.topic.chooseInTitleMenu('notify-every')
-    expect(every.labels.slice(0, 7)).toEqual(never.labels.slice(0, 7))
+    expect(every.labels.slice(0, 8)).toEqual(never.labels.slice(0, 8))
     const title = (await juno.topic.titleButton.boundingBox())!
     expect(Math.round(every.at!.x)).toBe(Math.round(title.x))
     expect(every.labels).toContain('> Never ✓')
@@ -144,7 +145,7 @@ syncedTest('Main’s thread links, its title switcher, its Notify me and its hea
     await juno.tabs.expectCount(1)
   })
 
-  await test.step('Main’s Notify me is its channel’s, and the header is reached pill, title, Start huddle, ⋯, Juno', async () => {
+  await test.step('Main’s Notify me is its channel’s, and the header is reached pill, title, Juno, ⋯', async () => {
     await juno.sidebar.row(ENG_MAIN).open()
     await juno.topic.expectTitle('Main')
     const { labels } = await juno.topic.chooseInMenu('copy-link')
@@ -154,11 +155,13 @@ syncedTest('Main’s thread links, its title switcher, its Notify me and its hea
 
     await juno.topic.contextPill.focus()
     const order: string[] = []
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 4; i++) {
       order.push(await win.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.textContent ?? ''))
       await win.keyboard.press('Tab')
     }
-    expect(order).toEqual(['eng, public channel. Show in sidebar.', 'Main', 'Start huddle', 'More', 'Juno ⌘J'])
+    // No huddle runs in #eng, so its header has no huddle control: Start huddle is in ⋯.
+    expect(labels).toContain('Start huddle')
+    expect(order).toEqual(['eng, public channel. Show in sidebar.', 'Main', 'Juno ⌘J', 'More'])
     // Juno is on unless AI assist is off, so the header has its button.
     await expect(juno.topic.header.getByRole('button', { name: 'Juno ⌘J' })).toBeVisible()
   })
