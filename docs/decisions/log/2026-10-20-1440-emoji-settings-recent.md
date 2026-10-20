@@ -1,0 +1,1 @@
+- 10-20 14:40 · Tushar · Choosing a quick reaction in Settings changes the preference without recording recent use; actual reactions and composer picks still record use.
