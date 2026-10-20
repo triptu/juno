@@ -133,6 +133,14 @@ export default defineFixtures(
           ]}
         />
       )),
+      // A resolved topic offers Reopen, with the header's filled check.
+      'resolved-topic-commands': scene(() => (
+        <Palette
+          tab="conversations"
+          initial=">"
+          sections={[{ key: 'topic', heading: 'Postgres 16 migration plan', items: [{ id: 'k1', icon: 'reopen', label: 'Reopen', compact: true }, ...topicCommands.slice(1)] }]}
+        />
+      )),
       'topic-and-conversations': scene(() => (
         <Palette
           tab="conversations"

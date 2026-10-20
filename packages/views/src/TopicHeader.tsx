@@ -72,11 +72,12 @@ export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename
   const pillName = `${channel.name}, ${kind.charAt(0).toLowerCase()}${kind.slice(1)}`
 
   // Icons alone, with the word as the tooltip and the name. Reopen is the filled check: the thread is done, and a click undoes that.
+  // Filled, the disc in the island's text colour outweighs the stroked icons beside it, so it takes the muted icon colour.
   const resolve =
     !main && onFollow !== undefined && !detail.subscribed ? (
       <IconButton icon={Bell} label="Follow" size={28} iconSize={16} radius="full" variant="island" onClick={() => onFollow()} />
     ) : main || onResolve === undefined ? null : (
-      <IconButton icon={CheckCircle} label={detail.resolved ? 'Reopen' : 'Resolve'} size={28} iconSize={16} radius="full" variant="island" {...(detail.resolved ? { iconWeight: 'fill' as const } : {})} onClick={onResolve} />
+      <IconButton icon={CheckCircle} label={detail.resolved ? 'Reopen' : 'Resolve'} size={28} iconSize={16} radius="full" variant="island" {...(detail.resolved ? { iconWeight: 'fill' as const, iconTint: 'neutral' as const } : {})} onClick={onResolve} />
     )
   const junoButton = juno === undefined ? null : <JunoToggle pressed={juno.open} onToggle={juno.onToggle} />
 
