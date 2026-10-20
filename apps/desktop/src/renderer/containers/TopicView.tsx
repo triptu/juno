@@ -1,14 +1,14 @@
-import { memo, useEffect, useRef } from 'react'
+import { memo, Suspense, useEffect, useRef } from 'react'
 import type { TopicDetail } from '@juno/contract'
 import { acknowledgeTopic, updateTabs, selectedTopicAtom, discardMessage, messageListAtom, nowAtom, retryMessage, registry, scrollSnapshotAtom, topicAtom, topicView, traceSend, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { hueFor, MessageList, NewMessagesPill, TopicView as TopicViewFrame, type ActivateEvent, type MediaViewing } from '@juno/views'
+import { chunk, hueFor, MessageList, NewMessagesPill, TopicView as TopicViewFrame, type ActivateEvent, type MediaViewing } from '@juno/views'
 import { closeTabById, openTopic, warmTopic } from './navigation'
 import { useMessageActions, type ComposerHandle, type MessageActionsOutput } from './messageActions'
 import { showPersonMenu } from './notifyActions'
 import { takeComposerFocus } from './pageFocus'
 import { scopeToChannel, showChannelMenu } from './placeMenus'
-import { messageLinkInfo, openMessageLink } from './slackLinks'
+import { messageLinkInfo, openMessageLink, openPerson } from './slackLinks'
 import { attach } from './attachments'
 import { TopicComposer } from './TopicComposer'
 import { downloadMessageFile, useTopicFiles } from './topic/files'
@@ -40,6 +40,8 @@ function openThread(id: string, event: ActivateEvent): void {
 }
 
 const personMenu = (person: { readonly id: string; readonly name: string }) => void showPersonMenu(person)
+const openPersonDm = (id: string, behind: boolean) => void openPerson(id, behind)
+const DeactivatedNote = chunk(() => import('./topic/deactivated')).component((module) => module.DeactivatedNote)
 
 const retry = (clientMsgId: string) => void retryMessage(registry, clientMsgId)
 const discard = (clientMsgId: string) => void discardMessage(registry, clientMsgId)
@@ -206,6 +208,7 @@ function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps)
       onOpenThread={readOnly ? openThreadInNewTab : openThread}
       onPrefetchThread={warmTopic}
       onChannel={scopeToChannel}
+      onPerson={openPersonDm}
       onLink={openMessageLink}
       linkInfo={messageLinkInfo}
       onDownload={downloadMessageFile}
@@ -222,7 +225,7 @@ function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps)
     <TopicViewFrame
       header={header}
       pill={pill.show ? <NewMessagesPill count={pill.count} onJump={jump} /> : undefined}
-      composer={<TopicComposer key={id} detail={id === detail.id ? detail : { ...detail, id }} onSent={sent} handle={composer} takeFocus={(field) => takeComposerFocus(view, field)} onArrowUpEmpty={messageActions.selectNewest} dropping={files.dropping} />}
+      composer={detail.deactivated ? <Suspense><DeactivatedNote name={detail.channel.label} /></Suspense> : <TopicComposer key={id} detail={id === detail.id ? detail : { ...detail, id }} onSent={sent} handle={composer} takeFocus={(field) => takeComposerFocus(view, field)} onArrowUpEmpty={messageActions.selectNewest} dropping={files.dropping} />}
       floating={<>{messageActions.floating}{files.viewer}</>}
       onFiles={(dropped) => attach(id, dropped)}
       onDragFiles={files.setDropping}

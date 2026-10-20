@@ -8,6 +8,7 @@ import { Message, placeToolbar, type MessageActions, type MessageProps } from '.
 import type { LinkInfo } from './MessageLink'
 import { inField } from './fieldMenu'
 import { NewDivider } from './NewDivider'
+import { PersonLinks, press } from './personLink'
 import { messageTime } from './time'
 
 /** One row as the container holds it: the message and its sender from the window's refs. */
@@ -82,6 +83,12 @@ export interface MessageListProps {
   /** The pointer came onto a Main message that has a thread: warm the thread, which a peek or an open may read next. */
   readonly onPrefetchThread?: (id: string) => void
   readonly onChannel?: (id: string) => void
+  /**
+   * A click, or Enter, on a sender's name or avatar or an @person chip: your
+   * DM with them (SPEC 7, "People"), `behind` the current tab with ⌘. Created
+   * once. Without it people open nothing. Right-click is still `onPersonMenu`.
+   */
+  readonly onPerson?: (id: string, behind: boolean) => void
   readonly onLink?: (url: string, event: ActivateEvent) => void
   /** Which links open inside Juno, and where they go (`MessageBody`). */
   readonly linkInfo?: LinkInfo
@@ -123,6 +130,7 @@ const DRAG_SELECTION = 4
  * focus and the keyboard are untouched: a focused row still shows its toolbar.
  */
 function watchSelectionDrag(event: PointerEvent<HTMLDivElement>): void {
+  press.dragged = false
   if (event.button !== 0 || event.pointerType !== 'mouse' || !(event.target instanceof Element) || event.target.closest('button, a, input, textarea, [role="toolbar"]') !== null) return
   const list = event.currentTarget.closest<HTMLElement>('[data-scroll-area]')
   if (list === null) return
@@ -130,7 +138,7 @@ function watchSelectionDrag(event: PointerEvent<HTMLDivElement>): void {
   let dragging = false
   const move = (next: globalThis.PointerEvent) => {
     if (dragging || Math.hypot(next.clientX - from.x, next.clientY - from.y) < DRAG_SELECTION) return
-    dragging = true
+    dragging = press.dragged = true
     list.toggleAttribute('data-selecting', true)
     list.style.setProperty('--row-hover-toolbar', 'none')
   }
@@ -231,6 +239,7 @@ export function MessageList({
   onOpenThread,
   onPrefetchThread,
   onChannel,
+  onPerson,
   onLink,
   linkInfo,
   onToggleReaction,
@@ -267,7 +276,7 @@ export function MessageList({
         aria-label="Messages"
         aria-busy={status === 'loading' || status === 'pending'}
         onKeyDown={(event) => onKeyDown(event, onRowKey)}
-        onPointerDown={actions === undefined ? undefined : watchSelectionDrag}
+        onPointerDown={watchSelectionDrag}
         onPointerOver={
           onPrefetchThread === undefined
             ? undefined
@@ -294,6 +303,7 @@ export function MessageList({
         ) : null}
         {notDrawnAbove > 0 ? <div aria-hidden {...stylex.props(styles.notDrawn(notDrawnAbove))} /> : null}
         {items.length === 0 ? <Empty main={main} status={status} /> : null}
+        <PersonLinks value={onPerson}>
         {items.map((item, index) => {
           const atDivider = index === dividerIndex && index > 0
           // A row's header and margin never depend on its place in the window, so a page added above
@@ -334,6 +344,7 @@ export function MessageList({
             </Row>
           )
         })}
+        </PersonLinks>
       </div>
     </ScrollArea>
   )

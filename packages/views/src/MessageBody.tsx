@@ -6,6 +6,7 @@ import { Chip, Divider, focusRing, Text, type ActivateEvent, type HueName } from
 import { HighlightedCodeBlock } from './CodeHighlight'
 import { AttachmentCard, AttachmentFields, AttachmentImage, SharedFileLines, SharedPlace, type FileBlock } from './AttachmentCard'
 import { MessageLink as Link, type LinkInfo } from './MessageLink'
+import { PersonChip } from './personLink'
 import { slackDate } from './time'
 
 export interface MessageBodyProps {
@@ -191,18 +192,8 @@ function Inline({ inline, now, hueOf, onChannel, onLink, linkInfo, tabIndex, qui
       return styled(inline.text, inline.style)
     case 'link':
       return <Link url={inline.url} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} quiet={quiet}>{styled(inline.text, inline.style)}</Link>
-    // Chip text sits in <bdi> so "@Name" keeps its own direction inside a
-    // right-to-left paragraph (otherwise the "@" jumps to the other end).
     case 'user':
-      return inline.isMe ? (
-        <Chip variant="mention" size="inline" title="Mentions you">
-          <bdi>@{inline.name}</bdi>
-        </Chip>
-      ) : (
-        <Chip variant="person" size="inline" hue={hueOf(inline.id)} data-person={inline.id} data-person-name={inline.name}>
-          <bdi>@{inline.name}</bdi>
-        </Chip>
-      )
+      return <PersonChip inline={inline} hue={hueOf(inline.id)} tabIndex={tabIndex} />
     case 'channel':
       return (
         <button
