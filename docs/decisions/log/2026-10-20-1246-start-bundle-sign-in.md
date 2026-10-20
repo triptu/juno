@@ -1,0 +1,1 @@
+- 10-20 12:46 · start-bundle-sign-in · Load sign-in and its appearance controls as a chunk, warmed on idle after the shell paints and loaded immediately when a signed-out session is known. Show the whole page once ready, without a Suspense fallback delay; signed-in Home and topic frames stay eager.

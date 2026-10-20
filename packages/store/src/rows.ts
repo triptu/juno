@@ -12,6 +12,9 @@ export type { ConversationKind, TopicKind }
 export type Flag = 0 | 1
 
 export interface MessageRow {
+  /** Derived by reindex: 0 none, 1 broadcast, 2 direct or own user group; null until derived. Optional on incoming rows. */
+  readonly attention?: number | null
+  readonly attention_context?: string | null
   readonly bot_name: string | null
   readonly bot_icon: string | null
   readonly channel: string

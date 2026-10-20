@@ -50,6 +50,19 @@ export function moveLinks(before: string, after: string, links: ReadonlyArray<Li
     oldEnd = before.length - same
     newEnd = after.length - same
   }
+  // Formatting inserts or removes markers around unchanged labels. Keep their URL,
+  // including Undo, without treating an arbitrary replacement label as the old one.
+  const oldPart = before.slice(from, oldEnd)
+  const newPart = after.slice(from, newEnd)
+  const markerOnly = (value: string) => /^[*_~`>\s]*$/.test(value)
+  const keptAt = newPart.indexOf(oldPart)
+  const removedAt = oldPart.indexOf(newPart)
+  if (oldPart && keptAt >= 0 && markerOnly(newPart.slice(0, keptAt) + newPart.slice(keptAt + oldPart.length))) {
+    return links.map((link) => link.end <= from ? link : link.start >= oldEnd ? { ...link, start: link.start + delta, end: link.end + delta } : { ...link, start: link.start + keptAt, end: link.end + keptAt })
+  }
+  if (newPart && removedAt >= 0 && markerOnly(oldPart.slice(0, removedAt) + oldPart.slice(removedAt + newPart.length))) {
+    return links.map((link) => link.end <= from ? link : link.start >= oldEnd ? { ...link, start: link.start + delta, end: link.end + delta } : { ...link, start: Math.max(from, link.start - removedAt), end: Math.min(newEnd, link.end - removedAt) }).filter((link) => link.end > link.start)
+  }
   const out: LinkRange[] = []
   for (const link of links) {
     const { start, end } = link

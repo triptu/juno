@@ -130,8 +130,8 @@ export const EngineToMain = Schema.Union([
   Schema.TaggedStruct('setCookies', { url: Schema.String, cookies: Schema.Array(Schema.String) }),
   /** Please show this OS notification. */
   Schema.TaggedStruct('notify', { notification: OsNotification }),
-  /** Whether any topic has an unread mention: the dock shows a `•` badge. */
-  Schema.TaggedStruct('badge', { mentions: Schema.Boolean }),
+  /** Any eligible unread DM or mention: the dock shows a dot. */
+  Schema.TaggedStruct('badge', { unread: Schema.Boolean }),
   /**
    * The huddle the user is in or joining, at the engine's start and on every
    * change; null for none. Main asks before quitting while there is one

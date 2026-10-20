@@ -3,9 +3,12 @@ export { inlinesOf } from './model'
 export { UNKNOWN_PERSON } from './inline'
 
 export { unescapeMrkdwn } from './from-mrkdwn'
-export { bodyFromMrkdwn, messageBody, plainText, previewLine, previewText, type MessageContent } from './body'
+export { bodyFromMrkdwn, messageBody, plainText, previewLine, previewText, readableText, type MessageContent } from './body'
 
 export { composeOutgoing } from './outgoing'
+export { composeEdit } from './edit-outgoing'
+export { editMarkup } from './edit-markup'
+export { markupLayout, toggleMarkup, type MarkupEdit, type MarkupLayout, type MarkupStyle } from './markup'
 export { findLinks, linkOf } from './links'
 export type { MentionTargets } from './outgoing'
 export {

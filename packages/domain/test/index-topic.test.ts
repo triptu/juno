@@ -88,3 +88,8 @@ describe('mention detection', () => {
     expect(messageMentionsMeDirectly(bodyFromMrkdwn('<@U0ME> hi'), my)).toBe(true)
   })
 })
+
+it('projects the same parsed unread mentions per sender for notifications, excluding own and read messages', () => {
+  const row = indexTopic(input([root, reply1, reply2], { includeAttention: true, reads: { lastReadTs: root.ts, markedUnread: false, pendingLocalWrite: false } }))
+  expect(row?.attention).toEqual([{ ts: reply1.ts, kind: 2 }])
+})

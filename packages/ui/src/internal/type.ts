@@ -181,6 +181,8 @@ export const variants = stylex.create({
     fontWeight: text['--text-code-weight'],
     lineHeight: text['--text-code-leading'],
     letterSpacing: text['--text-code-tracking'],
+    // Code shows as typed: no ligatures, so => -> ++ keep their characters (decision log 10-20, reversible).
+    fontVariantLigatures: 'none',
   },
 })
 

@@ -94,6 +94,7 @@ export interface IpcDeps {
   readonly setViewing: (topicId: string | null) => void
   /** Settings › Notifications: the test notification, macOS's permission and its settings (notificationPermission.ts). */
   readonly notifications: {
+    readonly contentShown: () => Promise<void>
     readonly test: () => void
     readonly permission: () => Promise<NotificationPermission>
     readonly requestPermission: () => Promise<NotificationPermission>
@@ -199,6 +200,7 @@ export function registerIpc({ updates, supervisor, agent, providers, codex, back
     setSidebar(sidebar)
   })
 
+  handle(Channels.notificationsContentShown, () => notifications.contentShown())
   handle(Channels.notificationsTest, () => notifications.test())
   handle(Channels.notificationsPermission, () => notifications.permission())
   handle(Channels.notificationsRequestPermission, () => notifications.requestPermission())

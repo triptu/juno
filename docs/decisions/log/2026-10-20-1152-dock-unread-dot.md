@@ -1,0 +1,1 @@
+- 10-20 11:52 · Tushar · Keep the dock badge as `•` and broaden it to unread DMs, group DMs and mentions elsewhere, using the sidebar's unread eligibility across views, Slack mutes and Juno's notification levels. More unread items keep the same dot. It clears when no eligible item remains. The domain's `dockBadgeActive` owns this policy so it can change in one place.

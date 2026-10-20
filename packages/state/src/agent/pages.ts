@@ -37,7 +37,7 @@ import type {
   JobId,
   T3Address,
 } from '@juno/agent-contract'
-import { chatCopy } from '@juno/agent-contract'
+import { junoAskCopy } from '@juno/agent-contract'
 import type { HomeItem } from '@juno/contract'
 import type { Registry } from '../client'
 import { aiAssistOnAtom } from '../notifications'
@@ -95,7 +95,7 @@ export const homeAsksAtom = Atom.make((get): ReadonlyArray<HomeItem> => {
   if (!get(aiAssistOnAtom)) return []
   const result = get(asksAtom)
   if (result._tag !== 'Success') return []
-  const learn = chatCopy.ask.learn
+  const learn = junoAskCopy.learn
   return result.value.asks.filter((ask) => ask.status._tag === 'open').map((ask): HomeItem => ({
     id: `ask:${ask.id}`,
     kind: 'ask',

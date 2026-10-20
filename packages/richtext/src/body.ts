@@ -36,15 +36,28 @@ export function bodyFromMrkdwn(text: string, lookups: Lookups = {}): MessageBody
  * channels as "#name", emoji as unicode or ":name:". For search and checks.
  */
 export function plainText(body: MessageBody): string {
-  return bodyText(body, true)
+  return bodyText(body, true, false)
 }
 
-function bodyText(body: MessageBody, quotes: boolean): string {
+/**
+ * The text as a person reads it, for notification bodies and search
+ * snippets: as `plainText`, but a code block's tag line (```ts) is left
+ * out, as the view leaves it out. `plainText` keeps it, for the edit field
+ * and what goes back to Slack.
+ */
+export function readableText(body: MessageBody): string {
+  return bodyText(body, true, true)
+}
+
+/** A code block's text as the view shows it: without its tag line. */
+const shownCode = (block: { readonly text: string; readonly tagLine?: true }) => (block.tagLine ? block.text.slice(block.text.indexOf('\n') + 1) : block.text)
+
+function bodyText(body: MessageBody, quotes: boolean, shown: boolean): string {
   const parts: string[] = []
   for (const block of body.blocks) {
     switch (block.kind) {
       case 'attachment':
-        parts.push(inlineText(block.title), bodyText({ blocks: block.blocks }, quotes), inlineText(block.footer))
+        parts.push(inlineText(block.title), bodyText({ blocks: block.blocks }, quotes, shown), inlineText(block.footer))
         break
       case 'fields':
         parts.push(...block.items.map((item) => inlineText(item)))
@@ -67,7 +80,7 @@ function bodyText(body: MessageBody, quotes: boolean): string {
         )
         break
       case 'code':
-        parts.push(block.text)
+        parts.push(shown ? shownCode(block) : block.text)
         break
       case 'file':
         parts.push(block.name)
@@ -84,10 +97,11 @@ function bodyText(body: MessageBody, quotes: boolean): string {
 
 /**
  * One-line text for a sidebar row: quote blocks dropped, breaks collapsed
- * to spaces, whitespace squeezed. Empty when the message was only a quote.
+ * to spaces, whitespace squeezed, a code block's tag line left out. Empty
+ * when the message was only a quote.
  */
 export function previewText(body: MessageBody): string {
-  return bodyText(body, false).replace(/\s+/g, ' ').trim()
+  return bodyText(body, false, true).replace(/\s+/g, ' ').trim()
 }
 
 /**

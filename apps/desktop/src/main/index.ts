@@ -1,8 +1,10 @@
 // First, so coverage (test runs only) starts before the rest of the bundle runs.
 import { flushAllCoverage, recordWindowCoverage } from '../coverage'
 import { app, BrowserWindow, Notification, powerMonitor, shell } from 'electron'
-import { Events, type NotificationPermission, type NotificationTarget, type PrivacyState } from '@juno/contract'
+import { Events, type NotificationTarget, type PrivacyState } from '@juno/contract'
 import { join } from 'node:path'
+import { createDockBadge } from './dockBadge'
+import { testNotificationPermission } from './notificationTestHooks'
 import { createActivityWatch } from './activity'
 import { createAgentSupervisor } from './agent'
 import { appBackupSecrets } from './backupSecrets'
@@ -112,7 +114,7 @@ const supervisor = createSupervisor({
   },
 })
 const huddleQuit = createHuddleQuit(e2e, appWindow)
-supervisor.onFailed(() => huddleQuit.engineFailed())
+supervisor.onFailed(() => { huddleQuit.engineFailed(); dockBadge.set('') })
 
 /** Under JUNO_E2E notifications are recorded, not shown; a test clicks them through `junoTest`. */
 const notificationsForTests: Array<{ readonly title: string; readonly body: string; click: () => void }> = []
@@ -142,10 +144,7 @@ const notifier = new Notifier({
     const shown = new Notification({ title: options.title, body: options.body })
     return { show: () => shown.show(), close: () => shown.close(), onClick: (f) => shown.on('click', f) }
   },
-  setBadge: (text) => {
-    badgeForTests = text
-    if (!e2e) app.dock?.setBadge(text)
-  },
+  setBadge: (text) => dockBadge.set(text),
   open: openTarget,
   focus: () => void focusWindow(),
   send: (message) => supervisor.send(message),
@@ -167,22 +166,19 @@ const activity = createActivityWatch({
 // A new engine hears at once, not at the next poll.
 supervisor.onReady(() => activity.poll())
 
-/**
- * Whether macOS lets Juno notify (notificationPermission.ts). Under JUNO_E2E a test sets it
- * (`junoTest.notificationPermission`); a request then answers allowed, as if the user clicked Allow.
- */
-let permissionForTests: NotificationPermission = 'allowed'
+/** Native notification permission, or the e2e stand-in. */
+const permissionForTests = testNotificationPermission()
 let notificationSettingsOpenedForTests = 0
-const notificationPermission = e2e
-  ? {
-      preload: () => {},
-      read: () => Promise.resolve(permissionForTests),
-      request: () => {
-        if (permissionForTests === 'notDetermined') permissionForTests = 'allowed'
-        return Promise.resolve(permissionForTests)
-      },
-    }
-  : createNotificationPermission(loadPermissionBridge)
+const notificationPermission = e2e ? permissionForTests : createNotificationPermission(loadPermissionBridge)
+const dockBadge = createDockBadge(notificationPermission, (text) => {
+  badgeForTests = text
+  if (!e2e) app.dock?.setBadge(text)
+}, {
+  enabled: app.isPackaged || (e2e && process.env.JUNO_E2E_DEV_NOTIFICATIONS !== '1'),
+  asked: () => launch.notificationPermissionAsked === true,
+  remember: async () => { updateLaunch({ notificationPermissionAsked: true }); await launchFile.pending() },
+})
+const refreshDockBadge = () => void dockBadge.refresh()
 
 /** System Settings at Juno's notifications; the Notifications pane if macOS refuses the entry's link. */
 const openNotificationSettings = async () => (e2e ? void (notificationSettingsOpenedForTests += 1) : openSettings(app.isPackaged))
@@ -237,7 +233,8 @@ app.whenReady().then(() => {
   if (process.platform === 'darwin' && !app.isPackaged && !e2e) app.dock?.setIcon(join(__dirname, '../../build/icon.png'))
   serveAppScheme(join(__dirname, '../renderer'), fakeSlackUrl === undefined ? undefined : new URL(fakeSlackUrl).origin)
   registerMediaPermissions()
-  powerMonitor.on('resume', () => notifier.wake())
+  powerMonitor.on('resume', () => { notifier.wake(); refreshDockBadge() })
+  app.on('browser-window-focus', refreshDockBadge)
   powerMonitor.on('lock-screen', () => {
     screenLocked = true
   })
@@ -255,9 +252,10 @@ app.whenReady().then(() => {
     processes,
     setViewing: (topicId) => notifier.setViewing(topicId),
     notifications: {
+      contentShown: () => dockBadge.contentShown(),
       test: () => notifier.test(),
       permission: notificationPermission.read,
-      requestPermission: notificationPermission.request,
+      requestPermission: dockBadge.request,
       openSettings: openNotificationSettings,
     },
     agent,
@@ -372,14 +370,14 @@ if (e2e) {
       notifications: () => notificationsForTests.map(({ title, body }) => ({ title, body })),
       clickNotification: (index = 0) => notificationsForTests[index]?.click(),
       dockBadge: () => badgeForTests,
+      clearDockBadge: () => dockBadge.set(''),
       ...huddleQuit.testHooks,
-      notificationPermission: (permission: NotificationPermission) => {
-        permissionForTests = permission
-      },
+      notificationPermission: permissionForTests.set,
       notificationSettingsOpened: () => notificationSettingsOpenedForTests,
+      notificationRequests: permissionForTests.requests,
       ...huddleSettingsForTests,
       slackKeychainReads,
-      wake: () => notifier.wake(),
+      wake: () => { notifier.wake(); refreshDockBadge() },
       // The activity watch's seam: the Mac's idle time in seconds, read at once.
       systemIdle: (seconds: number) => {
         idleForTests = seconds

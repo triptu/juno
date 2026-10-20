@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { ArrowUp } from '@phosphor-icons/react/dist/icons/ArrowUp'
 import type { ClipboardEvent, DragEvent, KeyboardEvent, MouseEvent, ReactNode, Ref, SyntheticEvent } from 'react'
 import { accent, layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { IconButton, Surface, Textarea, type TextareaMark } from '@juno/ui'
+import { IconButton, Surface, Textarea, type TextareaFormat, type TextareaMark } from '@juno/ui'
 
 /** The open @, # or emoji suggestions (inventory 7.1). */
 export interface ComposerMention {
@@ -57,6 +57,8 @@ export interface ComposerProps {
   readonly dropping?: boolean
   /** Picked @people and #channels, drawn as chips in the field. */
   readonly marks?: ReadonlyArray<TextareaMark>
+  /** Slack's markup in the draft, drawn as it will look (spec section 8). */
+  readonly format?: TextareaFormat
   /** The @, # or emoji suggestions while they are open. */
   readonly mention?: ComposerMention
   /** Sees every key in the field first; true when it took the key (the suggestions' arrows, Enter, Tab, Esc, Backspace). */
@@ -123,7 +125,7 @@ export function transfers(onFiles: ComposerProps['onFiles'], onPasteText: Compos
  * as in the Juno composer; `leading` is where the attach button goes.
  * `notices` grow the box upwards; the text row stays where it is.
  */
-export function Composer({ value, onChange, onSend, placeholder, sending = false, above, inputRef, onArrowUpEmpty, leading, notices, onEscape, attachments, onFiles, dropping = false, marks, mention, onFieldKey, onCaret, onPasteText, onFieldClick, popover }: ComposerProps) {
+export function Composer({ value, onChange, onSend, placeholder, sending = false, above, inputRef, onArrowUpEmpty, leading, notices, onEscape, attachments, onFiles, dropping = false, marks, format, mention, onFieldKey, onCaret, onPasteText, onFieldClick, popover }: ComposerProps) {
   const empty = value.trim().length === 0
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (onFieldKey?.(event) === true) return
@@ -160,6 +162,7 @@ export function Composer({ value, onChange, onSend, placeholder, sending = false
             onChange={(event) => onChange(event.currentTarget.value, event.currentTarget.selectionStart)}
             onKeyDown={onKeyDown}
             {...mentionProps(marks, mention, onCaret, popover)}
+            {...(format === undefined ? {} : { format })}
             onPaste={onFiles === undefined && onPasteText === undefined ? undefined : onPaste}
             onClick={onFieldClick}
             dir="auto"

@@ -31,10 +31,10 @@ export interface HuddleHeaderButtonProps {
 }
 
 /**
- * The huddle control first in the right island of a channel's or DM's
- * Main (SPEC 20): Start huddle as an icon, or Join, Switch or In huddle as
- * text with the green headphones. Under 480px the text and the faces go
- * and the icon stays, as Resolve and Follow do.
+ * The huddle control first in the topic header's right island (SPEC 20):
+ * Start huddle as an icon, or Join, Switch or In huddle as text with the
+ * green headphones. Under 480px the text and the faces go and the icon
+ * stays.
  */
 export function HuddleHeaderButton({ mode, people = [], current, place, onClick }: HuddleHeaderButtonProps) {
   if (mode === 'start') {

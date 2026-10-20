@@ -40,7 +40,7 @@ import {
   type UserId,
   type Me,
 } from '@juno/domain'
-import { emojiUnicode, messageBody, plainText, splitEmojiName, type Lookups, type MessageBody, type MessageContent, type UsergroupName } from '@juno/richtext'
+import { editMarkup, emojiUnicode, messageBody, splitEmojiName, type Lookups, type MessageBody, type MessageContent, type UsergroupName } from '@juno/richtext'
 import { syncState, StoreReader, type SqlClient, type SqlError } from '@juno/store'
 import { imagesWithoutThumbs, type PendingFile } from '@juno/sync'
 import { windowCovered } from './coverage'
@@ -66,6 +66,8 @@ interface CachedBody {
   readonly epoch: number
   readonly body: MessageBody
   readonly mentionsMe: boolean
+  /** For your own messages: the text the edit field starts with. */
+  readonly editText?: string
 }
 
 /** What one `messages.list` subscription keeps between runs. See the module comment. */
@@ -284,7 +286,8 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
         ...(row.attachments_json === null ? {} : { attachments: parseJson<MessageContent['attachments']>(row.attachments_json) ?? [] }),
       }
       const body = row.deleted === 1 ? { blocks: [] } : messageBody(content, lookups)
-      return { version: row.version, epoch: cache.epoch, body, mentionsMe: me !== undefined && messageMentionsMe(body, me) }
+      const own = row.deleted !== 1 && selfId !== undefined && row.user_id === selfId
+      return { version: row.version, epoch: cache.epoch, body, mentionsMe: me !== undefined && messageMentionsMe(body, me), ...(own ? { editText: editMarkup(content, lookups) } : {}) }
     }
     const bodies = new Map<string, CachedBody>()
     const parsedNow: Array<WindowMessage> = []
@@ -519,7 +522,7 @@ function shapeRow(row: WindowMessage, body: CachedBody, input: ShapeInput): Mess
     ...(input.thread === undefined ? {} : { thread: input.thread }),
     ...(row.client_msg_id === null ? {} : { clientMsgId: row.client_msg_id }),
     ...(input.pending === undefined ? {} : { pending: input.pending.state === 'failed' ? ('failed' as const) : ('sending' as const) }),
-    ...(kind === 'message' && input.selfId !== undefined && row.user_id === input.selfId ? { editText: composerText(body.body) } : {}),
+    ...(kind === 'message' && body.editText !== undefined ? { editText: body.editText } : {}),
   }
   return { ...fields, rev: hashId(JSON.stringify(fields)) } as MessageView
 }
@@ -546,11 +549,6 @@ function contentVersion(text: string, blocksJson: string | null): number {
   const content = `${text}\u0001${blocksJson ?? ''}`
   for (let i = 0; i < content.length; i++) hash = ((hash << 5) + hash + content.charCodeAt(i)) | 0
   return -1 - (hash >>> 0)
-}
-
-/** A message as the edit field starts with it: the composer's text, without the names of its files. */
-function composerText(body: MessageBody): string {
-  return plainText({ blocks: body.blocks.filter((block) => block.kind !== 'file') })
 }
 
 // Edits, deletes and reactions not yet in Slack

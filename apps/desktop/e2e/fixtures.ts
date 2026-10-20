@@ -25,6 +25,9 @@ export function tempUserData(): Promise<string> {
 }
 
 export interface LaunchOptions {
+  readonly notificationResponse?: 'denied'
+  readonly notificationInitial?: 'notDetermined'
+  readonly developmentNotifications?: boolean
   /** Engine scheduling profile. Timing, perf, feel and @mac checks retain production defaults. */
   readonly timing?: 'fast' | 'production'
   /** The fake Slack the app signs in against (sign-in window, socket allow-list). */
@@ -110,6 +113,9 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   }
   env.JUNO_USER_DATA = userData
   env.JUNO_E2E = '1'
+  if (options.notificationResponse) env.JUNO_E2E_NOTIFICATION_RESPONSE = options.notificationResponse
+  if (options.notificationInitial) env.JUNO_E2E_NOTIFICATION_INITIAL = options.notificationInitial
+  if (options.developmentNotifications) env.JUNO_E2E_DEV_NOTIFICATIONS = '1'
   env.JUNO_E2E_FAST_TIMING = launchTiming(options) === 'fast' ? '1' : '0'
   delete env.JUNO_E2E_OPENROUTER_KEY
   env.JUNO_FAKE_AI_REQUIRES_KEY = options.fakeAiRequiresKey === true ? '1' : '0'

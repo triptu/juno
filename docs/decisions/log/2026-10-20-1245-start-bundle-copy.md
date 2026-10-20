@@ -1,0 +1,1 @@
+- 10-20 12:45 · start-bundle-copy · Keep the copy Home, topic actions and tab titles use in a separate module, so their imports do not keep every Juno page's copy in the startup bundle. Juno's existing idle preload loads the remaining copy with its UI.

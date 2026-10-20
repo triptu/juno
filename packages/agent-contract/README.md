@@ -25,7 +25,7 @@ View-shaped types for the Juno chat (SPEC "Juno Agent", plan v3 §12 and §13). 
 | `commands.ts` | `CardCommand`: what a card button asks for, one union for every card. The views call back with it; `@juno/state/agent` maps it to the card RPCs |
 | `files.ts` | Files the owner gives Juno: which types it reads (`junoFileKind`), the limits, `fitImage` (the size an image is scaled to), `imageTokenBound`, `imageSize`, `cutText`, `junoTakes` (what a send takes and why the rest stays), and the wire shapes (`JunoFileInput` on a send, `OwnerFile` on the bubble) |
 | `docs.ts` | Juno's notes about the owner (`MemoryDoc`, `MemorySource`, `MemoryEntryRow`, `MemoryChange`, `MemoryDocsPage`) and proactive asks (`ProactiveAsk`, `AskStatus`, `AskAnswer`); the chat's `AskItem` and the `memoryUpdated` note are in `items.ts` |
-| `copy.ts` | `chatCopy`: every fixed string the chat prints: plan v3 §13.2 states, ending and failure lines, banner chips and lines, card buttons and after-lines, the Remove sheet, the pages. The model never writes any of them |
+| `copy.ts`, `shellCopy.ts` | `chatCopy`: every fixed string the chat prints: plan v3 §13.2 states, ending and failure lines, banner chips and lines, card buttons and after-lines, the Remove sheet, the pages. The model never writes any of them. `shellCopy.ts` exports the small subset Home, topic actions and tab titles need without loading the Juno pages |
 
 Rules of the shape:
 

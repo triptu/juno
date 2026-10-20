@@ -37,7 +37,9 @@ export function blocksOf(spans: ReadonlyArray<BubbleSpan>): ReadonlyArray<JunoBl
     }
     const close = closingFence(lines, i, fence[1]!)
     const end = close === -1 ? lines.length : close
-    builder.code(lines.slice(i + 1, end).join('\n'))
+    // The info string's first word names the language: ```ts, ```python title="x".
+    const language = lines[i]!.slice(fence[0].length).trim().split(/\s/)[0]
+    builder.code(lines.slice(i + 1, end).join('\n'), language)
     i = end
   }
   return builder.done()
@@ -87,10 +89,12 @@ class Builder {
     this.endList()
   }
 
-  code(text: string) {
+  code(text: string, language?: string) {
     this.end()
     this.blank = false
-    if (text.trim() !== '') this.blocks.push({ _tag: 'codeBlock', text: restore(text, this.sources) })
+    if (text.trim() === '') return
+    const block = { _tag: 'codeBlock', text: restore(text, this.sources) } as const
+    this.blocks.push(language === undefined || language === '' ? block : { ...block, language })
   }
 
   line(line: string) {

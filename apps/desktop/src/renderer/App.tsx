@@ -1,16 +1,19 @@
 import { Suspense, useEffect, useLayoutEffect } from 'react'
-import { accentAtom, closeSidebarSheet, densityAtom, topicTitleLinesAtom, junoSetupPendingAtom, openSidebarSheet, persistAccent, persistTheme, privacyAtom, registry, reportAppStateAtom, resolvedThemeAtom, sessionUnknownAtom, signedInAtom, themeAtom, type Accent, type Density, type ResolvedTheme, type Theme } from '@juno/state'
-import { useAtom, useAtomValue } from '@juno/state/react'
-import { AppearanceSettings, applyPrivacy, applyTheme, SheetOpenContext, Shell, type AccentName, type DensityName, type ThemeName, type ThemePreference } from '@juno/views'
-import { chunk } from './containers/chunks'
+import { accentAtom, closeSidebarSheet, densityAtom, topicTitleLinesAtom, junoSetupPendingAtom, openSidebarSheet, privacyAtom, registry, reportAppStateAtom, resolvedThemeAtom, sessionUnknownAtom, signedInAtom, type Accent, type Density, type ResolvedTheme, type Theme } from '@juno/state'
+import { useAtomValue } from '@juno/state/react'
+import { applyPrivacy, applyTheme, CodeHighlighterContext, SheetOpenContext, Shell, type AccentName, type DensityName, type ThemeName, type ThemePreference } from '@juno/views'
+import { chunk, usePreloaded } from './containers/chunks'
 import { Frame } from './containers/Frame'
 import { followFullScreen } from './containers/fullScreen'
 import { Peek } from './containers/Peek'
 import { followSharingPrivacy } from './containers/privacy'
-import { Session } from './containers/Session'
 import { Sidebar } from './containers/Sidebar'
 import { Workspace } from './containers/Workspace'
 import { applyTopicTitleLines } from './containers/topicTitleLines'
+import { codeHighlighter } from './highlight/codeHighlighter'
+
+const signedOut = chunk(() => import('./containers/SignedOut'))
+const SignedOut = signedOut.component((module) => module.SignedOut)
 
 // Warm the setup page while signed out, after the sign-in frame has painted.
 const setup = chunk(() => import('./containers/SetUpJuno'))
@@ -41,14 +44,14 @@ function PrivacyRoot() {
 
 /** The root container: the theme, privacy mode, and the shell in its signed-in or signed-out shape. */
 export function App() {
-  const [theme, setTheme] = useAtom(themeAtom)
   const resolved = useAtomValue(resolvedThemeAtom)
-  const [accent, setAccent] = useAtom(accentAtom)
+  const accent = useAtomValue(accentAtom)
   const density = useAtomValue(densityAtom)
   const topicTitleLines = useAtomValue(topicTitleLinesAtom)
   const signedIn = useAtomValue(signedInAtom)
   const sessionUnknown = useAtomValue(sessionUnknownAtom)
   const setUpPending = useAtomValue(junoSetupPendingAtom)
+  const signedOutReady = usePreloaded(signedOut, signedIn === undefined && !sessionUnknown)
 
   useEffect(followFullScreen, [])
   // Main's idle CPU check hears the view and whether a sync runs (processes.ts).
@@ -65,16 +68,6 @@ export function App() {
   useLayoutEffect(() => applyTopicTitleLines(topicTitleLines), [topicTitleLines])
 
   useLayoutEffect(() => applyTheme(resolved, accent, density), [resolved, accent, density])
-
-  const changeTheme = (next: Theme) => {
-    setTheme(next)
-    persistTheme(next)
-  }
-
-  const changeAccent = (next: Accent) => {
-    setAccent(next)
-    persistAccent(next)
-  }
 
   // Signed in: the sidebar and the workspace; Settings holds the
   // appearance settings. Right after a first sign-in with no model set up,
@@ -93,10 +86,12 @@ export function App() {
   if (signedIn !== undefined) {
     return (
       <SheetOpenContext.Provider value={sheetOpen}>
-        <PrivacyRoot />
-        <Frame sidebar={<Sidebar />} peek={<Peek />}>
-          <Workspace />
-        </Frame>
+        <CodeHighlighterContext value={codeHighlighter}>
+          <PrivacyRoot />
+          <Frame sidebar={<Sidebar />} peek={<Peek />}>
+            <Workspace />
+          </Frame>
+        </CodeHighlighterContext>
       </SheetOpenContext.Provider>
     )
   }
@@ -104,8 +99,7 @@ export function App() {
   if (sessionUnknown) return null
   return (
     <Shell>
-      <Session />
-      <AppearanceSettings theme={theme} accent={accent} onThemeChange={changeTheme} onAccentChange={changeAccent} />
+      {signedOutReady ? <SignedOut /> : null}
     </Shell>
   )
 }

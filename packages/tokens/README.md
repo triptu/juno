@@ -7,8 +7,8 @@ The only place a colour, size, radius, shadow, font or duration is written down.
 | File | What it holds |
 | --- | --- |
 | `src/tokens.stylex.ts` | Every variable group with its light, Coral value. |
-| `src/themes.stylex.ts` | `dark` (colours, shadows, swatches, the two-copy switch) and a light and a dark theme for each of the eight accents. |
-| `src/global.css` | Body defaults, scrollbars, `::selection`, reduced motion, theme-switch suppression. |
+| `src/themes.stylex.ts` | `dark` (colours, shadows, swatches, art, code colours, the two-copy switch) and a light and a dark theme for each of the eight accents. |
+| `src/global.css` | Body defaults, scrollbars, `::selection`, reduced motion, theme-switch suppression, and the `::highlight(syntax-*)` rules that colour code. |
 | `src/fonts.css` | `@font-face` imports for Figtree, Instrument Serif and JetBrains Mono from `@fontsource`. |
 
 Import tokens through the subpath, never a barrel: `import { colors } from '@juno/tokens/tokens.stylex'`. Import the two stylesheets once from the app entry.
@@ -24,6 +24,7 @@ Import tokens through the subpath, never a barrel: `import { colors } from '@jun
 | `tints` | `--tint-<context>-bg` / `-fg` | `public`, `private`, `dm`, `resolved`, `warning`, `mention` |
 | `hues` | `--hue-<name>` | the eight person colours for avatars |
 | `art` | `--art-<hue>-<role>`, `--tide-<hue>-<tone>` | topic art: four roles and five Tide tones per hue, written by `@juno/topic-art`; dark values in `darkArt` |
+| `syntax` | `--syntax-<kind>` | code colours, one per token kind of `@juno/highlight` (keyword, string, number, comment, function, type, constant, property, tag, punctuation, meta, inserted, deleted), read by the `::highlight(syntax-*)` rules in `global.css`; dark values in `darkSyntax` |
 | `shadows` | `--shadow-*`, `--card-ring`, `--pop-shadow` | drop shadows and the rings floating surfaces use instead of borders |
 | `radii` | `--radius-<step>` | `xs` 4 to `bubble` 16 and `full` |
 | `spacing` | `--space-<n>` | 4px scale in px, with `0-5` (2px), `1-5` (6px), `2-5` (10px), `3-5` (14px) |

@@ -26,6 +26,8 @@ export * from './automated'
 
 // The standard emoji, for the renderer's picker through @juno/contract.
 export { workspaceEmoji, emojiCatalog, UNKNOWN_PERSON, type EmojiCategory } from '@juno/richtext'
+// Slack's markup in the composer: the field's look and the formatting keys, for the renderer through @juno/contract.
+export { markupLayout, toggleMarkup, type MarkupLayout, type MarkupStyle } from '@juno/richtext'
 export * from './composer-mentions'
 export * from './composer-emoji'
 export * from './composer-links'
@@ -36,3 +38,4 @@ export { prepareEmojiPicker, type PreparedEmojiPicker, type PickerItem, type Pic
 
 export { customEmoji } from './custom-emoji'
 export { matchEmoji, mergeEmoji } from './emoji-ranking'
+export { dockBadgeActive, type BadgeTopic, type BadgeContext } from './dockBadge'

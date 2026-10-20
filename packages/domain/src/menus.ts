@@ -8,6 +8,7 @@ import type { NotifyLevel } from './notifications'
 
 export type TopicMenuAction =
   | 'open-new-tab'
+  | 'huddle'
   | 'rename'
   | 'redraw'
   | 'mark-read'
@@ -23,7 +24,7 @@ export type TopicMenuAction =
   | 'ignore-channel'
   | 'juno-knows'
 
-export type ChannelMenuAction = 'show-topics' | 'open-main' | 'mark-channel-read' | 'mark-channel-unread' | NotifyAction | ViewMenuAction | 'ignore-channel' | 'ask-juno'
+export type ChannelMenuAction = 'show-topics' | 'open-main' | 'huddle' | 'mark-channel-read' | 'mark-channel-unread' | NotifyAction | ViewMenuAction | 'ignore-channel' | 'ask-juno'
 export type PersonMenuAction = 'ask-juno' | 'juno-knows'
 
 /** Add to view (inventory 15.8): add to or remove from a view by id, or a new view with the conversation in it. */
@@ -81,7 +82,14 @@ export interface TopicMenuState {
   readonly canDraw: boolean
   /** A one-to-one DM's other person, while the Juno Agent is on: What Juno knows about them (SPEC 13.8). */
   readonly knowsAbout?: string
+  /** A channel's huddle item (SPEC 20): Start huddle, or Join huddle while one runs there. Absent: no item (a DM, whose header has the control, or while you are in this huddle). */
+  readonly huddle?: HuddleMenuItem
 }
+
+/** The huddle item of a channel's menus: Start huddle, or Join huddle while one runs there. */
+export type HuddleMenuItem = 'start' | 'join'
+
+const huddleItem = (huddle: HuddleMenuItem) => item('huddle' as const, huddle === 'join' ? 'Join huddle' : 'Start huddle')
 
 /** What Juno knows about Maya: their file on What Juno remembers (SPEC 13.8), by first name. */
 const knowsAbout = (name: string) => `What Juno knows about ${name.split(' ')[0] ?? name}`
@@ -145,7 +153,9 @@ export function notifyChoiceLabel(choice: NotifyChoice): string {
 /** The menu for a topic row and the page header's title (inventory 15.1). */
 export function topicMenuItems(state: TopicMenuState): ReadonlyArray<MenuItem<TopicMenuAction>> {
   const isMain = state.kind === 'main'
-  const items: MenuItem<TopicMenuAction>[] = [item('open-new-tab', 'Open in new tab', '⌘ click'), separator]
+  const items: MenuItem<TopicMenuAction>[] = [item('open-new-tab', 'Open in new tab', '⌘ click')]
+  if (state.huddle !== undefined) items.push(huddleItem(state.huddle))
+  items.push(separator)
   if (!isMain) items.push(item('rename', 'Rename'))
   // A new drawing of the topic's art, only when one can be made. A DM's Main shows the person's photo, so there is nothing to redraw.
   if (state.canDraw && !(isMain && isDm(state.channel.kind))) items.push(item('redraw', 'Redraw art'))
@@ -169,12 +179,15 @@ export interface ChannelMenuState {
   readonly askJuno?: boolean
   /** The views, in pill order, for Add to view. Absent: no item. */
   readonly views?: ReadonlyArray<ViewChoice>
+  /** Start huddle or Join huddle, as in the topic menu. Absent: no item. */
+  readonly huddle?: HuddleMenuItem
 }
 
 /** The channel menu (inventory 15.2): a channel row in Browse, the header's context pill, a #channel chip. */
 export function channelMenuItems(state: ChannelMenuState): ReadonlyArray<MenuItem<ChannelMenuAction>> {
   const items: MenuItem<ChannelMenuAction>[] = [item('show-topics', 'Show its topics')]
   if (state.hasMain) items.push(item('open-main', 'Open Main'))
+  if (state.huddle !== undefined) items.push(huddleItem(state.huddle))
   items.push(separator, item('mark-channel-read', 'Mark channel as read'), item('mark-channel-unread', 'Mark channel as unread'))
   if (state.notify !== undefined || state.views !== undefined || !isDm(state.channel.kind)) items.push(separator)
   if (state.notify !== undefined) items.push(notifyMenu(state.notify))

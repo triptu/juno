@@ -4,7 +4,7 @@
  * type makes the table list every kind of `Place`.
  */
 import { Suspense, type ReactElement } from 'react'
-import { chatCopy } from '@juno/agent-contract'
+import { junoPageTitles } from '@juno/agent-contract'
 import { mainTopicOf, type TopicDetail } from '@juno/contract'
 import { registry, topicAtom, type Place } from '@juno/state'
 import type { WorkspaceTab, WorkspaceTabIcon } from '@juno/views'
@@ -110,7 +110,7 @@ export const tabKinds: { readonly [K in Place['kind']]: TabKind<Extract<Place, {
       <JunoTab tabId={tabId} />
     </Suspense>
   )),
-  junoPage: pageKind((place) => chatCopy.pageTitles[place.page], 'juno', (place) => (
+  junoPage: pageKind((place) => junoPageTitles[place.page], 'juno', (place) => (
     <Suspense key={place.page} fallback={null}>
       <JunoPageTab page={place.page} />
     </Suspense>

@@ -14,9 +14,10 @@ export const INDEX_VERSION_KEY = 'index-version'
  * instead of throwing the cache away. 2: `participants_json` holds the
  * senders of the latest unread messages. 3: a preview names user groups
  * ("@handle" or "@group", never the id). 4: a preview without words labels
- * its files ("Image") and stores the sender's namesakes.
+ * its files ("Image") and stores the sender's namesakes. 5: unread messages
+ * cache notification attention for their sender and mention context.
  */
-export const INDEX_VERSION = 4
+export const INDEX_VERSION = 5
 
 /** Rows per transaction, so the writer is never held long (performance rule 15). */
 const BATCH = 200

@@ -81,7 +81,7 @@ it('shows a heading as a heading block, at any level, in markdown or HTML', () =
 it('keeps a code block as written, markup and all', () => {
   expect(of('Run this:\n```sql\nSELECT **x** FROM <b>t</b>;\n```\nThen tell me.')).toEqual([
     para({ _tag: 'text', text: 'Run this:' }),
-    { _tag: 'codeBlock', text: 'SELECT **x** FROM <b>t</b>;' },
+    { _tag: 'codeBlock', text: 'SELECT **x** FROM <b>t</b>;', language: 'sql' },
     para({ _tag: 'text', text: 'Then tell me.' }),
   ])
   expect(of('<pre><code>a &amp;&amp; b</code></pre>')).toEqual([{ _tag: 'codeBlock', text: 'a && b' }])

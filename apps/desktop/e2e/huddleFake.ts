@@ -59,6 +59,12 @@ export async function openEngMain(juno: Juno): Promise<void> {
   await juno.sidebar.leave()
 }
 
+/** Start huddle from the open topic's ⋯ menu: a channel's header has no Start huddle (SPEC 20). */
+export async function startHuddleFromMenu(juno: Juno): Promise<void> {
+  const menu = await juno.topic.chooseInMenu('huddle')
+  expect(menu.labels).toContain('Start huddle')
+}
+
 /** The page's media stopped: Chime drops the attendee, which on v2 is how Slack learns of the leave. */
 export async function chimeDrops(win: Page, fake: FakeSlack, attendeeId: string): Promise<void> {
   await expect.poll(() => connection(win)).toBe('ended')

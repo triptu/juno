@@ -44,6 +44,13 @@
  * clients spell links: `link` element keys, how `url` relates to `text`,
  * and the `<url>` and `<url|label>` forms in the mrkdwn `text`.
  *
+ * `--only styles` reads one history page of the self-DM and of the 25 most
+ * recently active conversations, and counts how messages sent from Slack's
+ * clients spell text styles, code blocks and quotes: style key sets by
+ * element type, `rich_text_preformatted` and `rich_text_quote` keys, and
+ * which mrkdwn markers the `text` puts around a styled run. Nothing is
+ * written to disk.
+ *
  * Output is counts, key censuses and milliseconds. No id, text, name, URL or
  * value is printed. `--out DIR` writes the redacted response shapes there
  * (default: a new temporary directory); copy the ones a fixture needs into
@@ -219,6 +226,11 @@ async function main(): Promise<number> {
   if (flag('--only') === 'links') {
     console.log(JSON.stringify(await linksOnly(call), null, 2))
     return writeShapes(out)
+  }
+
+  if (flag('--only') === 'styles') {
+    console.log(JSON.stringify(await stylesOnly(call), null, 2))
+    return 0
   }
 
   const now = Date.now() / 1000
@@ -598,6 +610,121 @@ async function linksOnly(call: Call): Promise<unknown> {
     relation: Object.fromEntries(relation),
     textForms: Object.fromEntries(textForms),
     urlLikeTextInTextElements: urlInTextElement,
+  }
+}
+
+const styleKey = (style: unknown) => (style !== null && typeof style === 'object' ? Object.keys(style).filter((k) => (style as Json)[k] === true).toSorted().join('+') : '')
+const styleMarkers: Record<string, readonly [string, string]> = { bold: ['*', '*'], italic: ['_', '_'], strike: ['~', '~'], code: ['`', '`'] }
+
+/** The census of one `rich_text` block's elements for `--only styles`: true when any is styled, a code block or a quote. */
+function containerStyles(elements: ReadonlyArray<Json>, mrkdwn: string, add: (key: string) => void): boolean {
+  let has = false
+  elements.forEach((container, index) => {
+    const kind = String(container['type'])
+    const kids = (container['elements'] as Array<Json> | undefined) ?? []
+    if (kind === 'rich_text_preformatted' || kind === 'rich_text_quote') {
+      has = true
+      add(`${kind} keys ${Object.keys(container).toSorted().join(',')}`)
+      if (container['border'] !== undefined) add(`${kind} border ${String(container['border'])}`)
+      add(`${kind} child types ${[...new Set(kids.map((k) => String(k['type'])))].toSorted().join(',')}`)
+      const first = kids[0]
+      const last = kids.at(-1)
+      if (typeof first?.['text'] === 'string' && first['text'].startsWith('\n')) add(`${kind} first text starts with newline`)
+      if (typeof last?.['text'] === 'string' && last['text'].endsWith('\n')) add(`${kind} last text ends with newline`)
+      if (kids.some((k) => k['style'] !== undefined)) add(`${kind} has styled children ${[...new Set(kids.map((k) => styleKey(k['style'])).filter((k) => k !== ''))].join(' ')}`)
+      const before = elements[index - 1]
+      const beforeLast = ((before?.['elements'] as Array<Json> | undefined) ?? []).at(-1)
+      if (before !== undefined) add(`${kind} after ${String(before['type'])}${typeof beforeLast?.['text'] === 'string' && beforeLast['text'].endsWith('\n') ? ' ending with newline' : ''}`)
+      const after = elements[index + 1]
+      const afterFirst = ((after?.['elements'] as Array<Json> | undefined) ?? [])[0]
+      if (after !== undefined) add(`${kind} before ${String(after['type'])}${typeof afterFirst?.['text'] === 'string' && afterFirst['text'].startsWith('\n') ? ' starting with newline' : ''}`)
+      if (kind === 'rich_text_preformatted') {
+        const body = kids.map((k) => (typeof k['text'] === 'string' ? k['text'] : '')).join('')
+        if (mrkdwn.includes('```' + body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '```')) add('preformatted in text as ```body```')
+        else if (mrkdwn.includes('```\n')) add('preformatted in text with a newline after the opening fence')
+        else add('preformatted in text in another form')
+      }
+    }
+    if (kind === 'rich_text_quote' && !/(^|\n)&gt; ?/.test(mrkdwn)) add('quote but no &gt; line in text')
+    if (kind === 'rich_text_quote' && /(^|\n)&gt; /.test(mrkdwn)) add('quote as "&gt; " in text')
+    if (kind === 'rich_text_quote' && /(^|\n)&gt;[^ ]/.test(mrkdwn)) add('quote as "&gt;" without space in text')
+    for (const kid of [...kids, ...kids.flatMap((k) => (k['elements'] as Array<Json> | undefined) ?? [])]) {
+      const key = styleKey(kid['style'])
+      if (key === '') continue
+      has = true
+      add(`style ${String(kid['type'])} ${key}`)
+      if (kid['type'] !== 'text' || typeof kid['text'] !== 'string') continue
+      const text = kid['text']
+      if (/^\s/.test(text)) add(`styled text starts with whitespace ${key}`)
+      if (/\s$/.test(text)) add(`styled text ends with whitespace ${key}`)
+      if (text.includes('\n')) add(`styled text holds a newline ${key}`)
+      const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      const names = key.split('+')
+      if (names.length === 1) {
+        const [open, close] = styleMarkers[names[0]!] ?? ['', '']
+        add(`${key} in text ${mrkdwn.includes(open + escaped + close) ? 'wrapped in its markers' : mrkdwn.includes(escaped) ? 'present without its markers' : 'absent'}`)
+      } else {
+        const at = mrkdwn.indexOf(escaped)
+        add(`${key} in text ${at < 0 ? 'absent' : 'with ' + JSON.stringify(mrkdwn.slice(Math.max(0, at - 3), at).replace(/[^*_~`]/g, '.')) + ' before'}`)
+      }
+    }
+    for (const kid of kids) {
+      if (kid['type'] === 'text' && kid['style'] === undefined && typeof kid['text'] === 'string') {
+        if (/(^|[\s(])\*[^*\s][^*\n]*\*(?=$|[\s).,!?])/.test(kid['text'])) add('unstyled text holding *words*')
+        if (/(^|[\s(])_[^_\s][^_\n]*_(?=$|[\s).,!?])/.test(kid['text'])) add('unstyled text holding _words_')
+        if (/`[^`\n]+`/.test(kid['text'])) add('unstyled text holding `words`')
+      }
+    }
+  })
+  return has
+}
+
+/** `--only styles`: how Slack's own clients encode bold, italic, strike, code, code blocks and quotes. Counts only. */
+async function stylesOnly(call: Call): Promise<unknown> {
+  const auth = await call('auth.test', {}, 'styles')
+  const boot = await call('client.userBoot', { version_all_channels: true, return_all_relevant_mpdms: true }, 'styles')
+  const counts = await call('client.counts', { thread_counts_by_channel: true }, 'styles')
+  const self = String(auth?.['user_id'] ?? '')
+  const selfDm = ((boot?.['ims'] as Array<Json> | undefined) ?? []).find((im) => im['user'] === self)
+  const recent = ['channels', 'mpims', 'ims'].flatMap((list) => (counts?.[list] as Array<{ id: string; latest?: string }> | undefined) ?? [])
+    .filter((e) => e.latest !== undefined)
+    .toSorted((a, b) => tsSeconds(b.latest!) - tsSeconds(a.latest!))
+    .slice(0, 25)
+    .map((e) => e.id)
+  const ids = [...new Set([...(selfDm === undefined ? [] : [String(selfDm['id'])]), ...recent])]
+  const tally = new Map<string, number>()
+  const add = (key: string) => tally.set(key, (tally.get(key) ?? 0) + 1)
+  let messages = 0
+  let fromClients = 0
+  let styled = 0
+  let blocksType = 0
+  for (const channel of ids) {
+    const page = await call('conversations.history', { channel, limit: 100, no_user_profile: true }, 'styles')
+    for (const m of (page?.['messages'] as Array<Msg> | undefined) ?? []) {
+      messages++
+      if (typeof m['client_msg_id'] !== 'string' || m.subtype !== undefined) continue
+      fromClients++
+      const mrkdwn = typeof m['text'] === 'string' ? m['text'] : ''
+      let has = false
+      for (const block of (m['blocks'] as Array<Json> | undefined) ?? []) {
+        add(`block ${String(block['type'])}`)
+        if (block['type'] !== 'rich_text') continue
+        blocksType++
+        const elements = (block['elements'] as Array<Json> | undefined) ?? []
+        if (containerStyles(elements, mrkdwn, add)) has = true
+      }
+      if (has) styled++
+    }
+  }
+  return {
+    calls: summariseCalls(),
+    selfDmRead: selfDm !== undefined,
+    conversations: ids.length,
+    messages,
+    fromClients,
+    richTextBlocks: blocksType,
+    styledMessages: styled,
+    counts: Object.fromEntries([...tally].toSorted((a, b) => a[0].localeCompare(b[0]))),
   }
 }
 

@@ -10,7 +10,7 @@ Pure product rules. No I/O, no Effect services, no React. The same code runs in 
 - Title resolution, sidebar and All topics sorting, relative time.
 - The shared vocabulary as `Schema.Literals`, declared once here and re-exported by `@juno/contract` for the wire: `ConversationKind`, `ContextTint`, `TopicKind`, `RowTag`, `AllTopicsStatus`, `ChannelIcon` and `ChannelColor`. A channel's default icon and hue (`defaultChannelStyle`, `defaultPersonColor`) use the keys `@juno/ui` draws (`channelIcons`, `hueNames`), so no layer translates them.
 - `reindexTopics` inputs: the topic index row computed from source rows.
-- The read-state merge rule and the notification decision order.
+- The read-state merge rule, the notification decision order, and `dockBadgeActive`, the dock badge policy built on the alert decision, with sidebar visibility and unread DMs.
 - Clarity and audience checks before send, and which messages the checks read (`sendChecksApply`: not empty, at most 1,000 characters).
 - The composer's colon emoji: the query at the caret (`composer-emoji.ts`), shared picker ranking (`emoji-ranking.ts`), and composer choices from the shared alias resolver (`custom-emoji.ts`). `emoji-picker.ts` prepares immutable browse data and alias-aware selection lookup.
 - `frequentDestinations`: Home's Recent, five people then five channels, each ranked by decayed own sends and filled by activity.

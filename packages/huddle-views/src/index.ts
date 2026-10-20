@@ -3,7 +3,7 @@
 export { HuddleBar, type HuddleBarProps } from './HuddleBar'
 export { muteShortcut } from './HuddleControls'
 export { HuddleDeviceMenu, systemDevice } from './HuddleDeviceMenu'
-export { HuddleHeaderButton } from './HuddleHeaderButton'
+export { HuddleHeaderButton, type HuddleHeaderMode } from './HuddleHeaderButton'
 export { HuddleIndicator, huddleIndicatorLabel } from './HuddleIndicator'
 export { HuddlePage, type HuddlePageState } from './HuddlePage'
 export { HuddleShareVideo } from './HuddleStage'

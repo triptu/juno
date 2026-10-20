@@ -1,6 +1,6 @@
 import { SEARCH_LIMIT_MAX, SEARCH_PLACES_MAX, type SearchMessage, type SearchPlace, type SearchResult } from '@juno/contract'
 import { FALLBACK_TITLE_WORDS, firstWords, mainLabel, mentionedUserIds, mentionedUsergroupIds, mainTopicId, threadTopicId, tsToMillis, type ChannelId, type ConversationKind, type Ts } from '@juno/domain'
-import { messageBody, plainText, type Lookups, type MessageContent, type UsergroupName } from '@juno/richtext'
+import { messageBody, readableText, type Lookups, type MessageContent, type UsergroupName } from '@juno/richtext'
 import { ftsQuery, StoreReader, type SqlClient } from '@juno/store'
 import { Effect } from 'effect'
 import { channelInfoOf, channelRefOf, parseIds, personFrom, userName, type UserRow } from '../topicRows'
@@ -195,7 +195,7 @@ export const messageResults = (
         ts: hit.ts,
         place,
         sender: hit.bot_name ?? (hit.user_id === null ? (hit.username ?? '') : userName(hit.user_id, users.get(hit.user_id))),
-        text: oneLine(plainText(messageBody({ text: hit.text, attachments: hit.attachments_json ? JSON.parse(hit.attachments_json) as MessageContent['attachments'] : undefined, blocks: hit.blocks_json ? JSON.parse(hit.blocks_json) as MessageContent['blocks'] : undefined }, lookups))),
+        text: oneLine(readableText(messageBody({ text: hit.text, attachments: hit.attachments_json ? JSON.parse(hit.attachments_json) as MessageContent['attachments'] : undefined, blocks: hit.blocks_json ? JSON.parse(hit.blocks_json) as MessageContent['blocks'] : undefined }, lookups))),
         stored: hit.stored,
       }
     })

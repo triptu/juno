@@ -6,6 +6,7 @@
 import { productionTiming } from '../src/config'
 import { step } from './step'
 import { describe, expect, it } from 'vitest'
+import { SELF_ID } from '@juno/fake-slack'
 import { deleteMessage, editMessage, sendMessage } from '@juno/state'
 import { waitFor, WAIT_MS } from './harness'
 import { apiCalls, errorOf, quiet, readDb, valueOf } from './scenario'
@@ -145,6 +146,28 @@ describe('edit', () => {
     await quiet(engine)
     expect(engine.fake.messages('C0ENG').find((m) => m.client_msg_id === pending.clientMsgId)?.text).toBe('Edit while queued')
     await rows((list) => rowWith(list, 'Edit while queued')?.pending === undefined && rowWith(list, 'Edit while queued') !== undefined, 'the newest text shown')
+  })
+
+  it('keeps a code block’s language tag when another line is edited', async () => {
+    const engine = await booted()
+    const rows = watch(engine, MAIN)
+    const posted = engine.fake.workspace.post({
+      channel: 'C0ENG',
+      user: SELF_ID,
+      text: 'Use this:\n```ts\nconst tries = 3\n```',
+      blocks: [{ type: 'rich_text', elements: [
+        { type: 'rich_text_section', elements: [{ type: 'text', text: 'Use this:' }] },
+        { type: 'rich_text_preformatted', elements: [{ type: 'text', text: 'ts\nconst tries = 3' }] },
+      ] }],
+    })
+    const list = await rows((shown) => rowWith(shown, 'Use this:')?.editText !== undefined, 'the tagged message')
+    const message = rowWith(list, 'Use this:')!
+    // The edit field starts with the code as written, tag line and all.
+    expect(message.editText).toContain('ts\nconst tries = 3')
+    valueOf(await editMessage(engine.registry, refOf(message), message.editText!.replace('Use this:', 'Use this one:')))
+    await waitFor(() => (inSlack(engine, posted.ts)?.text?.includes('Use this one:') ? true : undefined), WAIT_MS, 'the edit in Slack')
+    // Slack's fallback text breaks lines with \r\n.
+    expect(inSlack(engine, posted.ts)?.text?.replace(/\r\n/g, '\n')).toContain('ts\nconst tries = 3')
   })
 
   it('refuses to edit someone else’s message', async () => {
