@@ -75,7 +75,7 @@ describe('files', () => {
     const pending = (await rows((list) => list.some((row) => row.pending !== undefined && withFiles(row)), 'the pending row')).find((row) => row.pending !== undefined)!
     expect(pending.files.map(shape)).toEqual([
       { name: 'chart.png', kind: 'image', box: [360, 270] },
-      { name: 'notes.txt', kind: 'file', box: undefined },
+      { name: 'notes.txt', kind: 'text', box: undefined },
     ])
     expect(pending.files[0]!.thumb!.src).toMatch(/^juno:\/\/uploads\/[0-9a-f-]+\.png$/)
 
