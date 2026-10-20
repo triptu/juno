@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-20 12:46 · start-bundle-sign-in · Load sign-in and its appearance controls as a chunk, warmed on idle after the shell paints and loaded immediately when a signed-out session is known. Show the whole page once ready, without a Suspense fallback delay; signed-in Home and topic frames stay eager.
 - 10-20 12:45 · start-bundle-copy · Keep the copy Home, topic actions and tab titles use in a separate module, so their imports do not keep every Juno page's copy in the startup bundle. Juno's existing idle preload loads the remaining copy with its UI.
 - 10-20 11:12 · sidebar-first-key · Hold the character that starts sidebar type-ahead along with later keys, so opening a topic and typing before its composer mounts keeps the whole draft.
 - 10-20 11:06 · daily-full-run · A scheduled task runs the full suites on main once a day; the agent that runs it commits the refreshed coverage map and merges it.
