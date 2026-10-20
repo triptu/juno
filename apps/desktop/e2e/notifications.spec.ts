@@ -162,6 +162,8 @@ syncedTest('Tidy up saves rapid changes to separate controls', async ({ juno }) 
   await juno.openSettings('Tidy up')
   const checks = juno.settings.root.getByRole('checkbox', { name: /^(Threads|Direct messages)$/ })
   await expect(checks).toHaveCount(2)
+  await expect(juno.settings.root.getByRole('checkbox', { name: 'Threads', exact: true })).toBeChecked()
+  await expect(juno.settings.root.getByRole('checkbox', { name: 'Direct messages', exact: true })).toBeChecked()
   // Activate both before a saved page model can arrive, as two quick user changes can do.
   await checks.evaluateAll((nodes) => {
     for (const node of nodes) if (node instanceof HTMLInputElement) node.click()
