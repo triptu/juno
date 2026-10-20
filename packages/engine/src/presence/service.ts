@@ -70,7 +70,7 @@ const sessionPresence = (active: SubscriptionRef.SubscriptionRef<ReadonlyArray<s
   const presence = new Map<string, 'active' | 'away'>()
 
   const publish = Effect.suspend(() => {
-    const ids = [...presence].filter(([id, value]) => value === 'active' && wanted.has(id)).map(([id]) => id).sort()
+    const ids = [...presence].filter(([id, value]) => value === 'active' && wanted.has(id)).map(([id]) => id).toSorted()
     return SubscriptionRef.update(active, (last) => (sameIds(last, ids) ? last : ids))
   })
   // Sends the list when it differs from the last one sent. An empty list goes out only to end a subscription.

@@ -93,12 +93,12 @@ const program = Effect.gen(function* () {
   let frames = 0
   let singleUser = 0
   let firstAt: number | undefined
-  let connected = false
+  const state = { connected: false }
   const batches: Array<string> = []
   yield* Effect.forkScoped(
     Stream.runForEach(events, (event) =>
       Effect.sync(() => {
-        if (event._tag === 'Connected') connected = true
+        if (event._tag === 'Connected') state.connected = true
         if (event._tag !== 'Frame' || event.frame.type !== 'presence_change') return
         frames++
         firstAt ??= Date.now()
@@ -109,7 +109,7 @@ const program = Effect.gen(function* () {
       }),
     ),
   )
-  while (!connected) yield* Effect.sleep(200)
+  while (!state.connected) yield* Effect.sleep(200)
   console.log('presence-sub-live: socket connected')
 
   const sentAt = Date.now()
