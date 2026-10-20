@@ -118,17 +118,14 @@ export const FileView = Schema.Struct({
   full: Schema.optionalKey(Schema.String),
   /** A video the viewer plays, a `juno://files/<id>/video` url main streams from Slack. `thumb` is its poster. */
   video: Schema.optionalKey(Schema.String),
-  /** An audio file or voice clip the player plays, a `juno://files/<id>/audio` url main streams from Slack. */
+  /** An audio file or voice clip the player plays, a `juno://files/<id>/audio` url main streams from Slack, and its length when Slack gives it. */
   audio: Schema.optionalKey(Schema.String),
-  /** An audio file's length, when Slack gives it. */
   durationMs: Schema.optionalKey(Schema.Number),
   /** A pdf, html or text file as Slack serves it, a `juno://files/<id>/content/<name>` url, for the viewer. */
   content: Schema.optionalKey(Schema.String),
-  /** How the viewer draws a `text` file. */
+  /** How the viewer draws a `text` file; for code its language as a reader names it ("Python"); its lines when Slack counted them (a snippet). */
   textKind: Schema.optionalKey(FileTextKind),
-  /** The language of a `code` text file, as a reader names it ("Python"). */
   language: Schema.optionalKey(Schema.String),
-  /** Lines in a text file, when Slack counted them (a snippet). */
   lines: Schema.optionalKey(Schema.Int),
   /** Slack's download url, which main fetches on the Slack session. Absent for a file still being sent. */
   download: Schema.optionalKey(Schema.String),
