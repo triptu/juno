@@ -7,6 +7,7 @@ const custom = (name: string): EmojiChoice => ({ id: name, name, insert: `:${nam
 
 describe('the colon query being typed', () => {
   it('follows a colon at a word start, up to the caret, lowercased', () => {
+    expect(emojiQueryAt(':ありがとう', 6)?.text).toBe('ありがとう')
     expect(emojiQueryAt(':smi', 4)).toEqual({ start: 0, end: 4, text: 'smi' })
     expect(emojiQueryAt('Looking good :SMI', 17)).toEqual({ start: 13, end: 17, text: 'smi' })
     expect(emojiQueryAt('ok (:+1', 7)?.text).toBe('+1')
@@ -32,8 +33,8 @@ describe('workspace emoji', () => {
       { name: 'loop_a', url: null, alias_for: 'loop_b' },
       { name: 'loop_b', url: null, alias_for: 'loop_a' },
     ])).toEqual([
-      { name: 'wave', url: 'https://emoji.example/wave.png' },
-      { name: 'wave_hello', url: 'https://emoji.example/wave.png' },
+      { name: 'wave', canonical: 'wave', url: 'https://emoji.example/wave.png' },
+      { name: 'wave_hello', canonical: 'wave', url: 'https://emoji.example/wave.png' },
     ])
   })
 

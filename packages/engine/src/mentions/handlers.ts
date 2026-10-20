@@ -20,7 +20,12 @@ export const MentionsHandlers = MentionsRoutes.toLayer(
     return {
       'mentions.emoji': () => serveWorkspaceValue(workspace.changes, 'mentions.emoji', ['emoji', 'team'], Effect.gen(function* () {
         const sql = yield* StoreReader
-        return yield* sql<{ name: string; url: string | null; alias_for: string | null }>`SELECT name, url, alias_for FROM emoji ORDER BY name`
+        // SQLite serializes the table without allocating an object per row in the engine.
+        const rows = yield* sql<{ value: string }>`
+          SELECT json_group_array(json_object('name', name, 'url', url, 'alias_for', alias_for)) AS value
+          FROM (SELECT name, url, alias_for FROM emoji ORDER BY name)
+        `
+        return rows[0]!.value
       })),
       'mentions.people': ({ channel, threadTs, query }) => live('mentions.people', queryPeople(channel, threadTs, query)),
       'mentions.groups': ({ query }) => serveWorkspaceValue(workspace.changes, 'mentions.groups', ['usergroups', 'team'], queryGroups(query)),

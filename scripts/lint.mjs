@@ -9,6 +9,7 @@ const node = (script, ...args) => [process.execPath, [`scripts/${script}`, ...ar
 const checks = [
   ['oxlint', [resolve(root, 'node_modules/.bin/oxlint'), ['.']]],
   ['decision log', node('decision-log.mjs', '--check')],
+  ['emoji codec', node('emoji-codec.mjs', '--check')],
   ['cache epoch', node('check-cache-epoch.mjs')],
   ['migration order', node('check-migration-order.mjs')],
   ['cursor rule', node('check-no-pointer-cursor.mjs')],

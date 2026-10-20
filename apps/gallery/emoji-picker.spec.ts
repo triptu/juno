@@ -22,3 +22,78 @@ for (const theme of ['light', 'dark'] as const) {
     await test.info().attach(`Workspace ${theme}`, { path, contentType: 'image/png' })
   })
 }
+
+async function regression(page: import('@playwright/test').Page) {
+  const route = (await readRoutes(page)).find((route) => route.component === 'EmojiPicker' && route.state === 'regression')
+  if (route === undefined) throw new Error('Regression picker fixture is missing')
+  await openState(page, route)
+  return page.getByRole('dialog', { name: 'Emoji' })
+}
+
+test('focused emoji survives wheel scrolling, arrows still move and Escape dismisses', async ({ page }) => {
+  const picker = await regression(page)
+  await picker.getByRole('textbox').press('ArrowDown')
+  const focused = picker.locator('[data-emoji]:focus')
+  const name = await focused.getAttribute('data-emoji')
+  await picker.locator('[data-scroll-area]').hover()
+  await page.mouse.wheel(0, 4000)
+  await expect.poll(() => picker.locator('[data-scroll-area]').evaluate((node) => node.scrollTop)).toBeGreaterThan(1000)
+  await expect(picker.locator(`[data-emoji="${name}"]`).first()).toBeFocused()
+  await page.keyboard.press('ArrowRight')
+  await expect(picker.locator('[data-emoji="eyes"]').first()).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(picker).toHaveCount(0)
+})
+
+test('Enter prefers the exact standard alias to a custom prefix', async ({ page }) => {
+  const picker = await regression(page)
+  await picker.getByRole('textbox').fill('thumbsup')
+  await picker.getByRole('textbox').press('Enter')
+  await expect(page.getByRole('status', { name: 'Picked emoji' })).toHaveText('+1')
+  await picker.getByRole('textbox').fill('thumbsup')
+  await expect(picker.locator('[data-emoji-results] [data-emoji]').first()).toHaveAttribute('data-emoji', '+1')
+})
+
+test('failed images retain their cell and do not move later emoji', async ({ page }) => {
+  let release: () => void = () => {}
+  const held = new Promise<void>((resolve) => { release = resolve })
+  await page.route('**/broken-emoji.svg', async (route) => { await held; await route.fulfill({ status: 404, body: '' }) })
+  const picker = await regression(page)
+  await picker.getByRole('textbox').fill('broken_')
+  const cell = picker.locator('[data-emoji="broken_image"]')
+  await expect(cell).toBeVisible()
+  const before = await cell.boundingBox()
+  const neighbour = picker.locator('[data-emoji="broken_neighbor"]')
+  const neighbourBefore = await neighbour.boundingBox()
+  release()
+  await expect(cell).toHaveText(':broken_image:')
+  expect(await cell.boundingBox()).toEqual(before)
+  expect(await neighbour.boundingBox()).toEqual(neighbourBefore)
+})
+
+test('an alias saved in Settings marks its canonical emoji chosen in browse mode', async ({ page }) => {
+  const picker = await regression(page)
+  await expect(picker.getByRole('textbox')).toHaveValue('')
+  await expect(picker.getByRole('group', { name: 'Frequently used' }).getByRole('button', { name: ':juno_wave:, added', exact: true })).toHaveAttribute('aria-disabled', 'true')
+  await expect(picker.getByRole('group', { name: 'Frequently used' }).getByRole('button', { name: ':eyes:, added', exact: true })).toHaveAttribute('aria-disabled', 'true')
+})
+
+
+test('workspace aliases of standard emoji find their canonical glyph', async ({ page }) => {
+  const picker = await regression(page)
+  await picker.getByRole('textbox').fill('approval')
+  await expect(picker.locator('[data-emoji-results] [data-emoji]')).toHaveCount(1)
+  await picker.getByRole('textbox').press('Enter')
+  await expect(page.getByRole('status', { name: 'Picked emoji' })).toHaveText('+1')
+  await expect(page.getByRole('status', { name: 'Picked glyph' })).toHaveText('👍')
+})
+
+test('an image with a standard name keeps a separate cell and picks the workspace name', async ({ page }) => {
+  const picker = await regression(page)
+  await picker.getByRole('textbox').fill('tada')
+  const cells = picker.locator('[data-emoji="tada"]')
+  await expect(cells).toHaveCount(2)
+  await cells.filter({ has: page.locator('img') }).click()
+  await expect(page.getByRole('status', { name: 'Picked emoji' })).toHaveText('tada')
+  await expect(page.getByRole('status', { name: 'Picked glyph' })).toHaveText('')
+})

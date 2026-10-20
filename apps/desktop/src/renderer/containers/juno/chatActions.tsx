@@ -2,15 +2,15 @@
  * What the chat's rows and composer do (see `JunoChat`): sending, focus
  * requests, the remove sheet and the row callbacks.
  */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type MouseEvent, type RefObject, type SetStateAction } from 'react'
-import { chatCopy, junoText, type ChatItem, type ChatMention, type ChatPage, type JunoFileInput, type JunoPage, type MessageMenu, type OpId, type Quote, type SendContext } from '@juno/agent-contract'
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type MouseEvent, type RefObject, type SetStateAction } from 'react'
+import { chatCopy, junoText, type ChatItem, type ChatMention, type ChatPage, type JunoFileInput, type JunoPage, type MessageMenu, type OpId, type Reaction, type Quote, type SendContext } from '@juno/agent-contract'
 import { copyText, junoFocusAtom, popupContextMenu, registry } from '@juno/state'
 import { junoThumbAtom, messageActions } from '@juno/state/agent'
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
-import { OwnerImage, RemoveSheet, SheetLayer, type ActivateEvent, type ChatActions, type ChatMenuTarget, type OwnerImageFile, type ReactionTarget } from '@juno/views'
+import { OwnerImage, ReactionBadge, RemoveSheet, SheetLayer, type ActivateEvent, type ChatActions, type ChatMenuTarget, type OwnerImageFile, type ReactionTarget } from '@juno/views'
 import { openSlackMessage, openTopic } from '../navigation'
-import { useWorkspaceEmoji } from '../workspaceEmoji'
+import { chunk } from '../chunks'
 import { openWebLink } from '../slackLinks'
 import { junoCommands } from './actions'
 import { scrollToRow } from './chatScroll'
@@ -78,6 +78,12 @@ function OwnerThumb({ opId, file }: { readonly opId: OpId; readonly file: OwnerI
   return <OwnerImage file={file} src={src} />
 }
 
+const reactionBadge = chunk(() => import('./WorkspaceReactionBadge'))
+const WorkspaceReactionBadge = reactionBadge.component((module) => module.default)
+const renderReactions = (reactions: ReadonlyArray<Reaction>, corner: 'start' | 'end') => reactions.length === 0 ? null : (
+  <Suspense fallback={<ReactionBadge reactions={reactions} corner={corner} />}><WorkspaceReactionBadge reactions={reactions} corner={corner} /></Suspense>
+)
+
 const renderOwnerImage = (opId: OpId, file: OwnerImageFile) => <OwnerThumb opId={opId} file={file} />
 
 /** The remove sheet a message's menu opens, and the removal it confirms. */
@@ -112,7 +118,6 @@ interface ActionsInput {
 
 /** Callbacks every row gets, stable for the chat's life (performance 5.1); they read the latest state through refs. */
 export function useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote, openPicker, setRemoval, openPage }: ActionsInput): ChatActions {
-  const { url: emojiUrl } = useWorkspaceEmoji()
   const itemsRef = useRef(items)
   const openPageRef = useRef(openPage)
   useLayoutEffect(() => {
@@ -157,9 +162,9 @@ export function useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote
         })
       },
       renderOwnerImage,
-      emojiUrl,
+      renderReactions,
     }),
-    [scrollRef, pinnedRef, inputRef, setQuote, openPicker, setRemoval, emojiUrl],
+    [scrollRef, pinnedRef, inputRef, setQuote, openPicker, setRemoval],
   )
 }
 

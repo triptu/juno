@@ -1,35 +1,27 @@
 import * as stylex from '@stylexjs/stylex'
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
 import { useDeferredValue, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
-import { useVirtualizer } from '@tanstack/react-virtual'
-import type { EmojiCategory } from '@juno/contract'
+import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
+import { matchEmoji, prepareEmojiPicker, type EmojiCategory, type PickerItem as Item, type PickerCustomEmoji, type PreparedEmojiPicker } from '@juno/contract'
 import { accent, colors, layout, motion, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { ScrollArea, Surface, Text, TextField } from '@juno/ui'
 
 export interface EmojiPickerProps {
   /** All standard emoji, by category (from @juno/contract's emojiCatalog). */
   readonly catalog: ReadonlyArray<EmojiCategory>
+  readonly data?: PreparedEmojiPicker
   /** The workspace's custom emoji, shown as their own category after the standard categories when non-empty. */
-  readonly custom?: ReadonlyArray<{ readonly name: string; readonly url: string; readonly aliases?: ReadonlyArray<string> }>
+  readonly custom?: ReadonlyArray<PickerCustomEmoji>
   /** Recently used names (Slack names), shown first as "Frequently used" when non-empty. */
   readonly recent?: ReadonlyArray<string>
   /** A Slack emoji name: "+1", "partying_face", a custom name. */
-  readonly onPick: (name: string) => void
+  readonly onPick: (name: string, unicode?: string) => void
   /** Esc. */
   readonly onClose: () => void
   /** Names already chosen (Settings' quick reactions): drawn as chosen and not picked again. */
   readonly selected?: ReadonlySet<string>
   /** The search to open with. For fixtures; the app opens the picker empty. */
   readonly initialQuery?: string
-}
-
-/** One cell: a standard emoji (`unicode`) or a custom one (`url`). */
-interface Item {
-  readonly name: string
-  readonly unicode?: string
-  readonly url?: string
-  /** Every name and alias, lowercase, space separated, for search. */
-  readonly keys: string
 }
 
 interface Section {
@@ -48,27 +40,25 @@ const EMPTY: ReadonlyArray<never> = []
 const NONE: ReadonlySet<string> = new Set()
 
 /** A windowed grid: only nearby rows mount, including in a large workspace or search. */
-export function EmojiPicker({ catalog, custom = EMPTY, recent = EMPTY, selected = NONE, onPick, onClose, initialQuery = '' }: EmojiPickerProps) {
+export function EmojiPicker({ catalog, data, custom = EMPTY, recent = EMPTY, selected = NONE, onPick, onClose, initialQuery = '' }: EmojiPickerProps) {
   const [query, setQuery] = useState(initialQuery)
   const [failed, setFailed] = useState<ReadonlySet<string>>(NONE)
+  const [focused, setFocused] = useState<number | undefined>(undefined)
   const search = normalize(useDeferredValue(query))
   const gridRef = useRef<HTMLDivElement>(null)
   const pendingFocus = useRef<number | undefined>(undefined)
   const scrollerRef = useRef<HTMLElement>(null)
 
-  const standard = useMemo(() => catalog.map((category) => ({ heading: category.name, items: category.emoji.map(standardItem) })), [catalog])
-  const customItems = useMemo(() => custom.filter((emoji) => emoji.url !== '' && !failed.has(emoji.name)).map((emoji) => ({ name: emoji.name, url: emoji.url, keys: [emoji.name, ...(emoji.aliases ?? [])].join(' ').toLowerCase() })), [custom, failed])
-  // Search keeps workspace matches first, independently of the browse order.
-  const all = useMemo(() => [...customItems, ...standard.flatMap((category) => category.items)], [customItems, standard])
+  const { standard, customItems, all, byName } = data ?? prepareEmojiPicker(catalog, custom)
+  const selectedItems = useMemo(() => new Set([...selected].map((name) => byName.get(name.toLowerCase()))), [selected, byName])
+  const isChosen = (item: Item) => selectedItems.has(item)
 
   const browse = useMemo((): ReadonlyArray<Section> => {
-    const byName = new Map<string, Item>()
-    for (const item of all) for (const key of item.keys.split(' ')) if (!byName.has(key)) byName.set(key, item)
-    const seen = new Set<string>()
+    const seen = new Set<Item>()
     const recentItems = recent.flatMap((name) => {
       const item = byName.get(name.toLowerCase())
-      if (item === undefined || seen.has(item.name)) return []
-      seen.add(item.name)
+      if (item === undefined || seen.has(item)) return []
+      seen.add(item)
       return [item]
     })
     return [
@@ -76,36 +66,36 @@ export function EmojiPicker({ catalog, custom = EMPTY, recent = EMPTY, selected 
       ...standard.map((category) => ({ key: category.heading, ...category })),
       ...(customItems.length > 0 ? [{ key: 'custom', heading: 'Workspace', items: customItems }] : []),
     ]
-  }, [all, recent, customItems, standard])
+  }, [byName, recent, customItems, standard])
 
   const results = useMemo((): ReadonlyArray<Section> | undefined => {
     if (search === '') return undefined
-    const matches = all.filter((item) => item.keys.includes(search))
+    const matches = matchEmoji(all, search, [], [], Infinity)
     return [{ key: 'results', items: matches }]
   }, [all, search])
 
   const sections = results ?? browse
   const grid = useMemo(() => {
-    const rows: Array<{ key: string; heading: string } | { key: string; section: string; cells: ReadonlyArray<Item>; first: number }> = []
-    const groups: Array<{ section: Section; top: number; height: number }> = []
+    const rows: Array<{ key: string; heading: string } | { key: string; section: string; items: ReadonlyArray<Item>; start: number; first: number }> = []
+    const groups: Array<{ section: Section; top: number; height: number; first: number; row: number }> = []
     let top = 0
-    const cellRows: number[] = []
-    const cells: Item[] = []
+    let count = 0
     for (const section of sections) {
       const height = (section.heading === undefined ? 0 : HEADER_HEIGHT) + Math.ceil(section.items.length / COLUMNS) * ROW_HEIGHT
-      groups.push({ section, top, height })
+      groups.push({ section, top, height, first: count, row: rows.length + (section.heading === undefined ? 0 : 1) })
       top += height
       if (section.heading !== undefined) {
         rows.push({ key: section.key, heading: section.heading })
       }
       for (let start = 0; start < section.items.length; start += COLUMNS) {
-        const chunk = section.items.slice(start, start + COLUMNS)
-        const first = cells.length
-        for (const item of chunk) { cellRows.push(rows.length); cells.push(item) }
-        rows.push({ key: `${section.key}:${start}`, section: section.key, cells: chunk, first })
+        rows.push({ key: `${section.key}:${start}`, section: section.key, items: section.items, start, first: count + start })
       }
+      count += section.items.length
     }
-    return { rows, groups, cellRows, cells }
+    const groupAt = (index: number) => groups.find((group) => index >= group.first && index < group.first + group.section.items.length)
+    const rowAt = (index: number) => { const group = groupAt(index); return group === undefined ? undefined : group.row + Math.floor((index - group.first) / COLUMNS) }
+    const itemAt = (index: number) => { const group = groupAt(index); return group?.section.items[index - group.first] }
+    return { rows, groups, count, rowAt, itemAt }
   }, [sections])
   // oxlint-disable-next-line react/incompatible-library
   const virtualizer = useVirtualizer({
@@ -114,17 +104,22 @@ export function EmojiPicker({ catalog, custom = EMPTY, recent = EMPTY, selected 
     estimateSize: (index) => 'heading' in grid.rows[index]! ? HEADER_HEIGHT : ROW_HEIGHT,
     getItemKey: (index) => grid.rows[index]!.key,
     overscan: 3,
+    rangeExtractor: (range) => {
+      const indexes = defaultRangeExtractor(range)
+      const row = focused === undefined ? undefined : grid.rowAt(focused)
+      return row === undefined || indexes.includes(row) ? indexes : [...indexes, row].toSorted((a, b) => a - b)
+    },
     scrollPaddingStart: HEADER_HEIGHT,
   })
   const visibleRows = virtualizer.getVirtualItems()
-  const firstRow = visibleRows.find((row) => row.index >= (virtualizer.range?.startIndex ?? 0) && 'cells' in grid.rows[row.index]!)
+  const firstRow = visibleRows.find((row) => row.index >= (virtualizer.range?.startIndex ?? 0) && 'items' in grid.rows[row.index]!)
   const first = firstRow === undefined ? undefined : grid.rows[firstRow.index]
-  const tabStop = first !== undefined && 'cells' in first ? first.first : 0
+  const tabStop = focused ?? (first !== undefined && 'items' in first ? first.first : 0)
   const focusCell = (index: number) => {
     const cell = gridRef.current?.querySelector<HTMLElement>(`[data-cell="${index}"]`)
     if (cell) { pendingFocus.current = undefined; cell.focus(); return }
     pendingFocus.current = index
-    virtualizer.scrollToIndex(grid.cellRows[index] ?? 0, { align: 'auto' })
+    virtualizer.scrollToIndex(grid.rowAt(index) ?? 0, { align: 'auto' })
   }
   useLayoutEffect(() => {
     const index = pendingFocus.current
@@ -134,6 +129,7 @@ export function EmojiPicker({ catalog, custom = EMPTY, recent = EMPTY, selected 
   })
   useLayoutEffect(() => {
     pendingFocus.current = undefined
+    setFocused(undefined)
     virtualizer.scrollToOffset(0)
   }, [search, virtualizer])
 
@@ -148,12 +144,12 @@ export function EmojiPicker({ catalog, custom = EMPTY, recent = EMPTY, selected 
     if (event.key === 'Enter') {
       // The live query, not the deferred one, so Enter right after typing picks what was typed.
       const typed = normalize(query)
-      const first = typed === '' ? undefined : all.find((item) => item.keys.includes(typed) && !selected.has(item.name))
-      if (first === undefined) return
+      const match = typed === '' ? undefined : matchEmoji(all, typed, [], [], Infinity).find((item) => !isChosen(item))
+      if (match === undefined) return
       event.preventDefault()
-      onPick(first.name)
+      onPick(match.name, match.unicode)
     } else if (event.key === 'ArrowDown') {
-      if (grid.cells.length === 0) return
+      if (grid.count === 0) return
       event.preventDefault()
       focusCell(0)
     }
@@ -172,8 +168,8 @@ export function EmojiPicker({ catalog, custom = EMPTY, recent = EMPTY, selected 
 
   const onGridClick = (event: MouseEvent<HTMLElement>) => {
     const button = (event.target as Element).closest<HTMLElement>('button[data-emoji]')
-    const name = button?.dataset['emoji']
-    if (name !== undefined && !selected.has(name)) onPick(name)
+    const item = grid.itemAt(Number(button?.dataset['cell']))
+    if (item !== undefined && !isChosen(item)) onPick(item.name, item.unicode)
   }
 
   return (
@@ -194,7 +190,12 @@ export function EmojiPicker({ catalog, custom = EMPTY, recent = EMPTY, selected 
           onKeyDown={onFieldKeyDown}
         />
       </div>
-      <ScrollArea ref={scrollerRef} scrollbar="hover" sx={styles.scroller} onClick={onGridClick} onKeyDown={onGridKeyDown}>
+      <ScrollArea ref={scrollerRef} scrollbar="hover" sx={styles.scroller} onClick={onGridClick} onKeyDown={onGridKeyDown} onFocusCapture={(event) => {
+        const cell = (event.target as HTMLElement).dataset['cell']
+        if (cell !== undefined) setFocused(Number(cell))
+      }} onBlurCapture={(event) => {
+        if (!(event.relatedTarget instanceof HTMLElement) || event.relatedTarget.dataset['cell'] === undefined) setFocused(undefined)
+      }}>
         <div ref={gridRef} data-emoji-results={results === undefined ? undefined : ''} {...stylex.props(styles.window(virtualizer.getTotalSize()))}>
           {grid.groups.map(({ section, top, height }) => (
             <div key={section.key} role="group" aria-label={section.heading} data-emoji-section="" {...stylex.props(styles.group(height))}>
@@ -205,14 +206,14 @@ export function EmojiPicker({ catalog, custom = EMPTY, recent = EMPTY, selected 
               )}
               {visibleRows.map((virtual) => {
                 const row = grid.rows[virtual.index]!
-                if (!('cells' in row) || row.section !== section.key) return null
+                if (!('items' in row) || row.section !== section.key) return null
                 return (
                   <div key={virtual.key} {...stylex.props(styles.virtualRow(virtual.start - top, virtual.size), styles.grid)}>
-                    {row.cells.map((item, index) => {
-                      const chosen = selected.has(item.name)
+                    {row.items.slice(row.start, row.start + COLUMNS).map((item, index) => {
+                      const chosen = isChosen(item)
                       return (
                         <button
-                          key={item.name}
+                          key={itemKey(item)}
                           type="button"
                           tabIndex={row.first + index === tabStop ? 0 : -1}
                           data-emoji={item.name}
@@ -222,8 +223,8 @@ export function EmojiPicker({ catalog, custom = EMPTY, recent = EMPTY, selected 
                           title={chosen ? `:${item.name}: is added` : `:${item.name}:`}
                           {...stylex.props(styles.cell, chosen && styles.chosen)}
                         >
-                          {item.url === undefined ? item.unicode : (
-                            <img src={item.url} alt="" draggable={false} loading="lazy" decoding="async" onError={() => setFailed((names) => new Set(names).add(item.name))} {...stylex.props(styles.image)} />
+                          {item.url === undefined ? item.unicode : failed.has(itemKey(item)) ? <span {...stylex.props(styles.fallback)}>{`:${item.name}:`}</span> : (
+                            <img src={item.url} alt="" draggable={false} loading="lazy" decoding="async" onError={() => setFailed((names) => new Set(names).add(itemKey(item)))} {...stylex.props(styles.image)} />
                           )}
                         </button>
                       )
@@ -234,16 +235,13 @@ export function EmojiPicker({ catalog, custom = EMPTY, recent = EMPTY, selected 
             </div>
           ))}
         </div>
-        {results !== undefined && grid.cells.length === 0 ? <Text variant="ui" tone="muted" as="div" sx={styles.noMatch}>No match.</Text> : null}
+        {results !== undefined && grid.count === 0 ? <Text variant="ui" tone="muted" as="div" sx={styles.noMatch}>No match.</Text> : null}
       </ScrollArea>
     </Surface>
   )
 }
 
-function standardItem(emoji: EmojiCategory['emoji'][number]): Item {
-  const names = emoji.aliases === undefined ? emoji.name : [emoji.name, ...emoji.aliases].join(' ')
-  return { name: emoji.name, unicode: emoji.unicode, keys: names.toLowerCase() }
-}
+const itemKey = (item: Item) => `${item.url === undefined ? 'standard' : 'workspace'}:${item.name}`
 
 /** Search text as a name: lowercase, no colons, spaces as underscores (":Party face" finds partying_face). */
 function normalize(query: string): string {
@@ -384,6 +382,7 @@ const styles = stylex.create({
     height: GLYPH,
     objectFit: 'contain',
   },
+  fallback: { width: GLYPH, height: GLYPH, overflow: 'hidden', whiteSpace: 'nowrap', fontSize: text['--text-meta-size'], lineHeight: GLYPH },
   noMatch: {
     paddingBlock: spacing['--space-3-5'],
     paddingInline: spacing['--space-2-5'],

@@ -53,4 +53,4 @@ Deferred views use `chunk` from `@juno/ui`, also re-exported here for desktop co
 
 Unfurl cards retain author and service icons, body text and source links. Their images load through the bounded main-process image route and collapse on failure. A shared Slack message's footer names its place, as a quiet link that opens the message (`SharedPlace`). The AttachmentCard gallery includes X, YouTube, generic, failed and shared-message previews.
 
-`EmojiPicker` windows its grid with TanStack Virtual. Custom entries carry a canonical name, image URL and searchable aliases. The Workspace section and search mount only nearby rows; image boxes stay fixed while lazy images load.
+`EmojiPicker` windows its grid with TanStack Virtual. Custom entries carry a canonical name, image URL and searchable aliases. Workspace follows the standard categories. Browse and search mount nearby rows plus the focused row. Failed images keep their cell and show a shortcode in the same fixed box. Search shares the composer ranking, and selected names resolve through aliases.

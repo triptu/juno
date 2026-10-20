@@ -1,4 +1,4 @@
-/** Small, distinct workspace images; served with the same session check as avatars. */
+/** Small, distinct workspace images; served publicly like Slack CDN emoji. */
 export const WORKSPACE_EMOJI: Readonly<Record<string, string>> = {
   juno_wave: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M10 28 4 16q-2-5 2-5l5 7L7 5q0-5 4-2l5 12-2-12q1-5 4-1l3 13 1-10q3-4 4 1l-1 14 3-4q5-2 3 4l-6 10q-8 6-15-2" fill="#f4bc58" stroke="#a96728" stroke-width="1.5"/></svg>',
   juno_shipit: '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="m4 22 11-3 3-14q10-4 12-3 1 9-4 16L14 22l-6 7Z" fill="#7b8de0"/><path d="m12 23-6 2-3 7 8-4Z" fill="#ed9752"/><circle cx="24" cy="9" r="3" fill="#d4f3ff"/></svg>',

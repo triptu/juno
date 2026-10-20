@@ -25,9 +25,14 @@ export * from './views'
 export * from './automated'
 
 // The standard emoji, for the renderer's picker through @juno/contract.
-export { workspaceEmoji, customEmojiLookup, emojiCatalog, UNKNOWN_PERSON, type EmojiCategory } from '@juno/richtext'
+export { workspaceEmoji, emojiCatalog, UNKNOWN_PERSON, type EmojiCategory } from '@juno/richtext'
 export * from './composer-mentions'
 export * from './composer-emoji'
 export * from './composer-links'
 export { frequentDestinations, rankConversations } from './frequent'
 export { indexSubject, matchSubject, rankSearchResults, searchWords, type IndexedSubject, type SubjectMatch } from './conversation-search'
+
+export { prepareEmojiPicker, type PreparedEmojiPicker, type PickerItem, type PickerCustomEmoji } from './emoji-picker'
+
+export { customEmoji } from './custom-emoji'
+export { matchEmoji, mergeEmoji } from './emoji-ranking'

@@ -9,8 +9,6 @@ export { composeOutgoing } from './outgoing'
 export { findLinks, linkOf } from './links'
 export type { MentionTargets } from './outgoing'
 export {
-  customEmojiLookup,
-  workspaceEmoji,
   emojiCatalog,
   PICKER_EMOJI,
   QUICK_REACTIONS,
@@ -22,3 +20,5 @@ export {
 } from './emoji'
 
 export { messageTitle } from './title'
+
+export { customEmojiLookup, workspaceEmoji, type CustomEmojiRow } from './custom-emoji'

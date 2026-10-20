@@ -1,12 +1,16 @@
+import { useState } from 'react'
 /**
  * The emoji picker for Settings' quick reactions, loaded on its own like
  * `EmojiPickerPanel`, so the catalog is not in the first bundle.
  */
 import { emojiCatalog, type QuickReaction } from '@juno/contract'
-import { EmojiPicker, type EmojiPickerProps } from '@juno/views'
+import { emojiPickerDataAtom, warmWorkspaceEmoji } from '@juno/state/emoji'
+import { useAtomValue } from '@juno/state/react'
+import { EmojiPicker } from '@juno/views'
+
+warmWorkspaceEmoji(emojiCatalog)
 
 interface QuickReactionPickerProps {
-  readonly custom: NonNullable<EmojiPickerProps['custom']>
   readonly recent: ReadonlyArray<string>
   /** The quick reactions already chosen: shown as chosen, not picked again. */
   readonly selected: ReadonlySet<string>
@@ -15,14 +19,18 @@ interface QuickReactionPickerProps {
 }
 
 /** The picker for Settings' quick reactions: custom emoji too, and the pick as the toolbar draws it. */
-export default function QuickReactionPicker({ custom, recent, selected, onPick, onClose }: QuickReactionPickerProps) {
-  const pick = (name: string) => {
-    const own = custom.find((emoji) => emoji.name === name)
-    if (own !== undefined) return onPick({ name, unicode: `:${name}:`, url: own.url })
-    for (const category of emojiCatalog) {
-      const emoji = category.emoji.find((item) => item.name === name)
-      if (emoji !== undefined) return onPick({ name, unicode: emoji.unicode })
-    }
+export default function QuickReactionPicker({ recent, selected, onPick, onClose }: QuickReactionPickerProps) {
+  const current = useAtomValue(emojiPickerDataAtom(emojiCatalog))
+  const [snapshot, setSnapshot] = useState(current)
+  if (snapshot === undefined && current !== undefined) setSnapshot(current)
+  // Table changes take effect on the next open, so cells never move under a pending click.
+  const answer = snapshot ?? current
+  if (answer === undefined) return null
+  const { custom, data } = answer
+  const pick = (name: string, unicode?: string) => {
+    if (unicode !== undefined) return onPick({ name, unicode })
+    const own = data.byName.get(name)
+    if (own?.url !== undefined) return onPick({ name, unicode: `:${name}:`, url: own.url })
   }
-  return <EmojiPicker catalog={emojiCatalog} custom={custom} recent={recent} selected={selected} onPick={pick} onClose={onClose} />
+  return <EmojiPicker data={data} catalog={emojiCatalog} custom={custom} recent={recent} selected={selected} onPick={pick} onClose={onClose} />
 }

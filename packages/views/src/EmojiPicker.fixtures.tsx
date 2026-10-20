@@ -1,5 +1,6 @@
 import { emojiCatalog } from '@juno/contract'
-import { defineFixtures, fixture, type FixtureFrame } from '@juno/ui'
+import { useState } from 'react'
+import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
 import { EmojiPicker, type EmojiPickerProps } from './EmojiPicker'
 
 const noop = () => {}
@@ -26,6 +27,7 @@ const picker = (overrides: Partial<EmojiPickerProps> = {}, frame?: FixtureFrame)
 export default defineFixtures(EmojiPicker, {
   Browse: {
     default: picker(),
+    regression: scene(() => <RegressionPicker />),
     workspace: picker({ custom }),
     'workspace-2000': picker({ custom: Array.from({ length: 2000 }, (_, i) => ({ name: `workspace_${i}`, url: custom[i % custom.length]!.url })) }),
     'recent-and-custom': picker({ recent, custom }),
@@ -37,3 +39,11 @@ export default defineFixtures(EmojiPicker, {
     'no-match': picker({ custom, initialQuery: 'zzqx' }),
   },
 })
+
+/** A person can pick and dismiss the fixture, so gallery checks exercise the callbacks. */
+function RegressionPicker() {
+  const [picked, setPicked] = useState('')
+  const [glyph, setGlyph] = useState('')
+  const [open, setOpen] = useState(true)
+  return <>{open ? <EmojiPicker catalog={emojiCatalog} custom={[...custom, { name: 'thumbsup_parrot', url: custom[0]!.url }, { name: 'broken_image', url: '/broken-emoji.svg' }, { name: 'broken_neighbor', url: custom[1]!.url }, { name: '+1', unicode: '👍', aliases: ['approval'] }, { name: 'tada', url: custom[3]!.url }]} recent={['hello_juno', 'eyes']} selected={new Set(['hello_juno', 'eyes'])} onPick={(name, unicode) => { setPicked(name); setGlyph(unicode ?? '') }} onClose={() => setOpen(false)} /> : null}<output aria-label="Picked emoji">{picked}</output><output aria-label="Picked glyph">{glyph}</output></>
+}

@@ -30,6 +30,10 @@ export type PerfName =
   | 'juno.send-queued'
   | 'juno.send-commit'
   | 'juno.live-update'
+  | 'juno.emoji-subscribe'
+  | 'juno.emoji-ready'
+  | 'juno.emoji-resolve'
+  | 'juno.emoji-prepare'
   /** Mark: a topic was warmed by hover, focus or keyboard selection (performance.md 4.2). */
   | 'juno.prefetch'
   /** From the peek key's keydown to the first frame with the peeked topic's messages. */

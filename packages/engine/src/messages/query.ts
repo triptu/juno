@@ -21,7 +21,6 @@
  * thing keeps its `rev` and does not travel. The sender is a ref: a new
  * name or photo changes no row.
  */
-import { emojiImageUrl } from '../emojiImage'
 import { Effect } from 'effect'
 import { pendingRowId, type FileView, type MessageView, type Person, type ReactionIssue, type ReactionView, type ThreadLink } from '@juno/contract'
 import {
@@ -419,7 +418,7 @@ const readEmoji = (sql: SqlClient.SqlClient, cache: MessageCache, names: Iterabl
           aliases.set(row.name, target)
           if (!cache.emoji.has(target)) next.push(target)
         } else if (row.url) {
-          cache.emoji.set(row.name, emojiImageUrl(row.url))
+          cache.emoji.set(row.name, row.url)
         }
       }
       missing = next

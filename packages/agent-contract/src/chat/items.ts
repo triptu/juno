@@ -33,7 +33,7 @@ export const THUMBS_UP = '👍'
  * per item. A reaction is never a click: it approves nothing and pins
  * nothing.
  */
-const WorkspaceEmojiName = Schema.String.check(Schema.makeFilter((name: string) => /^[a-z0-9_+-]+$/.test(name) || 'a workspace emoji name', { title: 'Workspace emoji name' }))
+const WorkspaceEmojiName = Schema.String.check(Schema.makeFilter((name: string) => /^[\p{Ll}\p{Lm}\p{Lo}\p{M}\p{N}_+-]+$/u.test(name) || 'a workspace emoji name', { title: 'Workspace emoji name' }))
 
 export const Reaction = Schema.Struct({ by: Schema.Literals(['owner', 'juno']), emoji: Schema.Union([Emoji, WorkspaceEmojiName]) })
 export type Reaction = typeof Reaction.Type

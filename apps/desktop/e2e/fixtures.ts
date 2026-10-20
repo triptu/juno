@@ -21,7 +21,7 @@ export const E2E_OPENROUTER_KEY = 'sk-or-v1-e2e-launch-0123456789abcdef'
 
 /** A throwaway user-data directory. Delete it with `rm` when done. */
 export function tempUserData(): Promise<string> {
-  return mkdtemp(join(tmpdir(), 'juno-e2e-'))
+  return mkdtemp(join(process.env.JUNO_TEST_SCRATCH ?? tmpdir(), 'juno-e2e-'))
 }
 
 export interface LaunchOptions {
@@ -142,6 +142,8 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
     // `(hover: none)`, which turns off every hover style. Say there is a mouse.
     args: [...(process.platform === 'linux' ? ['--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4'] : []), resolve(__dirname, '..')],
     env,
+    // The fake HTTP image origin stands in for Slack's HTTPS CDN. Only the test context bypasses CSP.
+    bypassCSP: options.fakeSlackUrl !== undefined,
   })
   const win = await app.firstWindow()
   await win.waitForLoadState('domcontentloaded')
@@ -241,7 +243,7 @@ async function buildSynced(dir: string, options: SyncOptions): Promise<Omit<Sync
   const started = performance.now()
   const seedTime = Date.now()
   const fake = await startFakeSlack({ seedTime })
-  const appDir = await mkdtemp(join(tmpdir(), 'juno-slack-app-'))
+  const appDir = await mkdtemp(join(process.env.JUNO_TEST_SCRATCH ?? tmpdir(), 'juno-slack-app-'))
   try {
     const slackApp = await writeSlackApp(fake, appDir)
     const running = await launchApp(dir, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, ...options })
@@ -316,7 +318,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     if (syncedStart === undefined) await fake.close()
   },
   slackApp: async ({ fake }, use) => {
-    const dir = await mkdtemp(join(tmpdir(), 'juno-slack-app-'))
+    const dir = await mkdtemp(join(process.env.JUNO_TEST_SCRATCH ?? tmpdir(), 'juno-slack-app-'))
     await use(await writeSlackApp(fake, dir))
     await rm(dir, { recursive: true, force: true })
   },

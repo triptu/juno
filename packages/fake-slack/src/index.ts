@@ -351,6 +351,10 @@ export class FakeSlack {
   }
 
   /** File downloads answer after `ms` milliseconds, so images arrive late. 0 turns it off. */
+  /** In-process image gate for measuring a cold picker without browser-interception overhead. */
+  holdEmojiImages(): void { this.server.holdEmojiImages() }
+  releaseEmojiImages(): void { this.server.releaseEmojiImages() }
+
   delayFiles(input: { ms: number }): void {
     this.server.delayFiles(input.ms)
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PICKER_EMOJI, QUICK_REACTIONS, emojiUnicode, reactionDisplay, splitEmojiName, unicodeFromHex } from '../src/index'
+import { workspaceEmoji, customEmojiLookup, emojiCatalog, PICKER_EMOJI, QUICK_REACTIONS, emojiUnicode, reactionDisplay, splitEmojiName, unicodeFromHex } from '../src/index'
 
 const custom = (name: string) => (name === 'partyparrot' ? 'https://x/p.gif' : undefined)
 
@@ -43,5 +43,30 @@ describe('emoji table', () => {
     expect(reactionDisplay('white_check_mark', custom)).toEqual({ kind: 'unicode', value: '✅' })
     expect(reactionDisplay('partyparrot', custom)).toEqual({ kind: 'image', url: 'https://x/p.gif' })
     expect(reactionDisplay('mystery', custom)).toEqual({ kind: 'name', value: 'mystery' })
+  })
+})
+
+
+describe('workspace aliases', () => {
+  const rows = [
+    { name: 'wave', url: 'https://emoji.example/wave.png' },
+    { name: 'hello', alias_for: 'wave' },
+    { name: 'greeting', alias_for: 'hello' },
+    { name: 'hey', url: 'https://emoji.example/alias.png', alias_for: 'wave' },
+    { name: 'approval', alias_for: 'thumbsup' },
+    { name: 'cycle_a', alias_for: 'cycle_b' },
+    { name: 'cycle_b', alias_for: 'cycle_a' },
+    { name: 'lost', alias_for: 'gone' },
+    { name: 'empty', url: '' },
+  ]
+  it('groups image aliases, resolves standard aliases, and omits cycles and missing targets', () => {
+    expect(workspaceEmoji(rows, emojiCatalog)).toMatchObject([
+      { name: '+1', unicode: '👍', aliases: ['approval'] },
+      { name: 'wave', url: 'https://emoji.example/wave.png', aliases: ['hello', 'greeting', 'hey'] },
+    ])
+    const lookup = customEmojiLookup(rows)
+    expect(lookup('greeting')).toBe('https://emoji.example/wave.png')
+    expect(lookup('hey')).toBe('https://emoji.example/wave.png')
+    for (const name of ['cycle_a', 'cycle_b', 'lost', 'empty', 'approval']) expect(lookup(name)).toBeUndefined()
   })
 })

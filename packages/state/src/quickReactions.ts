@@ -18,7 +18,8 @@ export const quickReactionsAtom = Atom.make((get): ReadonlyArray<QuickReaction> 
 })
 
 /** Saves the list. The default list is saved as no preference, so a later change of default reaches it. */
-export function setQuickReactions(registry: Registry, reactions: ReadonlyArray<QuickReaction>) {
+export function setQuickReactions(registry: Registry, input: ReadonlyArray<QuickReaction>) {
+  const reactions = quickReactionsFrom(input)
   const isDefault = reactions.length === DEFAULT_QUICK_REACTIONS.length && reactions.every((reaction, i) => reaction.name === DEFAULT_QUICK_REACTIONS[i]!.name)
   const value = isDefault ? null : reactions.map((reaction) => (reaction.url === undefined ? { name: reaction.name, unicode: reaction.unicode } : { name: reaction.name, unicode: reaction.unicode, url: reaction.url }))
   return runCommand(registry, prefsSet, { key: QUICK_REACTIONS_PREF, value })
