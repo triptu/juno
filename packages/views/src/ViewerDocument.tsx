@@ -51,6 +51,7 @@ export function ViewerDocument({ file, now, loadText }: ViewerDocumentProps) {
       </div>
     )
   }
+  // Not sandboxed: Chromium does not run its PDF viewer in a sandboxed frame. The frame shows only main's PDF answer.
   if (file.kind === 'pdf') return <iframe src={file.content} title={file.name} {...stylex.props(styles.embed)} />
   // No scripts, forms, popups or top navigation; main's answer adds a policy that allows no network.
   if (file.kind === 'html') return <iframe src={file.content} title={file.name} sandbox="" referrerPolicy="no-referrer" {...stylex.props(styles.embed, styles.page)} />
@@ -62,19 +63,18 @@ type Loaded = { readonly state: 'loading' } | { readonly state: 'failed' } | ({ 
 /** A text file, read when it opens: blank while it loads, then drawn by its kind. */
 function TextFile({ file, now, loadText }: { readonly file: FileView; readonly now: number; readonly loadText: LoadFileText | undefined }) {
   const [loaded, setLoaded] = useState<Loaded>({ state: 'loading' })
+  const content = file.content
   useEffect(() => {
-    if (file.content === undefined || loadText === undefined) {
-      setLoaded({ state: 'failed' })
-      return
-    }
+    if (content === undefined || loadText === undefined) return
     const abort = new AbortController()
-    void loadText(file.content, abort.signal).then((read) => {
+    void loadText(content, abort.signal).then((read) => {
       if (!abort.signal.aborted) setLoaded(read === undefined ? { state: 'failed' } : { state: 'ready', ...read })
     })
     return () => abort.abort()
-  }, [file.content, loadText])
-  if (loaded.state === 'loading') return null
-  if (loaded.state === 'failed') {
+  }, [content, loadText])
+  const unreadable = content === undefined || loadText === undefined
+  if (!unreadable && loaded.state === 'loading') return null
+  if (unreadable || loaded.state !== 'ready') {
     return (
       <div {...stylex.props(styles.empty)}>
         <Text variant="ui" tone="muted">
