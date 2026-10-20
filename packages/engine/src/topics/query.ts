@@ -65,7 +65,7 @@ import { StoreReader, syncState, type SqlError } from '@juno/store'
 import { BOOT_KEY, QUICK_START_KEY } from '@juno/sync'
 import { Effect } from 'effect'
 import type { ListRun } from '../protocol/live'
-import { countsStatement, OPEN_RULE, THREAD_RULE } from '../sidebarUnread'
+import { countsStatement, IN_ALL, OPEN_RULE, THREAD_RULE } from '../sidebarUnread'
 import {
   artRefOf,
   channelInfoOf,
@@ -227,8 +227,7 @@ export const kindClause = (kind: ListFilter['kind']): string =>
  * (`automated_holds`, a probe by key). Correlated, so it never changes how
  * SQLite walks `topic_index`.
  */
-const KEPT_OUT = ` AND NOT EXISTS (SELECT 1 FROM sidebar_view_channels vc JOIN sidebar_views v ON v.id = vc.view_id WHERE vc.channel = i.channel AND v.keep_out_of_all = 1)
-  AND NOT EXISTS (SELECT 1 FROM automated_holds h WHERE h.channel = i.channel)`
+const KEPT_OUT = ` AND ${IN_ALL}`
 
 /**
  * Which conversations the filter shows, after membership and the ignored
@@ -286,8 +285,6 @@ export function listStatements(filter: ListFilter, cutoff: string, limit: number
     },
   ]
 }
-
-export { countsStatement } from '../sidebarUnread'
 
 /** Every view's conversations, in pill order, with the view's Keep these out of All. */
 export const VIEW_MEMBERS = `SELECT v.id AS view_id, v.keep_out_of_all AS keep_out, vc.channel AS channel
@@ -612,14 +609,10 @@ export const countTopics = (scope: string | undefined): Effect.Effect<TopicCount
   Effect.gen(function* () {
     const sql = yield* StoreReader
     const statement = countsStatement(scope)
-    const rows = yield* sql.unsafe<{ channel: string; kind: 'public' | 'private' | 'im' | 'mpim'; n: number; mentions: number }>(statement.sql, statement.params)
+    const rows = yield* sql.unsafe<{ channel: string; kind: 'public' | 'private' | 'im' | 'mpim'; n: number; mentions: number; in_all: number }>(statement.sql, statement.params)
     const members = yield* sql.unsafe<{ view_id: string; keep_out: number; channel: string }>(VIEW_MEMBERS)
-    const keptOut = new Set<string>()
-    // A channel the first sync holds out of All is not counted in its dots either.
-    if (scope === undefined) for (const held of yield* sql<{ channel: string }>`SELECT channel FROM automated_holds`) keptOut.add(held.channel)
     const viewsOf = new Map<string, Array<string>>()
     for (const member of members) {
-      if (member.keep_out === 1 && scope === undefined) keptOut.add(member.channel)
       const views = viewsOf.get(member.channel)
       if (views === undefined) viewsOf.set(member.channel, [member.view_id])
       else views.push(member.view_id)
@@ -629,7 +622,7 @@ export const countTopics = (scope: string | undefined): Effect.Effect<TopicCount
     const mentioned = new Set<string>()
     for (const row of rows) {
       if (row.mentions > 0) for (const view of viewsOf.get(row.channel) ?? []) mentioned.add(view)
-      if (keptOut.has(row.channel)) continue
+      if (scope === undefined && row.in_all === 0) continue
       if (isDm(row.kind)) dmsUnread += row.n
       else channelsUnread += row.n
     }

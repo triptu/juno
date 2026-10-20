@@ -4,7 +4,7 @@
  * The engine decides; main only shows. `notify` shows one notification,
  * once per id, and a click brings the window forward and hands the target
  * to the renderer, which opens the topic at the message. `badge` sets the
- * dock's dot while any eligible DM or mention is unread. `test` shows Settings ›
+ * dock's dot while any eligible item is unread. `test` shows Settings ›
  * Notifications' test notification the same way; its click only brings
  * Juno forward.
  *

@@ -4,6 +4,9 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-20 12:39 · Tushar · Use the alert decision for the dock dot, with unread DMs and group DMs that count in All also qualifying. Share the sidebar exclusions; a mention can qualify in a kept-out conversation. Apply sender and conversation levels equally to badges and alerts.
+- 10-20 12:39 · Engine · Cache per-message notification attention during the existing unread-body parse, then query badge existence through indexes. Compile notification decisions through the domain rule and cache settings between preference changes, so SQL does not duplicate alert precedence or return all unread messages.
+- 10-20 12:39 · Tushar · Ask macOS for notifications once on the first Home or topic view after setup, and persist the attempt before requesting. Existing installs follow the same rule. Development asks only through Settings.
 - 10-20 11:52 · Tushar · Keep the dock badge as `•` and broaden it to unread DMs, group DMs and mentions elsewhere, using the sidebar's unread eligibility across views, Slack mutes and Juno's notification levels. More unread items keep the same dot. It clears when no eligible item remains. The domain's `dockBadgeActive` owns this policy so it can change in one place.
 - 10-20 11:12 · sidebar-first-key · Hold the character that starts sidebar type-ahead along with later keys, so opening a topic and typing before its composer mounts keeps the whole draft.
 - 10-20 11:06 · daily-full-run · A scheduled task runs the full suites on main once a day; the agent that runs it commits the refreshed coverage map and merges it.

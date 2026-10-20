@@ -1,0 +1,1 @@
+- 10-20 12:39 · Engine · Cache per-message notification attention during the existing unread-body parse, then query badge existence through indexes. Compile notification decisions through the domain rule and cache settings between preference changes, so SQL does not duplicate alert precedence or return all unread messages.

@@ -1,13 +1,13 @@
 /** Shared session composition and host seam for the notifications feature. */
-import { ChannelId, UserId, dockBadgeActive, isDm, messageMentionsMe, messageMentionsMeDirectly, type Me, type Presence, type BadgeTopic } from '@juno/domain'
+import { ChannelId, UserId, isDm, messageMentionsMe, messageMentionsMeDirectly, type Me, type Presence } from '@juno/domain'
 import { makeNotifications, readSettings, type Notifier, type Notifications } from '@juno/notifications'
 import { AiProvider } from '@juno/ai'
 import { messageBody, plainText, UNKNOWN_PERSON } from '@juno/richtext'
 import { SlackApi, SlackSession, type SocketEvent } from '@juno/slack'
-import { liveQuery, StoreReader, type ConversationRow } from '@juno/store'
+import { Invalidation, liveQuery, StoreReader, type ConversationRow } from '@juno/store'
 import { Clock, Context, Effect, Layer, Ref, Stream, SubscriptionRef } from 'effect'
 import { conversationLabel } from './placeLabel'
-import { UNREAD_FROM } from './sidebarUnread'
+import { startDockBadge } from './dockBadge'
 import { HostLink } from './protocol/host'
 import { SocketEvents, type SessionStart, type SocketInput } from './socketEvents'
 
@@ -68,14 +68,15 @@ export const NotificationHost = Context.Reference<NotificationHost>('juno/engine
 export const hostNotificationHost = Layer.effect(NotificationHost, Effect.gen(function* () {
   const link = yield* HostLink
   const viewing = yield* Ref.make<string | null>(null)
+  const lastBadge = yield* Ref.make(false)
   const messages = yield* link.messages
-  yield* Effect.forkScoped(Stream.runForEach(messages, (message) => message._tag === 'viewing' ? Ref.set(viewing, message.topicId) : Effect.void))
+  yield* Effect.forkScoped(Stream.runForEach(messages, (message) => message._tag === 'viewing' ? Ref.set(viewing, message.topicId) : message._tag === 'wake' ? Effect.flatMap(Ref.get(lastBadge), (unread) => link.send({ _tag: 'badge', unread })) : Effect.void))
   const host: NotificationHost = {
     notifier: {
       show: ({ id, title, body, target }) => link.send({ _tag: 'notify', notification: { id, title, body, target: { _tag: 'message', source: target.source } } }),
       viewing: (topicId) => Effect.map(Ref.get(viewing), (shown) => shown === topicId),
     },
-    badge: (unread) => link.send({ _tag: 'badge', unread }),
+    badge: (unread) => Ref.set(lastBadge, unread).pipe(Effect.andThen(link.send({ _tag: 'badge', unread }))),
   }
   return host
 }))
@@ -157,22 +158,7 @@ const sessionNotifications = (control: NotificationControl['Service'], host: Not
     last = result.success
     return safe(notifications.settingsChanged)
   }))
-  // The sidebar's unread eligibility, across every view, followed by the one dock badge policy.
-  const badge = host.badge
-  if (badge !== undefined) {
-    let shown: boolean | undefined
-    yield* Effect.forkScoped(Stream.runForEach(liveQuery(['topics', 'ignored_channels', 'conversations', 'topic_overlay', 'thread_subs', 'prefs', 'team'], Effect.gen(function* () {
-      const rows = yield* sql.unsafe<Omit<BadgeTopic, 'mentionsMe'> & { mentionsMe: number }>(`SELECT i.topic_id AS id, i.channel, c.kind, c.user_id AS person, i.mentions_me AS mentionsMe ${UNREAD_FROM} AND (c.kind IN ('im', 'mpim') OR i.mentions_me = 1)`)
-      const { settings } = yield* readSettings
-      const team = yield* sql<{ muted: unknown }>`SELECT json_extract(prefs_json, '$.muted_channels') AS muted FROM team LIMIT 1`
-      return dockBadgeActive(rows.map((row) => ({ ...row, mentionsMe: row.mentionsMe === 1 })), settings, new Set((typeof team[0]?.muted === 'string' ? team[0].muted : '').split(',').filter(Boolean)))
-    })), (result) => {
-      if (result._tag === 'Failure' || result.success === shown) return Effect.void
-      shown = result.success
-      return badge(result.success)
-    }))
-    yield* Effect.addFinalizer(() => shown === true ? badge(false) : Effect.void)
-  }
+  if (host.badge !== undefined) yield* startDockBadge(host.badge, session.userId)
   yield* Effect.forkScoped(Effect.gen(function* () {
     yield* safe(notifications.tick)
     while (true) {
@@ -180,6 +166,7 @@ const sessionNotifications = (control: NotificationControl['Service'], host: Not
       const now = yield* Clock.currentTimeMillis
       yield* Effect.sleep(60_000 - now % 60_000)
       yield* safe(notifications.tick)
+      yield* Invalidation.use((invalidation) => invalidation.invalidate(['badge_clock']))
     }
   }))
   // `SocketEvents` calls this after the sync wrote the event, one event at a time, so the message's channel and people are in the store.

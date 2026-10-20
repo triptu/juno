@@ -3,6 +3,9 @@
 // statements, and the topic view's: the Main and thread windows, their
 // reactions and thread titles, a channel's active threads, and the New chat
 // pickers, All topics (its order, counts and places), and ⌘K's local search.
+import { countsStatement } from '../src/sidebarUnread'
+import { badgeStatement, badgePolicy } from '../src/dockBadge'
+import { defaultNotificationSettings } from '@juno/domain'
 import { assert, describe, it } from '@effect/vitest'
 import { Effect, Layer } from 'effect'
 import * as fs from 'node:fs/promises'
@@ -20,7 +23,7 @@ import { mentionStatements } from '../src/mentions/query'
 import { ignorableStatement } from '../src/topics/ignored'
 import { searchStatements } from '../src/search/query'
 import { countsStatement as allTopicsCountsStatement, orderStatement, placesStatement } from '../src/topics/allTopics'
-import { countsStatement, listStatements, type ListFilter } from '../src/topics/query'
+import { listStatements, type ListFilter } from '../src/topics/query'
 
 const tempDir = Effect.acquireRelease(
   Effect.promise(() => fs.mkdtemp(path.join(os.tmpdir(), 'juno-plan-'))),
@@ -87,6 +90,16 @@ describe('query plans', () => {
         const lines = yield* plan(statement.sql, statement.params)
         assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
       }
+    }).pipe(Effect.provide(freshStore)),
+  )
+
+  it.effect('dock badge uses EXISTS and indexed unread message probes', () =>
+    Effect.gen(function* () {
+      const statement = badgeStatement(badgePolicy(defaultNotificationSettings, { aiAssist: false, at: { weekday: 1, minutes: 600 } }), 'U0SELF')
+      const lines = yield* plan(statement.sql, statement.params)
+      assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
+      assert.isTrue(lines.some((line) => line.includes('topic_index_unread')), lines.join('\n'))
+      assert.isTrue(statement.sql.includes('EXISTS'), 'the badge returns one boolean')
     }).pipe(Effect.provide(freshStore)),
   )
 

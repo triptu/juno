@@ -1,19 +1,33 @@
-/** Dock badge policy, over the same unread topics as the sidebar. */
+/** The dock uses the alert decision, with unread DMs in All also counting when held for hours or AI. */
 import { isDm, type ConversationKind } from './channel'
-import { notificationIsMuted, type NotificationSettings } from './notifications'
+import { ChannelId, UserId } from './ids'
+import { decideWithCause, type DecisionContext, type Judgement, type LocalTime, type NotificationSettings } from './notifications'
 
 export interface BadgeTopic {
   readonly id: string
   readonly channel: string
   readonly kind: ConversationKind
+  /** The unread message's sender, including in channels and group DMs. */
   readonly person: string | null
   readonly mentionsMe: boolean
+  readonly mentionsMeDirectly?: boolean
+  readonly sidebarVisible?: boolean
+  readonly ignored?: boolean
+  readonly judgement?: Judgement
 }
 
-/** Never mutes the badge unless Every message overrides it. Hours and AI judgements affect alerts only. */
-export function dockBadgeActive(topics: ReadonlyArray<BadgeTopic>, settings: NotificationSettings, mutedChannels: ReadonlySet<string> = new Set()): boolean {
-  return topics.some((topic) => (isDm(topic.kind) || topic.mentionsMe) && !mutedChannels.has(topic.channel) && !notificationIsMuted(
-    settings.threads?.[topic.id], settings.channels[topic.channel],
-    topic.kind === 'im' && topic.person !== null ? settings.people[topic.person] : undefined,
-  ))
+export interface BadgeContext extends DecisionContext { readonly at: LocalTime }
+
+export function dockBadgeActive(items: ReadonlyArray<BadgeTopic>, settings: NotificationSettings, context: BadgeContext): boolean {
+  return items.some((item) => {
+    if (item.sidebarVisible === false && !(item.mentionsMeDirectly ?? item.mentionsMe)) return false
+    const decision = decideWithCause({
+      topicId: item.id, channel: { id: ChannelId.make(item.channel), kind: item.kind, name: '', ignored: item.ignored === true },
+      senderId: UserId.make(item.person ?? ''), mentionsMe: item.mentionsMe,
+      mentionsMeDirectly: item.mentionsMeDirectly ?? item.mentionsMe, at: context.at,
+    }, settings, { ...context, aiAssist: context.aiAssist && item.judgement !== undefined }, item.judgement)
+    if ('needsJudgement' in decision) return false
+    if (decision.decision.outcome === 'now') return true
+    return isDm(item.kind) && ['hours', 'aiOff', 'juno'].includes(decision.cause.kind)
+  })
 }

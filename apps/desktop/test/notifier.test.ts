@@ -93,6 +93,7 @@ it('shows what the engine decides, opens the message on click, hides the topic o
   expect(main.badge()).toBe('•')
   for (const { topic_id } of mentioned) await runCommand(engine.registry, readsMarkRead, { id: topic_id })
   await waitFor(() => (main.badge() === '' ? true : undefined), 15_000, 'the badge to clear')
+  await runCommand(engine.registry, notificationsSetLevel, { target: { kind: 'channel', id: 'C0ENG' }, choice: 'every' })
   engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: '<@U0TUSHAR> can you review the plan?' })
   await waitFor(() => (main.badge() === '•' ? true : undefined), 15_000, 'the dock badge')
 })

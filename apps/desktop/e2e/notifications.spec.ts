@@ -13,7 +13,6 @@ import { seedWorkspace, startFakeSlack, topic300Seed } from '@juno/fake-slack'
 import { expect, syncedTest, test } from './fixtures'
 import { watchFlashes } from './driver/flashes'
 import type { Juno } from './driver/juno'
-import { hooks } from './hooks'
 
 const ALERTS_MAIN = '#alerts-prod'
 const ROADMAP = 'Proposal: cut offline mode and public'
@@ -293,74 +292,4 @@ longThread('a notification for a topic open in another tab focuses it, scrolls t
   await juno.tabs.select('Review the rollout checklist 1')
   await juno.win.waitForTimeout(500)
   expect(await flashes()).toHaveLength(before)
-})
-
-const badgeTest = test.extend({
-  // oxlint-disable-next-line no-empty-pattern
-  fake: async ({}, use) => {
-    const fake = await startFakeSlack({ seed: (workspace, avatars) => {
-      seedWorkspace(workspace, avatars)
-      for (const channel of workspace.conversations.keys()) {
-        const last = workspace.all(channel).at(-1)?.ts
-        if (last !== undefined) workspace.markConversation(channel, last)
-      }
-      for (const sub of workspace.subscriptions.values()) {
-        const last = workspace.all(sub.channel).at(-1)?.ts
-        if (last !== undefined) workspace.markThread(sub.channel, sub.threadTs, last, true)
-      }
-      workspace.post({ channel: 'D0MAYA', user: 'U0MAYA', text: 'A DM before launch' })
-    } })
-    await use(fake)
-    await fake.close()
-  },
-})
-
-badgeTest('dock dot follows unread DMs, group DMs and mentions through reads, wake and engine restart', async ({ juno, slack, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.openNotifications()
-  const badge = (text: string) => expect.poll(() => juno.dockBadge(), { timeout: 15_000 }).toBe(text)
-  await badge('•')
-  fake.emitFrame({ type: 'pref_change', name: 'muted_channels', value: 'D0MAYA' })
-  await badge('')
-  fake.emitFrame({ type: 'pref_change', name: 'muted_channels', value: '' })
-  await badge('•')
-  await juno.sidebar.row('Maya', { exact: true }).chooseInMenu('notify-never')
-  await badge('')
-  await juno.sidebar.row('Maya', { exact: true }).chooseInMenu('notify-every')
-  await badge('•')
-  // More unread items keep the same dot, including a mention in the DM.
-  const dm = slack.as('Maya').dm('<@U0TUSHAR> Another DM')
-  await badge('•')
-  slack.as('Leo').postIn('eng', '<@U0TUSHAR> Please review this')
-  await badge('•')
-  // A read from another Slack client leaves the channel mention as the only unread item.
-  fake.markRead({ channel: 'D0MAYA', ts: dm })
-  await badge('•')
-  await juno.sidebar.row('#eng', { exact: true }).chooseInMenu('mark-read')
-  await badge('')
-  slack.as('Leo').groupDm('A group DM')
-  await badge('•')
-  const pid = await hooks(juno.app, 'enginePid')
-  expect(pid).toBeDefined()
-  process.kill(pid!, 'SIGKILL')
-  await expect.poll(() => hooks(juno.app, 'enginePid'), { timeout: 15_000 }).not.toBe(pid)
-  await juno.waitForSync()
-  await badge('•')
-  await hooks(juno.app, 'wake')
-  await badge('•')
-  await juno.sidebar.row('Maya, Leo', { exact: true }).chooseInMenu('mark-read')
-  await badge('')
-})
-
-// Permission must be requested by badging itself, without sending a test or message notification.
-badgeTest('the first dock badge asks for authorization before any notification is shown', async ({ juno }) => {
-  await juno.setNotificationPermission({ authorization: 'notDetermined', badges: 'unknown' })
-  await juno.signIn()
-  await juno.waitForSync()
-  await expect.poll(() => hooks(juno.app, 'notificationRequests')).toBe(1)
-  await expect.poll(() => juno.dockBadge()).toBe('•')
-  expect(await juno.osNotifications()).toEqual([])
-  await juno.openNotifications()
-  await expect(juno.notifications.root.getByRole('status', { name: 'Notification permission' })).toHaveCount(0)
 })

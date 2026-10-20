@@ -1,0 +1,1 @@
+- 10-20 12:39 · Tushar · Use the alert decision for the dock dot, with unread DMs and group DMs that count in All also qualifying. Share the sidebar exclusions; a mention can qualify in a kept-out conversation. Apply sender and conversation levels equally to badges and alerts.
