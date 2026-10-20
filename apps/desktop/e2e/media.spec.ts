@@ -139,7 +139,7 @@ syncedTest('images and videos in #eng show inline and open full screen, and a pa
 })
 
 // The viewer covers only its tab's topic, so the sidebar and the tab strip stay usable while it is open, and each
-// tab keeps its own viewer at its own item while another tab shows (SPEC 8, "Opening").
+// tab keeps its own viewer at its own item while another tab shows, even after its topic unmounts (SPEC 8, "Opening").
 syncedTest('the viewer covers only its tab, and each tab keeps its own picture open', async ({ juno, win, fake }) => {
   const { sidebar, tabs, topic } = juno
   await sidebar.row(ENG_MAIN).open()
@@ -169,6 +169,19 @@ syncedTest('the viewer covers only its tab, and each tab keeps its own picture o
   await tabs.select('eng')
   await tabs.expectActive('eng')
   await expect(viewer).toHaveCount(1)
+  await expect(viewer.locator('[data-viewer-name]')).toHaveText('rack-back.png')
+  await expect(viewer.locator('[data-viewer-item]')).toHaveAttribute('data-viewer-item', '2')
+
+  // Five more topic tabs: the first two leave the five kept mounted, and their viewers with them.
+  const others = ['#incidents', '#design-review', '#hiring', 'Rina finished the onsite', 'Draft plan is in the doc']
+  for (const [index, title] of others.entries()) {
+    await sidebar.row(title).openInNewTab()
+    await tabs.expectCount(3 + index)
+  }
+  await expect(win.locator('[data-media-viewer]')).toHaveCount(0)
+  // Each comes back mounted afresh, at its own item.
+  await tabs.select('eng')
+  await tabs.expectActive('eng')
   await expect(viewer.locator('[data-viewer-name]')).toHaveText('rack-back.png')
   await expect(viewer.locator('[data-viewer-item]')).toHaveAttribute('data-viewer-item', '2')
   await win.keyboard.press('Escape')
