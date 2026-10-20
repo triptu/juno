@@ -28,7 +28,7 @@ test('start a huddle from the header, mute from the bar, open the tab and leave'
   await header.click()
 
   // The bar shows at once, under the title bar, and the call connects.
-  const bar = win.getByRole('region', { name: 'Huddle' })
+  const bar = win.getByRole('region', { name: 'Huddle', exact: true })
   await expect(bar).toBeVisible()
   await expect(bar.getByRole('button', { name: 'Open huddle in #eng' })).toBeVisible()
   await expect.poll(() => connection(win)).toBe('connected')
@@ -84,7 +84,7 @@ test('start a huddle from the header, mute from the bar, open the tab and leave'
 test('someone shares their screen: the bar says so, the tab shows it, two can share, and it goes when they stop', async ({ juno, fake, win }) => {
   await openEngMain(juno)
   await win.getByRole('button', { name: 'Start huddle' }).click()
-  const bar = win.getByRole('region', { name: 'Huddle' })
+  const bar = win.getByRole('region', { name: 'Huddle', exact: true })
   // The bar shows once the media session has loaded.
   await expect(bar).toBeVisible()
   await expect.poll(() => connection(win)).toBe('connected')
@@ -157,7 +157,7 @@ test('start, mute and leave a huddle from the palette, with the Huddle menu foll
   await expect(palette.root.getByRole('option', { name: 'Leave huddle' })).toHaveCount(0)
   await palette.root.getByRole('option', { name: 'Start huddle' }).click()
 
-  const bar = win.getByRole('region', { name: 'Huddle' })
+  const bar = win.getByRole('region', { name: 'Huddle', exact: true })
   await expect(bar).toBeVisible()
   await expect.poll(() => connection(win)).toBe('connected')
   await expect.poll(() => huddleMenuItem(app, 'huddle-leave')).toEqual({ label: 'Leave Huddle', enabled: true })
@@ -191,11 +191,12 @@ test('start, mute and leave a huddle from the palette, with the Huddle menu foll
 test('join a running huddle, and Join here after joining on another device', async ({ juno, fake, win }) => {
   await openEngMain(juno)
   fake.control('startHuddle', { channel: 'C0ENG', user: 'U0MAYA' })
-  const join = win.getByRole('button', { name: /^Join/ })
+  // The header's Join; the sidebar's incoming card has its own (huddle-incoming.spec.ts).
+  const join = juno.topic.header.getByRole('button', { name: /^Join/ })
   await expect(join).toBeVisible({ timeout: 15_000 })
   await expect(juno.sidebar.row('#eng').root.locator('[data-huddle-indicator]')).toBeVisible()
   await join.click()
-  const bar = win.getByRole('region', { name: 'Huddle' })
+  const bar = win.getByRole('region', { name: 'Huddle', exact: true })
   await expect(bar).toBeVisible()
   await expect.poll(() => connection(win)).toBe('connected')
   const first = await attendee(win)
@@ -222,7 +223,7 @@ test('join a running huddle, and Join here after joining on another device', asy
 test('quitting in a huddle asks first: Cancel keeps the huddle, Quit leaves it', async ({ juno, fake, win, app, running }) => {
   await openEngMain(juno)
   await win.getByRole('button', { name: 'Start huddle' }).click()
-  const bar = win.getByRole('region', { name: 'Huddle' })
+  const bar = win.getByRole('region', { name: 'Huddle', exact: true })
   await expect(bar).toBeVisible()
   await expect.poll(() => connection(win)).toBe('connected')
   const attendeeId = await attendee(win)
@@ -245,7 +246,7 @@ test('once the engine stops for good, quitting in a huddle does not ask', async 
   await openEngMain(juno)
   await win.getByRole('button', { name: 'Start huddle' }).click()
   // The bar shows once the media session has loaded.
-  await expect(win.getByRole('region', { name: 'Huddle' })).toBeVisible()
+  await expect(win.getByRole('region', { name: 'Huddle', exact: true })).toBeVisible()
   await expect.poll(() => connection(win)).toBe('connected')
 
   // With the engine gone there is nothing left to leave; a Cancel answer would keep the app open if it asked.
@@ -259,7 +260,7 @@ test('once the engine stops for good, quitting in a huddle does not ask', async 
 test('while macOS blocks the microphone, Mute says so and opens System Settings; with no microphone it only says so', async ({ juno, fake, win, app }) => {
   await openEngMain(juno)
   await win.getByRole('button', { name: 'Start huddle' }).click()
-  const bar = win.getByRole('region', { name: 'Huddle' })
+  const bar = win.getByRole('region', { name: 'Huddle', exact: true })
   // The bar shows once the media session has loaded.
   await expect(bar).toBeVisible()
   await expect.poll(() => connection(win)).toBe('connected')
@@ -305,7 +306,7 @@ test('while macOS blocks the microphone, Mute says so and opens System Settings;
 test('Switch leaves the huddle the user is in, joins the other, and says so', async ({ juno, fake, win }) => {
   await openEngMain(juno)
   await win.getByRole('button', { name: 'Start huddle' }).click()
-  const bar = win.getByRole('region', { name: 'Huddle' })
+  const bar = win.getByRole('region', { name: 'Huddle', exact: true })
   await expect(bar).toBeVisible()
   await expect.poll(() => connection(win)).toBe('connected')
   const first = await attendee(win)
@@ -315,7 +316,7 @@ test('Switch leaves the huddle the user is in, joins the other, and says so', as
   await juno.sidebar.row('#product').open()
   await juno.topic.expectTitle('Main')
   await juno.sidebar.leave()
-  const switchButton = win.getByRole('button', { name: /^Switch/ })
+  const switchButton = juno.topic.header.getByRole('button', { name: /^Switch/ })
   await expect(switchButton).toBeVisible({ timeout: 15_000 })
   await switchButton.click()
   await juno.expectToast('Left the huddle in #eng')
