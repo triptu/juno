@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-20 13:44 · huddle-header-placement · The topic header's right island reads huddle control, Resolve/Reopen or Follow (icons only, word as tooltip and name; Reopen is the filled check), Juno, then ⋯ last. A DM shows the huddle control on every topic; a channel shows it only while a huddle runs, with Start huddle (or Join huddle) in its topic and channel menus. The huddle tab's controls are one size up (32px in a 40px island).
 - 10-20 12:46 · start-bundle-sign-in · Load sign-in and its appearance controls as a chunk, warmed on idle after the shell paints and loaded immediately when a signed-out session is known. Show the whole page once ready, without a Suspense fallback delay; signed-in Home and topic frames stay eager.
 - 10-20 12:45 · start-bundle-copy · Keep the copy Home, topic actions and tab titles use in a separate module, so their imports do not keep every Juno page's copy in the startup bundle. Juno's existing idle preload loads the remaining copy with its UI.
 - 10-20 12:39 · Tushar · Use the alert decision for the dock dot, with unread DMs and group DMs that count in All also qualifying. Share the sidebar exclusions; a mention can qualify in a kept-out conversation. Apply sender and conversation levels equally to badges and alerts.
