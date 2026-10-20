@@ -1,0 +1,23 @@
+{
+  "name": "@juno/pictures",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Home's pictures: the bundled catalog of paintings, prints, nature studies and space images with their stories, sources and licences, and the rule that picks the next one. Data and pure functions, no dependencies.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./catalog": "./src/catalog.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "vitest": "5.0.4"
+  },
+  "juno": {
+    "allowedDeps": []
+  }
+}

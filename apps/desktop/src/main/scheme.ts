@@ -6,12 +6,14 @@
  * lets Chromium keep the V8 code cache for the bundle between launches.
  * `juno://files/` serves message thumbnails on the Slack session and
  * `juno://uploads/` the images the composer staged (files.ts).
+ * `juno://pictures/` serves Home's pictures from the engine's cache.
  */
 import { app, net, protocol } from 'electron'
 import { resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { serveThumbnail, serveUpload } from './files'
 import { serveImage } from './images'
+import { servePicture } from './pictures'
 import { startupMark } from './startupMarks'
 
 export const APP_SCHEME = 'juno'
@@ -37,6 +39,7 @@ export function serveAppScheme(rendererDir: string, fakeSlackOrigin?: string): v
     if (url.host === 'images') return serveImage(url, fakeSlackOrigin)
     if (url.host === 'files') return serveThumbnail(url, fakeSlackOrigin, request.headers.get('range'))
     if (url.host === 'uploads') return serveUpload(url, app.getPath('userData'))
+    if (url.host === 'pictures') return servePicture(url, app.getPath('userData'))
     if (url.host !== 'app') return new Response('Not found', { status: 404 })
     const pathname = url.pathname === '/' ? '/index.html' : decodeURIComponent(url.pathname)
     // Resolve against the root and refuse anything that escapes it. Chromium
