@@ -267,8 +267,8 @@ syncedTest("pressing a row selects it, the keyboard moves the selection, and Tab
     await second.select()
     await second.expectSelected()
     await first.expectSelected(false)
-    // The open puts focus in the topic's composer (SPEC 6, "Ready to type"); wait for it before focusing the row.
-    await expect(juno.topic.composer).toBeFocused()
+    // An open from a row keeps focus on that row (SPEC 6, "Ready to type").
+    await second.expectFocused()
 
     // Arrows move focus between rows; Enter makes the focused row the selection.
     await second.focus()
@@ -303,8 +303,7 @@ syncedTest("pressing a row selects it, the keyboard moves the selection, and Tab
     // The first row is selected; the Postgres thread is reached with the keyboard only.
     await first.select()
     await first.expectSelected()
-    await expect(juno.topic.composer).toBeFocused()
-    await first.focus()
+    await first.expectFocused()
     for (let i = 0; i < steps; i++) await win.keyboard.press('ArrowDown')
     await postgres.expectFocused()
     await postgres.expectSelected(false)
