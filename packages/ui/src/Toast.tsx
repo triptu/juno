@@ -26,8 +26,7 @@ export interface ToastProps {
 /**
  * One line of text on a floating ink surface, with an optional filled icon
  * and an optional Undo. Rises in over --duration-appear; the owner removes
- * it (fade over --duration-exit) and keys a replacement so it cross-fades
- * instead of sliding again.
+ * it at once, and a replacement takes its place without rising again.
  */
 export function Toast({ text, icon, action }: ToastProps) {
   return (
