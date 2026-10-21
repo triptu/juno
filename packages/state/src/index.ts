@@ -16,7 +16,7 @@ export {
 } from './allTopics'
 export { readCatchUpAtom, mirrorReadsAtom, shouldMarkRead } from './reads'
 export { quietDaysAtom, setQuietDays } from './quietWindow'
-export { personActiveAtom, setShowPresence, showPresenceAtom } from './presence'
+export { personPresenceAtom, setShowPresence, showPresenceAtom, sidebarPersonActiveAtom } from './presence'
 export { isPeekKey, peekKeyAtom, setPeekKey } from './peek'
 export { openViewerAtom } from './mediaViewer'
 export { closeWelcome, showWelcome, tickWelcome, welcomeAtom, type Welcome } from './welcome'

@@ -2,6 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { radii, sizes, spacing, text, tints, weights } from '@juno/tokens/tokens.stylex'
 import { Icon, type IconSize, type PhosphorIcon } from './Icon'
 import { focusRing } from './focusRing'
+import { PresenceDot } from './PresenceDot'
 import { interactive } from './internal/interactive'
 import { tooltip } from './Tooltip'
 import { variants as typeVariants } from './internal/type'
@@ -39,6 +40,12 @@ export interface ContextPillProps {
    * name and the kind in both forms.
    */
   readonly iconWhenNarrow?: boolean
+  /**
+   * A DM's person, when Slack has said: a dot takes the icon's place, green
+   * when active and hollow when away, in the icon's box so nothing moves.
+   * The tooltip says it in words; a button's `label` should too.
+   */
+  readonly presence?: 'active' | 'away'
 }
 
 const iconBySize: Record<ContextPillSize, IconSize> = { 22: 12, 24: 13, 26: 14, 28: 14 }
@@ -50,13 +57,21 @@ const iconBySize: Record<ContextPillSize, IconSize> = { 22: 12, 24: 13, 26: 14, 
  * name takes an ellipsis, the icon and the kind keep their size, and the
  * pill never gets narrower than those two, so nothing spills out of it.
  */
-export function ContextPill({ tint, icon, name, kindLabel, showKind = false, size = 26, onClick, label, iconWhenNarrow = false }: ContextPillProps) {
+export function ContextPill({ tint, icon, name, kindLabel, showKind = false, size = 26, onClick, label, iconWhenNarrow = false, presence }: ContextPillProps) {
   const kind = showKind && kindLabel ? kindLabel : undefined
+  const presenceWord = presence === undefined ? undefined : presence === 'active' ? 'Active' : 'Away'
+  const hintKind = [kindLabel, presenceWord].filter((part) => part !== undefined).join(' · ') || undefined
   // The tooltip names the place too when the name can be hidden; otherwise the native title says the kind, as before.
-  const hint = iconWhenNarrow ? tooltip(kindLabel === undefined ? name : `${name} · ${kindLabel}`) : { title: kindLabel }
+  const hint = iconWhenNarrow ? tooltip(hintKind === undefined ? name : `${name} · ${hintKind}`) : { title: hintKind }
   const content = (
     <>
-      <Icon icon={icon} size={iconBySize[size]} />
+      {presence === undefined ? (
+        <Icon icon={icon} size={iconBySize[size]} />
+      ) : (
+        <span data-pill-presence={presence} {...stylex.props(styles.dotSlot, slot.box(iconBySize[size]))}>
+          <PresenceDot active={presence === 'active'} surface="inline" />
+        </span>
+      )}
       <span {...stylex.props(styles.name, iconWhenNarrow && kind === undefined && styles.nameNarrow)}>{name}</span>
       {kind !== undefined ? (
         <span {...stylex.props(styles.kind)}>
@@ -114,6 +129,11 @@ const styles = stylex.create({
   kind: {
     fontWeight: weights['--weight-regular'],
   },
+  dotSlot: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   // Out of sight in the narrow form but still read, so a pill that is not a
   // button keeps its name. Every property states its wide value too: a
   // `null` default would drop the value set before it.
@@ -139,6 +159,9 @@ const narrowStyles = stylex.create({
   26: { gridTemplateColumns: { default: 'auto minmax(0, max-content)', [NARROW]: 'auto' }, justifyContent: { default: 'normal', [NARROW]: 'center' }, width: { default: 'auto', [NARROW]: sizes['--control-26'] }, paddingInline: { default: spacing['--space-2-5'], [NARROW]: 0 } },
   28: { gridTemplateColumns: { default: 'auto minmax(0, max-content)', [NARROW]: 'auto' }, justifyContent: { default: 'normal', [NARROW]: 'center' }, width: { default: 'auto', [NARROW]: sizes['--control-28'] }, paddingInline: { default: spacing['--space-2-5'], [NARROW]: 0 } },
 })
+
+// The icon's box, which the presence dot keeps, so the pill is as wide either way.
+const slot = stylex.create({ box: (px: IconSize) => ({ width: px, height: px }) })
 
 const sizeStyles = stylex.create({
   22: { height: sizes['--control-22'], paddingInline: spacing['--space-2'], gap: spacing['--space-1'] },

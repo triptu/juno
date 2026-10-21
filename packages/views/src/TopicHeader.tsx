@@ -34,6 +34,13 @@ export interface TopicHeaderProps {
   readonly onFollow?: () => void
   /** Controls from features, such as the huddle control: first in the right island. The feature decides on which topics it shows. */
   readonly actions?: ReactNode
+  /**
+   * A 1:1 DM, once Slack has said whether the person is active (SPEC 7,
+   * "Presence in a DM"): a dot takes the person icon's place in the pill,
+   * green when active and hollow when away, and the pill's name and tooltip
+   * say it. Shown whatever the sidebar setting.
+   */
+  readonly presence?: 'active' | 'away'
   /** The Juno panel's toggle. Hidden when absent (AI assist off). */
   readonly juno?: { readonly open: boolean; readonly onToggle: () => void }
 }
@@ -58,18 +65,20 @@ const tints: Record<TopicDetail['channel']['kind'], ContextTint> = {
  * topic, with no bar. Left: the context pill (the channel's name; its kind
  * is the tint, the icon, the tooltip and the accessible name) and the
  * title, which opens the topic switcher, hung under the left island; a
- * right-click on it opens the topic's menu. Right: features' `actions` (the
+ * right-click on it opens the topic's menu. In a 1:1 DM the pill's icon is
+ * the person's presence once known. Right: features' `actions` (the
  * huddle control), then Resolve or Reopen on a thread, or Follow on a thread
  * you do not follow, as icon buttons, then Juno and ⋯ (the topic's menu)
  * last. The islands line up with the reading column. Rename turns the title
  * into a field in place.
  */
-export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename, onPill, onPillMenu, onResolve, onFollow, actions, juno }: TopicHeaderProps) {
+export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename, onPill, onPillMenu, onResolve, onFollow, actions, presence, juno }: TopicHeaderProps) {
   const { channel } = detail
   const main = detail.kind === 'main'
   const kind = kindLabels[channel.kind]
-  // "eng, public channel", "Maya and Leo, group DM": only the first letter steps down, so DM stays DM.
-  const pillName = `${channel.name}, ${kind.charAt(0).toLowerCase()}${kind.slice(1)}`
+  const dot = channel.kind === 'im' ? presence : undefined
+  // "eng, public channel", "Maya and Leo, group DM", "Maya, direct message, active": only the first letter steps down, so DM stays DM.
+  const pillName = `${channel.name}, ${kind.charAt(0).toLowerCase()}${kind.slice(1)}${dot === undefined ? '' : `, ${dot}`}`
 
   // Icons alone, with the word as the tooltip and the name. Reopen is the filled check: the thread is done, and a click undoes that.
   // Filled, the disc in the island's text colour outweighs the stroked icons beside it, so it takes the muted icon colour.
@@ -106,6 +115,7 @@ export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename
               size={24}
               // A Main's title is the one word "Main": the channel's name keeps its place there.
               iconWhenNarrow={!main}
+              {...(dot === undefined ? {} : { presence: dot })}
               {...(onPill === undefined ? {} : { onClick: onPill, label: `${pillName}. Show in sidebar.` })}
             />
           </span>

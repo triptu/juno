@@ -44,7 +44,7 @@ export { WelcomeCard } from './WelcomeCard'
 export { Shell } from './Shell'
 export { Sidebar, type SidebarNavTarget } from './Sidebar'
 
-export { TopicHeader } from './TopicHeader'
+export { TopicHeader, type TopicHeaderProps } from './TopicHeader'
 export { TopicSwitcher } from './TopicSwitcher'
 export { ActionToast } from './ActionToast'
 
