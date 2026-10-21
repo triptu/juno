@@ -1089,6 +1089,10 @@ export const density = stylex.defineVars({
 })
 
 export const z = stylex.defineVars({
+  // A message row at rest. Not auto: a row raised to --z-toolbar on hover then
+  // only changes its order, and Chromium lays out a row again when z-index
+  // goes from auto to a number (performance.md 8.14).
+  '--z-row': '0',
   '--z-toolbar': '2',
   '--z-header': '3',
   // The Juno panel when it covers the topic: over the topic's header and toolbar.
