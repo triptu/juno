@@ -257,9 +257,8 @@ const styles = stylex.create({
       default: 1,
       [HOVER]: { default: 0, ':focus-visible': 1, [stylex.when.ancestor(':hover')]: 1 },
     },
-    transitionProperty: 'opacity, scale',
+    transitionProperty: 'opacity',
     transitionDuration: { default: motion['--duration-fast'], '@media (prefers-reduced-motion: reduce)': '0ms' },
-    scale: { default: '1', ':active': motion['--press-scale'] },
   },
   // On the picture, as Expand is, but always showing: a quick way out of sharing the wrong window.
   stop: {
@@ -283,9 +282,6 @@ const styles = stylex.create({
     fontWeight: weights['--weight-medium'],
     whiteSpace: 'nowrap',
     cursor: 'default',
-    transitionProperty: 'scale',
-    transitionDuration: { default: motion['--duration-fast'], '@media (prefers-reduced-motion: reduce)': '0ms' },
-    scale: { default: '1', ':active': motion['--press-scale'] },
   },
   // Wraps to a second line rather than hide anyone; the stage gives up the room.
   strip: {

@@ -318,7 +318,7 @@ test('media viewer open: a picture in a message to the viewer painted', async ({
     await tile.evaluate((node) => {
       const w = window as unknown as { __viewerSample?: Promise<number> }
       w.__viewerSample = new Promise((resolve) => {
-        // A tile opens on `click`, its activating event, as the account menu does; timing from pointerdown would add the driver's 60 ms hold.
+        // A tile opens on `click`; timing it from pointerdown would add the driver's 60 ms hold.
         node.addEventListener(
           'click',
           (event) => {
@@ -496,7 +496,7 @@ test('first open in a second app: account menu, topic switcher, emoji picker and
     await fresh.waitForSync()
     const hidden = await countHidden(again.win)
     const measure = async (name: string, selector: string, action: () => Promise<void>) => {
-      const elapsed = await firstOpen(again.win, name === 'Settings' ? 'pointerdown' : 'click', selector, action)
+      const elapsed = await firstOpen(again.win, 'pointerdown', selector, action)
       within(`${name}, first open`, stats(`${name}, first open in a second app`, [elapsed]).p95, 50)
     }
     await measure('account menu', '[role="menuitem"]', async () => {

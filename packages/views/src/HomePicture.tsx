@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
-import { accent, layout, sizes, spacing, motion } from '@juno/tokens/tokens.stylex'
+import { accent, layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { activateHandlers, Text, type ActivateEvent } from '@juno/ui'
 import { HomeScene } from './HomeScene'
 import { PictureImage, pictureLift } from './PictureImage'
@@ -92,9 +92,6 @@ const styles = stylex.create({
     borderWidth: 0,
     backgroundColor: 'transparent',
     cursor: 'default',
-    transform: { default: 'none', ':active': `scale(${motion['--press-scale']})` },
-    transitionProperty: 'transform',
-    transitionDuration: motion['--duration-fast'],
     outlineStyle: { default: 'none', ':focus-visible': 'solid' },
     outlineWidth: sizes['--focus-ring-width'],
     outlineOffset: sizes['--focus-ring-offset'],

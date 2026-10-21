@@ -1,3 +1,4 @@
+import { menuTriggerHandlers } from './menuTrigger'
 import * as stylex from '@stylexjs/stylex'
 import type { ButtonHTMLAttributes } from 'react'
 import { colors, radii, sizes } from '@juno/tokens/tokens.stylex'
@@ -33,6 +34,7 @@ export function EmojiButton({ emoji, src, label, noTooltip = false, type = 'butt
       aria-label={label}
       {...(noTooltip ? {} : tooltip(label))}
       {...rest}
+      {...menuTriggerHandlers(rest)}
       {...stylex.props(interactive.reset, interactive.feedback, interactive.press, focusRing.outside, styles.base)}
     >
       {src === undefined ? (

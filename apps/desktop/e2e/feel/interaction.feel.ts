@@ -1,3 +1,4 @@
+import { answersWithin } from './answers'
 // Hover and press feedback, and popovers, on the default seed.
 import { expect } from '@playwright/test'
 import { feedbackInOneFrame, firstFrameRight, landsAndStays, noFlicker, noLayoutShift, opensAtAnchor, opensWhole, staysDrawn, type Check } from './checks'
@@ -26,6 +27,7 @@ const popover = (dialog: string, anchor: string, label: string) => ({
   ] satisfies Probe[],
   // A popover opens at once (SPEC 16): fully drawn, at its full size, in the first frame it is on screen.
   checks: [
+    answersWithin('dialog', 'pointerdown', label, { from: 'press', frames: 1 }),
     firstFrameRight(`${label} is fully drawn in its first frame`, (v) => v['dialog'] !== null, (v) => (v['dialogOpacity'] === 1 ? null : `opacity ${String(v['dialogOpacity'])}`), { from: 'press' }),
     staysDrawn('dialogOpacity', label, { from: 'press' }),
     opensWhole('dialog', 'dialogText', label, { from: 'press' }),
@@ -59,7 +61,7 @@ test('hover and press feedback', async ({ juno, win, feel }) => {
   const search = await tag(juno.sidebar.searchButton, 'press-button')
   await pointAt(win, juno.sidebar.searchButton)
   await win.waitForTimeout(300)
-  await feel.run({ name: 'press-button', title: 'Hold the mouse down on an icon button: the press state shows in the next frame', probes: look(search), checks: feedback('pointerdown', 'button press') }, async (rec) => {
+  await feel.run({ name: 'press-button', title: 'Hold an icon button: it stays still through press and release', probes: [{ kind: 'rect', name: 'buttonRect', selector: search }], checks: [landsAndStays('buttonRect', 'the icon button', { from: 'go' }), noLayoutShift({ includeInput: true })] }, async (rec) => {
     await rec.mark('go')
     await win.mouse.down()
     await win.waitForTimeout(300)
@@ -89,7 +91,12 @@ test('popovers open from their anchor, whole', async ({ juno, win, feel }) => {
   const title = await tag(juno.topic.titleButton, 'title-button')
   await feel.run({ name: 'topic-switcher', title: 'Open the topic switcher from a Main header', ...popover('[role="dialog"][aria-label="Topics in this channel"]', title, 'the topic switcher') }, async (rec) => {
     await rec.mark('press')
-    await juno.topic.titleButton.click()
+    await pointAt(win, juno.topic.titleButton)
+    await win.mouse.down()
+    await expect(win.getByRole('dialog', { name: 'Topics in this channel' })).toBeVisible()
+    await win.waitForTimeout(60)
+    await rec.mark('release')
+    await win.mouse.up()
     await expect(win.getByRole('dialog', { name: 'Topics in this channel' })).toBeVisible()
   })
   await win.keyboard.press('Escape')
@@ -98,7 +105,12 @@ test('popovers open from their anchor, whole', async ({ juno, win, feel }) => {
   const account = await tag(juno.sidebar.accountButton, 'account-button')
   await feel.run({ name: 'account-menu', title: 'Open the account menu from the avatar', ...popover('[role="dialog"][aria-label="Account"]', account, 'the account menu') }, async (rec) => {
     await rec.mark('press')
-    await juno.sidebar.accountButton.click()
+    await pointAt(win, juno.sidebar.accountButton)
+    await win.mouse.down()
+    await expect(juno.accountMenu.root).toBeVisible()
+    await win.waitForTimeout(60)
+    await rec.mark('release')
+    await win.mouse.up()
     await expect(juno.accountMenu.root).toBeVisible()
   })
 })

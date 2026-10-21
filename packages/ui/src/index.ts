@@ -73,3 +73,5 @@ export { defineFixtures, fixture, scene, type Fixture, type FixtureFrame, type F
 export { FixtureAppearanceContext, useFixtureAppearance } from './fixtures/appearance'
 export { chunk } from './chunks'
 export { rootDuration } from './motion'
+
+export { menuTriggerHandlers } from './menuTrigger'
