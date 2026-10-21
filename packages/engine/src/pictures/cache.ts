@@ -16,11 +16,8 @@ import { Context, Effect, Layer } from 'effect'
 import type { PictureSize } from '@juno/contract'
 import { EngineConfig } from '../config'
 
-/**
- * The public, read-only R2 bucket `juno-art` (scripts/pictures/README.md).
- * Undefined until the bucket's public URL is set: Home then shows its scene.
- */
-export const PICTURES_URL: string | undefined = undefined
+/** The public, read-only R2 bucket `juno-art` (scripts/pictures/README.md). */
+export const PICTURES_URL: string | undefined = 'https://pub-f2385276dc3043fda2d34a4e3e1c7d28.r2.dev/'
 
 /** A picture id: lower-case letters, digits and single hyphens (`@juno/pictures`). */
 const ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
