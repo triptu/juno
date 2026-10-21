@@ -88,10 +88,6 @@ const base: HomeProps = {
 
 const two = [homeItems.waiting, homeItems.resume]
 
-/** Home's thoughts (SPEC 12): a short quote, and a fact near the longest the list allows. */
-const quote = { text: 'How we spend our days is, of course, how we spend our lives.', by: 'Annie Dillard' }
-const longQuote = { text: 'The first principle is that you must not fool yourself—and you are the easiest person to fool.', by: 'Richard Feynman' }
-const fact = { text: 'In 1885 Hermann Ebbinghaus published pioneering experiments on memory, with himself as the only subject. Most of what he forgot, he lost within the first day.' }
 const narrow: FixtureFrame = { width: 560, height: 720, padded: false }
 
 /** Home's picture (SPEC 12, "A picture"): a card from the fixtures, as Home gets it from disk. */
@@ -205,29 +201,24 @@ export default defineFixtures(
       // Home is ready while the rest of history lands: no line, the rows shown, and room kept for one that lands later.
       'ready-filling': state({ items: [homeItems.waiting], reservedItems: 3 }),
       'nothing-waiting': state({ scene: 'night', title: 'Still up, Tushar.', items: [] }),
-      // A thought under the greeting when nothing waits: a quote with who said it, and a fact.
-      'thought-quote': state({ scene: 'caughtUp', title: 'All caught up.', items: [], thought: quote }),
-      'thought-fact': state({ scene: 'midday', title: 'Hello, Tushar.', items: [], thought: fact }),
-      'thought-narrow': state({ scene: 'caughtUp', title: 'All caught up.', items: [], thought: longQuote }, narrow),
-      'thought-minimum-window': state({ scene: 'caughtUp', title: 'All caught up.', items: [], thought: fact }, minimum),
-      // Ready while history lands with nothing yet: the thought sits over the reserved slots, and a row that lands takes its place.
-      'thought-filling': state({ scene: 'midday', title: 'Hello, Tushar.', items: [], reservedItems: 3, thought: fact }),
-      'thought-gives-way': state({ scene: 'midday', title: 'Hello, Tushar.', items: [homeItems.waiting], reservedItems: 3, thought: fact }),
+      // Ready while history lands with nothing yet: the greeting over the reserved slots, and a row that lands takes the first.
+      'ready-empty-filling': state({ scene: 'midday', title: 'Hello, Tushar.', items: [], reservedItems: 3 }),
+      'ready-first-row': state({ scene: 'midday', title: 'Hello, Tushar.', items: [homeItems.waiting], reservedItems: 3 }),
       'no-name': state({ scene: 'midday', title: 'Hello.', items: [homeItems.waiting] }),
     },
-    // A picture in the caught-up scene's place: the same box for every shape, resting on its plaque line.
+    // A picture in the caught-up scene's place: the same box for every shape, resting on its two-line caption.
     Picture: {
-      wide: state({ ...caughtUp, ...picture('monet-impression-sunrise'), thought: quote }),
-      tall: state({ ...caughtUp, ...picture('kota-radha-krishna'), thought: quote }),
-      panorama: state({ ...caughtUp, ...picture('webb-cosmic-cliffs'), thought: fact }),
-      // A long title: the plaque line takes an ellipsis, with the whole line as its tooltip.
-      'long-title': state({ ...caughtUp, ...picture('hiroshige-sudden-shower'), thought: quote }, narrow),
-      'short-window': state({ ...caughtUp, ...picture('monet-impression-sunrise'), thought: quote }, { width: 720, height: 600, padded: false }),
-      'minimum-window': state({ ...caughtUp, ...picture('monet-impression-sunrise'), thought: fact }, minimum),
+      wide: state({ ...caughtUp, ...picture('monet-impression-sunrise') }),
+      tall: state({ ...caughtUp, ...picture('kota-radha-krishna') }),
+      panorama: state({ ...caughtUp, ...picture('webb-cosmic-cliffs') }),
+      // A long title: the title line takes an ellipsis inside the box's width, with the whole title as its tooltip.
+      'long-title': state({ ...caughtUp, ...picture('hiroshige-sudden-shower') }, narrow),
+      'short-window': state({ ...caughtUp, ...picture('monet-impression-sunrise') }, { width: 720, height: 600, padded: false }),
+      'minimum-window': state({ ...caughtUp, ...picture('monet-impression-sunrise') }, minimum),
       // The file would not load: the box keeps its size and shows the caught-up scene.
-      missing: state({ ...caughtUp, picture: { src: '/__fixture/missing-picture.webp', title: 'Irises', artist: 'Vincent van Gogh', date: '1889', ratio: 1.29 }, onOpenPicture: noop, thought: quote }),
-      hover: state({ ...caughtUp, ...picture('monet-impression-sunrise'), thought: quote }, { hover: '[data-home-picture] button' }),
-      focus: state({ ...caughtUp, ...picture('monet-impression-sunrise'), thought: quote }, { focus: '[data-home-picture] button' }),
+      missing: state({ ...caughtUp, picture: { src: '/__fixture/missing-picture.webp', title: 'Irises', artist: 'Vincent van Gogh', date: '1889', ratio: 1.29 }, onOpenPicture: noop }),
+      hover: state({ ...caughtUp, ...picture('monet-impression-sunrise') }, { hover: '[data-home-picture] button' }),
+      focus: state({ ...caughtUp, ...picture('monet-impression-sunrise') }, { focus: '[data-home-picture] button' }),
     },
     // The chip keeps its hover fill from hover through press to open, so opening changes no colour (gallery trigger-open spec).
     Open: {

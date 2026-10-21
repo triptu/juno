@@ -378,7 +378,7 @@ Sizes are the Figtree values; the prototype's Inter value is half a pixel smalle
 | Page title | serif 34px (32 All topics) | 400 | 1.1–1.15 | 0 | default | Settings sections, All topics |
 | Display | serif 38px | 400 | 1.1 | 0 | default | "What do you need?" |
 | Greeting | serif 36px | 400 | 1.15 | 0 | default | Home's first line, "Morning, Tushar." (`--text-greeting-*`) |
-| Thought | serif 18px | 400 | 1.45 | 0 | subtle; the attribution is meta in muted | Home's quote or fact under the greeting when nothing waits (`--text-thought-*`) |
+| Thought | serif 18px | 400 | 1.45 | 0 | default; a quote's attribution is meta in muted | A sentence to read: the picture page's caption and the gallery's quotes (`--text-thought-*`). Not on Home |
 | Empty title | serif 30px | 400 | | | subtle | "Nothing open" |
 | Kbd / confidence | mono 10–11px | 400 | | | subtle / muted | esc, ⌘J, ⌘Z, ↵, "95%" |
 | Prompt block | mono 12.5px | 400 | 1.6 | | default | Code in Juno cards |
@@ -556,9 +556,9 @@ The `chat` group (`tokens.stylex.ts`). `--owner-bubble-bg` and `--owner-bubble-f
 | Token | Value | Use |
 | --- | --- | --- |
 | `--home-picture-width` × `--home-picture-height` | 320 × 216 | Home's picture box at most (SPEC 12, "A picture"); the picture is fitted inside and rests on its bottom edge |
-| `--home-picture-height-min`, `--home-picture-room` | 144, 348 | The box's height is the page's height less the room, never under the min, so the column fits above the destination chip and the field |
+| `--home-picture-height-min`, `--home-picture-room` | 144, 264 | The box's height is the page's height less the room, never under the min, so the column fits above the destination chip and the field |
 | `--gallery-row` | 150 | The height of a row of pictures in the gallery |
-| `--picture-label-width` | 380 | The picture page's label column beside the picture |
+| `--picture-label-width` | 380 | The picture page's label column beside the picture, and the gallery's columns of quotes and facts |
 
 ### Illustrations and the mark
 

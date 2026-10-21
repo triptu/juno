@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { colors, radii, shadows } from '@juno/tokens/tokens.stylex'
 
-/** What a picture's tile, plaque and page need (`@juno/pictures`'s `Picture` has these fields). */
+/** What a picture's tile, caption and page need (`@juno/pictures`'s `Picture` has these fields). */
 export interface PictureCardView {
   readonly id: string
   readonly kind: 'painting' | 'print' | 'illustration' | 'space'

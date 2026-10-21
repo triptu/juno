@@ -1,8 +1,10 @@
 // Home's picture (SPEC 12, "A picture" and "Pictures and the gallery"): a
 // caught-up Home shows a picture that is already on disk, never one that
-// would arrive late; opening it shows its story; the gallery lists every
-// picture; Settings › General turns it off. Picture files come from the fake
-// Slack's picture store, never the network.
+// would arrive late, with its two-line caption and nothing else; opening it
+// shows its story; the gallery lists every picture; Settings › General turns
+// it off, and Home shows the scene and "All caught up." with nothing under
+// it. Picture files come from the fake Slack's picture store, never the
+// network.
 import { SELF_ID, startFakeSlack, TEAM, type Workspace } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 
@@ -37,27 +39,29 @@ quiet('A caught-up Home shows a picture once it is on disk, opens its story, and
   const { home } = juno
   await home.open()
   await expect(home.greeting).toHaveText('All caught up.')
-  // Nothing is on disk yet: the scene, not a picture that would arrive later.
+  // Nothing is on disk yet: the scene and the greeting, with nothing under it, not a picture that would arrive later.
   await expect(home.picture).toHaveCount(0)
+  await expect(home.column).toHaveText('All caught up.')
 
   // When idle, Juno downloads the next picture, both sizes.
   await expect.poll(() => fake.pictureRequests().filter((name) => name.endsWith('-small.webp')).length, { timeout: 30_000 }).toBeGreaterThan(0)
   await expect.poll(() => win.evaluate(() => JSON.parse(localStorage.getItem('juno.homePictures') ?? '{}').next?.id ?? null), { timeout: 30_000 }).not.toBeNull()
 
-  // The next caught-up Home has it in its first frame, with its plaque under it.
+  // The next caught-up Home has it in its first frame, with its caption under it: the title, then "artist, date".
   await juno.openSettings('General')
   await home.open()
   await expect(home.picture).toBeVisible()
   const image = home.picture.locator('img')
   await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true)
-  const plaque = await home.picture.locator('p').textContent()
-  const title = plaque!.split(' · ')[0]!
-  // The picture says Home is caught up: no greeting line, the thought under the plaque, and a heading for screen readers.
-  await expect(home.root).not.toContainText('All caught up.')
+  const caption = home.picture.locator('[data-home-caption] p')
+  await expect(caption).toHaveCount(2)
+  await expect(caption.last()).toHaveText(/^.+, .+$/)
+  const [title, byline] = (await caption.allTextContents()) as [string, string]
+  const [picture, under] = await Promise.all([image.boundingBox(), caption.first().boundingBox()])
+  expect(under!.y).toBeGreaterThan(picture!.y + picture!.height)
+  // The picture says Home is caught up: no greeting line and no thought, only the picture, its caption and a heading for screen readers.
   await expect(home.root.getByRole('heading', { name: 'Home' })).toBeAttached()
-  await expect(home.thought).toBeVisible()
-  const [box, thought] = await Promise.all([home.picture.boundingBox(), home.thought.boundingBox()])
-  expect(thought!.y).toBeGreaterThan(box!.y + box!.height)
+  await expect(home.column).toHaveText(`${title}${byline}Home`)
 
   // Clicking it opens the picture with its story in the tab.
   await home.picture.getByRole('button', { name: `Open ${title}` }).click()
@@ -93,4 +97,5 @@ quiet('Settings › General turns the picture off, and Home shows its scene', as
   await home.open()
   await expect(home.greeting).toHaveText('All caught up.')
   await expect(home.picture).toHaveCount(0)
+  await expect(home.column).toHaveText('All caught up.')
 })

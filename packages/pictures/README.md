@@ -1,11 +1,12 @@
 # @juno/pictures
 
-Home's pictures (SPEC 12, "A picture" and "Pictures and the gallery"): the bundled catalog of paintings, prints, nature studies and space images, each with its story, sources and licence, and the rule that picks the next one. Data and pure functions; the image files live in the R2 bucket `juno-art` and, once downloaded, in the engine's picture cache (`packages/engine/src/pictures/`).
+Home's pictures and the gallery's words (SPEC 12, "A picture" and "Pictures and the gallery"): the bundled catalog of paintings, prints, nature studies and space images, each with its story, sources and licence, the rule that picks the next one, and the quotes and facts. Data and pure functions; the image files live in the R2 bucket `juno-art` and, once downloaded, in the engine's picture cache (`packages/engine/src/pictures/`).
 
 ## Public API
 
-- `.` (small, loads with Home): the `Picture`, `PictureFact`, `PictureLabel` and `PictureKind` types, `pictureFile(id, size)` (`<id>-small.webp`, `<id>-large.webp`), `PICTURE_ID`, `PICTURE_KINDS`, `labelOf(picture)` (what Home's plaque needs), `suitsNight`, `isLateNight(now)` and `pickPicture(list, seen, random, { night, avoid })`: the next picture, unseen first, late at night one that suits the night while one is left, and never the one showing twice in a row.
+- `.` (small, loads with Home): the `Picture`, `PictureFact`, `PictureLabel` and `PictureKind` types, `pictureFile(id, size)` (`<id>-small.webp`, `<id>-large.webp`), `PICTURE_ID`, `PICTURE_KINDS`, `labelOf(picture)` (what Home's caption needs), `suitsNight`, `isLateNight(now)` and `pickPicture(list, seen, random, { night, avoid })`: the next picture, unseen first, late at night one that suits the night while one is left, and never the one showing twice in a row.
 - `./catalog`: `PICTURES`, every picture with its story. Its own chunk: the renderer imports it only with `import()` (`@juno/state`'s `loadPictures`), when idle after Home paints and when the gallery opens.
+- `./thoughts`: `THOUGHTS`, the quotes (with `by`) and facts (without), each with a theme and a source that is never shown. Its own chunk, imported only by `@juno/state`'s `loadThoughts` when the gallery opens. The `Thought` and `ThoughtTheme` types are in `.`.
 
 ## Adding a picture
 
@@ -15,7 +16,7 @@ Home's pictures (SPEC 12, "A picture" and "Pictures and the gallery"): the bundl
 
 ## Tests
 
-`pnpm --filter @juno/pictures test`: every entry has a licence, a credit, a source page, its shape, a caption within length and three to five sourced facts. No entry is pinned.
+`pnpm --filter @juno/pictures test`: every entry has a licence, a credit, a source page, its shape, a caption within length and three to five sourced facts; every quote and fact is short, sourced and distinct, and every quote names who said it. No entry is pinned.
 
 ## Must not
 

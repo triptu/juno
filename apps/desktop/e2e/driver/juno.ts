@@ -2556,9 +2556,9 @@ export class HomePane {
     return this.root.getByRole('heading', { level: 2 })
   }
 
-  /** The quote or fact under the greeting when Home has no rows (SPEC 12). */
-  get thought(): Locator {
-    return this.root.locator('[data-home-thought]')
+  /** What Home shows above its composer: the scene or picture, the greeting, the rows and the welcome card (SPEC 12). */
+  get column(): Locator {
+    return this.root.locator('[data-home-column]')
   }
 
   /** The picture in the caught-up scene's place (SPEC 12, "A picture"). */

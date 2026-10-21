@@ -81,32 +81,47 @@ test('Home moves nothing when it becomes ready before the first sync ends', asyn
 })
 
 /**
- * Home's thought (SPEC 12) is centred under the greeting, 14px under it as
- * the greeting is under the scene. During the first sync it sits over the
- * reserved slots, so a row that lands takes its place and the greeting
- * stays where it was.
+ * Home ready while history lands with nothing yet (SPEC 12): a row that
+ * lands takes the first reserved slot and the greeting stays where it was.
  */
-test("Home centres the thought under the greeting, and a row that lands takes its place without moving the greeting", async ({ page }) => {
-  const places: Array<{ readonly greeting: number; readonly row: number | undefined }> = []
-  for (const state of ['empty/thought-filling', 'empty/thought-gives-way']) {
+test('Home keeps the greeting in place when the first row lands in a reserved slot', async ({ page }) => {
+  const places: Array<number> = []
+  for (const state of ['empty/ready-empty-filling', 'empty/ready-first-row']) {
     await open(page, 'Home', state)
-    places.push(await page.locator('[data-home]').evaluate((node) => ({
-      greeting: node.querySelector('h2')!.getBoundingClientRect().top,
-      row: node.querySelector('[data-home-item]')?.getBoundingClientRect().top,
-    })))
+    places.push(await page.locator('[data-home] h2').evaluate((node) => node.getBoundingClientRect().top))
   }
-  await expect(page.locator('[data-home-thought]')).toHaveCount(0)
-  expect(places[1]!.greeting).toBe(places[0]!.greeting)
+  expect(places[1]).toBe(places[0])
+})
 
-  for (const state of ['empty/thought-quote', 'empty/thought-fact', 'empty/thought-narrow', 'empty/thought-filling']) {
+/**
+ * Home's picture (SPEC 12, "A picture"): its caption is two lines, the
+ * title and "artist, date", 12px under the picture's box and no wider than
+ * it; a long title takes an ellipsis instead of a third line.
+ */
+test("Home's picture has a two-line caption under its box, never wider than the box", async ({ page }) => {
+  for (const [state, title, by] of [
+    ['picture/wide', 'Impression, Sunrise', 'Claude Monet, 1872'],
+    ['picture/tall', null, null],
+    ['picture/panorama', 'Cosmic Cliffs in the Carina Nebula', 'James Webb Space Telescope, 2022'],
+    ['picture/long-title', null, 'Utagawa Hiroshige, 1857'],
+  ] as const) {
     await open(page, 'Home', state)
-    const at = await page.locator('[data-home]').evaluate((node) => {
-      const scene = node.querySelector('svg')!.getBoundingClientRect()
-      const greeting = node.querySelector('h2')!.getBoundingClientRect()
-      const thought = node.querySelector('[data-home-thought]')!.getBoundingClientRect()
-      return { sceneGap: greeting.top - scene.bottom, thoughtGap: thought.top - greeting.bottom, greetingMid: greeting.left + greeting.width / 2, thoughtMid: thought.left + thought.width / 2 }
+    const caption = page.locator('[data-home-caption]')
+    const lines = caption.locator('p')
+    await expect(lines).toHaveCount(2)
+    if (title !== null) await expect(lines.first()).toHaveText(title)
+    if (by !== null) await expect(lines.last()).toHaveText(by)
+    const at = await page.locator('[data-home-picture]').evaluate((node) => {
+      const box = node.firstElementChild!.getBoundingClientRect()
+      const words = node.querySelector('[data-home-caption]')!
+      const [first, second] = [...words.querySelectorAll('p')].map((line) => line.getBoundingClientRect())
+      return { gap: words.getBoundingClientRect().top - box.bottom, width: words.getBoundingClientRect().width, box: box.width, first: first!.height, second: second!.height, stacked: second!.top >= first!.bottom }
     })
-    expect(Math.abs(at.thoughtGap - at.sceneGap), state).toBeLessThan(0.5)
-    expect(Math.abs(at.thoughtMid - at.greetingMid), state).toBeLessThan(1)
+    expect(at.gap, state).toBe(12)
+    expect(at.width, state).toBeLessThanOrEqual(at.box)
+    expect(at.stacked, state).toBe(true)
+    // One line each: a line's height is its leading, never two.
+    expect(at.first, state).toBeLessThan(24)
+    expect(at.second, state).toBeLessThan(20)
   }
 })

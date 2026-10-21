@@ -1,6 +1,7 @@
 /**
- * Home's thoughts (SPEC 12, "A thought"): quotes and facts, loaded as their
- * own chunk (`homeThoughts.ts`).
+ * The gallery's quotes and facts (SPEC 12, "Pictures and the gallery"), its
+ * own chunk: the renderer imports it only with `import()` (`@juno/state`'s
+ * `loadThoughts`), when the gallery opens.
  *
  * A thought observes; it never advises. No imperatives, no "you must", no
  * self-help or motivation. It should make the reader think "huh" or "wow",
@@ -11,9 +12,9 @@
  * checkable; `source` says where to check it and is never shown. When in
  * doubt, leave an entry out.
  */
-import type { ThoughtEntry } from './homeThoughts'
+import type { Thought } from './index'
 
-export const HOME_THOUGHTS: ReadonlyArray<ThoughtEntry> = [
+export const THOUGHTS: ReadonlyArray<Thought> = [
   // Focus and craft
   { text: 'How we spend our days is, of course, how we spend our lives.', by: 'Annie Dillard', theme: 'focus', source: 'The Writing Life, 1989' },
   { text: 'A schedule defends from chaos and whim. It is a net for catching days.', by: 'Annie Dillard', theme: 'focus', source: 'The Writing Life, 1989' },

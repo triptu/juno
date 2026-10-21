@@ -11,12 +11,6 @@ import { metaOf, opensReview, rowButtons, TILE_ICONS, type HomeAskAnswer } from 
 import { PlaceTile } from './PlaceTile'
 import { tileOf } from './tileModel'
 
-/** Home's thought (SPEC 12, "A thought"): a quote with who said it, or a fact. */
-export interface HomeThoughtView {
-  readonly text: string
-  readonly by?: string
-}
-
 export interface HomeProps {
   readonly scene: HomeSceneName
   /** "Morning, Tushar.", or "All caught up." Not shown with a picture, which says it instead. */
@@ -54,11 +48,6 @@ export interface HomeProps {
   readonly waiting?: boolean
   /** The welcome card (`WelcomeCard`, SPEC 4) under the rows; on a short window the scene and greeting give it their room. */
   readonly welcome?: ReactNode
-  /**
-   * A quote or fact under the greeting, shown while there are no rows. With reserved slots it sits
-   * over them and goes when a row lands, so the greeting never moves.
-   */
-  readonly thought?: HomeThoughtView
   /** In the caught-up scene's place, already on this Mac (SPEC 12, "A picture"). Home then has no greeting line. */
   readonly picture?: HomePictureView
   /** Opens the picture with its story; fires on mouse down, `event.metaKey` asks for a new tab. */
@@ -74,20 +63,18 @@ export interface HomeProps {
  * under the chosen line limit. The column scrolls on its own, so the
  * composer never moves.
  */
-export function Home({ scene, title, line, items, done, now, enter = true, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, onDismiss, onAsk, loading = false, reservedItems = 0, composer, waiting = false, welcome, thought, picture, onOpenPicture, onPictureMissing }: HomeProps) {
+export function Home({ scene, title, line, items, done, now, enter = true, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, onDismiss, onAsk, loading = false, reservedItems = 0, composer, waiting = false, welcome, picture, onOpenPicture, onPictureMissing }: HomeProps) {
   const headingId = useId()
   const pictured = picture !== undefined && onOpenPicture !== undefined
-  const shownThought = thought === undefined || items.length > 0 || loading ? undefined : thought
   const itemsShown = items.length > 0 || reservedItems > 0
   // Each shown part enters one stagger step after the one above it: the scene, the greeting (none with a picture), then these.
-  const thoughtStep = pictured ? 1 : 2
-  const itemsStep = thoughtStep + (shownThought === undefined ? 0 : 1)
+  const itemsStep = pictured ? 1 : 2
   const welcomeStep = itemsStep + (itemsShown ? 1 : 0)
   const part = (step: number) => (enter ? [styles.rise, styles.delay(step)] : [])
   return (
     <div data-home="" data-home-waiting={waiting ? '' : undefined} data-home-loading={loading ? '' : undefined} aria-busy={loading || undefined} {...stylex.props(styles.root)}>
       <div {...stylex.props(styles.scroll)}>
-        {waiting ? null : <div {...stylex.props(styles.column, welcome !== undefined && styles.columnWelcome)}>
+        {waiting ? null : <div data-home-column="" {...stylex.props(styles.column, welcome !== undefined && styles.columnWelcome)}>
           <div {...stylex.props(welcome !== undefined && styles.sceneGives, ...part(0))}>
             {pictured ? <HomePicture picture={picture} onOpen={onOpenPicture} {...(onPictureMissing === undefined ? {} : { onMissing: onPictureMissing })} /> : <HomeScene name={scene} />}
           </div>
@@ -106,14 +93,6 @@ export function Home({ scene, title, line, items, done, now, enter = true, onOpe
               </Text>
             )}
           </div>}
-          {shownThought === undefined ? null : reservedItems > 0 ? (
-            // Over the reserved slots, out of the flow: a row that lands takes its place and nothing moves.
-            <div {...stylex.props(styles.thoughtAnchor)}>
-              <HomeThought thought={shownThought} sx={[styles.thoughtOver, ...part(thoughtStep)]} />
-            </div>
-          ) : (
-            <HomeThought thought={shownThought} sx={[pictured && styles.thoughtAfterPicture, ...part(thoughtStep)]} />
-          )}
           {itemsShown ? (
             <ul aria-labelledby={headingId} {...stylex.props(styles.items, welcome !== undefined && styles.itemsWelcome, reservedItems > 0 && styles.itemSlots(reservedItems), ...part(itemsStep))}>
               {items.map((item) => (
@@ -138,16 +117,6 @@ export function Home({ scene, title, line, items, done, now, enter = true, onOpe
         </div>}
       </div>
       {composer}
-    </div>
-  )
-}
-
-/** The thought: plain text after the greeting, the attribution a quieter line under it. */
-function HomeThought({ thought, sx }: { readonly thought: HomeThoughtView; readonly sx: stylex.StyleXStyles | ReadonlyArray<stylex.StyleXStyles> }) {
-  return (
-    <div data-home-thought="" {...stylex.props(styles.thought, sx)}>
-      <p {...stylex.props(styles.thoughtText)}>{thought.text}</p>
-      {thought.by === undefined ? null : <p {...stylex.props(styles.thoughtBy)}>— {thought.by}</p>}
     </div>
   )
 }
@@ -338,20 +307,6 @@ const styles = stylex.create({
     margin: 0,
     whiteSpace: 'nowrap',
   },
-  // The thought sits under the greeting by the gap the greeting sits under the scene.
-  thought: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: spacing['--space-1-5'],
-    width: '100%',
-    maxWidth: layout['--home-width'],
-    marginTop: spacing['--space-3-5'],
-    textAlign: 'center',
-    userSelect: 'text',
-  },
-  // With a picture and no greeting: the gap the rows keep under the greeting, so the plaque stays with its picture.
-  thoughtAfterPicture: { marginTop: spacing['--space-8'] },
   hiddenTitle: {
     position: 'absolute',
     width: '1px', // tokens-allow: the visually hidden pattern
@@ -360,26 +315,6 @@ const styles = stylex.create({
     overflow: 'hidden',
     clipPath: 'inset(50%)',
     whiteSpace: 'nowrap',
-  },
-  // In the flow with no height, so the thought over the reserved slots changes no layout.
-  thoughtAnchor: { position: 'relative', width: '100%', maxWidth: layout['--home-width'], height: 0 },
-  thoughtOver: { position: 'absolute', top: 0, insetInline: 0 },
-  thoughtText: {
-    margin: 0,
-    fontFamily: text['--text-thought-family'],
-    fontSize: text['--text-thought-size'],
-    fontWeight: text['--text-thought-weight'],
-    lineHeight: text['--text-thought-leading'],
-    letterSpacing: text['--text-thought-tracking'],
-    color: colors['--foreground-subtle'],
-    textWrap: 'balance',
-  },
-  thoughtBy: {
-    margin: 0,
-    fontFamily: text['--text-meta-family'],
-    fontSize: text['--text-meta-size'],
-    lineHeight: text['--text-meta-leading'],
-    color: colors['--foreground-muted'],
   },
   itemSlots: (count: number) => ({ minHeight: `calc(${count} * (${sizes['--row-52']} + ${spacing['--space-0-5']}) - ${spacing['--space-0-5']})` }),
   items: {
