@@ -6,7 +6,7 @@
  */
 import * as Atom from 'effect/reactivity/Atom'
 import { picturesFetch, picturesOnDisk, type PictureSize } from '@juno/contract'
-import { isLateNight, labelOf, pickPicture, type Picture, type Thought } from '@juno/pictures'
+import { fitsHome, isLateNight, labelOf, pickPicture, type Picture, type Thought } from '@juno/pictures'
 import { runCommand } from './atoms'
 import type { Registry } from './client'
 import { readPictures, rememberTitles, writePictures } from './homePictures'
@@ -59,22 +59,32 @@ export async function readPictureFiles(registry: Registry, size: PictureSize): P
 
 let preparing: Promise<void> | undefined
 
+/** The next picture: one on disk and not shown yet when there is one, else any by the usual rotation. */
+async function pickNext(registry: Registry, list: ReadonlyArray<Picture>, saved: ReturnType<typeof readPictures>, night: boolean) {
+  const exit = await runCommand(registry, picturesOnDisk, { size: 'small' })
+  const there = new Set(exit._tag === 'Success' ? exit.value : [])
+  const seen = new Set(saved.seen)
+  const ready = list.filter((picture) => there.has(picture.id) && fitsHome(picture) && !seen.has(picture.id) && picture.id !== saved.current?.label.id)
+  const fromDisk = ready.length === 0 ? undefined : pickPicture(ready, [], Math.random(), { night })
+  if (fromDisk !== undefined) return { picture: fromDisk.picture, seen: [...saved.seen, fromDisk.picture.id] }
+  return pickPicture(list, saved.seen, Math.random(), { night, ...(saved.current === undefined ? {} : { avoid: [saved.current.label.id] }) })
+}
+
 /**
  * Picks the next picture if none is saved, has the engine download both
  * its files, and saves it as next once the small one is on disk, so the
- * next caught-up Home has it in its first frame. Late at night the next is
- * a picture that suits the night. A failed download saves nothing; the next
- * Home tries again.
+ * next caught-up Home has it in its first frame. A picture not shown yet
+ * that is on disk already (the gallery downloaded it) comes first, so it
+ * is saved at once. Late at night the next is a picture that suits the
+ * night. A failed download saves nothing; the next Home tries again.
  */
 export function prepareNextPicture(registry: Registry, now: Date): Promise<void> {
   preparing ??= (async () => {
     const saved = readPictures()
     if (saved.off === true) return
     const list = await loadPictures()
-    const picked =
-      saved.next === undefined
-        ? pickPicture(list, saved.seen, Math.random(), { night: isLateNight(now), ...(saved.current === undefined ? {} : { avoid: [saved.current.label.id] }) })
-        : undefined
+    const night = isLateNight(now)
+    const picked = saved.next === undefined ? await pickNext(registry, list, saved, night) : undefined
     const label = saved.next ?? (picked === undefined ? undefined : labelOf(picked.picture))
     if (label === undefined) return
     if (!(await ensurePicture(registry, label.id, 'small'))) return

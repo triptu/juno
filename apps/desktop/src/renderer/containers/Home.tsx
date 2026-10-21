@@ -194,18 +194,19 @@ function usePicture(): void {
 
 /**
  * The picture while Home is caught up (`wanted`): the current pick, already on this Mac, taken in the render
- * Home becomes caught up and kept while it stays so, so it never changes on screen.
+ * Home becomes caught up and kept while it stays so. With none on disk then, the scene stays for that stretch,
+ * so a picture never arrives after the first frame.
  */
 function useCaughtUpPicture(wanted: boolean, now: number): ReturnType<typeof takePicture> {
-  const [picture, setPicture] = useState<ReturnType<typeof takePicture>>(undefined)
+  const [taken, setTaken] = useState<{ readonly picture: ReturnType<typeof takePicture> } | undefined>(undefined)
   if (!wanted) {
-    if (picture !== undefined) setPicture(undefined)
+    if (taken !== undefined) setTaken(undefined)
     return undefined
   }
-  if (picture !== undefined) return picture
-  const taken = takePicture(now)
-  if (taken !== undefined) setPicture(taken)
-  return taken
+  if (taken !== undefined) return taken.picture
+  const picture = takePicture(now)
+  setTaken({ picture })
+  return picture
 }
 
 /** The syncing line with the first sync's count. Its own component, so a new count redraws the line and not Home. */
