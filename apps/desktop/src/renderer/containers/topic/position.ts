@@ -232,13 +232,14 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
       } else if (pinRef.current?.kind === 'bottom') pinRef.current = undefined
       // Anywhere else, the list holds the row it came to rest on. A jump lands on rows still at their size estimate,
       // and Chromium does not anchor on those, so as they reach their real height a frame or two later the rows in view
-      // moved by the difference. The rows around the held row are laid out in full in the next commit, and the pin puts
-      // it back before that frame is painted.
+      // moved by the difference. Then the rows around the held row are laid out in full in the next commit, and the pin
+      // puts it back before that frame is painted. A row already laid out is an anchor, and changing the eager rows
+      // after every step of a scroll restyled hundreds of elements, so it only gets the pin.
       const inView = pinRef.current === undefined ? rowInView(scroller) : undefined
       if (inView !== undefined) {
         pinRef.current = { kind: 'row', element: inView.element, offset: inView.offset }
         pinnedTopRef.current = scroller.scrollTop
-        setHeldAt(inView.anchorKey)
+        if (inView.element.firstElementChild?.checkVisibility({ contentVisibilityAuto: true }) === false) setHeldAt(inView.anchorKey)
       }
       setAtBottom(bottom)
       setFar(distance > scroller.clientHeight)
