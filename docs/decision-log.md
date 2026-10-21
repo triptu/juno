@@ -4,6 +4,8 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-22 00:21 · Tushar · Picture files are cropped to the object when the photograph has a black border or a scan backdrop (scripts/pictures/crops.json); paper margins, mounts and black sky stay.
+- 10-22 00:20 · Tushar · The gallery by time gives each century a row of its own, and each picture its title (up to two lines) and "date · artist" under it, instead of the date alone.
 - 10-21 23:20 · Tushar · The catalog drops The Ninth Wave, Mystic Mountain, the Khwaja Umar Hamzanama page and the Jaipur Krishna sheet: their lines were the weakest, or repeated another picture's; their R2 files stay.
 - 10-21 22:44 · Tushar · The standalone quotes and facts are retired: each picture has one line of its own instead, and its old bullet facts become that line and a short paragraph.
 - 10-21 22:43 · Tushar · Where a picture has the data, its page shows how big (the artwork drawn to scale beside a person) or how far (a log-scale line from Earth, with how long the light took); nothing is reserved when it has none.

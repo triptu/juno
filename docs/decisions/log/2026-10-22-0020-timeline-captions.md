@@ -1,0 +1,1 @@
+- 10-22 00:20 · Tushar · The gallery by time gives each century a row of its own, and each picture its title (up to two lines) and "date · artist" under it, instead of the date alone.
