@@ -1,14 +1,16 @@
 // Tabs: opening uses the current tab and typing goes to its composer, ⌘-click opens a new one, a plain open
-// of an open topic focuses its tab, one topic in two tabs scrolls apart,
+// of an open topic focuses its tab, one topic in two tabs scrolls apart and a hidden tab keeps its place as messages arrive,
 // closing focuses the neighbour and never leaves no tab, a new tab opens
 // Home and does not cancel an open still waiting, where "+" sits, the app
 // menu's tab items, the row menu's Open in new tab, tabs survive a restart, dragging and ⌃⇧← ⌃⇧→ reorder them, and
 // each tab shows its topic's art or the DM person's photo, and a tab not
 // viewed for a day closes by itself.
-import { startFakeSlack, topic300Seed } from '@juno/fake-slack'
+import type { Page } from '@playwright/test'
+import { startFakeSlack, topic300Seed, TOPIC300_THREAD_CHANNEL } from '@juno/fake-slack'
 import { expectNoLayoutShift } from '@juno/testing/layout-shift'
 import { expect, launchApp, syncedTest, test } from './fixtures'
 import { Juno } from './driver/juno'
+import { expectStableAnchor } from './shiftProbe'
 import { readUserDb, savedTabs, threadId } from './driver/userDb'
 
 test.describe.configure({ timeout: 120_000 })
@@ -287,11 +289,20 @@ test('a tab not viewed for a day closes by itself, ⌘⇧T brings it back, and a
   await tabs.expectActive(POSTGRES)
 })
 
+/** Waits for `count` animation frames. */
+const frames = (page: Page, count: number) =>
+  page.evaluate((count) => new Promise<void>((resolve) => {
+    let left = count
+    const tick = () => (--left <= 0 ? resolve() : requestAnimationFrame(tick))
+    requestAnimationFrame(tick)
+  }), count)
+
 test.describe('one topic in two tabs', () => {
+  let threadTs = ''
   const longTest = test.extend({
     // oxlint-disable-next-line no-empty-pattern
     fake: async ({}, use) => {
-      const fake = await startFakeSlack({ seed: (workspace, avatars) => void topic300Seed()(workspace, avatars) })
+      const fake = await startFakeSlack({ seed: (workspace, avatars) => void (threadTs = topic300Seed()(workspace, avatars).threadTs) })
       await use(fake)
       await fake.close()
     },
@@ -310,8 +321,10 @@ test.describe('one topic in two tabs', () => {
     await expect(tabs.tab(THREAD)).toHaveCount(2)
     await tabs.expectActiveAt(THREAD, 1)
     await topic.expectAtBottom()
-    await topic.scrollUp(2400)
-    const up = await topic.firstVisibleRow()
+    // The wheel jumps onto rows still at their size estimate; they reach their real height without moving the row in view.
+    const up = await topic.scrollUp(2400)
+    await frames(juno.win, 5)
+    expect(await topic.rowTop(up.ts)).toBeCloseTo(up.top, 0)
 
     // The first tab is still at the bottom; the second is where it was left.
     await tabs.selectAt(THREAD, 0)
@@ -329,6 +342,34 @@ test.describe('one topic in two tabs', () => {
     await tabs.expectActiveAt(THREAD, 0)
     await topic.expectAtBottom()
     await expect(tabs.tab(THREAD)).toHaveCount(2)
+  })
+
+  longTest('a tab left in the middle of a long topic comes back there after messages arrive while it is hidden', async ({ juno, fake, win }) => {
+    await juno.signIn()
+    await juno.waitForSync()
+    const { sidebar, tabs, topic } = juno
+    await sidebar.row(THREAD).open()
+    await topic.expectAtBottom()
+    await sidebar.row(THREAD).openInNewTab()
+    await tabs.expectActiveAt(THREAD, 1)
+    await topic.expectAtBottom()
+    // Half the window up, past the rows kept laid out at the end, among rows of every height at their estimate.
+    const middle = await topic.scrollUp(5000)
+
+    // The first tab follows the new replies at the bottom; the window drops as many rows from its top.
+    await tabs.selectAt(THREAD, 0)
+    await tabs.expectActiveAt(THREAD, 0)
+    for (const n of [1, 2, 3]) fake.injectMessage({ channel: TOPIC300_THREAD_CHANNEL, user: 'U0PERFLEO', threadTs, text: `A reply while the other tab is hidden ${n}` })
+    await topic.expectMessage('A reply while the other tab is hidden 3')
+    await topic.expectAtBottom()
+
+    // The second tab comes back with that row where it was, in its first frame and every frame after.
+    await expectStableAnchor(win, `[data-message-row="${middle.ts}"]`, async () => {
+      await tabs.selectAt(THREAD, 1)
+      await tabs.expectActiveAt(THREAD, 1)
+      expect(await topic.rowTop(middle.ts)).toBeCloseTo(middle.top, 0)
+      await topic.expectPill('3 new messages')
+    })
   })
 })
 

@@ -1777,18 +1777,27 @@ export class TopicPane {
    * does, and waits for the scroll to settle. The wheel is what lets go of
    * the list's hold on the bottom; a scroll set from a script does not, and a
    * commit that adds rows before it settles puts the bottom back.
+   * Returns the first row in view as the scroll ended, read in `scrollend`
+   * itself: a jump lands on rows still at their size estimate, and a read
+   * from a later task can fall after they reached their real height.
    */
-  async scrollUp(pixels: number): Promise<void> {
+  async scrollUp(pixels: number): Promise<{ readonly ts: string; readonly top: number }> {
     const box = await this.scroller.boundingBox()
     if (box === null) throw new Error('No message list to scroll')
     await this.win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-    type Watched = HTMLElement & { scrollEnded?: Promise<void> }
+    type Watched = HTMLElement & { scrollEnded?: Promise<{ ts: string; top: number }> }
     // The listener is in place before the wheel turns: the wheel reaches the page by another path than evaluate.
     await this.scroller.evaluate((scroller: Watched) => {
-      scroller.scrollEnded = new Promise((resolve) => scroller.addEventListener('scrollend', () => resolve(), { once: true }))
+      scroller.scrollEnded = new Promise((resolve) =>
+        scroller.addEventListener('scrollend', () => {
+          const top = scroller.getBoundingClientRect().top
+          const row = [...scroller.querySelectorAll<HTMLElement>('[data-message-row]')].find((node) => node.getBoundingClientRect().top >= top)
+          resolve({ ts: row?.dataset['messageRow'] ?? '', top: row?.getBoundingClientRect().top ?? Number.NaN })
+        }, { once: true }),
+      )
     })
     await this.win.mouse.wheel(0, -pixels)
-    await this.scroller.evaluate((scroller: Watched) => scroller.scrollEnded)
+    return await this.scroller.evaluate((scroller: Watched) => scroller.scrollEnded!)
   }
 
   async scrollToBottom(): Promise<void> {
