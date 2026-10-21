@@ -119,8 +119,8 @@ badgeTest('badge regression: an engine that gives up clears the dot', async ({ j
   await expect.poll(() => juno.dockBadge()).toBe('')
 })
 
-badgeTest('a denied request is remembered across a full app restart', async ({ fake, userData }) => {
-  const options = { fakeSlackUrl: fake.url, notificationInitial: 'notDetermined' as const, notificationResponse: 'denied' as const }
+badgeTest('a denied request is remembered across a full app restart', async ({ fake, slackApp, userData }) => {
+  const options = { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, notificationInitial: 'notDetermined' as const, notificationResponse: 'denied' as const }
   const first = await launchApp(userData, options)
   try {
     const juno = new Juno(first.app, first.win)
