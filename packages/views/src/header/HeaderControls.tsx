@@ -1,10 +1,11 @@
 import * as stylex from '@stylexjs/stylex'
 import { CaretDown } from '@phosphor-icons/react/dist/icons/CaretDown'
 import { DotsThree } from '@phosphor-icons/react/dist/icons/DotsThree'
+import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import type { KeyboardEvent, MouseEvent, ReactNode, Ref } from 'react'
 import { menuKeys } from '@juno/contract/channels'
 import { colors, layout, motion, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
-import { focusRing, Icon, IconButton, SparkleDuotone, Text } from '@juno/ui'
+import { focusRing, Icon, IconButton, Text } from '@juno/ui'
 
 /** Where a menu opened from the header goes, in CSS pixels from the window's top left. */
 export interface MenuAnchor {
@@ -127,7 +128,7 @@ export interface JunoToggleProps {
 
 /** The right island's Juno button: opens and closes the Juno panel (⌘J does the same). */
 export function JunoToggle({ pressed, onToggle }: JunoToggleProps) {
-  return <IconButton icon={SparkleDuotone} label="Juno" shortcut={menuKeys('juno.toggle')} size={28} iconSize={16} radius="full" variant="island" pressed={pressed} onClick={onToggle} />
+  return <IconButton icon={Sparkle} label="Juno" shortcut={menuKeys('juno.toggle')} size={28} iconSize={16} radius="full" variant="island" pressed={pressed} onClick={onToggle} />
 }
 
 const styles = stylex.create({
