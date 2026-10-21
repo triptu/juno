@@ -1008,6 +1008,17 @@ test.describe('topic view', () => {
     return (await juno.measures(name)).at(-1)!
   }
 
+  /** Twenty switches between Main's tab and the thread's, timed with `juno.tab-switch`. */
+  async function switchTabs(juno: Juno): Promise<number[]> {
+    const samples: number[] = []
+    for (let i = 0; i < 20; i++) {
+      const before = (await juno.measures('juno.tab-switch')).length
+      await juno.tabs.select(i % 2 === 0 ? 'perf-main' : THREAD)
+      samples.push(await nextMeasure(juno, 'juno.tab-switch', before))
+    }
+    return samples
+  }
+
   test.beforeAll(async () => {
     test.setTimeout(300_000)
     fake = await startFakeSlack({
@@ -1103,27 +1114,14 @@ test.describe('topic view', () => {
       // Tab switch: two mounted tabs.
       await juno.sidebar.row(THREAD).openInNewTab()
       await juno.tabs.expectCount(2)
-      const mounted: number[] = []
-      await traced(running.win, 'tab-switch-mounted', async () => {
-        for (let i = 0; i < 20; i++) {
-          const title = i % 2 === 0 ? 'perf-main' : THREAD
-          const before = (await juno.measures('juno.tab-switch')).length
-          await juno.tabs.select(title)
-          mounted.push(await nextMeasure(juno, 'juno.tab-switch', before))
-        }
-      })
+      let mounted: number[] = []
+      await traced(running.win, 'tab-switch-mounted', async () => void (mounted = await switchTabs(juno)))
       within('tab switch mounted, p95', stats('tab switch, mounted (juno.tab-switch)', mounted).p95, oneFrame)
 
       // The same with the thread's tab scrolled up: showing it again puts its held row back before paint.
       await juno.tabs.select(THREAD)
       await juno.topic.scrollUp(3000)
-      const scrolledUp: number[] = []
-      for (let i = 0; i < 20; i++) {
-        const title = i % 2 === 0 ? 'perf-main' : THREAD
-        const before = (await juno.measures('juno.tab-switch')).length
-        await juno.tabs.select(title)
-        scrolledUp.push(await nextMeasure(juno, 'juno.tab-switch', before))
-      }
+      const scrolledUp = await switchTabs(juno)
       within('tab switch mounted scrolled up, p95', stats('tab switch, mounted, one tab scrolled up (juno.tab-switch)', scrolledUp).p95, oneFrame)
     } finally {
       await running.close()
