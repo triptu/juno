@@ -379,7 +379,8 @@ Sizes are the Figtree values; the prototype's Inter value is half a pixel smalle
 | Page title | serif 34px (32 All topics) | 400 | 1.1–1.15 | 0 | default | Settings sections, All topics |
 | Display | serif 38px | 400 | 1.1 | 0 | default | "What do you need?" |
 | Greeting | serif 36px | 400 | 1.15 | 0 | default | Home's first line, "Morning, Tushar." (`--text-greeting-*`) |
-| Thought | serif 18px | 400 | 1.45 | 0 | default; a quote's attribution is meta in muted | A sentence to read: the picture page's caption and the gallery's quotes (`--text-thought-*`). Not on Home |
+| Picture line | serif 18px | 400 | 1.4 | 0 | secondary; a quote's speaker is meta in muted, run in | A picture's line on Home under the picture and in the gallery's columns (`--text-picture-line-*`) |
+| Picture lead | serif 24px | 400 | 1.28 | 0 | default | The same line on the picture page, where it leads the words (`--text-picture-lead-size`, `--text-picture-lead-leading`) |
 | Empty title | serif 30px | 400 | | | subtle | "Nothing open" |
 | Kbd / confidence | mono 10–11px | 400 | | | subtle / muted | esc, ⌘J, ⌘Z, ↵, "95%" |
 | Prompt block | mono 12.5px | 400 | 1.6 | | default | Code in Juno cards |
@@ -558,11 +559,14 @@ The `chat` group (`tokens.stylex.ts`). `--owner-bubble-bg` and `--owner-bubble-f
 
 | Token | Value | Use |
 | --- | --- | --- |
-| `--home-picture-width` × `--home-picture-height` | 320 × 216 | Home's picture box at most (SPEC 12, "A picture"); the picture is fitted inside and rests on its bottom edge |
-| `--home-picture-height-min`, `--home-picture-room` | 144, 264 | The box's height is the page's height less the room, never under the min, so the column fits above the destination chip and the field |
-| `--gallery-row` | 150 | The height of a row of pictures in the gallery |
+| `--home-picture-width` × `--home-picture-height` | 440 × 300 | Home's picture box at most (SPEC 12, "A picture"); the picture is fitted inside, whole, and rests on its bottom edge |
+| `--home-picture-height-min`, `--home-picture-room` | 160, 310 | The box's height is the page's height less the room (padding, the label, two lines of the line, the composer), never under the min, so the column fits above the destination chip and the field |
+| `--home-line-width` | 440 | The widest Home's picture line gets, the box's width: a line of 140 characters takes two lines |
+| `--gallery-column` | 230 | The narrowest column of the gallery by kind. Columns share the width evenly: three at 1200 wide with the sidebar, four at 1600, five at 1920 |
+| `--gallery-row` | 120 | The height of a row of pictures in the gallery by time |
 | `--picture-label-width` | 380 | The picture page's label column beside the picture |
-| `--gallery-words-column` | 290 | The narrowest column of the gallery's quotes and facts. Columns share the width evenly, so two or more stay under 1.5 times this: about 45 to 75 characters a line |
+| `--picture-scale-height` | 120 | The picture page's How big drawing at most: the taller of the person and the artwork fills it |
+| `--picture-scale-ruler`, `--picture-scale-dot`, `--picture-scale-here` | 52, 9, 13 | The How far line with its labels above and below; its Earth ring and ticks; the dot at the picture's distance |
 
 ### Illustrations and the mark
 
@@ -609,7 +613,10 @@ A field Textarea (a note or pin under edit on What Juno remembers) grows the sam
 | `--pop-shadow` | `0 2px 6px -1px oklch(0 0 0 / .05), 0 14px 36px -8px oklch(0 0 0 / .13)` | `0 2px 6px -1px oklch(0 0 0 / .3), 0 14px 36px -8px oklch(0 0 0 / .5)` | options D1 | Menus, popovers, palette, hover toolbar |
 | `--peek-shadow` | `0 0 0 1px oklch(0 0 0 / .12), 0 2px 6px -1px oklch(0 0 0 / .08), 0 14px 36px -8px oklch(0 0 0 / .18)` | Same as dark `--pop-shadow` | review 10-18 | Peek: a hairline shadow ring and soft elevation; the transparent border and geometry stay unchanged |
 | `--tab-shadow` | `0 -1px 3px -1px oklch(0 0 0 / .08)` | `0 -1px 3px -1px oklch(0 0 0 / .5)` | 10-16 | The active tab lifted out of the strip: up and sideways only, so nothing falls on the page it joins |
-| `--picture-edge` | `inset 0 0 0 1px oklch(0 0 0 / .06)` | `inset 0 0 0 1px oklch(1 0 0 / .07)` | pictures 10-20 | The thin edge drawn over a picture (Home's, the picture page's, the gallery's), so a pale painting or a dark space image keeps its edge. Pictures take `--shadow-lg`, and `--pop-shadow` under the pointer |
+| `--picture-edge` | `inset 0 0 0 1px oklch(0 0 0 / .06)` | `inset 0 0 0 1px oklch(1 0 0 / .07)` | pictures 10-20 | The thin edge drawn over a picture (the picture page's, the gallery's), so a pale painting or a dark space image keeps its edge. Pictures take `--shadow-lg`, and `--pop-shadow` under the pointer |
+| `--picture-home-edge` | `inset 0 0 0 1px oklch(0 0 0 / .10)` | `inset 0 0 0 1px oklch(1 0 0 / .12)` | pictures 10-21 | Home's picture: a firmer edge than `--picture-edge`, so it sits on the page |
+| `--picture-home-shadow` | `0 0 0 1px oklch(0 0 0 / .04), 0 1px 2px 0 oklch(0 0 0 / .06), 0 6px 14px -4px oklch(0 0 0 / .10), 0 22px 44px -14px oklch(0 0 0 / .26)` | the same layers at `.5`, `.4`, `.45`, `.7` | pictures 10-21 | Home's picture lifted off the page: a hairline, a contact shadow and two wider soft ones |
+| `--picture-home-shadow-hover` | `0 0 0 1px oklch(0 0 0 / .05), 0 2px 4px 0 oklch(0 0 0 / .07), 0 10px 20px -6px oklch(0 0 0 / .13), 0 30px 56px -16px oklch(0 0 0 / .32)` | the same layers at `.55`, `.45`, `.5`, `.8` | pictures 10-21 | Home's picture under the pointer and on keyboard focus |
 | `--panel-shadow` | `0 0 0 1px oklch(0 0 0 / .05), 0 1px 2px 0 oklch(0 0 0 / .04), 0 8px 24px -6px oklch(0 0 0 / .08), 0 24px 56px -12px oklch(0 0 0 / .12)` | `inset 0 0 0 1px oklch(1 0 0 / .06), 0 0 0 1px oklch(0 0 0 / .5), 0 1px 2px 0 oklch(0 0 0 / .3), 0 8px 24px -6px oklch(0 0 0 / .4), 0 24px 56px -12px oklch(0 0 0 / .5)` | 10-16 | The Juno panel floating over the page: a hairline ring, a contact shadow, two wide soft ones; in dark a faint light inner edge |
 
 Peek uses its own neutral `--peek-surface` and `--peek-shadow` in every accent. In light, the fill changes from #FBFBF8 to #F7F6F3 against the #FCFBF7 page (1.00:1 → 1.04:1). Muted #706E66 text on the new fill is 4.73:1. The 12% black hairline alone composites to #DEDDD9 on the page (1.31:1 against the page, 1.26:1 against Peek); the two blurred shadows add separation that varies with distance from the edge, so they have no single contrast ratio. The original border is transparent (no edge contrast). In the default-width Mac Chrome gallery shot at 2×, a straight left-edge pixel including the shadow measures 1.14:1 → 1.57:1 against the page and 1.14:1 → 1.50:1 against Peek. The same dark sample stays 1.06:1 against the page and 1.52:1 against Peek. These are representative samples, not minimum contrast along the whole edge. Its light shadow ring makes the complete edge visible over topic content; its dark values match the existing raised popover. Gallery checks cover both widths, every accent, text and icons at 4.5:1, and identical geometry before and after.
@@ -684,7 +691,7 @@ Apply these when porting; the prototype values are listed so no one copies them 
 
 | Prototype | App |
 | --- | --- |
-| `cursor: pointer` on every control | Never. Default arrow; text cursor only in editable text |
+| `cursor: pointer` on every control | Never. Default arrow; text cursor only in editable text. The one exception is a link in content that opens outside the app (a link in a message, a picture page's link to read more), which keeps the browser's pointer |
 | `:hover` rules unconditionally | Wrap hover styles in `@media (hover: hover)` |
 | Text selectable everywhere | `user-select: none` on chrome; messages, inputs and the prompt block stay selectable |
 | `--foreground-muted` 52% L in the CSS file | 42% L (the prototype's runtime override) |

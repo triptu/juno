@@ -1,0 +1,1 @@
+- 10-21 22:44 · Tushar · The standalone quotes and facts are retired: each picture has one line of its own instead, and its old bullet facts become that line and a short paragraph.

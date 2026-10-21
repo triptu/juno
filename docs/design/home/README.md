@@ -47,7 +47,7 @@ There is none: the rows are the count (SPEC §12). Only the first sync has a sec
 
 ### No thought
 
-Home shows nothing under the greeting when nothing waits: no quote or fact, during the first sync or after it. The quotes and facts are in the gallery (SPEC §12, "Pictures and the gallery"; `docs/design/home-art/`), from the list in `packages/pictures/src/thoughts.ts`. To add one, check the quote against its primary source (book, essay, speech, letter, with the year; Quote Investigator for anything famous) or the fact against a reference such as a NASA page or an encyclopedia article, and leave it out when in doubt.
+Home shows nothing under the greeting when nothing waits: no quote or fact, during the first sync or after it. Words appear only with a picture, as that picture's line (SPEC §12, "A picture"; `docs/design/home-art/`).
 
 ### Item templates
 

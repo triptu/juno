@@ -1,0 +1,1 @@
+- 10-21 22:41 · Tushar · The picture page has one link, at its foot, labelled with the institution and opening the museum's or the mission's page in the browser, over the credit line; it replaces the Source link and is the only link on the page.

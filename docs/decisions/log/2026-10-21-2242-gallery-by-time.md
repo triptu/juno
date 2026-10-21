@@ -1,0 +1,1 @@
+- 10-21 22:42 · Tushar · The gallery shows each picture in columns with its label and line by default, and By time groups the pictures by century, oldest first; the Quotes and Facts pills are gone.

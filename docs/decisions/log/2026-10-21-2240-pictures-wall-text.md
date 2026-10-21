@@ -1,0 +1,1 @@
+- 10-21 22:40 · Tushar · Pictures follow concept A, the wall text: on Home the picture leads (440 by 300, lifted with a firm edge and a layered shadow), then a one-line label and the picture's line in the serif at 18; the page and the gallery show the same line with the same picture.
