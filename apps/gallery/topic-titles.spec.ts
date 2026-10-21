@@ -57,13 +57,19 @@ for (const theme of ['light', 'dark'] as const) {
         const baseline = (node: Element) => {
           const flex = getComputedStyle(node).display.includes('flex')
           const line = flex ? document.createElement('span') : node
-          if (flex) line.append(...node.childNodes), node.append(line)
+          if (flex) {
+            line.append(...node.childNodes)
+            node.append(line)
+          }
           const probe = document.createElement('span')
           probe.style.cssText = 'display: inline-block; width: 0; height: 0'
           line.prepend(probe)
           const bottom = probe.getBoundingClientRect().bottom
           probe.remove()
-          if (flex) node.append(...line.childNodes), line.remove()
+          if (flex) {
+            node.append(...line.childNodes)
+            line.remove()
+          }
           return bottom
         }
         const title = row.querySelector('[data-row-part="title"]')
