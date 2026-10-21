@@ -263,24 +263,24 @@ const DOUBLE_CLICK_ZOOM = 2.5
 function useZoom(enabled: boolean) {
   const frame = useRef<HTMLDivElement>(null)
   const content = useRef<HTMLDivElement>(null)
+  // Kept in a ref, not the effect: a hidden tab runs the effect again and the picture stays as it was.
+  const view = useRef({ scale: 1, x: 0, y: 0 })
   const [zoomed, setZoomed] = useState(false)
 
   useEffect(() => {
     const box = frame.current
     const node = content.current
     if (!enabled || box === null || node === null) return
-    let scale = 1
-    let x = 0
-    let y = 0
+    const at = view.current
     let dragFrom: { readonly x: number; readonly y: number } | undefined
 
     const show = (nextScale: number, nextX: number, nextY: number) => {
       const { width, height } = box.getBoundingClientRect()
-      if ((scale > 1) !== (nextScale > 1)) setZoomed(nextScale > 1)
-      scale = nextScale
-      x = Math.min(0, Math.max(width - width * scale, nextX))
-      y = Math.min(0, Math.max(height - height * scale, nextY))
-      node.style.transform = scale === 1 ? '' : `translate(${x}px, ${y}px) scale(${scale})`
+      if ((at.scale > 1) !== (nextScale > 1)) setZoomed(nextScale > 1)
+      at.scale = nextScale
+      at.x = Math.min(0, Math.max(width - width * nextScale, nextX))
+      at.y = Math.min(0, Math.max(height - height * nextScale, nextY))
+      node.style.transform = nextScale === 1 ? '' : `translate(${at.x}px, ${at.y}px) scale(${nextScale})`
     }
     // The point under the pointer stays where it is.
     const zoomAt = (to: number, clientX: number, clientY: number) => {
@@ -288,27 +288,27 @@ function useZoom(enabled: boolean) {
       const next = Math.min(MAX_ZOOM, Math.max(1, to))
       const px = clientX - left
       const py = clientY - top
-      show(next, px - ((px - x) * next) / scale, py - ((py - y) * next) / scale)
+      show(next, px - ((px - at.x) * next) / at.scale, py - ((py - at.y) * next) / at.scale)
     }
     // Not passive, so a pinch does not zoom the page and a scroll while zoomed moves only the picture.
     const onWheel = (event: WheelEvent) => {
       if (event.ctrlKey) {
         event.preventDefault()
-        zoomAt(scale * Math.exp(-event.deltaY / 100), event.clientX, event.clientY)
-      } else if (scale > 1) {
+        zoomAt(at.scale * Math.exp(-event.deltaY / 100), event.clientX, event.clientY)
+      } else if (at.scale > 1) {
         event.preventDefault()
-        show(scale, x - event.deltaX, y - event.deltaY)
+        show(at.scale, at.x - event.deltaX, at.y - event.deltaY)
       }
     }
-    const onDoubleClick = (event: globalThis.MouseEvent) => zoomAt(scale > 1 ? 1 : DOUBLE_CLICK_ZOOM, event.clientX, event.clientY)
+    const onDoubleClick = (event: globalThis.MouseEvent) => zoomAt(at.scale > 1 ? 1 : DOUBLE_CLICK_ZOOM, event.clientX, event.clientY)
     const onPointerDown = (event: PointerEvent) => {
-      if (scale === 1 || event.button !== 0) return
+      if (at.scale === 1 || event.button !== 0) return
       box.setPointerCapture(event.pointerId)
       dragFrom = { x: event.clientX, y: event.clientY }
     }
     const onPointerMove = (event: PointerEvent) => {
       if (dragFrom === undefined) return
-      show(scale, x + event.clientX - dragFrom.x, y + event.clientY - dragFrom.y)
+      show(at.scale, at.x + event.clientX - dragFrom.x, at.y + event.clientY - dragFrom.y)
       dragFrom = { x: event.clientX, y: event.clientY }
     }
     const onDragEnd = () => {
