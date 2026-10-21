@@ -1056,8 +1056,8 @@ export const sizes = stylex.defineVars({
   '--gallery-row': '120px',
   '--picture-label-width': '380px',
   // The gallery's columns of pictures with their words: the narrowest a column gets. Columns share the
-  // page's width evenly: three at 1200 wide with the sidebar, four at 1600, five at 1920.
-  '--gallery-column': '230px',
+  // page's width evenly: three at 1200 wide with the sidebar, five at 1600, six at 1920.
+  '--gallery-column': '200px',
   // The picture page's scale: the height of an artwork drawn next to a person; the distance line's
   // height with its labels above and below, its Earth ring and ticks, and the dot for the picture.
   '--picture-scale-height': '120px',

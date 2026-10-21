@@ -562,7 +562,7 @@ The `chat` group (`tokens.stylex.ts`). `--owner-bubble-bg` and `--owner-bubble-f
 | `--home-picture-width` × `--home-picture-height` | 440 × 300 | Home's picture box at most (SPEC 12, "A picture"); the picture is fitted inside, whole, and rests on its bottom edge |
 | `--home-picture-height-min`, `--home-picture-room` | 160, 310 | The box's height is the page's height less the room (padding, the label, two lines of the line, the composer), never under the min, so the column fits above the destination chip and the field |
 | `--home-line-width` | 440 | The widest Home's picture line gets, the box's width: a line of 140 characters takes two lines |
-| `--gallery-column` | 230 | The narrowest column of the gallery by kind. Columns share the width evenly: three at 1200 wide with the sidebar, four at 1600, five at 1920 |
+| `--gallery-column` | 200 | The narrowest column of the gallery by kind. Columns share the width evenly: three at 1200 wide with the sidebar, five at 1600, six at 1920 |
 | `--gallery-row` | 120 | The height of a row of pictures in the gallery by time |
 | `--picture-label-width` | 380 | The picture page's label column beside the picture |
 | `--picture-scale-height` | 120 | The picture page's How big drawing at most: the taller of the person and the artwork fills it |

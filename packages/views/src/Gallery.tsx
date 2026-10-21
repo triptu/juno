@@ -306,11 +306,11 @@ const styles = stylex.create({
   // Read by `useColumns`: the narrowest a column gets, and the gap between columns.
   wall: {
     '--gallery-column-min': sizes['--gallery-column'],
-    columnGap: spacing['--space-7'],
+    columnGap: spacing['--space-6'],
   },
   section: { marginTop: spacing['--space-7'] },
   heading: { margin: 0, marginBottom: spacing['--space-3'] },
-  columns: { display: 'flex', alignItems: 'flex-start', gap: spacing['--space-7'] },
+  columns: { display: 'flex', alignItems: 'flex-start', gap: spacing['--space-6'] },
   column: {
     display: 'flex',
     flexDirection: 'column',
