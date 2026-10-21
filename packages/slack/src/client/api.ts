@@ -127,8 +127,8 @@ export class SlackApi extends Context.Service<SlackApi, SlackApiShape>()('juno/s
       const call = <M extends MethodName, E = never>(method: M, args: MethodArgs<M>, options: CallOptions<E> = {}) => {
         const lane = options.lane ?? 'interactive'
         const fields = encodeFields(method, args, session.token, options.reason)
-        // The token is always the first field (`encodeFields`).
-        const describe = () => ({ method, lane, reason: options.reason, params: fields.slice(1), startedAt: Date.now() })
+        // The method's own fields: not the token, nor `_x_reason` and `_x_mode`, which the trace has as `reason` or does not need.
+        const describe = () => ({ method, lane, reason: options.reason, params: fields.filter(([name]) => name !== 'token' && !name.startsWith('_x_')), startedAt: Date.now() })
         return traced(trace, describe, (recorder) => Effect.gen(function* () {
           const attempts = options.singleAttempt === true ? { ...config, maxAttempts: 1 } : config
           const before = options.beforeSend

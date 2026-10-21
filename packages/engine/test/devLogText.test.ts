@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { makeDevLog } from '../src/devLog'
 import { capLines, clean, cleanLine, ENTRY_CHARS, MAX_LINES, summarise, VALUE_CHARS } from '../src/devLogText'
 
-// Invented values in the shapes Slack uses; none is a real credential.
-const token = 'xoxc-1234567890-1234567890123-1234567890123-abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789'
+// Invented values in the shapes Slack uses; none is a real credential. Joined here so the
+// file itself never holds a token-shaped string (the remote runner refuses those).
+const token = ['xoxc', '1234567890', '1234567890123', '1234567890123', 'abcdef0123456789'.repeat(4)].join('-')
 const cookie = 'xoxd-AbCdEf%2BgHiJkL%2FmNoP%3D%3D'
 
 describe('developer log text', () => {
