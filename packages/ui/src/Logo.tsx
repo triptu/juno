@@ -12,7 +12,7 @@ export interface LogoProps {
   readonly entrance?: boolean
   /** Under the pointer, the j's dot gives a small nod. */
   readonly nod?: boolean
-  /** Work is running: the dots pulse softly, in place of a spinner. The owner stops it while the window is hidden or in the background. */
+  /** Work is running: the dots pulse softly, in place of a spinner, until it ends. Reduced motion shows them still. */
   readonly busy?: boolean
 }
 
