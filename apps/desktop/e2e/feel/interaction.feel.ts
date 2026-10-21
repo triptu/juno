@@ -1,6 +1,6 @@
 // Hover and press feedback, and popovers, on the default seed.
 import { expect } from '@playwright/test'
-import { feedbackInOneFrame, landsAndStays, noFlicker, noLayoutShift, opensAtAnchor, opensWhole, type Check } from './checks'
+import { feedbackInOneFrame, firstFrameRight, landsAndStays, noFlicker, noLayoutShift, opensAtAnchor, opensWhole, staysDrawn, type Check } from './checks'
 import { pointAt } from '../driver/juno'
 import { test } from './feel'
 import { tag } from './pane'
@@ -24,11 +24,13 @@ const popover = (dialog: string, anchor: string, label: string) => ({
     { kind: 'rect', name: 'anchor', selector: anchor },
     { kind: 'opacity', name: 'dialogOpacity', selector: dialog },
   ] satisfies Probe[],
-  // Only frames where the popover can be seen: it fades in from opacity 0, and what it does while invisible does not show.
+  // A popover opens at once (SPEC 16): fully drawn, at its full size, in the first frame it is on screen.
   checks: [
-    opensWhole('dialog', 'dialogText', label, { from: 'press', where: seen }),
-    opensAtAnchor('dialog', 'anchor', label, { from: 'press', where: seen }),
-    landsAndStays('dialogBox', label, { from: 'press', where: seen }),
+    firstFrameRight(`${label} is fully drawn in its first frame`, (v) => v['dialog'] !== null, (v) => (v['dialogOpacity'] === 1 ? null : `opacity ${String(v['dialogOpacity'])}`), { from: 'press' }),
+    staysDrawn('dialogOpacity', label, { from: 'press' }),
+    opensWhole('dialog', 'dialogText', label, { from: 'press' }),
+    opensAtAnchor('dialog', 'anchor', label, { from: 'press' }),
+    landsAndStays('dialogBox', label, { from: 'press' }),
     noLayoutShift({ includeInput: true }),
     noFlicker('window', 'the window'),
   ],
