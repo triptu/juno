@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { spacing } from '@juno/tokens/tokens.stylex'
 import { Button, Text } from '@juno/ui'
 import { SignInArt } from './SignInArt'
@@ -47,6 +47,7 @@ export const signInCopy = {
  */
 export function SignInView({ mode, busy, error, onCopyDetails, onImport, footer }: SignInViewProps) {
   const waiting = busy !== undefined
+  const active = useWindowActive()
   const expired = mode === 'expired'
   const status = waiting
     ? { text: signInCopy.busy, tone: 'muted' as const }
@@ -61,6 +62,7 @@ export function SignInView({ mode, busy, error, onCopyDetails, onImport, footer 
         title={expired ? signInCopy.expiredTitle : signInCopy.title}
         body={expired ? signInCopy.expiredBody : signInCopy.pitch}
         align="center"
+        busy={waiting && active}
         {...(status === undefined ? {} : { status })}
         {...(status?.tone === 'danger' && onCopyDetails !== undefined
           ? {
@@ -98,6 +100,23 @@ export function SignInView({ mode, busy, error, onCopyDetails, onImport, footer 
       {footer === undefined ? null : <div {...stylex.props(styles.footer)}>{footer}</div>}
     </div>
   )
+}
+
+/** Whether the window is shown and in front. The busy pulse stops otherwise, so a background window does no animation work. */
+function useWindowActive(): boolean {
+  const [active, setActive] = useState(() => document.visibilityState === 'visible' && document.hasFocus())
+  useEffect(() => {
+    const update = () => setActive(document.visibilityState === 'visible' && document.hasFocus())
+    addEventListener('focus', update)
+    addEventListener('blur', update)
+    document.addEventListener('visibilitychange', update)
+    return () => {
+      removeEventListener('focus', update)
+      removeEventListener('blur', update)
+      document.removeEventListener('visibilitychange', update)
+    }
+  }, [])
+  return active
 }
 
 const styles = stylex.create({

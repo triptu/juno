@@ -14,6 +14,8 @@ export interface SignInPageProps {
   readonly statusAction?: ReactNode
   /** `center` centres every line on the column (sign-in); `start` keeps them on its start edge (Set up Juno, with its form). Default `start`. */
   readonly align?: 'start' | 'center'
+  /** Work is running: the mark's dots pulse softly. */
+  readonly busy?: boolean
   readonly children: ReactNode
   readonly 'data-set-up-juno'?: ''
 }
@@ -27,13 +29,13 @@ const SHORT = '@media (max-height: 720px)'
  * and a status line whose room is kept, so a message never moves the
  * buttons. `SignInView` and `SetUpJunoView` share it.
  */
-export function SignInPage({ titleId, title, body, status, statusAction, align = 'start', children, ...data }: SignInPageProps) {
+export function SignInPage({ titleId, title, body, status, statusAction, align = 'start', busy = false, children, ...data }: SignInPageProps) {
   const centred = align === 'center'
   return (
     <section {...stylex.props(styles.root, centred && styles.rootCentred)} aria-labelledby={titleId} {...data}>
       <div {...stylex.props(styles.text, centred && styles.centred)}>
         <span {...stylex.props(styles.mark)}>
-          <Logo size={40} entrance={centred} />
+          <Logo size={40} entrance={centred} nod={centred} busy={busy} />
         </span>
         <Text variant="pageTitle" tone="default" id={titleId}>
           {title}
