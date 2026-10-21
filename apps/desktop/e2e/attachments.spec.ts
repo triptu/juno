@@ -2,7 +2,8 @@
 // button stage files as chips; a send uploads them with the text through
 // the outbox; a failed upload keeps the text and the files for Retry; a
 // message's image opens in the viewer and a file downloads into Downloads.
-import { readFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { expect, test, type Fixtures } from './fixtures'
 import { brief, chart, chip, chips, drop, paste, staged } from './attach'
 import { expectStableAnchor } from './shiftProbe'
@@ -14,6 +15,61 @@ test.describe.configure({ timeout: 120_000 })
 
 const ENG_MAIN = '#eng'
 const PROPOSAL = 'Proposal: cut offline mode'
+
+test('multi-chunk archives and files with no MIME type can be pasted, picked and sent', async ({ juno, win, fake, userData }) => {
+  const { topic } = juno
+  await juno.sidebar.row(ENG_MAIN).open()
+  await topic.expectTitle('Main')
+  const diskImage = { name: 'Juno.dmg', mimeType: '', buffer: Buffer.alloc(3 * 1024 * 1024, 7) }
+  await paste(topic.composer, [diskImage])
+  const downloads = join(userData, 'Downloads')
+  await mkdir(downloads, { recursive: true })
+  const archive = join(downloads, 'archive.zip')
+  await writeFile(archive, Buffer.alloc(2 * 1024 * 1024, 9))
+  const chooser = win.waitForEvent('filechooser')
+  await topic.root.getByRole('button', { name: 'Attach files', exact: true }).click()
+  await (await chooser).setFiles(archive)
+  await staged(topic, 2)
+  await win.screenshot({ path: test.info().outputPath('attachments-ready.png') })
+  await topic.send('Archives attached')
+  await topic.expectSent('Archives attached')
+  const posted = fake.messages('C0ENG').find((message) => message.text === 'Archives attached')
+  expect(posted?.files?.map((file) => ({ name: file.name, size: file.size }))).toEqual([
+    { name: 'Juno.dmg', size: diskImage.buffer.length },
+    { name: 'archive.zip', size: 2 * 1024 * 1024 },
+  ])
+})
+
+for (const failure of ['read_error', 'bad_chunk'] as const) {
+  test(`an attachment ${failure} has a specific title and a safe app log entry`, async ({ juno, win, userData }) => {
+    const { topic } = juno
+    await juno.sidebar.row(ENG_MAIN).open()
+    await topic.expectTitle('Main')
+    // A File can become unreadable after selection. A short first read also exercises the real engine's offset refusal.
+    await win.evaluate((reason) => {
+      const slice = File.prototype.slice
+      File.prototype.slice = function (start, end, type) {
+        if (this.name !== 'unreadable.dmg') return slice.call(this, start, end, type)
+        File.prototype.slice = slice
+        if (reason === 'read_error') throw new DOMException('File became unavailable', 'NotReadableError')
+        return slice.call(this, start, (end ?? this.size) - 1, type)
+      }
+    }, failure)
+    await paste(topic.composer, [{ name: 'unreadable.dmg', mimeType: '', buffer: Buffer.alloc(3 * 1024 * 1024) }])
+    const failed = topic.root.locator('[data-attachment="failed"]')
+    await expect(failed).toHaveCount(1)
+    await win.screenshot({ path: test.info().outputPath(`attachment-${failure}.png`) })
+    await expect(failed).toHaveAttribute('title', failure === 'read_error' ? 'Could not read this file' : 'Could not attach this file. Try attaching it again.')
+    await expect.poll(async () => readFile(join(userData, 'logs', 'main.log'), 'utf8')).toMatch(new RegExp(`files: staging failed.*reason=${failure}.*offset=${failure === 'read_error' ? 0 : 1024 * 1024}`))
+    const log = await readFile(join(userData, 'logs', 'main.log'), 'utf8')
+    expect(log).toContain('files: staging failed')
+    expect(log).not.toContain('unreadable.dmg')
+    expect(log).not.toContain('File became unavailable')
+    await chip(topic, 'unreadable.dmg').click()
+    await paste(topic.composer, [{ name: 'retry.dmg', mimeType: '', buffer: Buffer.alloc(3 * 1024 * 1024) }])
+    await staged(topic, 1)
+  })
+}
 
 test('a pasted image goes with the message and shows in it at its final size', async ({ juno, fake }) => {
   const { topic } = juno

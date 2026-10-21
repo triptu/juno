@@ -6,6 +6,7 @@
  * types below are imported from them, which is erased at compile time.
  */
 import type { Accent, Density, HuddleMenu, TopicTitleLines, ProviderChange, SidebarLayout, SlackTarget, Theme, WebPanelBounds } from './shell'
+import type { AttachmentFailure } from './routes/files'
 import type { MenuCommand } from './menu'
 
 export type { Accent, Density, TopicTitleLines, ProviderChange, SidebarLayout, SlackTarget, Theme, WebPanelBounds } from './shell'
@@ -28,6 +29,7 @@ export const Channels = {
   appShowLogs: 'app.showLogs',
   /** The renderer tells main its view and whether a sync runs, for main's idle CPU check (no titles, no ids). */
   appReportState: 'app.reportState',
+  appReportStagingFailure: 'app.reportStagingFailure',
   /** Renderer asks main for a fresh engine port. The port arrives on `Events.enginePort`. */
   engineRequestPort: 'engine.requestPort',
   /** Starts the engine again after the supervisor gave up on it. */
@@ -194,6 +196,7 @@ export interface JunoBridge {
     readonly getInfo: () => Promise<unknown>
     /** A `Diagnostics`, answered by main. */
     readonly diagnostics: () => Promise<unknown>
+    readonly reportStagingFailure: (failure: { readonly id: string; readonly reason: AttachmentFailure; readonly offset: number }) => Promise<void>
     readonly logDiagnostics: () => Promise<unknown>
     /** A `SyncLogInput`; answers 'copied' or 'failed'. */
     readonly copySyncLog: (input: unknown) => Promise<unknown>

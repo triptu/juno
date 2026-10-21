@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-21 12:51 · Tushar · Keep the staging failure reason in attachment chips and log its category, generated id and chunk offset through main. The downloaded 0.1.11 app accepted ZIPs, an empty-MIME 3 MB DMG and its own 112 MB DMG; this fixes misleading diagnostics without claiming an unproven file-type regression.
 - 10-21 11:47 · dev-log · @juno/slack reports calls through SlackTrace, a Context.Reference that is off by default, and the sync through an onStep observer; secrets are stripped in one place, devLogText.ts.
 - 10-21 11:46 · dev-log · The developer log opens from ⌘K only when the text names "developer" or "dev log", in its own tab that is never saved; a hidden command flag, not a developer-mode toggle.
 - 10-21 11:45 · dev-log · A hidden developer log keeps the newest 2,000 Slack calls, socket events and sync steps in the engine's memory only; it is never logged, saved, put in Copy log or sent.

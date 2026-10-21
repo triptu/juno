@@ -42,6 +42,10 @@ export const StagedFile = Schema.Struct({
 })
 export type StagedFile = typeof StagedFile.Type
 
+/** Why a composer could not stage a file. Also the safe reason written to the app log. */
+export const AttachmentFailure = Schema.Literals(['read_error', 'not_signed_in', 'bad_chunk', 'file_too_large', 'connection_error', 'engine_error'])
+export type AttachmentFailure = typeof AttachmentFailure.Type
+
 export const StageError = Schema.Union([NotSignedIn, Rejected])
 export type StageError = typeof StageError.Type
 

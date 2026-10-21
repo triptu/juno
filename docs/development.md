@@ -1207,7 +1207,7 @@ lint/typecheck. Heavy checks run through `pnpm affected` on the SSH runner.
 2. Set the version with `pnpm release:version` ("Versions" below). Build and smoke the
    local package with `pnpm package` and `pnpm test:package`. The smoke launches
    the executable directly, signs in to fake Slack, waits for sidebar rows,
-   starts the agent against fake OpenRouter, and relaunches the cached account.
+   starts the agent against fake OpenRouter, stages multi-chunk ZIP and empty-MIME DMG files in a topic composer, and relaunches the cached account.
    It uses temporary data and never reads a real Slack session. Without a Developer
    ID signature, it applies `codesign -s -` locally and verifies the result. It
    measures five cached-account launches from process spawn to the renderer's
