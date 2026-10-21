@@ -5,7 +5,7 @@
  * file as it nears the screen and the large one when its page opens.
  */
 import { use, useEffect, useMemo, useState } from 'react'
-import { ensurePicture, lastPictureId, loadPictures, openExternal, pictureFilesAtom, pictureUrl, readPictureFiles, registry, tabsAtom, yearOf, type Picture } from '@juno/state'
+import { ensurePicture, lastPictureId, loadPictures, openExternal, pictureFilesAtom, pictureUrl, pictureYear, readPictureFiles, registry, tabsAtom, type Picture } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { Gallery, GALLERY_SECTIONS, PicturePage, type GalleryFilter, type GalleryOrder, type GalleryPictureView } from '@juno/views'
 import { openGallery, stepPicture } from './navigation'
@@ -22,7 +22,7 @@ const onTheWall = (picture: Picture): GalleryPictureView => ({
   date: picture.date,
   ratio: picture.ratio,
   line: picture.line.by === undefined ? { text: picture.line.text } : { text: picture.line.text, by: picture.line.by },
-  year: yearOf(picture.date) ?? 0,
+  year: pictureYear(picture) ?? 0,
 })
 
 /** The gallery's order: the sections in turn, each in the catalog's order. */

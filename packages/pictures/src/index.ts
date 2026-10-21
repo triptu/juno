@@ -8,11 +8,11 @@
  * after Home paints and when the gallery opens.
  */
 
-/** Paintings (including manuscript pages and calligraphy), prints, scientific and natural-history illustration, and space images. */
-export type PictureKind = 'painting' | 'print' | 'illustration' | 'space'
+/** Paintings (including murals, cave art, manuscript pages and calligraphy), prints, scientific and natural-history illustration, space images, and objects (sculpture, reliefs, vessels, seals and masks). */
+export type PictureKind = 'painting' | 'print' | 'illustration' | 'space' | 'objects'
 
-/** Artworks are public domain or CC0; some ESA images are CC BY 4.0 and show their credit. */
-export type PictureLicence = 'public-domain' | 'cc0' | 'cc-by-4.0'
+/** The image's licence as its source page states it. Every picture shows its credit line. */
+export type PictureLicence = 'public-domain' | 'cc0' | 'cc-by-2.0' | 'cc-by-3.0' | 'cc-by-4.0' | 'cc-by-sa-3.0' | 'cc-by-sa-4.0'
 
 /**
  * The one line that goes with a picture: something a named person said or
@@ -56,8 +56,10 @@ export interface Picture {
   readonly artist: string
   /** Where and what tradition, when it helps ("Pahari, Tehri Garhwal"). */
   readonly culture?: string
-  /** As the holding collection gives it: "c. 1830–32", "late 14th century". */
+  /** As the holding collection gives it: "c. 1830–32", "late 14th century", "c. 2600–1900 BCE". */
   readonly date: string
+  /** The year the gallery's order by time uses, negative before the common era. Needed where `yearOf(date)` cannot read the date: BCE dates and "years ago". */
+  readonly year?: number
   readonly medium: string
   /** The holding collection and city, or for a space image what and where it is. */
   readonly place: string
@@ -110,9 +112,10 @@ export const labelOf = (picture: Picture): PictureLabel => ({
 })
 
 /**
- * The year a picture was made, as near as its date says: the first year in
+ * The year a common-era date gives, as near as it says: the first year in
  * it ("c. 1830–32" is 1830), or the middle of the first century it names
- * ("late 14th century" is 1350). For the gallery's order by time.
+ * ("late 14th century" is 1350). It cannot tell BCE from CE, so a picture
+ * from before the common era carries its own `year`.
  */
 export function yearOf(date: string): number | undefined {
   const year = /\b(\d{3,4})\b/.exec(date)
@@ -121,8 +124,11 @@ export function yearOf(date: string): number | undefined {
   return century === null ? undefined : (Number(century[1]) - 1) * 100 + 50
 }
 
+/** The year a picture was made, for the gallery's order by time: its own `year`, else the one its date gives. Negative before the common era. */
+export const pictureYear = (picture: Picture): number | undefined => picture.year ?? yearOf(picture.date)
+
 /** The gallery's order of kinds, and their section names. */
-export const PICTURE_KINDS: ReadonlyArray<PictureKind> = ['painting', 'print', 'illustration', 'space']
+export const PICTURE_KINDS: ReadonlyArray<PictureKind> = ['painting', 'print', 'illustration', 'space', 'objects']
 
 /** Whether a picture suits late night: every space image, and pictures marked for it. */
 export const suitsNight = (picture: Picture): boolean => picture.kind === 'space' || picture.night === true

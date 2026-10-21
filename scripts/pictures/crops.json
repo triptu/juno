@@ -47,17 +47,53 @@
     "left": 0.0,
     "right": 0.0846
   },
+  "indus-unicorn-seal": {
+    "top": 0.0,
+    "bottom": 0.005,
+    "left": 0.001,
+    "right": 0.0015
+  },
+  "knossos-bull-leaping-fresco": {
+    "top": 0.0965,
+    "bottom": 0.0965,
+    "left": 0.0585,
+    "right": 0.0585
+  },
   "la-tour-penitent-magdalen": {
     "top": 0.0417,
     "bottom": 0.0458,
     "left": 0.0611,
     "right": 0.0673
   },
+  "lascaux-hall-of-the-bulls": {
+    "top": 0.0,
+    "bottom": 0.2,
+    "left": 0.0,
+    "right": 0.0
+  },
+  "menna-fishing-and-fowling": {
+    "top": 0.0135,
+    "bottom": 0.0112,
+    "left": 0.0098,
+    "right": 0.0064
+  },
+  "mohenjo-daro-dancing-girl": {
+    "top": 0.0,
+    "bottom": 0.3,
+    "left": 0.0,
+    "right": 0.0
+  },
   "nepal-vasudhara-mandala-1777": {
     "top": 0.0271,
     "bottom": 0.0262,
     "left": 0.0275,
     "right": 0.0364
+  },
+  "nimrud-lamassu": {
+    "top": 0.3,
+    "bottom": 0.12,
+    "left": 0.22,
+    "right": 0.22
   },
   "payag-shah-jahan-on-horseback": {
     "top": 0.0046,

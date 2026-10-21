@@ -1,7 +1,7 @@
 // Invariants every catalog entry keeps (SPEC 12, "Pictures and the gallery").
 // No entry is pinned: the list changes as pictures are added and dropped.
 import { describe, expect, it } from 'vitest'
-import { PICTURE_ID, PICTURE_KINDS, yearOf } from '../src/index'
+import { PICTURE_ID, PICTURE_KINDS, pictureYear, yearOf } from '../src/index'
 import { PICTURES } from '../src/catalog'
 
 const CAPTION_MAX = 160
@@ -16,16 +16,25 @@ describe('the picture catalog', () => {
 
   it('gives every picture a licence, a credit, a source page, its shape and a year', () => {
     for (const picture of PICTURES) {
-      expect(['public-domain', 'cc0', 'cc-by-4.0'], picture.id).toContain(picture.licence)
+      expect(['public-domain', 'cc0', 'cc-by-2.0', 'cc-by-3.0', 'cc-by-4.0', 'cc-by-sa-3.0', 'cc-by-sa-4.0'], picture.id).toContain(picture.licence)
       expect(picture.credit.trim(), picture.id).not.toBe('')
       expect(picture.sourceUrl, picture.id).toMatch(/^https:\/\//)
       expect(picture.ratio, picture.id).toBeGreaterThan(0.2)
       expect(picture.ratio, picture.id).toBeLessThan(5)
       expect(PICTURE_KINDS, picture.id).toContain(picture.kind)
       for (const field of [picture.title, picture.artist, picture.date, picture.medium, picture.place]) expect(field.trim(), picture.id).not.toBe('')
-      expect(yearOf(picture.date), `${picture.id}: ${picture.date}`).toBeTypeOf('number')
+      expect(pictureYear(picture), `${picture.id}: ${picture.date}`).toBeTypeOf('number')
       expect(picture.caption.length, picture.id).toBeGreaterThan(0)
       expect(picture.caption.length, picture.id).toBeLessThanOrEqual(CAPTION_MAX)
+    }
+  })
+
+  it('gives a picture from before the common era its own year, before 1', () => {
+    for (const picture of PICTURES) {
+      const early = /\bBCE\b|years ago/.test(picture.date)
+      if (early) expect(picture.year, `${picture.id}: ${picture.date}`).toBeLessThan(1)
+      // A year written out for a common-era date may be nearer than the date says, but in the century it gives.
+      else if (picture.year !== undefined) expect(Math.floor(picture.year / 100), `${picture.id}: ${picture.date}`).toBe(Math.floor((yearOf(picture.date) ?? Number.NaN) / 100))
     }
   })
 
