@@ -4,6 +4,7 @@
  * Times are minutes before the clock's "now" when the seed runs.
  */
 import type { Team, Ts, User } from '@juno/slack-schema'
+import { WORKSPACE_EMOJI } from './emoji.ts'
 import { fileObject } from './files.ts'
 import { samplePdf, samplePng } from './samples.ts'
 import { NEVER_READ, Workspace, type ConversationKind } from './state.ts'
@@ -499,6 +500,9 @@ export function seedWorkspace(workspace: Workspace, avatarBase: string): void {
   const minute = 60_000
   const at = (ago: number) => now - ago * minute
   // Avatars are served at `<base>/avatars`, files at `<base>/files`.
+  const emojiBase = avatarBase.replace(/\/avatars$/, '/emoji')
+  for (const name of Object.keys(WORKSPACE_EMOJI)) workspace.emoji.set(name, { name, value: `${emojiBase}/${name}.svg` })
+  workspace.emoji.set('hello_juno', { name: 'hello_juno', value: 'alias:juno_wave' })
   const baseUrl = avatarBase.replace(/\/avatars$/, '')
 
   for (const person of PEOPLE) workspace.addUser(userObject(person, avatarBase))

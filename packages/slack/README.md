@@ -17,10 +17,11 @@ Then use the services:
 - `RequestQueue`: request lanes, per-method rate limits and `Retry-After`.
 - `SlackSocket`: the event socket with reconnect, as a stream of `SocketEvent`. Each frame carries `receivedAt`, stamped before it enters the consumer queue; sync uses it to distinguish a newer pong from an older queued one. `tickle(reason)` tells Slack the user is here, at most once per `socket.tickleSpacingMillis` (19 s) across reconnects.
 - `SlackConfig` / `slackConfigLayer`: timers and limits, with defaults.
+- `SlackTrace`: hears each Web API and edge call start and end (params without the token, timing, attempts, outcome, response size and body) for the engine's developer log. A `Context.Reference` that is off by default, so a client built without it does no extra work.
 
 `@juno/slack/import` is a separate entry: `locateSlackAppData(slackAppCandidates(home))` finds the installed Slack app's data (direct download or Mac App Store, `Network/Cookies` or `Cookies`) and `copySlackAppData` copies it; `readSlackAppSession({ dir, keychainPassword })` reads a team record and the `d` cookie out of a copy of the installed Slack app's data (a leveldb scan for `localConfig_v2`, Chromium cookie decryption). Plain file reading, no network; main and the live smoke use it.
 
-Errors are tagged and typed: `SlackAuthRequired`, `SlackRateLimited` (`retryAfterMillis`), `SlackRejected`, `SlackTransportError`, `SlackDecodeError`. The engine maps them to `@juno/contract` errors; this package does not import the contract.
+Errors are tagged and typed: `SlackAuthRequired`, `SlackRateLimited` (`retryAfterMillis`), `SlackRejected`, `SlackTransportError`, `SlackDecodeError`. `SlackDecodeError` carries a schema field path and fixed issue kind without response values. Paths allow only field names declared by the schemas and array indexes; dynamic record keys become `unknown`. The engine maps them to `@juno/contract` errors; this package does not import the contract.
 
 ## Must not
 

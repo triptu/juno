@@ -225,9 +225,6 @@ importers:
 
   apps/desktop:
     dependencies:
-      '@juno/highlight':
-        specifier: workspace:*
-        version: link:../../packages/highlight
       electron-updater:
         specifier: 6.8.3
         version: 6.8.3(supports-color@7.2.0)
@@ -256,6 +253,9 @@ importers:
       '@juno/fake-slack':
         specifier: workspace:*
         version: link:../../packages/fake-slack
+      '@juno/highlight':
+        specifier: workspace:*
+        version: link:../../packages/highlight
       '@juno/huddle-media':
         specifier: workspace:*
         version: link:../../packages/huddle-media

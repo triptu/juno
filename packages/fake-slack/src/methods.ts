@@ -339,7 +339,7 @@ export const coreMethods = {
     })
     const state = ws.threadCounts(index)
     return {
-      threads: page,
+      threads: page.map((view) => ws.threadViewRowOverrides.has(view.root_msg.ts) ? ws.threadViewRowOverrides.get(view.root_msg.ts) : view),
       has_more: views.length > limit,
       total_unread_replies: Object.values(state.unread_count_by_channel ?? {}).reduce((a, b) => a + b, 0),
       ...(args.fetch_threads_state === true ? { threads_state: state } : {}),
@@ -404,7 +404,7 @@ export const coreMethods = {
     if (existing.user !== ws.selfId) return new ApiError('cant_update_message')
     const text = args.text ?? args.markdown_text
     if ((text === undefined || text === '') && args.blocks === undefined) return new ApiError('no_text')
-    const message = ws.edit(args.channel, args.ts, text ?? '', ws.selfId, args.text !== undefined)
+    const message = ws.edit(args.channel, args.ts, text ?? '', ws.selfId, args.text !== undefined, args.blocks)
     // chat.update returns a partial message; its timestamp is on the envelope.
     return { channel: args.channel, ts: args.ts, text: message.text ?? '', message: { text: message.text ?? '', user: ws.selfId } }
   },

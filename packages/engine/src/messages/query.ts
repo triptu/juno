@@ -40,6 +40,7 @@ import {
   type Ts,
   type UserId,
   type Me,
+  fileTextKind,
 } from '@juno/domain'
 import { editMarkup, emojiUnicode, messageBody, splitEmojiName, type Lookups, type MessageBody, type MessageContent, type UsergroupName } from '@juno/richtext'
 import { syncState, StoreReader, type SqlClient, type SqlError } from '@juno/store'
@@ -71,12 +72,46 @@ interface CachedBody {
   readonly editText?: string
 }
 
+/**
+ * A user as the message list reads them. For an app or a deactivated
+ * person, `dm` is their DM and `dm_main` the same once it has a Main, which
+ * is what a click opens; null for anyone else.
+ */
+type MessageUser = UserRow & { readonly is_bot: 0 | 1; readonly deleted: 0 | 1; readonly dm: string | null; readonly dm_main: string | null }
+
+/** The users `ids` names, with the DM of each app and deactivated person (`MessageUser`), through `conversations_im_user`. */
+export function messageUsersStatement(ids: ReadonlyArray<string>): { readonly sql: string; readonly params: ReadonlyArray<unknown> } {
+  const dm = `SELECT d.id FROM conversations d WHERE d.kind = 'im' AND d.user_id = u.id AND d.is_member = 1`
+  return {
+    sql: `SELECT u.id, u.name, u.display_name, u.real_name, u.avatar_url, u.avatar_small_url, u.avatar_large_url, u.is_bot, u.deleted,
+      CASE WHEN u.is_bot = 1 OR u.deleted = 1 THEN (${dm} LIMIT 1) END AS dm,
+      CASE WHEN u.is_bot = 1 OR u.deleted = 1 THEN (${dm} AND EXISTS (SELECT 1 FROM topic_index t WHERE t.topic_id = 'm:' || d.id) LIMIT 1) END AS dm_main
+      FROM users u WHERE u.id IN (${ids.map(() => '?').join(', ')})`,
+    params: ids,
+  }
+}
+
+/**
+ * Juno has nothing to open for this user (SPEC 7, "People"): one the store
+ * does not know, or an app or deactivated person whose DM has no Main. A
+ * person with no DM still opens Home addressed to them. Undefined: not read yet.
+ */
+const unreachable = (user: MessageUser | null | undefined): boolean => user === null || ((user?.is_bot === 1 || user?.deleted === 1) && user.dm_main === null)
+
+/** `person` with its `unreachable` flag set to `flag`, the same object when it already is. */
+function reach(person: Person, flag: boolean): Person {
+  if ((person.unreachable === true) === flag) return person
+  if (flag) return { ...person, unreachable: true }
+  const { unreachable: _unreachable, ...rest } = person
+  return rest
+}
+
 /** What one `messages.list` subscription keeps between runs. See the module comment. */
 export interface MessageCache {
   rows: Map<string, CachedRow>
   bodies: Map<string, CachedBody>
   /** Users read so far, `null` for an id with no row. */
-  users: Map<string, UserRow | null>
+  users: Map<string, MessageUser | null>
   /** Conversations read so far, `null` for an id with no row. */
   channels: Map<string, ChannelRow | null>
   /** User groups read so far, `null` for an id with no row. */
@@ -88,6 +123,8 @@ export interface MessageCache {
   /** Bumped whenever the lookup maps are dropped; a body parsed in an older epoch is parsed again. */
   epoch: number
   people: Map<string, Person>
+  /** Set by the subscription: forget the lookups and run again once this Main exists. */
+  watchMain?: (topicId: string) => void
   selfId: string | undefined
   membership: string
 }
@@ -251,6 +288,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       ...(selfId === undefined ? {} : { me: selfId }),
       ...(me?.usergroupIds === undefined ? {} : { myUsergroups: me.usergroupIds }),
       user,
+      unreachable: (id: string) => unreachable(cache.users.get(id)),
       channel: (id: string) => {
         const row = cache.channels.get(id)
         if (row === undefined) wanted.channels.add(id)
@@ -360,13 +398,15 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       nextRows.set(row.ts, { key, row: view })
       out.push(view)
       if (view.senderId !== undefined && !people.has(view.senderId)) {
+        // A post with its own name or icon (an app, a webhook) is drawn as that sender, and opens the DM of the app user behind it.
+        const app = cache.users.get(row.user_id ?? '')
         const person = row.bot_name !== null || row.bot_icon !== null
-          ? personFrom(view.senderId, { id: view.senderId, name: row.bot_name ?? row.user_id, display_name: row.bot_name, real_name: null, avatar_url: row.bot_icon ?? cache.users.get(row.user_id ?? '')?.avatar_url ?? null })
-          : personFrom(view.senderId, cache.users.get(view.senderId), cache.people.get(view.senderId))
+          ? { ...personFrom(view.senderId, { id: view.senderId, name: row.bot_name ?? row.user_id, display_name: row.bot_name, real_name: null, avatar_url: row.bot_icon ?? app?.avatar_url ?? null }), ...(unreachable(app) ? { unreachable: true as const } : { user: row.user_id! }) }
+          : reach(personFrom(view.senderId, cache.users.get(view.senderId), cache.people.get(view.senderId)), unreachable(cache.users.get(view.senderId)))
         people.set(view.senderId, person)
       }
       for (const reaction of view.reactions) {
-        for (const id of reaction.users ?? []) if (!people.has(id)) people.set(id, personFrom(id, cache.users.get(id), cache.people.get(id)))
+        for (const id of reaction.users ?? []) if (!people.has(id)) people.set(id, reach(personFrom(id, cache.users.get(id), cache.people.get(id)), unreachable(cache.users.get(id))))
       }
     }
     cache.rows = nextRows
@@ -379,7 +419,12 @@ const readUsers = (sql: SqlClient.SqlClient, cache: MessageCache, ids: Iterable<
     const missing = [...ids].filter((id) => !cache.users.has(id))
     if (missing.length === 0) return
     for (const id of missing) cache.users.set(id, null)
-    for (const user of yield* sql<UserRow>`SELECT id, name, display_name, real_name, avatar_url, avatar_small_url, avatar_large_url FROM users WHERE id IN ${sql.in(missing)}`) cache.users.set(user.id, user)
+    const statement = messageUsersStatement(missing)
+    for (const user of yield* sql.unsafe<MessageUser>(statement.sql, statement.params)) {
+      cache.users.set(user.id, user)
+      // A DM with no Main yet opens nothing until its Main arrives; the list hears of that one row (`watchMain`).
+      if (user.dm !== null && user.dm_main === null) cache.watchMain?.(`m:${user.dm}`)
+    }
   })
 
 const readChannels = (sql: SqlClient.SqlClient, cache: MessageCache, ids: Iterable<string>) =>
@@ -421,7 +466,7 @@ const readEmoji = (sql: SqlClient.SqlClient, cache: MessageCache, names: Iterabl
         if (target !== undefined) {
           aliases.set(row.name, target)
           if (!cache.emoji.has(target)) next.push(target)
-        } else if (row.url !== null) {
+        } else if (row.url) {
           cache.emoji.set(row.name, row.url)
         }
       }
@@ -689,9 +734,14 @@ interface SlackFile {
   readonly title?: string | null
   readonly mimetype?: string
   readonly filetype?: string
+  readonly pretty_type?: string
+  readonly subtype?: string
   readonly size?: number
   readonly mode?: string
   readonly file_access?: string
+  readonly lines?: number
+  readonly duration_ms?: number
+  readonly aac?: string
   readonly original_w?: number
   readonly original_h?: number
   readonly thumb_360?: string
@@ -773,6 +823,35 @@ function pendingFiles(row: PendingRow): ReadonlyArray<FileView> {
         : {}),
     }
   })
+}
+
+/**
+ * What the viewer needs for a file that is not a picture: an audio file's
+ * player url (a voice clip's `aac` when Slack made one) and length, and a
+ * pdf, html or text file's content url, with how to draw text. A snippet's
+ * `preview` may be cut short, so the viewer always reads the content url.
+ */
+function documentOf(file: SlackFile, kind: FileView['kind']): Partial<FileView> {
+  if (file.id === undefined) return {}
+  const id = encodeURIComponent(file.id)
+  if (kind === 'audio') {
+    const play = file.aac ?? file.url_private
+    return {
+      ...(play === undefined ? {} : { audio: `juno://files/${id}/audio?url=${encodeURIComponent(play)}` }),
+      ...(file.duration_ms === undefined ? {} : { durationMs: file.duration_ms }),
+    }
+  }
+  if ((kind !== 'pdf' && kind !== 'html' && kind !== 'text') || file.url_private === undefined) return {}
+  // The name last, so Chromium's PDF viewer titles the file by it.
+  const content = `juno://files/${id}/content/${encodeURIComponent(file.name || file.title || 'file')}?url=${encodeURIComponent(file.url_private)}`
+  if (kind !== 'text') return { content }
+  const text = fileTextKind(file)
+  return {
+    content,
+    textKind: text.kind,
+    ...(text.language === undefined ? {} : { language: text.language }),
+    ...(file.lines === undefined ? {} : { lines: file.lines }),
+  }
 }
 
 /** A sent image's staged copy, while Slack has no thumbnails for it (`uploaded_files`). */
@@ -858,6 +937,7 @@ function filesOf(files: ReadonlyArray<SlackFile> | undefined, local: ReadonlyMap
       ...(file.original_w === undefined || file.original_h === undefined ? {} : { width: file.original_w, height: file.original_h }),
       ...(thumb === undefined ? {} : { thumb }),
       ...(full === undefined ? {} : { full: `juno://files/${encodeURIComponent(file.id)}/full?url=${encodeURIComponent(full)}` }),
+      ...documentOf(file, kind),
       ...(file.url_private_download === undefined ? {} : { download: file.url_private_download }),
     })
   }

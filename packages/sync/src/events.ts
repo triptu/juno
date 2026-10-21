@@ -15,6 +15,7 @@ import {
 } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction, type MessageRow, type SqlError } from '@juno/store'
 import { Clock, Effect, Queue } from 'effect'
+import { writeHuddleFrame } from './write/huddles'
 import { observeMetadata, patchMetadata, type MetadataFence } from './metadata'
 import { reindexOptions, wantUsers, type SyncContext } from './context'
 import { mergeRootCounters, mergeTombstone, type MergeSource } from './merge'
@@ -211,6 +212,8 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
       case 'file_thumbnail_generated':
         // Carries no sizes: file info or a message re-read brings the thumbnails with them (`run/files.ts`).
         return yield* Queue.offer(ctx.fileFetches, { kind: 'event', fileId: frame.file_id })
+      case 'unknown':
+        return yield* transaction(writeHuddleFrame(frame.raw, ctx.me.userId))
       default:
         return
     }

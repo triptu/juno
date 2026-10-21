@@ -7,12 +7,12 @@
  */
 import { Effect, Schema } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
-import { AppState, Diagnostics, LogDiagnostics, engineOutbox, type AppInfo, type ProcessReading } from '@juno/contract'
+import { AppState, Diagnostics, LogDiagnostics, SyncLogInput, engineOutbox, type AppInfo, type ProcessReading } from '@juno/contract'
 import type { JunoBridge } from '@juno/contract/channels'
 import { command } from './atoms'
 import * as AtomRegistry from 'effect/reactivity/AtomRegistry'
 import { registry } from './client'
-import { engineStatusAtom } from './engine'
+import { engineStatusAtom, syncFailureAtom } from './engine'
 import { junoPanelViewAtom } from './junoPanel'
 import { activeTab, currentPlace, tabsAtom, type Place, type Tabs } from './tabs'
 
@@ -26,6 +26,8 @@ const placeKind = (place: Place): string => {
       return 'Home'
     case 'allTopics':
       return 'All topics'
+    case 'devLog':
+      return 'Developer log'
     case 'settings':
       return `Settings ${place.section}`
     case 'juno':
@@ -93,6 +95,14 @@ export async function diagnosticDetails(): Promise<string> {
 }
 
 export async function showLogs(): Promise<void> { await window.juno.app.showLogs() }
+
+/** The sync notice's Copy log: main puts the versions, this phase and its reason, and the end of engine.log on the clipboard. */
+export async function copySyncLog(): Promise<boolean> {
+  const status = registry.get(engineStatusAtom)
+  const reason = registry.get(syncFailureAtom)
+  const input: SyncLogInput = { phase: status._tag === 'Success' ? status.value.phase._tag : 'unknown', ...(reason === undefined ? {} : { reason }) }
+  return (await window.juno.app.copySyncLog(Schema.encodeSync(SyncLogInput)(input))) === 'copied'
+}
 
 /** "12.3 %" with one decimal under 10 and none above. */
 export const formatCpu = (cpu: number): string => `${cpu < 10 ? cpu.toFixed(1) : cpu.toFixed(0)} %`

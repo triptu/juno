@@ -58,15 +58,18 @@ export function lookAt(state: IncomingState, running: RunningHuddles, selfId: st
 /** Whether the user is in, or joining, a huddle. */
 export const inACall = (call: HuddleCall | undefined): boolean => call !== undefined && (call.phase === 'joining' || call.phase === 'joined')
 
-/** The entry for a fresh huddle. It rings for `RING_MILLIS` unless it is quiet or the user is in a call. */
-export function incomingOf(fresh: Fresh, alert: HuddleAlert, call: HuddleCall | undefined, now: number): IncomingHuddle {
+/**
+ * The entry for a fresh huddle. It rings for `RING_MILLIS` unless it is
+ * quiet, Ring for huddles is off (`sound`), or the user is in a call.
+ */
+export function incomingOf(fresh: Fresh, alert: HuddleAlert, sound: boolean, call: HuddleCall | undefined, now: number): IncomingHuddle {
   return {
     channelId: fresh.channelId,
     callId: fresh.huddle.callId,
     startedBy: fresh.startedBy,
     participants: fresh.huddle.participants,
     alert,
-    ringUntil: alert === 'ring' && !inACall(call) ? now + RING_MILLIS : null,
+    ringUntil: alert === 'ring' && sound && !inACall(call) ? now + RING_MILLIS : null,
   }
 }
 

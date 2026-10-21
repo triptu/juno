@@ -119,6 +119,11 @@ export default defineFixtures(
       'two-lines': state({ items: [rewritten.waiting, { ...rewritten.resume, aiTitle: 'Plan' }] }, { ...minimum, topicTitleLines: 'two' }),
     },
     Items: {
+      'missed-huddle-channel': state({ items: [homeItems.waiting, { id: 'missedHuddle:R1', kind: 'missedHuddle', title: 'Missed huddle in #eng', topics: homeItems.channelMain.topics, at: NOW - 18 * 60_000, durationMinutes: 12 }, homeItems.followUp] }),
+      'missed-huddle-dm': state({ items: [homeItems.waiting, { id: 'missedHuddle:R2', kind: 'missedHuddle', title: 'Missed huddle with Maya Chen', topics: homeItems.dm.topics, at: NOW - 42 * 60_000, durationMinutes: 8 }, homeItems.followUp] }),
+      // The shortest and longest meta lines: "Lasted under a minute · 3m" and "Lasted 1 hr 12 min · 2h".
+      'missed-huddle-short': state({ items: [homeItems.waiting, { id: 'missedHuddle:R3', kind: 'missedHuddle', title: 'Missed huddle with Maya Chen', topics: homeItems.dm.topics, at: NOW - 3 * 60_000, durationMinutes: 0 }, homeItems.followUp] }),
+      'missed-huddle-long': state({ items: [homeItems.waiting, { id: 'missedHuddle:R4', kind: 'missedHuddle', title: 'Missed huddle in #eng', topics: homeItems.channelMain.topics, at: NOW - 2 * 3_600_000, durationMinutes: 72 }, homeItems.followUp] }),
       three: state(),
       // The same rows with the assistant's title lines: every box stays where it was (gallery behaviour test).
       'ai-titles': state({ items: [rewritten.waiting, rewritten.resume, rewritten.moved] }),

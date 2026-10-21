@@ -107,6 +107,10 @@ export function createMainWindow(currentLaunch: () => PageLaunch): BrowserWindow
     if (direction === 'left') tabCommand(window, 'history.back')
     else if (direction === 'right') tabCommand(window, 'history.forward')
   })
+  // Esc in the media viewer's PDF or HTML frame stays in the frame; the page closes the viewer when a frame of it has focus.
+  window.webContents.on('before-input-event', (_event, input) => {
+    if (input.type === 'keyDown' && input.key === 'Escape') window.webContents.send(Events.menuCommand, 'frame.escape')
+  })
   // Zoom outlives a reload (Chromium keeps it per origin), and pinch or
   // Control-scroll can change it without the menu.
   window.webContents.on('did-finish-load', () => fitMinimumSizeToZoom(window))

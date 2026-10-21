@@ -1,0 +1,1 @@
+- 10-20 15:06 · missed-huddle-recovery · Slack’s huddle message can recover start, end, creator and participation after relaunch when complete; missing participant history stays unknown. huddles/info lists running calls only. Durable local huddle_history retains joins and acknowledgements so rereads cannot revive cleared misses.

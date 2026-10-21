@@ -57,7 +57,9 @@ const bridge: JunoBridge = {
     getInfo: () => ipcRenderer.invoke(Channels.appGetInfo),
     diagnostics: () => ipcRenderer.invoke(Channels.appDiagnostics),
     logDiagnostics: () => ipcRenderer.invoke(Channels.appLogDiagnostics),
+    copySyncLog: (input) => ipcRenderer.invoke(Channels.appCopySyncLog, input),
     showLogs: () => ipcRenderer.invoke(Channels.appShowLogs),
+    reportStagingFailure: (failure) => ipcRenderer.invoke(Channels.appReportStagingFailure, failure),
     reportState: (state) => ipcRenderer.invoke(Channels.appReportState, state),
   },
   engine: {
@@ -132,6 +134,9 @@ const bridge: JunoBridge = {
     editUndo: () => ipcRenderer.invoke(Channels.shellEditUndo),
     downloadFile: ({ url, name }) => ipcRenderer.invoke(Channels.shellDownloadFile, { url, name }),
     openFile: ({ url, name }) => ipcRenderer.invoke(Channels.shellOpenFile, { url, name }),
+  },
+  files: {
+    quickLook: ({ url, name }) => ipcRenderer.invoke(Channels.filesQuickLook, { url, name }),
   },
   clipboard: {
     writeText: (text) => ipcRenderer.invoke(Channels.clipboardWriteText, { text }),

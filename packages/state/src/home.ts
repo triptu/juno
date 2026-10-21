@@ -23,7 +23,7 @@
 import { Exit } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
-import { draftsDiscard, draftsKeep, followUpsMarkDone, followUpsNotDone, homeMarkDone, homeMovesSeen, homeMovesShown, homeView, homeVisit, viewsSortChannel, prefsGet, prefsSet, TIDY_UP_PREF, tidyUpPrefsOf, topicsKeepOpen, topicsResolve, type CommandResult, type HomeItem, type HomeTopic, type HomeView, type TidyUpPrefs, type UndoCommand } from '@juno/contract'
+import { draftsDiscard, draftsKeep, followUpsMarkDone, followUpsNotDone, homeMarkDone, homeMovesSeen, homeMovesShown, homeView, homeVisit, viewsSortChannel, prefsGet, tidyUpSet, TIDY_UP_PREF, tidyUpPrefsOf, topicsKeepOpen, topicsResolve, type CommandResult, type HomeItem, type HomeTopic, type HomeView, type TidyUpPrefs, type UndoCommand } from '@juno/contract'
 import { liveQuery, prefetch, runCommand } from './atoms'
 import { withAsks } from './homeAsks'
 import type { Registry } from './client'
@@ -355,6 +355,6 @@ export const tidyUpPrefsAtom = Atom.make((get): TidyUpPrefs => {
   return tidyUpPrefsOf(AsyncResult.isSuccess(saved) ? saved.value : undefined)
 })
 
-export function setTidyUpPrefs(registry: Registry, prefs: TidyUpPrefs): void {
-  void runCommand(registry, prefsSet, { key: TIDY_UP_PREF, value: prefs })
+export function setTidyUpPrefs(registry: Registry, patch: Partial<TidyUpPrefs>): void {
+  void runCommand(registry, tidyUpSet, { patch })
 }

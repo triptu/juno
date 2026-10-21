@@ -86,20 +86,22 @@ export type ReactionIssue = typeof ReactionIssue.Type
  * main serves it from the Slack session (architecture 9) and fetches only
  * Slack file hosts.
  */
-export const FileThumb = Schema.Struct({
-  src: Schema.String,
-  width: Schema.Int,
-  height: Schema.Int,
-})
+export const FileThumb = Schema.Struct({ src: Schema.String, width: Schema.Int, height: Schema.Int })
 export type FileThumb = typeof FileThumb.Type
 
-export const FileKind = Schema.Literals(['image', 'video', 'audio', 'pdf', 'file', 'deleted'])
+export const FileKind = Schema.Literals(['image', 'video', 'audio', 'pdf', 'html', 'text', 'file', 'deleted'])
 export type FileKind = typeof FileKind.Type
 
+/** How the viewer draws a `text` file (`@juno/domain` `fileTextKind`). */
+export const FileTextKind = Schema.Literals(['markdown', 'csv', 'json', 'code', 'plain'])
+export type FileTextKind = typeof FileTextKind.Type
+
 /**
- * A file on a message, for the file card. An image has `thumb` when Slack
- * made one; an image without dimensions, or any other file, is a card of
- * fixed height. `deleted` is a file Slack no longer serves.
+ * A file on a message. An image has `thumb` when Slack made one; an image
+ * without dimensions is a card of fixed height. `audio`, `pdf`, `html` and
+ * `text` files are cards that open in the media viewer; `file` is a card
+ * with Quick Look. `deleted` is a file Slack no longer serves. `@juno/domain`
+ * `fileMediaKind` decides the kind.
  */
 export const FileView = Schema.Struct({
   id: Schema.String,
@@ -116,6 +118,15 @@ export const FileView = Schema.Struct({
   full: Schema.optionalKey(Schema.String),
   /** A video the viewer plays, a `juno://files/<id>/video` url main streams from Slack. `thumb` is its poster. */
   video: Schema.optionalKey(Schema.String),
+  /** An audio file or voice clip the player plays, a `juno://files/<id>/audio` url main streams from Slack, and its length when Slack gives it. */
+  audio: Schema.optionalKey(Schema.String),
+  durationMs: Schema.optionalKey(Schema.Number),
+  /** A pdf, html or text file as Slack serves it, a `juno://files/<id>/content/<name>` url, for the viewer. */
+  content: Schema.optionalKey(Schema.String),
+  /** How the viewer draws a `text` file; for code its language as a reader names it ("Python"); its lines when Slack counted them (a snippet). */
+  textKind: Schema.optionalKey(FileTextKind),
+  language: Schema.optionalKey(Schema.String),
+  lines: Schema.optionalKey(Schema.Int),
   /** Slack's download url, which main fetches on the Slack session. Absent for a file still being sent. */
   download: Schema.optionalKey(Schema.String),
 })
@@ -271,6 +282,8 @@ export const TopicDetail = Schema.Struct({
   threadCount: Schema.optionalKey(Schema.Int),
   /** The topic's art as a recipe, as on `TopicRow.art`; the header and the tab draw it at 20 and 16px. Absent means the Tide placeholder. */
   art: Schema.optionalKey(Schema.String),
+  /** A DM, or a thread in one, with a person whose account is deactivated: it can be read, not written to (SPEC 7, "People"). */
+  deactivated: Schema.optionalKey(Schema.Literal(true)),
 })
 export type TopicDetail = typeof TopicDetail.Type
 
@@ -375,7 +388,8 @@ export const messagesLocate = Rpc.make('messages.locate', {
 
 /**
  * A person a Slack profile link names (SPEC 8, "Links"): your DM with them
- * when you have one. `person` is absent when the store does not know them.
+ * when you have one. `person` is absent when the store does not know them,
+ * or they are deactivated and you have no DM with them.
  */
 export const peopleLocate = Rpc.make('people.locate', {
   payload: { user: Schema.String },

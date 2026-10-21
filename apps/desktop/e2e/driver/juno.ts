@@ -87,6 +87,12 @@ function settledBox(target: Locator): Promise<Box | null> {
 }
 
 export type SidebarSectionName = 'Pinned' | 'Recent'
+/** Where a scroll came to rest: the first row whose top is in view, its top, and its top on each frame after. */
+export interface Landing {
+  readonly ts: string
+  readonly top: number
+  readonly tops: ReadonlyArray<number>
+}
 export type SidebarFilterName = 'All' | 'Channels' | 'DMs'
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -819,11 +825,7 @@ export class Juno {
     await this.win.evaluate(() => window.dispatchEvent(new FocusEvent('focus')))
   }
 
-  /** The sign-in page's primary and secondary actions. */
-  get signInButton() {
-    return this.win.getByRole('button', { name: 'Sign in to Slack' })
-  }
-
+  /** The sign-in page’s primary action. */
   get importButton() {
     return this.win.getByRole('button', { name: "Use the Slack app's session" })
   }
@@ -840,19 +842,9 @@ export class Juno {
     return this.clipboard()
   }
 
-  /**
-   * Clicks "Sign in to Slack", fills the fake's sign-in page in the window
-   * that opens, and waits for the app to come back signed in. Then skips
-   * "Set up Juno" unless `skipSetUp` is false.
-   */
-  async signIn(options: { readonly email?: string; readonly skipSetUp?: boolean } = {}): Promise<void> {
-    const started = performance.now()
-    const page = await this.openSignInWindow()
-    await page.getByPlaceholder('Email').fill(options.email ?? 'tushar@juno-fake.test')
-    await page.getByPlaceholder('Password').fill('password')
-    await Promise.all([page.waitForEvent('close'), page.getByRole('button', { name: 'Sign in' }).click()])
-    if (options.skipSetUp !== false) await this.skipSetUp()
-    if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: sign-in ${Math.round(performance.now() - started)} ms`)
+  /** Imports the fixture Slack app’s session and optionally skips “Set up Juno”. */
+  async signIn(options: { readonly skipSetUp?: boolean } = {}): Promise<void> {
+    await this.importFromSlackApp(options)
   }
 
   /** "Set up Juno", shown after a first sign-in with no model provider (SPEC 13.10). */
@@ -867,23 +859,6 @@ export class Juno {
   async skipSetUp(): Promise<void> {
     await expect(this.setUp.or(this.sidebar.root).first()).toBeVisible({ timeout: 15_000 })
     if (await this.setUp.isVisible()) await this.setUp.getByRole('button', { name: 'Skip for now' }).click()
-  }
-
-  /** Clicks "Sign in to Slack" and closes the window without signing in. */
-  async abandonSignIn(): Promise<void> {
-    const page = await this.openSignInWindow()
-    await page.close()
-  }
-
-  /**
-   * Clicks "Sign in to Slack" and returns the window it opens. The main
-   * window is never taken for it: closing that by mistake leaves the test
-   * with no app window.
-   */
-  private async openSignInWindow(): Promise<Page> {
-    const opened = this.app.waitForEvent('window', { predicate: (page) => page !== this.win })
-    await this.signInButton.click()
-    return opened
   }
 
   /** Clicks "Use the Slack app's session" and skips "Set up Juno" unless `skipSetUp` is false (as for an import that fails). The app reads the fixture directory it was launched with. */
@@ -1011,6 +986,16 @@ export class Juno {
   /** The dock's badge text: "•" with eligible unread items, else empty. */
   dockBadge(): Promise<string> {
     return this.app.evaluate(() => (globalThis as unknown as { junoTest: { dockBadge: () => string } }).junoTest.dockBadge())
+  }
+
+  /** How many times the dock icon bounced (main counts them under JUNO_E2E). */
+  dockBounces(): Promise<number> {
+    return this.app.evaluate(() => (globalThis as unknown as { junoTest: { dockBounces: () => number } }).junoTest.dockBounces())
+  }
+
+  /** Whether Juno is the frontmost app, as main's dock bounce reads it. Juno starts frontmost. */
+  async setFrontmost(frontmost: boolean): Promise<void> {
+    await this.app.evaluate((_electron, value) => (globalThis as unknown as { junoTest: { frontmost: (f: boolean) => void } }).junoTest.frontmost(value), frontmost)
   }
 
   /** The why popover (inventory 15.4), by its title. */
@@ -1757,18 +1742,73 @@ export class TopicPane {
    * does, and waits for the scroll to settle. The wheel is what lets go of
    * the list's hold on the bottom; a scroll set from a script does not, and a
    * commit that adds rows before it settles puts the bottom back.
+   * Answers with where the scroll landed (`watchLanding`).
    */
-  async scrollUp(pixels: number): Promise<void> {
+  async scrollUp(pixels: number, frames = 0): Promise<Landing> {
     const box = await this.scroller.boundingBox()
     if (box === null) throw new Error('No message list to scroll')
     await this.win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-    type Watched = HTMLElement & { scrollEnded?: Promise<void> }
-    // The listener is in place before the wheel turns: the wheel reaches the page by another path than evaluate.
-    await this.scroller.evaluate((scroller: Watched) => {
-      scroller.scrollEnded = new Promise((resolve) => scroller.addEventListener('scrollend', () => resolve(), { once: true }))
-    })
+    const landed = await this.watchLanding(frames)
     await this.win.mouse.wheel(0, -pixels)
-    await this.scroller.evaluate((scroller: Watched) => scroller.scrollEnded)
+    return await landed()
+  }
+
+  /**
+   * Scrolls the list by a few pixels from a script, so that the scroller's top edge falls in the gap above a row
+   * that starts a group, where no row is under it. Answers with where the scroll landed (`watchLanding`).
+   */
+  async scrollToGroupGap(frames = 0): Promise<Landing> {
+    const by = await this.scroller.evaluate((scroller) => {
+      const top = scroller.getBoundingClientRect().top
+      const rows = [...scroller.querySelectorAll<HTMLElement>('[data-message-row]')].map((row) => row.getBoundingClientRect())
+      for (let i = 1; i < rows.length; i++) {
+        const gap = rows[i]!.top - rows[i - 1]!.bottom
+        if (rows[i - 1]!.bottom > top + 40 && gap >= 4) return rows[i - 1]!.bottom + gap / 2 - (top + 1)
+      }
+      throw new Error('No gap between groups in view')
+    })
+    const landed = await this.watchLanding(frames)
+    await this.scroller.evaluate((scroller, by) => void (scroller.scrollTop += by), by)
+    return await landed()
+  }
+
+  /**
+   * Sets the list's scrollTop in one step to `fraction` of its range, as a scrollbar drag does. Answers with where
+   * the scroll landed (`watchLanding`).
+   */
+  async jumpTo(fraction: number, frames = 0): Promise<Landing> {
+    const landed = await this.watchLanding(frames)
+    await this.scroller.evaluate((scroller, fraction) => void (scroller.scrollTop = (scroller.scrollHeight - scroller.clientHeight) * fraction), fraction)
+    return await landed()
+  }
+
+  /**
+   * Watches for the next `scrollend` and answers with the first row in view then, read in `scrollend` itself, and
+   * that row's top on each of the `frames` frames after it. A jump lands on rows still at their size estimate, and a
+   * read from a later task can fall after they reached their real height. The listener is in place before the scroll
+   * starts: a wheel reaches the page by another path than evaluate.
+   */
+  private async watchLanding(frames: number): Promise<() => Promise<Landing>> {
+    type Watched = HTMLElement & { landed?: Promise<Landing> }
+    await this.scroller.evaluate((scroller: Watched, frames) => {
+      scroller.landed = new Promise((resolve) =>
+        scroller.addEventListener('scrollend', () => {
+          const box = scroller.getBoundingClientRect()
+          const row = [...scroller.querySelectorAll<HTMLElement>('[data-message-row]')].find((node) => node.getBoundingClientRect().top >= box.top)
+          const tops: number[] = []
+          const landing = { ts: row?.dataset['messageRow'] ?? '', top: row?.getBoundingClientRect().top ?? Number.NaN, tops }
+          if (row === undefined) return resolve(landing)
+          const tick = () => {
+            tops.push(row.getBoundingClientRect().top)
+            if (tops.length < frames) requestAnimationFrame(tick)
+            else resolve(landing)
+          }
+          if (frames === 0) resolve(landing)
+          else requestAnimationFrame(tick)
+        }, { once: true }),
+      )
+    }, frames)
+    return () => this.scroller.evaluate((scroller: Watched) => scroller.landed!)
   }
 
   async scrollToBottom(): Promise<void> {
@@ -2479,7 +2519,7 @@ export class PrivacyMode {
   }
 }
 
-export type HomeItemKind = 'waiting' | 'mentioned' | 'resume' | 'moved' | 'followUp' | 'ask' | 'automated' | 'tidyUp' | 'automatedMoves' | 'doneFollowUps' | 'oldDrafts' | 'unfollow' | 'ignore'
+export type HomeItemKind = 'waiting' | 'mentioned' | 'missedHuddle' | 'resume' | 'moved' | 'followUp' | 'ask' | 'automated' | 'tidyUp' | 'automatedMoves' | 'doneFollowUps' | 'oldDrafts' | 'unfollow' | 'ignore'
 
 /** Home (SPEC section 12): the greeting and the rows, in the visible page. Its composer is `HomeWritePane`. */
 export class HomePane {

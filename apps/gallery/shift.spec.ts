@@ -55,16 +55,28 @@ async function targets(page: Page, route: Route): Promise<Locator[]> {
   const count = await all.count()
   const indexes = Array.from({ length: count }, (_, index) => index)
   const picked = count <= perState ? indexes : [...indexes.slice(0, perState - 3), ...indexes.slice(-3)]
-  const found: Locator[] = []
-  for (const index of picked) {
-    const element = all.nth(index)
-    if (await element.isVisible()) found.push(element)
-  }
-  return found
+  const selected = picked.map((index) => all.nth(index))
+  const visible = await Promise.all(selected.map((element) => element.isVisible()))
+  return selected.filter((_, index) => visible[index])
 }
 
 /** After a touch: code the touch started loading (a popover's content) has rendered, so what it moves is measured too. */
-const chunksLoaded = (page: Page) => page.waitForFunction(() => document.querySelector('[data-chunk-pending]') === null, null, { timeout: 15_000 })
+const chunksLoaded = (page: Page) => page.evaluate(() => {
+  if (document.querySelector('[data-chunk-pending]') === null) return
+  return new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      observer.disconnect()
+      reject(new Error('Gallery chunks did not load within 15 s'))
+    }, 15_000)
+    const observer = new MutationObserver(() => {
+      if (document.querySelector('[data-chunk-pending]') !== null) return
+      clearTimeout(timer)
+      observer.disconnect()
+      resolve()
+    })
+    observer.observe(document.documentElement, { subtree: true, childList: true, attributes: true })
+  })
+})
 
 /** Touches one element every way a person can; returns what shifted, as readable text. */
 async function touch(page: Page, element: Locator): Promise<string[]> {
@@ -120,7 +132,9 @@ const drawn = (page: Page, route: Route) =>
     const scrolled = Array.from(frame.querySelectorAll('*'), (node, index) => (node.scrollTop || node.scrollLeft ? `${index}:${node.scrollTop},${node.scrollLeft}` : '')).filter(Boolean)
     const portals = Array.from(document.body.children, (node) => (node.id === 'root' || node.tagName === 'SCRIPT' ? '' : node.outerHTML))
     const attributes = [document.documentElement, document.body].flatMap((node) => node.getAttributeNames().map((name) => `${name}=${node.getAttribute(name)}`))
-    const text = [...attributes, frame.className, frame.getAttribute('style'), frame.innerHTML, ...portals, ...scrolled].join('\n')
+    const markup = frame.innerHTML
+    Object.assign(globalThis, { __junoShiftMarkup: markup })
+    const text = [...attributes, frame.className, frame.getAttribute('style'), markup, ...portals, ...scrolled].join('\n')
     const digest = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(text))
     return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
   }, route.route)
@@ -188,25 +202,31 @@ for (let part = 0; part < shards; part++) {
     const queue = claimQueue('shift')
     const failures: string[] = []
     const cursors: string[] = []
+    let states = 0, duplicates = 0, elements = 0, resets = 0
     try {
       for (let route = queue.next(routes); route !== undefined; route = queue.next(routes)) {
         const started = Date.now()
         const page = await pages.next()
         await checkStateWithin(route, async () => {
           await openState(page, route)
+          states++
           for (const hit of await cursorOffenders(page, route)) cursors.push(`${route.route}: ${hit}`)
           const shotOnly = route.frame.hover !== undefined || route.frame.press !== undefined || route.frame.focus !== undefined
-          if (!queue.claim(`dom ${await drawn(page, route)}`) && shotOnly) return
+          if (!queue.claim(`dom ${await drawn(page, route)}`) && shotOnly) {
+            duplicates++
+            return
+          }
           // An interactive fixture can change when touched (a press on Undo puts back other buttons), so the elements
           // after it would be gone or different: open the state again whenever a touch changed what it draws.
-          await rememberMarkup(page, route)
           for (const [index, element] of (await targets(page, route)).entries()) {
             if (await markupChanged(page, route)) {
               // The same URL again only changes the hash, which keeps the fixture's state: load a blank page first.
+              resets++
               await page.goto('about:blank')
               await openState(page, route)
               await rememberMarkup(page, route)
             }
+            elements++
             for (const failure of await touch(page, element)) failures.push(`${route.route} (element ${index + 1}) ${failure}`)
           }
         })
@@ -214,6 +234,7 @@ for (let part = 0; part < shards; part++) {
         if (Date.now() - started > 10_000) console.log(`slow state: ${route.route} took ${Math.round((Date.now() - started) / 1000)} s`)
       }
     } finally {
+      console.log(`shift walk: ${states} states, ${duplicates} screenshot duplicates, ${elements} elements, ${resets} resets`)
       await pages.close()
     }
     expect.soft(cursors, 'no state shows the pointer outside external links, and the text cursor only over selectable text').toEqual([])
@@ -481,6 +502,35 @@ test.describe('Message actions', () => {
     expect(box.y + box.height).toBeLessThan(selection.y)
   })
 })
+
+for (const injection of ['hover rule', 'loaded chunk'] as const) {
+  test(`the broad walk catches an injected shift in a gallery button (${injection})`, async ({ page }) => {
+    const route = (await readRoutes(page)).find((route) => route.component === 'Button' && route.id === 'variant/primary')
+    expect(route, 'the primary button fixture exists').toBeDefined()
+    if (!route) throw new Error('Missing primary button fixture')
+    await openState(page, route)
+    await page.mouse.move(2, 2)
+    if (injection === 'hover rule') {
+      await page.addStyleTag({ content: '[data-fixture-frame] button:hover { padding-bottom: 40px !important; }' })
+    } else {
+      await page.locator('[data-fixture-frame] button').first().evaluate((button) => {
+        button.addEventListener('pointerenter', () => {
+          const pending = document.createElement('span')
+          pending.hidden = true
+          pending.setAttribute('data-chunk-pending', '')
+          document.body.append(pending)
+          setTimeout(() => {
+            button.style.paddingBottom = '40px'
+            pending.remove()
+          }, 100)
+        }, { once: true })
+      })
+    }
+    const failures = await touch(page, page.locator('[data-fixture-frame] button').first())
+    expect(failures.some((failure) => failure.startsWith('hover: Layout shifted during the action.')), failures.join('\n')).toBe(true)
+    expect(failures.join('\n')).toContain('layout box changed')
+  })
+}
 
 test.describe('the guard itself', () => {
   const frame = (css: string, body: string) => `<style>${css}</style><div data-fixture-frame="guard">${body}</div>`

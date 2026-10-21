@@ -39,3 +39,29 @@ export const singleImage = window([{ ago: 20, from: people.priya, text: 'The new
 export const singleVideo = window([{ ago: 20, from: people.priya, text: 'Recording of the stand-up.', files: [clip] }])
 export const mixedMedia = window([{ ago: 20, from: people.priya, text: 'Photos and the walkthrough.', files: [album[0]!, clip, album[2]!] }])
 
+
+/** Files the viewer opens from their cards (SPEC section 8, "Other files"). The gallery serves no content, so `documentText` stands in for it. */
+export const documents = {
+  markdown: { id: 'F0NOTES', name: 'release-notes.md', kind: 'text', textKind: 'markdown', mimetype: 'text/plain', size: 1_200, lines: 24, content: 'fixture:markdown', download: downloadUrl('F0NOTES') },
+  csv: { id: 'F0CSV', name: 'cluster-metrics.csv', kind: 'text', textKind: 'csv', mimetype: 'text/csv', size: 18_400, content: 'fixture:csv', download: downloadUrl('F0CSV') },
+  code: { id: 'F0PY', name: 'rotate_keys.py', kind: 'text', textKind: 'code', language: 'Python', mimetype: 'text/plain', size: 640, lines: 18, content: 'fixture:code', download: downloadUrl('F0PY') },
+  log: { id: 'F0LOG', name: 'deploy.log', kind: 'text', textKind: 'plain', mimetype: 'text/plain', size: 160_000, content: 'fixture:log', download: downloadUrl('F0LOG') },
+  html: { id: 'F0HTML', name: 'weekly-digest.html', kind: 'html', mimetype: 'text/html', size: 2_400, content: 'data:text/html,<body style="font-family:Georgia;padding:24px"><h1>Weekly digest</h1><p>Queue latency is back under 200 ms.</p></body>', download: downloadUrl('F0HTML') },
+  audio: { id: 'F0AUDIO', name: 'standup-recording.wav', kind: 'audio', mimetype: 'audio/wav', size: 2_400_000, durationMs: 300_000, audio: '/__fixture/standup-recording.wav', download: downloadUrl('F0AUDIO') },
+  zip: { id: 'F0ZIP', name: 'build-logs.zip', kind: 'file', mimetype: 'application/zip', size: 4_100, download: downloadUrl('F0ZIP') },
+} satisfies Record<string, FileView>
+
+const DOCUMENT_TEXT: Readonly<Record<string, string>> = {
+  'fixture:markdown': '# Release 4.2\n\nShips on **Monday**. The plan is in [the tracker](https://example.com).\n\n## What changes\n\n- Search reads the local index first\n- Threads keep their scroll position\n- [x] Offline drafts survive a restart\n\n```sh\ndeploy rollback --to 4.1.3\n```\n\n> Tell the support channel before you roll back.\n',
+  'fixture:csv': [Array.from({ length: 40 }, (_, c) => (c === 0 ? 'host' : `metric_${String(c).padStart(2, '0')}`)).join(','), ...Array.from({ length: 60 }, (_, r) => Array.from({ length: 40 }, (_, c) => (c === 0 ? `node-${r + 1}` : String(((r + 1) * (c + 3) * 37) % 1000))).join(','))].join('\n'),
+  'fixture:code': 'import os\n\n\ndef rotate(keys, days=30):\n    """Rotate keys older than `days`."""\n    for key in keys:\n        if key.age_days > days:\n            key.rotate()\n    return len(keys)\n',
+  'fixture:log': Array.from({ length: 400 }, (_, n) => `2026-10-20T09:${String(Math.floor(n / 20) % 60).padStart(2, '0')}:${String((n * 3) % 60).padStart(2, '0')}Z INFO  deploy[4101] step ${n + 1}: health check passed on /healthz after a slow start of the worker pool`).join('\n'),
+}
+
+/** The text behind a fixture document's `content`, as the container would read it. */
+export const documentText = (url: string) => Promise.resolve(DOCUMENT_TEXT[url] === undefined ? undefined : { text: DOCUMENT_TEXT[url], truncated: false })
+
+/** One message with a file of each kind the viewer opens, and a zip with Quick Look. */
+export const withDocuments = window([{ ago: 20, from: people.priya, text: 'Notes, metrics, the script, the digest and the build logs.', files: [documents.markdown, documents.csv, documents.code, documents.html, documents.zip] }])
+/** A lone audio file: a player in its card. */
+export const singleAudio = window([{ ago: 20, from: people.priya, text: 'Recording of the stand-up.', files: [documents.audio] }])

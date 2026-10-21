@@ -13,8 +13,9 @@ A release is a patch version published to the private repository `triptu/juno-re
 
 Run these from a Juno checkout with dependencies installed (not the main checkout). Only one release runs at a time; `release:scheduled` holds a lock in the shared `.juno-status`.
 
-1. **Look first.** `git fetch origin main`, then `pnpm release:scheduled --dry-run`. It prints the newest `origin/main` commit with a green full-run record, the gate result, the next version and the release notes. It changes nothing.
+1. **Look first.** `git fetch origin main`, then `pnpm release:scheduled --dry-run`. It prints the newest `origin/main` commit with a green full-run record, the gate result, the next version and the release notes. It changes nothing. "Selected commit does not descend from the last released source; refusing a rollback" means no green full run covers anything newer than the last release: go to step 2. Also run `gh release list --repo triptu/juno-releases --limit 3`; another agent may have released while you worked.
 2. **Get a green full run if needed.** If the dry run says no eligible full run covers the changes you need, run `pnpm verify:main --ref origin/main` once (about 25 minutes, one remote plan on the laptop). Results land in the main checkout's `.juno-status/verify-main/`.
+   - Commit the refreshed `apps/desktop/e2e/coverage-map.json` the run leaves in your checkout, as "Refresh the e2e coverage map", and merge it with your fixes.
    - If it fails, find the cause. Fix failures in code (or start a fixer agent per failure) and merge the fixes, then run it once more. Never rerun in a loop hoping for green, and never weaken an assertion.
 3. **Publish.** Read the updater token from the keychain straight into the command:
 

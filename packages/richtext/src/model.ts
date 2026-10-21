@@ -18,7 +18,8 @@ export type BroadcastRange = 'here' | 'channel' | 'everyone'
 export type Inline =
   | { readonly kind: 'text'; readonly text: string; readonly style?: InlineStyle }
   | { readonly kind: 'link'; readonly url: string; readonly text: string; readonly style?: InlineStyle }
-  | { readonly kind: 'user'; readonly id: string; readonly name: string; readonly isMe: boolean }
+  /** A person. `unreachable` when Juno has nothing to open for them (`Lookups.unreachable`). */
+  | { readonly kind: 'user'; readonly id: string; readonly name: string; readonly isMe: boolean; readonly unreachable?: true }
   | { readonly kind: 'channel'; readonly id: string; readonly name: string }
   /** A user group. `name` is the group's full name, for a tooltip; `isMine` when the user belongs to it. */
   | { readonly kind: 'usergroup'; readonly id: string; readonly handle: string; readonly name?: string; readonly isMine: boolean }
@@ -28,6 +29,13 @@ export type Inline =
   | { readonly kind: 'break' }
 
 export type ListStyle = 'bullet' | 'ordered' | 'checked' | 'unchecked'
+
+/** A table column's settings from Slack. Absent fields are Slack's defaults: left aligned, on one line. */
+export interface TableColumn {
+  readonly align?: 'center' | 'right'
+  /** The column's text wraps; by default each cell stays on one line and the table scrolls sideways. */
+  readonly wrap?: true
+}
 
 export type ContentBlock =
   | { readonly kind: 'paragraph'; readonly children: ReadonlyArray<Inline> }
@@ -50,6 +58,20 @@ export type ContentBlock =
   | { readonly kind: 'context'; readonly children: ReadonlyArray<Inline> }
   | { readonly kind: 'image'; readonly url: string; readonly alt: string; readonly width?: number; readonly height?: number }
   | { readonly kind: 'file'; readonly id: string; readonly name: string; readonly mimetype: string; readonly width?: number; readonly height?: number }
+  /**
+   * A Slack table. Every row has the same number of cells; a cell is a run
+   * of inlines, empty for an empty cell. The first row is the header, as
+   * Slack's client draws it. `columns` holds settings by column index, only
+   * when Slack sent any. `caption` names the table; `showCaption` when Slack
+   * shows it above the table.
+   */
+  | {
+      readonly kind: 'table'
+      readonly rows: ReadonlyArray<ReadonlyArray<ReadonlyArray<Inline>>>
+      readonly columns?: ReadonlyArray<TableColumn>
+      readonly caption?: string
+      readonly showCaption?: true
+    }
 
 export type PlaceKind = 'public' | 'private' | 'im' | 'mpim'
 
@@ -94,6 +116,8 @@ export interface Lookups {
   readonly me?: string
   /** Display name for a user id, without "@". */
   readonly user?: (id: string) => string | undefined
+  /** Juno has nothing to open for this user: an app with no DM, or a user the store does not know. Sets `unreachable` on user mentions. */
+  readonly unreachable?: (id: string) => boolean
   /** Channel name for a channel id, without "#". */
   readonly channel?: (id: string) => string | undefined
   /** The kind and name of any conversation by id, DMs included: where a shared message came from. */
@@ -135,6 +159,9 @@ export function inlinesOf(body: MessageBody): ReadonlyArray<Inline> {
         break
       case 'list':
         for (const item of block.items) out.push(...item)
+        break
+      case 'table':
+        for (const row of block.rows) for (const cell of row) out.push(...cell)
         break
       case 'code':
         out.push({ kind: 'text', text: block.text, style: { code: true } })

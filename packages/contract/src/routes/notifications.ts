@@ -10,6 +10,7 @@
  * - `notifications.why` answers the message menu's why item.
  * - The setters write the settings. `notifications.setLevel` returns an
  *   undo (ADR 0010); on a thread it also follows or unfollows it (SPEC 5).
+ * - `notifications.setHuddleRing` is Ring for huddles (SPEC 20).
  * - `notifications.setPresence` is Set yourself away or active. It holds
  *   until the next switch in the active hours.
  * - `notifications.setSlackSchedule` and `notifications.restoreSlackSchedule`
@@ -41,6 +42,8 @@ export const NotificationSettingsView = Schema.Struct({
   threads: Schema.Record(Schema.String, NotifyLevel),
   /** Off: DMs and mentions notify, and What matters to you is not read. */
   aiAssist: Schema.Boolean,
+  /** Ring for huddles. Off: an incoming huddle shows its card and notification without the sound. */
+  huddleRing: Schema.Boolean,
 })
 export type NotificationSettingsView = typeof NotificationSettingsView.Type
 
@@ -135,13 +138,27 @@ export const notificationsWhy = Rpc.make('notifications.why', {
 })
 
 export const notificationsSetHours = Rpc.make('notifications.setHours', {
-  payload: { which: Schema.Literals(['notifications', 'presence']), hours: Hours },
+  payload: { which: Schema.Literals(['notifications', 'presence']), hours: Hours.mapFields(({ days, from, to }) => ({ days: Schema.optionalKey(days), from: Schema.optionalKey(from), to: Schema.optionalKey(to) })) },
+  success: Schema.Void,
+  error: NotSignedIn,
+})
+
+/** Sets one day without resending the other days from a possibly older page. */
+export const notificationsSetDay = Rpc.make('notifications.setDay', {
+  payload: { which: Schema.Literals(['notifications', 'presence']), day: Weekday, enabled: Schema.Boolean },
   success: Schema.Void,
   error: NotSignedIn,
 })
 
 export const notificationsSetMatters = Rpc.make('notifications.setMatters', {
   payload: { text: Schema.String.check(Schema.isMaxLength(2000)) },
+  success: Schema.Void,
+  error: NotSignedIn,
+})
+
+/** Ring for huddles on or off. */
+export const notificationsSetHuddleRing = Rpc.make('notifications.setHuddleRing', {
+  payload: { enabled: Schema.Boolean },
   success: Schema.Void,
   error: NotSignedIn,
 })
@@ -179,7 +196,9 @@ export const NotificationsRoutes = RpcGroup.make(
   notificationsStatus,
   notificationsWhy,
   notificationsSetHours,
+  notificationsSetDay,
   notificationsSetMatters,
+  notificationsSetHuddleRing,
   notificationsSetLevel,
   notificationsSetPresence,
   notificationsSetSlackSchedule,

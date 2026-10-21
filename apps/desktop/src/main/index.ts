@@ -3,7 +3,7 @@ import { flushAllCoverage, recordWindowCoverage } from '../coverage'
 import { app, BrowserWindow, Notification, powerMonitor, shell } from 'electron'
 import { Events, type NotificationTarget, type PrivacyState } from '@juno/contract'
 import { join } from 'node:path'
-import { createDockBadge } from './dockBadge'
+import { createDockBadge, createDockBounce } from './dockBadge'
 import { testNotificationPermission } from './notificationTestHooks'
 import { createActivityWatch } from './activity'
 import { createAgentSupervisor } from './agent'
@@ -13,7 +13,7 @@ import { appMcpCredentials } from './mcpCredentials'
 import { createSupervisor } from './engine'
 import { createEngineTestHooks } from './engineTestHooks'
 import { createHuddleQuit } from './huddleQuit'
-import { copiedForTests, copyImage, downloadFile, downloadsForTests, openedForTests, openFile } from './files'
+import { clearTemporaryFiles, copyImage, downloadFile, fileTestHooks, openFile, quickLook } from './files'
 import { browserLinksForTests, contextMenuForTests, folderForTests, registerIpc, logsForTests, huddleSettingsForTests, slackLinksForTests, webPanelForTests } from './ipc'
 import { CUSTOM_ITEM, macKeychain, memoryKeychain, OPENROUTER_ITEM } from './keychain'
 import { ProviderStore } from './providers'
@@ -119,6 +119,7 @@ supervisor.onFailed(() => { huddleQuit.engineFailed(); dockBadge.set('') })
 /** Under JUNO_E2E notifications are recorded, not shown; a test clicks them through `junoTest`. */
 const notificationsForTests: Array<{ readonly title: string; readonly body: string; readonly silent?: boolean; click: () => void }> = []
 let badgeForTests = ''
+const dockBounce = createDockBounce(e2e, () => BrowserWindow.getFocusedWindow() !== null, () => app.dock?.bounce('informational'))
 
 /** A clicked notification: the app window comes forward, or opens. */
 function focusWindow(): BrowserWindow {
@@ -145,6 +146,7 @@ const notifier = new Notifier({
     return { show: () => shown.show(), close: () => shown.close(), onClick: (f) => shown.on('click', f) }
   },
   setBadge: (text) => dockBadge.set(text),
+  bounce: dockBounce.bounce,
   open: openTarget,
   focus: () => void focusWindow(),
   send: (message) => supervisor.send(message),
@@ -219,8 +221,6 @@ const providers = new ProviderStore(
 const sessionHost = new SessionHost({
   secrets: new SecretsStore(app.getPath('userData'), { plaintext: e2e }),
   send: (message) => supervisor.send(message),
-  signInWindow:
-    fakeSlackUrl === undefined ? {} : { startUrl: `${fakeSlackUrl}/signin`, extraHosts: [new URL(fakeSlackUrl).hostname] },
   importOptions: { ...(slackAppDir === undefined ? {} : { slackDir: slackAppDir }), ...(keychainPassword === undefined ? {} : { keychainPassword }) },
   saveSession: (session) => void (launch = withSession(launch, session, launchFile)),
 })
@@ -232,6 +232,7 @@ app.whenReady().then(() => {
   // packaged app does not have, so the start-up scenarios would measure something that never ships.
   if (process.platform === 'darwin' && !app.isPackaged && !e2e) app.dock?.setIcon(join(__dirname, '../../build/icon.png'))
   serveAppScheme(join(__dirname, '../renderer'), fakeSlackUrl === undefined ? undefined : new URL(fakeSlackUrl).origin)
+  void clearTemporaryFiles(e2e)
   registerMediaPermissions()
   powerMonitor.on('resume', () => { notifier.wake(); refreshDockBadge() })
   app.on('browser-window-focus', refreshDockBadge)
@@ -248,6 +249,7 @@ app.whenReady().then(() => {
     supervisor,
     downloadFile: (file) => downloadFile(file, fakeSlackOrigin, e2e),
     openFile: (file) => openFile(file, fakeSlackOrigin, e2e),
+    quickLook: (file, window) => quickLook(file, window, fakeSlackOrigin, e2e),
     copyImage: (src) => copyImage(src, fakeSlackOrigin, e2e),
     processes,
     setViewing: (topicId) => notifier.setViewing(topicId),
@@ -360,9 +362,7 @@ if (e2e) {
       slackLinks: slackLinksForTests,
       browserLinks: browserLinksForTests,
       webPanel: () => webPanelForTests(appWindow()),
-      downloads: downloadsForTests,
-      opened: openedForTests,
-      copiedImages: () => copiedForTests.images,
+      ...fileTestHooks,
       agentState: () => agent.currentState,
       agentHost: () => agent.host?.host,
       agentPid: () => agent.pid,
@@ -371,7 +371,7 @@ if (e2e) {
       clickNotification: (index = 0) => notificationsForTests[index]?.click(),
       dockBadge: () => badgeForTests,
       clearDockBadge: () => dockBadge.set(''),
-      ...huddleQuit.testHooks,
+      ...huddleQuit.testHooks, ...dockBounce.testHooks,
       notificationPermission: permissionForTests.set,
       notificationSettingsOpened: () => notificationSettingsOpenedForTests,
       notificationRequests: permissionForTests.requests,

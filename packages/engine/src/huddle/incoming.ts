@@ -9,7 +9,7 @@
  */
 import { Clock, Context, Effect, Layer, Semaphore, Stream, SubscriptionRef } from 'effect'
 import type { HuddleCall, IncomingHuddle, RunningHuddles } from '@juno/contract'
-import { channelLabel, decideHuddleAlert, localTime, type ConversationKind, type HuddleAlertDecision } from '@juno/domain'
+import { channelLabel, decideHuddleAlert, localTime, type ConversationKind } from '@juno/domain'
 import { dismiss, Huddle, incomingOf, lookAt, noIncoming, offer, settle, type Fresh, type IncomingState } from '@juno/huddle'
 import { readSettings } from '@juno/notifications'
 import { SlackSession } from '@juno/slack'
@@ -20,14 +20,16 @@ import { SocketEvents, type SessionServices, type SocketListener } from '../sock
 
 const ignore: SocketListener = () => Effect.void
 
-/** How the notification settings let this huddle interrupt. A store that cannot say lets it ring: a live call must not be lost. */
+/**
+ * How the notification settings let this huddle interrupt, and whether Ring
+ * for huddles lets it play the sound. A store that cannot say lets it ring:
+ * a live call must not be lost.
+ */
 const alertFor = (fresh: Fresh, now: number) =>
   Effect.gen(function* () {
-    const sql = yield* StoreReader
-    const ignored = (yield* sql<{ one: number }>`SELECT 1 AS one FROM ignored_channels WHERE channel = ${fresh.channelId}`).length > 0
     const { settings } = yield* readSettings
-    return decideHuddleAlert({ channelId: fresh.channelId, startedBy: fresh.startedBy, ignored, at: localTime(now) }, settings)
-  }).pipe(Effect.catch(() => Effect.succeed<HuddleAlertDecision>('ring')))
+    return { alert: decideHuddleAlert({ channelId: fresh.channelId, startedBy: fresh.startedBy, at: localTime(now) }, settings), sound: settings.huddleRing !== false }
+  }).pipe(Effect.catch(() => Effect.succeed({ alert: 'ring' as const, sound: true })))
 
 /** A person's name as message notifications show it: their display name first. */
 const personName = (sql: StoreReader['Service'], id: string) =>
@@ -79,8 +81,8 @@ export class IncomingHuddles extends Context.Service<IncomingHuddles, {
           const looked = lookAt(yield* SubscriptionRef.get(state), running, selfId, now)
           const entries: Array<IncomingHuddle> = []
           for (const fresh of looked.fresh) {
-            const alert = yield* alertFor(fresh, now).pipe(Effect.provide(context))
-            if (alert !== 'none') entries.push(incomingOf(fresh, alert, call, now))
+            const { alert, sound } = yield* alertFor(fresh, now).pipe(Effect.provide(context))
+            entries.push(incomingOf(fresh, alert, sound, call, now))
           }
           const next = settle(offer(looked.state, entries), running, call, selfId)
           yield* SubscriptionRef.set(state, next)

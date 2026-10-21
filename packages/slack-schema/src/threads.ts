@@ -60,7 +60,8 @@ export const ThreadView = S.Struct({
 export type ThreadView = typeof ThreadView.Type
 
 export const ThreadGetViewFields = {
-  threads: S.Array(ThreadView),
+  // The envelope survives an unfamiliar row. Sync decodes each entry with ThreadView.
+  threads: S.Array(S.Unknown),
   has_more: S.Boolean,
   total_unread_replies: S.Number,
   threads_state: opt(ThreadCounts),

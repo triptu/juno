@@ -1,0 +1,1 @@
+- 10-21 05:14 · implementation · Keep highlight in the desktop's build-time dependencies and reject workspace runtime dependencies during the build; packaged Electron cannot load their TypeScript source from node_modules.

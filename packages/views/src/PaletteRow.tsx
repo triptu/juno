@@ -5,7 +5,6 @@
 import { Broom } from '@phosphor-icons/react/dist/icons/Broom'
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
-import { ArrowCounterClockwise } from '@phosphor-icons/react/dist/icons/ArrowCounterClockwise'
 import { ArrowSquareOut } from '@phosphor-icons/react/dist/icons/ArrowSquareOut'
 import { Bell } from '@phosphor-icons/react/dist/icons/Bell'
 import { ChatCircle } from '@phosphor-icons/react/dist/icons/ChatCircle'
@@ -119,7 +118,7 @@ const icons: Record<PaletteIconName, PhosphorIcon> = {
   'open-dm': ChatCircle,
   ask: Sparkle,
   resolve: CheckCircle,
-  reopen: ArrowCounterClockwise,
+  reopen: CheckCircle,
   'theme-light': Sun,
   'theme-dark': Moon,
   'theme-system': CircleHalf,
@@ -156,6 +155,9 @@ const icons: Record<PaletteIconName, PhosphorIcon> = {
   'share-screen': MonitorArrowUp,
   'stop-sharing': StopCircle,
 }
+
+// Reopen is the filled check, as in the topic header: the thread is done, and choosing it undoes that.
+const filledIcons: ReadonlySet<PaletteIconName> = new Set(['reopen'])
 
 export interface PaletteItem {
   readonly id: string
@@ -288,7 +290,7 @@ function Glyph({ item }: { readonly item: PaletteItem }) {
   }
   return (
     <span aria-hidden="true" {...stylex.props(styles.glyphSlot, item.compact === true && styles.glyphSlotCompact)}>
-      {item.accent !== undefined ? <span {...stylex.props(styles.accentDot, accentDots[item.accent])} /> : <Icon icon={icons[item.icon]} size={16} />}
+      {item.accent !== undefined ? <span {...stylex.props(styles.accentDot, accentDots[item.accent])} /> : <Icon icon={icons[item.icon]} size={16} {...(filledIcons.has(item.icon) ? { weight: 'fill' as const } : {})} />}
     </span>
   )
 }

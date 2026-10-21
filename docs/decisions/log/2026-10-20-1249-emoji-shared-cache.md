@@ -1,0 +1,1 @@
+- 10-20 12:49 · Tushar · Picker preload starts one retained emoji query after the first list paints. State resolves aliases, sorts and prepares search data once per table change. Juno badges read the loaded cache on demand, never hold a live emoji subscription and never change the shared callbacks; unknown names get a small glyph fallback.

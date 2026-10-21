@@ -1,6 +1,5 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 import { Schema } from 'effect'
-import { release } from 'node:os'
 import { mkdir } from 'node:fs/promises'
 import { logFolder, warningLines } from '../logging'
 import { Channels, ShellRoutes, type AppState, type Diagnostics, type DownloadResult, type NotificationPermission, type SharingSetting, type ShellInput, type ShellOutput } from '@juno/contract'
@@ -16,6 +15,8 @@ import type { Updates } from './updates'
 import type { Launch } from './launch'
 import { openMicrophoneSettings } from './media'
 import { createScreenShareSources } from './screenShare'
+import { osVersion, syncLogText } from './syncLog'
+import { mainLog } from './logging'
 import { APP_ORIGIN } from './scheme'
 import { closeWebPanel, hideWebPanel, setWebPanelBounds, showWebPanel } from './webPanel'
 import { setMenuHuddle } from './window'
@@ -102,15 +103,17 @@ export interface IpcDeps {
   }
   /** Download (files.ts), with the hosts it may fetch from already bound. */
   readonly downloadFile: (file: { readonly url: string; readonly name: string }) => Promise<DownloadResult>
-  /** Open in the viewer (files.ts), bound the same way. */
+  /** Open in browser in the viewer (files.ts), bound the same way. */
   readonly openFile: (file: { readonly url: string; readonly name: string }) => Promise<DownloadResult>
+  /** Quick Look on a card or in the viewer (files.ts), over the asking window, bound the same way. */
+  readonly quickLook: (file: { readonly url: string; readonly name: string }, window: BrowserWindow | undefined) => Promise<DownloadResult>
   /** Copy image in the viewer (files.ts), bound the same way. */
   readonly copyImage: (src: string) => Promise<'copied' | 'failed'>
   /** Settings › About's diagnostics, and the renderer's view and sync for the idle CPU check (processWatch.ts). */
   readonly processes: { readonly diagnostics: () => Diagnostics; readonly reportState: (state: AppState) => void }
 }
 
-export function registerIpc({ updates, supervisor, agent, providers, codex, backupSecrets, setTheme, setAccent, setDensity, setTopicTitleLines, setPrivacy, setSidebar, sharing, setViewing, notifications, downloadFile, openFile, copyImage, processes }: IpcDeps): void {
+export function registerIpc({ updates, supervisor, agent, providers, codex, backupSecrets, setTheme, setAccent, setDensity, setTopicTitleLines, setPrivacy, setSidebar, sharing, setViewing, notifications, downloadFile, openFile, quickLook, copyImage, processes }: IpcDeps): void {
   handle(Channels.updatesGet, () => updates.get())
   handle(Channels.updatesSet, ({ enabled }) => updates.set(enabled))
   handle(Channels.updatesRestart, () => updates.restart())
@@ -123,13 +126,20 @@ export function registerIpc({ updates, supervisor, agent, providers, codex, back
     electron: process.versions.electron ?? 'unknown',
   }))
   handle(Channels.appDiagnostics, () => processes.diagnostics())
-  handle(Channels.appLogDiagnostics, async () => ({ osVersion: process.platform === 'darwin' ? `macOS ${process.getSystemVersion()}` : `${process.platform} ${release()}`, logs: await warningLines() }))
+  handle(Channels.appLogDiagnostics, async () => ({ osVersion: osVersion(), logs: await warningLines() }))
+  handle(Channels.appCopySyncLog, async (input) => {
+    try {
+      clipboard.writeText(await syncLogText(app.getVersion(), input))
+      return 'copied'
+    } catch { return 'failed' }
+  })
   handle(Channels.appShowLogs, async () => {
     await mkdir(logFolder(), { recursive: true })
     if (e2e) { logsForTests.opened++; return }
     const error = await shell.openPath(logFolder())
     if (error) throw new Error('Could not open logs')
   })
+  handle(Channels.appReportStagingFailure, (failure) => mainLog.log('WARN', 'files: staging failed', failure))
   handle(Channels.appReportState, (state) => processes.reportState(state))
 
   // The port cannot travel in the invoke answer; it goes out through
@@ -238,6 +248,7 @@ export function registerIpc({ updates, supervisor, agent, providers, codex, back
 
   handle(Channels.shellDownloadFile, (file) => downloadFile(file))
   handle(Channels.shellOpenFile, (file) => openFile(file))
+  handle(Channels.filesQuickLook, (file, event) => quickLook(file, BrowserWindow.fromWebContents(event.sender) ?? undefined))
   handle(Channels.clipboardWriteImage, ({ src }) => copyImage(src))
 
   handle(Channels.clipboardWriteText, ({ text }) => {

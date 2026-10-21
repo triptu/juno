@@ -13,6 +13,8 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { Store, StoreReader, workspacePathsFromDir, type StoreError } from '@juno/store'
 import { reactionsStatement, rootStatement, threadsStatements, threadTitlesStatement, windowStatements, type WindowTarget } from '../src/messages/window'
+import { missedHuddleStatement } from '../src/home/huddles'
+import { messageUsersStatement } from '../src/messages/query'
 import { homeStatements } from '../src/home/query'
 import { suggestedStatements } from '../src/home/suggested'
 import { staleStatement } from '../src/home/job'
@@ -149,6 +151,15 @@ describe('query plans', () => {
     }).pipe(Effect.provide(freshStore)),
   )
 
+  it.effect("messages.list finds an app's or a deactivated person's DM through the DM index", () =>
+    Effect.gen(function* () {
+      const statement = messageUsersStatement(['U0GRAFANA', 'U0MAYA'])
+      const lines = yield* plan(statement.sql, statement.params)
+      assert.isFalse(lines.some((line) => /^SCAN (d|conversations)\b/.test(line)), lines.join('\n'))
+      assert.isTrue(lines.some((line) => line.includes('conversations_im_user')), lines.join('\n'))
+    }).pipe(Effect.provide(freshStore)),
+  )
+
   it.effect("channel.threads reads a channel's threads through the channel index", () =>
     Effect.gen(function* () {
       const recent = threadsStatements('C0ENG', '1700000000.000000', 100)
@@ -216,6 +227,7 @@ describe('query plans', () => {
         automatedStatements.moved(),
         movesStatements.unseen(),
         homeStatements.mains(['C0ALERTS', 'C0DEPLOYS']),
+        missedHuddleStatement(Date.now()),
       ]
       for (const statement of statements) {
         const lines = yield* plan(statement.sql, statement.params)

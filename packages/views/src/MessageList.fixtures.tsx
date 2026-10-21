@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { MessageView } from '@juno/contract'
-import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
+import { defineFixtures, fixture, scene, TooltipLayer, type FixtureFrame } from '@juno/ui'
 import { useFixtureControl } from './juno-chat/fixtures/control'
 import { conversation } from './fixtures/conversation'
 import {
@@ -26,7 +26,7 @@ import {
   p,
   withFiles,
 } from './fixtures/messages'
-import { albumOf, mediaAndPdf, mixedMedia, singleImage, singleVideo } from './fixtures/media'
+import { albumOf, mediaAndPdf, mixedMedia, singleAudio, singleImage, singleVideo, withDocuments } from './fixtures/media'
 import { NOW, people } from './fixtures/topics'
 import { noopActions } from './fixtures/actions'
 import { sevenQuickReactions } from './fixtures/quickReactions'
@@ -220,6 +220,10 @@ export default defineFixtures(
       'grid-6': state({ items: albumOf(6), main: false, onOpenMedia: noop }),
       // The pictures make the grid where the first is; the PDF keeps its card.
       'grid-and-pdf': state({ items: mediaAndPdf, main: false, onOpenMedia: noop, onDownload: noop }),
+      // Cards the viewer opens, each with Download, and a zip with Quick Look.
+      documents: state({ items: withDocuments, main: false, onOpenMedia: noop, onDownload: noop, onQuickLook: noop }),
+      // A lone audio file: a player in its card.
+      audio: state({ items: singleAudio, main: false, onOpenMedia: noop, onDownload: noop }),
       'focus-tile': state({ items: albumOf(6), main: false, onOpenMedia: noop }, { focus: '[data-thumbnail]' }),
     },
     Send: {
@@ -259,6 +263,18 @@ export default defineFixtures(
       'hover-toolbar-long-line': state({ items: longFirstLine, main: true, actions: noopActions }, { hover: ROW }),
       focus: state({ items: thread, main: false, actions: noopActions }, { focus: `${ROW}:last-of-type` }),
       'hover-thread-link': state({ items: mainStream, main: true }, { hover: '[data-thread-link]' }),
+      // A sender's name, avatar and an @person chip open the DM: a quiet underline, a hairline ring, "Message Leo".
+      'hover-person-name': scene(
+        () => (
+          <>
+            <MessageList {...base} items={thread} main={false} onPerson={noop} />
+            <TooltipLayer />
+          </>
+        ),
+        { tooltip: `${ROW}:nth-of-type(4) [data-message-header] [data-opens-person]` },
+      ),
+      'hover-person-avatar': state({ items: thread, main: false, onPerson: noop }, { hover: `${ROW}:nth-of-type(4) [data-sender] [data-opens-person]` }),
+      'hover-person-chip': state({ items: thread, main: false, onPerson: noop }, { hover: `${ROW} [data-msg-text] [data-opens-person]` }),
       // The tabbable row's link: the shot tabs back and forth, and only that row's link is in the Tab order.
       'focus-thread-link': state({ items: mainStream, main: true }, { focus: '[data-message-row][tabindex="0"] [data-thread-link]' }),
     },

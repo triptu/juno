@@ -350,12 +350,21 @@ export class FakeSlack {
     this.server.loseResponse(input.method, input.times ?? 1)
   }
 
+  /** The next `times` calls of `method` answer `{ ok: true }` without the method's fields, so the client fails to decode them. */
+  forceMalformed(input: { method: string; times?: number }): void {
+    this.server.forceMalformed(input.method, input.times ?? 1)
+  }
+
   /** Every Web API and edge call waits `ms` before it runs, like a real network. 0 turns it off. */
   setLatency(input: { ms: number }): void {
     this.server.setLatency(input.ms)
   }
 
   /** File downloads answer after `ms` milliseconds, so images arrive late. 0 turns it off. */
+  /** In-process image gate for measuring a cold picker without browser-interception overhead. */
+  holdEmojiImages(): void { this.server.holdEmojiImages() }
+  releaseEmojiImages(): void { this.server.releaseEmojiImages() }
+
   delayFiles(input: { ms: number }): void {
     this.server.delayFiles(input.ms)
   }
@@ -534,3 +543,4 @@ export { largeSeed, LARGE_SEED_DEFAULTS } from './seeds/large.ts'
 export { topic300Seed, TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL } from './seeds/topic300.ts'
 export { CODE_BLOCK_COUNT, codeBlocksSeed } from './seeds/codeBlocks.ts'
 export { sharedMessage, unfurlFixtures } from './unfurls.ts'
+export { tableBlock } from './tables.ts'

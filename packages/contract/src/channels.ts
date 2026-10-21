@@ -6,6 +6,7 @@
  * types below are imported from them, which is erased at compile time.
  */
 import type { Accent, Density, HuddleMenu, TopicTitleLines, ProviderChange, SidebarLayout, SlackTarget, Theme, WebPanelBounds } from './shell'
+import type { AttachmentFailure } from './routes/files'
 import type { MenuCommand } from './menu'
 
 export type { Accent, Density, TopicTitleLines, ProviderChange, SidebarLayout, SlackTarget, Theme, WebPanelBounds } from './shell'
@@ -23,9 +24,12 @@ export const Channels = {
   /** Settings › About's diagnostics: each process's CPU and memory, and what the engine and agent supervisors are doing. */
   appDiagnostics: 'app.diagnostics',
   appLogDiagnostics: 'app.logDiagnostics',
+  /** The sync notice's Copy log: main puts the app and macOS versions, the sync phase and the end of engine.log on the clipboard. */
+  appCopySyncLog: 'app.copySyncLog',
   appShowLogs: 'app.showLogs',
   /** The renderer tells main its view and whether a sync runs, for main's idle CPU check (no titles, no ids). */
   appReportState: 'app.reportState',
+  appReportStagingFailure: 'app.reportStagingFailure',
   /** Renderer asks main for a fresh engine port. The port arrives on `Events.enginePort`. */
   engineRequestPort: 'engine.requestPort',
   /** Starts the engine again after the supervisor gave up on it. */
@@ -87,6 +91,8 @@ export const Channels = {
   shellDownloadFile: 'shell.downloadFile',
   /** Saves a Slack file into a temporary folder on the Slack session and opens it in the default app. */
   shellOpenFile: 'shell.openFile',
+  /** Saves a Slack file into a temporary folder on the Slack session and shows it in Quick Look. */
+  filesQuickLook: 'files.quickLook',
   /** Puts the image behind a `juno://files` or `juno://uploads` url on the clipboard. */
   clipboardWriteImage: 'clipboard.writeImage',
   /** Puts text on the clipboard. */
@@ -190,7 +196,10 @@ export interface JunoBridge {
     readonly getInfo: () => Promise<unknown>
     /** A `Diagnostics`, answered by main. */
     readonly diagnostics: () => Promise<unknown>
+    readonly reportStagingFailure: (failure: { readonly id: string; readonly reason: AttachmentFailure; readonly offset: number }) => Promise<void>
     readonly logDiagnostics: () => Promise<unknown>
+    /** A `SyncLogInput`; answers 'copied' or 'failed'. */
+    readonly copySyncLog: (input: unknown) => Promise<unknown>
     readonly showLogs: () => Promise<unknown>
     /** An `AppState`: the view kind and whether a sync runs. */
     readonly reportState: (state: unknown) => Promise<unknown>
@@ -294,6 +303,10 @@ export interface JunoBridge {
     readonly downloadFile: (file: { readonly url: string; readonly name: string }) => Promise<unknown>
     /** Only Slack file urls open; main answers `saved` once the default app was asked to open it, or `failed`. */
     readonly openFile: (file: { readonly url: string; readonly name: string }) => Promise<unknown>
+  }
+  readonly files: {
+    /** Only Slack file urls; main answers `saved` once the preview window was asked to show it, or `failed`. */
+    readonly quickLook: (file: { readonly url: string; readonly name: string }) => Promise<unknown>
   }
   readonly clipboard: {
     readonly writeText: (text: string) => Promise<unknown>

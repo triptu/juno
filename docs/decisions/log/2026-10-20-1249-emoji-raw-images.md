@@ -1,0 +1,1 @@
+- 10-20 12:49 · Tushar · Every emoji surface uses raw Slack image URLs and the browser cache. Remove the emoji thumbnail wrapper. The fake CDN uses a test-harness CSP exception, and Settings saves raw URLs.

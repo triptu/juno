@@ -48,6 +48,8 @@ function parse(argv) {
   for (const pair of options.env) if (!/^[A-Za-z_][A-Za-z0-9_]*=[^\n\r]*$/.test(pair ?? '')) throw new Error('--env takes NAME=value on one line')
   const [script, ...args] = argv.slice(index)
   if (!script) throw new Error('usage: pnpm remote [--local] [--cores n] [--wait seconds] <script> [args...]')
+  // A split plan can queue an app job behind the unit/spec jobs in the same allocation.
+  if (runnerPlanJobs({ ...options, script, args }).length > 0 && !argv.includes('--wait') && process.env.JUNO_RUNNER_WAIT === undefined) options.wait = 3600
   const steps = script === 'test:plan' ? parsePlan(args) : [{ script, args }]
   for (const step of steps) {
     if (localOnly[step.script]) throw new Error(`${step.script} measures ${localOnly[step.script]} and runs only on the Mac. Run pnpm ${step.script} locally.`)

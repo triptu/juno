@@ -8,7 +8,7 @@
  * attached (`staging.ts`), and `messages.send` names the staged ones.
  */
 import * as Atom from 'effect/reactivity/Atom'
-import { filesUnstage, MAX_FILES_PER_MESSAGE, uploadsProgress } from '@juno/contract'
+import { filesUnstage, MAX_FILES_PER_MESSAGE, uploadsProgress, type AttachmentFailure } from '@juno/contract'
 import type { JunoBridge } from '@juno/contract/channels'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
@@ -24,6 +24,8 @@ export interface Attachment {
   readonly mimetype: string
   /** `staging` while the bytes go to the engine, `failed` when they could not. */
   readonly state: 'staging' | 'ready' | 'failed'
+  /** A failed Slack attachment's reason; local read failures use the default read error. */
+  readonly failure?: AttachmentFailure
   /** An image's preview, once staged; a Juno-only image's is made from its file before its chip shows (`attachLocal`). */
   readonly preview?: string | undefined
   /** Held here only, for Juno: never staged in the engine (`attachLocal`). */
@@ -135,7 +137,57 @@ export async function downloadFile(file: { readonly url: string; readonly name: 
   }
 }
 
-/** Open in the viewer: main saves the file into a temporary folder and opens it in the default app. Resolves whether it opened. */
+/** Quick Look: main saves the file into a temporary folder and shows it in the macOS preview window. Resolves whether it showed. */
+export async function quickLookFile(file: { readonly url: string; readonly name: string }): Promise<boolean> {
+  try {
+    return (await window.juno.files.quickLook(file)) === 'saved'
+  } catch {
+    return false
+  }
+}
+
+/** The most of a text file the viewer reads, so a huge log never stalls the page. */
+const TEXT_MAX_BYTES = 2 * 1024 * 1024
+
+/**
+ * A text file the media viewer shows, from its `juno://files/<id>/content`
+ * url: its text, decoded as the type's charset (UTF-8 when it names none),
+ * at most `TEXT_MAX_BYTES` of it, and whether there was more. Undefined
+ * when main could not get it.
+ */
+export async function readFileText(url: string, signal?: AbortSignal): Promise<{ readonly text: string; readonly truncated: boolean } | undefined> {
+  try {
+    const response = await fetch(url, signal === undefined ? {} : { signal })
+    if (!response.ok || response.body === null) return undefined
+    const charset = /charset=([^;]+)/i.exec(response.headers.get('content-type') ?? '')?.[1]?.trim()
+    const decoder = textDecoder(charset)
+    const reader = response.body.getReader()
+    let text = ''
+    let length = 0
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) return { text: text + decoder.decode(), truncated: false }
+      if (length + value.byteLength > TEXT_MAX_BYTES) {
+        await reader.cancel()
+        return { text: text + decoder.decode(value.subarray(0, TEXT_MAX_BYTES - length)), truncated: true }
+      }
+      text += decoder.decode(value, { stream: true })
+      length += value.byteLength
+    }
+  } catch {
+    return undefined
+  }
+}
+
+function textDecoder(charset: string | undefined) {
+  try {
+    return new TextDecoder(charset ?? 'utf-8')
+  } catch {
+    return new TextDecoder('utf-8')
+  }
+}
+
+/** Open in browser in the viewer: main saves the file into a temporary folder and opens it in the default app. Resolves whether it opened. */
 export async function openFile(file: { readonly url: string; readonly name: string }): Promise<boolean> {
   try {
     return (await window.juno.shell.openFile(file)) === 'saved'

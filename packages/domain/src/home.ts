@@ -5,17 +5,17 @@
  */
 
 /** Ranked in this order. */
-export type HomeKind = 'waiting' | 'mentioned' | 'resume' | 'moved' | 'followUp' | 'automated' | 'tidyUp' | 'doneFollowUps' | 'oldDrafts' | 'unfollow' | 'ignore' | 'automatedMoves'
+export type HomeKind = 'waiting' | 'mentioned' | 'missedHuddle' | 'resume' | 'moved' | 'followUp' | 'automated' | 'tidyUp' | 'doneFollowUps' | 'oldDrafts' | 'unfollow' | 'ignore' | 'automatedMoves'
 
 /**
  * A mention in an ignored channel comes right after a question: it is the
- * one way that channel reaches the user. Automated's question comes before
+ * message exception for that channel. Missed huddles follow mentions. Automated's question comes before
  * Tidy up: it is asked once, and an unanswered one keeps a channel in the
  * wrong place. The other review cards come after it: nothing is lost while
  * they wait; Unfollow and Ignore, which change more, after the others.
  * Automated's record comes last: it reports what Juno already did.
  */
-export const HOME_KINDS: ReadonlyArray<HomeKind> = ['waiting', 'mentioned', 'resume', 'moved', 'followUp', 'automated', 'tidyUp', 'doneFollowUps', 'oldDrafts', 'unfollow', 'ignore', 'automatedMoves']
+export const HOME_KINDS: ReadonlyArray<HomeKind> = ['waiting', 'mentioned', 'missedHuddle', 'resume', 'moved', 'followUp', 'automated', 'tidyUp', 'doneFollowUps', 'oldDrafts', 'unfollow', 'ignore', 'automatedMoves']
 
 /** Moved a lot: a followed topic with at least this many new messages. */
 export const MOVED_A_LOT_MIN = 8

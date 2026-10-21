@@ -18,8 +18,17 @@ export const TILE_ICONS: Partial<Record<HomeItemKind, PhosphorIcon>> = { ask: Br
 /** The cards whose row opens a review sheet. */
 export const opensReview = (kind: HomeItemKind): boolean => kind === 'tidyUp' || kind === 'doneFollowUps' || kind === 'oldDrafts' || kind === 'unfollow' || kind === 'ignore' || kind === 'automatedMoves'
 
+/** How long a missed huddle lasted: "Lasted under a minute", "Lasted 8 min", "Lasted 1 hr 12 min". */
+export function lastedOf(minutes: number): string {
+  if (minutes < 1) return 'Lasted under a minute'
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  return `Lasted ${[hours > 0 ? `${hours} hr` : '', rest > 0 ? `${rest} min` : ''].filter(Boolean).join(' ')}`
+}
+
 /** The meta line: plain data, the same with and without AI. */
 export function metaOf(item: HomeItem, now: number): string {
+  if (item.kind === 'missedHuddle') return [lastedOf(item.durationMinutes ?? 0), item.at === undefined ? undefined : relativeTime(item.at, now)].filter(Boolean).join(' · ')
   if (item.kind === 'ask') return item.ask?.connection !== undefined ? junoAskCopy.learn.metaConnection(item.ask.connection) : junoAskCopy.learn.meta(item.ask?.sources ?? [])
   if (item.kind === 'automated') return item.reason === undefined ? 'To Automated' : `To Automated · ${item.reason}`
   if (opensReview(item.kind)) return placesLine(item.topics.map((topic) => topic.place))

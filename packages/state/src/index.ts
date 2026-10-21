@@ -1,8 +1,8 @@
 export { liveQuery, runCommand, type LiveListAtom, type LiveValueAtom } from './atoms'
 export { configureConnection, connectionStateAtom, makeRegistry, registry, restartEngine, type Registry } from './client'
-export { engineStatusAtom, pingCommand, syncNoticeAtom, syncProgressAtom } from './engine'
-export { appStateAtom, describeTabs, diagnosticDetails, showLogs, diagnosticsReport, formatCpu, readDiagnostics, reportAppStateAtom } from './diagnostics'
-export { importFromSlackAppCommand, junoSetupPendingAtom, sessionStatusAtom, sessionProfileAtom, sessionUnknownAtom, signedInAtom, signInCommand, signOutCommand } from './session'
+export { engineStatusAtom, pingCommand, syncFailureAtom, syncNoticeAtom, syncProgressAtom } from './engine'
+export { appStateAtom, copySyncLog, describeTabs, diagnosticDetails, showLogs, diagnosticsReport, formatCpu, readDiagnostics, reportAppStateAtom } from './diagnostics'
+export { importFromSlackAppCommand, junoSetupPendingAtom, sessionStatusAtom, sessionProfileAtom, sessionUnknownAtom, signedInAtom, signOutCommand } from './session'
 export { viewPillsAtom, viewSheetAtom, viewsAtom, type ViewSheetState } from './views'
 export { defaultTopicListFilter, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
 export {
@@ -17,6 +17,7 @@ export {
 export { readCatchUpAtom, mirrorReadsAtom, shouldMarkRead } from './reads'
 export { quietDaysAtom, setQuietDays } from './quietWindow'
 export { isPeekKey, peekKeyAtom, setPeekKey } from './peek'
+export { openViewerAtom } from './mediaViewer'
 export { closeWelcome, showWelcome, tickWelcome, welcomeAtom, type Welcome } from './welcome'
 export { setTabExpiry, startTabExpiry, tabExpiryAtom } from './tabExpiry'
 export { quickReactionsAtom, setQuickReactions } from './quickReactions'
@@ -96,6 +97,7 @@ export {
   tabTopic,
   topicPlace,
   huddlePlace,
+  devLogPlace,
   galleryPlace,
   replaceInTab,
   updateTabs,
@@ -149,6 +151,8 @@ export {
   notificationStatusAtom,
   restoreSlackSchedule,
   setHours,
+  setHuddleRing,
+  setHoursDay,
   setMatters,
   setPresence,
   setSlackSchedule,
@@ -200,6 +204,7 @@ export {
 export type { PortLike } from './transport'
 export { canRedraw, redrawTopic, type RedrawProblem } from './art'
 export { aiActivityAtom } from './aiActivity'
+export { DEV_LOG_PAGE, devLogDetailAtom, devLogFilterAtom, devLogLimitAtom, devLogListAtom } from './devLog'
 export { messageLink, parseSlackLink, slackLink, threadRootTs, type SlackLinkMatch, type SlackLinkTarget } from './links'
 export { headerRenamingAtom, renamingAtom, rowRenamingAtom, tableRenamingAtom, type RenameTarget } from './rename'
 export {
@@ -284,6 +289,8 @@ export {
   settleLocal,
   downloadFile,
   openFile,
+  quickLookFile,
+  readFileText,
   copyImage,
   readyFiles,
   sendableFiles,

@@ -4,7 +4,9 @@
  * live in channels.ts, which the preload bundles without any runtime import.
  */
 import { Schema } from 'effect'
+import { AttachmentFailure } from './routes/files'
 import { Channels, SIDEBAR_WIDTH } from './channels'
+import { SyncFailure } from './routes/engine'
 
 export const PlatformSchema = Schema.Literals(['darwin', 'win32', 'linux'])
 
@@ -297,8 +299,15 @@ export const LogDiagnostics = Schema.Struct({
   osVersion: Schema.String,
   logs: Schema.Array(Schema.Struct({ process: Schema.Literals(['main', 'engine', 'agent']), lines: Schema.Array(Schema.String) })),
 })
+/** What the sync notice's Copy log names: the engine phase's tag and, when it failed, why. */
+export const SyncLogInput = Schema.Struct({
+  phase: Schema.String.check(Schema.isPattern(/^[a-z-]{1,32}$/)),
+  reason: Schema.optionalKey(SyncFailure),
+})
+export type SyncLogInput = typeof SyncLogInput.Type
 export const ShellRoutes = {
   [Channels.appLogDiagnostics]: { input: Schema.Void, output: LogDiagnostics },
+  [Channels.appCopySyncLog]: { input: SyncLogInput, output: Schema.Literals(['copied', 'failed']) },
   [Channels.appShowLogs]: { input: Schema.Void, output: Schema.Void },
   [Channels.updatesGet]: { input: Schema.Void, output: UpdateState },
   [Channels.updatesSet]: { input: Schema.Struct({ enabled: Schema.Boolean }), output: UpdateState },
@@ -307,6 +316,7 @@ export const ShellRoutes = {
   [Channels.updatesNotes]: { input: Schema.Struct({ scope: Schema.Literals(['installed', 'update']) }), output: ReleaseNotes },
   [Channels.appGetInfo]: { input: Schema.Void, output: AppInfo },
   [Channels.appDiagnostics]: { input: Schema.Void, output: Diagnostics },
+  [Channels.appReportStagingFailure]: { input: Schema.Struct({ id: Schema.String, reason: AttachmentFailure, offset: Schema.Number }), output: Schema.Void },
   [Channels.appReportState]: { input: AppState, output: Schema.Void },
   [Channels.engineRequestPort]: { input: Schema.Void, output: PortRequestResult },
   [Channels.engineRestart]: { input: Schema.Void, output: Schema.Void },
@@ -348,6 +358,10 @@ export const ShellRoutes = {
     output: DownloadResult,
   },
   [Channels.shellOpenFile]: {
+    input: Schema.Struct({ url: Schema.String.check(Schema.isMaxLength(4096)), name: Schema.String.check(Schema.isMaxLength(512)) }),
+    output: DownloadResult,
+  },
+  [Channels.filesQuickLook]: {
     input: Schema.Struct({ url: Schema.String.check(Schema.isMaxLength(4096)), name: Schema.String.check(Schema.isMaxLength(512)) }),
     output: DownloadResult,
   },

@@ -46,8 +46,10 @@ Indexes the sidebar relies on (`docs/performance.md` section 6): `topic_index (l
 
 `pnpm --filter @juno/store test`. Tests open a real store on a private temporary directory (`test/helpers.ts`) and use `@effect/vitest`. Remote runs set `JUNO_TEST_FILE_PARALLEL=1` to overlap files in separate workers; synchronous SQLite handles and files are never shared. `it.effect` runs on a `TestClock`, so tests advance the debounce with `TestClock.adjust(DEFAULT_LIVE_QUERY_DEBOUNCE)`. SQLite is `node:sqlite`; Electron 44 runs Node 24, so see `docs/development.md` for running the suite under Electron's Node.
 
-Home's Recent reads recent own sends through the partial `messages_sender_ts (user_id, ts, channel) WHERE deleted = 0` index.
+⌘K's Conversations ranking reads recent own sends through the partial `messages_sender_ts (user_id, ts, channel) WHERE deleted = 0` index.
 
 `started_threads` in user.db maps a root sent from Home: its outbox ID and pending topic ID to its acknowledged Slack root timestamp. The mapping survives reconciliation and keeps pending replies and saved tab views addressable.
 
 `messages.attention` is a derived cache projection for the badge existence query. Sync derives it from unread rich-text bodies while reindexing. It is reused only for the same message content and mention context; a trigger clears it when content changes. It is not a Slack field.
+
+`huddle_history` in user.db keeps recent room facts with local joined and seen marks. End and join evidence only accumulates; rereading Slack history never clears an acknowledgement.

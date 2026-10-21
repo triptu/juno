@@ -1,14 +1,14 @@
 import * as stylex from '@stylexjs/stylex'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
 import { X } from '@phosphor-icons/react/dist/icons/X'
-import type { FileKind } from '@juno/contract'
+import type { AttachmentFailure, FileKind } from '@juno/contract'
 import { colors, opacity, radii, sizes, spacing, tints } from '@juno/tokens/tokens.stylex'
 import { Icon, IconButton, Text } from '@juno/ui'
 import { fileIcon, fileSize } from './FileCard'
 
 /**
  * A file going with the message being written. `staging` while its bytes are
- * read, `ready` once staged, `failed` when it could not be read.
+ * read, `ready` once staged, `failed` when it could not be attached.
  */
 export interface AttachmentChip {
   readonly id: string
@@ -19,6 +19,7 @@ export interface AttachmentChip {
   /** An image's preview src: the chip shows the picture. */
   readonly preview?: string
   readonly state: 'staging' | 'ready' | 'failed'
+  readonly failure?: AttachmentFailure
 }
 
 export interface AttachmentChipsProps {
@@ -29,7 +30,14 @@ export interface AttachmentChipsProps {
 // A chip's longest side: a file chip's name gives way past it.
 const CHIP_MAX_WIDTH = '240px' // tokens-allow: a file chip's widest
 
-const FAILED = 'Could not read this file'
+const FAILURES: Record<AttachmentFailure, string> = {
+  read_error: 'Could not read this file',
+  not_signed_in: 'Sign in to attach this file',
+  bad_chunk: 'Could not attach this file. Try attaching it again.',
+  file_too_large: 'This file is too large to attach',
+  connection_error: 'Connection lost while attaching this file. Try again.',
+  engine_error: 'Could not save this file in Juno. Try attaching it again.',
+}
 
 function kindOf(mimetype: string): FileKind {
   if (mimetype === 'application/pdf') return 'pdf'
@@ -76,8 +84,9 @@ function ThumbnailChip({ file, preview, onRemove }: ChipProps & { readonly previ
 
 function FileChip({ file, onRemove }: ChipProps) {
   const failed = file.state === 'failed'
+  const failureLabel = file.failure === undefined || file.failure === 'read_error' ? 'Could not read' : 'Could not attach'
   return (
-    <div role="listitem" title={failed ? FAILED : file.name} data-attachment={file.state} {...stylex.props(styles.chip, styles.fileChip, failed && styles.failedChip)}>
+    <div role="listitem" title={failed ? FAILURES[file.failure ?? 'read_error'] : file.name} data-attachment={file.state} {...stylex.props(styles.chip, styles.fileChip, failed && styles.failedChip)}>
       <span {...stylex.props(styles.fileBody, file.state === 'staging' && styles.staging)}>
         <span {...stylex.props(styles.icon, failed && styles.failedIcon)}>
           <Icon icon={failed ? WarningCircle : fileIcon[kindOf(file.mimetype)]} size={18} />
@@ -87,7 +96,7 @@ function FileChip({ file, onRemove }: ChipProps) {
             {file.name}
           </Text>
           <Text variant="meta" tone={failed ? 'inherit' : 'muted'} truncate>
-            {failed ? 'Could not read' : file.size === undefined ? '\u00a0' : fileSize(file.size)}
+            {failed ? failureLabel : file.size === undefined ? '\u00a0' : fileSize(file.size)}
           </Text>
         </span>
       </span>

@@ -96,7 +96,7 @@ export function normalize(inlines: ReadonlyArray<Inline>): Inline[] {
 export const UNKNOWN_PERSON = 'Someone'
 
 export function userInline(id: string, lookups: Lookups, fallbackName?: string): Inline {
-  return { kind: 'user', id, name: lookups.user?.(id) ?? fallbackName ?? UNKNOWN_PERSON, isMe: lookups.me !== undefined && lookups.me === id }
+  return { kind: 'user', id, name: lookups.user?.(id) ?? fallbackName ?? UNKNOWN_PERSON, isMe: lookups.me !== undefined && lookups.me === id, ...(lookups.unreachable?.(id) === true ? { unreachable: true as const } : {}) }
 }
 
 export function channelInline(id: string, fallbackName: string | undefined, lookups: Lookups): Inline {

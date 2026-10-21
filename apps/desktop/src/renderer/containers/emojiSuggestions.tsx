@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState, type KeyboardEvent, type RefObject } from 'react'
-import { customEmoji, EMOJI_QUERY_MIN, emojiQueryAt, matchEmoji, mergeEmoji } from '@juno/contract'
+import { EMOJI_QUERY_MIN, emojiQueryAt } from '@juno/contract'
 import { composerEmojiAtom, quickReactionsAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { mentionRowId, type ComposerMention, type EmojiSuggestion } from '@juno/views'
@@ -17,18 +17,18 @@ const EMPTY_ROWS: ReadonlyArray<EmojiSuggestion> = []
 
 function useEmojiRows(open: boolean) {
   const custom = useAtomValue(composerEmojiAtom(open))
-  const [standard, setStandard] = useState(EMPTY_ROWS)
+  const [catalog, setCatalog] = useState<typeof import('./emojiMatches') | undefined>(undefined)
   const [answer, setAnswer] = useState(custom)
   if (custom._tag === 'Success' && (answer._tag !== 'Success' || custom.value !== answer.value)) setAnswer(custom)
   useEffect(() => {
-    if (!open || standard.length > 0) return
+    if (!open || catalog !== undefined) return
     let live = true
-    void import('./emojiMatches').then((data) => { if (live) setStandard(data.standardEmoji) })
+    void import('./emojiMatches').then((data) => { if (live) setCatalog(data) })
     return () => { live = false }
-  }, [open, standard])
-  // The workspace answer alone owns alias resolution and sorting, never a standard-catalog update.
-  const workspace = useMemo(() => answer._tag !== 'Success' ? EMPTY_ROWS : customEmoji(answer.value).map((emoji) => ({ id: emoji.name, name: emoji.name, insert: `:${emoji.name}:`, url: emoji.url })), [answer])
-  return useMemo(() => mergeEmoji(standard, workspace), [standard, workspace])
+  }, [open, catalog])
+  const standard = catalog?.standardEmoji ?? EMPTY_ROWS
+  const workspace = useMemo(() => answer._tag !== 'Success' || catalog === undefined ? EMPTY_ROWS : catalog.workspaceChoices(answer.value), [answer, catalog])
+  return useMemo(() => ({ rows: catalog?.mergeEmoji(standard, workspace) ?? standard, match: catalog?.matchEmoji }), [catalog, standard, workspace])
 }
 
 /** Local colon suggestions share the mention list's anchor, rows, and keyboard handling. */
@@ -39,11 +39,11 @@ export function useEmojiSuggestions({ text, onChange, field }: Options) {
   const [chosen, setChosen] = useState<string | undefined>(undefined)
   const typed = emojiQueryAt(text, Math.min(caret, text.length))
   const loading = typed !== undefined && (/^[a-z]/.test(typed.text) || typed.text.length >= EMOJI_QUERY_MIN)
-  const catalog = useEmojiRows(loading && typed.start !== dismissed)
+  const { rows: catalog, match } = useEmojiRows(loading && typed.start !== dismissed)
   const listReady = useSuggestionList(loading)
   const query = typed === undefined || typed.start === dismissed || typed.text.length < EMOJI_QUERY_MIN ? undefined : typed
   const quick = useAtomValue(quickReactionsAtom)
-  const rows = query === undefined ? [] : matchEmoji(catalog, query.text, recentEmoji(), quick)
+  const rows = query === undefined || match === undefined ? [] : match(catalog, query.text, recentEmoji(), quick)
   const ids = rows.map((row) => mentionRowId(listId, row.id))
   const activeId = chosen !== undefined && ids.includes(chosen) ? chosen : ids[0]
   const pick = (id: string) => {

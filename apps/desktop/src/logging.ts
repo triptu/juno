@@ -3,13 +3,14 @@ import { appendFile, mkdir, rename, stat, open } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { Logger } from 'effect'
+import { isSchemaPath } from '@juno/slack'
 import { LOG_EVENTS } from './logEvents'
 
 export const LOG_LIMIT = 5 * 1024 * 1024
 export const LOG_PROCESSES = ['main', 'engine', 'agent'] as const
 export type LogProcess = typeof LOG_PROCESSES[number]
 export type Level = 'INFO' | 'WARN' | 'ERROR'
-const FIELDS = new Set(['id', 'rowId', 'pid', 'count', 'attempts', 'retryInMillis', 'cpu', 'memoryMb', 'passes'])
+const FIELDS = new Set(['id', 'rowId', 'pid', 'count', 'attempts', 'retryInMillis', 'cpu', 'memoryMb', 'passes', 'offset'])
 const ERROR_NAMES = new Set(['Error', 'TypeError', 'RangeError', 'SyntaxError', 'AggregateError', 'ReferenceError'])
 const SLACK_ERRORS = new Set(['SlackTransportError', 'SlackDecodeError', 'SlackRejected', 'SlackAuthRequired', 'SlackRateLimited'])
 
@@ -30,6 +31,12 @@ export function safeDetails(value: unknown, depth = 0, seen = new Set<unknown>()
     if (typeof tag === 'string' && SLACK_ERRORS.has(tag)) {
       const method: unknown = Reflect.get(value, 'method')
       if (typeof method === 'string' && method.length <= 80 && method.trim() === method && /^[a-z]+(?:\.[a-zA-Z]+)+$/.test(method)) parts.push(`method=${method}`)
+      if (tag === 'SlackDecodeError') {
+        const path: unknown = Reflect.get(value, 'schemaPath')
+        const kind: unknown = Reflect.get(value, 'issueKind')
+        if (isSchemaPath(path)) parts.push(`schemaPath=${path}`)
+        if (kind === 'missing' || kind === 'wrong_type' || kind === 'invalid') parts.push(`issueKind=${kind}`)
+      }
       if (tag === 'SlackRejected') {
         const code: unknown = Reflect.get(value, 'error')
         if (typeof code === 'string' && code.trim() === code && /^[a-z_]{1,64}$/.test(code)) parts.push(`code=${code}`)
@@ -45,7 +52,7 @@ export function safeDetails(value: unknown, depth = 0, seen = new Set<unknown>()
     }).slice(0, 12)
     if (frames.length) parts.push(`stack=${frames.join(',')}`)
   }
-  for (const [key, allowed] of Object.entries({ step: ['requestSecrets', 'signIn', 'importFromSlackApp', 'storeSecrets', 'signOut', 'authRequired'], worker: ['post', 'action', 'mark'], process: ['Main', 'Window', 'Engine', 'Juno agent', 'Graphics', 'Network', 'Other'], view: ['starting', 'topic', 'Home', 'All topics', 'Settings', 'Juno', 'no tab'] })) {
+  for (const [key, allowed] of Object.entries({ reason: ['read_error', 'not_signed_in', 'bad_chunk', 'file_too_large', 'connection_error', 'engine_error'], step: ['requestSecrets', 'signIn', 'importFromSlackApp', 'storeSecrets', 'signOut', 'authRequired'], worker: ['post', 'action', 'mark'], process: ['Main', 'Window', 'Engine', 'Juno agent', 'Graphics', 'Network', 'Other'], view: ['starting', 'topic', 'Home', 'All topics', 'Settings', 'Juno', 'no tab'] })) {
     if (key in value) {
       const field: unknown = Reflect.get(value, key)
       if (typeof field === 'string' && allowed.includes(field)) parts.push(`${key}=${field}`)
@@ -134,8 +141,8 @@ export function createLog(processName: LogProcess, folder = logFolder()) {
   return { log, effectLogger, flush, close: async () => { await flush() }, healthy: () => !failed }
 }
 
-/** Scans backwards in small chunks so Copy does not load whole log files into main. */
-async function readWarnings(file: string, limit: number): Promise<string[]> {
+/** Scans backwards in small chunks so Copy does not load whole log files into main. Keeps the last `limit` lines that pass `keep`. */
+async function readLastLines(file: string, limit: number, keep: (line: string) => boolean): Promise<string[]> {
   const handle = await open(file, 'r').catch(() => undefined)
   if (!handle) return []
   try {
@@ -152,7 +159,7 @@ async function readWarnings(file: string, limit: number): Promise<string[]> {
       // Generated lines are bounded. Ignore a malformed, unbounded line in an old file.
       if (carry.length > 16 * 1024) carry = ''
       for (const line of lines.toReversed()) {
-        if (/^\S+ (WARN|ERROR) (main|engine|agent) /.test(line)) found.push(line)
+        if (keep(line)) found.push(line)
         if (found.length === limit) break
       }
     }
@@ -166,9 +173,19 @@ export async function warningLines(folder = logFolder()): Promise<Array<{ proces
   for (const process of LOG_PROCESSES) {
     const lines: string[] = []
     for (let n = 0; n <= 3 && lines.length < 50; n++) {
-      lines.unshift(...await readWarnings(join(folder, `${process}.log${n ? `.${n}` : ''}`), 50 - lines.length).catch(() => []))
+      lines.unshift(...await readLastLines(join(folder, `${process}.log${n ? `.${n}` : ''}`), 50 - lines.length, (line) => /^\S+ (WARN|ERROR) (main|engine|agent) /.test(line)).catch(() => []))
     }
     results.push({ process, lines })
   }
   return results
+}
+
+/** The last `limit` lines of one process's log, every level, with its rotations when the file is short. Only lines the writer made are kept. */
+export async function lastLines(process: LogProcess, limit: number, folder = logFolder()): Promise<string[]> {
+  const lines: string[] = []
+  const written = new RegExp(`^\\S+ (INFO|WARN|ERROR) ${process} `)
+  for (let n = 0; n <= 3 && lines.length < limit; n++) {
+    lines.unshift(...await readLastLines(join(folder, `${process}.log${n ? `.${n}` : ''}`), limit - lines.length, (line) => written.test(line)).catch(() => []))
+  }
+  return lines
 }

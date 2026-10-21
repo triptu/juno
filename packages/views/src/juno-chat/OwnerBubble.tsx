@@ -56,7 +56,7 @@ export const OwnerBubble = memo(function OwnerBubble({ item, now, actions, eager
           {files !== undefined ? (
             <div onContextMenu={wordless ? onMenu : undefined} {...stylex.props(wordless && rowStyles.anchor)}>
               <OwnerFiles opId={item.opId} files={files} renderImage={actions.renderOwnerImage} />
-              {wordless ? <ReactionBadge reactions={item.reactions} corner="start" /> : null}
+              {wordless ? (actions.renderReactions?.(item.reactions, 'start') ?? <ReactionBadge reactions={item.reactions} corner="start" />) : null}
             </div>
           ) : null}
           {wordless ? null : (
@@ -64,7 +64,7 @@ export const OwnerBubble = memo(function OwnerBubble({ item, now, actions, eager
               <Text variant="bodySmall" tone="inherit" selectable dir="auto" as="p" sx={rowStyles.bubbleText}>
                 {item.text}
               </Text>
-              <ReactionBadge reactions={item.reactions} corner="start" />
+              {actions.renderReactions?.(item.reactions, 'start') ?? <ReactionBadge reactions={item.reactions} corner="start" />}
             </div>
           )}
         </div>

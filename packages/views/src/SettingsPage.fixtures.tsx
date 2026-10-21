@@ -1,4 +1,4 @@
-import { DEFAULT_QUICK_REACTIONS, emojiCatalog, sendCheckDefaults, sendCheckPrefKeys, TIDY_UP_DEFAULTS, type AiActivity, type AiCallRow, type ProviderState } from '@juno/contract'
+import { DEFAULT_QUICK_REACTIONS, emojiCatalog, prepareEmojiPicker, sendCheckDefaults, sendCheckPrefKeys, TIDY_UP_DEFAULTS, type AiActivity, type AiCallRow, type ProviderState } from '@juno/contract'
 import { SettingsTidyUp } from './TidyUpSettings'
 import { useLayoutEffect, type ReactNode } from 'react'
 import { defineFixtures, fixture, scene, type FixtureFrame } from '@juno/ui'
@@ -145,7 +145,7 @@ export default defineFixtures(
       'read-mirroring-off': at('general', <SettingsGeneral hideWhileSharing sharingDetection="available" onHideWhileSharingChange={noop} checks={checks} onCheckChange={noop} mirrorReads={false} onMirrorReadsChange={noop} catchUp={{ available: 3, pending: 0 }} onCatchUp={noop} peekKey="option" onPeekKeyChange={noop} homeThoughts onHomeThoughtsChange={noop} homePictures onHomePicturesChange={noop} onOpenGallery={noop} webPanel onWebPanelChange={noop} classifier onClassifierChange={noop} />),
       'appearance-quick-reactions': at('appearance', <SettingsAppearance theme="system" accent="coral" density="compact" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} quickReactions={<QuickReactionsSetting reactions={sevenQuickReactions} onChange={noop} onAdd={noop} />} />),
       // Add's picker over the page, not clipped by the card.
-      'appearance-quick-reactions-picker': at('appearance', <SettingsAppearance theme="system" accent="coral" density="compact" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} quickReactions={<QuickReactionsSetting reactions={DEFAULT_QUICK_REACTIONS} onChange={noop} onAdd={noop} picker={<EmojiPicker catalog={emojiCatalog} recent={DEFAULT_QUICK_REACTIONS.map((reaction) => reaction.name)} selected={new Set(DEFAULT_QUICK_REACTIONS.map((reaction) => reaction.name))} onPick={noop} onClose={noop} />} />} />),
+      'appearance-quick-reactions-picker': at('appearance', <SettingsAppearance theme="system" accent="coral" density="compact" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} quickReactions={<QuickReactionsSetting reactions={DEFAULT_QUICK_REACTIONS} onChange={noop} onAdd={noop} picker={<EmojiPicker data={prepareEmojiPicker(emojiCatalog, [])} recent={DEFAULT_QUICK_REACTIONS.map((reaction) => reaction.name)} selected={DEFAULT_QUICK_REACTIONS} onPick={noop} onClose={noop} />} />} />),
       // The minimum window with the sidebar hidden: the hours rows put their days and times under the label.
       'notifications-minimum-window': at('notifications', <NotificationsPage {...notificationsBase} />, { width: 720, height: 436, padded: false }),
       // The minimum window with the sidebar shown: Settings is 336 wide, so the list is a rail of icons.

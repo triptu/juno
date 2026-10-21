@@ -3,16 +3,17 @@ import { memo, type FocusEvent, type KeyboardEvent, type PointerEvent, type Reac
 import type { FileView, MessageView, Person, QuickReaction, ReactionIssue } from '@juno/contract'
 import { colors, density, layout, motion, opacity, radii, sizes, spacing, text, tints, z } from '@juno/tokens/tokens.stylex'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
-import { Avatar, focusRing, Icon, Text, type ActivateEvent, type HueName } from '@juno/ui'
+import { Avatar, focusRing, Icon, pointerMoved, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { SharedFileLines, type FileBlock } from './AttachmentCard'
 import { Files } from './FileCard'
-import { mediaOf } from './MediaGrid'
+import { viewableOf } from './MediaGrid'
 import type { MediaViewing } from './MediaViewer'
 import type { MenuAnchor } from './header/HeaderControls'
 import { HoverToolbar } from './HoverToolbar'
 import { hueFor, initials } from './look'
 import { MessageBody } from './MessageBody'
 import type { LinkInfo } from './MessageLink'
+import { PersonLink } from './personLink'
 import { Reactions } from './Reactions'
 import { TextButton } from './juno-chat/TextButton'
 import { ThreadLink } from './ThreadLink'
@@ -90,10 +91,12 @@ export interface MessageProps {
   readonly onRetry?: (clientMsgId: string) => void
   /** Delete draft on a failed send, with its `clientMsgId`. */
   readonly onDiscard?: (clientMsgId: string) => void
-  /** An image or video was opened: the media viewer, at it, with the message's others. */
+  /** A file the viewer shows was opened: the media viewer, at it, with the message's others. */
   readonly onOpenMedia?: ((viewing: MediaViewing) => void) | undefined
   /** Download on a file card. */
   readonly onDownload?: ((file: FileView) => void) | undefined
+  /** Quick Look on a card of a file the viewer cannot show. */
+  readonly onQuickLook?: ((file: FileView) => void) | undefined
   /** How far a sending message's files have uploaded, 0 to 1. */
   readonly progress?: number | undefined
 }
@@ -125,7 +128,7 @@ function holdToolbarForMove(event: KeyboardEvent<HTMLDivElement>): void {
 }
 
 /**
- * Where the toolbar goes, decided as the row is pointed at or focused, again
+ * Where the toolbar goes, decided as the pointer moves onto the row or it is focused, again
  * as the pointer moves over it, and when the list stops scrolling (never per
  * frame): a row can scroll or grow under a still pointer, and an answer kept
  * from before would leave the toolbar under the band. It rises above the
@@ -168,6 +171,16 @@ export function placeToolbar(row: HTMLElement): void {
 /** The pointer is over a row: it places its toolbar, except during a drag selection, which shows none (`MessageList`). */
 function pointedAt(event: PointerEvent<HTMLDivElement>): void {
   if (event.currentTarget.closest('[data-selecting]') === null) placeToolbar(event.currentTarget)
+}
+
+/**
+ * The pointer moved onto a row. A row that scrolled under a still pointer is
+ * placed when the scroll ends (`MessageList`): read here, its rect laid the
+ * page out inside every scroll frame that brought a new row under the pointer
+ * (performance.md 8.14).
+ */
+function pointerEntered(event: PointerEvent<HTMLDivElement>): void {
+  if (pointerMoved(event)) pointedAt(event)
 }
 
 const dim = stylex.keyframes({
@@ -218,11 +231,15 @@ export const Message = memo(function Message({
   onDiscard,
   onOpenMedia,
   onDownload,
+  onQuickLook,
   progress,
 }: MessageProps) {
   const name = sender?.name ?? message.senderId ?? 'Unknown'
   const hue = sender === undefined ? hueOf(message.senderId ?? message.ts) : hueFor(sender.color, sender.id)
   const header = startsGroup || message.groupStart
+  // The sender opens their DM (`PersonLink`), or the app user's behind a post under its own name; nothing when Juno has none.
+  const opens = sender?.unreachable === true ? undefined : (sender?.user ?? sender?.id)
+  const label = message.fromMe ? 'yourself' : name
   const focus = (event: FocusEvent<HTMLDivElement>) => {
     if (actions !== undefined) placeToolbar(event.currentTarget)
     if (event.target === event.currentTarget) onFocus?.(message.ts)
@@ -233,7 +250,7 @@ export const Message = memo(function Message({
     onOpenMedia === undefined
       ? undefined
       : (file: FileView) => {
-          const items = mediaOf(message.files)
+          const items = viewableOf(message.files)
           onOpenMedia({ items, index: Math.max(0, items.findIndex((each) => each === file)), sender: name, at: message.at })
         }
   // A shared message's files are drawn in its card; the rest under the body.
@@ -248,7 +265,7 @@ export const Message = memo(function Message({
           const missing = blocks.filter((block) => !files.some((file) => file.id === block.id))
           return (
             <>
-              <Files files={files} onOpenMedia={openMedia} onDownload={onDownload} tabbable={tabbable} flush />
+              <Files files={files} onOpenMedia={openMedia} onDownload={onDownload} onQuickLook={onQuickLook} tabbable={tabbable} flush />
               {missing.length === 0 ? null : <SharedFileLines files={missing} />}
             </>
           )
@@ -282,7 +299,7 @@ export const Message = memo(function Message({
       onFocus={focus}
       onKeyDownCapture={actions === undefined ? undefined : holdToolbarForMove}
       onBlur={actions === undefined ? undefined : (event) => event.currentTarget.contains(event.relatedTarget) || event.currentTarget.style.removeProperty('--row-toolbar-display')}
-      onPointerEnter={actions === undefined ? undefined : pointedAt}
+      onPointerEnter={actions === undefined ? undefined : pointerEntered}
       onPointerMove={actions === undefined ? undefined : pointedAt}
       data-editing={editor === undefined ? undefined : ''}
       {...stylex.props(
@@ -297,7 +314,9 @@ export const Message = memo(function Message({
     >
       <span data-sender={header ? '' : undefined} {...stylex.props(styles.gutter, !header && styles.gutterContinuation)}>
         {header ? (
-          <Avatar label={sender === undefined ? '?' : initials(name)} name={name} size={32} hue={hue} {...(sender?.avatarUrl === undefined ? {} : { src: sender.avatarUrl })} />
+          <PersonLink id={opens} label={label} part="avatar">
+            <Avatar label={sender === undefined ? '?' : initials(name)} name={name} size={32} hue={hue} {...(sender?.avatarUrl === undefined ? {} : { src: sender.avatarUrl })} />
+          </PersonLink>
         ) : (
           <Text variant="tag" tone="muted" numeric as="time" title={fullTime(message.at)} sx={styles.gutterTime}>
             {clockTime(message.at)}
@@ -307,9 +326,11 @@ export const Message = memo(function Message({
       <span {...stylex.props(styles.content, pending === 'sending' && styles.sending)}>
         {header ? (
           <span data-message-header="" {...stylex.props(styles.header)}>
-            <Text variant="messageName" tone="default" truncate tooltipWhenTruncated dir="auto" as="span" sx={styles.name} data-sender="" data-person-name={name}>
-              {name}
-            </Text>
+            <PersonLink id={opens} label={label} part="name" tabIndex={tabbable ? 0 : -1}>
+              <Text variant="messageName" tone="default" truncate tooltipWhenTruncated dir="auto" as="span" sx={styles.name} data-sender="" data-person-name={name}>
+                {name}
+              </Text>
+            </PersonLink>
             <Text variant="meta" tone="muted" numeric as="time" title={fullTime(message.at)} sx={styles.time}>
               {time}
             </Text>
@@ -338,6 +359,7 @@ export const Message = memo(function Message({
           files={own}
           onOpenMedia={openMedia}
           onDownload={onDownload}
+          onQuickLook={onQuickLook}
           tabbable={tabbable}
           progress={pending === 'sending' ? progress : undefined}
         />
@@ -388,7 +410,7 @@ export const Message = memo(function Message({
           </Text>
         ) : null}
       </span>
-      {toolbar !== undefined ? <span {...stylex.props(styles.toolbar)}>{toolbar}</span> : null}
+      {toolbar !== undefined ? <span {...stylex.props(styles.toolbar)}><span {...stylex.props(styles.toolbarShown)}>{toolbar}</span></span> : null}
     </div>
   )
 })
@@ -489,11 +511,15 @@ const styles = stylex.create({
     },
     // The toolbar is out of the layout until then too: every row has one, and
     // laid out but transparent it was most of the list's style and layout work
-    // when a topic opened or the pane changed width (performance.md 8). It is
-    // absolutely placed in a reserved slot, so showing it moves nothing.
+    // when a topic opened or the pane changed width (performance.md 8). Its
+    // slot is absolutely placed and stays in layout, so showing it moves
+    // nothing and lays out only the slot, not the row (performance.md 8.14).
     // The active row paints over its neighbours, which its toolbar overlaps.
+    // At rest it is --z-row, not auto: from auto to a number Chromium lays the
+    // whole row out again, on every row that slides under a still pointer
+    // while the list scrolls (performance.md 8.14).
     zIndex: {
-      default: 'auto',
+      default: z['--z-row'],
       ':hover': { default: null, [HOVER]: z['--z-toolbar'] },
       ':focus-visible': z['--z-toolbar'],
       ':has(:focus-visible)': z['--z-toolbar'],
@@ -552,6 +578,9 @@ const styles = stylex.create({
   },
   gutterTime: {
     opacity: 'var(--row-action-opacity)',
+    // Always its own stacking context, so the hover's opacity change from 0
+    // to 1 does not make it one and lay the row out again (performance.md 8.14).
+    isolation: 'isolate',
     whiteSpace: 'nowrap',
   },
   // Whole pixels tall, whatever the text inside (performance 3.3): a row
@@ -614,12 +643,24 @@ const styles = stylex.create({
   // a row whose top is under the header band, or inside a row too tall for
   // either, under the band. Paint containment would clip it
   // outside the row, so the row's overflow-clip-margin lets it paint.
+  // The slot is an empty anchor at the toolbar's top right corner. It never
+  // leaves the row's layout or changes size: either would lay the whole row
+  // out again when the toolbar shows (performance.md 8.14).
   toolbar: {
-    display: 'var(--row-toolbar-display)',
     position: 'absolute',
     top: `var(--row-toolbar-top, calc(${STRADDLE} - ${layout['--toolbar-height']}))`,
     right: spacing['--space-2'],
+    width: 0,
+    height: 0,
     zIndex: z['--z-toolbar'],
     opacity: 'var(--row-action-opacity)',
+  },
+  // The toolbar, shown and hidden inside the slot, hanging from its corner.
+  toolbarShown: {
+    display: 'var(--row-toolbar-display)',
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 'max-content',
   },
 })

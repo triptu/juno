@@ -1,4 +1,7 @@
-/** Keep the current badge. Automatic permission is tied to the first post-setup content view. */
+/**
+ * The dock: the unread badge and the incoming huddle's bounce. Keep the
+ * current badge. Automatic permission is tied to the first post-setup content view.
+ */
 import type { PermissionBridge } from './notificationPermission'
 
 export interface AutomaticNotificationPermission {
@@ -31,5 +34,24 @@ export function createDockBadge(permission: PermissionBridge, show: (text: strin
         refresh()
       })().finally(() => { asking = undefined })
     },
+  }
+}
+
+/**
+ * One informational bounce for an incoming huddle (SPEC 20, "Incoming
+ * huddles"), unless one of Juno's windows has focus. It never touches the
+ * badge. Under JUNO_E2E bounces are counted, and a test says whether Juno is
+ * frontmost; Playwright keeps the window focused, so it starts frontmost.
+ */
+export function createDockBounce(e2e: boolean, focused: () => boolean, bounce: () => void) {
+  let bounces = 0
+  let frontmost = true
+  return {
+    bounce: () => {
+      if (e2e ? frontmost : focused()) return
+      if (e2e) bounces += 1
+      else bounce()
+    },
+    testHooks: { dockBounces: () => bounces, frontmost: (value: boolean) => void (frontmost = value) },
   }
 }

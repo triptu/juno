@@ -6,6 +6,8 @@ import { Chip, Divider, focusRing, Text, type ActivateEvent, type HueName } from
 import { HighlightedCodeBlock } from './CodeHighlight'
 import { AttachmentCard, AttachmentFields, AttachmentImage, SharedFileLines, SharedPlace, type FileBlock } from './AttachmentCard'
 import { MessageLink as Link, type LinkInfo } from './MessageLink'
+import { MessageTable } from './MessageTable'
+import { PersonChip } from './personLink'
 import { slackDate } from './time'
 
 export interface MessageBodyProps {
@@ -52,8 +54,8 @@ export function isEmojiOnly(body: MessageBodyModel): boolean {
 }
 
 /**
- * Draws a `MessageBody`: paragraphs, quotes, code, lists, headings and
- * rules, with mentions as chips, links (Slack links to this workspace open
+ * Draws a `MessageBody`: paragraphs, quotes, code, lists, headings,
+ * tables and rules, with mentions as chips, links (Slack links to this workspace open
  * inside Juno, the rest outside), emoji and dates.
  * The message's own files are not drawn here; the message draws them from
  * its `files`. A shared message's files are drawn in its card, by
@@ -97,6 +99,8 @@ function Block({ block, now, hueOf, onChannel, onLink, linkInfo, tabIndex, rende
     }
     case 'image':
       return <AttachmentImage image={block} />
+    case 'table':
+      return <MessageTable table={block} tabbable={tabIndex === 0} render={(inlines) => <Inlines inlines={inlines} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} />} />
     case 'fields':
       return <AttachmentFields items={block.items} render={(inlines) => <Inlines inlines={inlines} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} />} />
     case 'context':
@@ -191,18 +195,8 @@ function Inline({ inline, now, hueOf, onChannel, onLink, linkInfo, tabIndex, qui
       return styled(inline.text, inline.style)
     case 'link':
       return <Link url={inline.url} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} quiet={quiet}>{styled(inline.text, inline.style)}</Link>
-    // Chip text sits in <bdi> so "@Name" keeps its own direction inside a
-    // right-to-left paragraph (otherwise the "@" jumps to the other end).
     case 'user':
-      return inline.isMe ? (
-        <Chip variant="mention" size="inline" title="Mentions you">
-          <bdi>@{inline.name}</bdi>
-        </Chip>
-      ) : (
-        <Chip variant="person" size="inline" hue={hueOf(inline.id)} data-person={inline.id} data-person-name={inline.name}>
-          <bdi>@{inline.name}</bdi>
-        </Chip>
-      )
+      return <PersonChip inline={inline} hue={hueOf(inline.id)} tabIndex={tabIndex} />
     case 'channel':
       return (
         <button
@@ -277,6 +271,10 @@ const styles = stylex.create({
     textWrap: 'pretty',
     userSelect: 'text',
     cursor: 'text',
+    // A message's column sizes the body to its content. A table on one line is
+    // as wide as its cells, so a body with one takes the column's width
+    // instead, and the table scrolls inside it rather than widening the message.
+    alignSelf: { default: null, ':has([data-msg-table])': 'stretch' },
   },
   jumbo: {
     fontSize: EMOJI_ONLY_SCALE,

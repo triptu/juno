@@ -1,9 +1,10 @@
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import type { FileView } from '@juno/contract'
-import { copyImage, downloadFile, openFile, uploadProgressAtom } from '@juno/state'
+import { copyImage, downloadFile, onMenuCommand, openFile, openViewerAtom, quickLookFile, readFileText, registry, uploadProgressAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import type { MediaViewing } from '@juno/views'
 import { chunk } from '../chunks'
+import { messageLinkInfo, openMessageLink } from '../slackLinks'
 
 const viewer = chunk(() => import('../MediaViewerPanel'))
 const MediaViewerPanel = viewer.component((module) => module.default)
@@ -16,13 +17,35 @@ function preloadViewer(): void {
   window.requestIdleCallback(() => void viewer.load())
 }
 
+/**
+ * Esc while a PDF or HTML file's frame in the viewer has focus: the frame
+ * keeps its keys from the page, so main reports the key (`frame.escape`)
+ * and the viewer gets it as if it had been pressed on the frame. Once for
+ * the app, whatever the number of topics.
+ */
+let frameEscape = false
+function listenFrameEscape(): void {
+  if (frameEscape) return
+  frameEscape = true
+  onMenuCommand((command) => {
+    const frame = document.activeElement
+    if (command !== 'frame.escape' || !(frame instanceof HTMLIFrameElement) || frame.closest('[data-media-viewer]') === null) return
+    frame.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+  })
+}
+
 /** Download on a file row or in the viewer: main saves it into ~/Downloads and shows it in Finder. */
 export function downloadMessageFile(file: FileView): void {
   if (file.download !== undefined) void downloadFile({ url: file.download, name: file.name })
 }
 
-/** Open in the viewer: main saves the file into a temporary folder and opens it in the default app. */
-function openMessageFile(file: FileView): void {
+/** Quick Look on a card or in the viewer: main saves the file into a temporary folder and shows it in the macOS preview window. */
+export function quickLookMessageFile(file: FileView): void {
+  if (file.download !== undefined) void quickLookFile({ url: file.download, name: file.name })
+}
+
+/** Open in browser for an HTML file in the viewer: main saves it into a temporary folder and opens it in the default app. */
+function openInBrowser(file: FileView): void {
   if (file.download !== undefined) void openFile({ url: file.download, name: file.name })
 }
 
@@ -32,27 +55,56 @@ function copyMessageImage(file: FileView): void {
   if (src !== undefined) void copyImage(src)
 }
 
-/** A topic's files: those dragged over it, the uploads in progress, and the message's media open in the viewer. */
-export function useTopicFiles() {
+/** The viewer open in `view`, at the item it shows. */
+function TopicViewer({ view, opener }: { readonly view: string; readonly opener: Element | null }) {
+  const open = useAtomValue(openViewerAtom(view))
+  if (open === undefined) return null
+  const { now, ...viewing } = open
+  return (
+    <Suspense fallback={null}>
+      <MediaViewerPanel
+        viewing={viewing}
+        now={now}
+        opener={opener}
+        onClose={() => registry.set(openViewerAtom(view), undefined)}
+        onShowItem={(index) => registry.set(openViewerAtom(view), { ...open, index })}
+        onDownload={downloadMessageFile}
+        onQuickLook={quickLookMessageFile}
+        onOpenInBrowser={openInBrowser}
+        onCopyImage={copyMessageImage}
+        loadText={readFileText}
+        onLink={openMessageLink}
+        linkInfo={messageLinkInfo}
+      />
+    </Suspense>
+  )
+}
+
+/**
+ * A topic's files: those dragged over it, the uploads in progress, and the
+ * message's media open in the viewer. The open viewer is kept per topic
+ * view (`openViewerAtom`), so the tab shows it again when its topic mounts
+ * again.
+ */
+export function useTopicFiles(view: string) {
   const [dropping, setDropping] = useState(false)
-  const [viewing, setOpen] = useState<{ readonly viewing: MediaViewing; readonly now: number } | undefined>(undefined)
+  // What had focus at the open, taken before the topic turns inert under the viewer; on a cold load its chunk mounts later.
+  const [opener, setOpener] = useState<Element | null>(null)
+  // The view now: a new thread's id changes once Slack acknowledges it, without a remount.
+  const current = useRef(view)
+  useEffect(() => {
+    current.current = view
+  }, [view])
   // Created once, like every row callback; the time in the viewer's header is reckoned from the moment it opened.
-  const [setViewing] = useState(() => (next: MediaViewing) => setOpen({ viewing: next, now: Date.now() }))
+  const [setViewing] = useState(() => (next: MediaViewing) => {
+    setOpener(document.activeElement)
+    registry.set(openViewerAtom(current.current), { ...next, now: Date.now() })
+  })
+  const open = useAtomValue(openViewerAtom(view), (viewer) => viewer !== undefined)
   const progress = useAtomValue(uploadProgressAtom)
   useEffect(preloadViewer, [])
+  useEffect(listenFrameEscape, [])
   const uploadProgress = progress._tag === 'Success' && Object.keys(progress.value).length > 0 ? progress.value : undefined
-  const viewer =
-    viewing === undefined ? null : (
-      <Suspense fallback={null}>
-        <MediaViewerPanel
-          viewing={viewing.viewing}
-          now={viewing.now}
-          onClose={() => setOpen(undefined)}
-          onDownload={downloadMessageFile}
-          onOpenFile={openMessageFile}
-          onCopyImage={copyMessageImage}
-        />
-      </Suspense>
-    )
+  const viewer = open ? <TopicViewer view={view} opener={opener} /> : null
   return { dropping, setDropping, setViewing, uploadProgress, viewer }
 }

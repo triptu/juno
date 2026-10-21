@@ -1,0 +1,1 @@
+- 10-20 14:40 · Tushar · Emoji matches rank by exact name or alias, recent use, common emoji, prefix and substring, with standard before workspace only on equal ranks; composer and picker share the rule.

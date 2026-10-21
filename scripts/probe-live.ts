@@ -439,6 +439,7 @@ async function emojiOnly(call: Call, edge: Edge): Promise<unknown> {
   return {
     pages,
     results: results.length,
+    nameCharacterClasses: countBy(results.flatMap((row) => typeof row['name'] === 'string' ? [...row['name']] : []), (character) => /^[a-z0-9_+-]$/.test(character) ? 'ascii_name' : /\p{L}/u.test(character) ? 'unicode_letter' : /\p{M}/u.test(character) ? 'unicode_mark' : /\p{N}/u.test(character) ? 'unicode_number' : `other_U+${character.codePointAt(0)?.toString(16).toUpperCase()}`),
     keys: keyCensus(results),
     stringValueKinds: Object.fromEntries(
       ['url', 'value', 'alias_for', 'alias', 'is_alias'].map((key) => [key, countBy(results, (r) => (key in r ? urlish(r[key]) : 'absent'))]),

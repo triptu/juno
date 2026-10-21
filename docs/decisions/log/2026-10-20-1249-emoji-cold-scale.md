@@ -1,0 +1,1 @@
+- 10-20 12:49 · Tushar · Measure at least ten cold picker subscriptions against 20,000 distinct custom image URLs, ending when the first visible images have loaded. Keep the picker within its existing open budget.

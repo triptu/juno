@@ -30,6 +30,7 @@ import MessageList from './MessageList.fixtures'
 import CommandPalette from './CommandPalette.fixtures'
 import NewDivider from './NewDivider.fixtures'
 import NewMessagesPill from './NewMessagesPill.fixtures'
+import HuddleRingSection from './HuddleRingSection.fixtures'
 import NotificationsPage from './NotificationsPage.fixtures'
 import UpdateSettings from './UpdateSettings.fixtures'
 import SettingsPage from './SettingsPage.fixtures'
@@ -39,6 +40,7 @@ import PeekKeySetting from './PeekKeySetting.fixtures'
 import QuickReactionsSetting from './QuickReactionsSetting.fixtures'
 import PeekView from './PeekView.fixtures'
 import ProcessesView from './ProcessesView.fixtures'
+import DevLogPage from './DevLogPage.fixtures'
 import Reactions from './Reactions.fixtures'
 import ReactorsCard from './ReactorsCard.fixtures'
 import SendCheckBar from './SendCheckBar.fixtures'
@@ -133,6 +135,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   NewDivider,
   NewMessagesPill,
   SendCheckBar,
+  HuddleRingSection,
   NotificationsPage,
   TabExpirySetting,
   TopicSwitcher,
@@ -140,6 +143,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   QuickReactionsSetting,
   PeekView,
   ProcessesView,
+  DevLogPage,
   OwnerBubble,
   SettingsPage,
   UpdateSettings,

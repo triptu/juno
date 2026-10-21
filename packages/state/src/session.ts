@@ -1,7 +1,7 @@
 /** Atoms for the session feature. */
 import { Option, Schema } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
-import { ReadySession, sessionImportFromSlackApp, sessionSignIn, sessionSignOut, sessionProfile, sessionStatus } from '@juno/contract'
+import { ReadySession, sessionImportFromSlackApp, sessionSignOut, sessionProfile, sessionStatus } from '@juno/contract'
 import { command, liveQuery } from './atoms'
 import { launchParam } from './shell'
 
@@ -11,7 +11,6 @@ export const sessionProfileAtom = liveQuery(sessionProfile)(undefined)
 
 export const sessionStatusAtom = liveQuery(sessionStatus)(undefined)
 
-export const signInCommand = command(sessionSignIn)
 export const importFromSlackAppCommand = command(sessionImportFromSlackApp)
 export const signOutCommand = command(sessionSignOut)
 

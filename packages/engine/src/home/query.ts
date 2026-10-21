@@ -23,7 +23,7 @@
  *   the first sync is done and at most once a day (`MOVES_SHOWN_PREF`).
  *
  * "Followed" is a thread Slack follows or a DM's Main. Resolved topics and
- * ignored channels never appear, except as Mentioned. `rankHomeItems` keeps at most one of each
+ * ignored channels supply only Mentioned and Missed huddle. `rankHomeItems` keeps at most one of each
  * kind and three in all. An item's `aiTitle` is the assistant's rewrite
  * (`homeTitle` in `ai_cache`) when it was made after the topic's latest
  * activity and was confident.
@@ -54,6 +54,7 @@ import { BOOT_KEY } from '@juno/sync'
 import { Clock, Effect } from 'effect'
 import { aiAssistOn } from '../ai'
 import { readMoves, withMove, type MoveRow } from './moves'
+import { readMissedHuddles } from './huddles'
 import { homeStage } from './ready'
 import { parseReason, parseScore, parseTitle } from './answers'
 import { cardTitle, readDelivered, readOldDrafts, withDelivery, withDraft, type Delivered, type OpenPromise } from './reviewCards'
@@ -171,6 +172,12 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
       candidates.push({ kind: item.kind, topicIds: rows.map((row) => row.topic_id), value: { item, rows, ...extra } })
     const tidy = tidyUpPrefsOf(yield* prefs.get<unknown>(TIDY_UP_PREF).pipe(Effect.catch(() => Effect.succeed(undefined))))
     const senders = new Set<string>()
+    for (const { huddle, row } of yield* readMissedHuddles(now)) {
+      if (notificationIsMuted(undefined, settings.channels[row.channel], settings.people[huddle.started_by])) continue
+      add({ id: `missedHuddle:${huddle.call_id}`, kind: 'missedHuddle', title: '', huddleId: huddle.call_id,
+        at: huddle.ended_at, durationMinutes: huddle.ended_at - huddle.started_at < 60_000 ? 0 : Math.round((huddle.ended_at - huddle.started_at) / 60_000),
+      }, [row])
+    }
 
     // Waiting on you: the newest topic with a question first.
     if (selfId !== undefined) {
@@ -290,7 +297,7 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
     }
 
     const visibleCandidates = candidates.flatMap((candidate) => {
-      const rows = candidate.value.rows.filter((row) => !isMuted(row))
+      const rows = candidate.value.rows.filter((row) => candidate.kind === 'missedHuddle' || !isMuted(row))
       return rows.length === 0 ? [] : [{ ...candidate, topicIds: rows.map((row) => row.topic_id), value: { ...candidate.value, rows } }]
     })
     const ranked = rankHomeItems(visibleCandidates, HOME_ITEM_LIMIT)
@@ -367,7 +374,8 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
       const draftOf = (row: HomeRow) => withDraft(topicOf(row), candidate.value.drafts?.get(row.topic_id))
       const unopenedOf = (row: HomeRow) => withUnopened(topicOf(row), row, candidate.value.unopened?.get(row.topic_id))
       const shape = base.kind === 'tidyUp' ? settledOf : base.kind === 'automatedMoves' ? movedOf : base.kind === 'doneFollowUps' ? deliveredOf : base.kind === 'oldDrafts' ? draftOf : base.kind === 'unfollow' || base.kind === 'ignore' ? unopenedOf : topicOf
-      const item: HomeItem = { ...base, title, topics: rows.map(shape), ...(aiTitle === undefined ? {} : { aiTitle }), ...(channel === undefined ? {} : { channel }) }
+      const missedTitle = base.kind === 'missedHuddle' && rows[0] !== undefined ? `Missed huddle ${rows[0].c_kind === 'im' || rows[0].c_kind === 'mpim' ? 'with' : 'in'} ${topicOf(rows[0]).title}` : title
+      const item: HomeItem = { ...base, title: missedTitle, topics: rows.map(shape), ...(aiTitle === undefined ? {} : { aiTitle }), ...(channel === undefined ? {} : { channel }) }
       if (aiAssist && rewriteIds.includes(base.id) && rows[0] !== undefined && (cached === undefined || !freshFor(cached.created_at, rows[0]))) rewritable.push({ item, row: rows[0] })
       return item
     })

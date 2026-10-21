@@ -1,0 +1,1 @@
+- 10-21 12:00 · initial-css-budget · Initial CSS budget is 200 KB (Tushar, 10-21): headroom for pages added after the StyleX sheet was minified.

@@ -4,6 +4,7 @@
  * paints, and closed by a press outside it or a scroll under it.
  */
 import { useEffect } from 'react'
+import { afterPaint, mark, measure } from '@juno/state/perf'
 import { chunk } from './chunks'
 
 const emojiPicker = chunk(() => import('./EmojiPickerPanel'))
@@ -11,11 +12,18 @@ export const EmojiPickerPanel = emojiPicker.component((module) => module.default
 
 /** Fetch the picker's chunk once a list has painted, so the first open does not wait for it. */
 let pickerLoaded = false
-const loadPicker = () => void emojiPicker.load()
+const loadPicker = () => {
+  const started = mark('juno.emoji-preload')
+  void emojiPicker.load().then(async () => {
+    const { workspaceEmojiReady } = await import('@juno/state/emoji')
+    await workspaceEmojiReady
+    measure('juno.emoji-preload', started)
+  })
+}
 export function preloadPicker(): void {
   if (pickerLoaded) return
   pickerLoaded = true
-  window.requestIdleCallback(loadPicker)
+  afterPaint(() => window.requestIdleCallback(loadPicker))
 }
 
 /** While `open`, a press outside the floating picker or a wheel scroll calls `close`. */

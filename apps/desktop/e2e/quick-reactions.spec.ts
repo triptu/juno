@@ -9,6 +9,7 @@ import type { Fixtures } from './fixtures'
 import type { Locator } from '@playwright/test'
 import { expect, launchApp, test } from './fixtures'
 import { Juno } from './driver/juno'
+import { readUserDb } from './driver/userDb'
 
 // Starts signed in and synced (README, "Synced start").
 test.use({ synced: true })
@@ -115,7 +116,7 @@ async function editQuickReactions({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'
     return box.height > 300 && hit !== null && panel.contains(hit)
   })
   expect(bottomIsPicker).toBe(true)
-  await expect(picker(juno).getByRole('button', { name: ':+1:, added' }).first()).toHaveAttribute('aria-disabled', 'true')
+  await expect(picker(juno).getByRole('group', { name: 'Frequently used' }).getByRole('button', { name: ':+1:, added' })).toHaveAttribute('aria-disabled', 'true')
 
   // Esc closes it and gives focus back to Add.
   await juno.win.keyboard.press('Escape')
@@ -155,3 +156,24 @@ async function limitQuickReactions({ juno }: Pick<Fixtures, 'juno'>): Promise<vo
   await full.click({ force: true })
   await expect(picker(juno)).toHaveCount(0)
 }
+
+
+test('a workspace alias adds its real emoji to quick reactions', async ({ juno, fake, userData }) => {
+  await juno.openSettings('Appearance')
+  await add(juno, 'hello_juno')
+  await expect.poll(() => pillNames(juno)).toEqual(['+1', 'white_check_mark', 'eyes', 'juno_wave'])
+  await expect(juno.settings.root.locator('[data-quick-reaction="juno_wave"] img')).toBeVisible()
+  await expect.poll(() => readUserDb(userData, fake.teamId, (db) => db.prepare("SELECT value_json FROM prefs WHERE key = 'quickReactions'").get()?.['value_json'])).toContain(`${fake.url}/emoji/juno_wave.svg`)
+  await juno.settings.root.getByRole('button', { name: 'Add reaction' }).click()
+  await expect(picker(juno).getByRole('heading', { name: 'Frequently used', exact: true })).toBeVisible()
+  await expect(picker(juno).getByRole('button', { name: ':juno_wave:, added', exact: true }).first()).toHaveAttribute('aria-disabled', 'true')
+})
+
+
+test('choosing a quick reaction in Settings does not record recent use', async ({ juno }) => {
+  await juno.openSettings('Appearance')
+  await add(juno, 'juno_wave')
+  await juno.settings.root.getByRole('button', { name: 'Remove juno_wave' }).click()
+  await juno.settings.root.getByRole('button', { name: 'Add reaction' }).click()
+  await expect(picker(juno).getByRole('group', { name: 'Frequently used' }).locator('[data-emoji="juno_wave"]')).toHaveCount(0)
+})

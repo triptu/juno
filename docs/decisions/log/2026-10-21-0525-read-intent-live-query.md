@@ -1,0 +1,1 @@
+- 10-21 05:25 · implementation · Wait for the pending read intent to reach the sidebar before testing an older read frame, and assert the durable pointer after that frame; the socket barrier does not drain live queries.

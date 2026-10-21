@@ -4,9 +4,8 @@
  * `juno://app/` serves the built renderer. `standard` gives it a real origin
  * and relative URLs, `secure` lets it use secure-context APIs, `codeCache`
  * lets Chromium keep the V8 code cache for the bundle between launches.
- * `juno://files/` serves message thumbnails on the Slack session and
- * `juno://uploads/` the images the composer staged (files.ts).
- * `juno://pictures/` serves Home's pictures from the engine's cache.
+ * `juno://files/` serves message thumbnails and media viewer files on the Slack session; `juno://uploads/` serves staged composer images. `corsEnabled` lets the page read text files with fetch; main allows only the app origin.
+ * `juno://pictures/` serves Home pictures from the engine cache.
  */
 import { app, net, protocol } from 'electron'
 import { resolve, sep } from 'node:path'
@@ -23,7 +22,7 @@ export const APP_URL = `${APP_ORIGIN}/index.html`
 /** Must run before `app.whenReady()`. */
 export function registerAppScheme(): void {
   protocol.registerSchemesAsPrivileged([
-    { scheme: APP_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, codeCache: true } },
+    { scheme: APP_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, codeCache: true } },
   ])
 }
 
@@ -37,7 +36,7 @@ export function serveAppScheme(rendererDir: string, fakeSlackOrigin?: string): v
   protocol.handle(APP_SCHEME, (request) => {
     const url = new URL(request.url)
     if (url.host === 'images') return serveImage(url, fakeSlackOrigin)
-    if (url.host === 'files') return serveThumbnail(url, fakeSlackOrigin, request.headers.get('range'))
+    if (url.host === 'files') return serveThumbnail(url, fakeSlackOrigin, request.headers.get('range'), request.headers.get('origin'))
     if (url.host === 'uploads') return serveUpload(url, app.getPath('userData'))
     if (url.host === 'pictures') return servePicture(url, app.getPath('userData'))
     if (url.host !== 'app') return new Response('Not found', { status: 404 })

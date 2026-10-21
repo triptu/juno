@@ -66,9 +66,9 @@ export function useReactionPicker(items: ReadonlyArray<ChatItem>, scrollRef: Ref
   const mine = ownReaction(items, picker.target)
   const react = (name: string, unicode: string | undefined) => {
     setPicker(undefined)
-    if (unicode === undefined) return
     noteRecentEmoji(name)
-    void junoCommands.react(picker.target, unicode === mine ? null : unicode)
+    const emoji = unicode ?? name
+    void junoCommands.react(picker.target, emoji === mine ? null : emoji)
   }
   // Esc closes, and focus goes back to the row's React button.
   const back = () => {
@@ -80,8 +80,7 @@ export function useReactionPicker(items: ReadonlyArray<ChatItem>, scrollRef: Ref
     event.preventDefault()
     back()
   }
-  // A Juno reaction is the emoji itself: workspace emoji, which are images, stay out of it.
-  const reactions = quick.filter((reaction) => reaction.url === undefined)
+  const reactions = quick
 
   const floating = (
     <Floating x={picker.x} y={picker.y} placement={picker.placement} layer="picker">
@@ -94,7 +93,7 @@ export function useReactionPicker(items: ReadonlyArray<ChatItem>, scrollRef: Ref
           <HoverToolbar
             label="Reactions"
             reactions={reactions}
-            onReact={(name) => react(name, reactions.find((reaction) => reaction.name === name)?.unicode)}
+            onReact={(name) => react(name, reactions.find((reaction) => reaction.name === name && reaction.url === undefined)?.unicode)}
             onMoreReactions={() => setPicker({ ...picker, full: true })}
           />
         </div>
