@@ -1905,6 +1905,8 @@ Alternated with main, three rounds of two runs, load 2.2 to 3.3:
 | Main | 8.2, 8.3, 8.4, 8.6, 8.4, 8.4 | 8.4 | 3.6 to 3.7 |
 | Fix | 7.9, 7.9, 7.7, 7.8, 7.7, 7.7 | 7.75 | 3.3 to 3.5 |
 
+The final code, with the slot as a 0 by 0 anchor, alternated with `origin/main` at `ce27a9c8` over two rounds at load 2.5 to 3.6: 7.9, 7.6, 7.5 and 7.7 ms (held-clock 3.4) against 8.5, 8.4, 8.5 and 8.6 ms (held-clock 3.6 to 3.8).
+
 The gate and the seed are unchanged. What is left in the heaviest frames is the toolbar's style (about 45 elements), a row leaving `content-visibility` skipping, and paint, prepaint and layerize of about 1 to 2.5 ms each. In about 70 runs, the prepend step at the start of the scenario timed out three times, its older page never arriving within 15 s; that is separate and not followed up here. Logs and traces are in `/Volumes/AgentWork/scroll-perf-gate/`.
 
 ### Developer log (2026-10-21)
