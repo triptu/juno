@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { MessageChannel } from 'node:worker_threads'
 import { HttpTransport } from '@juno/slack'
-import { workspacePaths } from '@juno/store'
+import { prefs, Store, workspacePaths } from '@juno/store'
 import { migratedWorkspace } from './migratedWorkspace'
 import { startFakeSlack, type Credentials, type FakeSlack, type FakeSlackOptions } from '@juno/fake-slack'
 import type { EngineStatus, SessionSecrets, SessionStatus, TopicRow } from '@juno/contract'
@@ -185,6 +185,8 @@ export interface EngineOptions {
   readonly clock?: EngineHostOptions['clock']
   /** How many topics the recheck after a drop reads (the app reads 10). */
   readonly recheckTopics?: number
+  /** Saved topic window for scenarios that need older cached history. */
+  readonly quietDays?: number
   /**
    * Space Slack calls as the app does (`SlackConfig.lanes`), not with the fake's pacing off, every spacing divided
    * by this number (1 is the app's pacing) so the methods keep their real ratios.
@@ -216,6 +218,9 @@ export async function startTestEngine(options: EngineOptions = {}): Promise<Runn
   if (options.reuse === undefined) {
     const enterprise = fake.workspace.team.enterprise_id
     await timed('schema copy', () => migratedWorkspace(workspacePaths(userData, enterprise === undefined ? fake.teamId : `${enterprise}-${fake.teamId}`)))
+  }
+  if (options.quietDays !== undefined) {
+    await Effect.runPromise(prefs.set('quietDays', options.quietDays).pipe(Effect.provide(Store.layer(workspacePaths(userData, fake.teamId))), Effect.scoped))
   }
   const transport = memoryTransport()
   let cycles = 0

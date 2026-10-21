@@ -164,7 +164,7 @@ it('repairs a Friday 17:00 edit made Saturday after closing Friday 18:00 and reo
   const monday = Date.now()
   const friday = monday - 3 * DAY
   let ts = ''
-  const engine = await bootedEngine(engines, { fakeOptions: { now: friday }, recheckTopics: 0, initial: (fake) => {
+  const engine = await bootedEngine(engines, { quietDays: 7, fakeOptions: { now: friday }, recheckTopics: 0, initial: (fake) => {
     ts = fake.workspace.post({ channel: 'C0ENG', user: 'U0LEO', text: 'Friday 17:00', at: friday - 3_600_000, silent: true }).ts
     return fake.signIn()
   } })

@@ -1160,6 +1160,7 @@ describe('cold boot details (review M3 finding 10)', () => {
     await quiet(engine)
     const searches = () => apiCalls(engine, 'search.modules.messages')
     expect(searches().map((c) => [c.args['_x_reason'], c.ok])).toEqual([['previews', false], ['discovery', false]])
+    const failedQuery = String(searches()[1]!.args['query'])
     engine.fake.resetCalls()
     engine.fake.dropSocket()
     await engine.phase('offline')
@@ -1167,8 +1168,7 @@ describe('cold boot details (review M3 finding 10)', () => {
     await quiet(engine)
     // The catch-up searched from the start of the window again, not from the failed boot.
     const query = String(searches()[0]!.args['query'])
-    const after = Date.parse(/after:(\d{4}-\d{2}-\d{2})/.exec(query)![1]!)
-    expect(after).toBeLessThan(Date.now() - 6 * 86_400_000)
+    expect(/after:(\d{4}-\d{2}-\d{2})/.exec(query)![1]).toBe(/after:(\d{4}-\d{2}-\d{2})/.exec(failedQuery)![1])
   })
 
   it("shows a channel's Main when its only activity in the window is a reply to an older, unfollowed root", async () => {
