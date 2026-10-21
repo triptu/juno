@@ -75,7 +75,7 @@ export const MainToEngine = Schema.Union([
   Schema.TaggedStruct('aiKey', { key: Schema.NullOr(Schema.String) }),
   /** A port to the agent utility process, in `ports[0]`. The engine serves the AgentHost group on it (ADR 0012). */
   Schema.TaggedStruct('agentPort', {}),
-  /** The answer to `requestSecrets`, `signIn` and `importFromSlackApp`: the stored or just captured session, or nothing. */
+  /** The answer to `requestSecrets` and `importFromSlackApp`: the stored or just captured session, or nothing. */
   Schema.TaggedStruct('secrets', { secrets: Schema.NullOr(SessionSecrets) }),
   /** A sign-in or import ended without a session. `details` is the import's report for "Copy details": no secrets, no values. */
   Schema.TaggedStruct('sessionFailed', { method: SignInMethod, kind: SignInFailureKind, message: Schema.String, details: Schema.optionalKey(Schema.String) }),
@@ -121,8 +121,6 @@ export const EngineToMain = Schema.Union([
   Schema.TaggedStruct('ready', {}),
   /** Please send the stored secrets (`secrets`, possibly null). */
   Schema.TaggedStruct('requestSecrets', {}),
-  /** Please open the sign-in window; answer with `secrets` or `sessionFailed`. */
-  Schema.TaggedStruct('signIn', {}),
   /** Please import the Slack app's session; answer with `secrets` or `sessionFailed`. */
   Schema.TaggedStruct('importFromSlackApp', {}),
   /** The session verified; please encrypt and store it. */

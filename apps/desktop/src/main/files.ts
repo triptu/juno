@@ -29,7 +29,7 @@ import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import { readdir, readFile, rm } from 'node:fs/promises'
 import { join, parse } from 'node:path'
 import type { DownloadResult } from '@juno/contract'
-import { SLACK_PARTITION } from './signInWindow'
+import { SLACK_PARTITION } from './slackSession'
 
 const SLACK_FILE_HOSTS = ['files.slack.com', 'slack-files.com', 'secure.gravatar.com']
 

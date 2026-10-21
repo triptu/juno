@@ -43,10 +43,10 @@ export type SlackAppRead =
   | { readonly ok: true; readonly team: LocalConfigTeam; readonly cookie: SlackCookie }
   | { readonly ok: false; readonly kind: SignInFailureKind; readonly message: string; readonly details: string }
 
-export const NOT_INSTALLED = 'Slack isn’t installed on this Mac.'
-export const SIGNED_OUT = 'Slack is installed but not signed in. Sign in to Slack in its app first, or use Sign in to Slack.'
-export const NO_KEYCHAIN = 'Juno could not read the Slack keychain item. Allow access when macOS asks, or sign in instead.'
-export const WRONG_KEYCHAIN = 'The Slack keychain item did not unlock the session cookie. Sign in instead.'
+export const NOT_INSTALLED = 'Slack isn’t installed on this Mac. Install Slack, sign in to it, then try again.'
+export const SIGNED_OUT = 'Slack is installed but not signed in. Open Slack, sign in there, then try again.'
+export const NO_KEYCHAIN = 'Juno could not read the Slack keychain item. Try again and allow access when macOS asks.'
+export const WRONG_KEYCHAIN = 'The Slack keychain item did not unlock the session cookie. Open Slack, sign in there, then try again.'
 export const NEXT_KEYCHAIN = 'That Slack keychain item did not unlock the session cookie. Use the Slack app’s session again to try the next one.'
 export const UNREADABLE = 'The Slack app’s data could not be read.'
 

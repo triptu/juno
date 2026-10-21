@@ -825,11 +825,7 @@ export class Juno {
     await this.win.evaluate(() => window.dispatchEvent(new FocusEvent('focus')))
   }
 
-  /** The sign-in page's primary and secondary actions. */
-  get signInButton() {
-    return this.win.getByRole('button', { name: 'Sign in to Slack' })
-  }
-
+  /** The sign-in page’s primary action. */
   get importButton() {
     return this.win.getByRole('button', { name: "Use the Slack app's session" })
   }
@@ -846,19 +842,9 @@ export class Juno {
     return this.clipboard()
   }
 
-  /**
-   * Clicks "Sign in to Slack", fills the fake's sign-in page in the window
-   * that opens, and waits for the app to come back signed in. Then skips
-   * "Set up Juno" unless `skipSetUp` is false.
-   */
-  async signIn(options: { readonly email?: string; readonly skipSetUp?: boolean } = {}): Promise<void> {
-    const started = performance.now()
-    const page = await this.openSignInWindow()
-    await page.getByPlaceholder('Email').fill(options.email ?? 'tushar@juno-fake.test')
-    await page.getByPlaceholder('Password').fill('password')
-    await Promise.all([page.waitForEvent('close'), page.getByRole('button', { name: 'Sign in' }).click()])
-    if (options.skipSetUp !== false) await this.skipSetUp()
-    if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: sign-in ${Math.round(performance.now() - started)} ms`)
+  /** Imports the fixture Slack app’s session and optionally skips “Set up Juno”. */
+  async signIn(options: { readonly skipSetUp?: boolean } = {}): Promise<void> {
+    await this.importFromSlackApp(options)
   }
 
   /** "Set up Juno", shown after a first sign-in with no model provider (SPEC 13.10). */
@@ -873,23 +859,6 @@ export class Juno {
   async skipSetUp(): Promise<void> {
     await expect(this.setUp.or(this.sidebar.root).first()).toBeVisible({ timeout: 15_000 })
     if (await this.setUp.isVisible()) await this.setUp.getByRole('button', { name: 'Skip for now' }).click()
-  }
-
-  /** Clicks "Sign in to Slack" and closes the window without signing in. */
-  async abandonSignIn(): Promise<void> {
-    const page = await this.openSignInWindow()
-    await page.close()
-  }
-
-  /**
-   * Clicks "Sign in to Slack" and returns the window it opens. The main
-   * window is never taken for it: closing that by mistake leaves the test
-   * with no app window.
-   */
-  private async openSignInWindow(): Promise<Page> {
-    const opened = this.app.waitForEvent('window', { predicate: (page) => page !== this.win })
-    await this.signInButton.click()
-    return opened
   }
 
   /** Clicks "Use the Slack app's session" and skips "Set up Juno" unless `skipSetUp` is false (as for an import that fails). The app reads the fixture directory it was launched with. */

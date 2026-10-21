@@ -1,29 +1,22 @@
-// Sign-in and session, end to end: the sign-in window against the fake's
-// sign-in page, the Slack-app import through the test seam, sign-out, and
-// the session expiring under the app.
+// Session import, sign-out, relaunch and expiry against the fake Slack app.
 import { readFile, access, readdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Page } from '@playwright/test'
 import { expect, launchApp, test, writeSlackApp } from './fixtures'
 import { Juno } from './driver/juno'
 
-// The sign-in window closed early asks Slack nothing, so the sign-in after it is still the first auth.test.
-test('signed out at launch, a sign-in window closed early, then a sign-in that verifies the session', async ({ juno, win, fake, userData }) => {
-  await test.step('starts signed out with the sign-in page', async () => {
+test('signed out at launch, then imports and verifies the Slack app’s session', async ({ juno, win, fake, userData }) => {
+  await test.step('starts signed out with one primary action', async () => {
     await juno.expectSignedOut()
-    await expect(juno.signInButton).toBeVisible()
     await expect(juno.importButton).toBeVisible()
+    await expect(win.getByRole('button', { name: 'Sign in to Slack', exact: true })).toHaveCount(0)
+    await expect(win.getByText("I'll use the Slack app on this Mac to sort your conversations into topics. Nothing is sent without you.")).toBeVisible()
     await expect(win.getByText('macOS will ask once for your Mac password so Juno can read Slack’s keychain item.')).toBeVisible()
     await expect(win.getByRole('status', { name: 'Engine status' })).toHaveCount(0)
+    await win.screenshot({ path: test.info().outputPath('slack-session-sign-in.png') })
   })
 
-  await test.step('says so when the sign-in window is closed early', async () => {
-    await juno.abandonSignIn()
-    await juno.expectSignInError('The sign-in window was closed before it finished.')
-    await expect(juno.signInButton).toBeEnabled()
-  })
-
-  await test.step('signs in through Slack’s sign-in page: the token and cookie are captured and the session verified', async () => {
+  await test.step('imports the token and cookie and verifies the session', async () => {
     await juno.expectSignedOut()
     await juno.signIn()
     await juno.expectSignedIn('Juno Fake')
@@ -172,7 +165,7 @@ test('comes back signed in when the local cache is damaged, and syncs it again',
 })
 
 // Signing out ends with a fresh sign-in, which the expiry step starts from.
-test('signing out, and Slack expiring the session, both return to the sign-in page', async ({ juno, fake, userData }) => {
+test('signing out, and Slack expiring the session, both return to the sign-in page', async ({ juno, win, fake, userData, slackApp }) => {
   await test.step('signs out: the secrets, the cookies and the session are gone', async () => {
     await juno.signIn()
     await juno.expectSignedIn('Juno Fake')
@@ -198,8 +191,11 @@ test('signing out, and Slack expiring the session, both return to the sign-in pa
     fake.expireSession()
 
     await juno.expectSessionExpired()
-    await expect(juno.signInButton).toBeVisible()
-    // Signing in again replaces the expired session.
+    await expect(juno.importButton).toBeVisible()
+    await expect(win.getByText('The Slack app’s session ended. Open Slack, sign in there, then try again. Your topics and settings are kept.')).toBeVisible()
+    // Stand in for signing in again in the installed Slack app.
+    await writeSlackApp(fake, slackApp.dir)
+    // Importing again replaces the expired session.
     await juno.signIn()
     await juno.expectSignedIn('Juno Fake')
   })
@@ -223,7 +219,7 @@ test('explains a Mac without Slack', async ({ fake, userData }) => {
   try {
     const juno = new Juno(running.app, running.win)
     await juno.importFromSlackApp({ skipSetUp: false })
-    await juno.expectSignInError('Slack isn’t installed on this Mac.')
+    await juno.expectSignInError('Slack isn’t installed on this Mac. Install Slack, sign in to it, then try again.')
     await juno.expectSignedOut()
   } finally {
     await running.close()
@@ -236,7 +232,7 @@ test('explains a Slack app that is not signed in', async ({ fake, userData }) =>
   try {
     const juno = new Juno(running.app, running.win)
     await juno.importFromSlackApp({ skipSetUp: false })
-    await juno.expectSignInError('Slack is installed but not signed in. Sign in to Slack in its app first, or use Sign in to Slack.')
+    await juno.expectSignInError('Slack is installed but not signed in. Open Slack, sign in there, then try again.')
     await juno.expectSignedOut()
     // "Copy details" gives a report of where the import stopped, with no cookie or token in it.
     const details = await juno.copySignInDetails()
@@ -254,12 +250,12 @@ test('explains a keychain password that does not unlock the cookie, and does not
   try {
     const juno = new Juno(running.app, running.win)
     await juno.importFromSlackApp({ skipSetUp: false })
-    await juno.expectSignInError('The Slack keychain item did not unlock the session cookie. Sign in instead.')
+    await juno.expectSignInError('The Slack keychain item did not unlock the session cookie. Open Slack, sign in there, then try again.')
     await juno.expectSignedOut()
     // A second press reuses the password from the first: the keychain is read once.
     await juno.importFromSlackApp({ skipSetUp: false })
     await expect.poll(() => juno.copySignInDetails(), { timeout: 15_000 }).toContain('"Slack Safe Storage" found, allowed earlier in this run, did not unlock the cookie')
-    await juno.expectSignInError('The Slack keychain item did not unlock the session cookie. Sign in instead.')
+    await juno.expectSignInError('The Slack keychain item did not unlock the session cookie. Open Slack, sign in there, then try again.')
     expect(await juno.slackKeychainReads()).toBe(1)
   } finally {
     await running.close()

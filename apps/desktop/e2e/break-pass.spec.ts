@@ -65,7 +65,7 @@ test('a malformed launch.json still opens a usable window', async ({ running, us
   await writeFile(join(userData, 'launch.json'), '{"theme":')
   const again = await launchApp(userData)
   try {
-    await expect(again.win.getByRole('button', { name: 'Sign in to Slack' })).toBeVisible()
+    await expect(again.win.getByRole('button', { name: "Use the Slack app's session" })).toBeVisible()
     await again.win.getByRole('radio', { name: 'Dark' }).click()
     await expect(again.win.getByRole('radio', { name: 'Dark' })).toHaveAttribute('aria-checked', 'true')
   } finally {

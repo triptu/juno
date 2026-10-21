@@ -18,7 +18,7 @@ import { COOKIES_FILES, LOCAL_STORAGE_DIR } from './locate.ts'
 
 export { type SlackCookie } from './cookies.ts'
 
-export { LocalConfigTeam, pickTeam } from './localConfig.ts'
+export { LocalConfigTeam } from './localConfig.ts'
 export { snappyUncompress } from './snappy.ts'
 
 export {
