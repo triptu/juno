@@ -1,15 +1,21 @@
 import type { ReactNode } from 'react'
 import { defineFixtures, scene } from '@juno/ui'
+import { ComposerSlot } from './ComposerSlot'
+import { noopActions } from './fixtures/actions'
 import { GalleryAppearanceSettings, GallerySettingsAppearance } from './fixtures/appearance'
+import { details, thread } from './fixtures/messages'
+import { MessageList } from './MessageList'
 import { NOW, pinnedIds, recentIds, rows, rowsById } from './fixtures/topics'
 import { SettingsPage } from './SettingsPage'
 import { Shell } from './Shell'
 import { Sidebar } from './Sidebar'
 import { SignInView } from './SignInView'
 import { relativeTime } from './time'
+import { TopicHeader } from './TopicHeader'
 import { TopicList } from './TopicList'
 import { TitlebarNav } from './TitlebarNav'
 import { TopicRow } from './TopicRow'
+import { TopicView } from './TopicView'
 import { Workspace } from './Workspace'
 
 const noop = () => {}
@@ -19,6 +25,13 @@ const workspaceTabs = [
   { id: 'postgres', title: 'Postgres 16 migration plan', icon: 'hash' },
   { id: 'density', title: 'Thread list density', icon: 'hash', unread: true },
 ] as const
+
+/** A topic open in the window, with the hover toolbar's actions. */
+const topicPage = (
+  <TopicView header={<TopicHeader detail={details.postgres} onMenu={noop} onPill={noop} onResolve={noop} juno={{ open: false, onToggle: noop }} />} composer={<ComposerSlot placeholder="Reply" />}>
+    <MessageList items={thread} main={false} now={NOW} actions={noopActions} onOpenThread={noop} onChannel={noop} onLink={noop} />
+  </TopicView>
+)
 
 const nav = (hidden: boolean) => <TitlebarNav sidebarHidden={hidden} canGoBack canGoForward={false} onToggleSidebar={noop} onBack={noop} onForward={noop} />
 
@@ -109,6 +122,8 @@ export default defineFixtures(
     },
     Interaction: {
       'hover-resize-edge': scene(() => <SignedIn />, { hover: '[role="separator"][aria-label="Resize sidebar"]' }),
+      // The pointer over one message in an open topic: the row's hover fill (--message-hover) and its toolbar.
+      'hover-message': scene(() => <SignedIn page={topicPage} />, { width: 1200, height: 800, hover: '[data-message-row]:nth-of-type(4) [data-msg-text]' }),
     },
   },
   { width: 1200, height: 720, padded: false },
