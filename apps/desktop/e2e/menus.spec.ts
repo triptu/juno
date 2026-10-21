@@ -68,3 +68,75 @@ test('the avatar menu and the palette each have one active row under the pointer
     await expect.poll(async () => highlighted(list)).toEqual([await rows.nth(1).textContent()])
   })
 })
+
+test('menu triggers open on mouse down and the release leaves them open', async ({ juno, win }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const press = async (trigger: Locator) => {
+    const box = (await trigger.boundingBox())!
+    await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await win.mouse.down()
+  }
+  const account = juno.sidebar.accountButton
+  await press(account)
+  await expect(juno.accountMenu.root).toBeVisible()
+  await win.mouse.up()
+  await expect(juno.accountMenu.root).toBeVisible()
+  await expect(account).toHaveAttribute('aria-expanded', 'true')
+  // A second press toggles closed; its click must not reopen it.
+  await press(account)
+  await expect(juno.accountMenu.root).toHaveCount(0)
+  await win.mouse.up()
+  await expect(juno.accountMenu.root).toHaveCount(0)
+  await account.click()
+  await expect(juno.accountMenu.root).toBeVisible()
+  await win.keyboard.press('Escape')
+
+  await juno.sidebar.row('#eng').open()
+  const switcher = win.getByRole('dialog', { name: 'Topics in this channel' })
+  await press(juno.topic.titleButton)
+  await expect(switcher).toBeVisible()
+  await expect(switcher.getByRole('textbox', { name: 'Search this channel' })).toBeFocused()
+  await win.mouse.up()
+  await expect(switcher).toBeVisible()
+  await juno.topic.expectTitle('Main')
+  await press(juno.topic.titleButton)
+  await expect(switcher).toHaveCount(0)
+  await win.mouse.up()
+  await expect(switcher).toHaveCount(0)
+  // Custom popovers need a separate press to choose an item: releasing over one is harmless.
+  await press(juno.topic.titleButton)
+  await expect(switcher).toBeVisible()
+  await switcher.getByRole('option').nth(1).hover()
+  await win.mouse.up()
+  await expect(switcher).toBeVisible()
+  await juno.topic.expectTitle('Main')
+  await win.keyboard.press('Escape')
+  // Enter, Space, ↓ and AT's detail=0 click still open from focus.
+  for (const key of ['Enter', 'Space', 'ArrowDown']) {
+    await juno.topic.titleButton.focus()
+    await win.keyboard.press(key)
+    await expect(switcher).toBeVisible()
+    await win.keyboard.press('Escape')
+  }
+  await juno.topic.titleButton.evaluate((button: HTMLButtonElement) => button.click())
+  await expect(switcher).toBeVisible()
+  await win.keyboard.press('Escape')
+  await juno.topic.titleButton.click()
+  await expect(switcher).toBeVisible()
+  await win.keyboard.press('Escape')
+
+  // Native Electron menus use the existing held-menu seam: opening is observable before release.
+  await juno.chooseNextMenuItem(null, { hold: true })
+  const before = await juno.menusAsked()
+  await press(juno.topic.moreButton)
+  await expect(juno.topic.moreButton).toHaveAttribute('aria-expanded', 'true')
+  await expect.poll(() => juno.menusAsked()).toBe(before + 1)
+  expect((await juno.lastMenu()).labels).toContain('Copy Slack link')
+  await win.mouse.up()
+  await expect(juno.topic.moreButton).toHaveAttribute('aria-expanded', 'true')
+  expect(await juno.menusAsked()).toBe(before + 1)
+  await juno.topic.expectTitle('Main')
+  await juno.releaseMenu()
+  await expect(juno.topic.moreButton).toHaveAttribute('aria-expanded', 'false')
+})

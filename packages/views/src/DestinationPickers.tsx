@@ -1,3 +1,4 @@
+import { menuTriggerHandlers } from '@juno/ui'
 import * as stylex from '@stylexjs/stylex'
 import { Globe } from '@phosphor-icons/react/dist/icons/Globe'
 import { CaretDown } from '@phosphor-icons/react/dist/icons/CaretDown'
@@ -9,7 +10,7 @@ import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
 import { useEffect, useRef, type KeyboardEvent, type ReactNode, type Ref } from 'react'
 import type { ConversationKind, PickConversation, PickConversations, ThreadSummary } from '@juno/contract'
-import { accent, colors, motion, radii, sizes, spacing, text, tints } from '@juno/tokens/tokens.stylex'
+import { accent, colors, radii, sizes, spacing, text, tints } from '@juno/tokens/tokens.stylex'
 import { Avatar, chunk, Icon, Popover, SparkleDuotone, Text, TopicArt, type PhosphorIcon } from '@juno/ui'
 import { hueFor, initials } from './look'
 
@@ -297,8 +298,7 @@ function PickerButton({ ref, label, icon, leading, tint, muted, wide = false, ex
       aria-expanded={expanded}
       onPointerEnter={warm}
       onFocus={warm}
-      onClick={onOpen}
-      onKeyDown={onKeyDown}
+      {...menuTriggerHandlers({ 'aria-haspopup': 'dialog', onClick: onOpen, onKeyDown })}
       {...stylex.props(styles.button, tint === undefined ? (subtle ? styles.unset : styles.plain) : tintStyles[tint], expanded && tint === undefined && styles.open)}
     >
       <span {...stylex.props(styles.face)}>
@@ -346,9 +346,6 @@ const styles = stylex.create({
     outlineOffset: sizes['--focus-ring-offset'],
     scrollMargin: sizes['--focus-ring-room'],
     outlineColor: accent['--focus-ring'],
-    transform: { default: 'none', ':active': `scale(${motion['--press-scale']})` },
-    transitionProperty: 'transform',
-    transitionDuration: { default: motion['--duration-fast'], '@media (prefers-reduced-motion: reduce)': '0ms' },
   },
   unset: {
     color: colors['--foreground-subtle'],

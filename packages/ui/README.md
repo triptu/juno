@@ -6,9 +6,9 @@ Dumb, accessible primitives. StyleX plus `@juno/tokens` only; no app state, no d
 
 - No `cursor: pointer`, ever. The body sets the arrow cursor; text inputs and textareas set the text cursor; checkboxes, ranges and selects keep the arrow. The gallery's behaviour spec checks every fixture for this.
 - Hover styles only under `@media (hover: hover)`, nested with `default: null` so they fall back to nothing.
-- Press feedback is `scale: var(--press-scale)` on `:active`, never on a disabled control (`pointer-events: none` makes `:active` impossible).
+- Buttons keep their geometry on press and toggle. Hover and press colours change at once. Disabled controls use `pointer-events: none`.
 - The focus ring shows on `:focus-visible` only: 2px `--focus-ring`, offset 2px (inset for tabs, segments and rows that sit flush).
-- Transitions are 150ms (`--duration-fast`) on colour, shadow, opacity and scale. Entrances (Toast, Popover, EmptyState) are 240ms (`--duration-appear`) and pops (an IconButton toggle filling, a reaction Chip with `pop`) 220ms (`--duration-pop`) on the spring. Every duration, scale and distance collapses under `prefers-reduced-motion` through the token itself, so no component has a media query. Only `transform` and `opacity` animate; rows, tabs and nav items never do.
+- Buttons have no transform transition or toggle pop. Toast and empty-state entrances use `--duration-appear`; menus and popovers open and close at once. Other motion uses only transform and opacity and collapses under reduced motion through the tokens.
 - `disabled` and `dimmed` share one look (`--opacity-disabled`); dimmed stays focusable and sets `aria-disabled`.
 - Chrome text is not selectable. `Text selectable`, `Textarea`, `TextField` and `CodeBlock` opt in.
 - Tooltips come from the one `TooltipLayer` the app mounts at its root; an element asks for one with `tooltip(label, keys?)`, and `IconButton`, `EmojiButton`, `AvatarButton` and `Swatch` do it from their `label` (an IconButton's `shortcut` adds keycaps). Do not use `title` on a control; it stays only for cut-off text and content.
@@ -38,6 +38,10 @@ as soon as loading finishes without ever committing a Suspense fallback. Views a
 `Popover` holds its whole floating panel behind Suspense. A cold chunk never
 shows a short empty panel that grows when the content arrives. The panel
 clamps to its pane when it mounts, including after a deferred load.
+
+## Menu and popover triggers
+
+Every menu or popover button declares `aria-haspopup`. `Button`, `IconButton`, `AvatarButton`, `EmojiButton` and `SelectButton` share `menuTriggerHandlers`; custom view buttons use it too. `expanded` on Button and IconButton implies a dialog trigger unless `aria-haspopup` says otherwise. Primary mouse-down invokes the trigger; its later click is ignored. Preventing the mouse-down default preserves focus in the panel. Keyboard and touch still activate on click; ↓ also opens. Ctrl-click and right-click keep their context-menu behaviour. Custom popovers require a separate press to select an item; native menus keep system drag selection.
 
 ## Mouse-down activation
 
@@ -85,5 +89,5 @@ export default defineFixtures(Component, {
 - A bare `name: fixture(...)` at the top level still works; those states are listed first with no heading. Prefer groups.
 - List only states the component's code can reach. If a fixture shows something production cannot produce, remove it; do not add a branch to the component to make it possible. Copy in a view's fixtures is the copy its container passes.
 - A pending or loading state holds still. Never resolve a fixture with a timeout. For a thing that never arrives, point at a request the gallery server holds open (Avatar `photo/pending` uses `/__fixture/pending.png`); tests answer it when they need the arrival.
-- A state's frame can ask the screenshot runner to put the component into a look first: `hover`, `press` (holds the primary button, with motion on so the press scale shows) and `focus` (keyboard focus, so the ring shows) each take a CSS selector inside the frame. Every primitive with such looks has states for them, so hover, pressed, focused and disabled are reviewed in light and dark like everything else. Do not add a `press` state for a disabled control: it cannot be pressed.
+- A state's frame can ask the screenshot runner to put the component into a look first: `hover`, `press` (holds the primary button, with motion on so unwanted press motion is caught) and `focus` (keyboard focus, so the ring shows) each take a CSS selector inside the frame. Every primitive with such looks has states for them, so hover, pressed, focused and disabled are reviewed in light and dark like everything else. Do not add a `press` state for a disabled control: it cannot be pressed.
 - The layout-shift test (`apps/gallery/shift.spec.ts`) hovers, presses and focuses every interactive element of every state and fails on any movement. Hover and focus may change colour, shadow and outline, never size, position or border width.

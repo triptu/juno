@@ -1,6 +1,6 @@
 # The friendly layer
 
-Direction for making Juno feel playful and friendly without giving up what makes it calm. The spec's layout, whitespace, quiet sidebar and native feel stay exactly as they are. Personality goes into the details: the icon set, the shape of small things, a little more colour where a person is involved, quick springy feedback on infrequent actions, a few spot illustrations, and warmer copy.
+Direction for making Juno feel playful and friendly without giving up what makes it calm. The spec's layout, whitespace, quiet sidebar and native feel stay exactly as they are. Personality goes into the details: the icon set, the shape of small things, a little more colour where a person is involved, instant feedback on buttons, a few spot illustrations, and warmer copy.
 
 Where this document and `tokens.md`, `primitives.md` or `inventory.md` disagree, this document wins; section 9 lists the edits to apply to `tokens.md` so they stop disagreeing. `docs/design/handoff/SPEC.md` still decides behaviour.
 
@@ -10,10 +10,10 @@ The before/after mock is `docs/design/friendly-layer/mock.html` (renders: `mock-
 
 Implemented in `packages/tokens`, `packages/ui`, `packages/views` and the gallery:
 
-- §2 Icons: Phosphor replaces Lucide everywhere; `Icon` has `weight` and `active`; `Button`, `IconButton`, `NavItem`, `Chip`, `ContextPill`, `Tab`, `Card` and `TextField` take Phosphor icons at the sizes in §2.2. `IconButton` toggles and `NavItem` fill when active with the spring; tabs stay regular. Bundle: initial JS 426 → 435 KB, CSS 69 → 75 KB.
+- §2 Icons: Phosphor replaces Lucide everywhere; `Icon` has `weight` and `active`; `Button`, `IconButton`, `NavItem`, `Chip`, `ContextPill`, `Tab`, `Card` and `TextField` take Phosphor icons at the sizes in §2.2. `IconButton` toggles and `NavItem` fill at once when active; tabs stay regular. Bundle: initial JS 426 → 435 KB, CSS 69 → 75 KB.
 - §3 Shape: `--radius-tag`, `--radius-pill`, `--radius-toast`; `--radius-xl` 12, `--radius-2xl` 14; nav and filter buttons on `--radius-lg`.
 - §4 Colour: `person` Chip variant with the 16% / 40% mix (`--person-chip-bg-mix`, `--person-chip-fg-mix`), `--warm`, `--warm-soft`, `--toast-success`. Reactions keep no hue; the pressed count turns `--foreground-default`.
-- §5 Motion: every token in the table plus `--stagger`, `--appear-scale`, `--rise-toast` and `--rise-stagger`, all collapsing under reduced motion. Toggle fill, reaction `pop`, toast rise, popover appear and the staggered empty state are in the primitives; resolve row removal and the catch-up card wait for those features.
+- §5 Motion: buttons and toggles stay still; menus and popovers open on primary mouse-down without motion. Toast rise and staggered empty states use the motion tokens and collapse under reduced motion.
 - §6 Illustrations: the five drawings as `Illustration`, `EmptyState` takes `illustration`, and `Logo` draws the laptop-two mark.
 - §7 Copy: the sign-in, session, empty-state, toast and engine-status copy is in the views and fixtures. The engine-status container strings in `apps/desktop` still read "Engine …" until that container is reworked.
 - Beyond this document: SPEC §5 now says person avatars are Slack profile photos and channels get a client-only icon and colour. `Avatar` takes `src` with a no-shift fade; `ChannelIcon` draws a chosen icon or the first letter on a chosen hue, with `defaultChannelLook(id)` for the untouched case; `channelIcons` and `channelColorNames` are the picker's data and `ChannelIconPicker` in `@juno/views` is the (unwired) picker.
@@ -187,33 +187,11 @@ Nothing new depends on `--hl`, so the four accents keep working. The person-hue 
 
 ## 5. Motion
 
-Three ideas: instant for the things you do constantly, quick ease-out for presses and toggles, and a small spring for the handful of moments that deserve it. All durations and curves are tokens; none is written in a component.
+Buttons keep their geometry on press and toggle. Hover and pressed colours change at once; no scale, translate, spring or transform transition. Icon fills swap at once, and reaction buttons do not pop.
 
-| Token | Value | Use |
-| --- | --- | --- |
-| `--duration-fast` | 150ms | unchanged: press scale, hover colour, focus ring |
-| `--duration-pop` | 220ms | reaction pop, toggle fill, resolve check |
-| `--duration-appear` | 240ms | toast, popover, palette, card and empty-state entrance |
-| `--duration-exit` | 150ms | every exit |
-| `--ease-out` | `cubic-bezier(0.2, 0, 0, 1)` | presses, toggles, entrances, exits (replaces the keyword `ease-out`) |
-| `--ease-spring` | `cubic-bezier(0.34, 1.4, 0.64, 1)` | the three pops below only; overshoots about 8% |
-| `--press-scale` | 0.96 | unchanged |
-| `--pop-scale` | 1.12 | the peak of a pop |
+Menu and popover triggers open on primary mouse-down. The following click does not toggle them again or choose an item. Keyboard Enter, Space and ↓ still open from focus. Panels open and close in their final position without a fade or scale. Custom popovers require a separate press to choose an item; native menus keep system drag selection.
 
-Where each applies:
-
-- **Press**: `scale` to `--press-scale` over `--duration-fast` `--ease-out`, release springs back over `--duration-pop` `--ease-spring`. Never when disabled.
-- **Toggle to active** (subscribe, pin, reaction I add): the filled icon scales 0.8 → `--pop-scale` → 1 over `--duration-pop` `--ease-spring` with an opacity cross-fade from the outline icon. Toggling off just cross-fades over `--duration-fast`. Both icons stay in the DOM; only `transform` and `opacity` animate.
-- **Reaction pop**: the emoji inside the chip scales 1 → `--pop-scale` → 1 over `--duration-pop` `--ease-spring` when my reaction lands. Other people's reactions arriving do not animate.
-- **Resolve** (row button, header button, Tidy up): the check fills and pops as above; the row fades to 0 over `--duration-exit` and is removed. Height is never animated; the list reflows after removal, as it does today. The undo toast appears at the same time.
-- **Toast**: enter `translateY(8px)` → 0 with opacity over `--duration-appear` `--ease-out`; exit opacity over `--duration-exit`. A replacing toast cross-fades, it does not slide again.
-- **Appear** (popover, menu, palette, send-check bar, catch-up card, grouping card, empty state): opacity 0 → 1 and `scale` 0.98 → 1 over `--duration-appear` `--ease-out`, origin at the anchor. Exit opacity only. The catch-up and grouping cards must not change height while entering (performance 3.3): they are laid out at full size and only fade.
-- **Empty state**: the illustration, title and action enter staggered 80ms apart with opacity and `translateY(6px)`, once, when the state first appears. Not on every filter change: if the empty state was visible less than a second ago it just shows.
-- **Theme switch**: unchanged (transitions suppressed for two frames).
-
-Never animated: row hover, selected row, tab switch, tab hover, typing, scrolling, list reorders, nav item hover and active. These stay instant as `docs/performance.md` 2.3 and 4.1 require. Only `transform` and `opacity` are animated anywhere; `will-change` is set on toasts and popovers while they enter and removed after.
-
-Reduced motion: `--duration-pop`, `--duration-appear`, `--duration-exit` and the stagger collapse to 0.01ms through the token (same pattern as `--duration-fast`), `--press-scale` and `--pop-scale` become 1, and translate distances become 0. Opacity cross-fades remain so state changes still have a visible cue; the filled icon, the toast text and the resolve check are the static cues.
+Toast and empty-state entrances may animate transform and opacity through the motion tokens, with reduced motion collapsing their durations and distances. The current tokens and rules live in `tokens.md` section 8.
 
 ## 6. Spot illustrations
 
@@ -285,7 +263,7 @@ Apply these in `docs/design/tokens.md` and `packages/tokens/src/tokens.stylex.ts
 3. **§1.5 Status**: add the toast check colour: `--toast-success: color-mix(in oklch, var(--success) 55%, var(--background))` light, `80%` dark.
 4. **§4 Radii**: add `--radius-tag: 999px` and `--radius-pill: 999px`; change `--radius-xl` 10 → 12 and `--radius-2xl` 12 → 14; add `--radius-toast: 14px`; move "Mention chip" from `--radius-xs` to `--radius-tag`; move nav and filter buttons from `--radius-md-plus` to `--radius-lg`. Update the use column of `--radius-md` to drop tags, chips, pills, reactions and the scope chip (they move to `--radius-tag` / `--radius-pill`). Keep the nesting rule paragraph; add "a label is a pill, a control or container is a rounded rectangle; pills never nest in pills".
 5. **§5 Icons**: replace the paragraph. "Phosphor (`@phosphor-icons/react`). Weight by size: `bold` at 12–14, `regular` at 15–20. `fill` marks active and selected states. `duotone` only for the Juno nav item, AI sparkles, For you card kinds and illustrations. Sizes: 12 (badges, chip close), 13 (row meta, tags, tab close), 14 (pills, cards, thread link, catch-up sparkle), 15 (tab icon), 16 (nav, menu items, buttons, title sparkle), 18 (icon buttons, hover toolbar, palette rows, send), 20 (attach, palette search). Tab icons sit at 0.75 opacity. Remove `--icon-stroke` and `--icon-stroke-small`; Phosphor is filled paths." Add `--icon-20` and drop `--icon-11`.
-6. **§8 Motion**: replace the table with section 5 of this document: `--duration-fast` 150, `--duration-pop` 220, `--duration-appear` 240, `--duration-exit` 150, `--ease-out cubic-bezier(0.2, 0, 0, 1)`, `--ease-spring cubic-bezier(0.34, 1.4, 0.64, 1)`, `--press-scale` 0.96, `--pop-scale` 1.12, the reduced-motion collapse for all of them, and the "never animated" list. Replace the closing sentence ("No enter/exit animations… cap it at 150ms") with "Entrances are 240ms, exits 150ms, pops 220ms; rows, tabs and typing never animate."
+6. **§8 Motion**: follow section 5: instant button feedback, no press motion or toggle spring, mouse-down menus and popovers with no entrance animation. `tokens.md` section 8 owns the remaining motion tokens.
 7. **§10 Spec overrides**: add the row "Lucide outline icons → Phosphor (this document §2)" and "Radius 6 tags → pills".
 8. **§2.2 Type roles**: no change. Note under the table that illustrations are 96–120px wide and sit 14px above the empty-state title.
 

@@ -1,3 +1,4 @@
+import { menuTriggerHandlers } from './menuTrigger'
 import * as stylex from '@stylexjs/stylex'
 import type { ButtonHTMLAttributes } from 'react'
 import { colors, radii, sizes } from '@juno/tokens/tokens.stylex'
@@ -29,7 +30,7 @@ const HOVER = '@media (hover: hover)'
 
 /**
  * The title bar's account button: a 24px avatar inside a 30px round ghost
- * button. Press scale, hover fill and the keyboard focus ring come from the
+ * button. Instant hover fill and the keyboard focus ring come from the
  * shared interactive styles. With `presence`, a dot on the avatar's corner
  * shows whether Slack shows you as active; with `paused`, it becomes a moon. The
  * button's description gives both in words.
@@ -44,6 +45,7 @@ export function AvatarButton({ label, initials, hue = 'rose', src, open = false,
       aria-expanded={open}
       {...tooltip(label)}
       {...rest}
+      {...menuTriggerHandlers({ ...rest, 'aria-haspopup': 'menu' })}
       {...stylex.props(interactive.reset, interactive.feedback, interactive.press, focusRing.outside, styles.button, open && styles.open)}
     >
       <span {...stylex.props(styles.avatar)}>

@@ -32,7 +32,7 @@ Import tokens through the subpath, never a barrel: `import { colors } from '@jun
 | `weights` | `--weight-regular` / `-medium` / `-semibold` | 400 / 500 / 600 |
 | `tracking` | `--tracking-tight` / `-normal` / `-wide` / `-none` | letter spacing |
 | `text` | `--text-<role>-family` / `-size` / `-weight` / `-leading` / `-tracking` | one complete setting per type role (`ui`, `meta`, `body`, `row-title`, `page-title`, ...) |
-| `motion` | `--duration-fast`, `--ease-out`, `--press-scale`, `--toast-life-*` | durations collapse under `prefers-reduced-motion` by themselves |
+| `motion` | `--duration-fast`, `--ease-out`, `--toast-life-*` | durations collapse under `prefers-reduced-motion` by themselves |
 | `layout` | `--sidebar-width`, `--titlebar-height`, `--tab-height`, `--reading-width`, `--page-width*`, `--menu-width*`, ... | fixed shell dimensions |
 | `sizes` | `--control-<px>`, `--tile-<px>`, `--avatar-<px>`, `--initials-<px>`, `--icon-<px>`, misc | control, tile, avatar and icon sizes named by pixel value |
 | `z` | `--z-<layer>` | stacking order from `toolbar` (2) to `toast` (45) |

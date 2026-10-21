@@ -17,7 +17,7 @@ export interface FixtureFrame {
   readonly hover?: string
   /**
    * Before the screenshot, press and hold the primary button on the first
-   * element matching this selector so the `:active` styles (press scale)
+   * element matching this selector so the `:active` colour feedback
    * show. Reduced motion is turned off for the shot.
    */
   readonly press?: string
