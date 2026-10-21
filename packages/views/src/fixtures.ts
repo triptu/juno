@@ -38,6 +38,7 @@ import PeekKeySetting from './PeekKeySetting.fixtures'
 import QuickReactionsSetting from './QuickReactionsSetting.fixtures'
 import PeekView from './PeekView.fixtures'
 import ProcessesView from './ProcessesView.fixtures'
+import DevLogPage from './DevLogPage.fixtures'
 import Reactions from './Reactions.fixtures'
 import ReactorsCard from './ReactorsCard.fixtures'
 import SendCheckBar from './SendCheckBar.fixtures'
@@ -138,6 +139,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   QuickReactionsSetting,
   PeekView,
   ProcessesView,
+  DevLogPage,
   OwnerBubble,
   SettingsPage,
   UpdateSettings,
