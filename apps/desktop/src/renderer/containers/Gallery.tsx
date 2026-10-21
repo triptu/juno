@@ -1,11 +1,11 @@
 /**
  * The gallery and the picture page (SPEC 12, "Pictures and the gallery"),
- * one lazy chunk with the catalog's. The catalog is bundled; the files come
+ * one lazy chunk with the catalog's; the quotes and facts load with it. The catalog is bundled; the files come
  * through the engine's picture cache, which downloads a picture's small
  * file as it nears the screen and the large one when its page opens.
  */
 import { use, useEffect, useState } from 'react'
-import { ensurePicture, lastPictureId, loadPictures, openExternal, pictureFilesAtom, pictureUrl, readPictureFiles, registry, tabsAtom, type Picture } from '@juno/state'
+import { ensurePicture, lastPictureId, loadPictures, loadThoughts, openExternal, pictureFilesAtom, pictureUrl, readPictureFiles, registry, tabsAtom, type Picture, type Thought } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { Gallery, GALLERY_SECTIONS, PicturePage, type GalleryFilter } from '@juno/views'
 import { openGallery, stepPicture } from './navigation'
@@ -17,12 +17,14 @@ const walls = new Map<string, { filter: GalleryFilter; scrollTop: number }>()
 const inGalleryOrder = (pictures: ReadonlyArray<Picture>): ReadonlyArray<Picture> => GALLERY_SECTIONS.flatMap((section) => pictures.filter((picture) => picture.kind === section.kind))
 
 export function GalleryTab({ pictureId, tabId }: { readonly pictureId: string | undefined; readonly tabId: string }) {
+  // Both chunks load at once, so the Quotes and Facts pills show their words in the frame they are pressed.
+  const thoughts = loadThoughts()
   const pictures = use(loadPictures())
   const picture = pictureId === undefined ? undefined : pictures.find((entry) => entry.id === pictureId)
-  return picture === undefined ? <Wall pictures={pictures} tabId={tabId} /> : <Story picture={picture} pictures={pictures} tabId={tabId} />
+  return picture === undefined ? <Wall pictures={pictures} thoughts={use(thoughts)} tabId={tabId} /> : <Story picture={picture} pictures={pictures} tabId={tabId} />
 }
 
-function Wall({ pictures, tabId }: { readonly pictures: ReadonlyArray<Picture>; readonly tabId: string }) {
+function Wall({ pictures, thoughts, tabId }: { readonly pictures: ReadonlyArray<Picture>; readonly thoughts: ReadonlyArray<Thought>; readonly tabId: string }) {
   const files = useAtomValue(pictureFilesAtom)
   const kept = walls.get(tabId)
   const [filter, setFilter] = useState<GalleryFilter>(kept?.filter ?? 'all')
@@ -33,6 +35,7 @@ function Wall({ pictures, tabId }: { readonly pictures: ReadonlyArray<Picture>; 
   return (
     <Gallery
       pictures={pictures}
+      thoughts={thoughts}
       sources={sources}
       {...(current === undefined ? {} : { current })}
       filter={filter}

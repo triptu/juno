@@ -1,0 +1,32 @@
+/** Quotes and facts from the list (`@juno/pictures/thoughts`), a few of each theme, without their sources. */
+import type { GalleryThoughtView } from '../Gallery'
+
+export const thoughts: ReadonlyArray<GalleryThoughtView> = [
+  { text: 'How we spend our days is, of course, how we spend our lives.', by: 'Annie Dillard', theme: 'focus' },
+  { text: 'A schedule defends from chaos and whim. It is a net for catching days.', by: 'Annie Dillard', theme: 'focus' },
+  { text: 'Beauty and grace are performed whether or not we will or sense them. The least we can do is try to be there.', by: 'Annie Dillard', theme: 'focus' },
+  { text: 'What I cannot create, I do not understand.', by: 'Richard Feynman', theme: 'thinking' },
+  { text: "I think it's much more interesting to live not knowing than to have answers which might be wrong.", by: 'Richard Feynman', theme: 'thinking' },
+  { text: 'I have steadily endeavoured to keep my mind free so as to give up any hypothesis… as soon as facts are shown to be opposed to it.', by: 'Charles Darwin', theme: 'thinking' },
+  { text: 'Students who practised recalling a passage remembered more of it a week later than those who reread it, though rereading looked better after five minutes.', theme: 'thinking' },
+  { text: 'In 1885 Hermann Ebbinghaus published pioneering experiments on memory, with himself as the only subject. Most of what he forgot, he lost within the first day.', theme: 'thinking' },
+  { text: 'Working memory holds only about four chunks of information at a time.', theme: 'thinking' },
+  { text: "Look again at that dot. That's here. That's home. That's us.", by: 'Carl Sagan', theme: 'wonder' },
+  { text: 'Our planet is a lonely speck in the great enveloping cosmic dark.', by: 'Carl Sagan', theme: 'wonder' },
+  { text: 'If you wish to make an apple pie from scratch, you must first invent the universe.', by: 'Carl Sagan', theme: 'wonder' },
+  { text: 'The universe is about 13.8 billion years old, a figure read from the faint afterglow of the Big Bang.', theme: 'wonder' },
+  { text: 'The observable universe is about 93 billion light-years across. It is wider than its age suggests because space kept stretching while the light travelled.', theme: 'wonder' },
+  { text: 'The oldest light we can see was set free about 380,000 years after the Big Bang. It still reaches us from every direction.', theme: 'wonder' },
+  { text: 'Time is but the stream I go a-fishing in.', by: 'Henry David Thoreau', theme: 'life' },
+  { text: 'I went to the woods because I wished to live deliberately, to front only the essential facts of life…', by: 'Henry David Thoreau', theme: 'life' },
+  { text: 'Only that day dawns to which we are awake. There is more day to dawn. The sun is but a morning star.', by: 'Henry David Thoreau', theme: 'life' },
+  { text: 'The sunlight on your skin left the Sun about 8 minutes 19 seconds ago.', theme: 'life' },
+  { text: 'When you look at the Moon, you see it as it was about 1.3 seconds ago.', theme: 'life' },
+  { text: 'The light you see from the Andromeda Galaxy left it more than 2 million years ago, long before our species existed.', theme: 'life' },
+  { text: 'The Empire State Building took 410 days to build, from March 1930 to its opening on 1 May 1931.', theme: 'made' },
+  { text: 'Brendan Eich wrote the first prototype of JavaScript, then called Mocha, in ten days in May 1995.', theme: 'made' },
+  { text: "On 7 April 2005 Linus Torvalds made Git's first commit, using Git itself. He later said it took about 10 days before Git could be used for the Linux kernel.", theme: 'made' },
+  { text: 'The word "Impressionist" came from Louis Leroy, a journalist who mocked Monet\'s Impression, Sunrise in a satirical review of the 1874 exhibition.', theme: 'art' },
+  { text: "Vincent van Gogh's career as an artist lasted only about ten years, from 1880 to 1890. In that time he made roughly 1,000 paintings, some 840 of which are known today.", theme: 'art' },
+  { text: 'In Renaissance Europe, ultramarine blue was made from lapis lazuli mined in Afghanistan and could cost more than gold.', theme: 'art' },
+]
