@@ -68,20 +68,25 @@ export function itemsOf(window: MessageWindow): ReadonlyArray<MessageListItem> {
 export const rowSelector = (ts: string) => `[data-message-row="${CSS.escape(ts)}"]`
 
 /**
- * The first row whose top is in view, and its offset from the top of the scroller. Not the row cut by the top
- * edge: after a jump that row may still be at its size estimate, and holding its top would let its real height
- * move every row below it.
+ * The first row whose top is in view, and its offset from the top of the scroller; the row over the top edge when
+ * it is taller than the view. Not the row cut by the top edge: after a jump that row may still be at its size
+ * estimate, and holding its top would let its real height move every row below it. Row tops only grow down the
+ * list, so a binary search reads about ten of them; a hit test at the edge finds nothing in the gap between groups.
  */
 export function rowInView(scroller: HTMLElement): { readonly element: HTMLElement; readonly anchorKey: string; readonly offset: number } | undefined {
   const box = scroller.getBoundingClientRect()
-  let element = document.elementFromPoint(box.left + box.width / 2, box.top + 1)?.closest<HTMLElement>(ROW) ?? scroller.querySelector<HTMLElement>(ROW)
-  if (element != null && element.getBoundingClientRect().top < box.top) {
-    let next = element.nextElementSibling
-    while (next !== null && !next.matches(ROW)) next = next.nextElementSibling
-    if (next instanceof HTMLElement && next.getBoundingClientRect().top < box.bottom) element = next
+  const rows = scroller.querySelectorAll<HTMLElement>(ROW)
+  let low = 0
+  let high = rows.length
+  while (low < high) {
+    const middle = (low + high) >> 1
+    if (rows[middle]!.getBoundingClientRect().top < box.top) low = middle + 1
+    else high = middle
   }
+  const below = rows[low]
+  const element = below !== undefined && below.getBoundingClientRect().top < box.bottom ? below : rows[low - 1]
   const anchorKey = element?.dataset['messageRow']
-  if (element == null || anchorKey === undefined) return undefined
+  if (element === undefined || anchorKey === undefined) return undefined
   return { element, anchorKey, offset: element.getBoundingClientRect().top - box.top }
 }
 
