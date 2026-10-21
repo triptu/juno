@@ -2,7 +2,7 @@
 
 Built on 10-17 as round 4's layout B, with the destination chip moved above the field (`round-5/README.md`). SPEC §12, "Writing", now decides behaviour.
 
-Round 4, the layout to build (greeting back, "Recent" above the composer, All topics in the sidebar title bar), is in `round-4/README.md`. Round 3, the calm address book the owner picked and the final removal plan, is in `round-3/README.md`; it replaces the plan below. Round 2, after the owner's feedback (one composer at the bottom, Juno by default, @ and # to pick, generous recents), is in `round-2/README.md`.
+Round 4, the layout that was built (greeting back, "Recent" above the composer, All topics in the sidebar title bar), is in `round-4/README.md`. Recent was removed on 10-21: Home's composer has the destination chip and the field, and people and channels are a first @ or #, the chip's list or ⌘K away. Round 3, the calm address book the owner picked and the final removal plan, is in `round-3/README.md`; it replaces the plan below. Round 2, after the owner's feedback (one composer at the bottom, Juno by default, @ and # to pick, generous recents), is in `round-2/README.md`.
 
 Three proposals for one Home that shows what needs you, lets you write to anyone, and asks Juno, so New chat stops being a separate page. Nothing here is built into the app yet; the owner picks a direction first.
 

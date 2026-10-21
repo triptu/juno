@@ -35,7 +35,7 @@ export interface ComposerProps {
   readonly placeholder: string
   /** A send is in flight: the field stays editable, the button does not send twice. */
   readonly sending?: boolean
-  /** Above the field, inside its column: Home's Recent and destination chip. */
+  /** Above the field, inside its column: Home's destination chip. */
   readonly above?: ReactNode
   readonly inputRef?: Ref<HTMLTextAreaElement>
   /** ↑ in an empty field: a topic selects its newest message (SPEC section 7, Keyboard). */

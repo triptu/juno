@@ -10,12 +10,12 @@ import { engTopics } from './fixtures/messages'
 import { recentConversations } from './fixtures/newChat'
 import { pictureCards } from './fixtures/pictures'
 import { PrivacyOn } from './fixtures/privacy'
-import { atMa, DRAFT, eng, hashEn, maya, MULTILINE, recentChannels, recentPeople } from './fixtures/recents'
+import { atMa, DRAFT, eng, hashEn, maya, MULTILINE } from './fixtures/homeWrite'
 import { art, NOW } from './fixtures/topics'
 import { Home, type HomeProps } from './Home'
 import { HomeSyncLine } from './HomeSyncLine'
 import { HomeScene, type HomeSceneName } from './HomeScene'
-import { destinationLabel, HomeRecent, SendToList, sendToRowId } from './HomeWrite'
+import { destinationLabel, SendToList, sendToRowId } from './HomeWrite'
 import { WelcomeCard, type WelcomeHintName } from './WelcomeCard'
 import { HomeWriteTop } from './HomeWriteTop'
 
@@ -28,12 +28,6 @@ interface Write {
   readonly sendTo?: { readonly kind: 'person' | 'channel'; readonly rows: ReadonlyArray<PickConversation> }
   /** The chip's destination list. */
   readonly listOpen?: boolean
-  /** No Recent: a first run. */
-  readonly noRecent?: boolean
-  /** Only the first few of each column: a new account. */
-  readonly fewRecent?: number
-  /** The first sync is running: Recent's room stays empty. */
-  readonly syncing?: boolean
   /** A running job's state line in place of the placeholder (SPEC 13.4). */
   readonly jobLine?: string
   /** The thread chosen in the topic chip; none is Main. */
@@ -50,11 +44,10 @@ const engHomeTopics: ReadonlyArray<ThreadSummary> = engTopics.map((thread, index
 const migration = engHomeTopics[0]!
 const secrets = engHomeTopics[4]!
 
-/** The composer as the container builds it: Recent, the chip, then the field. */
-function write({ destination, draft = '', sendTo, listOpen = false, noRecent = false, fewRecent, syncing = false, jobLine, thread, topicsOpen = false }: Write = {}): ReactNode {
+/** The composer as the container builds it: the chip, then the field. */
+function write({ destination, draft = '', sendTo, listOpen = false, jobLine, thread, topicsOpen = false }: Write = {}): ReactNode {
   const chip = <DestinationChip destination={destination} open={listOpen} onOpen={noop} query="" onQuery={noop} conversations={listOpen ? recentConversations : undefined} onPick={noop} />
   const topic = <TopicChip conversation={destination} thread={thread} open={topicsOpen} onOpen={noop} query="" onQuery={noop} threads={destination?.channelId === 'C0ENG' ? engHomeTopics : []} now={NOW} onPick={noop} />
-  const recent = noRecent ? null : <HomeRecent people={recentPeople.slice(0, fewRecent)} channels={recentChannels.slice(0, fewRecent)} chosen={destination?.key} onPick={noop} onOpen={noop} reserve={syncing} />
   const active = sendTo?.rows[0]?.key
   return (
     <Composer
@@ -62,7 +55,7 @@ function write({ destination, draft = '', sendTo, listOpen = false, noRecent = f
       onChange={noop}
       onSend={noop}
       placeholder={destination === undefined ? (jobLine ?? 'Ask Juno, or start with @ or #') : thread === undefined ? `Message ${destinationLabel(destination)}` : `Reply in ${thread.title}`}
-      above={<HomeWriteTop recent={recent} chip={chip} topic={topic} topicShown={destination !== undefined} />}
+      above={<HomeWriteTop chip={chip} topic={topic} topicShown={destination !== undefined} />}
       {...(sendTo === undefined
         ? {}
         : {
@@ -155,12 +148,12 @@ export default defineFixtures(
       // A DM with someone who has no photo, beside a thread in a channel.
       'places-no-photo': state({ scene: 'evening', title: 'Evening, Tushar.', items: [homeItems.dmNoPhoto, homeItems.waiting] }),
       one: state({ scene: 'friday', title: 'Happy Friday, Tushar.', items: [homeItems.resume] }),
-      // The minimum window with the sidebar shown: the page is 336 by 436; the column keeps 24 on each side and Recent stacks.
+      // The minimum window with the sidebar shown: the page is 336 by 436; the column keeps 24 on each side.
       'minimum-window': state({}, { width: 336, height: 436, padded: false }),
       'short-window': state({ items: two }, { width: 720, height: 520, padded: false }),
       narrow: state({}, narrow),
     },
-    // Writing (SPEC section 12): Recent, the destination chip and the field, one stack at the bottom.
+    // Writing (SPEC section 12): the destination chip and the field at the bottom.
     Write: {
       juno: state({ items: two }),
       'maya-chosen': state({ items: two, composer: write({ destination: maya, draft: DRAFT }) }),
@@ -181,9 +174,6 @@ export default defineFixtures(
       'topic-list': state({ items: two, composer: write({ destination: eng, thread: migration, topicsOpen: true }) }),
       // A long thread title and a narrow page: the topic chip shortens first, then the destination chip.
       'topic-narrow': state({ items: two, composer: write({ destination: eng, thread: secrets, draft: DRAFT }) }, { width: 400, height: 720, padded: false }),
-      // Two of each: Recent is as tall as its rows, so the chip stays 12 below the last one.
-      'few-recent': state({ items: two, composer: write({ fewRecent: 2 }) }),
-      'first-run': state({ scene: 'midday', title: 'Hello, Tushar.', items: [], composer: write({ noRecent: true }) }),
       // A running job's state line in place of the placeholder (SPEC 13.4); a long one takes an ellipsis.
       'job-line': state({ composer: write({ jobLine: 'T3 Code · tests running, 2 of 5' }) }),
       'job-line-long': state({ composer: write({ jobLine: 'T3 Code · Fix the sidebar flake · tests running, 2 of 5, the slowest suite still has four minutes to go' }) }),
@@ -207,15 +197,13 @@ export default defineFixtures(
       'caught-up': state({ scene: 'caughtUp', title: 'All caught up.', items: [] }),
       'caught-up-narrow': state({ scene: 'caughtUp', title: 'All caught up.', items: [] }, narrow),
       // The first sync is still running: the greeting and one calm line, no rows, never a blank page.
-      // Recent keeps its room empty until the sync ends, so its rows never re-rank under the pointer.
-      syncing: state({ line: <HomeSyncLine line="Syncing with Slack." />, items: [], loading: true, reservedItems: 3, composer: write({ syncing: true }) }),
+      syncing: state({ line: <HomeSyncLine line="Syncing with Slack." />, items: [], loading: true, reservedItems: 3 }),
       // Once the conversations are listed, the line counts them as the sidebar's card does, in a fixed width.
-      'syncing-count': state({ line: <HomeSyncLine line="Syncing with Slack." progress={{ done: 7, total: 143 }} />, items: [], loading: true, reservedItems: 3, composer: write({ syncing: true }) }),
+      'syncing-count': state({ line: <HomeSyncLine line="Syncing with Slack." progress={{ done: 7, total: 143 }} />, items: [], loading: true, reservedItems: 3 }),
       // Mid-sync: the rows that landed so far, with room kept for the rest.
-      'syncing-rows': state({ line: <HomeSyncLine line="Syncing with Slack." progress={{ done: 64, total: 143 }} />, items: [homeItems.waiting], loading: true, reservedItems: 3, composer: write({ syncing: true }) }),
+      'syncing-rows': state({ line: <HomeSyncLine line="Syncing with Slack." progress={{ done: 64, total: 143 }} />, items: [homeItems.waiting], loading: true, reservedItems: 3 }),
       // Home is ready while the rest of history lands: no line, the rows shown, and room kept for one that lands later.
-      // Recent still keeps its room until the sync ends.
-      'ready-filling': state({ items: [homeItems.waiting], reservedItems: 3, composer: write({ syncing: true }) }),
+      'ready-filling': state({ items: [homeItems.waiting], reservedItems: 3 }),
       'nothing-waiting': state({ scene: 'night', title: 'Still up, Tushar.', items: [] }),
       // A thought under the greeting when nothing waits: a quote with who said it, and a fact.
       'thought-quote': state({ scene: 'caughtUp', title: 'All caught up.', items: [], thought: quote }),
@@ -223,8 +211,8 @@ export default defineFixtures(
       'thought-narrow': state({ scene: 'caughtUp', title: 'All caught up.', items: [], thought: longQuote }, narrow),
       'thought-minimum-window': state({ scene: 'caughtUp', title: 'All caught up.', items: [], thought: fact }, minimum),
       // Ready while history lands with nothing yet: the thought sits over the reserved slots, and a row that lands takes its place.
-      'thought-filling': state({ scene: 'midday', title: 'Hello, Tushar.', items: [], reservedItems: 3, thought: fact, composer: write({ syncing: true }) }),
-      'thought-gives-way': state({ scene: 'midday', title: 'Hello, Tushar.', items: [homeItems.waiting], reservedItems: 3, thought: fact, composer: write({ syncing: true }) }),
+      'thought-filling': state({ scene: 'midday', title: 'Hello, Tushar.', items: [], reservedItems: 3, thought: fact }),
+      'thought-gives-way': state({ scene: 'midday', title: 'Hello, Tushar.', items: [homeItems.waiting], reservedItems: 3, thought: fact }),
       'no-name': state({ scene: 'midday', title: 'Hello.', items: [homeItems.waiting] }),
     },
     // A picture in the caught-up scene's place: the same box for every shape, resting on its plaque line.
@@ -253,8 +241,6 @@ export default defineFixtures(
       'focus-row': state({}, { focus: '[data-home-item="resume"] a' }),
       'hover-follow-up': state({ items: [homeItems.waiting, homeItems.followUp, homeItems.tidyUp] }, { hover: '[data-home-item="followUp"] a' }),
       'hover-automated': state({ items: [homeItems.waiting, homeItems.resume, homeItems.automated] }, { hover: '[data-home-item="automated"] a' }),
-      'hover-recent': state({ items: two }, { hover: '[data-recent="0-1"]' }),
-      'focus-recent': state({ items: two }, { focus: '[data-recent="0-0"]' }),
       'hover-chip': state({ items: two }, { hover: 'button[aria-label="Send to: Juno"]' }),
       'focus-topic-chip': state({ items: two, composer: write({ destination: eng, thread: migration }) }, { focus: 'button[aria-label^="Topic:"]' }),
       entrance: state({ enter: true }),

@@ -3,8 +3,8 @@ import type { Fixtures } from './fixtures'
 // anatomy", inventory 15.1 and 16): Redraw art in the row's menu and in the
 // header's title menu draws the topic again, the toast's Undo and ⌘Z put the
 // previous drawing back, and the menu has no Redraw art when no drawing can
-// be made: AI assist off or no OpenRouter key. Home's Recent draws a
-// channel with its Main's art, as the sidebar does. At the daily AI limit Redraw
+// be made: AI assist off or no OpenRouter key. Home's destination list
+// draws a channel with its Main's art, as the sidebar does. At the daily AI limit Redraw
 // art says so, and Change limit leads to the field in Settings › AI activity.
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
@@ -23,18 +23,22 @@ test('shares channel art with Home and redraws topic art with Undo', async ({ ju
   await juno.signIn()
   await juno.waitForSync()
   const context = { juno }
-  await test.step("a channel in Home's Recent shows the art its Main row shows in the sidebar", () => homeChannelArt(context))
+  await test.step("a channel in Home's destination list shows the art its Main row shows in the sidebar", () => homeChannelArt(context))
   await test.step('Redraw art draws a topic again, and Undo puts the previous drawing back', () => redrawTopicArt(context))
 })
 
 async function homeChannelArt({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   const markup = await juno.sidebar.row('#eng').artMarkup()
-  const tile = juno.write.recentRow('eng').locator('[data-topic-art]')
+  await juno.write.chip.click()
+  await juno.write.search.fill('eng')
+  const tile = juno.write.option('eng').locator('[data-topic-art]')
   await expect(tile).toHaveAttribute('data-topic-art', 'art', { timeout: 15_000 })
   // The sizes differ, so compare the drawing's hue: the ink colour every stroke starts from.
   const ink = (svg: string) => /stroke="(var\([^"]+\))"/.exec(svg)?.[1]
   expect(ink(markup)).toBeDefined()
   expect(ink(await tile.innerHTML())).toBe(ink(markup))
+  await juno.win.keyboard.press('Escape')
+  await expect(juno.write.list).toBeHidden()
 }
 
 async function redrawTopicArt({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {

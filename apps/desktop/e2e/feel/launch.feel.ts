@@ -15,7 +15,6 @@ test('launch shows Home with its composer', async ({ juno, running, userData, fa
       name: 'launch', title: 'Launch into Home',
       probes: [
         { kind: 'box', name: 'composer', selector: '[data-home] [data-composer-field]' },
-        { kind: 'count', name: 'recentRows', within: '[data-home-recent]', selector: 'button' },
         { kind: 'text', name: 'tab', selector: '[role="tab"][aria-selected="true"]' },
       ],
       checks: [landsAndStays('composer', 'composer', { tolerance: 0 }), ({ recording }) => {
@@ -25,7 +24,7 @@ test('launch shows Home with its composer', async ({ juno, running, userData, fa
     }, async () => {
       await expect(again.write.composer).toBeVisible()
       await expect(again.write.composer).toBeFocused()
-      await expect(again.write.recent.getByRole('button').first()).toBeVisible()
+      await expect(again.write.chip).toBeVisible()
     })
   } finally { await next.close() }
 })

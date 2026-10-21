@@ -34,7 +34,7 @@ export { bodyFromMarkdown, tableText } from '@juno/richtext'
 export * from './composer-mentions'
 export * from './composer-emoji'
 export * from './composer-links'
-export { frequentDestinations, rankConversations } from './frequent'
+export { rankConversations } from './frequent'
 export { indexSubject, matchSubject, rankSearchResults, searchWords, type IndexedSubject, type SubjectMatch } from './conversation-search'
 
 export { prepareEmojiPicker, type PreparedEmojiPicker, type PickerItem } from './emoji-picker'

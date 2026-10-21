@@ -25,7 +25,7 @@ function quietSeed(workspace: Workspace, avatarBase: string): void {
     workspace.addUser({ id, team_id: TEAM.id, name, real_name: name, profile: { display_name: name, image_72: `${avatarBase}/${id}.svg` } })
   }
   const members = new Set([SELF_ID, ...people.map(([id]) => id)])
-  // Five of each, so Recent's two columns are full, as on a workspace in use.
+  // Five of each, as on a workspace in use.
   for (const [id, name] of [['C0GEN', 'general'], ['C0ENG', 'eng'], ['C0DES', 'design'], ['C0OPS', 'ops'], ['C0REL', 'releases']] as const) {
     workspace.addConversation({ id, name, kind: 'public', members, created: now - 90 * DAY, topic: '', purpose: '', isOpen: true, archived: false })
     const last = workspace.post({ channel: id, user: 'U0LEO', text: 'Notes are in the doc.', at: now - 2 * 60 * 60_000, silent: true })

@@ -23,7 +23,7 @@ import { takeAttachments, useAttachments } from './attachments'
 import { useComposerMarkup } from './composerMarkup'
 import { useFocusOnShow, useFocusRequest } from './homeFocus'
 import { useHomeSendChecks } from './homeSendChecks'
-import { isPeople, WriteTop } from './homeWriteTop'
+import { WriteTop } from './homeWriteTop'
 import { junoCommands } from './juno/actions'
 import { chatMentions } from './juno/chatMentions'
 import { leaveComposer, takeForJuno, useJunoFiles } from './juno/junoFiles'
@@ -41,6 +41,9 @@ function typeIn(field: HTMLTextAreaElement | null, text: string): void {
 /** A first @ or # with what follows it, and nothing else typed yet. */
 const FIRST = /^([@#])([^\s@#]*)$/
 
+
+/** A DM or group DM: a first @'s rows. */
+const isPeople = (conversation: PickConversation) => conversation.kind === 'im' || conversation.kind === 'mpim'
 
 /** The "Send to" rows for a first @ (people) or # (channels): the recent ones that match, then the rest, at most six. */
 function sendToRows(sections: PickConversations | undefined, trigger: '@' | '#'): ReadonlyArray<PickConversation> {
@@ -209,7 +212,7 @@ async function deliver(tabId: string, body: string, to: Destination, junoOn: boo
   return false
 }
 
-/** Where the draft goes, and the chip's list: choosing from Recent, the list or a first @ or # sets it and puts focus back in the field. */
+/** Where the draft goes, and the chip's list: choosing from the list or a first @ or # sets it and puts focus back in the field. */
 export function useDestination(tabId: string, focusField: () => void) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -257,11 +260,11 @@ export interface HomeComposerProps {
 }
 
 /**
- * Home's composer (SPEC section 12, "Writing"): Recent, the destination
- * chip and the field, at the bottom of Home. The draft and the destination
- * live in `homeDraftAtom(tabId)`, so they survive a tab switch and a
- * restart. Juno is the destination until another is chosen, from Recent,
- * the chip's list, or a first @ or #: those suggest without taking over
+ * Home's composer (SPEC section 12, "Writing"): the destination chip and
+ * the field, at the bottom of Home. The draft and the destination live in
+ * `homeDraftAtom(tabId)`, so they survive a tab switch and a restart. Juno
+ * is the destination until another is chosen, from the chip's list or a
+ * first @ or #: those suggest without taking over
  * (Tab or Enter picks, Space or Esc keeps the text for Juno). Backspace in
  * an empty field goes back to Juno. A send to a person or channel goes to
  * its Main (a channel's starts a thread), and Home stays: the field
