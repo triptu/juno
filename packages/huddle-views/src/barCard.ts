@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors, layout, motion, radii, shadows, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { colors, layout, radii, shadows, sizes, spacing } from '@juno/tokens/tokens.stylex'
 
 // Hover styles only apply on devices with a real pointer. Local because
 // StyleX cannot read constants from other modules.
@@ -73,10 +73,8 @@ export const barCard = stylex.create({
       ':hover': { default: null, [HOVER]: colors['--huddle-bar-hover'] },
       ':active': { default: colors['--huddle-bar-hover'], [HOVER]: colors['--huddle-bar-hover'] },
     },
-    transitionProperty: 'scale, background-color',
-    transitionDuration: { default: motion['--duration-fast'], '@media (prefers-reduced-motion: reduce)': '0ms' },
-    transitionTimingFunction: motion['--ease-out'],
-    scale: { default: '1', ':active': motion['--press-scale'] },
+    transitionProperty: 'background-color',
+    transitionDuration: '0s',
   },
   placeIcon: {
     display: 'inline-flex',

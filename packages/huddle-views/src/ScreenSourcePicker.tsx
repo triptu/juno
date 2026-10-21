@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { EyeSlash } from '@phosphor-icons/react/dist/icons/EyeSlash'
 import type { KeyboardEvent } from 'react'
-import { accent, colors, layout, motion, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { accent, colors, layout, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Button, Icon, moveFocus, ringRoom, Surface, Text } from '@juno/ui'
 
 export interface ScreenSource {
@@ -257,10 +257,6 @@ const styles = stylex.create({
     backgroundColor: 'transparent',
     textAlign: 'start',
     cursor: 'default',
-    transitionProperty: 'scale',
-    transitionDuration: { default: motion['--duration-fast'], '@media (prefers-reduced-motion: reduce)': '0ms' },
-    transitionTimingFunction: motion['--ease-out'],
-    scale: { default: '1', ':active': motion['--press-scale'] },
   },
   // The snapshot fits a 16:10 box on a quiet fill. Keyboard focus on the tile rings the picture, not its name.
   thumb: {

@@ -214,7 +214,7 @@ Used by: page header context pill, Juno send-card pill. Icons: `hash` (public), 
 | Token | Value | Source | Notes |
 | --- | --- | --- | --- |
 | `--danger` | #C41E3A light, #F8767E dark | css / redesign | Sign-in error line. 5.64:1 on paper, 6.59:1 on ink |
-| `--danger-fill-hover` | `color-mix(in oklch, var(--danger) 88%, var(--foreground-default))` | huddle mute 10-20 | `IconButton alert`: a control in a state the user must not miss, the huddle's Mute while nobody can hear you. Rest is `--danger` with the glyph in `--background` (5.64:1 light, 6.59:1 dark); hover mixes in the text colour, so it goes darker on paper and lighter on ink; press is the press scale alone, as on the other island controls. A tint of the red was tried first and read too close to the Coral and Claret bars. |
+| `--danger-fill-hover` | `color-mix(in oklch, var(--danger) 88%, var(--foreground-default))` | huddle mute 10-20 | `IconButton alert`: a control in a state the user must not miss, the huddle's Mute while nobody can hear you. Rest is `--danger` with the glyph in `--background` (5.64:1 light, 6.59:1 dark); hover mixes in the text colour, so it goes darker on paper and lighter on ink; press keeps the hover fill and the same geometry, as on the other island controls. A tint of the red was tried first and read too close to the Coral and Claret bars. |
 | `--success` | #00674F | css | Resolved check icon in rows; Resolved status chip tint |
 | `--presence-active` | #1F9D66 light (3.34:1 on the menu), #34C77B dark (5.59:1 on `--surface-raised`) | friendly layer | The active presence dot. `--success` read grey at 6px (1.78:1 in dark). |
 | `--huddle-live` | #1C935F light, #34C77B dark (the presence green) | huddles 10-18 | Live in a huddle (SPEC 20): the speaking ring, and the headphones on a running huddle's row and on Join. The same green idea as presence, a step deeper in light: `--presence-active` is 2.98:1 on the tiles' `--secondary-default`, this is 3.36:1 there and 3.76:1 on a card (dark: 6.12:1 and 7.1:1). A graphic, never text |
@@ -636,33 +636,29 @@ Floating surfaces have `border: 1px solid transparent` plus the shadow, never a 
 
 ## 8. Motion
 
-Three ideas (`friendly-layer.md` §5): instant for the things you do constantly, a quick ease-out for presses and toggles, and a small spring for the handful of moments that deserve it. Every duration and curve is a token; none is written in a component.
+Buttons, toggles, menus and popovers answer at once. Buttons have no press motion or toggle spring. Toasts and empty states may enter with motion. Every duration and curve is a token; none is written in a component.
 
 | Token | Value | Use |
 | --- | --- | --- |
-| `--duration-fast` | 150ms | Press scale, hover colour, focus ring |
-| `--duration-pop` | 220ms | Reaction pop, toggle fill, resolve check |
+| `--duration-fast` | 150ms | Non-button opacity and surface transitions |
 | `--duration-appear` | 240ms | Toast, palette, card and empty-state entrance |
 | `--delay-pending` | 800ms | How long a send may take before its pending row dims |
 | `--stagger` | 80ms | Between the parts of an empty state as they enter |
 | `--duration-pulse` | 2400ms | One breath of an incoming huddle's glow (huddles 10-20), read from the root by its Web Animation. Not shortened for reduced motion: the card does not start the pulse there |
-| `--ease-out` | `cubic-bezier(0.2, 0, 0, 1)` | Presses, toggles, entrances, exits |
-| `--ease-spring` | `cubic-bezier(0.34, 1.4, 0.64, 1)` | The three pops only; overshoots about 8% |
-| `--press-scale` | 0.96 | On `:active`, never when disabled |
-| `--pop-scale` | 1.12 | The peak of a pop |
+| `--ease-out` | `cubic-bezier(0.2, 0, 0, 1)` | Non-button entrances and exits |
 | `--rise-toast`, `--rise-stagger` | 8px, 6px | How far a toast and an empty-state part rise as they enter |
 | `--duration-gather`, `--duration-settle` | 600ms, 900ms | The sign-in page's entrance, once: the mark's dots gather into the j; the pebbles fade in and settle |
 | `--rise-settle` | 6px | How far a sign-in pebble settles as it enters |
 | `--duration-drift` | 1200ms | A hovered sign-in pebble's wave bands drift, and drift back |
 | `--duration-nod` | 320ms | The sign-in mark's dot nods under the pointer |
-| Transition set | `scale, background-color, color, border-color, box-shadow, opacity` at `--duration-fast` `--ease-out` | |
-| Toggle to active | The filled icon scales 0.8 → 1 with the spring over `--duration-pop` and cross-fades from the outline icon; off just cross-fades over `--duration-fast`. Both icons stay in the DOM | |
+| Button feedback | Instant colour and background changes; no transform or scale transition | |
+| Toggle to active | The filled icon replaces the outline at once, with no motion. Both icons stay in the DOM | |
 | Toast | Enter `translateY(--rise-toast)` → 0 with opacity over `--duration-appear`; it goes at once, and a replacement takes its place without rising again | |
-| Popovers and menus | Open and close at once, in their final place: no fade, no scale (Tushar, 10-21) | |
+| Popovers and menus | Open on primary mouse-down and close at once, in their final place: no fade, no scale (Tushar, 10-21) | |
 | Home | Never animates: every part is drawn in its final state in the frame it first shows (Tushar, 10-21) | |
 | Empty state | Illustration, title, body and action enter `--stagger` apart with opacity and `--rise-stagger`, once, when the state first appears | |
 | Theme switch | add `data-theme-switching` on the root; `* { transition: none !important }` while set; remove after two animation frames | |
-| Reduced motion | `@media (prefers-reduced-motion: reduce)` through the tokens themselves: every duration and the stagger 0.01ms / 0ms, `--press-scale` and `--pop-scale` 1, the rise distances 0. Opacity cross-fades remain as the visible cue. `global.css` turns every transition off (`0s`) and shortens every animation to 0.01ms, so a state change such as a row's fill shows in its own frame | |
+| Reduced motion | `@media (prefers-reduced-motion: reduce)` through the tokens themselves: every duration and the stagger 0.01ms / 0ms, the rise distances 0. Opacity cross-fades remain as the visible cue. `global.css` turns every transition off (`0s`) and shortens every animation to 0.01ms, so a state change such as a row's fill shows in its own frame | |
 | Hover | Only inside `@media (hover: hover)` | |
 | Scroll to new | On open, scroll the "new" divider to 80px below the top, else to the bottom; `requestAnimationFrame` then a 150ms retry | |
 | Toast life | 5000ms for undoable, 4000ms for info | |
@@ -695,7 +691,7 @@ Apply these when porting; the prototype values are listed so no one copies them 
 | Global letter-spacing 0.02em in CSS file | 0 (Figtree; 0.01em was the Inter value) |
 | Lucide outline icons | Phosphor, weight by size, fill for active (`friendly-layer.md` §2) |
 | Radius 6 tags, chips, pills and reactions | Pills (`--radius-tag`, `--radius-pill`); rows and tiles 16, cards 20, nav 12, composer 20 (a pill at one line), 32px+ buttons pills, toast 14 |
-| No entrances; everything 150ms | Entrances 240ms and pops 220ms with a spring; Home, menus, popovers, rows, tabs and typing never animate |
+| No entrances; everything 150ms | Toast and empty-state entrances 240ms; buttons stay still; Home, menus, popovers, rows, tabs and typing never animate |
 
 ### Inline and empty-chat measurements
 

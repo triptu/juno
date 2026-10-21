@@ -1,6 +1,7 @@
+import { menuTriggerHandlers } from './menuTrigger'
 import * as stylex from '@stylexjs/stylex'
 import type { ButtonHTMLAttributes } from 'react'
-import { accent, colors, motion, radii, shadows, sizes } from '@juno/tokens/tokens.stylex'
+import { accent, colors, radii, shadows, sizes } from '@juno/tokens/tokens.stylex'
 import { Icon, type IconSize, type IconWeight, type PhosphorIcon } from './Icon'
 import { focusRing } from './focusRing'
 import { interactive } from './internal/interactive'
@@ -30,7 +31,7 @@ export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEle
   readonly tone?: IconButtonTone
   /**
    * Toggle state (subscribed, pinned). Sets aria-pressed and fills the icon;
-   * the fill pops in with the spring, toggling off just cross-fades.
+   * the icon changes at once, without motion.
    */
   readonly pressed?: boolean
   /** A menu button whose menu or popover is showing: `aria-expanded`, held at the hover fill so opening changes no colour. */
@@ -76,8 +77,7 @@ const iconBySize: Record<IconButtonSize, IconSize> = {
 
 /**
  * A button that is only an icon. Needs a label. A `pressed` toggle keeps
- * both the outline and the filled icon in the DOM and cross-fades them, so
- * only opacity and transform ever animate.
+ * both the outline and the filled icon in the DOM and swaps them at once.
  */
 export function IconButton({
   icon,
@@ -102,6 +102,7 @@ export function IconButton({
 }: IconButtonProps) {
   const px = iconSize ?? iconBySize[size]
   const toggle = pressed !== undefined
+  const popup = rest['aria-haspopup'] ?? (expanded === undefined ? undefined : 'dialog')
   return (
     <button
       type={type}
@@ -113,6 +114,8 @@ export function IconButton({
       aria-disabled={dimmed || undefined}
       disabled={disabled}
       {...rest}
+      aria-haspopup={popup}
+      {...menuTriggerHandlers({ ...rest, 'aria-haspopup': popup })}
       {...stylex.props(
         interactive.reset,
         interactive.feedback,
@@ -133,10 +136,10 @@ export function IconButton({
     >
       {toggle ? (
         <span {...stylex.props(styles.pair)}>
-          <span {...stylex.props(styles.layer, styles.outline, pressed && styles.outlineHidden)}>
+          <span {...stylex.props(styles.layer, pressed && styles.outlineHidden)}>
             {iconWeight === undefined ? <Icon icon={icon} size={px} /> : <Icon icon={icon} size={px} weight={iconWeight} />}
           </span>
-          <span {...stylex.props(styles.layer, styles.filled, pressed ? styles.filledShown : styles.filledHidden)}>
+          <span {...stylex.props(styles.layer, pressed ? styles.filledShown : styles.filledHidden)}>
             <Icon icon={icon} size={px} weight="fill" />
           </span>
         </span>
@@ -201,31 +204,10 @@ const styles = stylex.create({
   layer: {
     gridArea: '1 / 1',
     display: 'inline-flex',
-    transitionProperty: 'opacity, transform',
   },
-  outline: {
-    transitionDuration: motion['--duration-fast'],
-    transitionTimingFunction: motion['--ease-out'],
-    opacity: 1,
-  },
-  outlineHidden: {
-    opacity: 0,
-  },
-  filled: {
-    transitionTimingFunction: motion['--ease-spring'],
-  },
-  filledHidden: {
-    opacity: 0,
-    transform: 'scale(0.8)',
-    transitionDuration: motion['--duration-fast'],
-    transitionTimingFunction: motion['--ease-out'],
-  },
-  // The spring overshoots to --pop-scale on its own; the target is 1.
-  filledShown: {
-    opacity: 1,
-    transform: 'scale(1)',
-    transitionDuration: motion['--duration-pop'],
-  },
+  outlineHidden: { opacity: 0 },
+  filledHidden: { opacity: 0 },
+  filledShown: { opacity: 1 },
 })
 
 const sizeStyles = stylex.create({

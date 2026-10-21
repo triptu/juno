@@ -1,11 +1,11 @@
 /**
- * Styles every interactive primitive shares: the element reset, the 150ms
- * feedback transition and the press scale (never when disabled). The focus
+ * Styles every interactive primitive shares: the element reset and instant
+ * colour feedback. Buttons keep their geometry while pressed. The focus
  * ring is `focusRing` (../focusRing.ts), which views use too. Hover colours
  * live in each primitive and must sit under the `hover` media query from here.
  */
 import * as stylex from '@stylexjs/stylex'
-import { motion, opacity } from '@juno/tokens/tokens.stylex'
+import { opacity } from '@juno/tokens/tokens.stylex'
 
 export const interactive = stylex.create({
   reset: {
@@ -32,18 +32,11 @@ export const interactive = stylex.create({
     // 20 % of the scroll's frame work (performance.md 8.5).
   },
   feedback: {
-    transitionProperty: 'scale, background-color, color, border-color, box-shadow, opacity',
-    transitionDuration: motion['--duration-fast'],
-    transitionTimingFunction: motion['--ease-out'],
+    transitionProperty: 'background-color, color, border-color, box-shadow, opacity',
+    transitionDuration: '0s',
   },
   press: {
-    scale: {
-      default: '1',
-      ':active': motion['--press-scale'],
-      ':disabled': '1',
-    },
-    // Disabled controls get no pointer events, so :active can never match
-    // and the press scale never applies to them.
+    // Disabled controls cannot receive a press.
     pointerEvents: {
       default: 'auto',
       ':disabled': 'none',

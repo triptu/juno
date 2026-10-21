@@ -1,3 +1,4 @@
+import { menuTriggerHandlers } from './menuTrigger'
 import * as stylex from '@stylexjs/stylex'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { accent, colors, radii, shadows, sizes, spacing, weights } from '@juno/tokens/tokens.stylex'
@@ -80,8 +81,8 @@ const iconBySize: Record<ButtonSize, IconSize> = {
 }
 
 /**
- * Every clickable control with a label. Arrow cursor, press scale unless
- * disabled, hover colours only with a pointer, focus ring on keyboard focus.
+ * Every clickable control with a label. Arrow cursor, static press geometry,
+ * hover colours only with a pointer, focus ring on keyboard focus.
  * Radius, text size and icon size follow from the size; sidebar nav items
  * are `NavItem`.
  */
@@ -106,6 +107,7 @@ export function Button({
   const effectiveSize: ButtonSize = filter ? 'sm' : size
   const iconPx = iconBySize[effectiveSize]
   const iconProps = iconWeight === undefined ? { size: iconPx } : { size: iconPx, weight: iconWeight }
+  const popup = rest['aria-haspopup'] ?? (expanded === undefined ? undefined : 'dialog')
   return (
     <button
       type={type}
@@ -114,6 +116,8 @@ export function Button({
       aria-expanded={expanded}
       aria-disabled={dimmed || undefined}
       {...rest}
+      aria-haspopup={popup}
+      {...menuTriggerHandlers({ ...rest, 'aria-haspopup': popup })}
       {...stylex.props(
         interactive.reset,
         interactive.feedback,

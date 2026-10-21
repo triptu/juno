@@ -113,7 +113,7 @@ export function HoverToolbar({ main = false, hasThread = false, reactions = DEFA
       <span {...stylex.props(styles.separator)}>
         <Divider vertical inset="none" />
       </span>
-      <IconButton icon={Smiley} label="More reactions" size={28} data-toolbar-item="more-reactions" tabIndex={tab('more-reactions')} onClick={onMoreReactions === undefined ? undefined : (event) => onMoreReactions(below(event))} />
+      <IconButton icon={Smiley} label="More reactions" aria-haspopup="dialog" size={28} data-toolbar-item="more-reactions" tabIndex={tab('more-reactions')} onClick={onMoreReactions === undefined ? undefined : (event) => onMoreReactions(below(event))} />
       {onQuote !== undefined ? <IconButton icon={Quotes} label="Quote" size={28} data-toolbar-item="quote" tabIndex={tab('quote')} onClick={onQuote} /> : null}
       {main ? (
         <IconButton
@@ -128,7 +128,7 @@ export function HoverToolbar({ main = false, hasThread = false, reactions = DEFA
           onKeyDown={onReply === undefined ? undefined : (event) => replyKey(event, onReply)}
         />
       ) : null}
-      {onMore !== undefined ? <IconButton icon={DotsThree} label="More" size={28} data-toolbar-item="more" tabIndex={tab('more')} onClick={(event) => onMore(below(event))} /> : null}
+      {onMore !== undefined ? <IconButton icon={DotsThree} label="More" aria-haspopup="menu" size={28} data-toolbar-item="more" tabIndex={tab('more')} onClick={(event) => onMore(below(event))} /> : null}
     </Surface>
   )
 }

@@ -4,8 +4,8 @@ import { DotsThree } from '@phosphor-icons/react/dist/icons/DotsThree'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import type { KeyboardEvent, MouseEvent, ReactNode, Ref } from 'react'
 import { menuKeys } from '@juno/contract/channels'
-import { colors, layout, motion, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
-import { focusRing, Icon, IconButton, Text } from '@juno/ui'
+import { colors, layout, radii, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
+import { focusRing, menuTriggerHandlers, Icon, IconButton, Text } from '@juno/ui'
 
 /** Where a menu opened from the header goes, in CSS pixels from the window's top left. */
 export interface MenuAnchor {
@@ -27,7 +27,7 @@ export interface HeaderTitleButtonProps {
   readonly leading?: ReactNode
   /** The menu or popover it opens is showing. */
   readonly expanded: boolean
-  /** Click, Enter, Space or ↓; and right-click or the context-menu key unless `onMenu` is given. `at` is under the left island, at the title's left edge. */
+  /** Primary press, Enter, Space or ↓; and right-click or the context-menu key unless `onMenu` is given. `at` is under the left island, at the title's left edge. */
   readonly onOpen: (at: MenuAnchor) => void
   /** What it opens: a menu (the Juno menu), or a popover with a searchable list (the topic switcher). Default `menu`. */
   readonly popup?: 'menu' | 'dialog'
@@ -72,8 +72,7 @@ export function HeaderTitleButton({ title, leading, expanded, onOpen, popup = 'm
         type="button"
         aria-haspopup={popup}
         aria-expanded={expanded}
-        onClick={(event) => open(event.currentTarget)}
-        onKeyDown={onKeyDown}
+        {...menuTriggerHandlers({ 'aria-haspopup': popup, onClick: (event) => open(event.currentTarget), onKeyDown })}
         onContextMenu={onContextMenu}
         {...stylex.props(styles.reset, focusRing.outside, styles.title, expanded && styles.titleOpen)}
       >
@@ -99,7 +98,7 @@ function underRightIsland(button: HTMLElement): MenuAnchor {
 export interface MoreButtonProps {
   /** Its menu is showing. */
   readonly expanded: boolean
-  /** Click, Enter or Space. `at` is under the right island, at the button's left edge. */
+  /** Primary press, Enter or Space. `at` is under the right island, at the button's left edge. */
   readonly onOpen: (at: MenuAnchor) => void
 }
 
@@ -153,10 +152,8 @@ const styles = stylex.create({
     userSelect: 'none',
     cursor: 'default',
     WebkitAppRegion: 'no-drag',
-    transitionProperty: 'scale, background-color',
-    transitionDuration: { default: motion['--duration-fast'], '@media (prefers-reduced-motion: reduce)': '0ms' },
-    transitionTimingFunction: motion['--ease-out'],
-    scale: { default: '1', ':active': motion['--press-scale'] },
+    transitionProperty: 'background-color',
+    transitionDuration: '0s',
   },
   title: {
     display: 'inline-flex',

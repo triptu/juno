@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { X } from '@phosphor-icons/react/dist/icons/X'
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react'
-import { accent, colors, hues, motion, radii, sizes, spacing, tints, weights } from '@juno/tokens/tokens.stylex'
+import { accent, colors, hues, radii, sizes, spacing, tints, weights } from '@juno/tokens/tokens.stylex'
 import { Icon, type IconSize, type PhosphorIcon } from './Icon'
 import { IconButton } from './IconButton'
 import type { HueName } from './internal/hue'
@@ -60,19 +60,12 @@ interface ChipBaseProps {
 export interface ChipLabelProps extends ChipBaseProps, Omit<HTMLAttributes<HTMLSpanElement>, 'style' | 'className' | 'title' | 'children'> {
   readonly interactive?: false
   readonly pressed?: undefined
-  readonly pop?: undefined
 }
 
 export interface ChipButtonProps extends ChipBaseProps, Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'style' | 'className' | 'title' | 'children'> {
   /** Renders a button; `pressed` is the toggled state. */
   readonly interactive: true
   readonly pressed?: boolean
-  /**
-   * Play the pop once: the content springs to --pop-scale and back. Set it
-   * when the toggle was the user's own action (my reaction landing), never
-   * for a change that arrived from someone else.
-   */
-  readonly pop?: boolean
 }
 
 export type ChipProps = ChipLabelProps | ChipButtonProps
@@ -107,7 +100,7 @@ export function Chip(props: ChipProps) {
   const content = (
     <>
       {icon ? <Icon icon={icon} size={iconSize ?? iconBySize[size]} /> : null}
-      {children !== undefined && children !== null ? <span {...stylex.props(styles.label, ringRoom.all, rest.interactive === true && rest.pop && styles.pop)}>{children}</span> : null}
+      {children !== undefined && children !== null ? <span {...stylex.props(styles.label, ringRoom.all)}>{children}</span> : null}
       {onRemove ? (
         <IconButton icon={X} label={removeLabel} size={20} iconSize={12} tone="muted" onClick={onRemove} noTooltip />
       ) : null}
@@ -126,7 +119,7 @@ export function Chip(props: ChipProps) {
     shrink && styles.shrink,
   ]
   if (rest.interactive === true) {
-    const { interactive: _interactive, pressed, pop: _pop, type = 'button', ...buttonProps } = rest
+    const { interactive: _interactive, pressed, type = 'button', ...buttonProps } = rest
     return (
       <button
         type={type}
@@ -147,19 +140,13 @@ export function Chip(props: ChipProps) {
       </button>
     )
   }
-  const { interactive: _interactive, pressed: _pressed, pop: _pop, ...spanProps } = rest
+  const { interactive: _interactive, pressed: _pressed, ...spanProps } = rest
   return (
     <span title={title} {...spanProps} {...stylex.props(...shared)}>
       {content}
     </span>
   )
 }
-
-const popKeyframes = stylex.keyframes({
-  '0%': { transform: 'scale(1)' },
-  '50%': { transform: `scale(${motion['--pop-scale']})` },
-  '100%': { transform: 'scale(1)' },
-})
 
 const styles = stylex.create({
   base: {
@@ -185,12 +172,6 @@ const styles = stylex.create({
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     minWidth: 0,
-  },
-  pop: {
-    animationName: popKeyframes,
-    animationDuration: motion['--duration-pop'],
-    animationTimingFunction: motion['--ease-spring'],
-    animationFillMode: 'both',
   },
   numeric: {
     fontVariantNumeric: 'tabular-nums',

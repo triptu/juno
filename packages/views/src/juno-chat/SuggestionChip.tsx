@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { accent, colors, motion, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
+import { accent, colors, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { Icon, type PhosphorIcon } from '@juno/ui'
 
 export interface SuggestionChipProps {
@@ -63,16 +63,8 @@ const styles = stylex.create({
     whiteSpace: 'nowrap',
     userSelect: 'none',
     cursor: 'default',
-    transitionProperty: 'scale, background-color, border-color',
-    transitionDuration: {
-      default: motion['--duration-fast'],
-      '@media (prefers-reduced-motion: reduce)': '0ms',
-    },
-    transitionTimingFunction: motion['--ease-out'],
-    scale: {
-      default: '1',
-      ':active': motion['--press-scale'],
-    },
+    transitionProperty: 'background-color, border-color',
+    transitionDuration: '0s',
     outlineStyle: {
       default: 'none',
       ':focus-visible': 'solid',

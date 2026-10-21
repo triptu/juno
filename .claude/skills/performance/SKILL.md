@@ -29,7 +29,7 @@ The bar: the app must feel native and insanely fast. Input paints on the next fr
 
 **Interaction**
 
-5. Navigation (rows, tabs, nav items, filter chips, palette and Browse rows, thread links) activates on `pointerdown`: primary button only, not with `ctrlKey`, not inside a nested control; `metaKey` opens a new tab. Mutating buttons (Resolve, Send, Pin, close) activate on `click`. Keep `onClick` for assistive tech with a flag against double activation.
+5. Navigation (rows, tabs, nav items, filter chips, palette and Browse rows, thread links) activates on `pointerdown`: primary button only, not with `ctrlKey`, not inside a nested control; `metaKey` opens a new tab. Menu and popover triggers open on primary mouse `pointerdown` through `menuTriggerHandlers` in `@juno/ui`; their following click is ignored. Mutating buttons (Resolve, Send, Pin, close) activate on `click`. Keep `onClick` for assistive tech with a flag against double activation.
 6. Prefetch on hover, focus or keyboard selection: mount the topic's `messagesAtom` (idle TTL 30 s, at most 3 warm). Local query only; the Slack fetch starts on the real open.
 7. The active tab and the 4 most recent topic tabs stay mounted in `<Activity mode="hidden">`. Older tabs keep a scroll snapshot and restore it in `useLayoutEffect` before paint. Every effect must clean up; hidden means unmounted.
 8. No spinner under 300 ms, never a global one. Skeletons only with the final geometry. Filter, tab and theme changes show the finished state in one frame, never an empty intermediate. `startTransition` does not hold atom state (`useAtomValue` commits synchronously): a list that switches its source atom holds the previous window in the atom, as `sidebarListAtom` does (`docs/performance.md` 5.3).

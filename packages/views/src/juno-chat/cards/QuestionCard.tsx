@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
 import { chatCopy, type QuestionCard as QuestionCardModel } from '@juno/agent-contract'
-import { accent, colors, motion, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
+import { accent, colors, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { Button, Chip, Text, TextField } from '@juno/ui'
 import type { ChatActions } from '../commands'
 import { ChatCard } from './ChatCard'
@@ -105,14 +105,8 @@ const styles = stylex.create({
     textAlign: 'start',
     userSelect: 'none',
     cursor: 'default',
-    transitionProperty: 'scale, background-color, border-color',
-    transitionDuration: motion['--duration-fast'],
-    transitionTimingFunction: motion['--ease-out'],
-    scale: {
-      default: '1',
-      ':active': motion['--press-scale'],
-      ':disabled': '1',
-    },
+    transitionProperty: 'background-color, border-color',
+    transitionDuration: '0s',
     pointerEvents: {
       default: 'auto',
       ':disabled': 'none',

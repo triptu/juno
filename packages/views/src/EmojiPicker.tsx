@@ -3,7 +3,7 @@ import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlas
 import { useDeferredValue, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
 import { matchEmoji, type PickerItem as Item, type PreparedEmojiPicker } from '@juno/contract'
-import { accent, colors, layout, motion, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
+import { accent, colors, layout, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { ScrollArea, Surface, Text, TextField } from '@juno/ui'
 
 export interface EmojiPickerProps {
@@ -362,10 +362,8 @@ const styles = stylex.create({
       ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
       ':focus-visible': colors['--surface-hover'],
     },
-    scale: { default: '1', ':active': motion['--press-scale'] },
-    transitionProperty: 'scale, background-color',
-    transitionDuration: motion['--duration-fast'],
-    transitionTimingFunction: motion['--ease-out'],
+    transitionProperty: 'background-color',
+    transitionDuration: '0s',
     // Inset, so the ring is not clipped by the scroller or the next cell.
     outlineStyle: { default: 'none', ':focus-visible': 'solid' },
     outlineWidth: sizes['--focus-ring-width'],
@@ -380,7 +378,6 @@ const styles = stylex.create({
       ':focus-visible': accent['--hl-soft'],
     },
     boxShadow: `inset 0 0 0 1px ${accent['--hl-ring']}`, // tokens-allow: 1px hairline ring, as the reaction chip's border
-    scale: { default: '1', ':active': '1' },
   },
   image: {
     width: GLYPH,

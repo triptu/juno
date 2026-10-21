@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { colors, motion, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
+import { colors, sizes, spacing, text, weights } from '@juno/tokens/tokens.stylex'
 
 // Hover styles only apply on devices with a real pointer. Local because
 // StyleX cannot read constants from other modules.
@@ -37,10 +37,8 @@ export const islandText = stylex.create({
       ':hover': { default: null, [HOVER]: colors['--secondary-default'] },
       ':active': { default: colors['--secondary-default'], [HOVER]: colors['--secondary-default'] },
     },
-    transitionProperty: 'scale, background-color',
-    transitionDuration: { default: motion['--duration-fast'], '@media (prefers-reduced-motion: reduce)': '0ms' },
-    transitionTimingFunction: motion['--ease-out'],
-    scale: { default: '1', ':active': motion['--press-scale'] },
+    transitionProperty: 'background-color',
+    transitionDuration: '0s',
   },
   icon: {
     display: 'inline-flex',

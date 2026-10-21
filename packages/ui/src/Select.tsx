@@ -1,3 +1,4 @@
+import { menuTriggerHandlers } from './menuTrigger'
 import * as stylex from '@stylexjs/stylex'
 import type { ButtonHTMLAttributes, ReactNode, Ref, SelectHTMLAttributes } from 'react'
 import { accent, colors, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
@@ -47,7 +48,7 @@ export interface SelectButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonE
  */
 export function SelectButton({ ref, size = 32, leading, placeholder = false, expanded, children, type = 'button', ...rest }: SelectButtonProps) {
   return (
-    <button ref={ref} type={type} aria-haspopup="dialog" aria-expanded={expanded} {...rest} {...stylex.props(styles.select, styles.button, typeVariants.ui, sizeStyles[size], placeholder && styles.placeholder)}>
+    <button ref={ref} type={type} aria-haspopup="dialog" aria-expanded={expanded} {...rest} {...menuTriggerHandlers({ ...rest, 'aria-haspopup': 'dialog' })} {...stylex.props(styles.select, styles.button, typeVariants.ui, sizeStyles[size], placeholder && styles.placeholder)}>
       {leading === undefined ? null : <span {...stylex.props(styles.leading)}>{leading}</span>}
       <span {...stylex.props(styles.value)}>{children}</span>
     </button>

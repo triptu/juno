@@ -787,10 +787,6 @@ export const motion = stylex.defineVars({
     default: '150ms',
     [REDUCED_MOTION]: '0.01ms',
   },
-  '--duration-pop': {
-    default: '220ms',
-    [REDUCED_MOTION]: '0.01ms',
-  },
   '--duration-appear': {
     default: '240ms',
     [REDUCED_MOTION]: '0.01ms',
@@ -805,16 +801,6 @@ export const motion = stylex.defineVars({
   '--ease-out': 'cubic-bezier(0.2, 0, 0, 1)',
   // One breath of the incoming huddle's pulse. Reduced motion stops the pulse instead.
   '--duration-pulse': '2400ms',
-  // Overshoots by about 8%. The three pops only.
-  '--ease-spring': 'cubic-bezier(0.34, 1.4, 0.64, 1)',
-  '--press-scale': {
-    default: '0.96',
-    [REDUCED_MOTION]: '1',
-  },
-  '--pop-scale': {
-    default: '1.12',
-    [REDUCED_MOTION]: '1',
-  },
   // Entrances: the toast rises 8px, each part of an empty state rises 6px.
   '--rise-toast': {
     default: '8px',

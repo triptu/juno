@@ -10,9 +10,8 @@ import { claimQueue, openState, readRoutes, walkPages, type Route } from './supp
  *
  * Motion is left on: reduced motion collapses transitions, which would hide
  * a shift that only a real transition produces. The guard waits out only the
- * motion that can move a box (`motion: 'layout'`): every touch starts colour
- * fades and the press scale, which cannot, and waiting for them was most of
- * the run.
+ * motion that can move a box (`motion: 'layout'`). Buttons have instant
+ * colour feedback and keep their geometry on press.
  *
  * The same walk checks the cursor rule on each state as it opens it, so the
  * states are opened once for both.
