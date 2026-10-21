@@ -7,7 +7,7 @@ import { At } from '@phosphor-icons/react/dist/icons/At'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react'
+import { useEffect, useRef, type KeyboardEvent, type ReactNode, type Ref } from 'react'
 import type { ConversationKind, PickConversation, PickConversations, ThreadSummary } from '@juno/contract'
 import { accent, colors, motion, radii, sizes, spacing, text, tints } from '@juno/tokens/tokens.stylex'
 import { Avatar, chunk, Icon, Popover, SparkleDuotone, Text, TopicArt, type PhosphorIcon } from '@juno/ui'
@@ -48,7 +48,7 @@ export interface DestinationChipProps {
  * says Juno until a person or channel is chosen, then takes the context
  * pill's tint (neutral, amber for private, blue for DMs) and the face or
  * the channel's mark. The chip's slot is always there, so a change moves
- * nothing; the new name rises into it once, briefly. It opens the
+ * nothing; the new name shows in the next frame. It opens the
  * destination list above itself, Juno first.
  */
 export function DestinationChip({ destination, juno = true, open, onOpen, query, onQuery, conversations, loading, onPick, buttonRef, onType, placement = 'top-start' }: DestinationChipProps) {
@@ -80,7 +80,6 @@ export function DestinationChip({ destination, juno = true, open, onOpen, query,
           expanded={open}
           onOpen={() => onOpen(!open)}
           {...(onType === undefined ? {} : { onType })}
-          change={destination?.key ?? 'juno'}
         >
           {destination?.name ?? none}
         </PickerButton>
@@ -163,7 +162,6 @@ export function TopicChip({ conversation, thread, open, onOpen, query, onQuery, 
           onOpen={() => onOpen(!open)}
           {...(onWarm === undefined ? {} : { onWarm })}
           {...(onType === undefined ? {} : { onType })}
-          change={thread?.id ?? 'main'}
         >
           {label}
         </PickerButton>
@@ -259,8 +257,6 @@ interface PickerButtonProps {
   readonly icon: PhosphorIcon
   /** In place of the icon: a person's face. */
   readonly leading?: ReactNode
-  /** A key that changes with what the button names: the name rises in once when it changes (not on first paint). */
-  readonly change?: string
   /** A picked conversation's context tint. */
   readonly tint?: PickConversation['tint'] | undefined
   /** Nothing picked: subtle text. Default: no tint. */
@@ -276,15 +272,12 @@ interface PickerButtonProps {
   readonly children: ReactNode
 }
 
-function PickerButton({ ref, label, icon, leading, change, tint, muted, wide = false, expanded, onOpen, onType, onWarm, children }: PickerButtonProps) {
+function PickerButton({ ref, label, icon, leading, tint, muted, wide = false, expanded, onOpen, onType, onWarm, children }: PickerButtonProps) {
   const warm = () => {
     void loadLists()
     onWarm?.()
   }
   const subtle = muted ?? tint === undefined
-  // The name shown first never rises; any later one does.
-  const [first] = useState(change)
-  const rises = change !== undefined && change !== first
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (expanded) return
     if (event.key === 'ArrowDown') {
@@ -308,7 +301,7 @@ function PickerButton({ ref, label, icon, leading, change, tint, muted, wide = f
       onKeyDown={onKeyDown}
       {...stylex.props(styles.button, tint === undefined ? (subtle ? styles.unset : styles.plain) : tintStyles[tint], expanded && tint === undefined && styles.open)}
     >
-      <span key={change} {...stylex.props(styles.face, rises && styles.rise)}>
+      <span {...stylex.props(styles.face)}>
         {leading ?? <Icon icon={icon} size={13} />}
         <Text variant="inherit" truncate tooltipWhenTruncated sx={[styles.buttonLabel, wide && styles.buttonLabelWide]}>
           {children}
@@ -324,25 +317,12 @@ function PickerButton({ ref, label, icon, leading, change, tint, muted, wide = f
 /** The longest a topic's title runs in its chip before the ellipsis; the whole title shows on hover. */
 const THREAD_LABEL_MAX = '260px' // tokens-allow: a topic title's widest in its chip
 
-// The new destination rises 4px into the chip with the fade; with reduced motion it only fades.
-const rise = stylex.keyframes({
-  from: { opacity: 0, transform: 'var(--picker-rise-from)' },
-  to: { opacity: 1, transform: 'none' },
-})
-
 const styles = stylex.create({
   face: {
     display: 'inline-flex',
     alignItems: 'center',
     gap: spacing['--space-1-5'],
     minWidth: 0,
-  },
-  rise: {
-    '--picker-rise-from': { default: 'none', '@media (prefers-reduced-motion: no-preference)': `translateY(${spacing['--space-1']})` },
-    animationName: rise,
-    animationDuration: motion['--duration-fast'],
-    animationTimingFunction: motion['--ease-out'],
-    animationFillMode: 'both',
   },
   button: {
     display: 'inline-flex',
