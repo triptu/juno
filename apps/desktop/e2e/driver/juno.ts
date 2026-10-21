@@ -1528,9 +1528,9 @@ export class TopicPane {
     return lastMenu(this.win)
   }
 
-  /** A message by the start of its text. */
+  /** A message by its body text, excluding thread-link previews. */
   message(text: string): Locator {
-    return this.list.locator('[data-message-row]').filter({ hasText: text })
+    return this.list.locator('[data-message-row]').filter({ has: this.win.locator('[data-msg-text]', { hasText: text }) })
   }
 
   /** The composer's text field. */
