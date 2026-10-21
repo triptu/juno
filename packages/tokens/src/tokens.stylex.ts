@@ -72,9 +72,10 @@ export const colors = stylex.defineVars({
   '--foreground-default': 'hsla(48, 15%, 12%, 1)',
   '--foreground-subtle': 'hsla(48, 8%, 35%, 1)',
   '--foreground-muted': 'hsla(48, 5%, 42%, 1)',
-  // The middle step of a list row's three text levels (title, this, meta):
-  // the sidebar preview. It sits between default and muted in both themes;
-  // subtle is too close to muted in light to read as its own level.
+  // An unread sidebar row's preview, the middle of its three text levels
+  // (title, this, meta). A read row's preview is muted, like its meta. It
+  // sits between default and muted in both themes; subtle is too close to
+  // muted in light to read as its own level.
   '--foreground-secondary': 'hsla(48, 8%, 28%, 1)',
   // Muted text on a secondary fill (a selected row), where light muted
   // falls under 4.5:1. Dark muted passes there, so it stays muted and keeps
@@ -663,10 +664,10 @@ export const text = stylex.defineVars({
   '--text-body-leading': '1.6',
   '--text-body-tracking': '0',
 
-  // Sidebar row title. 600 when unread.
+  // Sidebar row title. Regular when read and 600 when unread, so unread stands out.
   '--text-row-title-family': fonts['--font-sans'],
-  '--text-row-title-size': '15px',
-  '--text-row-title-weight': '500',
+  '--text-row-title-size': '14px',
+  '--text-row-title-weight': '400',
   '--text-row-title-leading': '22px',
   '--text-row-title-tracking': '0',
 

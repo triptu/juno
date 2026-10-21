@@ -72,9 +72,9 @@ const PRIVATE_TITLE = 'Private channel'
  * One sidebar row, chat style: the topic's art or the person's photo, then
  * the title and time, a one-line "Sender: text" preview ending with the
  * people who wrote the unread messages beside the @ and count tags, and the
- * meta line: the place with its Reopened tag. Text takes three levels: the
- * title, the preview one step down, and the meta line and time a step below
- * that. A Main (a channel's, a DM's or a group DM's) has no meta line and no
+ * meta line: the place with its Reopened tag. On a read row the title is
+ * regular and everything under it is muted, so the list stays calm; an unread
+ * row's title is semibold and its preview steps up between the two. A Main (a channel's, a DM's or a group DM's) has no meta line and no
  * Main tag: Main is the default and its title already names the place, so
  * the row is two lines and shorter, and its `accessory`, a Reopened tag or
  * the new-thread count follows the title. The Resolve check overlays the
@@ -106,8 +106,9 @@ export const TopicRow = memo(function TopicRow({
   const stateId = useId()
   const unread = row.unreadCount > 0
   // Resolved and unsubscribed rows read quieter: the check or the muted bell
-  // says why, the title steps down to the subtle colour and the tile fades.
-  // The text keeps at least 4.5:1, so the row itself is never faded.
+  // says why, the title steps down to the subtle colour, the preview stays
+  // muted even when unread and the tile fades. The text keeps at least 4.5:1,
+  // so the row itself is never faded.
   const quiet = row.resolved || row.status === 'unsubscribed'
   const main = row.tags.includes('main')
   const twoLine = isTwoLine(row)
@@ -162,7 +163,7 @@ export const TopicRow = memo(function TopicRow({
     <span {...stylex.props(styles.line2, twoLine && resolvable && styles.underMask)}>
       {/* The message sets the direction; the sender is isolated so a Latin
           name before Arabic text, or the reverse, keeps its own order. */}
-      <Text variant="preview" tone={quiet ? 'muted' : 'secondary'} truncate as="span" dir="auto" id={previewId} data-sensitive="" data-row-part="preview" sx={styles.preview}>
+      <Text variant="preview" tone={unread && !quiet ? 'secondary' : 'muted'} truncate as="span" dir="auto" id={previewId} data-sensitive="" data-row-part="preview" sx={styles.preview}>
         {row.preview.text.length === 0 || row.preview.sender.length === 0 ? (
           row.preview.text || row.preview.sender
         ) : (
@@ -245,7 +246,7 @@ export const TopicRow = memo(function TopicRow({
             <Text
               variant="rowTitle"
               tone={quiet ? 'subtle' : 'default'}
-              weight={unread ? 'semibold' : 'medium'}
+              weight={unread ? 'semibold' : undefined}
               topicTitle
               dir="auto"
               id={titleId}
