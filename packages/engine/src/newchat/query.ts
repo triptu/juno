@@ -7,7 +7,7 @@
  * that each one reads it through an index (performance 6).
  */
 import { PALETTE_CONVERSATIONS, PICK_LIMIT, RECENT_CONVERSATIONS, type PickConversation, type PickConversations } from '@juno/contract'
-import { frequentDestinations, parseTopicId, rankConversations, rankSearchResults, searchWords } from '@juno/domain'
+import { parseTopicId, rankConversations, rankSearchResults, searchWords } from '@juno/domain'
 import { StoreReader, type SqlClient } from '@juno/store'
 import { Clock, Effect } from 'effect'
 import { aiAssistOn } from '../ai'
@@ -15,7 +15,7 @@ import type { UserRow } from '../topicRows'
 import { CONVERSATION_COLUMNS, peopleOf, pickOf, type ConversationRow } from './picks'
 import { searchEntries, type Found } from './searchIndex'
 
-/** How far back Recent and the threads from everywhere look. */
+/** How far back the destination list's recent conversations look. */
 const RECENT_DAYS = 30
 const DAY = 24 * 60 * 60 * 1000
 
@@ -97,7 +97,7 @@ export const queryConversations = Effect.fn('newChat.conversations')(function* (
 
 
 
-/** Indexed own-message range used by Frequent, also checked by the plan gate. */
+/** Indexed own-message range used by ⌘K's ranking, also checked by the plan gate. */
 export const frequentSendsStatement = (selfId: string, now: number) => ({
   sql: `SELECT channel, ts FROM messages INDEXED BY messages_sender_ts
     WHERE user_id = ? AND ts >= ? AND ts <= ? AND deleted = 0`,
@@ -109,22 +109,6 @@ export const frequentConversationsStatement = `SELECT ${CONVERSATION_COLUMNS},
   (SELECT MAX(t.last_activity_ts) FROM topic_index t WHERE t.channel = c.id) AS activity
   FROM conversations c LEFT JOIN ignored_channels g ON g.channel = c.id
   WHERE c.is_member = 1 AND c.is_archived = 0 AND g.channel IS NULL`
-
-/** Local ranking only; no Slack fetch, including when the message cache is empty. */
-export const queryFrequent = Effect.fn('newChat.frequent')(function* () {
-  const sql = yield* StoreReader
-  const selfId = yield* selfIdOf(sql)
-  const now = yield* Clock.currentTimeMillis
-  const rows = yield* sql.unsafe<ConversationRow & { activity: string | null }>(frequentConversationsStatement)
-  const statement = frequentSendsStatement(selfId ?? '', now)
-  const sends = yield* sql.unsafe<{ channel: string; ts: string }>(statement.sql, statement.params)
-  const ids = frequentDestinations(rows.map(row => ({ id: row.id, kind: row.kind, lastActivityAt: Number(row.activity ?? 0) * 1000 })),
-    sends.map(row => ({ channel: row.channel, at: Number(row.ts) * 1000 })), now)
-  const byId = new Map(rows.map(row => [row.id, row]))
-  const chosen = ids.flatMap(id => { const row = byId.get(id); return row === undefined ? [] : [row] })
-  const users = yield* readUsers(sql, peopleOf(chosen))
-  return yield* withMainArt(sql, chosen.map(row => pickOf(row, users, selfId)))
-})
 
 /** The latest activity of each of `ids`, read through the channel index. A conversation with no row has no topics. */
 export const activityStatement = (ids: ReadonlyArray<string>) => ({

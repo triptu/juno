@@ -65,7 +65,7 @@ On an empty cache, the sidebar holds its first rows until the cold boot's quick 
 
 All topics also holds its first rows on an empty cache until the quick start is stored; cached and filtered windows keep the existing snapshot handoff.
 
-Home's Recent is the `newChat.frequent` live query: up to five people then five channels, each ranked by own sends over 30 days with a seven-day half-life, then filled by member activity. Archived and ignored channels are excluded. It never calls Slack. The renderer reads `frequentConversationsAtom` on page open without waiting to paint. Each Home tab's draft and destination are `homeDraftAtom(tabId)` in `src/homeDraft.ts`, saved with the tab (`setHomeDraft`); `requestHomeFocus` asks a Home tab's composer for focus (⌘N, ⌘T).
+Each Home tab's draft and destination are `homeDraftAtom(tabId)` in `src/homeDraft.ts`, saved with the tab (`setHomeDraft`); `requestHomeFocus` asks a Home tab's composer for focus (⌘N, ⌘T).
 
 A thread started by a send keeps its pending `viewId` when `acknowledgeTopic` replaces the topic ID in open and closed tab history. The view key preserves the message subscription, composer and scroll position; it is saved with the tab for reopening.
 

@@ -95,10 +95,8 @@ before restoring it, so a later edit is not overwritten.
 
 Message windows publish `meta.windowCovered` from `src/messages/coverage.ts`. Main uses synced history ranges; threads use stored reply counts or the cursor coverage. Coverage-only changes are emitted even when no message changed. The renderer uses this to avoid positioning isolated cached messages before history arrives.
 
-Home's Recent, the `newChat.frequent` live query, returns up to five people then five channels, ranked by own sends over 30 days with a seven-day half-life, then filled by member activity. Archived and ignored channels are excluded. It never calls Slack. The renderer reads `frequentConversationsAtom` on page open without waiting to paint.
-
 Channel and group DM roots sent from Home use `startedThreads.ts` to resolve durable outbox topic identities. The thread view stays mounted through acknowledgement; dependent replies wait for the root in the normal post worker.
 
-The ⌘K Conversations tab's `newChat.ranked` live query ranks the same way over own sends and topic visits (`topic_visits`), uncapped before its 12 rows, then by activity; with text it ranks the conversation picker's matches, names that start with the text first among the unused. It re-runs on conversation, user, ignore and visit changes, not on messages, so a send re-ranks it on the next open. The renderer reads it as `paletteConversationsAtom`.
+The ⌘K Conversations tab's `newChat.ranked` live query ranks conversations by own sends and topic visits (`topic_visits`) over 30 days, each use counting half as much per week, then by activity, before its 12 rows; archived and ignored channels are excluded and it never calls Slack; with text it ranks the conversation picker's matches, names that start with the text first among the unused. It re-runs on conversation, user, ignore and visit changes, not on messages, so a send re-ranks it on the next open. The renderer reads it as `paletteConversationsAtom`.
 
 `EngineHostOptions.logger` lets the process entry supply a content-safe Effect logger. `engine.outbox` reads counts by kind and state only; no payload or error text leaves the store.

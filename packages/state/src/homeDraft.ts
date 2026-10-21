@@ -11,7 +11,7 @@
  */
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
-import { newChatConversations, newChatFrequent, type MentionPick, type PickConversation, type SendTarget } from '@juno/contract'
+import { newChatConversations, type MentionPick, type PickConversation, type SendTarget } from '@juno/contract'
 import { liveQuery } from './atoms'
 import { channelTopicsAtom } from './messages'
 import type { Registry } from './client'
@@ -80,9 +80,6 @@ export const pickConversationsAtom = (query: string | undefined) => (query === u
 
 /** The topic chip's threads in `channel`, while it is reading them: the topic switcher's query, so the two share it. */
 export const homeThreadsAtom = (channel: string | undefined) => (channel === undefined ? closed : channelTopicsAtom(channel))
-
-/** Home's Recent: five people, then five channels (`frequentDestinations`). Local; subscribing never delays Home's first paint. */
-export const frequentConversationsAtom = liveQuery(newChatFrequent)(undefined)
 
 /** A request for a Home tab's composer to take focus (⌘N, ⌘T and "+"); with `list`, its destination list opens too (⌘N). */
 export interface HomeFocus {

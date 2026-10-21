@@ -32,6 +32,6 @@ export { markupLayout, toggleMarkup, type MarkupLayout, type MarkupStyle } from 
 export * from './composer-mentions'
 export * from './composer-emoji'
 export * from './composer-links'
-export { frequentDestinations, rankConversations } from './frequent'
+export { rankConversations } from './frequent'
 export { indexSubject, matchSubject, rankSearchResults, searchWords, type IndexedSubject, type SubjectMatch } from './conversation-search'
 export { dockBadgeActive, type BadgeTopic, type BadgeContext } from './dockBadge'

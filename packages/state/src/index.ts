@@ -114,7 +114,6 @@ export {
   homeDraftAtom,
   homeFocusAtom,
   requestHomeFocus,
-  frequentConversationsAtom,
   homeThreadsAtom,
   pickConversation,
   pickThread,

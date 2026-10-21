@@ -2,7 +2,7 @@ import { isDm, type ConversationKind } from './channel'
 
 const DAY = 86_400_000
 
-/** Local destinations eligible for Home's Recent, with activity in epoch milliseconds. */
+/** A conversation to rank, with activity in epoch milliseconds. */
 interface Destination {
   readonly id: string
   readonly kind: ConversationKind
@@ -49,20 +49,4 @@ export function rankConversations(
       return Number(preferred.has(b.id)) - Number(preferred.has(a.id)) || Number(isDm(b.kind)) - Number(isDm(a.kind)) || b.lastActivityAt - a.lastActivityAt || a.id.localeCompare(b.id)
     })
     .map(({ id }) => id)
-}
-
-/** How many people and how many channels Home's Recent shows. */
-export const RECENT_PER_KIND = 5
-
-/**
- * Home's Recent (SPEC section 12): own sends decay by half each week,
- * unscored conversations fill by activity. At most five people (DMs and
- * group DMs), then at most five channels, each in rank order.
- */
-export function frequentDestinations(conversations: ReadonlyArray<Destination>, sends: ReadonlyArray<Use>, now: number): ReadonlyArray<string> {
-  const kinds = new Map(conversations.map((conversation) => [conversation.id, isDm(conversation.kind)]))
-  const ranked = rankConversations(conversations, sends, now)
-  const people = ranked.filter((id) => kinds.get(id) === true).slice(0, RECENT_PER_KIND)
-  const channels = ranked.filter((id) => kinds.get(id) !== true).slice(0, RECENT_PER_KIND)
-  return [...people, ...channels]
 }

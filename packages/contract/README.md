@@ -48,8 +48,6 @@ The shell update routes (`updates.get`, `updates.set`, `updates.restart`, `updat
 
 - `mentions.emoji` serves cached workspace emoji and aliases once per workspace; composer keystrokes filter it locally. It never calls Slack.
 
-Home's Recent, the `newChat.frequent` live query, returns up to five people then five channels, ranked by own sends over 30 days with a seven-day half-life, then filled by member activity. Archived and ignored channels are excluded. It never calls Slack. The renderer reads `frequentConversationsAtom` on page open without waiting to paint.
-
-The ⌘K Conversations tab's `newChat.ranked` live query ranks the same way over own sends and topic visits (`topic_visits`), uncapped before its 12 rows, then by activity; with text it ranks the conversation picker's matches, names that start with the text first among the unused. It re-runs on conversation, user, ignore and visit changes, not on messages, so a send re-ranks it on the next open. The renderer reads it as `paletteConversationsAtom`.
+The ⌘K Conversations tab's `newChat.ranked` live query ranks conversations by own sends and topic visits (`topic_visits`) over 30 days, each use counting half as much per week, then by activity, before its 12 rows; archived and ignored channels are excluded and it never calls Slack; with text it ranks the conversation picker's matches, names that start with the text first among the unused. It re-runs on conversation, user, ignore and visit changes, not on messages, so a send re-ranks it on the next open. The renderer reads it as `paletteConversationsAtom`.
 
 `engine.outbox` returns outbox counts by fixed kind and state (null without a workspace). `app.logDiagnostics` returns the operating-system version and safe warning/error tails; `app.showLogs` opens the process log folder in Finder.
