@@ -4,6 +4,9 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-21 11:47 · dev-log · @juno/slack reports calls through SlackTrace, a Context.Reference that is off by default, and the sync through an onStep observer; secrets are stripped in one place, devLogText.ts.
+- 10-21 11:46 · dev-log · The developer log opens from ⌘K only when the text names "developer" or "dev log", in its own tab that is never saved; a hidden command flag, not a developer-mode toggle.
+- 10-21 11:45 · dev-log · A hidden developer log keeps the newest 2,000 Slack calls, socket events and sync steps in the engine's memory only; it is never logged, saved, put in Copy log or sent.
 - 10-21 11:35 · copy-sync-log-in-main · Copy log is built and written to the clipboard in main (`app.copySyncLog`): the app and macOS versions, the phase and reason, and the last 200 engine.log lines, which `safeDetails` already filtered. The log never passes through the renderer, and the renderer's 2 KB clipboard route is not widened. Settings › About keeps its own Copy diagnostics; no Help menu item was added.
 - 10-21 11:34 · Tushar · Import the installed Slack app’s session as the only sign-in path and primary action. Remove the embedded Slack sign-in window because it does not work. Supersedes the 10-12 ~17:50 two-path choice in `2026-10-12-1750-237-sign-in-two-ways-juno-s-own-slack-sign-in-window-and-im.md`.
 - 10-21 11:34 · sync-failed-notice · A boot that keeps failing is `offline` only when the request got no answer (a `SlackTransportError` with no HTTP status); any other failure is a new `failed { reason }` phase (error tag, Slack method, Slack's code or HTTP status), shown as "Couldn't finish syncing" with the reason in plain words and Copy log. Two users saw "You're offline" while online in v0.1.10. The title keeps to the four-word rule, so it drops "with Slack".
