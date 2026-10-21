@@ -87,12 +87,15 @@ quiet('Home with a picture, the picture page with its scale, and the gallery in 
     await expect.poll(() => home.picture.locator('img').evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true)
     await shoot(win, name)
   }
+  // The page in a laptop-sized window, wide enough for the words beside the picture.
   const pageOf = async (id: string, name: string) => {
     await page.getByRole('button', { name: 'All pictures' }).click()
     await gallery.locator(`[data-gallery-picture="${id}"]`).getByRole('button').click()
     await expect(page.locator('h1')).toBeVisible()
+    await juno.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1440, 900))
     await expect.poll(() => page.locator('img').first().evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true)
     await shoot(win, name)
+    await juno.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1200, 800))
   }
   const size = scaled('size', 'monet-impression-sunrise')
   const distance = scaled('distance', 'webb-cosmic-cliffs')
