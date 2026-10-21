@@ -67,10 +67,19 @@ export function itemsOf(window: MessageWindow): ReadonlyArray<MessageListItem> {
 
 export const rowSelector = (ts: string) => `[data-message-row="${CSS.escape(ts)}"]`
 
-/** The first row in view and its offset from the top of the scroller. */
+/**
+ * The first row whose top is in view, and its offset from the top of the scroller. Not the row cut by the top
+ * edge: after a jump that row may still be at its size estimate, and holding its top would let its real height
+ * move every row below it.
+ */
 export function rowInView(scroller: HTMLElement): { readonly element: HTMLElement; readonly anchorKey: string; readonly offset: number } | undefined {
   const box = scroller.getBoundingClientRect()
-  const element = document.elementFromPoint(box.left + box.width / 2, box.top + 1)?.closest<HTMLElement>(ROW) ?? scroller.querySelector<HTMLElement>(ROW)
+  let element = document.elementFromPoint(box.left + box.width / 2, box.top + 1)?.closest<HTMLElement>(ROW) ?? scroller.querySelector<HTMLElement>(ROW)
+  if (element != null && element.getBoundingClientRect().top < box.top) {
+    let next = element.nextElementSibling
+    while (next !== null && !next.matches(ROW)) next = next.nextElementSibling
+    if (next instanceof HTMLElement && next.getBoundingClientRect().top < box.bottom) element = next
+  }
   const anchorKey = element?.dataset['messageRow']
   if (element == null || anchorKey === undefined) return undefined
   return { element, anchorKey, offset: element.getBoundingClientRect().top - box.top }
