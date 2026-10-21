@@ -564,7 +564,7 @@ The `chat` group (`tokens.stylex.ts`). `--owner-bubble-bg` and `--owner-bubble-f
 | `--home-line-width` | 440 | The widest Home's picture line gets, the box's width: a line of 140 characters takes two lines |
 | `--gallery-column` | 200 | The narrowest column of the gallery by kind. Columns share the width evenly: three at 1200 wide with the sidebar, five at 1600, six at 1920 |
 | `--gallery-row` | 120 | The height of a row of pictures in the gallery by time |
-| `--gallery-tile-min` | 128 | The narrowest tile in the gallery by time, so a tall picture's title and date have room |
+| `--gallery-tile-min` | 168 | The narrowest tile in the gallery by time, so a tall picture's title and date have room |
 | `--picture-label-width` | 380 | The picture page's label column beside the picture |
 | `--picture-scale-height` | 120 | The picture page's How big drawing at most: the taller of the person and the artwork fills it |
 | `--picture-scale-ruler`, `--picture-scale-dot`, `--picture-scale-here` | 52, 9, 13 | The How far line with its labels above and below; its Earth ring and ticks; the dot at the picture's distance |

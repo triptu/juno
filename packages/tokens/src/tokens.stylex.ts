@@ -1055,7 +1055,7 @@ export const sizes = stylex.defineVars({
   // The gallery's rows of pictures by time, each at its own shape, and the picture page's label column.
   '--gallery-row': '120px',
   // The narrowest tile in the gallery by time, so a tall picture's title and date have room.
-  '--gallery-tile-min': '128px',
+  '--gallery-tile-min': '168px',
   '--picture-label-width': '380px',
   // The gallery's columns of pictures with their words: the narrowest a column gets. Columns share the
   // page's width evenly: three at 1200 wide with the sidebar, five at 1600, six at 1920.
