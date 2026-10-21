@@ -23,10 +23,11 @@ export default defineFixtures(Gallery, {
   Wall: {
     all: page(),
     space: page({ filter: 'space' }),
+    objects: page({ filter: 'objects' }),
     'files-landing': page({ sources: someSources }),
     'no-files': page({ sources: {} }),
   },
-  // By time: sections by century, oldest first, in rows with the date under each picture.
+  // By time: sections by period (centuries, millennia BCE, before 10,000 BCE), oldest first, in rows with the date under each picture.
   Time: {
     all: page({ order: 'time' }),
     paintings: page({ order: 'time', filter: 'painting' }),

@@ -32,6 +32,9 @@ export const pictureCards: ReadonlyArray<GalleryPictureView & { readonly src: st
   { id: 'webb-cosmic-cliffs', kind: 'space', title: 'Cosmic Cliffs in the Carina Nebula', artist: 'James Webb Space Telescope', date: '2022', ratio: 1.73, year: 2022, line: { text: 'The tallest peaks here are about seven light-years high.' }, src: space(1.73) },
   { id: 'apollo-8-earthrise', kind: 'space', title: 'Earthrise', artist: 'William Anders, Apollo 8', date: '1968', ratio: 1, year: 1968, line: { text: 'We came to explore the Moon and found the Earth.', by: 'A crew member' }, src: space(1) },
   { id: 'hubble-ultra-deep-field', kind: 'space', title: 'Hubble Ultra Deep Field', artist: 'Hubble Space Telescope', date: '2004', ratio: 1, year: 2004, line: { text: 'Almost every point of light here is a galaxy.' }, src: space(1) },
+  { id: 'cave-horses', kind: 'painting', title: 'Panel of the Horses', artist: 'Unknown painters', date: 'c. 36,000 years ago', ratio: 1.5, year: -34000, line: { text: 'The wall was scraped clean before the horses were drawn on it in charcoal.' }, src: painting(1.5, '#C9A57A', '#8A6A48', '#2E2620') },
+  { id: 'indus-seal', kind: 'objects', title: 'Stamp seal with a bull', artist: 'Unknown maker', date: 'c. 2600–1900 BCE', ratio: 1, year: -2600, line: { text: 'The signs along the top are a script no one has yet read.' }, src: painting(1, '#8A8478', '#D9D2C2', '#6B6458') },
+  { id: 'chola-nataraja', kind: 'objects', title: 'Shiva as Lord of the Dance', artist: 'Unknown maker', date: 'late 11th century', ratio: 0.75, year: 1070, line: { text: 'The ring of flames stands for the universe he dances into being and out again.' }, src: painting(0.75, '#B9BDB4', '#4E6B5E', '#C9A85A') },
 ]
 
 export const pictureSources: Readonly<Record<string, string>> = Object.fromEntries(pictureCards.map((card) => [card.id, card.src]))

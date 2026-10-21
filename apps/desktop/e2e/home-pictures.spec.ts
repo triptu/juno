@@ -8,6 +8,7 @@
 // nothing under it. Picture files come from the fake Slack's picture store,
 // never the network.
 import { SELF_ID, startFakeSlack, TEAM, type FakeSlack, type Workspace } from '@juno/fake-slack'
+import { pictureYear } from '@juno/pictures'
 import { PICTURES } from '@juno/pictures/catalog'
 import type { Page } from '@playwright/test'
 import type { Juno } from './driver/juno'
@@ -118,13 +119,15 @@ quiet('The gallery shows each picture with its line, has no quotes or facts, and
   await expect(gallery.locator('button[aria-current="true"]')).toHaveCount(1)
   await expect(gallery.getByRole('button', { name: /^(Quotes|Facts)\b/ })).toHaveCount(0)
 
-  // By time: sections by century, oldest first, each picture with its date and no line.
+  // By time: sections by period, oldest first, BCE included, each picture with its date and no line.
   await gallery.getByRole('radio', { name: 'By time' }).click()
   await expect(gallery).toHaveAttribute('data-gallery-order', 'time')
-  const centuries = (await gallery.locator('section h2').allTextContents()).map((name) => Number.parseInt(name))
-  expect(centuries.length).toBeGreaterThan(3)
-  expect(centuries).toEqual(centuries.toSorted((a, b) => a - b))
   await expect(gallery.locator('[data-gallery-picture]')).toHaveCount(PICTURES.length)
+  const periods = await gallery.locator('section h2').allTextContents()
+  expect(periods.length).toBeGreaterThan(3)
+  expect(new Set(periods).size).toBe(periods.length)
+  const years = (await gallery.locator('[data-gallery-picture]').evaluateAll((tiles) => tiles.map((tile) => (tile as HTMLElement).dataset['galleryPicture']!))).map((id) => pictureYear(PICTURES.find((entry) => entry.id === id)!)!)
+  expect(years).toEqual(years.toSorted((a, b) => a - b))
   await expect(gallery.locator('[data-picture-line]')).toHaveCount(0)
 
   // Back to the picture and forward again: the wall comes back in the order it was left.

@@ -8,10 +8,10 @@ import { PictureLine, type PictureLineView } from './PictureLine'
 export type GalleryKind = PictureCardView['kind']
 /** All is every picture; each kind has a pill. */
 export type GalleryFilter = 'all' | GalleryKind
-/** By kind: pictures in columns with their words, in sections by kind. By time: in rows, in sections by century. */
+/** By kind: pictures in columns with their words, in sections by kind. By time: in rows, in sections by period (`periodOf`). */
 export type GalleryOrder = 'kind' | 'time'
 
-/** A picture on the gallery's wall: its card, its line, and the year its date gives. */
+/** A picture on the gallery's wall: its card, its line, and the year it was made (negative before the common era). */
 export interface GalleryPictureView extends PictureCardView {
   readonly line: PictureLineView
   readonly year: number
@@ -23,6 +23,7 @@ export const GALLERY_SECTIONS: ReadonlyArray<{ readonly kind: GalleryKind; reado
   { kind: 'print', name: 'Prints' },
   { kind: 'illustration', name: 'Nature' },
   { kind: 'space', name: 'Space' },
+  { kind: 'objects', name: 'Objects' },
 ]
 
 const ORDERS = [
@@ -53,14 +54,32 @@ export interface GalleryProps {
 /** How far below the screen a picture starts downloading. */
 const NEAR_MARGIN = '600px' // tokens-allow: an observer margin, not a layout length
 
-/** The century a year falls in, as its heading says it: 1872 is "1800s", 937 is "900s". */
-const centuryOf = (year: number): number => Math.floor(year / 100) * 100
+/**
+ * The By time section a year falls in, as its heading says it. Centuries
+ * from 1000 BCE on ("600s BCE", "900s", "1800s"), millennia before that
+ * ("3000s BCE" is 3999 to 3000 BCE), and everything older than 10,000 BCE
+ * in one section, so 45,000 years make a short list. A negative year is BCE.
+ */
+export function periodOf(year: number): string {
+  if (year < -10_000) return 'Before 10,000 BCE'
+  if (year >= 1) {
+    const century = Math.floor(year / 100) * 100
+    return century === 0 ? '1–99' : `${century}s`
+  }
+  const bce = Math.max(1, -year)
+  if (bce >= 1000) {
+    const millennium = Math.floor(bce / 1000) * 1000
+    return `${millennium >= 10_000 ? millennium.toLocaleString('en-US') : millennium}s BCE`
+  }
+  const century = Math.floor(bce / 100) * 100
+  return century === 0 ? '1–99 BCE' : `${century}s BCE`
+}
 
 /**
  * The gallery (SPEC 12, "Pictures and the gallery"). By kind: every picture
  * in sections by kind, in columns that share the page's width, each picture
  * at its own shape with its label and its line under it. By time: sections
- * by century, oldest first, in rows of one height with the date under each.
+ * by period (`periodOf`), oldest first, in rows of one height with the date under each.
  * A picture without its file keeps its box, so nothing moves when one lands.
  */
 export function Gallery({ pictures, sources, current, filter, onFilter, order, onOrder, onOpen, onNear, scrollTop, onScroll }: GalleryProps) {
@@ -103,7 +122,7 @@ export function Gallery({ pictures, sources, current, filter, onFilter, order, o
           Gallery
         </Text>
         <Text variant="body" tone="subtle" as="p" sx={styles.lead}>
-          A thousand years of paintings, prints and studies of nature, and pictures of space that make them look recent.
+          Forty-five thousand years of paintings, carvings, prints and studies of nature, and pictures of space that make them look recent.
         </Text>
         <div {...stylex.props(styles.bar)}>
           <GalleryPills pictures={pictures} filter={filter} onFilter={onFilter} />
@@ -203,22 +222,23 @@ function ByKind({ pictures, columns, sources, current, titled, onOpen }: WallPro
 }
 
 /**
- * Sections by century, oldest first, each a row of its own: a heading over a
+ * Sections by period, oldest first, each a row of its own: a heading over a
  * rule across the page, then its pictures at one height, wrapping. Under
  * each picture its title, on up to two lines, then "date · artist", muted;
  * a picture narrower than a caption gets a tile of the caption's width.
  */
 function ByTime({ pictures, sources, current, onOpen }: WallProps) {
+  // Sorted by year, each period's pictures are next to each other and the periods come oldest first.
   const sorted = pictures.toSorted((a, b) => a.year - b.year)
-  const centuries = [...new Set(sorted.map((picture) => centuryOf(picture.year)))]
-  return centuries.map((century) => (
-    <section key={century} aria-label={`${century}s`} {...stylex.props(styles.section)}>
+  const periods = [...new Set(sorted.map((picture) => periodOf(picture.year)))]
+  return periods.map((period) => (
+    <section key={period} aria-label={period} {...stylex.props(styles.section)}>
       <Text variant="sectionLabel" tone="muted" as="h2" numeric sx={styles.timeHeading}>
-        {century}s
+        {period}
       </Text>
       <ul {...stylex.props(styles.row)}>
         {sorted
-          .filter((picture) => centuryOf(picture.year) === century)
+          .filter((picture) => periodOf(picture.year) === period)
           .map((picture) => (
             <li key={picture.id} data-gallery-picture={picture.id} data-gallery-missing={sources[picture.id] === undefined ? '' : undefined} {...stylex.props(styles.tile, styles.atRow(picture.ratio))}>
               <PictureButton picture={picture} src={sources[picture.id]} current={picture.id === current} onOpen={onOpen} width={`calc(${sizes['--gallery-row']} * ${picture.ratio})`}>
