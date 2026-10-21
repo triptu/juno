@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-22 04:15 · Tushar · The gallery adds ancient and early art, an Objects group and BCE timeline groups; most Islamic works removed (Tushar, 10-22). 37 works from cave art to Hindu sculpture, Mesopotamia and the Maya join; seven Islamic works go; By time shows "Before 10,000 BCE", millennia BCE, then centuries; licences no longer rule a picture out, and every picture keeps its credit.
 - 10-22 03:27 · Tushar · Full runs can run on this Mac when the laptop is unavailable (Tushar, 10-22). `pnpm verify:main --local` runs the same suites and refreshes coverage through the heavy lock; an unreachable runner falls back locally, and the record names the host.
 - 10-22 03:23 · Release timing · Normal releases have no minimum gap between them (Tushar, 10-22).
 - 10-22 01:33 · release · Keep Automated's displayed record for the current Home visit when the shown-today write removes it from the live query. Opening or dismissing it removes Dismiss; later visits keep the daily limit. The existing automated-record e2e covers both moves and their review actions.
