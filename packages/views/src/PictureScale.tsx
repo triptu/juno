@@ -46,7 +46,7 @@ function SizeScale({ widthCm, heightCm, src }: { readonly widthCm: number; reado
         <svg role="img" aria-label={words} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMinYMax meet" {...stylex.props(styles.drawing)}>
           <path d={PERSON_PATH} transform={`translate(0 ${height - PERSON_CM}) scale(${PERSON_CM / 100})`} {...stylex.props(styles.person)} />
           <rect x={left} y={height - heightCm} width={widthCm} height={heightCm} {...stylex.props(styles.artwork)} />
-          {src === undefined ? null : <image href={src} x={left} y={height - heightCm} width={widthCm} height={heightCm} preserveAspectRatio="none" />}
+          {src === undefined ? null : <image href={src} x={left} y={height - heightCm} width={widthCm} height={heightCm} preserveAspectRatio="xMidYMax meet" />}
         </svg>
       </div>
       <Text variant="meta" tone="muted" as="figcaption" numeric selectable sx={styles.caption}>
