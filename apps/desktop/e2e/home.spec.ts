@@ -13,7 +13,7 @@ test.describe.configure({ timeout: 150_000 })
 // Home's AI items and title rewrites come from the background AI jobs.
 test.use({ aiJobs: true })
 
-/** Home reads its items when it appears: show a topic, then Home again. */
+/** Show a topic, then Home again, so the next step starts from a fresh Home. */
 async function freshHome(juno: Juno, via: string): Promise<string[]> {
   await juno.sidebar.row(via).open()
   await juno.topic.expectTitle(via)
@@ -196,9 +196,8 @@ test('Mark done clears a follow-up, and Resolve all resolves the settled topics 
 
   await home.button('followUp', 'Mark done').click()
   await juno.expectToast('Follow-up done')
-  await expect(home.button('followUp', 'Mark done')).toHaveCount(0)
-  // The row stays while Home is on screen, so nothing moves under the pointer.
-  expect(await home.kinds()).toEqual(['waiting', 'followUp', 'tidyUp'])
+  // The row goes at once, even under the pointer: the user did it (home-live.spec.ts).
+  await expect.poll(() => home.kinds()).toEqual(['waiting', 'tidyUp'])
 
   await home.button('tidyUp', 'Resolve all').click()
   await juno.expectToast('Resolved 2 topics')
@@ -206,7 +205,7 @@ test('Mark done clears a follow-up, and Resolve all resolves the settled topics 
   await juno.undoFromToast()
   await sidebar.row(KEYS).expectVisible()
 
-  // Home again: the follow-up is gone.
+  // Home again: the follow-up is still gone.
   expect(await freshHome(juno, POSTGRES)).not.toContain('followUp')
 })
 

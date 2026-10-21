@@ -91,8 +91,8 @@ test('Home asks about an unclear channel; Move puts it in Automated with Undo, a
 
   await home.button('automated', 'Move').click()
   await juno.expectToast('Moved #releases to Automated')
-  // The row stays while Home is on screen, without its buttons.
-  await expect(home.button('automated', 'Move')).toHaveCount(0)
+  // The row goes at once: the user answered it.
+  await expect(home.item('automated')).toHaveCount(0)
   await sidebar.row(RELEASES_MAIN).expectAbsent()
   await sidebar.selectView('Automated')
   await sidebar.row(RELEASES_MAIN).expectVisible()

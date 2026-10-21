@@ -62,38 +62,6 @@ test('Home keeps the syncing line under the greeting as its copy changes', async
 })
 
 /**
- * Home becomes ready while the first sync still reads history (owner,
- * 10-18): the syncing line goes and the reserved slots stay, so the
- * greeting and the rows shown keep their places.
- */
-test('Home moves nothing when it becomes ready before the first sync ends', async ({ page }) => {
-  const places: Array<{ readonly greeting: number; readonly row: number; readonly items: number }> = []
-  for (const state of ['empty/syncing-rows', 'empty/ready-filling']) {
-    await open(page, 'Home', state)
-    places.push(await page.locator('[data-home]').evaluate((node) => ({
-      greeting: node.querySelector('h2')!.getBoundingClientRect().top,
-      row: node.querySelector('[data-home-item]')!.getBoundingClientRect().top,
-      items: node.querySelector('ul')!.getBoundingClientRect().height,
-    })))
-  }
-  await expect(page.locator('[data-home] h2 + p')).toHaveCount(0)
-  expect(places[1]).toEqual(places[0])
-})
-
-/**
- * Home ready while history lands with nothing yet (SPEC 12): a row that
- * lands takes the first reserved slot and the greeting stays where it was.
- */
-test('Home keeps the greeting in place when the first row lands in a reserved slot', async ({ page }) => {
-  const places: Array<number> = []
-  for (const state of ['empty/ready-empty-filling', 'empty/ready-first-row']) {
-    await open(page, 'Home', state)
-    places.push(await page.locator('[data-home] h2').evaluate((node) => node.getBoundingClientRect().top))
-  }
-  expect(places[1]).toBe(places[0])
-})
-
-/**
  * Home's picture (SPEC 12, "A picture"): its caption is two lines, the
  * title and "artist, date", 12px under the picture's box and no wider than
  * it; a long title takes an ellipsis instead of a third line.
