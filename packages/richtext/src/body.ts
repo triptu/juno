@@ -1,10 +1,11 @@
 /** Entry points: a Slack message in, a `MessageBody` out, plus text views of a body. */
 import type { Message } from '@juno/slack-schema'
-import type { Block, Inline, Lookups, MessageBody } from './model'
+import type { Block, Lookups, MessageBody } from './model'
 import { bodyFromBlocks } from './from-blocks'
 import { mrkdwnBlocks } from './from-mrkdwn'
 import { attachmentBlock, fileBlock } from './attachments'
 import { inlineText } from './inline'
+import { tableText } from './table-text'
 
 /**
  * The part of a Slack message that carries its content. A decoded
@@ -53,16 +54,6 @@ export function readableText(body: MessageBody): string {
 
 /** A code block's text as the view shows it: without its tag line. */
 const shownCode = (block: { readonly text: string; readonly tagLine?: true }) => (block.tagLine ? block.text.slice(block.text.indexOf('\n') + 1) : block.text)
-
-/**
- * A table as a spreadsheet takes it: one line per row, cells split by tabs.
- * A tab or line break inside a cell becomes a space, so every cell stays in its column.
- */
-function tableText(rows: ReadonlyArray<ReadonlyArray<ReadonlyArray<Inline>>>): string {
-  return rows.map((row) => row.map((cell) => cellText(cell)).join('\t')).join('\n')
-}
-
-const cellText = (cell: ReadonlyArray<Inline>) => inlineText(cell).replace(/[\t\n]+/g, ' ').trim()
 
 interface TextOptions {
   /** Quote blocks are included, as "> " lines. */

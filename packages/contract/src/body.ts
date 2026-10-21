@@ -131,3 +131,11 @@ export type BodyBlock = typeof BodyBlock.Type
 
 export const MessageBody = Schema.Struct({ blocks: Schema.Array(BodyBlock) })
 export type MessageBody = typeof MessageBody.Type
+
+/**
+ * Rows of a table body as tab-separated lines, as `plainText` writes a whole
+ * table: the view copies the rows a selection covers with it. A
+ * `@juno/richtext` rule, reached through `@juno/domain` because views do not
+ * import either.
+ */
+export { tableText } from '@juno/domain'

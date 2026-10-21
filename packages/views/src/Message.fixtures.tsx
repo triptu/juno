@@ -82,13 +82,18 @@ export default defineFixtures(
     Code: {
       'code-blocks': one(codeBlocks[0]!, { startsGroup: true }),
     },
-    // Tables: a status table with mentions, a link, code and an empty cell; a wide one that scrolls in its box; a tall one cut at ten rows; and a table alone.
+    // Tables: a status table with mentions, a link, code and an empty cell; a wide one that scrolls in its box; a tall one cut at ten rows; a table alone; a wrapped column at a narrow width; a cell with a tab and two paragraphs; and a row that is not the tab stop.
     Table: {
       status: one(tableMessages[0]!, { startsGroup: true }),
       wide: one(tableMessages[1]!, { startsGroup: true }),
       tall: one(tableMessages[2]!, { startsGroup: true }),
       'table-only': one(tableMessages[3]!, { startsGroup: true }),
       'hover-toolbar': one(tableMessages[0]!, { startsGroup: true, actions: noopActions }, { hover: '[data-message-row]' }),
+      // A wrapped description at a narrow width: it wraps so the table fits, and the box does not scroll.
+      wrapped: one(tableMessages[4]!, { startsGroup: true }, { width: 380 }),
+      'copy-cell': one(tableMessages[5]!, { startsGroup: true }),
+      // A row that is not the list's tab stop: its scroll box is not one either.
+      'wide-not-tabbable': one(tableMessages[1]!, { startsGroup: true, tabbable: false }),
     },
     // A send still on its way looks like the message it becomes; past --delay-pending it dims.
     Send: {

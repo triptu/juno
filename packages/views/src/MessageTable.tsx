@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
-import { useState, type ReactNode } from 'react'
-import type { BodyBlock, BodyInline } from '@juno/contract'
+import { useState, type ClipboardEvent, type ReactNode } from 'react'
+import { tableText, type BodyBlock, type BodyInline } from '@juno/contract'
 import { colors, radii, spacing, weights } from '@juno/tokens/tokens.stylex'
 import { Button } from '@juno/ui'
 
@@ -12,10 +12,13 @@ const TABLE_ROWS_SHOWN = 10
 /**
  * A Slack table in a message (SPEC section 7, "Tables"): the first row is
  * the header, cells hold message text, and a column keeps to one line unless
- * Slack wraps it. The box is as wide as the table up to the message's width
- * and scrolls sideways inside itself past that, its far edge shaded while
- * there is more to see. A table of more than ten
- * rows shows ten and a Show all button that grows it in place.
+ * Slack wraps it. The box is as wide as the table up to the message's width:
+ * a wrapped column wraps to fit, and only when the other columns alone are
+ * wider does it scroll sideways, its far edge shaded while there is more to
+ * see. A table of more than ten rows shows ten and a Show all button that
+ * grows it in place. Copying a selection inside the table gives its rows as
+ * tab-separated lines, as a spreadsheet takes them. The box is a tab stop
+ * only on the list's tabbable row, as the cells' links are.
  */
 export function MessageTable({ table, render, tabbable }: { readonly table: Table; readonly render: (inlines: ReadonlyArray<BodyInline>) => ReactNode; readonly tabbable: boolean }) {
   const [expanded, setExpanded] = useState(false)
@@ -27,9 +30,19 @@ export function MessageTable({ table, render, tabbable }: { readonly table: Tabl
     const Tag = header ? 'th' : 'td'
     return <Tag key={column} dir="auto" {...(header ? { scope: 'col' } : {})} {...stylex.props(styles.cell, header && styles.header, !last && styles.divided, setting?.wrap ? styles.wrap : styles.line, setting?.align !== undefined && aligns[setting.align])}>{render(inlines)}</Tag>
   }
+  // The selection's rows, whole: a native copy keeps a cell's own tabs and line breaks, which split it in a spreadsheet.
+  const copy = (event: ClipboardEvent<HTMLTableElement>) => {
+    const selection = window.getSelection()
+    const element = event.currentTarget
+    if (selection === null || selection.isCollapsed || !element.contains(selection.anchorNode) || !element.contains(selection.focusNode)) return
+    const rows = table.rows.filter((_, index) => element.rows[index] !== undefined && selection.containsNode(element.rows[index], true))
+    event.clipboardData.setData('text/plain', tableText(rows))
+    event.preventDefault()
+  }
   return <>
-    <div data-msg-table="" {...stylex.props(styles.box)}>
-      <table aria-label={table.caption !== undefined && table.showCaption !== true ? table.caption : undefined} {...stylex.props(styles.table)}>
+    {/* Chromium makes a scroller that overflows a tab stop of its own; off the tabbable row it is not one. */}
+    <div data-msg-table="" tabIndex={tabbable ? undefined : -1} {...stylex.props(styles.box)}>
+      <table aria-label={table.caption !== undefined && table.showCaption !== true ? table.caption : undefined} onCopy={copy} {...stylex.props(styles.table)}>
         {table.showCaption && <caption {...stylex.props(styles.caption)}>{table.caption}</caption>}
         {head !== undefined && <thead><tr>{head.map((inlines, column) => cell(inlines, column, true, body.length === 0))}</tr></thead>}
         {shown.length > 0 && <tbody>{shown.map((row, index) => <tr key={index}>{row.map((inlines, column) => cell(inlines, column, false, index === shown.length - 1))}</tr>)}</tbody>}
@@ -58,8 +71,9 @@ const styles = stylex.create({
     borderColor: colors['--border-default'],
     borderRadius: radii['--radius-md'],
   },
+  // It shrinks to fit the box, down to its narrowest: wrapped columns at
+  // their longest word, the others at their full line. Past that it scrolls.
   table: {
-    flexShrink: 0,
     borderCollapse: 'collapse',
     // A wrapped column is never narrower than its longest word.
     overflowWrap: 'break-word',

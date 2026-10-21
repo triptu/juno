@@ -7,7 +7,7 @@
 import { Message } from '@juno/slack-schema'
 import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { messageBody, plainText, previewLine, previewText, readableText, type Lookups, type MessageBody } from '../src/index'
+import { composeEdit, editMarkup, messageBody, plainText, previewLine, previewText, readableText, tableText, type Lookups, type MessageBody } from '../src/index'
 
 const lookups: Lookups = { me: 'U0ME', user: (id) => ({ U0ME: 'Tushar', U0MAYA: 'Maya Chen' })[id] }
 
@@ -99,6 +99,8 @@ describe('text views of a table', () => {
     ['plainText', plainText(messageBody(decode(payload), lookups)), 'Release status:\nService\tOwner\tNotes\nAPI\t@Maya Chen\tp95 at 212 ms\nWorker\t\trunbook⚠️\nRollback is ready.'],
     ['readableText', readableText(table), 'Service\tOwner\nAPI\t@Maya Chen\nWorker\t'],
     // A tab or a line break inside a cell becomes a space, so every cell stays in its column.
+    // A carriage return, alone or before a line feed, becomes a space too.
+    ['plainText of a cell with CR and CRLF', plainText(only([[section(text('one\rtwo')), section(text('three\r\nfour'))]])), 'one two\tthree four'],
     ['plainText of a cell with a break and a tab', plainText(only([[{ type: 'rich_text', elements: [{ type: 'rich_text_section', elements: [text('one\ttwo')] }, { type: 'rich_text_section', elements: [text('three')] }] }, section(text('x'))]])), 'one two three\tx'],
     // A message with words shows the words, as one with files does.
     ['previewText with words', previewText(messageBody(decode(payload), lookups)), 'Release status: Rollback is ready.'],
@@ -111,3 +113,52 @@ describe('text views of a table', () => {
     expect(actual).toBe(expected)
   })
 })
+
+describe('tables cached before they were decoded', () => {
+  // Messages synced before tables were known were stored with the table as the schema's unknown variant.
+  const cached = (raw: object) => messageBody({ text: 'Release status', blocks: [{ type: 'unknown', raw: { type: 'table', ...raw } }] }, lookups)
+
+  it('read as tables, with their cells and settings', () => {
+    const body = cached({ rows: [[section(text('Service')), section({ type: 'user', user_id: 'U0MAYA' })]], column_settings: [{ align: 'right' }] })
+    expect(body.blocks).toEqual([{ kind: 'table', rows: [[[{ kind: 'text', text: 'Service' }], [{ kind: 'user', id: 'U0MAYA', name: 'Maya Chen', isMe: false }]]], columns: [{ align: 'right' }] }])
+    expect(previewText(body)).toBe('Table: Service, @Maya Chen')
+  })
+
+  it('stay unknown when the stored object is not a table Juno can read', () => {
+    expect(cached({ rows: 'not rows' }).blocks).toEqual([{ kind: 'paragraph', children: [{ kind: 'text', text: 'Release status' }] }])
+  })
+})
+
+describe('tableText', () => {
+  it('writes the given rows as tab-separated lines, for copying part of a table', () => {
+    const rows = tableOf(table)!.rows
+    expect(tableText(rows.slice(1, 3))).toBe('API\t@Maya Chen\nWorker\t')
+  })
+})
+
+describe('editing a message with a table', () => {
+  const rt = (...lines: ReadonlyArray<string>) => ({ type: 'rich_text', elements: lines.map((line) => ({ type: 'rich_text_section', elements: [text(line)] })) })
+  const statusTable = { type: 'table', rows: [[section(text('API')), section(text('Healthy'))]] }
+  const blocksOf = (...blocks: ReadonlyArray<object>) => decode({ ...payload, blocks }).blocks!
+
+  it('shows only the words in the field', () => {
+    expect(editMarkup({ text: 'Status', blocks: blocksOf(rt('Status'), statusTable) })).toBe('Status')
+    // A message of only a table shows its text, never the table's cells.
+    expect(editMarkup({ text: 'Release status', blocks: blocksOf(statusTable) })).toBe('Release status')
+  })
+
+  it.each([
+    ['a table after the edited words', [rt('Status'), statusTable], 'Status updated', [rt('Status updated'), statusTable]],
+    ['a table between two blocks of words', [rt('Before'), statusTable, rt('After')], 'Before\nAfter now', [rt('Before'), statusTable, rt('After now')]],
+    ['a table before the edited words', [statusTable, rt('Status')], 'Status updated', [statusTable, rt('Status updated')]],
+    ['a table and no other change', [rt('Status'), statusTable], 'Status', [rt('Status'), statusTable]],
+  ])('keeps %s, unchanged and in its place', (_name, before, input, expected) => {
+    const blocks = blocksOf(...before)
+    const edited = composeEdit(input, { text: 'Status', blocks })
+    expect(edited.blocks.map(strip)).toEqual(blocksOf(...expected).map(strip))
+    expect(edited.blocks.find((block) => block.type === 'table')).toBe(blocks.find((block) => block.type === 'table'))
+  })
+})
+
+/** A block's shape without the ids and keys composeOutgoing adds, so kept and parsed blocks compare by what they say. */
+const strip = (block: unknown): unknown => JSON.parse(JSON.stringify(block, (key, value) => (key === 'block_id' || key === 'border' || key === 'style' && value !== null && typeof value === 'object' && Object.keys(value).length === 0 ? undefined : value)))

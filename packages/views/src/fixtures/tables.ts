@@ -46,10 +46,29 @@ export const tallTable = table(
   [{}, {}, { wrap: true }],
 )
 
+/** A short id column and a long description Slack wraps: at a narrow width the description wraps and the table fits. */
+export const wrappedTable = table(
+  [
+    ['ID', 'Description'],
+    [[code('OPS-410')], 'Certificates expire at the end of the month; the rotation script needs the new vault path before it can run on staging.'],
+    [[code('OPS-411')], 'Raise the worker memory limit after the queue backlog on Tuesday.'],
+  ],
+  [{}, { wrap: true }],
+)
+
+/** A cell with a tab and two paragraphs, as Slack can send them: copying its row keeps it one cell. */
+export const copyTable = table([
+  ['Step', 'Notes'],
+  ['Deploy', [t('Run\tmigrate'), { kind: 'break' }, t('then restart')]],
+  ['Verify', 'Check the dashboards'],
+])
+
 /** Messages with tables, for the Message gallery's Table group. */
 export const tableMessages = window([
   { ago: 30, from: people.grafana, blocks: [p('Service status for the 14:00 release:'), statusTable] },
   { ago: 20, from: people.dev, blocks: [p('Traffic by region over the last hour:'), wideTable] },
   { ago: 10, from: people.elena, blocks: [p('Open ops tickets:'), tallTable] },
   { ago: 5, from: people.grafana, blocks: [statusTable] },
+  { ago: 4, from: people.elena, blocks: [p('Open tickets, with notes:'), wrappedTable] },
+  { ago: 3, from: people.leo, blocks: [p('Release steps:'), copyTable] },
 ])

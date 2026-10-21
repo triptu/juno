@@ -53,9 +53,6 @@ export function isEmojiOnly(body: MessageBodyModel): boolean {
   return content.length > 0 && content.length <= MAX_EMOJI_ONLY && content.every((inline) => inline.kind === 'emoji')
 }
 
-/** A table, in a shared message's card too. */
-const hasTable = (blocks: ReadonlyArray<BodyBlock>): boolean => blocks.some((block) => block.kind === 'table' || (block.kind === 'attachment' && hasTable(block.blocks)))
-
 /**
  * Draws a `MessageBody`: paragraphs, quotes, code, lists, headings,
  * tables and rules, with mentions as chips, links (Slack links to this workspace open
@@ -68,7 +65,7 @@ export function MessageBody({ body, now, hueOf, onChannel, onLink, linkInfo, tab
   const jumbo = isEmojiOnly(body)
   const tabIndex = tabbable ? 0 : -1
   return (
-    <div data-msg-text="" {...stylex.props(styles.body, jumbo && styles.jumbo, hasTable(body.blocks) && styles.full)}>
+    <div data-msg-text="" {...stylex.props(styles.body, jumbo && styles.jumbo)}>
       {body.blocks.map((block, index) => (
         <Block key={index} block={block} now={now} hueOf={hueOf} onChannel={onChannel} onLink={onLink} linkInfo={linkInfo} tabIndex={tabIndex} renderFiles={renderFiles} />
       ))}
@@ -274,12 +271,10 @@ const styles = stylex.create({
     textWrap: 'pretty',
     userSelect: 'text',
     cursor: 'text',
-  },
-  // A message's column sizes the body to its content. A table on one line is
-  // as wide as its cells, so a body with one takes the column's width
-  // instead, and the table scrolls inside it rather than widening the message.
-  full: {
-    alignSelf: 'stretch',
+    // A message's column sizes the body to its content. A table on one line is
+    // as wide as its cells, so a body with one takes the column's width
+    // instead, and the table scrolls inside it rather than widening the message.
+    alignSelf: { default: null, ':has([data-msg-table])': 'stretch' },
   },
   jumbo: {
     fontSize: EMOJI_ONLY_SCALE,
