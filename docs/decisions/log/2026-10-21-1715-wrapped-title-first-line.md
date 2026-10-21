@@ -1,0 +1,1 @@
+- 10-21 17:15 · wrapped-title-first-line · With Two lines topic titles, a sidebar row keeps its time, icons and tags on the title's first line: each centres in a box one title line tall (`--text-row-title-leading`), so one-line rows stay pixel for pixel as before. True baseline alignment moved one-line times by 0.5 to 1px.
