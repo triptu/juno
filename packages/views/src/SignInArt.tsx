@@ -1,4 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
+import { useEffect, useRef } from 'react'
 import { accent, layout, motion } from '@juno/tokens/tokens.stylex'
 import { Pebble } from '@juno/ui'
 
@@ -37,8 +38,10 @@ const HIDE = '@container sign-in-art (width < 960px)'
  * follows the theme and the accent through CSS variables. Decorative.
  */
 export function SignInArt() {
+  const box = useRef<HTMLDivElement>(null)
+  useParallax(box)
   return (
-    <div {...stylex.props(styles.root)} aria-hidden data-sign-in-art="">
+    <div ref={box} {...stylex.props(styles.root)} aria-hidden data-sign-in-art="">
       <div {...stylex.props(styles.wash)} />
       <Side placements={LEFT} side="left" />
       <Side placements={RIGHT} side="right" />
@@ -46,13 +49,53 @@ export function SignInArt() {
   )
 }
 
+/** The largest pebble moves `MAX_DEPTH` px at most as the pointer crosses the window; smaller ones, further back, move less. */
+const LARGEST = 300
+const MAX_DEPTH = 8
+
+/**
+ * A small parallax: as the pointer moves, each pebble shifts against it by
+ * up to its depth. Only a transform, written at most once a frame and only
+ * while the pointer moves, so an idle window does no work. Off under
+ * reduced motion and while the art is hidden.
+ */
+function useParallax(box: { readonly current: HTMLDivElement | null }) {
+  useEffect(() => {
+    const root = box.current
+    if (root === null) return
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)')
+    const shown = matchMedia('(min-width: 960px)')
+    const items = Array.from(root.querySelectorAll<HTMLElement>('[data-depth]'), (node) => ({ node, depth: Number(node.dataset['depth']) }))
+    let x = 0
+    let y = 0
+    let frame = 0
+    const draw = () => {
+      frame = 0
+      const dx = x / innerWidth - 0.5
+      const dy = y / innerHeight - 0.5
+      for (const { node, depth } of items) node.style.transform = `translate3d(${(-dx * depth).toFixed(2)}px, ${(-dy * depth).toFixed(2)}px, 0)`
+    }
+    const move = (event: PointerEvent) => {
+      if (reduced.matches || !shown.matches) return
+      x = event.clientX
+      y = event.clientY
+      if (frame === 0) frame = requestAnimationFrame(draw)
+    }
+    addEventListener('pointermove', move, { passive: true })
+    return () => {
+      removeEventListener('pointermove', move)
+      if (frame !== 0) cancelAnimationFrame(frame)
+    }
+  }, [box])
+}
+
 function Side({ placements, side }: { readonly placements: ReadonlyArray<Placement>; readonly side: 'left' | 'right' }) {
   return (
     <div {...stylex.props(styles.side, side === 'left' ? styles.left : styles.right)}>
       {placements.map((p) => (
-        <div key={p.seed} {...stylex.props(styles.place(p.left, (p.top / ART_HEIGHT) * 100))}>
+        <div key={p.seed} data-depth={(p.size / LARGEST) * MAX_DEPTH} {...stylex.props(styles.place(p.left, (p.top / ART_HEIGHT) * 100))}>
           <div {...stylex.props(styles.settle)}>
-            <Pebble seed={p.seed} size={p.size} {...(p.accentBand === true ? { accentBand: true } : {})} />
+            <Pebble seed={p.seed} size={p.size} ripple {...(p.accentBand === true ? { accentBand: true } : {})} />
           </div>
         </div>
       ))}
