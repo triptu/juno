@@ -5,7 +5,7 @@
 // rather than the fake's one stand-in:
 //
 //   JUNO_SCREENS=1 JUNO_SCREENS_PICTURES=/Volumes/AgentWork/pictures-juno-art pnpm --filter @juno/desktop exec playwright test e2e/home-pictures-screens.spec.ts
-import { cp, mkdir, readdir } from 'node:fs/promises'
+import { cp, mkdir, readdir, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { SELF_ID, startFakeSlack, TEAM, type Workspace } from '@juno/fake-slack'
 import { labelOf } from '@juno/pictures'
@@ -79,6 +79,8 @@ quiet('Home with a picture, the picture page with its scale, and the gallery in 
   const page = win.locator('[data-picture-page]')
   const gallery = win.locator('[data-gallery]')
 
+  // Where Home's picture, label and line sit in each shot, to measure that the picture leads.
+  const boxes: Record<string, unknown> = {}
   const homeWith = async (id: string, name: string) => {
     await nextPicture(win, id)
     await juno.openSettings('General')
@@ -86,6 +88,8 @@ quiet('Home with a picture, the picture page with its scale, and the gallery in 
     await expect(home.picture.locator('img')).toBeVisible()
     await expect.poll(() => home.picture.locator('img').evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true)
     await shoot(win, name)
+    const box = (selector: string) => home.picture.locator(selector).first().boundingBox()
+    boxes[name] = { picture: await box('img'), label: await box('[data-home-caption] p'), line: await box('[data-picture-line]'), page: await win.evaluate(() => ({ width: innerWidth, height: innerHeight })) }
   }
   // The page in a laptop-sized window, wide enough for the words beside the picture.
   const pageOf = async (id: string, name: string) => {
@@ -125,4 +129,5 @@ quiet('Home with a picture, the picture page with its scale, and the gallery in 
   await homeWith('monet-impression-sunrise', 'pictures-a-home-painting-dark')
   await juno.setTheme('Light')
   await homeWith('voyager1-pale-blue-dot', 'pictures-a-home-space-light')
+  await writeFile(join(progress, 'pictures-a-home-boxes.json'), JSON.stringify(boxes, null, 2))
 })
