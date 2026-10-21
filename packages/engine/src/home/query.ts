@@ -383,7 +383,7 @@ export const readHome = (): Effect.Effect<HomeRun, SqlError, StoreReader> =>
     const self = selfId === undefined ? undefined : users.get(selfId)
     const name = self === undefined ? '' : firstName(self.real_name ?? self.display_name ?? self.name ?? '')
     return {
-      view: { ...(name === '' ? {} : { firstName: name }), items, unread: unread.length > 0, ...(yield* homeStage) },
+      view: { ...(name === '' ? {} : { firstName: name }), items, ...(yield* homeStage) },
       aiAssist,
       rewritable,
     }

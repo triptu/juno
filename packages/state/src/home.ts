@@ -95,8 +95,8 @@ export function homeAppears(registry: Registry): HomeAppearance {
 /** What Home says over its rows, from the live view: the scene, the greeting and, until Home is ready, the syncing line. */
 export function homeHeading(view: HomeView, items: ReadonlyArray<HomeItem>, appearance: HomeAppearance): { readonly scene: HomeScene; readonly title: string; readonly line: string | undefined; readonly caughtUp: boolean } {
   const now = new Date(appearance.at)
-  // Until Home is ready it never says "All caught up" (SPEC 12).
-  const done = view.ready && items.length === 0 && !view.unread
+  // Ready with no rows is caught up (SPEC 12); before that it never says "All caught up".
+  const done = view.ready && items.length === 0
   return {
     scene: homeScene({ now, caughtUp: done, firstVisitToday: appearance.firstVisitToday }),
     title: homeGreeting({ now, firstName: view.firstName, caughtUp: done }).title,
