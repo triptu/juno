@@ -189,3 +189,42 @@ syncedTest('the viewer covers only its tab, and each tab keeps its own picture o
   await tabs.select('product')
   await expect(viewer.locator('[data-viewer-name]')).toHaveText('pricing.png')
 })
+
+// An image zooms inside its box (SPEC 8, "Zoom"): a double-click goes to 2.5x and back, a pinch zooms, and a drag pans
+// without closing the viewer, even when it ends over the backdrop.
+syncedTest('a picture in the viewer zooms with a double-click and a pinch, and pans with a drag', async ({ juno, win, fake }) => {
+  const { topic } = juno
+  await juno.sidebar.row(ENG_MAIN).open()
+  await topic.expectTitle('Main')
+  fake.injectMedia({ channel: 'C0ENG', user: 'U0MAYA', text: 'Whiteboard from the planning session', media: [{ name: 'whiteboard.png', width: 900, height: 600 }] })
+  await topic.message('Whiteboard from the planning session').getByRole('button', { name: 'Open whiteboard.png' }).click()
+  const viewer = win.getByRole('dialog')
+  const frame = viewer.locator('[data-viewer-item]')
+  const zoom = frame.locator('[data-viewer-zoom]')
+  const view = () => zoom.evaluate((node) => new DOMMatrix(getComputedStyle(node).transform))
+  await expect.poll(async () => (await view()).a).toBe(1)
+
+  await frame.dblclick()
+  await expect.poll(async () => (await view()).a).toBe(2.5)
+  const box = (await frame.boundingBox())!
+  const before = await view()
+  await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await win.mouse.down()
+  await win.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2 + 40, { steps: 4 })
+  await win.mouse.move(box.x - 24, box.y + box.height / 2, { steps: 4 })
+  await win.mouse.up()
+  await expect(viewer).toHaveCount(1)
+  expect((await view()).e).not.toBe(before.e)
+
+  await frame.dblclick()
+  await expect.poll(async () => (await view()).a).toBe(1)
+  expect((await view()).e).toBe(0)
+
+  await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await win.keyboard.down('Control')
+  await win.mouse.wheel(0, -100)
+  await win.keyboard.up('Control')
+  await expect.poll(async () => (await view()).a).toBeGreaterThan(2)
+  await win.keyboard.press('Escape')
+  await expect(viewer).toHaveCount(0)
+})

@@ -14,6 +14,7 @@ import { Filmstrip } from './Filmstrip'
 import { isMedia, type MediaFile } from './MediaGrid'
 import { fullTime, messageTime } from './time'
 import { ViewerDocument, type DocumentLinks, type LoadFileText } from './ViewerDocument'
+import { useZoom } from './zoom'
 
 /** What the viewer shows: every file of a message it can show (`viewableOf`), the one opened, and who sent them when. */
 export interface MediaViewing {
@@ -57,7 +58,8 @@ export interface MediaViewerProps extends DocumentLinks {
  * actions, and along the bottom a filmstrip of every item, the current one
  * marked. ← and →, the side arrows and the strip move through them; Home and
  * End go to the ends. The thumbnail shows at once and the full image fades in
- * over it when it arrives, so nothing moves while it loads; a new item fades
+ * over it when it arrives, so nothing moves while it loads. An image zooms
+ * inside its box with a pinch or a double-click, and pans while zoomed; a new item fades
  * in (`--duration-fast`, none with reduced motion), and its neighbours'
  * full images are fetched ahead. Opens in one frame with focus on Close and
  * gives focus back to what had it when it closes. It is not modal: mount it
@@ -87,9 +89,11 @@ export function MediaViewer({ viewing, now, opener, onClose, onShowItem, onDownl
     setIndex(shown)
     onShowItem?.(shown)
   }
-  // A click on the dim around the picture, the bar or the strip closes; one on the picture or a button does not.
+  // A click on the dim around the picture, the bar or the strip closes; one on the picture or a button does not,
+  // nor one that was pressed elsewhere, such as a drag of a zoomed picture that ends over the dim.
+  const pressed = useRef<EventTarget | null>(null)
   const onBackdrop = (event: MouseEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget) close()
+    if (event.target === event.currentTarget && pressed.current === event.target) close()
   }
   const meta = [viewing.sender, messageTime(viewing.at, now), ...(file.language === undefined ? [] : [file.language]), ...(several ? [`${index + 1} of ${items.length}`] : [])].join(' · ')
   return (
@@ -97,8 +101,13 @@ export function MediaViewer({ viewing, now, opener, onClose, onShowItem, onDownl
       ref={root}
       role="dialog"
       aria-label={file.name}
+      // A click on the picture or the dim leaves focus here, not on the page, so Esc and the arrows still work.
+      tabIndex={-1}
       data-media-viewer=""
       onKeyDown={(event) => onViewerKey(event, index, items.length, go, close)}
+      onPointerDown={(event) => {
+        pressed.current = event.target
+      }}
       onClick={onBackdrop}
       {...stylex.props(styles.backdrop)}
     >
@@ -221,18 +230,22 @@ function ViewerBar({ file, items, meta, at, onClose, onDownload, onQuickLook, on
   )
 }
 
-/** One item in a box fitted to the stage: the thumbnail at once, the full image fading in over it, or the video over its poster. */
+/** One item in a box fitted to the stage: the thumbnail at once, the full image fading in over it, or the video over its poster. An image zooms (`useZoom`). */
 function Item({ file, position }: { readonly file: MediaFile; readonly position: number }) {
   const [loaded, setLoaded] = useState(false)
+  const { frame, content, zoomed } = useZoom(file.kind === 'image')
   const full = file.kind === 'image' ? file.full : undefined
   const width = file.width ?? file.thumb.width
   const height = file.height ?? file.thumb.height
   return (
-    <div data-viewer-item={position} {...stylex.props(styles.frame, styles.fitted(width, height))}>
-      <img src={file.thumb.src} alt="" draggable={false} decoding="async" {...stylex.props(styles.image)} />
-      {full === undefined ? null : (
-        <img src={full} alt={file.name} draggable={false} decoding="async" onLoad={() => setLoaded(true)} {...stylex.props(styles.image, styles.full, loaded && styles.fullShown)} />
-      )}
+    <div ref={frame} data-viewer-item={position} {...stylex.props(styles.frame, styles.fitted(width, height), zoomed && styles.zoomed)}>
+      {/* One transform for both images, so the full image stays over the thumbnail. */}
+      <div ref={content} data-viewer-zoom="" {...stylex.props(styles.zoom)}>
+        <img src={file.thumb.src} alt="" draggable={false} decoding="async" {...stylex.props(styles.image)} />
+        {full === undefined ? null : (
+          <img src={full} alt={file.name} draggable={false} decoding="async" onLoad={() => setLoaded(true)} {...stylex.props(styles.image, styles.full, loaded && styles.fullShown)} />
+        )}
+      </div>
       {file.kind === 'video' && file.video !== undefined ? (
         <video src={file.video} poster={file.thumb.src} controls playsInline preload="metadata" aria-label={file.name} {...stylex.props(styles.image)} />
       ) : null}
@@ -340,6 +353,15 @@ const styles = stylex.create({
     width: `min(${width}px, 100cqw, calc(100cqh * ${width} / ${height}))`,
     aspectRatio: `${width} / ${height}`,
   }),
+  // Scales from its top left corner, so the zoom's arithmetic needs no offsets.
+  zoom: {
+    position: 'absolute',
+    inset: 0,
+    transformOrigin: 'top left',
+  },
+  zoomed: {
+    cursor: { default: 'grab', ':active': 'grabbing' },
+  },
   image: {
     position: 'absolute',
     inset: 0,

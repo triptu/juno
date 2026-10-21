@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-21 21:16 · viewer-zoom · Tushar: images in the media viewer zoom inside their box: a pinch from fit to 8x around the pointer, a double-click between fit and 2.5x, and a scroll or drag to pan while zoomed. One CSS transform on a wrapper around the thumbnail and the full image, written straight to the element so a gesture renders nothing, and no transition. No zoom buttons, readout or setting. A click on the backdrop now closes only when the press also began there, so a pan that ends over it does not close the viewer, and the viewer itself takes focus on a click on the picture, so Esc and the arrows keep working.
 - 10-21 18:50 · home-caught-up-no-rows · Tushar: Home with no rows always showed the greeting, never "All caught up." or the picture, because caught up also needed no unread message in a followed topic, and a real workspace nearly always has one that asks nothing (19 on Tushar's). Ready with no rows is now caught up; `HomeView.unread` is gone. The next picture prefers one already on disk and not shown yet, so it is saved at once.
 - 10-21 18:44 · header-juno-outline · The topic header's Juno button uses the outline sparkle like its neighbours (Tushar, 10-21).
 - 10-21 18:43 · Tushar · Tidy up's topic window defaults to 3 days (Tushar, 10-21).
