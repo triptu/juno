@@ -20,6 +20,7 @@ export interface PebbleProps {
  * Colours are the Tide tone variables, so it follows the theme.
  */
 export function Pebble({ seed, size, accentBand = false, ripple = false }: PebbleProps) {
+  'use no memo' // Drawn once per page and never again; the compiler's cache would only add bytes to the sign-in chunk.
   const shape = pebbleShape(seed)
   const last = shape.bands.length - 1
   return (

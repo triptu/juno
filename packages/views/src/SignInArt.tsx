@@ -38,6 +38,7 @@ const HIDE = '@container sign-in-art (width < 960px)'
  * follows the theme and the accent through CSS variables. Decorative.
  */
 export function SignInArt() {
+  'use no memo' // Rendered once; the compiler's cache would only add bytes to the sign-in chunk.
   const box = useRef<HTMLDivElement>(null)
   useParallax(box)
   return (
@@ -90,6 +91,7 @@ function useParallax(box: { readonly current: HTMLDivElement | null }) {
 }
 
 function Side({ placements, side }: { readonly placements: ReadonlyArray<Placement>; readonly side: 'left' | 'right' }) {
+  'use no memo'
   return (
     <div {...stylex.props(styles.side, side === 'left' ? styles.left : styles.right)}>
       {placements.map((p) => (
