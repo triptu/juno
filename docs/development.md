@@ -756,7 +756,7 @@ Agents run selective checks before reporting. A scheduled task runs the full sui
 
 **Flakes.** Remote Playwright runs retry once. Tests that pass only on retry remain listed as flaky in the console and full-run summary. A failed test fails the gate. Fix intermittent failures without weakening assertions or running retry loops to obtain green results. Use `pnpm flake` to investigate them ("Hunting a flaky test" below).
 
-**Remote plan shape**: `pnpm affected` and `pnpm verify:main` use separate unit, app and specs jobs on the SSH runner. The app job builds the desktop app once and does not shard desktop e2e. See "Remote runs" and "Machine shapes".
+**Remote plan shape**: `pnpm affected` and `pnpm verify:main` use separate unit, app and specs jobs when running on the SSH runner. The app job builds the desktop app once and does not shard desktop e2e. See "Remote runs" and "Machine shapes".
 
 **Test selection by coverage** (landed 10-17): `pnpm affected` picks desktop e2e specs by a coverage map that `pnpm verify:main` refreshes, and gallery behaviour specs by the components they open. See "Desktop specs by coverage".
 
@@ -936,7 +936,9 @@ for machine setup, lessons and troubleshooting.
 Jobs wait up to 60 seconds for capacity (`--wait <seconds>` or
 `JUNO_RUNNER_WAIT` changes this). An unavailable or full runner fails. Use
 `pnpm remote --local <script>` or `pnpm affected --local` to run the steps on
-this Mac through the heavy lock. No automatic local fallback is enabled.
+this Mac through the heavy lock. These commands have no automatic local fallback.
+`pnpm verify:main` falls back locally when its runner health check reports an
+unreachable host (see "Full runs").
 Namespace, if needed again, is available only through `/tstack:runner`.
 
 `test:plan` splits unit, app and specs steps into independent SSH jobs. App
@@ -1473,9 +1475,24 @@ Use `fake.holdNext({ method, reason: 'open' })`, assert the call is held, then `
 `pnpm verify:main --ref origin/main` runs every suite on main; fetch main first.
 The scheduled task runs it once a day on main. It checks out that commit in a temporary worktree on the scratch volume and
 runs unit tests, Quint checks, conformance, gallery and desktop tests as
-one plan of separate SSH jobs on the laptop. Heavy sync tests stay in
+one plan of separate SSH jobs on the laptop when it is reachable. Heavy sync tests stay in
 this run. Random Quint simulations run each time; deterministic Apalache and
 typecheck results use the cache. Changes to sync or outbox code also trigger selective protocol checks.
+
+`pnpm verify:main --ref origin/main --local` runs the same plan on this Mac.
+Without `--local`, an unreachable runner triggers a clear message and local
+execution after the health check, without retrying the run. SSH authentication,
+configuration and runner setup errors still fail. A failing remote suite never
+triggers a local rerun.
+
+The local plan installs the detached checkout, takes the exclusive machine-wide
+heavy lock and runs suites sequentially. Worker limits live in
+`scripts/verify-execution.mjs`; they leave room for Electron and one Apalache JVM
+on the 8-core, 8 GB Mac. Before each plan step it waits while load exceeds 8.
+Heavy sync tests and coverage recording stay enabled. The ordinary desktop
+step skips `@mac`, matching the remote plan; `--with-mac` runs those tests once
+on this Mac after the local plan. `--dry-run --local` prints the plan without
+installing, running suites or writing a full-run record.
 
 `pnpm verify:main --ref origin/main --nightly` implies
 `--no-cache` for Quint and `--with-mac` for the Mac-only e2e tests, perf and feel,
@@ -1488,7 +1505,9 @@ require a full Mac run. Keep timing gates on a quiet Mac and inspect its load.
 Results live in the main checkout's shared `.juno-status`: the latest
 `verify-main.json` and `.md`, permanent per-commit JSON under
 `verify-main/commits/<commit>/<run>.json`, and logs under `verify-main/<run>/`.
-The summary includes tests that passed on retry. A failed suite exits 1. The command refreshes the coverage
+The summary records the execution mode, host and each suite's host, plus tests
+that passed on retry. Local and remote records use the same release gate.
+A failed suite exits 1. The command refreshes the coverage
 map in the invoking checkout; commit that map after a run on main.
 
 On 2026-10-18, one full run at `6c15fbb4` before and one at `d0ecf4ab` after this lane/cache change used separate 8x16 machines. Wall time was 1,418 s before and 1,453 s after. The old unit-then-spec lane took 222 + 281 = 503 s; the new parallel unit and spec lanes took 378 and 364 s, so both finished by 378 s. Both full runs failed for the same unrelated reasons: the gallery's `RemoveCard/remove/click-then-working` shift state consumed about 13 minutes and its part timed out at 15 minutes (gallery 938 s before, 950 s after), and `updates.spec.ts` expected version `0.1.1`–`0.1.6` while the app was `0.1.7` (desktop 413 s before, 427 s after). The gallery timeout dominated total time, so the 125 s shorter unit/spec path did not reduce this pair of full runs. The gallery hang was fixed on main after these runs.

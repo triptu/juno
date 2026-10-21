@@ -18,8 +18,9 @@
 // result; the exit code is 1 if any step failed.
 
 import { spawn } from 'node:child_process'
-import { availableParallelism } from 'node:os'
+import { availableParallelism, loadavg } from 'node:os'
 import { createInterface } from 'node:readline'
+import { setTimeout as sleep } from 'node:timers/promises'
 import { forwardSignals } from './remote/children.mjs'
 
 export function parsePlan(argv) {
@@ -103,7 +104,14 @@ if (import.meta.main) {
   const codes = (await Promise.all(planned.map(async (lane, index) => {
     const results = []
     // The unit and spec lanes give priority to the app lane.
-    for (const step of lane) results.push(await run(step, index > 0 && planned.length > 1))
+    for (const step of lane) {
+      // The local full run owns the lock, but unrelated processes may still be busy.
+      while (serial && loadavg()[0] > Number(process.env.JUNO_PLAN_MAX_LOAD ?? Infinity)) {
+        console.log(`plan: load ${loadavg()[0].toFixed(1)} is above ${process.env.JUNO_PLAN_MAX_LOAD}; waiting before ${step.script}`)
+        await sleep(30_000)
+      }
+      results.push(await run(step, index > 0 && planned.length > 1))
+    }
     return results
   }))).flat()
   process.exit(codes.every((code) => code === 0) ? 0 : 1)

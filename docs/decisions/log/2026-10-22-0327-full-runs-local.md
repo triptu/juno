@@ -1,0 +1,1 @@
+- 10-22 03:27 · Tushar · Full runs can run on this Mac when the laptop is unavailable (Tushar, 10-22). `pnpm verify:main --local` runs the same suites and refreshes coverage through the heavy lock; an unreachable runner falls back locally, and the record names the host.

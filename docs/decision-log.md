@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-22 03:27 · Tushar · Full runs can run on this Mac when the laptop is unavailable (Tushar, 10-22). `pnpm verify:main --local` runs the same suites and refreshes coverage through the heavy lock; an unreachable runner falls back locally, and the record names the host.
 - 10-22 03:23 · Release timing · Normal releases have no minimum gap between them (Tushar, 10-22).
 - 10-22 01:33 · release · Keep Automated's displayed record for the current Home visit when the shown-today write removes it from the live query. Opening or dismissing it removes Dismiss; later visits keep the daily limit. The existing automated-record e2e covers both moves and their review actions.
 - 10-22 01:07 · home-cold-sync-test · Align the cold-sync e2e with SPEC 12 and the 10-21 Home decision: new rows may recenter the column without reserved slots. Combine the initial fill and later history checks in one journey. Sample every frame for retained row identity and order, fixed greeting offsets, a fixed composer and no fading or empty frame. Keep All topics' zero-movement check.
