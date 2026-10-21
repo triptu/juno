@@ -10,7 +10,7 @@
  * with `useCallback`. The memo code would only add to the initial bundle
  * (performance 1).
  */
-import { startTransition, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { startTransition, useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import { flushSync } from 'react-dom'
 import { bottomWindow, messageFlashAtom, messageWindowSpecAtom, registry, scrollSnapshotAtom, type MessageWindow } from '@juno/state'
 import { afterPaint, mark, measure } from '@juno/state/perf'
@@ -215,21 +215,9 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
     const letGo = () => {
       if (pinRef.current?.kind === 'row') pinRef.current = undefined
     }
-    // A gesture still going on: the user's own scroll, which moves the list with no pin held, in the last moment, or
-    // a press on the list that has scrolled it (a scrollbar drag, a selection running past the edge). A press that
-    // has not, such as one on a thread link that opens a new tab, is no gesture.
-    let pressed = false
-    let dragging = false
-    let movedAt = Number.NEGATIVE_INFINITY
-    const onPress = () => void (pressed = true)
-    const onRelease = () => void (pressed = dragging = false)
     // The scrollTop last seen at the bottom. Holding the end and rows growing above only make it larger.
     let bottomTop = scroller.scrollTop
     const onScroll = () => {
-      if (pinRef.current === undefined) {
-        movedAt = performance.now()
-        dragging = pressed
-      }
       if (pinRef.current?.kind !== 'bottom') return
       const top = scroller.scrollTop
       if (top < bottomTop - 1 && distanceFromBottom(scroller) > 1) pinRef.current = undefined
@@ -242,12 +230,11 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
     const leave = () => {
       const inView = rowInView(scroller)
       registry.set(scrollSnapshotAtom(view), inView === undefined ? undefined : { anchorKey: inView.anchorKey, offset: inView.offset })
-      if (inView === undefined || pinRef.current !== undefined || dragging || performance.now() - movedAt < GESTURE_IDLE) return
+      if (inView === undefined || pinRef.current !== undefined || gesture.going()) return
       pinRef.current = { kind: 'row', element: inView.element, offset: inView.offset }
       pinnedTopRef.current = scroller.scrollTop
     }
     const onScrollEnd = () => {
-      movedAt = Number.NEGATIVE_INFINITY
       if (pinRef.current?.kind === 'row' && Math.abs(scroller.scrollTop - pinnedTopRef.current) > 1) pinRef.current = undefined
       const distance = distanceFromBottom(scroller)
       const bottom = atEndRef.current && distance <= BOTTOM_SLACK
@@ -275,22 +262,53 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
     }
     const inputs = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const
     for (const type of inputs) scroller.addEventListener(type, letGo, { passive: true })
-    scroller.addEventListener('pointerdown', onPress, { passive: true })
-    addEventListener('pointerup', onRelease, { passive: true })
-    addEventListener('pointercancel', onRelease, { passive: true })
     scroller.addEventListener('scroll', onScroll, { passive: true })
     scroller.addEventListener('scrollend', onScrollEnd)
+    // After the listeners above, so it sees the bottom let go in the same scroll.
+    const gesture = watchGesture(scroller, pinRef)
     const stopLeaving = readOnly ? () => {} : onLeaveTab(view, leave)
     return () => {
       for (const type of inputs) scroller.removeEventListener(type, letGo)
+      scroller.removeEventListener('scroll', onScroll)
+      scroller.removeEventListener('scrollend', onScrollEnd)
+      gesture.stop()
+      stopLeaving()
+    }
+  }, [view, readOnly, scrollRef, pinRef, pinnedTopRef, setAtBottom, setFar, setSeenTs, setHeldAt, lastRef, atEndRef])
+}
+
+/**
+ * Watches for a gesture of the user's still going on in the list: their own scroll, which moves the list with no pin
+ * held, in the last moment, or a press on the list that has scrolled it (a scrollbar drag, a selection running past
+ * the edge). A press that has not, such as one on a thread link that opens a new tab, is no gesture.
+ */
+function watchGesture(scroller: HTMLElement, pinRef: RefObject<Pin | undefined>): { readonly going: () => boolean; readonly stop: () => void } {
+  let pressed = false
+  let dragging = false
+  let movedAt = Number.NEGATIVE_INFINITY
+  const onPress = () => void (pressed = true)
+  const onRelease = () => void (pressed = dragging = false)
+  const onScroll = () => {
+    if (pinRef.current !== undefined) return
+    movedAt = performance.now()
+    dragging = pressed
+  }
+  const onScrollEnd = () => void (movedAt = Number.NEGATIVE_INFINITY)
+  scroller.addEventListener('pointerdown', onPress, { passive: true })
+  addEventListener('pointerup', onRelease, { passive: true })
+  addEventListener('pointercancel', onRelease, { passive: true })
+  scroller.addEventListener('scroll', onScroll, { passive: true })
+  scroller.addEventListener('scrollend', onScrollEnd)
+  return {
+    going: () => dragging || performance.now() - movedAt < GESTURE_IDLE,
+    stop: () => {
       scroller.removeEventListener('pointerdown', onPress)
       removeEventListener('pointerup', onRelease)
       removeEventListener('pointercancel', onRelease)
       scroller.removeEventListener('scroll', onScroll)
       scroller.removeEventListener('scrollend', onScrollEnd)
-      stopLeaving()
-    }
-  }, [view, readOnly, scrollRef, pinRef, pinnedTopRef, setAtBottom, setFar, setSeenTs, setHeldAt, lastRef, atEndRef])
+    },
+  }
 }
 
 /** Back to the newest message: the pill's jump, and after a send. A new function only when the newest row or the window's end changes (`useCallback`). */
