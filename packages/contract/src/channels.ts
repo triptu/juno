@@ -23,6 +23,8 @@ export const Channels = {
   /** Settings › About's diagnostics: each process's CPU and memory, and what the engine and agent supervisors are doing. */
   appDiagnostics: 'app.diagnostics',
   appLogDiagnostics: 'app.logDiagnostics',
+  /** The sync notice's Copy log: main puts the app and macOS versions, the sync phase and the end of engine.log on the clipboard. */
+  appCopySyncLog: 'app.copySyncLog',
   appShowLogs: 'app.showLogs',
   /** The renderer tells main its view and whether a sync runs, for main's idle CPU check (no titles, no ids). */
   appReportState: 'app.reportState',
@@ -193,6 +195,8 @@ export interface JunoBridge {
     /** A `Diagnostics`, answered by main. */
     readonly diagnostics: () => Promise<unknown>
     readonly logDiagnostics: () => Promise<unknown>
+    /** A `SyncLogInput`; answers 'copied' or 'failed'. */
+    readonly copySyncLog: (input: unknown) => Promise<unknown>
     readonly showLogs: () => Promise<unknown>
     /** An `AppState`: the view kind and whether a sync runs. */
     readonly reportState: (state: unknown) => Promise<unknown>

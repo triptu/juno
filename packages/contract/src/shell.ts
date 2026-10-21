@@ -5,6 +5,7 @@
  */
 import { Schema } from 'effect'
 import { Channels, SIDEBAR_WIDTH } from './channels'
+import { SyncFailure } from './routes/engine'
 
 export const PlatformSchema = Schema.Literals(['darwin', 'win32', 'linux'])
 
@@ -297,8 +298,15 @@ export const LogDiagnostics = Schema.Struct({
   osVersion: Schema.String,
   logs: Schema.Array(Schema.Struct({ process: Schema.Literals(['main', 'engine', 'agent']), lines: Schema.Array(Schema.String) })),
 })
+/** What the sync notice's Copy log names: the engine phase's tag and, when it failed, why. */
+export const SyncLogInput = Schema.Struct({
+  phase: Schema.String.check(Schema.isPattern(/^[a-z-]{1,32}$/)),
+  reason: Schema.optionalKey(SyncFailure),
+})
+export type SyncLogInput = typeof SyncLogInput.Type
 export const ShellRoutes = {
   [Channels.appLogDiagnostics]: { input: Schema.Void, output: LogDiagnostics },
+  [Channels.appCopySyncLog]: { input: SyncLogInput, output: Schema.Literals(['copied', 'failed']) },
   [Channels.appShowLogs]: { input: Schema.Void, output: Schema.Void },
   [Channels.updatesGet]: { input: Schema.Void, output: UpdateState },
   [Channels.updatesSet]: { input: Schema.Struct({ enabled: Schema.Boolean }), output: UpdateState },

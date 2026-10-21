@@ -121,6 +121,7 @@ export class FakeServer {
   readonly #holds = new Map<string, HoldRule>()
   readonly #stalls = new Map<string, HoldRule>()
   readonly #lost = new Map<string, number>()
+  readonly #malformed = new Map<string, number>()
   #gate: ((method: string, args: Readonly<Record<string, string>>) => boolean) | undefined
   readonly #gated = new Map<number, GateWaiter>()
   #gateSerial = 0
@@ -300,6 +301,20 @@ export class FakeServer {
     const remaining = this.#lost.get(method) ?? 0
     if (remaining <= 0) return false
     this.#lost.set(method, remaining - 1)
+    return true
+  }
+
+  // Malformed answers
+
+  /** The next `times` calls of `method` answer HTTP 200 `{ ok: true }` with none of the method's fields, which the client's schema rejects. */
+  forceMalformed(method: string, times: number): void {
+    this.#malformed.set(method, (this.#malformed.get(method) ?? 0) + times)
+  }
+
+  #takeMalformed(method: string): boolean {
+    const remaining = this.#malformed.get(method) ?? 0
+    if (remaining <= 0) return false
+    this.#malformed.set(method, remaining - 1)
     return true
   }
 
@@ -608,6 +623,7 @@ export class FakeServer {
     }
     if (forced !== undefined) return record(200, { ok: false, error: forced })
     if (result === undefined) return
+    if (!(result instanceof ApiError) && this.#takeMalformed(method)) return record(200, { ok: true })
     if (result instanceof ApiError) {
       if (result.retryAfter !== undefined) response.setHeader('Retry-After', String(result.retryAfter))
       return record(result.status, { ok: false, error: result.error })

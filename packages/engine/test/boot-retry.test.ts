@@ -14,17 +14,20 @@ it.effect('force_reload wakes a failed boot immediately and the next failure sti
   yield* Effect.gen(function* () {
     const starts: number[] = []
     let failures = 0
+    const reasons: unknown[] = []
     let reloads = 0
     const fiber = yield* Effect.forkScoped(runSync({
       onPhase: (phase) => Effect.gen(function* () {
         if (phase._tag === 'booting') starts.push(yield* Clock.currentTimeMillis)
-        if (phase._tag === 'offline') failures++
+        if (phase._tag === 'offline') throw new Error('Slack answered, so the boot is not offline')
+        if (phase._tag === 'failed') { failures++; reasons.push(phase.reason) }
       }),
       onEvent: (event) => Effect.sync(() => {
         if (event._tag === 'Frame' && event.frame.type === 'force_reload') reloads++
       }),
     }))
     yield* eventually(() => failures === 1 && fake.socketCount() === 1)
+    expect(reasons[0]).toEqual({ error: 'SlackRejected', method: 'client.userBoot', detail: 'not_allowed' })
     yield* TestClock.adjust(1000)
     const reloadedAt = yield* Clock.currentTimeMillis
     fake.emitFrame({ type: 'force_reload' })

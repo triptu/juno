@@ -1,7 +1,7 @@
 /** Atoms for the engine feature. */
 import { Option } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
-import { enginePing, engineStatus } from '@juno/contract'
+import { enginePing, engineStatus, type SyncFailure } from '@juno/contract'
 import { command, liveQuery } from './atoms'
 import { connectionStateAtom } from './client'
 
@@ -30,8 +30,12 @@ export const syncProgressAtom = Atom.make((get): SyncProgress | undefined => {
   return undefined
 })
 
-/** Why the sidebar may be behind Slack. `stopped`: the engine has stopped for good and needs a restart. */
-export type SyncNotice = 'offline' | 'rate-limited' | 'stopped'
+/**
+ * Why the sidebar may be behind Slack. `stopped`: the engine has stopped for
+ * good and needs a restart. `failed`: the sync keeps failing for a reason
+ * other than the network (`syncFailureAtom` says which).
+ */
+export type SyncNotice = 'offline' | 'failed' | 'rate-limited' | 'stopped'
 
 /** A lost connection that comes back within this long never shows: a short drop is not worth a line. */
 export const OFFLINE_GRACE_MILLIS = 5_000
@@ -43,6 +47,8 @@ const currentNotice = Atom.make((get): SyncNotice | undefined => {
   switch (status.value.phase._tag) {
     case 'offline':
       return 'offline'
+    case 'failed':
+      return 'failed'
     case 'rate-limited':
       return 'rate-limited'
     default:
@@ -50,14 +56,26 @@ const currentNotice = Atom.make((get): SyncNotice | undefined => {
   }
 })
 
+/** The last boot failure's reason while the sync is `failed`, or while it boots again after one. */
+export const syncFailureAtom = Atom.make((get): SyncFailure | undefined => {
+  const status = get(engineStatusAtom)
+  if (status._tag !== 'Success') return undefined
+  const phase = status.value.phase
+  if (phase._tag === 'failed') return phase.reason
+  return phase._tag === 'booting' ? Option.getOrUndefined(get.self<SyncFailure | undefined>()) : undefined
+})
+
 /**
  * The line under the sidebar's filters, if any: the engine stopped for
- * good, Slack slowing Juno down, or offline once that has lasted
+ * good, the sync failing for a reason other than the network (kept while
+ * it boots again, so the retry every 30 s does not flash the card), Slack
+ * slowing Juno down, or offline once that has lasted
  * `OFFLINE_GRACE_MILLIS`. Nothing while all is well, and nothing for an
  * engine restart in progress, which recovers on its own in a few seconds.
  */
 export const syncNoticeAtom = Atom.make((get): SyncNotice | undefined => {
   const notice = get(currentNotice)
+  if (notice === undefined && get(syncFailureAtom) !== undefined) return 'failed'
   if (notice !== 'offline') return notice
   if (Option.getOrUndefined(get.self<SyncNotice | undefined>()) === 'offline') return 'offline'
   const timer = setTimeout(() => get.setSelf('offline'), OFFLINE_GRACE_MILLIS)

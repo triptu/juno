@@ -99,6 +99,7 @@ Style: transparent, colour `--foreground-subtle`, hover `--surface-hover`, press
 | First sync, listing | `ProgressRing` 20, empty track | Syncing with Slack | Finding your conversations | none |
 | First sync, counting | `ProgressRing` 20, N of M | Syncing with Slack | N of M conversations | none |
 | Offline (after 5 s) | `wifi-slash` 18 | You're offline | Juno catches up when you're back. | none |
+| Sync can't finish | `cloud-warning` 18 | Couldn't finish syncing | The reason in plain words ("Slack sent data Juno can't read."), else "Juno tries again every 30 seconds." | Copy log |
 | Rate limited | `hourglass-medium` 18 | Slack asked us to slow down | Juno will catch up in a minute. | none |
 | Engine stopped | `warning-circle` 18 | Sync stopped | The topics here are kept. | Restart |
 

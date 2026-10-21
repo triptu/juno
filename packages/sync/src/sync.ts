@@ -14,7 +14,8 @@
  * catch-up, sweep or root fetch included, fails the effect with
  * `SlackAuthRequired` and the engine ends the session. Any other boot
  * failure is logged and retried after `bootRetryMillis` with the phase at
- * `offline`; `force_reload` cuts that wait short. Any other catch-up failure
+ * `offline` when the network failed, else at `failed` with a safe reason;
+ * `force_reload` cuts that wait short. Any other catch-up failure
  * is logged, the phase settles, and the catch-up runs again after the rate
  * limit that stopped it or after `bootRetryMillis`. A store error is a bug; it is logged per event so one bad frame does not
  * end the sync, and surfaces in the engine log.
@@ -42,6 +43,18 @@ export type SyncPhase =
   | { readonly _tag: 'catching-up'; readonly done: number; readonly total: number; readonly first?: boolean }
   | { readonly _tag: 'live' }
   | { readonly _tag: 'offline' }
+  /** A boot keeps failing for a reason other than the network, for example an answer the schema rejects. Retried like `offline`. */
+  | { readonly _tag: 'failed'; readonly reason: SyncFailure }
+
+/**
+ * Why a boot failed, safe to show and copy: the error's tag, the Slack
+ * method and Slack's error code or the HTTP status. Never a message or content.
+ */
+export interface SyncFailure {
+  readonly error: string
+  readonly method?: string
+  readonly detail?: string
+}
 
 export interface RunSyncOptions {
   /** Observer after event application. Must enqueue work without blocking the socket. */

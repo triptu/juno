@@ -1,6 +1,5 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 import { Schema } from 'effect'
-import { release } from 'node:os'
 import { mkdir } from 'node:fs/promises'
 import { logFolder, warningLines } from '../logging'
 import { Channels, ShellRoutes, type AppState, type Diagnostics, type DownloadResult, type NotificationPermission, type SharingSetting, type ShellInput, type ShellOutput } from '@juno/contract'
@@ -16,6 +15,7 @@ import type { Updates } from './updates'
 import type { Launch } from './launch'
 import { openMicrophoneSettings } from './media'
 import { createScreenShareSources } from './screenShare'
+import { osVersion, syncLogText } from './syncLog'
 import { APP_ORIGIN } from './scheme'
 import { closeWebPanel, hideWebPanel, setWebPanelBounds, showWebPanel } from './webPanel'
 import { setMenuHuddle } from './window'
@@ -125,7 +125,13 @@ export function registerIpc({ updates, supervisor, agent, providers, codex, back
     electron: process.versions.electron ?? 'unknown',
   }))
   handle(Channels.appDiagnostics, () => processes.diagnostics())
-  handle(Channels.appLogDiagnostics, async () => ({ osVersion: process.platform === 'darwin' ? `macOS ${process.getSystemVersion()}` : `${process.platform} ${release()}`, logs: await warningLines() }))
+  handle(Channels.appLogDiagnostics, async () => ({ osVersion: osVersion(), logs: await warningLines() }))
+  handle(Channels.appCopySyncLog, async (input) => {
+    try {
+      clipboard.writeText(await syncLogText(app.getVersion(), input))
+      return 'copied'
+    } catch { return 'failed' }
+  })
   handle(Channels.appShowLogs, async () => {
     await mkdir(logFolder(), { recursive: true })
     if (e2e) { logsForTests.opened++; return }

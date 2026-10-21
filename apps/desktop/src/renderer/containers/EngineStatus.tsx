@@ -16,6 +16,8 @@ const phaseLabel = (phase: Status['phase']): string => {
       return 'Engine live'
     case 'offline':
       return 'Engine offline'
+    case 'failed':
+      return `Engine sync failed, ${[phase.reason.error, phase.reason.method, phase.reason.detail].filter((part) => part !== undefined).join(', ')}`
     case 'rate-limited':
       return 'Engine rate limited'
     case 'session-expired':

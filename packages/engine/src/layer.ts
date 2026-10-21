@@ -63,7 +63,8 @@ interface PhaseInputs {
 /**
  * The engine phase (architecture 2.5 and 11) from the session and the sync:
  * no session is `first-run`, a rejected one `session-expired`; a ready one
- * reports the sync's phase, or `offline` until the sync has started. While
+ * reports the sync's phase (`failed` when a boot keeps failing for a reason
+ * other than the network), or `offline` until the sync has started. While
  * a rate limit holds the client back, a sync that is not offline reports
  * `rate-limited` until the pause ends.
  */
