@@ -1,5 +1,6 @@
 import type { Locator } from '@playwright/test'
 import { expect, hooks, test } from './fixtures'
+import { expectHomeSyncFrames } from './homeSyncProbe'
 import { JunoChatPane, test as chatTest } from './juno-agent/chat'
 import { expectStableAnchor } from './shiftProbe'
 
@@ -217,69 +218,67 @@ test('sidebar rows stay fixed while sync fills the remaining topics', { tag: ['@
   })
 })
 
-for (const destination of ['Home', 'All topics'] as const) {
-  test(`cold sync fills ${destination} without moving painted rows`, { tag: ['@heavy', '@heavy-sync'] }, async ({ juno, win, fake }) => {
-    fake.holdNext({ method: 'subscriptions.thread.getView' })
-    await juno.signIn()
-    await expect.poll(() => fake.heldCount({ method: 'subscriptions.thread.getView' })).toBe(1)
-    // Open the page under test from the sidebar, so it reads its rows afresh.
-    if (destination === 'All topics') await juno.allTopics.open()
-    else await juno.home.navItem.click()
-    const selector = destination === 'Home' ? '[data-home-item]' : '[data-all-topics-row]'
-    await expect(win.locator(selector)).toHaveCount(0)
-    const anchor = destination === 'Home' ? '[data-home-scene]' : selector
-    // The unfocused sidebar may reorder as cold history and Automated membership arrive (SPEC 5).
-    // This probe checks the destination page; sidebar.spec.ts checks the changing topic list.
-    await expectStableAnchor(win, anchor, async () => {
-      fake.release({ method: 'subscriptions.thread.getView' })
-      await expect(win.locator('[data-topic-row]').first()).toBeVisible()
-      await expect(win.locator(selector).first()).toBeVisible()
-    }, { outside: '[aria-label="Sidebar"] [role="group"][aria-label="Topics"]' })
-  })
-}
+test('cold sync fills All topics without moving painted rows', { tag: ['@heavy', '@heavy-sync'] }, async ({ juno, win, fake }) => {
+  fake.holdNext({ method: 'subscriptions.thread.getView' })
+  await juno.signIn()
+  await expect.poll(() => fake.heldCount({ method: 'subscriptions.thread.getView' })).toBe(1)
+  // Open the page under test from the sidebar, so it reads its rows afresh.
+  await juno.allTopics.open()
+  const selector = '[data-all-topics-row]'
+  await expect(win.locator(selector)).toHaveCount(0)
+  // The unfocused sidebar may reorder as cold history and Automated membership arrive (SPEC 5).
+  // This probe checks the destination page; sidebar.spec.ts checks the changing topic list.
+  await expectStableAnchor(win, selector, async () => {
+    fake.release({ method: 'subscriptions.thread.getView' })
+    await expect(win.locator('[data-topic-row]').first()).toBeVisible()
+    await expect(win.locator(selector).first()).toBeVisible()
+  }, { outside: '[aria-label="Sidebar"] [role="group"][aria-label="Topics"]' })
+})
 
-test('Home rows painted during the first sync stay fixed as later history pages land', { tag: ['@heavy', '@heavy-sync'] }, async ({ juno, win, fake }) => {
+test('cold sync fills Home with retained rows, a fixed composer and no flicker', { tag: ['@heavy', '@heavy-sync'] }, async ({ juno, win, fake }) => {
   const method = 'conversations.history'
+  const subscriptions = 'subscriptions.thread.getView'
+  fake.holdNext({ method: subscriptions })
   fake.holdNext({ method })
   // Previews run beside history, so hold them before any history page can land.
   fake.holdNext({ method: 'conversations.replies', reason: 'thread-preview', times: 1000 })
   await juno.signIn()
+  await expect.poll(() => fake.heldCount({ method: subscriptions })).toBe(1)
   // Open Home from the sidebar while the sync runs.
   await juno.home.navItem.click()
-  const syncing = win.locator('[data-home][data-home-loading]')
-  // Let pages land one at a time until Home paints a row while the sync still runs.
-  await expect
-    .poll(
-      async () => {
-        if ((await syncing.locator('[data-home-item]').count()) > 0) return true
-        if (fake.heldCount({ method }) > 0) {
-          fake.release({ method })
-          fake.holdNext({ method })
-        }
-        return false
-      },
-      { timeout: 30_000 },
-    )
-    .toBe(true)
-  await expect.poll(() => fake.heldCount({ method })).toBe(1)
-  const boxes = () => win.locator('[data-home-item]').evaluateAll((rows) => rows.map((row) => ({ id: row.getAttribute('data-home-item'), ...row.getBoundingClientRect().toJSON() })))
-  const painted = await boxes()
-  // The held previews keep sync open while the probe watches the remaining history pages land;
-  // the sidebar's progress line leaving at the end is checked separately below.
-  // The sidebar's list is still being built: its rows take their places by recency, and #alerts-prod and #deploys
-  // leave for Automated, as their pages land (sidebar.spec.ts, "during the first sync"). Only those moves are skipped.
-  // Home becomes ready once the DMs, mentions and unread followed threads have history, while the sync goes on
-  // (owner, 10-18), so that step is inside the probe too and must move nothing either.
-  await expectStableAnchor(win, '[data-home-item]', async () => {
+  const home = win.locator('[data-home]')
+  const rows = home.locator('[data-home-item]')
+  await expect(home).toHaveAttribute('data-home-loading', '')
+  await expect(rows).toHaveCount(0)
+  // SPEC 12: "rows show in rank order as the conversations they come from land, and no space is kept for rows that may come."
+  // Adding rows may recenter the column; the composer and the spacing within the painted column stay fixed.
+  await expectHomeSyncFrames(win, async () => {
+    fake.release({ method: subscriptions })
+    // Let pages land one at a time until Home paints a row while the sync still runs.
+    await expect
+      .poll(
+        async () => {
+          if ((await rows.count()) > 0) return true
+          if (fake.heldCount({ method }) > 0) {
+            fake.release({ method })
+            fake.holdNext({ method })
+          }
+          return false
+        },
+        { timeout: 30_000 },
+      )
+      .toBe(true)
+    await expect.poll(() => fake.heldCount({ method })).toBe(1)
+    await expect(home).toHaveAttribute('data-home-loading', '')
     fake.release({ method })
     await expect.poll(() => fake.heldCount({ method: 'conversations.replies' }), { timeout: 30_000 }).toBeGreaterThan(0)
     await expect(juno.sidebar.syncStatus).toBeVisible()
-  }, { outside: '[aria-label="Sidebar"] [role="group"][aria-label="Topics"]' })
-  expect((await boxes()).slice(0, painted.length)).toEqual(painted)
-  // The sync ends: the rows painted are still where they were.
-  fake.release({ method: 'conversations.replies' })
-  await expect(win.locator('[data-home]:not([data-home-loading])')).toBeVisible({ timeout: 30_000 })
-  expect((await boxes()).slice(0, painted.length)).toEqual(painted)
+    fake.release({ method: 'conversations.replies' })
+    await expect(home).not.toHaveAttribute('data-home-loading', { timeout: 30_000 })
+    await juno.expectEngineLive()
+    await juno.sidebar.expectNoSyncStatus()
+    await expect(rows.first()).toBeVisible()
+  })
 })
 
 test('the probe rejects a one-pixel movement that returns before the action ends', async ({ win }) => {

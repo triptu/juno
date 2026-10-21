@@ -1464,6 +1464,8 @@ At `d0876483`, all 18 cases passed in 38.5 seconds on one `linux/amd64:4x8` remo
 
 `expectStableAnchor` in `apps/desktop/e2e/shiftProbe.ts` samples a retained DOM anchor's screen coordinates every animation frame and asserts exactly zero movement. It also requires Chromium's Layout Shift observer and rejects entries without recent input. The anchor check includes the recent-input interval, which otherwise hides jumps for 500 ms. Start it before releasing delayed data, and wait for the resulting UI inside its action. A missing anchor fails.
 
+Home's first sync uses `expectHomeSyncFrames` instead: SPEC 12 leaves no space for rows that have not arrived, so adding rows recentres the column. Every sampled frame keeps the composer fixed, retains painted rows in order with their greeting offsets, and shows the scene, greeting and rows without fading. Progress and readiness changes alone must not move the column.
+
 Use `fake.holdNext({ method, reason: 'open' })`, assert the call is held, then `fake.release({ method })` to exercise partial caches. Use silent fake posts followed by one socket message to reproduce history missing above the latest message. Do not substitute a settled gallery fixture for this case. Repeat with `pnpm flake apps/desktop/e2e/layout-shift.spec.ts --repeat 20 --machines 1`. Keep one remote run at a time; all jobs share the laptop’s configured cores.
 
 ## Full runs
