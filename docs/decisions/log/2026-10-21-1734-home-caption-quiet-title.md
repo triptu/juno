@@ -1,0 +1,1 @@
+- 10-21 17:34 · home-caption-quiet-title · Tushar: the title on caught-up Home's caption is regular weight in `--foreground-subtle` instead of medium in the default tone, so the caption stays quiet under the picture; the size step (13.5 over 12.5) and the tone step (subtle over muted) still set it apart from the "artist, date" line. A gallery tile keeps its medium, default title.

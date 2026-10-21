@@ -24,9 +24,8 @@ export interface HomePictureProps {
 }
 
 /**
- * The picture in the caught-up scene's place, and its caption: the title,
- * then "artist, date" on a quieter line, one line each, as a gallery tile
- * says it. The box is the same for every picture (lower on a shorter
+ * The picture in the caught-up scene's place, and its caption: the title
+ * in the subtle tone, then "artist, date" smaller and muted, one line each. The box is the same for every picture (lower on a shorter
  * window), so the caption is always in one place; the picture is fitted
  * inside and rests on the box's bottom edge, over the caption.
  */
@@ -56,7 +55,7 @@ export function HomePicture({ picture, onOpen, onMissing }: HomePictureProps) {
         )}
       </div>
       <div data-home-caption="" {...stylex.props(styles.caption)}>
-        <Text variant="ui" weight="medium" tone="default" as="p" truncate tooltipWhenTruncated>
+        <Text variant="ui" tone="subtle" as="p" truncate tooltipWhenTruncated>
           {picture.title}
         </Text>
         <Text variant="meta" tone="muted" as="p" truncate tooltipWhenTruncated>

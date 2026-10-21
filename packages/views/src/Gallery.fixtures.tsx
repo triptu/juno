@@ -25,6 +25,7 @@ export default defineFixtures(Gallery, {
     quotes: page({ filter: 'quotes' }),
     facts: page({ filter: 'facts' }),
     'quotes-wide': page({ filter: 'quotes' }, { width: 1600, height: 900 }),
+    'facts-wide': page({ filter: 'facts' }, { width: 1920, height: 900 }),
     'quotes-narrow': page({ filter: 'quotes' }, { width: 640, height: 760 }),
     'facts-minimum-window': page({ filter: 'facts' }, { width: 336, height: 436 }),
   },
