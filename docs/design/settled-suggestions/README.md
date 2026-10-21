@@ -74,7 +74,7 @@ Only settings that change behaviour people would want different. Weighed, and de
 | Kinds: threads, DMs | **Built.** Threads and Direct messages, both on | Resolving a DM hides the person from the sidebar until they write, which some people never want. A channel's Main is never proposed: it is a stream, not a topic you follow. |
 | Never suggest where someone asked you something, or you were mentioned last | **A rule, not a setting** | Nobody wants an unanswered question tidied away. Stated on the page so the rule is visible. |
 | What Resolve does to Slack | **No new setting** | Resolve only marks read, and Mark messages read in Slack too already decides whether that reaches Slack. A second switch would disagree with the first. |
-| How often to suggest | **No setting** | Home computes items when it appears; the quiet time is the real control. |
+| How often to suggest | **No setting** | Home's items follow the data live; the quiet time is the real control. |
 | A Keep open list or snooze | **No list** | Keep open ends by itself when someone writes again, so there is nothing to manage. All topics still shows every topic. |
 | Resolve automatically, without asking, once trusted | **Proposed next, not built** | The owner's end state. It needs a place to see what Juno did: a Home row "Juno resolved 4 topics" with the same review sheet, every row with Reopen, and an AI activity entry per resolve. Suggest it as a choice in Settings › Tidy up ("Ask first" · "Resolve and tell me") after the owner has used Resolve from the review a few times. Default Ask first. |
 
