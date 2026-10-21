@@ -321,9 +321,9 @@ test.describe('state switcher', () => {
     const avatar = page.getByRole('img', { name: 'Maya Chen' })
     await expect(avatar).toHaveText('MC')
     await page.waitForTimeout(1500)
-    // Still the initials, and the photo has not been drawn.
+    // Still the initials, and the photo has no bytes to draw.
     await expect(avatar).toHaveText('MC')
-    await expect(avatar.locator('img')).toHaveCSS('opacity', '0')
+    expect(await avatar.locator('img').evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(0)
   })
 })
 

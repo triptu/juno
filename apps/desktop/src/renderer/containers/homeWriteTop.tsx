@@ -25,8 +25,7 @@ export function WriteTop({ tabId, draft, junoOn, destination, focusField, onType
   return (
     <HomeWriteTop
       chip={<Chip destination={draft.conversation} junoOn={junoOn} onType={onType} {...destination.chip} />}
-      topic={<Topic conversation={draft.conversation} thread={draft.thread} onType={onType} {...topic} />}
-      topicShown={draft.conversation !== undefined}
+      topic={draft.conversation === undefined ? undefined : <Topic conversation={draft.conversation} thread={draft.thread} onType={onType} {...topic} />}
     />
   )
 }

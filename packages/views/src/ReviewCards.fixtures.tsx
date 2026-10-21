@@ -46,7 +46,7 @@ const acted = (topics: ReadonlyArray<HomeTopic>): ReadonlyMap<string, ReviewStat
   ])
 
 function CardsOnHome() {
-  return <Home scene="evening" title="Evening, Tushar." items={cards} now={NOW} enter={false} onOpen={noop} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} />
+  return <Home scene="evening" title="Evening, Tushar." items={cards} now={NOW} onOpen={noop} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} />
 }
 
 export default defineFixtures(

@@ -795,16 +795,6 @@ export const motion = stylex.defineVars({
     default: '240ms',
     [REDUCED_MOTION]: '0.01ms',
   },
-  '--duration-exit': {
-    default: '150ms',
-    [REDUCED_MOTION]: '0.01ms',
-  },
-  // Menus and popovers come in at once and may leave slower: a slow
-  // entrance makes the interface feel slow (owner, 10-17).
-  '--duration-menu-in': {
-    default: '80ms',
-    [REDUCED_MOTION]: '0.01ms',
-  },
   // How long a send may take before its pending row dims (inventory 6.1).
   '--delay-pending': '800ms',
   // The gap between the illustration, title and action of an empty state.
@@ -833,10 +823,6 @@ export const motion = stylex.defineVars({
   '--rise-stagger': {
     default: '6px',
     [REDUCED_MOTION]: '0px',
-  },
-  '--appear-scale': {
-    default: '0.98',
-    [REDUCED_MOTION]: '1',
   },
   // The sign-in page (inventory 1.1): the mark's dots gather into the j,
   // the pebbles fade in and settle by --rise-settle, a hovered pebble's

@@ -640,11 +640,9 @@ Three ideas (`friendly-layer.md` §5): instant for the things you do constantly,
 
 | Token | Value | Use |
 | --- | --- | --- |
-| `--duration-fast` | 150ms | Press scale, hover colour, focus ring, the avatar photo fade |
+| `--duration-fast` | 150ms | Press scale, hover colour, focus ring |
 | `--duration-pop` | 220ms | Reaction pop, toggle fill, resolve check |
 | `--duration-appear` | 240ms | Toast, palette, card and empty-state entrance |
-| `--duration-menu-in` | 80ms | Popover and menu entrance: menus come in fast and may leave slower (owner, 10-17) |
-| `--duration-exit` | 150ms | Every exit |
 | `--delay-pending` | 800ms | How long a send may take before its pending row dims |
 | `--stagger` | 80ms | Between the parts of an empty state as they enter |
 | `--duration-pulse` | 2400ms | One breath of an incoming huddle's glow (huddles 10-20), read from the root by its Web Animation. Not shortened for reduced motion: the card does not start the pulse there |
@@ -652,7 +650,6 @@ Three ideas (`friendly-layer.md` §5): instant for the things you do constantly,
 | `--ease-spring` | `cubic-bezier(0.34, 1.4, 0.64, 1)` | The three pops only; overshoots about 8% |
 | `--press-scale` | 0.96 | On `:active`, never when disabled |
 | `--pop-scale` | 1.12 | The peak of a pop |
-| `--appear-scale` | 0.98 | Where an entrance starts |
 | `--rise-toast`, `--rise-stagger` | 8px, 6px | How far a toast and an empty-state part rise as they enter |
 | `--duration-gather`, `--duration-settle` | 600ms, 900ms | The sign-in page's entrance, once: the mark's dots gather into the j; the pebbles fade in and settle |
 | `--rise-settle` | 6px | How far a sign-in pebble settles as it enters |
@@ -660,16 +657,17 @@ Three ideas (`friendly-layer.md` §5): instant for the things you do constantly,
 | `--duration-nod` | 320ms | The sign-in mark's dot nods under the pointer |
 | Transition set | `scale, background-color, color, border-color, box-shadow, opacity` at `--duration-fast` `--ease-out` | |
 | Toggle to active | The filled icon scales 0.8 → 1 with the spring over `--duration-pop` and cross-fades from the outline icon; off just cross-fades over `--duration-fast`. Both icons stay in the DOM | |
-| Toast | Enter `translateY(--rise-toast)` → 0 with opacity over `--duration-appear`; exit opacity over `--duration-exit`; a replacement cross-fades | |
-| Appear | Opacity 0 → 1 and scale `--appear-scale` → 1 over `--duration-appear` (`--duration-menu-in` for popovers and menus), origin at the anchor corner. Exit opacity only | |
+| Toast | Enter `translateY(--rise-toast)` → 0 with opacity over `--duration-appear`; it goes at once, and a replacement takes its place without rising again | |
+| Popovers and menus | Open and close at once, in their final place: no fade, no scale (Tushar, 10-21) | |
+| Home | Never animates: every part is drawn in its final state in the frame it first shows (Tushar, 10-21) | |
 | Empty state | Illustration, title, body and action enter `--stagger` apart with opacity and `--rise-stagger`, once, when the state first appears | |
 | Theme switch | add `data-theme-switching` on the root; `* { transition: none !important }` while set; remove after two animation frames | |
-| Reduced motion | `@media (prefers-reduced-motion: reduce)` through the tokens themselves: every duration and the stagger 0.01ms / 0ms, `--press-scale`, `--pop-scale` and `--appear-scale` 1, the rise distances 0. Opacity cross-fades remain as the visible cue. `global.css` turns every transition off (`0s`) and shortens every animation to 0.01ms, so a state change such as a row's fill shows in its own frame | |
+| Reduced motion | `@media (prefers-reduced-motion: reduce)` through the tokens themselves: every duration and the stagger 0.01ms / 0ms, `--press-scale` and `--pop-scale` 1, the rise distances 0. Opacity cross-fades remain as the visible cue. `global.css` turns every transition off (`0s`) and shortens every animation to 0.01ms, so a state change such as a row's fill shows in its own frame | |
 | Hover | Only inside `@media (hover: hover)` | |
 | Scroll to new | On open, scroll the "new" divider to 80px below the top, else to the bottom; `requestAnimationFrame` then a 150ms retry | |
 | Toast life | 5000ms for undoable, 4000ms for info | |
 
-Menus and popovers enter in 80ms, other entrances in 240ms, exits 150ms, pops 220ms; rows, tabs and typing never animate. Never animated: row hover, selected row, tab switch, tab hover, typing, scrolling, list reorders, nav item hover and active. Only `transform` and `opacity` are animated anywhere.
+Entrances take 240ms and pops 220ms; there are no exit animations. Never animated: Home, menus and popovers, row hover, selected row, tab switch, tab hover, typing, scrolling, list reorders, nav item hover and active. Only `transform` and `opacity` are animated anywhere.
 
 ## 9. Opacity
 
@@ -697,7 +695,7 @@ Apply these when porting; the prototype values are listed so no one copies them 
 | Global letter-spacing 0.02em in CSS file | 0 (Figtree; 0.01em was the Inter value) |
 | Lucide outline icons | Phosphor, weight by size, fill for active (`friendly-layer.md` §2) |
 | Radius 6 tags, chips, pills and reactions | Pills (`--radius-tag`, `--radius-pill`); rows and tiles 16, cards 20, nav 12, composer 20 (a pill at one line), 32px+ buttons pills, toast 14 |
-| No entrances; everything 150ms | Entrances 240ms, exits 150ms, pops 220ms with a spring; rows, tabs and typing still never animate |
+| No entrances; everything 150ms | Entrances 240ms and pops 220ms with a spring; Home, menus, popovers, rows, tabs and typing never animate |
 
 ### Inline and empty-chat measurements
 

@@ -85,7 +85,7 @@ async function appear(juno: Juno, win: Page, fake: FakeSlack, feel: Feel): Promi
         landsAndStays('card', 'the welcome card'),
         staysDrawn('cardOpacity', 'the welcome card'),
         ...aroundHolds().slice(0, 2),
-        noLayoutShift({ region: 'home', includeInput: true }),
+        // No layout-shift check here: rows that land in the first sync take room as they come and move the centred column (SPEC 12).
         noFlicker('home', 'Home'),
       ],
     },

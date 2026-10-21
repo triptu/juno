@@ -1,5 +1,5 @@
 import { pointAt, press } from '../driver/juno'
-import { feedbackInOneFrame, happened, landsAndStays, noFlicker, noLayoutShift, shotOfFrame, switchesOnce, type Check } from './checks'
+import { feedbackInOneFrame, happened, landsAndStays, noFlicker, switchesOnce } from './checks'
 import { expect, test } from './feel'
 import { tag } from './pane'
 
@@ -14,7 +14,7 @@ test('Home has its data when it replaces the topic after its subscription expire
 
   await feel.run({
     name: 'home-after-idle',
-    title: 'Open Home after reading a topic: its data is ready before the entrance animation starts',
+    title: 'Open Home after reading a topic: it replaces the topic with its rows, with no loading frame between',
     probes: [
       { kind: 'count', within: 'main', name: 'topic', selector: '[data-topic-view]' },
       { kind: 'count', within: 'main', name: 'home', selector: '[data-home-item]' },
@@ -32,30 +32,7 @@ test('Home has its data when it replaces the topic after its subscription expire
   })
 })
 
-const rowsStayInSlots: Check = (evidence) => {
-  const painted = new Map<string, string>()
-  const bad: number[] = []
-  for (const frame of evidence.recording.frames) {
-    const items = frame.values['items']
-    if (typeof items !== 'object' || items === null || !('length' in items)) continue
-    const slots = frame.values['slots']
-    if (items.length > 0 && (typeof slots !== 'object' || slots === null || !('width' in slots)
-      || items[0]?.y !== slots.y
-      || items.some((item) => item.y < slots.y || item.y + item.height > slots.y + slots.height))) bad.push(frame.index)
-    for (const [key, box] of painted) {
-      if (JSON.stringify(items.find((item) => item.key === key)) !== box) bad.push(frame.index)
-    }
-    for (const item of items) painted.set(item.key, JSON.stringify(item))
-  }
-  return {
-    name: 'rows fill from the top and every painted row stays in its slot',
-    status: painted.size > 0 && bad.length === 0 ? 'pass' : 'fail',
-    detail: `${painted.size} rows checked; ${new Set(bad).size} frames violated a reserved slot or moved or removed a painted row`,
-    shots: [...new Set(bad)].slice(0, 12).map((frame) => shotOfFrame(evidence, frame)),
-  }
-}
-
-test('Home fills reserved slots during the first sync without moving painted content', async ({ juno, win, fake, feel }) => {
+test('Home shows rows as the first sync lands them, with the composer still and no flicker', async ({ juno, win, fake, feel }) => {
   const method = 'conversations.history'
   const replies = 'conversations.replies'
   const subscriptions = 'subscriptions.thread.getView'
@@ -67,7 +44,7 @@ test('Home fills reserved slots during the first sync without moving painted con
   const rows = home.locator('[data-home-item]')
   await feel.run({
     name: 'home-first-sync',
-    title: 'Open Home during first sync; history pages fill reserved slots without moving painted content',
+    title: 'Open Home during the first sync: rows show as history pages land, no space is kept for them, and the composer never moves',
     regions: { home: '[data-home]' },
     probes: [
       { kind: 'text', name: 'greeting', selector: '[data-home] h2' },
@@ -75,26 +52,21 @@ test('Home fills reserved slots during the first sync without moving painted con
       { kind: 'count', name: 'syncing', within: 'main', selector: '[data-home-loading]' },
       { kind: 'count', name: 'rows', within: '[data-home]', selector: '[data-home-item]' },
       { kind: 'rect', name: 'greetingBox', selector: '[data-home] h2' },
-      { kind: 'rect', name: 'lineBox', selector: '[data-home] h2 + p' },
-      { kind: 'rect', name: 'slots', selector: '[data-home] ul' },
       { kind: 'rect', name: 'chip', selector: '[data-home-write] [aria-label^="Send to:"]' },
       { kind: 'rect', name: 'field', selector: '[data-home] [data-composer-field]' },
-      { kind: 'boxes', name: 'items', selector: '[data-home-item]', key: 'data-home-item' },
     ],
     checks: [
-      happened('first Home frame has its greeting, sync text and reserved slots', (r) => {
+      happened('first Home frame has its greeting and sync text, and no rows', (r) => {
         const first = r.frames.find((f) => f.values['greetingBox'] !== null)
         return first !== undefined && typeof first.values['greeting'] === 'string' && first.values['greeting'].length > 0
           // "Syncing with Slack." while the conversations are listed, then the first sync's count (SPEC 12).
-          && /^Syncing (with Slack|\d+ of \d+ conversations)\.$/.test(String(first.values['line'])) && first.values['slots'] !== null
+          && /^Syncing (with Slack|\d+ of \d+ conversations)\.$/.test(String(first.values['line']))
           && first.values['rows'] === 0 && first.values['syncing'] === 1
       }),
       happened('rows arrive while sync is still running', (r) => r.frames.some((f) => Number(f.values['rows']) > 0 && f.values['syncing'] === 1)),
       happened('sync completes with rows still painted', (r) => Number(r.frames.at(-1)?.values['rows']) > 0 && r.frames.at(-1)?.values['syncing'] === 0),
-      landsAndStays('lineBox', 'sync text', { tolerance: 0, where: (v) => v['syncing'] === 1 }),
-      ...['greetingBox', 'slots', 'chip', 'field'].map((probe) => landsAndStays(probe, probe, { tolerance: 0 })),
-      noLayoutShift({ region: 'home', includeInput: true, from: 'history pages' }),
-      rowsStayInSlots,
+      ...['chip', 'field'].map((probe) => landsAndStays(probe, probe, { tolerance: 0 })),
+      noFlicker('home', 'Home'),
     ],
   }, async (rec) => {
     await rec.mark('open')

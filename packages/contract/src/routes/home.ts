@@ -172,8 +172,6 @@ export const HomeView = Schema.Struct({
   firstName: Schema.optionalKey(Schema.String),
   /** Ranked, at most three. */
   items: Schema.Array(HomeItem),
-  /** A followed topic has unread messages. With no items and none of these, the user is caught up. */
-  unread: Schema.Boolean,
   /**
    * The cache can say what waits: the first sync has read the DMs,
    * mentions and unread followed threads (owner, 10-18), or a boot has

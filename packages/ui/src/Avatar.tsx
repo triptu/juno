@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
-import { colors, hues, motion, radii, sizes, weights } from '@juno/tokens/tokens.stylex'
+import { colors, hues, radii, sizes, weights } from '@juno/tokens/tokens.stylex'
 import { tileSizes } from './internal/tileSizes'
 import { hueForId, hueNames, type HueName } from './internal/hue'
 
@@ -24,7 +24,7 @@ export interface AvatarProps {
   readonly hue?: HueName
   /**
    * The Slack profile photo. The box is reserved at `size` before the bytes
-   * arrive and the photo fades in over the initials, so nothing moves. If
+   * arrive and the photo is drawn over the initials, so nothing moves. If
    * it fails, the initials stay.
    */
   readonly src?: string
@@ -42,11 +42,9 @@ export interface AvatarProps {
  */
 export function Avatar({ kind = 'person', label, name, size = 32, hue = 'rose', src, ring }: AvatarProps) {
   // Keyed by src so a row that is reused for another person starts over.
-  const [loaded, setLoaded] = useState<string | undefined>(undefined)
   const [failed, setFailed] = useState<string | undefined>(undefined)
   const imageSrc = src === undefined || src.startsWith('/') || src.startsWith('data:') || src.startsWith('juno:') ? src : `juno://files/avatar?url=${encodeURIComponent(src)}`
   const showImage = src !== undefined && failed !== src
-  const shown = showImage && loaded === src
   return (
     <span
       role={name ? 'img' : undefined}
@@ -63,9 +61,8 @@ export function Avatar({ kind = 'person', label, name, size = 32, hue = 'rose', 
           draggable={false}
           decoding="async"
           loading="lazy"
-          onLoad={() => setLoaded(src)}
           onError={() => setFailed(src)}
-          {...stylex.props(styles.image, shown && styles.imageShown)}
+          {...stylex.props(styles.image)}
         />
       ) : null}
     </span>
@@ -88,21 +85,13 @@ const styles = stylex.create({
     overflow: 'hidden',
     whiteSpace: 'nowrap',
   },
-  // Sits over the initials in the same box; only opacity changes, and the
-  // fade collapses to nothing under reduced motion through the token.
+  // Sits over the initials in the same box and covers them once it is drawn.
   image: {
     position: 'absolute',
     inset: 0,
     width: '100%',
     height: '100%',
     objectFit: 'cover',
-    opacity: 0,
-    transitionProperty: 'opacity',
-    transitionDuration: motion['--duration-fast'],
-    transitionTimingFunction: motion['--ease-out'],
-  },
-  imageShown: {
-    opacity: 1,
   },
 })
 

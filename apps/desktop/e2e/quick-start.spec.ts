@@ -112,7 +112,7 @@ mediumQuick('Home is ready once DMs, mentions and unread threads have history, b
   await juno.signIn()
   await juno.home.navItem.click()
 
-  // Home is ready: the greeting with no syncing line, and not caught up while DMs are unread, as the sidebar still syncs.
+  // Home is ready: the greeting with no syncing line and the rows the DMs bring, not caught up, as the sidebar still syncs.
   await expect(juno.home.greeting).toBeVisible({ timeout: 60_000 })
   await expect(juno.home.root.locator('h2 + p')).toHaveCount(0)
   await expect(juno.home.root.getByText('All caught up.')).toHaveCount(0)

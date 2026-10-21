@@ -265,14 +265,14 @@ test.describe('Avatar photo', () => {
     const avatar = page.getByRole('img', { name: 'Maya Chen' })
     await expect(avatar).toHaveText('MC')
     const image = avatar.locator('img')
-    await expect(image).toHaveCSS('opacity', '0')
+    const drawn = () => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)
+    expect(await drawn()).toBe(false)
 
     await expectNoLayoutShift(page, async () => {
       release()
-      // The photo is drawn: its fade-in has started, the box is the same.
-      await expect(image).not.toHaveCSS('opacity', '0')
+      // The photo is drawn over the initials, with no fade, in the same box.
+      await expect.poll(drawn).toBe(true)
     })
-    await expect(image).toHaveCSS('opacity', '1')
   })
 
   test('failing to arrive does not move anything', async ({ page }) => {
@@ -294,7 +294,7 @@ test.describe('Avatar photo', () => {
     const avatar = page.getByRole('img', { name: 'Maya Chen' })
     const before = await avatar.boundingBox()
     release()
-    await expect(avatar.locator('img')).toHaveCSS('opacity', '1')
+    await expect.poll(() => avatar.locator('img').evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true)
     expect(await avatar.boundingBox()).toEqual(before)
   })
 })

@@ -43,13 +43,7 @@ The first name comes from the Slack profile. If there is none, drop the name and
 
 ### Greeting, second line
 
-| Items | Text |
-| --- | --- |
-| 1 | One thing wants you. |
-| 2 | Two things want you. |
-| 3 | Three things want you. |
-| 0, caught up | Nothing is waiting on you. |
-| 0, not caught up (unread in followed topics) | Nothing is waiting on you. The time-of-day line stays. |
+There is none: the rows are the count (SPEC §12). Only the first sync has a second line, "Syncing with Slack." and then its count. Once Home is ready, no rows means caught up, whatever is unread in the sidebar: unread messages that want nothing of you do not make a row.
 
 ### No thought
 
@@ -92,9 +86,9 @@ Missed huddles rank after mentions. At most one appears, within the three-row ca
 - Rank: waiting on you first, then mentions in ignored channels, then missed huddles, then pick up where you left off, then moved a lot, then follow-ups, then Automated, then tidy up, then follow-ups that look done and old drafts (SPEC §12). At most one of each kind; tidy up is one row for several topics. "Followed" is a thread Slack follows or a DM; a channel's Main is a stream, not a followed topic, so it never shows as Moved a lot.
 - Cap at three. If the window is shorter than 600px, cap at two.
 - Each item is one topic, except tidy up. A topic appears once; if it qualifies for two kinds, the higher kind wins.
-- Opening an item opens the topic in the current tab like any row, with ⌘-click for a new tab. Opening it marks it read under the normal rule, so it leaves the list on the next visit.
+- Opening an item opens the topic in the current tab like any row, with ⌘-click for a new tab. Opening it marks it read under the normal rule, so it leaves the list at once.
 - Resolved, unfollowed and muted topics do not supply message rows. Missed huddles use the conversation regardless of its followed or resolved state, with the notification rules above.
-- Items do not refresh while the home is on screen. They are computed at mount, and recomputed on the next mount, so a row never disappears under the pointer. During the first sync, before and after Home is ready, rows are only added, into empty slots (see "Performance").
+- Items are live (SPEC §12, "Home is live"). Your own action on a row removes or changes it at once; the rows below move up and the next item takes the free place. Changes from elsewhere show while Home is on screen, except while the pointer or keyboard focus is in the rows or a review sheet is open, when the rows hold as the sidebar does and the waiting changes apply in one step when the hold ends.
 
 ## Accessibility
 
@@ -103,13 +97,13 @@ Missed huddles rank after mentions. At most one appears, within the three-row ca
 - Items are real links (`a` with an href to the topic), in a list, focusable in order, with the hover highlight also shown on focus. The caret appears on hover and focus only.
 - The ask field is a button labelled "Ask Juno" that opens the Juno chat; it is not an input, so there is no second composer on the page. ⌘J does the same.
 - Text meets 4.5:1 in both themes: the title line is `--foreground-default`, the meta line `--foreground-muted` on `--background` (4.93:1 light, 6.6:1 dark).
-- The entrance respects `prefers-reduced-motion`: the four parts rise 6px over 240ms, 80ms apart, and under reduced motion they simply appear.
+- Home never animates. The scene, the greeting, the rows and the welcome card are drawn in their final state in the frame Home first shows, so there is nothing to reduce for reduced motion.
 
 ## Performance
 
 - The scenes are inline SVG symbols in the bundle, about 4 KB for all eight. Nothing is fetched. The first paint has the scene, the greeting and the items; there is no loading state and no spinner.
-- The layout is fixed before data arrives: the scene box is 120 by 83, the greeting is one line, the items column has a fixed width and each row is 52px. A row that arrives late is not allowed, except into a reserved slot during the first sync (below). Home paints whole when `home.view` (a local query) answers. Opening it from a topic keeps the topic on screen while the local result arrives, for at most 150 ms, as All topics does. Until the first sync has finished (first launch on a real workspace takes minutes), Home shows the scene and the greeting with "Syncing with Slack." in place of the count line; it never says "All caught up" too early. The list reserves room for all its rows, and rows fill it from the top as conversations land, without the entrance: a new row only takes the next empty slot, so a row already shown never moves, even when a later one ranks higher. When the sync finishes, the rows shown stay where they are, the empty slots take the next items in rank order, the count line replaces "Syncing with Slack.", and the scene and the reserved room stay until Home appears again. Before `home.view` answers at all (milliseconds) the page is blank. The items it showed stay until Home appears again.
-- The AI rewrite of an item's title is the only other thing that can arrive after paint. It replaces the text of a one-line, ellipsised title, so the row height does not change.
+- The scene box is 120 by 83, the greeting is one line, the items column has a fixed width and each row is at least 52px. No space is kept for rows that may come: a row that comes or goes moves the column, as the SPEC allows (density over zero shift). Home paints whole when `home.view` (a local query) answers. Opening it from a topic keeps the topic on screen while the local result arrives, for at most 150 ms, as All topics does. Until the first sync has finished (first launch on a real workspace takes minutes), Home shows the scene and the greeting with "Syncing with Slack." in place of the count line; it never says "All caught up" too early. Rows show in rank order as conversations land, held like any other change while the pointer is in them. Before `home.view` answers at all (milliseconds) the page is blank.
+- The AI rewrite of an item's title replaces the text of a one-line, ellipsised title, so the row height does not change, and it applies even while the rows hold.
 - No timers. The scene and greeting do not update on the minute.
 
 ## With AI off

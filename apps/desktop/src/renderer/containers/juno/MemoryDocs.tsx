@@ -18,7 +18,7 @@ const known = new Map<string, Person | null>()
 
 /**
  * The avatars of the people with a file, from the engine's store, never
- * Slack. Rows draw their initials first; a photo fades in over them when it
+ * Slack. Rows draw their initials first; a photo is drawn over them when it
  * arrives, so nothing moves.
  */
 function useFaces(page: MemoryDocsPageModel | undefined): PersonFaces {

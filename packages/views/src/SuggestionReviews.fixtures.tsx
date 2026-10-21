@@ -13,7 +13,7 @@ import { IgnoreReview, UnfollowReview } from './SuggestionReviews'
 const noop = () => {}
 
 const home = (items: Parameters<typeof Home>[0]['items']) => (
-  <Home scene="evening" title="Evening, Tushar." items={items} now={NOW} enter={false} onOpen={noop} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} />
+  <Home scene="evening" title="Evening, Tushar." items={items} now={NOW} onOpen={noop} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} />
 )
 
 /** Unfollow's or Ignore's review over Home, its buttons working, so the gallery and the shift guard see a row change in place. */

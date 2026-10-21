@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { Check } from '@phosphor-icons/react/dist/icons/Check'
 import { useId } from 'react'
-import { accent, colors, motion, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { accent, colors, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Button, Icon, Surface, Text } from '@juno/ui'
 import type { PeekKeyName } from './PeekKeySetting'
 
@@ -74,9 +74,7 @@ export function WelcomeCard({ done, peekKey, onClose, hidden = false }: WelcomeC
           return (
             <li key={hint} data-welcome-hint={hint} data-done={ticked ? '' : undefined} {...stylex.props(styles.hint)}>
               <span aria-hidden {...stylex.props(styles.tick, ticked && styles.ticked)}>
-                <span {...stylex.props(styles.check, ticked && styles.checkShown)}>
-                  <Icon icon={Check} size={12} weight="bold" />
-                </span>
+                {ticked ? <Icon icon={Check} size={12} weight="bold" /> : null}
               </span>
               <Text variant="bodySmall" tone={ticked ? 'subtle' : 'default'} as="span">
                 {welcomeCopy.hint(hint, peekKey)}
@@ -148,23 +146,10 @@ const styles = stylex.create({
     // 3:1 on the card, so an unticked circle reads as a control.
     borderColor: colors['--border-control'],
     color: accent['--hl-fg'],
-    transitionProperty: 'background-color, border-color',
-    transitionDuration: motion['--duration-fast'],
-    transitionTimingFunction: motion['--ease-out'],
   },
   ticked: {
     borderColor: accent['--hl'],
     backgroundColor: accent['--hl'],
-  },
-  check: {
-    display: 'inline-flex',
-    opacity: 0,
-    transitionProperty: 'opacity',
-    transitionDuration: motion['--duration-fast'],
-    transitionTimingFunction: motion['--ease-out'],
-  },
-  checkShown: {
-    opacity: 1,
   },
   announce: {
     position: 'absolute',

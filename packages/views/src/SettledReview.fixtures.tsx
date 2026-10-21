@@ -33,7 +33,7 @@ function Live({ topics = settledTopics, initial = new Map(), ...rest }: Partial<
 
 /** Home under the sheet's layer, as the window shows it: the layer dims the page and the sheet sits in the middle. */
 function OverHome({ children }: { readonly children: ReactNode }) {
-  return <SheetOverHome home={<Home scene="evening" title="Evening, Tushar." items={[homeItems.waiting, homeItems.followUp, tidyUpItem]} now={NOW} enter={false} onOpen={noop} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} />}>{children}</SheetOverHome>
+  return <SheetOverHome home={<Home scene="evening" title="Evening, Tushar." items={[homeItems.waiting, homeItems.followUp, tidyUpItem]} now={NOW} onOpen={noop} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} />}>{children}</SheetOverHome>
 }
 
 const acted: ReadonlyMap<string, ReviewStatus> = new Map([
@@ -57,8 +57,8 @@ export default defineFixtures(
     },
     // Home's card: the whole row opens the review; Resolve all stays in its slot.
     Card: {
-      card: scene(() => <Home scene="evening" title="Evening, Tushar." items={[homeItems.waiting, homeItems.followUp, tidyUpItem]} now={NOW} enter={false} onOpen={noop} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} />, { hover: '[data-home-review]' }),
-      'card-focus': scene(() => <Home scene="evening" title="Evening, Tushar." items={[homeItems.waiting, homeItems.followUp, tidyUpItem]} now={NOW} enter={false} onOpen={noop} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} />, { focus: '[data-home-review]' }),
+      card: scene(() => <Home scene="evening" title="Evening, Tushar." items={[homeItems.waiting, homeItems.followUp, tidyUpItem]} now={NOW} onOpen={noop} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} />, { hover: '[data-home-review]' }),
+      'card-focus': scene(() => <Home scene="evening" title="Evening, Tushar." items={[homeItems.waiting, homeItems.followUp, tidyUpItem]} now={NOW} onOpen={noop} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} />, { focus: '[data-home-review]' }),
     },
   },
   { width: 1056, height: 720, padded: false },

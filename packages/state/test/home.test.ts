@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import type { HomeItem, HomeView } from '@juno/contract'
-import { freezeHome, homeItemLimit } from '../src/home'
+import type { HomeItem } from '@juno/contract'
+import { holdHome, homeItemLimit } from '../src/home'
 import { homeGreeting, homeScene } from '../src/homeScene'
 
 // 2026-10-14 is a Wednesday, 2026-10-16 a Friday; local time.
 const at = (day: number, hour: number) => new Date(2026, 9, day, hour, 30)
 const greet = (now: Date) => homeGreeting({ now, firstName: 'Tushar', caughtUp: false })
 const item = (id: string, aiTitle?: string): HomeItem => ({ id, kind: 'waiting', title: 'Elena asked you something', topics: [], ...(aiTitle === undefined ? {} : { aiTitle }) })
-const view = (...items: HomeItem[]): HomeView => ({ items, unread: true, ready: true, firstSync: false })
 
 describe('Home copy and scene', () => {
   it('greets by the time of day, and with Happy Friday on Friday until late', () => {
@@ -51,21 +50,33 @@ describe('Home copy and scene', () => {
   })
 })
 
-describe('freezeHome', () => {
-  it('takes art drawn after Home appeared', () => {
-    const topic = { id: 't:C0ENG:1.000001', title: 'Postgres 16 migration plan', place: 'eng' }
-    const shown = view({ ...item('a'), topics: [topic] })
-    const later = freezeHome(shown, view({ ...item('a'), topics: [{ ...topic, art: '<svg/>' }] }))
-    expect(later.items[0]!.topics[0]!.art).toBe('<svg/>')
-  })
+describe('holdHome', () => {
+  const ids = (items: ReadonlyArray<HomeItem>) => items.map((row) => row.id)
+  const none = new Set<string>()
 
-  it('keeps the rows it showed and takes only their new title lines', () => {
-    const shown = view(item('a'), item('b'))
-    expect(freezeHome(shown, view(item('b'), item('c')))).toBe(shown)
-    const later = freezeHome(shown, view(item('c'), item('a', 'Elena wants a call by Friday')))
-    expect(later.items.map((row) => [row.id, row.aiTitle])).toEqual([
+  it('keeps the rows in their places with their new title lines, and makes a new item wait', () => {
+    const shown = [item('a'), item('b')]
+    const held = holdHome(shown, [item('c'), item('b'), item('a', 'Elena wants a call by Friday')], none, 3)
+    expect(held.map((row) => [row.id, row.aiTitle])).toEqual([
       ['a', 'Elena wants a call by Friday'],
       ['b', undefined],
     ])
+  })
+
+  it('keeps a row that went elsewhere, and returns the rows shown when nothing changed', () => {
+    const shown = [item('a'), item('b')]
+    expect(holdHome(shown, [item('b')], none, 3)).toEqual(shown)
+    expect(holdHome(shown, shown, none, 3)).toBe(shown)
+  })
+
+  it('takes a row the user acted on away at once, closes the gap and fills the free place with the next item', () => {
+    const shown = [item('a'), item('b'), item('c')]
+    expect(ids(holdHome(shown, [item('b'), item('c'), item('d')], new Set(['a']), 3))).toEqual(['b', 'c', 'd'])
+    expect(ids(holdHome(shown, [item('b'), item('c')], new Set(['a']), 3))).toEqual(['b', 'c'])
+  })
+
+  it('puts a row back by rank when its action is undone', () => {
+    const shown = [item('b'), item('c')]
+    expect(ids(holdHome(shown, [item('a'), item('b'), item('c')], new Set(['a']), 3))).toEqual(['a', 'b', 'c'])
   })
 })
