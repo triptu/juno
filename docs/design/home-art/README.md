@@ -43,7 +43,7 @@ The picture page opens in the tab. The picture fills the left of the page at the
 2. The title in the serif, the artist (with the culture when there is one, "Pahari, Tehri Garhwal"), then the date and medium, then where the picture is ("Musée Marmottan Monet, Paris"; for a space image, what and where it is, with its distance).
 3. The caption, one sentence in the serif at 18 (the Thought role): what the picture is.
 4. Three to five facts, the best first. What it is and how it was made, what was surprising or argued about at the time, what you would miss at first glance; for a space image, what you are looking at, how big and how far, what the colours stand for.
-5. The credit line (the licence and where the picture comes from, and for a CC BY image the credit its publisher asks for), and **Sources**, a quiet numbered list of each fact's source with its link.
+5. The credit line (the licence and where the picture comes from, and for a CC BY image the credit its publisher asks for). Fact sources stay in the catalog and are not shown.
 
 Text is selectable. The facts are a list, so a screen reader announces how many there are. The small picture shows at once, scaled, and the large one replaces it when it is on disk, in the same box, so nothing moves. In a window narrower than 900px the story goes under the picture and the page scrolls (`story-narrow.png`).
 

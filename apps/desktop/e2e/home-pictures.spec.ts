@@ -68,6 +68,9 @@ quiet('A caught-up Home shows a picture once it is on disk, opens its story, and
   const page = win.locator('[data-picture-page]')
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(title)
   expect(await page.locator('li').count()).toBeGreaterThanOrEqual(3)
+  await expect(page.getByRole('heading', { name: 'Sources' })).toHaveCount(0)
+  await expect(page.locator('footer p')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Source' })).toBeVisible()
   await expect(page.locator('img')).toBeVisible()
 
   // All pictures opens the gallery, which lists every picture and rings the one Home showed.

@@ -7,11 +7,9 @@ import { accent, colors, sizes, spacing, text } from '@juno/tokens/tokens.stylex
 import { activateHandlers, Button, IconButton, Text, type ActivateEvent } from '@juno/ui'
 import { PictureImage, type PictureCardView } from './PictureImage'
 
-/** One fact of a picture's story, with where it is stated. */
+/** One fact of a picture's story. */
 export interface PictureFactView {
   readonly text: string
-  readonly source: string
-  readonly url?: string
 }
 
 /** A picture with its story (`@juno/pictures`'s `Picture` has these fields). */
@@ -33,7 +31,7 @@ export interface PicturePageProps {
   readonly onAllPictures: (event: ActivateEvent) => void
   /** The previous or next picture in the gallery's order. */
   readonly onStep: (step: -1 | 1) => void
-  /** A source's link, opened in the browser. */
+  /** The picture credit's source page, opened in the browser. */
   readonly onOpenLink: (url: string) => void
 }
 
@@ -41,7 +39,7 @@ export interface PicturePageProps {
  * The picture page (SPEC 12, "Pictures and the gallery"): the picture as
  * large as the page allows, and beside it a column like a museum label:
  * the title, the artist, the date and medium, where it is, a caption, the
- * facts, the credit, and each fact's source. Below about 900px of
+ * facts and the credit. Below about 900px of
  * width the label goes under the picture and the page scrolls.
  */
 export function PicturePage({ picture, src, onAllPictures, onStep, onOpenLink }: PicturePageProps) {
@@ -95,22 +93,6 @@ export function PicturePage({ picture, src, onAllPictures, onStep, onOpenLink }:
                 Source
               </a>
             </Text>
-            <Text variant="meta" tone="muted" as="h2" sx={styles.sourcesHeading}>
-              Sources
-            </Text>
-            <ol data-picture-sources="" {...stylex.props(styles.sources)}>
-              {picture.facts.map((fact) => (
-                <li key={fact.text}>
-                  {fact.url === undefined ? (
-                    fact.source
-                  ) : (
-                    <a href={fact.url} onClick={link(fact.url)} {...stylex.props(styles.link)}>
-                      {fact.source}
-                    </a>
-                  )}
-                </li>
-              ))}
-            </ol>
           </footer>
         </div>
       </div>
@@ -216,18 +198,5 @@ const styles = stylex.create({
     outlineStyle: { default: 'none', ':focus-visible': 'solid' },
     outlineWidth: sizes['--focus-ring-width'],
     outlineColor: accent['--focus-ring'],
-  },
-  sourcesHeading: { margin: 0, marginTop: spacing['--space-3'] },
-  sources: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing['--space-1'],
-    margin: 0,
-    paddingInlineStart: spacing['--space-4'],
-    fontFamily: text['--text-meta-family'],
-    fontSize: text['--text-meta-size'],
-    lineHeight: text['--text-meta-leading'],
-    color: colors['--foreground-muted'],
-    userSelect: 'text',
   },
 })

@@ -1,0 +1,1 @@
+- 10-21 21:39 · Tushar · The picture page shows no sources list; sources stay in the catalog.
