@@ -97,18 +97,40 @@ export function pebbleHue(topicId: string): HueName {
   return HUE_NAMES[rng(hashId(topicId)).int(0, HUE_NAMES.length - 1)]!
 }
 
+/** One wave band of a pebble: path data on the 40 grid and its fill. */
+export interface PebbleBand {
+  readonly d: string
+  readonly fill: string
+}
+
 /**
- * The placeholder for a topic as inline SVG. The clip path's id is derived
- * from the topic id, so two pebbles of one topic on the same page share one
- * identical definition and two topics never collide.
+ * A pebble as parts, for a renderer that draws it in its own markup (the
+ * sign-in page's large pebbles). `renderPebble` draws the same parts.
+ * Bands are listed top to bottom; they sit in a group rotated by `tilt`
+ * degrees about the centre and clipped to `clip`.
  */
-export function renderPebble(topicId: string, size: ArtSize): string {
-  const hash = hashId(topicId)
+export interface PebbleShape {
+  readonly clipId: string
+  readonly clip: string
+  readonly base: string
+  readonly tilt: number
+  readonly bands: ReadonlyArray<PebbleBand>
+  /** The small highlight dot, on about two pebbles in five. */
+  readonly dot?: { readonly cx: number; readonly cy: number; readonly r: number; readonly fill: string }
+  /** Three-band pebbles draw their first band only at 20px and up. */
+  readonly firstBandIsDetail: boolean
+}
+
+/**
+ * The parts of the pebble seeded by `seed`, in the order the random stream
+ * draws them, so a renderer of the parts and `renderPebble` agree.
+ */
+export function pebbleShape(seed: string): PebbleShape {
+  const hash = hashId(seed)
   const r = rng(hash)
   const i = r.int(0, HUE_NAMES.length - 1)
   const main = HUE_NAMES[i]!
   const partner = HUE_NAMES[(i + r.pick([1, 7])) % HUE_NAMES.length]!
-  const small = size < SMALL_BELOW
   const tilt = r.pick([0, 0, -18, 18])
   const amp = r.range(1.5, 4)
   const wavelength = r.pick([20, 26, 32, 40])
@@ -123,20 +145,39 @@ export function renderPebble(topicId: string, size: ArtSize): string {
         { y: r.range(22, 27), fill: tideVar(main, 'mid') },
         { y: r.range(31, 35), fill: tideVar(main, 'deep') },
       ]
-  const clipId = `ta${hash.toString(36)}`
   const clip = pebblePath(r)
-  let inner = `<rect width="40" height="40" fill="${tideVar(main, 'base')}"/>`
-  inner += `<g transform="rotate(${tilt} 20 20)">`
-  layers.forEach((layer, k) => {
-    if (small && !two && k === 0) return
-    inner += `<path d="${wavePath(layer.y, amp, k * Math.PI, wavelength)}" fill="${layer.fill}"/>`
+  // The dot reads as a highlight in light and a shadow in dark; the token carries that difference.
+  const dot = r.chance(0.4) ? { cx: r.pick([13, 27]), cy: 12, r: 3.2, fill: tideVar(main, 'pale') } : undefined
+  return {
+    clipId: `ta${hash.toString(36)}`,
+    clip,
+    base: tideVar(main, 'base'),
+    tilt,
+    bands: layers.map((layer, k) => ({ d: wavePath(layer.y, amp, k * Math.PI, wavelength), fill: layer.fill })),
+    ...(dot === undefined ? {} : { dot }),
+    firstBandIsDetail: !two,
+  }
+}
+
+/**
+ * The placeholder for a topic as inline SVG. The clip path's id is derived
+ * from the topic id, so two pebbles of one topic on the same page share one
+ * identical definition and two topics never collide.
+ */
+export function renderPebble(topicId: string, size: ArtSize): string {
+  const shape = pebbleShape(topicId)
+  const small = size < SMALL_BELOW
+  let inner = `<rect width="40" height="40" fill="${shape.base}"/>`
+  inner += `<g transform="rotate(${shape.tilt} 20 20)">`
+  shape.bands.forEach((band, k) => {
+    if (small && shape.firstBandIsDetail && k === 0) return
+    inner += `<path d="${band.d}" fill="${band.fill}"/>`
   })
   inner += '</g>'
-  // The dot reads as a highlight in light and a shadow in dark; the token carries that difference.
-  if (!small && r.chance(0.4)) inner += `<circle cx="${r.pick([13, 27])}" cy="12" r="3.2" fill="${tideVar(main, 'pale')}"/>`
+  if (!small && shape.dot !== undefined) inner += `<circle cx="${shape.dot.cx}" cy="${shape.dot.cy}" r="${shape.dot.r}" fill="${shape.dot.fill}"/>`
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="${size}" height="${size}" aria-hidden="true" focusable="false">` +
-    `<defs><clipPath id="${clipId}"><path d="${clip}"/></clipPath></defs>` +
-    `<g clip-path="url(#${clipId})">${inner}</g></svg>`
+    `<defs><clipPath id="${shape.clipId}"><path d="${shape.clip}"/></clipPath></defs>` +
+    `<g clip-path="url(#${shape.clipId})">${inner}</g></svg>`
   )
 }
