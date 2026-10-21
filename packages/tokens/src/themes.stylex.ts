@@ -24,6 +24,7 @@ export const darkColors = stylex.createTheme(colors, {
   '--background-subtle': '#151411',
   '--surface-default': '#252421',
   '--surface-hover': '#2D2B28',
+  '--message-hover': '#23211E',
   '--surface-active': '#32302D',
   '--peek-surface': '#373532',
   '--surface-raised': '#373532',

@@ -496,7 +496,7 @@ const styles = stylex.create({
     containerType: 'inline-size',
     backgroundColor: {
       default: 'transparent',
-      ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
+      ':hover': { default: null, [HOVER]: colors['--message-hover'] },
     },
     // The toolbar and the gutter time read these: hidden until the pointer is
     // over the row, or keyboard focus is on the row or inside it. Only
@@ -545,7 +545,7 @@ const styles = stylex.create({
   // Being edited, or asking to confirm a delete: the row keeps its hover look and its toolbar until that ends.
   rowHeld: {
     zIndex: z['--z-toolbar'],
-    backgroundColor: colors['--surface-hover'],
+    backgroundColor: colors['--message-hover'],
     '--row-action-opacity': '1',
     '--row-toolbar-display': 'block',
   },

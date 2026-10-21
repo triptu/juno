@@ -29,6 +29,9 @@ export const colors = stylex.defineVars({
   '--background-subtle': 'hsla(48, 35%, 97%, 1)',
   '--surface-default': 'hsla(48, 30%, 98%, 1)',
   '--surface-hover': 'hsla(48, 30%, 94%, 1)',
+  // A message under the pointer: half the step of --surface-hover, so a list
+  // of messages stays calm and the row the hover toolbar belongs to still shows.
+  '--message-hover': 'hsla(48, 30%, 95.5%, 1)',
   '--surface-active': 'hsla(48, 30%, 92%, 1)',
   '--peek-surface': 'hsla(48, 22%, 96%, 1)',
   // A surface that sits on top of --surface-hover and must read as raised in
