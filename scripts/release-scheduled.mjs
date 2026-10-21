@@ -1,5 +1,5 @@
-// Picks and publishes a release on the release Mac, at most one every six
-// hours. Nothing runs it on a schedule. --dry-run reads GitHub and local
+// Picks and publishes a release on the release Mac. Nothing runs it on a
+// schedule. --dry-run reads GitHub and local
 // verification records without fetching, building, committing or publishing.
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -46,7 +46,7 @@ async function scheduled() {
   const records = readRecords(status)
   const candidate = selectCommit(root, tip, records)
   const previous = latest ? previousCommit(latest.tagName) : undefined
-  const reason = releaseDue({ candidate, previous, publishedAt: latest?.publishedAt })
+  const reason = releaseDue({ candidate, previous })
   console.log(`release:scheduled: origin/main ${tip}; ${records.length} full-run record(s)`)
   if (candidate) printGate(releaseGate(root, candidate, records))
   if (reason) { console.log(`release:scheduled: no action: ${reason}`); return }

@@ -10,10 +10,9 @@ export function selectCommit(root, tip, records) {
   return null
 }
 
-export function releaseDue({ candidate, previous, publishedAt, now = Date.now() }) {
+export function releaseDue({ candidate, previous }) {
   if (!candidate) return 'no commit has an eligible full-run record'
   if (candidate === previous) return 'the selected commit is already released'
-  if (publishedAt && now - Date.parse(publishedAt) < 6 * 60 * 60 * 1000) return 'the last release was less than 6 hours ago'
   return null
 }
 

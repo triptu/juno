@@ -85,7 +85,7 @@ test('a failed main push can be retried after publication without publishing aga
   assert.throws(() => syncReleasedVersion(root, '0.1.8'), /is published.*updating origin\/main failed.*without publishing again/)
   assert.equal(version(root), '0.1.7')
   rmSync(hook)
-  // The scheduled CLI must repair before candidate selection or the cadence gate.
+  // The scheduled CLI must repair before candidate selection.
   const bin = join(folder, 'bin')
   mkdirSync(bin)
   const calls = join(folder, 'gh-calls')

@@ -23,7 +23,7 @@ Run these from a Juno checkout with dependencies installed (not the main checkou
    JUNO_UPDATE_TOKEN="$(security find-generic-password -w -s juno-update-token -a juno)" pnpm release:scheduled
    ```
 
-   It picks the commit, bumps the patch version in a scratch worktree, packages through the heavy lock, runs the packaged smoke (`test:package`), uploads, writes `CHANGELOG.md` in the releases repository and pushes a `Set version to x.y.z after release` commit to main. It refuses if the last release is under six hours old or nothing user-facing changed; tell Tushar that rather than working around it.
+   It picks the commit, bumps the patch version in a scratch worktree, packages through the heavy lock, runs the packaged smoke (`test:package`), uploads, writes `CHANGELOG.md` in the releases repository and pushes a `Set version to x.y.z after release` commit to main. There is no minimum gap between releases. It refuses if nothing user-facing changed; tell Tushar that rather than working around it.
 4. **Check.** `gh release view v<version> --repo triptu/juno-releases` shows the DMG, its block map and `latest-mac.yml`, marked latest. `git log origin/main -1` shows the version commit.
 5. **Report** the version, the source commit, the changelog lines and whether it was urgent.
 
@@ -31,7 +31,7 @@ If a step fails after the upload, rerun the same command: it finishes only the m
 
 ## Urgent releases
 
-`--urgent` skips the full-run gate and the six-hour limit. Use it only for a fix to a problem hurting Tushar now: a CPU spin, data loss, a crash on launch. A new feature he wants to try is not urgent. The manual path is `pnpm release:version patch`, commit it, `JUNO_UPDATE_TOKEN=… pnpm package`, `pnpm test:package`, then `pnpm release:publish --urgent --notes <file>`. Run `pnpm verify:main --ref <commit>` for it afterwards; the command prints the commit.
+`--urgent` skips the full-run gate. Use it only for a fix to a problem hurting Tushar now: a CPU spin, data loss, a crash on launch. A new feature he wants to try is not urgent. The manual path is `pnpm release:version patch`, commit it, `JUNO_UPDATE_TOKEN=… pnpm package`, `pnpm test:package`, then `pnpm release:publish --urgent --notes <file>`. Run `pnpm verify:main --ref <commit>` for it afterwards; the command prints the commit.
 
 ## Rules
 

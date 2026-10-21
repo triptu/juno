@@ -1337,8 +1337,8 @@ following `.claude/skills/do-release/SKILL.md`, which also covers the update tok
 GitHub release without fetching, building, committing or publishing.
 
 The command fetches `origin/main` and chooses its newest commit covered by an
-eligible full run. It does nothing if that source is already released, the last
-release is under six hours old, or there are no user-facing changes. It refuses
+eligible full run. There is no minimum gap between releases. It does nothing if that source is
+already released or there are no user-facing changes. It refuses
 to release an ancestor of the last released source. GitHub release metadata
 records both the source and build commits; older releases use their
 `Release x.y.z` commit on main.

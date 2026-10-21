@@ -66,7 +66,7 @@ if (!isVersion(version) || normalizeVersion(version) !== version) fail(`apps/des
 const tag = `v${version}`
 // The repository.
 gh(['auth', 'status'])
-const releases = JSON.parse(gh(['release', 'list', '--repo', repo, '--limit', '200', '--json', 'tagName,isDraft,isPrerelease,publishedAt'])) as Array<{ tagName: string; isDraft: boolean; isPrerelease: boolean; publishedAt: string }>
+const releases = JSON.parse(gh(['release', 'list', '--repo', repo, '--limit', '200', '--json', 'tagName,isDraft,isPrerelease'])) as Array<{ tagName: string; isDraft: boolean; isPrerelease: boolean }>
 const published = releases.find((release) => release.tagName === tag && !release.isDraft && !release.isPrerelease)
 if (published && !values.prerelease) {
   if (!dry) syncReleasedVersion(root, version)
@@ -118,7 +118,6 @@ if (!urgent) {
 }
 
 if (releases.some((release) => release.tagName === tag)) fail(`${repo} already has ${tag}; bump the version (pnpm release:version)`)
-if (!urgent && releases.some((release) => !release.isDraft && !release.isPrerelease && Date.now() - Date.parse(release.publishedAt) < 6 * 60 * 60 * 1000)) fail('the last release was less than 6 hours ago')
 const newest = releases.filter((release) => !release.isDraft && !release.isPrerelease && isVersion(release.tagName))
   .map((release) => normalizeVersion(release.tagName)).sort(compareVersions).at(-1)
 if (newest !== undefined && compareVersions(version, newest) <= 0) fail(`${version} is not newer than the published ${newest}`)
