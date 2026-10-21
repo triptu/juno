@@ -13,6 +13,18 @@ Home's pictures and their words (SPEC 12, "A picture" and "Pictures and the gall
 2. Write a caption (one sentence, at most 160 characters; it is the image's alt text), a line (a verbatim quote with `by`, or one dated fact, at most about 140 characters, with its source and an optional `context` clause for the picture page), an about (two to four plain sentences), a `learnMore` link (the museum's object page or the release, labelled with the institution) and, where it says something, a `scale` (the museum's size in cm, or the distance in light-years or km). Plain English, no hype, no metaphors; leave it out when in doubt, and keep popular myths out (`docs/design/home-art/README.md`, "Writing the words").
 3. Add the original's download URL to `scripts/pictures/sources.json`, run `pnpm pictures:build --only <id>` for its two files and its `ratio`, then `pnpm pictures:upload` (`scripts/pictures/README.md`).
 
+## Links to check by hand
+
+Each picture's `learnMore` link was opened in Chrome on 2026-10-21. These ten did not load the object page from an automated browser (a bot check, a refused connection or a server error), so a person should open each once and fix any that do not show the right object:
+
+- `monet-beach-at-sainte-adresse`, `caillebotte-paris-street-rainy-day`, `seurat-sunday-on-la-grande-jatte`, `monet-water-lilies-1906`: Art Institute of Chicago (bot check).
+- `sorolla-fish-is-expensive`: Museo del Prado (bot check).
+- `klimt-the-kiss`: Belvedere (no connection).
+- `friedrich-wanderer-sea-of-fog`: Hamburger Kunsthalle (server error).
+- `haeckel-diatomea`: Internet Archive (timed out in the browser; curl gets the page).
+- `merian-guava-tarantulas`: links to the Getty's exhibition page, not an object page; the Biodiversity Heritage Library page for the plate is behind a bot check.
+- `haeckel-discomedusae`: links to a Public Domain Review article; the Library of Congress item page (`loc.gov/item/2014645034/`) is behind a bot check.
+
 ## Tests
 
 `pnpm --filter @juno/pictures test`: every entry has a licence, a credit, a source page, its shape, a year its date gives and a caption within length; a sourced line within length, an about, and a link labelled with a name, not an address; scale numbers are positive and distances belong to space images. No entry is pinned.
