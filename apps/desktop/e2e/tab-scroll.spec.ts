@@ -18,53 +18,67 @@ function expectStill(landing: Landing): void {
   expect(landing.tops.filter((top) => Math.abs(top - landing.top) >= 0.5), `row ${landing.ts} must stay at ${landing.top}`).toEqual([])
 }
 
-test.describe('one topic in two tabs', () => {
-  let threadTs = ''
-  const longTest = test.extend({
-    // oxlint-disable-next-line no-empty-pattern
-    fake: async ({}, use) => {
-      const fake = await startFakeSlack({ seed: (workspace, avatars) => void (threadTs = topic300Seed()(workspace, avatars).threadTs) })
-      await use(fake)
-      await fake.close()
-    },
-  })
-  const THREAD = 'Review the rollout checklist 1'
+const THREAD = 'Review the rollout checklist 1'
+let threadTs = ''
+const longTest = test.extend({
+  // oxlint-disable-next-line no-empty-pattern
+  fake: async ({}, use) => {
+    const fake = await startFakeSlack({ seed: (workspace, avatars) => void (threadTs = topic300Seed()(workspace, avatars).threadTs) })
+    await use(fake)
+    await fake.close()
+  },
+})
 
-  /** The thread open in two tabs, the second active, both at the bottom. */
-  async function openTwice(juno: Juno): Promise<void> {
-    await juno.signIn()
-    await juno.waitForSync()
-    const { sidebar, tabs, topic } = juno
-    await sidebar.row(THREAD).open()
-    await topic.expectAtBottom()
-    // ⌘-click opens the topic again in a new tab, though a tab shows it.
-    await sidebar.row(THREAD).openInNewTab()
-    await expect(tabs.tab(THREAD)).toHaveCount(2)
+/** The thread open in two tabs, the second active, both at the bottom. */
+async function openTwice(juno: Juno): Promise<void> {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { sidebar, tabs, topic } = juno
+  await sidebar.row(THREAD).open()
+  await topic.expectAtBottom()
+  // ⌘-click opens the topic again in a new tab, though a tab shows it.
+  await sidebar.row(THREAD).openInNewTab()
+  await expect(tabs.tab(THREAD)).toHaveCount(2)
+  await tabs.expectActiveAt(THREAD, 1)
+  await topic.expectAtBottom()
+}
+
+/**
+ * The first tab follows three new replies at the bottom, and the window drops as many rows from its top; then the
+ * second tab comes back with `row` where it was, in its first frame and every frame after. `meanwhile` runs while
+ * the second tab is hidden.
+ */
+async function hideWhileRepliesArrive(juno: Juno, fake: FakeSlack, row: { readonly ts: string; readonly top: number }, meanwhile?: () => Promise<unknown>): Promise<void> {
+  const { tabs, topic } = juno
+  await tabs.selectAt(THREAD, 0)
+  await tabs.expectActiveAt(THREAD, 0)
+  await meanwhile?.()
+  for (const n of [1, 2, 3]) fake.injectMessage({ channel: TOPIC300_THREAD_CHANNEL, user: 'U0PERFLEO', threadTs, text: `A reply while the other tab is hidden ${n}` })
+  await topic.expectMessage('A reply while the other tab is hidden 3')
+  await topic.expectAtBottom()
+  await expectStableAnchor(juno.win, `[data-message-row="${row.ts}"]`, async () => {
+    await tabs.selectAt(THREAD, 1)
     await tabs.expectActiveAt(THREAD, 1)
-    await topic.expectAtBottom()
-  }
+    expect(await topic.rowTop(row.ts)).toBeCloseTo(row.top, 0)
+    await topic.expectPill('3 new messages')
+  })
+}
 
-  /**
-   * The first tab follows three new replies at the bottom, and the window drops as many rows from its top; then the
-   * second tab comes back with `row` where it was, in its first frame and every frame after. `meanwhile` runs while
-   * the second tab is hidden.
-   */
-  async function hideWhileRepliesArrive(juno: Juno, fake: FakeSlack, row: { readonly ts: string; readonly top: number }, meanwhile?: () => Promise<unknown>): Promise<void> {
-    const { tabs, topic } = juno
-    await tabs.selectAt(THREAD, 0)
-    await tabs.expectActiveAt(THREAD, 0)
-    await meanwhile?.()
-    for (const n of [1, 2, 3]) fake.injectMessage({ channel: TOPIC300_THREAD_CHANNEL, user: 'U0PERFLEO', threadTs, text: `A reply while the other tab is hidden ${n}` })
-    await topic.expectMessage('A reply while the other tab is hidden 3')
-    await topic.expectAtBottom()
-    await expectStableAnchor(juno.win, `[data-message-row="${row.ts}"]`, async () => {
-      await tabs.selectAt(THREAD, 1)
-      await tabs.expectActiveAt(THREAD, 1)
-      expect(await topic.rowTop(row.ts)).toBeCloseTo(row.top, 0)
-      await topic.expectPill('3 new messages')
-    })
-  }
+/** A point on the text of the row in the middle of the view. */
+function textInMiddle(juno: Juno): Promise<{ readonly x: number; readonly y: number }> {
+  return juno.topic.scroller.evaluate((scroller) => {
+    const box = scroller.getBoundingClientRect()
+    const middle = box.top + box.height / 2
+    const row = [...scroller.querySelectorAll<HTMLElement>('[data-message-row]')].find((node) => node.getBoundingClientRect().bottom > middle)!
+    const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT, (node) => (node.textContent?.startsWith('Review the rollout') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP))
+    const range = document.createRange()
+    range.selectNodeContents(walker.nextNode()!)
+    const text = range.getClientRects()[0]!
+    return { x: text.left + 20, y: text.top + text.height / 2 }
+  })
+}
 
+test.describe('one topic in two tabs', () => {
   longTest('each tab keeps its own scroll position', async ({ juno }) => {
     await openTwice(juno)
     const { sidebar, tabs, topic } = juno
@@ -112,16 +126,7 @@ test.describe('one topic in two tabs', () => {
     const { topic, win } = juno
     expectStill(await topic.scrollUp(5000, FRAMES))
     // A click on the text of a row in the middle of the view: the press lets go of the held row, and no scroll ends.
-    const at = await topic.scroller.evaluate((scroller) => {
-      const box = scroller.getBoundingClientRect()
-      const middle = box.top + box.height / 2
-      const row = [...scroller.querySelectorAll<HTMLElement>('[data-message-row]')].find((node) => node.getBoundingClientRect().bottom > middle)!
-      const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT, (node) => (node.textContent?.startsWith('Review the rollout') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP))
-      const range = document.createRange()
-      range.selectNodeContents(walker.nextNode()!)
-      const text = range.getClientRects()[0]!
-      return { x: text.left + 20, y: text.top + text.height / 2 }
-    })
+    const at = await textInMiddle(juno)
     await win.mouse.click(at.x, at.y)
     const row = await topic.firstVisibleRow()
     // The window narrows while the tab is hidden, so the rows around the view wrap again before it is laid out.
