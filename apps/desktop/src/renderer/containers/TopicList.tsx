@@ -8,6 +8,7 @@ import {
   engineStatusAtom,
   focusedTopicAtom,
   nowAtom,
+  sidebarPersonActiveAtom,
   registry,
   resumeSidebarHold,
   rowRenamingAtom,
@@ -135,6 +136,8 @@ const Row = memo(function Row({ id }: { readonly id: string }) {
   // The minute tick re-renders a row only when its label changes.
   const time = useAtomValue(nowAtom, (now) => relativeTime(at, now))
   const accessory = useRowAccessory(row)
+  // With the sidebar setting on, a DM's Main shows whether its person is active; every other row reads the empty id, which is never active.
+  const partnerActive = useAtomValue(sidebarPersonActiveAtom(row?.kind === 'main' && row.channel.kind === 'im' ? (row.channel.partner?.id ?? '') : ''))
   if (row === undefined) return null
   return (
     <TopicRowView
@@ -143,6 +146,7 @@ const Row = memo(function Row({ id }: { readonly id: string }) {
       selected={selected}
       tabbable={tabbable}
       newThreads={row.newThreads}
+      partnerActive={partnerActive}
       {...(accessory === undefined ? {} : { accessory: accessory.node, accessoryLabel: accessory.label })}
       onOpen={open}
       onResolve={resolveTopic}

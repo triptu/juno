@@ -38,6 +38,7 @@
     "gallery:shots": "node scripts/heavy.mjs --electron pnpm --filter @juno/gallery shots",
     "smoke:live": "node scripts/smoke-live.ts",
     "presence:live": "node scripts/presence-live.ts",
+    "presence:sub-live": "node scripts/presence-sub-live.ts",
     "probe:live": "node scripts/probe-live.ts",
     "react:live": "node --import ./scripts/ts-resolve-hooks.mjs scripts/react-live.ts",
     "forward:live": "node --import ./scripts/ts-resolve-hooks.mjs scripts/forward-live.ts",

@@ -16,6 +16,7 @@ import {
   Icon,
   IconButton,
   pointerMoved,
+  PresenceDot,
   Text,
   tooltip,
   TopicArt,
@@ -58,6 +59,8 @@ export interface TopicRowProps {
   readonly accessory?: ReactNode
   /** What `accessory` says, added to the row's description ("huddle with 3 people"). */
   readonly accessoryLabel?: string
+  /** A DM's Main only: Slack shows the person as active, drawn as the presence dot on their photo. */
+  readonly partnerActive?: boolean
 }
 
 const HOVER = '@media (hover: hover)'
@@ -100,6 +103,7 @@ export const TopicRow = memo(function TopicRow({
   newThreads = 0,
   accessory,
   accessoryLabel,
+  partnerActive = false,
 }: TopicRowProps) {
   const titleId = useId()
   const previewId = useId()
@@ -116,7 +120,8 @@ export const TopicRow = memo(function TopicRow({
   const threadsLabel = threads === 1 ? '1 new thread' : `${threads} new threads`
   const unreadLabel = row.unreadExact ? `${row.unreadCount} unread` : `${row.unreadCount} or more unread`
   const mark = main && accessory !== undefined && accessory !== null
-  const state = rowState(row, unreadLabel, threads > 0 ? threadsLabel : undefined, main ? accessoryLabel : undefined)
+  const active = partnerActive && main && row.channel.kind === 'im'
+  const state = rowState(row, unreadLabel, threads > 0 ? threadsLabel : undefined, main ? accessoryLabel : undefined, active)
   const people: ReadonlyArray<AvatarStackPerson> = row.participants.map((person) => stackPerson(person))
   const hasPeople = people.length > 0
   const resolvable = row.canResolveOnHover && !renaming
@@ -230,7 +235,7 @@ export const TopicRow = memo(function TopicRow({
       {...stylex.props(styles.row, focusRing.inset, twoLine && styles.twoLineRow, selected && styles.selected)}
     >
       <span {...stylex.props(styles.tile, main && styles.mainTile, quiet && styles.quietTile)}>
-        <Tile row={row} />
+        <Tile row={row} dot={active ? (selected ? 'rowSelected' : 'row') : undefined} />
       </span>
       <span {...stylex.props(styles.body)}>
         <span {...stylex.props(styles.line1)}>
@@ -317,13 +322,21 @@ export const TopicRow = memo(function TopicRow({
  * Tide placeholder until the art exists or while AI assist is off. The art
  * is 40px in a 44px slot, so its text column lines up with a photo row's.
  */
-function Tile({ row }: { readonly row: TopicRowModel }) {
+function Tile({ row, dot }: { readonly row: TopicRowModel; readonly dot: 'row' | 'rowSelected' | undefined }) {
   const { channel } = row
   if (row.kind === 'main' && channel.kind === 'im') {
     const partner = channel.partner
     const name = partner?.name ?? channel.name
     const hue = hueFor(partner?.color ?? channel.color, partner?.id ?? channel.id)
-    return <Avatar label={initials(name)} size={44} hue={hue} {...(partner?.avatarUrl === undefined ? {} : { src: partner.avatarLargeUrl || partner.avatarUrl })} />
+    const photo = <Avatar label={initials(name)} size={44} hue={hue} {...(partner?.avatarUrl === undefined ? {} : { src: partner.avatarLargeUrl || partner.avatarUrl })} />
+    if (dot === undefined) return photo
+    // The dot is placed against the photo's own box: the tile's box is cut to the two-line row.
+    return (
+      <span {...stylex.props(styles.photo)}>
+        {photo}
+        <PresenceDot active surface={dot} />
+      </span>
+    )
   }
   if (row.kind === 'main' && channel.kind === 'mpim') {
     const members = channel.members ?? []
@@ -345,9 +358,10 @@ function isTwoLine(row: Pick<TopicRowModel, 'kind'>): boolean {
   return row.kind === 'main'
 }
 
-/** What the tags and icons say, for the row's description: "2 unread, mentions you." */
-function rowState(row: TopicRowModel, unreadLabel: string, threadsLabel: string | undefined, accessoryLabel: string | undefined): string | undefined {
+/** What the tags and icons say, for the row's description: "active, 2 unread, mentions you." */
+function rowState(row: TopicRowModel, unreadLabel: string, threadsLabel: string | undefined, accessoryLabel: string | undefined, active: boolean): string | undefined {
   const parts = [
+    active ? 'active' : undefined,
     row.unreadCount > 0 ? unreadLabel : undefined,
     row.mentionsMe ? 'mentions you' : undefined,
     threadsLabel,
@@ -424,6 +438,13 @@ const styles = stylex.create({
   },
   // The 44px artwork may extend beyond Main’s 42px content box, as before.
   mainTile: { maxHeight: density['--density-row-two-line-estimate'] },
+  // Positioned, so a DM's presence dot sits on the photo's corner. As tall as the photo, not the cut tile.
+  photo: {
+    position: 'relative',
+    display: 'inline-flex',
+    alignSelf: 'flex-start',
+    flexShrink: 0,
+  },
   artSlot: {
     display: 'inline-flex',
     alignItems: 'center',
