@@ -6,6 +6,7 @@ import { Button, Checkbox, Page, PageHeader, Section, Surface, Text } from '@jun
 import { AppearanceSettings, type AppearanceSettingsProps } from './AppearanceSettings'
 import { IgnoredChannels } from './IgnoredChannels'
 import { PeekKeySetting, type PeekKeyName } from './PeekKeySetting'
+import { PresenceSection, type PresenceProps } from './PresenceSection'
 
 // The sections of Settings that are the app's own (SPEC 14). Notifications,
 // Juno, Connections and Backup & This Mac are their own pages. Each section
@@ -115,18 +116,21 @@ export function SettingsGeneral({ peekKey, onPeekKeyChange, homeThoughts, onHome
 }
 
 export interface SettingsAppearanceProps extends AppearanceSettingsProps {
+  /** Show who is active in the sidebar, in its own section under the look. */
+  readonly sidebarPresence?: PresenceProps
   /** The quick reactions setting (`QuickReactionsSetting`), in its own section under the look. */
   readonly quickReactions?: ReactNode
 }
 
-/** Appearance: theme, accent and density, then the message toolbar's quick reactions. */
-export function SettingsAppearance({ quickReactions, ...props }: SettingsAppearanceProps) {
+/** Appearance: theme, accent and density, then the sidebar's presence dots, then the message toolbar's quick reactions. */
+export function SettingsAppearance({ sidebarPresence, quickReactions, ...props }: SettingsAppearanceProps) {
   return (
     <Page width="settings">
       <PageHeader title="Appearance" subtitle="System follows macOS. Density changes the sidebar and the messages." />
       <Surface kind="group" padding="md" sx={styles.card}>
         <AppearanceSettings {...props} />
       </Surface>
+      {sidebarPresence === undefined ? null : <PresenceSection {...sidebarPresence} />}
       {quickReactions === undefined ? null : (
         <Section heading="Quick reactions" sub="One click each in the toolbar over a message. Up to 7.">
           <Surface kind="group" padding="md" sx={styles.card}>
