@@ -31,10 +31,15 @@ test('a boot Slack answers with data Juno cannot read shows the sync failure and
   expect(copied).toMatch(line)
 })
 
-test('a boot that never reaches Slack still says you are offline', async ({ juno, fake }) => {
-  test.setTimeout(120_000)
-  fake.loseResponse({ method: 'client.userBoot', times: 1_000 })
-  await juno.signIn()
-  await expect(juno.sidebar.syncStatus).toHaveText("You're offline", { timeout: 90_000 })
-  await expect(juno.sidebar.root.getByRole('button', { name: 'Copy log' })).toHaveCount(0)
+test.describe('with the real 30 s boot retry', () => {
+  // Fast timing retries the boot every 1.5 s, shorter than the offline grace, so the card would never show.
+  test.use({ timing: 'production' })
+
+  test('a boot that never reaches Slack still says you are offline', async ({ juno, fake }) => {
+    test.setTimeout(90_000)
+    fake.loseResponse({ method: 'client.userBoot', times: 1_000 })
+    await juno.signIn()
+    await expect(juno.sidebar.syncStatus).toHaveText("You're offline", { timeout: 30_000 })
+    await expect(juno.sidebar.root.getByRole('button', { name: 'Copy log' })).toHaveCount(0)
+  })
 })
