@@ -16,6 +16,7 @@ import type { Launch } from './launch'
 import { openMicrophoneSettings } from './media'
 import { createScreenShareSources } from './screenShare'
 import { osVersion, syncLogText } from './syncLog'
+import { mainLog } from './logging'
 import { APP_ORIGIN } from './scheme'
 import { closeWebPanel, hideWebPanel, setWebPanelBounds, showWebPanel } from './webPanel'
 import { setMenuHuddle } from './window'
@@ -138,6 +139,7 @@ export function registerIpc({ updates, supervisor, agent, providers, codex, back
     const error = await shell.openPath(logFolder())
     if (error) throw new Error('Could not open logs')
   })
+  handle(Channels.appReportStagingFailure, (failure) => mainLog.log('WARN', 'files: staging failed', failure))
   handle(Channels.appReportState, (state) => processes.reportState(state))
 
   // The port cannot travel in the invoke answer; it goes out through

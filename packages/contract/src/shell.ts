@@ -4,6 +4,7 @@
  * live in channels.ts, which the preload bundles without any runtime import.
  */
 import { Schema } from 'effect'
+import { AttachmentFailure } from './routes/files'
 import { Channels, SIDEBAR_WIDTH } from './channels'
 import { SyncFailure } from './routes/engine'
 
@@ -315,6 +316,7 @@ export const ShellRoutes = {
   [Channels.updatesNotes]: { input: Schema.Struct({ scope: Schema.Literals(['installed', 'update']) }), output: ReleaseNotes },
   [Channels.appGetInfo]: { input: Schema.Void, output: AppInfo },
   [Channels.appDiagnostics]: { input: Schema.Void, output: Diagnostics },
+  [Channels.appReportStagingFailure]: { input: Schema.Struct({ id: Schema.String, reason: AttachmentFailure, offset: Schema.Number }), output: Schema.Void },
   [Channels.appReportState]: { input: AppState, output: Schema.Void },
   [Channels.engineRequestPort]: { input: Schema.Void, output: PortRequestResult },
   [Channels.engineRestart]: { input: Schema.Void, output: Schema.Void },

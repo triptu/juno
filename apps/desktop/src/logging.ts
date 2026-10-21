@@ -10,7 +10,7 @@ export const LOG_LIMIT = 5 * 1024 * 1024
 export const LOG_PROCESSES = ['main', 'engine', 'agent'] as const
 export type LogProcess = typeof LOG_PROCESSES[number]
 export type Level = 'INFO' | 'WARN' | 'ERROR'
-const FIELDS = new Set(['id', 'rowId', 'pid', 'count', 'attempts', 'retryInMillis', 'cpu', 'memoryMb', 'passes'])
+const FIELDS = new Set(['id', 'rowId', 'pid', 'count', 'attempts', 'retryInMillis', 'cpu', 'memoryMb', 'passes', 'offset'])
 const ERROR_NAMES = new Set(['Error', 'TypeError', 'RangeError', 'SyntaxError', 'AggregateError', 'ReferenceError'])
 const SLACK_ERRORS = new Set(['SlackTransportError', 'SlackDecodeError', 'SlackRejected', 'SlackAuthRequired', 'SlackRateLimited'])
 
@@ -52,7 +52,7 @@ export function safeDetails(value: unknown, depth = 0, seen = new Set<unknown>()
     }).slice(0, 12)
     if (frames.length) parts.push(`stack=${frames.join(',')}`)
   }
-  for (const [key, allowed] of Object.entries({ step: ['requestSecrets', 'signIn', 'importFromSlackApp', 'storeSecrets', 'signOut', 'authRequired'], worker: ['post', 'action', 'mark'], process: ['Main', 'Window', 'Engine', 'Juno agent', 'Graphics', 'Network', 'Other'], view: ['starting', 'topic', 'Home', 'All topics', 'Settings', 'Juno', 'no tab'] })) {
+  for (const [key, allowed] of Object.entries({ reason: ['read_error', 'not_signed_in', 'bad_chunk', 'file_too_large', 'connection_error', 'engine_error'], step: ['requestSecrets', 'signIn', 'importFromSlackApp', 'storeSecrets', 'signOut', 'authRequired'], worker: ['post', 'action', 'mark'], process: ['Main', 'Window', 'Engine', 'Juno agent', 'Graphics', 'Network', 'Other'], view: ['starting', 'topic', 'Home', 'All topics', 'Settings', 'Juno', 'no tab'] })) {
     if (key in value) {
       const field: unknown = Reflect.get(value, key)
       if (typeof field === 'string' && allowed.includes(field)) parts.push(`${key}=${field}`)

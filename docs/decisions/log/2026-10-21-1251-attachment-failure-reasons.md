@@ -1,0 +1,1 @@
+- 10-21 12:51 · Tushar · Keep the staging failure reason in attachment chips and log its category, generated id and chunk offset through main. The downloaded 0.1.11 app accepted ZIPs, an empty-MIME 3 MB DMG and its own 112 MB DMG; this fixes misleading diagnostics without claiming an unproven file-type regression.

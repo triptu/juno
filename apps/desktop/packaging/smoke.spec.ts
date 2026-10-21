@@ -90,6 +90,25 @@ test('packaged app signs in and starts both utility processes @mac', async () =>
           // The engine got the saved key from main: a sidebar thread has an AI title without being opened.
           await expect(page.locator('[data-topic-row][data-title-source="ai"]').first()).toBeVisible({ timeout: 30_000 })
           await page.screenshot({ path: 'test-results/packaged-sidebar.png' })
+          if (pass === 0) {
+            await page.getByRole('listitem', { name: '#eng', exact: true }).click()
+            const field = page.locator('[data-composer] textarea').last()
+            await expect(field).toBeVisible()
+            const transfer = await page.evaluateHandle(() => {
+              const data = new DataTransfer()
+              data.items.add(new File([new Uint8Array(3 * 1024 * 1024)], 'Juno.dmg', { type: '' }))
+              data.items.add(new File([new Uint8Array(2 * 1024 * 1024)], 'archive.zip', { type: 'application/zip' }))
+              return data
+            })
+            await field.focus()
+            await field.evaluate((element, data) => element.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true })), transfer)
+            await expect(page.locator('[data-attachment="ready"]')).toHaveCount(2)
+            await page.screenshot({ path: test.info().outputPath('packaged-attachments.png') })
+            await page.getByRole('button', { name: 'Remove Juno.dmg', exact: true }).click()
+            await page.getByRole('button', { name: 'Remove archive.zip', exact: true }).click()
+            await transfer.dispose()
+            await page.getByRole('button', { name: 'Home', exact: true }).click()
+          }
         } finally {
           await browser.close()
         }
