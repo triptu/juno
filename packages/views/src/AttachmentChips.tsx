@@ -8,7 +8,7 @@ import { fileIcon, fileSize } from './FileCard'
 
 /**
  * A file going with the message being written. `staging` while its bytes are
- * read, `ready` once staged, `failed` when it could not be read.
+ * read, `ready` once staged, `failed` when it could not be attached.
  */
 export interface AttachmentChip {
   readonly id: string
