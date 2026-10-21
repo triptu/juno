@@ -172,6 +172,8 @@ Centered `illustration` (optional; an `IllustrationName`, 96 wide in `list`, 120
 
 `Logo`: the laptop-two mark in `currentColor`. `size` 16 | 18 | 20 | 24 | 28 | 32 | 40 | 44; `label` ("Juno") when it is not decorative. The sign-in page shows it at 40; the assistant's avatar is 28.
 
+`Pebble`: a Tide pebble (the placeholder `TopicArt` shows for a topic with no art) drawn large as decoration. `seed` picks the shape, hues and bands as a topic id does; `size` in px; `accentBand` paints the lowest band in `--hl-band`. Drawn as React SVG from `pebbleShape` in `@juno/topic-art`, so each band is its own element. Decorative (`aria-hidden`). Used only by the sign-in page's art.
+
 ## 15b. ProgressRing
 
 A determinate ring, as macOS draws one for a download: `value` out of `max`, a `--border-strongest` track and an `--hl` arc from twelve o'clock with round ends. Without `max` it draws the track only (the total is not known yet). `size` 16 | 20 (default 20), stroke 2 and 2.5. It is the `progressbar` itself: `label` is required ("Sync progress") and `valueText` is what a screen reader says ("11 of 148 conversations"). The arc does not animate; each value repaints it. Used by the sidebar's sync status card.
@@ -214,7 +216,7 @@ The huddle views (`@juno/huddle-views`, inventory 22) add no primitive. They are
 
 ## Count
 
-24 primitives (Surface gains the `island` kind and `HeaderBand`): Icon, Button, NavItem, IconButton, Avatar (+AvatarStack, AvatarButton, PresenceDot), ChannelIcon (+Swatch, DayToggles), Chip, ContextPill, Kbd, Text, Surface (+Divider, LabelledRule), Popover/OptionList, ScrollArea, Tabs, Fields (TextField, Textarea, Select, Checkbox, Slider, Segmented), ListRow, Toast, EmptyState, Illustration, Logo, ProgressRing, Page/PageHeader/Section, CodeBlock, Card.
+24 primitives (Surface gains the `island` kind and `HeaderBand`): Icon, Button, NavItem, IconButton, Avatar (+AvatarStack, AvatarButton, PresenceDot), ChannelIcon (+Swatch, DayToggles), Chip, ContextPill, Kbd, Text, Surface (+Divider, LabelledRule), Popover/OptionList, ScrollArea, Tabs, Fields (TextField, Textarea, Select, Checkbox, Slider, Segmented), ListRow, Toast, EmptyState, Illustration, Logo (+Pebble), ProgressRing, Page/PageHeader/Section, CodeBlock, Card.
 
 Differences from the first proposal: Button's accent variant is called `primary`; Tile and Avatar are one component; Menu/MenuItem were folded into OptionList (same row anatomy, one keyboard model); PageHeader got a `Page` container for the width and padding instead of setting them itself; `Icon` takes a component rather than a name.
 

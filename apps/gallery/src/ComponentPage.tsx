@@ -1,4 +1,4 @@
-import { accentNames, themeNames, type AccentName, type ThemeName } from '@juno/ui'
+import { accentNames, FixtureAppearanceContext, themeNames, type AccentName, type ThemeName } from '@juno/ui'
 import { Frame, Stage } from './Frame'
 import { href } from './location'
 import { components, type ComponentEntry, type StateEntry } from './registry'
@@ -101,7 +101,9 @@ export function ComponentPage({ entry, state, theme, accent }: Props) {
         </div>
         <Stage>
           {/* Keyed by state so switching always remounts the component. */}
-          <Frame key={state.route} entry={entry} state={state} />
+          <FixtureAppearanceContext.Provider value={{ theme, accent }}>
+            <Frame key={state.route} entry={entry} state={state} />
+          </FixtureAppearanceContext.Provider>
         </Stage>
       </div>
     </div>

@@ -12,9 +12,16 @@ export interface SignInPageProps {
   readonly status?: { readonly text: string; readonly tone: 'muted' | 'danger' }
   /** A quiet control beside the status line, such as "Copy details". */
   readonly statusAction?: ReactNode
+  /** `center` centres every line on the column (sign-in); `start` keeps them on its start edge (Set up Juno, with its form). Default `start`. */
+  readonly align?: 'start' | 'center'
+  /** Work is running: the mark's dots pulse softly. */
+  readonly busy?: boolean
   readonly children: ReactNode
   readonly 'data-set-up-juno'?: ''
 }
+
+/** A window shorter than this tightens the column's rhythm, so sign-in fits without scrolling. */
+const SHORT = '@media (max-height: 720px)'
 
 /**
  * The page the window shows before the app (SPEC section 4, "Sign-in"):
@@ -22,22 +29,23 @@ export interface SignInPageProps {
  * and a status line whose room is kept, so a message never moves the
  * buttons. `SignInView` and `SetUpJunoView` share it.
  */
-export function SignInPage({ titleId, title, body, status, statusAction, children, ...data }: SignInPageProps) {
+export function SignInPage({ titleId, title, body, status, statusAction, align = 'start', busy = false, children, ...data }: SignInPageProps) {
+  const centred = align === 'center'
   return (
-    <section {...stylex.props(styles.root)} aria-labelledby={titleId} {...data}>
-      <div {...stylex.props(styles.text)}>
+    <section {...stylex.props(styles.root, centred && styles.rootCentred)} aria-labelledby={titleId} {...data}>
+      <div {...stylex.props(styles.text, centred && styles.centred)}>
         <span {...stylex.props(styles.mark)}>
-          <Logo size={40} />
+          <Logo size={40} entrance={centred} nod={centred} busy={busy} />
         </span>
         <Text variant="pageTitle" tone="default" id={titleId}>
           {title}
         </Text>
-        <Text variant="body" tone="subtle" as="p">
+        <Text variant="body" tone="subtle" as="p" {...(centred ? { sx: styles.pitch } : {})}>
           {body}
         </Text>
       </div>
       {children}
-      <div {...stylex.props(styles.status)} role="status" aria-live="polite">
+      <div {...stylex.props(styles.status, centred && styles.centred)} role="status" aria-live="polite">
         {status === undefined ? null : (
           <Text variant="ui" tone={status.tone} as="p" {...(status.tone === 'danger' ? { 'data-sign-in-error': '' } : {})}>
             {status.text}
@@ -60,10 +68,24 @@ const styles = stylex.create({
     marginBlock: 'auto',
     paddingBlock: spacing['--space-12'],
   },
+  // Above the sign-in page's art, which is placed against the window.
+  rootCentred: {
+    position: 'relative',
+    gap: { default: spacing['--space-8'], [SHORT]: spacing['--space-6'] },
+    paddingBlock: { default: spacing['--space-12'], [SHORT]: spacing['--space-8'] },
+  },
   text: {
     display: 'flex',
     flexDirection: 'column',
     gap: spacing['--space-3'],
+  },
+  centred: {
+    alignItems: 'center',
+    textAlign: 'center',
+  },
+  pitch: {
+    maxWidth: layout['--sign-in-pitch-width'],
+    textWrap: 'balance',
   },
   mark: {
     display: 'inline-flex',

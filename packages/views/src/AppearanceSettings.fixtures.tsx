@@ -1,31 +1,30 @@
-import { defineFixtures, fixture } from '@juno/ui'
-import { AppearanceSettings } from './AppearanceSettings'
+import { defineFixtures, scene } from '@juno/ui'
+import { GalleryAppearanceSettings } from './fixtures/appearance'
 
 const noop = () => {}
 
-export default defineFixtures(AppearanceSettings, {
+// The selected theme and accent are the gallery's own (its theme and accent
+// switchers, and the shots in both themes), so the checked segment and swatch
+// always match the colours the frame is drawn in.
+export default defineFixtures(GalleryAppearanceSettings, {
   Titles: {
-    'one-line': fixture({ theme: 'system', accent: 'coral', density: 'compact', topicTitleLines: 'one', onTopicTitleLinesChange: noop, onThemeChange: noop, onAccentChange: noop, onDensityChange: noop }),
-    'two-lines': fixture({ theme: 'system', accent: 'coral', density: 'compact', topicTitleLines: 'two', onTopicTitleLinesChange: noop, onThemeChange: noop, onAccentChange: noop, onDensityChange: noop }),
+    'one-line': scene(() => <GalleryAppearanceSettings theme="system" density="compact" topicTitleLines="one" onTopicTitleLinesChange={noop} onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} />),
+    'two-lines': scene(() => <GalleryAppearanceSettings theme="system" density="compact" topicTitleLines="two" onTopicTitleLinesChange={noop} onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} />),
   },
-  Theme: {
-    'light-coral': fixture({ theme: 'light', accent: 'coral', onThemeChange: noop, onAccentChange: noop }),
-    'dark-coral': fixture({ theme: 'dark', accent: 'coral', onThemeChange: noop, onAccentChange: noop }),
-  },
-  Accent: {
-    'light-teal': fixture({ theme: 'light', accent: 'teal', onThemeChange: noop, onAccentChange: noop }),
-    'light-ink': fixture({ theme: 'light', accent: 'ink', onThemeChange: noop, onAccentChange: noop }),
+  Look: {
+    current: scene(() => <GalleryAppearanceSettings onThemeChange={noop} onAccentChange={noop} />),
   },
   System: {
-    'system-density': fixture({ theme: 'system', accent: 'coral', density: 'compact', onThemeChange: noop, onAccentChange: noop, onDensityChange: noop }),
+    'system-density': scene(() => <GalleryAppearanceSettings theme="system" density="compact" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} />),
     // Comfortable picked, drawn in Comfortable.
-    'comfortable-density': fixture({ theme: 'system', accent: 'coral', density: 'comfortable', onThemeChange: noop, onAccentChange: noop, onDensityChange: noop }, { density: 'comfortable' }),
+    'comfortable-density': scene(() => <GalleryAppearanceSettings theme="system" density="comfortable" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} />, { density: 'comfortable' }),
   },
   Layout: {
-    stacked: fixture({ theme: 'light', accent: 'coral', layout: 'stack', onThemeChange: noop, onAccentChange: noop }, { width: 300 }),
+    stacked: scene(() => <GalleryAppearanceSettings layout="stack" onThemeChange={noop} onAccentChange={noop} />, { width: 300 }),
+    bar: scene(() => <GalleryAppearanceSettings layout="bar" onThemeChange={noop} onAccentChange={noop} />, { width: 520 }),
   },
   Interaction: {
-    'hover-swatch': fixture({ theme: 'light', accent: 'coral', onThemeChange: noop, onAccentChange: noop }, { hover: '[role="group"] button:nth-of-type(4)' }),
-    'focus-swatch': fixture({ theme: 'light', accent: 'coral', onThemeChange: noop, onAccentChange: noop }, { focus: '[role="group"] button:nth-of-type(4)' }),
+    'hover-swatch': scene(() => <GalleryAppearanceSettings onThemeChange={noop} onAccentChange={noop} />, { hover: '[role="group"] button:nth-of-type(4)' }),
+    'focus-swatch': scene(() => <GalleryAppearanceSettings onThemeChange={noop} onAccentChange={noop} />, { focus: '[role="group"] button:nth-of-type(4)' }),
   },
 })

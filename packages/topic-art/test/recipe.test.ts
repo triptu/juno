@@ -2,7 +2,7 @@
 // a checked recipe or a quotable reason out; the canonical text reads back
 // unchanged; and nothing hostile in a reply reaches the rendered markup.
 import { describe, expect, it } from 'vitest'
-import { countElements, HUE_NAMES, parseRecipe, pebbleHue, renderArt, renderPebble, serialiseRecipe, type Recipe } from '../src/index'
+import { countElements, HUE_NAMES, parseRecipe, pebbleHue, pebbleShape, renderArt, renderPebble, serialiseRecipe, type Recipe } from '../src/index'
 
 const database = `<svg viewBox="0 0 40 40" data-hue="teal">
   <path d="M9 11 V29 A11 4.5 0 0 0 31 29 V11"/>
@@ -163,6 +163,17 @@ describe('the pebble', () => {
     const idOf = (svg: string) => /clipPath id="([^"]+)"/.exec(svg)![1]
     expect(idOf(renderPebble('m:C0ENG', 40))).toBe(idOf(renderPebble('m:C0ENG', 16)))
     expect(idOf(renderPebble('m:C0ENG', 40))).not.toBe(idOf(renderPebble('m:C0PRODUCT', 40)))
+  })
+
+  it('comes as parts that draw the same pebble, for a page that renders it itself', () => {
+    for (const id of ['m:C0ENG', 't:C0ENG:1760000000.000100', 'signin/left/1']) {
+      const shape = pebbleShape(id)
+      const svg = renderPebble(id, 40)
+      expect(svg).toContain(`<clipPath id="${shape.clipId}"><path d="${shape.clip}"/>`)
+      expect(svg).toContain(`rotate(${shape.tilt} 20 20)`)
+      for (const band of shape.bands) expect(svg).toContain(`<path d="${band.d}" fill="${band.fill}"/>`)
+      expect(svg.includes('<circle')).toBe(shape.dot !== undefined)
+    }
   })
 
   it('writes only whitelisted tags and attributes', () => {

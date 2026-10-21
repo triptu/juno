@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react'
 import { defineFixtures, scene } from '@juno/ui'
-import { AppearanceSettings } from './AppearanceSettings'
+import { GalleryAppearanceSettings, GallerySettingsAppearance } from './fixtures/appearance'
 import { NOW, pinnedIds, recentIds, rows, rowsById } from './fixtures/topics'
 import { SettingsPage } from './SettingsPage'
-import { SettingsAppearance } from './SettingsSections'
 import { Shell } from './Shell'
 import { Sidebar } from './Sidebar'
 import { SignInView } from './SignInView'
@@ -91,7 +90,7 @@ export default defineFixtures(
           <SignedIn
             page={
               <SettingsPage section="appearance" onSection={noop}>
-                <SettingsAppearance theme="system" accent="coral" density="compact" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} />
+                <GallerySettingsAppearance theme="system" density="compact" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} />
               </SettingsPage>
             }
           />
@@ -100,8 +99,11 @@ export default defineFixtures(
       ),
       'signed-out': scene(() => (
         <Shell>
-          <SignInView mode="first-run" onImport={noop} />
-          <AppearanceSettings theme="light" accent="coral" onThemeChange={noop} onAccentChange={noop} />
+          <SignInView
+            mode="first-run"
+            onImport={noop}
+            footer={<GalleryAppearanceSettings layout="bar" onThemeChange={noop} onAccentChange={noop} />}
+          />
         </Shell>
       )),
     },

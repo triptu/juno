@@ -2,6 +2,7 @@ import type { SignInFailed } from '@juno/contract'
 import { copyText, errorOf, importFromSlackAppCommand, junoSetupPendingAtom, registry, sessionStatusAtom, signOutCommand } from '@juno/state'
 import { agentProviderAtom } from '@juno/state/agent'
 import { useAtomSet, useAtomValue } from '@juno/state/react'
+import type { ReactNode } from 'react'
 import { SessionView, SignInView } from '@juno/views'
 
 /** UI copy for a failed attempt (SPEC section 17: plain, one sentence, says what to do next). */
@@ -25,8 +26,11 @@ function failureLine(error: SignInFailed): string {
   }
 }
 
-/** Wires the session live value and the session commands to the sign-in and session views. */
-export function Session() {
+/**
+ * Wires the session live value and the session commands to the sign-in and
+ * session views. `signInFooter` goes at the foot of the sign-in page.
+ */
+export function Session({ signInFooter }: { readonly signInFooter?: ReactNode }) {
   const status = useAtomValue(sessionStatusAtom)
   const importResult = useAtomValue(importFromSlackAppCommand)
   const signOutResult = useAtomValue(signOutCommand)
@@ -63,6 +67,7 @@ export function Session() {
       {...(value._tag === 'signingIn' ? { busy: value.method } : {})}
       {...(error === undefined ? {} : { error })}
       {...(details === undefined ? {} : { onCopyDetails: () => copyText(details) })}
+      {...(signInFooter === undefined ? {} : { footer: signInFooter })}
       onImport={() => {
         setUpAfter()
         importSession(undefined)

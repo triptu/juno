@@ -26,6 +26,7 @@ import Illustration from './illustrations/Illustration.fixtures'
 import Kbd from './Kbd.fixtures'
 import ListRow from './ListRow.fixtures'
 import Logo from './Logo.fixtures'
+import Pebble from './Pebble.fixtures'
 import NavItem from './NavItem.fixtures'
 import OptionList from './OptionList.fixtures'
 import Page from './Page.fixtures'
@@ -70,6 +71,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   Kbd,
   ListRow,
   Logo,
+  Pebble,
   NavItem,
   OptionList,
   Page,
