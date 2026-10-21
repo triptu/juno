@@ -1,11 +1,11 @@
 import * as stylex from '@stylexjs/stylex'
 import { useState } from 'react'
-import { accent, layout, sizes, spacing, text, colors, motion } from '@juno/tokens/tokens.stylex'
-import { activateHandlers, type ActivateEvent } from '@juno/ui'
+import { accent, layout, sizes, spacing, motion } from '@juno/tokens/tokens.stylex'
+import { activateHandlers, Text, type ActivateEvent } from '@juno/ui'
 import { HomeScene } from './HomeScene'
 import { PictureImage, pictureLift } from './PictureImage'
 
-/** Home's picture (SPEC 12, "A picture"): already on this Mac, with what its plaque says. */
+/** Home's picture (SPEC 12, "A picture"): already on this Mac, with what its caption says. */
 export interface HomePictureView {
   readonly src: string
   readonly title: string
@@ -24,14 +24,14 @@ export interface HomePictureProps {
 }
 
 /**
- * The picture in the caught-up scene's place, and its plaque line. The box
- * is the same for every picture (lower on a shorter window), so the
- * greeting under it is always in one place; the picture is fitted inside
- * and rests on the box's bottom edge, on the plaque.
+ * The picture in the caught-up scene's place, and its caption: the title,
+ * then "artist, date" on a quieter line, one line each, as a gallery tile
+ * says it. The box is the same for every picture (lower on a shorter
+ * window), so the caption is always in one place; the picture is fitted
+ * inside and rests on the box's bottom edge, over the caption.
  */
 export function HomePicture({ picture, onOpen, onMissing }: HomePictureProps) {
   const [missing, setMissing] = useState(false)
-  const plaque = `${picture.title} · ${picture.artist}, ${picture.date}`
   return (
     <div data-home-picture="" {...stylex.props(styles.root)}>
       <div {...stylex.props(styles.box)}>
@@ -55,9 +55,14 @@ export function HomePicture({ picture, onOpen, onMissing }: HomePictureProps) {
           </button>
         )}
       </div>
-      <p title={plaque} {...stylex.props(styles.plaque)}>
-        <span {...stylex.props(styles.plaqueTitle)}>{picture.title}</span> · {picture.artist}, {picture.date}
-      </p>
+      <div data-home-caption="" {...stylex.props(styles.caption)}>
+        <Text variant="ui" weight="medium" tone="default" as="p" truncate tooltipWhenTruncated>
+          {picture.title}
+        </Text>
+        <Text variant="meta" tone="muted" as="p" truncate tooltipWhenTruncated>
+          {picture.artist}, {picture.date}
+        </Text>
+      </div>
     </div>
   )
 }
@@ -98,17 +103,11 @@ const styles = stylex.create({
   },
   // As wide as the box allows at the picture's shape: the full width, or less for a tall picture.
   width: (ratio: number) => ({ width: `min(100%, calc(var(--home-picture-h) * ${ratio}))` }),
-  plaque: {
-    margin: 0,
-    marginTop: spacing['--space-2-5'],
+  // Two lines, never more: each takes an ellipsis inside the box's width, with the whole line as its tooltip.
+  caption: {
+    width: sizes['--home-picture-width'],
     maxWidth: '100%',
-    fontFamily: text['--text-meta-family'],
-    fontSize: text['--text-meta-size'],
-    lineHeight: text['--text-meta-leading'],
-    color: colors['--foreground-muted'],
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
+    marginTop: spacing['--space-3'],
+    textAlign: 'center',
   },
-  plaqueTitle: { color: colors['--foreground-subtle'] },
 })

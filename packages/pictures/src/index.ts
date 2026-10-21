@@ -1,11 +1,24 @@
 /**
- * Home's pictures (SPEC 12, "A picture" and "Pictures and the gallery").
+ * Home's pictures and the gallery's quotes and facts (SPEC 12, "A picture"
+ * and "Pictures and the gallery").
  *
  * This module is small and loads with Home: the types, the image file
  * names and the rule that picks the next picture. The catalog itself, with
  * every story, is `./catalog`, its own chunk, loaded when idle after Home
- * paints and when the gallery opens.
+ * paints and when the gallery opens. The quotes and facts are `./thoughts`,
+ * another chunk, loaded when the gallery opens.
  */
+
+/** The rough theme of a quote or fact: focus and craft, thinking deeply, wonder at the universe, life, things made, art and beauty. */
+export type ThoughtTheme = 'focus' | 'thinking' | 'wonder' | 'life' | 'made' | 'art'
+
+/** A quote (with `by`) or a fact (without). `source` is never shown; it is there to check the entry against. */
+export interface Thought {
+  readonly text: string
+  readonly by?: string
+  readonly theme: ThoughtTheme
+  readonly source: string
+}
 
 /** Paintings (including manuscript pages and calligraphy), prints, scientific and natural-history illustration, and space images. */
 export type PictureKind = 'painting' | 'print' | 'illustration' | 'space'
@@ -61,7 +74,7 @@ export const PICTURE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 /** The file of one size of a picture, as stored in the bucket and on disk. */
 export const pictureFile = (id: string, size: PictureSize): string => `${id}-${size}.webp`
 
-/** What Home's plaque and box need, saved with the next picture so Home has it in its first frame without the catalog. */
+/** What Home's caption and box need, saved with the next picture so Home has it in its first frame without the catalog. */
 export interface PictureLabel {
   readonly id: string
   readonly title: string

@@ -34,9 +34,6 @@ export interface SettingsGeneralProps {
   /** A plain click on a web link opens it in the web panel (SPEC 7). */
   readonly webPanel: boolean
   readonly onWebPanelChange: (enabled: boolean) => void
-  /** A quote or fact under Home's greeting when nothing waits (SPEC 12). */
-  readonly homeThoughts: boolean
-  readonly onHomeThoughtsChange: (enabled: boolean) => void
   /** A picture in the caught-up scene's place (SPEC 12, "A picture"). */
   readonly homePictures: boolean
   readonly onHomePicturesChange: (enabled: boolean) => void
@@ -59,8 +56,8 @@ export interface SettingsGeneralProps {
   readonly onHideWhileSharingChange: (enabled: boolean) => void
 }
 
-/** General: peek, Home's thought and picture, links, Slack read mirroring, hiding text while sharing, message checks and the fast classifier. */
-export function SettingsGeneral({ peekKey, onPeekKeyChange, homeThoughts, onHomeThoughtsChange, homePictures, onHomePicturesChange, onOpenGallery, webPanel, onWebPanelChange, classifier, onClassifierChange, mirrorReads, onMirrorReadsChange, catchUp, onCatchUp, checks, grammarUnavailable, onCheckChange, hideWhileSharing, sharingDetection, onHideWhileSharingChange }: SettingsGeneralProps) {
+/** General: peek, Home's picture, links, Slack read mirroring, hiding text while sharing, message checks and the fast classifier. */
+export function SettingsGeneral({ peekKey, onPeekKeyChange, homePictures, onHomePicturesChange, onOpenGallery, webPanel, onWebPanelChange, classifier, onClassifierChange, mirrorReads, onMirrorReadsChange, catchUp, onCatchUp, checks, grammarUnavailable, onCheckChange, hideWhileSharing, sharingDetection, onHideWhileSharingChange }: SettingsGeneralProps) {
   return (
     <Page width="settings">
       <PageHeader title="General" />
@@ -71,9 +68,6 @@ export function SettingsGeneral({ peekKey, onPeekKeyChange, homeThoughts, onHome
       </Section>
       <Section heading="Home">
         <Surface kind="group" padding="md" sx={styles.card}>
-          <Checkbox role="switch" label="Show a thought when Home is empty" checked={homeThoughts}
-            onChange={(event) => onHomeThoughtsChange(event.currentTarget.checked)}
-            description="A short quote or fact under the greeting when nothing is waiting." />
           <Checkbox role="switch" label="Show a picture when you are caught up" checked={homePictures}
             onChange={(event) => onHomePicturesChange(event.currentTarget.checked)}
             description="A painting, a print or a space image in place of the scene. Click it to read its story." />

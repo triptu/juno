@@ -30,7 +30,6 @@ import type { Registry } from './client'
 import { activeTab, currentPlace, tabsAtom } from './tabs'
 import { homeAppeared, homeGreeting, homeScene, type HomeScene } from './homeScene'
 import { takePicture } from './homePictures'
-import { pendingThought, takeThought, type HomeThought } from './homeThoughts'
 import type { PictureLabel } from '@juno/pictures'
 import { runActionExit, showToast, undoStackAtom, UNDO_LIMIT } from './undo'
 
@@ -99,11 +98,6 @@ export interface HomeShown {
   /** Row slots held through the first sync's visit: rows that land later fill them, so nothing shown moves. */
   readonly reservedItems: number
   /**
-   * The quote or fact under the greeting when Home appeared with no rows (`homeThoughts.ts`); it goes
-   * once a row lands in a reserved slot. `pending` until the list loads, only before any was ever saved.
-   */
-  readonly thought: HomeThought | 'pending' | undefined
-  /**
    * The picture in the caught-up scene's place (`homePictures.ts`): only when Home appeared caught up,
    * not coming out of the first sync and not under the welcome card, so its box never arrives mid-visit.
    */
@@ -159,7 +153,6 @@ export function showHome(registry: Registry, key: string, options: { readonly wi
       loading: true,
       filling: true,
       reservedItems: limit,
-      thought: undefined,
       picture: undefined,
     })
   }
@@ -184,19 +177,8 @@ export function showHome(registry: Registry, key: string, options: { readonly wi
     filling: view.firstSync,
     // The reserved slots stay until Home appears again, so nothing moves; shown while history lands, it reserves them.
     reservedItems: syncing ? previous.reservedItems : view.firstSync && !done ? limit : 0,
-    // One thought for the visit; none under the welcome card, which has the room under the greeting.
-    thought: syncing && previous.thought !== undefined ? previous.thought : items.length === 0 && options.welcome !== true ? takeThought(now.getTime()) : undefined,
     picture: done && !syncing && options.welcome !== true ? takePicture(now.getTime()) : undefined,
   })
-}
-
-/** A Home whose thought was `pending`: shows it once the list has loaded, if it is still pending. */
-export async function fillThought(registry: Registry, key: string): Promise<void> {
-  const shown = registry.get(homeShownAtom(key))
-  if (shown?.thought !== 'pending') return
-  const thought = await pendingThought(shown.now)
-  const now = registry.get(homeShownAtom(key))
-  if (now?.thought === 'pending') registry.set(homeShownAtom(key), { ...now, thought })
 }
 
 /** During the first sync: adds the items that landed since, into the free slots. A caught-up Home stays so. */

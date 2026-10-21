@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { homeHuddleSeen, viewsSortChannel, type HomeItem } from '@juno/contract'
-import { closeWelcome, fillHome, fillThought, forgetPicture, freezeHome, homeGreeting, homePicturesOnAtom, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, markMovesSeen, markMovesShown, peekKeyAtom, pictureUrl, preparePicture, prepareThought, registry, resolveAllTopics, runAction, runCommand, showHome, showToast, syncProgressAtom, welcomeAtom, type Welcome } from '@juno/state'
+import { closeWelcome, fillHome, forgetPicture, freezeHome, homeGreeting, homePicturesOnAtom, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, markMovesSeen, markMovesShown, peekKeyAtom, pictureUrl, preparePicture, registry, resolveAllTopics, runAction, runCommand, showHome, showToast, syncProgressAtom, welcomeAtom, type Welcome } from '@juno/state'
 import { homeAsksAtom, junoPageActions } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
 import { junoAskCopy } from '@juno/agent-contract'
@@ -149,20 +149,6 @@ function useWelcome(appearedAt: number | undefined) {
 }
 
 /**
- * Home's thought (SPEC 12): loads the list when idle after Home paints, so the next Home has its thought
- * in its first frame, and fills in a thought that waited for the list.
- */
-function useThought(key: string, pending: boolean): void {
-  useEffect(() => {
-    const idle = requestIdleCallback(() => void prepareThought(), { timeout: 5_000 })
-    return () => cancelIdleCallback(idle)
-  }, [])
-  useEffect(() => {
-    if (pending) void fillThought(registry, key)
-  }, [key, pending])
-}
-
-/**
  * Home's picture (SPEC 12, "A picture"): when idle after Home paints, the next picture is picked and downloaded,
  * so the next caught-up Home has it on disk in its first frame.
  */
@@ -201,7 +187,6 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
   const shown = useAtomValue(homeShownAtom(key))
   const welcome = useWelcome(shown?.now)
   useMovesShown(shown?.view.items, shown?.now)
-  useThought(key, shown?.thought === 'pending')
   usePicture()
   const picturesOn = useAtomValue(homePicturesOnAtom)
 
@@ -249,7 +234,6 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
       onAsk={ask}
       composer={<HomeComposer tabId={tabId} />}
       welcome={welcome}
-      {...(shown.thought === undefined || shown.thought === 'pending' ? {} : { thought: shown.thought })}
       {...(shown.picture === undefined || !picturesOn ? {} : pictureProps(shown.picture))}
     />
     {reviewing === undefined || !reviewReady ? null : (

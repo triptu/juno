@@ -8,7 +8,7 @@
  *   gallery opens, so they never grow the start bundle.
  * - A picture shows only when its file is on this Mac. `preparePicture`
  *   picks the next one, has the engine download it, and only then saves it
- *   as next, with what the plaque needs, so Home has it in its first frame
+ *   as next, with what the caption needs, so Home has it in its first frame
  *   with no catalog and no network.
  * - This Mac keeps in local storage whether pictures show (Settings ›
  *   General), the pictures shown, the one showing and the next one. A Home
