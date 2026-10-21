@@ -99,6 +99,9 @@ quiet('Home with a picture, the picture page with its scale, and the gallery in 
     await juno.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1440, 900))
     await expect.poll(() => page.locator('img').first().evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true)
     await shoot(win, name)
+    // The column scrolled to its foot: the scale, the link to read more and the credit.
+    await page.locator('footer').evaluate((node) => node.scrollIntoView({ block: 'end' }))
+    await shoot(win, `${name}-foot`)
     await juno.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1200, 800))
   }
   const size = scaled('size', 'monet-impression-sunrise')
