@@ -8,6 +8,13 @@ const base: GalleryProps = { pictures: pictureCards, sources: pictureSources, cu
 const page = (props: Partial<GalleryProps> = {}, frame: FixtureFrame = { width: 1200, height: 760 }) =>
   scene<GalleryProps>(() => <Gallery {...base} {...props} />, { ...frame, padded: false })
 
+/** Early pictures with long titles and long, loose dates, as the oldest catalog entries have. */
+const longTimeline: GalleryProps['pictures'] = [
+  { ...pictureCards[2]!, id: 'fixture-scroll', title: 'Riverbank with a Long Title That Wraps', artist: 'A Painter of the Southern Tang', date: 'second half 9th–mid-10th century', year: 870, ratio: 0.52 },
+  { ...pictureCards[7]!, id: 'fixture-hanging', title: 'Summer Mountains', artist: 'Attributed to a Court Painter', date: 'Southern Tang dynasty (937–76)', year: 937, ratio: 0.45 },
+  ...pictureCards,
+]
+
 /** Only some files on this Mac: the others keep their boxes in the secondary fill. */
 const someSources = Object.fromEntries(Object.entries(pictureSources).filter((_, at) => at % 3 !== 1))
 
@@ -24,6 +31,8 @@ export default defineFixtures(Gallery, {
     all: page({ order: 'time' }),
     paintings: page({ order: 'time', filter: 'painting' }),
     'no-files': page({ order: 'time', sources: {} }),
+    // Long titles wrap to two lines and long dates end in an ellipsis; a tall picture's tile is as wide as a caption.
+    'long-titles': page({ order: 'time', pictures: longTimeline }),
     wide: page({ order: 'time' }, { width: 1920, height: 900 }),
   },
   Size: {

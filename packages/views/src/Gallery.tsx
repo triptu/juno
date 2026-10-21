@@ -203,37 +203,37 @@ function ByKind({ pictures, columns, sources, current, titled, onOpen }: WallPro
 }
 
 /**
- * Sections by century, oldest first, side by side while they fit: each a
- * heading over a rule and its pictures at one height, wrapping inside the
- * section when it is wider than the page, with each picture's date under it.
+ * Sections by century, oldest first, each a row of its own: a heading over a
+ * rule across the page, then its pictures at one height, wrapping. Under
+ * each picture its title, on up to two lines, then "date · artist", muted;
+ * a picture narrower than a caption gets a tile of the caption's width.
  */
 function ByTime({ pictures, sources, current, onOpen }: WallProps) {
   const sorted = pictures.toSorted((a, b) => a.year - b.year)
   const centuries = [...new Set(sorted.map((picture) => centuryOf(picture.year)))]
-  return (
-    <div {...stylex.props(styles.times)}>
-      {centuries.map((century) => (
-        <section key={century} aria-label={`${century}s`} {...stylex.props(styles.time)}>
-          <Text variant="sectionLabel" tone="muted" as="h2" numeric sx={styles.timeHeading}>
-            {century}s
-          </Text>
-          <ul {...stylex.props(styles.row)}>
-            {sorted
-              .filter((picture) => centuryOf(picture.year) === century)
-              .map((picture) => (
-                <li key={picture.id} data-gallery-picture={picture.id} data-gallery-missing={sources[picture.id] === undefined ? '' : undefined} {...stylex.props(styles.tile, styles.atRow(picture.ratio))}>
-                  <PictureButton picture={picture} src={sources[picture.id]} current={picture.id === current} onOpen={onOpen}>
-                    <Text variant="meta" tone="muted" numeric truncate tooltipWhenTruncated>
-                      {picture.date}
-                    </Text>
-                  </PictureButton>
-                </li>
-              ))}
-          </ul>
-        </section>
-      ))}
-    </div>
-  )
+  return centuries.map((century) => (
+    <section key={century} aria-label={`${century}s`} {...stylex.props(styles.section)}>
+      <Text variant="sectionLabel" tone="muted" as="h2" numeric sx={styles.timeHeading}>
+        {century}s
+      </Text>
+      <ul {...stylex.props(styles.row)}>
+        {sorted
+          .filter((picture) => centuryOf(picture.year) === century)
+          .map((picture) => (
+            <li key={picture.id} data-gallery-picture={picture.id} data-gallery-missing={sources[picture.id] === undefined ? '' : undefined} {...stylex.props(styles.tile, styles.atRow(picture.ratio))}>
+              <PictureButton picture={picture} src={sources[picture.id]} current={picture.id === current} onOpen={onOpen} width={`calc(${sizes['--gallery-row']} * ${picture.ratio})`}>
+                <Text variant="meta" tone="subtle" clamp={2} tooltipWhenTruncated>
+                  {picture.title}
+                </Text>
+                <Text variant="meta" tone="muted" numeric truncate tooltipWhenTruncated>
+                  {picture.date} · {picture.artist}
+                </Text>
+              </PictureButton>
+            </li>
+          ))}
+      </ul>
+    </section>
+  ))
 }
 
 /** All, then each kind, with its count. */
@@ -258,8 +258,8 @@ function GalleryPills({ pictures, filter, onFilter }: Pick<GalleryProps, 'pictur
   )
 }
 
-/** A picture that opens its page: its box at its shape, then what the wall says under it. */
-function PictureButton({ picture, src, current, onOpen, children }: { readonly picture: PictureCardView; readonly src: string | undefined; readonly current: boolean; readonly onOpen: GalleryProps['onOpen']; readonly children: ReactNode }) {
+/** A picture that opens its page: its box at its shape (at `width` when the tile is wider), then what the wall says under it. */
+function PictureButton({ picture, src, current, onOpen, width, children }: { readonly picture: PictureCardView; readonly src: string | undefined; readonly current: boolean; readonly onOpen: GalleryProps['onOpen']; readonly width?: string; readonly children: ReactNode }) {
   return (
     <button
       type="button"
@@ -268,7 +268,7 @@ function PictureButton({ picture, src, current, onOpen, children }: { readonly p
       {...activateHandlers<HTMLButtonElement>((event) => onOpen(picture.id, event))}
       {...stylex.props(styles.open, pictureLift)}
     >
-      <span {...stylex.props(styles.frame, current && styles.current)}>
+      <span {...stylex.props(styles.frame, width !== undefined && styles.frameWidth(width), current && styles.current)}>
         <PictureImage src={src} ratio={picture.ratio} />
       </span>
       <span aria-hidden {...stylex.props(styles.words)}>
@@ -324,9 +324,6 @@ const styles = stylex.create({
   },
   plate: { display: 'flex', flexDirection: 'column', gap: spacing['--space-1-5'], minWidth: 0 },
   label: { display: 'block', marginTop: spacing['--space-1'] },
-  // The centuries flow side by side and wrap; one wider than the page wraps its own pictures.
-  times: { display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', columnGap: spacing['--space-7'] },
-  time: { flexGrow: 0, flexShrink: 1, minWidth: 0, maxWidth: '100%', marginTop: spacing['--space-7'] },
   timeHeading: {
     margin: 0,
     marginBottom: spacing['--space-3'],
@@ -335,17 +332,20 @@ const styles = stylex.create({
     borderBottomStyle: 'solid',
     borderBottomColor: colors['--border-strong'],
   },
-  // One height: each picture as wide as its shape at that height.
+  // One height: each picture as wide as its shape at that height. Captions may differ in height, so pictures align at the top.
   row: {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: `${spacing['--space-5']} ${spacing['--space-4']}`,
+    alignItems: 'flex-start',
+    gap: `${spacing['--space-6']} ${spacing['--space-5']}`,
     margin: 0,
     padding: 0,
     listStyle: 'none',
   },
   tile: { flexShrink: 0, minWidth: 0 },
-  atRow: (ratio: number) => ({ width: `calc(${sizes['--gallery-row']} * ${ratio})` }),
+  // As wide as the picture at the row's height, and never narrower than a caption.
+  atRow: (ratio: number) => ({ width: `max(calc(${sizes['--gallery-row']} * ${ratio}), ${sizes['--gallery-tile-min']})` }),
+  frameWidth: (width: string) => ({ width }),
   open: {
     display: 'flex',
     flexDirection: 'column',
