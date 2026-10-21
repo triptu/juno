@@ -18,19 +18,10 @@ const ALERTS = '#alerts-prod'
 const AGENTS = '#eng-agents'
 const POSTGRES = 'Draft plan is in the doc'
 
-/** Home reads its items when it appears, and shows the record once: show a topic, then Home, until the card is there. */
+/** Home is live; stay on it so a card shown once is not lost by opening another visit. */
 async function homeShowsRecord(juno: Juno): Promise<void> {
-  await expect
-    .poll(
-      async () => {
-        await juno.sidebar.filter('All')
-        await juno.sidebar.row(POSTGRES).open()
-        await juno.home.open()
-        return juno.home.kinds()
-      },
-      { timeout: 30_000 },
-    )
-    .toContain('automatedMoves')
+  await juno.home.open()
+  await expect.poll(() => juno.home.kinds(), { timeout: 30_000 }).toContain('automatedMoves')
 }
 
 /** The job has examined the changed rows, including a pass that keeps their placement. */

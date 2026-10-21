@@ -1,0 +1,1 @@
+- 10-22 01:33 · release · Keep Automated's displayed record for the current Home visit when the shown-today write removes it from the live query. Opening or dismissing it removes Dismiss; later visits keep the daily limit. The existing automated-record e2e covers both moves and their review actions.

@@ -48,9 +48,14 @@ const NONE: ReadonlySet<string> = new Set()
 function useHeldRows(live: ReadonlyArray<HomeItem>, limit: number, sheetOpen: boolean) {
   const [held, setHeld] = useState<ReadonlyArray<HomeItem> | undefined>(undefined)
   const [released, setReleased] = useState(NONE)
+  // Recording that Home showed the card hides it from later visits, not this one.
+  const [record, setRecord] = useState<HomeItem | undefined>(undefined)
+  const items = record === undefined || live.some((item) => item.kind === 'automatedMoves') ? live : [...live, record]
   const inside = useRef({ pointer: false, keyboard: false })
   const letGo = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  const rows = held === undefined ? live.slice(0, limit) : holdHome(held, live, released, limit)
+  const rows = held === undefined ? items.slice(0, limit) : holdHome(held, items, released, limit)
+  const shownRecord = rows.find((item) => item.kind === 'automatedMoves')
+  if (shownRecord !== undefined && shownRecord !== record) setRecord(shownRecord)
   const engaged = (part: 'pointer' | 'keyboard', now: boolean) => {
     inside.current = { ...inside.current, [part]: now }
     clearTimeout(letGo.current)
@@ -83,7 +88,7 @@ function useHeldRows(live: ReadonlyArray<HomeItem>, limit: number, sheetOpen: bo
 }
 
 /** What Home's row buttons do, for the items `items`; `release` lets the item an action is on skip the hold. */
-function itemActions(items: ReadonlyArray<HomeItem>, setReviewing: (item: HomeItem) => void, release: (itemId: string) => void) {
+function itemActions(items: ReadonlyArray<HomeItem>, setReviewing: (item: HomeItem) => void, release: (itemId: string) => void, movesSeen: () => void) {
   const itemOf = (itemId: string) => items.find((candidate) => candidate.id === itemId)
   const markDone = (itemId: string) => {
     const item = itemOf(itemId)
@@ -107,6 +112,7 @@ function itemActions(items: ReadonlyArray<HomeItem>, setReviewing: (item: HomeIt
     // Opening Automated's record is seeing its moves: they are not listed again, and Dismiss has nothing left to do.
     if (item.kind === 'automatedMoves') {
       release(itemId)
+      movesSeen()
       markMovesSeen(registry, item)
     }
   }
@@ -115,6 +121,7 @@ function itemActions(items: ReadonlyArray<HomeItem>, setReviewing: (item: HomeIt
     const item = itemOf(itemId)
     if (item === undefined) return
     release(itemId)
+    movesSeen()
     markMovesSeen(registry, item)
   }
 
@@ -226,6 +233,7 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
   const [appearance] = useState(() => homeAppears(registry))
   // A card's review, open over Home (`HomeReview`), with the item it shows.
   const [reviewing, setReviewing] = useState<HomeItem | undefined>(undefined)
+  const [movesSeen, setMovesSeen] = useState(false)
   const reviewReady = usePreloaded(reviewSheets, reviewing !== undefined)
   const result = useAtomValue(homeViewAtom)
   const value = result._tag === 'Success' ? result.value : undefined
@@ -243,7 +251,7 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
   // Until Home has a value (a few milliseconds) the column is blank, never a spinner, and the composer is already in place.
   if (heading === undefined) return <Home waiting scene="morning" title="" items={[]} now={0} onOpen={openItem} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} composer={<HomeComposer tabId={tabId} />} />
 
-  const { markDone, resolveAll, review, dismiss, sort, itemMenu, ask } = itemActions(rows, setReviewing, release)
+  const { markDone, resolveAll, review, dismiss, sort, itemMenu, ask } = itemActions(rows, setReviewing, release, () => setMovesSeen(true))
   const closeReview = (item: HomeItem) => {
     // What was done in the sheet shows as it closes.
     release(item.id)
@@ -271,7 +279,7 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
       onReview={review}
       onSort={sort}
       onItemMenu={itemMenu}
-      onDismiss={dismiss}
+      {...(movesSeen ? {} : { onDismiss: dismiss })}
       onAsk={ask}
       composer={<HomeComposer tabId={tabId} />}
       welcome={welcome}
