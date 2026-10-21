@@ -57,7 +57,8 @@ export interface MediaViewerProps extends DocumentLinks {
  * actions, and along the bottom a filmstrip of every item, the current one
  * marked. ← and →, the side arrows and the strip move through them; Home and
  * End go to the ends. The thumbnail shows at once and the full image fades in
- * over it when it arrives, so nothing moves while it loads; a new item fades
+ * over it when it arrives, so nothing moves while it loads. An image zooms
+ * inside its box with a pinch or a double-click, and pans while zoomed; a new item fades
  * in (`--duration-fast`, none with reduced motion), and its neighbours'
  * full images are fetched ahead. Opens in one frame with focus on Close and
  * gives focus back to what had it when it closes. It is not modal: mount it
@@ -87,9 +88,11 @@ export function MediaViewer({ viewing, now, opener, onClose, onShowItem, onDownl
     setIndex(shown)
     onShowItem?.(shown)
   }
-  // A click on the dim around the picture, the bar or the strip closes; one on the picture or a button does not.
+  // A click on the dim around the picture, the bar or the strip closes; one on the picture or a button does not,
+  // nor one that was pressed elsewhere, such as a drag of a zoomed picture that ends over the dim.
+  const pressed = useRef<EventTarget | null>(null)
   const onBackdrop = (event: MouseEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget) close()
+    if (event.target === event.currentTarget && pressed.current === event.target) close()
   }
   const meta = [viewing.sender, messageTime(viewing.at, now), ...(file.language === undefined ? [] : [file.language]), ...(several ? [`${index + 1} of ${items.length}`] : [])].join(' · ')
   return (
@@ -99,6 +102,9 @@ export function MediaViewer({ viewing, now, opener, onClose, onShowItem, onDownl
       aria-label={file.name}
       data-media-viewer=""
       onKeyDown={(event) => onViewerKey(event, index, items.length, go, close)}
+      onPointerDown={(event) => {
+        pressed.current = event.target
+      }}
       onClick={onBackdrop}
       {...stylex.props(styles.backdrop)}
     >
@@ -221,23 +227,108 @@ function ViewerBar({ file, items, meta, at, onClose, onDownload, onQuickLook, on
   )
 }
 
-/** One item in a box fitted to the stage: the thumbnail at once, the full image fading in over it, or the video over its poster. */
+/** One item in a box fitted to the stage: the thumbnail at once, the full image fading in over it, or the video over its poster. An image zooms (`useZoom`). */
 function Item({ file, position }: { readonly file: MediaFile; readonly position: number }) {
   const [loaded, setLoaded] = useState(false)
+  const { frame, content, zoomed } = useZoom(file.kind === 'image')
   const full = file.kind === 'image' ? file.full : undefined
   const width = file.width ?? file.thumb.width
   const height = file.height ?? file.thumb.height
   return (
-    <div data-viewer-item={position} {...stylex.props(styles.frame, styles.fitted(width, height))}>
-      <img src={file.thumb.src} alt="" draggable={false} decoding="async" {...stylex.props(styles.image)} />
-      {full === undefined ? null : (
-        <img src={full} alt={file.name} draggable={false} decoding="async" onLoad={() => setLoaded(true)} {...stylex.props(styles.image, styles.full, loaded && styles.fullShown)} />
-      )}
+    <div ref={frame} data-viewer-item={position} {...stylex.props(styles.frame, styles.fitted(width, height), zoomed && styles.zoomed)}>
+      {/* One transform for both images, so the full image stays over the thumbnail. */}
+      <div ref={content} data-viewer-zoom="" {...stylex.props(styles.zoom)}>
+        <img src={file.thumb.src} alt="" draggable={false} decoding="async" {...stylex.props(styles.image)} />
+        {full === undefined ? null : (
+          <img src={full} alt={file.name} draggable={false} decoding="async" onLoad={() => setLoaded(true)} {...stylex.props(styles.image, styles.full, loaded && styles.fullShown)} />
+        )}
+      </div>
       {file.kind === 'video' && file.video !== undefined ? (
         <video src={file.video} poster={file.thumb.src} controls playsInline preload="metadata" aria-label={file.name} {...stylex.props(styles.image)} />
       ) : null}
     </div>
   )
+}
+
+const MAX_ZOOM = 8
+const DOUBLE_CLICK_ZOOM = 2.5
+
+/**
+ * Zoom for an image, inside its frame: a pinch (a wheel event with ctrlKey) zooms around the pointer from fit to 8x,
+ * a double-click goes between fit and 2.5x at the click, and while zoomed a scroll or a drag pans. The picture's
+ * edges never come inside the frame, and at fit it is centred again. The transform is written to `content` directly,
+ * so a gesture renders nothing; `zoomed` changes only on leaving fit and coming back to it. A new item mounts a new
+ * `Item`, so it starts at fit.
+ */
+function useZoom(enabled: boolean) {
+  const frame = useRef<HTMLDivElement>(null)
+  const content = useRef<HTMLDivElement>(null)
+  const [zoomed, setZoomed] = useState(false)
+
+  useEffect(() => {
+    const box = frame.current
+    const node = content.current
+    if (!enabled || box === null || node === null) return
+    let scale = 1
+    let x = 0
+    let y = 0
+    let dragFrom: { readonly x: number; readonly y: number } | undefined
+
+    const show = (nextScale: number, nextX: number, nextY: number) => {
+      const { width, height } = box.getBoundingClientRect()
+      if ((scale > 1) !== (nextScale > 1)) setZoomed(nextScale > 1)
+      scale = nextScale
+      x = Math.min(0, Math.max(width - width * scale, nextX))
+      y = Math.min(0, Math.max(height - height * scale, nextY))
+      node.style.transform = scale === 1 ? '' : `translate(${x}px, ${y}px) scale(${scale})`
+    }
+    // The point under the pointer stays where it is.
+    const zoomAt = (to: number, clientX: number, clientY: number) => {
+      const { left, top } = box.getBoundingClientRect()
+      const next = Math.min(MAX_ZOOM, Math.max(1, to))
+      const px = clientX - left
+      const py = clientY - top
+      show(next, px - ((px - x) * next) / scale, py - ((py - y) * next) / scale)
+    }
+    // Not passive, so a pinch does not zoom the page and a scroll while zoomed moves only the picture.
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey) {
+        event.preventDefault()
+        zoomAt(scale * Math.exp(-event.deltaY / 100), event.clientX, event.clientY)
+      } else if (scale > 1) {
+        event.preventDefault()
+        show(scale, x - event.deltaX, y - event.deltaY)
+      }
+    }
+    const onDoubleClick = (event: globalThis.MouseEvent) => zoomAt(scale > 1 ? 1 : DOUBLE_CLICK_ZOOM, event.clientX, event.clientY)
+    const onPointerDown = (event: PointerEvent) => {
+      if (scale === 1 || event.button !== 0) return
+      box.setPointerCapture(event.pointerId)
+      dragFrom = { x: event.clientX, y: event.clientY }
+    }
+    const onPointerMove = (event: PointerEvent) => {
+      if (dragFrom === undefined) return
+      show(scale, x + event.clientX - dragFrom.x, y + event.clientY - dragFrom.y)
+      dragFrom = { x: event.clientX, y: event.clientY }
+    }
+    const onDragEnd = () => {
+      dragFrom = undefined
+    }
+    box.addEventListener('wheel', onWheel, { passive: false })
+    box.addEventListener('dblclick', onDoubleClick)
+    box.addEventListener('pointerdown', onPointerDown)
+    box.addEventListener('pointermove', onPointerMove)
+    box.addEventListener('lostpointercapture', onDragEnd)
+    return () => {
+      box.removeEventListener('wheel', onWheel)
+      box.removeEventListener('dblclick', onDoubleClick)
+      box.removeEventListener('pointerdown', onPointerDown)
+      box.removeEventListener('pointermove', onPointerMove)
+      box.removeEventListener('lostpointercapture', onDragEnd)
+    }
+  }, [enabled])
+
+  return { frame, content, zoomed }
 }
 
 /** A document's frame: a PDF and a CSV as wide as the stage, HTML and other text at reading width, audio a card of the bar's width. */
@@ -340,6 +431,15 @@ const styles = stylex.create({
     width: `min(${width}px, 100cqw, calc(100cqh * ${width} / ${height}))`,
     aspectRatio: `${width} / ${height}`,
   }),
+  // Scales from its top left corner, so the zoom's arithmetic needs no offsets.
+  zoom: {
+    position: 'absolute',
+    inset: 0,
+    transformOrigin: 'top left',
+  },
+  zoomed: {
+    cursor: { default: 'grab', ':active': 'grabbing' },
+  },
   image: {
     position: 'absolute',
     inset: 0,
