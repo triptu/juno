@@ -8,7 +8,7 @@
  * attached (`staging.ts`), and `messages.send` names the staged ones.
  */
 import * as Atom from 'effect/reactivity/Atom'
-import { filesUnstage, MAX_FILES_PER_MESSAGE, uploadsProgress } from '@juno/contract'
+import { filesUnstage, MAX_FILES_PER_MESSAGE, uploadsProgress, type AttachmentFailure } from '@juno/contract'
 import type { JunoBridge } from '@juno/contract/channels'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
@@ -24,6 +24,8 @@ export interface Attachment {
   readonly mimetype: string
   /** `staging` while the bytes go to the engine, `failed` when they could not. */
   readonly state: 'staging' | 'ready' | 'failed'
+  /** A failed Slack attachment's reason; local read failures use the default read error. */
+  readonly failure?: AttachmentFailure
   /** An image's preview, once staged; a Juno-only image's is made from its file before its chip shows (`attachLocal`). */
   readonly preview?: string | undefined
   /** Held here only, for Juno: never staged in the engine (`attachLocal`). */

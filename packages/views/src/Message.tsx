@@ -3,7 +3,7 @@ import { memo, type FocusEvent, type KeyboardEvent, type PointerEvent, type Reac
 import type { FileView, MessageView, Person, QuickReaction, ReactionIssue } from '@juno/contract'
 import { colors, density, layout, motion, opacity, radii, sizes, spacing, text, tints, z } from '@juno/tokens/tokens.stylex'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
-import { Avatar, focusRing, Icon, Text, type ActivateEvent, type HueName } from '@juno/ui'
+import { Avatar, focusRing, Icon, pointerMoved, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { SharedFileLines, type FileBlock } from './AttachmentCard'
 import { Files } from './FileCard'
 import { viewableOf } from './MediaGrid'
@@ -128,7 +128,7 @@ function holdToolbarForMove(event: KeyboardEvent<HTMLDivElement>): void {
 }
 
 /**
- * Where the toolbar goes, decided as the row is pointed at or focused, again
+ * Where the toolbar goes, decided as the pointer moves onto the row or it is focused, again
  * as the pointer moves over it, and when the list stops scrolling (never per
  * frame): a row can scroll or grow under a still pointer, and an answer kept
  * from before would leave the toolbar under the band. It rises above the
@@ -171,6 +171,16 @@ export function placeToolbar(row: HTMLElement): void {
 /** The pointer is over a row: it places its toolbar, except during a drag selection, which shows none (`MessageList`). */
 function pointedAt(event: PointerEvent<HTMLDivElement>): void {
   if (event.currentTarget.closest('[data-selecting]') === null) placeToolbar(event.currentTarget)
+}
+
+/**
+ * The pointer moved onto a row. A row that scrolled under a still pointer is
+ * placed when the scroll ends (`MessageList`): read here, its rect laid the
+ * page out inside every scroll frame that brought a new row under the pointer
+ * (performance.md 8.14).
+ */
+function pointerEntered(event: PointerEvent<HTMLDivElement>): void {
+  if (pointerMoved(event)) pointedAt(event)
 }
 
 const dim = stylex.keyframes({
@@ -289,7 +299,7 @@ export const Message = memo(function Message({
       onFocus={focus}
       onKeyDownCapture={actions === undefined ? undefined : holdToolbarForMove}
       onBlur={actions === undefined ? undefined : (event) => event.currentTarget.contains(event.relatedTarget) || event.currentTarget.style.removeProperty('--row-toolbar-display')}
-      onPointerEnter={actions === undefined ? undefined : pointedAt}
+      onPointerEnter={actions === undefined ? undefined : pointerEntered}
       onPointerMove={actions === undefined ? undefined : pointedAt}
       data-editing={editor === undefined ? undefined : ''}
       {...stylex.props(
@@ -400,7 +410,7 @@ export const Message = memo(function Message({
           </Text>
         ) : null}
       </span>
-      {toolbar !== undefined ? <span {...stylex.props(styles.toolbar)}>{toolbar}</span> : null}
+      {toolbar !== undefined ? <span {...stylex.props(styles.toolbar)}><span {...stylex.props(styles.toolbarShown)}>{toolbar}</span></span> : null}
     </div>
   )
 })
@@ -501,11 +511,15 @@ const styles = stylex.create({
     },
     // The toolbar is out of the layout until then too: every row has one, and
     // laid out but transparent it was most of the list's style and layout work
-    // when a topic opened or the pane changed width (performance.md 8). It is
-    // absolutely placed in a reserved slot, so showing it moves nothing.
+    // when a topic opened or the pane changed width (performance.md 8). Its
+    // slot is absolutely placed and stays in layout, so showing it moves
+    // nothing and lays out only the slot, not the row (performance.md 8.14).
     // The active row paints over its neighbours, which its toolbar overlaps.
+    // At rest it is --z-row, not auto: from auto to a number Chromium lays the
+    // whole row out again, on every row that slides under a still pointer
+    // while the list scrolls (performance.md 8.14).
     zIndex: {
-      default: 'auto',
+      default: z['--z-row'],
       ':hover': { default: null, [HOVER]: z['--z-toolbar'] },
       ':focus-visible': z['--z-toolbar'],
       ':has(:focus-visible)': z['--z-toolbar'],
@@ -564,6 +578,9 @@ const styles = stylex.create({
   },
   gutterTime: {
     opacity: 'var(--row-action-opacity)',
+    // Always its own stacking context, so the hover's opacity change from 0
+    // to 1 does not make it one and lay the row out again (performance.md 8.14).
+    isolation: 'isolate',
     whiteSpace: 'nowrap',
   },
   // Whole pixels tall, whatever the text inside (performance 3.3): a row
@@ -626,12 +643,24 @@ const styles = stylex.create({
   // a row whose top is under the header band, or inside a row too tall for
   // either, under the band. Paint containment would clip it
   // outside the row, so the row's overflow-clip-margin lets it paint.
+  // The slot is an empty anchor at the toolbar's top right corner. It never
+  // leaves the row's layout or changes size: either would lay the whole row
+  // out again when the toolbar shows (performance.md 8.14).
   toolbar: {
-    display: 'var(--row-toolbar-display)',
     position: 'absolute',
     top: `var(--row-toolbar-top, calc(${STRADDLE} - ${layout['--toolbar-height']}))`,
     right: spacing['--space-2'],
+    width: 0,
+    height: 0,
     zIndex: z['--z-toolbar'],
     opacity: 'var(--row-action-opacity)',
+  },
+  // The toolbar, shown and hidden inside the slot, hanging from its corner.
+  toolbarShown: {
+    display: 'var(--row-toolbar-display)',
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 'max-content',
   },
 })

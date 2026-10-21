@@ -60,12 +60,13 @@ const NOT_TEXT_MIMETYPES = new Set(['text/calendar', 'text/vcard', 'text/x-vcard
 const TEXT_MIMETYPES = new Set(['application/json', 'application/xml', 'application/x-yaml', 'application/yaml', 'application/javascript', 'application/x-sh', 'application/sql', 'application/toml'])
 
 function kindOfMimetype(mimetype: string): FileMediaKind {
+  const family = mimetype.split('/')[0]
+  if (family === 'image' || family === 'video' || family === 'audio') return family
   if (mimetype === 'application/pdf') return 'pdf'
   if (mimetype === 'text/html') return 'html'
   if (NOT_TEXT_MIMETYPES.has(mimetype)) return 'file'
   if (mimetype.startsWith('text/') || TEXT_MIMETYPES.has(mimetype) || mimetype.endsWith('+json') || mimetype.endsWith('+xml')) return 'text'
-  const family = mimetype.split('/')[0]
-  return family === 'image' || family === 'video' || family === 'audio' ? family : 'file'
+  return 'file'
 }
 
 function extensionOf(name: string | null | undefined): string | undefined {

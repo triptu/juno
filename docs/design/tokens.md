@@ -602,6 +602,7 @@ Floating surfaces have `border: 1px solid transparent` plus the shadow, never a 
 
 | Token | Value | Surface |
 | --- | --- | --- |
+| `--z-row` | 0 | A message row at rest; hover and focus raise it to `--z-toolbar`. A number, not `auto`: going from `auto` to a number lays the row out again (performance.md 8.14) |
 | `--z-toolbar` | 2 | Message hover toolbar (relative to message) |
 | `--z-header` | 3 | Page header band and islands, over the list that scrolls under them |
 | `--z-panel` | 4 | The Juno panel while it covers the topic, over the topic's header |

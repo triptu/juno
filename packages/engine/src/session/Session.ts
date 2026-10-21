@@ -34,6 +34,7 @@ import {
   RequestQueue,
   SlackApi,
   SlackClient,
+  SlackTrace,
   SlackEdge,
   SlackSession,
   SlackSocket,
@@ -45,6 +46,7 @@ import {
 import { EngineConfig, EngineTiming } from '../config'
 import { HostLink } from '../protocol/host'
 import { Workspace } from '../workspace'
+import { DevLog } from '../devLog'
 import { hostHandshake } from './handshake'
 
 export type SlackServices = SlackApi | SlackEdge | SlackSocket | RequestQueue | SlackSession
@@ -76,7 +78,7 @@ export class Session extends Context.Service<
     readonly expire: (reason: string) => Effect.Effect<void>
   }
 >()('juno/engine/Session') {
-  static readonly layer: Layer.Layer<Session, never, HostLink | EngineConfig | HttpTransport | Workspace> = Layer.effect(
+  static readonly layer: Layer.Layer<Session, never, HostLink | EngineConfig | HttpTransport | Workspace | DevLog> = Layer.effect(
     Session,
     Effect.gen(function* () {
       const host = yield* HostLink
@@ -84,6 +86,7 @@ export class Session extends Context.Service<
       const timing = yield* EngineTiming
       const transport = yield* HttpTransport
       const workspace = yield* Workspace
+      const devLog = yield* DevLog
       const serviceScope = yield* Effect.scope
       const state = yield* SubscriptionRef.make<SessionStatus>({ _tag: 'starting' })
       const active = yield* Ref.make<ActiveSession | undefined>(undefined)
@@ -99,6 +102,7 @@ export class Session extends Context.Service<
             Layer.mergeAll(
               Layer.succeed(HttpTransport, transport),
               Layer.succeed(SocketHandshake, hostHandshake(host)),
+              Layer.succeed(SlackTrace, devLog.slack),
               slackConfigLayer({
                 transientBackoffMillis: timing.slackRetryBaseMillis,
                 transientBackoffCapMillis: timing.slackRetryCapMillis,
@@ -165,7 +169,7 @@ export class Session extends Context.Service<
         })
 
       /** Sends `request` and waits for main's `secrets` or `sessionFailed` answer. */
-      const askHost = (request: 'requestSecrets' | 'signIn' | 'importFromSlackApp') =>
+      const askHost = (request: 'requestSecrets' | 'importFromSlackApp') =>
         Effect.scoped(
           Effect.gen(function* () {
             const messages = yield* host.messages
@@ -204,7 +208,7 @@ export class Session extends Context.Service<
           if (before._tag === 'signingIn') return yield* new SignInFailed({ kind: 'other', message: 'A sign-in is already in progress.' })
           const restore = setStatus(before)
           yield* setStatus({ _tag: 'signingIn', method })
-          const answer = yield* askHost(method === 'window' ? 'signIn' : 'importFromSlackApp')
+          const answer = yield* askHost('importFromSlackApp')
           if (answer === undefined) {
             yield* restore
             return yield* new SignInFailed({ kind: 'other', message: 'The app closed before the sign-in finished.' })

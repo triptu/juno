@@ -60,6 +60,8 @@ export type Place =
   | { readonly kind: 'junoPage'; readonly page: JunoTabPage }
   /** The huddle of a channel or DM, one tab per channel. */
   | { readonly kind: 'huddle'; readonly channelId: string }
+  /** The developer log, opened from ⌘K. Never saved, so it does not come back at the next launch. */
+  | { readonly kind: 'devLog' }
 
 export const homePlace: Place = { kind: 'home' }
 export const allTopicsPlace: Place = { kind: 'allTopics' }
@@ -68,6 +70,7 @@ export const junoPlace: Place = { kind: 'juno' }
 export const junoPagePlace = (page: JunoTabPage): Place => ({ kind: 'junoPage', page })
 export const topicPlace = (topicId: string): Place => ({ kind: 'topic', topicId })
 export const huddlePlace = (channelId: string): Place => ({ kind: 'huddle', channelId })
+export const devLogPlace: Place = { kind: 'devLog' }
 
 /** The places a tab showed, oldest first, and the one it shows. */
 export interface TabHistory {
@@ -512,8 +515,10 @@ function parseHomeDrafts(value: unknown): ReadonlyMap<string, HomeDraft> {
 
 /** What `TABS_PREF` holds: each tab with the place it shows, whether its Juno panel is open, and a Home tab's draft and destination. */
 export function savedTabs(tabs: Tabs, draftOf: (tabId: string) => HomeDraft | undefined = () => undefined): unknown {
+  const kept = tabs.tabs.filter((tab) => currentPlace(tab).kind !== 'devLog')
+  const ids = new Set(kept.map((tab) => tab.id))
   return {
-    tabs: tabs.tabs.map((tab) => {
+    tabs: kept.map((tab) => {
       const place = currentPlace(tab)
       const chat = place.kind === 'home' ? draftOf(tab.id) : undefined
       return {
@@ -525,8 +530,8 @@ export function savedTabs(tabs: Tabs, draftOf: (tabId: string) => HomeDraft | un
         ...(chat === undefined || untouched(chat) ? {} : { homeDraft: savedHomeDraft(chat) }),
       }
     }),
-    active: tabs.active ?? null,
-    recent: tabs.recent,
+    active: tabs.active !== undefined && ids.has(tabs.active) ? tabs.active : null,
+    recent: tabs.recent.filter((id) => ids.has(id)),
   }
 }
 

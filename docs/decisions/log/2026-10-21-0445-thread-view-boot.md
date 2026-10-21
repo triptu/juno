@@ -1,0 +1,1 @@
+- 10-21 04:45 · implementation · Decode getView threads separately, retain dropped identities and the original cursor, and defer non-auth thread-list failures until after first sync so channels and DMs remain usable. Keep follow ordering unchanged and log only schema-owned paths and fixed issue kinds.

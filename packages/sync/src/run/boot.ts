@@ -3,24 +3,48 @@ import { Clock, Deferred, Effect, Fiber, Scope } from 'effect'
 import { backfillWindow } from '../window'
 import { bootState, coldBoot, warmBoot } from '../boot'
 
-import type { SyncServices } from '../sync'
+import type { SyncFailure, SyncPhase, SyncServices } from '../sync'
 import { followPassIfDue, repairAfterLive } from './reconcile'
 import { isNotAuth, type SyncRuntime } from './runtime'
 
 const bootOnce = (runtime: SyncRuntime) => {
-  const { state, ctx, options, reportBoot, work } = runtime
+  const { state, ctx, options, reportBoot, work, step } = runtime
   const openNow = options.openTopics ?? Effect.succeed([])
   return Effect.gen(function* () {
     const startedAt = yield* Clock.currentTimeMillis
     const previous = yield* bootState()
-    if (previous === undefined) yield* coldBoot(ctx, reportBoot)
-    else yield* warmBoot(ctx, previous, reportBoot, yield* openNow)
+    const threadsLoaded = previous === undefined
+      ? yield* step('cold-boot', coldBoot(ctx, reportBoot))
+      : (yield* step('warm-boot', warmBoot(ctx, previous, reportBoot, yield* openNow)), true)
     if (previous !== undefined && (previous.quietDays === undefined || ctx.config.quietDays > previous.quietDays)) yield* backfillWindow(ctx)
     state.lastBoot = yield* bootState()
     // Both boots read the followed threads over the window and check the ones left out: a follow pass.
-    state.lastFollowPass = startedAt
+    state.lastFollowPass = threadsLoaded ? startedAt : undefined
     if (options.onBooted !== undefined) yield* options.onBooted
   }).pipe(work.withPermit)
+}
+
+const TAG = /^[A-Z][A-Za-z]{2,40}$/
+const METHOD = /^[a-z]+(?:[./][a-zA-Z]+)+$/
+const CODE = /^[a-z_]{1,64}$/
+
+/**
+ * The phase for a failed boot. Only a request that never got an answer (no
+ * connection, DNS, a timeout: a transport error with no HTTP status) is
+ * `offline`; anything else is `failed` with a reason safe to show and copy.
+ */
+export const bootFailure = (error: { readonly _tag: string }): SyncPhase => {
+  const field = (key: string): unknown => Reflect.get(error, key)
+  if (error._tag === 'SlackTransportError' && field('status') === undefined) return { _tag: 'offline' }
+  const method = field('method')
+  const code = error._tag === 'SlackRejected' ? field('error') : undefined
+  const status = error._tag === 'SlackTransportError' ? field('status') : undefined
+  const reason: SyncFailure = {
+    error: TAG.test(error._tag) ? error._tag : 'Error',
+    ...(typeof method === 'string' && METHOD.test(method) ? { method } : {}),
+    ...(typeof code === 'string' && CODE.test(code) ? { detail: code } : typeof status === 'number' ? { detail: `HTTP ${status}` } : {}),
+  }
+  return { _tag: 'failed', reason }
 }
 
 export const makeBootLoop = (
@@ -51,7 +75,7 @@ export const makeBootLoop = (
       yield* Effect.logWarning('sync: boot failed, retrying', { cause: error })
       const wake = yield* Deferred.make<void>()
       state.bootRetry = wake
-      yield* phase({ _tag: 'offline' }).pipe(
+      yield* phase(bootFailure(error)).pipe(
         Effect.andThen(Effect.raceFirst(Effect.sleep(config.bootRetryMillis), Deferred.await(wake))),
         Effect.ensuring(Effect.sync(() => { state.bootRetry = undefined })),
       )

@@ -67,12 +67,26 @@ export function itemsOf(window: MessageWindow): ReadonlyArray<MessageListItem> {
 
 export const rowSelector = (ts: string) => `[data-message-row="${CSS.escape(ts)}"]`
 
-/** The first row in view and its offset from the top of the scroller. */
+/**
+ * The first row whose top is in view, and its offset from the top of the scroller; the row over the top edge when
+ * it is taller than the view. Not the row cut by the top edge: after a jump that row may still be at its size
+ * estimate, and holding its top would let its real height move every row below it. Row tops only grow down the
+ * list, so a binary search reads about ten of them; a hit test at the edge finds nothing in the gap between groups.
+ */
 export function rowInView(scroller: HTMLElement): { readonly element: HTMLElement; readonly anchorKey: string; readonly offset: number } | undefined {
   const box = scroller.getBoundingClientRect()
-  const element = document.elementFromPoint(box.left + box.width / 2, box.top + 1)?.closest<HTMLElement>(ROW) ?? scroller.querySelector<HTMLElement>(ROW)
+  const rows = scroller.querySelectorAll<HTMLElement>(ROW)
+  let low = 0
+  let high = rows.length
+  while (low < high) {
+    const middle = (low + high) >> 1
+    if (rows[middle]!.getBoundingClientRect().top < box.top) low = middle + 1
+    else high = middle
+  }
+  const below = rows[low]
+  const element = below !== undefined && below.getBoundingClientRect().top < box.bottom ? below : rows[low - 1]
   const anchorKey = element?.dataset['messageRow']
-  if (element == null || anchorKey === undefined) return undefined
+  if (element === undefined || anchorKey === undefined) return undefined
   return { element, anchorKey, offset: element.getBoundingClientRect().top - box.top }
 }
 
@@ -108,15 +122,16 @@ export function hold(scroller: HTMLElement, pin: RefObject<Pin | undefined>, pin
  * The rows laid out in full rather than at their size estimate, so the
  * position set before the first paint is where they end up: a window's
  * worth around the open position, a window's worth around
- * the row held during a source jump or an older page (`heldAt`), and the last window's worth,
- * where new messages arrive and the bottom is held. A page row drawn at its
+ * the row held during a source jump or an older page (`heldAt`), the last window's worth,
+ * where new messages arrive and the bottom is held, and the row a scroll landed on while it was
+ * still at its estimate (`landedAt`), so Chromium anchors on it as the rows around it grow. A page row drawn at its
  * estimate between the top of the view and the held row would grow a frame
  * later and move what is on screen; the page's rows are new, so laying them
  * out in full moves nothing. Everywhere else the browser's scroll anchoring
  * absorbs rows growing as they come into view.
  */
-export function eagerRows(order: ReadonlyArray<string>, openAt: number, heldAt: number, rows: number): ReadonlySet<string> {
-  const eager = new Set<string>()
+export function eagerRows(order: ReadonlyArray<string>, openAt: number, heldAt: number, rows: number, landedAt?: string): ReadonlySet<string> {
+  const eager = new Set<string>(landedAt === undefined ? [] : [landedAt])
   for (let i = Math.max(0, openAt - rows); i < Math.min(order.length, openAt + rows); i++) eager.add(order[i]!)
   for (let i = Math.max(0, heldAt - rows); heldAt >= 0 && i < Math.min(order.length, heldAt + rows); i++) eager.add(order[i]!)
   for (let i = Math.max(0, order.length - rows); i < order.length; i++) eager.add(order[i]!)

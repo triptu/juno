@@ -10,14 +10,18 @@
  * with `useCallback`. The memo code would only add to the initial bundle
  * (performance 1).
  */
-import { startTransition, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { startTransition, useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { flushSync } from 'react-dom'
 import { bottomWindow, messageFlashAtom, messageWindowSpecAtom, registry, scrollSnapshotAtom, type MessageWindow } from '@juno/state'
 import { afterPaint, mark, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { flashChatRow } from '@juno/views'
 import { onLeaveTab, takeOpenStart } from '../navigation'
 import { takeSendMark } from '../sendMark'
-import { BOTTOM_SLACK, distanceFromBottom, dividerTop, hold, rowSelector, snapshotOf, type Pin } from './scroll'
+import { BOTTOM_SLACK, distanceFromBottom, dividerTop, hold, rowInView, rowSelector, snapshotOf, type Pin } from './scroll'
+
+/** A scroll of the user's that moved the list this recently, in milliseconds, is still going on. */
+const GESTURE_IDLE = 100
 
 /** The list's ends. `atEnd`: the window holds the newest message (no anchor). */
 function edgesOf(list: MessageWindow) {
@@ -40,6 +44,8 @@ export function usePosition(list: MessageWindow) {
   const pinRef = useRef<Pin | undefined>(undefined)
   // The row held after a source jump or while an older page went in above it.
   const [heldAt, setHeldAt] = useState<string | undefined>(undefined)
+  // The row a scroll came to rest on while it was still at its size estimate, laid out in full so Chromium anchors on it.
+  const [landedAt, setLandedAt] = useState<string | undefined>(undefined)
   const pinnedTopRef = useRef(0)
   // The rows and window size the bottom was held for.
   const heldForRef = useRef<{ readonly rows: MessageWindow['rows']; readonly size: string } | undefined>(undefined)
@@ -50,7 +56,7 @@ export function usePosition(list: MessageWindow) {
     lastRef.current = last
     atEndRef.current = atEnd
   })
-  return { scrollRef, anchorRef, positioned, setPositioned, drawnAll, setDrawnAll, atBottom, setAtBottom, far, setFar, seenTs, setSeenTs, pinRef, pinnedTopRef, heldAt, setHeldAt, heldForRef, lastRef, atEndRef }
+  return { scrollRef, anchorRef, positioned, setPositioned, drawnAll, setDrawnAll, atBottom, setAtBottom, far, setFar, seenTs, setSeenTs, pinRef, pinnedTopRef, heldAt, setHeldAt, landedAt, setLandedAt, heldForRef, lastRef, atEndRef }
 }
 
 export type Position = ReturnType<typeof usePosition>
@@ -123,14 +129,17 @@ export function useMessageFlash(position: Position, id: string, readOnly: boolea
 /** Keeps the pinned row or the bottom where it is while rows go in above it or the window resizes. */
 export function useHeldPosition(position: Position, list: MessageWindow): void {
   'use no memo'
-  const { scrollRef, pinRef, pinnedTopRef, positioned, drawnAll } = position
+  const { scrollRef, pinRef, pinnedTopRef, positioned, drawnAll, heldAt, landedAt } = position
   const { first } = edgesOf(list)
-  // Rows added above the ones in view (the rest of the window after the first frame, an older page):
-  // scroll anchoring keeps the rows in view still, except at offset 0, where Chromium does not anchor.
+  // Rows added above the ones in view (the rest of the window after the first frame, an older page), and rows laid out
+  // in full around a held row (`heldAt`) or as the row a scroll landed on (`landedAt`): scroll anchoring keeps the rows
+  // in view still, except at offset 0, where Chromium does not anchor, and on rows still at their size estimate, which
+  // it never anchors on.
+  // A tab shown again runs this too: rows that changed while it was hidden had no anchoring at all.
   useLayoutEffect(() => {
     const scroller = scrollRef.current
     if (scroller !== null && positioned) hold(scroller, pinRef, pinnedTopRef)
-  }, [positioned, first, drawnAll, list.rows, scrollRef, pinRef, pinnedTopRef])
+  }, [positioned, first, drawnAll, heldAt, landedAt, list.rows, scrollRef, pinRef, pinnedTopRef])
 
   // The list's box changes size (the window, the composer growing, the Juno panel beside it); at the bottom, stay
   // there. The observer sees only the scroller's own box, and runs after layout and before the frame's paint.
@@ -202,7 +211,7 @@ export function useSendMeasure(list: MessageWindow): void {
  */
 export function useScrollRelease(position: Position, view: string, readOnly: boolean): void {
   'use no memo'
-  const { scrollRef, pinRef, pinnedTopRef, setAtBottom, setFar, setSeenTs, lastRef, atEndRef } = position
+  const { scrollRef, pinRef, pinnedTopRef, setAtBottom, setFar, setSeenTs, setLandedAt, lastRef, atEndRef } = position
   useEffect(() => {
     const scroller = scrollRef.current
     if (scroller === null) return
@@ -217,8 +226,16 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
       if (top < bottomTop - 1 && distanceFromBottom(scroller) > 1) pinRef.current = undefined
       else bottomTop = top
     }
-    const record = () => {
-      if (!readOnly) registry.set(scrollSnapshotAtom(view), snapshotOf(scroller))
+    // As the tab is left, the position is recorded from what is on screen then, since the rows can change after the
+    // scroll ended (an older page, a reaction), and that row is held while the tab is hidden: input that scrolled
+    // nothing (a click on a message) let go of the held row and ended no scroll, and what changes while the tab is
+    // hidden is laid out with nothing to anchor on. A gesture still going on is not held against.
+    const leave = () => {
+      const inView = rowInView(scroller)
+      registry.set(scrollSnapshotAtom(view), inView === undefined ? undefined : { anchorKey: inView.anchorKey, offset: inView.offset })
+      if (inView === undefined || pinRef.current !== undefined || gesture.going()) return
+      pinRef.current = { kind: 'row', element: inView.element, offset: inView.offset }
+      pinnedTopRef.current = scroller.scrollTop
     }
     const onScrollEnd = () => {
       if (pinRef.current?.kind === 'row' && Math.abs(scroller.scrollTop - pinnedTopRef.current) > 1) pinRef.current = undefined
@@ -228,26 +245,73 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
         pinRef.current = { kind: 'bottom' }
         bottomTop = scroller.scrollTop
       } else if (pinRef.current?.kind === 'bottom') pinRef.current = undefined
+      // Anywhere else, the list holds the row it came to rest on. A jump lands on rows still at their size estimate,
+      // and Chromium does not anchor on those, so as they reach their real height a frame or two later the rows in view
+      // moved by the difference. Then that row alone is laid out in full, and the pin puts it back; Chromium anchors
+      // on it as the rows around it are laid out. The commit is flushed in this handler: React would render it in a
+      // later task, and on a loaded machine Chromium laid the rows out first, for frames on end. A row already laid
+      // out is an anchor, and changing the eager rows after every step of a scroll restyled hundreds of elements, so
+      // it only gets the pin.
+      const inView = pinRef.current === undefined ? rowInView(scroller) : undefined
+      if (inView !== undefined) {
+        pinRef.current = { kind: 'row', element: inView.element, offset: inView.offset }
+        pinnedTopRef.current = scroller.scrollTop
+        if (inView.element.firstElementChild?.checkVisibility({ contentVisibilityAuto: true }) === false) flushSync(() => setLandedAt(inView.anchorKey))
+      }
       setAtBottom(bottom)
       setFar(distance > scroller.clientHeight)
       if (bottom) setSeenTs(lastRef.current)
-      record()
+      if (!readOnly) registry.set(scrollSnapshotAtom(view), inView === undefined ? snapshotOf(scroller) : { anchorKey: inView.anchorKey, offset: inView.offset })
     }
     const inputs = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const
     for (const type of inputs) scroller.addEventListener(type, letGo, { passive: true })
     scroller.addEventListener('scroll', onScroll, { passive: true })
     scroller.addEventListener('scrollend', onScrollEnd)
-    // After a jump (End, a scrollbar drag, a script) the rows it brought near the view reach their real
-    // height frames after the scroll ended, and Chromium does not always anchor that; so the position is
-    // also recorded as the tab is left, from what is on screen then.
-    const stopLeaving = readOnly ? () => {} : onLeaveTab(view, record)
+    // After the listeners above, so it sees the bottom let go in the same scroll.
+    const gesture = watchGesture(scroller, pinRef)
+    const stopLeaving = readOnly ? () => {} : onLeaveTab(view, leave)
     return () => {
       for (const type of inputs) scroller.removeEventListener(type, letGo)
       scroller.removeEventListener('scroll', onScroll)
       scroller.removeEventListener('scrollend', onScrollEnd)
+      gesture.stop()
       stopLeaving()
     }
-  }, [view, readOnly, scrollRef, pinRef, pinnedTopRef, setAtBottom, setFar, setSeenTs, lastRef, atEndRef])
+  }, [view, readOnly, scrollRef, pinRef, pinnedTopRef, setAtBottom, setFar, setSeenTs, setLandedAt, lastRef, atEndRef])
+}
+
+/**
+ * Watches for a gesture of the user's still going on in the list: their own scroll, which moves the list with no pin
+ * held, in the last moment, or a press on the list that has scrolled it (a scrollbar drag, a selection running past
+ * the edge). A press that has not, such as one on a thread link that opens a new tab, is no gesture.
+ */
+function watchGesture(scroller: HTMLElement, pinRef: RefObject<Pin | undefined>): { readonly going: () => boolean; readonly stop: () => void } {
+  let pressed = false
+  let dragging = false
+  let movedAt = Number.NEGATIVE_INFINITY
+  const onPress = () => void (pressed = true)
+  const onRelease = () => void (pressed = dragging = false)
+  const onScroll = () => {
+    if (pinRef.current !== undefined) return
+    movedAt = performance.now()
+    dragging = pressed
+  }
+  const onScrollEnd = () => void (movedAt = Number.NEGATIVE_INFINITY)
+  scroller.addEventListener('pointerdown', onPress, { passive: true })
+  addEventListener('pointerup', onRelease, { passive: true })
+  addEventListener('pointercancel', onRelease, { passive: true })
+  scroller.addEventListener('scroll', onScroll, { passive: true })
+  scroller.addEventListener('scrollend', onScrollEnd)
+  return {
+    going: () => dragging || performance.now() - movedAt < GESTURE_IDLE,
+    stop: () => {
+      scroller.removeEventListener('pointerdown', onPress)
+      removeEventListener('pointerup', onRelease)
+      removeEventListener('pointercancel', onRelease)
+      scroller.removeEventListener('scroll', onScroll)
+      scroller.removeEventListener('scrollend', onScrollEnd)
+    },
+  }
 }
 
 /** Back to the newest message: the pill's jump, and after a send. A new function only when the newest row or the window's end changes (`useCallback`). */

@@ -18,6 +18,7 @@ import { SlackSocket, SocketHandshake } from './client/socket.ts'
 import { HttpTransport } from './client/transport.ts'
 
 export { SlackApi, type SlackApiShape } from './client/api.ts'
+export { decodeIssueDetails, isSchemaPath } from './client/decodeIssue.ts'
 export { scaledPacing, slackConfigLayer, type SlackConfigOverrides } from './client/config.ts'
 export { SlackEdge } from './client/edge.ts'
 export { SlackAuthRequired, SlackDecodeError, SlackRejected, type SlackApiError } from './client/errors.ts'
@@ -26,6 +27,7 @@ export { RequestQueue } from './client/queue.ts'
 export { apiBaseFromWorkspace, SlackSession, slackRoute, type SlackSessionShape } from './client/session.ts'
 export { SlackSocket, SocketHandshake, type SocketEvent, type SocketHandshakeShape } from './client/socket.ts'
 export { HttpTransport, HttpTransportError, type HttpResponse } from './client/transport.ts'
+export { SlackTrace, type SlackCallEnd, type SlackCallOutcome, type SlackCallStart, type SlackTraceShape } from './client/trace.ts'
 
 /** Every client service, needing only the host's seams. */
 export const SlackClient = {

@@ -59,6 +59,13 @@ export type BodyInline = typeof BodyInline.Type
 export const BodyListStyle = Schema.Literals(['bullet', 'ordered', 'checked', 'unchecked'])
 export type BodyListStyle = typeof BodyListStyle.Type
 
+/** A table column's settings; absent fields are Slack's defaults, left aligned on one line. */
+export const BodyTableColumn = Schema.Struct({
+  align: Schema.optionalKey(Schema.Literals(['center', 'right'])),
+  wrap: Schema.optionalKey(Schema.Literal(true)),
+})
+export type BodyTableColumn = typeof BodyTableColumn.Type
+
 const ContentBlock = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('paragraph'), children: Schema.Array(BodyInline) }),
   Schema.Struct({ kind: Schema.Literal('quote'), children: Schema.Array(BodyInline) }),
@@ -89,6 +96,18 @@ const ContentBlock = Schema.Union([
     width: Schema.optionalKey(Schema.Number),
     height: Schema.optionalKey(Schema.Number),
   }),
+  /**
+   * A Slack table: rows of cells of the same length, each cell a run of
+   * inlines, the first row its header. `columns` holds Slack's settings by
+   * column index; `caption` names the table, shown above it with `showCaption`.
+   */
+  Schema.Struct({
+    kind: Schema.Literal('table'),
+    rows: Schema.Array(Schema.Array(Schema.Array(BodyInline))),
+    columns: Schema.optionalKey(Schema.Array(BodyTableColumn)),
+    caption: Schema.optionalKey(Schema.String),
+    showCaption: Schema.optionalKey(Schema.Literal(true)),
+  }),
 ])
 export const BodyBlock = Schema.Union([
   ContentBlock,
@@ -112,3 +131,11 @@ export type BodyBlock = typeof BodyBlock.Type
 
 export const MessageBody = Schema.Struct({ blocks: Schema.Array(BodyBlock) })
 export type MessageBody = typeof MessageBody.Type
+
+/**
+ * Rows of a table body as tab-separated lines, as `plainText` writes a whole
+ * table: the view copies the rows a selection covers with it. A
+ * `@juno/richtext` rule, reached through `@juno/domain` because views do not
+ * import either.
+ */
+export { tableText } from '@juno/domain'

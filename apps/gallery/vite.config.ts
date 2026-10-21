@@ -48,6 +48,8 @@ export default defineConfig({
     pendingImage(),
     stylex.vite({
       useCSSLayers: true,
+      // As the app's build does (apps/desktop/electron.vite.config.ts), so gallery checks see the CSS that ships.
+      lightningcssOptions: { minify: true },
       unstable_moduleResolution: { type: 'commonJS', rootDir: repoRoot },
     }),
     react({ babel: { plugins: [reactCompiler] } }),

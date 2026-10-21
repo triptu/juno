@@ -81,11 +81,12 @@ export function elementMarkup(element: RichTextElement, lookups: Lookups): strin
 
 /**
  * The text the edit field starts with for a message of your own. A message
- * with `rich_text` is written as markup; any other reads as plain text,
- * without the names of its files.
+ * with `rich_text` is written as markup; any other reads as its `text`, as
+ * plain text. Other blocks (a table, a bot's layout blocks) are not in the
+ * field: `composeEdit` sends them back as they were.
  */
 export function editMarkup(content: MessageContent, lookups: Lookups = {}): string {
   const richText = (content.blocks ?? []).flatMap((block) => (block.type === 'rich_text' ? block.elements : []))
   if (richText.length > 0) return richText.flatMap((element) => elementMarkup(element, lookups) ?? []).join('\n')
-  return plainText(messageBody({ ...(content.text === undefined ? {} : { text: content.text }), ...(content.blocks === undefined ? {} : { blocks: content.blocks }) }, lookups))
+  return plainText(messageBody(content.text === undefined ? {} : { text: content.text }, lookups))
 }

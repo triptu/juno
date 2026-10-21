@@ -1,7 +1,7 @@
 /**
  * Session routes (architecture 2.3, 14 and 16 M2): the signed-in state as a
- * live value and the three commands that change it. Main does the work that
- * needs Electron (the sign-in window, the Slack-app import, `secrets.bin`,
+ * live value and the two commands that change it. Main does the work that
+ * needs Electron (the Slack-app import, `secrets.bin`,
  * the cookie session); the engine owns the state and verifies the session
  * with `auth.test`. The renderer only ever sees this.
  */
@@ -31,7 +31,7 @@ export const SessionSecrets = Schema.Struct({
 })
 export type SessionSecrets = typeof SessionSecrets.Type
 
-export const SignInMethod = Schema.Literals(['window', 'import'])
+export const SignInMethod = Schema.Literals(['import'])
 export type SignInMethod = typeof SignInMethod.Type
 
 /** A verified session as the renderer sees it: no secrets. Main keeps the last one in `launch.json` so a relaunch opens on the shell. */
@@ -60,9 +60,7 @@ export type SessionStatus = typeof SessionStatus.Type
 
 /** Why a sign-in or import did not end in a session. `message` is short and never holds a secret. */
 export const SignInFailureKind = Schema.Literals([
-  /** The user closed the window or declined the keychain prompt. */
-  'cancelled',
-  /** The page signed in but no token could be read. */
+  /** No token could be read from the Slack app. */
   'no-token',
   /** No Slack app data on this Mac. */
   'no-slack-app',
@@ -92,13 +90,10 @@ export const sessionProfile = liveValueRoute('session.profile', { value: Schema.
 /** The session state. Emits once at subscribe time, then on every change. */
 export const sessionStatus = liveValueRoute('session.status', { value: SessionStatus })
 
-/** Opens the sign-in window and waits for a verified session. */
-export const sessionSignIn = Rpc.make('session.signIn', { success: Schema.Void, error: SignInFailed })
-
 /** Reads the installed Slack app's session (macOS asks for keychain access) and waits for it to verify. */
 export const sessionImportFromSlackApp = Rpc.make('session.importFromSlackApp', { success: Schema.Void, error: SignInFailed })
 
 /** Forgets the session: secrets, cookies and the workspace cache. */
 export const sessionSignOut = Rpc.make('session.signOut', { success: Schema.Void })
 
-export const SessionRoutes = RpcGroup.make(sessionProfile, sessionStatus, sessionSignIn, sessionImportFromSlackApp, sessionSignOut)
+export const SessionRoutes = RpcGroup.make(sessionProfile, sessionStatus, sessionImportFromSlackApp, sessionSignOut)

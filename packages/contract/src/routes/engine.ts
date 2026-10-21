@@ -9,6 +9,14 @@ import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
 import { liveValueRoute } from '../live'
 
+/** Why the sync cannot finish: the error's tag, the Slack method and Slack's error code or `HTTP <status>`. No message or content. */
+export const SyncFailure = Schema.Struct({
+  error: Schema.String.check(Schema.isMaxLength(64)),
+  method: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(80))),
+  detail: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(64))),
+})
+export type SyncFailure = typeof SyncFailure.Type
+
 export const EnginePhase = Schema.Union([
   Schema.TaggedStruct('first-run', {}),
   /** `first`: the first sync of this workspace (a cold boot); the sidebar shows its progress. */
@@ -16,6 +24,8 @@ export const EnginePhase = Schema.Union([
   Schema.TaggedStruct('catching-up', { done: Schema.Int, total: Schema.Int, first: Schema.optionalKey(Schema.Boolean) }),
   Schema.TaggedStruct('live', {}),
   Schema.TaggedStruct('offline', {}),
+  /** The sync keeps failing for a reason other than the network; it retries every 30 s. */
+  Schema.TaggedStruct('failed', { reason: SyncFailure }),
   Schema.TaggedStruct('rate-limited', { until: Schema.Number }),
   Schema.TaggedStruct('session-expired', {}),
 ])

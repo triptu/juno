@@ -1136,7 +1136,7 @@ describe('cold boot details (review M3 finding 10)', () => {
     // The first conversation's page lands; the second keeps failing (every retry), so the boot fails and waits to try again.
     engine.fake.forceError({ method: 'conversations.history', error: 'internal_error', times: 3 })
     engine.fake.release()
-    await engine.phase('offline', 30_000)
+    await engine.phase('failed', 30_000)
     expect(apiCalls(engine, 'conversations.history').filter((c) => c.ok)).toHaveLength(1)
     engine.fake.resetCalls()
     // force_reload cuts the retry wait short; the next boot skips the conversation it already has.

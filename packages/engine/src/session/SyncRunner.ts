@@ -32,6 +32,7 @@ import { SyncControl, EngineTiming } from '../config'
 import { Session, type ActiveSession } from './Session'
 import { SyncLink } from '../syncLink'
 import { Workspace } from '../workspace'
+import { DevLog } from '../devLog'
 
 export class SyncRunner extends Context.Service<
   SyncRunner,
@@ -44,7 +45,7 @@ export class SyncRunner extends Context.Service<
     readonly slowedUntil: Stream.Stream<number | undefined>
   }
 >()('juno/engine/SyncRunner') {
-  static readonly layer: Layer.Layer<SyncRunner, never, Session | Workspace | SyncLink | NotificationControl | SocketEvents> = Layer.effect(
+  static readonly layer: Layer.Layer<SyncRunner, never, Session | Workspace | SyncLink | NotificationControl | SocketEvents | DevLog> = Layer.effect(
     SyncRunner,
     Effect.gen(function* () {
       const session = yield* Session
@@ -54,9 +55,18 @@ export class SyncRunner extends Context.Service<
       const link = yield* SyncLink
       const events = yield* SocketEvents
       const notifications = yield* NotificationControl
+      const devLog = yield* DevLog
       // The host hears it too: tests compare it with the fake's socket.
       const setOnline = (online: boolean) => link.setOnline(online).pipe(Effect.andThen(Effect.sync(() => control.onConnection?.(online))))
       const scope = yield* Effect.scope
+      const syncConfig = syncConfigLayer({
+        bootRetryMillis: timing.bootRetryMillis,
+        usersBatchMillis: timing.usersBatchMillis,
+        fileRetryMillis: timing.fileRetryMillis,
+        sweepIntervalMillis: timing.sweepIntervalMillis,
+        followPassMillis: timing.followPassMillis,
+        ...control.config,
+      })
       const phase = yield* SubscriptionRef.make<SyncPhase | undefined>(undefined)
       const syncing = yield* SubscriptionRef.make(false)
       const slowed = yield* SubscriptionRef.make<number | undefined>(undefined)
@@ -86,16 +96,18 @@ export class SyncRunner extends Context.Service<
               return SubscriptionRef.set(syncing, cycles > 0)
             })
           const program = Effect.gen(function* () {
+            // Subscribers start in this sync's scope and hear each event after its write attempt.
+            const publish = yield* events.attach
             return yield* runSync({
-              // Subscribers start in this sync's scope and hear each event after its write attempt.
-              onEvent: yield* events.attach,
+              onEvent: (event, me) => Effect.andThen(Effect.sync(() => devLog.socket(event)), publish(event, me)),
+              onStep: devLog.step,
               onSelfPresence: notifications.seedPresence,
               onCycle: (event) =>
                 (event === 'finished' ? link.caughtUp : Effect.void).pipe(
                   Effect.andThen(countCycle(event)),
                   Effect.andThen(Effect.sync(() => control.onCycle?.(event))),
                 ),
-              onPhase: (next) => SubscriptionRef.set(phase, next),
+              onPhase: (next) => Effect.andThen(Effect.sync(() => devLog.phase(next)), SubscriptionRef.set(phase, next)),
               onConnection: setOnline,
               // The topic view's fetches run in this sync's context while it lives.
               onFetcher: (fetcher) => link.setFetcher(fetcher),
@@ -114,16 +126,7 @@ export class SyncRunner extends Context.Service<
           }).pipe(
             Effect.provide(active.context),
             Effect.provide(open.context),
-            Effect.provide(
-              syncConfigLayer({
-                bootRetryMillis: timing.bootRetryMillis,
-                usersBatchMillis: timing.usersBatchMillis,
-                fileRetryMillis: timing.fileRetryMillis,
-                sweepIntervalMillis: timing.sweepIntervalMillis,
-                followPassMillis: timing.followPassMillis,
-                ...control.config,
-              }),
-            ),
+            Effect.provide(syncConfig),
             Effect.scoped,
           )
           const fiber = yield* Effect.forkIn(program, active.scope)

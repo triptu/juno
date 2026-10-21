@@ -1,7 +1,7 @@
 import { Schema } from 'effect'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { EdgeUsersInfoResponse, isThreadRoot, Message, searchMatches } from '@juno/slack-schema'
-import { CONVERSATIONS, startFakeSlack, type FakeSlack } from '../src/index.ts'
+import { CONVERSATIONS, startFakeSlack, tableBlock, type FakeSlack } from '../src/index.ts'
 import { isType, TestClient } from './helpers.ts'
 
 let fake: FakeSlack
@@ -155,6 +155,11 @@ describe('every fixture response decodes with @juno/slack schemas', () => {
     expect(updated.message).toEqual({ text: 'hello again', user: fake.selfId })
     expect(updated.ts).toBe(posted.ts)
     expect(updated.text).toBe('hello again')
+    // Blocks a client sends with an edit are kept, a table among them; without blocks they are made from the text.
+    const table = tableBlock([['Service', 'Status'], ['API', 'Healthy']])
+    const words = { type: 'rich_text', elements: [{ type: 'rich_text_section', elements: [{ type: 'text', text: 'hello with a table' }] }] } as const
+    await client.ok('chat.update', { channel: opened.channel.id, ts: posted.ts, text: 'hello with a table', blocks: [words, table] })
+    expect(fake.messages(opened.channel.id).find((message) => message.ts === posted.ts)?.blocks).toEqual([words, table])
 
     expect(await client.ok('reactions.add', { channel: opened.channel.id, timestamp: posted.ts, name: 'eyes' })).toEqual({ ok: true })
     const twice = await client.call('reactions.add', { channel: opened.channel.id, timestamp: posted.ts, name: 'eyes' })

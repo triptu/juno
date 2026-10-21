@@ -36,7 +36,7 @@ Conventions that apply everywhere (SPEC §16):
 
 **Shows:** gallery `SignInView`, `SetUpJunoView`; `docs/design/reviews/2026-10-16-first-run/after/40-*` to `44-*`.
 
-- Signed out, the window is one page under a drag strip (`Shell` with no sidebar): `SignInView` in a column of `--page-width-narrow`, centred, padding `--space-12` top and bottom, gap `--space-8`: the mark 40, the serif page title, body 15 subtle, then Sign in to Slack (primary, 2xl) over Use the Slack app's session (outline, 2xl) with its keychain note 12.5 muted, then one reserved status line. The appearance block (Theme, Accent) sits under the page.
+- Signed out, the window is one page under a drag strip (`Shell` with no sidebar): `SignInView` in a column of `--page-width-narrow`, centred, padding `--space-12` top and bottom, gap `--space-8`: the mark 40, the serif page title, body 15 subtle, then Use the Slack app's session (primary, 2xl) with its keychain note 12.5 muted, then one reserved status line. The appearance block (Theme, Accent) sits under the page.
 - [built] **Set up Juno** (`SetUpJunoView`, container `SetUpJuno`): the same column and rhythm. Mark, "Set up Juno", the body "I run on a model you choose. Keys stay in your keychain, and you can change this later in Settings.", a `Segmented` of OpenRouter and OpenAI-compatible while the `CODEX_ENABLED` flag is off (Codex remains in code but is unavailable for selection), then one group card with the provider's rows (API key, or Base URL and API key (optional); a saved key is the "Key set" chip beside the field, which keeps its placeholder, as in Settings), and the Model row once the key is saved ("Getting the models…" until the agent lists them; Model id for an endpoint that lists none). Under the card, Continue (primary, 2xl) and Skip for now (ghost, 2xl), then the reserved status line (busy text muted, a failure in `--danger`). No appearance block. It shows after a first sign-in (not after "Slack signed you out") while no provider is active, and never again on its own. Skip leaves AI assist on.
 
 ### 1.2 The welcome
@@ -99,6 +99,7 @@ Style: transparent, colour `--foreground-subtle`, hover `--surface-hover`, press
 | First sync, listing | `ProgressRing` 20, empty track | Syncing with Slack | Finding your conversations | none |
 | First sync, counting | `ProgressRing` 20, N of M | Syncing with Slack | N of M conversations | none |
 | Offline (after 5 s) | `wifi-slash` 18 | You're offline | Juno catches up when you're back. | none |
+| Sync can't finish | `cloud-warning` 18 | Couldn't finish syncing | The reason in plain words ("Slack sent data Juno can't read."), else "Juno tries again every 30 seconds." | Copy log |
 | Rate limited | `hourglass-medium` 18 | Slack asked us to slow down | Juno will catch up in a minute. | none |
 | Engine stopped | `warning-circle` 18 | Sync stopped | The topics here are kept. | Restart |
 
@@ -346,6 +347,10 @@ Scroll container `[data-scroll]` with contained scroll; inner column max-width 8
 ### 6.3 Quote block
 
 Lines starting with ">" render as one block: margin 2 0, padding 4 10, radius 6, bg `color-mix(currentColor 6%, transparent)` (12% inside bubbles), colour `--foreground-subtle` (inherit inside own bubble), pre-wrap. Consecutive quote lines merge; empty text blocks are dropped. S01 shows one.
+
+### 6.3a Table
+
+[built message-tables] A Slack `table` block (SPEC 7, "Tables"; `MessageTable`, through `MessageBody`): a `<table>` in a box `fit-content` wide, at most the body's width, with a 1px `--border-default` frame and `--radius-md`, margin 2 0. Cells: padding 4 10, the message's text size and leading, top aligned, `pre` (one line) unless Slack wraps the column (`pre-wrap`, never narrower than its longest word), start aligned unless Slack says centre or right. The table shrinks to fit the box, so a wrapped column wraps and the box scrolls only when the one-line columns alone are wider. The first row is a `thead` of `th scope="col"` in `--weight-semibold` on `--quote-fill`; a 1px `--border-default` line under each row but the last. A wider table scrolls sideways inside its box, so the message never widens, and while the box can scroll on, a sticky `--space-6` strip at its far edge shades the cells with a gradient from `--quote-fill`, shown by `@container scroll-state(scrollable: inline-end)` on the box (no script, no scroll-linked animation: one cost 3 ms of held-clock frame work in the 300-message scroll), so a table that fits, or one scrolled to its end, has none. More than 10 rows: the first 10, then a ghost "Show all N rows" button whose text starts at the frame's edge (`data-expands-in-place`); "Show less" puts it back. A copy whose selection starts and ends in the table writes `tableText` (through `@juno/contract`) for the rows it touches, as `text/plain`. The box has `tabIndex -1` unless the row is the list's tabbable one, so Chromium's own tab stop on an overflowing scroller follows the row. The body takes the column's width (`alignSelf: stretch`) through `:has([data-msg-table])`. Gallery: `Message` › Table (status with mentions, a link, code and an empty cell; wide; tall; a table alone; hover; wrapped at 380px; a cell with a tab and two paragraphs; a row that is not the tab stop).
 
 ### 6.4 Reactions
 
@@ -770,7 +775,7 @@ Shown from 15.1 (Main rows) and 15.2. One item per view, in pill order, with a c
 
 ### 15.9 Text menu
 
-Right-click a text field (the composers, search, settings fields) or selected text that no other menu takes (SPEC "Feels native"). Built in main (`textMenu.ts`) from Chromium's `context-menu` event, on the app window and the sign-in window, with the system's labels:
+Right-click a text field (the composers, search, settings fields) or selected text that no other menu takes (SPEC "Feels native"). Built in main (`textMenu.ts`) from Chromium's `context-menu` event, on the app window, with the system's labels:
 
 - **Misspelled word** (fields only): one item per guess, or a disabled "No Guesses Found" · — · Learn Spelling · —
 - **Selection:** Look Up “word” (macOS; the selection shortened to 24 characters) · Search with Google (opens the browser) · —

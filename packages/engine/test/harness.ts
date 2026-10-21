@@ -69,17 +69,16 @@ export function fakeMain(fake: FakeSlack, initial?: Credentials) {
   const host = memoryHost()
   let current = initial
   let stored: SessionSecrets | null = initial === undefined ? null : toSecrets(initial)
-  let nextSignIn: (() => Credentials | { failed: { kind: 'cancelled' | 'keychain'; message: string } }) | undefined
+  let nextSignIn: (() => Credentials | { failed: { kind: 'keychain'; message: string } }) | undefined
   host.onEngine((message) => {
     switch (message._tag) {
       case 'requestSecrets':
         host.deliver({ _tag: 'secrets', secrets: stored })
         break
-      case 'signIn':
       case 'importFromSlackApp': {
         const outcome = nextSignIn === undefined ? fake.signIn() : nextSignIn()
         if ('failed' in outcome) {
-          host.deliver({ _tag: 'sessionFailed', method: message._tag === 'signIn' ? 'window' : 'import', ...outcome.failed })
+          host.deliver({ _tag: 'sessionFailed', method: 'import', ...outcome.failed })
         } else {
           current = outcome
           host.deliver({ _tag: 'secrets', secrets: toSecrets(outcome) })
@@ -129,7 +128,7 @@ export function fakeMain(fake: FakeSlack, initial?: Credentials) {
     get stored() {
       return stored
     },
-    failNextSignIn: (kind: 'cancelled' | 'keychain', message: string) => {
+    failNextSignIn: (kind: 'keychain', message: string) => {
       nextSignIn = () => ({ failed: { kind, message } })
     },
   }

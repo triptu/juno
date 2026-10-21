@@ -29,6 +29,7 @@ import {
   activateTab,
   activeTab,
   huddlePlace,
+  devLogPlace,
   attachmentsAtom,
   allTopicsLayoutAtom,
   flushSidebar,
@@ -511,6 +512,12 @@ export function openHuddle(channelId: string, options: OpenOptions = {}): void {
 /** The Juno tab (SPEC 13). A plain open focuses a tab that shows it; each Juno tab shows the one chat. */
 export function openJuno(options: OpenOptions = {}): void {
   show((tabs) => openPlace(tabs, junoPlace, options), undefined)
+}
+
+/** The developer log, from ⌘K. In a tab of its own, so the tab it was opened from keeps its place. */
+export function openDevLog(): void {
+  const showing = tabShowingPlace(registry.get(tabsAtom), devLogPlace)
+  show((tabs) => openPlace(tabs, devLogPlace, { newTab: showing === undefined }), undefined)
 }
 
 /**
