@@ -2,11 +2,13 @@ import { expect, test, type Page } from '@playwright/test'
 
 /**
  * The sidebar row's text levels (SPEC section 5, "Row anatomy"): on a read
- * row the title, then the preview, place and time together, well below it;
- * on an unread row the preview steps up between them. Each is at least 4.5:1
+ * row the title, then the place and time well below it, and the preview
+ * (`--foreground-preview-read`) at or just under them; on an unread row the
+ * preview steps up between the title and the meta. Each is at least 4.5:1
  * on what it sits on (the sidebar, a hovered row or the selected row), in
- * both themes and with every accent. Colours are resolved by drawing them,
- * so `color-mix()` and variables count as the browser paints them.
+ * both themes and with every accent. In the hover state each row is hovered
+ * in turn, read and unread. Colours are resolved by drawing them, so
+ * `color-mix()` and variables count as the browser paints them.
  */
 test.describe('sidebar row contrast', () => {
   const accents = ['coral', 'ink', 'marigold', 'teal', 'midnight', 'emerald', 'claret', 'cyan'] as const
@@ -56,16 +58,19 @@ test.describe('sidebar row contrast', () => {
   for (const theme of ['light', 'dark'] as const) {
     for (const accent of accents) {
       test(`${theme}, ${accent}: title over preview and meta, all readable`, async ({ page }) => {
-        for (const state of ['mixed-list', 'mixed-list-hover']) {
+        // Each pass is the state and the row to hover, if any.
+        const passes: Array<{ state: string; hover?: number }> = [{ state: 'mixed-list' }]
+        for (let hover = 0; hover < 3; hover++) passes.push({ state: 'mixed-list-hover', hover })
+        for (const { state, hover } of passes) {
           await page.goto(`/#/TopicRow?__state=hierarchy/${state}${theme === 'light' ? '' : '&theme=dark'}${accent === 'coral' ? '' : `&accent=${accent}`}`)
           await expect(page.locator('[data-topic-row]').first()).toBeVisible()
           await page.waitForFunction(() => !document.documentElement.hasAttribute('data-theme-switching'))
-          if (state === 'mixed-list-hover') await page.locator('[data-topic-row]').nth(1).hover()
+          if (hover !== undefined) await page.locator('[data-topic-row]').nth(hover).hover()
           const rows = await levels(page)
           expect(rows.length).toBeGreaterThan(2)
           expect(rows.some((row) => row.unread) && rows.some((row) => !row.unread)).toBe(true)
           for (const row of rows) {
-            const where = `${row.id} in ${state}: ${JSON.stringify(row)}`
+            const where = `${row.id} in ${state}${hover === undefined ? '' : `, row ${hover} hovered`}: ${JSON.stringify(row)}`
             expect(row.title, where).toBeGreaterThanOrEqual(7)
             expect(row.preview, where).toBeGreaterThanOrEqual(4.5)
             expect(row.place, where).toBeGreaterThanOrEqual(4.5)
@@ -76,7 +81,7 @@ test.describe('sidebar row contrast', () => {
               expect(row.preview / row.place, where).toBeGreaterThanOrEqual(1.2)
             } else {
               expect(row.title / row.preview, where).toBeGreaterThanOrEqual(2)
-              expect(row.preview, where).toBe(row.place)
+              expect(row.preview, where).toBeLessThanOrEqual(row.place)
             }
             expect(row.time, where).toBe(row.place)
           }
