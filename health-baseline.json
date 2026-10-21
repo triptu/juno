@@ -110,7 +110,7 @@
     "packages/agent/test/serve/full-rebuild.ts:chatItems#1",
     "packages/ai/src/pi/provider.ts:makePiAiProvider#1",
     "packages/ai/test/pi.test.ts:describe('PiAiProvider decisions')#1",
-    "packages/domain/test/commands.test.ts:describe('\u2318K commands')#1",
+    "packages/domain/test/commands.test.ts:describe('⌘K commands')#1",
     "packages/engine/src/agent-host/host.ts:JunoHostLive/Layer.effect/Effect.gen#1",
     "packages/engine/src/home/handlers.ts:HomeHandlers/HomeRoutes.toLayer/Effect.gen#1",
     "packages/engine/src/home/query.ts:readHome#1",
