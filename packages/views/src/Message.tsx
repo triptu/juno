@@ -643,16 +643,24 @@ const styles = stylex.create({
   // a row whose top is under the header band, or inside a row too tall for
   // either, under the band. Paint containment would clip it
   // outside the row, so the row's overflow-clip-margin lets it paint.
+  // The slot is an empty anchor at the toolbar's top right corner. It never
+  // leaves the row's layout or changes size: either would lay the whole row
+  // out again when the toolbar shows (performance.md 8.14).
   toolbar: {
     position: 'absolute',
     top: `var(--row-toolbar-top, calc(${STRADDLE} - ${layout['--toolbar-height']}))`,
     right: spacing['--space-2'],
+    width: 0,
+    height: 0,
     zIndex: z['--z-toolbar'],
     opacity: 'var(--row-action-opacity)',
   },
-  // The toolbar, shown and hidden inside the slot: the slot itself never
-  // leaves the row's layout, which would lay the whole row out again.
+  // The toolbar, shown and hidden inside the slot, hanging from its corner.
   toolbarShown: {
     display: 'var(--row-toolbar-display)',
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 'max-content',
   },
 })
