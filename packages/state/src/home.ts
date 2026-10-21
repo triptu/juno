@@ -29,7 +29,9 @@ import { withAsks } from './homeAsks'
 import type { Registry } from './client'
 import { activeTab, currentPlace, tabsAtom } from './tabs'
 import { homeAppeared, homeGreeting, homeScene, type HomeScene } from './homeScene'
+import { takePicture } from './homePictures'
 import { pendingThought, takeThought, type HomeThought } from './homeThoughts'
+import type { PictureLabel } from '@juno/pictures'
 import { runActionExit, showToast, undoStackAtom, UNDO_LIMIT } from './undo'
 
 export const homeViewAtom = liveQuery(homeView)(undefined)
@@ -101,6 +103,11 @@ export interface HomeShown {
    * once a row lands in a reserved slot. `pending` until the list loads, only before any was ever saved.
    */
   readonly thought: HomeThought | 'pending' | undefined
+  /**
+   * The picture in the caught-up scene's place (`homePictures.ts`): only when Home appeared caught up,
+   * not coming out of the first sync and not under the welcome card, so its box never arrives mid-visit.
+   */
+  readonly picture: PictureLabel | undefined
 }
 
 /**
@@ -153,6 +160,7 @@ export function showHome(registry: Registry, key: string, options: { readonly wi
       filling: true,
       reservedItems: limit,
       thought: undefined,
+      picture: undefined,
     })
   }
   const view = result.value
@@ -178,6 +186,7 @@ export function showHome(registry: Registry, key: string, options: { readonly wi
     reservedItems: syncing ? previous.reservedItems : view.firstSync && !done ? limit : 0,
     // One thought for the visit; none under the welcome card, which has the room under the greeting.
     thought: syncing && previous.thought !== undefined ? previous.thought : items.length === 0 && options.welcome !== true ? takeThought(now.getTime()) : undefined,
+    picture: done && !syncing && options.welcome !== true ? takePicture(now.getTime()) : undefined,
   })
 }
 

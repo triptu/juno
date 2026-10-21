@@ -75,7 +75,7 @@ AI never adds an item the rules did not find; it only rewrites the title line of
 
 One scene per visit, chosen in this order. The first rule that matches wins.
 
-1. **Caught up.** No items and no unread in followed topics: the sunk-back scene. Always, regardless of the time.
+1. **Caught up.** No items and no unread in followed topics: the sunk-back scene. Always, regardless of the time. When a picture is on this Mac and pictures are on, the picture takes the scene's place (`../home-art/`).
 2. **Seasonal, rare.** On the first visit of a day inside a season window, one in six: `winter` (1 Dec to 31 Jan) or `autumn` (15 Sep to 15 Nov). Never twice in a row, never at night.
 3. **Friday.** Friday, 5:00 to 21:59: the plant.
 4. **Time of day.** 5:00 to 10:59 morning (coffee), 11:00 to 16:59 midday (at the laptop, sun high), 17:00 to 21:59 evening (leaning back, laptop closed, sun down), 22:00 to 4:59 late night (a moon).

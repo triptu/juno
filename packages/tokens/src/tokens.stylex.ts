@@ -464,6 +464,9 @@ export const shadows = stylex.defineVars({
   // The active tab lifted out of the strip: a soft shadow up and to the
   // sides only, so nothing falls on the page it joins.
   '--tab-shadow': '0 -1px 3px -1px oklch(0 0 0 / 0.08)',
+  // A picture on the page (Home's picture, the picture page, the gallery): a thin edge drawn over it, so a
+  // pale painting or a dark space image keeps its edge. Its shadow is --shadow-lg, --pop-shadow under the pointer.
+  '--picture-edge': 'inset 0 0 0 1px oklch(0 0 0 / 0.06)',
 })
 
 /* -------------------------------------------------------------------------- */
@@ -1003,6 +1006,16 @@ export const sizes = stylex.defineVars({
   '--row-message-estimate': '56px',
   // A one-line chat bubble off screen: 8px padding above and below a 22px line.
   '--row-bubble-estimate': '38px',
+
+  // Home's picture (SPEC 12, "A picture"): the box the picture is fitted into. Its height is the page's
+  // height less the room the rest of Home takes, between the min and the full height, so the column fits.
+  '--home-picture-width': '320px',
+  '--home-picture-height': '216px',
+  '--home-picture-height-min': '144px',
+  '--home-picture-room': '540px',
+  // The gallery's rows of pictures, each at its own shape, and the picture page's label column.
+  '--gallery-row': '150px',
+  '--picture-label-width': '380px',
 
   '--tile-44': '44px',
   '--tile-36': '36px',

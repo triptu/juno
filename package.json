@@ -63,7 +63,9 @@
     "health:baseline": "node scripts/health.mjs --update-baseline",
     "test:health": "node --test scripts/health.test.mjs",
     "test:repo-tools": "node scripts/heavy.mjs node --test scripts/build-cached.test.mjs scripts/batch-merge.test.mjs scripts/check-migration-order.test.mjs scripts/affected-select.test.mjs scripts/heavy.test.mjs scripts/release-gate.test.mjs scripts/release-main.test.mjs scripts/release-schedule.test.mjs scripts/test-results-reporter.test.mjs scripts/check-tokens.test.mjs scripts/affected.test.mjs",
-    "test:runner": "node --test scripts/remote/usage.test.mjs scripts/remote/runner.test.mjs scripts/remote/workspace.test.mjs scripts/remote/runner-health.test.mjs scripts/plan.test.mjs"
+    "test:runner": "node --test scripts/remote/usage.test.mjs scripts/remote/runner.test.mjs scripts/remote/workspace.test.mjs scripts/remote/runner-health.test.mjs scripts/plan.test.mjs",
+    "pictures:build": "node scripts/pictures/build.mjs",
+    "pictures:upload": "node scripts/pictures/upload.mjs"
   },
   "devDependencies": {
     "@informalsystems/quint": "0.33.0",

@@ -262,6 +262,9 @@ importers:
       '@juno/huddle-views':
         specifier: workspace:*
         version: link:../../packages/huddle-views
+      '@juno/pictures':
+        specifier: workspace:*
+        version: link:../../packages/pictures
       '@juno/slack':
         specifier: workspace:*
         version: link:../../packages/slack
@@ -841,6 +844,15 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
 
+  packages/pictures:
+    devDependencies:
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: 5.0.4
+        version: 5.0.4(@types/node@24.19.2)(vite@7.3.7(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
+
   packages/richtext:
     dependencies:
       '@juno/highlight':
@@ -921,6 +933,9 @@ importers:
       '@juno/contract':
         specifier: workspace:*
         version: link:../contract
+      '@juno/pictures':
+        specifier: workspace:*
+        version: link:../pictures
       effect:
         specifier: 4.0.3
         version: 4.0.3

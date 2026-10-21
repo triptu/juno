@@ -914,10 +914,10 @@ export class Juno {
     await this.sidebar.expectRows()
     await this.expectEngineLive()
     // Park the pointer and the focus on the workspace. With no tab open that is Home, whose rows sit
-    // where a blind click would land, so wait for it and click its greeting, which does nothing.
+    // where a blind click would land, so wait for it and click its empty top corner, which does nothing.
     const tabOpen = this.win.getByRole('tablist').getByRole('tab', { selected: true })
-    await expect(this.home.greeting.or(tabOpen).first()).toBeVisible()
-    if (await this.home.greeting.isVisible()) await this.home.greeting.click()
+    await expect(this.home.root.or(tabOpen).first()).toBeVisible()
+    if (await this.home.root.isVisible()) await this.home.root.click({ position: { x: 4, y: 4 } })
     else await this.win.mouse.click(900, 400)
     if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: sync ${Math.round(performance.now() - started)} ms`)
   }
@@ -2539,6 +2539,7 @@ export class HomePane {
     return this.win.locator('[data-home]:not([data-home-waiting]):not([data-home-loading])').filter({ visible: true })
   }
 
+  /** The greeting; with a picture, Home's heading for screen readers only (SPEC 12, "A picture"). */
   get greeting(): Locator {
     return this.root.getByRole('heading', { level: 2 })
   }
@@ -2548,8 +2549,14 @@ export class HomePane {
     return this.root.locator('[data-home-thought]')
   }
 
+  /** The picture in the caught-up scene's place (SPEC 12, "A picture"). */
+  get picture(): Locator {
+    return this.root.locator('[data-home-picture]')
+  }
+
   async expectShown(): Promise<void> {
-    await expect(this.greeting).toBeVisible()
+    await expect(this.root).toBeVisible()
+    await expect(this.greeting).toBeAttached()
   }
 
   /** The sidebar title bar's Home button (SPEC 5). */

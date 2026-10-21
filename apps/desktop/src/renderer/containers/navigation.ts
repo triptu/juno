@@ -45,6 +45,8 @@ import {
   cycleTab,
   goToEntry,
   allTopicsPlace,
+  galleryPlace,
+  replaceInTab,
   allTopicsTab,
   homePlace,
   homeViewAtom,
@@ -527,6 +529,20 @@ export function openDevLog(): void {
  */
 export function openSettings(section: SettingsSection = 'general', options: OpenOptions = {}): void {
   show((tabs) => openSettingsSection(tabs, section, options), undefined)
+}
+
+/**
+ * The gallery, or one picture with its story (SPEC 12, "Pictures and the
+ * gallery"), in the current tab, so Back returns to where it was; a plain
+ * open focuses a tab that shows it.
+ */
+export function openGallery(pictureId?: string, options: OpenOptions = {}): void {
+  show((tabs) => openPlace(tabs, galleryPlace(pictureId), options), undefined)
+}
+
+/** Another picture in the tab that shows one, without a new history entry (the picture page's ‹ and ›). */
+export function stepPicture(tabId: string, pictureId: string): void {
+  show((tabs) => replaceInTab(tabs, tabId, galleryPlace(pictureId)), undefined)
 }
 
 /** Below the header band, where a message a notification opens lands. */

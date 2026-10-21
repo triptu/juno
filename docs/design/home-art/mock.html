@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Juno · Home's picture, its story and the gallery</title>
+<style>
+@font-face { font-family: 'Figtree Variable'; font-style: normal; font-weight: 300 900; font-display: block;
+  src: url('fonts/figtree-latin-wght-normal.woff2') format('woff2-variations'); }
+@font-face { font-family: 'Instrument Serif'; font-style: normal; font-weight: 400; font-display: block;
+  src: url('fonts/instrument-serif-latin-400-normal.woff2') format('woff2'); }
+
+/* Tokens as in packages/tokens (light, then dark). */
+.theme-light {
+  --background: hsla(48, 50%, 98%, 1);
+  --surface-hover: hsla(48, 30%, 94%, 1);
+  --secondary-default: hsla(48, 30%, 92%, 1);
+  --tab-strip: hsla(48, 26%, 94%, 1);
+  --border-default: hsla(48, 30%, 91%, 1);
+  --input-border: hsla(48, 14%, 82%, 1);
+  --foreground-default: hsla(48, 15%, 12%, 1);
+  --foreground-secondary: hsla(48, 8%, 28%, 1);
+  --foreground-subtle: hsla(48, 8%, 35%, 1);
+  --foreground-muted: hsla(48, 5%, 42%, 1);
+  --picture-shadow: 0 1px 2px 0 rgba(27, 28, 21, 0.06), 0 8px 24px -6px rgba(27, 28, 21, 0.18);
+  --picture-edge: inset 0 0 0 1px rgba(27, 28, 21, 0.06);
+  --mat: hsla(48, 30%, 94%, 1);
+  --link: hsla(16, 68%, 40%, 1);
+}
+.theme-dark {
+  --background: #1B1916;
+  --surface-hover: #2D2B28;
+  --secondary-default: #302F2C;
+  --tab-strip: #151412;
+  --border-default: #32302D;
+  --input-border: #45433F;
+  --foreground-default: #EEEBE2;
+  --foreground-secondary: #D6D3CB;
+  --foreground-subtle: #C6C4BE;
+  --foreground-muted: #A09E9A;
+  --picture-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.3), 0 10px 28px -6px rgba(0, 0, 0, 0.55);
+  --picture-edge: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+  --mat: #24221F;
+  --link: #FF9A80;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; padding: 32px; background: #DAD6CC; font-family: 'Figtree Variable', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+h1.sheet { font: 500 20px/1.3 'Figtree Variable'; margin: 0 0 6px; color: #2a2823; }
+p.sheet { font: 400 14px/1.5 'Figtree Variable'; margin: 0 0 24px; color: #4a4740; max-width: 900px; }
+section[data-key] { display: inline-flex; gap: 24px; flex-wrap: wrap; padding: 24px; background: #DAD6CC; vertical-align: top; }
+.label { font: 500 13px/1.4 'Figtree Variable'; color: #3a3832; margin: 0 0 8px; }
+
+/* A window's page: the tab strip and the page under it. */
+.window { width: 960px; height: 720px; border-radius: 12px; overflow: hidden; background: var(--background); color: var(--foreground-default); display: flex; flex-direction: column; box-shadow: 0 0 0 1px rgba(0,0,0,.08), 0 20px 40px -12px rgba(0,0,0,.25); }
+.window.wide { width: 1200px; height: 780px; }
+.window.narrow { width: 640px; height: 780px; }
+.strip { height: 40px; flex: none; background: var(--tab-strip); display: flex; align-items: flex-end; padding: 0 10px; gap: 2px; }
+.tab { height: 32px; padding: 0 14px; display: flex; align-items: center; gap: 8px; font: 500 12.5px/1 'Figtree Variable'; color: var(--foreground-muted); border-radius: 9px 9px 0 0; }
+.tab.on { background: var(--background); color: var(--foreground-default); }
+.tab svg { width: 14px; height: 14px; }
+.page { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
+
+/* Home: the column centred over the composer. */
+.home-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 48px 8px; }
+.pic-box { width: 320px; height: 216px; display: flex; align-items: flex-end; justify-content: center; }
+.pic { display: block; max-width: 100%; max-height: 100%; border-radius: 2px; box-shadow: var(--picture-shadow); position: relative; }
+.pic-wrap { position: relative; max-width: 100%; max-height: 100%; display: flex; }
+.pic-wrap::after { content: ''; position: absolute; inset: 0; border-radius: 2px; box-shadow: var(--picture-edge); pointer-events: none; }
+.pic-wrap.hover .pic { box-shadow: 0 1px 2px 0 rgba(27,28,21,.08), 0 12px 32px -6px rgba(27,28,21,.26); }
+.plaque { margin-top: 10px; font: 400 12.5px/1.35 'Figtree Variable'; color: var(--foreground-muted); text-align: center; white-space: nowrap; }
+.plaque b { font-weight: 500; color: var(--foreground-subtle); }
+.thought { margin-top: 32px; max-width: 480px; text-align: center; }
+.thought p { margin: 0; font: 400 18px/1.45 'Instrument Serif'; color: var(--foreground-subtle); text-wrap: balance; }
+.thought .by { margin-top: 6px; font: 400 12.5px/1.35 'Figtree Variable'; color: var(--foreground-muted); }
+
+.composer { flex: none; padding: 0 0 24px; display: flex; flex-direction: column; align-items: center; }
+.composer-inner { width: 640px; }
+.recent-label { font: 500 11.5px/1 'Figtree Variable'; color: var(--foreground-muted); margin: 0 0 8px 6px; }
+.recent { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; margin-bottom: 14px; }
+.recent div { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 6px; font: 400 13px/1 'Figtree Variable'; color: var(--foreground-subtle); }
+.face { width: 18px; height: 18px; border-radius: 50%; background: var(--secondary-default); display: inline-flex; align-items: center; justify-content: center; font: 600 9px/1 'Figtree Variable'; color: var(--foreground-muted); }
+.chan { width: 18px; height: 18px; border-radius: 5px; background: var(--secondary-default); }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 999px; background: var(--secondary-default); font: 500 12px/1 'Figtree Variable'; color: var(--foreground-subtle); margin: 0 0 8px 2px; }
+.field { height: 52px; border-radius: 20px; border: 1px solid var(--input-border); display: flex; align-items: center; padding: 0 18px; font: 400 14px/1 'Figtree Variable'; color: var(--foreground-muted); }
+
+/* The picture page: the picture on the wall, the plaque beside it. */
+.viewer { flex: 1; min-height: 0; display: flex; }
+.viewer .wall { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 40px 32px 40px 48px; position: relative; }
+.viewer .wall .pic-wrap { max-height: 100%; }
+.viewer .wall .pic { max-height: 580px; max-width: 100%; }
+.plaque-col { width: 380px; flex: none; overflow: hidden; padding: 28px 40px 28px 8px; display: flex; flex-direction: column; }
+.topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+.quiet-btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 8px; font: 500 12.5px/1 'Figtree Variable'; color: var(--foreground-subtle); }
+.quiet-btn.box { background: var(--secondary-default); }
+.steppers { display: flex; gap: 4px; }
+.stepper { width: 28px; height: 28px; border-radius: 8px; background: var(--secondary-default); display: inline-flex; align-items: center; justify-content: center; color: var(--foreground-subtle); }
+.p-title { font: 400 30px/1.12 'Instrument Serif'; margin: 0; color: var(--foreground-default); }
+.p-artist { margin-top: 10px; font: 500 14px/1.35 'Figtree Variable'; color: var(--foreground-default); }
+.p-meta { margin-top: 3px; font: 400 13px/1.45 'Figtree Variable'; color: var(--foreground-muted); }
+.p-caption { margin: 22px 0 0; font: 400 18px/1.42 'Instrument Serif'; color: var(--foreground-default); }
+.p-facts { margin: 18px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; }
+.p-facts li { font: 400 13.5px/1.55 'Figtree Variable'; color: var(--foreground-secondary); padding-left: 14px; position: relative; }
+.p-facts li::before { content: ''; position: absolute; left: 0; top: 0.72em; width: 4px; height: 4px; border-radius: 50%; background: var(--foreground-muted); opacity: .7; }
+.p-foot { margin-top: auto; padding-top: 18px; font: 400 12px/1.5 'Figtree Variable'; color: var(--foreground-muted); }
+.p-foot a { color: var(--link); text-decoration: none; }
+.p-foot .sources { margin-top: 4px; }
+.keys { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); font: 400 11.5px/1 'Figtree Variable'; color: var(--foreground-muted); opacity: .8; }
+.viewer.stack { flex-direction: column; overflow: hidden; }
+.viewer.stack .wall { flex: none; padding: 24px 32px 8px; }
+.viewer.stack .wall .pic { max-height: 340px; }
+.viewer.stack .plaque-col { width: auto; padding: 18px 40px 24px; }
+.viewer.stack .topbar { position: absolute; top: 14px; left: 20px; right: 20px; margin: 0; }
+
+/* The gallery: one wall, sections by kind, rows of one height. */
+.gallery { flex: 1; min-height: 0; overflow: hidden; padding: 36px 48px; }
+.g-head { display: flex; align-items: baseline; justify-content: space-between; }
+.g-title { font: 400 36px/1.15 'Instrument Serif'; margin: 0; }
+.g-sub { margin: 6px 0 0; font: 400 13.5px/1.5 'Figtree Variable'; color: var(--foreground-muted); max-width: 620px; }
+.g-pills { display: flex; gap: 4px; margin-top: 20px; }
+.g-pill { height: 28px; padding: 0 12px; border-radius: 999px; display: inline-flex; align-items: center; font: 500 12.5px/1 'Figtree Variable'; color: var(--foreground-muted); }
+.g-pill.on { background: var(--secondary-default); color: var(--foreground-default); }
+.g-pill span { margin-left: 6px; font-weight: 400; color: var(--foreground-muted); font-variant-numeric: tabular-nums; }
+.g-section { margin-top: 28px; }
+.g-h { font: 500 13px/1 'Figtree Variable'; color: var(--foreground-muted); margin: 0 0 12px; }
+.g-row { display: flex; gap: 24px 20px; flex-wrap: wrap; }
+.g-row::after { content: ''; flex: 10000 1 0; }
+.g-tile { display: flex; flex-direction: column; gap: 8px; min-width: 0; flex: var(--r) 1 calc(150px * var(--r)); max-width: calc(220px * var(--r)); }
+.g-tile .pic-wrap { width: 100%; }
+.g-tile .pic-wrap .pic { width: 100%; height: auto; aspect-ratio: var(--r); max-width: none; max-height: none; object-fit: cover; }
+.g-tile .t { font: 500 12.5px/1.3 'Figtree Variable'; color: var(--foreground-default); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-tile .a { font: 400 12px/1.3 'Figtree Variable'; color: var(--foreground-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: -6px; }
+.g-tile.current .pic { outline: 2px solid var(--foreground-muted); outline-offset: 3px; }
+.dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--foreground-muted); margin-right: 6px; vertical-align: 1px; }
+</style>
+</head>
+<body>
+
+<template id="tab-icons">
+</template>
+
+<h1 class="sheet">Home's picture, its story and the gallery</h1>
+<p class="sheet">Mock for review. The picture takes the caught-up scene's place in a fixed box; the plaque line and the thought follow, with no greeting line: the picture says you are caught up. Clicking the picture opens it in the tab, larger, with its story. The gallery is a page of its own.</p>
+
+<script>
+const ICON = {
+  home: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 7 8 2.5 13.5 7v6.5h-11Z"/><path d="M6.5 13.5v-4h3v4"/></svg>',
+  frame: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="m2.5 11.5 3.5-3.5 2.5 2.5 2-2 3 3"/><circle cx="10.5" cy="5.8" r="1"/></svg>',
+  hash: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 6h10M3 10h10M6.5 2.5 5.5 13.5M10.5 2.5l-1 11"/></svg>',
+}
+const strip = (active) => `<div class="strip">
+  <div class="tab">${ICON.hash}Postgres 16 migration plan</div>
+  <div class="tab on">${ICON[active === 'Home' ? 'home' : 'frame']}${active}</div>
+</div>`
+const composer = `<div class="composer"><div class="composer-inner">
+  <div class="recent-label">Recent</div>
+  <div class="recent">
+    <div><span class="face">M</span>Maya Chen</div><div><span class="chan"></span>eng</div>
+    <div><span class="face">L</span>Leo Park</div><div><span class="chan"></span>hiring</div>
+  </div>
+  <div class="chip">✦ Juno</div>
+  <div class="field">Ask Juno, or start with @ or #</div>
+</div></div>`
+const home = ({ theme, img, title, artist, date, thought, by, hover }) => `
+<div>
+<p class="label">${theme.label}</p>
+<div class="window ${theme.cls}">
+  ${strip('Home')}
+  <div class="page">
+    <div class="home-col">
+      <div class="pic-box"><div class="pic-wrap${hover ? ' hover' : ''}"><img class="pic" src="img/${img}.webp"></div></div>
+      <div class="plaque"><b>${title}</b> · ${artist}, ${date}</div>
+      <div class="thought"><p>${thought}</p>${by ? `<div class="by">— ${by}</div>` : ''}</div>
+    </div>
+    ${composer}
+  </div>
+</div></div>`
+</script>
+
+<section data-key="home-day">
+<script>document.currentScript.parentElement.insertAdjacentHTML('beforeend',
+  home({ theme: { cls: 'theme-light', label: 'Caught up, day, light' }, img: 'monet_beach_at_sainte_adresse', title: 'The Beach at Sainte-Adresse', artist: 'Claude Monet', date: '1867', thought: 'How we spend our days is, of course, how we spend our lives.', by: 'Annie Dillard' }) +
+  home({ theme: { cls: 'theme-dark', label: 'Caught up, day, dark' }, img: 'hokusai_great_wave', title: 'Under the Wave off Kanagawa', artist: 'Katsushika Hokusai', date: 'c. 1830–32', thought: 'Attention is the beginning of devotion.', by: 'Mary Oliver' }))
+</script>
+</section>
+
+<section data-key="home-night">
+<script>document.currentScript.parentElement.insertAdjacentHTML('beforeend',
+  home({ theme: { cls: 'theme-light', label: 'Caught up, late night, light (hover)' }, img: 'hubble_mystic_mountain_carina', title: 'Mystic Mountain', artist: 'Hubble Space Telescope', date: '2010', thought: 'Confine thyself to the present.', by: 'Marcus Aurelius', hover: true }) +
+  home({ theme: { cls: 'theme-dark', label: 'Caught up, late night, dark' }, img: 'webb_cosmic_cliffs_carina', title: 'Cosmic Cliffs in the Carina Nebula', artist: 'James Webb Space Telescope', date: '2022', thought: 'Everywhere means nowhere.', by: 'Seneca' }))
+</script>
+</section>
+
+<section data-key="home-portrait">
+<script>document.currentScript.parentElement.insertAdjacentHTML('beforeend',
+  home({ theme: { cls: 'theme-light', label: 'A tall picture: the box keeps its size; the picture sits on its base line' }, img: 'kota_radha_krishna_flowering_grove', title: 'Radha and Krishna Walk in a Flowering Grove', artist: 'The Kota Master', date: 'c. 1720', thought: 'A schedule defends from chaos and whim. It is a net for catching days.', by: 'Annie Dillard' }))
+</script>
+</section>
+
+<script>
+const story = {
+  title: 'Impression, Sunrise',
+  artist: 'Claude Monet',
+  meta: ['1872 · Oil on canvas', 'Musée Marmottan Monet, Paris'],
+  caption: 'The port of Le Havre at dawn, seen from a window over the water: a red sun, its reflection, and two rowing boats in the mist.',
+  facts: [
+    'Monet showed it in April 1874 at the first exhibition of the group that soon took the name Impressionists, held in the photographer Nadar’s former studio on the boulevard des Capucines in Paris.',
+    'The critic Louis Leroy wrote a mocking review of the show for Le Charivari, titled “The Exhibition of the Impressionists”, after this picture’s title. The name stuck, and the painters took it up.',
+    'Critics objected to how unfinished it looked: loose strokes, no fine detail, and the subject reduced to light and colour, against the Salon’s rule of a smooth, finished surface.',
+    'It was stolen from the Musée Marmottan in 1985 and recovered in Corsica in 1990.',
+  ],
+  credit: 'Public domain · Musée Marmottan Monet, via Wikimedia Commons',
+}
+const viewer = ({ cls, label, size = 'wide', stack = false }) => `
+<div>
+<p class="label">${label}</p>
+<div class="window ${size} ${cls}">
+  ${strip('Impression, Sunrise')}
+  <div class="page">
+    <div class="viewer${stack ? ' stack' : ''}">
+      <div class="wall"><div class="pic-wrap"><img class="pic" src="img/monet_impression_sunrise.webp"></div>
+</div>
+      <div class="plaque-col">
+        <div class="topbar">
+          <span class="quiet-btn box">${ICON.frame.replace('<svg', '<svg width="13" height="13"')}All pictures</span>
+          <span class="steppers"><span class="stepper">‹</span><span class="stepper">›</span></span>
+        </div>
+        <h2 class="p-title">${story.title}</h2>
+        <div class="p-artist">${story.artist}</div>
+        ${story.meta.map((m) => `<div class="p-meta">${m}</div>`).join('')}
+        <p class="p-caption">${story.caption}</p>
+        <ul class="p-facts">${story.facts.map((f) => `<li>${f}</li>`).join('')}</ul>
+        <div class="p-foot">${story.credit}<div class="sources"><a>Sources</a></div></div>
+      </div>
+    </div>
+  </div>
+</div></div>`
+</script>
+
+<section data-key="story">
+<script>document.currentScript.parentElement.insertAdjacentHTML('beforeend',
+  viewer({ cls: 'theme-light', label: 'The picture with its story, light' }) + viewer({ cls: 'theme-dark', label: 'The picture with its story, dark' }))
+</script>
+</section>
+
+<section data-key="story-narrow">
+<script>document.currentScript.parentElement.insertAdjacentHTML('beforeend',
+  viewer({ cls: 'theme-light', label: 'Narrow window: the story under the picture, the page scrolls', size: 'narrow', stack: true }))
+</script>
+</section>
+
+<script>
+const RATIO = { monet_impression_sunrise: 1393/1080, vermeer_the_milkmaid: 963/1080, kota_radha_krishna_flowering_grove: 701/1080, turner_fighting_temeraire: 1920/1426, van_gogh_irises: 1398/1080, tibet_mandala_of_jnanadakini: 914/1080, seurat_sunday_on_la_grande_jatte: 1920/1278, friedrich_wanderer_above_the_sea_of_fog: 842/1080, van_gogh_almond_blossom: 1367/1080, webb_cosmic_cliffs_carina: 1920/1111, apollo_8_earthrise: 1920/1080, hubble_westerlund_2: 1600/1200, apollo_17_blue_marble: 1 }
+const tile = (img, t, a, current) => `<div class="g-tile${current ? ' current' : ''}" style="--r:${RATIO[img]}"><div class="pic-wrap"><img class="pic" src="img/${img}.webp"></div><div class="t">${t}</div><div class="a">${a}</div></div>`
+const gallery = ({ cls, label }) => `
+<div>
+<p class="label">${label}</p>
+<div class="window wide ${cls}">
+  ${strip('Gallery')}
+  <div class="page">
+    <div class="gallery">
+      <div class="g-head"><h1 class="g-title">Gallery</h1></div>
+      <p class="g-sub">The pictures Home shows when you are caught up, each with its story. Paintings, prints and nature studies in the public domain, and images from Hubble, Webb and NASA.</p>
+      <div class="g-pills"><span class="g-pill on">All<span>72</span></span><span class="g-pill">Paintings<span>41</span></span><span class="g-pill">Prints<span>7</span></span><span class="g-pill">Nature<span>9</span></span><span class="g-pill">Space<span>15</span></span></div>
+      <div class="g-section">
+        <div class="g-h">Paintings</div>
+        <div class="g-row">
+          ${tile('monet_impression_sunrise', 'Impression, Sunrise', 'Claude Monet, 1872', true)}
+          ${tile('vermeer_the_milkmaid', 'The Milkmaid', 'Johannes Vermeer, c. 1658')}
+          ${tile('kota_radha_krishna_flowering_grove', 'Radha and Krishna Walk…', 'The Kota Master, c. 1720')}
+          ${tile('turner_fighting_temeraire', 'The Fighting Temeraire', 'J. M. W. Turner, 1839')}
+          ${tile('van_gogh_irises', 'Irises', 'Vincent van Gogh, 1889')}
+          ${tile('tibet_mandala_of_jnanadakini', 'Mandala of Jnanadakini', 'Tibet, late 14th century')}
+          ${tile('seurat_sunday_on_la_grande_jatte', 'A Sunday on La Grande Jatte', 'Georges Seurat, 1884–86')}
+          ${tile('friedrich_wanderer_above_the_sea_of_fog', 'Wanderer above the Sea of Fog', 'Caspar David Friedrich, c. 1817')}
+          ${tile('van_gogh_almond_blossom', 'Almond Blossom', 'Vincent van Gogh, 1890')}
+        </div>
+      </div>
+      <div class="g-section">
+        <div class="g-h">Space</div>
+        <div class="g-row">
+          ${tile('webb_cosmic_cliffs_carina', 'Cosmic Cliffs in the Carina Nebula', 'Webb, 2022')}
+          ${tile('apollo_8_earthrise', 'Earthrise', 'Apollo 8, 1968')}
+          ${tile('hubble_westerlund_2', 'Westerlund 2', 'Hubble, 2015')}
+          ${tile('apollo_17_blue_marble', 'The Blue Marble', 'Apollo 17, 1972')}
+        </div>
+      </div>
+    </div>
+  </div>
+</div></div>`
+</script>
+
+<section data-key="gallery">
+<script>document.currentScript.parentElement.insertAdjacentHTML('beforeend',
+  gallery({ cls: 'theme-light', label: 'The gallery, light' }) + gallery({ cls: 'theme-dark', label: 'The gallery, dark' }))
+</script>
+</section>
+
+</body>
+</html>

@@ -36,6 +36,8 @@ const placeKind = (place: Place): string => {
       return `Juno page ${place.page}`
     case 'huddle':
       return 'Huddle'
+    case 'gallery':
+      return place.pictureId === undefined ? 'Gallery' : 'Picture'
   }
 }
 

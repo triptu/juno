@@ -25,6 +25,7 @@ import { House } from '@phosphor-icons/react/dist/icons/House'
 import { Info } from '@phosphor-icons/react/dist/icons/Info'
 import { Pulse } from '@phosphor-icons/react/dist/icons/Pulse'
 import { LinkSimple } from '@phosphor-icons/react/dist/icons/LinkSimple'
+import { ImageSquare } from '@phosphor-icons/react/dist/icons/ImageSquare'
 import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { MonitorArrowUp } from '@phosphor-icons/react/dist/icons/MonitorArrowUp'
@@ -87,6 +88,7 @@ export type PaletteIconName =
   | 'start-thread'
   | 'home'
   | 'all-topics'
+  | 'gallery'
   | 'appearance'
   | 'notifications'
   | 'ignored'
@@ -136,6 +138,7 @@ const icons: Record<PaletteIconName, PhosphorIcon> = {
   'start-thread': ChatsCircle,
   home: House,
   'all-topics': ListBullets,
+  gallery: ImageSquare,
   appearance: Palette,
   notifications: Bell,
   ignored: EyeSlash,

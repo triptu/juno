@@ -16,6 +16,7 @@ import { EdgeEmojisListOk, EdgeUsersInfoArgs, EdgeUsersInfoOk, encodeRtmFrame, i
 import { parseCookies, parseFields, parseJson, parseMultipartParts, readBody, type FormFields } from './body.ts'
 import { WORKSPACE_EMOJI } from './emoji.ts'
 import { mimetypeOf } from './files.ts'
+import { pictureBytes } from './pictures.ts'
 import type { EdgeHandlers } from './features/registry.ts'
 import { ApiError, type Handlers, type MethodContext } from './methods.ts'
 import { clientPage, signInPage } from './signin.ts'
@@ -110,6 +111,10 @@ export class FakeServer {
   #releaseEmojiImageGate: (() => void) | undefined
   readonly sessions = new Map<string, Session>()
   readonly calls: CallRecord[] = []
+  /** Picture files asked for (`/pictures/<name>`), in order. */
+  readonly pictureRequests: string[] = []
+  /** The picture store answers 404 to everything, as when it cannot be reached. */
+  picturesDown = false
   readonly sockets = new Set<WebSocket>()
   /** Frames clients sent on the socket, other than `ping`, oldest first. */
   readonly received: ReceivedFrame[] = []
@@ -569,6 +574,15 @@ export class FakeServer {
       // `<id>.svg`, or `<team>-<user>-<avatar_hash>-<size>` as `team.avatar_base_url` photos are spelled.
       const name = path.slice('/avatars/'.length)
       return this.#avatar(/^T[A-Z0-9]+-[UW][A-Z0-9]+-[^-]+-\d+$/.test(name) ? name.split('-')[1]! : name.replace(/\.svg$/, ''), response)
+    }
+    if (path.startsWith('/pictures/') && method === 'GET') {
+      const name = path.slice('/pictures/'.length)
+      const bytes = this.picturesDown ? undefined : pictureBytes(name)
+      this.pictureRequests.push(name)
+      if (bytes === undefined) return json(response, 404, { ok: false, error: 'not_found' })
+      response.writeHead(200, { 'content-type': 'image/webp', 'content-length': String(bytes.length) })
+      response.end(bytes)
+      return
     }
     if (path.startsWith('/control/') && method === 'POST') return this.#controlRoute(path.slice('/control/'.length), request, response)
     if ((path === '/' || path === '/signin') && method === 'GET') return html(response, 200, signInPage({}))

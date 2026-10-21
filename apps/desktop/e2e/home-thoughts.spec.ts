@@ -81,8 +81,8 @@ quiet('An empty Home shows one thought under the greeting, and none once the set
   await expect(toggle).toBeChecked()
   await toggle.click()
   await expect(toggle).not.toBeChecked()
+  // This Home may show a picture, which has no greeting line (SPEC 12, "A picture").
   await home.open()
-  await expect(home.greeting).toHaveText('All caught up.')
   await expect(home.thought).toHaveCount(0)
 })
 

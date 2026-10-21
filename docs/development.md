@@ -55,6 +55,7 @@ Run these from the repo root.
 | `pnpm test:agent-contracts` | Runs the `agent-cards` and `agent-contract` property tests: card identities, digests, retries, the RPC codecs and the chat projection. |
 | `pnpm --filter @juno/agent-memory test` | Runs the pure memory rules' property tests. Its script takes the heavy-job lock itself. |
 | `pnpm --filter @juno/engine test` | Runs one package's suite (here the engine's: the port protocol over an in-memory MessageChannel, live query serving). |
+| `pnpm pictures:build`, `pnpm pictures:upload` | Make the two WebP files of each of Home's pictures from their open-licence originals, and upload them to the R2 bucket `juno-art` (`scripts/pictures/README.md`). |
 | `node scripts/build-icons.mjs` | Rebuilds `apps/desktop/build/icon.icns` and `icon.png` from `assets/icon.svg`. See "App icon". |
 | `pnpm package` | Builds an unsigned DMG with electron-builder into `apps/desktop/release/`; signed builds also make a ZIP for in-place updates. The tag workflow builds these too; see "Releasing". |
 | `JUNO_LIVE=1 pnpm smoke:live` | The read-only live smoke against your real workspace (see "Sign-in and the live smoke"). `pnpm smoke:live -- --fake` runs the same script against an in-process fake. |
@@ -361,9 +362,12 @@ from `@juno/agent-testing/openai` is an endpoint to set up through
 
 ## Sign-in and the live smoke
 
-The only way in is importing the installed Slack app’s session, which the engine verifies with `auth.test`
+Two ways in, both ending in a session the engine verifies with `auth.test`
 (`docs/architecture.md` section 14):
 
+- **Sign in to Slack** opens Slack's own sign-in page in a window on the
+  `persist:slack` partition. The token is read from the page's `localConfig_v2`
+  once it reaches `/client/<team>`; the cookie is already in the session.
 - **Use the Slack app's session** reads copies of the installed Slack app's
   `Local Storage/leveldb` and `Cookies`. macOS asks once for access to the
   "Slack Safe Storage" keychain item (the `security` tool makes the request,
@@ -374,7 +378,7 @@ The only way in is importing the installed Slack app’s session, which the engi
 
 Secrets go to `<userData>/secrets.bin`, encrypted with `safeStorage`. Under
 `JUNO_E2E=1` the file is plain JSON and the three test seams are read from the
-environment: `JUNO_FAKE_SLACK_URL` (the fake API and socket
+environment: `JUNO_FAKE_SLACK_URL` (the fake the sign-in window and the socket
 allow-list point at), `JUNO_SLACK_APP_DIR` (a fixture Slack-app directory) and
 `JUNO_SLACK_SAFE_STORAGE_PASSWORD` (stands in for the keychain). The e2e fixtures
 in `apps/desktop/e2e/fixtures.ts` set all three; `juno.signIn()` and
@@ -418,8 +422,6 @@ results are in research section 10, "Live probe".
 
 ### Keychain prompts
 
-The packaged smoke uses Chromium's `--use-mock-keychain` with its temporary fake-Slack profile, so cookie storage cannot wait on a macOS permission dialog. Installed apps use the real keychain.
-
 Goal: at most one macOS prompt on a first run. Every keychain access from
 launch through the first sign-in and sync, in order:
 
@@ -446,7 +448,9 @@ launch through the first sign-in and sync, in order:
 5. **The import writes the `d` cookie** into `persist:slack`, and after
    `auth.test` main writes `secrets.bin` with `safeStorage.encryptString`.
    Both use "Juno Safe Storage" from step 3, so no prompt.
-6. **MCP credentials** (`juno-mcp`) and **backup secrets** (`juno-backup`) are
+6. **Sign in to Slack** (the window) reads no Slack item; its cookies go
+   through step 3's item.
+7. **MCP credentials** (`juno-mcp`) and **backup secrets** (`juno-backup`) are
    read only when the agent asks, after a provider is set up. Like step 1,
    `security` created them, so there is no prompt.
 
@@ -625,11 +629,13 @@ timeout. Global setup prevents this mismatch after a merge.
 
 Nothing may move when the pointer or the keyboard touches it. `expectNoLayoutShift(page, action)` from `@juno/testing/layout-shift` (`packages/testing`) runs `action` and fails with a report (the node, the old and new box, the delta) if anything shifted. It starts a `PerformanceObserver` for `layout-shift` entries just before the action, waits two frames and then until every transition or animation running under the frame has finished (one iteration of an endless one the action started; with `motion: 'layout'` only those of properties that can move a box, which the gallery uses), and counts every entry with a value above 0, including those Chromium marks `hadRecentInput`, except a `<video>`'s own controls (sources with no node inside a video's box, or an entry with no sources while a video with controls is under the frame). As a fallback it compares the layout box of every element in the frame (`offsetLeft`, `offsetTop`, `offsetWidth`, `offsetHeight`, relative to the frame) before and after. Those ignore transforms, so the press scale is not a shift but a change of size, border or position is, and nothing has to be excluded.
 
-`apps/gallery/shift.spec.ts` checks hover, keyboard focus, blur, press, release and leave with motion on. Every state gets a cursor check. The interaction walk takes up to eight controls per state, the first five and last three when there are more, and skips only screenshot-only states whose rendered DOM signature was already checked. It keeps the existing negative controls and injects both a hover size change and a delayed chunk size change into a real Button fixture to prove the walk rejects them. The Avatar late-load and failed-load checks remain. Desktop e2e can import the same guard.
+`apps/gallery/shift.spec.ts` hovers, leaves, presses, releases, focuses from the keyboard and blurs every interactive element of every state, with motion on, and checks that an Avatar photo arriving late or failing moves nothing (the `photo/pending` state points at `/__fixture/pending.png`, which the gallery server never answers; the test answers it). The desktop e2e can import the same helper for sidebar hover, tab switches, live messages and image loads.
 
-State readiness waits for chunks, fonts, visible images, the theme and finite entrance motion. These browser checks share one driver call after chunks are ready. After each action, a pending chunk is watched for DOM changes rather than polled every frame; the guard still settles for two frames and waits for layout motion before reading both shift entries and geometry. The walk saves its initial markup while computing the DOM signature, and keeps full reloads whenever a touch changed that markup. It reports states, screenshot duplicates, elements and reloads per part, and saves Playwright JSON beside its failure report.
+The guard and the focus-ring check walk many states on one page, and a state changes only the address's hash, so the document is never reloaded and its renderer keeps the code and styles of every component it drew. Both take their page from `walkPages()` in `apps/gallery/support.ts`, which moves to a fresh browser context every 20 states. Before that (10-18), the 24 parts of a remote run on an 8x16 machine grew their renderers from about 100 MB to 370 MB each, the machine ran out of its 16 GB, and the kernel's OOM killer ended one renderer, which Playwright reports as `Target crashed` or `Page crashed` in whatever state that part had reached. With the fresh contexts the same run peaks at 12.7 GB with 3 GB free (154 s script time). 16 workers peak at 9.5 GB but take 172 s, so the remote runner keeps 24. `/dev/shm` is not the cause: the container has 7.9 GB of it, and Playwright already passes `--disable-dev-shm-usage`.
 
-The guard and focus-ring walk use `walkPages()` in `apps/gallery/support.ts`, which moves to a fresh browser context every 20 states to bound renderer memory. Each state has a 30 s deadline. Focus and blur run before press and release, while a control that disables itself on press is still interactive. Cleanup closes the page before its context, bounds each close at 5 s and closes the worker browser if its context cannot close.
+The 10-18 shift-walk hang looked like a close stuck in `pages.close()`, but a repeat of the RemoveCard states failed 20 of 20 walks at `remove/click-then-working`: pressing the last control makes the card working and disables that control, then the guard's keyboard-focus action on it waited until the test deadline. When Playwright aborted the test, context cleanup saw an already closed browser. Closing the page before the context did not fix that action. The guard now checks focus and blur before press and release, while the control is still interactive, and gives each state 30 s to finish. `walkPages()` closes the page with `runBeforeUnload: false` before closing its context, bounds each close at 5 s, and closes the worker browser with a clear failure if the context cannot close. This keeps a stuck context from silently retaining a renderer across rollovers.
+
+After the change, two full remote gallery runs in a row passed all 305 tests: 178 s with 13.0 GB peak used and 2.7 GB available, then 171 s with 12.8 GB peak used and 2.8 GB available. Both used the standard 8x16 machine and 24 gallery workers. The focused RemoveCard walk also passed three repeats at 24 workers after the interaction order changed.
 
 ## The feel suite
 
@@ -672,12 +678,10 @@ At the end of each UI milestone, run these reviews in parallel and turn the find
   from the package directory. Node 24 prints an ExperimentalWarning for `node:sqlite`;
   it is harmless.
 - **Workspace packages and `effect` in main and preload.** `externalizeDepsPlugin`
-  externalises production dependencies. Keep workspace packages and `effect` in
-  the desktop manifest's `devDependencies` so they are bundled. Workspace packages
-  ship TypeScript; packaged Electron cannot load that source from `node_modules`.
-  `electron.vite.config.ts` rejects workspace packages in production dependencies
-  and checks that every external import has a packaged runtime dependency.
-  Bundling `effect` cut the launch to first window from 416 ms to 314 ms.
+  externalises every dependency, and workspace packages ship TypeScript, so
+  `electron.vite.config.ts` excludes `@juno/contract`, `@juno/engine`, `@juno/state`
+  and `effect` to bundle them. Bundling `effect` cut the launch to first window from
+  416 ms to 314 ms. Add a workspace package that main or the engine imports to that list.
 - **`app.getVersion()` in tests.** Launching Electron with the script path makes it
   report Electron's own version. The fixture launches the package directory, like
   `electron .`, and `package.json` has `productName: "Juno"`.
@@ -692,11 +696,14 @@ At the end of each UI milestone, run these reviews in parallel and turn the find
   (`perf.ts`, `port.ts`), never through the DOM lib's names.
 - **Node and DOM `MessagePort`s** have the same `addEventListener` surface at runtime
   but different typings; tests cast Node ports to `PortLike` / `MessagePortLike`.
-- **Renderer bundle size.** The budget is 1.1 MB of initial JS and 155 KB of CSS
+- **Renderer bundle size.** The budget is 1.1 MB of initial JS and 135 KB of CSS
   (`docs/performance.md`); `pnpm build` runs `scripts/check-bundle-size.mjs` and fails
   over it. The M1 shell is 426.1 KB of JS (138.6 KB gzip) and 68.7 KB of CSS, minified.
   electron-vite does not minify by default, so the config sets `minify: 'esbuild'` for
-  all three targets; without it the same code was 1,097 KB.
+  all three targets; without it the same code was 1,097 KB. Vite's CSS minifier does not
+  reach the sheet StyleX writes, so the StyleX plugin minifies it itself
+  (`lightningcssOptions: { minify: true }`); without it the same styles were 157.9 KB
+  instead of 130.3 KB (10-20).
 
 Effect and StyleX pitfalls are in their skills: `.claude/skills/effect/SKILL.md` ("Pitfalls") and
 `.claude/skills/stylex/SKILL.md`.
@@ -705,7 +712,7 @@ Effect and StyleX pitfalls are in their skills: `.claude/skills/effect/SKILL.md`
 
 - **Spec cache.** `pnpm specs:check` stores each passing Quint run in the system temp folder (`juno-cache/specs`), keyed by its arguments, what is checked on its output, the spec file and what it imports, and the Quint and Apalache versions. Every worktree shares it. A run whose key matches is not repeated: its saved output goes through the same checks and its trace is written back to `specs/traces/`. A changed spec reruns only its own checks. `SPECS_CACHE=off pnpm specs:check` or `--no-cache` runs everything; `SPECS_JOBS=<n>` sets how many typechecks and simulations run at once (default 3). The Apalache checks run after them, one at a time, on one Apalache server started for the run, so a check no longer pays for starting a JVM. Bump `cacheVersion` in `specs/check.mjs` when you change how a result is checked.
 - **Build skip.** `test:e2e`, `perf`, `test:feel`, `test:gallery` and `gallery:shots` build through `scripts/build-cached.mjs`. It hashes the app, packages, scripts, root configuration and lockfile, build command, Node version, platform, architecture and build flags (including Vite variables and local `.env` files). Desktop e2e files, app-level specs, Playwright configs, package/app `test/` and `tests/` directories, and `scripts/*.test.mjs` do not affect the build key. Seed definitions and other helpers under `src/` still do. It verifies output bytes before reuse. Remote runs also restore matching output from a persistent cache; a changed input, missing output or failed checksum rebuilds. `JUNO_REBUILD=1` forces a build. `pnpm build` and `pnpm dev` always build.
-- **Shift guard.** The gallery's guard waits only for running transitions and animations that can move a box, skips only equivalent screenshot-only states, and its parallel parts take states from one queue in the temp folder, so they finish together. Remote runs use one part per gallery worker. The parts also check the cursor rule on each state they open. `GALLERY_SHIFT_ONLY=Button,Chip pnpm test:gallery` checks a few components while you iterate.
+- **Shift guard.** The gallery's guard waits only for running transitions and animations that can move a box, touches once a state that draws the same DOM as one already checked, and its twelve parts take components from one queue in the temp folder, so they finish together. The parts also check the cursor rule on each state they open. `GALLERY_SHIFT_ONLY=Button,Chip pnpm test:gallery` checks a few components while you iterate.
 - **Changed tests only.** `pnpm test --changed main` runs only the vitest files affected by changes since `main` (vitest follows imports across packages).
 - **Remote runs.** `pnpm remote <script>` takes no local slot. See "Remote runs" below.
 
@@ -743,7 +750,7 @@ Agents run selective checks before reporting. A scheduled task runs the full sui
 
 **Flakes.** Remote Playwright runs retry once. Tests that pass only on retry remain listed as flaky in the console and full-run summary. A failed test fails the gate. Fix intermittent failures without weakening assertions or running retry loops to obtain green results. Use `pnpm flake` to investigate them ("Hunting a flaky test" below).
 
-**Remote plan shape**: `pnpm affected` and `pnpm verify:main` use separate unit, gallery, desktop and specs jobs on the SSH runner. The desktop job builds the app once and does not shard desktop e2e. See "Remote runs" and "Machine shapes".
+**Remote plan shape**: `pnpm affected` and `pnpm verify:main` use separate unit, app and specs jobs on the SSH runner. The app job builds the desktop app once and does not shard desktop e2e. See "Remote runs" and "Machine shapes".
 
 **Test selection by coverage** (landed 10-17): `pnpm affected` picks desktop e2e specs by a coverage map that `pnpm verify:main` refreshes, and gallery behaviour specs by the components they open. See "Desktop specs by coverage".
 
@@ -920,16 +927,14 @@ tstack owns reservations, pinned containers, leases, heartbeats and cleanup.
 See [Juno runner configuration](self-hosted-runner.md); use `/tstack:runner`
 for machine setup, lessons and troubleshooting.
 
-Standalone jobs wait up to 60 seconds for capacity; split plans default to one hour so a job can wait for another job in the plan to release its cores (`--wait <seconds>` or
+Jobs wait up to 60 seconds for capacity (`--wait <seconds>` or
 `JUNO_RUNNER_WAIT` changes this). An unavailable or full runner fails. Use
 `pnpm remote --local <script>` or `pnpm affected --local` to run the steps on
 this Mac through the heavy lock. No automatic local fallback is enabled.
 Namespace, if needed again, is available only through `/tstack:runner`.
 
-`test:plan` splits unit, gallery, desktop and specs steps into independent SSH jobs.
-Steps within each job run in order; conformance stays with specs. Gallery and
-desktop can overlap within the existing allocator limit. Each uses the verified
-persistent build cache for its own output; they do not share a workspace. Each job
+`test:plan` splits unit, app and specs steps into independent SSH jobs. App
+steps run in order and share builds; conformance stays with specs. Each job
 gets a separate install and report directory, and releases its cores when it
 finishes. `JUNO_RUNNER_PLAN=single` keeps one job; `JUNO_PLAN_SERIAL=1` also
 runs every step in order. `KEY=VALUE` before a step overrides its environment.
@@ -976,11 +981,7 @@ pnpm flake apps/gallery/behaviour.spec.ts -g "rewritten Home" --repeat 400 --wor
 
 Measure the failure rate before a fix and prove the fix with the same count and load. A test that fails a few times in a hundred needs a hundred or more runs to show it. To see what the app was doing when a test failed, add a temporary `console.log` of what the test cannot see in its assertion (what `:hover` matches, which Slack calls arrived) and repeat; the line reporter prints it.
 
-Causes found so far (2026-10-20):
-
-- **A sidebar click measured before a caused move.** The People flow injected a DM and opened its row before waiting for the activity reorder. A replay that delivered the DM between `SidebarRow.select`'s box measurement and mouse move clicked `m:C0HIRING` and opened that same topic in all three runs. The app used the row under the pointer. The test now waits for Maya at the top of Recent before the driver measures her row, and checks the active tab before the message. A caller that causes a reorder must wait for its expected order (`expectTop`) before a coordinate-based row open.
-
-- **Settings edits built from an old page.** Each hours control sent a complete hours object from the last engine answer, so pressing Saturday could restore the old start time over a recent edit. Tidy up controls did the same with their shared preference. Both pages now send only edited fields, and each hours day button sends only its own day; the engine merges hours under its settings lock and Tidy up inside one writer transaction. Keep rapid-edit persistence checks fast, without waiting for a save between controls.
+Causes found so far (2026-10-15):
 
 - **A host port started before its listener.** The agent started its Electron port as soon as main handed it over, before the RPC worker attached its message listener. The engine's one-time ready frame could be lost in that gap, leaving `host.hello` waiting forever and both chat tests timing out at agent readiness. The adapter now starts the port only after attaching the listener, so Electron keeps the frame queued.
 
@@ -1077,7 +1078,7 @@ The shared host maps sibling CPUs and sets the actual thread quota. Workers
 use its `RUNNER_THREADS`, forwarded as `JUNO_RUNNER_JOB_CORES`; they never infer
 threads from the request. At four threads wide units run four Vitest workers
 in each of two packages, desktop runs three workers (two in sequential plans),
-and gallery runs four. Quint uses one simulation per two threads and one
+and gallery runs three. Quint uses one simulation per two threads and one
 Apalache checker per four, at least one each. Explicit worker settings win.
 
 The host caps memory without swap and mounts `/tmp` and `/work` as tmpfs.
@@ -1207,7 +1208,7 @@ lint/typecheck. Heavy checks run through `pnpm affected` on the SSH runner.
 2. Set the version with `pnpm release:version` ("Versions" below). Build and smoke the
    local package with `pnpm package` and `pnpm test:package`. The smoke launches
    the executable directly, signs in to fake Slack, waits for sidebar rows,
-   starts the agent against fake OpenRouter, stages multi-chunk ZIP and empty-MIME DMG files in a topic composer, and relaunches the cached account.
+   starts the agent against fake OpenRouter, and relaunches the cached account.
    It uses temporary data and never reads a real Slack session. Without a Developer
    ID signature, it applies `codesign -s -` locally and verifies the result. It
    measures five cached-account launches from process spawn to the renderer's
@@ -1464,9 +1465,7 @@ Use `fake.holdNext({ method, reason: 'open' })`, assert the call is held, then `
 `pnpm verify:main --ref origin/main` runs every suite on main; fetch main first.
 The scheduled task runs it once a day on main. It checks out that commit in a temporary worktree on the scratch volume and
 runs unit tests, Quint checks, conformance, gallery and desktop tests as
-one plan of separate unit, specs, gallery and desktop SSH jobs on the laptop.
-Gallery and desktop each request two physical cores; desktop can start when
-unit releases its two cores, without increasing Juno's lent allocation. Heavy sync tests stay in
+one plan of separate SSH jobs on the laptop. Heavy sync tests stay in
 this run. Random Quint simulations run each time; deterministic Apalache and
 typecheck results use the cache. Changes to sync or outbox code also trigger selective protocol checks.
 
@@ -1481,19 +1480,7 @@ require a full Mac run. Keep timing gates on a quiet Mac and inspect its load.
 Results live in the main checkout's shared `.juno-status`: the latest
 `verify-main.json` and `.md`, permanent per-commit JSON under
 `verify-main/commits/<commit>/<run>.json`, and logs under `verify-main/<run>/`.
-The summary includes tests that passed on retry. A failed suite or coordinator
-exits 1, including report collection failures after successful steps. The command
-refreshes the coverage map in the invoking checkout; commit that map after a run
-on main.
+The summary includes tests that passed on retry. A failed suite exits 1. The command refreshes the coverage
+map in the invoking checkout; commit that map after a run on main.
 
-On 2026-10-20, the successful baseline at `f5d3854e4` took 2,079.332 s
-wall time. One split-job candidate at `4260ce84e`, after merging main at
-`67cffc883`, took 1,330.647 s, including a 748 s allocator wait for specs.
-Step times were unit 192 → 265 s, Quint 347 → 418 s, conformance 15 → 19 s,
-gallery 1,139 → 1,055 s and desktop 933 → 1,317 s. Gallery passed 312 tests
-against 297 before; desktop passed 457 against 418. Both had no flakes or
-failures. Four gallery workers peaked at 3.90 GiB under the existing 6 GiB
-cap, so that setting stays. This is one observed pair across intervening app
-and flake fixes, not a controlled worker benchmark. Desktop now dominates.
-[Full-run measurements](test-speed-5.md) record each job's wall time, queues,
-guard controls, coverage merge and the unimplemented selective-state estimate.
+On 2026-10-18, one full run at `6c15fbb4` before and one at `d0ecf4ab` after this lane/cache change used separate 8x16 machines. Wall time was 1,418 s before and 1,453 s after. The old unit-then-spec lane took 222 + 281 = 503 s; the new parallel unit and spec lanes took 378 and 364 s, so both finished by 378 s. Both full runs failed for the same unrelated reasons: the gallery's `RemoveCard/remove/click-then-working` shift state consumed about 13 minutes and its part timed out at 15 minutes (gallery 938 s before, 950 s after), and `updates.spec.ts` expected version `0.1.1`–`0.1.6` while the app was `0.1.7` (desktop 413 s before, 427 s after). The gallery timeout dominated total time, so the 125 s shorter unit/spec path did not reduce this pair of full runs. The gallery hang was fixed on main after these runs.
