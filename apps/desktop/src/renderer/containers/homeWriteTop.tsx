@@ -1,14 +1,10 @@
 import { useState } from 'react'
 import type { PickConversation, ThreadSummary } from '@juno/contract'
-import { frequentConversationsAtom, homeDraftAtom, homeThreadsAtom, homeViewAtom, nowAtom, pickConversationsAtom, pickThread, registry, setHomeDraft, type HomeDraft, type HomeThread } from '@juno/state'
+import { homeDraftAtom, homeThreadsAtom, nowAtom, pickConversationsAtom, pickThread, registry, setHomeDraft, type HomeDraft, type HomeThread } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { DestinationChip, HomeRecent, HomeWriteTop, TopicChip } from '@juno/views'
+import { DestinationChip, HomeWriteTop, TopicChip } from '@juno/views'
 import type { useDestination } from './HomeComposer'
-import { openTopic } from './navigation'
 import { useHeld } from './pickerRows'
-
-/** A DM or group DM: Recent's left column, a first @'s rows. */
-export const isPeople = (conversation: PickConversation) => conversation.kind === 'im' || conversation.kind === 'mpim'
 
 export interface WriteTopProps {
   readonly tabId: string
@@ -21,14 +17,13 @@ export interface WriteTopProps {
 }
 
 /**
- * The stack above Home's field (SPEC section 12, "Writing"): Recent, the
- * destination chip and, while a person or channel is chosen, the topic chip.
+ * The row above Home's field (SPEC section 12, "Writing"): the destination
+ * chip and, while a person or channel is chosen, the topic chip.
  */
 export function WriteTop({ tabId, draft, junoOn, destination, focusField, onType }: WriteTopProps) {
   const topic = useTopic(tabId, focusField)
   return (
     <HomeWriteTop
-      recent={<Recent chosen={draft.conversation?.key} onPick={destination.choose} />}
       chip={<Chip destination={draft.conversation} junoOn={junoOn} onType={onType} {...destination.chip} />}
       topic={<Topic conversation={draft.conversation} thread={draft.thread} onType={onType} {...topic} />}
       topicShown={draft.conversation !== undefined}
@@ -96,24 +91,6 @@ function Topic({ conversation, thread, open, query, onQuery, onOpen, onPick, onT
       onPick={onPick}
       onWarm={() => setWarm(channel)}
       onType={onType}
-    />
-  )
-}
-
-/** Recent, from the local ranking: five people and five channels. ⌘-click or ⌘Enter opens a conversation instead of choosing it. */
-function Recent({ chosen, onPick }: { readonly chosen: string | undefined; readonly onPick: (conversation: PickConversation) => void }) {
-  const frequent = useAtomValue(frequentConversationsAtom)
-  const recent = frequent._tag === 'Success' ? frequent.value : []
-  // Until the first sync ends and the ranking is here, Recent keeps its room empty: rows landing mid-sync re-rank under the pointer.
-  const syncing = useAtomValue(homeViewAtom, (result) => result._tag !== 'Success' || !result.value.ready || result.value.firstSync)
-  return (
-    <HomeRecent
-      people={recent.filter(isPeople)}
-      channels={recent.filter((conversation) => !isPeople(conversation))}
-      chosen={chosen}
-      onPick={onPick}
-      onOpen={(conversation) => (conversation.mainId === undefined ? onPick(conversation) : openTopic(conversation.mainId, { newTab: true }))}
-      reserve={syncing || frequent._tag !== 'Success'}
     />
   )
 }

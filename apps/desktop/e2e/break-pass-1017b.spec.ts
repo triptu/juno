@@ -67,7 +67,7 @@ test('in the smallest window the destination list from ⌘N fits above the chip,
 test('holding Backspace to clear the text keeps the destination; a new Backspace in the empty field goes back to Juno', async ({ juno }) => {
   const { write, win } = juno
 
-  await write.recentRow('Maya').click()
+  await write.pickConversation('ma', 'Maya')
   await write.expectDestination('Maya')
   await write.composer.pressSequentially('ok')
   // A held key: the first press, then repeats past the last character.

@@ -688,7 +688,7 @@ export class Juno {
   readonly settings: SettingsPage
   readonly notifications: NotificationsPage
   readonly topic: TopicPane
-  /** Home's composer: Recent, the destination chip and the field. */
+  /** Home's composer: the destination chip and the field. */
   readonly write: HomeWritePane
   readonly tabs: TabStrip
   readonly nav: Navigation
@@ -1380,8 +1380,8 @@ export class AllTopicsPane {
 }
 
 /**
- * Home's composer (SPEC section 12, "Writing"): Recent, the destination chip
- * above the field, the field, the "Send to" list a first @ or # opens, and
+ * Home's composer (SPEC section 12, "Writing"): the destination chip above
+ * the field, the field, the "Send to" list a first @ or # opens, and
  * the chip's destination list.
  */
 export class HomeWritePane {
@@ -1427,16 +1427,6 @@ export class HomeWritePane {
 
   sendToOption(name: string): Locator {
     return this.sendTo.getByRole('option', { name: new RegExp(`^${escapeRegExp(name)}(\\s|$)`) })
-  }
-
-  /** Recent: the people and channels you wrote to. */
-  get recent(): Locator {
-    return this.root.locator('[data-home-recent]')
-  }
-
-  /** The Recent row named `name`; a private channel's name goes on with "Private". */
-  recentRow(name: string): Locator {
-    return this.recent.getByRole('button', { name: new RegExp(`^${escapeRegExp(name)}( Private)?$`) })
   }
 
   /** The chip's destination list. */

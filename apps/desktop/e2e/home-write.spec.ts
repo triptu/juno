@@ -1,8 +1,7 @@
 // Writing from Home (spec section 12, "Writing"): Juno by default, a first
-// @ or # that suggests a destination without taking over, Recent and the
-// destination list, sends that leave Home in place, a first DM opened with
+// @ or # that suggests a destination without taking over, the destination
+// list, sends that leave Home in place, a first DM opened with
 // conversations.open, ⌘N and "+", and Home from the sidebar.
-import { SELF_ID } from '@juno/fake-slack'
 import { recordBoxes } from './shiftProbe'
 import { expect, syncedTest, test, type Fixtures } from './fixtures'
 
@@ -15,8 +14,8 @@ const DRAFT = 'Lunch order goes out at noon'
 
 syncedTest('writes from Home to people and channels, keeps text and read state, and opens a first DM', async ({ juno, fake, slack }) => {
   const context = { juno, fake, slack }
-  await test.step('a first @ suggests a person, Tab makes them the destination, and the send stays on Home with the field in place', () => sendToPerson(context))
-  await test.step('a first # or @ stays text for Juno on Space or Esc, and Recent chooses a person', () => keepPrefixText(context))
+  await test.step('Home has no Recent section; a first @ suggests a person, Tab makes them the destination, and the send stays on Home with the field in place', () => sendToPerson(context))
+  await test.step('a first # or @ stays text for Juno on Space or Esc, and Backspace in an empty field goes back to Juno', () => keepPrefixText(context))
   await test.step('choosing a destination never marks anything read', () => keepDestinationUnread(context))
   await test.step('a person never messaged: chosen from the list, then conversations.open on send', () => openFirstDm(context))
   await test.step('a send to a channel starts a thread there, shows it in the sidebar, and Home stays', () => startChannelThread(context))
@@ -27,9 +26,11 @@ async function sendToPerson({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Pr
 
   const { write, tabs } = juno
 
-  // A launch opens Home, ready to ask Juno.
+  // A launch opens Home, ready to ask Juno. People and channels come from a first @ or #, the chip's list and search; Home lists none of its own.
   await juno.expectNothingOpen()
   await write.expectDestination('Juno')
+  await expect(juno.home.root.getByText('Recent', { exact: true })).toHaveCount(0)
+  await expect(juno.home.root.getByRole('list', { name: /^(People|Channels)$/ })).toHaveCount(0)
 
   await write.composer.pressSequentially('@ma')
   await expect(write.sendToOption('Maya')).toBeVisible()
@@ -46,6 +47,7 @@ async function sendToPerson({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Pr
   const fields = await recordBoxes(juno.win, '[data-composer-field]')
   await write.send()
   await expect.poll(() => fake.calls.filter((call) => call.method === 'chat.postMessage').map((call) => call.args['channel'])).toEqual(['D0MAYA'])
+  await expect.poll(() => fake.messages('D0MAYA').some((message) => message.text === DRAFT)).toBe(true)
   await juno.expectToast('Sent to Maya')
   // Home stays: the field is empty and back on Juno, where it was.
   await tabs.expectActive('Home')
@@ -69,7 +71,7 @@ async function keepPrefixText({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   })
   // An empty field again, so the next @ is a first @.
   await write.composer.fill('')
-  await test.step('Esc keeps a first @ for Juno, Recent chooses a person, and Backspace in an empty field goes back to Juno', async () => {
+  await test.step('Esc keeps a first @ for Juno, and Backspace in an empty field goes back to Juno', async () => {
     await write.composer.pressSequentially('@ma')
     await expect(write.sendTo).toBeVisible()
     await write.composer.press('Escape')
@@ -78,13 +80,11 @@ async function keepPrefixText({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
     await expect(write.composer).toHaveValue('@ma')
 
     await write.composer.fill('')
-    await write.recentRow('Maya').click()
+    await write.pickConversation('ma', 'Maya')
     await write.expectDestination('Maya')
-    await expect(write.recentRow('Maya')).toHaveAttribute('aria-pressed', 'true')
     await expect(write.composer).toBeFocused()
     await write.composer.press('Backspace')
     await write.expectDestination('Juno')
-    await expect(write.recentRow('Maya')).toHaveAttribute('aria-pressed', 'false')
   })
 }
 
@@ -158,7 +158,7 @@ async function startChannelThread({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'
 syncedTest('Home keeps its draft and destination when a topic opens over it, and Back brings them back', async ({ juno }) => {
   const { write, topic, sidebar, nav } = juno
 
-  await write.recentRow('Maya').click()
+  await write.pickConversation('ma', 'Maya')
   await write.write('A long thought I do not want to lose')
   await sidebar.row(POSTGRES).open()
   await topic.expectTitle(POSTGRES)
@@ -234,37 +234,6 @@ syncedTest('Home opens from the sidebar in the current tab; a plain open focuses
   await juno.home.expectShown()
 })
 
-test('Recent lists people and channels by use, and choosing one sets where the message goes', async ({ juno, fake }) => {
-  // Seed before sign-in so boot history, rather than socket timing, decides the order.
-  for (let i = 0; i < 12; i++) fake.injectMessage({ channel: 'C0ENG', user: SELF_ID, text: `Frequent send ${i}` })
-  fake.injectMessage({ channel: 'C0PRODUCT', user: SELF_ID, text: 'Less frequent send' })
-  await juno.signIn()
-  await juno.waitForSync()
-  const { write } = juno
-  const channels = write.recent.getByRole('list', { name: 'Channels' }).getByRole('button')
-  await expect(channels.first()).toHaveText('eng')
-  await channels.first().click()
-  await write.expectDestination('#eng')
-  await expect(write.composer).toBeFocused()
-  await expect(channels.first()).toHaveAttribute('aria-pressed', 'true')
-
-  // One Tab stop: the arrows move inside Recent, Space chooses.
-  await channels.first().focus()
-  await juno.win.keyboard.press('ArrowDown')
-  const next = channels.nth(1)
-  await expect(next).toBeFocused()
-  const nextName = await next.innerText()
-  await juno.win.keyboard.press('Space')
-  await write.expectDestination(`#${nextName}`)
-  await expect(write.composer).toBeFocused()
-
-  await channels.first().click()
-  await write.write('The release checklist is ready.')
-  await write.send()
-  await expect.poll(() => fake.messages('C0ENG').some((message) => message.text === 'The release checklist is ready.')).toBe(true)
-  expect(fake.calls.filter((call) => call.method === 'chat.postMessage').map((call) => call.args['channel'])).toEqual(['C0ENG'])
-})
-
 syncedTest('a new thread whose root fails stays in the sidebar with Not sent and Retry, and a queued reply follows it', async ({ juno, fake }) => {
   const { write, topic, sidebar } = juno
   await write.pickConversation('eng', 'eng')
@@ -289,7 +258,7 @@ syncedTest('a new thread whose root fails stays in the sidebar with Not sent and
 syncedTest('closing Home with a draft shows "Draft closed", and Undo brings the tab back with its draft', async ({ juno }) => {
   const { write, tabs } = juno
 
-  await write.recentRow('Maya').click()
+  await write.pickConversation('ma', 'Maya')
   await write.write(DRAFT)
   await tabs.closeAt('Home', 0)
   await juno.expectToast('Draft closed')
