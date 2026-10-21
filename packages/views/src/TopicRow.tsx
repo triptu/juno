@@ -235,8 +235,7 @@ export const TopicRow = memo(function TopicRow({
       {...stylex.props(styles.row, focusRing.inset, twoLine && styles.twoLineRow, selected && styles.selected)}
     >
       <span {...stylex.props(styles.tile, main && styles.mainTile, quiet && styles.quietTile)}>
-        <Tile row={row} />
-        {active ? <PresenceDot active surface={selected ? 'rowSelected' : 'row'} /> : null}
+        <Tile row={row} dot={active ? (selected ? 'rowSelected' : 'row') : undefined} />
       </span>
       <span {...stylex.props(styles.body)}>
         <span {...stylex.props(styles.line1)}>
@@ -323,13 +322,21 @@ export const TopicRow = memo(function TopicRow({
  * Tide placeholder until the art exists or while AI assist is off. The art
  * is 40px in a 44px slot, so its text column lines up with a photo row's.
  */
-function Tile({ row }: { readonly row: TopicRowModel }) {
+function Tile({ row, dot }: { readonly row: TopicRowModel; readonly dot: 'row' | 'rowSelected' | undefined }) {
   const { channel } = row
   if (row.kind === 'main' && channel.kind === 'im') {
     const partner = channel.partner
     const name = partner?.name ?? channel.name
     const hue = hueFor(partner?.color ?? channel.color, partner?.id ?? channel.id)
-    return <Avatar label={initials(name)} size={44} hue={hue} {...(partner?.avatarUrl === undefined ? {} : { src: partner.avatarLargeUrl || partner.avatarUrl })} />
+    const photo = <Avatar label={initials(name)} size={44} hue={hue} {...(partner?.avatarUrl === undefined ? {} : { src: partner.avatarLargeUrl || partner.avatarUrl })} />
+    if (dot === undefined) return photo
+    // The dot is placed against the photo's own box: the tile's box is cut to the two-line row.
+    return (
+      <span {...stylex.props(styles.photo)}>
+        {photo}
+        <PresenceDot active surface={dot} />
+      </span>
+    )
   }
   if (row.kind === 'main' && channel.kind === 'mpim') {
     const members = channel.members ?? []
@@ -424,15 +431,20 @@ const styles = stylex.create({
     },
     '--foreground-muted': colors['--foreground-muted-on-fill'],
   },
-  // Positioned, so a DM's presence dot sits on the photo's corner.
   tile: {
-    position: 'relative',
     display: 'inline-flex',
     flexShrink: 0,
     zoom: density['--density-row-tile-zoom'],
   },
   // The 44px artwork may extend beyond Main’s 42px content box, as before.
   mainTile: { maxHeight: density['--density-row-two-line-estimate'] },
+  // Positioned, so a DM's presence dot sits on the photo's corner. As tall as the photo, not the cut tile.
+  photo: {
+    position: 'relative',
+    display: 'inline-flex',
+    alignSelf: 'flex-start',
+    flexShrink: 0,
+  },
   artSlot: {
     display: 'inline-flex',
     alignItems: 'center',
