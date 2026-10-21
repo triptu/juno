@@ -36,7 +36,7 @@ Conventions that apply everywhere (SPEC §16):
 
 **Shows:** gallery `SignInView`, `SetUpJunoView`; `docs/design/reviews/2026-10-16-first-run/after/40-*` to `44-*`.
 
-- Signed out, the window is one page under a drag strip (`Shell` with no sidebar): `SignInView` in a column of `--page-width-narrow`, centred, padding `--space-12` top and bottom, gap `--space-8`: the mark 40, the serif page title, body 15 subtle, then Sign in to Slack (primary, 2xl) over Use the Slack app's session (outline, 2xl) with its keychain note 12.5 muted, then one reserved status line. The appearance block (Theme, Accent) sits under the page.
+- Signed out, the window is one page under a drag strip (`Shell` with no sidebar): `SignInView` in a column of `--page-width-narrow`, centred, padding `--space-12` top and bottom, gap `--space-8`: the mark 40, the serif page title, body 15 subtle, then Use the Slack app's session (primary, 2xl) with its keychain note 12.5 muted, then one reserved status line. The appearance block (Theme, Accent) sits under the page.
 - [built] **Set up Juno** (`SetUpJunoView`, container `SetUpJuno`): the same column and rhythm. Mark, "Set up Juno", the body "I run on a model you choose. Keys stay in your keychain, and you can change this later in Settings.", a `Segmented` of OpenRouter and OpenAI-compatible while the `CODEX_ENABLED` flag is off (Codex remains in code but is unavailable for selection), then one group card with the provider's rows (API key, or Base URL and API key (optional); a saved key is the "Key set" chip beside the field, which keeps its placeholder, as in Settings), and the Model row once the key is saved ("Getting the models…" until the agent lists them; Model id for an endpoint that lists none). Under the card, Continue (primary, 2xl) and Skip for now (ghost, 2xl), then the reserved status line (busy text muted, a failure in `--danger`). No appearance block. It shows after a first sign-in (not after "Slack signed you out") while no provider is active, and never again on its own. Skip leaves AI assist on.
 
 ### 1.2 The welcome
@@ -770,7 +770,7 @@ Shown from 15.1 (Main rows) and 15.2. One item per view, in pill order, with a c
 
 ### 15.9 Text menu
 
-Right-click a text field (the composers, search, settings fields) or selected text that no other menu takes (SPEC "Feels native"). Built in main (`textMenu.ts`) from Chromium's `context-menu` event, on the app window and the sign-in window, with the system's labels:
+Right-click a text field (the composers, search, settings fields) or selected text that no other menu takes (SPEC "Feels native"). Built in main (`textMenu.ts`) from Chromium's `context-menu` event, on the app window, with the system's labels:
 
 - **Misspelled word** (fields only): one item per guess, or a disabled "No Guesses Found" · — · Learn Spelling · —
 - **Selection:** Look Up “word” (macOS; the selection shortened to 24 characters) · Search with Google (opens the browser) · —

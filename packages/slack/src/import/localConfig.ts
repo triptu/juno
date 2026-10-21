@@ -1,8 +1,7 @@
 /**
  * `localConfig_v2`: the web client's record of signed-in teams, kept in
  * Local Storage for the origin `https://app.slack.com` (research section 1).
- * The Slack-app import reads it from a
- * copy of the Slack app's leveldb. Both end here.
+ * The Slack-app import reads it from a copy of the Slack app's leveldb.
  */
 import { Schema as S } from 'effect'
 import { newestValue, type LevelDbRecord } from './leveldb.ts'

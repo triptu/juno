@@ -250,7 +250,7 @@ Keep SPEC §17: sentence case, verb-first buttons, no emoji in chrome, undo over
 | ⌘K empty | No matches. | No matches for "staging" / Try a word from the message, or a person. |
 | Juno chat empty | What do you need? | unchanged |
 | Juno error | Couldn't reach the assistant. Try again in a moment. | Juno didn't answer. Give it a moment and try again. |
-| Sign-in, first run | Engine ready to sign in | Hi, I'm Juno / Sign in to Slack and I'll sort your conversations into topics. Nothing is sent without you. [button: Sign in to Slack] |
+| Sign-in, first run | Engine ready to sign in | Hi, I'm Juno / I'll use the Slack app on this Mac to sort your conversations into topics. Nothing is sent without you. [button: Use the Slack app's session] |
 | Sign-in, session expired | Engine session expired | Slack signed you out / Sign in again to pick up where you left off. [button: Sign in] |
 | Offline | Engine offline | You're offline / Juno shows what it has and catches up when you're back. In the sidebar's status card the second line is "Juno catches up when you're back." and the full sentence is the tooltip. |
 | Rate limited | Engine rate limited | Slack asked us to slow down / Juno will catch up in a minute. |
@@ -294,5 +294,5 @@ Related doc edits for the implementer: `primitives.md` §1 (Icon API from 2.4), 
 
 - Pills on the context pill make private (amber) and DM (blue) read a little louder than the square version. The mock keeps them; say if the square pill should stay for context only.
 - `--radius-xl` 10 → 12 touches rows, cards and tiles at once. The alternative is to change only tiles and the toast and leave rows at 10.
-- The sign-in copy introduces "I'm Juno". If the app should never speak in the first person, use "Sign in to Slack and Juno will sort your conversations into topics."
+- The sign-in copy introduces "I'm Juno". If the app should never speak in the first person, use "Juno will use the Slack app on this Mac to sort your conversations into topics."
 - Whether the Juno tab icon should be `fill` when active like the other nav items, or stay duotone always so Juno is always marked as the one AI surface. The mock uses duotone.

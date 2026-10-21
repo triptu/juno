@@ -10,7 +10,7 @@ Two facts argue against main. `node:sqlite` is synchronous, so bulk writes at bo
 
 ## Decision
 
-The engine is a plain Node program (`@juno/engine`, `startEngine(transport, config)`) that Electron runs in a `utilityProcess` forked with `partition: 'persist:slack'` (see ADR 0007). Main stays a thin shell: windows, menus, notifications, dock badge, `safeStorage`, the Slack session, sign-in window, import from the installed Slack app, the `juno://` scheme, and supervision of the engine process.
+The engine is a plain Node program (`@juno/engine`, `startEngine(transport, config)`) that Electron runs in a `utilityProcess` forked with `partition: 'persist:slack'` (see ADR 0007). Main stays a thin shell: windows, menus, notifications, dock badge, `safeStorage`, the Slack session, import from the installed Slack app, the `juno://` scheme, and supervision of the engine process.
 
 Main creates a `MessageChannelMain` and gives one port to the utility process and the other to the renderer (forwarded by the preload with `window.postMessage`). Renderer and engine talk directly; main is not in the data path. The token is decrypted in main and sent to the engine over `parentPort` at start; the engine keeps it in memory only.
 

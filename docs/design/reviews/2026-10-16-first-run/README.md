@@ -1,6 +1,6 @@
 # Design review, 2026-10-16: the first run
 
-The owner is about to use Juno every day for the first time. This review walks the first run as a new user does, against the fake Slack (and a fake OpenRouter for Juno): launch with no account and sign in, by the sign-in window and by the Slack app's session; the first sync; the first Home, All topics, topic and ⌘K; Juno with no provider, then a key, a model and the first chat; the empty states; and AI assist off from the start. It follows the method of `../2026-10-16/` and checks against SPEC sections 5, 10 to 13, 16 and 17, `inventory.md`, `tokens.md` and `primitives.md`. The fixes are on `first-run-1`.
+The owner is about to use Juno every day for the first time. This review walks the first run as a new user does, against the fake Slack (and a fake OpenRouter for Juno): launch with no account and sign in, by importing the Slack app's session; the first sync; the first Home, All topics, topic and ⌘K; Juno with no provider, then a key, a model and the first chat; the empty states; and AI assist off from the start. It follows the method of `../2026-10-16/` and checks against SPEC sections 5, 10 to 13, 16 and 17, `inventory.md`, `tokens.md` and `primitives.md`. The fixes are on `first-run-1`.
 
 ## Scope and how it was checked
 
@@ -11,7 +11,7 @@ The owner is about to use Juno every day for the first time. This review walks t
 
 What held up:
 
-- The sign-in page is short and plain, keeps a line for its status so nothing moves, and both buttons wait while one runs ("Waiting for the sign-in window").
+- The sign-in page is short and plain, keeps a line for its status so nothing moves, and its primary button waits during import ("Reading the Slack app’s session").
 - The import from the Slack app's session is instant on the fake and lands on the same first Home.
 - The first topic, All topics and ⌘K look as finished as in the earlier reviews.
 - The provider page rejects a bad key in one plain line ("That is not a key. Keys have no spaces."), and the model list reads as names and prices.

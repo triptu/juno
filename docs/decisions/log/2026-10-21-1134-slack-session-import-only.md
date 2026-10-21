@@ -1,0 +1,1 @@
+- 10-21 11:34 · Tushar · Import the installed Slack app’s session as the only sign-in path and primary action. Remove the embedded Slack sign-in window because it does not work. Supersedes the 10-12 ~17:50 two-path choice in `2026-10-12-1750-237-sign-in-two-ways-juno-s-own-slack-sign-in-window-and-im.md`.
