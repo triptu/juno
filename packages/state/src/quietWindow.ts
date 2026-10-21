@@ -8,7 +8,7 @@ const savedQuietDays = liveQuery(prefsGet)({ key: 'quietDays' })
 
 export const quietDaysAtom = Atom.make((get) => {
   const saved = get(savedQuietDays)
-  return AsyncResult.isSuccess(saved) && (saved.value === 1 || saved.value === 3 || saved.value === 7 || saved.value === 14) ? saved.value : 7
+  return AsyncResult.isSuccess(saved) && (saved.value === 1 || saved.value === 3 || saved.value === 7 || saved.value === 14) ? saved.value : 3
 })
 
 export function setQuietDays(registry: Registry, days: number): void {

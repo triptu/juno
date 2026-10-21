@@ -23,7 +23,7 @@ export interface TopicListProps {
   readonly renderRow: (id: string) => ReactNode
   /** Shown when every section is empty. Undefined while nothing has arrived yet. */
   readonly empty?: TopicListEmpty
-  /** The quiet window, for the empty-state copy. Default 7. */
+  /** The quiet window, for the empty-state copy. Default 3. */
   readonly quietDays?: number
   /** Play the empty state's entrance. Pass false when it was visible a moment ago. */
   readonly enterEmpty?: boolean
@@ -68,7 +68,7 @@ export function TopicList({
   sections,
   renderRow,
   empty,
-  quietDays = 7,
+  quietDays = 3,
   enterEmpty = true,
   truncated = false,
   onClearFilters,

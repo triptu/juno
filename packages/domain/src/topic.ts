@@ -58,7 +58,7 @@ export interface Topic {
   readonly preview?: TopicPreview
 }
 
-export const DEFAULT_QUIET_DAYS = 7
+export const DEFAULT_QUIET_DAYS = 3
 export const MAX_QUIET_DAYS = 14
 
 /** Time and settings the rules need. */

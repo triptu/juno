@@ -17,10 +17,15 @@ import { DAY, HOUR, NOW, alerts, eng, group, hiring, maya, topic, ts } from './f
 const ctx: RuleContext = { now: NOW }
 
 describe('topic status', () => {
+  it('uses a 3-day quiet window by default', () => {
+    expect(topicStatus(topic({ ago: 3 * DAY }), ctx)).toBe('open')
+    expect(topicStatus(topic({ ago: 3 * DAY + 1 }), ctx)).toBe('quiet')
+  })
+
   it.each([
     ['active and untouched', topic({ ago: HOUR }), 'open'],
-    ['no activity for 8 days', topic({ ago: 8 * DAY }), 'quiet'],
-    ['no activity for 6 days', topic({ ago: 6 * DAY }), 'open'],
+    ['no activity for 4 days', topic({ ago: 4 * DAY }), 'quiet'],
+    ['no activity for 2 days', topic({ ago: 2 * DAY }), 'open'],
     ['8 days old but unread', topic({ ago: 8 * DAY, unread: 2 }), 'open'],
     ['8 days old but pinned', topic({ ago: 8 * DAY, overlay: { pinnedAt: NOW } }), 'open'],
     ['resolved with no new activity', topic({ ago: HOUR, overlay: { resolvedAt: NOW - 1, resolvedActivityTs: ts(NOW - HOUR) } }), 'resolved'],
@@ -82,9 +87,9 @@ describe('what shows up (spec section 5)', () => {
     ['a thread you do not follow with a mention you already read', topic({ subscribed: null, unread: 0, mentionsMe: false }), 'hidden'],
     ['a thread you unfollowed in Slack', topic({ subscribed: false }), 'hidden'],
     ['a thread you unfollowed, with an unread mention', topic({ subscribed: false, unread: 1, mentionsMe: true }), 'hidden'],
-    // "Quiet. Topics with no activity in the last 7 days are hidden unless pinned or unread."
-    ['a followed thread with no activity for 8 days', topic({ subscribed: true, ago: 8 * DAY }), 'hidden'],
-    ['a followed thread with no activity for 8 days but unread', topic({ subscribed: true, ago: 8 * DAY, unread: 1 }), 'recent'],
+    // "Quiet. Topics with no activity in the last 3 days are hidden unless pinned or unread."
+    ['a followed thread with no activity for 4 days', topic({ subscribed: true, ago: 4 * DAY }), 'hidden'],
+    ['a followed thread with no activity for 4 days but unread', topic({ subscribed: true, ago: 4 * DAY, unread: 1 }), 'recent'],
     ['an old unfollowed thread with an unread mention', topic({ subscribed: null, ago: 8 * DAY, unread: 1, mentionsMe: true }), 'recent'],
     // "Pinned first": a pin keeps any thread in the sidebar; only an ignored channel hides a pinned topic.
     ['a pinned thread you do not follow', topic({ subscribed: null, overlay: { pinnedAt: NOW } }), 'pinned'],
@@ -93,7 +98,7 @@ describe('what shows up (spec section 5)', () => {
     ['a Main with a message this hour', topic({ kind: 'main', ago: HOUR }), 'recent'],
     ['a Main with no message for 10 days but a thread reply today', topic({ kind: 'main', ago: 10 * DAY, channelAgo: HOUR }), 'recent'],
     ['a Main with no activity of any kind for 8 days', topic({ kind: 'main', ago: 10 * DAY, channelAgo: 8 * DAY }), 'hidden'],
-    ['a Main with no activity for 8 days but unread', topic({ kind: 'main', ago: 8 * DAY, unread: 1 }), 'recent'],
+    ['a Main with no activity for 4 days but unread', topic({ kind: 'main', ago: 4 * DAY, unread: 1 }), 'recent'],
     // "Ignored channels are hidden everywhere in Juno."
     ['a followed thread in an ignored channel', topic({ channel: alerts, subscribed: true, unread: 1, mentionsMe: true }), 'hidden'],
     ['a Main in an ignored channel', topic({ channel: alerts, kind: 'main', ago: HOUR }), 'hidden'],
@@ -169,7 +174,7 @@ describe('sidebar list', () => {
     expect(sidebarEmptyState(empty, { kind: 'dms', unreadOnly: false }, ctx)).toMatchObject({ title: 'No recent topics here', actionLabel: 'Clear filters' })
     expect(sidebarEmptyState(empty, { kind: 'all', unreadOnly: false }, ctx)).toMatchObject({
       title: 'No recent topics here',
-      body: 'Topics with activity in the last 7 days show up here.',
+      body: 'Topics with activity in the last 3 days show up here.',
       actionLabel: 'View all topics',
     })
     expect(sidebarEmptyState(sidebarList(all, { kind: 'all', unreadOnly: false }, ctx), { kind: 'all', unreadOnly: false }, ctx)).toBeUndefined()
