@@ -55,7 +55,9 @@ function useHeldRows(live: ReadonlyArray<HomeItem>, limit: number, sheetOpen: bo
     inside.current = { ...inside.current, [part]: now }
     clearTimeout(letGo.current)
     if (inside.current.pointer || inside.current.keyboard || sheetOpen) {
-      if (held === undefined) setHeld(rows)
+      if (held !== undefined) return
+      setHeld(rows)
+      setReleased(NONE)
       return
     }
     letGo.current = setTimeout(() => {
@@ -75,9 +77,8 @@ function useHeldRows(live: ReadonlyArray<HomeItem>, limit: number, sheetOpen: bo
     engaged('pointer', pointer)
   })
   useEffect(() => () => clearTimeout(letGo.current), [])
-  const release = (itemId: string) => {
-    if (held !== undefined && !released.has(itemId)) setReleased(new Set([...released, itemId]))
-  }
+  // Recorded whether or not the rows hold yet: the press that acts can be the one that starts the hold.
+  const release = (itemId: string) => setReleased((before) => (before.has(itemId) ? before : new Set([...before, itemId])))
   return { rows, onHold: engaged, release }
 }
 
