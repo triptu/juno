@@ -32,7 +32,7 @@ import { accentLabels, settingsSections, type PaletteIconName, type PaletteItem 
 import { muteShortcut } from '@juno/huddle-views'
 import { currentCall, joinHuddle, leaveCurrentHuddle, mediaSnapshot, shareFull, showCurrentHuddle, toggleHuddleMuted, toggleSharing } from './huddle/media'
 import { closeJunoPanel, openPanel } from './juno/actions'
-import { openAllTopics, openHome, openJuno, openJunoPage, newMessage, openNewTab, openSettings, openTopic, showTheTour } from './navigation'
+import { openAllTopics, openDevLog, openHome, openJuno, openJunoPage, newMessage, openNewTab, openSettings, openTopic, showTheTour } from './navigation'
 import { messageBeforePalette } from './paletteActions'
 import { setPrivacy } from './privacy'
 import { isLinkable, labelOf, runTopicAction, topicOf, type ActionTopic } from './topicActions'
@@ -59,6 +59,8 @@ export interface CommandRow extends PaletteItem {
   readonly family?: string
   readonly run: (options: OpenOptions) => void
   readonly stays?: boolean
+  /** Listed only when the text names it (`namesHidden`), never in a listing or a near match. */
+  readonly hidden?: boolean
 }
 
 const row = (id: string, icon: PaletteIconName, label: string, words: string, run: (options: OpenOptions) => void, extra: Partial<CommandRow> = {}): CommandRow => ({
@@ -169,6 +171,8 @@ export function globalCommands(): ReadonlyArray<CommandRow> {
     row('new-tab', 'new-tab', 'New tab', 'open', openNewTab, { hint: '⌘T' }),
     // ⌘N: Home's composer with the destination list open (SPEC 12).
     row('new-message', 'new-message', 'New message', 'write compose dm send chat', () => newMessage(), { hint: '⌘N' }),
+    // Hidden: the developer log shows only for "developer" or "dev log".
+    row('dev-log', 'settings', 'Open developer log', 'dev', () => openDevLog(), { hidden: true }),
     // The welcome card (SPEC 4) again, as Help › Show the Tour brings it.
     row('tour', 'tour', 'Show the tour', 'help guide onboarding welcome tips how', () => showTheTour()),
     privacy
@@ -235,6 +239,12 @@ function namesFamily(candidate: CommandRow, typed: ReadonlyArray<string>): boole
   return typed.every((word) => family.some((own) => own === word || (word.length >= FAMILY_PREFIX && own.startsWith(word))))
 }
 
+/** The text names the hidden commands: the word "developer", or "dev log". */
+export function namesHidden(text: string): boolean {
+  const words = wordsOf(text)
+  return words.includes('developer') || words.some((word, at) => word === 'dev' && words[at + 1]?.startsWith('log') === true)
+}
+
 /** The label starts with the text, word by word: "theme light" starts "Theme: Light". */
 export function labelStartsWith(candidate: CommandRow, text: string): boolean {
   const label = wordsOf(candidate.label)
@@ -249,8 +259,10 @@ export function labelStartsWith(candidate: CommandRow, text: string): boolean {
  */
 export function matchCommands(rows: ReadonlyArray<CommandRow>, text: string, max = Infinity): ReadonlyArray<CommandRow> {
   const typed = wordsOf(text)
-  if (typed.length === 0) return rows
-  const found = rows.filter((candidate) => {
+  const hiddenNamed = namesHidden(text)
+  const listed = rows.filter((candidate) => candidate.hidden !== true || hiddenNamed)
+  if (typed.length === 0) return listed
+  const found = listed.filter((candidate) => {
     const words = wordsOf(`${candidate.label} ${candidate.words} ${candidate.family ?? ''}`)
     return typed.every((word) => words.some((own) => own.startsWith(word)))
   })

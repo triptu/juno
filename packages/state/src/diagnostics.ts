@@ -26,6 +26,8 @@ const placeKind = (place: Place): string => {
       return 'Home'
     case 'allTopics':
       return 'All topics'
+    case 'devLog':
+      return 'Developer log'
     case 'settings':
       return `Settings ${place.section}`
     case 'juno':

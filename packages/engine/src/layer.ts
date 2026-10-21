@@ -17,6 +17,8 @@ import { AiProviderLive } from './ai'
 import { AiAudit } from './aiAudit'
 import { AiHandlers } from './aiActivity'
 import { AiCredentials } from './aiCredentials'
+import { DevLog } from './devLog'
+import { DevLogHandlers } from './devLogRoutes'
 import { AiSpend } from './aiSpend'
 import { ArtHandlers } from './art/handlers'
 import { ArtJob } from './art/job'
@@ -115,12 +117,13 @@ export const Services = Layer.mergeAll(EnginePhases, ArtJob, TitleJob, HomeJob, 
   Layer.provideMerge(SessionClientLive),
   Layer.provideMerge(Session.layer),
   Layer.provideMerge(Workspace.layer),
-  Layer.provideMerge(Status.layer),
+  Layer.provideMerge(Layer.merge(Status.layer, DevLog.layer)),
 )
 
 /** One `toLayer` per feature, merged. Requires `Services`. `Layer.mergeAll` takes at most 20, so later features merge after it. */
 export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, MessagesHandlers, ReadsHandlers, ArtHandlers, NewChatHandlers, SendHandlers, HomeHandlers, AllTopicsHandlers, NotificationsHandlers, ViewsHandlers, FilesHandlers, MentionsHandlers, AiHandlers, AgentWritesHandlers).pipe(
   Layer.merge(HuddleHandlers),
+  Layer.merge(DevLogHandlers),
 )
 
 /** The engine's side of the AgentHost port (ADR 0012): `JunoHost` over `Services`, with the engine phase from the status feature. */

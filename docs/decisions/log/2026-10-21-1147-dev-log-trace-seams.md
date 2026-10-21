@@ -1,0 +1,1 @@
+- 10-21 11:47 · dev-log · @juno/slack reports calls through SlackTrace, a Context.Reference that is off by default, and the sync through an onStep observer; secrets are stripped in one place, devLogText.ts.

@@ -4,7 +4,7 @@
  * and `reindexTopics` are exported for tests and for the engine's commands
  * (which re-index the topics they touch).
  */
-export { runSync, type SyncPhase, type TopicFetcher } from './sync'
+export { runSync, type SyncPhase, type SyncStep, type TopicFetcher } from './sync'
 export { type FetchReport } from './open'
 export { syncConfigLayer, type SyncConfigShape } from './config'
 export { followFenceLayer } from './followFence'
