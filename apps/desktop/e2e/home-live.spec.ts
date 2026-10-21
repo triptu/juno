@@ -79,7 +79,7 @@ test('a new item shows while Home is on screen, and waits while the pointer is o
   await expect(home.meta('waiting')).toHaveText(/^Sam · /)
 })
 
-/** Leo asked a question in a DM, read and not answered; everything is read. */
+/** Leo asked a question in a DM; everything else is read. */
 function oneQuestion(workspace: Workspace): void {
   const now = workspace.clock.now()
   for (const [id, name] of [[SELF_ID, 'Sam Ortiz'], ['U0LEO', 'Leo Park']] as const) {
@@ -89,9 +89,7 @@ function oneQuestion(workspace: Workspace): void {
   const last = workspace.post({ channel: 'C0QUIET', user: 'U0LEO', text: 'Release notes are out.', at: now - 60 * 60_000, silent: true })
   workspace.reads.set('C0QUIET', last.ts)
   workspace.addConversation({ id: 'D0LEO', name: '', kind: 'im', members: new Set([SELF_ID, 'U0LEO']), created: now - 90 * DAY, topic: '', purpose: '', isOpen: true, archived: false })
-  // Read but not answered: it waits on the user, and nothing else is unread.
-  const question = workspace.post({ channel: 'D0LEO', user: 'U0LEO', text: 'Can you check the release notes today?', at: now - 30 * 60_000 })
-  workspace.reads.set('D0LEO', question.ts)
+  workspace.post({ channel: 'D0LEO', user: 'U0LEO', text: 'Can you check the release notes today?', at: now - 30 * 60_000 })
 }
 
 const asked = test.extend({
@@ -103,7 +101,7 @@ const asked = test.extend({
   },
 })
 
-asked('answering the last row from Home shows the caught-up state at once', async ({ juno }) => {
+asked('answering the last row takes it away at once, and Home is caught up as soon as nothing is unread, without a new tab', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { home, write } = juno
@@ -118,7 +116,12 @@ asked('answering the last row from Home shows the caught-up state at once', asyn
   await write.send()
   await juno.expectToast('Sent to Leo')
   await juno.tabs.expectActive('Home')
-  // The same Home, caught up: no row, and the caught-up scene with its greeting.
+  // The answer takes the row away at once; Leo's DM is still unread, so Home is not caught up yet.
   await expect(home.root.locator('[data-home-item]')).toHaveCount(0)
+  await expect(home.greeting).not.toHaveText('All caught up.')
+
+  // Read on another device: the same Home is caught up.
+  const last = fake.messages('D0LEO').at(-1)!
+  fake.markRead({ channel: 'D0LEO', ts: last.ts })
   await expect(home.greeting).toHaveText('All caught up.')
 })
