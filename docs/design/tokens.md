@@ -122,6 +122,7 @@ The accent is a user setting (`AppearanceSettings`, persisted in `launch.json` l
 | `--hl-rule`, `--hl-ring` | `--hl` at 30% and 45% alpha: the new divider's rule, the mine-reaction ring | | |
 | `--focus-ring` | The accent text colour, so the ring meets 4.5:1 on the page (3:1 is the minimum) | #B4351F | #FF9C87 |
 | `--selection-background` | `color-mix(in oklch, var(--hl) 28%, var(--background))` | | |
+| `--hl-band`, `--hl-wash` | `color-mix(in oklch, var(--hl) <mix>, var(--background))`: on the sign-in page, one wave band per side of the pebble art, and the wash behind the title | 14% / 7% | 18% / 9% |
 
 Ink keeps the old grey states: `--hl-nav` is `--secondary-default`, its tint mixes are 9% and 18%, and its focus ring stays the info blue (#008AB3 light, 3.8:1 on paper; `hsla(200, 80%, 65%)` dark).
 
@@ -474,6 +475,8 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--reading-width` | 800px message column, centred; composer inner max 752px (800 − 2×24) |
 | `--home-width` | 480px: Home's column of item rows and the Ask Juno field |
 | `--page-width-narrow` | 680px |
+| `--sign-in-pitch-width` | 520px: the sign-in page's pitch, so it sets as two even lines |
+| `--sign-in-art-width` | 330px: each side of the sign-in page's pebble art, the box its pebbles are placed in |
 | `--page-width` | 720px (Juno) |
 | `--page-width-settings` | 760px: every section of Settings, so the sections share one column and one title edge |
 | `--settings-nav-width` | 200px: Settings' list of sections, with the sidebar's 10px inset on both sides; fits "Backup & This Mac" |
@@ -651,6 +654,10 @@ Three ideas (`friendly-layer.md` §5): instant for the things you do constantly,
 | `--pop-scale` | 1.12 | The peak of a pop |
 | `--appear-scale` | 0.98 | Where an entrance starts |
 | `--rise-toast`, `--rise-stagger` | 8px, 6px | How far a toast and an empty-state part rise as they enter |
+| `--duration-gather`, `--duration-settle` | 600ms, 900ms | The sign-in page's entrance, once: the mark's dots gather into the j; the pebbles fade in and settle |
+| `--rise-settle` | 6px | How far a sign-in pebble settles as it enters |
+| `--duration-drift` | 1200ms | A hovered sign-in pebble's wave bands drift, and drift back |
+| `--duration-nod` | 320ms | The sign-in mark's dot nods under the pointer |
 | Transition set | `scale, background-color, color, border-color, box-shadow, opacity` at `--duration-fast` `--ease-out` | |
 | Toggle to active | The filled icon scales 0.8 → 1 with the spring over `--duration-pop` and cross-fades from the outline icon; off just cross-fades over `--duration-fast`. Both icons stay in the DOM | |
 | Toast | Enter `translateY(--rise-toast)` → 0 with opacity over `--duration-appear`; exit opacity over `--duration-exit`; a replacement cross-fades | |

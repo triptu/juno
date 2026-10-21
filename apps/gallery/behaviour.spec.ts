@@ -364,3 +364,26 @@ test('palette keeps the highlighted item through late commands and reordered res
   await input.press('Enter')
   await expect(log(page)).toHaveText('cmd')
 })
+
+/**
+ * A fixture that draws the accent swatches checks the gallery's own accent,
+ * so a shot in teal never shows coral checked (decision 10-21 17:01). Every
+ * state that holds the swatches, in a non-default accent and theme.
+ */
+test('the checked swatch is the accent the frame is drawn in', async ({ page }) => {
+  const routes = (await readRoutes(page)).filter(
+    (route) =>
+      route.component === 'AppearanceSettings' ||
+      route.component === 'SignInView' ||
+      (['Shell', 'SettingsPage', 'Sidebar'].includes(route.component) && /appearance|signed-out|account-menu/.test(route.id)),
+  )
+  expect(routes.length).toBeGreaterThan(10)
+  for (const route of routes) {
+    await openState(page, route, 'dark', 'teal')
+    const frame = page.locator(`[data-fixture-frame="${route.route}"]`)
+    const swatches = frame.locator('[role="group"]').filter({ has: page.getByRole('button', { name: 'Coral', exact: true }) })
+    if ((await swatches.count()) === 0) continue
+    await expect(swatches.getByRole('button', { name: 'Teal', exact: true }), route.route).toHaveAttribute('aria-pressed', 'true')
+    await expect(swatches.getByRole('button', { name: 'Coral', exact: true }), route.route).toHaveAttribute('aria-pressed', 'false')
+  }
+})

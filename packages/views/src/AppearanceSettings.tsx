@@ -1,6 +1,6 @@
 import type { TopicTitleLines } from '@juno/contract'
 import * as stylex from '@stylexjs/stylex'
-import { spacing } from '@juno/tokens/tokens.stylex'
+import { colors, spacing } from '@juno/tokens/tokens.stylex'
 import { accentLabels, accentNames, Segmented, Swatch, Text, type AccentName, type DensityName, type ThemePreference } from '@juno/ui'
 
 export interface AppearanceSettingsProps {
@@ -14,8 +14,12 @@ export interface AppearanceSettingsProps {
   /** With both, a Density row: Comfortable or Compact. */
   readonly density?: DensityName
   readonly onDensityChange?: (density: DensityName) => void
-  /** `row` puts the label beside the control (Settings); `stack` puts it above (a narrow popover). Default `row`. */
-  readonly layout?: 'row' | 'stack'
+  /**
+   * `row` puts the label beside the control (Settings); `stack` puts it above
+   * (a narrow popover); `bar` is the theme and accent alone in one centred
+   * row with no visible labels (the sign-in page's footer). Default `row`.
+   */
+  readonly layout?: 'row' | 'stack' | 'bar'
 }
 
 const themeOptions: ReadonlyArray<{ readonly value: ThemePreference; readonly label: string }> = [
@@ -34,6 +38,20 @@ const densityOptions: ReadonlyArray<{ readonly value: DensityName; readonly labe
  * (System follows macOS), the accent as swatches, density, and the topic title line limit.
  */
 export function AppearanceSettings({ theme, accent, onThemeChange, onAccentChange, density, onDensityChange, topicTitleLines, onTopicTitleLinesChange, layout = 'row' }: AppearanceSettingsProps) {
+  if (layout === 'bar') {
+    // The controls keep their names for assistive tech; only the visible labels go.
+    return (
+      <section {...stylex.props(styles.bar)} aria-label="Appearance">
+        <Segmented options={themeOptions} value={theme} onChange={onThemeChange} label="Theme" />
+        <span {...stylex.props(styles.barRule)} aria-hidden />
+        <div role="group" aria-label="Accent" {...stylex.props(styles.swatches)}>
+          {accentNames.map((name) => (
+            <Swatch key={name} accent={name} label={accentLabels[name]} selected={name === accent} onClick={() => onAccentChange(name)} />
+          ))}
+        </div>
+      </section>
+    )
+  }
   const stacked = layout === 'stack'
   return (
     <section {...stylex.props(styles.section)} aria-label="Appearance">
@@ -113,6 +131,19 @@ const styles = stylex.create({
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: spacing['--space-2'],
+  },
+  bar: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    columnGap: spacing['--space-5'],
+    rowGap: spacing['--space-3'],
+  },
+  barRule: {
+    width: '1px', // tokens-allow: a hairline divider
+    height: spacing['--space-4'],
+    backgroundColor: colors['--border-strongest'],
   },
   // On a narrow page the swatches wrap rather than run past the card.
   swatches: {
