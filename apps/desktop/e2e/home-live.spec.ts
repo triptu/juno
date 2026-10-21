@@ -101,12 +101,14 @@ const asked = test.extend({
   },
 })
 
-asked('answering the last row takes it away at once, and Home is caught up as soon as nothing is unread, without a new tab', async ({ juno, fake }) => {
+asked('answering the last row shows the caught-up picture at once, with the DM still unread', async ({ juno, win }) => {
   await juno.signIn()
   await juno.waitForSync()
   const { home, write } = juno
   await home.open()
   expect(await home.kinds()).toEqual(['waiting'])
+  // When idle after Home paints, the next picture is downloaded and saved, so it is on disk before the row goes.
+  await expect.poll(() => win.evaluate(() => JSON.parse(localStorage.getItem('juno.homePictures') ?? '{}').next?.id ?? null), { timeout: 30_000 }).not.toBeNull()
 
   await write.composer.pressSequentially('@le')
   await expect(write.sendToOption('Leo')).toBeVisible()
@@ -116,12 +118,35 @@ asked('answering the last row takes it away at once, and Home is caught up as so
   await write.send()
   await juno.expectToast('Sent to Leo')
   await juno.tabs.expectActive('Home')
-  // The answer takes the row away at once; Leo's DM is still unread, so Home is not caught up yet.
+  // The answer takes the last row away, and the same Home is caught up: an unread message that asks nothing makes no row.
   await expect(home.root.locator('[data-home-item]')).toHaveCount(0)
-  await expect(home.greeting).not.toHaveText('All caught up.')
+  await expect(home.picture.locator('img')).toBeVisible()
+  await expect.poll(() => home.picture.locator('img').evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true)
+})
 
-  // Read on another device: the same Home is caught up, with the picture when one is on disk by now, else the scene.
-  const last = fake.messages('D0LEO').at(-1)!
-  fake.markRead({ channel: 'D0LEO', ts: last.ts })
-  await expect(home.picture.or(home.root.locator('[data-home-scene="caughtUp"]'))).toBeVisible()
+/** Leo's unread DM says something that asks nothing of the user: no row. */
+function unreadNothingAsked(workspace: Workspace): void {
+  oneQuestion(workspace)
+  workspace.post({ channel: 'D0LEO', user: 'U0LEO', text: 'Release notes are out.', at: workspace.clock.now() - 10 * 60_000 })
+  workspace.reads.set('D0LEO', workspace.post({ channel: 'D0LEO', user: SELF_ID, text: 'Done, checked them.', at: workspace.clock.now() - 20 * 60_000 }).ts)
+}
+
+const unreadOnly = test.extend({
+  // oxlint-disable-next-line no-empty-pattern
+  fake: async ({}, use) => {
+    const fake = await startFakeSlack({ seed: unreadNothingAsked })
+    await use(fake)
+    await fake.close()
+  },
+})
+
+unreadOnly('with no rows, the first Home is caught up even while a DM is unread', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  const { home, sidebar } = juno
+  await sidebar.row('Leo Park', { exact: true }).expectPreview(/Release notes are out\./)
+  await home.open()
+  expect(await home.kinds()).toEqual([])
+  // The caught-up scene, or the picture once one is on disk; never the time of day's scene and greeting.
+  await expect(home.root.locator('[data-home-scene="caughtUp"]').or(home.picture)).toBeVisible()
 })
