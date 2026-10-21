@@ -43,7 +43,7 @@ export function SharedPlace({ source }: { readonly source: NonNullable<Attachmen
  * A shared message's files when Juno has nothing to draw them with: one
  * quiet line each, its kind and name in the sidebar preview's words
  * ("Video: demo.mov", "File: report.pdf"). The line is message text, so it
- * can be selected.
+ * can be selected, and the pointer stays the arrow over it.
  */
 export function SharedFileLines({ files }: { readonly files: ReadonlyArray<FileBlock> }) {
   return files.map((file) => {
@@ -51,7 +51,7 @@ export function SharedFileLines({ files }: { readonly files: ReadonlyArray<FileB
     const word = kind === 'image' ? 'Image' : kind === 'video' ? 'Video' : kind === 'audio' ? 'Audio' : 'File'
     return <div key={file.id} data-shared-file="" {...stylex.props(styles.fileLine)}>
       <Icon icon={fileIcon[kind]} size={14} />
-      <Text variant="ui" tone="muted" truncate selectable dir="auto" title={file.name} data-sensitive="">{`${word}: ${file.name}`}</Text>
+      <Text variant="ui" tone="muted" truncate selectable dir="auto" title={file.name} data-sensitive="" sx={styles.fileText}>{`${word}: ${file.name}`}</Text>
     </div>
   })
 }
@@ -128,6 +128,8 @@ const styles = stylex.create({
   },
   footer: { fontSize: text['--text-tag-small-size'], color: colors['--foreground-muted'] },
   fileLine: { display: 'flex', alignItems: 'center', gap: spacing['--space-1-5'], minWidth: 0, color: colors['--foreground-muted'] },
+  // Message text: selectable, with the arrow.
+  fileText: { cursor: 'default' },
   place: { display: 'inline-flex', alignItems: 'center', gap: spacing['--space-1'], verticalAlign: 'bottom' },
   imageBox: (width: number, height: number) => ({ position: 'relative', flexShrink: 0, width, height, maxWidth: '100%', aspectRatio: `${width} / ${height}`, backgroundColor: colors['--background-subtle'], borderRadius: radii['--radius-md'], overflow: 'hidden' }),
   image: { position: 'absolute', inset: 0, display: 'block', width: '100%', height: '100%', objectFit: 'contain' },

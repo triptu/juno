@@ -269,8 +269,9 @@ const styles = stylex.create({
     color: colors['--foreground-default'],
     overflowWrap: 'anywhere',
     textWrap: 'pretty',
+    // Selectable, with the arrow over it: a message is not a field (SPEC 16).
     userSelect: 'text',
-    cursor: 'text',
+    cursor: 'default',
     // A message's column sizes the body to its content. A table on one line is
     // as wide as its cells, so a body with one takes the column's width
     // instead, and the table scrolls inside it rather than widening the message.
@@ -329,9 +330,8 @@ const styles = stylex.create({
     lineHeight: 1,
     color: colors['--foreground-subtle'],
     verticalAlign: `calc(-1 * ${spacing['--space-0-5']})`,
-    // Chrome inside selectable text: the arrow, not the text cursor.
+    // Chrome inside selectable text: not selectable.
     userSelect: 'none',
-    cursor: 'default',
   },
   // A done item stays quiet: a filled grey box, not the accent.
   checked: {
@@ -344,6 +344,8 @@ const styles = stylex.create({
   },
   heading: {
     marginTop: spacing['--space-1'],
+    // Text selectable gives the text cursor; message text keeps the arrow.
+    cursor: 'default',
   },
   rule: {
     marginBlock: spacing['--space-1'],

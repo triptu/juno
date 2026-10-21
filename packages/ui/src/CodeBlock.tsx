@@ -30,8 +30,8 @@ const styles = stylex.create({
     overflowY: 'auto',
     whiteSpace: 'pre-wrap',
     overflowWrap: 'anywhere',
+    // Selectable, but not a field: the cursor is the one around it (the arrow in messages and Juno's replies).
     userSelect: 'text',
-    cursor: 'text',
   },
   code: {
     display: 'block',
