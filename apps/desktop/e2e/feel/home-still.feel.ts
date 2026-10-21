@@ -7,6 +7,7 @@ import type { Probe, ProbeFrame } from './recorder'
 const SCENE = '[data-home] [data-home-scene]'
 const GREETING = '[data-home] h2'
 const ROWS = '[data-home] ul'
+const STAGING = 'Unrelated: has anyone looked at the'
 
 const probes: Probe[] = [
   { kind: 'count', within: 'main', name: 'home', selector: '[data-home-item]' },
@@ -74,12 +75,17 @@ test('a new tab from + shows Home whole in its first frame', async ({ juno, win,
   })
 })
 
-test("pointing at Home's rows leaves the scene and the greeting as they are", async ({ juno, win, feel }) => {
+test("pointing at Home's rows leaves the scene and the greeting as they are", async ({ juno, slack, win, feel }) => {
   await juno.signIn()
   await juno.waitForSync()
+  // Rows of each tile: Maya's DM with her photo (waiting on you) and a thread with its art (moved a lot).
+  slack.as('Maya').dm('Can you look at the hiring plan today?')
+  for (let n = 1; n <= 9; n++) slack.as('Leo').replyIn(STAGING, `Cost update ${n}.`)
+  await juno.sidebar.row(STAGING).expectPreview(/Cost update 9\./)
   await juno.home.open()
   const rows = juno.home.root.locator('[data-home-item]')
-  await expect(rows.first()).toBeVisible()
+  await expect.poll(() => juno.home.kinds(), { timeout: 30_000 }).toEqual(expect.arrayContaining(['waiting', 'moved']))
+  await expect(juno.home.item('waiting').locator('img')).toBeVisible()
   // A resting point on Home, right of the column and above the composer.
   const page = (await juno.home.root.boundingBox())!
   const rest = { x: page.x + page.width - 16, y: page.y + 48 }
