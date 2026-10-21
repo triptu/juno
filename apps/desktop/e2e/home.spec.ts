@@ -200,8 +200,10 @@ test('Mark done clears a follow-up, and Resolve all resolves the settled topics 
   // The row goes at once, even under the pointer: the user did it (home-live.spec.ts).
   await expect.poll(() => home.kinds()).toEqual(['waiting', 'tidyUp'])
 
+  // Tidy up is live too: the follow-up just marked done can make its topic look settled, so read the count off the row.
+  const settled = (await home.title('tidyUp').textContent())!.match(/^(\d+) topics look settled$/)![1]
   await home.button('tidyUp', 'Resolve all').click()
-  await juno.expectToast('Resolved 2 topics')
+  await juno.expectToast(`Resolved ${settled} topics`)
   await sidebar.row(KEYS).expectAbsent()
   await juno.undoFromToast()
   await sidebar.row(KEYS).expectVisible()
