@@ -57,9 +57,14 @@ export function itemsOf(window: MessageWindow): ReadonlyArray<MessageListItem> {
     const message = window.rows.get(ts)!
     const sender = message.senderId === undefined ? undefined : window.refs.people.get(message.senderId)
     const reactors = reactorsOf(message, window.refs.people)
+    const ids = message.thread?.replierIds
+    const repliers = ids === undefined || ids.length === 0 ? undefined : new Map(ids.flatMap((id) => {
+      const person = window.refs.people.get(id)
+      return person === undefined ? [] : [[id, person] as const]
+    }))
     const held = items.get(message)
-    if (held !== undefined && held.sender === sender && samePeople(held.reactors, reactors)) return held
-    const item = { message, sender, ...(reactors === undefined ? {} : { reactors }) }
+    if (held !== undefined && held.sender === sender && samePeople(held.reactors, reactors) && samePeople(held.repliers, repliers)) return held
+    const item = { message, sender, ...(repliers === undefined ? {} : { repliers }), ...(reactors === undefined ? {} : { reactors }) }
     items.set(message, item)
     return item
   })

@@ -38,8 +38,8 @@ export function AvatarStack({ people, max = 4, more = 0, size = 18, surface = 's
   return (
     <span role="img" aria-label={label ?? (rest > 0 ? `${names} and ${rest} more` : names)} {...stylex.props(styles.stack)}>
       {shown.map((person, index) => (
-        <span key={person.id} {...stylex.props(styles.item, index > 0 && styles.overlap)}>
-          <Avatar label={firstGrapheme(person.initials)} size={size} hue={person.hue} ring={surface} {...(person.src === undefined ? {} : { src: person.src })} />
+        <span key={person.id} title={person.name} {...stylex.props(styles.item, index > 0 && styles.overlap)}>
+          <Avatar name={person.name} label={firstGrapheme(person.initials)} size={size} hue={person.hue} ring={surface} {...(person.src === undefined ? {} : { src: person.src })} />
         </span>
       ))}
       {rest > 0 ? (

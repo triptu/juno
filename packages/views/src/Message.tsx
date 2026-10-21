@@ -47,6 +47,8 @@ export interface MessageProps {
   readonly sender: Person | undefined
   /** The people who reacted, by id: hovering a chip shows them. */
   readonly reactors?: ReadonlyMap<string, Person>
+  /** Repliers for Main thread links, from the window refs. */
+  readonly repliers?: ReadonlyMap<string, Person>
   /** The message time, already formatted ("9:12"). */
   readonly time: string
   /** Epoch milliseconds, for `date` inlines. */
@@ -208,6 +210,7 @@ export const Message = memo(function Message({
   message,
   sender,
   reactors,
+  repliers,
   time,
   now,
   main,
@@ -373,7 +376,7 @@ export const Message = memo(function Message({
           </Text>
         ) : null}
         {message.reactionIssue !== undefined ? <ReactionIssueLine issue={message.reactionIssue} onResolve={actions?.onResolveAction} /> : null}
-        {main && message.thread !== undefined && onOpenThread !== undefined ? <ThreadLink link={message.thread} onOpen={onOpenThread} tabIndex={tabbable ? 0 : -1} /> : null}
+        {main && message.thread !== undefined && onOpenThread !== undefined ? <ThreadLink {...(repliers === undefined ? {} : { people: repliers })} link={message.thread} onOpen={onOpenThread} tabIndex={tabbable ? 0 : -1} /> : null}
         {suggestion !== undefined && editor === undefined ? (
           <Text variant="meta" tone="muted" as="p" role="group" aria-label="Suggested fix" data-send-suggestion="" sx={styles.suggestion}>
             <Text variant="meta" tone="default" as="span" sx={styles.suggestionLabel}>{suggestion.label}</Text>

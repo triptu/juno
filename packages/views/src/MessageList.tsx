@@ -17,6 +17,8 @@ export interface MessageListItem {
   readonly sender: Person | undefined
   /** The people who reacted, by id, for the chips' card of who reacted. */
   readonly reactors?: ReadonlyMap<string, Person>
+  /** Repliers for Main thread links, from the window refs. */
+  readonly repliers?: ReadonlyMap<string, Person>
 }
 
 /**
@@ -318,6 +320,7 @@ export function MessageList({
               <Message
                 message={item.message}
                 sender={item.sender}
+                {...(item.repliers === undefined ? {} : { repliers: item.repliers })}
                 {...(item.reactors === undefined ? {} : { reactors: item.reactors })}
                 time={messageTime(item.message.at, now)}
                 now={now}

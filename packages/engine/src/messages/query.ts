@@ -256,6 +256,12 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       }
     }
     const contentRows = [...rows, ...firstReplies.values()]
+    const repliers = new Map<string, ReadonlyArray<string>>()
+    if (target.kind === 'main') {
+      for (const row of rows) {
+        if (row.thread_ts === row.ts) repliers.set(row.ts, (parseJson<Array<string>>(row.reply_users_json) ?? []).slice(0, 3))
+      }
+    }
 
     // The user's own images Slack has no thumbnails for yet show their staged copies (`uploaded_files`).
     const local = new Map<string, LocalFile>()
@@ -270,6 +276,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     // The people a reaction's popover names, read with the senders.
     if (selfId !== undefined) senders.add(selfId)
     for (const list of reactions.values()) for (const reaction of list) for (const id of reaction.users.slice(0, REACTORS_SHOWN + 1)) senders.add(id)
+    for (const ids of repliers.values()) for (const id of ids) senders.add(id)
     yield* readUsers(sql, cache, senders)
     const wanted = { users: new Set<string>(), channels: new Set<string>(), usergroups: new Set<string>(), emoji: new Set<string>() }
     const user = (id: string) => {
@@ -375,6 +382,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
         groupStart ? 1 : 0,
         row.reply_count,
         row.latest_reply,
+        row.reply_users_json,
         preview,
         pending.get(row.ts)?.state,
         local.size === 0 ? '' : localKey(row, local),
@@ -387,7 +395,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       if (held !== undefined && held.key === key) {
         view = held.row
       } else {
-        const thread = topicId === undefined ? undefined : threadLink(topicId, row, preview)
+        const thread = topicId === undefined ? undefined : threadLink(topicId, row, preview, repliers.get(row.ts) ?? [])
         view = shapeRow(row, body, { groupStart, isRoot, selfId, reactions: own, reactionIssue: intent?.issue, actionIssue: intent?.actionIssue, thread, cache, pending: pending.get(row.ts), local })
       }
       nextRows.set(row.ts, { key, row: view })
@@ -399,6 +407,9 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
           ? { ...personFrom(view.senderId, { id: view.senderId, name: row.bot_name ?? row.user_id, display_name: row.bot_name, real_name: null, avatar_url: row.bot_icon ?? app?.avatar_url ?? null }), ...(unreachable(app) ? { unreachable: true as const } : { user: row.user_id! }) }
           : reach(personFrom(view.senderId, cache.users.get(view.senderId), cache.people.get(view.senderId)), unreachable(cache.users.get(view.senderId)))
         people.set(view.senderId, person)
+      }
+      for (const id of view.thread?.replierIds ?? []) {
+        if (!people.has(id)) people.set(id, reach(personFrom(id, cache.users.get(id), cache.people.get(id)), unreachable(cache.users.get(id))))
       }
       for (const reaction of view.reactions) {
         for (const id of reaction.users ?? []) if (!people.has(id)) people.set(id, reach(personFrom(id, cache.users.get(id), cache.people.get(id)), unreachable(cache.users.get(id))))
@@ -485,11 +496,13 @@ function threadLink(
   topicId: string,
   row: WindowMessage,
   preview: string | undefined,
+  replierIds: ReadonlyArray<string>,
 ): ThreadLink {
   return {
     id: topicId,
     replyCount: row.reply_count,
     label: threadLinkLabel(row.reply_count),
+    replierIds,
     ...(preview === undefined ? {} : { preview }),
     ...(row.latest_reply === null ? {} : { lastReplyAt: tsToMillis(row.latest_reply as Ts) }),
   }
@@ -699,6 +712,7 @@ const pendingMessage = (row: PendingRow, selfId: string | undefined): WindowMess
   client_msg_id: row.client_msg_id,
   reply_count: 0,
   latest_reply: null,
+  reply_users_json: null,
   // An edit before the post went out rewrites the row's text, so its body is parsed again.
   version: contentVersion(row.text, `${row.blocks_json ?? ''}${row.share_json ?? ''}`),
   last_event_ts: null,
