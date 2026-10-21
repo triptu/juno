@@ -1,0 +1,1 @@
+- 10-21 18:44 · header-juno-outline · The topic header's Juno button uses the outline sparkle like its neighbours (Tushar, 10-21).
