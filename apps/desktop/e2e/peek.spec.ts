@@ -117,7 +117,7 @@ test('holding ⌥ over a thread in a Main peeks at its replies without opening i
   const { peek, tabs, topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
-  const link = topic.threadLink(/^6 replies: Draft plan/)
+  const link = topic.threadLinkUnder(POSTGRES)
   await expect(link.root).toBeVisible()
   slack.resetCalls()
 

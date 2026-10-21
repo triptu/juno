@@ -149,8 +149,14 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('messages.list on the large s
           const cache = makeMessageCache()
           const warm = yield* time(40, () => listMessages(target, range, cache))
           const snapshot = yield* listMessages(target, range, makeMessageCache()).pipe(Effect.provideService(StoreReader, reader))
+          const mainTarget = { kind: 'main', channel } as const
+          const mainCold = yield* time(40, () => listMessages(mainTarget, range, makeMessageCache()))
+          const mainCache = makeMessageCache()
+          const mainWarm = yield* time(40, () => listMessages(mainTarget, range, mainCache))
+          const main = yield* listMessages(mainTarget, range, mainCache)
+          expect(main.rows.find(row => row.id === root.ts)?.thread?.preview).toContain('Step 0: replication lag is 0 seconds')
           const topicsRun = yield* listTopics({ kind: 'all', unreadOnly: false }, { now: Date.now(), limit: 300 }, makeRowCache()).pipe(Effect.provideService(StoreReader, reader))
-          return { cold, warm, snapshot, topicsRun }
+          return { cold, warm, snapshot, topicsRun, mainCold, mainWarm }
         }).pipe(Effect.provide(Store.layer(paths)), Effect.scoped),
       )
 
@@ -177,6 +183,10 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('messages.list on the large s
         isolatedFirstRunMsP95: p95(isolated.cold),
         isolatedRerunMsMedian: median(isolated.warm),
         isolatedRerunMsP95: p95(isolated.warm),
+        mainFirstRunMsMedian: median(isolated.mainCold),
+        mainFirstRunMsP95: p95(isolated.mainCold),
+        mainRerunMsMedian: median(isolated.mainWarm),
+        mainRerunMsP95: p95(isolated.mainWarm),
         liveQueryMsMedian: median(queryMs),
         liveQueryMsP95: p95(queryMs),
         injectToRowsMsMedian: median(latencies),
@@ -190,6 +200,7 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('messages.list on the large s
       }
       const budgets = {
         rerunP95: report.isolatedRerunMsP95 <= 5,
+        mainRerunP95: report.mainRerunMsP95 <= 5,
         liveQueryP95: report.liveQueryMsP95 <= 5,
         snapshot: snapshotBytes <= 200 * 1024,
         delta: report.deltaBytesMax <= 32 * 1024,
@@ -203,6 +214,7 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('messages.list on the large s
       expect(budgets.topicsSnapshot).toBe(true)
       if (process.env['JUNO_BENCH_STRICT'] === '1') {
         expect(budgets.rerunP95).toBe(true)
+        expect(budgets.mainRerunP95).toBe(true)
         expect(budgets.liveQueryP95).toBe(true)
         expect(budgets.codec).toBe(true)
       }

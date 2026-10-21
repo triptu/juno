@@ -203,7 +203,7 @@ test('a person in a thread peek opens their DM', async ({ juno, fake }) => {
   const { peek, tabs, topic } = juno
   await juno.sidebar.row('#eng').open()
   await topic.expectTitle('Main')
-  await topic.threadLink(/replies: Draft plan/).peek()
+  await topic.threadLinkUnder(POSTGRES).peek()
   await peek.expectShowing(POSTGRES)
   const maya = peek.root.locator('[data-message-header] [data-opens-person]', { hasText: 'Maya' })
   await maya.hover()

@@ -254,7 +254,7 @@ The header has no bar. Two islands float over the top of the message list, 8px u
 - **Open actions.** A message keeps its active background and toolbar while its reaction picker or More menu is open.
 - **Keyboard.** ↑ in an empty composer selects the newest message; ↑ and ↓ move the selection, and Esc returns to the composer. On your own selected message, E edits it inline and Delete or Backspace deletes it after one inline confirm (Enter confirms, Esc cancels).
 - **Quoting** follows Slack. Quoting inserts "> " lines into your reply. Selecting any part of a message shows a small floating toolbar over it: Quote, which quotes only the selection, and Ask Juno, which takes it to the Juno panel (Juno panel, below). It shows as soon as the selection ends, with no delay.
-- **Thread links.** In Main, a message that has a thread shows a small "2 replies · Title ›" link under it.
+- **Thread links.** In Main, a message that has a thread shows a small "2 replies · Maya: Sounds good… ›" link under it. The preview is the earliest reply's plain-text prefix, with the replier's first name when known, truncated on the same line. Until the first reply is known locally, show only "2 replies ›". Never repeat the root or use the topic title. Main does not fetch replies for these links; when existing sync or a thread open brings them in, the preview fills the same line without moving messages.
 - **Settled hint.** When AI thinks a thread is settled, a quiet line at its top says why, with Resolve and Not yet.
 
 ### Main thread

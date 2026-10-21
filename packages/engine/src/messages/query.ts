@@ -4,7 +4,7 @@
  * 6).
  *
  * A run reads the window through its index (`window.ts`), the reactions of
- * those messages, and for Main the overlay titles of the threads it links
+ * those messages, and for Main the first known replies of the threads it links
  * to. Then it shapes the rows. Shaping is the expensive part, so each
  * subscription keeps a `MessageCache`:
  *
@@ -28,7 +28,7 @@ import {
   fileMediaKind,
   hashId,
   messageMentionsMe,
-  resolveTitle,
+  firstName,
   startsGroup,
   threadLinkLabel,
   threadTopicId,
@@ -36,20 +36,19 @@ import {
   type ChannelId,
   type ChannelInfo,
   type GroupMessage,
-  type Topic,
   type Ts,
   type UserId,
   type Me,
   fileTextKind,
 } from '@juno/domain'
-import { editMarkup, emojiUnicode, messageBody, splitEmojiName, type Lookups, type MessageBody, type MessageContent, type UsergroupName } from '@juno/richtext'
+import { editMarkup, emojiUnicode, messageBody, readableText, splitEmojiName, type MessageBody, type MessageContent, type UsergroupName } from '@juno/richtext'
 import { syncState, StoreReader, type SqlClient, type SqlError } from '@juno/store'
 import { imagesWithoutThumbs, type PendingFile } from '@juno/sync'
 import { windowCovered } from './coverage'
 import { uploadsUrl } from '../staging'
 import type { ListRun } from '../protocol/live'
 import { personFrom, userName, type UserRow } from '../topicRows'
-import { actionsStatement, hiddenCopiesStatement, pendingStatement, reactionsStatement, rootStatement, threadTitlesStatement, windowStatements, type WindowMessage, type WindowTarget } from './window'
+import { actionsStatement, hiddenCopiesStatement, pendingStatement, reactionsStatement, rootStatement, firstRepliesStatement, windowStatements, type WindowMessage, type WindowTarget } from './window'
 
 export interface MessageRange {
   readonly anchor?: string | undefined
@@ -160,11 +159,6 @@ interface ChannelRow {
   readonly member_ids_json: string | null
 }
 
-interface ConversationInfo {
-  readonly kind: ChannelInfo['kind']
-  readonly name: string | null
-}
-
 const STUB = (row: WindowMessage) => row.user_id === null && row.text === '' && row.blocks_json === null && row.deleted === 0
 
 const parseJson = <A>(json: string | null): A | undefined => {
@@ -251,18 +245,17 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       }
     }
 
-    // Main: the titles of the threads the window links to.
-    const titles = new Map<string, { readonly manual_title: string | null; readonly ai_title: string | null }>()
-    let conversation: ConversationInfo | undefined
+    // Main reads one local reply per linked root, never fetching threads for the list.
+    const firstReplies = new Map<string, WindowMessage>()
     if (target.kind === 'main') {
-      const linked = rows.filter((row) => row.thread_ts === row.ts && (row.reply_count > 0 || ownRoots.has(row.ts))).map(threadId)
-      if (linked.length > 0) {
-        const statement = threadTitlesStatement(linked)
-        for (const title of yield* sql.unsafe<{ topic_id: string; manual_title: string | null; ai_title: string | null }>(statement.sql, statement.params)) titles.set(title.topic_id, title)
-        const found = yield* sql<ConversationInfo>`SELECT kind, name FROM conversations WHERE id = ${target.channel}`
-        conversation = found[0]
+      const roots = rows.filter((row) => row.thread_ts === row.ts && row.reply_count > 0).map((row) => row.ts)
+      if (roots.length > 0) {
+        const statement = firstRepliesStatement(target.channel, roots)
+        const replies = yield* sql.unsafe<WindowMessage>(statement.sql, statement.params)
+        for (const reply of withIntents(replies, actions, target)) if (reply.thread_ts !== null && reply.deleted === 0) firstReplies.set(reply.thread_ts, reply)
       }
     }
+    const contentRows = [...rows, ...firstReplies.values()]
 
     // The user's own images Slack has no thumbnails for yet show their staged copies (`uploaded_files`).
     const local = new Map<string, LocalFile>()
@@ -273,7 +266,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
 
     // Senders, then bodies: parse with what the maps hold, read what they lacked, parse those again.
     const senders = new Set<string>()
-    for (const row of rows) if (row.user_id !== null) senders.add(row.user_id)
+    for (const row of contentRows) if (row.user_id !== null) senders.add(row.user_id)
     // The people a reaction's popover names, read with the senders.
     if (selfId !== undefined) senders.add(selfId)
     for (const list of reactions.values()) for (const reaction of list) for (const id of reaction.users.slice(0, REACTORS_SHOWN + 1)) senders.add(id)
@@ -330,7 +323,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     }
     const bodies = new Map<string, CachedBody>()
     const parsedNow: Array<WindowMessage> = []
-    for (const row of rows) {
+    for (const row of contentRows) {
       const held = cache.bodies.get(row.ts)
       if (held !== undefined && held.version === row.version && held.epoch === cache.epoch) {
         bodies.set(row.ts, held)
@@ -371,16 +364,18 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       const intent = intentOf(actions, row)
       const own = intent === undefined || intent.reactions.size === 0 ? (reactions.get(row.ts) ?? []) : withReactionIntents(reactions.get(row.ts) ?? [], intent.reactions, selfId)
       const topicId = target.kind === 'main' && row.thread_ts === row.ts && (row.reply_count > 0 || ownRoots.has(row.ts)) ? threadId(row) : undefined
-      const title = topicId === undefined ? undefined : titles.get(topicId)
+      const reply = firstReplies.get(row.ts)
+      const replyText = reply === undefined ? '' : readableText(bodies.get(reply.ts)!.body).replace(/\s+/g, ' ').trim().slice(0, 240)
+      const sender = reply?.bot_name ?? (reply?.user_id === null || reply?.user_id === undefined ? undefined : cache.users.get(reply.user_id))
+      const name = typeof sender === 'string' ? sender : sender == null ? undefined : firstName(userName(sender.id, sender))
+      const preview = replyText === '' ? undefined : name ? `${name}: ${replyText}` : replyText
       const key = [
         row.version,
         body.epoch,
         groupStart ? 1 : 0,
         row.reply_count,
         row.latest_reply,
-        title?.manual_title,
-        title?.ai_title,
-        conversation?.name,
+        preview,
         pending.get(row.ts)?.state,
         local.size === 0 ? '' : localKey(row, local),
         intent?.actionIssue?.id,
@@ -392,7 +387,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       if (held !== undefined && held.key === key) {
         view = held.row
       } else {
-        const thread = topicId === undefined ? undefined : threadLink(topicId, row, title, target.channel, conversation, lookups)
+        const thread = topicId === undefined ? undefined : threadLink(topicId, row, preview)
         view = shapeRow(row, body, { groupStart, isRoot, selfId, reactions: own, reactionIssue: intent?.issue, actionIssue: intent?.actionIssue, thread, cache, pending: pending.get(row.ts), local })
       }
       nextRows.set(row.ts, { key, row: view })
@@ -489,30 +484,13 @@ const readEmoji = (sql: SqlClient.SqlClient, cache: MessageCache, names: Iterabl
 function threadLink(
   topicId: string,
   row: WindowMessage,
-  title: { readonly manual_title: string | null; readonly ai_title: string | null } | undefined,
-  channel: string,
-  conversation: ConversationInfo | undefined,
-  lookups: Lookups,
+  preview: string | undefined,
 ): ThreadLink {
-  const topic: Topic = {
-    id: topicId as Topic['id'],
-    kind: 'thread',
-    channel: { id: channel as ChannelId, kind: conversation?.kind ?? 'public', name: conversation?.name ?? channel },
-    activity: { lastActivityTs: (row.latest_reply ?? row.ts) as Ts, messageCount: row.reply_count + 1, unreadCount: 0, mentionsMe: false, participants: [] },
-    overlay: {
-      ...(title?.manual_title ? { manualTitle: title.manual_title } : {}),
-      ...(title?.ai_title ? { aiTitle: title.ai_title } : {}),
-    },
-    ...(row.deleted === 0 && row.text !== '' ? { firstMessageText: row.text } : {}),
-  }
-  // The root's own body was parsed with the same lookups, so the people it mentions are loaded: "@Maya fix the…", never "<@U…>".
-  const resolved = resolveTitle(topic, lookups)
   return {
     id: topicId,
     replyCount: row.reply_count,
     label: threadLinkLabel(row.reply_count),
-    title: resolved.text,
-    titleSource: resolved.source,
+    ...(preview === undefined ? {} : { preview }),
     ...(row.latest_reply === null ? {} : { lastReplyAt: tsToMillis(row.latest_reply as Ts) }),
   }
 }

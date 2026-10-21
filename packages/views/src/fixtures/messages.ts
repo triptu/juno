@@ -193,7 +193,7 @@ export const main = window([
     ago: 2 * HOUR / MINUTE + 2,
     from: people.leo,
     text: 'Unrelated: has anyone looked at the staging bill? It doubled since August.',
-    thread: { id: 'C0ENG:1759993200.000100', replyCount: 2, label: '2 replies', title: 'Staging bill doubled since August', titleSource: 'ai', lastReplyAt: NOW - 50 * MINUTE },
+    thread: { id: 'C0ENG:1759993200.000100', replyCount: 2, label: '2 replies', preview: 'Jonas: Preview environments have no TTL. I can add a 48h reaper.', lastReplyAt: NOW - 50 * MINUTE },
   },
   { ago: 119, from: people.dev, blocks: [p(mention(people.leo), ' I think the preview environments never shut down. Will check.')] },
   { ago: 70, from: people.grafana, blocks: [p(t('[RESOLVED]', { bold: true }), ' queue depth > 5k on billing-consumer')] },
@@ -201,20 +201,20 @@ export const main = window([
     ago: 58,
     from: people.maya,
     text: 'Postgres 16 migration plan is up for review. Thursday is the dry run.',
-    thread: { id: 'C0ENG:1760000000.000100', replyCount: 14, label: '14 replies', title: 'Postgres 16 migration plan', titleSource: 'ai', lastReplyAt: NOW - 4 * MINUTE },
+    thread: { id: 'C0ENG:1760000000.000100', replyCount: 14, label: '14 replies', preview: 'Elena: 4 minutes is fine for us.', lastReplyAt: NOW - 4 * MINUTE },
   },
   { ago: 30, from: people.dev, text: 'Replica lag back under a second.', broadcast: true },
   {
     ago: 12,
     from: people.priya,
     text: 'Anyone else seeing slow CI on the main branch?',
-    thread: { id: 'C0ENG:1759999280.000100', replyCount: 1, label: '1 reply', title: 'Anyone else seeing slow CI on the main branch?', titleSource: 'fallback' },
+    thread: { id: 'C0ENG:1759999280.000100', replyCount: 1, label: '1 reply', preview: 'Sam: The runners look busy.' },
   },
   {
     ago: 6,
     from: people.elena,
     text: 'Office is closed Friday for the floor refit.',
-    thread: { id: 'C0ENG:1759999640.000100', replyCount: 0, label: 'Thread', title: 'Office is closed Friday for the floor refit.', titleSource: 'fallback' },
+    thread: { id: 'C0ENG:1759999640.000100', replyCount: 0, label: 'Thread' },
   },
 ])
 

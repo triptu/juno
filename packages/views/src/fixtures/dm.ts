@@ -21,7 +21,7 @@ export const dmThread = window([
 export const dmMain = window([
   { ago: 7 * HOUR / MINUTE, from: people.maya, text: 'Morning! Did the vendor send the new contract?' },
   { ago: 7 * HOUR / MINUTE - 4, from: me, text: 'Not yet. They said by noon.' },
-  { ago: 5 * HOUR / MINUTE, from: people.maya, text: 'For the offsite, can we keep Wednesday afternoon free for the roadmap review?', thread: { id: 'D0MAYA:1759990000.000500', replyCount: 7, label: '7 replies', title: 'Offsite: Wednesday afternoon slot', titleSource: 'manual', lastReplyAt: NOW - 7 * MINUTE } },
+  { ago: 5 * HOUR / MINUTE, from: people.maya, text: 'For the offsite, can we keep Wednesday afternoon free for the roadmap review?', thread: { id: 'D0MAYA:1759990000.000500', replyCount: 7, label: '7 replies', preview: 'Maya: Wednesday afternoon works.', lastReplyAt: NOW - 7 * MINUTE } },
   { ago: 3 * HOUR / MINUTE, from: me, blocks: [p('Contract is in: ', link('https://example.com/docs/vendor-contract-v3', 'vendor contract v3'), '. Section 4 changed the renewal terms.')] },
   { ago: 3 * HOUR / MINUTE - 12, from: people.maya, text: 'Reading it now.', reactions: [reaction('+1', '👍', 1, true)] },
   { ago: 95, from: people.maya, text: 'Section 4 looks fine to me. The notice period went from 60 to 90 days, which finance already agreed to.' },

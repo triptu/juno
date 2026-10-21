@@ -132,16 +132,15 @@ export const FileView = Schema.Struct({
 })
 export type FileView = typeof FileView.Type
 
-/** The link under a Main message that has a thread: "2 replies · Title ›" (inventory 6.7). */
+/** The link under a Main message that has a thread: "2 replies · Maya: Sounds good… ›" (inventory 6.7). */
 export const ThreadLink = Schema.Struct({
   /** The thread's topic id, for opening it. */
   id: Schema.String,
   replyCount: Schema.Int,
   /** "2 replies", "1 reply", or "Thread" when only the root exists. */
   label: Schema.String,
-  /** The thread's title: manual, AI, or the root's first words. */
-  title: Schema.String,
-  titleSource: TitleSource,
+  /** The first reply's plain-text prefix, with its sender when known. Absent until known locally. */
+  preview: Schema.optionalKey(Schema.String),
   /** Epoch milliseconds of the latest reply. */
   lastReplyAt: Schema.optionalKey(Schema.Number),
 })

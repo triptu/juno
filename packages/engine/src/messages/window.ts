@@ -116,11 +116,19 @@ export function reactionsStatement(channel: string, ts: ReadonlyArray<string>): 
   }
 }
 
-/** The overlay titles of the threads a Main window links to, by primary key. */
-export function threadTitlesStatement(topicIds: ReadonlyArray<string>): Statement {
+/** One earliest reply per linked root, through messages_thread. Tail-only caches cannot identify the first reply. */
+export function firstRepliesStatement(channel: string, roots: ReadonlyArray<string>): Statement {
   return {
-    sql: `SELECT topic_id, manual_title, ai_title FROM topic_overlay WHERE topic_id IN (${topicIds.map(() => '?').join(', ')})`,
-    params: topicIds,
+    sql: `SELECT ${MESSAGE_COLUMNS} FROM messages WHERE channel = ? AND ts IN (
+      SELECT (SELECT r.ts FROM messages r
+        WHERE r.channel = root.channel AND r.thread_ts = root.ts AND r.ts > root.ts
+          AND r.deleted = 0
+        ORDER BY r.ts LIMIT 1)
+      FROM messages root LEFT JOIN thread_cursors c ON c.channel = root.channel AND c.thread_ts = root.ts
+      WHERE root.channel = ? AND root.ts IN (${roots.map(() => '?').join(', ')})
+        AND (root.reply_count = 1 OR c.replies_complete = 1 OR c.complete_from <= root.ts)
+    )`,
+    params: [channel, channel, ...roots],
   }
 }
 

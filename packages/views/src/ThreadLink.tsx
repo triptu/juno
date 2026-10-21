@@ -15,7 +15,7 @@ export interface ThreadLinkProps {
 const HOVER = '@media (hover: hover)'
 
 /**
- * "2 replies · Title ›" under a Main message that has a thread (inventory
+ * "2 replies · Maya: Sounds good… ›" under a Main message that has a thread (inventory
  * 6.7). Navigates on mouse down like a row.
  */
 export function ThreadLink({ link, onOpen, tabIndex = 0 }: ThreadLinkProps) {
@@ -23,16 +23,18 @@ export function ThreadLink({ link, onOpen, tabIndex = 0 }: ThreadLinkProps) {
     <div
       role="button"
       tabIndex={tabIndex}
-      aria-label={`${link.label}: ${link.title}`}
+      aria-label={link.preview === undefined ? link.label : `${link.label}: ${link.preview}`}
       data-thread-link={link.id}
       {...activateHandlers<HTMLDivElement>((event) => onOpen(link.id, event))}
       {...stylex.props(styles.link, focusRing.outside)}
     >
       <Icon icon={ChatsCircle} size={13} />
       <span {...stylex.props(styles.count)}>{link.label}</span>
-      <Text variant="meta" tone="inherit" truncate tooltipWhenTruncated dir="auto" as="span" sx={styles.title}>
-        {link.title}
-      </Text>
+      {link.preview === undefined ? null : (
+        <Text data-sensitive variant="meta" tone="inherit" truncate tooltipWhenTruncated dir="auto" as="span" sx={styles.preview}>
+          {link.preview}
+        </Text>
+      )}
       <span {...stylex.props(styles.caret)}>
         <Icon icon={CaretRight} size={12} />
       </span>
@@ -70,7 +72,7 @@ const styles = stylex.create({
     fontWeight: weights['--weight-semibold'],
     color: colors['--foreground-default'],
   },
-  title: {
+  preview: {
     lineHeight: 1,
   },
   caret: {

@@ -1,7 +1,7 @@
 // Every live query statement has an index (performance 6): the plan may not
 // scan messages, topic_index, reactions or topic_overlay. The sidebar's
 // statements, and the topic view's: the Main and thread windows, their
-// reactions and thread titles, a channel's active threads, and the New chat
+// reactions and first-reply previews, a channel's active threads, and the New chat
 // pickers, All topics (its order, counts and places), and ⌘K's local search.
 import { countsStatement } from '../src/sidebarUnread'
 import { badgeStatement, badgePolicy } from '../src/dockBadge'
@@ -12,7 +12,7 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { Store, StoreReader, workspacePathsFromDir, type StoreError } from '@juno/store'
-import { reactionsStatement, rootStatement, threadsStatements, threadTitlesStatement, windowStatements, type WindowTarget } from '../src/messages/window'
+import { reactionsStatement, rootStatement, threadsStatements, firstRepliesStatement, windowStatements, type WindowTarget } from '../src/messages/window'
 import { missedHuddleStatement } from '../src/home/huddles'
 import { messageUsersStatement } from '../src/messages/query'
 import { homeStatements } from '../src/home/query'
@@ -36,7 +36,7 @@ const freshStore: Layer.Layer<Layer.Success<ReturnType<typeof Store.layer>>, Sto
 )
 
 /** Table aliases the statements use, back to the tables the rule names. */
-const ALIASES: Record<string, string> = { i: 'topic_index', t: 'topic_index', ti: 'topic_index', o: 'topic_overlay', ov: 'topic_overlay', m: 'messages' }
+const ALIASES: Record<string, string> = { i: 'topic_index', t: 'topic_index', ti: 'topic_index', o: 'topic_overlay', ov: 'topic_overlay', m: 'messages', r: 'messages', root: 'messages' }
 const GUARDED = new Set(['messages', 'topic_index', 'reactions', 'topic_overlay'])
 
 const plan = (sql: string, params: ReadonlyArray<unknown>) =>
@@ -144,7 +144,7 @@ describe('query plans', () => {
           }
         }
       }
-      for (const statement of [rootStatement({ kind: 'thread', channel: 'C0ENG', threadTs: '1700000000.000100' }), reactionsStatement('C0ENG', ['1700000000.000100', '1700000000.000200']), threadTitlesStatement(['t:C0ENG:1700000000.000100'])]) {
+      for (const statement of [rootStatement({ kind: 'thread', channel: 'C0ENG', threadTs: '1700000000.000100' }), reactionsStatement('C0ENG', ['1700000000.000100', '1700000000.000200']), firstRepliesStatement('C0ENG', ['1700000000.000100'])]) {
         const lines = yield* plan(statement.sql, statement.params)
         assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
       }

@@ -49,6 +49,17 @@ test('a rewritten Home title line leaves every box where it was', async ({ page 
   await expect(page.locator('[data-home-title]').first()).toHaveText("Elena wants a call on Rina's competing offer by Friday")
 })
 
+test('a thread link keeps its height when the first reply becomes known', async ({ page }) => {
+  await page.goto('/#/ThreadLink?__state=label/not-loaded')
+  const link = page.locator('[data-thread-link]')
+  await expect(link).toHaveAccessibleName('5 replies')
+  await expect(link).toHaveText('5 replies')
+  const height = (await link.boundingBox())!.height
+  await page.goto('/#/ThreadLink?__state=label/replies')
+  await expect(link).toHaveAccessibleName('2 replies: Maya: Sounds good.')
+  expect((await link.boundingBox())!.height).toBe(height)
+})
+
 test.describe('truncation tooltip', () => {
   const hoverText = async (page: Page, text: string | RegExp) => {
     const node = page.locator('[data-fixture-frame]').getByText(text, { exact: true }).first()
@@ -76,12 +87,12 @@ test.describe('truncation tooltip', () => {
     await expect(name).not.toHaveAttribute('title')
   })
 
-  test('a cut-off thread link title shows the full title; one that fits does not', async ({ page }) => {
-    await page.goto('/#/ThreadLink?__state=label/long-title')
-    const long = await hoverText(page, /^Rotate the staging secrets/)
-    await expect(long).toHaveAttribute('title', 'Rotate the staging secrets before the audit, and document where each one lives so nobody has to ask again')
+  test('a cut-off thread link preview shows the full preview; one that fits does not', async ({ page }) => {
+    await page.goto('/#/ThreadLink?__state=label/long-preview')
+    const long = await hoverText(page, /^Priya: Rotate the staging secrets/)
+    await expect(long).toHaveAttribute('title', 'Priya: Rotate the staging secrets before the audit, and document where each one lives so nobody has to ask again')
     await page.goto('/#/ThreadLink?__state=label/replies')
-    const short = await hoverText(page, 'Staging bill doubled since August')
+    const short = await hoverText(page, 'Maya: Sounds good.')
     await expect(short).not.toHaveAttribute('title')
   })
 

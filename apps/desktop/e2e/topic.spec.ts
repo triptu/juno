@@ -108,9 +108,9 @@ syncedTest('Main’s thread links, its title switcher, its Notify me and its hea
     await main.open()
     await juno.topic.expectTitle('Main')
     await expect(juno.topic.contextPill).toHaveAccessibleName('eng, public channel. Show in sidebar.')
-    await expect(juno.topic.threadLink(/^6 replies: Draft plan/).root).toBeVisible()
+    await expect(juno.topic.threadLinkUnder(POSTGRES).root).toBeVisible()
 
-    await juno.topic.threadLink(/^6 replies: Draft plan/).open()
+    await juno.topic.threadLinkUnder(POSTGRES).open()
     await juno.topic.expectTitle(POSTGRES)
     await juno.tabs.expectCount(1)
 
@@ -171,7 +171,7 @@ syncedTest('Main’s thread links, its title switcher, its Notify me and its hea
 syncedTest('Follow on an unfollowed thread from Main, then Notify me after it', async ({ juno, slack }) => {
   await test.step('an unfollowed thread opened from Main shows Follow in Resolve’s place; a click follows it with When it matters, no menu, and ⌘Z undoes it', async () => {
     await juno.sidebar.row(ENG_MAIN).open()
-    await juno.topic.threadLink(/checkout\.spec failed/).open()
+    await juno.topic.threadLinkUnder(CHECKOUT).open()
     await juno.topic.expectTitle(CHECKOUT)
     const header = juno.topic.header
     const resolve = header.getByRole('button', { name: 'Resolve', exact: true })
@@ -206,7 +206,7 @@ syncedTest('Follow on an unfollowed thread from Main, then Notify me after it', 
 
   await test.step('after Follow, Notify me in ⋯ shows When it matters and changes it', async () => {
     await juno.sidebar.row(ENG_MAIN).open()
-    await juno.topic.threadLink(/checkout\.spec failed/).open()
+    await juno.topic.threadLinkUnder(CHECKOUT).open()
     await juno.topic.expectTitle(CHECKOUT)
     expect((await juno.topic.follow()).menuOpened).toBe(false)
     await juno.expectToast('When it matters')

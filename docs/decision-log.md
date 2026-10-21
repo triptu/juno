@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-22 00:47 · Tushar · The thread link previews the first reply, not the root (Tushar, 10-22). Show its plain text with the replier's first name when known; until local coverage identifies the first reply, show only the reply count and chevron. Do not fetch replies for Main's links.
 - 10-22 00:38 · Tushar · Message hover is subtler: messages take their own --message-hover (1.05:1 on the page in light, 1.09:1 in dark, down from --surface-hover's 1.08:1 and 1.24:1), which still marks the row the hover toolbar belongs to; other hovered rows and controls keep --surface-hover. The pointer stays the arrow over message text, shared-card lines and code blocks, which stay selectable; links that open outside Juno keep the pointer and the edit field the text cursor.
 - 10-22 00:21 · Tushar · Picture files are cropped to the object when the photograph has a black border or a scan backdrop (scripts/pictures/crops.json); paper margins, mounts and black sky stay.
 - 10-22 00:20 · Tushar · The gallery by time gives each century a row of its own, and each picture its title (up to two lines) and "date · artist" under it, instead of the date alone.

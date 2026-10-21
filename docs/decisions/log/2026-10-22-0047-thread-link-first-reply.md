@@ -1,0 +1,1 @@
+- 10-22 00:47 · Tushar · The thread link previews the first reply, not the root (Tushar, 10-22). Show its plain text with the replier's first name when known; until local coverage identifies the first reply, show only the reply count and chevron. Do not fetch replies for Main's links.

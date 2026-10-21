@@ -6,8 +6,9 @@
  * query. Their keys:
  * - `messages.list`: the topic's messages and reactions (`{ messages: [id] }`,
  *   which every message write fires for each topic that shows the message),
- *   `users`, `conversations` and `emoji` for the names and images bodies
- *   use, `topic_overlay` for thread titles, `team` for the signed-in user;
+ *   Main also listens to channel messages and thread coverage for first-reply previews.
+ *   `users`, `conversations` and `emoji` supply body names and images,
+ *   `team` the signed-in user;
  * - `topics.get`: its index row, overlay, art and read state by id, the
  *   conversation, the follow flags, users and prefs, and for Main every
  *   topic (its thread count);
@@ -118,7 +119,7 @@ export const MessagesHandlers = MessagesRoutes.toLayer(
           before: Math.max(0, payload.before ?? MESSAGE_WINDOW_BEFORE),
           limit: Math.max(1, Math.min(MESSAGE_WINDOW_MAX, payload.range.limit)),
         }
-        const keys: InvalidationKeys = { messages: pendingThread(payload.id) === undefined ? [payload.id] : [`channel:${target.channel}`], users: [], conversations: [], usergroups: [], emoji: [], topic_overlay: [], team: [], sync_state: [], synced_ranges: [target.channel], thread_cursors: [payload.id] }
+        const keys: InvalidationKeys = { messages: target.kind === 'main' || pendingThread(payload.id) !== undefined ? [payload.id, `channel:${target.channel}`] : [payload.id], users: [], conversations: [], usergroups: [], emoji: [], team: [], sync_state: [], synced_ranges: [target.channel], thread_cursors: target.kind === 'main' ? [] : [payload.id] }
         const setup = Effect.gen(function* () {
           const cache = makeMessageCache()
           const invalidation = yield* Invalidation

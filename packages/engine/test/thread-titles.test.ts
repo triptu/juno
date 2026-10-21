@@ -1,5 +1,4 @@
-// Thread titles outside the sidebar: a Main's thread link and the channel's
-// Threads list read the root's Slack text with entities decoded and the
+// The channel's Threads list reads the root's Slack text with entities decoded and the
 // people it mentions named, never `<@U…>`.
 import { afterEach, expect, it } from 'vitest'
 import { channelThreadsAtom, messagesAtom, type ListWindow, type LiveListAtom } from '@juno/state'
@@ -24,14 +23,14 @@ function watchList<Row, E>(engine: RunningEngine, atom: LiveListAtom<Row, E>) {
 
 const rowsOf = <Row>(window: ListWindow<Row>) => window.order.map((id) => window.rows.get(id)!)
 
-it('names the people a thread link and the Threads list mention, and decodes Slack escaping', async () => {
+it('names the people the Threads list mentions, and decodes Slack escaping', async () => {
   const engine = await bootedEngine(engines)
   await quiet(engine)
   // As Slack stores it: `<@U0DEV> fix the backend -&gt; github sync today`.
   const root = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: '<@U0DEV> fix the backend -> github sync today' })
   engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0DEV', threadTs: root.ts, text: 'On it.' })
   const window = await watchList(engine, messagesAtom('m:C0ENG'))((current) => current.rows.get(root.ts)?.thread?.replyCount === 1, 'the thread link')
-  expect(window.rows.get(root.ts)!.thread!.title).toBe('@Dev fix the backend -> github…')
+  expect(window.rows.get(root.ts)!.thread!.preview).toBe('Dev: On it.')
   const listed = await watchList(engine, channelThreadsAtom('C0ENG'))((current) => rowsOf(current).some((row) => row.rootTs === root.ts), 'the thread in the list')
   expect(rowsOf(listed).find((row) => row.rootTs === root.ts)!.title).toBe('@Dev fix the backend -> github…')
 })

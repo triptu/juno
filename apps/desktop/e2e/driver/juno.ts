@@ -1879,7 +1879,12 @@ export class TopicPane {
     await this.expectAtBottom()
   }
 
-  /** A "2 replies · Title" link under a Main message, by its label or title. */
+  /** A thread link under the Main message whose body contains `text`. */
+  threadLinkUnder(text: string): ThreadLinkDriver {
+    return new ThreadLinkDriver(this.win, this.message(text).locator('[data-thread-link]'))
+  }
+
+  /** A thread link by its reply count and optional first-reply preview. */
   threadLink(text: string | RegExp): ThreadLinkDriver {
     return new ThreadLinkDriver(this.win, this.list.getByRole('button', { name: text }))
   }

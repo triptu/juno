@@ -380,7 +380,7 @@ Selecting text inside a message (`[data-msg-text]`) shows a floating toolbar cen
 
 ### 6.7 Thread link (Main only)
 
-Under a Main message that has a thread: button 26px, margin-top 6, padding `0 8 0 6`, gap 6, 1px `--border-default`, radius 6, bg surface, fg subtle, 12.5px, max-width 100%: `messages-square` 13 · "2 replies" 600 default ("1 reply", "Thread" when only the root) · title ellipsis · `chevron-right` 12. Hover border `--border-strongest`. Click opens the topic (⌘-click new tab). [built M4] A cut-off title shows the full title as its tooltip on hover.
+Under a Main message that has a thread: button 26px, margin-top 6, padding `0 8 0 6`, gap 6, 1px `--border-default`, radius 6, bg surface, fg subtle, 12.5px, max-width 100%: `messages-square` 13 · "2 replies" 600 default ("1 reply", "Thread" when only the root) · first reply preview ellipsis ("Maya: Sounds good…") when known locally · `chevron-right` 12. Hover border `--border-strongest`. Click opens the topic (⌘-click new tab). [built M4] A cut-off preview shows its full text as its tooltip on hover. Until the first reply is known, omit the preview and keep the count and chevron. The preview fills the same line without changing its height; never show the root or topic title.
 
 ### 6.8 New divider
 
