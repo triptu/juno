@@ -96,7 +96,8 @@ test('Home shows what waits from the sidebar, and each row opens its topic', asy
   // Home from the sidebar, with the question Elena asked.
   await home.open()
   await expect(home.greeting).toHaveText(/Tushar\.$/)
-  await expect(home.meta('waiting')).toHaveText(/^Rina finished the onsite\. Panel notes… · hiring · \d+m$/)
+  // The thread's title, the root's words or its AI title once the job names it: Home shows it live.
+  await expect(home.meta('waiting')).toHaveText(/^Rina finished the onsite.* · hiring · \d+m$/)
   await expect(home.navItem).toHaveAttribute('aria-current', 'page')
   // The assistant rewrites the title line after paint; the row keeps its height.
   await expect(home.title('waiting')).toHaveText('Elena asks: She has a competing offer with a Friday')
@@ -161,7 +162,7 @@ test("A Home row from a DM shows the person's photo and names them once; a chann
 
   // Elena's question in a #hiring thread: the tile is the thread's art, and the meta line has the thread and the channel.
   await home.open()
-  await expect(home.meta('waiting')).toHaveText(/^Rina finished the onsite\. Panel notes… · hiring · \d+m$/)
+  await expect(home.meta('waiting')).toHaveText(/^Rina finished the onsite.* · hiring · \d+m$/)
   await expect(home.item('waiting').locator('[data-topic-art]')).toHaveCount(1)
   await expect(home.item('waiting').locator('img')).toHaveCount(0)
 

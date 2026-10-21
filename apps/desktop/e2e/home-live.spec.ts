@@ -79,7 +79,7 @@ test('a new item shows while Home is on screen, and waits while the pointer is o
   await expect(home.meta('waiting')).toHaveText(/^Sam · /)
 })
 
-/** Leo asked a question in a DM; everything else is read. */
+/** Leo asked a question in a DM, read and not answered; everything is read. */
 function oneQuestion(workspace: Workspace): void {
   const now = workspace.clock.now()
   for (const [id, name] of [[SELF_ID, 'Sam Ortiz'], ['U0LEO', 'Leo Park']] as const) {
@@ -89,7 +89,9 @@ function oneQuestion(workspace: Workspace): void {
   const last = workspace.post({ channel: 'C0QUIET', user: 'U0LEO', text: 'Release notes are out.', at: now - 60 * 60_000, silent: true })
   workspace.reads.set('C0QUIET', last.ts)
   workspace.addConversation({ id: 'D0LEO', name: '', kind: 'im', members: new Set([SELF_ID, 'U0LEO']), created: now - 90 * DAY, topic: '', purpose: '', isOpen: true, archived: false })
-  workspace.post({ channel: 'D0LEO', user: 'U0LEO', text: 'Can you check the release notes today?', at: now - 30 * 60_000 })
+  // Read but not answered: it waits on the user, and nothing else is unread.
+  const question = workspace.post({ channel: 'D0LEO', user: 'U0LEO', text: 'Can you check the release notes today?', at: now - 30 * 60_000 })
+  workspace.reads.set('D0LEO', question.ts)
 }
 
 const asked = test.extend({
