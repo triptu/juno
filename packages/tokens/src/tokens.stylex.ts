@@ -182,6 +182,11 @@ export const accent = stylex.defineVars({
   '--hl-ring': 'color-mix(in oklch, #CC4628 45%, transparent)',
   '--focus-ring': '#B4351F',
   '--selection-background': `color-mix(in oklch, #CC4628 28%, ${colors['--background']})`,
+  // The sign-in page's art: one wave band per side in the accent, and the
+  // wash behind the title. Mixed from --hl on the same element, so every
+  // accent theme gets them; the dark themes mix more of it.
+  '--hl-band': `color-mix(in oklch, var(--hl) 14%, ${colors['--background']})`,
+  '--hl-wash': `color-mix(in oklch, var(--hl) 7%, ${colors['--background']})`,
 })
 
 /**
@@ -916,6 +921,10 @@ export const layout = stylex.defineVars({
   // Home's column: the item rows and the Ask Juno field.
   '--home-width': '480px',
   '--page-width-narrow': '680px',
+  // The sign-in page's pitch, so it sets as two even lines.
+  '--sign-in-pitch-width': '520px',
+  // Each side of the sign-in page's art: the box its pebbles are placed in.
+  '--sign-in-art-width': '330px',
   '--page-width': '720px',
   '--page-width-settings': '760px',
   // The label column of Settings' rows (Theme, Accent, Density, Hold to peek), so the controls share one edge.
