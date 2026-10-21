@@ -267,7 +267,7 @@ Rule that follows: muted text may sit on `--background`, `--background-subtle`, 
 | Hover `--surface-hover` | 14.4 / 7.8 / 4.56 | 11.8 / 7.6 / 5.3 |
 | Selected `--secondary-default` | 13.9 / 7.5 / 5.6 | 11.2 / 7.2 / 5.0 |
 
-Two alternatives were tried on 10-21 and not kept. Every preview muted, unread included: set the preview's `tone` to `"muted"` in `TopicRow.tsx`. Then unread rows stand out only by weight and count. Every row two lines, with a thread's place moved to line 1 before the time: rows are the same height, but titles are cut much shorter and line 1 holds three things.
+Two alternatives were tried on 10-21 and not kept. Every preview muted, unread included: set the preview's `tone` to `"muted"` in `TopicRow.tsx`. Then unread rows stand out only by weight and count. No line 3, with a thread's place moved to line 1 before the time: every row is two lines (with Topic titles at One line), but titles are cut much shorter, line 1 holds three things, and with Two lines the place squeezes a wrapped title further. The Topic titles setting is unchanged, and its default stays One line: the regular weight shows about 7% more of a cut title (34 characters at the default 384px width, 28 at 312px), and two of seven cut gallery titles now fit, so one line is the case these levels are tuned for.
 
 Dark mode muted (#A09E9A) is 6.56:1 on the page, 5.8:1 on cards, 4.57:1 on popovers and 5.01:1 on `--secondary-default`, so in dark the rule is not needed, but keep to it so the two themes share one set of pairings.
 
