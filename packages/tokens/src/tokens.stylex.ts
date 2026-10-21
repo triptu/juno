@@ -1003,11 +1003,12 @@ export const sizes = stylex.defineVars({
   '--row-bubble-estimate': '38px',
 
   // Home's picture (SPEC 12, "A picture"): the box the picture is fitted into. Its height is the page's
-  // height less the room the rest of Home takes, between the min and the full height, so the column fits.
+  // height less the room the rest of Home takes (the column's padding, the plaque, a two-line thought and
+  // the composer), between the min and the full height, so the column fits.
   '--home-picture-width': '320px',
   '--home-picture-height': '216px',
   '--home-picture-height-min': '144px',
-  '--home-picture-room': '540px',
+  '--home-picture-room': '348px',
   // The gallery's rows of pictures, each at its own shape, and the picture page's label column.
   '--gallery-row': '150px',
   '--picture-label-width': '380px',

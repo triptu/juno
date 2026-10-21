@@ -47,7 +47,7 @@ export interface HomeProps {
   readonly loading?: boolean
   /** Keep these row slots through a cold visit, including before its items arrive; rows that land later fill them. */
   readonly reservedItems?: number
-  /** Pinned at the bottom, where a topic's composer is: Recent, the destination and the field (`HomeWrite` and a `Composer`). */
+  /** Pinned at the bottom, where a topic's composer is: the destination and the field (`HomeWrite` and a `Composer`). */
   readonly composer?: ReactNode
   /** Nothing to show yet (a few milliseconds): the column is empty, the composer is already in its place. */
   readonly waiting?: boolean
@@ -240,7 +240,7 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, 
 const HOVER = '@media (hover: hover)'
 // The column's 480 and its 48 on each side: under this the page keeps 24 on each side, and the column takes the rest.
 const NARROW = '@container home (width < 576px)'
-/** Recent's own threshold (HomeWrite): below it the welcome card takes the scene's and the greeting's room. */
+/** Home's page under 560 tall (a window under about 600, where Home shows one row with the card): the welcome card takes the scene's and the greeting's room. */
 const SHORT = '@container home (height < 560px)'
 
 const rise = stylex.keyframes({
