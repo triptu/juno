@@ -471,6 +471,8 @@ const styles = stylex.create({
     flexGrow: 1,
     minWidth: 0,
   },
+  // The time, icons and tags beside the title each centre in a box one title
+  // line tall, so a wrapped title keeps them on its first line, as Mail does.
   line1: {
     display: 'flex',
     alignItems: 'center',
@@ -480,6 +482,9 @@ const styles = stylex.create({
   },
   resolvedCheck: {
     display: 'inline-flex',
+    alignSelf: 'flex-start',
+    alignItems: 'center',
+    height: text['--text-row-title-leading'],
     flexShrink: 0,
     color: tints['--tint-resolved-fg'],
   },
@@ -492,20 +497,29 @@ const styles = stylex.create({
   // A two-line row's accessory, Reopened tag and thread count, after the title.
   titleTags: {
     display: 'inline-flex',
+    alignSelf: 'flex-start',
     alignItems: 'center',
+    height: text['--text-row-title-leading'],
     gap: spacing['--space-2'],
     flexShrink: 0,
   },
   mutedIcon: {
     display: 'inline-flex',
+    alignSelf: 'flex-start',
+    alignItems: 'center',
+    height: text['--text-row-title-leading'],
     flexShrink: 0,
     color: colors['--foreground-muted'],
   },
   // At least the stable slot, and the time ends at the row's trailing inset,
   // so "4m" and "Yesterday" end on one edge.
   time: {
+    display: 'inline-flex',
+    alignSelf: 'flex-start',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    height: text['--text-row-title-leading'],
     minWidth: sizes['--topic-time-width'],
-    textAlign: 'end',
     flexShrink: 0,
     marginInlineStart: 'auto',
     paddingInlineStart: spacing['--space-1'],
