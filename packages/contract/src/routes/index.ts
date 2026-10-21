@@ -4,6 +4,7 @@
  */
 import { AgentWritesRoutes } from './agentWrites'
 import { AiRoutes } from './ai'
+import { DevLogRoutes } from './devLog'
 import { AllTopicsRoutes } from './allTopics'
 import { ArtRoutes } from './art'
 import { SearchRoutes } from './search'
@@ -22,6 +23,6 @@ import { SessionRoutes } from './session'
 import { TopicsRoutes } from './topics'
 import { ViewsRoutes } from './views'
 
-export const AllRoutes = EngineRoutes.merge(SessionRoutes).merge(TopicsRoutes).merge(SearchRoutes).merge(PrefsRoutes).merge(MessagesRoutes).merge(ReadsRoutes).merge(ArtRoutes).merge(NewChatRoutes).merge(SendRoutes).merge(HomeRoutes).merge(AllTopicsRoutes).merge(NotificationsRoutes).merge(ViewsRoutes).merge(FilesRoutes).merge(MentionsRoutes).merge(AiRoutes).merge(AgentWritesRoutes).merge(HuddleRoutes)
+export const AllRoutes = EngineRoutes.merge(SessionRoutes).merge(TopicsRoutes).merge(SearchRoutes).merge(PrefsRoutes).merge(MessagesRoutes).merge(ReadsRoutes).merge(ArtRoutes).merge(NewChatRoutes).merge(SendRoutes).merge(HomeRoutes).merge(AllTopicsRoutes).merge(NotificationsRoutes).merge(ViewsRoutes).merge(FilesRoutes).merge(MentionsRoutes).merge(AiRoutes).merge(AgentWritesRoutes).merge(HuddleRoutes).merge(DevLogRoutes)
 
 export type AllRoutes = typeof AllRoutes
