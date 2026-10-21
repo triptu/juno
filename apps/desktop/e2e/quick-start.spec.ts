@@ -10,7 +10,6 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { largeSeed, SELF_ID, startFakeSlack } from '@juno/fake-slack'
-import { millisToTs, quietDaysOf } from '@juno/domain'
 import { expect, launchApp, test, writeSlackApp } from './fixtures'
 
 const LATENCY_MS = 300
@@ -102,12 +101,12 @@ mediumQuick('Home is ready once DMs, mentions and unread threads have history, b
   // with unread replies in a followed thread. History reads them first, one conversation at a time.
   const ws = fake.workspace
   const threads = ws.threadCounts()
-  const now = Date.now()
-  const windowStart = millisToTs(now - quietDaysOf({ now }) * 86_400_000)
+  // The default topic window is three days.
+  const windowStart = (Date.now() - 3 * 86_400_000) / 1000
   const forHome = new Set([...ws.conversations.values()].filter((c) => {
     if (!c.members.has(SELF_ID) || c.archived) return false
     const entry = ws.countEntry(c)
-    if (entry.latest === undefined || entry.latest < windowStart) return false
+    if (entry.latest === undefined || Number(entry.latest) < windowStart) return false
     return c.kind === 'im' || c.kind === 'mpim' || (entry.has_unreads && entry.mention_count > 0)
       || (threads.mention_count_by_channel?.[c.id] ?? 0) > 0 || (threads.unread_count_by_channel?.[c.id] ?? 0) > 0
   }).map((c) => c.id))
