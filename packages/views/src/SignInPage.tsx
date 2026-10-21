@@ -33,7 +33,7 @@ export function SignInPage({ titleId, title, body, status, statusAction, align =
     <section {...stylex.props(styles.root, centred && styles.rootCentred)} aria-labelledby={titleId} {...data}>
       <div {...stylex.props(styles.text, centred && styles.centred)}>
         <span {...stylex.props(styles.mark)}>
-          <Logo size={40} />
+          <Logo size={40} entrance={centred} />
         </span>
         <Text variant="pageTitle" tone="default" id={titleId}>
           {title}

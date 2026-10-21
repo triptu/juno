@@ -649,6 +649,10 @@ Three ideas (`friendly-layer.md` §5): instant for the things you do constantly,
 | `--pop-scale` | 1.12 | The peak of a pop |
 | `--appear-scale` | 0.98 | Where an entrance starts |
 | `--rise-toast`, `--rise-stagger` | 8px, 6px | How far a toast and an empty-state part rise as they enter |
+| `--duration-gather`, `--duration-settle` | 600ms, 900ms | The sign-in page's entrance, once: the mark's dots gather into the j; the pebbles fade in and settle |
+| `--rise-settle` | 6px | How far a sign-in pebble settles as it enters |
+| `--duration-drift` | 1200ms | A hovered sign-in pebble's wave bands drift, and drift back |
+| `--duration-nod` | 320ms | The sign-in mark's dot nods under the pointer |
 | Transition set | `scale, background-color, color, border-color, box-shadow, opacity` at `--duration-fast` `--ease-out` | |
 | Toggle to active | The filled icon scales 0.8 → 1 with the spring over `--duration-pop` and cross-fades from the outline icon; off just cross-fades over `--duration-fast`. Both icons stay in the DOM | |
 | Toast | Enter `translateY(--rise-toast)` → 0 with opacity over `--duration-appear`; exit opacity over `--duration-exit`; a replacement cross-fades | |

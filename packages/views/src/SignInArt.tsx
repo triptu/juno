@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { accent, layout } from '@juno/tokens/tokens.stylex'
+import { accent, layout, motion } from '@juno/tokens/tokens.stylex'
 import { Pebble } from '@juno/ui'
 
 /** One pebble: its seed, its place in its side's box (left in px, top as a share of a 780px window) and its size in px. */
@@ -51,12 +51,20 @@ function Side({ placements, side }: { readonly placements: ReadonlyArray<Placeme
     <div {...stylex.props(styles.side, side === 'left' ? styles.left : styles.right)}>
       {placements.map((p) => (
         <div key={p.seed} {...stylex.props(styles.place(p.left, (p.top / ART_HEIGHT) * 100))}>
-          <Pebble seed={p.seed} size={p.size} {...(p.accentBand === true ? { accentBand: true } : {})} />
+          <div {...stylex.props(styles.settle)}>
+            <Pebble seed={p.seed} size={p.size} {...(p.accentBand === true ? { accentBand: true } : {})} />
+          </div>
         </div>
       ))}
     </div>
   )
 }
+
+// Once, on mount: each pebble fades in and settles a few pixels into place.
+const settleIn = stylex.keyframes({
+  from: { opacity: 0, transform: `translateY(${motion['--rise-settle']})` },
+  to: { opacity: 1, transform: 'none' },
+})
 
 const styles = stylex.create({
   root: {
@@ -87,6 +95,12 @@ const styles = stylex.create({
   right: {
     right: 0,
     transformOrigin: 'right center',
+  },
+  settle: {
+    animationName: settleIn,
+    animationDuration: motion['--duration-settle'],
+    animationTimingFunction: motion['--ease-out'],
+    animationFillMode: 'both',
   },
   place: (left: number, topPercent: number) => ({
     position: 'absolute',

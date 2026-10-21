@@ -828,6 +828,29 @@ export const motion = stylex.defineVars({
     default: '0.98',
     [REDUCED_MOTION]: '1',
   },
+  // The sign-in page (inventory 1.1): the mark's dots gather into the j,
+  // the pebbles fade in and settle by --rise-settle, a hovered pebble's
+  // bands drift, and the mark's dot nods under the pointer.
+  '--duration-gather': {
+    default: '600ms',
+    [REDUCED_MOTION]: '0.01ms',
+  },
+  '--duration-settle': {
+    default: '900ms',
+    [REDUCED_MOTION]: '0.01ms',
+  },
+  '--duration-drift': {
+    default: '1200ms',
+    [REDUCED_MOTION]: '0.01ms',
+  },
+  '--duration-nod': {
+    default: '320ms',
+    [REDUCED_MOTION]: '0.01ms',
+  },
+  '--rise-settle': {
+    default: '6px',
+    [REDUCED_MOTION]: '0px',
+  },
   '--toast-life-undo': '5000ms',
   '--toast-life-info': '4000ms',
 })
