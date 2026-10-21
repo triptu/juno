@@ -133,7 +133,6 @@ export default defineFixtures(
       'learn-ask-connection': state({ scene: 'midday', title: 'Hello, Tushar.', items: [homeItems.askConnection], onAsk: noop }, { hover: '[data-home-item="ask"] button' }),
       'learn-ask-narrow': state({ scene: 'midday', title: 'Hello, Tushar.', items: [homeItems.ask, homeItems.resume], onAsk: noop }, narrow),
       'follow-up-and-tidy-up': state({ scene: 'evening', title: 'Evening, Tushar.', items: [homeItems.waiting, homeItems.followUp, homeItems.tidyUp] }),
-      'buttons-used': state({ scene: 'evening', title: 'Evening, Tushar.', items: [homeItems.waiting, homeItems.followUp, homeItems.tidyUp], done: new Set([homeItems.followUp.id, homeItems.tidyUp.id]) }),
       // The Automated question, after the ones it ranks below.
       automated: state({ scene: 'midday', title: 'Hello, Tushar.', items: [homeItems.waiting, homeItems.resume, homeItems.automated] }, { hover: '[data-home-item=automated]' }),
       // Juno's reason in place of the count; in a narrow window the meta line takes an ellipsis.
@@ -185,24 +184,19 @@ export default defineFixtures(
       narrow: state({ welcome: card(['juno']) }, narrow),
       // Before the sidebar has rows, and after Hide: the card's room, empty, so the rows never move.
       'room-kept': state({ welcome: card([], true) }),
-      // The first sync: reserved rows and the card's room.
-      syncing: state({ line: <HomeSyncLine line="Syncing with Slack." />, items: [], loading: true, reservedItems: 3, welcome: card([], true) }),
+      // The first sync: the card's room.
+      syncing: state({ line: <HomeSyncLine line="Syncing with Slack." />, items: [], loading: true, welcome: card([], true) }),
     },
     Empty: {
       'caught-up': state({ scene: 'caughtUp', title: 'All caught up.', items: [] }),
       'caught-up-narrow': state({ scene: 'caughtUp', title: 'All caught up.', items: [] }, narrow),
       // The first sync is still running: the greeting and one calm line, no rows, never a blank page.
-      syncing: state({ line: <HomeSyncLine line="Syncing with Slack." />, items: [], loading: true, reservedItems: 3 }),
+      syncing: state({ line: <HomeSyncLine line="Syncing with Slack." />, items: [], loading: true }),
       // Once the conversations are listed, the line counts them as the sidebar's card does, in a fixed width.
-      'syncing-count': state({ line: <HomeSyncLine line="Syncing with Slack." progress={{ done: 7, total: 143 }} />, items: [], loading: true, reservedItems: 3 }),
-      // Mid-sync: the rows that landed so far, with room kept for the rest.
-      'syncing-rows': state({ line: <HomeSyncLine line="Syncing with Slack." progress={{ done: 64, total: 143 }} />, items: [homeItems.waiting], loading: true, reservedItems: 3 }),
-      // Home is ready while the rest of history lands: no line, the rows shown, and room kept for one that lands later.
-      'ready-filling': state({ items: [homeItems.waiting], reservedItems: 3 }),
+      'syncing-count': state({ line: <HomeSyncLine line="Syncing with Slack." progress={{ done: 7, total: 143 }} />, items: [], loading: true }),
+      // Mid-sync: the rows that landed so far, and no room kept for the rest.
+      'syncing-rows': state({ line: <HomeSyncLine line="Syncing with Slack." progress={{ done: 64, total: 143 }} />, items: [homeItems.waiting], loading: true }),
       'nothing-waiting': state({ scene: 'night', title: 'Still up, Tushar.', items: [] }),
-      // Ready while history lands with nothing yet: the greeting over the reserved slots, and a row that lands takes the first.
-      'ready-empty-filling': state({ scene: 'midday', title: 'Hello, Tushar.', items: [], reservedItems: 3 }),
-      'ready-first-row': state({ scene: 'midday', title: 'Hello, Tushar.', items: [homeItems.waiting], reservedItems: 3 }),
       'no-name': state({ scene: 'midday', title: 'Hello.', items: [homeItems.waiting] }),
     },
     // A picture in the caught-up scene's place: the same box for every shape, resting on its two-line caption.

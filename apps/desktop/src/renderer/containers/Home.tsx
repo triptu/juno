@@ -1,6 +1,6 @@
-import { Suspense, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { homeHuddleSeen, viewsSortChannel, type HomeItem } from '@juno/contract'
-import { closeWelcome, fillHome, forgetPicture, freezeHome, homeGreeting, homePicturesOnAtom, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, markMovesSeen, markMovesShown, peekKeyAtom, pictureUrl, preparePicture, registry, resolveAllTopics, runAction, runCommand, showHome, showToast, syncProgressAtom, welcomeAtom, type Welcome } from '@juno/state'
+import { closeWelcome, forgetPicture, holdHome, homeAppears, homeHeading, homeItemLimit, homePicturesOnAtom, homeViewAtom, markFollowUpDone, markMovesSeen, markMovesShown, nowAtom, peekKeyAtom, pictureUrl, preparePicture, registry, resolveAllTopics, runAction, runCommand, showToast, syncProgressAtom, takePicture, welcomeAtom, withAsks } from '@juno/state'
 import { homeAsksAtom, junoPageActions } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
 import { junoAskCopy } from '@juno/agent-contract'
@@ -11,6 +11,7 @@ import { openGallery, openJuno, openTopic } from './navigation'
 import { showChannelMenu } from './placeMenus'
 
 const noop = () => {}
+const NO_ITEMS: ReadonlyArray<HomeItem> = []
 
 /** The review sheets open only from a card, so they load after Home, when idle or on the click. */
 const reviewSheets = chunk(() => import('./HomeReview'))
@@ -30,36 +31,69 @@ function pictureProps(picture: { readonly id: string; readonly title: string; re
 }
 
 /**
- * Takes Home at each stage (`showHome`), with Juno's open asks as they are then: no value, not ready, ready while
- * the first sync still reads history, done. Until the first sync is done it adds the items each new value brings
- * (`fillHome`).
+ * How long Home's rows keep holding after the pointer and keyboard focus
+ * have left them, as the sidebar's list does (SPEC 5, "Holding the order").
  */
-function useShowHome(key: string, stage: 0 | 1 | 2 | 3, value: unknown, asks: ReadonlyArray<HomeItem>): void {
-  const asksRef = useRef(asks)
-  useLayoutEffect(() => {
-    asksRef.current = asks
+const HOLD_GRACE_MS = 400
+
+const NONE: ReadonlySet<string> = new Set()
+
+/**
+ * Home's rows through the hold (SPEC 12, "Home is live"): the live items,
+ * capped, or while the pointer or keyboard focus is in the rows or a review
+ * sheet is open, the rows shown when the hold began with live contents
+ * (`holdHome`). `release` is the user acting on an item: it goes, or comes
+ * back, at once even while the rows hold.
+ */
+function useHeldRows(live: ReadonlyArray<HomeItem>, limit: number, sheetOpen: boolean) {
+  const [held, setHeld] = useState<ReadonlyArray<HomeItem> | undefined>(undefined)
+  const [released, setReleased] = useState(NONE)
+  const inside = useRef({ pointer: false, keyboard: false })
+  const letGo = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const rows = held === undefined ? live.slice(0, limit) : holdHome(held, live, released, limit)
+  const engaged = (part: 'pointer' | 'keyboard', now: boolean) => {
+    inside.current = { ...inside.current, [part]: now }
+    clearTimeout(letGo.current)
+    if (inside.current.pointer || inside.current.keyboard || sheetOpen) {
+      if (held === undefined) setHeld(rows)
+      return
+    }
+    letGo.current = setTimeout(() => {
+      setHeld(undefined)
+      setReleased(NONE)
+    }, HOLD_GRACE_MS)
+  }
+  // A review sheet holds the rows while it is open. Rows that leave from under the pointer, or take keyboard focus
+  // with them, send no leave event: with no row left, or focus gone to the page, the hold ends as if they had left.
+  const sheet = useRef(sheetOpen)
+  useEffect(() => {
+    const pointer = inside.current.pointer && rows.length > 0
+    const keyboard = inside.current.keyboard && rows.length > 0 && document.activeElement !== document.body
+    if (sheet.current === sheetOpen && pointer === inside.current.pointer && keyboard === inside.current.keyboard) return
+    sheet.current = sheetOpen
+    inside.current = { pointer, keyboard }
+    engaged('pointer', pointer)
   })
-  useLayoutEffect(() => {
-    showHome(registry, key, { windowHeight: window.innerHeight, welcome: registry.get(welcomeAtom) !== undefined, asks: asksRef.current })
-  }, [key, stage])
-  useLayoutEffect(() => {
-    if (stage === 1 || stage === 2) fillHome(registry, key)
-  }, [key, stage, value])
+  useEffect(() => () => clearTimeout(letGo.current), [])
+  const release = (itemId: string) => {
+    if (held !== undefined && !released.has(itemId)) setReleased(new Set([...released, itemId]))
+  }
+  return { rows, onHold: engaged, release }
 }
 
-/** What Home's row buttons do, for the items `items` (Home's `key`). */
-function itemActions(key: string, items: ReadonlyArray<HomeItem>, setReviewing: (item: HomeItem) => void) {
+/** What Home's row buttons do, for the items `items`; `release` lets the item an action is on skip the hold. */
+function itemActions(items: ReadonlyArray<HomeItem>, setReviewing: (item: HomeItem) => void, release: (itemId: string) => void) {
   const itemOf = (itemId: string) => items.find((candidate) => candidate.id === itemId)
   const markDone = (itemId: string) => {
     const item = itemOf(itemId)
     if (item === undefined) return
-    markHomeItemUsed(registry, key, itemId)
+    release(itemId)
     void markFollowUpDone(registry, item)
   }
   const resolveAll = (itemId: string) => {
     const item = itemOf(itemId)
     if (item === undefined) return
-    markHomeItemUsed(registry, key, itemId)
+    release(itemId)
     void resolveAllTopics(
       registry,
       item.topics.map((topic) => topic.id),
@@ -71,7 +105,7 @@ function itemActions(key: string, items: ReadonlyArray<HomeItem>, setReviewing: 
     setReviewing(item)
     // Opening Automated's record is seeing its moves: they are not listed again, and Dismiss has nothing left to do.
     if (item.kind === 'automatedMoves') {
-      markHomeItemUsed(registry, key, itemId)
+      release(itemId)
       markMovesSeen(registry, item)
     }
   }
@@ -79,7 +113,7 @@ function itemActions(key: string, items: ReadonlyArray<HomeItem>, setReviewing: 
   const dismiss = (itemId: string) => {
     const item = itemOf(itemId)
     if (item === undefined) return
-    markHomeItemUsed(registry, key, itemId)
+    release(itemId)
     markMovesSeen(registry, item)
   }
 
@@ -87,12 +121,14 @@ function itemActions(key: string, items: ReadonlyArray<HomeItem>, setReviewing: 
   const sort = (itemId: string, to: 'automated' | 'kept') => {
     const channel = itemOf(itemId)?.channel
     if (channel === undefined) return
-    markHomeItemUsed(registry, key, itemId)
+    release(itemId)
     void runAction(registry, viewsSortChannel, { channel: channel.id, to }, { text: to === 'automated' ? `Moved ${channel.label} to Automated` : `Keeping ${channel.label} in All` })
   }
   const itemMenu = (itemId: string) => {
     const item = itemOf(itemId)
     if (item?.channel === undefined) return
+    // The menu's Ignore removes the row at once.
+    release(itemId)
     const main = item.topics[0]?.id
     void showChannelMenu({ ...item.channel, ...(main === undefined ? {} : { mainId: main }) })
   }
@@ -101,7 +137,7 @@ function itemActions(key: string, items: ReadonlyArray<HomeItem>, setReviewing: 
     const id = itemOf(itemId)?.ask?.id
     if (id === undefined) return
     if (answer === 'open') return openJuno()
-    markHomeItemUsed(registry, key, itemId)
+    release(itemId)
     void pageActions.answerAsk(id, answer).then((outcome) => {
       if (answer === 'start' && outcome === 'ok') showToast(registry, { text: junoAskCopy.learn.started })
     })
@@ -114,35 +150,32 @@ const pageActions = junoPageActions(registry)
 const closeCard = () => closeWelcome(registry)
 
 /**
- * Tells the engine once per appearance that Home showed Automated's record,
- * so the card waits a day before it shows again. Its moves stay until the
- * record is opened or the card dismissed.
+ * Tells the engine once per Home on screen that it showed Automated's
+ * record, so the card waits a day before it shows again. Its moves stay
+ * until the record is opened or the card dismissed.
  */
-function useMovesShown(items: ReadonlyArray<HomeItem> | undefined, appearedAt: number | undefined): void {
-  const told = useRef<number | undefined>(undefined)
-  const record = items?.find((item) => item.kind === 'automatedMoves')
+function useMovesShown(items: ReadonlyArray<HomeItem>): void {
+  const told = useRef(false)
+  const record = items.some((item) => item.kind === 'automatedMoves')
   useEffect(() => {
-    if (record === undefined || appearedAt === undefined || told.current === appearedAt) return
-    told.current = appearedAt
+    if (!record || told.current) return
+    told.current = true
     markMovesShown(registry)
-  }, [record, appearedAt])
+  }, [record])
 }
 
 /**
  * The welcome card (SPEC 4) as this Home shows it. Once it has shown, its
- * room stays until Home appears again (`appearedAt` changes), empty after
- * Hide or Done, so the rows above it never move.
+ * room stays while this Home is on screen, empty after Hide or Done.
  */
-function useWelcome(appearedAt: number | undefined) {
+function useWelcome() {
   const welcome = useAtomValue(welcomeAtom)
   const peekKey = useAtomValue(peekKeyAtom)
-  // The card as this appearance last showed it, so its room stays after it goes.
-  const [kept, setKept] = useState<{ readonly at: number | undefined; readonly last: Welcome | undefined }>({ at: appearedAt, last: welcome })
-  const same = kept.at === appearedAt
-  if (!same || (welcome !== undefined && welcome !== kept.last)) setKept({ at: appearedAt, last: welcome ?? (same ? kept.last : undefined) })
-  const last = welcome ?? (same ? kept.last : undefined)
-  if (last === undefined) return undefined
-  return <WelcomeCard done={last.done} peekKey={peekKey} onClose={closeCard} hidden={welcome === undefined || !welcome.ready} />
+  const [last, setLast] = useState(welcome)
+  if (welcome !== undefined && welcome !== last) setLast(welcome)
+  const shown = welcome ?? last
+  if (shown === undefined) return undefined
+  return <WelcomeCard done={shown.done} peekKey={peekKey} onClose={closeCard} hidden={welcome === undefined || !welcome.ready} />
 }
 
 /**
@@ -158,6 +191,22 @@ function usePicture(): void {
   }, [on])
 }
 
+/**
+ * The picture while Home is caught up (`wanted`): the current pick, already on this Mac, taken in the render
+ * Home becomes caught up and kept while it stays so, so it never changes on screen.
+ */
+function useCaughtUpPicture(wanted: boolean, now: number): ReturnType<typeof takePicture> {
+  const [picture, setPicture] = useState<ReturnType<typeof takePicture>>(undefined)
+  if (!wanted) {
+    if (picture !== undefined) setPicture(undefined)
+    return undefined
+  }
+  if (picture !== undefined) return picture
+  const taken = takePicture(now)
+  if (taken !== undefined) setPicture(taken)
+  return taken
+}
+
 /** The syncing line with the first sync's count. Its own component, so a new count redraws the line and not Home. */
 function SyncLine({ line }: { readonly line: string }) {
   return <HomeSyncLine line={line} progress={useAtomValue(syncProgressAtom)} />
@@ -165,60 +214,54 @@ function SyncLine({ line }: { readonly line: string }) {
 
 /**
  * Home (SPEC section 12): the Home tab, with its composer (`HomeComposer`)
- * at the bottom. It shows the items `home.view` had when Home appeared
- * (`showHome`, before the first paint, again each time Home comes back
- * from a hidden tab, once more when the first value arrives, and when
- * Home is ready and the first sync ends); later values change only a row's
- * title line (`freezeHome`). Until Home is ready it shows the scene and
- * the greeting with "Syncing with Slack.", then the sync's count; until
- * the first sync is done rows fill reserved slots as they land (`fillHome`).
+ * at the bottom. It shows `home.view`'s items as they are now, capped, and
+ * holds them while the pointer or keyboard focus is in the rows or a
+ * review sheet is open (`useHeldRows`); what the user does to a row shows
+ * at once. Until Home is ready it shows the scene and the greeting with
+ * "Syncing with Slack.", then the sync's count, and rows as they land.
  */
 export function HomePage({ tabId }: { readonly tabId: string }) {
-  const key = useId()
+  const [appearance] = useState(() => homeAppears(registry))
   // A card's review, open over Home (`HomeReview`), with the item it shows.
   const [reviewing, setReviewing] = useState<HomeItem | undefined>(undefined)
   const reviewReady = usePreloaded(reviewSheets, reviewing !== undefined)
   const result = useAtomValue(homeViewAtom)
   const value = result._tag === 'Success' ? result.value : undefined
-  const latest = value?.ready === true ? value : undefined
-  const shown = useAtomValue(homeShownAtom(key))
-  const welcome = useWelcome(shown?.now)
-  useMovesShown(shown?.view.items, shown?.now)
-  usePicture()
-  const picturesOn = useAtomValue(homePicturesOnAtom)
-
   const asks = useAtomValue(homeAsksAtom)
-  // Nothing yet, not ready, ready while history still lands, or done: Home is taken again at each step.
-  useShowHome(key, latest !== undefined ? (latest.firstSync ? 2 : 3) : value !== undefined ? 1 : 0, value, asks)
+  const now = useAtomValue(nowAtom)
+  const welcome = useWelcome()
+  const picturesOn = useAtomValue(homePicturesOnAtom)
+  usePicture()
+  const live = value === undefined ? NO_ITEMS : withAsks(value, asks).items
+  const { rows, onHold, release } = useHeldRows(live, homeItemLimit(window.innerHeight, welcome !== undefined), reviewing !== undefined)
+  useMovesShown(rows)
+  const heading = value === undefined ? undefined : homeHeading(value, rows, appearance)
+  const picture = useCaughtUpPicture(heading?.caughtUp === true && picturesOn && welcome === undefined, now)
 
   // Until Home has a value (a few milliseconds) the column is blank, never a spinner, and the composer is already in place.
-  if (shown === undefined) return <Home waiting scene="morning" title="" items={[]} now={0} onOpen={openItem} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} composer={<HomeComposer tabId={tabId} />} />
-  const view = value === undefined ? shown.view : freezeHome(shown.view, value)
+  if (heading === undefined) return <Home waiting scene="morning" title="" items={[]} now={0} onOpen={openItem} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} composer={<HomeComposer tabId={tabId} />} />
 
-  const { markDone, resolveAll, review, dismiss, sort, itemMenu, ask } = itemActions(key, view.items, setReviewing)
-  const closeReview = (item: HomeItem, allDone: boolean) => {
-    if (allDone) markHomeItemUsed(registry, key, item.id)
+  const { markDone, resolveAll, review, dismiss, sort, itemMenu, ask } = itemActions(rows, setReviewing, release)
+  const closeReview = (item: HomeItem) => {
+    // What was done in the sheet shows as it closes.
+    release(item.id)
     setReviewing(undefined)
   }
 
   return (
     <>
     <Home
-      loading={shown.loading}
-      reservedItems={shown.reservedItems}
-      scene={shown.scene}
-      // While syncing there are no rows to hold still, so the greeting takes the name once the boot has stored it.
-      title={shown.loading && value !== undefined ? homeGreeting({ now: new Date(shown.now), firstName: value.firstName, caughtUp: false }).title : shown.title}
-      line={shown.line === undefined ? undefined : <SyncLine line={shown.line} />}
-      items={view.items}
-      done={shown.used}
-      now={shown.now}
+      loading={heading.line !== undefined}
+      scene={heading.scene}
+      title={heading.title}
+      line={heading.line === undefined ? undefined : <SyncLine line={heading.line} />}
+      items={rows}
+      now={now}
+      onHold={onHold}
       onOpen={(topicId, event) => {
-        const item = view.items.find((entry) => entry.kind === 'missedHuddle' && entry.topics.some((topic) => topic.id === topicId))
-        if (item?.huddleId !== undefined) {
-          markHomeItemUsed(registry, key, item.id)
-          void runCommand(registry, homeHuddleSeen, { callId: item.huddleId })
-        }
+        const item = rows.find((entry) => entry.topics.some((topic) => topic.id === topicId))
+        if (item !== undefined) release(item.id)
+        if (item?.kind === 'missedHuddle' && item.huddleId !== undefined) void runCommand(registry, homeHuddleSeen, { callId: item.huddleId })
         openItem(topicId, event)
       }}
       onMarkDone={markDone}
@@ -230,11 +273,11 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
       onAsk={ask}
       composer={<HomeComposer tabId={tabId} />}
       welcome={welcome}
-      {...(shown.picture === undefined || !picturesOn ? {} : pictureProps(shown.picture))}
+      {...(picture === undefined ? {} : pictureProps(picture))}
     />
     {reviewing === undefined || !reviewReady ? null : (
       <Suspense fallback={null}>
-        <HomeReview item={reviewing} now={shown.now} onClose={(allDone) => closeReview(reviewing, allDone)} />
+        <HomeReview item={reviewing} now={now} onClose={() => closeReview(reviewing)} />
       </Suspense>
     )}
     </>

@@ -1,12 +1,10 @@
 /**
  * Home in the renderer (SPEC section 12, `docs/design/home/README.md`).
  *
- * - `homeViewAtom`: the engine's `home.view`. Home keeps the items it
- *   showed when it appeared (`freezeHome`) and takes only their `aiTitle`
- *   from later values, so a row never moves or leaves under the pointer.
- *   During the first sync, before and after Home is ready, it adds items
- *   as they land, below the ones it shows, into slots it reserved
- *   (`fillHome`).
+ * - `homeViewAtom`: the engine's `home.view`. Home shows its live items,
+ *   and while the pointer or keyboard focus is in the rows holds them
+ *   (`holdHome`), so a row never moves or leaves under the pointer unless
+ *   the user acted on it.
  * - `homeItemLimit`: the cap, from the window, chosen when Home appears;
  *   the greeting and the scene come from `homeScene.ts`.
  * - `prefetchHome`: warms `home.view` on pointer enter or focus of the
@@ -25,12 +23,9 @@ import * as Atom from 'effect/reactivity/Atom'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import { draftsDiscard, draftsKeep, followUpsMarkDone, followUpsNotDone, homeMarkDone, homeMovesSeen, homeMovesShown, homeView, homeVisit, viewsSortChannel, prefsGet, tidyUpSet, TIDY_UP_PREF, tidyUpPrefsOf, topicsKeepOpen, topicsResolve, type CommandResult, type HomeItem, type HomeTopic, type HomeView, type TidyUpPrefs, type UndoCommand } from '@juno/contract'
 import { liveQuery, prefetch, runCommand } from './atoms'
-import { withAsks } from './homeAsks'
 import type { Registry } from './client'
 import { activeTab, currentPlace, tabsAtom } from './tabs'
 import { homeAppeared, homeGreeting, homeScene, type HomeScene } from './homeScene'
-import { takePicture } from './homePictures'
-import type { PictureLabel } from '@juno/pictures'
 import { runActionExit, showToast, undoStackAtom, UNDO_LIMIT } from './undo'
 
 export const homeViewAtom = liveQuery(homeView)(undefined)
@@ -50,146 +45,64 @@ export const VISIT_MILLIS = 60_000
 
 export const homeItemLimit = (windowHeight: number, welcome = false): number => (windowHeight >= SHORT_WINDOW ? ITEM_LIMIT : welcome ? SHORT_WELCOME_LIMIT : SHORT_LIMIT)
 
-/** No items and no unread messages in followed topics. */
-export const caughtUp = (view: HomeView): boolean => view.items.length === 0 && !view.unread
-
 /**
- * What Home shows from now on: the items of `shown` in their order, each
- * with the newest `aiTitle` and topic art the engine has for it (a text
- * swap in a one-line title, and art that fades in over its placeholder, so
- * nothing moves). Returns `shown` itself when nothing changed, so React
- * keeps the rows.
+ * What a Home on screen shows of `live` (ranked, uncapped) while its rows
+ * hold (SPEC 12, "Home is live"): the items of `shown` in their places,
+ * each with its contents from `live`, so a title line or art still changes
+ * in place. An item that left `live` stays with its last contents and a new
+ * one waits, except the items the user acted on (`released`): one of those
+ * that left goes at once, the rows below close up, and the next items in
+ * rank take the places it freed; one that came back (Undo) takes its place
+ * by rank. Returns `shown` itself when nothing changed, so React keeps the rows.
  */
-export function freezeHome(shown: HomeView, latest: HomeView): HomeView {
-  let changed = false
-  const items = shown.items.map((item): HomeItem => {
-    const next = latest.items.find((candidate) => candidate.id === item.id)
-    if (next === undefined) return item
-    const aiTitle = next.aiTitle ?? item.aiTitle
-    const topics = item.topics.map((topic) => {
-      const art = next.topics.find((candidate) => candidate.id === topic.id)?.art
-      return art === undefined || art === topic.art ? topic : { ...topic, art }
-    })
-    const artChanged = topics.some((topic, index) => topic !== item.topics[index])
-    if (aiTitle === item.aiTitle && !artChanged) return item
-    changed = true
-    return { ...item, ...(aiTitle === undefined ? {} : { aiTitle }), topics }
+export function holdHome(shown: ReadonlyArray<HomeItem>, live: ReadonlyArray<HomeItem>, released: ReadonlySet<string>, limit: number): ReadonlyArray<HomeItem> {
+  const rank = new Map(live.map((item, index) => [item.id, index]))
+  const items = shown.flatMap((item) => {
+    const index = rank.get(item.id)
+    if (index !== undefined) return [live[index]!]
+    return released.has(item.id) ? [] : [item]
   })
-  return changed ? { ...shown, items } : shown
-}
-
-/** What one Home on screen showed when it appeared (the home README, "Items do not refresh"). */
-export interface HomeShown {
-  readonly view: HomeView
-  readonly scene: HomeScene
-  readonly title: string
-  /** Under the greeting only until Home is ready (`HOME_SYNCING_LINE`). */
-  readonly line: string | undefined
-  readonly now: number
-  readonly caughtUp: boolean
-  /** Items whose Mark done or Resolve all was used. */
-  readonly used: ReadonlySet<string>
-  /** Home is not ready yet: the greeting shows with `HOME_SYNCING_LINE`. */
-  readonly loading: boolean
-  /** Shown during the first sync, which is still running: items fill the free slots as they land (`fillHome`). */
-  readonly filling: boolean
-  /** Row slots held through the first sync's visit: rows that land later fill them, so nothing shown moves. */
-  readonly reservedItems: number
-  /**
-   * The picture in the caught-up scene's place (`homePictures.ts`): only when Home appeared caught up,
-   * not coming out of the first sync and not under the welcome card, so its box never arrives mid-visit.
-   */
-  readonly picture: PictureLabel | undefined
-}
-
-/**
- * `shown`, then the items of `latest` it lacks, in `latest`'s order, up to
- * `limit`. Returns `shown` itself when nothing was added.
- */
-export function addHomeItems(shown: ReadonlyArray<HomeItem>, latest: ReadonlyArray<HomeItem>, limit: number): ReadonlyArray<HomeItem> {
-  const added = latest.filter((item) => !shown.some((old) => old.id === item.id)).slice(0, Math.max(0, limit - shown.length))
-  return added.length === 0 ? shown : [...shown, ...added]
+  for (const id of released) {
+    const index = rank.get(id)
+    if (index === undefined || items.some((item) => item.id === id)) continue
+    const at = items.findIndex((item) => (rank.get(item.id) ?? -1) > index)
+    items.splice(at < 0 ? items.length : at, 0, live[index]!)
+  }
+  for (const item of live) {
+    if (items.length >= Math.min(shown.length, limit)) break
+    if (!items.some((other) => other.id === item.id)) items.push(item)
+  }
+  const held = items.slice(0, limit)
+  return held.length === shown.length && held.every((item, i) => item === shown[i]) ? shown : held
 }
 
 /** Home's second line until Home is ready in the first sync: present tense, names what is happening (SPEC 17). */
 export const HOME_SYNCING_LINE = 'Syncing with Slack.'
 
-/** By a key of the Home component's own, so two Homes never share one. Reset when nothing reads it. */
-export const homeShownAtom = Atom.family((_key: string) => Atom.make<HomeShown | undefined>(undefined))
+/** When one Home on screen appeared: its scene and greeting are of that moment, and do not change on the minute. */
+export interface HomeAppearance {
+  readonly at: number
+  /** The first Home of the day, which may show the season's scene. */
+  readonly firstVisitToday: boolean
+}
 
-/**
- * Home appeared (mounted, shown again, or its value moved on a stage):
- * takes the items, the copy and the scene now, or nothing while there is
- * no value yet. Until Home is ready it shows the greeting with
- * `HOME_SYNCING_LINE`, never a blank page and never "All caught up", and
- * reserves the rows' slots; `fillHome` adds items to them as they land.
- * When Home is ready, and again when the first sync ends, the rows already
- * shown stay where they are, the free slots take the next items, and the
- * scene stays. Shown during the first sync, Home reserves the slots and
- * keeps filling them until it ends. A Home that said "All caught up" then
- * stays so for the visit: what lands later shows on the next one.
- */
-export function showHome(registry: Registry, key: string, options: { readonly windowHeight: number; readonly welcome?: boolean; readonly asks?: ReadonlyArray<HomeItem> }): void {
-  const served = registry.get(homeViewAtom)
-  if (served._tag !== 'Success') return registry.set(homeShownAtom(key), undefined)
-  const result = { value: withAsks(served.value, options.asks ?? []) }
+/** Home appeared (mounted): call once per Home on screen. */
+export function homeAppears(registry: Registry): HomeAppearance {
   const now = new Date()
-  const previous = registry.get(homeShownAtom(key))
-  const limit = homeItemLimit(options.windowHeight, options.welcome)
-  const syncing = previous?.filling === true
-  if (!result.value.ready) {
-    const greeting = homeGreeting({ now, firstName: result.value.firstName, caughtUp: false })
-    return registry.set(homeShownAtom(key), {
-      view: { ...result.value, items: addHomeItems(syncing ? previous.view.items : [], result.value.items, limit) },
-      scene: previous?.loading === true ? previous.scene : homeScene({ now, caughtUp: false, firstVisitToday: homeAppeared(registry, now) }),
-      title: greeting.title,
-      line: HOME_SYNCING_LINE,
-      now: now.getTime(),
-      caughtUp: false,
-      used: syncing ? previous.used : new Set<string>(),
-      loading: true,
-      filling: true,
-      reservedItems: limit,
-      picture: undefined,
-    })
-  }
-  const view = result.value
-  if (syncing && previous.caughtUp) return registry.set(homeShownAtom(key), { ...previous, filling: view.firstSync })
-  // Rows shown while syncing keep their places; the free slots take the next items.
-  const items = syncing ? addHomeItems(previous.view.items, view.items, previous.reservedItems) : view.items.slice(0, limit)
-  const shown = { ...view, items }
-  const done = caughtUp(shown)
-  const greeting = homeGreeting({ now, firstName: view.firstName, caughtUp: done })
-  registry.set(homeShownAtom(key), {
-    view: shown,
-    // Coming out of the syncing state the scene stays, unless there is nothing to do.
-    scene: syncing && !done ? previous.scene : homeScene({ now, caughtUp: done, firstVisitToday: homeAppeared(registry, now) }),
-    ...greeting,
-    line: undefined,
-    now: now.getTime(),
+  return { at: now.getTime(), firstVisitToday: homeAppeared(registry, now) }
+}
+
+/** What Home says over its rows, from the live view: the scene, the greeting and, until Home is ready, the syncing line. */
+export function homeHeading(view: HomeView, items: ReadonlyArray<HomeItem>, appearance: HomeAppearance): { readonly scene: HomeScene; readonly title: string; readonly line: string | undefined; readonly caughtUp: boolean } {
+  const now = new Date(appearance.at)
+  // Until Home is ready it never says "All caught up" (SPEC 12).
+  const done = view.ready && items.length === 0 && !view.unread
+  return {
+    scene: homeScene({ now, caughtUp: done, firstVisitToday: appearance.firstVisitToday }),
+    title: homeGreeting({ now, firstName: view.firstName, caughtUp: done }).title,
+    line: view.ready ? undefined : HOME_SYNCING_LINE,
     caughtUp: done,
-    used: syncing ? previous.used : new Set<string>(),
-    loading: false,
-    filling: view.firstSync,
-    // The reserved slots stay until Home appears again, so nothing moves; shown while history lands, it reserves them.
-    reservedItems: syncing ? previous.reservedItems : view.firstSync && !done ? limit : 0,
-    picture: done && !syncing && options.welcome !== true ? takePicture(now.getTime()) : undefined,
-  })
-}
-
-/** During the first sync: adds the items that landed since, into the free slots. A caught-up Home stays so. */
-export function fillHome(registry: Registry, key: string): void {
-  const shown = registry.get(homeShownAtom(key))
-  const result = registry.get(homeViewAtom)
-  if (shown?.filling !== true || shown.caughtUp || result._tag !== 'Success' || !result.value.firstSync) return
-  const items = addHomeItems(shown.view.items, result.value.items, shown.reservedItems)
-  if (items !== shown.view.items) registry.set(homeShownAtom(key), { ...shown, view: { ...shown.view, items } })
-}
-
-/** A row's button was used: it goes, its slot stays. */
-export function markHomeItemUsed(registry: Registry, key: string, itemId: string): void {
-  const shown = registry.get(homeShownAtom(key))
-  if (shown !== undefined) registry.set(homeShownAtom(key), { ...shown, used: new Set([...shown.used, itemId]) })
+  }
 }
 
 /**

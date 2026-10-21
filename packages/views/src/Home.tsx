@@ -19,8 +19,6 @@ export interface HomeProps {
   readonly line?: ReactNode
   /** Already ranked and capped. */
   readonly items: ReadonlyArray<HomeItem>
-  /** Items whose button was used: the button is gone, its slot stays. */
-  readonly done?: ReadonlySet<string>
   readonly now: number
   /** Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onOpen: (topicId: string, event: ActivateEvent) => void
@@ -36,10 +34,10 @@ export interface HomeProps {
   readonly onDismiss?: (itemId: string) => void
   /** A proactive ask's Start and Not now, and its row, which opens the ask in the Juno chat. Without it the row has no buttons. */
   readonly onAsk?: (itemId: string, answer: HomeAskAnswer) => void
-  /** The first sync is still running: `line` says so and items fill in as they land. */
+  /** The first sync is still running: `line` says so and items show as they land. */
   readonly loading?: boolean
-  /** Keep these row slots through a cold visit, including before its items arrive; rows that land later fill them. */
-  readonly reservedItems?: number
+  /** The pointer moved over the rows or left them, or keyboard focus came into them or left: the owner holds the rows meanwhile (SPEC 12, "Home is live"). */
+  readonly onHold?: (part: 'pointer' | 'keyboard', inside: boolean) => void
   /** Pinned at the bottom, where a topic's composer is: the destination and the field (`HomeWrite` and a `Composer`). */
   readonly composer?: ReactNode
   /** Nothing to show yet (a few milliseconds): the column is empty, the composer is already in its place. */
@@ -61,10 +59,9 @@ export interface HomeProps {
  * under the chosen line limit. The column scrolls on its own, so the
  * composer never moves.
  */
-export function Home({ scene, title, line, items, done, now, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, onDismiss, onAsk, loading = false, reservedItems = 0, composer, waiting = false, welcome, picture, onOpenPicture, onPictureMissing }: HomeProps) {
+export function Home({ scene, title, line, items, now, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, onDismiss, onAsk, loading = false, onHold, composer, waiting = false, welcome, picture, onOpenPicture, onPictureMissing }: HomeProps) {
   const headingId = useId()
   const pictured = picture !== undefined && onOpenPicture !== undefined
-  const itemsShown = items.length > 0 || reservedItems > 0
   return (
     <div data-home="" data-home-waiting={waiting ? '' : undefined} data-home-loading={loading ? '' : undefined} aria-busy={loading || undefined} {...stylex.props(styles.root)}>
       <div {...stylex.props(styles.scroll)}>
@@ -87,13 +84,19 @@ export function Home({ scene, title, line, items, done, now, onOpen, onMarkDone,
               </Text>
             )}
           </div>}
-          {itemsShown ? (
-            <ul aria-labelledby={headingId} {...stylex.props(styles.items, welcome !== undefined && styles.itemsWelcome, reservedItems > 0 && styles.itemSlots(reservedItems))}>
+          {items.length > 0 ? (
+            <ul
+              aria-labelledby={headingId}
+              onPointerMove={onHold === undefined ? undefined : () => onHold('pointer', true)}
+              onPointerLeave={onHold === undefined ? undefined : () => onHold('pointer', false)}
+              onFocus={onHold === undefined ? undefined : (event) => event.target.matches(':focus-visible') && onHold('keyboard', true)}
+              onBlur={onHold === undefined ? undefined : (event) => !event.currentTarget.contains(event.relatedTarget as Node | null) && onHold('keyboard', false)}
+              {...stylex.props(styles.items, welcome !== undefined && styles.itemsWelcome)}
+            >
               {items.map((item) => (
                 <HomeRow
                   key={item.id}
                   item={item}
-                  done={done?.has(item.id) === true}
                   now={now}
                   onOpen={onOpen}
                   onMarkDone={onMarkDone}
@@ -139,7 +142,7 @@ function RowTile({ item }: { readonly item: HomeItem }) {
 }
 
 /** A row's own props, and the callbacks Home passes down. */
-type HomeRowProps = { readonly item: HomeItem; readonly done: boolean } & Pick<HomeProps, 'now' | 'onOpen' | 'onMarkDone' | 'onResolveAll' | 'onReview' | 'onSort' | 'onItemMenu' | 'onDismiss' | 'onAsk'>
+type HomeRowProps = { readonly item: HomeItem } & Pick<HomeProps, 'now' | 'onOpen' | 'onMarkDone' | 'onResolveAll' | 'onReview' | 'onSort' | 'onItemMenu' | 'onDismiss' | 'onAsk'>
 
 const preventNavigation = (event: MouseEvent) => event.preventDefault()
 
@@ -149,7 +152,7 @@ const preventNavigation = (event: MouseEvent) => event.preventDefault()
  * in All and Move, or Dismiss on Automated's record. Automated's row opens the conversation's menu on
  * right-click, where Ignore is.
  */
-function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, onDismiss, onAsk }: HomeRowProps) {
+function HomeRow({ item, now, onOpen, onMarkDone, onResolveAll, onReview, onSort, onItemMenu, onDismiss, onAsk }: HomeRowProps) {
   const topic = item.topics[0]
   const body = (
     <>
@@ -204,13 +207,11 @@ function HomeRow({ item, done, now, onOpen, onMarkDone, onResolveAll, onReview, 
       )}
       {buttons.length === 0 ? null : (
         <span {...stylex.props(styles.slot)}>
-          {done
-            ? null
-            : buttons.map((button) => (
-                <Button key={button.label} variant={button.primary ? 'raised' : 'ghost'} size="sm" tone={button.primary ? 'default' : 'muted'} onClick={button.run}>
-                  {button.label}
-                </Button>
-              ))}
+          {buttons.map((button) => (
+            <Button key={button.label} variant={button.primary ? 'raised' : 'ghost'} size="sm" tone={button.primary ? 'default' : 'muted'} onClick={button.run}>
+              {button.label}
+            </Button>
+          ))}
         </span>
       )}
     </li>
@@ -305,7 +306,6 @@ const styles = stylex.create({
     clipPath: 'inset(50%)',
     whiteSpace: 'nowrap',
   },
-  itemSlots: (count: number) => ({ minHeight: `calc(${count} * (${sizes['--row-52']} + ${spacing['--space-0-5']}) - ${spacing['--space-0-5']})` }),
   items: {
     display: 'flex',
     flexDirection: 'column',

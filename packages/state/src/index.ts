@@ -19,7 +19,7 @@ export { quietDaysAtom, setQuietDays } from './quietWindow'
 export { personPresenceAtom, setShowPresence, showPresenceAtom, sidebarPersonActiveAtom } from './presence'
 export { isPeekKey, peekKeyAtom, setPeekKey } from './peek'
 export { openViewerAtom } from './mediaViewer'
-export { closeWelcome, showWelcome, tickWelcome, welcomeAtom, type Welcome } from './welcome'
+export { closeWelcome, showWelcome, tickWelcome, welcomeAtom } from './welcome'
 export { setTabExpiry, startTabExpiry, tabExpiryAtom } from './tabExpiry'
 export { quickReactionsAtom, setQuickReactions } from './quickReactions'
 export {
@@ -240,16 +240,15 @@ export {
 } from './junoPanel'
 export { closeWebPanel, followWebPanel, openWebPanel, setWebPanelOn, webPanelAtom, webPanelOnAtom, webPanelStateAtom } from './webPanel'
 export {
-  fillHome,
-  freezeHome,
-  homeShownAtom,
+  holdHome,
+  homeAppears,
+  homeHeading,
+  homeItemLimit,
   homeViewAtom,
   markFollowUpDone,
   actOnDoneFollowUp,
   actOnOldDraft,
-  markHomeItemUsed,
   prefetchHome,
-  showHome,
   resolveAllTopics,
   actOnSettled,
   actOnMove,
@@ -259,9 +258,9 @@ export {
   startVisitLog,
   tidyUpPrefsAtom,
 } from './home'
-export { homeGreeting } from './homeScene'
 export type { Picture, Thought } from '@juno/pictures'
-export { forgetPicture, homePicturesOnAtom, lastPictureId, pictureTitle, pictureUrl, preparePicture, setHomePicturesOn } from './homePictures'
+export { forgetPicture, homePicturesOnAtom, lastPictureId, pictureTitle, pictureUrl, preparePicture, setHomePicturesOn, takePicture } from './homePictures'
+export { withAsks } from './homeAsks'
 export { ensurePicture, loadPictures, loadThoughts, pictureFilesAtom, readPictureFiles } from './pictureFiles'
 export { actOnSuggested } from './suggested'
 export {
