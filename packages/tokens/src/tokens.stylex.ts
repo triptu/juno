@@ -1027,6 +1027,9 @@ export const sizes = stylex.defineVars({
   // The gallery's rows of pictures, each at its own shape, and the picture page's label column.
   '--gallery-row': '150px',
   '--picture-label-width': '380px',
+  // The narrowest column of the gallery's quotes and facts. Columns share the page's width evenly, so
+  // with two or more a column is under 1.5 times this: about 45 to 75 characters a line.
+  '--gallery-words-column': '290px',
 
   '--tile-44': '44px',
   '--tile-36': '36px',

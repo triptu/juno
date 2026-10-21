@@ -175,7 +175,7 @@ function GalleryPills({ pictures, thoughts, filter, onFilter }: Pick<GalleryProp
  * The quotes or the facts, in sections by theme: set as the picture page
  * sets its words, a quote in the serif of its caption with who said it on
  * a quiet line under it, a fact in the body text of its facts. In columns
- * of the picture page's label width, as many as the page holds.
+ * that share the page's width evenly, more of them as the page widens.
  */
 function GalleryWordList({ thoughts, words }: { readonly thoughts: ReadonlyArray<GalleryThoughtView>; readonly words: GalleryWords }) {
   return GALLERY_THEMES.map(({ theme, name }) => {
@@ -237,8 +237,11 @@ function GalleryTile({ picture, src, current, onOpen }: { readonly picture: Pict
 }
 
 const styles = stylex.create({
+  // Stretched, so its width never comes from its content: the words' columns share the page's width.
   scroll: {
     flexGrow: 1,
+    alignSelf: 'stretch',
+    width: '100%',
     minHeight: 0,
     overflowY: 'auto',
     scrollbarGutter: 'stable',
@@ -299,17 +302,18 @@ const styles = stylex.create({
     outlineColor: colors['--border-strongest'],
   },
   words: { display: 'flex', flexDirection: 'column', minWidth: 0 },
-  // Columns of the picture page's label width, as many as fit; an entry never breaks across two.
+  // As many columns as fit at the narrowest, sharing the width evenly, with the picture rows' gap between them.
+  // An entry fills its column and never breaks across two.
   wordList: {
-    columnWidth: sizes['--picture-label-width'],
-    columnGap: spacing['--space-8'],
+    columnWidth: sizes['--gallery-words-column'],
+    columnGap: spacing['--space-5'],
     margin: 0,
     padding: 0,
     listStyle: 'none',
   },
-  // At most the label's width, so a line keeps a reading length however wide its column is.
+  // Two or more columns never reach this width; it only keeps a single column to a reading length.
   entry: {
-    maxWidth: sizes['--picture-label-width'],
+    maxWidth: `calc(${sizes['--gallery-words-column']} * 1.5 + ${spacing['--space-5']})`,
     breakInside: 'avoid',
     contain: 'content',
     paddingBottom: spacing['--space-5'],

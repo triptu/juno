@@ -558,7 +558,8 @@ The `chat` group (`tokens.stylex.ts`). `--owner-bubble-bg` and `--owner-bubble-f
 | `--home-picture-width` × `--home-picture-height` | 320 × 216 | Home's picture box at most (SPEC 12, "A picture"); the picture is fitted inside and rests on its bottom edge |
 | `--home-picture-height-min`, `--home-picture-room` | 144, 264 | The box's height is the page's height less the room, never under the min, so the column fits above the destination chip and the field |
 | `--gallery-row` | 150 | The height of a row of pictures in the gallery |
-| `--picture-label-width` | 380 | The picture page's label column beside the picture, and the gallery's columns of quotes and facts |
+| `--picture-label-width` | 380 | The picture page's label column beside the picture |
+| `--gallery-words-column` | 290 | The narrowest column of the gallery's quotes and facts. Columns share the width evenly, so two or more stay under 1.5 times this: about 45 to 75 characters a line |
 
 ### Illustrations and the mark
 
