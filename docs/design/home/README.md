@@ -43,13 +43,7 @@ The first name comes from the Slack profile. If there is none, drop the name and
 
 ### Greeting, second line
 
-| Items | Text |
-| --- | --- |
-| 1 | One thing wants you. |
-| 2 | Two things want you. |
-| 3 | Three things want you. |
-| 0, caught up | Nothing is waiting on you. |
-| 0, not caught up (unread in followed topics) | Nothing is waiting on you. The time-of-day line stays. |
+There is none: the rows are the count (SPEC §12). Only the first sync has a second line, "Syncing with Slack." and then its count. Once Home is ready, no rows means caught up, whatever is unread in the sidebar: unread messages that want nothing of you do not make a row.
 
 ### No thought
 
