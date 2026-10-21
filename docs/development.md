@@ -361,12 +361,9 @@ from `@juno/agent-testing/openai` is an endpoint to set up through
 
 ## Sign-in and the live smoke
 
-Two ways in, both ending in a session the engine verifies with `auth.test`
+The only way in is importing the installed Slack app’s session, which the engine verifies with `auth.test`
 (`docs/architecture.md` section 14):
 
-- **Sign in to Slack** opens Slack's own sign-in page in a window on the
-  `persist:slack` partition. The token is read from the page's `localConfig_v2`
-  once it reaches `/client/<team>`; the cookie is already in the session.
 - **Use the Slack app's session** reads copies of the installed Slack app's
   `Local Storage/leveldb` and `Cookies`. macOS asks once for access to the
   "Slack Safe Storage" keychain item (the `security` tool makes the request,
@@ -377,7 +374,7 @@ Two ways in, both ending in a session the engine verifies with `auth.test`
 
 Secrets go to `<userData>/secrets.bin`, encrypted with `safeStorage`. Under
 `JUNO_E2E=1` the file is plain JSON and the three test seams are read from the
-environment: `JUNO_FAKE_SLACK_URL` (the fake the sign-in window and the socket
+environment: `JUNO_FAKE_SLACK_URL` (the fake API and socket
 allow-list point at), `JUNO_SLACK_APP_DIR` (a fixture Slack-app directory) and
 `JUNO_SLACK_SAFE_STORAGE_PASSWORD` (stands in for the keychain). The e2e fixtures
 in `apps/desktop/e2e/fixtures.ts` set all three; `juno.signIn()` and
@@ -449,9 +446,7 @@ launch through the first sign-in and sync, in order:
 5. **The import writes the `d` cookie** into `persist:slack`, and after
    `auth.test` main writes `secrets.bin` with `safeStorage.encryptString`.
    Both use "Juno Safe Storage" from step 3, so no prompt.
-6. **Sign in to Slack** (the window) reads no Slack item; its cookies go
-   through step 3's item.
-7. **MCP credentials** (`juno-mcp`) and **backup secrets** (`juno-backup`) are
+6. **MCP credentials** (`juno-mcp`) and **backup secrets** (`juno-backup`) are
    read only when the agent asks, after a provider is set up. Like step 1,
    `security` created them, so there is no prompt.
 
@@ -1212,7 +1207,7 @@ lint/typecheck. Heavy checks run through `pnpm affected` on the SSH runner.
 2. Set the version with `pnpm release:version` ("Versions" below). Build and smoke the
    local package with `pnpm package` and `pnpm test:package`. The smoke launches
    the executable directly, signs in to fake Slack, waits for sidebar rows,
-   starts the agent against fake OpenRouter, and relaunches the cached account.
+   starts the agent against fake OpenRouter, stages multi-chunk ZIP and empty-MIME DMG files in a topic composer, and relaunches the cached account.
    It uses temporary data and never reads a real Slack session. Without a Developer
    ID signature, it applies `codesign -s -` locally and verifies the result. It
    measures five cached-account launches from process spawn to the renderer's

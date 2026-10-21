@@ -26,7 +26,6 @@ export const SessionHandlers = SessionRoutes.toLayer(
         return user === undefined ? null : personFrom(user.id, user)
       })),
       'session.status': () => serveLiveValue(session.statuses.pipe(Stream.mapEffect(() => Effect.result(timed(session.status)))), { measure }),
-      'session.signIn': () => session.signIn('window'),
       'session.importFromSlackApp': () => session.signIn('import'),
       'session.signOut': () => session.signOut,
     }

@@ -20,6 +20,10 @@ const settings = chunk(() => import('./Settings'))
 const SettingsTab = settings.component((module) => module.SettingsTab)
 export const loadSettingsTab = settings.load
 
+// The developer log loads when its tab first shows.
+const devLog = chunk(() => import('./DevLog'))
+const DevLogTab = devLog.component((module) => module.DevLogTab)
+
 // The huddle page loads when a huddle tab first shows.
 const huddle = chunk(() => import('./huddle/Tab'))
 const HuddleTab = huddle.component((module) => module.HuddleTab)
@@ -113,6 +117,11 @@ export const tabKinds: { readonly [K in Place['kind']]: TabKind<Extract<Place, {
   junoPage: pageKind((place) => junoPageTitles[place.page], 'juno', (place) => (
     <Suspense key={place.page} fallback={null}>
       <JunoPageTab page={place.page} />
+    </Suspense>
+  )),
+  devLog: pageKind(() => 'Developer log', 'settings', () => (
+    <Suspense key="dev-log" fallback={null}>
+      <DevLogTab />
     </Suspense>
   )),
   huddle: {

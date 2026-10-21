@@ -27,11 +27,11 @@ const refreshOpenTopics = (runtime: SyncRuntime) => Effect.gen(function* () {
  * After the phase has settled: it runs on the background lane.
  */
 export const followPassIfDue = (runtime: SyncRuntime) => {
-  const { state, config, ctx, work } = runtime
+  const { state, config, ctx, work, step } = runtime
   return Effect.gen(function* () {
     const now = yield* Clock.currentTimeMillis
     if (state.lastFollowPass !== undefined && now - state.lastFollowPass < config.followPassMillis) return
-    yield* followPass(ctx)
+    yield* step('follow-pass', followPass(ctx))
     state.lastFollowPass = now
   }).pipe(
     work.withPermit,
@@ -99,8 +99,8 @@ export const repairAfterLive = (runtime: SyncRuntime) => repairMutations(runtime
   Effect.catchIf(isNotAuth, (error) => Effect.logWarning('sync: mutation repair deferred', { cause: error })),
 )
 
-export const makeReconcile = (runtime: SyncRuntime) => {
-  const { cycle, work, settle } = runtime
+export const makeReconcile = (runtime: SyncRuntime, name: 'catch-up' | 'sweep') => {
+  const { cycle, work, settle, step } = runtime
   /**
    * The catch-up after a reconnect or a sweep, under the work permit, then
    * the follow pass if it is due. Reconnects refresh the incremental thread
@@ -108,7 +108,7 @@ export const makeReconcile = (runtime: SyncRuntime) => {
    * a drop it rechecks the gap; a drop during it is rechecked by the next
    * one, and a failure keeps the gap.
    */
-  const reconcile: Effect.Effect<void, SlackAuthRequired, SyncServices | Scope.Scope> = cycle(catchUpAfterGap(runtime).pipe(
+  const reconcile: Effect.Effect<void, SlackAuthRequired, SyncServices | Scope.Scope> = cycle(step(name, catchUpAfterGap(runtime)).pipe(
     work.withPermit,
     Effect.tapError((error) => Effect.logWarning('sync: catch-up failed', { cause: error })),
     Effect.andThen(settle),

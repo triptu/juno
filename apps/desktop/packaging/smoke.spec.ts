@@ -5,7 +5,7 @@ import { once } from 'node:events'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve, join } from 'node:path'
-import { startFakeSlack } from '@juno/fake-slack'
+import { startFakeSlack, writeSlackAppFixture } from '@juno/fake-slack'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 
 test('packaged app signs in and starts both utility processes @mac', async () => {
@@ -31,7 +31,16 @@ test('packaged app signs in and starts both utility processes @mac', async () =>
   const userData = await mkdtemp(join(tmpdir(), 'juno-package-'))
   const fake = await startFakeSlack()
   const model = await startFakeOpenRouter()
+  const slackAppDir = join(userData, 'slack-app')
+  const keychainPassword = 'juno-fake-packaged-keychain'
+  const credentials = fake.signIn()
+  await writeSlackAppFixture(slackAppDir, {
+    team: { id: fake.teamId, name: 'Juno Fake', domain: 'juno-fake', url: `${fake.url}/`, token: credentials.token, userId: credentials.userId },
+    cookie: credentials.cookie,
+    keychainPassword,
+  })
   const env: NodeJS.ProcessEnv = { ...process.env, JUNO_E2E: '1', JUNO_USER_DATA: userData, JUNO_FAKE_SLACK_URL: fake.url,
+    JUNO_SLACK_APP_DIR: slackAppDir, JUNO_SLACK_SAFE_STORAGE_PASSWORD: keychainPassword,
     JUNO_E2E_OPENROUTER_KEY: 'sk-or-v1-e2e-packaging-0123456789abcdef', JUNO_FAKE_OPENROUTER_URL: model.origin,
     // The agent runs one script at start and writes the result: the QuickJS worker and binary load from the asar.
     JUNO_AGENT_CODEMODE: '1',
@@ -64,13 +73,8 @@ test('packaged app signs in and starts both utility processes @mac', async () =>
           const page = context.pages().find((candidate) => candidate.url().startsWith('juno://'))
           if (!page) throw new Error('Packaged app did not open its main window')
           if (pass === 0) {
-            await expect(page.getByRole('button', { name: 'Sign in to Slack', exact: true })).toBeVisible()
-            const opened = context.waitForEvent('page')
-            await page.getByRole('button', { name: 'Sign in to Slack', exact: true }).click()
-            const signIn = await opened
-            await signIn.getByPlaceholder('Email').fill('tushar@juno-fake.test')
-            await signIn.getByPlaceholder('Password').fill('password')
-            await signIn.getByRole('button', { name: 'Sign in', exact: true }).click()
+            await expect(page.getByRole('button', { name: "Use the Slack app's session", exact: true })).toBeVisible()
+            await page.getByRole('button', { name: "Use the Slack app's session", exact: true }).click()
           }
           await expect(page.getByRole('complementary', { name: 'Sidebar' }).getByRole('listitem').first()).toBeVisible({ timeout: 20_000 })
           if (pass > 0) {
@@ -86,6 +90,25 @@ test('packaged app signs in and starts both utility processes @mac', async () =>
           // The engine got the saved key from main: a sidebar thread has an AI title without being opened.
           await expect(page.locator('[data-topic-row][data-title-source="ai"]').first()).toBeVisible({ timeout: 30_000 })
           await page.screenshot({ path: 'test-results/packaged-sidebar.png' })
+          if (pass === 0) {
+            await page.getByRole('listitem', { name: '#eng', exact: true }).click()
+            const field = page.locator('[data-composer] textarea').last()
+            await expect(field).toBeVisible()
+            const transfer = await page.evaluateHandle(() => {
+              const data = new DataTransfer()
+              data.items.add(new File([new Uint8Array(3 * 1024 * 1024)], 'Juno.dmg', { type: '' }))
+              data.items.add(new File([new Uint8Array(2 * 1024 * 1024)], 'archive.zip', { type: 'application/zip' }))
+              return data
+            })
+            await field.focus()
+            await field.evaluate((element, data) => element.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true })), transfer)
+            await expect(page.locator('[data-attachment="ready"]')).toHaveCount(2)
+            await page.screenshot({ path: test.info().outputPath('packaged-attachments.png') })
+            await page.getByRole('button', { name: 'Remove Juno.dmg', exact: true }).click()
+            await page.getByRole('button', { name: 'Remove archive.zip', exact: true }).click()
+            await transfer.dispose()
+            await page.getByRole('button', { name: 'Home', exact: true }).click()
+          }
         } finally {
           await browser.close()
         }

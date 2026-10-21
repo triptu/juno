@@ -18,6 +18,7 @@ import { SlackTransportError, type SlackApiError } from './errors.ts'
 import { RequestQueue, type Lane } from './queue.ts'
 import { SlackSession } from './session.ts'
 import { HttpTransport } from './transport.ts'
+import { SlackTrace, traced } from './trace.ts'
 
 export interface EdgeCallOptions {
   /** Default `background`: edge lookups fill caches, they rarely block the user. */
@@ -48,6 +49,7 @@ export class SlackEdge extends Context.Service<SlackEdge, SlackEdgeShape>()('jun
       const transport = yield* HttpTransport
       const queue = yield* RequestQueue
       const api = yield* SlackApi
+      const trace = yield* SlackTrace
       const cached = yield* Ref.make<{ url: string; expiresAt: number } | undefined>(undefined)
       // Calls that start together wait for one fetch instead of each asking Slack.
       const fetching = yield* Semaphore.make(1)
@@ -72,10 +74,18 @@ export class SlackEdge extends Context.Service<SlackEdge, SlackEdgeShape>()('jun
         Effect.gen(function* () {
           const schema = S.Union([ok, ErrorResponse])
           const key = `edge:${method}`
+          const lane = options.lane ?? 'background'
           const payload = JSON.stringify({ token: session.token, ...body })
-          return yield* withRetries(queue, config, options.lane ?? 'background', key, () =>
-            Effect.gen(function* () {
-              const base = yield* baseUrl(options.lane ?? 'background')
+          const describe = () => ({
+            method: key,
+            lane,
+            reason: undefined,
+            params: Object.entries(body).map(([name, value]): readonly [string, string] => [name, typeof value === 'string' ? value : JSON.stringify(value) ?? '']),
+            startedAt: Date.now(),
+          })
+          return yield* traced(trace, describe, (recorder) => withRetries(queue, config, lane, key, () => {
+            const exchange = Effect.gen(function* () {
+              const base = yield* baseUrl(lane)
               const response = yield* transport
                 .request({
                   url: `${base}/${method}?_x_app_name=client`,
@@ -91,9 +101,10 @@ export class SlackEdge extends Context.Service<SlackEdge, SlackEdgeShape>()('jun
                       : new SlackTransportError({ method: key, message: error.message, retryable: true }),
                   ),
                 )
-              return (yield* decodeResponse(key, response, schema, config)) as A
-            }),
-          )
+              return (yield* decodeResponse(key, response, schema, config, recorder?.seen)) as A
+            })
+            return recorder === undefined ? exchange : recorder.exchange(exchange)
+          }))
         }).pipe(Effect.withSpan('SlackEdge.call', { attributes: { method } }))
 
       const usersInfo: SlackEdgeShape['usersInfo'] = (ids, options = {}) => {

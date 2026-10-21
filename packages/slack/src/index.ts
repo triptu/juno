@@ -27,6 +27,7 @@ export { RequestQueue } from './client/queue.ts'
 export { apiBaseFromWorkspace, SlackSession, slackRoute, type SlackSessionShape } from './client/session.ts'
 export { SlackSocket, SocketHandshake, type SocketEvent, type SocketHandshakeShape } from './client/socket.ts'
 export { HttpTransport, HttpTransportError, type HttpResponse } from './client/transport.ts'
+export { SlackTrace, type SlackCallEnd, type SlackCallOutcome, type SlackCallStart, type SlackTraceShape } from './client/trace.ts'
 
 /** Every client service, needing only the host's seams. */
 export const SlackClient = {

@@ -8,6 +8,7 @@ export const LOG_EVENTS = new Set([
   "engine: bad message from main",
   "engine: failed to start",
   "engine: failed to stop",
+  "files: staging failed",
   "files: sweep failed",
   "grammar: a request failed",
   "home: a pass failed",

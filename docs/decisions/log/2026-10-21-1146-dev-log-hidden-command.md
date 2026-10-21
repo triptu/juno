@@ -1,0 +1,1 @@
+- 10-21 11:46 · dev-log · The developer log opens from ⌘K only when the text names "developer" or "dev log", in its own tab that is never saved; a hidden command flag, not a developer-mode toggle.

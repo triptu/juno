@@ -45,7 +45,8 @@ export class PhaseSource extends Context.Service<PhaseSource, Stream.Stream<Engi
 
 const isSqlError = (error: unknown): error is SqlError => (error as { readonly _tag?: unknown } | undefined)?._tag === 'SqlError'
 
-const ONLINE = new Set<EnginePhase['_tag']>(['first-run', 'catching-up', 'live', 'rate-limited'])
+// `failed`: Slack answers, the sync just cannot finish, so reads still work.
+const ONLINE = new Set<EnginePhase['_tag']>(['first-run', 'catching-up', 'live', 'failed', 'rate-limited'])
 
 const hostError = (error: MirrorError): AgentHostError => {
   switch (error._tag) {
