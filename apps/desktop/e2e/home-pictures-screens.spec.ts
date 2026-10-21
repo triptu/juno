@@ -116,6 +116,10 @@ quiet('Home with a picture, the picture page with its scale, and the gallery in 
   await shoot(win, 'pictures-a-gallery-kind-light')
   await gallery.getByRole('radio', { name: 'By time' }).click()
   await shoot(win, 'pictures-a-gallery-time-light')
+  // A large laptop window: more centuries side by side, or more pictures to a row.
+  await juno.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1600, 1000))
+  await shoot(win, 'pictures-a-gallery-time-wide-light')
+  await juno.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1200, 800))
   await gallery.getByRole('radio', { name: 'By kind' }).click()
 
   await juno.setTheme('Dark')
