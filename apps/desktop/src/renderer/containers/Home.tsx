@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
-import { viewsSortChannel, type HomeItem } from '@juno/contract'
+import { homeHuddleSeen, viewsSortChannel, type HomeItem } from '@juno/contract'
 import { closeWelcome, fillHome, fillThought, forgetPicture, freezeHome, homeGreeting, homePicturesOnAtom, homeShownAtom, homeViewAtom, markFollowUpDone, markHomeItemUsed, markMovesSeen, markMovesShown, peekKeyAtom, pictureUrl, preparePicture, prepareThought, registry, resolveAllTopics, runAction, runCommand, showHome, showToast, syncProgressAtom, welcomeAtom, type Welcome } from '@juno/state'
 import { homeAsksAtom, junoPageActions } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'

@@ -119,13 +119,14 @@ export const Services = Layer.mergeAll(EnginePhases, ArtJob, TitleJob, HomeJob, 
   Layer.provideMerge(SessionClientLive),
   Layer.provideMerge(Session.layer),
   Layer.provideMerge(Workspace.layer),
-  Layer.provideMerge(Layer.merge(Status.layer, DevLog.layer, PictureCache.layer)),
+  Layer.provideMerge(Layer.merge(Layer.merge(Status.layer, DevLog.layer), PictureCache.layer)),
 )
 
 /** One `toLayer` per feature, merged. Requires `Services`. `Layer.mergeAll` takes at most 20, so later features merge after it. */
 export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHandlers, SearchHandlers, PrefsHandlers, MessagesHandlers, ReadsHandlers, ArtHandlers, NewChatHandlers, SendHandlers, HomeHandlers, AllTopicsHandlers, NotificationsHandlers, ViewsHandlers, FilesHandlers, MentionsHandlers, AiHandlers, AgentWritesHandlers).pipe(
   Layer.merge(HuddleHandlers),
-  Layer.merge(DevLogHandlers, PicturesHandlers),
+  Layer.merge(DevLogHandlers),
+  Layer.merge(PicturesHandlers),
 )
 
 /** The engine's side of the AgentHost port (ADR 0012): `JunoHost` over `Services`, with the engine phase from the status feature. */
