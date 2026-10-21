@@ -1,11 +1,16 @@
 // Home's picture (SPEC 12, "A picture" and "Pictures and the gallery"): a
 // caught-up Home shows a picture that is already on disk, never one that
-// would arrive late, with its two-line caption and nothing else; opening it
-// shows its story; the gallery lists every picture; Settings › General turns
-// it off, and Home shows the scene and "All caught up." with nothing under
-// it. Picture files come from the fake Slack's picture store, never the
-// network.
-import { SELF_ID, startFakeSlack, TEAM, type Workspace } from '@juno/fake-slack'
+// would arrive late, with its one-line label and its line and nothing else;
+// opening it shows the page with the line, the about, how big or how far
+// where that is known, and one link to read more; the gallery shows each
+// picture's line under it and switches to an order by time; Settings ›
+// General turns it off, and Home shows the scene and "All caught up." with
+// nothing under it. Picture files come from the fake Slack's picture store,
+// never the network.
+import { SELF_ID, startFakeSlack, TEAM, type FakeSlack, type Workspace } from '@juno/fake-slack'
+import { PICTURES } from '@juno/pictures/catalog'
+import type { Page } from '@playwright/test'
+import type { Juno } from './driver/juno'
 import { expect, test } from './fixtures'
 
 test.describe.configure({ timeout: 150_000 })
@@ -33,7 +38,8 @@ const quiet = test.extend({
   },
 })
 
-quiet('A caught-up Home shows a picture once it is on disk, opens its story, and the gallery lists every picture', async ({ juno, win, fake }) => {
+/** Waits until the next picture is on disk, then opens a caught-up Home that shows it, and returns it from the catalog. */
+async function homeWithPicture({ juno, win, fake }: { readonly juno: Juno; readonly win: Page; readonly fake: FakeSlack }) {
   await juno.signIn()
   await juno.waitForSync()
   const { home } = juno
@@ -42,46 +48,92 @@ quiet('A caught-up Home shows a picture once it is on disk, opens its story, and
   // Nothing is on disk yet: the scene and the greeting, with nothing under it, not a picture that would arrive later.
   await expect(home.picture).toHaveCount(0)
   await expect(home.column).toHaveText('All caught up.')
-
   // When idle, Juno downloads the next picture, both sizes.
   await expect.poll(() => fake.pictureRequests().filter((name) => name.endsWith('-small.webp')).length, { timeout: 30_000 }).toBeGreaterThan(0)
   await expect.poll(() => win.evaluate(() => JSON.parse(localStorage.getItem('juno.homePictures') ?? '{}').next?.id ?? null), { timeout: 30_000 }).not.toBeNull()
-
-  // The next caught-up Home has it in its first frame, with its caption under it: the title, then "artist, date".
+  // The next caught-up Home has it in its first frame.
   await juno.openSettings('General')
   await home.open()
   await expect(home.picture).toBeVisible()
   const image = home.picture.locator('img')
   await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true)
-  const caption = home.picture.locator('[data-home-caption] p')
-  await expect(caption).toHaveCount(2)
-  await expect(caption.last()).toHaveText(/^.+, .+$/)
-  const [title, byline] = (await caption.allTextContents()) as [string, string]
-  const [picture, under] = await Promise.all([image.boundingBox(), caption.first().boundingBox()])
-  expect(under!.y).toBeGreaterThan(picture!.y + picture!.height)
-  // The picture says Home is caught up: no greeting line and no thought, only the picture, its caption and a heading for screen readers.
+  const id = await win.evaluate(() => JSON.parse(localStorage.getItem('juno.homePictures') ?? '{}').current?.label.id as string)
+  return PICTURES.find((entry) => entry.id === id)!
+}
+
+quiet('A caught-up Home shows a picture with its label and line, and opens its page with one link to read more', async ({ juno, win, fake }) => {
+  const picture = await homeWithPicture({ juno, win, fake })
+  const { home } = juno
+  // The picture, its label "Title · Artist, date", then its line.
+  const image = home.picture.locator('img')
+  const label = home.picture.locator('[data-home-caption]')
+  await expect(label).toHaveText(`${picture.title} · ${picture.artist}, ${picture.date}`)
+  const line = home.picture.locator('[data-picture-line]')
+  await expect(line).toHaveText(picture.line.by === undefined ? picture.line.text : `“${picture.line.text}”${picture.line.by}`)
+  const [box, under, words] = await Promise.all([image.boundingBox(), label.boundingBox(), line.boundingBox()])
+  expect(under!.y).toBeGreaterThan(box!.y + box!.height)
+  expect(words!.y).toBeGreaterThan(under!.y + under!.height - 1)
+  // The picture leads: it takes far more of the page than its words.
+  expect(box!.width * box!.height).toBeGreaterThan(3 * words!.width * words!.height)
+  // The picture says Home is caught up: no greeting line, only the picture, its words and a heading for screen readers.
   await expect(home.root.getByRole('heading', { name: 'Home' })).toBeAttached()
-  await expect(home.column).toHaveText(`${title}${byline}Home`)
 
-  // Clicking it opens the picture with its story in the tab.
-  await home.picture.getByRole('button', { name: `Open ${title}` }).click()
+  // Clicking it opens the picture page in the tab: the line, the about, no list, and one link, labelled with the institution.
+  await home.picture.getByRole('button', { name: `Open ${picture.title}` }).click()
   const page = win.locator('[data-picture-page]')
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(title)
-  expect(await page.locator('li').count()).toBeGreaterThanOrEqual(3)
-  await expect(page.getByRole('heading', { name: 'Sources' })).toHaveCount(0)
-  await expect(page.locator('footer p')).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Source' })).toBeVisible()
-  await expect(page.locator('img')).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(picture.title)
+  await expect(page.locator('[data-picture-page-line]')).toContainText(picture.line.text)
+  await expect(page.getByText(picture.about)).toBeVisible()
+  await expect(page.locator('li')).toHaveCount(0)
+  const links = page.getByRole('link')
+  await expect(links).toHaveCount(1)
+  await expect(links).toHaveText(picture.learnMore.label)
+  await expect(links).toHaveAttribute('href', picture.learnMore.url)
+  await expect(page.getByText(picture.credit)).toBeVisible()
+  await expect(page.locator('[data-picture-scale]')).toHaveCount(picture.scale === undefined ? 0 : 1)
 
-  // All pictures opens the gallery, which lists every picture and rings the one Home showed.
+  // A picture with its size shows it beside a person; a space image shows how far.
+  for (const kind of ['size', 'distance'] as const) {
+    const scaled = PICTURES.find((entry) => entry.scale?.kind === kind)
+    if (scaled === undefined) continue
+    await page.getByRole('button', { name: 'All pictures' }).click()
+    await win.locator(`[data-gallery-picture="${scaled.id}"]`).getByRole('button').click()
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(scaled.title)
+    await expect(page.locator(`[data-picture-scale="${kind}"]`)).toBeVisible()
+  }
+})
+
+quiet('The gallery shows each picture with its line, has no quotes or facts, and orders by time', async ({ juno, win, fake }) => {
+  const picture = await homeWithPicture({ juno, win, fake })
+  await juno.home.picture.getByRole('button', { name: `Open ${picture.title}` }).click()
+  const page = win.locator('[data-picture-page]')
   await page.getByRole('button', { name: 'All pictures' }).click()
+
+  // By kind: every picture in columns with its line under it, the one Home showed ringed, and no Quotes or Facts.
   const gallery = win.locator('[data-gallery]')
   await expect(gallery.getByRole('heading', { name: 'Gallery' })).toBeVisible()
-  expect(await gallery.locator('[data-gallery-picture]').count()).toBeGreaterThan(20)
+  await expect(gallery.locator('[data-gallery-picture]')).toHaveCount(PICTURES.length)
+  await expect(gallery.locator('[data-picture-line]')).toHaveCount(PICTURES.length)
+  await expect(gallery.locator(`[data-gallery-picture="${picture.id}"] [data-picture-line]`)).toContainText(picture.line.text)
   await expect(gallery.locator('button[aria-current="true"]')).toHaveCount(1)
-  // Back returns to the picture.
+  await expect(gallery.getByRole('button', { name: /^(Quotes|Facts)\b/ })).toHaveCount(0)
+
+  // By time: sections by century, oldest first, each picture with its date and no line.
+  await gallery.getByRole('radio', { name: 'By time' }).click()
+  await expect(gallery).toHaveAttribute('data-gallery-order', 'time')
+  const centuries = (await gallery.locator('section h2').allTextContents()).map((name) => Number.parseInt(name))
+  expect(centuries.length).toBeGreaterThan(3)
+  expect(centuries).toEqual(centuries.toSorted((a, b) => a - b))
+  await expect(gallery.locator('[data-gallery-picture]')).toHaveCount(PICTURES.length)
+  await expect(gallery.locator('[data-picture-line]')).toHaveCount(0)
+
+  // Back to the picture and forward again: the wall comes back in the order it was left.
   await juno.nav.back()
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(title)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(picture.title)
+  await juno.nav.forward()
+  await expect(gallery).toHaveAttribute('data-gallery-order', 'time')
+  await gallery.getByRole('radio', { name: 'By kind' }).click()
+  await expect(gallery).toHaveAttribute('data-gallery-order', 'kind')
 })
 
 quiet('Settings › General turns the picture off, and Home shows its scene', async ({ juno, win }) => {
