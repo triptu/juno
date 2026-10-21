@@ -120,8 +120,8 @@ asked('answering the last row takes it away at once, and Home is caught up as so
   await expect(home.root.locator('[data-home-item]')).toHaveCount(0)
   await expect(home.greeting).not.toHaveText('All caught up.')
 
-  // Read on another device: the same Home is caught up.
+  // Read on another device: the same Home is caught up, with the picture when one is on disk by now, else the scene.
   const last = fake.messages('D0LEO').at(-1)!
   fake.markRead({ channel: 'D0LEO', ts: last.ts })
-  await expect(home.greeting).toHaveText('All caught up.')
+  await expect(home.picture.or(home.root.locator('[data-home-scene="caughtUp"]'))).toBeVisible()
 })
