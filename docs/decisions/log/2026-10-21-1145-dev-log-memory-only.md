@@ -1,0 +1,1 @@
+- 10-21 11:45 · dev-log · A hidden developer log keeps the newest 2,000 Slack calls, socket events and sync steps in the engine's memory only; it is never logged, saved, put in Copy log or sent.
