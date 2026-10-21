@@ -44,6 +44,8 @@ export function usePosition(list: MessageWindow) {
   const pinRef = useRef<Pin | undefined>(undefined)
   // The row held after a source jump or while an older page went in above it.
   const [heldAt, setHeldAt] = useState<string | undefined>(undefined)
+  // The row a scroll came to rest on while it was still at its size estimate, laid out in full so Chromium anchors on it.
+  const [landedAt, setLandedAt] = useState<string | undefined>(undefined)
   const pinnedTopRef = useRef(0)
   // The rows and window size the bottom was held for.
   const heldForRef = useRef<{ readonly rows: MessageWindow['rows']; readonly size: string } | undefined>(undefined)
@@ -54,7 +56,7 @@ export function usePosition(list: MessageWindow) {
     lastRef.current = last
     atEndRef.current = atEnd
   })
-  return { scrollRef, anchorRef, positioned, setPositioned, drawnAll, setDrawnAll, atBottom, setAtBottom, far, setFar, seenTs, setSeenTs, pinRef, pinnedTopRef, heldAt, setHeldAt, heldForRef, lastRef, atEndRef }
+  return { scrollRef, anchorRef, positioned, setPositioned, drawnAll, setDrawnAll, atBottom, setAtBottom, far, setFar, seenTs, setSeenTs, pinRef, pinnedTopRef, heldAt, setHeldAt, landedAt, setLandedAt, heldForRef, lastRef, atEndRef }
 }
 
 export type Position = ReturnType<typeof usePosition>
@@ -127,16 +129,17 @@ export function useMessageFlash(position: Position, id: string, readOnly: boolea
 /** Keeps the pinned row or the bottom where it is while rows go in above it or the window resizes. */
 export function useHeldPosition(position: Position, list: MessageWindow): void {
   'use no memo'
-  const { scrollRef, pinRef, pinnedTopRef, positioned, drawnAll, heldAt } = position
+  const { scrollRef, pinRef, pinnedTopRef, positioned, drawnAll, heldAt, landedAt } = position
   const { first } = edgesOf(list)
-  // Rows added above the ones in view (the rest of the window after the first frame, an older page), and the rows
-  // around a held row laid out in full (`heldAt`): scroll anchoring keeps the rows in view still, except at offset 0,
-  // where Chromium does not anchor, and on rows still at their size estimate, which it never anchors on.
+  // Rows added above the ones in view (the rest of the window after the first frame, an older page), and rows laid out
+  // in full around a held row (`heldAt`) or as the row a scroll landed on (`landedAt`): scroll anchoring keeps the rows
+  // in view still, except at offset 0, where Chromium does not anchor, and on rows still at their size estimate, which
+  // it never anchors on.
   // A tab shown again runs this too: rows that changed while it was hidden had no anchoring at all.
   useLayoutEffect(() => {
     const scroller = scrollRef.current
     if (scroller !== null && positioned) hold(scroller, pinRef, pinnedTopRef)
-  }, [positioned, first, drawnAll, heldAt, list.rows, scrollRef, pinRef, pinnedTopRef])
+  }, [positioned, first, drawnAll, heldAt, landedAt, list.rows, scrollRef, pinRef, pinnedTopRef])
 
   // The list's box changes size (the window, the composer growing, the Juno panel beside it); at the bottom, stay
   // there. The observer sees only the scroller's own box, and runs after layout and before the frame's paint.
@@ -208,7 +211,7 @@ export function useSendMeasure(list: MessageWindow): void {
  */
 export function useScrollRelease(position: Position, view: string, readOnly: boolean): void {
   'use no memo'
-  const { scrollRef, pinRef, pinnedTopRef, setAtBottom, setFar, setSeenTs, setHeldAt, lastRef, atEndRef } = position
+  const { scrollRef, pinRef, pinnedTopRef, setAtBottom, setFar, setSeenTs, setLandedAt, lastRef, atEndRef } = position
   useEffect(() => {
     const scroller = scrollRef.current
     if (scroller === null) return
@@ -244,8 +247,8 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
       } else if (pinRef.current?.kind === 'bottom') pinRef.current = undefined
       // Anywhere else, the list holds the row it came to rest on. A jump lands on rows still at their size estimate,
       // and Chromium does not anchor on those, so as they reach their real height a frame or two later the rows in view
-      // moved by the difference. Then the rows around the held row are laid out in full in the next commit, and the pin
-      // puts it back before that frame is painted. That commit is flushed in this handler: React would render it in a
+      // moved by the difference. Then that row alone is laid out in full, and the pin puts it back; Chromium anchors
+      // on it as the rows around it are laid out. The commit is flushed in this handler: React would render it in a
       // later task, and on a loaded machine Chromium laid the rows out first, for frames on end. A row already laid
       // out is an anchor, and changing the eager rows after every step of a scroll restyled hundreds of elements, so
       // it only gets the pin.
@@ -253,7 +256,7 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
       if (inView !== undefined) {
         pinRef.current = { kind: 'row', element: inView.element, offset: inView.offset }
         pinnedTopRef.current = scroller.scrollTop
-        if (inView.element.firstElementChild?.checkVisibility({ contentVisibilityAuto: true }) === false) flushSync(() => setHeldAt(inView.anchorKey))
+        if (inView.element.firstElementChild?.checkVisibility({ contentVisibilityAuto: true }) === false) flushSync(() => setLandedAt(inView.anchorKey))
       }
       setAtBottom(bottom)
       setFar(distance > scroller.clientHeight)
@@ -274,7 +277,7 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
       gesture.stop()
       stopLeaving()
     }
-  }, [view, readOnly, scrollRef, pinRef, pinnedTopRef, setAtBottom, setFar, setSeenTs, setHeldAt, lastRef, atEndRef])
+  }, [view, readOnly, scrollRef, pinRef, pinnedTopRef, setAtBottom, setFar, setSeenTs, setLandedAt, lastRef, atEndRef])
 }
 
 /**
