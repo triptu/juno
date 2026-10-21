@@ -1,7 +1,8 @@
-// Writes the progress screenshots of Home's picture, its story and the
-// gallery (SPEC 12) into docs/progress/. Not part of the suite: run it by hand
-// after building the picture files (scripts/pictures/README.md), so the
-// screenshots show the real pictures rather than the fake's one stand-in:
+// Writes the progress screenshots of Home's picture, its page and the
+// gallery (SPEC 12) into docs/progress/ (or JUNO_SCREENS_OUT). Not part of the
+// suite: run it by hand after building the picture files
+// (scripts/pictures/README.md), so the screenshots show the real pictures
+// rather than the fake's one stand-in:
 //
 //   JUNO_SCREENS=1 JUNO_SCREENS_PICTURES=/Volumes/AgentWork/pictures-juno-art pnpm --filter @juno/desktop exec playwright test e2e/home-pictures-screens.spec.ts
 import { cp, mkdir, readdir } from 'node:fs/promises'
@@ -12,7 +13,7 @@ import { PICTURES } from '@juno/pictures/catalog'
 import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
 
-const progress = resolve(__dirname, '../../../docs/progress')
+const progress = process.env['JUNO_SCREENS_OUT'] ?? resolve(__dirname, '../../../docs/progress')
 const files = process.env['JUNO_SCREENS_PICTURES']
 const DAY = 24 * 60 * 60 * 1000
 
@@ -62,25 +63,21 @@ async function shoot(win: Page, name: string): Promise<void> {
   await win.screenshot({ path: join(progress, `${name}.png`) })
 }
 
-quiet('Home caught up before and after the picture, the story and the gallery, light and dark', async ({ juno, win, userData }) => {
+/** The first picture with a scale of this kind, for the picture page's shots. */
+const scaled = (kind: 'size' | 'distance', prefer: string) => PICTURES.find((entry) => entry.id === prefer && entry.scale?.kind === kind) ?? PICTURES.find((entry) => entry.scale?.kind === kind && entry.kind !== 'space') ?? PICTURES.find((entry) => entry.scale?.kind === kind)
+
+quiet('Home with a picture, the picture page with its scale, and the gallery in both orders, light and dark', async ({ juno, win, userData }) => {
   test.setTimeout(240_000)
   await mkdir(progress, { recursive: true })
   await juno.signIn()
   await juno.waitForSync()
   const { home } = juno
-
-  // Before: the caught-up scene, as Home shows it with no picture on disk.
-  await win.evaluate(() => localStorage.setItem('juno.homePictures', JSON.stringify({ off: true, seen: [] })))
-  await home.open()
-  await shoot(win, 'home-art-before-light')
-  await juno.setTheme('Dark')
-  await shoot(win, 'home-art-before-dark')
-  await juno.setTheme('Light')
-
   if (files !== undefined) {
     await mkdir(join(userData, 'pictures'), { recursive: true })
     for (const name of await readdir(files)) if (name.endsWith('.webp')) await cp(join(files, name), join(userData, 'pictures', name))
   }
+  const page = win.locator('[data-picture-page]')
+  const gallery = win.locator('[data-gallery]')
 
   const homeWith = async (id: string, name: string) => {
     await nextPicture(win, id)
@@ -90,40 +87,39 @@ quiet('Home caught up before and after the picture, the story and the gallery, l
     await expect.poll(() => home.picture.locator('img').evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true)
     await shoot(win, name)
   }
-  await homeWith('monet-impression-sunrise', 'home-art-after-light')
-  await home.picture.getByRole('button').click()
-  await expect(win.locator('[data-picture-page] h1')).toBeVisible()
-  await shoot(win, 'home-art-story-light')
-  await win.locator('[data-picture-page]').getByRole('button', { name: 'All pictures' }).click()
-  await expect(win.locator('[data-gallery]')).toBeVisible()
-  await shoot(win, 'home-art-gallery-light')
+  const pageOf = async (id: string, name: string) => {
+    await page.getByRole('button', { name: 'All pictures' }).click()
+    await gallery.locator(`[data-gallery-picture="${id}"]`).getByRole('button').click()
+    await expect(page.locator('h1')).toBeVisible()
+    await expect.poll(() => page.locator('img').first().evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0)).toBe(true)
+    await shoot(win, name)
+  }
+  const size = scaled('size', 'monet-impression-sunrise')
+  const distance = scaled('distance', 'webb-cosmic-cliffs')
 
-  // A wider window, as on a laptop screen: the label sits beside the picture.
-  await juno.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1440, 900))
-  await win.locator('[data-gallery-picture]').first().getByRole('button').click()
-  await expect(win.locator('[data-picture-page] h1')).toBeVisible()
-  await shoot(win, 'home-art-story-wide-light')
-  await juno.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1200, 800))
+  await homeWith('monet-impression-sunrise', 'pictures-a-home-painting-light')
+  await home.picture.getByRole('button').click()
+  await expect(page.locator('h1')).toBeVisible()
+  if (size !== undefined) await pageOf(size.id, 'pictures-a-page-size-light')
+  await page.getByRole('button', { name: 'All pictures' }).click()
+  await expect(gallery).toBeVisible()
+  await shoot(win, 'pictures-a-gallery-kind-light')
+  await gallery.getByRole('radio', { name: 'By time' }).click()
+  await shoot(win, 'pictures-a-gallery-time-light')
+  await gallery.getByRole('radio', { name: 'By kind' }).click()
 
   await juno.setTheme('Dark')
-  await homeWith('hokusai-great-wave', 'home-art-after-dark')
+  await homeWith('voyager1-pale-blue-dot', 'pictures-a-home-space-dark')
   await home.picture.getByRole('button').click()
-  await expect(win.locator('[data-picture-page] h1')).toBeVisible()
-  await shoot(win, 'home-art-story-dark')
-  await homeWith('webb-cosmic-cliffs', 'home-art-after-night-dark')
-  await home.picture.getByRole('button').click()
-  await expect(win.locator('[data-picture-page] h1')).toBeVisible()
-  await shoot(win, 'home-art-story-space-dark')
-  await juno.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1440, 900))
-  await expect(win.locator('[data-picture-page] h1')).toBeVisible()
-  await shoot(win, 'home-art-story-space-wide-dark')
-  await juno.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1200, 800))
-  await win.locator('[data-picture-page]').getByRole('button', { name: 'All pictures' }).click()
-  await expect(win.locator('[data-gallery]')).toBeVisible()
-  await shoot(win, 'home-art-gallery-dark')
-
-  // A large window, taller than a laptop screen allows a real one: the same box, the column centred in more room.
+  await expect(page.locator('h1')).toBeVisible()
+  if (distance !== undefined) await pageOf(distance.id, 'pictures-a-page-distance-dark')
+  await page.getByRole('button', { name: 'All pictures' }).click()
+  await expect(gallery).toBeVisible()
+  await shoot(win, 'pictures-a-gallery-kind-dark')
+  await gallery.getByRole('radio', { name: 'By time' }).click()
+  await shoot(win, 'pictures-a-gallery-time-dark')
+  await gallery.getByRole('radio', { name: 'By kind' }).click()
+  await homeWith('monet-impression-sunrise', 'pictures-a-home-painting-dark')
   await juno.setTheme('Light')
-  await win.setViewportSize({ width: 1728, height: 1080 })
-  await homeWith('monet-impression-sunrise', 'home-art-after-large-light')
+  await homeWith('voyager1-pale-blue-dot', 'pictures-a-home-space-light')
 })
