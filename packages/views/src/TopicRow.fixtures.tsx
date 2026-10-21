@@ -40,6 +40,23 @@ const titleScene = (lines: '1' | '2', density: 'compact' | 'comfortable') => sce
   </div>
 ), { density })
 
+const WRAPS = 'Plan the next release together with design and support this week'
+
+/** Two-line titles that wrap, in each state that shares the title line: the time sits on the first line. */
+const wrappedScene = scene<TopicRowProps>(() => (
+  <div style={titleColumn('2')}>
+    <TopicRow {...one({ ...rows.postgres, title: 'Plan' })} />
+    <TopicRow {...one({ ...rows.postgres, id: 'wraps', title: WRAPS })} />
+    <TopicRow {...one({ ...rows.roadmap, title: WRAPS })} selected />
+    <TopicRow {...one({ ...rows.flags, title: WRAPS })} />
+    <TopicRow {...one({ ...rows.notes, title: WRAPS })} />
+    <TopicRow {...one({ ...rows.pricing, title: WRAPS })} />
+    <TopicRow {...one({ ...rows.alertsMain, title: '#alerts-prod-billing-consumer-queue-depth-and-latency' }, { newThreads: newThreadsById.get(rows.alertsMain.id) })} />
+    <TopicRow {...one(rows.rtl)} />
+    <TopicRow {...one({ ...rows.postgres, id: 'renaming', title: WRAPS }, { renaming: true, onRename: noop, onRenameCancel: noop })} />
+  </div>
+))
+
 const ROW = '[data-topic-row]'
 
 /** A stand-in for a feature's mark in a Main row's `accessory` slot (the huddle glyph is drawn in `@juno/huddle-views`). */
@@ -80,6 +97,8 @@ export default defineFixtures(
       'two-lines-compact': titleScene('2', 'compact'),
       'one-line-comfortable': titleScene('1', 'comfortable'),
       'two-lines-comfortable': titleScene('2', 'comfortable'),
+      // Wrapped titles in each state: selected, unread, unsubscribed, resolved, Reopened, Main, right to left, renaming.
+      'two-lines-wrapped': wrappedScene,
     },
     Tile: {
       art: state(rows.postgres),
