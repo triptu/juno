@@ -1,5 +1,5 @@
 // Session import, sign-out, relaunch and expiry against the fake Slack app.
-import { readFile, access, readdir, writeFile } from 'node:fs/promises'
+import { readFile, access, readdir, writeFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Page } from '@playwright/test'
 import { expect, launchApp, test, writeSlackApp } from './fixtures'
@@ -194,6 +194,7 @@ test('signing out, and Slack expiring the session, both return to the sign-in pa
     await expect(juno.importButton).toBeVisible()
     await expect(win.getByText('The Slack app’s session ended. Open Slack, sign in there, then try again. Your topics and settings are kept.')).toBeVisible()
     // Stand in for signing in again in the installed Slack app.
+    await rm(slackApp.dir, { recursive: true, force: true })
     await writeSlackApp(fake, slackApp.dir)
     // Importing again replaces the expired session.
     await juno.signIn()
