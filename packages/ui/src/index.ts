@@ -70,6 +70,6 @@ export { moveFocus, radioItem, radioKeys } from './roving'
 export { holdKeys, releaseKeys } from './internal/heldKeys'
 
 export { defineFixtures, fixture, scene, type Fixture, type FixtureFrame, type FixtureSet } from './fixtures/define'
-export { FixtureAppearanceContext, useFixtureAppearance, type FixtureAppearance } from './fixtures/appearance'
+export { FixtureAppearanceContext, useFixtureAppearance } from './fixtures/appearance'
 export { chunk } from './chunks'
 export { rootDuration } from './motion'
