@@ -478,6 +478,11 @@ export const shadows = stylex.defineVars({
   // A picture on the page (Home's picture, the picture page, the gallery): a thin edge drawn over it, so a
   // pale painting or a dark space image keeps its edge. Its shadow is --shadow-lg, --pop-shadow under the pointer.
   '--picture-edge': 'inset 0 0 0 1px oklch(0 0 0 / 0.06)',
+  // Home's picture sits on the page rather than in it: a firmer edge, a contact shadow and a wide soft
+  // one, and deeper under the pointer. The picture is the one thing on a caught-up Home.
+  '--picture-home-edge': 'inset 0 0 0 1px oklch(0 0 0 / 0.10)',
+  '--picture-home-shadow': '0 0 0 1px oklch(0 0 0 / 0.04), 0 1px 2px 0 oklch(0 0 0 / 0.06), 0 6px 14px -4px oklch(0 0 0 / 0.10), 0 22px 44px -14px oklch(0 0 0 / 0.26)',
+  '--picture-home-shadow-hover': '0 0 0 1px oklch(0 0 0 / 0.05), 0 2px 4px 0 oklch(0 0 0 / 0.07), 0 10px 20px -6px oklch(0 0 0 / 0.13), 0 30px 56px -16px oklch(0 0 0 / 0.32)',
 })
 
 /* -------------------------------------------------------------------------- */
@@ -737,12 +742,15 @@ export const text = stylex.defineVars({
   '--text-greeting-leading': '1.15',
   '--text-greeting-tracking': '0',
 
-  // A sentence to read: the picture page's caption and the gallery's quotes.
-  '--text-thought-family': fonts['--font-serif'],
-  '--text-thought-size': '18px',
-  '--text-thought-weight': '400',
-  '--text-thought-leading': '1.45',
-  '--text-thought-tracking': '0',
+  // A picture's line (SPEC 12): one serif role at two sizes. 18 on Home under the picture and in the
+  // gallery's columns; 24 on the picture page, where it leads the words.
+  '--text-picture-line-family': fonts['--font-serif'],
+  '--text-picture-line-size': '18px',
+  '--text-picture-line-weight': '400',
+  '--text-picture-line-leading': '1.4',
+  '--text-picture-line-tracking': '0',
+  '--text-picture-lead-size': '24px',
+  '--text-picture-lead-leading': '1.28',
 
   // "Nothing open"
   '--text-empty-title-family': fonts['--font-serif'],
@@ -1036,18 +1044,26 @@ export const sizes = stylex.defineVars({
   '--row-bubble-estimate': '38px',
 
   // Home's picture (SPEC 12, "A picture"): the box the picture is fitted into. Its height is the page's
-  // height less the room the rest of Home takes (the column's padding, the two-line caption and the
-  // composer), between the min and the full height, so the column fits.
-  '--home-picture-width': '320px',
-  '--home-picture-height': '216px',
-  '--home-picture-height-min': '144px',
-  '--home-picture-room': '264px',
-  // The gallery's rows of pictures, each at its own shape, and the picture page's label column.
-  '--gallery-row': '150px',
+  // height less the room the rest of Home takes (the column's padding, the label, two lines of the
+  // picture's line and the composer), between the min and the full height, so the column fits.
+  '--home-picture-width': '440px',
+  '--home-picture-height': '300px',
+  '--home-picture-height-min': '160px',
+  '--home-picture-room': '310px',
+  // The picture's line under it on Home: the box's width, so a line of 140 characters takes two lines.
+  '--home-line-width': '440px',
+  // The gallery's rows of pictures by time, each at its own shape, and the picture page's label column.
+  '--gallery-row': '120px',
   '--picture-label-width': '380px',
-  // The narrowest column of the gallery's quotes and facts. Columns share the page's width evenly, so
-  // with two or more a column is under 1.5 times this: about 45 to 75 characters a line.
-  '--gallery-words-column': '290px',
+  // The gallery's columns of pictures with their words: the narrowest a column gets. Columns share the
+  // page's width evenly: three at 1200 wide with the sidebar, four at 1600, five at 1920.
+  '--gallery-column': '230px',
+  // The picture page's scale: the height of an artwork drawn next to a person; the distance line's
+  // height with its labels above and below, its Earth ring and ticks, and the dot for the picture.
+  '--picture-scale-height': '120px',
+  '--picture-scale-ruler': '52px',
+  '--picture-scale-dot': '9px',
+  '--picture-scale-here': '13px',
 
   '--tile-44': '44px',
   '--tile-36': '36px',

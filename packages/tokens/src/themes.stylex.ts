@@ -99,6 +99,9 @@ export const darkShadows = stylex.createTheme(shadows, {
   '--tab-shadow': '0 -1px 3px -1px oklch(0 0 0 / 0.5)',
   // A faint light line, so a dark space image keeps its edge on the dark page.
   '--picture-edge': 'inset 0 0 0 1px oklch(1 0 0 / 0.07)',
+  '--picture-home-edge': 'inset 0 0 0 1px oklch(1 0 0 / 0.12)',
+  '--picture-home-shadow': '0 0 0 1px oklch(0 0 0 / 0.5), 0 1px 2px 0 oklch(0 0 0 / 0.4), 0 6px 14px -4px oklch(0 0 0 / 0.45), 0 22px 44px -14px oklch(0 0 0 / 0.7)',
+  '--picture-home-shadow-hover': '0 0 0 1px oklch(0 0 0 / 0.55), 0 2px 4px 0 oklch(0 0 0 / 0.45), 0 10px 20px -6px oklch(0 0 0 / 0.5), 0 30px 56px -16px oklch(0 0 0 / 0.8)',
 })
 
 /** The accent picker's swatches in dark: the dark fills of the accent themes below. */
