@@ -48,6 +48,7 @@ import { RequestQueue, type Lane } from './queue.ts'
 import { apiBaseFromWorkspace, SlackSession, slackRoute } from './session.ts'
 import { HttpTransport, type HttpResponse } from './transport.ts'
 import { decodeIssueDetails } from './decodeIssue.ts'
+import { SlackTrace, traced, type CallRecorder } from './trace.ts'
 
 export interface CallOptions<E = never> {
   /** Default `interactive`. */
@@ -96,10 +97,11 @@ export class SlackApi extends Context.Service<SlackApi, SlackApiShape>()('juno/s
       const session = yield* SlackSession
       const transport = yield* HttpTransport
       const queue = yield* RequestQueue
+      const trace = yield* SlackTrace
       const base = config.apiBaseUrl ?? apiBaseFromWorkspace(session.workspaceUrl)
       const route = slackRoute(session)
 
-      const once = <M extends MethodName>(method: M, fields: ReadonlyArray<readonly [string, string]>, attempt: number) =>
+      const once = <M extends MethodName>(method: M, fields: ReadonlyArray<readonly [string, string]>, attempt: number, recorder: CallRecorder | undefined) =>
         Effect.gen(function* () {
           const url = new URL(`${base}/${method}`)
           url.searchParams.set('_x_id', yield* requestId(config.versionTs))
@@ -119,28 +121,31 @@ export class SlackApi extends Context.Service<SlackApi, SlackApiShape>()('juno/s
                   : new SlackTransportError({ method, message: error.message, retryable: true }),
               ),
             )
-          return yield* decodeResponse(method, response, Methods[method].response, config)
-        })
+          return yield* decodeResponse(method, response, Methods[method].response, config, recorder?.seen)
+        }).pipe((exchange) => (recorder === undefined ? exchange : recorder.exchange(exchange)))
 
-      const call = <M extends MethodName, E = never>(method: M, args: MethodArgs<M>, options: CallOptions<E> = {}) =>
-        Effect.gen(function* () {
-          const lane = options.lane ?? 'interactive'
-          const fields = encodeFields(method, args, session.token, options.reason)
+      const call = <M extends MethodName, E = never>(method: M, args: MethodArgs<M>, options: CallOptions<E> = {}) => {
+        const lane = options.lane ?? 'interactive'
+        const fields = encodeFields(method, args, session.token, options.reason)
+        // The token is always the first field (`encodeFields`).
+        const describe = () => ({ method, lane, reason: options.reason, params: fields.slice(1), startedAt: Date.now() })
+        return traced(trace, describe, (recorder) => Effect.gen(function* () {
           const attempts = options.singleAttempt === true ? { ...config, maxAttempts: 1 } : config
           const before = options.beforeSend
-          if (before === undefined) return yield* withRetries(queue, attempts, lane, method, (attempt) => once(method, fields, attempt))
+          if (before === undefined) return yield* withRetries(queue, attempts, lane, method, (attempt) => once(method, fields, attempt, recorder))
           // A failed check ends the retries as a refusal would, and the caller gets the check's own error.
           let stopped: { readonly error: E } | undefined
           const checked = (attempt: number) =>
             Effect.flatMap(Effect.result(before), (result) => {
-              if (Result.isSuccess(result)) return once(method, fields, attempt)
+              if (Result.isSuccess(result)) return once(method, fields, attempt, recorder)
               stopped = { error: result.failure }
               return Effect.fail(new SlackRejected({ method, error: 'not_sent' }))
             })
           return yield* withRetries(queue, attempts, lane, method, checked).pipe(
             Effect.catch((error): Effect.Effect<never, SlackApiError | E> => Effect.fail(stopped === undefined ? error : stopped.error)),
           )
-        }).pipe(Effect.withSpan('SlackApi.call', { attributes: { method, lane: options.lane ?? 'interactive' } }))
+        })).pipe(Effect.withSpan('SlackApi.call', { attributes: { method, lane } }))
+      }
 
       const upload = (url: string, file: UploadBody) =>
         Effect.gen(function* () {
@@ -195,6 +200,8 @@ export const decodeResponse = <A extends { ok: boolean }>(
   response: HttpResponse,
   schema: S.Codec<A, unknown>,
   config: SlackConfigShape,
+  /** Hears the parsed body and its length before it is decoded (`SlackTrace`). */
+  seen?: (json: unknown, size: number) => void,
 ) =>
   Effect.gen(function* () {
     const retryAfter = retryAfterMillis(response.header('retry-after'), config.defaultRetryAfterMillis)
@@ -211,6 +218,7 @@ export const decodeResponse = <A extends { ok: boolean }>(
       try: () => JSON.parse(response.text) as unknown,
       catch: () => new SlackTransportError({ method, status: 200, message: 'response is not JSON', retryable: true }),
     })
+    seen?.(json, response.text.length)
     const decoded = yield* S.decodeUnknownEffect(schema)(json).pipe(
       Effect.mapError((error) => new SlackDecodeError({ method, message: 'response does not match schema', ...decodeIssueDetails(error.issue) })),
     )
