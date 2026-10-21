@@ -970,7 +970,7 @@ test('topic open, uncached: a thread whose replies were never fetched, to the he
 })
 
 // The M4 gate (performance 3.4) on the topic300 seed: a 300-message thread
-// and a 300-message Main, 20 % images and 10 % code blocks, plus #perf-code
+// and a 300-message Main, 20 % images and 15 % code blocks, plus #perf-code
 // (codeBlocksSeed: 50 distinct code blocks of 40 to 100 lines). One synced
 // user-data directory; every scenario launches the app warm on it.
 test.describe('topic view', () => {
@@ -1113,6 +1113,18 @@ test.describe('topic view', () => {
         }
       })
       within('tab switch mounted, p95', stats('tab switch, mounted (juno.tab-switch)', mounted).p95, oneFrame)
+
+      // The same with the thread's tab scrolled up: showing it again puts its held row back before paint.
+      await juno.tabs.select(THREAD)
+      await juno.topic.scrollUp(3000)
+      const scrolledUp: number[] = []
+      for (let i = 0; i < 20; i++) {
+        const title = i % 2 === 0 ? 'perf-main' : THREAD
+        const before = (await juno.measures('juno.tab-switch')).length
+        await juno.tabs.select(title)
+        scrolledUp.push(await nextMeasure(juno, 'juno.tab-switch', before))
+      }
+      within('tab switch mounted scrolled up, p95', stats('tab switch, mounted, one tab scrolled up (juno.tab-switch)', scrolledUp).p95, oneFrame)
     } finally {
       await running.close()
     }
