@@ -1,10 +1,11 @@
 import { defineFixtures, fixture } from '@juno/ui'
-import { AppearanceSettings } from './AppearanceSettings'
+import { GalleryAppearanceSettings } from './fixtures/appearance'
 import { SignInView } from './SignInView'
 
 const noop = () => {}
 // The appearance controls the SignedOut container puts at the foot of the page.
-const footer = <AppearanceSettings layout="bar" theme="system" accent="coral" onThemeChange={noop} onAccentChange={noop} />
+// It shows the gallery's theme and accent as selected, as the container shows the owner's.
+const footer = <GalleryAppearanceSettings layout="bar" onThemeChange={noop} onAccentChange={noop} />
 
 // Every line in Failure is a line the Session container produces for a
 // SignInFailed kind (apps/desktop/src/renderer/containers/Session.tsx).
