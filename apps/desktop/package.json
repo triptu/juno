@@ -1,7 +1,7 @@
 {
   "name": "@juno/desktop",
   "productName": "Juno",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "private": true,
   "description": "Juno desktop app (Electron shell).",
   "main": "./out/main/index.js",
@@ -21,7 +21,6 @@
     "test:package": "node ../../scripts/without-run-as-node.mjs playwright test -c playwright.package.config.ts"
   },
   "dependencies": {
-    "@juno/highlight": "workspace:*",
     "electron-updater": "6.8.3",
     "koffi": "3.3.3"
   },
@@ -33,6 +32,7 @@
     "@juno/contract": "workspace:*",
     "@juno/engine": "workspace:*",
     "@juno/fake-slack": "workspace:*",
+    "@juno/highlight": "workspace:*",
     "@juno/huddle-media": "workspace:*",
     "@juno/huddle-views": "workspace:*",
     "@juno/slack": "workspace:*",

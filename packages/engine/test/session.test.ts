@@ -5,7 +5,7 @@
 import { access } from 'node:fs/promises'
 import { Cause, Exit } from 'effect'
 import { afterEach, describe, expect, it } from 'vitest'
-import { sessionImportFromSlackApp, sessionSignIn, sessionSignOut } from '@juno/contract'
+import { sessionImportFromSlackApp, sessionSignOut } from '@juno/contract'
 import { runCommand } from '@juno/state'
 import { workspacePaths } from '@juno/store'
 import { startTestEngine, waitFor, type EngineOptions, type RunningEngine } from './harness'
@@ -29,7 +29,7 @@ describe('session', () => {
     expect((await e.status('signedOut'))._tag).toBe('signedOut')
     expect(e.main.stored).toBeNull()
 
-    const exit = await runCommand(e.registry, sessionSignIn, undefined)
+    const exit = await runCommand(e.registry, sessionImportFromSlackApp, undefined)
     expect(Exit.isSuccess(exit)).toBe(true)
 
     const ready = await e.status('ready')
@@ -37,7 +37,7 @@ describe('session', () => {
     expect(ready._tag === 'ready' && ready.enterprise).toBeUndefined()
     expect(e.fake.callCount('auth.test')).toBe(1)
     expect(e.main.stored?.teamId).toBe(e.fake.teamId)
-    expect(sentTags(e)).toEqual(expect.arrayContaining(['requestSecrets', 'signIn', 'storeSecrets']))
+    expect(sentTags(e)).toEqual(expect.arrayContaining(['requestSecrets', 'importFromSlackApp', 'storeSecrets']))
     // The socket is up for the life of the session, through main's handshake.
     await waitFor(() => (e.fake.socketCount() === 1 ? true : undefined), undefined, 'the socket')
     expect(sentTags(e)).toContain('handshake')
@@ -48,7 +48,7 @@ describe('session', () => {
     const e = await boot({ initial: (fake) => fake.signIn() })
     const ready = await e.status('ready')
     expect(ready).toMatchObject({ teamName: 'Juno Fake' })
-    expect(sentTags(e)).not.toContain('signIn')
+    expect(sentTags(e)).not.toContain('importFromSlackApp')
     expect(sentTags(e)).not.toContain('storeSecrets')
     // Main keeps the verified session, without secrets, so the next launch opens on the shell.
     expect(e.main.host.fromEngine.find((m) => m._tag === 'sessionReady')).toMatchObject({ session: { teamName: 'Juno Fake' } })
@@ -82,7 +82,7 @@ describe('session', () => {
   it('signs out of a live workspace: main clears, the cache is deleted, user data stays, and the status is signedOut', async () => {
     const e = await boot()
     await e.status('signedOut')
-    expect(Exit.isSuccess(await runCommand(e.registry, sessionSignIn, undefined))).toBe(true)
+    expect(Exit.isSuccess(await runCommand(e.registry, sessionImportFromSlackApp, undefined))).toBe(true)
     await e.status('ready')
     await e.phase('live')
     const paths = workspacePaths(e.userData, e.fake.teamId)
@@ -103,10 +103,10 @@ describe('session', () => {
   it('reports a failed sign-in as SignInFailed and stays signed out', async () => {
     const e = await boot()
     await e.status('signedOut')
-    e.main.failNextSignIn('cancelled', 'The window was closed.')
-    const exit = await runCommand(e.registry, sessionSignIn, undefined)
+    e.main.failNextSignIn('keychain', 'Keychain access was declined.')
+    const exit = await runCommand(e.registry, sessionImportFromSlackApp, undefined)
     expect(Exit.isFailure(exit)).toBe(true)
-    if (Exit.isFailure(exit)) expect(Cause.squash(exit.cause)).toMatchObject({ _tag: 'SignInFailed', kind: 'cancelled' })
+    if (Exit.isFailure(exit)) expect(Cause.squash(exit.cause)).toMatchObject({ _tag: 'SignInFailed', kind: 'keychain' })
     expect((await e.status('signedOut'))._tag).toBe('signedOut')
     expect(e.main.stored).toBeNull()
   })

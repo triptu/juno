@@ -221,8 +221,6 @@ const providers = new ProviderStore(
 const sessionHost = new SessionHost({
   secrets: new SecretsStore(app.getPath('userData'), { plaintext: e2e }),
   send: (message) => supervisor.send(message),
-  signInWindow:
-    fakeSlackUrl === undefined ? {} : { startUrl: `${fakeSlackUrl}/signin`, extraHosts: [new URL(fakeSlackUrl).hostname] },
   importOptions: { ...(slackAppDir === undefined ? {} : { slackDir: slackAppDir }), ...(keychainPassword === undefined ? {} : { keychainPassword }) },
   saveSession: (session) => void (launch = withSession(launch, session, launchFile)),
 })

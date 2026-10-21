@@ -4,7 +4,19 @@ import { join } from 'node:path'
 import { Effect, Logger } from 'effect'
 import { SlackAuthRequired, SlackDecodeError, SlackRejected } from '@juno/slack'
 import { expect, it } from 'vitest'
-import { createLog, LOG_LIMIT, warningLines } from '../src/logging'
+import { createLog, LOG_LIMIT, safeDetails, warningLines } from '../src/logging'
+
+it('keeps only checked schema paths and issue kinds on SlackDecodeError', () => {
+  const detail = safeDetails(new SlackDecodeError({ method: 'subscriptions.thread.getView', message: 'private response', schemaPath: 'threads[3].root_msg.latest_reply', issueKind: 'missing' }))
+  expect(detail).toContain('schemaPath=threads[3].root_msg.latest_reply issueKind=missing')
+  expect(detail).not.toContain('private response')
+  for (const path of ['private_message', 'threads[3].private_message', 'threads[-1].root_msg', 'threads[1.5]', 'threads[0].root_msg\n', 'root_msg.text=private', 'threads[9999999999]', 'a'.repeat(301), '/Users/private/file', 'threads[0] root_msg']) {
+    expect(safeDetails({ _tag: 'SlackDecodeError', schemaPath: path, issueKind: 'private' })).not.toMatch(/schemaPath=|issueKind=/)
+  }
+  expect(safeDetails({ schemaPath: 'threads[3].root_msg', issueKind: 'missing' })).toBe('')
+  expect(safeDetails({ _tag: 'SlackRejected', schemaPath: 'threads[3].root_msg', issueKind: 'missing' })).not.toMatch(/schemaPath=|issueKind=/)
+  for (const kind of ['wrong_type', 'invalid']) expect(safeDetails({ _tag: 'SlackDecodeError', schemaPath: 'threads[0].root_msg', issueKind: kind })).toContain(`issueKind=${kind}`)
+})
 
 it('writes the Slack cause and method for a boot warning without the decode message', async () => {
   const folder = await mkdtemp(join(tmpdir(), 'juno-logs-'))

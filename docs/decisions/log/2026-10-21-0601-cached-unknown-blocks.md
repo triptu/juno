@@ -1,0 +1,1 @@
+- 10-21 06:01 · message-tables · Richtext decodes a stored `unknown` block again on read, so a table cached before tables were known shows without a resync, and `INDEX_VERSION` 6 re-indexes stored topics once, locally, so their previews read "Table: …". Why: messages synced before this change keep `{ type: 'unknown', raw }` in `blocks_json`.

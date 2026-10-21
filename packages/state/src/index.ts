@@ -2,7 +2,7 @@ export { liveQuery, runCommand, type LiveListAtom, type LiveValueAtom } from './
 export { configureConnection, connectionStateAtom, makeRegistry, registry, restartEngine, type Registry } from './client'
 export { engineStatusAtom, pingCommand, syncFailureAtom, syncNoticeAtom, syncProgressAtom } from './engine'
 export { appStateAtom, copySyncLog, describeTabs, diagnosticDetails, showLogs, diagnosticsReport, formatCpu, readDiagnostics, reportAppStateAtom } from './diagnostics'
-export { importFromSlackAppCommand, junoSetupPendingAtom, sessionStatusAtom, sessionProfileAtom, sessionUnknownAtom, signedInAtom, signInCommand, signOutCommand } from './session'
+export { importFromSlackAppCommand, junoSetupPendingAtom, sessionStatusAtom, sessionProfileAtom, sessionUnknownAtom, signedInAtom, signOutCommand } from './session'
 export { viewPillsAtom, viewSheetAtom, viewsAtom, type ViewSheetState } from './views'
 export { defaultTopicListFilter, topicCountsAtom, topicListAtom, type TopicListFilter } from './topics'
 export {

@@ -13,12 +13,13 @@ const bootOnce = (runtime: SyncRuntime) => {
   return Effect.gen(function* () {
     const startedAt = yield* Clock.currentTimeMillis
     const previous = yield* bootState()
-    if (previous === undefined) yield* coldBoot(ctx, reportBoot)
-    else yield* warmBoot(ctx, previous, reportBoot, yield* openNow)
+    const threadsLoaded = previous === undefined
+      ? yield* coldBoot(ctx, reportBoot)
+      : (yield* warmBoot(ctx, previous, reportBoot, yield* openNow), true)
     if (previous !== undefined && (previous.quietDays === undefined || ctx.config.quietDays > previous.quietDays)) yield* backfillWindow(ctx)
     state.lastBoot = yield* bootState()
     // Both boots read the followed threads over the window and check the ones left out: a follow pass.
-    state.lastFollowPass = startedAt
+    state.lastFollowPass = threadsLoaded ? startedAt : undefined
     if (options.onBooted !== undefined) yield* options.onBooted
   }).pipe(work.withPermit)
 }

@@ -118,18 +118,9 @@ base('01 sign in and first sync', async ({ juno, fake }) => {
     await setSize(app, 1400, 900)
   })
 
-  await step('sign-in window', async () => {
-    const opened = app.waitForEvent('window')
-    await juno.signInButton.click()
-    const page = await opened
-    await page.waitForLoadState('domcontentloaded')
-    await settle(page, 500)
-    await both(page, '02-sign-in-window')
-    await both(win, '02b-waiting-for-sign-in-window')
+  await step('import the Slack app’s session', async () => {
     fake.holdNext({ method: 'client.userBoot', before: true })
-    await page.getByPlaceholder('Email').fill('tushar@juno-fake.test')
-    await page.getByPlaceholder('Password').fill('password')
-    await Promise.all([page.waitForEvent('close'), page.getByRole('button', { name: 'Sign in' }).click()])
+    await juno.importFromSlackApp({ skipSetUp: false })
   })
 
   await step('before the first boot answers', async () => {

@@ -124,6 +124,9 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
 - **Workspace setup.** Packages ship TypeScript source and list `@stylexjs/stylex` as their own
   dependency. The plugin sits before `react()` in `electron.vite.config.ts` and gets
   `unstable_moduleResolution: { type: 'commonJS', rootDir: repoRoot }` so builds work from any cwd.
+  The plugin writes its sheet after Vite has minified the CSS, so its own lightningcss pass minifies
+  it (`lightningcssOptions: { minify }`, in the app's and the gallery's config alike); without that the sheet
+  carried 21 KB of whitespace.
 - **Fonts**: bundled `@fontsource` packages, imported once per app from `@juno/tokens/fonts.css`
   (Figtree, Instrument Serif, JetBrains Mono). Pick them through the `fonts` tokens. Instrument Serif
   has one weight (400); never set bold on it.

@@ -8,7 +8,7 @@ ADR 0001 v1 said the utility process must use Node `fetch` and attach the `d` co
 
 ## Decision
 
-- Main stores the `d` cookie in `session.fromPartition('persist:slack')`. The sign-in window uses that partition; the import path writes the decrypted cookie into it with `cookies.set`.
+- Main stores the `d` cookie in `session.fromPartition('persist:slack')`. The Slack-app import writes the decrypted cookie into it with `cookies.set`.
 - The engine is forked with `partition: 'persist:slack'` and `SlackApi` calls `net.fetch` on it through an `HttpTransport` service. `ElectronNet` is the production layer; `NodeFetch` is the test layer pointed at `fake-slack`.
 - The websocket still uses `ws` because `net` has no WebSocket. Before each connect the engine asks main for the serialised cookie header for `slack.com` and for `session.resolveProxy(url)`, connects with `Cookie`, `Origin: https://app.slack.com` and the Slack desktop `User-Agent`, forwards any `Set-Cookie` from the upgrade response back to main, and discards the header string.
 - `juno://files/...` thumbnails and downloads are served by main on the same session, because custom protocols are not supported in utility processes.

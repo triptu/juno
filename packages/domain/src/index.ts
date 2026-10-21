@@ -30,7 +30,7 @@ export { workspaceEmoji, emojiCatalog, UNKNOWN_PERSON, type EmojiCategory } from
 // Slack's markup in the composer: the field's look and the formatting keys, for the renderer through @juno/contract.
 export { markupLayout, toggleMarkup, type MarkupLayout, type MarkupStyle } from '@juno/richtext'
 // A Markdown file as a body, for the media viewer's text items, for the renderer through @juno/contract.
-export { bodyFromMarkdown } from '@juno/richtext'
+export { bodyFromMarkdown, tableText } from '@juno/richtext'
 export * from './composer-mentions'
 export * from './composer-emoji'
 export * from './composer-links'

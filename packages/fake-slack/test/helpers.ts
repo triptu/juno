@@ -5,7 +5,7 @@
 import { Schema } from 'effect'
 import { WebSocket } from 'ws'
 import type { MethodArgs, MethodName, MethodOk, MethodResponse, RtmFrame } from '@juno/slack-schema'
-import { decodeRtmFrame, Methods } from '@juno/slack-schema'
+import { decodeRtmFrame, Methods, ThreadView } from '@juno/slack-schema'
 import type { Credentials, FakeSlack } from '../src/index.ts'
 
 export interface ApiCall<M extends MethodName> {
@@ -42,8 +42,8 @@ export class TestClient {
   }
 
   /** Every followed thread, paged by `current_ts` the way the sync does (pages are capped at 10). */
-  async allThreadViews(): Promise<MethodOk<'subscriptions.thread.getView'>['threads']> {
-    const threads: Array<MethodOk<'subscriptions.thread.getView'>['threads'][number]> = []
+  async allThreadViews(): Promise<ReadonlyArray<ThreadView>> {
+    const threads: ThreadView[] = []
     let current: string | undefined
     for (;;) {
       const page = await this.ok('subscriptions.thread.getView', { limit: 50, ...(current === undefined ? {} : { current_ts: current as never }) })
@@ -54,9 +54,14 @@ export class TestClient {
   }
 
   /** Like `call`, but fails the test unless the response is `ok: true`. */
+  async ok(method: 'subscriptions.thread.getView', args: MethodArgs<'subscriptions.thread.getView'>): Promise<Omit<MethodOk<'subscriptions.thread.getView'>, 'threads'> & { threads: ReadonlyArray<ThreadView> }>
+  async ok<M extends MethodName>(method: M, args: MethodArgs<M>): Promise<MethodOk<M>>
   async ok<M extends MethodName>(method: M, args: MethodArgs<M>): Promise<MethodOk<M>> {
     const result = await this.call(method, args)
     if (!result.body.ok) throw new Error(`${method} failed: ${result.body.error} (HTTP ${result.status})`)
+    if (method === 'subscriptions.thread.getView' && 'threads' in result.body) {
+      return { ...result.body, threads: Schema.decodeUnknownSync(Schema.Array(ThreadView))(result.body.threads) } as MethodOk<M>
+    }
     return result.body as MethodOk<M>
   }
 

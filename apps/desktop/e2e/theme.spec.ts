@@ -31,7 +31,7 @@ test('a chosen accent and the dark theme survive a relaunch', async () => {
     const lightWindow = await first.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.getBackgroundColor())
 
     const coralFill = await resolveColorVar(first.win, '--hl')
-    const signIn = first.win.getByRole('button', { name: 'Sign in to Slack' })
+    const signIn = first.win.getByRole('button', { name: "Use the Slack app's session" })
     await test.step('a chosen accent colours the primary button and survives a relaunch: choosing it', async () => {
       await expect(signIn).toHaveCSS('background-color', coralFill)
       await expect(first.win.getByRole('button', { name: 'Coral' })).toHaveAttribute('aria-pressed', 'true')
@@ -76,7 +76,7 @@ test('a chosen accent and the dark theme survive a relaunch', async () => {
       await test.step('a chosen accent colours the primary button and survives a relaunch: after the relaunch', async () => {
         // The accent is in the URL, so the first render is already teal.
         await expect(second.win.getByRole('button', { name: 'Teal' })).toHaveAttribute('aria-pressed', 'true')
-        await expect(second.win.getByRole('button', { name: 'Sign in to Slack' })).toHaveCSS('background-color', tealDarkFill)
+        await expect(second.win.getByRole('button', { name: "Use the Slack app's session" })).toHaveCSS('background-color', tealDarkFill)
         expect(await second.win.evaluate(() => document.documentElement.dataset['accent'])).toBe('teal')
       })
     } finally {

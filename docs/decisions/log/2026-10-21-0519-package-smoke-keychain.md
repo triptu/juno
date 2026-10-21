@@ -1,0 +1,1 @@
+- 10-21 05:19 · implementation · Launch the packaged smoke's temporary fake-Slack profile with Chromium's mock keychain after a process sample confirmed cookie-keychain access blocked sign-in; production launches retain the real keychain.

@@ -4,7 +4,7 @@
  * here; the engine owns the session state.
  *
  * - `requestSecrets`: read `secrets.bin`.
- * - `signIn` / `importFromSlackApp`: capture a session and answer with
+ * - `importFromSlackApp`: capture a session and answer with
  *   `secrets` or `sessionFailed`. The engine verifies it; only then does it
  *   send `storeSecrets`.
  * - `signOut`: delete `secrets.bin`, clear the `persist:slack` session and
@@ -15,19 +15,18 @@
  *   socket URL (ADR 0007). `setCookies`: store `Set-Cookie` values from an
  *   upgrade response.
  */
-import { BrowserWindow, session as electronSession } from 'electron'
+import { session as electronSession } from 'electron'
 import type { EngineToMain, MainToEngine, ReadySession, SessionSecrets } from '@juno/contract'
 import { mainLog as log } from './logging'
 import type { SecretsStore } from './secrets'
 import { forgetSlackKeychain, importFromSlackApp, type ImportOptions } from './slackImport'
-import { openSignInWindow, SLACK_PARTITION, type SignInWindowOptions } from './signInWindow'
+import { SLACK_PARTITION } from './slackSession'
 
 const SOCKET_ORIGIN = 'https://app.slack.com'
 
 export interface SessionHostDeps {
   readonly secrets: SecretsStore
   readonly send: (message: MainToEngine) => void
-  readonly signInWindow: SignInWindowOptions
   readonly importOptions: ImportOptions
   /** Keeps the verified session for the next launch, or drops it. */
   readonly saveSession: (session: ReadySession | undefined) => void
@@ -43,13 +42,10 @@ export class SessionHost {
 
   /** Handles one message from the engine. Returns false for messages that are not about the session. */
   handle(message: EngineToMain): boolean {
-    if (['requestSecrets', 'signIn', 'importFromSlackApp', 'storeSecrets', 'signOut', 'authRequired'].includes(message._tag)) log.log('INFO', 'sign-in step', { step: message._tag })
+    if (['requestSecrets', 'importFromSlackApp', 'storeSecrets', 'signOut', 'authRequired'].includes(message._tag)) log.log('INFO', 'sign-in step', { step: message._tag })
     switch (message._tag) {
       case 'requestSecrets':
         void this.#deps.secrets.read().then((secrets) => this.#deps.send({ _tag: 'secrets', secrets }))
-        return true
-      case 'signIn':
-        void this.#capture('window', () => openSignInWindow({ ...this.#deps.signInWindow, parent: BrowserWindow.getFocusedWindow() ?? undefined }))
         return true
       case 'importFromSlackApp':
         void this.#capture('import', () => importFromSlackApp(this.#deps.importOptions))
@@ -84,7 +80,7 @@ export class SessionHost {
   }
 
   async #capture(
-    method: 'window' | 'import',
+    method: 'import',
     run: () => Promise<{ ok: true; secrets: SessionSecrets } | { ok: false; kind: MainToEngineFailure['kind']; message: string; details?: string }>,
   ): Promise<void> {
     if (this.#busy) {

@@ -30,6 +30,13 @@ export type Inline =
 
 export type ListStyle = 'bullet' | 'ordered' | 'checked' | 'unchecked'
 
+/** A table column's settings from Slack. Absent fields are Slack's defaults: left aligned, on one line. */
+export interface TableColumn {
+  readonly align?: 'center' | 'right'
+  /** The column's text wraps; by default each cell stays on one line and the table scrolls sideways. */
+  readonly wrap?: true
+}
+
 export type ContentBlock =
   | { readonly kind: 'paragraph'; readonly children: ReadonlyArray<Inline> }
   | { readonly kind: 'quote'; readonly children: ReadonlyArray<Inline> }
@@ -51,6 +58,20 @@ export type ContentBlock =
   | { readonly kind: 'context'; readonly children: ReadonlyArray<Inline> }
   | { readonly kind: 'image'; readonly url: string; readonly alt: string; readonly width?: number; readonly height?: number }
   | { readonly kind: 'file'; readonly id: string; readonly name: string; readonly mimetype: string; readonly width?: number; readonly height?: number }
+  /**
+   * A Slack table. Every row has the same number of cells; a cell is a run
+   * of inlines, empty for an empty cell. The first row is the header, as
+   * Slack's client draws it. `columns` holds settings by column index, only
+   * when Slack sent any. `caption` names the table; `showCaption` when Slack
+   * shows it above the table.
+   */
+  | {
+      readonly kind: 'table'
+      readonly rows: ReadonlyArray<ReadonlyArray<ReadonlyArray<Inline>>>
+      readonly columns?: ReadonlyArray<TableColumn>
+      readonly caption?: string
+      readonly showCaption?: true
+    }
 
 export type PlaceKind = 'public' | 'private' | 'im' | 'mpim'
 
@@ -138,6 +159,9 @@ export function inlinesOf(body: MessageBody): ReadonlyArray<Inline> {
         break
       case 'list':
         for (const item of block.items) out.push(...item)
+        break
+      case 'table':
+        for (const row of block.rows) for (const cell of row) out.push(...cell)
         break
       case 'code':
         out.push({ kind: 'text', text: block.text, style: { code: true } })

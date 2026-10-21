@@ -21,7 +21,7 @@ import { join } from 'node:path'
 import type { SessionSecrets, SignInFailureKind } from '@juno/contract'
 import { KEYCHAIN_SERVICE, slackAppCandidates, type SlackAppCandidate, type SlackCookie } from '@juno/slack/import'
 import { securityRunner } from './keychain'
-import { SLACK_PARTITION } from './signInWindow'
+import { SLACK_PARTITION } from './slackSession'
 import { fixedKeychain, readSlackApp, securityKeychain, UNREADABLE, type SlackKeychain } from './slackAppData'
 
 export type ImportResult =
@@ -114,7 +114,7 @@ export async function importFromSlackApp(options: ImportOptions = {}): Promise<I
   }
 }
 
-/** Writes the cookie into the session the engine and the sign-in window share. */
+/** Writes the cookie into the session the engine uses. */
 async function storeCookie(workspaceUrl: string, cookie: SlackCookie): Promise<void> {
   const slackSession = electronSession.fromPartition(SLACK_PARTITION)
   await slackSession.cookies.set({

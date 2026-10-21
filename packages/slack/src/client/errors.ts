@@ -44,6 +44,8 @@ export class SlackTransportError extends S.TaggedError<SlackTransportError>()('S
 export class SlackDecodeError extends S.TaggedError<SlackDecodeError>()('SlackDecodeError', {
   method: S.String,
   message: S.String,
+  schemaPath: S.optionalKey(S.String),
+  issueKind: S.optionalKey(S.Literals(['missing', 'wrong_type', 'invalid'])),
 }) {}
 
 export type SlackApiError = SlackAuthRequired | SlackRateLimited | SlackRejected | SlackTransportError | SlackDecodeError

@@ -20,7 +20,7 @@ Then use the services:
 
 `@juno/slack/import` is a separate entry: `locateSlackAppData(slackAppCandidates(home))` finds the installed Slack app's data (direct download or Mac App Store, `Network/Cookies` or `Cookies`) and `copySlackAppData` copies it; `readSlackAppSession({ dir, keychainPassword })` reads a team record and the `d` cookie out of a copy of the installed Slack app's data (a leveldb scan for `localConfig_v2`, Chromium cookie decryption). Plain file reading, no network; main and the live smoke use it.
 
-Errors are tagged and typed: `SlackAuthRequired`, `SlackRateLimited` (`retryAfterMillis`), `SlackRejected`, `SlackTransportError`, `SlackDecodeError`. The engine maps them to `@juno/contract` errors; this package does not import the contract.
+Errors are tagged and typed: `SlackAuthRequired`, `SlackRateLimited` (`retryAfterMillis`), `SlackRejected`, `SlackTransportError`, `SlackDecodeError`. `SlackDecodeError` carries a schema field path and fixed issue kind without response values. Paths allow only field names declared by the schemas and array indexes; dynamic record keys become `unknown`. The engine maps them to `@juno/contract` errors; this package does not import the contract.
 
 ## Must not
 

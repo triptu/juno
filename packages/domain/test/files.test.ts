@@ -30,6 +30,7 @@ describe('file kind', () => {
 describe('file kinds', () => {
   it.each([
     [{ mimetype: 'image/png', name: 'a.png' }, 'image'],
+    [{ mimetype: 'image/svg+xml', name: 'diagram.svg' }, 'image'],
     [{ mimetype: 'video/quicktime', name: 'demo.mov' }, 'video'],
     [{ mimetype: 'audio/mpeg', name: 'standup.mp3' }, 'audio'],
     [{ mimetype: 'audio/mp4', subtype: 'slack_audio', name: 'audio_message.m4a' }, 'audio'],
@@ -39,6 +40,8 @@ describe('file kinds', () => {
     [{ mimetype: 'text/plain', filetype: 'markdown', mode: 'snippet', name: 'notes' }, 'text'],
     [{ mimetype: 'text/csv', name: 'export.csv' }, 'text'],
     [{ mimetype: 'application/json', name: 'config.json' }, 'text'],
+    [{ mimetype: 'application/xml', name: 'config.xml' }, 'text'],
+    [{ mimetype: 'application/atom+xml', name: 'feed.xml' }, 'text'],
     [{ mimetype: 'application/octet-stream', name: 'deploy.log' }, 'text'],
     [{ mimetype: 'text/calendar', name: 'invite.ics' }, 'file'],
     [{ mimetype: 'application/zip', name: 'logs.zip' }, 'file'],

@@ -1,6 +1,5 @@
-import { useState } from 'react'
 import type { SignInFailed } from '@juno/contract'
-import { copyText, errorOf, importFromSlackAppCommand, junoSetupPendingAtom, registry, sessionStatusAtom, signInCommand, signOutCommand } from '@juno/state'
+import { copyText, errorOf, importFromSlackAppCommand, junoSetupPendingAtom, registry, sessionStatusAtom, signOutCommand } from '@juno/state'
 import { agentProviderAtom } from '@juno/state/agent'
 import { useAtomSet, useAtomValue } from '@juno/state/react'
 import { SessionView, SignInView } from '@juno/views'
@@ -8,19 +7,17 @@ import { SessionView, SignInView } from '@juno/views'
 /** UI copy for a failed attempt (SPEC section 17: plain, one sentence, says what to do next). */
 function failureLine(error: SignInFailed): string {
   switch (error.kind) {
-    case 'cancelled':
-      return 'The sign-in window was closed before it finished.'
     case 'no-token':
-      return 'Slack signed in, but Juno could not read the session. Try again.'
+      return 'Juno could not read the Slack app’s session. Open Slack, sign in there, then try again.'
     case 'no-slack-app':
-      return 'Slack isn’t installed on this Mac.'
+      return 'Slack isn’t installed on this Mac. Install Slack, sign in to it, then try again.'
     case 'slack-signed-out':
-      return 'Slack is installed but not signed in. Sign in to Slack in its app first, or use Sign in to Slack.'
+      return 'Slack is installed but not signed in. Open Slack, sign in there, then try again.'
     case 'keychain':
       // Main's line says which: refused, missing, did not unlock, or try the next item.
       return error.message
     case 'rejected':
-      return 'Slack did not accept the session. Sign in again.'
+      return 'Slack did not accept the session. Open Slack, sign in there, then try again.'
     case 'offline':
       return 'Slack could not be reached. Check the connection and try again.'
     case 'other':
@@ -28,21 +25,16 @@ function failureLine(error: SignInFailed): string {
   }
 }
 
-/** Wires the session live value and the three session commands to the sign-in and session views. */
+/** Wires the session live value and the session commands to the sign-in and session views. */
 export function Session() {
   const status = useAtomValue(sessionStatusAtom)
-  const signInResult = useAtomValue(signInCommand)
   const importResult = useAtomValue(importFromSlackAppCommand)
   const signOutResult = useAtomValue(signOutCommand)
-  const signIn = useAtomSet(signInCommand)
   const importSession = useAtomSet(importFromSlackAppCommand)
   const signOut = useAtomSet(signOutCommand)
   // Read now, so it is known by the time the owner presses a sign-in button.
   const noProvider = useAtomValue(agentProviderAtom, (state) => state?.active === null)
-  // Which action ran last decides whose failure is shown.
-  const [last, setLast] = useState<'window' | 'import' | undefined>(undefined)
-  const result = last === 'import' ? importResult : last === 'window' ? signInResult : undefined
-  const failed = result === undefined || result.waiting ? undefined : errorOf(result)
+  const failed = importResult.waiting ? undefined : errorOf(importResult)
   // A transport failure (the engine restarting) is retried by the state layer and not shown.
   const error = failed?._tag === 'SignInFailed' ? failureLine(failed) : undefined
   const details = failed?._tag === 'SignInFailed' ? failed.details : undefined
@@ -71,13 +63,7 @@ export function Session() {
       {...(value._tag === 'signingIn' ? { busy: value.method } : {})}
       {...(error === undefined ? {} : { error })}
       {...(details === undefined ? {} : { onCopyDetails: () => copyText(details) })}
-      onSignIn={() => {
-        setLast('window')
-        setUpAfter()
-        signIn(undefined)
-      }}
       onImport={() => {
-        setLast('import')
         setUpAfter()
         importSession(undefined)
       }}

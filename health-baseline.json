@@ -1,17 +1,17 @@
 {
   "schemaVersion": 1,
-  "recordedOn": "2026-10-20",
+  "recordedOn": "2026-10-21",
   "counts": {
     "unusedFiles": 0,
     "unusedExports": 0,
     "unusedTypes": 0,
     "unusedDependencies": 0,
     "unlistedDependencies": 0,
-    "clonePairs": 5,
+    "clonePairs": 4,
     "oversizedFiles": 45,
     "oversizedFunctions": 128
   },
-  "clonedLines": 93,
+  "clonedLines": 76,
   "oversizedFiles": [
     "apps/desktop/e2e/driver/juno.ts",
     "apps/desktop/e2e/feel/recorder.ts",
