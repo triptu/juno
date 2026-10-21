@@ -3,7 +3,7 @@
 // scrolls sideways inside its own box, its far edge shaded, and never widens
 // the message; and a message that is only a table reads "Table: " and its
 // first row in the sidebar.
-import { tableBlock } from '@juno/fake-slack'
+import { SELF_ID, tableBlock } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 
 test.describe.configure({ timeout: 120_000 })
@@ -71,4 +71,34 @@ test('a table shows its cells, scrolls sideways in its own box, and reads as a t
   await expect(table.getByRole('columnheader', { name: 'Notes' })).toBeInViewport()
   await expect(edge).toHaveCSS('opacity', '0')
   expect(await scroller.evaluate((element) => element.scrollLeft)).toBe(listScroll)
+})
+
+test('editing the words of a message with a table keeps the table', async ({ juno, fake }) => {
+  const table = tableBlock([['Service', 'Status'], ['API', 'Healthy']])
+  const posted = fake.workspace.post({
+    channel: 'C0ENG',
+    user: SELF_ID,
+    text: 'Status',
+    silent: true,
+    blocks: [{ type: 'rich_text', elements: [{ type: 'rich_text_section', elements: [{ type: 'text', text: 'Status' }] }] }, table],
+  })
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row('#eng').open()
+  const { topic } = juno
+  await expect(topic.message('Healthy').getByRole('table')).toBeVisible({ timeout: 15_000 })
+
+  await topic.composer.press('ArrowUp')
+  await topic.message('Healthy').press('e')
+  const field = topic.list.getByRole('textbox', { name: 'Edit message' })
+  // The field holds the words; the table is not in it.
+  await expect(field).toHaveValue('Status')
+  await field.fill('Status updated')
+  await field.press('Enter')
+
+  const stored = () => fake.messages('C0ENG').find((message) => message.ts === posted.ts)
+  await expect.poll(() => stored()?.text).toBe('Status updated')
+  expect(stored()?.blocks?.map((block) => block.type)).toEqual(['rich_text', 'table'])
+  expect(stored()?.blocks?.[1]).toEqual(table)
+  await expect(topic.message('Status updated').getByRole('table')).toContainText('Healthy')
 })

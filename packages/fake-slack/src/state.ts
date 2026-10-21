@@ -463,7 +463,8 @@ export class Workspace {
   }
 
   /** `mrkdwn`: `text` came from a client (`chat.update`), escaped as Slack does. */
-  edit(channel: string, ts: string, text: string, editor: string, mrkdwn = false): Message {
+  /** `blocks` as a client sent them, which Slack keeps; without them, blocks are made from `text`. */
+  edit(channel: string, ts: string, text: string, editor: string, mrkdwn = false, blocks?: Message['blocks']): Message {
     const list = this.all(channel)
     const index = list.findIndex((m) => m.ts === ts)
     const previous = list[index]
@@ -472,7 +473,7 @@ export class Workspace {
     const message: Message = {
       ...previous,
       text: mrkdwn ? escapeText(text) : toMrkdwn(text),
-      blocks: textToBlocks(mrkdwn ? unescapeText(escapeText(text)) : text),
+      blocks: blocks ?? textToBlocks(mrkdwn ? unescapeText(escapeText(text)) : text),
       edited: { user: editor, ts: editTs },
     }
     list[index] = message
