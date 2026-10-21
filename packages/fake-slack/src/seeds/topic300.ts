@@ -5,13 +5,16 @@ import { NEVER_READ, type Workspace } from '../state.ts'
 export const TOPIC300_MAIN_CHANNEL = 'C0PERFMAIN'
 export const TOPIC300_THREAD_CHANNEL = 'C0PERFTHREAD'
 
+/** A block taller than a row's size estimate by far, so rows differ from it as they do in real topics. */
+const LONG_CODE = ['const steps = await checklist.load()', 'for (const step of steps) {', '  if (!step.done) await step.run()', '}', 'await checklist.save(steps)', 'console.log(steps.length)'].join('\n')
+
 export interface Topic300Summary {
   readonly mainId: string
   readonly threadId: string
   readonly threadTs: Ts
 }
 
-/** Two 300-row windows, each with exactly 60 images and 30 code blocks. */
+/** Two 300-row windows, each with exactly 60 images and 45 code blocks, 15 of them six lines long. */
 export function topic300Seed(): (workspace: Workspace, avatarBase: string) => Topic300Summary {
   return (workspace, avatarBase) => {
     const now = workspace.clock.now()
@@ -28,7 +31,7 @@ export function topic300Seed(): (workspace: Workspace, avatarBase: string) => To
     for (const channel of [TOPIC300_THREAD_CHANNEL, TOPIC300_MAIN_CHANNEL]) {
       for (let i = 0; i < 300; i++) {
         const text = `Review the rollout checklist ${i + 1}. The next step is ready for review.`
-        const code = i % 10 === 3
+        const code = i % 10 === 3 ? 'const ready = true;\nconsole.log(ready);' : i % 20 === 17 ? LONG_CODE : undefined
         const url = `${avatarBase}/../files/F${channel}${i}/image.svg`
         const file: File = { id: `F${channel}${i}`, name: `diagram-${i}.svg`, mimetype: 'image/svg+xml', original_w: 800, original_h: 600, thumb_360_w: 360, thumb_360_h: 270, thumb_360: url, url_private: url }
         if (i % 5 === 0) {
@@ -41,7 +44,7 @@ export function topic300Seed(): (workspace: Workspace, avatarBase: string) => To
           channel, user: sender ?? SELF_ID, text,
           blocks: [{ type: 'rich_text', elements: [
             { type: 'rich_text_section', elements: [{ type: 'text', text }] },
-            ...(code ? [{ type: 'rich_text_preformatted', elements: [{ type: 'text', text: 'const ready = true;\nconsole.log(ready);' }] } satisfies RichTextElement] : []),
+            ...(code === undefined ? [] : [{ type: 'rich_text_preformatted', elements: [{ type: 'text', text: code }] } satisfies RichTextElement]),
           ] }],
           ...(i % 5 === 0 ? { files: [file] } : {}),
           ...(channel === TOPIC300_THREAD_CHANNEL && root !== undefined ? { threadTs: root.ts } : {}),

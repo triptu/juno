@@ -87,6 +87,12 @@ function settledBox(target: Locator): Promise<Box | null> {
 }
 
 export type SidebarSectionName = 'Pinned' | 'Recent'
+/** Where a scroll came to rest: the first row whose top is in view, its top, and its top on each frame after. */
+export interface Landing {
+  readonly ts: string
+  readonly top: number
+  readonly tops: ReadonlyArray<number>
+}
 export type SidebarFilterName = 'All' | 'Channels' | 'DMs'
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -1777,18 +1783,73 @@ export class TopicPane {
    * does, and waits for the scroll to settle. The wheel is what lets go of
    * the list's hold on the bottom; a scroll set from a script does not, and a
    * commit that adds rows before it settles puts the bottom back.
+   * Answers with where the scroll landed (`watchLanding`).
    */
-  async scrollUp(pixels: number): Promise<void> {
+  async scrollUp(pixels: number, frames = 0): Promise<Landing> {
     const box = await this.scroller.boundingBox()
     if (box === null) throw new Error('No message list to scroll')
     await this.win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-    type Watched = HTMLElement & { scrollEnded?: Promise<void> }
-    // The listener is in place before the wheel turns: the wheel reaches the page by another path than evaluate.
-    await this.scroller.evaluate((scroller: Watched) => {
-      scroller.scrollEnded = new Promise((resolve) => scroller.addEventListener('scrollend', () => resolve(), { once: true }))
-    })
+    const landed = await this.watchLanding(frames)
     await this.win.mouse.wheel(0, -pixels)
-    await this.scroller.evaluate((scroller: Watched) => scroller.scrollEnded)
+    return await landed()
+  }
+
+  /**
+   * Scrolls the list by a few pixels from a script, so that the scroller's top edge falls in the gap above a row
+   * that starts a group, where no row is under it. Answers with where the scroll landed (`watchLanding`).
+   */
+  async scrollToGroupGap(frames = 0): Promise<Landing> {
+    const by = await this.scroller.evaluate((scroller) => {
+      const top = scroller.getBoundingClientRect().top
+      const rows = [...scroller.querySelectorAll<HTMLElement>('[data-message-row]')].map((row) => row.getBoundingClientRect())
+      for (let i = 1; i < rows.length; i++) {
+        const gap = rows[i]!.top - rows[i - 1]!.bottom
+        if (rows[i - 1]!.bottom > top + 40 && gap >= 4) return rows[i - 1]!.bottom + gap / 2 - (top + 1)
+      }
+      throw new Error('No gap between groups in view')
+    })
+    const landed = await this.watchLanding(frames)
+    await this.scroller.evaluate((scroller, by) => void (scroller.scrollTop += by), by)
+    return await landed()
+  }
+
+  /**
+   * Sets the list's scrollTop in one step to `fraction` of its range, as a scrollbar drag does. Answers with where
+   * the scroll landed (`watchLanding`).
+   */
+  async jumpTo(fraction: number, frames = 0): Promise<Landing> {
+    const landed = await this.watchLanding(frames)
+    await this.scroller.evaluate((scroller, fraction) => void (scroller.scrollTop = (scroller.scrollHeight - scroller.clientHeight) * fraction), fraction)
+    return await landed()
+  }
+
+  /**
+   * Watches for the next `scrollend` and answers with the first row in view then, read in `scrollend` itself, and
+   * that row's top on each of the `frames` frames after it. A jump lands on rows still at their size estimate, and a
+   * read from a later task can fall after they reached their real height. The listener is in place before the scroll
+   * starts: a wheel reaches the page by another path than evaluate.
+   */
+  private async watchLanding(frames: number): Promise<() => Promise<Landing>> {
+    type Watched = HTMLElement & { landed?: Promise<Landing> }
+    await this.scroller.evaluate((scroller: Watched, frames) => {
+      scroller.landed = new Promise((resolve) =>
+        scroller.addEventListener('scrollend', () => {
+          const box = scroller.getBoundingClientRect()
+          const row = [...scroller.querySelectorAll<HTMLElement>('[data-message-row]')].find((node) => node.getBoundingClientRect().top >= box.top)
+          const tops: number[] = []
+          const landing = { ts: row?.dataset['messageRow'] ?? '', top: row?.getBoundingClientRect().top ?? Number.NaN, tops }
+          if (row === undefined) return resolve(landing)
+          const tick = () => {
+            tops.push(row.getBoundingClientRect().top)
+            if (tops.length < frames) requestAnimationFrame(tick)
+            else resolve(landing)
+          }
+          if (frames === 0) resolve(landing)
+          else requestAnimationFrame(tick)
+        }, { once: true }),
+      )
+    }, frames)
+    return () => this.scroller.evaluate((scroller: Watched) => scroller.landed!)
   }
 
   async scrollToBottom(): Promise<void> {

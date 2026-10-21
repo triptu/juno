@@ -1,11 +1,10 @@
 // Tabs: opening uses the current tab and typing goes to its composer, ⌘-click opens a new one, a plain open
-// of an open topic focuses its tab, one topic in two tabs scrolls apart,
+// of an open topic focuses its tab,
 // closing focuses the neighbour and never leaves no tab, a new tab opens
 // Home and does not cancel an open still waiting, where "+" sits, the app
 // menu's tab items, the row menu's Open in new tab, tabs survive a restart, dragging and ⌃⇧← ⌃⇧→ reorder them, and
 // each tab shows its topic's art or the DM person's photo, and a tab not
 // viewed for a day closes by itself.
-import { startFakeSlack, topic300Seed } from '@juno/fake-slack'
 import { expectNoLayoutShift } from '@juno/testing/layout-shift'
 import { expect, launchApp, syncedTest, test } from './fixtures'
 import { Juno } from './driver/juno'
@@ -285,51 +284,6 @@ test('a tab not viewed for a day closes by itself, ⌘⇧T brings it back, and a
   await tabs.menu('reopen-tab')
   await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/), expect.stringMatching(/^Proposal/)])
   await tabs.expectActive(POSTGRES)
-})
-
-test.describe('one topic in two tabs', () => {
-  const longTest = test.extend({
-    // oxlint-disable-next-line no-empty-pattern
-    fake: async ({}, use) => {
-      const fake = await startFakeSlack({ seed: (workspace, avatars) => void topic300Seed()(workspace, avatars) })
-      await use(fake)
-      await fake.close()
-    },
-  })
-  const THREAD = 'Review the rollout checklist 1'
-
-  longTest('each tab keeps its own scroll position', async ({ juno }) => {
-    await juno.signIn()
-    await juno.waitForSync()
-    const { sidebar, tabs, topic } = juno
-    await sidebar.row(THREAD).open()
-    await topic.expectAtBottom()
-
-    // ⌘-click opens the topic again in a new tab, though a tab shows it.
-    await sidebar.row(THREAD).openInNewTab()
-    await expect(tabs.tab(THREAD)).toHaveCount(2)
-    await tabs.expectActiveAt(THREAD, 1)
-    await topic.expectAtBottom()
-    await topic.scrollUp(2400)
-    const up = await topic.firstVisibleRow()
-
-    // The first tab is still at the bottom; the second is where it was left.
-    await tabs.selectAt(THREAD, 0)
-    await tabs.expectActiveAt(THREAD, 0)
-    await topic.expectAtBottom()
-    await tabs.selectAt(THREAD, 1)
-    await tabs.expectActiveAt(THREAD, 1)
-    // The row that was first in view is back where it was. Which row counts as first can flip on a
-    // sub-pixel when a row edge sits on the list's top, so the same row is followed instead.
-    expect(await topic.rowTop(up.ts)).toBeCloseTo(up.top, 0)
-
-    // A plain open focuses the tab that was active last, without moving it.
-    await tabs.selectAt(THREAD, 0)
-    await sidebar.row(THREAD).open()
-    await tabs.expectActiveAt(THREAD, 0)
-    await topic.expectAtBottom()
-    await expect(tabs.tab(THREAD)).toHaveCount(2)
-  })
 })
 
 syncedTest('"+" sits one tab gap after the last tab, level with the tabs, and stays at the end of the strip when the tabs scroll', async ({ juno, app }) => {

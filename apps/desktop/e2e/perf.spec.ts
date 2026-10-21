@@ -23,7 +23,7 @@ import { HEAVY_MEMORY_BUDGETS, heavyUse, memoryDump, readMemory } from './perfMe
 import { typingReading } from './perfTyping'
 import { answer } from './juno-agent/chat'
 import { savedTabs } from './driver/userDb'
-import { Juno, press, type SidebarFilterName } from './driver/juno'
+import { Juno, press, type Landing, type SidebarFilterName } from './driver/juno'
 
 declare global {
   interface Window { __emojiBenchmarkReleaseImages: () => Promise<void> }
@@ -970,7 +970,7 @@ test('topic open, uncached: a thread whose replies were never fetched, to the he
 })
 
 // The M4 gate (performance 3.4) on the topic300 seed: a 300-message thread
-// and a 300-message Main, 20 % images and 10 % code blocks, plus #perf-code
+// and a 300-message Main, 20 % images and 15 % code blocks, plus #perf-code
 // (codeBlocksSeed: 50 distinct code blocks of 40 to 100 lines). One synced
 // user-data directory; every scenario launches the app warm on it.
 test.describe('topic view', () => {
@@ -1006,6 +1006,17 @@ test.describe('topic view', () => {
   async function nextMeasure(juno: Juno, name: string, before: number): Promise<number> {
     await expect.poll(async () => (await juno.measures(name)).length, { timeout: 15_000 }).toBeGreaterThan(before)
     return (await juno.measures(name)).at(-1)!
+  }
+
+  /** Twenty switches between Main's tab and the thread's, timed with `juno.tab-switch`. */
+  async function switchTabs(juno: Juno): Promise<number[]> {
+    const samples: number[] = []
+    for (let i = 0; i < 20; i++) {
+      const before = (await juno.measures('juno.tab-switch')).length
+      await juno.tabs.select(i % 2 === 0 ? 'perf-main' : THREAD)
+      samples.push(await nextMeasure(juno, 'juno.tab-switch', before))
+    }
+    return samples
   }
 
   test.beforeAll(async () => {
@@ -1103,16 +1114,15 @@ test.describe('topic view', () => {
       // Tab switch: two mounted tabs.
       await juno.sidebar.row(THREAD).openInNewTab()
       await juno.tabs.expectCount(2)
-      const mounted: number[] = []
-      await traced(running.win, 'tab-switch-mounted', async () => {
-        for (let i = 0; i < 20; i++) {
-          const title = i % 2 === 0 ? 'perf-main' : THREAD
-          const before = (await juno.measures('juno.tab-switch')).length
-          await juno.tabs.select(title)
-          mounted.push(await nextMeasure(juno, 'juno.tab-switch', before))
-        }
-      })
+      let mounted: number[] = []
+      await traced(running.win, 'tab-switch-mounted', async () => void (mounted = await switchTabs(juno)))
       within('tab switch mounted, p95', stats('tab switch, mounted (juno.tab-switch)', mounted).p95, oneFrame)
+
+      // The same with the thread's tab scrolled up: showing it again puts its held row back before paint.
+      await juno.tabs.select(THREAD)
+      await juno.topic.scrollUp(3000)
+      const scrolledUp = await switchTabs(juno)
+      within('tab switch mounted scrolled up, p95', stats('tab switch, mounted, one tab scrolled up (juno.tab-switch)', scrolledUp).p95, oneFrame)
     } finally {
       await running.close()
     }
@@ -1159,6 +1169,45 @@ test.describe('topic view', () => {
       expect(blocks).toBe(CODE_BLOCK_COUNT)
       expect(Math.max(...painted)).toBeLessThan(CODE_BLOCK_COUNT / 2)
       within('topic reopen with 50 code blocks, p95', stats('topic reopen, 50 code blocks with known colours, press to rows painted (juno.topic-open)', samples).p95, 50)
+    } finally {
+      await running.close()
+    }
+  })
+
+  // A scrollbar jump into the middle of #perf-code, opened cold: the rows it lands on have never been laid out (the
+  // older half, above the last window's worth laid out at the end), and every one is a 40 to 100 line code block. Untimed against a budget of its own: the frames after the jump are
+  // read against the scroll frame budget and the long-frame limit, and the row it landed on must not move.
+  test('jump into the middle of 50 tall code blocks: the frames after it lands', async () => {
+    test.setTimeout(300_000)
+    const { running, juno } = await ready()
+    const { win } = running
+    try {
+      await juno.sidebar.row(CODE).open()
+      await juno.topic.expectAtBottom()
+      await win.waitForTimeout(500)
+      await win.evaluate(() => {
+        const longFrames: number[] = []
+        new PerformanceObserver((list) => longFrames.push(...list.getEntries().map((entry) => entry.duration))).observe({ type: 'long-animation-frame' })
+        Object.assign(window, { junoLongFrames: longFrames })
+      })
+      // The 13th of the 50 rows at the top of the view.
+      const { fraction, skipped } = await juno.topic.scroller.evaluate((scroller) => {
+        const row = scroller.querySelectorAll<HTMLElement>('[data-message-row]')[12]!
+        const top = row.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop
+        return { fraction: top / (scroller.scrollHeight - scroller.clientHeight), skipped: row.firstElementChild?.checkVisibility({ contentVisibilityAuto: true }) === false }
+      })
+      expect(skipped, 'the row the jump lands on was never laid out').toBe(true)
+      let landing: Landing | undefined
+      const { work } = await traced(win, 'code-jump', async () => {
+        landing = await juno.topic.jumpTo(fraction, 30)
+        await win.waitForTimeout(300)
+      })
+      const longFrames = await win.evaluate(() => (window as unknown as { junoLongFrames: number[] }).junoLongFrames)
+      const moved = Math.max(...landing!.tops.map((top) => Math.abs(top - landing!.top)))
+      const heaviest = [...work].sort((a, b) => b - a).slice(0, 3)
+      console.log(`code jump: heaviest frames ${heaviest.map((ms) => ms.toFixed(1)).join(' ')} ms (scroll budget 8.3), long animation frames ${longFrames.map((ms) => ms.toFixed(0)).join(' ') || 'none'}, landed row moved ${moved.toFixed(1)} px, load ${loadavg()[0]!.toFixed(1)}`)
+      expect(moved, 'the row the jump landed on moves').toBeLessThan(0.5)
+      expect.soft(longFrames, 'long animation frames after the jump').toEqual([])
     } finally {
       await running.close()
     }
