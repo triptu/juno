@@ -51,9 +51,9 @@ The first name comes from the Slack profile. If there is none, drop the name and
 | 0, caught up | Nothing is waiting on you. |
 | 0, not caught up (unread in followed topics) | Nothing is waiting on you. The time-of-day line stays. |
 
-### The thought
+### No thought
 
-With no items, one quote or fact sits under the greeting (SPEC §12, "A thought"): serif 18px in `--foreground-subtle`, a quote's "— Name" under it in the meta style and `--foreground-muted`. It comes from the bundled list in `packages/state/src/homeThoughtList.ts`, where each entry keeps its source. A thought observes and never advises: no imperatives and no self-help. To add one, check the quote against its primary source (book, essay, speech, letter, with the year; Quote Investigator for anything famous) or the fact against a reference such as a NASA page or an encyclopedia article, and leave it out when in doubt.
+Home shows nothing under the greeting when nothing waits: no quote or fact, during the first sync or after it. The quotes and facts are in the gallery (SPEC §12, "Pictures and the gallery"; `docs/design/home-art/`), from the list in `packages/pictures/src/thoughts.ts`. To add one, check the quote against its primary source (book, essay, speech, letter, with the year; Quote Investigator for anything famous) or the fact against a reference such as a NASA page or an encyclopedia article, and leave it out when in doubt.
 
 ### Item templates
 
@@ -99,7 +99,7 @@ Missed huddles rank after mentions. At most one appears, within the three-row ca
 ## Accessibility
 
 - The scene is decorative: `aria-hidden`, no title. The greeting carries the meaning.
-- The greeting is an `h2` so a screen reader lands on it; the second line is a paragraph, and so is the thought, read after the greeting.
+- The greeting is an `h2` so a screen reader lands on it; the second line is a paragraph, read after the greeting.
 - Items are real links (`a` with an href to the topic), in a list, focusable in order, with the hover highlight also shown on focus. The caret appears on hover and focus only.
 - The ask field is a button labelled "Ask Juno" that opens the Juno chat; it is not an input, so there is no second composer on the page. ⌘J does the same.
 - Text meets 4.5:1 in both themes: the title line is `--foreground-default`, the meta line `--foreground-muted` on `--background` (4.93:1 light, 6.6:1 dark).
@@ -109,7 +109,6 @@ Missed huddles rank after mentions. At most one appears, within the three-row ca
 
 - The scenes are inline SVG symbols in the bundle, about 4 KB for all eight. Nothing is fetched. The first paint has the scene, the greeting and the items; there is no loading state and no spinner.
 - The layout is fixed before data arrives: the scene box is 120 by 83, the greeting is one line, the items column has a fixed width and each row is 52px. A row that arrives late is not allowed, except into a reserved slot during the first sync (below). Home paints whole when `home.view` (a local query) answers. Opening it from a topic keeps the topic on screen while the local result arrives, for at most 150 ms, as All topics does. Until the first sync has finished (first launch on a real workspace takes minutes), Home shows the scene and the greeting with "Syncing with Slack." in place of the count line; it never says "All caught up" too early. The list reserves room for all its rows, and rows fill it from the top as conversations land, without the entrance: a new row only takes the next empty slot, so a row already shown never moves, even when a later one ranks higher. When the sync finishes, the rows shown stay where they are, the empty slots take the next items in rank order, the count line replaces "Syncing with Slack.", and the scene and the reserved room stay until Home appears again. Before `home.view` answers at all (milliseconds) the page is blank. The items it showed stay until Home appears again.
-- The thought's list is its own chunk, loaded when idle after Home paints. The next thought is saved in local storage, so Home has it in its first frame; only the first Home ever, before the list has loaded, shows it a moment late. Over reserved slots it is laid out of the flow, so a row that lands moves nothing.
 - The AI rewrite of an item's title is the only other thing that can arrive after paint. It replaces the text of a one-line, ellipsised title, so the row height does not change.
 - No timers. The scene and greeting do not update on the minute.
 
