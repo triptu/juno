@@ -88,7 +88,7 @@ export function PicturePage({ picture, src, onAllPictures, onStep, onOpenLink }:
           </blockquote>
           {picture.line.by === undefined && picture.line.context === undefined ? null : (
             <Text variant="meta" tone="muted" as="p" selectable sx={styles.said}>
-              {[picture.line.by, picture.line.context].filter((part) => part !== undefined).join(', ')}
+              {saidOf(picture.line)}
             </Text>
           )}
           <Text variant="body" tone="secondary" as="p" selectable sx={styles.about}>
@@ -108,6 +108,17 @@ export function PicturePage({ picture, src, onAllPictures, onStep, onOpenLink }:
       </div>
     </article>
   )
+}
+
+/**
+ * The quiet line under the page's line: who said it and the context clause
+ * ("Louis Leroy, in Le Charivari, 1874, of this picture."), or a fact's
+ * context alone as a sentence. Ends with a full stop.
+ */
+function saidOf(line: PictureStoryView['line']): string {
+  const said = line.by === undefined ? (line.context ?? '') : line.context === undefined ? line.by : `${line.by}, ${line.context}`
+  const sentence = said.charAt(0).toUpperCase() + said.slice(1)
+  return /[.!?]$/.test(sentence) ? sentence : `${sentence}.`
 }
 
 const NARROW = '@container picture (width < 900px)'
