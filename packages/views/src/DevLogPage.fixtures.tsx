@@ -55,4 +55,4 @@ export default defineFixtures(DevLogPage, {
     'no-match': fixture({ ...base, text: 'reactions', rows: [], total: 0 }),
     empty: fixture({ ...base, rows: [], total: 0 }),
   },
-})
+}, { width: 1000, height: 520, padded: false })
