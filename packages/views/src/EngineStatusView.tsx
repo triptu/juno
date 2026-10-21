@@ -1,4 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
+import { CloudWarning } from '@phosphor-icons/react/dist/icons/CloudWarning'
 import { HourglassMedium } from '@phosphor-icons/react/dist/icons/HourglassMedium'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
 import { WifiSlash } from '@phosphor-icons/react/dist/icons/WifiSlash'
@@ -35,18 +36,28 @@ export function EngineStatusView({ line, pong, busy = false, onPing }: EngineSta
   )
 }
 
-/** Why the sidebar may be behind Slack. `stopped`: the engine has stopped for good and needs a restart. */
-export type EngineNoticeKind = 'offline' | 'rate-limited' | 'stopped'
+/**
+ * Why the sidebar may be behind Slack. `stopped`: the engine has stopped for
+ * good and needs a restart. `failed`: the sync keeps failing for a reason
+ * other than the network.
+ */
+export type EngineNoticeKind = 'offline' | 'failed' | 'rate-limited' | 'stopped'
 
 export interface EngineNoticeProps {
   readonly kind: EngineNoticeKind
   /** Starts the engine again. Offered only when it has stopped. */
   readonly onRestart?: () => void
+  /** `failed` only: the reason in plain words, one short sentence ("Slack sent data Juno can't read."). */
+  readonly reason?: string
+  /** `failed` only: puts the diagnostic log on the clipboard. */
+  readonly onCopyLog?: () => void
 }
 
 // `line` fits the card at the narrowest sidebar; `body` is the full sentence, in the tooltip.
 const notices: Record<EngineNoticeKind, { readonly icon: PhosphorIcon; readonly title: string; readonly line: string; readonly body: string }> = {
   offline: { icon: WifiSlash, title: "You're offline", line: "Juno catches up when you're back.", body: "Juno shows what it has and catches up when you're back." },
+  // The line is the reason when there is one.
+  failed: { icon: CloudWarning, title: "Couldn't finish syncing", line: 'Juno tries again every 30 seconds.', body: 'Juno tries again every 30 seconds. Copy the log and send it to us.' },
   'rate-limited': { icon: HourglassMedium, title: 'Slack asked us to slow down', line: 'Juno will catch up in a minute.', body: 'Juno will catch up in a minute.' },
   stopped: { icon: WarningCircle, title: 'Sync stopped', line: 'The topics here are kept.', body: 'The topics here are kept. Restart to catch up.' },
 }
@@ -86,20 +97,25 @@ function StatusCard({ leading, title, line, tooltip, action }: StatusCardProps) 
 /**
  * Why the sidebar may be behind Slack (friendly-layer 7), in the status
  * card at the foot of the sidebar: what happened, what is kept, and
- * Restart when the user has to act.
+ * Restart or Copy log when the user has to act.
  */
-export function EngineNotice({ kind, onRestart }: EngineNoticeProps) {
+export function EngineNotice({ kind, onRestart, reason, onCopyLog }: EngineNoticeProps) {
   const notice = notices[kind]
+  const failedReason = kind === 'failed' ? reason : undefined
   return (
     <StatusCard
       leading={<Icon icon={notice.icon} size={18} />}
       title={notice.title}
-      line={notice.line}
-      tooltip={notice.body}
+      line={failedReason ?? notice.line}
+      tooltip={failedReason === undefined ? notice.body : `${failedReason} ${notice.body}`}
       action={
         kind === 'stopped' && onRestart !== undefined ? (
           <Button variant="raised" size="xs" onClick={onRestart}>
             Restart
+          </Button>
+        ) : kind === 'failed' && onCopyLog !== undefined ? (
+          <Button variant="raised" size="xs" onClick={onCopyLog}>
+            Copy log
           </Button>
         ) : undefined
       }

@@ -232,6 +232,7 @@ export default defineFixtures(
       'first sync': scene(() => full({ dots: { channels: false, dms: false }, status: <SyncProgress done={11} total={148} /> }, { sections: [], empty: 'syncing' })),
       'first sync rows': scene(() => full({ status: <SyncProgress done={64} total={148} /> }, { sections: [{ id: 'recent', ids: firstRows }] })),
       offline: scene(() => full({ status: <EngineNotice kind="offline" /> })),
+      failed: scene(() => full({ status: <EngineNotice kind="failed" reason="Slack sent data Juno can't read." onCopyLog={noop} /> })),
       'rate-limited': scene(() => full({ status: <EngineNotice kind="rate-limited" /> })),
       stopped: scene(() => full({ status: <EngineNotice kind="stopped" onRestart={noop} /> })),
       'with privacy': scene(() => <PrivacyOn>{full({ status: <EngineNotice kind="offline" />, privacy: true, onPrivacyOff: noop })}</PrivacyOn>),

@@ -21,6 +21,7 @@ export default defineFixtures(EngineStatusView, {
     live: fixture({ line: 'Engine live', onPing }),
     offline: fixture({ line: "You're offline. Juno shows what it has and catches up when you're back.", onPing }),
     'rate-limited': fixture({ line: 'Slack asked us to slow down. Juno will catch up in a minute.', onPing }),
+    failed: fixture({ line: 'Engine sync failed', onPing }),
     'session-expired': fixture({ line: 'Engine session expired', onPing }),
   },
   Ping: {
@@ -29,6 +30,7 @@ export default defineFixtures(EngineStatusView, {
 })
 
 const onRestart = () => {}
+const onCopyLog = () => {}
 
 // The fixed secondary line in the sidebar header, as the Sidebar container draws it.
 export const engineNoticeFixtures = defineFixtures(
@@ -36,6 +38,8 @@ export const engineNoticeFixtures = defineFixtures(
   {
     Sync: {
       offline: fixture({ kind: 'offline' }),
+      failed: fixture({ kind: 'failed', reason: "Slack sent data Juno can't read.", onCopyLog }),
+      'failed without reason': fixture({ kind: 'failed', onCopyLog }),
       'rate-limited': fixture({ kind: 'rate-limited' }),
       stopped: fixture({ kind: 'stopped', onRestart }),
     },
