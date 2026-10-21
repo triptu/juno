@@ -1,7 +1,7 @@
 import { quietDaysOf } from '@juno/domain'
 import { prefs } from '@juno/store'
 import { SlackAuthRequired, SlackSession, SlackSocket } from '@juno/slack'
-import { Deferred, Effect, FiberSet, Queue, Semaphore } from 'effect'
+import { Cause, Deferred, Effect, Exit, FiberSet, Queue, Semaphore } from 'effect'
 import type { BootState, Phase } from '../boot'
 import { makeMarkerCandidates } from '../markerCandidates'
 import { SyncConfig } from '../config'
@@ -9,9 +9,18 @@ import type { FileFetch, RootFetch, SyncContext } from '../context'
 import { syncEmoji } from '../emoji'
 import { syncUsergroups } from '../usergroups'
 
-import type { RunSyncOptions } from '../sync'
+import type { RunSyncOptions, SyncStepName } from '../sync'
 
 export const isNotAuth = <E extends { readonly _tag: string }>(error: E): error is Exclude<E, SlackAuthRequired> => error._tag !== 'SlackAuthRequired'
+
+/** A failure as one short line: the error's tag and code or message. */
+const causeLine = (cause: Cause.Cause<unknown>): string => {
+  const found = Cause.findErrorOption(cause)
+  if (found._tag === 'None') return 'defect'
+  const error = found.value as { readonly _tag?: unknown; readonly error?: unknown; readonly message?: unknown }
+  const detail = typeof error.error === 'string' ? error.error : typeof error.message === 'string' ? error.message : ''
+  return [typeof error._tag === 'string' ? error._tag : 'Error', detail].filter((part) => part !== '').join(': ')
+}
 
 export const makeSyncRuntime = (options: RunSyncOptions) => Effect.gen(function* () {
   const config = yield* SyncConfig
@@ -56,6 +65,21 @@ export const makeSyncRuntime = (options: RunSyncOptions) => Effect.gen(function*
       Effect.andThen(effect),
       Effect.ensuring(options.onCycle?.('finished') ?? Effect.void),
     )
+  /** Tells `onStep` when `effect` starts and how it ended. */
+  const step = <A, E, R>(name: SyncStepName, effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> => {
+    const onStep = options.onStep
+    if (onStep === undefined) return effect
+    return Effect.suspend(() => {
+      const start = performance.now()
+      onStep({ name, event: 'started' })
+      return effect.pipe(Effect.onExit((exit) => Effect.sync(() => {
+        const durationMs = performance.now() - start
+        if (Exit.isSuccess(exit)) onStep({ name, event: 'finished', durationMs })
+        else if (Cause.hasInterruptsOnly(exit.cause)) onStep({ name, event: 'interrupted', durationMs })
+        else onStep({ name, event: 'failed', durationMs, cause: causeLine(exit.cause) })
+      })))
+    })
+  }
   const settle = () => phase(state.connected ? { _tag: 'live' } : { _tag: 'offline' })
   // Each says whether it finished; a failure other than an expired session is logged.
   const refreshEmoji = syncEmoji().pipe(
@@ -69,7 +93,7 @@ export const makeSyncRuntime = (options: RunSyncOptions) => Effect.gen(function*
   const reportBoot: Phase = phase
   // Catch-ups and reboots run in the background; joining the set below is what lets their auth failures end the sync.
   const background = yield* FiberSet.make<void, SlackAuthRequired>()
-  return { socket, ctx, state, work, phase, cycle, settle, refreshEmoji, refreshUsergroups, reportBoot, background, config, options }
+  return { socket, ctx, state, work, phase, cycle, step, settle, refreshEmoji, refreshUsergroups, reportBoot, background, config, options }
 })
 
 export type SyncRuntime = Effect.Success<ReturnType<typeof makeSyncRuntime>>

@@ -43,7 +43,16 @@ export type SyncPhase =
   | { readonly _tag: 'live' }
   | { readonly _tag: 'offline' }
 
+/** The timed steps of a sync, as the developer log shows them. */
+export type SyncStepName = 'cold-boot' | 'warm-boot' | 'catch-up' | 'sweep' | 'follow-pass'
+
+export type SyncStep =
+  | { readonly name: SyncStepName; readonly event: 'started' }
+  | { readonly name: SyncStepName; readonly event: 'finished' | 'failed' | 'interrupted'; readonly durationMs: number; readonly cause?: string }
+
 export interface RunSyncOptions {
+  /** Hears each step start and end. Synchronous and cheap; observation only. */
+  readonly onStep?: (step: SyncStep) => void
   /** Observer after event application. Must enqueue work without blocking the socket. */
   readonly onEvent?: (event: SocketEvent, me: import('@juno/domain').Me) => Effect.Effect<void>
   /** Brackets each boot, reboot or reconciliation, including its background follow pass. */
@@ -111,8 +120,8 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
     // No command is in flight before the sync runs; `follow` outbox rows are left over from a crash.
     yield* transaction(clearPendingFollows).pipe(Effect.catchCause((cause) => Effect.logError('sync: pending follows not cleared', { cause })))
     const events = yield* socket.events
-    const reconcile = makeReconcile(runtime)
-    const sweep = makeReconcile(runtime)
+    const reconcile = makeReconcile(runtime, 'catch-up')
+    const sweep = makeReconcile(runtime, 'sweep')
     const { reboot, bootLoop } = makeBootLoop(runtime, sweep)
     const handle = handleSocketEvent(runtime, reconcile, reboot)
     const consumer = Stream.runForEach(events, (event) => handle(event).pipe(Effect.andThen(options.onEvent?.(event, ctx.me) ?? Effect.void)))

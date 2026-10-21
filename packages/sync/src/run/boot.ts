@@ -8,14 +8,14 @@ import { followPassIfDue, repairAfterLive } from './reconcile'
 import { isNotAuth, type SyncRuntime } from './runtime'
 
 const bootOnce = (runtime: SyncRuntime) => {
-  const { state, ctx, options, reportBoot, work } = runtime
+  const { state, ctx, options, reportBoot, work, step } = runtime
   const openNow = options.openTopics ?? Effect.succeed([])
   return Effect.gen(function* () {
     const startedAt = yield* Clock.currentTimeMillis
     const previous = yield* bootState()
     const threadsLoaded = previous === undefined
-      ? yield* coldBoot(ctx, reportBoot)
-      : (yield* warmBoot(ctx, previous, reportBoot, yield* openNow), true)
+      ? yield* step('cold-boot', coldBoot(ctx, reportBoot))
+      : (yield* step('warm-boot', warmBoot(ctx, previous, reportBoot, yield* openNow)), true)
     if (previous !== undefined && (previous.quietDays === undefined || ctx.config.quietDays > previous.quietDays)) yield* backfillWindow(ctx)
     state.lastBoot = yield* bootState()
     // Both boots read the followed threads over the window and check the ones left out: a follow pass.
