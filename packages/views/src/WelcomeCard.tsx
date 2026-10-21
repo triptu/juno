@@ -61,7 +61,7 @@ export function WelcomeCard({ done, peekKey, onClose, hidden = false }: WelcomeC
       data-welcome={allSet ? 'all-set' : ''}
     >
       <div {...stylex.props(styles.head)}>
-        <Text variant="rowTitle" tone="default" as="h3" id={headingId}>
+        <Text variant="rowTitle" tone="default" weight="medium" as="h3" id={headingId}>
           {allSet ? welcomeCopy.allSet : welcomeCopy.heading}
         </Text>
         <Button variant="ghost" tone="subtle" size="xs" onClick={onClose} data-welcome-close="">

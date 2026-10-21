@@ -236,7 +236,7 @@ export class SidebarRow {
 
   async expectRead(): Promise<void> {
     await expect(this.root.locator('[title$=" unread"]')).toHaveCount(0)
-    await expect(this.titleText).toHaveCSS('font-weight', '500')
+    await expect(this.titleText).toHaveCSS('font-weight', '400')
   }
 
   async expectMention(): Promise<void> {

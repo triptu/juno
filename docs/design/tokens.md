@@ -36,7 +36,7 @@ Warm paper. HSL values are the source of truth; hex is the sRGB result for desig
 | `--border-strongest` | `hsla(48, 30%, 82%, 1)` | #DFD9C3 | css | Rename input, outline button hover |
 | `--foreground-default` | `hsla(48, 15%, 12%, 1)` | #23211A | css | Body text, toast background |
 | `--foreground-subtle` | `hsla(48, 8%, 35%, 1)` | #605E52 | css | Icons, secondary text, pill text |
-| `--foreground-secondary` | `hsla(48, 8%, 28%, 1)` | #4D4B42 | redesign | The middle of a list row's three text levels: the sidebar preview. See 1.7 |
+| `--foreground-secondary` | `hsla(48, 8%, 28%, 1)` | #4D4B42 | redesign | An unread sidebar row's preview, the middle of its three text levels. A read row's preview is muted. See 1.7 |
 | `--foreground-muted` | `hsla(48, 5%, 42%, 1)` | #706E66 | **proto** (overrides css 52%) | Meta, time, placeholders, section labels. See 1.6 |
 | `--foreground-muted-on-fill` | `hsla(48, 8%, 35%, 1)` | #605E52 | redesign | Muted text on a selected row's `--secondary-default` fill. See 1.7 |
 | `--accent-default` | `hsla(48, 30%, 8%, 1)` | #1B180E | css | Ink accent: send button, "new" divider, @you chip, Now chip |
@@ -259,13 +259,15 @@ Measured, light: midnight #C3C2D9 / #28214D (8.5:1), claret #E3C3C6 / #5D1F2C (7
 
 Rule that follows: muted text may sit on `--background`, `--background-subtle`, `--surface-default` and `--surface-hover`. On `--secondary-*` surfaces use `--foreground-subtle` (the prototype already does this for unread count tags, status chips and pills). The read-count tag (muted on `--secondary-default`, 4.39:1) is the one exception; [proposed] use `--foreground-subtle` there too.
 
-**Sidebar row levels.** A row has three text levels: title `--foreground-default`, preview `--foreground-secondary`, place and time `--foreground-muted`. Light subtle sits only 0.06 OKLCH lightness from muted, too close to read as a level, so the preview takes `--foreground-secondary`, which sits midway between the title and the meta in both themes (OKLCH L, light 0.25 / 0.41 / 0.54, dark 0.94 / 0.80 / 0.70). Dark meta cannot go lower: it must keep 4.5:1 on the selected row. On the selected row muted points at `--foreground-muted-on-fill`. Measured in Chromium by the gallery test `contrast.spec.ts` (title / preview / meta):
+**Sidebar row levels.** A read row has two text levels: the title `--foreground-default` at 400, and the preview, place and time together in `--foreground-muted`. An unread row has three: the title at 600, the preview a step up to `--foreground-secondary`, and the place and time in muted. Resolved and unsubscribed rows keep a muted preview even when unread. The read preview used to take secondary too, and in dark it sat 1.56× below the title in contrast, so every line read alike; Messages (macOS `secondaryLabelColor`) and WhatsApp (#8696A0) put the preview 2.1× and 2.6× below the name in dark, 3.6× and 3.8× in light. Muted gives 2.25× in dark and 3.15× in light (decided 10-21). Light subtle sits only 0.06 OKLCH lightness from muted, too close to read as a level, so the unread preview takes `--foreground-secondary`, which sits midway between the title and the meta in both themes (OKLCH L, light 0.25 / 0.41 / 0.54, dark 0.94 / 0.80 / 0.70). Dark meta cannot go lower: it must keep 4.5:1 on the selected row and on popovers. On the selected row muted points at `--foreground-muted-on-fill`. Measured in Chromium by the gallery test `contrast.spec.ts` (title / unread preview / read preview and meta):
 
 | Row on | Light | Dark |
 | --- | --- | --- |
 | Sidebar `--background-subtle` | 15.3 / 8.3 / 4.85 | 15.5 / 9.9 / 6.9 |
 | Hover `--surface-hover` | 14.4 / 7.8 / 4.56 | 11.8 / 7.6 / 5.3 |
 | Selected `--secondary-default` | 13.9 / 7.5 / 5.6 | 11.2 / 7.2 / 5.0 |
+
+Two alternatives were tried on 10-21 and not kept. Every preview muted, unread included: set the preview's `tone` to `"muted"` in `TopicRow.tsx`. Then unread rows stand out only by weight and count. No line 3, with a thread's place moved to line 1 before the time: every row is two lines (with Topic titles at One line), but titles are cut much shorter, line 1 holds three things, and with Two lines the place squeezes a wrapped title further. The Topic titles setting is unchanged, and its default stays One line: the regular weight shows about 7% more of a cut title (34 characters at the default 384px width, 28 at 312px), and two of seven cut gallery titles now fit, so one line is the case these levels are tuned for.
 
 Dark mode muted (#A09E9A) is 6.56:1 on the page, 5.8:1 on cards, 4.57:1 on popovers and 5.01:1 on `--secondary-default`, so in dark the rule is not needed, but keep to it so the two themes share one set of pairings.
 
@@ -363,10 +365,10 @@ Sizes are the Figtree values; the prototype's Inter value is half a pixel smalle
 | Small button | 13px | 500 | 28px box | 0 | | Resolve (hint), Fix and send, Stop ignoring, Not yet |
 | Thread link | 13px | 400 (count 600) | 26px box | 0 | subtle | "2 replies · Title ›" |
 | UI default | 13.5px | 400 / 500 | 1.5 | 0 | default | Nav, menu items, filters, buttons, selects, inputs, toast, table "Where" |
-| Preview | 13.5px | 400 | 1.45 | 0 | muted (subtle if unread) | Row line 2, one line with an ellipsis |
+| Preview | 13.5px | 400 | 1.45 | 0 | muted (`--foreground-secondary` if unread) | Row line 2, one line with an ellipsis |
 | Body small | 14px | 400 | 1.55–1.6 | 0 | subtle | Picker rows, Compact message body |
 | Body | 14.5px | 400 | 1.6 | 0 | default | Message body (Comfortable), composer (lh 22px), rule rows, palette labels, textareas |
-| Row title | 15px (14 compact) | 500, 600 unread | 22px box | 0 | default | Sidebar row line 1; All topics title is 14.5px |
+| Row title | 14px | 400, 600 unread | 22px box | 0 | default | Sidebar row line 1 (the welcome card's heading sets 500); All topics title is 14px Body small at 500 |
 | Message name | 14.5px | 600 | | 0 | default | Flat message header |
 | Body large | 15px | 400 | 1.6 | 0 | | Unused since the airy density was removed |
 | Heading | 15.5px | 600 | 1.35 | 0 | default | Settings section titles, palette input (400) |
@@ -566,10 +568,10 @@ Sidebar row heights per density (Settings › Appearance; rows include the tile;
 
 | Density | Row | Vertical padding | Line gap | Title size |
 | --- | --- | --- | --- | --- |
-| Comfortable | 90 / 109 | 11px | 3px | 14.5px |
-| Compact (default) | 80 / 99 | 8px | 1px | 13.5px |
+| Comfortable | 90 / 109 | 11px | 3px | 14px |
+| Compact (default) | 80 / 99 | 8px | 1px | 14px |
 
-[built M10] The `density` group in `tokens.stylex.ts` holds what changes, and `compact` in `themes.stylex.ts` overrides it on `<html>`: `--density-row-padding-block` 11px / 8px, `--density-row-line-gap` (line three's margin) 2px / 0px, `--density-row-tile-zoom` 1 / 0.8182 (the 44px tile drawn at 36px), `--density-row-estimate` (the row's content height and off-screen estimate) `--row-topic-estimate` / 64px, `--density-row-two-line-estimate` (the same for any Main, which has no meta line) `--row-topic-two-line-estimate` 42px / 42px, so those rows are 64px / 58px, `--density-message-padding-block` 4px / 2px, `--density-message-group-gap` 12px / 6px. The title size does not change yet.
+[built M10] The `density` group in `tokens.stylex.ts` holds what changes, and `compact` in `themes.stylex.ts` overrides it on `<html>`: `--density-row-padding-block` 11px / 8px, `--density-row-line-gap` (line three's margin) 2px / 0px, `--density-row-tile-zoom` 1 / 0.8182 (the 44px tile drawn at 36px), `--density-row-estimate` (the row's content height and off-screen estimate) `--row-topic-estimate` / 64px, `--density-row-two-line-estimate` (the same for any Main, which has no meta line) `--row-topic-two-line-estimate` 42px / 42px, so those rows are 64px / 58px, `--density-message-padding-block` 4px / 2px, `--density-message-group-gap` 12px / 6px. The title is 14px in both densities.
 
 Two-line picker row (the topic switcher, New chat's pickers): 44px, a 20px title line (`--text-option-title-leading`) over a 16px meta line (`--text-option-meta-leading`), 4px above and below. Gap between rows: 2px. All topics table row: min 52px. Notification rule row: min 48px. Today log row: min 44px. Palette result: 55px. Menu item: 30px (context) / 32px (other menus). Message group spacing (margin above a new sender): Compact 6px, Comfortable 12px. Message padding: 2 8 / 4 8.
 

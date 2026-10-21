@@ -1,12 +1,12 @@
 import { expect, test, type Page } from '@playwright/test'
 
 /**
- * The sidebar row's three text levels (SPEC section 5, "Row anatomy"): the
- * title strongest, the preview a step down, the place and time a step below
- * that, each at least 4.5:1 on what it sits on (the sidebar, a hovered row
- * or the selected row), in both themes and with every accent. Colours are
- * resolved by drawing them, so `color-mix()` and variables count as the
- * browser paints them.
+ * The sidebar row's text levels (SPEC section 5, "Row anatomy"): on a read
+ * row the title, then the preview, place and time together, well below it;
+ * on an unread row the preview steps up between them. Each is at least 4.5:1
+ * on what it sits on (the sidebar, a hovered row or the selected row), in
+ * both themes and with every accent. Colours are resolved by drawing them,
+ * so `color-mix()` and variables count as the browser paints them.
  */
 test.describe('sidebar row contrast', () => {
   const accents = ['coral', 'ink', 'marigold', 'teal', 'midnight', 'emerald', 'claret', 'cyan'] as const
@@ -48,13 +48,14 @@ test.describe('sidebar row contrast', () => {
         }
         // A DM's Main has no meta line; its time is the same level.
         const time = part('time')!
-        return { id: row.getAttribute('data-topic-id'), title: part('title')!, preview: part('preview')!, place: part('place') ?? time, time }
+        const unread = Number(getComputedStyle(row.querySelector('[data-row-part="title"]')!).fontWeight) >= 600
+        return { id: row.getAttribute('data-topic-id'), unread, title: part('title')!, preview: part('preview')!, place: part('place') ?? time, time }
       })
     })
 
   for (const theme of ['light', 'dark'] as const) {
     for (const accent of accents) {
-      test(`${theme}, ${accent}: title over preview over meta, all readable`, async ({ page }) => {
+      test(`${theme}, ${accent}: title over preview and meta, all readable`, async ({ page }) => {
         for (const state of ['mixed-list', 'mixed-list-hover']) {
           await page.goto(`/#/TopicRow?__state=hierarchy/${state}${theme === 'light' ? '' : '&theme=dark'}${accent === 'coral' ? '' : `&accent=${accent}`}`)
           await expect(page.locator('[data-topic-row]').first()).toBeVisible()
@@ -62,6 +63,7 @@ test.describe('sidebar row contrast', () => {
           if (state === 'mixed-list-hover') await page.locator('[data-topic-row]').nth(1).hover()
           const rows = await levels(page)
           expect(rows.length).toBeGreaterThan(2)
+          expect(rows.some((row) => row.unread) && rows.some((row) => !row.unread)).toBe(true)
           for (const row of rows) {
             const where = `${row.id} in ${state}: ${JSON.stringify(row)}`
             expect(row.title, where).toBeGreaterThanOrEqual(7)
@@ -69,8 +71,13 @@ test.describe('sidebar row contrast', () => {
             expect(row.place, where).toBeGreaterThanOrEqual(4.5)
             expect(row.time, where).toBeGreaterThanOrEqual(4.5)
             // A clear step between levels, not just an order.
-            expect(row.title / row.preview, where).toBeGreaterThanOrEqual(1.3)
-            expect(row.preview / row.place, where).toBeGreaterThanOrEqual(1.2)
+            if (row.unread) {
+              expect(row.title / row.preview, where).toBeGreaterThanOrEqual(1.3)
+              expect(row.preview / row.place, where).toBeGreaterThanOrEqual(1.2)
+            } else {
+              expect(row.title / row.preview, where).toBeGreaterThanOrEqual(2)
+              expect(row.preview, where).toBe(row.place)
+            }
             expect(row.time, where).toBe(row.place)
           }
         }
