@@ -1814,6 +1814,16 @@ export class TopicPane {
   }
 
   /**
+   * Sets the list's scrollTop in one step to `fraction` of its range, as a scrollbar drag does. Answers with where
+   * the scroll landed (`watchLanding`).
+   */
+  async jumpTo(fraction: number, frames = 0): Promise<Landing> {
+    const landed = await this.watchLanding(frames)
+    await this.scroller.evaluate((scroller, fraction) => void (scroller.scrollTop = (scroller.scrollHeight - scroller.clientHeight) * fraction), fraction)
+    return await landed()
+  }
+
+  /**
    * Watches for the next `scrollend` and answers with the first row in view then, read in `scrollend` itself, and
    * that row's top on each of the `frames` frames after it. A jump lands on rows still at their size estimate, and a
    * read from a later task can fall after they reached their real height. The listener is in place before the scroll
