@@ -71,7 +71,7 @@ export const NATURE: ReadonlyArray<Picture> = [
     licence: 'cc0',
     credit: 'The Metropolitan Museum of Art, CC0',
     sourceUrl: 'https://www.metmuseum.org/art/collection/search/828288',
-    ratio: 0.6906,
+    ratio: 0.6794,
   },
   {
     id: 'hooke-micrographia-flea',
@@ -88,7 +88,7 @@ export const NATURE: ReadonlyArray<Picture> = [
     licence: 'public-domain',
     credit: 'Wellcome Collection, public domain',
     sourceUrl: 'https://wellcomecollection.org/works/apmaw56u',
-    ratio: 1.3307,
+    ratio: 1.3365,
   },
   {
     id: 'zain-al-din-indian-roller',
@@ -124,7 +124,7 @@ export const NATURE: ReadonlyArray<Picture> = [
     licence: 'cc0',
     credit: 'The Metropolitan Museum of Art, CC0',
     sourceUrl: 'https://www.metmuseum.org/art/collection/search/286896',
-    ratio: 0.8165,
+    ratio: 0.763,
   },
   {
     id: 'haeckel-diatomea',

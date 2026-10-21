@@ -76,7 +76,7 @@ export const SOUTH_ASIA: ReadonlyArray<Picture> = [
     licence: 'cc0',
     credit: 'The Metropolitan Museum of Art, CC0',
     sourceUrl: 'https://www.metmuseum.org/art/collection/search/451267',
-    ratio: 0.6711,
+    ratio: 0.6673,
   },
   {
     id: 'ravi-varma-there-comes-papa',
@@ -133,7 +133,7 @@ export const SOUTH_ASIA: ReadonlyArray<Picture> = [
     licence: 'cc0',
     credit: 'The Metropolitan Museum of Art, CC0',
     sourceUrl: 'https://www.metmuseum.org/art/collection/search/78264',
-    ratio: 0.75,
+    ratio: 0.6726,
   },
   {
     id: 'basohli-kalki-avatar',
@@ -171,6 +171,6 @@ export const SOUTH_ASIA: ReadonlyArray<Picture> = [
     licence: 'cc0',
     credit: 'The Metropolitan Museum of Art, CC0',
     sourceUrl: 'https://www.metmuseum.org/art/collection/search/682119',
-    ratio: 0.8481,
+    ratio: 0.8386,
   },
 ]

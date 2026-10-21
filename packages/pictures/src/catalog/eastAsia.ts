@@ -192,7 +192,7 @@ export const EAST_ASIA: ReadonlyArray<Picture> = [
     licence: 'cc0',
     credit: 'The Metropolitan Museum of Art, CC0',
     sourceUrl: 'https://www.metmuseum.org/art/collection/search/39915',
-    ratio: 2.5006,
+    ratio: 2.5925,
   },
   {
     id: 'dong-yuan-riverbank',
@@ -211,7 +211,7 @@ export const EAST_ASIA: ReadonlyArray<Picture> = [
     licence: 'cc0',
     credit: 'The Metropolitan Museum of Art, CC0',
     sourceUrl: 'https://www.metmuseum.org/art/collection/search/39542',
-    ratio: 0.6945,
+    ratio: 0.5182,
   },
   {
     id: 'utamaro-tree-cricket-firefly',
@@ -249,6 +249,6 @@ export const EAST_ASIA: ReadonlyArray<Picture> = [
     licence: 'cc0',
     credit: 'The Metropolitan Museum of Art, CC0',
     sourceUrl: 'https://www.metmuseum.org/art/collection/search/748432',
-    ratio: 4.3716,
+    ratio: 4.8797,
   },
 ]

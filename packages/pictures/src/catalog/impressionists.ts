@@ -307,7 +307,7 @@ export const IMPRESSIONISTS: ReadonlyArray<Picture> = [
     licence: 'cc0',
     credit: 'The Metropolitan Museum of Art, CC0',
     sourceUrl: 'https://www.metmuseum.org/art/collection/search/436535',
-    ratio: 1.2563,
+    ratio: 1.2735,
   },
   {
     id: 'cezanne-mont-sainte-victoire-viaduct',
@@ -325,6 +325,6 @@ export const IMPRESSIONISTS: ReadonlyArray<Picture> = [
     licence: 'cc0',
     credit: 'The Metropolitan Museum of Art, CC0',
     sourceUrl: 'https://www.metmuseum.org/art/collection/search/435877',
-    ratio: 1.2403,
+    ratio: 1.2452,
   },
 ]

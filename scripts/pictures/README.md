@@ -14,6 +14,8 @@ pnpm pictures:build
 
 It downloads each original from `sources.json` into `<out>/originals` (once), writes the two WebP files to `<out>` (`/Volumes/AgentWork/pictures-juno-art` when that volume is mounted, else `scripts/pictures/.out`), prints each picture's sizes and width over height, and fails when the catalog's `ratio` is off. `--only id1,id2` builds a few.
 
+A picture photographed with a black border around the canvas, or scanned on a grey or white backdrop, is cropped to the object: its entry in `crops.json` gives the share of the original to cut from each edge (`{ "top": 0.03, "bottom": 0.03, "left": 0.05, "right": 0.05 }`), and the catalog's `ratio` is the cropped file's. Paper margins of prints and plates, scroll and textile mounts, and black sky in space images are part of the picture and stay. When you change a crop, rebuild that picture with `--only` and upload; files keep their names, so a Mac that already downloaded the old file keeps it (its box takes the new shape and covers the old file).
+
 ## Uploading
 
 ```sh

@@ -38,7 +38,7 @@ export const ISLAMIC: ReadonlyArray<Picture> = [
     licence: 'cc0',
     credit: 'The Metropolitan Museum of Art, CC0',
     sourceUrl: 'https://www.metmuseum.org/art/collection/search/451725',
-    ratio: 0.67,
+    ratio: 0.6618,
   },
   {
     id: 'blue-quran-folio',

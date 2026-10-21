@@ -6,9 +6,11 @@
 //   <out>/<id>-large.webp  2400 px on the long edge (never larger than the original), aiming under 900 KB
 //
 // Originals come from each picture's open-licence file in sources.json and are kept in
-// <out>/originals, so a second run downloads nothing. Needs cwebp (`brew install webp`)
-// and macOS `sips`. Prints each picture's width over height and fails when the catalog's
-// `ratio` differs from the file's by more than 0.01.
+// <out>/originals, so a second run downloads nothing. A picture photographed with a black
+// border, or scanned on a backdrop, is cropped to the object by its entry in crops.json
+// (fractions of the original cut from each edge). Needs cwebp (`brew install webp`) and
+// macOS `sips`. Prints each picture's width over height, after the crop, and fails when the
+// catalog's `ratio` differs from the file's by more than 0.01.
 //
 //   pnpm pictures:build [--out /Volumes/AgentWork/pictures-juno-art] [--only id1,id2]
 import { execFileSync } from 'node:child_process'
@@ -22,6 +24,7 @@ const args = Object.fromEntries(process.argv.slice(2).flatMap((arg, at, all) => 
 const out = args.out ?? (existsSync('/Volumes/AgentWork') ? '/Volumes/AgentWork/pictures-juno-art' : join(here, '.out'))
 const only = args.only === undefined ? undefined : new Set(args.only.split(','))
 const sources = JSON.parse(readFileSync(join(here, 'sources.json'), 'utf8'))
+const crops = JSON.parse(readFileSync(join(here, 'crops.json'), 'utf8'))
 const USER_AGENT = 'Juno-pictures-build/1.0 (https://github.com/triptu/juno)'
 
 const SMALL = { width: 640, height: 432, quality: 78, budget: 60 * 1024 }
@@ -54,8 +57,17 @@ function readable(file) {
   return png
 }
 
-function webp(input, output, width, height, quality) {
-  execFileSync('cwebp', ['-quiet', '-mt', '-metadata', 'none', '-q', String(quality), '-resize', String(width), String(height), input, '-o', output])
+/** The part of the original to keep, in pixels: all of it, or what is left after its crop. */
+function region(id, width, height) {
+  const cut = crops[id]
+  if (cut === undefined) return { x: 0, y: 0, width, height }
+  const [left, right, top, bottom] = [cut.left * width, cut.right * width, cut.top * height, cut.bottom * height].map(Math.round)
+  return { x: left, y: top, width: width - left - right, height: height - top - bottom }
+}
+
+function webp(input, output, area, width, height, quality) {
+  const crop = ['-crop', String(area.x), String(area.y), String(area.width), String(area.height)]
+  execFileSync('cwebp', ['-quiet', '-mt', '-metadata', 'none', '-q', String(quality), ...crop, '-resize', String(width), String(height), input, '-o', output])
   return statSync(output).size
 }
 
@@ -65,7 +77,9 @@ for (const picture of PICTURES) {
   if (only !== undefined && !only.has(picture.id)) continue
   try {
     const input = readable(await original(picture.id))
-    const { width, height } = size(input)
+    const full = size(input)
+    const area = region(picture.id, full.width, full.height)
+    const { width, height } = area
     const ratio = width / height
     if (Math.abs(ratio - picture.ratio) > 0.01) {
       failed = true
@@ -74,15 +88,15 @@ for (const picture of PICTURES) {
     // Small: fitted in the box at 2x, a step lower in quality until it is in budget.
     const [sw, sh] = ratio >= SMALL.width / SMALL.height ? [SMALL.width, 0] : [0, SMALL.height]
     let quality = SMALL.quality
-    let small = webp(input, join(out, `${picture.id}-small.webp`), sw, sh, quality)
-    while (small > SMALL.budget && quality > 50) small = webp(input, join(out, `${picture.id}-small.webp`), sw, sh, (quality -= 6))
+    let small = webp(input, join(out, `${picture.id}-small.webp`), area, sw, sh, quality)
+    while (small > SMALL.budget && quality > 50) small = webp(input, join(out, `${picture.id}-small.webp`), area, sw, sh, (quality -= 6))
     // Large: the long edge at most 2400 and never upscaled.
     const scale = Math.min(1, LARGE.edge / Math.max(width, height))
     const [lw, lh] = [Math.round(width * scale), Math.round(height * scale)]
     let largeQuality = LARGE.quality
-    let large = webp(input, join(out, `${picture.id}-large.webp`), lw, lh, largeQuality)
-    while (large > LARGE.budget && largeQuality > 56) large = webp(input, join(out, `${picture.id}-large.webp`), lw, lh, (largeQuality -= 8))
-    report.push({ id: picture.id, ratio: Number(ratio.toFixed(4)), small: Math.round(small / 1024), large: Math.round(large / 1024), original: `${width}x${height}` })
+    let large = webp(input, join(out, `${picture.id}-large.webp`), area, lw, lh, largeQuality)
+    while (large > LARGE.budget && largeQuality > 56) large = webp(input, join(out, `${picture.id}-large.webp`), area, lw, lh, (largeQuality -= 8))
+    report.push({ id: picture.id, ratio: Number(ratio.toFixed(4)), small: Math.round(small / 1024), large: Math.round(large / 1024), original: `${full.width}x${full.height}` })
   } catch (error) {
     failed = true
     console.error(String(error))

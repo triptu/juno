@@ -36,7 +36,7 @@ export const EUROPE_AND_AMERICA: ReadonlyArray<Picture> = [
     licence: 'cc0',
     credit: 'The Metropolitan Museum of Art, CC0',
     sourceUrl: 'https://www.metmuseum.org/art/collection/search/437853',
-    ratio: 1.3409,
+    ratio: 1.337,
   },
   {
     id: 'friedrich-wanderer-sea-of-fog',
@@ -90,7 +90,7 @@ export const EUROPE_AND_AMERICA: ReadonlyArray<Picture> = [
     licence: 'cc0',
     credit: 'The Metropolitan Museum of Art, CC0',
     sourceUrl: 'https://www.metmuseum.org/art/collection/search/10481',
-    ratio: 1.8156,
+    ratio: 1.8245,
   },
   {
     id: 'homer-breezing-up',
@@ -126,7 +126,7 @@ export const EUROPE_AND_AMERICA: ReadonlyArray<Picture> = [
     licence: 'cc0',
     credit: 'The Metropolitan Museum of Art, CC0',
     sourceUrl: 'https://www.metmuseum.org/art/collection/search/438417',
-    ratio: 1.2357,
+    ratio: 1.2525,
     night: true,
   },
   {
@@ -164,7 +164,7 @@ export const EUROPE_AND_AMERICA: ReadonlyArray<Picture> = [
     licence: 'cc0',
     credit: 'The Metropolitan Museum of Art, CC0',
     sourceUrl: 'https://www.metmuseum.org/art/collection/search/12127',
-    ratio: 0.584,
+    ratio: 0.5258,
   },
   {
     id: 'sorolla-fish-is-expensive',
@@ -218,6 +218,6 @@ export const EUROPE_AND_AMERICA: ReadonlyArray<Picture> = [
     licence: 'cc0',
     credit: 'The Metropolitan Museum of Art, CC0',
     sourceUrl: 'https://www.metmuseum.org/art/collection/search/438822',
-    ratio: 1.4204,
+    ratio: 1.4248,
   },
 ]

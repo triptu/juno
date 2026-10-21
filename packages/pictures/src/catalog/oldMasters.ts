@@ -126,7 +126,7 @@ export const OLD_MASTERS: ReadonlyArray<Picture> = [
     licence: 'cc0',
     credit: 'The Metropolitan Museum of Art, CC0',
     sourceUrl: 'https://www.metmuseum.org/art/collection/search/436839',
-    ratio: 0.7368,
+    ratio: 0.7038,
     night: true,
   },
   {
@@ -144,7 +144,7 @@ export const OLD_MASTERS: ReadonlyArray<Picture> = [
     licence: 'cc0',
     credit: 'The Metropolitan Museum of Art, CC0',
     sourceUrl: 'https://www.metmuseum.org/art/collection/search/436282',
-    ratio: 0.8355,
+    ratio: 0.8319,
   },
   {
     id: 'david-the-death-of-socrates',
@@ -162,7 +162,7 @@ export const OLD_MASTERS: ReadonlyArray<Picture> = [
     licence: 'cc0',
     credit: 'The Metropolitan Museum of Art, CC0',
     sourceUrl: 'https://www.metmuseum.org/art/collection/search/436105',
-    ratio: 1.5021,
+    ratio: 1.5137,
   },
   {
     id: 'goya-manuel-osorio-manrique-de-zuniga',

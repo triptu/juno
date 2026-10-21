@@ -1,0 +1,122 @@
+{
+  "atkins-rhodomenia-polycarpa": {
+    "top": 0.0042,
+    "bottom": 0.0,
+    "left": 0.0291,
+    "right": 0.0403
+  },
+  "cezanne-mont-sainte-victoire-viaduct": {
+    "top": 0.0114,
+    "bottom": 0.0109,
+    "left": 0.0092,
+    "right": 0.0092
+  },
+  "church-heart-of-the-andes": {
+    "top": 0.003,
+    "bottom": 0.0061,
+    "left": 0.0021,
+    "right": 0.0021
+  },
+  "david-the-death-of-socrates": {
+    "top": 0.0119,
+    "bottom": 0.0119,
+    "left": 0.0083,
+    "right": 0.0083
+  },
+  "dong-yuan-riverbank": {
+    "top": 0.0,
+    "bottom": 0.0,
+    "left": 0.1266,
+    "right": 0.1272
+  },
+  "friedrich-two-men-contemplating-the-moon": {
+    "top": 0.0221,
+    "bottom": 0.0273,
+    "left": 0.0196,
+    "right": 0.0171
+  },
+  "habiballah-concourse-of-the-birds": {
+    "top": 0.0254,
+    "bottom": 0.0013,
+    "left": 0.0367,
+    "right": 0.0019
+  },
+  "hooke-micrographia-flea": {
+    "top": 0.046,
+    "bottom": 0.0427,
+    "left": 0.0,
+    "right": 0.0846
+  },
+  "la-tour-penitent-magdalen": {
+    "top": 0.0417,
+    "bottom": 0.0458,
+    "left": 0.0611,
+    "right": 0.0673
+  },
+  "nepal-vasudhara-mandala-1777": {
+    "top": 0.0271,
+    "bottom": 0.0262,
+    "left": 0.0275,
+    "right": 0.0364
+  },
+  "payag-shah-jahan-on-horseback": {
+    "top": 0.0046,
+    "bottom": 0.0071,
+    "left": 0.0093,
+    "right": 0.0081
+  },
+  "qu-ding-summer-mountains": {
+    "top": 0.0219,
+    "bottom": 0.0135,
+    "left": 0.0,
+    "right": 0.0
+  },
+  "ravi-varma-press-lakshmi": {
+    "top": 0.0517,
+    "bottom": 0.0587,
+    "left": 0.1133,
+    "right": 0.0889
+  },
+  "redoute-fritillaria-imperialis": {
+    "top": 0.0233,
+    "bottom": 0.0275,
+    "left": 0.0332,
+    "right": 0.0332
+  },
+  "rousseau-repast-of-the-lion": {
+    "top": 0.0059,
+    "bottom": 0.0053,
+    "left": 0.0033,
+    "right": 0.0046
+  },
+  "sargent-madame-x": {
+    "top": 0.0354,
+    "bottom": 0.0383,
+    "left": 0.0835,
+    "right": 0.0827
+  },
+  "sin-hak-gwon-inner-geumgang": {
+    "top": 0.0692,
+    "bottom": 0.0674,
+    "left": 0.0192,
+    "right": 0.0171
+  },
+  "turner-venice-salute": {
+    "top": 0.0021,
+    "bottom": 0.0027,
+    "left": 0.0015,
+    "right": 0.0061
+  },
+  "van-eyck-crucifixion-last-judgment": {
+    "top": 0.0112,
+    "bottom": 0.01,
+    "left": 0.0125,
+    "right": 0.013
+  },
+  "van-gogh-wheat-field-cypresses": {
+    "top": 0.0314,
+    "bottom": 0.0257,
+    "left": 0.0213,
+    "right": 0.0229
+  }
+}
