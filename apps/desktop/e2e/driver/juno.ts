@@ -581,6 +581,11 @@ export class SettingsPage {
     return this.root.getByRole('radio', { name })
   }
 
+  /** Appearance › Sidebar › Show who is active in the sidebar. */
+  get sidebarPresence(): Locator {
+    return this.root.getByRole('switch', { name: 'Show who is active in the sidebar' })
+  }
+
   /** One ignored channel's row on the ignore list (inventory 14), by name without "#". */
   ignored(name: string): Locator {
     return this.root.locator('[data-ignored-channel]').filter({ hasText: name })
@@ -644,11 +649,6 @@ export class NotificationsPage {
   async writeMatters(text: string): Promise<void> {
     await this.matters.fill(text)
     await this.matters.blur()
-  }
-
-  /** Show when people are active. */
-  get showPresence(): Locator {
-    return this.root.getByRole('switch', { name: 'Show when people are active' })
   }
 
   /** The Every message or Never row. */
@@ -1632,6 +1632,18 @@ export class TopicPane {
   /** The context pill, a button named by the channel and its kind. */
   get contextPill() {
     return this.header.locator('[data-island="left"]').getByRole('button').first()
+  }
+
+  /** A 1:1 DM's presence in the context pill: `active`, `away`, or none while Slack has not said. */
+  async expectPresence(presence: 'active' | 'away' | undefined): Promise<void> {
+    const dot = this.contextPill.locator('[data-pill-presence]')
+    if (presence === undefined) {
+      await expect(dot).toHaveCount(0)
+      await expect(this.contextPill).not.toHaveAccessibleName(/, (active|away)\./)
+      return
+    }
+    await expect(dot).toHaveAttribute('data-pill-presence', presence)
+    await expect(this.contextPill).toHaveAccessibleName(new RegExp(`, ${presence}\\. Show in sidebar\\.$`))
   }
 
   /** The title, a menu button inside the page's heading. */
