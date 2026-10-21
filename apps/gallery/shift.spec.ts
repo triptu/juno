@@ -294,7 +294,7 @@ test.describe('Avatar photo', () => {
     const avatar = page.getByRole('img', { name: 'Maya Chen' })
     const before = await avatar.boundingBox()
     release()
-    await expect(avatar.locator('img')).toHaveCSS('opacity', '1')
+    await expect.poll(() => avatar.locator('img').evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true)
     expect(await avatar.boundingBox()).toEqual(before)
   })
 })
