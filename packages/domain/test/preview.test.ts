@@ -57,7 +57,14 @@ describe('preview text', () => {
     expect(messagePreviewText({ text: '', attachments: [{ is_share: true, fallback }] })).toBe(`Shared message: ${fallback}`)
   })
 
-  it('keeps an emoji-only message as its emoji', () => {
+  it('names a message that is only a table by its first row, and keeps the words of one with words', () => {
+    const cell = (text: string) => ({ type: 'rich_text', elements: [{ type: 'rich_text_section', elements: [{ type: 'text', text }] }] }) as const
+    const table = { type: 'table', rows: [[cell('Service'), cell('Status')], [cell('API'), cell('Healthy')]] } as const
+    expect(messagePreviewText({ text: 'Release status', blocks: [table] })).toBe('Table: Service, Status')
+    expect(messagePreviewText({ text: 'Release status', blocks: [{ type: 'rich_text', elements: [{ type: 'rich_text_section', elements: [{ type: 'text', text: 'Release status:' }] }] }, table] })).toBe('Release status:')
+  })
+
+    it('keeps an emoji-only message as its emoji', () => {
     expect(messagePreviewText({ text: ':tada:' })).toBe('🎉')
   })
 

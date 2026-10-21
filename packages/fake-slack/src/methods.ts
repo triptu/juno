@@ -404,7 +404,7 @@ export const coreMethods = {
     if (existing.user !== ws.selfId) return new ApiError('cant_update_message')
     const text = args.text ?? args.markdown_text
     if ((text === undefined || text === '') && args.blocks === undefined) return new ApiError('no_text')
-    const message = ws.edit(args.channel, args.ts, text ?? '', ws.selfId, args.text !== undefined)
+    const message = ws.edit(args.channel, args.ts, text ?? '', ws.selfId, args.text !== undefined, args.blocks)
     // chat.update returns a partial message; its timestamp is on the envelope.
     return { channel: args.channel, ts: args.ts, text: message.text ?? '', message: { text: message.text ?? '', user: ws.selfId } }
   },

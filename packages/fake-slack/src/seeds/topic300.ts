@@ -1,6 +1,7 @@
 import type { File, Message, RichTextElement, Ts } from '@juno/slack-schema'
 import { SELF_ID, TEAM } from '../fixtures.ts'
 import { NEVER_READ, type Workspace } from '../state.ts'
+import { tableBlock } from '../tables.ts'
 
 export const TOPIC300_MAIN_CHANNEL = 'C0PERFMAIN'
 export const TOPIC300_THREAD_CHANNEL = 'C0PERFTHREAD'
@@ -14,8 +15,18 @@ export interface Topic300Summary {
   readonly threadTs: Ts
 }
 
-/** Two 300-row windows, each with exactly 60 images and 45 code blocks, 15 of them six lines long. */
-export function topic300Seed(): (workspace: Workspace, avatarBase: string) => Topic300Summary {
+/** A status table that fits the message, and a 10-column one wider than it, which scrolls in its box. */
+const statusTable = (i: number) => tableBlock([['Service', 'Owner', 'Status', 'Notes'], ...['API', 'Worker', 'Search', 'Billing'].map((name, row) => [name, [{ type: 'user' as const, user_id: 'U0PERFLEO' }], row === i % 4 ? 'Degraded' : 'Healthy', [{ type: 'text' as const, text: `p95 ${180 + row * 7} ms`, style: { code: true } }]])])
+const wideTable = (i: number) => tableBlock([
+  ['Region', 'Requests', 'Errors', 'Error rate', 'p50', 'p95', 'p99', 'CPU', 'Memory', 'Instances'],
+  ...['us-east-1', 'eu-west-1', 'ap-south-1'].map((region, row) => [region, `${(i + 1) * 1000 + row}`, `${i + row}`, '0.15%', '38 ms', '212 ms', '480 ms', '61%', '7.2 GB', '24']),
+], [null, { align: 'right' }, { align: 'right' }, { align: 'right' }])
+
+/**
+ * Two 300-row windows, each with exactly 60 images and 45 code blocks (15 six lines long),
+ * and by default 15 tables too.
+ */
+export function topic300Seed({ tables = true }: { readonly tables?: boolean } = {}): (workspace: Workspace, avatarBase: string) => Topic300Summary {
   return (workspace, avatarBase) => {
     const now = workspace.clock.now()
     const users = [SELF_ID, 'U0PERFLEO', 'U0PERFMAYA']
@@ -32,6 +43,7 @@ export function topic300Seed(): (workspace: Workspace, avatarBase: string) => To
       for (let i = 0; i < 300; i++) {
         const text = `Review the rollout checklist ${i + 1}. The next step is ready for review.`
         const code = i % 10 === 3 ? 'const ready = true;\nconsole.log(ready);' : i % 20 === 17 ? LONG_CODE : undefined
+        const table = tables && i % 20 === 7 ? (i % 40 === 7 ? wideTable(i) : statusTable(i)) : undefined
         const url = `${avatarBase}/../files/F${channel}${i}/image.svg`
         const file: File = { id: `F${channel}${i}`, name: `diagram-${i}.svg`, mimetype: 'image/svg+xml', original_w: 800, original_h: 600, thumb_360_w: 360, thumb_360_h: 270, thumb_360: url, url_private: url }
         if (i % 5 === 0) {
@@ -45,7 +57,7 @@ export function topic300Seed(): (workspace: Workspace, avatarBase: string) => To
           blocks: [{ type: 'rich_text', elements: [
             { type: 'rich_text_section', elements: [{ type: 'text', text }] },
             ...(code === undefined ? [] : [{ type: 'rich_text_preformatted', elements: [{ type: 'text', text: code }] } satisfies RichTextElement]),
-          ] }],
+          ] }, ...(table === undefined ? [] : [table])],
           ...(i % 5 === 0 ? { files: [file] } : {}),
           ...(channel === TOPIC300_THREAD_CHANNEL && root !== undefined ? { threadTs: root.ts } : {}),
           at: now - (300 - i) * 60_000, silent: true,

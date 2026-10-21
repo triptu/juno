@@ -1,6 +1,9 @@
 import { expect, it } from 'vitest'
-import type { RichTextElement, RichTextInline, RichTextBlock } from '@juno/slack-schema'
+import type { Block, RichTextElement, RichTextInline, RichTextBlock } from '@juno/slack-schema'
 import { composeEdit, composeOutgoing, editMarkup } from '../src/index'
+
+/** The rich-text elements of an edit's blocks, in order. */
+const richElements = (block: Block) => (block.type === 'rich_text' ? block.elements : [])
 
 const shapes: ReadonlyArray<RichTextElement> = [
   { type: 'rich_text_section', elements: [{ type: 'text', text: '*literal*' }] },
@@ -17,7 +20,7 @@ for (const [index, shape] of shapes.entries()) {
   it(`preserves Slack shape ${index} when punctuation changes elsewhere`, () => {
     const blocks: RichTextBlock[] = [{ type: 'rich_text', elements: [shape, { type: 'rich_text_section', elements: [{ type: 'text', text: 'end' }] }] }]
     const original = { blocks }
-    expect(composeEdit(editMarkup(original, lookups) + '!', original, lookups).blocks[0]?.elements[0]).toEqual(shape)
+    expect(composeEdit(editMarkup(original, lookups) + '!', original, lookups).blocks.flatMap(richElements)[0]).toEqual(shape)
   })
 }
 for (const [index, shape] of shapes.entries()) {
@@ -39,7 +42,7 @@ it('round trips generated Slack blocks including styles markup cannot express', 
     expect(composeEdit(changed, { blocks: [{ type: 'rich_text', elements: [{ type: 'rich_text_section', elements }] }] }, lookups).blocks).toEqual(composeOutgoing(changed).blocks)
     const withTrailer: RichTextBlock[] = [{ type: 'rich_text', elements: [...blocks[0]!.elements, { type: 'rich_text_section', elements: [{ type: 'text', text: 'trailer' }] }] }]
     const edited = composeEdit(editMarkup({ blocks: withTrailer }, lookups) + '!', { blocks: withTrailer }, lookups)
-    expect(edited.blocks[0]?.elements.slice(0, -1)).toEqual(blocks[0]!.elements)
+    expect(edited.blocks.flatMap(richElements).slice(0, -1)).toEqual(blocks[0]!.elements)
   }
 })
 
@@ -52,10 +55,10 @@ it('keeps an unchanged Slack paragraph between two changed paragraphs', () => {
     { type: 'rich_text_section', elements: [{ type: 'text', text: 'before' }] }, shapes[6]!,
     { type: 'rich_text_section', elements: [{ type: 'text', text: 'after' }] },
   ] }]
-  expect(composeEdit('Before\nitem\nAfter', { blocks }).blocks[0]?.elements[1]).toEqual(shapes[6])
+  expect(composeEdit('Before\nitem\nAfter', { blocks }).blocks.flatMap(richElements)[1]).toEqual(shapes[6])
 })
 
 it('keeps punctuation typed at a quote’s end in that quote', () => {
   const original = { blocks: [{ type: 'rich_text' as const, elements: [{ type: 'rich_text_quote' as const, elements: [{ type: 'text' as const, text: 'quoted' }] }] }] }
-  expect(composeEdit('> quoted!', original).blocks[0]?.elements).toEqual([{ type: 'rich_text_quote', elements: [{ type: 'text', text: 'quoted!' }] }])
+  expect(composeEdit('> quoted!', original).blocks.flatMap(richElements)).toEqual([{ type: 'rich_text_quote', elements: [{ type: 'text', text: 'quoted!' }] }])
 })

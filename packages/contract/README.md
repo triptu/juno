@@ -8,7 +8,7 @@ The wire between Juno's processes. Names, schemas and types only; no logic. See 
 | --- | --- |
 | `src/live.ts` | `liveValueRoute`, `liveListRoute`, `ListRange`, `LiveMeta`, `ListDelta` (with its optional `refs`), the size budgets |
 | `src/refs.ts` | The side tables list routes send next to their rows: `Person`, `ChannelRef`, `TopicArt` (a topic's recipe; an empty recipe means not shown), `Refs` (architecture 7) |
-| `src/body.ts` | `MessageBody` as a schema: the body `@juno/richtext` builds, checked against richtext's type at compile time in `engine/src/messages/body.ts` |
+| `src/body.ts` | `MessageBody` as a schema: the body `@juno/richtext` builds, checked against richtext's type at compile time in `engine/src/messages/body.ts`; and `tableText`, richtext's rows-to-tab-separated-lines rule through `@juno/domain`, for the view's copy of a table selection |
 | `src/routes/<feature>.ts` | One `RpcGroup` per feature (`EngineRoutes`, `SessionRoutes`, `TopicsRoutes`, `AllTopicsRoutes`, `MessagesRoutes`, `ArtRoutes` with `art.redraw` and its undo `art.restore`). `routes/index.ts` merges them into `AllRoutes` |
 | `src/errors.ts` | The errors a route may fail with: `NotSignedIn`, `Offline`, `Rejected`, `RateLimited`, `NotFound`, `AiUnavailable`, `Invalid`, `ProtocolError` |
 | `src/shell.ts` | `ShellRoutes`, `ShellInput`, `ShellOutput`: renderer to main requests (app info, the engine port, launch theme and accent, `contextMenu.popup`, `shell.openExternal`); `Theme`, `AppInfo` |

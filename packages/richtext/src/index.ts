@@ -4,6 +4,7 @@ export { UNKNOWN_PERSON } from './inline'
 
 export { unescapeMrkdwn } from './from-mrkdwn'
 export { bodyFromMrkdwn, messageBody, plainText, previewLine, previewText, readableText, type MessageContent } from './body'
+export { tableText } from './table-text'
 
 export { bodyFromMarkdown } from './from-markdown'
 
