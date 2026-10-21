@@ -1,0 +1,1 @@
+- 10-21 23:20 · Tushar · The catalog drops The Ninth Wave, Mystic Mountain, the Khwaja Umar Hamzanama page and the Jaipur Krishna sheet: their lines were the weakest, or repeated another picture's; their R2 files stay.
