@@ -8,7 +8,7 @@ import { CONVERSATIONS, SELF_ID, startFakeSlack, type FakeSlack } from '@juno/fa
 import { prefs, Store, workspacePaths } from '@juno/store'
 import { runCommand, sidebarListAtom } from '@juno/state'
 import { startTestEngine, waitFor, type RunningEngine } from './harness'
-import { apiCalls, bootedEngine, callMap, DAY, quiet, readDb, seedThread, valueOf } from './scenario'
+import { apiCalls, callMap, DAY, quiet, readDb, seedThread, valueOf } from './scenario'
 
 const engines: RunningEngine[] = []
 afterEach(async () => {
@@ -52,12 +52,9 @@ it('a 3-day cold boot skips history for a conversation last active five days ago
 it('lowering hides an old read topic without calls or deletion; raising backfills every conversation', async () => {
   let oldId = ''
   let unreadId = ''
-  const engine = await bootedEngine(engines, {
-    initial: (fake) => {
-      oldId = seedThread(fake, { channel: 'C0PLATFORM', text: 'Five day topic', ago: 6 * DAY, replies: [5 * DAY], follow: true }).id
-      unreadId = seedThread(fake, { channel: 'C0PLATFORM', text: 'Older unread topic', ago: 7 * DAY, replies: [6 * DAY], follow: true, unread: 1 }).id
-      return fake.signIn()
-    },
+  const engine = await quietBoot(7, (fake) => {
+    oldId = seedThread(fake, { channel: 'C0PLATFORM', text: 'Five day topic', ago: 6 * DAY, replies: [5 * DAY], follow: true }).id
+    unreadId = seedThread(fake, { channel: 'C0PLATFORM', text: 'Older unread topic', ago: 7 * DAY, replies: [6 * DAY], follow: true, unread: 1 }).id
   })
   const unmount = engine.registry.mount(sidebarListAtom)
   await engine.rowsUntil((rows) => rows.some((r) => r.id === oldId) && rows.some((r) => r.id === unreadId), 'five-day and older unread topics')

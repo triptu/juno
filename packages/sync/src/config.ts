@@ -50,7 +50,7 @@ export interface SyncConfigShape {
 }
 
 export const defaultSyncConfig: SyncConfigShape = {
-  quietDays: 7,
+  quietDays: 3,
   historyPageLimit: 100,
   getViewPageLimit: 50,
   previewThreads: 50,

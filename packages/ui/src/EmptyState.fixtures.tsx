@@ -32,7 +32,7 @@ export default defineFixtures(
       quiet: fixture({
         illustration: 'nothing-here',
         title: "It's quiet",
-        body: 'Topics with activity in the last 7 days show up here.',
+        body: 'Topics with activity in the last 3 days show up here.',
       }),
     },
     Page: {

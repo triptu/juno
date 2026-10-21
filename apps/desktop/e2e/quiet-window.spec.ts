@@ -14,11 +14,14 @@ test('Tidy up changes the topic window: old topics leave locally and arrive thro
   await juno.waitForSync()
   const five = juno.sidebar.row('#quiet-five').root
   const ten = juno.sidebar.row('#quiet-ten').root
-  await expect(five).toHaveCount(1)
+  await expect(five).toHaveCount(0)
   await expect(ten).toHaveCount(0)
   await juno.openSettings('Tidy up')
   const control = juno.settings.root.getByRole('radiogroup', { name: 'Show topics active in the last' })
-  await expect(control.getByRole('radio', { name: '7 days', exact: true })).toHaveAttribute('aria-checked', 'true')
+  await expect(control.getByRole('radio', { name: '3 days', exact: true })).toHaveAttribute('aria-checked', 'true')
+  await control.getByRole('radio', { name: '7 days', exact: true }).click()
+  await expect(five).toHaveCount(1, { timeout: 30_000 })
+  fake.resetCalls()
   await control.getByRole('radio', { name: '3 days', exact: true }).click()
   await expect(five).toHaveCount(0)
   expect(fake.calls.filter((c) => c.args['_x_reason'] === 'window-history')).toHaveLength(0)
