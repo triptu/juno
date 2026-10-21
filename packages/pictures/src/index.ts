@@ -1,24 +1,12 @@
 /**
- * Home's pictures and the gallery's quotes and facts (SPEC 12, "A picture"
- * and "Pictures and the gallery").
+ * Home's pictures and their words (SPEC 12, "A picture" and "Pictures and
+ * the gallery").
  *
  * This module is small and loads with Home: the types, the image file
  * names and the rule that picks the next picture. The catalog itself, with
- * every story, is `./catalog`, its own chunk, loaded when idle after Home
- * paints and when the gallery opens. The quotes and facts are `./thoughts`,
- * another chunk, loaded when the gallery opens.
+ * every picture's words, is `./catalog`, its own chunk, loaded when idle
+ * after Home paints and when the gallery opens.
  */
-
-/** The rough theme of a quote or fact: focus and craft, thinking deeply, wonder at the universe, life, things made, art and beauty. */
-export type ThoughtTheme = 'focus' | 'thinking' | 'wonder' | 'life' | 'made' | 'art'
-
-/** A quote (with `by`) or a fact (without). `source` is never shown; it is there to check the entry against. */
-export interface Thought {
-  readonly text: string
-  readonly by?: string
-  readonly theme: ThoughtTheme
-  readonly source: string
-}
 
 /** Paintings (including manuscript pages and calligraphy), prints, scientific and natural-history illustration, and space images. */
 export type PictureKind = 'painting' | 'print' | 'illustration' | 'space'
@@ -26,13 +14,38 @@ export type PictureKind = 'painting' | 'print' | 'illustration' | 'space'
 /** Artworks are public domain or CC0; some ESA images are CC BY 4.0 and show their credit. */
 export type PictureLicence = 'public-domain' | 'cc0' | 'cc-by-4.0'
 
-/** One fact of a picture's story, with where it is stated. */
-export interface PictureFact {
+/**
+ * The one line that goes with a picture: something a named person said or
+ * wrote about it (a quote, with `by`), or one dated fact about it (no `by`).
+ * At most about 140 characters, so it fits in two lines on Home.
+ */
+export interface PictureLine {
   readonly text: string
-  /** The source that states it: a museum page, a catalogue, a release or a book. */
+  /** Who said it: shown as a quiet attribution after a quote. */
+  readonly by?: string
+  /** One short clause shown on the picture page only, after `by`: "in Le Charivari, 1874, of this picture." */
+  readonly context?: string
+  /** Where it is stated: kept to check it against, never shown. */
   readonly source: string
   readonly url?: string
 }
+
+/** The single best page to read more: shown as one link labelled with the institution, never the address. */
+export interface PictureLearnMore {
+  readonly label: string
+  readonly url: string
+}
+
+/**
+ * How big or how far, where it says something: an artwork's size, drawn next
+ * to a person; how far a space object is in light-years, so how long its
+ * light took; or how far away a picture of Earth or the Moon was taken.
+ * Every number is checked; `source` is never shown.
+ */
+export type PictureScale =
+  | { readonly kind: 'size'; readonly widthCm: number; readonly heightCm: number; readonly source?: string }
+  | { readonly kind: 'distance'; readonly lightYears: number; readonly note?: string; readonly source?: string }
+  | { readonly kind: 'distance'; readonly km: number; readonly note?: string; readonly source?: string }
 
 export interface Picture {
   /** Stable, lower-case words and hyphens; also the image files' name. */
@@ -50,14 +63,17 @@ export interface Picture {
   readonly place: string
   /** Space images: how far away the subject is. */
   readonly distance?: string
-  /** One sentence: what the picture is. */
+  /** One sentence: what the picture is. Not shown; it is the picture's description for screen readers. */
   readonly caption: string
-  /** Three to five, the best first. */
-  readonly facts: ReadonlyArray<PictureFact>
+  readonly line: PictureLine
+  /** Two to four plain sentences about the picture, for its page. */
+  readonly about: string
+  readonly learnMore: PictureLearnMore
+  readonly scale?: PictureScale
   readonly licence: PictureLicence
   /** The credit line to show. */
   readonly credit: string
-  /** The page for this image: the museum's object page, the Commons file page or the release. */
+  /** Where the image file comes from: the museum's object page, the Commons file page or the release. Not shown. */
   readonly sourceUrl: string
   /** Width over height of the image files, so a box can take the picture's shape before it loads. */
   readonly ratio: number
@@ -74,16 +90,36 @@ export const PICTURE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 /** The file of one size of a picture, as stored in the bucket and on disk. */
 export const pictureFile = (id: string, size: PictureSize): string => `${id}-${size}.webp`
 
-/** What Home's caption and box need, saved with the next picture so Home has it in its first frame without the catalog. */
+/** What Home's label, line and box need, saved with the next picture so Home has it in its first frame without the catalog. */
 export interface PictureLabel {
   readonly id: string
   readonly title: string
   readonly artist: string
   readonly date: string
   readonly ratio: number
+  readonly line: { readonly text: string; readonly by?: string }
 }
 
-export const labelOf = (picture: Picture): PictureLabel => ({ id: picture.id, title: picture.title, artist: picture.artist, date: picture.date, ratio: picture.ratio })
+export const labelOf = (picture: Picture): PictureLabel => ({
+  id: picture.id,
+  title: picture.title,
+  artist: picture.artist,
+  date: picture.date,
+  ratio: picture.ratio,
+  line: picture.line.by === undefined ? { text: picture.line.text } : { text: picture.line.text, by: picture.line.by },
+})
+
+/**
+ * The year a picture was made, as near as its date says: the first year in
+ * it ("c. 1830–32" is 1830), or the middle of the first century it names
+ * ("late 14th century" is 1350). For the gallery's order by time.
+ */
+export function yearOf(date: string): number | undefined {
+  const year = /\b(\d{3,4})\b/.exec(date)
+  if (year !== null) return Number(year[1])
+  const century = /\b(\d{1,2})(?:st|nd|rd|th)\b/.exec(date)
+  return century === null ? undefined : (Number(century[1]) - 1) * 100 + 50
+}
 
 /** The gallery's order of kinds, and their section names. */
 export const PICTURE_KINDS: ReadonlyArray<PictureKind> = ['painting', 'print', 'illustration', 'space']

@@ -1,12 +1,12 @@
 /**
- * Home's picture files, the catalog and the gallery's quotes and facts (SPEC 12,
+ * Home's picture files and the catalog (SPEC 12,
  * "A picture" and "Pictures and the gallery"): a chunk of its own, loaded when
  * idle after Home paints and when the gallery opens. `homePictures.ts` is the
  * part Home's first frame needs.
  */
 import * as Atom from 'effect/reactivity/Atom'
 import { picturesFetch, picturesOnDisk, type PictureSize } from '@juno/contract'
-import { fitsHome, isLateNight, labelOf, pickPicture, type Picture, type Thought } from '@juno/pictures'
+import { fitsHome, isLateNight, labelOf, pickPicture, type Picture } from '@juno/pictures'
 import { runCommand } from './atoms'
 import type { Registry } from './client'
 import { readPictures, rememberTitles, writePictures } from './homePictures'
@@ -20,14 +20,6 @@ export function loadPictures(): Promise<ReadonlyArray<Picture>> {
     return module.PICTURES
   })
   return catalog
-}
-
-let thoughts: Promise<ReadonlyArray<Thought>> | undefined
-
-/** The gallery's quotes and facts, from their own chunk, once. */
-export function loadThoughts(): Promise<ReadonlyArray<Thought>> {
-  thoughts ??= import('@juno/pictures/thoughts').then((module) => module.THOUGHTS)
-  return thoughts
 }
 
 

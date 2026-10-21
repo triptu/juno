@@ -258,10 +258,11 @@ export {
   startVisitLog,
   tidyUpPrefsAtom,
 } from './home'
-export type { Picture, Thought } from '@juno/pictures'
+export type { Picture } from '@juno/pictures'
+export { yearOf } from '@juno/pictures'
 export { forgetPicture, homePicturesOnAtom, lastPictureId, pictureTitle, pictureUrl, preparePicture, setHomePicturesOn, takePicture } from './homePictures'
 export { withAsks } from './homeAsks'
-export { ensurePicture, loadPictures, loadThoughts, pictureFilesAtom, readPictureFiles } from './pictureFiles'
+export { ensurePicture, loadPictures, pictureFilesAtom, readPictureFiles } from './pictureFiles'
 export { actOnSuggested } from './suggested'
 export {
   appendUnseen,

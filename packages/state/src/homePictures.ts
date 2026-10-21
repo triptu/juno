@@ -45,10 +45,17 @@ const memory = new Map<string, string>()
 const storage = (): PictureStorage =>
   (globalThis as { readonly localStorage?: PictureStorage }).localStorage ?? { getItem: (key) => memory.get(key) ?? null, setItem: (key, value) => void memory.set(key, value) }
 
+function isLine(value: unknown): value is PictureLabel['line'] {
+  if (typeof value !== 'object' || value === null) return false
+  const { text, by } = value as Record<string, unknown>
+  return typeof text === 'string' && (by === undefined || typeof by === 'string')
+}
+
+/** A saved label from before pictures had a line has none: it is dropped, and Home shows its scene until the next picture is ready. */
 function isLabel(value: unknown): value is PictureLabel {
   if (typeof value !== 'object' || value === null) return false
-  const { id, title, artist, date, ratio } = value as Record<string, unknown>
-  return typeof id === 'string' && typeof title === 'string' && typeof artist === 'string' && typeof date === 'string' && typeof ratio === 'number' && ratio > 0
+  const { id, title, artist, date, ratio, line } = value as Record<string, unknown>
+  return typeof id === 'string' && typeof title === 'string' && typeof artist === 'string' && typeof date === 'string' && typeof ratio === 'number' && ratio > 0 && isLine(line)
 }
 
 /** What this Mac keeps about Home's pictures. */
