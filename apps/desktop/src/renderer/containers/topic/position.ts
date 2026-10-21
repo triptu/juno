@@ -19,6 +19,9 @@ import { onLeaveTab, takeOpenStart } from '../navigation'
 import { takeSendMark } from '../sendMark'
 import { BOTTOM_SLACK, distanceFromBottom, dividerTop, hold, rowInView, rowSelector, snapshotOf, type Pin } from './scroll'
 
+/** A scroll of the user's that moved the list this recently, in milliseconds, is still going on. */
+const GESTURE_IDLE = 100
+
 /** The list's ends. `atEnd`: the window holds the newest message (no anchor). */
 function edgesOf(list: MessageWindow) {
   return { first: list.order[0], last: list.order.at(-1), atEnd: list.spec.anchor === undefined }
@@ -211,18 +214,39 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
     const letGo = () => {
       if (pinRef.current?.kind === 'row') pinRef.current = undefined
     }
+    // A gesture still going on: the user's own scroll, which moves the list with no pin held, in the last moment, or
+    // a press on the list that has scrolled it (a scrollbar drag, a selection running past the edge). A press that
+    // has not, such as one on a thread link that opens a new tab, is no gesture.
+    let pressed = false
+    let dragging = false
+    let movedAt = Number.NEGATIVE_INFINITY
+    const onPress = () => void (pressed = true)
+    const onRelease = () => void (pressed = dragging = false)
     // The scrollTop last seen at the bottom. Holding the end and rows growing above only make it larger.
     let bottomTop = scroller.scrollTop
     const onScroll = () => {
+      if (pinRef.current === undefined) {
+        movedAt = performance.now()
+        dragging = pressed
+      }
       if (pinRef.current?.kind !== 'bottom') return
       const top = scroller.scrollTop
       if (top < bottomTop - 1 && distanceFromBottom(scroller) > 1) pinRef.current = undefined
       else bottomTop = top
     }
-    const record = () => {
-      if (!readOnly) registry.set(scrollSnapshotAtom(view), snapshotOf(scroller))
+    // As the tab is left, the position is recorded from what is on screen then, since the rows can change after the
+    // scroll ended (an older page, a reaction), and that row is held while the tab is hidden: input that scrolled
+    // nothing (a click on a message) let go of the held row and ended no scroll, and what changes while the tab is
+    // hidden is laid out with nothing to anchor on. A gesture still going on is not held against.
+    const leave = () => {
+      const inView = rowInView(scroller)
+      registry.set(scrollSnapshotAtom(view), inView === undefined ? undefined : { anchorKey: inView.anchorKey, offset: inView.offset })
+      if (inView === undefined || pinRef.current !== undefined || dragging || performance.now() - movedAt < GESTURE_IDLE) return
+      pinRef.current = { kind: 'row', element: inView.element, offset: inView.offset }
+      pinnedTopRef.current = scroller.scrollTop
     }
     const onScrollEnd = () => {
+      movedAt = Number.NEGATIVE_INFINITY
       if (pinRef.current?.kind === 'row' && Math.abs(scroller.scrollTop - pinnedTopRef.current) > 1) pinRef.current = undefined
       const distance = distanceFromBottom(scroller)
       const bottom = atEndRef.current && distance <= BOTTOM_SLACK
@@ -248,13 +272,17 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
     }
     const inputs = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const
     for (const type of inputs) scroller.addEventListener(type, letGo, { passive: true })
+    scroller.addEventListener('pointerdown', onPress, { passive: true })
+    addEventListener('pointerup', onRelease, { passive: true })
+    addEventListener('pointercancel', onRelease, { passive: true })
     scroller.addEventListener('scroll', onScroll, { passive: true })
     scroller.addEventListener('scrollend', onScrollEnd)
-    // The position is also recorded as the tab is left, from what is on screen then: the rows can change after the
-    // scroll ended (an older page, a reaction), and the held row is not always the first in view after that.
-    const stopLeaving = readOnly ? () => {} : onLeaveTab(view, record)
+    const stopLeaving = readOnly ? () => {} : onLeaveTab(view, leave)
     return () => {
       for (const type of inputs) scroller.removeEventListener(type, letGo)
+      scroller.removeEventListener('pointerdown', onPress)
+      removeEventListener('pointerup', onRelease)
+      removeEventListener('pointercancel', onRelease)
       scroller.removeEventListener('scroll', onScroll)
       scroller.removeEventListener('scrollend', onScrollEnd)
       stopLeaving()
