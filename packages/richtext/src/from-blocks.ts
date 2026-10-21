@@ -1,5 +1,6 @@
 /** Slack `blocks` → `MessageBody`. `rich_text` is rendered faithfully; layout blocks get a plain rendering. */
-import type { Block as SlackBlock, RichTextElement, RichTextInline, RichTextListStyle, TableBlock, TableCell, TableColumnSetting, TextObject } from '@juno/slack-schema'
+import { Schema } from 'effect'
+import { Block as SlackBlockSchema, type Block as SlackBlock, type RichTextElement, type RichTextInline, type RichTextListStyle, type TableBlock, type TableCell, type TableColumnSetting, type TextObject } from '@juno/slack-schema'
 import type { ContentBlock as Block, Inline, ListStyle, Lookups, TableColumn } from './model'
 import { channelInline, dateInline, emojiInline, inlineText, linkedRuns, normalize, textRuns, toStyle, usergroupInline, userInline } from './inline'
 import { codeBlock } from './code'
@@ -132,21 +133,25 @@ function blocksFromMessageBlock(block: SlackBlock, lookups: Lookups): Block[] {
       return block.image_url ? [{ kind: 'image', url: block.image_url, alt: block.alt_text }] : paragraphOf(textRuns(block.alt_text))
     case 'table':
       return tableBlocks(block, lookups)
-    case 'unknown':
-      return unknownBlocks(block.raw, lookups)
+    case 'unknown': {
+      // Stored before Juno knew its kind (a table synced by an older version): read it as that kind now.
+      const known = decodeBlock(block.raw)
+      return known._tag === 'Some' && known.value.type !== 'unknown' ? blocksFromMessageBlock(known.value, lookups) : unknownBlocks(block.raw, lookups)
+    }
   }
 }
 
+const decodeBlock = Schema.decodeUnknownOption(SlackBlockSchema)
+
 /** A table, its short rows filled with empty cells so every column lines up. No rows, no table. */
 function tableBlocks(block: TableBlock, lookups: Lookups): Block[] {
-  const rows = block.rows.map((row) => row.map((cell) => cellInlines(cell, lookups)))
-  const width = Math.max(0, ...rows.map((row) => row.length))
+  const width = Math.max(0, ...block.rows.map((row) => row.length))
   if (width === 0) return []
   const columns = (block.column_settings ?? []).slice(0, width).map(tableColumn)
   const caption = block.caption?.trim() ?? ''
   return [{
     kind: 'table',
-    rows: rows.map((row) => row.length === width ? row : [...row, ...Array.from({ length: width - row.length }, () => [])]),
+    rows: block.rows.map((row) => Array.from({ length: width }, (_, column) => cellInlines(row[column] ?? null, lookups))),
     ...(columns.some((column) => column.align !== undefined || column.wrap !== undefined) ? { columns } : {}),
     ...(caption === '' ? {} : { caption, ...(block.is_caption_visible === true ? { showCaption: true as const } : {}) }),
   }]
