@@ -14,7 +14,7 @@ test('Home has its data when it replaces the topic after its subscription expire
 
   await feel.run({
     name: 'home-after-idle',
-    title: 'Open Home after reading a topic: its data is ready before the entrance animation starts',
+    title: 'Open Home after reading a topic: it replaces the topic with its rows, with no loading frame between',
     probes: [
       { kind: 'count', within: 'main', name: 'topic', selector: '[data-topic-view]' },
       { kind: 'count', within: 'main', name: 'home', selector: '[data-home-item]' },

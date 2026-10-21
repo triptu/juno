@@ -55,7 +55,7 @@ function write({ destination, draft = '', sendTo, listOpen = false, jobLine, thr
       onChange={noop}
       onSend={noop}
       placeholder={destination === undefined ? (jobLine ?? 'Ask Juno, or start with @ or #') : thread === undefined ? `Message ${destinationLabel(destination)}` : `Reply in ${thread.title}`}
-      above={<HomeWriteTop chip={chip} topic={topic} topicShown={destination !== undefined} />}
+      above={<HomeWriteTop chip={chip} {...(destination === undefined ? {} : { topic })} />}
       {...(sendTo === undefined
         ? {}
         : {
@@ -76,7 +76,6 @@ const base: HomeProps = {
   title: 'Morning, Tushar.',
   items: [homeItems.waiting, homeItems.resume, homeItems.moved],
   now: NOW,
-  enter: false,
   onOpen: noop,
   onMarkDone: noop,
   onResolveAll: noop,
@@ -234,7 +233,6 @@ export default defineFixtures(
       'hover-automated': state({ items: [homeItems.waiting, homeItems.resume, homeItems.automated] }, { hover: '[data-home-item="automated"] a' }),
       'hover-chip': state({ items: two }, { hover: 'button[aria-label="Send to: Juno"]' }),
       'focus-topic-chip': state({ items: two, composer: write({ destination: eng, thread: migration }) }, { focus: 'button[aria-label^="Topic:"]' }),
-      entrance: state({ enter: true }),
     },
     Overview: {
       scenes: scene(

@@ -87,8 +87,6 @@ export interface HomeShown {
   readonly line: string | undefined
   readonly now: number
   readonly caughtUp: boolean
-  /** Play the entrance: the first appearance, not a return from a hidden tab. */
-  readonly enter: boolean
   /** Items whose Mark done or Resolve all was used. */
   readonly used: ReadonlySet<string>
   /** Home is not ready yet: the greeting shows with `HOME_SYNCING_LINE`. */
@@ -131,7 +129,7 @@ export const homeShownAtom = Atom.family((_key: string) => Atom.make<HomeShown |
  * keeps filling them until it ends. A Home that said "All caught up" then
  * stays so for the visit: what lands later shows on the next one.
  */
-export function showHome(registry: Registry, key: string, options: { readonly windowHeight: number; readonly enter: boolean; readonly welcome?: boolean; readonly asks?: ReadonlyArray<HomeItem> }): void {
+export function showHome(registry: Registry, key: string, options: { readonly windowHeight: number; readonly welcome?: boolean; readonly asks?: ReadonlyArray<HomeItem> }): void {
   const served = registry.get(homeViewAtom)
   if (served._tag !== 'Success') return registry.set(homeShownAtom(key), undefined)
   const result = { value: withAsks(served.value, options.asks ?? []) }
@@ -148,7 +146,6 @@ export function showHome(registry: Registry, key: string, options: { readonly wi
       line: HOME_SYNCING_LINE,
       now: now.getTime(),
       caughtUp: false,
-      enter: options.enter,
       used: syncing ? previous.used : new Set<string>(),
       loading: true,
       filling: true,
@@ -171,7 +168,6 @@ export function showHome(registry: Registry, key: string, options: { readonly wi
     line: undefined,
     now: now.getTime(),
     caughtUp: done,
-    enter: options.enter,
     used: syncing ? previous.used : new Set<string>(),
     loading: false,
     filling: view.firstSync,

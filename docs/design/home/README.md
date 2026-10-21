@@ -103,7 +103,7 @@ Missed huddles rank after mentions. At most one appears, within the three-row ca
 - Items are real links (`a` with an href to the topic), in a list, focusable in order, with the hover highlight also shown on focus. The caret appears on hover and focus only.
 - The ask field is a button labelled "Ask Juno" that opens the Juno chat; it is not an input, so there is no second composer on the page. ⌘J does the same.
 - Text meets 4.5:1 in both themes: the title line is `--foreground-default`, the meta line `--foreground-muted` on `--background` (4.93:1 light, 6.6:1 dark).
-- The entrance respects `prefers-reduced-motion`: the four parts rise 6px over 240ms, 80ms apart, and under reduced motion they simply appear.
+- Home never animates. The scene, the greeting, the rows and the welcome card are drawn in their final state in the frame Home first shows, so there is nothing to reduce for reduced motion.
 
 ## Performance
 

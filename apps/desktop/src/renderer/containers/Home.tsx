@@ -35,15 +35,12 @@ function pictureProps(picture: { readonly id: string; readonly title: string; re
  * (`fillHome`).
  */
 function useShowHome(key: string, stage: 0 | 1 | 2 | 3, value: unknown, asks: ReadonlyArray<HomeItem>): void {
-  const appeared = useRef(false)
   const asksRef = useRef(asks)
   useLayoutEffect(() => {
     asksRef.current = asks
   })
   useLayoutEffect(() => {
-    // The entrance plays once, when Home first has something to show; the items arriving later just appear.
-    showHome(registry, key, { windowHeight: window.innerHeight, enter: stage > 0 && !appeared.current, welcome: registry.get(welcomeAtom) !== undefined, asks: asksRef.current })
-    if (stage > 0) appeared.current = true
+    showHome(registry, key, { windowHeight: window.innerHeight, welcome: registry.get(welcomeAtom) !== undefined, asks: asksRef.current })
   }, [key, stage])
   useLayoutEffect(() => {
     if (stage === 1 || stage === 2) fillHome(registry, key)
@@ -216,7 +213,6 @@ export function HomePage({ tabId }: { readonly tabId: string }) {
       items={view.items}
       done={shown.used}
       now={shown.now}
-      enter={shown.enter}
       onOpen={(topicId, event) => {
         const item = view.items.find((entry) => entry.kind === 'missedHuddle' && entry.topics.some((topic) => topic.id === topicId))
         if (item?.huddleId !== undefined) {

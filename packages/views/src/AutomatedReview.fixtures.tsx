@@ -32,7 +32,7 @@ function Live({ item = automatedMovesItem, initial = new Map(), ...rest }: Parti
 }
 
 const homeWith = (item: HomeItem) => (
-  <Home scene="morning" title="Morning, Tushar." items={[homeItems.waiting, homeItems.followUp, item]} now={NOW} enter={false} onOpen={noop} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} onDismiss={noop} />
+  <Home scene="morning" title="Morning, Tushar." items={[homeItems.waiting, homeItems.followUp, item]} now={NOW} onOpen={noop} onMarkDone={noop} onResolveAll={noop} onReview={noop} onSort={noop} onItemMenu={noop} onDismiss={noop} />
 )
 
 /** Home under the sheet's layer, as the window shows it. */
