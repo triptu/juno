@@ -115,6 +115,11 @@ export class SidebarRow {
     return this.root.getByRole('button', { name: new RegExp(`^Resolve ${escapeRegExp(this.title)}`) })
   }
 
+  /** The presence dot on a DM's photo, while Slack shows the person active. */
+  get presenceDot(): Locator {
+    return this.root.locator('[data-presence="active"]')
+  }
+
   /** The row's tile: `data-topic-art` is `art` once the topic has a drawing, `placeholder` for the pebble. */
   get art(): Locator {
     return this.root.locator('[data-topic-art]')
@@ -231,7 +236,7 @@ export class SidebarRow {
 
   async expectRead(): Promise<void> {
     await expect(this.root.locator('[title$=" unread"]')).toHaveCount(0)
-    await expect(this.titleText).toHaveCSS('font-weight', '500')
+    await expect(this.titleText).toHaveCSS('font-weight', '400')
   }
 
   async expectMention(): Promise<void> {
@@ -576,6 +581,11 @@ export class SettingsPage {
     return this.root.getByRole('radio', { name })
   }
 
+  /** Appearance › Sidebar › Show who is active in the sidebar. */
+  get sidebarPresence(): Locator {
+    return this.root.getByRole('switch', { name: 'Show who is active in the sidebar' })
+  }
+
   /** One ignored channel's row on the ignore list (inventory 14), by name without "#". */
   ignored(name: string): Locator {
     return this.root.locator('[data-ignored-channel]').filter({ hasText: name })
@@ -694,7 +704,7 @@ export class Juno {
   readonly settings: SettingsPage
   readonly notifications: NotificationsPage
   readonly topic: TopicPane
-  /** Home's composer: Recent, the destination chip and the field. */
+  /** Home's composer: the destination chip and the field. */
   readonly write: HomeWritePane
   readonly tabs: TabStrip
   readonly nav: Navigation
@@ -1365,8 +1375,8 @@ export class AllTopicsPane {
 }
 
 /**
- * Home's composer (SPEC section 12, "Writing"): Recent, the destination chip
- * above the field, the field, the "Send to" list a first @ or # opens, and
+ * Home's composer (SPEC section 12, "Writing"): the destination chip above
+ * the field, the field, the "Send to" list a first @ or # opens, and
  * the chip's destination list.
  */
 export class HomeWritePane {
@@ -1412,16 +1422,6 @@ export class HomeWritePane {
 
   sendToOption(name: string): Locator {
     return this.sendTo.getByRole('option', { name: new RegExp(`^${escapeRegExp(name)}(\\s|$)`) })
-  }
-
-  /** Recent: the people and channels you wrote to. */
-  get recent(): Locator {
-    return this.root.locator('[data-home-recent]')
-  }
-
-  /** The Recent row named `name`; a private channel's name goes on with "Private". */
-  recentRow(name: string): Locator {
-    return this.recent.getByRole('button', { name: new RegExp(`^${escapeRegExp(name)}( Private)?$`) })
   }
 
   /** The chip's destination list. */
@@ -1622,6 +1622,18 @@ export class TopicPane {
   /** The context pill, a button named by the channel and its kind. */
   get contextPill() {
     return this.header.locator('[data-island="left"]').getByRole('button').first()
+  }
+
+  /** A 1:1 DM's presence in the context pill: `active`, `away`, or none while Slack has not said. */
+  async expectPresence(presence: 'active' | 'away' | undefined): Promise<void> {
+    const dot = this.contextPill.locator('[data-pill-presence]')
+    if (presence === undefined) {
+      await expect(dot).toHaveCount(0)
+      await expect(this.contextPill).not.toHaveAccessibleName(/, (active|away)\./)
+      return
+    }
+    await expect(dot).toHaveAttribute('data-pill-presence', presence)
+    await expect(this.contextPill).toHaveAccessibleName(new RegExp(`, ${presence}\\. Show in sidebar\\.$`))
   }
 
   /** The title, a menu button inside the page's heading. */

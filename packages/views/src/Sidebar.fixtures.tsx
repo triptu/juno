@@ -6,6 +6,7 @@ import { EngineNotice, SyncProgress } from './EngineStatusView'
 import { useFixtureControl } from './juno-chat/fixtures/control'
 import { artRows } from './fixtures/artRows'
 import { PrivacyOn } from './fixtures/privacy'
+import { mixedPinnedIds, mixedRecentIds, mixedRows, mixedSelectedId } from './fixtures/mixedRows'
 import { art, hostileIds, newThreadsById, NOW, pinnedIds, recentIds, rows, rowsById } from './fixtures/topics'
 import { Sidebar, type SidebarProps, type SidebarViewPill } from './Sidebar'
 import { relativeTime } from './time'
@@ -78,8 +79,10 @@ const sheetProps: ViewSheetProps = {
   onCancel: noop,
 }
 
+const mixedById = new Map(mixedRows.map((row) => [row.id, row]))
+
 const renderRow = (id: string, selected?: string) => {
-  const row = rowsById.get(id)
+  const row = rowsById.get(id) ?? mixedById.get(id)
   if (row === undefined) return null
   return (
     <TopicRow
@@ -161,6 +164,11 @@ const allArt = (overrides: Partial<SidebarProps> = {}) => (
 // The first rows a sync brings, for the states with rows.
 const firstRows = recentIds.slice(0, 4)
 
+const mixedSections = [
+  { id: 'pinned', ids: mixedPinnedIds },
+  { id: 'recent', ids: mixedRecentIds },
+] as const
+
 const frame: FixtureFrame = { width: 384, height: 720, padded: false, surface: 'subtle' }
 
 export default defineFixtures(
@@ -176,6 +184,11 @@ export default defineFixtures(
       ),
     },
     // The filter row as scrollable pills (inventory 2.3): it never grows taller than the row of three.
+    // A list as people use it, to judge how calm the rows read together.
+    Rows: {
+      mixed: scene(() => full({}, { sections: mixedSections, selected: mixedSelectedId }), { ...frame, height: 1100 }),
+      'mixed-two-line-titles': scene(() => full({}, { sections: mixedSections, selected: mixedSelectedId }), { ...frame, height: 1100, topicTitleLines: 'two' }),
+    },
     Views: {
       overflowing: scene(() => full(viewChrome)),
       'view-selected': scene(() => full({ ...viewChrome, filter: { kind: 'all', unreadOnly: false, view: 'automated' } }, { sections: [{ id: 'recent', ids: [rows.alertsMain.id] }] })),

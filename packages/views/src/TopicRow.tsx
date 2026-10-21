@@ -16,6 +16,7 @@ import {
   Icon,
   IconButton,
   pointerMoved,
+  PresenceDot,
   Text,
   tooltip,
   TopicArt,
@@ -58,6 +59,8 @@ export interface TopicRowProps {
   readonly accessory?: ReactNode
   /** What `accessory` says, added to the row's description ("huddle with 3 people"). */
   readonly accessoryLabel?: string
+  /** A DM's Main only: Slack shows the person as active, drawn as the presence dot on their photo. */
+  readonly partnerActive?: boolean
 }
 
 const HOVER = '@media (hover: hover)'
@@ -72,9 +75,9 @@ const PRIVATE_TITLE = 'Private channel'
  * One sidebar row, chat style: the topic's art or the person's photo, then
  * the title and time, a one-line "Sender: text" preview ending with the
  * people who wrote the unread messages beside the @ and count tags, and the
- * meta line: the place with its Reopened tag. Text takes three levels: the
- * title, the preview one step down, and the meta line and time a step below
- * that. A Main (a channel's, a DM's or a group DM's) has no meta line and no
+ * meta line: the place with its Reopened tag. On a read row the title is
+ * regular and everything under it is muted, so the list stays calm; an unread
+ * row's title is semibold and its preview steps up between the two. A Main (a channel's, a DM's or a group DM's) has no meta line and no
  * Main tag: Main is the default and its title already names the place, so
  * the row is two lines and shorter, and its `accessory`, a Reopened tag or
  * the new-thread count follows the title. The Resolve check overlays the
@@ -100,14 +103,16 @@ export const TopicRow = memo(function TopicRow({
   newThreads = 0,
   accessory,
   accessoryLabel,
+  partnerActive = false,
 }: TopicRowProps) {
   const titleId = useId()
   const previewId = useId()
   const stateId = useId()
   const unread = row.unreadCount > 0
   // Resolved and unsubscribed rows read quieter: the check or the muted bell
-  // says why, the title steps down to the subtle colour and the tile fades.
-  // The text keeps at least 4.5:1, so the row itself is never faded.
+  // says why, the title steps down to the subtle colour, the preview stays
+  // muted even when unread and the tile fades. The text keeps at least 4.5:1,
+  // so the row itself is never faded.
   const quiet = row.resolved || row.status === 'unsubscribed'
   const main = row.tags.includes('main')
   const twoLine = isTwoLine(row)
@@ -116,7 +121,8 @@ export const TopicRow = memo(function TopicRow({
   const threadsLabel = threads === 1 ? '1 new thread' : `${threads} new threads`
   const unreadLabel = row.unreadExact ? `${row.unreadCount} unread` : `${row.unreadCount} or more unread`
   const mark = main && accessory !== undefined && accessory !== null
-  const state = rowState(row, unreadLabel, threads > 0 ? threadsLabel : undefined, main ? accessoryLabel : undefined)
+  const active = partnerActive && main && row.channel.kind === 'im'
+  const state = rowState(row, unreadLabel, threads > 0 ? threadsLabel : undefined, main ? accessoryLabel : undefined, active)
   const people: ReadonlyArray<AvatarStackPerson> = row.participants.map((person) => stackPerson(person))
   const hasPeople = people.length > 0
   const resolvable = row.canResolveOnHover && !renaming
@@ -162,7 +168,7 @@ export const TopicRow = memo(function TopicRow({
     <span {...stylex.props(styles.line2, twoLine && resolvable && styles.underMask)}>
       {/* The message sets the direction; the sender is isolated so a Latin
           name before Arabic text, or the reverse, keeps its own order. */}
-      <Text variant="preview" tone={quiet ? 'muted' : 'secondary'} truncate as="span" dir="auto" id={previewId} data-sensitive="" data-row-part="preview" sx={styles.preview}>
+      <Text variant="preview" tone={unread && !quiet ? 'secondary' : 'muted'} truncate as="span" dir="auto" id={previewId} data-sensitive="" data-row-part="preview" sx={styles.preview}>
         {row.preview.text.length === 0 || row.preview.sender.length === 0 ? (
           row.preview.text || row.preview.sender
         ) : (
@@ -230,7 +236,7 @@ export const TopicRow = memo(function TopicRow({
       {...stylex.props(styles.row, focusRing.inset, twoLine && styles.twoLineRow, selected && styles.selected)}
     >
       <span {...stylex.props(styles.tile, main && styles.mainTile, quiet && styles.quietTile)}>
-        <Tile row={row} />
+        <Tile row={row} dot={active ? (selected ? 'rowSelected' : 'row') : undefined} />
       </span>
       <span {...stylex.props(styles.body)}>
         <span {...stylex.props(styles.line1)}>
@@ -245,7 +251,7 @@ export const TopicRow = memo(function TopicRow({
             <Text
               variant="rowTitle"
               tone={quiet ? 'subtle' : 'default'}
-              weight={unread ? 'semibold' : 'medium'}
+              weight={unread ? 'semibold' : undefined}
               topicTitle
               dir="auto"
               id={titleId}
@@ -317,13 +323,21 @@ export const TopicRow = memo(function TopicRow({
  * Tide placeholder until the art exists or while AI assist is off. The art
  * is 40px in a 44px slot, so its text column lines up with a photo row's.
  */
-function Tile({ row }: { readonly row: TopicRowModel }) {
+function Tile({ row, dot }: { readonly row: TopicRowModel; readonly dot: 'row' | 'rowSelected' | undefined }) {
   const { channel } = row
   if (row.kind === 'main' && channel.kind === 'im') {
     const partner = channel.partner
     const name = partner?.name ?? channel.name
     const hue = hueFor(partner?.color ?? channel.color, partner?.id ?? channel.id)
-    return <Avatar label={initials(name)} size={44} hue={hue} {...(partner?.avatarUrl === undefined ? {} : { src: partner.avatarLargeUrl || partner.avatarUrl })} />
+    const photo = <Avatar label={initials(name)} size={44} hue={hue} {...(partner?.avatarUrl === undefined ? {} : { src: partner.avatarLargeUrl || partner.avatarUrl })} />
+    if (dot === undefined) return photo
+    // The dot is placed against the photo's own box: the tile's box is cut to the two-line row.
+    return (
+      <span {...stylex.props(styles.photo)}>
+        {photo}
+        <PresenceDot active surface={dot} />
+      </span>
+    )
   }
   if (row.kind === 'main' && channel.kind === 'mpim') {
     const members = channel.members ?? []
@@ -345,9 +359,10 @@ function isTwoLine(row: Pick<TopicRowModel, 'kind'>): boolean {
   return row.kind === 'main'
 }
 
-/** What the tags and icons say, for the row's description: "2 unread, mentions you." */
-function rowState(row: TopicRowModel, unreadLabel: string, threadsLabel: string | undefined, accessoryLabel: string | undefined): string | undefined {
+/** What the tags and icons say, for the row's description: "active, 2 unread, mentions you." */
+function rowState(row: TopicRowModel, unreadLabel: string, threadsLabel: string | undefined, accessoryLabel: string | undefined, active: boolean): string | undefined {
   const parts = [
+    active ? 'active' : undefined,
     row.unreadCount > 0 ? unreadLabel : undefined,
     row.mentionsMe ? 'mentions you' : undefined,
     threadsLabel,
@@ -424,6 +439,13 @@ const styles = stylex.create({
   },
   // The 44px artwork may extend beyond Main’s 42px content box, as before.
   mainTile: { maxHeight: density['--density-row-two-line-estimate'] },
+  // Positioned, so a DM's presence dot sits on the photo's corner. As tall as the photo, not the cut tile.
+  photo: {
+    position: 'relative',
+    display: 'inline-flex',
+    alignSelf: 'flex-start',
+    flexShrink: 0,
+  },
   artSlot: {
     display: 'inline-flex',
     alignItems: 'center',

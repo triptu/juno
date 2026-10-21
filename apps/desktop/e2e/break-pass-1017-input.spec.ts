@@ -1,7 +1,6 @@
 // Break pass of 10-17: typing and the keyboard on Home, the composers and
 // the edit field, and dark mode. Findings are in
 // docs/reviews/2026-10-17-break-pass.md.
-import { SELF_ID } from '@juno/fake-slack'
 import { expect, syncedTest, test } from './fixtures'
 
 test.describe.configure({ timeout: 120_000 })
@@ -35,8 +34,7 @@ syncedTest('Home works from the keyboard alone: ⌘N, pick with Enter, write, Sh
   await juno.tabs.expectActive('Home')
 })
 
-test('dark mode leaves no light surface on Home, the switcher and Settings', async ({ juno, fake }) => {
-  for (let i = 0; i < 6; i++) fake.injectMessage({ channel: 'C0ENG', user: SELF_ID, text: `Frequent send ${i}` })
+test('dark mode leaves no light surface on Home, the switcher and Settings', async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.setTheme('Dark')
@@ -53,7 +51,7 @@ test('dark mode leaves no light surface on Home, the switcher and Settings', asy
       }
       return light
     })
-  await expect(juno.write.recent.getByRole('button').first()).toBeVisible()
+  await expect(juno.write.chip).toBeVisible()
   expect(await lightSurfaces()).toEqual([])
   await juno.write.chip.click()
   await expect(juno.write.list).toBeVisible()

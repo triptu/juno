@@ -35,3 +35,23 @@ it('takes only the values the official client sends, and reports them back at bo
   expect((await client.ok('client.userBoot', {})).self.manual_presence).toBe('away')
   socket.close()
 })
+
+it("answers presence_sub with each person's presence, sends their changes, and an empty presence_sub ends the subscription", async () => {
+  const socket = await client.connect()
+  await socket.next(isType('hello'))
+  fake.setPresence({ users: ['U0MAYA'], presence: 'active' })
+  socket.send({ type: 'presence_sub', ids: ['U0MAYA', 'U0LEO'] })
+  expect(await socket.next(isType('presence_change'))).toMatchObject({ presence: 'active', users: ['U0MAYA'] })
+  expect(await socket.next(isType('presence_change'))).toMatchObject({ presence: 'away', users: ['U0LEO'] })
+  fake.setPresence({ users: ['U0LEO', 'U0PRIYA'], presence: 'active' })
+  expect(await socket.next(isType('presence_change'))).toMatchObject({ presence: 'active', users: ['U0LEO'] })
+
+  socket.send({ type: 'presence_sub', ids: [] })
+  await expect.poll(() => fake.presenceSubscriptions()).toEqual([])
+  fake.setPresence({ users: ['U0MAYA'], presence: 'away' })
+  socket.send({ type: 'ping', id: 16385 })
+  // The pong comes next: no presence_change went out before it.
+  expect(await socket.next((frame) => frame.type === 'pong' || frame.type === 'presence_change')).toMatchObject({ type: 'pong' })
+  fake.setPresence({ users: ['U0LEO', 'U0PRIYA'], presence: 'away' })
+  socket.close()
+})

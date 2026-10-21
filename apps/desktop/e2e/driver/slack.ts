@@ -51,6 +51,17 @@ export class Slack {
     return this.fake.received.filter((frame) => frame.type === 'tickle').length
   }
 
+  /** The `presence_sub` frames Juno sent since the last `resetCalls`, oldest first: each one's ids. */
+  presenceSubs(): ReadonlyArray<ReadonlyArray<string>> {
+    return this.fake.received.filter((frame) => frame.type === 'presence_sub').map((frame) => frame.ids ?? [])
+  }
+
+  /** Juno's socket is subscribed to this person's presence, or with `false` no longer is, within 10 s. */
+  async expectPresenceSubscribed(name: string, subscribed = true): Promise<void> {
+    const { id } = this.as(name)
+    await expect.poll(() => this.fake.presenceSubscriptions().includes(id), { timeout: 10_000 }).toBe(subscribed)
+  }
+
   /** What colleagues see for you in Slack, within 10 s. */
   async expectSeenAs(presence: 'active' | 'away'): Promise<void> {
     await expect.poll(() => this.fake.selfPresence(), { timeout: 10_000 }).toBe(presence)
@@ -85,6 +96,11 @@ export class Person {
     readonly slack: Slack,
     readonly id: string,
   ) {}
+
+  /** Goes active or away, as colleagues see it in Slack. */
+  setPresence(presence: 'active' | 'away'): void {
+    this.slack.fake.setPresence({ users: [this.id], presence })
+  }
 
   /** Replies in the thread whose root starts with `rootText`. */
   replyIn(rootText: string, text: string): void {

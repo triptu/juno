@@ -2,22 +2,20 @@ import { expect } from '../fixtures'
 import { landsAndStays, neverZero, noFlicker, shotOfFrame, type Check } from './checks'
 import { test } from './feel'
 
-test('Recent, the chip and the composer stay in place when a destination is chosen', async ({ juno, feel }) => {
+test('the chip and the composer stay in place when a first @ chooses a person', async ({ juno, feel }) => {
   await juno.signIn()
   await juno.waitForSync()
-  const rows = juno.write.recent.getByRole('button')
-  await expect(rows.first()).toBeVisible()
+  await juno.write.composer.pressSequentially('@ma')
+  await expect(juno.write.sendToOption('Maya')).toBeVisible()
   await feel.run({
-    name: 'home-write-recent',
-    title: 'Choose a destination from Recent; Recent, the chip and the composer stay in place',
-    probes: [
-      { kind: 'box', name: 'recent', selector: '[data-home-recent]' },
-      { kind: 'box', name: 'composer', selector: '[data-home] [data-composer-field]' },
-    ],
-    regions: { recent: '[data-home-recent]', chip: '[data-home-write] [aria-label^="Send to:"]' },
-    checks: [landsAndStays('recent', 'Recent'), landsAndStays('composer', 'composer', { tolerance: 0 }), noFlicker('recent', 'Recent')],
+    name: 'home-write-pick',
+    title: 'Choose a person with a first @ and Tab; the chip and the composer stay in place',
+    probes: [{ kind: 'box', name: 'composer', selector: '[data-home] [data-composer-field]' }],
+    regions: { chip: '[data-home-write] [aria-label^="Send to:"]' },
+    checks: [landsAndStays('composer', 'composer', { tolerance: 0 }), noFlicker('chip', 'the chip')],
   }, async () => {
-    await rows.first().click()
+    await juno.write.composer.press('Tab')
+    await juno.write.expectDestination('Maya')
     await expect(juno.write.composer).toBeFocused()
   })
 })

@@ -52,6 +52,16 @@ export default defineFixtures(
       'thread-actions': state({ detail: details.offsite, actions: action }),
       'main-actions-336': state({ detail: details.engMain, actions: action }, narrow),
     },
+    // A 1:1 DM shows its person's presence in the pill, whatever the sidebar setting: a dot in the icon's place,
+    // green when active, hollow when away, and the person icon while Slack has not said. Group DMs show none.
+    Presence: {
+      'dm-main-active': state({ detail: details.mayaMain, actions: action, presence: 'active' }),
+      'dm-main-away': state({ detail: details.mayaMain, actions: action, presence: 'away' }),
+      'dm-main-unknown': state({ detail: details.mayaMain, actions: action }),
+      'dm-thread-active': state({ detail: details.offsite, actions: action, presence: 'active' }),
+      'dm-main-active-336': state({ detail: details.mayaMain, actions: action, presence: 'active' }, narrow),
+      'group-dm-ignores': state({ detail: details.lunch, actions: action, presence: 'active' }),
+    },
     // The title opens the switcher under the left island: the channel's Main and threads, the resolved ones last.
     Switcher: {
       'switcher-thread': state({ detail: details.postgres, switcher: switcher(details.postgres.id) }, { height: 560 }),

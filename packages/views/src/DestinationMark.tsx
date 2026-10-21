@@ -3,7 +3,7 @@ import { Avatar, GroupAvatar, TopicArt } from '@juno/ui'
 import { hueFor, initials, stackPerson } from './look'
 
 /**
- * A conversation's mark wherever Home names it as a destination (Recent, the
+ * A conversation's mark wherever Home names it as a destination (the
  * destination list, the "Send to" list): a face, a group's pair of faces
  * (initials until its members are known) or a channel's Main art, at 20px,
  * so one conversation looks the same in each and as its Main row does in

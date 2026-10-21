@@ -83,7 +83,7 @@ export function Gallery({ pictures, sources, current, filter, onFilter, onOpen, 
           Gallery
         </Text>
         <Text variant="body" tone="subtle" as="p" sx={styles.lead}>
-          The pictures Home shows when you are caught up, each with its story. Paintings, prints and nature studies in the public domain, and images from Hubble, Webb and NASA.
+          A thousand years of paintings, prints and studies of nature, and pictures of space that make them look recent.
         </Text>
         <GalleryPills pictures={pictures} filter={filter} onFilter={onFilter} />
         {sections.map((section) =>

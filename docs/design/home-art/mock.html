@@ -75,11 +75,6 @@ section[data-key] { display: inline-flex; gap: 24px; flex-wrap: wrap; padding: 2
 
 .composer { flex: none; padding: 0 0 24px; display: flex; flex-direction: column; align-items: center; }
 .composer-inner { width: 640px; }
-.recent-label { font: 500 11.5px/1 'Figtree Variable'; color: var(--foreground-muted); margin: 0 0 8px 6px; }
-.recent { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; margin-bottom: 14px; }
-.recent div { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 6px; font: 400 13px/1 'Figtree Variable'; color: var(--foreground-subtle); }
-.face { width: 18px; height: 18px; border-radius: 50%; background: var(--secondary-default); display: inline-flex; align-items: center; justify-content: center; font: 600 9px/1 'Figtree Variable'; color: var(--foreground-muted); }
-.chan { width: 18px; height: 18px; border-radius: 5px; background: var(--secondary-default); }
 .chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 999px; background: var(--secondary-default); font: 500 12px/1 'Figtree Variable'; color: var(--foreground-subtle); margin: 0 0 8px 2px; }
 .field { height: 52px; border-radius: 20px; border: 1px solid var(--input-border); display: flex; align-items: center; padding: 0 18px; font: 400 14px/1 'Figtree Variable'; color: var(--foreground-muted); }
 
@@ -152,11 +147,6 @@ const strip = (active) => `<div class="strip">
   <div class="tab on">${ICON[active === 'Home' ? 'home' : 'frame']}${active}</div>
 </div>`
 const composer = `<div class="composer"><div class="composer-inner">
-  <div class="recent-label">Recent</div>
-  <div class="recent">
-    <div><span class="face">M</span>Maya Chen</div><div><span class="chan"></span>eng</div>
-    <div><span class="face">L</span>Leo Park</div><div><span class="chan"></span>hiring</div>
-  </div>
   <div class="chip">✦ Juno</div>
   <div class="field">Ask Juno, or start with @ or #</div>
 </div></div>`
@@ -259,7 +249,7 @@ const gallery = ({ cls, label }) => `
   <div class="page">
     <div class="gallery">
       <div class="g-head"><h1 class="g-title">Gallery</h1></div>
-      <p class="g-sub">The pictures Home shows when you are caught up, each with its story. Paintings, prints and nature studies in the public domain, and images from Hubble, Webb and NASA.</p>
+      <p class="g-sub">A thousand years of paintings, prints and studies of nature, and pictures of space that make them look recent.</p>
       <div class="g-pills"><span class="g-pill on">All<span>72</span></span><span class="g-pill">Paintings<span>41</span></span><span class="g-pill">Prints<span>7</span></span><span class="g-pill">Nature<span>9</span></span><span class="g-pill">Space<span>15</span></span></div>
       <div class="g-section">
         <div class="g-h">Paintings</div>

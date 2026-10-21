@@ -1,7 +1,7 @@
 /**
  * Destinations for Home's composer (spec section 12, "Writing"): the
- * conversation list, Recent and ⌘K's Conversations tab. The route names
- * keep the New chat prefix they were built with.
+ * conversation list, and ⌘K's Conversations tab. The route names keep the
+ * New chat prefix they were built with.
  *
  * Live queries, which never call Slack:
  * - `newChat.conversations`: the destination list's sections. With an
@@ -9,13 +9,11 @@
  *   people (everyone in the workspace, including people never messaged)
  *   and the matching channels and group DMs you are in. Ignored channels
  *   are left out.
- * - `newChat.frequent`: Home's Recent, up to five people then five
- *   channels by decayed own sends, with member activity as the fallback; no
- *   archived channels.
  * - `newChat.ranked`: the ⌘K Conversations tab (spec section 10). DMs,
- *   group DMs and channels by own sends and topic visits, decayed like
- *   `newChat.frequent`, then activity; with text, the conversations the
- *   picker finds for it, by how well they match, then ranked the same way.
+ *   group DMs and channels by own sends and topic visits, each use counting
+ *   half as much per week over the last 30 days, then activity; no archived
+ *   channels. With text, the conversations the picker finds for it, by how
+ *   well they match, then ranked the same way.
  *
  * With text, both search by words (`conversation-search.ts` in
  * `@juno/domain`): each typed word matches the start of a word of the
@@ -81,9 +79,6 @@ export const newChatConversations = liveValueRoute('newChat.conversations', {
 
 
 
-/** Up to six local destinations ranked by own recent sends, then activity. */
-export const newChatFrequent = liveValueRoute('newChat.frequent', { value: Schema.Array(PickConversation) })
-
 /** Rows `newChat.ranked` returns, with or without text. */
 export const PALETTE_CONVERSATIONS = 12
 
@@ -93,4 +88,4 @@ export const newChatRanked = liveValueRoute('newChat.ranked', {
   value: Schema.Array(PickConversation),
 })
 
-export const NewChatRoutes = RpcGroup.make(newChatConversations, newChatFrequent, newChatRanked)
+export const NewChatRoutes = RpcGroup.make(newChatConversations, newChatRanked)

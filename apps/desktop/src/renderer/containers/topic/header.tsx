@@ -1,8 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { mainTopicOf, type TopicDetail } from '@juno/contract'
-import { channelTopicsAtom, headerRenamingAtom, junoAvailableAtom, junoPanelOpenAtom, registry, topicAtom } from '@juno/state'
+import { channelTopicsAtom, headerRenamingAtom, junoAvailableAtom, junoPanelOpenAtom, personPresenceAtom, registry, topicAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { TopicHeader, type MenuAnchor } from '@juno/views'
+import { TopicHeader, type MenuAnchor, type TopicHeaderProps } from '@juno/views'
 import { chunk } from '../chunks'
 import { followThread } from '../notifyActions'
 import { toggleJunoPanel } from '../juno/actions'
@@ -45,7 +45,8 @@ export function useTopicHeader(detail: TopicDetail, readOnly: boolean, drawnAll:
   }, [drawnAll, readOnly, channel])
 
   return (
-    <TopicHeader
+    <PresenceHeader
+      partnerId={detail.channel.kind === 'im' ? (detail.channel.partner?.id ?? '') : ''}
       detail={detail}
       menuOpen={menuOpen}
       onMenu={openMenu}
@@ -58,4 +59,14 @@ export function useTopicHeader(detail: TopicDetail, readOnly: boolean, drawnAll:
       switcher={{ open: switcherOpen, onOpen: setSwitcherOpen, content: switcherOpen ? <Switcher detail={detail} onClose={() => setSwitcherOpen(false)} /> : null }}
     />
   )
+}
+
+/**
+ * The header with a 1:1 DM partner's presence (SPEC 7, "Presence in a DM"),
+ * whatever the sidebar setting: the engine always follows the open DMs'
+ * partners. Read here, so a presence change re-renders the header alone.
+ */
+function PresenceHeader({ partnerId, ...props }: TopicHeaderProps & { readonly partnerId: string }) {
+  const presence = useAtomValue(personPresenceAtom(partnerId))
+  return <TopicHeader {...props} {...(presence === undefined ? {} : { presence })} />
 }

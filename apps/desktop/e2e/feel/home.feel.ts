@@ -77,8 +77,6 @@ test('Home fills reserved slots during the first sync without moving painted con
       { kind: 'rect', name: 'greetingBox', selector: '[data-home] h2' },
       { kind: 'rect', name: 'lineBox', selector: '[data-home] h2 + p' },
       { kind: 'rect', name: 'slots', selector: '[data-home] ul' },
-      // Recent's room while its rows are on their way, then Recent: the same box.
-      { kind: 'rect', name: 'recent', selector: '[data-home] :is([data-home-recent], [data-home-recent-reserved])' },
       { kind: 'rect', name: 'chip', selector: '[data-home-write] [aria-label^="Send to:"]' },
       { kind: 'rect', name: 'field', selector: '[data-home] [data-composer-field]' },
       { kind: 'boxes', name: 'items', selector: '[data-home-item]', key: 'data-home-item' },
@@ -94,7 +92,7 @@ test('Home fills reserved slots during the first sync without moving painted con
       happened('rows arrive while sync is still running', (r) => r.frames.some((f) => Number(f.values['rows']) > 0 && f.values['syncing'] === 1)),
       happened('sync completes with rows still painted', (r) => Number(r.frames.at(-1)?.values['rows']) > 0 && r.frames.at(-1)?.values['syncing'] === 0),
       landsAndStays('lineBox', 'sync text', { tolerance: 0, where: (v) => v['syncing'] === 1 }),
-      ...['greetingBox', 'slots', 'recent', 'chip', 'field'].map((probe) => landsAndStays(probe, probe, { tolerance: 0 })),
+      ...['greetingBox', 'slots', 'chip', 'field'].map((probe) => landsAndStays(probe, probe, { tolerance: 0 })),
       noLayoutShift({ region: 'home', includeInput: true, from: 'history pages' }),
       rowsStayInSlots,
     ],

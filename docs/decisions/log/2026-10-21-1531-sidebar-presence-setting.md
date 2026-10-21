@@ -1,0 +1,1 @@
+- 10-21 15:31 · others-presence-2 · The sidebar's presence dots are off by default, set by "Show who is active in the sidebar" under Settings › Appearance › Sidebar (moved from Notifications). Juno always subscribes to the open DMs' partners and adds the 100 recent DM partners only with the setting on; the sorted set is sent after 100 ms of quiet and never resent unchanged.

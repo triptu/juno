@@ -1,7 +1,6 @@
 // Break pass of 10-17: the features that landed on 10-16 and 10-17 used
 // together, the way a busy day uses them. Findings are in
 // docs/reviews/2026-10-17-break-pass.md.
-import { SELF_ID } from '@juno/fake-slack'
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { expect, launchApp, syncedTest, test } from './fixtures'
@@ -131,22 +130,18 @@ syncedTest('Settings opened from ⌘, , the avatar menu and Notifications stays 
   expect(await juno.tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), 'Settings'])
 })
 
-test('a Recent pick and its draft survive switching tabs before sending', async ({ juno, fake }) => {
-  for (let i = 0; i < 6; i++) fake.injectMessage({ channel: 'C0ENG', user: SELF_ID, text: `Frequent send ${i}` })
+test('a picked destination and its draft survive switching tabs before sending', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.sidebar.row(POSTGRES).open()
   await juno.tabs.newTabButton.click()
-  const rows = juno.write.recent.getByRole('list', { name: 'Channels' }).getByRole('button')
-  await expect(rows.first()).toHaveText('eng')
-  await rows.first().click()
+  await juno.write.pickConversation('eng', 'eng')
   await juno.write.expectDestination('#eng')
   await juno.write.write('Picked then switched')
   await juno.tabs.select(POSTGRES)
   await juno.topic.expectTitle(POSTGRES)
   await juno.tabs.select('Home')
   await juno.write.expectDestination('#eng')
-  await expect(rows.first()).toHaveAttribute('aria-pressed', 'true')
   await expect(juno.write.composer).toHaveValue('Picked then switched')
   await juno.write.send()
   await expect.poll(() => fake.messages('C0ENG').filter((m) => m.text === 'Picked then switched').length).toBe(1)

@@ -123,6 +123,8 @@ export class Workspace {
   readonly usergroups = new Map<string, Subteam>()
   /** The self user's `manual_presence`: `active` (Slack's automatic mode) or `away`. */
   manualPresence: 'active' | 'away' = 'active'
+  /** Other users' presence as colleagues see it, set with `setPresence`. A user who is not here is away. */
+  readonly presence = new Map<string, 'active' | 'away'>()
   readonly clock: Clock
   readonly selfId: string
   readonly team: Team

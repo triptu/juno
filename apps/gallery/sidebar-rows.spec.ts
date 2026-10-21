@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import { expectNoLayoutShift } from '@juno/testing/layout-shift'
 import { openState, type Route } from './support'
 
@@ -10,6 +10,17 @@ import { openState, type Route } from './support'
 
 const open = (page: Page, component: string, id: string) =>
   openState(page, { component, id, route: `${component}/${id}`, group: '', groupId: '', state: '', frame: {} } satisfies Route)
+
+/** The dot's centre is on the round photo's edge at 45°, as far in from the right as from the bottom (inventory 2.1). */
+async function expectOnPhotoEdge(photo: Locator, dot: Locator): Promise<void> {
+  const p = (await photo.boundingBox())!
+  const d = (await dot.boundingBox())!
+  const radius = p.width / 2
+  const dx = d.x + d.width / 2 - (p.x + radius)
+  const dy = d.y + d.height / 2 - (p.y + p.height / 2)
+  expect(Math.abs(dx - dy)).toBeLessThan(0.5)
+  expect(Math.abs(Math.hypot(dx, dy) - radius)).toBeLessThan(0.75)
+}
 
 const row = (page: Page, title: string) => page.getByRole('listitem', { name: new RegExp(`^${title}`) })
 
@@ -27,6 +38,56 @@ test('a row says its unread count and a mention in words, not only in tooltips',
   await expect(row(page, 'Rina Sato')).toHaveAccessibleDescription(/^2 unread, mentions you\. \S/)
   await open(page, 'TopicRow', 'state/read')
   await expect(row(page, 'Postgres 16')).toHaveAccessibleDescription('Dev: Booked 2–4pm. Will post results here.')
+})
+
+test('an active DM partner gets the presence dot centred on the round photo’s bottom right edge, ringed in the row’s fill, plain and selected', async ({ page }) => {
+  /** The dot's ring and the fill behind it: the nearest ancestor background that is not transparent. */
+  const colours = (dot: ReturnType<Page['locator']>) => dot.evaluate((node) => {
+    let fill = 'rgba(0, 0, 0, 0)'
+    for (let element = node.parentElement; element !== null && fill === 'rgba(0, 0, 0, 0)'; element = element.parentElement) fill = getComputedStyle(element).backgroundColor
+    return { ring: getComputedStyle(node).borderTopColor, fill }
+  })
+
+  await open(page, 'TopicRow', 'tile/dm-main-photo')
+  await expect(page.locator('[data-presence]')).toHaveCount(0)
+
+  await open(page, 'TopicRow', 'tile/dm-main-active')
+  const maya = row(page, 'Maya Chen')
+  const dot = maya.locator('[data-presence="active"]')
+  await expect(dot).toBeVisible()
+  await expect(maya).toHaveAccessibleDescription(/^active\. /)
+  await expectOnPhotoEdge(maya.locator('[data-kind="person"]'), dot)
+  const plain = await colours(dot)
+  expect(plain.ring).toBe(plain.fill)
+
+  await open(page, 'TopicRow', 'tile/dm-main-active-selected')
+  const selected = await colours(page.locator('[data-presence="active"]'))
+  expect(selected.ring).toBe(selected.fill)
+
+  // Your own dot in the title bar sits the same way.
+  await open(page, 'AvatarButton', 'presence/active')
+  await expectOnPhotoEdge(page.locator('button [data-kind="person"], button img').first(), page.locator('[data-presence="active"]'))
+})
+
+test('an open DM’s header pill shows its person’s presence in the icon’s place, and a group DM’s shows none', async ({ page }) => {
+  const pill = page.locator('[data-topic-header] [data-island="left"] button').first()
+  await open(page, 'TopicHeader', 'presence/dm-main-unknown')
+  await expect(pill.locator('[data-pill-presence]')).toHaveCount(0)
+  const width = (await pill.boundingBox())!.width
+
+  await open(page, 'TopicHeader', 'presence/dm-main-active')
+  await expect(pill.locator('[data-pill-presence="active"]')).toBeVisible()
+  await expect(pill).toHaveAccessibleName('Maya Chen, direct message, active. Show in sidebar.')
+  await expect(pill).toHaveAttribute('title', 'Direct message · Active')
+  // The dot keeps the icon's box: the pill is as wide either way.
+  expect((await pill.boundingBox())!.width).toBe(width)
+
+  await open(page, 'TopicHeader', 'presence/dm-main-away')
+  await expect(pill.locator('[data-pill-presence="away"]')).toBeVisible()
+  await expect(pill).toHaveAccessibleName('Maya Chen, direct message, away. Show in sidebar.')
+
+  await open(page, 'TopicHeader', 'presence/group-dm-ignores')
+  await expect(pill.locator('[data-pill-presence]')).toHaveCount(0)
 })
 
 test('a title cut off by the row shows in full on hover, and one that fits shows no tooltip', async ({ page }) => {

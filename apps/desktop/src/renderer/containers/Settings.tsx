@@ -1,6 +1,6 @@
 import { memo, Suspense, useEffect, useState } from 'react'
 import { prefsGet, prefsSet, MIRROR_READS_PREF, readsCatchUp, type IgnorableChannel, type SendCheckPref, type SettingsSection, type SharingSetting } from '@juno/contract'
-import { tidyUpPrefsAtom, setTidyUpPrefs, aiActivityAtom, copyText, nowAtom, getSharingSetting, setSharingSetting, quietDaysAtom, setQuietDays, sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, homeThoughtsOnAtom, setHomeThoughtsOn, homePicturesOnAtom, setHomePicturesOn, topicTitleLinesAtom, persistTopicTitleLines, type TopicTitleLines, ignorableChannelsAtom, ignoreChannel, ignoredChannelsAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setPeekKey, setTabExpiry, setWebPanelOn, tabExpiryAtom, themeAtom, webPanelOnAtom, type Accent, type Density, type Theme } from '@juno/state'
+import { tidyUpPrefsAtom, setTidyUpPrefs, aiActivityAtom, copyText, nowAtom, getSharingSetting, setSharingSetting, quietDaysAtom, setQuietDays, sendCheckPrefsAtom, aiAvailableAtom, aiAssistOnAtom, setSendCheckPref, liveQuery, runCommand, mirrorReadsAtom, readCatchUpAtom, accentAtom, densityAtom, homeThoughtsOnAtom, setHomeThoughtsOn, homePicturesOnAtom, setHomePicturesOn, setShowPresence, showPresenceAtom, topicTitleLinesAtom, persistTopicTitleLines, type TopicTitleLines, ignorableChannelsAtom, ignoreChannel, ignoredChannelsAtom, peekKeyAtom, stopIgnoring, persistAccent, persistDensity, persistTheme, registry, setPeekKey, setTabExpiry, setWebPanelOn, tabExpiryAtom, themeAtom, webPanelOnAtom, type Accent, type Density, type Theme } from '@juno/state'
 import { junoPageActions, junoSettingsAtom } from '@juno/state/agent'
 import { useAtom, useAtomValue } from '@juno/state/react'
 import { AiActivityPage, IgnoreChannelRow, SettingsAbout, SettingsAppearance, SettingsGeneral, SettingsIgnored, SettingsPage, SettingsTidyUp } from '@juno/views'
@@ -132,7 +132,11 @@ function useSharingSetting(): readonly [SharingSetting, (hide: boolean) => void]
   return [setting, change]
 }
 
-/** Theme, accent and density, saved to main for the next launch's first frame; then the quick reactions. */
+function changeShowPresence(enabled: boolean): void {
+  setShowPresence(registry, enabled)
+}
+
+/** Theme, accent and density, saved to main for the next launch's first frame; then Show who is active in the sidebar and the quick reactions. */
 function Appearance() {
   const [theme, setTheme] = useAtom(themeAtom)
   const [accent, setAccent] = useAtom(accentAtom)
@@ -154,7 +158,8 @@ function Appearance() {
     setDensity(next)
     persistDensity(next)
   }
-  return <SettingsAppearance topicTitleLines={topicTitleLines} onTopicTitleLinesChange={changeTopicTitleLines} theme={theme} accent={accent} density={density} onThemeChange={changeTheme} onAccentChange={changeAccent} onDensityChange={changeDensity} quickReactions={<QuickReactions />} />
+  const showPresence = useAtomValue(showPresenceAtom)
+  return <SettingsAppearance {...(showPresence === undefined ? {} : { sidebarPresence: { showPresence, onShowPresenceChange: changeShowPresence } })} topicTitleLines={topicTitleLines} onTopicTitleLinesChange={changeTopicTitleLines} theme={theme} accent={accent} density={density} onThemeChange={changeTheme} onAccentChange={changeAccent} onDensityChange={changeDensity} quickReactions={<QuickReactions />} />
 }
 
 function Ignored() {

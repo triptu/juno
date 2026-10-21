@@ -1,0 +1,1 @@
+- 10-21 15:32 · others-presence-2 · The presence dot's centre sits on the round photo's edge at 45° (inset 14.645% of the avatar box less half the dot) on DM rows, your title bar avatar and the account menu; the row's dot hung 2.85px outside the edge and lopsided before.
