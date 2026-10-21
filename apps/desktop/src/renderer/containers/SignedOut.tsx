@@ -3,7 +3,7 @@ import { useAtom } from '@juno/state/react'
 import { AppearanceSettings } from '@juno/views'
 import { Session } from './Session'
 
-/** Sign-in and appearance controls, loaded together when the window has no session. */
+/** Sign-in with the appearance controls at its foot, loaded together when the window has no session. */
 export function SignedOut() {
   const [theme, setTheme] = useAtom(themeAtom)
   const [accent, setAccent] = useAtom(accentAtom)
@@ -15,10 +15,5 @@ export function SignedOut() {
     setAccent(next)
     persistAccent(next)
   }
-  return (
-    <>
-      <Session />
-      <AppearanceSettings theme={theme} accent={accent} onThemeChange={changeTheme} onAccentChange={changeAccent} />
-    </>
-  )
+  return <Session signInFooter={<AppearanceSettings layout="bar" theme={theme} accent={accent} onThemeChange={changeTheme} onAccentChange={changeAccent} />} />
 }

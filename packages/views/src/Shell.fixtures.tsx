@@ -100,8 +100,11 @@ export default defineFixtures(
       ),
       'signed-out': scene(() => (
         <Shell>
-          <SignInView mode="first-run" onImport={noop} />
-          <AppearanceSettings theme="light" accent="coral" onThemeChange={noop} onAccentChange={noop} />
+          <SignInView
+            mode="first-run"
+            onImport={noop}
+            footer={<AppearanceSettings layout="bar" theme="light" accent="coral" onThemeChange={noop} onAccentChange={noop} />}
+          />
         </Shell>
       )),
     },
