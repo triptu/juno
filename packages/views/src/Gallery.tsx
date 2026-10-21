@@ -19,14 +19,14 @@ export interface GalleryThoughtView {
   readonly theme: GalleryTheme
 }
 
-/** The quotes' and facts' sections, in order, with their names. */
+/** The quotes' and facts' sections, in order, with their names: what people made and saw first, focus and craft last. */
 export const GALLERY_THEMES: ReadonlyArray<{ readonly theme: GalleryTheme; readonly name: string }> = [
-  { theme: 'focus', name: 'Focus and craft' },
-  { theme: 'thinking', name: 'Thinking deeply' },
-  { theme: 'wonder', name: 'Wonder at the universe' },
-  { theme: 'life', name: 'Life' },
   { theme: 'made', name: 'Things made' },
   { theme: 'art', name: 'Art and beauty' },
+  { theme: 'wonder', name: 'Wonder at the universe' },
+  { theme: 'life', name: 'Life' },
+  { theme: 'thinking', name: 'Thinking deeply' },
+  { theme: 'focus', name: 'Focus and craft' },
 ]
 
 const WORDS: ReadonlyArray<{ readonly words: GalleryWords; readonly name: string }> = [

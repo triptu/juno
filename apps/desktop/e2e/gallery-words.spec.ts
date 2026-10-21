@@ -25,7 +25,9 @@ syncedTest('the gallery lists the quotes with who said them, and the facts apart
   const quoteCount = Number((await pill('Quotes').textContent())!.replace(/\D/g, ''))
   expect(quoteCount).toBeGreaterThan(50)
   await expect(quotes).toHaveCount(quoteCount)
-  await expect(gallery.getByRole('heading', { name: 'Focus and craft' })).toBeVisible()
+  // Quotes have no things made or art: they open on wonder and end on focus and craft.
+  const themes = gallery.locator('section[data-gallery-words] > h2')
+  await expect(themes).toHaveText(['Wonder at the universe', 'Life', 'Thinking deeply', 'Focus and craft'])
   const dillard = quotes.filter({ hasText: 'How we spend our days is, of course, how we spend our lives.' })
   await expect(dillard.locator('blockquote')).toHaveText('How we spend our days is, of course, how we spend our lives.')
   await expect(dillard.locator('p')).toHaveText('Annie Dillard')
@@ -37,7 +39,8 @@ syncedTest('the gallery lists the quotes with who said them, and the facts apart
   await expect(pill('Facts')).toHaveAttribute('aria-pressed', 'true')
   await expect(quotes).toHaveCount(0)
   expect(await facts.count()).toBeGreaterThan(50)
-  await expect(gallery.getByRole('heading', { name: 'Things made' })).toBeVisible()
+  // Things made and art first, then wonder; no fact is about focus and craft.
+  await expect(themes).toHaveText(['Things made', 'Art and beauty', 'Wonder at the universe', 'Life', 'Thinking deeply'])
   const git = facts.filter({ hasText: "Linus Torvalds made Git's first commit" })
   await expect(git.locator('p')).toHaveCount(1)
   await expect(gallery).not.toContainText('Empire State Building, \'History\'')
