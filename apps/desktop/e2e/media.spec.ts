@@ -26,7 +26,7 @@ function naturalSize(win: Page, src: string): Promise<{ width: number; height: n
 }
 
 test('an old card stored before Slack made the thumbnail becomes the picture through file info when its topic opens', async ({ juno, win, fake }) => {
-  fake.addChannel({ id: 'C0PHOTOS', name: 'photos', messages: [{ user: 'U0LEO', text: 'Photos from the offsite go here.', ago: 3 * DAY_MINUTES }] })
+  fake.addChannel({ id: 'C0PHOTOS', name: 'photos', messages: [{ user: 'U0LEO', text: 'Photos from the offsite go here.', ago: DAY_MINUTES }] })
   await juno.signIn()
   await juno.waitForSync()
   const { topic } = juno

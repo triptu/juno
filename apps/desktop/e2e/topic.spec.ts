@@ -330,7 +330,8 @@ async function headerFeedback({ juno, win }: Pick<Fixtures, 'juno' | 'win'>): Pr
     await control.hover()
     await expect.poll(async () => (await look(control)).background, { message: `hover on ${name}` }).not.toBe(rest.background)
     await win.mouse.down()
-    await expect.poll(async () => (await look(control)).scale, { message: `press on ${name}` }).not.toBe(rest.scale)
+    await expect.poll(async () => (await look(control)).background, { message: `press on ${name}` }).not.toBe(rest.background)
+    expect((await look(control)).scale).toBe(rest.scale)
     // Let go away from the control, so the press does nothing.
     await away()
     await win.mouse.up()
