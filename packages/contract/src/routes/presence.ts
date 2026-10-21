@@ -1,21 +1,27 @@
 /**
- * Other people's presence (SPEC 14, "Show when people are active").
+ * Other people's presence (SPEC 7, "Presence in a DM"; SPEC 14, "Show who
+ * is active in the sidebar").
  *
- * - `presence.active` is the user ids Slack shows as active among the people
- *   Juno follows (the DM partners in the sidebar), sorted. It is empty while
- *   the setting is off, while the socket is down and before the first
- *   answer. Presence lives in the engine's memory only.
+ * - `presence.people` is what Slack last said about the people Juno
+ *   follows: the partners of the open 1:1 DMs always, and the partners of
+ *   the recent DMs while the sidebar setting is on. Each list is sorted. A
+ *   followed person in neither list is unknown: before Slack's first
+ *   answer, and while the socket is down. Presence lives in the engine's
+ *   memory only.
  *
- * The setting is the `showPresence` preference (`prefs.get` / `prefs.set`);
- * missing means on.
+ * The sidebar setting is the `showPresence` preference (`prefs.get` /
+ * `prefs.set`); missing means off.
  */
 import { Schema } from 'effect'
 import { RpcGroup } from 'effect/rpc'
 import { liveValueRoute } from '../live'
 
-/** The preference key for Show when people are active. Missing or anything but `false` means on. */
+/** The preference key for Show who is active in the sidebar. Only `true` means on. */
 export const SHOW_PRESENCE_PREF = 'showPresence'
 
-export const presenceActive = liveValueRoute('presence.active', { value: Schema.Array(Schema.String) })
+export const PresencePeople = Schema.Struct({ active: Schema.Array(Schema.String), away: Schema.Array(Schema.String) })
+export type PresencePeople = typeof PresencePeople.Type
 
-export const PresenceRoutes = RpcGroup.make(presenceActive)
+export const presencePeople = liveValueRoute('presence.people', { value: PresencePeople })
+
+export const PresenceRoutes = RpcGroup.make(presencePeople)

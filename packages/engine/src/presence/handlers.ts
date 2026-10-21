@@ -11,7 +11,7 @@ export const PresenceHandlers = PresenceRoutes.toLayer(
     const config = yield* EngineConfig
     const measure = config.e2e || config.dev
     return {
-      'presence.active': () => serveLiveValue(presence.active.pipe(Stream.map((value) => Result.succeed({ value, queryMs: 0 }))), { measure }),
+      'presence.people': () => serveLiveValue(presence.people.pipe(Stream.map((value) => Result.succeed({ value, queryMs: 0 }))), { measure }),
     }
   }),
 )
