@@ -61,7 +61,7 @@ quiet('A caught-up Home shows a picture once it is on disk, opens its story, and
   expect(under!.y).toBeGreaterThan(picture!.y + picture!.height)
   // The picture says Home is caught up: no greeting line and no thought, only the picture, its caption and a heading for screen readers.
   await expect(home.root.getByRole('heading', { name: 'Home' })).toBeAttached()
-  await expect(home.column).toHaveText(`Home${title}${byline}`)
+  await expect(home.column).toHaveText(`${title}${byline}Home`)
 
   // Clicking it opens the picture with its story in the tab.
   await home.picture.getByRole('button', { name: `Open ${title}` }).click()
