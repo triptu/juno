@@ -169,18 +169,6 @@ const mixedSections = [
   { id: 'recent', ids: mixedRecentIds },
 ] as const
 
-/**
- * Mock: more muted previews on read rows, to compare with `mixed`. Each sets
- * the read-preview tokens for both themes; hovered and selected rows fall
- * back to muted. Contrast on the sidebar: docs/design/tokens.md 1.7.
- */
-const quieter = {
-  m1: { '--foreground-preview-read': 'light-dark(#747269, #95938F)' },
-  m2: { '--foreground-preview-read': 'light-dark(#747269, #95938F)', '--text-preview-read-size': '13px', '--text-preview-read-leading': '19.575px' },
-  m3: { '--foreground-preview-read': 'light-dark(#7A786F, #878580)', '--text-preview-read-size': '13px', '--text-preview-read-leading': '19.575px' },
-} as const
-const quieterList = (variant: keyof typeof quieter) => <div style={{ display: 'contents', ...quieter[variant] }}>{full({}, { sections: mixedSections, selected: mixedSelectedId })}</div>
-
 const frame: FixtureFrame = { width: 384, height: 720, padded: false, surface: 'subtle' }
 
 export default defineFixtures(
@@ -199,9 +187,6 @@ export default defineFixtures(
     // A list as people use it, to judge how calm the rows read together.
     Rows: {
       mixed: scene(() => full({}, { sections: mixedSections, selected: mixedSelectedId }), { ...frame, height: 1100 }),
-      'mixed-m1': scene(() => quieterList('m1'), { ...frame, height: 1100 }),
-      'mixed-m2': scene(() => quieterList('m2'), { ...frame, height: 1100 }),
-      'mixed-m3': scene(() => quieterList('m3'), { ...frame, height: 1100 }),
       'mixed-two-line-titles': scene(() => full({}, { sections: mixedSections, selected: mixedSelectedId }), { ...frame, height: 1100, topicTitleLines: 'two' }),
     },
     Views: {

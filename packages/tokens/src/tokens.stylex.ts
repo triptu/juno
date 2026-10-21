@@ -73,7 +73,7 @@ export const colors = stylex.defineVars({
   '--foreground-subtle': 'hsla(48, 8%, 35%, 1)',
   '--foreground-muted': 'hsla(48, 5%, 42%, 1)',
   // An unread sidebar row's preview, the middle of its three text levels
-  // (title, this, meta). A read row's preview is muted, like its meta. It
+  // (title, this, meta). A read row's preview is --foreground-preview-read. It
   // sits between default and muted in both themes; subtle is too close to
   // muted in light to read as its own level.
   '--foreground-secondary': 'hsla(48, 8%, 28%, 1)',
@@ -81,10 +81,11 @@ export const colors = stylex.defineVars({
   // falls under 4.5:1. Dark muted passes there, so it stays muted and keeps
   // its step below the preview.
   '--foreground-muted-on-fill': 'hsla(48, 8%, 35%, 1)',
-  // A read sidebar row's preview while the row is not hovered or selected.
-  // It may sit below muted, since muted must keep 4.5:1 on the selected row
-  // and on popovers; hovered and selected rows fall back to muted.
-  '--foreground-preview-read': 'hsla(48, 5%, 42%, 1)',
+  // A read sidebar row's preview while the row is not hovered or selected,
+  // a shade below muted: 4.58:1 on the sidebar. Hovered and selected rows
+  // fall back to muted, where this would fall under 4.5:1.
+  // Contrast: docs/design/tokens.md 1.7.
+  '--foreground-preview-read': '#747269',
 
   // Ink accent. The default accent theme points --hl at this.
   '--accent-default': 'hsla(48, 30%, 8%, 1)',
@@ -656,10 +657,10 @@ export const text = stylex.defineVars({
   '--text-preview-weight': '400',
   '--text-preview-leading': '1.45',
   '--text-preview-tracking': '0',
-  // A read sidebar row's preview. The leading is the same line box as the
-  // preview's, so a smaller size does not change the row's height.
-  '--text-preview-read-size': '13.5px',
-  '--text-preview-read-leading': '1.45',
+  // A read sidebar row's preview, half a pixel below the preview. The leading
+  // is the preview's line box (13.5px at 1.45), so the row keeps its height.
+  '--text-preview-read-size': '13px',
+  '--text-preview-read-leading': '19.575px',
 
   // Card bodies, reply options, picker rows.
   '--text-body-small-family': fonts['--font-sans'],

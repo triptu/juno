@@ -54,7 +54,7 @@ export const darkColors = stylex.createTheme(colors, {
   '--foreground-muted': '#A09E9A',
   '--foreground-secondary': '#C0BEB8',
   '--foreground-muted-on-fill': '#A09E9A',
-  '--foreground-preview-read': '#A09E9A',
+  '--foreground-preview-read': '#95938F',
 
   '--accent-default': 'hsla(48, 30%, 90%, 1)',
   '--accent-hover': 'hsla(48, 30%, 95%, 1)',
