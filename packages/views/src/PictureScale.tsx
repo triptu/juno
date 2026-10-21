@@ -101,9 +101,10 @@ function DistanceScale({ km, lightYears, note }: { readonly km: number; readonly
   )
 }
 
+const round = (n: number): string => String(Math.round(n * 10) / 10)
+
 /** 7600 as "7,600"; 2.5e6 as "2.5 million"; 6e9 as "6 billion". */
 function amount(value: number): string {
-  const round = (n: number) => String(Math.round(n * 10) / 10)
   if (value >= 1e9) return `${round(value / 1e9)} billion`
   if (value >= 1e6) return `${round(value / 1e6)} million`
   return Math.round(value).toLocaleString('en-GB')

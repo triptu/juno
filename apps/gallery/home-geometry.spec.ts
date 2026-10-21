@@ -62,34 +62,35 @@ test('Home keeps the syncing line under the greeting as its copy changes', async
 })
 
 /**
- * Home's picture (SPEC 12, "A picture"): its caption is two lines, the
- * title and "artist, date", 12px under the picture's box and no wider than
- * it; a long title takes an ellipsis instead of a third line.
+ * Home's picture (SPEC 12, "A picture"): its label is one line, "Title ·
+ * Artist, date", 16px under the picture's box and no wider than it, a long
+ * title taking an ellipsis; the picture's line hangs 10px under the label,
+ * no wider than the box.
  */
-test("Home's picture has a two-line caption under its box, never wider than the box", async ({ page }) => {
-  for (const [state, title, by] of [
-    ['picture/wide', 'Impression, Sunrise', 'Claude Monet, 1872'],
-    ['picture/tall', null, null],
-    ['picture/panorama', 'Cosmic Cliffs in the Carina Nebula', 'James Webb Space Telescope, 2022'],
-    ['picture/long-title', null, 'Utagawa Hiroshige, 1857'],
+test("Home's picture has a one-line label under its box and its line under that, never wider than the box", async ({ page }) => {
+  for (const [state, label] of [
+    ['picture/wide', 'Impression, Sunrise · Claude Monet, 1872'],
+    ['picture/fact', 'The Milkmaid · Johannes Vermeer, c. 1660'],
+    ['picture/tall', null],
+    ['picture/panorama', 'Cosmic Cliffs in the Carina Nebula · James Webb Space Telescope, 2022'],
+    ['picture/long-title', null],
+    ['picture/long-line', null],
   ] as const) {
     await open(page, 'Home', state)
     const caption = page.locator('[data-home-caption]')
-    const lines = caption.locator('p')
-    await expect(lines).toHaveCount(2)
-    if (title !== null) await expect(lines.first()).toHaveText(title)
-    if (by !== null) await expect(lines.last()).toHaveText(by)
+    await expect(caption.locator('p')).toHaveCount(1)
+    if (label !== null) await expect(caption).toHaveText(label)
     const at = await page.locator('[data-home-picture]').evaluate((node) => {
       const box = node.firstElementChild!.getBoundingClientRect()
-      const words = node.querySelector('[data-home-caption]')!
-      const [first, second] = [...words.querySelectorAll('p')].map((line) => line.getBoundingClientRect())
-      return { gap: words.getBoundingClientRect().top - box.bottom, width: words.getBoundingClientRect().width, box: box.width, first: first!.height, second: second!.height, stacked: second!.top >= first!.bottom }
+      const words = node.querySelector('[data-home-caption]')!.getBoundingClientRect()
+      const line = node.querySelector('[data-picture-line]')!.getBoundingClientRect()
+      return { gap: words.top - box.bottom, lineGap: line.top - words.bottom, width: words.width, lineWidth: line.width, box: box.width, label: words.height }
     })
-    expect(at.gap, state).toBe(12)
+    expect(at.gap, state).toBe(16)
+    expect(at.lineGap, state).toBe(10)
     expect(at.width, state).toBeLessThanOrEqual(at.box)
-    expect(at.stacked, state).toBe(true)
-    // One line each: a line's height is its leading, never two.
-    expect(at.first, state).toBeLessThan(24)
-    expect(at.second, state).toBeLessThan(20)
+    expect(at.lineWidth, state).toBeLessThanOrEqual(at.box)
+    // One line: the label's height is its leading, never two.
+    expect(at.label, state).toBeLessThan(20)
   }
 })

@@ -73,8 +73,8 @@ quiet('A caught-up Home shows a picture with its label and line, and opens its p
   const [box, under, words] = await Promise.all([image.boundingBox(), label.boundingBox(), line.boundingBox()])
   expect(under!.y).toBeGreaterThan(box!.y + box!.height)
   expect(words!.y).toBeGreaterThan(under!.y + under!.height - 1)
-  // The picture leads: it takes far more of the page than its words.
-  expect(box!.width * box!.height).toBeGreaterThan(3 * words!.width * words!.height)
+  // The picture leads: even a tall picture with a long line covers more of the page than its label and line together.
+  expect(box!.width * box!.height).toBeGreaterThan(under!.width * under!.height + words!.width * words!.height)
   // The picture says Home is caught up: no greeting line, only the picture, its words and a heading for screen readers.
   await expect(home.root.getByRole('heading', { name: 'Home' })).toBeAttached()
 
@@ -89,7 +89,7 @@ quiet('A caught-up Home shows a picture with its label and line, and opens its p
   await expect(links).toHaveCount(1)
   await expect(links).toHaveText(picture.learnMore.label)
   await expect(links).toHaveAttribute('href', picture.learnMore.url)
-  await expect(page.getByText(picture.credit)).toBeVisible()
+  await expect(page.locator('footer p')).toHaveText(picture.credit)
   await expect(page.locator('[data-picture-scale]')).toHaveCount(picture.scale === undefined ? 0 : 1)
 
   // A picture with its size shows it beside a person; a space image shows how far.
