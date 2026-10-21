@@ -20,7 +20,7 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
    with a literal share ("currentColor 6%") is a raw colour. Runtime parameters are not
    evaluated; review those for token use.
    - Allowed raw values: `0`, `none`, `auto`, `transparent`, `1px` hairlines. Before writing any
-     other number, search `tokens.stylex.ts` for it (focus ring, press scale, disabled opacity and
+     other number, search `tokens.stylex.ts` for it (focus ring, disabled opacity and
      font weights have tokens or are being added). A one-off size that no other component will
      share stays in that component as a named constant (`tokens.md` section 3, spacing); promote
      it to a token on the second use.
@@ -49,9 +49,9 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
    `onFocus`, or use the inset ring for items that fill the scroller edge to edge. A hand-written
    outset ring also sets `scrollMargin: sizes['--focus-ring-room']`. `apps/gallery/focus-ring.spec.ts`
    tabs through the main surfaces and fails on a cut ring.
-6. **Press scale** 0.96 (`--press-scale` when present): `transform: { default: 'none', ':active': 'scale(0.96)', ':disabled': 'none' }`
-   and `pointerEvents: { default: 'auto', ':disabled': 'none' }`. Disabled controls never scale.
-7. **Motion**: at most `motion['--duration-fast']` (150ms) for hover and press feedback. Set
+6. **Buttons stay still on press and toggle.** No scale, translate, spring or transform transition.
+   Hover and press colours change at once. Disabled controls use `pointerEvents: { default: 'auto', ':disabled': 'none' }`.
+7. **Motion**: no transition for button hover and press feedback. Other motion uses the motion tokens. Set
    `transitionDuration: { default: ..., '@media (prefers-reduced-motion: reduce)': '0ms' }`.
 8. **Components do not take `style` or `className`.** Omit them from props (as `ButtonProps` does)
    and expose variants instead. Combine styles with `stylex.props(a, b, cond && c)`; later wins.

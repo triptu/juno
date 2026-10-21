@@ -168,7 +168,7 @@ Rules:
 
 ### 2.3 Rendering and compositing
 
-- Only `transform` and `opacity` are animated. They run on the compositor; everything else forces style, layout or paint on the main thread. Press scale and hover colour are CSS, never JavaScript state.
+- Only `transform` and `opacity` are animated. They run on the compositor; everything else forces style, layout or paint on the main thread. Button hover and press colours are instant CSS; buttons never scale or translate on press.
 - `will-change` is set on an element only for the duration of its animation (menus, toasts, popovers while entering) and removed after. Never on rows, lists or the app shell: each promoted layer costs GPU memory and compositing time.
 - The one standing exception is a text field drawn inside a large layer with blurred shadows. GPU raster redraws whole tiles, so a keystroke in the ⌘K field redrew tiles of the window-sized overlay with the panel's shadow blurs: 21.6 ms of GPU raster over 40 keys against 8.0 ms in the composer (10-15, `JUNO_TRACE_SKIA`). The field's row has `will-change: transform`, so a keystroke redraws a 1116 × 100 px layer; the overlay redraws only when the results change.
 - No `backdrop-filter`, no large blurred `box-shadow` on anything that scrolls. Shadows live on floating surfaces (menus, popovers, toasts, the header islands). The header's band over the message list is a static gradient, never a blur.
@@ -253,6 +253,8 @@ Navigation (sidebar rows, tabs, nav items, filter chips, ⌘K rows, Browse rows,
 - Rows are not draggable, so there is nothing to cancel. Tabs are: as in Safari, a tab activates on mousedown and still drags once the pointer has moved 4px. The drag reads the tabs' places once, then writes only `transform` on the moved tabs once per animation frame, so no tab re-renders and nothing lays out while the pointer moves; the order commits once, on drop (inventory 4, "Reorder").
 - `onClick` still exists for assistive technology, which synthesises `click` with `detail === 0`. A real click (`detail !== 0`) is ignored because `pointerdown` already activated; a touch press waits for its click. This is `activateHandlers` in `packages/ui/src/internal/activate.ts`.
 - Keyboard activation is on `keydown` of Enter or Space (Space on `keyup` for `role="button"`, to match native buttons, but navigation rows use `keydown` for Enter). A held key's auto-repeat (`event.repeat`) does not activate again.
+
+Menu and popover buttons use `menuTriggerHandlers` in `@juno/ui`: primary mouse `pointerdown` opens or toggles them, ignoring ctrl-click and the following mouse click. Enter, Space, ↓, assistive clicks and touch clicks still work. Preventing the mouse-down default keeps focus inside the newly opened panel. Custom popovers do not select an item on the opening press's release; native menus keep the system's drag selection.
 
 ### 4.2 Prefetch
 
@@ -725,7 +727,7 @@ The perf scenario `first open in a second app` signs in once, closes that
 app, then measures the four first opens in a fresh renderer, each against
 50 ms. It observes actual content on the first presented frame, not the
 empty popover wrapper. Account, the switcher and emoji start at `click`,
-their activating event; Settings starts at `pointerdown`. This excludes
+their activating event, `pointerdown`. This excludes
 the driver's deliberate 60 ms mouse hold from click-activated controls.
 The `launch warm start` scenario also reports process creation to the
 first painted, focused New chat composer (`juno.composer-ready`).

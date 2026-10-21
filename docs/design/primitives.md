@@ -5,7 +5,8 @@ The dumb, reusable primitives in `packages/ui`, derived from the repeated patter
 Shared conventions for every primitive (details in `packages/ui/README.md`):
 
 - No `cursor: pointer`. Hover styles only under `@media (hover: hover)`.
-- Press feedback `scale(0.96)` at 150ms `--ease-out`, suppressed when disabled. Entrances (toast, popover, empty state) are 240ms, pops (a toggle filling, a reaction landing) 220ms with the spring; everything collapses under reduced motion through the tokens (`tokens.md` §8).
+- Buttons stay still on press and toggle, with instant hover and pressed colours. No scale, translate, spring or transform transition. Toast and empty-state entrances use `--duration-appear`; menus and popovers never animate. Other motion collapses under reduced motion through the tokens (`tokens.md` §8).
+- Menu and popover triggers open on primary mouse `pointerdown` through `menuTriggerHandlers` in `@juno/ui`; a second press toggles closed. The following click is ignored. Keyboard Enter/Space/↓ and assistive clicks still open; ctrl-click and right-click retain their context-menu behaviour. Custom popovers require a separate press to select; native menus keep system drag selection.
 - A control that opens a menu or popover (`aria-expanded`) draws its hover fill while it is open, and its press draws that fill too, so hover, press and open are one colour and opening changes nothing. `Button` and `IconButton` take `expanded`, `AvatarButton` takes `open`; views that draw their own trigger (the header title, Home's pickers) follow the same rule. A toggle (`pressed`) is a state of its own and keeps its own fill; a trigger is not also a toggle. Each set's `Open` fixture group holds `<name>-hover`, `-press`, `-open` and `-open-hover`, and `apps/gallery/trigger-open.spec.ts` checks the four fills match in light and dark (decided 10-17).
 - Icons are Phosphor: bold at 14px and below, regular at 15 and above, `fill` for an active or selected state, duotone only for the deliberate friendly spots (Juno nav item, AI sparkles, card kinds, illustrations), through the icons in `packages/ui/src/duotone.ts`.
 - Visible focus ring (`--focus-ring`, 2px) only on `:focus-visible`. It must show whole: a box that clips (overflow other than visible, or paint containment) gives the controls at its edge `ringRoom` (`--focus-ring-room` of padding taken back by a negative margin; a fixed size adds the room), and a scroller passes `revealFocus` as its `onFocus` so a control half under its edge scrolls in whole when it takes keyboard focus (`PillRow`, `TabStrip`, `ScrollArea` and `Page` do). Items that fill a scroller edge to edge take the inset ring instead. A scroller that is not a Tab stop of its own (its rows are driven from a field) sets `tabIndex={-1}`, since Chromium makes a scroller with no focusable children a Tab stop.
@@ -37,7 +38,7 @@ One component for every clickable control with a label. Radius, text size and ic
 | `pressed` | boolean | Toggle state (Pin, filters); sets `aria-pressed` |
 | `expanded` | boolean | Its menu or popover is showing; sets `aria-expanded` and holds the variant's hover fill (Show why) |
 | `dimmed` | boolean | opacity .4, still focusable, `aria-disabled` (Send with empty draft) |
-| `disabled` | boolean | Same look as dimmed; no press scale |
+| `disabled` | boolean | Same look as dimmed; no pointer events |
 
 Covers: quick filters, status chips, Resolve (row and header), Not yet, Discard/Send, card actions, suggestion chips, Stop ignoring, Add, Ignore, Mark read, Undo. Sidebar nav items are `NavItem`.
 
@@ -58,7 +59,7 @@ Button with only an icon. `label` is required and doubles as the tooltip (`noToo
 | `variant` | `ghost` (default), `secondary`, `primary` (send), `raised`, `island` (a page header island's control: hover and open `--secondary-default`, pressed toggle `--secondary-hover`) |
 | `tone` | `subtle` (default), `muted`, `default` for ghost |
 | `icon`, `iconSize`, `iconWeight`, `dimmed` | as Button. Icon 12 / 12 / 13 / 18 / 18 / 18 / 20 by size; the send arrow passes `iconWeight="bold"`, attach `iconSize={20}` |
-| `pressed` | Toggle state (subscribe, pin): `aria-pressed` and the filled icon. Both icons stay in the DOM; the fill scales 0.8 → 1 with the spring over `--duration-pop` and cross-fades in, off just cross-fades over `--duration-fast` |
+| `pressed` | Toggle state (subscribe, pin): `aria-pressed` and the filled icon. Both icons stay in the DOM and swap at once, with no motion |
 | `expanded` | Its menu or popover is showing (⋯, the quick reactions +, About): `aria-expanded` and the variant's hover fill held still, ghost `--surface-hover`, island `--secondary-default`, secondary `--secondary-hover` |
 | `current` | The button opens a page and that page is the current tab: `aria-current="page"`, the filled icon, and an active NavItem's `--hl-nav` fill and `--hl-text` colour (the sidebar title bar's All topics and Home) |
 
@@ -93,7 +94,7 @@ Small inline label. Replaces tags, count badges, status chips, decision chips, s
 | `icon`, `iconSize` | 12–13, bold | sparkle in the confidence badge |
 | `numeric` | boolean | tabular figures |
 | `onRemove`, `removeLabel` | | Adds a 20×20 close IconButton (12px bold X) |
-| `interactive`, `pressed`, `pop` | | Renders a toggle `button` (reaction chips: 1px `--border-default`, pressed = `--hl-soft` + `--hl-ring` border and the count in `--foreground-default`). `pop` plays the spring once (1 → 1.12 → 1 over `--duration-pop`); set it only when the toggle was the user's own action |
+| `interactive`, `pressed` | | Renders a toggle `button` (reaction chips: 1px `--border-default`, pressed = `--hl-soft` + `--hl-ring` border and the count in `--foreground-default`); toggling changes colour at once without motion |
 | `title` | tooltip | |
 
 ## 6. ContextPill
