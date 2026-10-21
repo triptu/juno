@@ -81,6 +81,10 @@ export const colors = stylex.defineVars({
   // falls under 4.5:1. Dark muted passes there, so it stays muted and keeps
   // its step below the preview.
   '--foreground-muted-on-fill': 'hsla(48, 8%, 35%, 1)',
+  // A read sidebar row's preview while the row is not hovered or selected.
+  // It may sit below muted, since muted must keep 4.5:1 on the selected row
+  // and on popovers; hovered and selected rows fall back to muted.
+  '--foreground-preview-read': 'hsla(48, 5%, 42%, 1)',
 
   // Ink accent. The default accent theme points --hl at this.
   '--accent-default': 'hsla(48, 30%, 8%, 1)',
@@ -652,6 +656,10 @@ export const text = stylex.defineVars({
   '--text-preview-weight': '400',
   '--text-preview-leading': '1.45',
   '--text-preview-tracking': '0',
+  // A read sidebar row's preview. The leading is the same line box as the
+  // preview's, so a smaller size does not change the row's height.
+  '--text-preview-read-size': '13.5px',
+  '--text-preview-read-leading': '1.45',
 
   // Card bodies, reply options, picker rows.
   '--text-body-small-family': fonts['--font-sans'],

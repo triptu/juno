@@ -5,7 +5,7 @@ import { CheckCircle } from '@phosphor-icons/react/dist/icons/CheckCircle'
 import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
 import { memo, useId, type FocusEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
 import type { TopicRow as TopicRowModel } from '@juno/contract'
-import { colors, density, opacity, radii, sizes, spacing, tints } from '@juno/tokens/tokens.stylex'
+import { colors, density, opacity, radii, sizes, spacing, text, tints } from '@juno/tokens/tokens.stylex'
 import {
   activateHandlers,
   Avatar,
@@ -165,7 +165,7 @@ export const TopicRow = memo(function TopicRow({
   // count, all at the line's end. Nothing is kept for any of them when
   // absent: the preview takes the space.
   const line2 = (
-    <span {...stylex.props(styles.line2, twoLine && resolvable && styles.underMask)}>
+    <span {...stylex.props(styles.line2, !unread && styles.readLine2, twoLine && resolvable && styles.underMask)}>
       {/* The message sets the direction; the sender is isolated so a Latin
           name before Arabic text, or the reverse, keeps its own order. */}
       <Text variant="preview" tone={unread && !quiet ? 'secondary' : 'muted'} truncate as="span" dir="auto" id={previewId} data-sensitive="" data-row-part="preview" sx={styles.preview}>
@@ -407,6 +407,12 @@ const styles = stylex.create({
       ':focus-visible': '1',
       ':has(:focus-visible)': '1',
     },
+    // A read row's preview: its own colour at rest, muted on hover, where the
+    // lower colour would fall under 4.5:1. The selected row sets it again.
+    '--row-read-preview': {
+      default: colors['--foreground-preview-read'],
+      ':hover': { default: null, [HOVER]: colors['--foreground-muted'] },
+    },
     // While Resolve shows over the end of the last line, what reaches it
     // (the place, or a two-line row's preview and counts) fades out under it
     // instead of running beneath the button.
@@ -431,6 +437,7 @@ const styles = stylex.create({
       ':hover': { default: null, [HOVER]: colors['--secondary-default'] },
     },
     '--foreground-muted': colors['--foreground-muted-on-fill'],
+    '--row-read-preview': colors['--foreground-muted-on-fill'],
   },
   tile: {
     display: 'inline-flex',
@@ -508,6 +515,13 @@ const styles = stylex.create({
     alignItems: 'flex-start',
     gap: spacing['--space-2'],
     minWidth: 0,
+  },
+  // A read row's preview takes its own colour and size; the trail's chips
+  // set their own colours.
+  readLine2: {
+    '--foreground-muted': 'var(--row-read-preview)',
+    '--text-preview-size': text['--text-preview-read-size'],
+    '--text-preview-leading': text['--text-preview-read-leading'],
   },
   // The last line of a two-line row, which Resolve overlays.
   line2Last: {
