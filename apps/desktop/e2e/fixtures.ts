@@ -30,7 +30,7 @@ export interface LaunchOptions {
   readonly developmentNotifications?: boolean
   /** Engine scheduling profile. Timing, perf, feel and @mac checks retain production defaults. */
   readonly timing?: 'fast' | 'production'
-  /** The fake Slack the app signs in against (sign-in window, socket allow-list). */
+  /** The fake Slack the app signs in against (API and socket allow-list). */
   readonly fakeSlackUrl?: string
   /** A fixture Slack-app directory for "Use the Slack app's session". */
   readonly slackAppDir?: string

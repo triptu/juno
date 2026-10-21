@@ -5,7 +5,7 @@ import { once } from 'node:events'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve, join } from 'node:path'
-import { startFakeSlack } from '@juno/fake-slack'
+import { startFakeSlack, writeSlackAppFixture } from '@juno/fake-slack'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 
 test('packaged app signs in and starts both utility processes @mac', async () => {
@@ -31,7 +31,16 @@ test('packaged app signs in and starts both utility processes @mac', async () =>
   const userData = await mkdtemp(join(tmpdir(), 'juno-package-'))
   const fake = await startFakeSlack()
   const model = await startFakeOpenRouter()
+  const slackAppDir = join(userData, 'slack-app')
+  const keychainPassword = 'juno-fake-packaged-keychain'
+  const credentials = fake.signIn()
+  await writeSlackAppFixture(slackAppDir, {
+    team: { id: fake.teamId, name: 'Juno Fake', domain: 'juno-fake', url: `${fake.url}/`, token: credentials.token, userId: credentials.userId },
+    cookie: credentials.cookie,
+    keychainPassword,
+  })
   const env: NodeJS.ProcessEnv = { ...process.env, JUNO_E2E: '1', JUNO_USER_DATA: userData, JUNO_FAKE_SLACK_URL: fake.url,
+    JUNO_SLACK_APP_DIR: slackAppDir, JUNO_SLACK_SAFE_STORAGE_PASSWORD: keychainPassword,
     JUNO_E2E_OPENROUTER_KEY: 'sk-or-v1-e2e-packaging-0123456789abcdef', JUNO_FAKE_OPENROUTER_URL: model.origin,
     // The agent runs one script at start and writes the result: the QuickJS worker and binary load from the asar.
     JUNO_AGENT_CODEMODE: '1',
@@ -64,13 +73,8 @@ test('packaged app signs in and starts both utility processes @mac', async () =>
           const page = context.pages().find((candidate) => candidate.url().startsWith('juno://'))
           if (!page) throw new Error('Packaged app did not open its main window')
           if (pass === 0) {
-            await expect(page.getByRole('button', { name: 'Sign in to Slack', exact: true })).toBeVisible()
-            const opened = context.waitForEvent('page')
-            await page.getByRole('button', { name: 'Sign in to Slack', exact: true }).click()
-            const signIn = await opened
-            await signIn.getByPlaceholder('Email').fill('tushar@juno-fake.test')
-            await signIn.getByPlaceholder('Password').fill('password')
-            await signIn.getByRole('button', { name: 'Sign in', exact: true }).click()
+            await expect(page.getByRole('button', { name: "Use the Slack app's session", exact: true })).toBeVisible()
+            await page.getByRole('button', { name: "Use the Slack app's session", exact: true }).click()
           }
           await expect(page.getByRole('complementary', { name: 'Sidebar' }).getByRole('listitem').first()).toBeVisible({ timeout: 20_000 })
           if (pass > 0) {

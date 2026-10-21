@@ -37,7 +37,7 @@ async function shellFontsAndColours(win: Page): Promise<void> {
   const title = win.getByRole('heading', { name: "Hi, I'm Juno", level: 1, exact: true })
   await expect(title).toBeVisible()
 
-  const button = win.getByRole('button', { name: 'Sign in to Slack' })
+  const button = win.getByRole('button', { name: "Use the Slack app's session" })
   await expect(button).toBeVisible()
 
   // Fonts come from @fontsource, not the system or the network.
@@ -237,7 +237,7 @@ async function buildLine(juno: Juno): Promise<void> {
 test('a second launch on the same data hands over to the open window', async ({ app: electronApp, win, userData }, testInfo) => {
   // Two process launches can take longer on the shared Mac.
   test.slow()
-  await expect(win.getByRole('button', { name: 'Sign in to Slack' })).toBeVisible()
+  await expect(win.getByRole('button', { name: "Use the Slack app's session" })).toBeVisible()
   const launch = await electronApp.evaluate(({ app }) => ({ executable: process.execPath, path: app.getAppPath(), userData: app.getPath('userData') }))
   expect(launch.userData).toBe(userData)
   const handover = await electronApp.evaluateHandle(({ app }) => {
@@ -264,7 +264,7 @@ test('a second launch on the same data hands over to the open window', async ({ 
   await expect.poll(() => handover.evaluate((received) => received.count)).toBe(1)
   await expect.poll(() => mainWindow.evaluate((window) => window.isMinimized())).toBe(false)
   expect(await electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1)
-  await expect(win.getByRole('button', { name: 'Sign in to Slack' })).toBeVisible()
+  await expect(win.getByRole('button', { name: "Use the Slack app's session" })).toBeVisible()
 })
 
 test('a window saved on a display that is gone opens on screen', async ({ running, userData }) => {

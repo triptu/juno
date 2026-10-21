@@ -165,7 +165,7 @@ export class Session extends Context.Service<
         })
 
       /** Sends `request` and waits for main's `secrets` or `sessionFailed` answer. */
-      const askHost = (request: 'requestSecrets' | 'signIn' | 'importFromSlackApp') =>
+      const askHost = (request: 'requestSecrets' | 'importFromSlackApp') =>
         Effect.scoped(
           Effect.gen(function* () {
             const messages = yield* host.messages
@@ -204,7 +204,7 @@ export class Session extends Context.Service<
           if (before._tag === 'signingIn') return yield* new SignInFailed({ kind: 'other', message: 'A sign-in is already in progress.' })
           const restore = setStatus(before)
           yield* setStatus({ _tag: 'signingIn', method })
-          const answer = yield* askHost(method === 'window' ? 'signIn' : 'importFromSlackApp')
+          const answer = yield* askHost('importFromSlackApp')
           if (answer === undefined) {
             yield* restore
             return yield* new SignInFailed({ kind: 'other', message: 'The app closed before the sign-in finished.' })
