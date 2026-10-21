@@ -1,26 +1,28 @@
 import * as stylex from '@stylexjs/stylex'
+import { ArrowUpRight } from '@phosphor-icons/react/dist/icons/ArrowUpRight'
 import { CaretLeft } from '@phosphor-icons/react/dist/icons/CaretLeft'
 import { CaretRight } from '@phosphor-icons/react/dist/icons/CaretRight'
 import { ImageSquare } from '@phosphor-icons/react/dist/icons/ImageSquare'
 import { useId, type MouseEvent } from 'react'
 import { accent, colors, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
-import { activateHandlers, Button, IconButton, Text, type ActivateEvent } from '@juno/ui'
+import { activateHandlers, Button, Icon, IconButton, Text, type ActivateEvent } from '@juno/ui'
 import { PictureImage, type PictureCardView } from './PictureImage'
+import type { PictureLineView } from './PictureLine'
+import { PictureScale, type PictureScaleView } from './PictureScale'
 
-/** One fact of a picture's story. */
-export interface PictureFactView {
-  readonly text: string
-}
-
-/** A picture with its story (`@juno/pictures`'s `Picture` has these fields). */
+/** A picture with its words (`@juno/pictures`'s `Picture` has these fields). */
 export interface PictureStoryView extends PictureCardView {
   readonly culture?: string
   readonly medium: string
   readonly place: string
+  /** What the picture shows, for screen readers. */
   readonly caption: string
-  readonly facts: ReadonlyArray<PictureFactView>
+  readonly line: PictureLineView & { readonly context?: string }
+  readonly about: string
+  /** The one page to read more, labelled with the institution. */
+  readonly learnMore: { readonly label: string; readonly url: string }
+  readonly scale?: PictureScaleView
   readonly credit: string
-  readonly sourceUrl: string
 }
 
 export interface PicturePageProps {
@@ -31,16 +33,19 @@ export interface PicturePageProps {
   readonly onAllPictures: (event: ActivateEvent) => void
   /** The previous or next picture in the gallery's order. */
   readonly onStep: (step: -1 | 1) => void
-  /** The picture credit's source page, opened in the browser. */
+  /** The page to read more, opened in the browser. */
   readonly onOpenLink: (url: string) => void
 }
 
 /**
  * The picture page (SPEC 12, "Pictures and the gallery"): the picture as
- * large as the page allows, and beside it a column like a museum label:
- * the title, the artist, the date and medium, where it is, a caption, the
- * facts and the credit. Below about 900px of
- * width the label goes under the picture and the page scrolls.
+ * large as the page allows, whole, and beside it a column like a museum
+ * wall text: the title, the artist, the date and medium, where it is; the
+ * picture's line, larger, with who said it and when; a short paragraph
+ * about it; how big or how far, where that is known; and at the foot one
+ * link to read more, labelled with the institution, over the credit.
+ * Below about 900px of width the label goes under the picture and the page
+ * scrolls.
  */
 export function PicturePage({ picture, src, onAllPictures, onStep, onOpenLink }: PicturePageProps) {
   const titleId = useId()
@@ -62,7 +67,7 @@ export function PicturePage({ picture, src, onAllPictures, onStep, onOpenLink }:
         </div>
         <div {...stylex.props(styles.wall)}>
           <div {...stylex.props(styles.frame, styles.fit(picture.ratio))}>
-            <PictureImage src={src} ratio={picture.ratio} />
+            <PictureImage src={src} ratio={picture.ratio} alt={picture.caption} />
           </div>
         </div>
         <div {...stylex.props(styles.label)}>
@@ -78,20 +83,25 @@ export function PicturePage({ picture, src, onAllPictures, onStep, onOpenLink }:
           <Text variant="meta" tone="muted" as="p" selectable sx={styles.meta}>
             {picture.place}
           </Text>
-          <p {...stylex.props(styles.caption)}>{picture.caption}</p>
-          <ul {...stylex.props(styles.facts)}>
-            {picture.facts.map((fact) => (
-              <li key={fact.text} {...stylex.props(styles.fact)}>
-                {fact.text}
-              </li>
-            ))}
-          </ul>
+          <blockquote data-picture-page-line="" {...stylex.props(styles.lead)}>
+            {picture.line.by === undefined ? picture.line.text : `“${picture.line.text}”`}
+          </blockquote>
+          {picture.line.by === undefined && picture.line.context === undefined ? null : (
+            <Text variant="meta" tone="muted" as="p" selectable sx={styles.said}>
+              {[picture.line.by, picture.line.context].filter((part) => part !== undefined).join(', ')}
+            </Text>
+          )}
+          <Text variant="body" tone="secondary" as="p" selectable sx={styles.about}>
+            {picture.about}
+          </Text>
+          {picture.scale === undefined ? null : <PictureScale scale={picture.scale} src={src} />}
           <footer {...stylex.props(styles.foot)}>
+            <a data-picture-learn-more="" href={picture.learnMore.url} onClick={link(picture.learnMore.url)} {...stylex.props(styles.link)}>
+              {picture.learnMore.label}
+              <Icon icon={ArrowUpRight} size={12} />
+            </a>
             <Text variant="meta" tone="muted" as="p" selectable sx={styles.meta}>
-              {picture.credit} ·{' '}
-              <a href={picture.sourceUrl} onClick={link(picture.sourceUrl)} {...stylex.props(styles.link)}>
-                Source
-              </a>
+              {picture.credit}
             </Text>
           </footer>
         </div>
@@ -160,41 +170,38 @@ const styles = stylex.create({
   title: { margin: 0 },
   artist: { margin: 0, marginTop: spacing['--space-2-5'] },
   meta: { margin: 0, marginTop: spacing['--space-0-5'] },
-  caption: {
+  // The line leads the words: the serif at 24.
+  lead: {
     margin: 0,
     marginTop: spacing['--space-6'],
-    fontFamily: text['--text-thought-family'],
-    fontSize: text['--text-thought-size'],
-    lineHeight: text['--text-thought-leading'],
+    fontFamily: text['--text-picture-line-family'],
+    fontSize: text['--text-picture-lead-size'],
+    fontWeight: text['--text-picture-line-weight'],
+    lineHeight: text['--text-picture-lead-leading'],
     color: colors['--foreground-default'],
+    textWrap: 'pretty',
     userSelect: 'text',
   },
-  facts: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing['--space-3'],
-    margin: 0,
-    marginTop: spacing['--space-4'],
-    paddingInlineStart: spacing['--space-4'],
-    fontFamily: text['--text-body-family'],
-    fontSize: text['--text-body-size'],
-    lineHeight: text['--text-body-leading'],
-    color: colors['--foreground-secondary'],
-    userSelect: 'text',
-  },
-  fact: { '::marker': { color: colors['--foreground-muted'] } },
+  said: { margin: 0, marginTop: spacing['--space-2'] },
+  about: { margin: 0, marginTop: spacing['--space-4'] },
   foot: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'flex-start',
-    gap: spacing['--space-1'],
+    gap: spacing['--space-0-5'],
     marginTop: 'auto',
     paddingTop: spacing['--space-6'],
   },
+  // A link that opens outside the app: the pointer cursor, as a link in a message has (CLAUDE.md).
   link: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: spacing['--space-1'],
+    fontFamily: text['--text-ui-family'],
+    fontSize: text['--text-ui-size'],
+    lineHeight: text['--text-ui-leading'],
     color: accent['--hl-text'],
     textDecoration: { default: 'none', ':hover': 'underline' },
-    cursor: 'default',
     outlineStyle: { default: 'none', ':focus-visible': 'solid' },
     outlineWidth: sizes['--focus-ring-width'],
     outlineColor: accent['--focus-ring'],

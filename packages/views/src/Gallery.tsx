@@ -1,41 +1,21 @@
 import * as stylex from '@stylexjs/stylex'
-import { Fragment, useEffect, useLayoutEffect, useRef } from 'react'
-import { accent, colors, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
-import { activateHandlers, Button, FilterPill, PillRow, Text, type ActivateEvent } from '@juno/ui'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { accent, colors, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { activateHandlers, Button, FilterPill, PillRow, Segmented, Text, type ActivateEvent } from '@juno/ui'
 import { PictureImage, pictureLift, type PictureCardView } from './PictureImage'
+import { PictureLine, type PictureLineView } from './PictureLine'
 
 export type GalleryKind = PictureCardView['kind']
-/** The quotes, or the facts: words to read, after the pictures. */
-export type GalleryWords = 'quotes' | 'facts'
-/** All is every picture; the quotes and the facts have a pill each. */
-export type GalleryFilter = 'all' | GalleryKind | GalleryWords
+/** All is every picture; each kind has a pill. */
+export type GalleryFilter = 'all' | GalleryKind
+/** By kind: pictures in columns with their words, in sections by kind. By time: in rows, in sections by century. */
+export type GalleryOrder = 'kind' | 'time'
 
-export type GalleryTheme = 'focus' | 'thinking' | 'wonder' | 'life' | 'made' | 'art'
-
-/** A quote (with who said it) or a fact (without). Its source is never shown (SPEC 12). */
-export interface GalleryThoughtView {
-  readonly text: string
-  readonly by?: string
-  readonly theme: GalleryTheme
+/** A picture on the gallery's wall: its card, its line, and the year its date gives. */
+export interface GalleryPictureView extends PictureCardView {
+  readonly line: PictureLineView
+  readonly year: number
 }
-
-/** The quotes' and facts' sections, in order, with their names: what people made and saw first, focus and craft last. */
-export const GALLERY_THEMES: ReadonlyArray<{ readonly theme: GalleryTheme; readonly name: string }> = [
-  { theme: 'made', name: 'Things made' },
-  { theme: 'art', name: 'Art and beauty' },
-  { theme: 'wonder', name: 'Wonder at the universe' },
-  { theme: 'life', name: 'Life' },
-  { theme: 'thinking', name: 'Thinking deeply' },
-  { theme: 'focus', name: 'Focus and craft' },
-]
-
-const WORDS: ReadonlyArray<{ readonly words: GalleryWords; readonly name: string }> = [
-  { words: 'quotes', name: 'Quotes' },
-  { words: 'facts', name: 'Facts' },
-]
-
-const isQuote = (thought: GalleryThoughtView) => thought.by !== undefined
-const wordsOf = (thoughts: ReadonlyArray<GalleryThoughtView>, words: GalleryWords) => thoughts.filter((thought) => isQuote(thought) === (words === 'quotes'))
 
 /** The gallery's sections, in order, with their names. */
 export const GALLERY_SECTIONS: ReadonlyArray<{ readonly kind: GalleryKind; readonly name: string }> = [
@@ -45,17 +25,22 @@ export const GALLERY_SECTIONS: ReadonlyArray<{ readonly kind: GalleryKind; reado
   { kind: 'space', name: 'Space' },
 ]
 
+const ORDERS = [
+  { value: 'kind', label: 'By kind' },
+  { value: 'time', label: 'By time' },
+] as const
+
 export interface GalleryProps {
   /** Every picture, in the catalog's order. */
-  readonly pictures: ReadonlyArray<PictureCardView>
-  /** Every quote and fact, in the list's order. */
-  readonly thoughts: ReadonlyArray<GalleryThoughtView>
+  readonly pictures: ReadonlyArray<GalleryPictureView>
   /** The small file of each picture on this Mac, by id; a picture without one shows its box in the secondary fill. */
   readonly sources: Readonly<Record<string, string>>
   /** The picture Home showed last: a thin ring. */
   readonly current?: string
   readonly filter: GalleryFilter
   readonly onFilter: (filter: GalleryFilter) => void
+  readonly order: GalleryOrder
+  readonly onOrder: (order: GalleryOrder) => void
   /** Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onOpen: (id: string, event: ActivateEvent) => void
   /** A picture without its file came near the screen: download it. */
@@ -68,28 +53,29 @@ export interface GalleryProps {
 /** How far below the screen a picture starts downloading. */
 const NEAR_MARGIN = '600px' // tokens-allow: an observer margin, not a layout length
 
+/** The century a year falls in, as its heading says it: 1872 is "1800s", 937 is "900s". */
+const centuryOf = (year: number): number => Math.floor(year / 100) * 100
+
 /**
- * The gallery (SPEC 12, "Pictures and the gallery"): every picture in
- * sections by kind, in rows of one height with each picture at its own
- * shape, and its title and "artist, date" under it. A picture without its
- * file keeps its box, so the rows never move when one lands. The Quotes and
- * Facts pills show the words instead, in sections by theme.
+ * The gallery (SPEC 12, "Pictures and the gallery"). By kind: every picture
+ * in sections by kind, in columns that share the page's width, each picture
+ * at its own shape with its label and its line under it. By time: sections
+ * by century, oldest first, in rows of one height with the date under each.
+ * A picture without its file keeps its box, so nothing moves when one lands.
  */
-export function Gallery({ pictures, thoughts, sources, current, filter, onFilter, onOpen, onNear, scrollTop, onScroll }: GalleryProps) {
+export function Gallery({ pictures, sources, current, filter, onFilter, order, onOrder, onOpen, onNear, scrollTop, onScroll }: GalleryProps) {
   const scroller = useRef<HTMLDivElement>(null)
   const near = useRef(onNear)
   near.current = onNear
-  const words = filter === 'quotes' || filter === 'facts' ? filter : undefined
-  const sections = GALLERY_SECTIONS.filter((section) => words === undefined && (filter === 'all' || section.kind === filter)).map((section) => ({
-    ...section,
-    pictures: pictures.filter((picture) => picture.kind === section.kind),
-  }))
+  const shown = filter === 'all' ? pictures : pictures.filter((picture) => picture.kind === filter)
+  const columns = useColumns(scroller)
 
   useLayoutEffect(() => {
+    if (columns === undefined) return
     if (scrollTop !== undefined && scroller.current !== null) scroller.current.scrollTop = scrollTop
-    // Only where the page was when it opened.
+    // Only where the page was when it opened, once its columns are laid out.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [columns === undefined])
 
   // One observer for the page: a picture without its file asks for it once it is near the screen.
   useEffect(() => {
@@ -108,10 +94,10 @@ export function Gallery({ pictures, thoughts, sources, current, filter, onFilter
     )
     for (const tile of root.querySelectorAll<HTMLElement>('[data-gallery-picture][data-gallery-missing]')) observer.observe(tile)
     return () => observer.disconnect()
-  }, [filter, sources])
+  }, [filter, order, columns, sources])
 
   return (
-    <div ref={scroller} data-gallery="" onScroll={onScroll === undefined ? undefined : (event) => onScroll(event.currentTarget.scrollTop)} {...stylex.props(styles.scroll)}>
+    <div ref={scroller} data-gallery="" data-gallery-order={order} onScroll={onScroll === undefined ? undefined : (event) => onScroll(event.currentTarget.scrollTop)} {...stylex.props(styles.scroll)}>
       <div {...stylex.props(styles.page)}>
         <Text variant="pageTitle" tone="default" as="h1">
           Gallery
@@ -119,125 +105,180 @@ export function Gallery({ pictures, thoughts, sources, current, filter, onFilter
         <Text variant="body" tone="subtle" as="p" sx={styles.lead}>
           A thousand years of paintings, prints and studies of nature, and pictures of space that make them look recent.
         </Text>
-        <GalleryPills pictures={pictures} thoughts={thoughts} filter={filter} onFilter={onFilter} />
-        {words === undefined ? null : <GalleryWordList thoughts={wordsOf(thoughts, words)} words={words} />}
-        {sections.map((section) =>
-          section.pictures.length === 0 ? null : (
-            <section key={section.kind} aria-label={section.name} {...stylex.props(styles.section)}>
-              {filter === 'all' ? (
-                <Text variant="sectionLabel" tone="muted" as="h2" sx={styles.heading}>
-                  {section.name}
-                </Text>
-              ) : null}
-              <ul {...stylex.props(styles.row)}>
-                {section.pictures.map((picture) => (
-                  <GalleryTile key={picture.id} picture={picture} src={sources[picture.id]} current={picture.id === current} onOpen={onOpen} />
-                ))}
-              </ul>
-            </section>
-          ),
-        )}
+        <div {...stylex.props(styles.bar)}>
+          <GalleryPills pictures={pictures} filter={filter} onFilter={onFilter} />
+          <Segmented label="Order" value={order} options={ORDERS} onChange={onOrder} />
+        </div>
+        <div data-gallery-wall="" {...stylex.props(styles.wall)}>
+          {columns === undefined ? null : order === 'kind' ? (
+            <ByKind pictures={shown} columns={columns} sources={sources} current={current} titled={filter === 'all'} onOpen={onOpen} />
+          ) : (
+            <ByTime pictures={shown} sources={sources} current={current} onOpen={onOpen} />
+          )}
+        </div>
       </div>
     </div>
   )
 }
 
-/** All, then each kind, with its count; then, a step apart, Quotes and Facts. */
-function GalleryPills({ pictures, thoughts, filter, onFilter }: Pick<GalleryProps, 'pictures' | 'thoughts' | 'filter' | 'onFilter'>) {
-  const pills: ReadonlyArray<{ readonly filter: GalleryFilter; readonly name: string; readonly count: number }> = [
-    { filter: 'all', name: 'All', count: pictures.length },
-    ...GALLERY_SECTIONS.map((section) => ({ filter: section.kind, name: section.name, count: pictures.filter((picture) => picture.kind === section.kind).length })),
-    ...WORDS.map((entry) => ({ filter: entry.words, name: entry.name, count: wordsOf(thoughts, entry.words).length })),
-  ]
-  return (
-    <div {...stylex.props(styles.pills)}>
-      <PillRow aria-label="Show">
-        {pills.map((pill) => (
-          <Fragment key={pill.filter}>
-            {/* The words are not pictures: a step of room sets them apart from All and the kinds. */}
-            {pill.filter === 'quotes' ? <span aria-hidden {...stylex.props(styles.pillStep)} /> : null}
-            <FilterPill>
-              <Button variant="filter" pressed={filter === pill.filter} {...activateHandlers<HTMLButtonElement>(() => onFilter(pill.filter))}>
-                {pill.name}
-                <Text variant="inherit" tone="muted" numeric sx={styles.count}>
-                  {pill.count}
-                </Text>
-              </Button>
-            </FilterPill>
-          </Fragment>
-        ))}
-      </PillRow>
-    </div>
-  )
+/**
+ * How many columns fit the wall: as many at least `--gallery-column` wide as
+ * fit, sharing the width evenly. Measured before the first paint and again
+ * when the page is resized, so the first frame is already laid out.
+ */
+function useColumns(scroller: RefObject<HTMLDivElement | null>): number | undefined {
+  const [columns, setColumns] = useState<number | undefined>(undefined)
+  useLayoutEffect(() => {
+    const wall = scroller.current?.querySelector<HTMLElement>('[data-gallery-wall]')
+    if (wall === null || wall === undefined) return
+    const measure = () => {
+      const style = getComputedStyle(wall)
+      const min = Number.parseFloat(style.getPropertyValue('--gallery-column-min')) || 1
+      const gap = Number.parseFloat(style.columnGap) || 0
+      setColumns(Math.max(1, Math.floor((wall.clientWidth + gap) / (min + gap))))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(wall)
+    return () => observer.disconnect()
+  }, [scroller])
+  return columns
 }
 
 /**
- * The quotes or the facts, in sections by theme: set as the picture page
- * sets its words, a quote in the serif of its caption with who said it on
- * a quiet line under it, a fact in the body text of its facts. In columns
- * that share the page's width evenly, more of them as the page widens.
+ * Places pictures in columns, each in the shortest column so far, as a pure
+ * function of their shapes and words, so the boxes are placed before any
+ * image loads. A height is in column widths: the picture's, then about how
+ * much its label and line take.
  */
-function GalleryWordList({ thoughts, words }: { readonly thoughts: ReadonlyArray<GalleryThoughtView>; readonly words: GalleryWords }) {
-  return GALLERY_THEMES.map(({ theme, name }) => {
-    const entries = thoughts.filter((thought) => thought.theme === theme)
-    if (entries.length === 0) return null
+function intoColumns<T extends GalleryPictureView>(pictures: ReadonlyArray<T>, count: number): ReadonlyArray<ReadonlyArray<T>> {
+  const columns: Array<Array<T>> = Array.from({ length: count }, () => [])
+  const heights: Array<number> = Array.from({ length: count }, () => 0)
+  for (const picture of pictures) {
+    let at = 0
+    for (let index = 1; index < count; index++) if (heights[index]! < heights[at]! - 0.01) at = index
+    columns[at]!.push(picture)
+    // About 40 characters to a line of the serif in a column, 0.1 column widths a line, and the label's line.
+    heights[at]! += 1 / picture.ratio + 0.1 * (1 + Math.ceil(picture.line.text.length / 40)) + 0.2
+  }
+  return columns
+}
+
+type WallProps = Pick<GalleryProps, 'sources' | 'current' | 'onOpen'> & { readonly pictures: ReadonlyArray<GalleryPictureView> }
+
+/** Sections by kind (titled under All), each in columns. */
+function ByKind({ pictures, columns, sources, current, titled, onOpen }: WallProps & { readonly columns: number; readonly titled: boolean }) {
+  return GALLERY_SECTIONS.map((section) => {
+    const list = pictures.filter((picture) => picture.kind === section.kind)
+    if (list.length === 0) return null
     return (
-      <section key={theme} aria-label={name} data-gallery-words={words} {...stylex.props(styles.section)}>
-        <Text variant="sectionLabel" tone="muted" as="h2" sx={styles.heading}>
-          {name}
-        </Text>
-        <ul {...stylex.props(styles.wordList)}>
-          {entries.map((entry) =>
-            entry.by === undefined ? (
-              <li key={entry.text} data-gallery-fact="" {...stylex.props(styles.entry)}>
-                <Text variant="body" tone="secondary" as="p" selectable>
-                  {entry.text}
-                </Text>
-              </li>
-            ) : (
-              <li key={entry.text} data-gallery-quote="" {...stylex.props(styles.entry)}>
-                <blockquote {...stylex.props(styles.quote)}>{entry.text}</blockquote>
-                <Text variant="meta" tone="muted" as="p" selectable sx={styles.by}>
-                  {entry.by}
-                </Text>
-              </li>
-            ),
-          )}
-        </ul>
+      <section key={section.kind} aria-label={section.name} {...stylex.props(styles.section)}>
+        {titled ? (
+          <Text variant="sectionLabel" tone="muted" as="h2" sx={styles.heading}>
+            {section.name}
+          </Text>
+        ) : null}
+        <div {...stylex.props(styles.columns)}>
+          {intoColumns(list, columns).map((column, index) => (
+            <ul key={index} {...stylex.props(styles.column)}>
+              {column.map((picture) => (
+                <li key={picture.id} data-gallery-picture={picture.id} data-gallery-missing={sources[picture.id] === undefined ? '' : undefined} {...stylex.props(styles.plate)}>
+                  <PictureButton picture={picture} src={sources[picture.id]} current={picture.id === current} onOpen={onOpen}>
+                    <Text variant="meta" tone="muted" truncate tooltipWhenTruncated sx={styles.label}>
+                      <Text variant="inherit" tone="subtle">
+                        {picture.title}
+                      </Text>
+                      {` · ${picture.artist}, ${picture.date}`}
+                    </Text>
+                  </PictureButton>
+                  <PictureLine line={picture.line} place="gallery" />
+                </li>
+              ))}
+            </ul>
+          ))}
+        </div>
       </section>
     )
   })
 }
 
-/** One picture on the wall: its box at its shape, its title and "artist, date" under it. */
-function GalleryTile({ picture, src, current, onOpen }: { readonly picture: PictureCardView; readonly src: string | undefined; readonly current: boolean; readonly onOpen: GalleryProps['onOpen'] }) {
+/**
+ * Sections by century, oldest first, side by side while they fit: each a
+ * heading over a rule and its pictures at one height, wrapping inside the
+ * section when it is wider than the page, with each picture's date under it.
+ */
+function ByTime({ pictures, sources, current, onOpen }: WallProps) {
+  const sorted = pictures.toSorted((a, b) => a.year - b.year)
+  const centuries = [...new Set(sorted.map((picture) => centuryOf(picture.year)))]
   return (
-    <li data-gallery-picture={picture.id} data-gallery-missing={src === undefined ? '' : undefined} {...stylex.props(styles.tile, styles.share(picture.ratio))}>
-      <button
-        type="button"
-        aria-label={`${picture.title}, ${picture.artist}, ${picture.date}`}
-        aria-current={current ? 'true' : undefined}
-        {...activateHandlers<HTMLButtonElement>((event) => onOpen(picture.id, event))}
-        {...stylex.props(styles.open, pictureLift)}
-      >
-        <span {...stylex.props(styles.frame, current && styles.current)}>
-          <PictureImage src={src} ratio={picture.ratio} />
-        </span>
-        <span aria-hidden {...stylex.props(styles.words)}>
-          <Text variant="ui" weight="medium" tone="default" truncate tooltipWhenTruncated>
-            {picture.title}
+    <div {...stylex.props(styles.times)}>
+      {centuries.map((century) => (
+        <section key={century} aria-label={`${century}s`} {...stylex.props(styles.time)}>
+          <Text variant="sectionLabel" tone="muted" as="h2" numeric sx={styles.timeHeading}>
+            {century}s
           </Text>
-          <Text variant="meta" tone="muted" truncate tooltipWhenTruncated>
-            {picture.artist}, {picture.date}
-          </Text>
-        </span>
-      </button>
-    </li>
+          <ul {...stylex.props(styles.row)}>
+            {sorted
+              .filter((picture) => centuryOf(picture.year) === century)
+              .map((picture) => (
+                <li key={picture.id} data-gallery-picture={picture.id} data-gallery-missing={sources[picture.id] === undefined ? '' : undefined} {...stylex.props(styles.tile, styles.atRow(picture.ratio))}>
+                  <PictureButton picture={picture} src={sources[picture.id]} current={picture.id === current} onOpen={onOpen}>
+                    <Text variant="meta" tone="muted" numeric truncate tooltipWhenTruncated>
+                      {picture.date}
+                    </Text>
+                  </PictureButton>
+                </li>
+              ))}
+          </ul>
+        </section>
+      ))}
+    </div>
+  )
+}
+
+/** All, then each kind, with its count. */
+function GalleryPills({ pictures, filter, onFilter }: Pick<GalleryProps, 'pictures' | 'filter' | 'onFilter'>) {
+  const pills: ReadonlyArray<{ readonly filter: GalleryFilter; readonly name: string; readonly count: number }> = [
+    { filter: 'all', name: 'All', count: pictures.length },
+    ...GALLERY_SECTIONS.map((section) => ({ filter: section.kind, name: section.name, count: pictures.filter((picture) => picture.kind === section.kind).length })),
+  ]
+  return (
+    <PillRow aria-label="Show">
+      {pills.map((pill) => (
+        <FilterPill key={pill.filter}>
+          <Button variant="filter" pressed={filter === pill.filter} {...activateHandlers<HTMLButtonElement>(() => onFilter(pill.filter))}>
+            {pill.name}
+            <Text variant="inherit" tone="muted" numeric sx={styles.count}>
+              {pill.count}
+            </Text>
+          </Button>
+        </FilterPill>
+      ))}
+    </PillRow>
+  )
+}
+
+/** A picture that opens its page: its box at its shape, then what the wall says under it. */
+function PictureButton({ picture, src, current, onOpen, children }: { readonly picture: PictureCardView; readonly src: string | undefined; readonly current: boolean; readonly onOpen: GalleryProps['onOpen']; readonly children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-label={`${picture.title}, ${picture.artist}, ${picture.date}`}
+      aria-current={current ? 'true' : undefined}
+      {...activateHandlers<HTMLButtonElement>((event) => onOpen(picture.id, event))}
+      {...stylex.props(styles.open, pictureLift)}
+    >
+      <span {...stylex.props(styles.frame, current && styles.current)}>
+        <PictureImage src={src} ratio={picture.ratio} />
+      </span>
+      <span aria-hidden {...stylex.props(styles.words)}>
+        {children}
+      </span>
+    </button>
   )
 }
 
 const styles = stylex.create({
-  // Stretched, so its width never comes from its content: the words' columns share the page's width.
   scroll: {
     flexGrow: 1,
     alignSelf: 'stretch',
@@ -253,28 +294,58 @@ const styles = stylex.create({
     paddingInline: spacing['--space-12'],
   },
   lead: { margin: 0, marginTop: spacing['--space-1-5'] },
-  pills: { marginTop: spacing['--space-5'] },
-  count: { marginInlineStart: spacing['--space-1-5'] },
-  pillStep: { flexShrink: 0, width: spacing['--space-3'] },
-  section: { marginTop: spacing['--space-7'] },
-  heading: { margin: 0, marginBottom: spacing['--space-3'] },
-  // Rows of one height: each picture grows by its width over height, so a row stays level as it fills the line.
-  row: {
+  bar: {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: `${spacing['--space-6']} ${spacing['--space-5']}`,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing['--space-3'],
+    marginTop: spacing['--space-5'],
+  },
+  count: { marginInlineStart: spacing['--space-1-5'] },
+  // Read by `useColumns`: the narrowest a column gets, and the gap between columns.
+  wall: {
+    '--gallery-column-min': sizes['--gallery-column'],
+    columnGap: spacing['--space-7'],
+  },
+  section: { marginTop: spacing['--space-7'] },
+  heading: { margin: 0, marginBottom: spacing['--space-3'] },
+  columns: { display: 'flex', alignItems: 'flex-start', gap: spacing['--space-7'] },
+  column: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing['--space-8'],
+    flexGrow: 1,
+    flexBasis: 0,
+    minWidth: 0,
     margin: 0,
     padding: 0,
     listStyle: 'none',
-    // The last row keeps its pictures' sizes instead of stretching to the end.
-    '::after': { content: "''", flexGrow: 1000 },
   },
-  tile: { minWidth: 0 },
-  share: (ratio: number) => ({
-    flexGrow: ratio,
-    flexBasis: `calc(${sizes['--gallery-row']} * ${ratio})`,
-    maxWidth: `calc(${sizes['--gallery-row']} * ${ratio} * 1.5)`,
-  }),
+  plate: { display: 'flex', flexDirection: 'column', gap: spacing['--space-1-5'], minWidth: 0 },
+  label: { display: 'block', marginTop: spacing['--space-1'] },
+  // The centuries flow side by side and wrap; one wider than the page wraps its own pictures.
+  times: { display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', columnGap: spacing['--space-7'] },
+  time: { flexGrow: 0, flexShrink: 1, minWidth: 0, maxWidth: '100%', marginTop: spacing['--space-7'] },
+  timeHeading: {
+    margin: 0,
+    marginBottom: spacing['--space-3'],
+    paddingBottom: spacing['--space-2'],
+    borderBottomWidth: '1px',
+    borderBottomStyle: 'solid',
+    borderBottomColor: colors['--border-strong'],
+  },
+  // One height: each picture as wide as its shape at that height.
+  row: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: `${spacing['--space-5']} ${spacing['--space-4']}`,
+    margin: 0,
+    padding: 0,
+    listStyle: 'none',
+  },
+  tile: { flexShrink: 0, minWidth: 0 },
+  atRow: (ratio: number) => ({ width: `calc(${sizes['--gallery-row']} * ${ratio})` }),
   open: {
     display: 'flex',
     flexDirection: 'column',
@@ -302,31 +373,4 @@ const styles = stylex.create({
     outlineColor: colors['--border-strongest'],
   },
   words: { display: 'flex', flexDirection: 'column', minWidth: 0 },
-  // As many columns as fit at the narrowest, sharing the width evenly, with the picture rows' gap between them.
-  // An entry fills its column and never breaks across two.
-  wordList: {
-    columnWidth: sizes['--gallery-words-column'],
-    columnGap: spacing['--space-5'],
-    margin: 0,
-    padding: 0,
-    listStyle: 'none',
-  },
-  // Two or more columns never reach this width; it only keeps a single column to a reading length.
-  entry: {
-    maxWidth: `calc(${sizes['--gallery-words-column']} * 1.5 + ${spacing['--space-5']})`,
-    breakInside: 'avoid',
-    contain: 'content',
-    paddingBottom: spacing['--space-5'],
-  },
-  quote: {
-    margin: 0,
-    fontFamily: text['--text-thought-family'],
-    fontSize: text['--text-thought-size'],
-    fontWeight: text['--text-thought-weight'],
-    lineHeight: text['--text-thought-leading'],
-    letterSpacing: text['--text-thought-tracking'],
-    color: colors['--foreground-default'],
-    userSelect: 'text',
-  },
-  by: { marginTop: spacing['--space-1'] },
 })

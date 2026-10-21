@@ -22,9 +22,9 @@ function openItem(topicId: string, event: ActivateEvent): void {
 }
 
 /** Home's picture, read from disk, and what opening it and a missing file do. */
-function pictureProps(picture: { readonly id: string; readonly title: string; readonly artist: string; readonly date: string; readonly ratio: number }) {
+function pictureProps(picture: NonNullable<ReturnType<typeof takePicture>>) {
   return {
-    picture: { src: pictureUrl(picture.id, 'small'), title: picture.title, artist: picture.artist, date: picture.date, ratio: picture.ratio },
+    picture: { src: pictureUrl(picture.id, 'small'), title: picture.title, artist: picture.artist, date: picture.date, ratio: picture.ratio, line: picture.line },
     onOpenPicture: (event: ActivateEvent) => openGallery(picture.id, { newTab: event.metaKey }),
     onPictureMissing: () => forgetPicture(picture.id),
   }

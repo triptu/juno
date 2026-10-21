@@ -92,7 +92,7 @@ const narrow: FixtureFrame = { width: 560, height: 720, padded: false }
 /** Home's picture (SPEC 12, "A picture"): a card from the fixtures, as Home gets it from disk. */
 const picture = (id: string) => {
   const card = pictureCards.find((entry) => entry.id === id)!
-  return { picture: { src: card.src, title: card.title, artist: card.artist, date: card.date, ratio: card.ratio }, onOpenPicture: noop }
+  return { picture: { src: card.src, title: card.title, artist: card.artist, date: card.date, ratio: card.ratio, line: card.line }, onOpenPicture: noop }
 }
 const caughtUp = { scene: 'caughtUp', title: 'All caught up.', items: [] } as const
 
@@ -199,9 +199,14 @@ export default defineFixtures(
       'nothing-waiting': state({ scene: 'night', title: 'Still up, Tushar.', items: [] }),
       'no-name': state({ scene: 'midday', title: 'Hello.', items: [homeItems.waiting] }),
     },
-    // A picture in the caught-up scene's place: the same box for every shape, resting on its two-line caption.
+    // A picture in the caught-up scene's place: the same box for every shape, lifted off the page, then its label and its line.
     Picture: {
+      // A quote, with who said it run in.
       wide: state({ ...caughtUp, ...picture('monet-impression-sunrise') }),
+      // A fact.
+      fact: state({ ...caughtUp, ...picture('vermeer-milkmaid') }),
+      // The longest line takes two lines and hangs under the label; the box and the label stay where they are.
+      'long-line': state({ ...caughtUp, ...picture('haeckel-discomedusae') }),
       tall: state({ ...caughtUp, ...picture('kota-radha-krishna') }),
       panorama: state({ ...caughtUp, ...picture('webb-cosmic-cliffs') }),
       // A long title: the title line takes an ellipsis inside the box's width, with the whole title as its tooltip.
@@ -209,7 +214,7 @@ export default defineFixtures(
       'short-window': state({ ...caughtUp, ...picture('monet-impression-sunrise') }, { width: 720, height: 600, padded: false }),
       'minimum-window': state({ ...caughtUp, ...picture('monet-impression-sunrise') }, minimum),
       // The file would not load: the box keeps its size and shows the caught-up scene.
-      missing: state({ ...caughtUp, picture: { src: '/__fixture/missing-picture.webp', title: 'Irises', artist: 'Vincent van Gogh', date: '1889', ratio: 1.29 }, onOpenPicture: noop }),
+      missing: state({ ...caughtUp, picture: { src: '/__fixture/missing-picture.webp', title: 'Irises', artist: 'Vincent van Gogh', date: '1889', ratio: 1.29, line: { text: 'A fixture line.' } }, onOpenPicture: noop }),
       hover: state({ ...caughtUp, ...picture('monet-impression-sunrise') }, { hover: '[data-home-picture] button' }),
       focus: state({ ...caughtUp, ...picture('monet-impression-sunrise') }, { focus: '[data-home-picture] button' }),
     },

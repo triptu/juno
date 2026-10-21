@@ -1,5 +1,5 @@
 import { defineFixtures, scene, type FixtureFrame } from '@juno/ui'
-import { pictureStory, spaceStory, spaceSource, storySource } from './fixtures/pictures'
+import { earthSource, earthStory, largeStory, pictureStory, plainStory, spaceStory, spaceSource, storySource } from './fixtures/pictures'
 import { PicturePage, type PicturePageProps } from './PicturePage'
 
 const noop = () => {}
@@ -9,10 +9,18 @@ const page = (props: Partial<PicturePageProps> = {}, frame: FixtureFrame = { wid
   scene<PicturePageProps>(() => <PicturePage {...base} {...props} />, { ...frame, padded: false })
 
 export default defineFixtures(PicturePage, {
-  // The picture as large as the page allows, its label beside it (SPEC 12, "Pictures and the gallery").
+  // The picture as large as the page allows, its wall text beside it (SPEC 12, "Pictures and the gallery").
   Story: {
+    // A quote with who said it and its context, the size beside a person, the link and the credit.
     painting: page(),
+    // A fact for the line, and how far in light-years.
     space: page({ picture: spaceStory, src: spaceSource }),
+    // A picture of Earth from far away: how far in kilometres, and how long light takes.
+    earth: page({ picture: earthStory, src: earthSource }),
+    // A canvas taller than a person.
+    'large-canvas': page({ picture: largeStory }),
+    // No scale data: nothing is reserved for it.
+    'no-scale': page({ picture: plainStory }),
     // A tall picture fits the page's height; the label keeps its width.
     tall: page({ picture: { ...pictureStory, ratio: 0.65 } }),
     // Before the file is on this Mac: the box at the picture's shape, in the secondary fill.
@@ -25,6 +33,8 @@ export default defineFixtures(PicturePage, {
   },
   Interaction: {
     'hover-next': page({}, { width: 1200, height: 760, hover: 'button[aria-label="Next picture"]' }),
+    'hover-learn-more': page({}, { width: 1200, height: 760, hover: '[data-picture-learn-more]' }),
+    'focus-learn-more': page({}, { width: 1200, height: 760, focus: '[data-picture-learn-more]' }),
     'focus-all-pictures': page({}, { width: 1200, height: 760, focus: 'button:has(svg)' }),
   },
 })

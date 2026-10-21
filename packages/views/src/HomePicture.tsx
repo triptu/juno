@@ -3,9 +3,10 @@ import { useState } from 'react'
 import { accent, layout, sizes, spacing, motion } from '@juno/tokens/tokens.stylex'
 import { activateHandlers, Text, type ActivateEvent } from '@juno/ui'
 import { HomeScene } from './HomeScene'
-import { PictureImage, pictureLift } from './PictureImage'
+import { PictureImage, homePictureLift } from './PictureImage'
+import { PictureLine, type PictureLineView } from './PictureLine'
 
-/** Home's picture (SPEC 12, "A picture"): already on this Mac, with what its caption says. */
+/** Home's picture (SPEC 12, "A picture"): already on this Mac, with its label and its line. */
 export interface HomePictureView {
   readonly src: string
   readonly title: string
@@ -13,6 +14,7 @@ export interface HomePictureView {
   readonly date: string
   /** Width over height. */
   readonly ratio: number
+  readonly line: PictureLineView
 }
 
 export interface HomePictureProps {
@@ -24,10 +26,12 @@ export interface HomePictureProps {
 }
 
 /**
- * The picture in the caught-up scene's place, and its caption: the title
- * in the subtle tone, then "artist, date" smaller and muted, one line each. The box is the same for every picture (lower on a shorter
- * window), so the caption is always in one place; the picture is fitted
- * inside and rests on the box's bottom edge, over the caption.
+ * The picture in the caught-up scene's place, lifted off the page, then its
+ * label on one line ("Title · Artist, date") and its line in the serif, a
+ * step quieter, so the picture leads. The box is the same for every picture
+ * (lower on a shorter window), so the label is always in one place; the
+ * picture is fitted inside, whole, and rests on the box's bottom edge. The
+ * line hangs under the label, so a longer line never moves the picture.
  */
 export function HomePicture({ picture, onOpen, onMissing }: HomePictureProps) {
   const [missing, setMissing] = useState(false)
@@ -41,7 +45,7 @@ export function HomePicture({ picture, onOpen, onMissing }: HomePictureProps) {
             type="button"
             aria-label={`Open ${picture.title}`}
             {...activateHandlers<HTMLButtonElement>(onOpen)}
-            {...stylex.props(styles.frame, styles.width(picture.ratio), pictureLift)}
+            {...stylex.props(styles.frame, styles.width(picture.ratio), homePictureLift)}
           >
             <PictureImage
               src={picture.src}
@@ -55,12 +59,15 @@ export function HomePicture({ picture, onOpen, onMissing }: HomePictureProps) {
         )}
       </div>
       <div data-home-caption="" {...stylex.props(styles.caption)}>
-        <Text variant="ui" tone="subtle" as="p" truncate tooltipWhenTruncated>
-          {picture.title}
-        </Text>
         <Text variant="meta" tone="muted" as="p" truncate tooltipWhenTruncated>
-          {picture.artist}, {picture.date}
+          <Text variant="inherit" tone="subtle">
+            {picture.title}
+          </Text>
+          {` · ${picture.artist}, ${picture.date}`}
         </Text>
+      </div>
+      <div {...stylex.props(styles.line)}>
+        <PictureLine line={picture.line} place="home" />
       </div>
     </div>
   )
@@ -102,11 +109,16 @@ const styles = stylex.create({
   },
   // As wide as the box allows at the picture's shape: the full width, or less for a tall picture.
   width: (ratio: number) => ({ width: `min(100%, calc(var(--home-picture-h) * ${ratio}))` }),
-  // Two lines, never more: each takes an ellipsis inside the box's width, with the whole line as its tooltip.
+  // One line, never more: an ellipsis inside the box's width, with the whole label as its tooltip.
   caption: {
     width: sizes['--home-picture-width'],
     maxWidth: '100%',
-    marginTop: spacing['--space-3'],
+    marginTop: spacing['--space-4'],
     textAlign: 'center',
+  },
+  line: {
+    width: sizes['--home-line-width'],
+    maxWidth: '100%',
+    marginTop: spacing['--space-2-5'],
   },
 })
