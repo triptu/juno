@@ -45,10 +45,28 @@ const SCROLLS_END = '@container scroll-state(scrollable: inline-end)'
  */
 export function ReactionsDialog({ reactions, selected, onSelect, loading = false }: ReactionsDialogProps) {
   const id = useId()
-  const strip = useRef<HTMLDivElement>(null)
   const chosen = reactions.find((reaction) => reaction.name === selected) ?? reactions[0]
+  if (chosen === undefined) return null
   const rows = Math.min(LIST_ROWS, Math.max(1, ...reactions.map((reaction) => reaction.count)))
+  return (
+    <Surface kind="popover" padding="none" sx={styles.panel} aria-busy={loading || undefined}>
+      <Strip id={id} reactions={reactions} chosen={chosen.name} onSelect={onSelect} />
+      <div {...stylex.props(styles.caption)}>
+        <Text variant="meta" tone="muted" truncate tooltipWhenTruncated>
+          :{chosen.name}:
+        </Text>
+        <Text variant="meta" tone="muted" numeric sx={styles.count}>
+          {chosen.count === 1 ? '1 person' : `${chosen.count} people`}
+        </Text>
+      </div>
+      <People id={id} chosen={chosen} rows={rows} loading={loading} />
+    </Surface>
+  )
+}
 
+/** The message's emoji with their counts, one chosen, in a track that scrolls sideways. */
+function Strip({ id, reactions, chosen, onSelect }: { readonly id: string; readonly reactions: ReadonlyArray<ReactionsDialogEntry>; readonly chosen: string; readonly onSelect: (name: string) => void }) {
+  const strip = useRef<HTMLDivElement>(null)
   // The chosen emoji stays in view, also when the dialog opens on one far along the strip.
   useLayoutEffect(() => {
     const scroller = strip.current
@@ -57,12 +75,9 @@ export function ReactionsDialog({ reactions, selected, onSelect, loading = false
     const room = tab.offsetWidth
     if (tab.offsetLeft - room < scroller.scrollLeft) scroller.scrollLeft = Math.max(0, tab.offsetLeft - room)
     else if (tab.offsetLeft + tab.offsetWidth + room > scroller.scrollLeft + scroller.clientWidth) scroller.scrollLeft = tab.offsetLeft + tab.offsetWidth + room - scroller.clientWidth
-  }, [selected])
-
-  if (chosen === undefined) return null
-  const missing = Math.max(0, chosen.count - chosen.reactors.length)
+  }, [chosen])
   const choose = (name: string) => {
-    if (name !== selected) onSelect(name)
+    if (name !== chosen) onSelect(name)
   }
   const press = (name: string) => (event: PointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0 || event.ctrlKey) return
@@ -74,81 +89,77 @@ export function ReactionsDialog({ reactions, selected, onSelect, loading = false
   const wheel = (event: WheelEvent<HTMLDivElement>) => {
     if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) event.currentTarget.scrollLeft += event.deltaY
   }
-
   return (
-    <Surface kind="popover" padding="none" sx={styles.panel} aria-busy={loading || undefined}>
-      <div {...stylex.props(styles.track)}>
-        <div
-          ref={strip}
-          role="tablist"
-          aria-label="Emoji"
-          data-reactions-strip=""
-          onKeyDown={(event: KeyboardEvent<HTMLElement>) => moveFocus(event, '[role="tab"]', { select: true })}
-          onWheel={wheel}
-          {...stylex.props(styles.strip)}
-        >
-          <span aria-hidden {...stylex.props(styles.edge, styles.edgeStart)} />
-          {reactions.map((reaction) => {
-            const on = reaction.name === chosen.name
-            return (
-              <button
-                key={reaction.name}
-                type="button"
-                role="tab"
-                id={`${id}-${reaction.name}`}
-                aria-selected={on}
-                aria-controls={`${id}-people`}
-                aria-label={`${reaction.count} ${reaction.url === undefined ? reaction.emoji : `:${reaction.name}:`}${reaction.reactors[0]?.you === true ? ', including you' : ''}`}
-                tabIndex={on ? 0 : -1}
-                data-reaction-tab={reaction.name}
-                onPointerDown={press(reaction.name)}
-                onClick={() => choose(reaction.name)}
-                {...stylex.props(styles.tab, focusRing.inset, on && styles.tabOn)}
-              >
-                <Emoji reaction={reaction} />
-                <span>{reaction.count}</span>
-              </button>
-            )
-          })}
-          <span aria-hidden {...stylex.props(styles.edge, styles.edgeEnd)} />
-        </div>
+    <div {...stylex.props(styles.track)}>
+      <div
+        ref={strip}
+        role="tablist"
+        aria-label="Emoji"
+        data-reactions-strip=""
+        onKeyDown={(event: KeyboardEvent<HTMLElement>) => moveFocus(event, '[role="tab"]', { select: true })}
+        onWheel={wheel}
+        {...stylex.props(styles.strip)}
+      >
+        <span aria-hidden {...stylex.props(styles.edge, styles.edgeStart)} />
+        {reactions.map((reaction) => {
+          const on = reaction.name === chosen
+          return (
+            <button
+              key={reaction.name}
+              type="button"
+              role="tab"
+              id={`${id}-${reaction.name}`}
+              aria-selected={on}
+              aria-controls={`${id}-people`}
+              aria-label={`${reaction.count} ${reaction.url === undefined ? reaction.emoji : `:${reaction.name}:`}${reaction.reactors[0]?.you === true ? ', including you' : ''}`}
+              tabIndex={on ? 0 : -1}
+              data-reaction-tab={reaction.name}
+              onPointerDown={press(reaction.name)}
+              onClick={() => choose(reaction.name)}
+              {...stylex.props(styles.tab, focusRing.inset, on && styles.tabOn)}
+            >
+              <Emoji reaction={reaction} />
+              <span>{reaction.count}</span>
+            </button>
+          )
+        })}
+        <span aria-hidden {...stylex.props(styles.edge, styles.edgeEnd)} />
       </div>
-      <div {...stylex.props(styles.caption)}>
-        <Text variant="meta" tone="muted" truncate tooltipWhenTruncated>
-          :{chosen.name}:
-        </Text>
-        <Text variant="meta" tone="muted" numeric sx={styles.count}>
-          {chosen.count === 1 ? '1 person' : `${chosen.count} people`}
-        </Text>
-      </div>
-      {/* The panel scrolls, so it is a Tab stop of its own: the keyboard scrolls it, with the inset ring. */}
-      <div id={`${id}-people`} role="tabpanel" tabIndex={0} aria-labelledby={`${id}-${chosen.name}`} data-reactions-people="" {...stylex.props(styles.list, styles.height(rows), focusRing.inset)}>
-        <ul {...stylex.props(styles.people)}>
-          {chosen.reactors.map((reactor) => (
-            <li key={reactor.id} {...stylex.props(styles.person)}>
-              <Avatar label={initials(reactor.name)} size={20} hue={reactor.hue} {...(reactor.avatarUrl === undefined ? {} : { src: reactor.avatarUrl })} />
-              <Text variant="ui" tone="default" truncate tooltipWhenTruncated dir="auto">
-                {reactor.you ? 'You' : reactor.name}
-              </Text>
+    </div>
+  )
+}
+
+/** The chosen emoji's people, you first; rows waiting for names Slack has not given yet. */
+function People({ id, chosen, rows, loading }: { readonly id: string; readonly chosen: ReactionsDialogEntry; readonly rows: number; readonly loading: boolean }) {
+  const missing = Math.max(0, chosen.count - chosen.reactors.length)
+  // The panel scrolls, so it is a Tab stop of its own: the keyboard scrolls it, with the inset ring.
+  return (
+    <div id={`${id}-people`} role="tabpanel" tabIndex={0} aria-labelledby={`${id}-${chosen.name}`} data-reactions-people="" {...stylex.props(styles.list, styles.height(rows), focusRing.inset)}>
+      <ul {...stylex.props(styles.people)}>
+        {chosen.reactors.map((reactor) => (
+          <li key={reactor.id} {...stylex.props(styles.person)}>
+            <Avatar label={initials(reactor.name)} size={20} hue={reactor.hue} {...(reactor.avatarUrl === undefined ? {} : { src: reactor.avatarUrl })} />
+            <Text variant="ui" tone="default" truncate tooltipWhenTruncated dir="auto">
+              {reactor.you ? 'You' : reactor.name}
+            </Text>
+          </li>
+        ))}
+        {missing === 0 ? null : loading ? (
+          Array.from({ length: missing }, (_, index) => (
+            <li key={`waiting-${index}`} aria-hidden {...stylex.props(styles.person)}>
+              <span {...stylex.props(styles.waitingAvatar)} />
+              <span {...stylex.props(styles.waitingName, index % 3 === 1 && styles.waitingShort, index % 3 === 2 && styles.waitingLong)} />
             </li>
-          ))}
-          {missing === 0 ? null : loading ? (
-            Array.from({ length: missing }, (_, index) => (
-              <li key={`waiting-${index}`} aria-hidden {...stylex.props(styles.person)}>
-                <span {...stylex.props(styles.waitingAvatar)} />
-                <span {...stylex.props(styles.waitingName, index % 3 === 1 && styles.waitingShort, index % 3 === 2 && styles.waitingLong)} />
-              </li>
-            ))
-          ) : (
-            <li {...stylex.props(styles.person)}>
-              <Text variant="meta" tone="muted">
-                {chosen.reactors.length === 0 ? (missing === 1 ? '1 person' : `${missing} people`) : `and ${missing === 1 ? '1 other' : `${missing} others`}`}
-              </Text>
-            </li>
-          )}
-        </ul>
-      </div>
-    </Surface>
+          ))
+        ) : (
+          <li {...stylex.props(styles.person)}>
+            <Text variant="meta" tone="muted">
+              {chosen.reactors.length === 0 ? (missing === 1 ? '1 person' : `${missing} people`) : `and ${missing === 1 ? '1 other' : `${missing} others`}`}
+            </Text>
+          </li>
+        )}
+      </ul>
+    </div>
   )
 }
 

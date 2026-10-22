@@ -45,6 +45,13 @@ export interface Confirming {
   readonly sent: boolean
 }
 
+/** The reactions dialog: on which message and emoji, under which chip. */
+export interface SeeingReactions {
+  readonly ts: string
+  readonly name: string
+  readonly anchor: HTMLElement
+}
+
 export interface Picker {
   readonly ts: string
   readonly x: number
@@ -64,6 +71,7 @@ interface CommandsInput {
   readonly setConfirming: Dispatch<SetStateAction<Confirming | undefined>>
   readonly setPicker: Dispatch<SetStateAction<Picker | undefined>>
   readonly setMenuMessage: Dispatch<SetStateAction<string | undefined>>
+  readonly setReactions: Dispatch<SetStateAction<SeeingReactions | undefined>>
 }
 
 /** Forward… opens the sheet with the message as the list shows it, its sender and where it was posted (SPEC 7, "Forward"). */
@@ -72,8 +80,26 @@ function openForward(channel: string, message: MessageView, { list, detail }: No
   registry.set(forwardSheetAtom, { channelId: channel, message, sender, place: detail.channel.label })
 }
 
+/** The picker under the message's toolbar, or above it near the bottom of the list. */
+function pickerAt(scrollRef: RefObject<HTMLElement | null>, message: MessageView, at: MenuAnchor): Picker | undefined {
+  const area = middleOf(scrollRef)
+  const toolbar = rowOf(scrollRef.current, message.ts)?.querySelector('[role="toolbar"]')
+  if (area === null) return undefined
+  const origin = area.getBoundingClientRect()
+  const box = toolbar?.getBoundingClientRect() ?? { right: at.x, bottom: at.y, top: at.y }
+  const below = box.bottom + PICKER_ROOM <= origin.bottom
+  return { ts: message.ts, x: box.right - origin.left, y: (below ? box.bottom : box.top) - origin.top, placement: below ? 'below-end' : 'above-end' }
+}
+
+/** View reactions in the message menu: the dialog on the first emoji, under its chip. */
+function firstReaction(scrollRef: RefObject<HTMLElement | null>, message: MessageView): SeeingReactions | undefined {
+  const chip = rowOf(scrollRef.current, message.ts)?.querySelector<HTMLElement>('[data-reaction]')
+  const first = message.reactions[0]
+  return chip === null || chip === undefined || first === undefined ? undefined : { ts: message.ts, name: first.name, anchor: chip }
+}
+
 /** The rows' handlers, created once per topic (performance 5.1); they read the latest state through `latest`. */
-export function useMessageCommands({ channel, scrollRef, composer, latest, setEditing, setConfirming, setPicker, setMenuMessage }: CommandsInput) {
+export function useMessageCommands({ channel, scrollRef, composer, latest, setEditing, setConfirming, setPicker, setMenuMessage, setReactions }: CommandsInput) {
   return useMemo(() => {
     const react = (message: MessageView, name: string, on?: boolean) => {
       const mine = message.reactions.find((reaction) => reaction.name === name)?.me === true
@@ -108,19 +134,12 @@ export function useMessageCommands({ channel, scrollRef, composer, latest, setEd
       startEdit,
       askDelete,
       onReact: (message, name) => react(message, name),
-      onMoreReactions: (message, at: MenuAnchor) => {
-        const area = middleOf(scrollRef)
-        const toolbar = rowOf(scrollRef.current, message.ts)?.querySelector('[role="toolbar"]')
-        if (area === null) return
-        const origin = area.getBoundingClientRect()
-        const box = toolbar?.getBoundingClientRect() ?? { right: at.x, bottom: at.y, top: at.y }
-        const below = box.bottom + PICKER_ROOM <= origin.bottom
-        setPicker({ ts: message.ts, x: box.right - origin.left, y: (below ? box.bottom : box.top) - origin.top, placement: below ? 'below-end' : 'above-end' })
-      },
+      onMoreReactions: (message, at: MenuAnchor) => setPicker((current) => pickerAt(scrollRef, message, at) ?? current),
       onQuote: (message) => composer.current?.quote(textOf(scrollRef.current, message.ts)),
       // ⌘-click or ⌘Enter opens the thread in a background tab: this tab, its scroll and its focus stay (SPEC 7).
       onReply: (message, options) => (options?.newTab === true ? openTopicInBackground : openTopic)(`t:${channel}:${message.ts}`),
       onMore: (message, at) => void menu(message, at),
+      onSeeReactions: (message, name, chip) => setReactions({ ts: message.ts, name, anchor: chip }),
       onConfirmDelete: confirmDelete,
       onCancelDelete: () => {
         const ts = latest.current.confirming?.ts
@@ -146,6 +165,7 @@ export function useMessageCommands({ channel, scrollRef, composer, latest, setEd
       else if (chosen === 'delete' && isOwnEditable(now)) askDelete(now)
       else if (chosen === 'reply') handlers.onReply?.(now)
       else if (chosen === 'forward' && now.pending === undefined) openForward(channel, now, latest.current)
+      else if (chosen === 'reactions') setReactions((current) => firstReaction(scrollRef, now) ?? current)
     }
     return { ...handlers, menu }
     // `channel` is fixed for a topic tab; the rest is read through refs.

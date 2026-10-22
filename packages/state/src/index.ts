@@ -57,7 +57,6 @@ export {
   messageWindowSpecAtom,
   openTopic,
   prefetchTopic,
-  reactionsWhoAtom,
   refreshMessages,
   topicAtom,
   topicOfView,

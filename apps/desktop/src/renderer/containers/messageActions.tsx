@@ -25,7 +25,7 @@ import { useAtomValue } from '@juno/state/react'
 import type { MessageActions } from '@juno/views'
 import { chunk, usePreloaded } from './chunks'
 import { landedTs, refOf } from './messageRows'
-import { rowHandlers, useMessageCommands, type Confirming, type Editing, type Picker } from './topic/messageCommands'
+import { rowHandlers, useMessageCommands, type Confirming, type Editing, type Picker, type SeeingReactions } from './topic/messageCommands'
 import { useSentSuggestions } from './topic/sentSuggestion'
 import { preloadPicker, usePickerDismiss } from './emojiPicker'
 import { floatingOf, useSelectionQuote } from './topic/messageOverlays'
@@ -33,6 +33,9 @@ import { floatingOf, useSelectionQuote } from './topic/messageOverlays'
 // The edit field shows only after Edit or E, so it loads when idle once a topic has mounted.
 const editField = chunk(() => import('./EditFieldPanel'))
 const EditField = editField.component((module) => module.EditField)
+// The reactions dialog opens from a card's See all or the message menu, so it loads when idle too.
+const reactionsDialog = chunk(() => import('./ReactionsDialogPanel'))
+const ReactionsDialog = reactionsDialog.component((module) => module.ReactionsDialogPanel)
 
 /** What the composer lets the topic do to it. Filled by `TopicComposer` once its draft has loaded. */
 export interface ComposerHandle {
@@ -110,9 +113,11 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
   const suggestions = useSentSuggestions(list, setEditing, editing)
   const [picker, setPicker] = useState<Picker | undefined>(undefined)
   const [menuMessage, setMenuMessage] = useState<string | undefined>(undefined)
+  const [reactions, setReactions] = useState<SeeingReactions | undefined>(undefined)
   useEffect(preloadPicker, [])
+  const reactionsReady = usePreloaded(reactionsDialog, reactions !== undefined)
 
-  const commands = useMessageCommands({ channel, scrollRef, composer, latest, setEditing, setConfirming, setPicker, setMenuMessage })
+  const commands = useMessageCommands({ channel, scrollRef, composer, latest, setEditing, setConfirming, setPicker, setMenuMessage, setReactions })
   // The rows re-render only when the quick reactions change.
   const quick = useAtomValue(quickReactionsAtom)
   // Ask Juno on a selection shows only while AI assist is on.
@@ -166,9 +171,14 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
       void editField.load()
       handlers.selectNewest()
     },
-    activeMessage: picker?.ts ?? menuMessage,
+    activeMessage: picker?.ts ?? reactions?.ts ?? menuMessage,
     confirmingDelete: confirming?.ts,
     editing: editingRow,
-    floating: floatingOf(picker, setPicker, selection, setSelection, rowMessage, actions.react, scrollRef, composer, juno),
+    floating: (
+      <>
+        {floatingOf(picker, setPicker, selection, setSelection, rowMessage, actions.react, scrollRef, composer, juno)}
+        {reactions !== undefined && reactionsReady ? <ReactionsDialog key={reactions.ts} channel={channel} seeing={reactions} message={rowMessage(reactions.ts)} people={latest.current.list.refs.people} onSelect={(name) => setReactions((now) => (now === undefined ? now : { ...now, name }))} onClose={() => setReactions(undefined)} /> : null}
+      </>
+    ),
   }
 }
