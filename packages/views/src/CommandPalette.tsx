@@ -37,8 +37,10 @@ export interface CommandPaletteProps {
   /** The query that produced the displayed rows, which may lag the input. */
   readonly resultsQuery: string
   readonly sections: ReadonlyArray<PaletteSection>
-  /** The results for the query are known, so an empty list says "No matches." */
+  /** The results belong to the current input, rather than a held previous query. */
   readonly settled: boolean
+  /** The displayed query has answered, including an empty answer held while the next query loads. */
+  readonly resultsReady?: boolean
   /** For row times. */
   readonly now: number
   readonly onSelect: (id: string, options: { readonly newTab: boolean }) => void
@@ -56,8 +58,9 @@ export interface CommandPaletteProps {
  * the tab changes; Enter runs it, ⌘Enter opens it in a new tab, Tab and
  * Shift Tab or ⌘1 and ⌘2 switch tabs, Esc and a press outside close.
  */
-export function CommandPalette({ tab, onTab, query, onQuery, resultsQuery, sections, settled, now, onSelect, onActiveChange, onMenu, onClose }: CommandPaletteProps) {
+export function CommandPalette({ tab, onTab, query, onQuery, resultsQuery, sections, settled, resultsReady = settled, now, onSelect, onActiveChange, onMenu, onClose }: CommandPaletteProps) {
   const items = sections.flatMap((section) => section.items)
+  const hasBody = resultsReady || items.length > 0
   const ids = items.map((item) => item.id)
   const shown = `${tab}\n${resultsQuery}`
   const [selection, setSelection] = useState({ query: shown, id: ids[0] })
@@ -127,7 +130,7 @@ export function CommandPalette({ tab, onTab, query, onQuery, resultsQuery, secti
   return (
     <div {...stylex.props(styles.overlay)} onPointerDown={onOverlayDown}>
       <Surface kind="popover" radius="palette" padding="none" role="dialog" aria-modal="true" aria-label="Search and commands" sx={styles.panel}>
-        <label {...stylex.props(styles.header)}>
+        <label {...stylex.props(styles.header, hasBody && styles.divider)}>
           <span {...stylex.props(styles.searchIcon)}>
             <Icon icon={MagnifyingGlass} size={18} />
           </span>
@@ -176,7 +179,7 @@ export function CommandPalette({ tab, onTab, query, onQuery, resultsQuery, secti
                 </div>
               ),
             )}
-            {settled && items.length === 0 ? (
+            {resultsReady && items.length === 0 ? (
               <Text variant="ui" tone="muted" as="div" sx={styles.empty}>
                 No matches.
               </Text>
@@ -219,9 +222,6 @@ const styles = stylex.create({
     gap: spacing['--space-2-5'],
     paddingBlock: spacing['--space-3-5'],
     paddingInline: spacing['--space-4'],
-    borderBottomWidth: '1px',
-    borderBottomStyle: 'solid',
-    borderBottomColor: colors['--border-default'],
     flexShrink: 0,
     cursor: 'text',
     // Its own compositor layer, so a keystroke re-rasters this row and not the window-sized overlay with the panel's shadows (performance 2.3).
@@ -230,6 +230,11 @@ const styles = stylex.create({
   searchIcon: {
     display: 'inline-flex',
     color: colors['--foreground-muted'],
+  },
+  divider: {
+    borderBottomWidth: '1px',
+    borderBottomStyle: 'solid',
+    borderBottomColor: colors['--border-default'],
   },
   input: {
     flexGrow: 1,
