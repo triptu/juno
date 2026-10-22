@@ -220,9 +220,12 @@ export function mapProblem(map, { now = Date.now(), commitKnown }) {
 /**
  * The gallery components a behaviour spec opens: the fixture names it spells
  * out. A spec that reads every route without filtering them, or names none,
- * walks every component (`'*'`).
+ * walks every component (`'*'`). A spec that opens no gallery address at all
+ * (no path to `goto`, no `./support` helper, no state address), such as the
+ * web shell's, opens none (`[]`): what it reaches comes from its imports.
  */
 export function galleryComponents(text, names) {
+  if (!/\bgoto\(\s*['"`]\/|from '\.\/support'|readRoutes|openState|walkPages|__state|#\//.test(text)) return []
   if (/=\s*await readRoutes\(page\)\s*$/m.test(text)) return '*'
   // Quoted names ('Sidebar'), and names in gallery addresses (/Sidebar?__state=…, #/Sidebar).
   const named = [...new Set([...text.matchAll(/'([A-Z][A-Za-z]+)'|(?:\/|#\/)([A-Z][A-Za-z]+)(?=\?__state|['`?])/g)].map((match) => match[1] ?? match[2]))].filter((name) => names.has(name))

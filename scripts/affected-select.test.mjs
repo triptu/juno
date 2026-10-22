@@ -168,6 +168,10 @@ test('a gallery spec that reads every route, or names no component, walks every 
   assert.equal(galleryComponents("await page.goto('/')", gallery), '*')
 })
 
+test('a gallery spec that opens no gallery address opens no component', () => {
+  assert.deepEqual(galleryComponents("const shell = await startWebShell({ port: 0 })\nawait page.goto(shell.url)\nawait open('Sidebar')", gallery), [])
+})
+
 const DRIVER_TEXT = `import { type Page } from '@playwright/test'
 
 export async function press(win: Page): Promise<void> {
