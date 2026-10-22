@@ -5,6 +5,9 @@
  * - `messagesAtom(id, window)`: one window of a topic's messages.
  * - `topicAtom(id)`: the header, `TopicDetail | null`.
  * - `channelThreadsAtom(channel)`: Main's active threads.
+ * - `whoReactedAtom(channel, ts)`: everyone who reacted to a message, for
+ *   the "who reacted" dialog. Mount it only while the dialog is open: the
+ *   subscription may fetch the full list from Slack when its stored snapshot is incomplete.
  *
  * What a topic tab reads, so the list never shows an empty frame when its
  * window moves (performance 5.3). Both are keyed by a view, `topicView(id,
@@ -31,6 +34,7 @@ import {
   messagesLoadOlder,
   messagesLocate,
   peopleLocate,
+  reactionsWho,
   THREADS_WINDOW_MAX,
   topicsGet,
   topicsOpen,
@@ -68,6 +72,13 @@ export const messagesAtom = (id: string, window: MessageWindowSpec = bottomWindo
 
 /** The topic header. `null` for a topic the store does not know. */
 export const topicAtom = (id: string) => topicFamily({ id })
+
+const whoReactedFamily = liveQuery(reactionsWho)
+// Dialog subscriptions stop on close instead of staying warm like topic tabs.
+const mountedReactors = Atom.family((atom: ReturnType<typeof whoReactedFamily>) => Atom.setIdleTTL(atom, 0))
+
+/** Everyone who reacted to a message (`reactions.who`): `WhoReacted`, or `null` for a message the store does not have. */
+export const whoReactedAtom = (channel: string, ts: string) => mountedReactors(whoReactedFamily({ channel, ts }))
 
 /** A channel's threads with activity in the quiet window, newest first. `meta.total` is how many there are. */
 export const channelThreadsAtom = (channel: string, limit: number = THREADS_WINDOW_MAX) => threadsFamily({ channel, range: { limit } })

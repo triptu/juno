@@ -261,8 +261,8 @@ function openTopicInSlack(topic: ActionTopic): void {
   if (session !== undefined) openInSlack({ teamId: session.teamId, channelId: topic.channel.id })
 }
 
-/** What the message menu leaves to the topic: the edit field, the delete confirm, opening the thread, the Forward sheet. */
-export type MessageMenuChoice = 'edit' | 'delete' | 'reply' | 'forward'
+/** What the message menu leaves to the topic: the edit field, the delete confirm, opening the thread, the Forward sheet, the reactions dialog. */
+export type MessageMenuChoice = 'edit' | 'delete' | 'reply' | 'forward' | 'reactions'
 
 /**
  * "Also send to #eng" on your own thread reply, as Slack's "Send reply to
@@ -277,14 +277,14 @@ export function broadcastLabel(channel: Pick<ActionTopic['channel'], 'kind' | 'n
  * The message menu (SPEC 7 "More", inventory 15.4 and 15.6), from the
  * toolbar's More and from a right-click: Edit and Delete on your own
  * messages, and on your own reply in a thread Also send to #eng, unless it
- * already was; Start thread or Open thread in Main, Forward…, Copy Slack link and Open in Slack,
+ * already was; Start thread or Open thread in Main, View reactions, Forward…, Copy Slack link and Open in Slack,
  * and, on someone else's message, why it did or did not notify. A reply's
  * link carries its thread; a message Slack does not have yet has none. On
  * the sender's name or avatar it is the person menu.
  */
 export async function showMessageMenu(
   topic: ActionTopic,
-  message: Pick<MessageView, 'ts' | 'pending' | 'thread' | 'kind' | 'root' | 'broadcast'>,
+  message: Pick<MessageView, 'ts' | 'pending' | 'thread' | 'kind' | 'root' | 'broadcast' | 'reactions'>,
   editable: boolean,
   at: ContextMenuAt,
   sender: { readonly id: string; readonly name: string } | undefined,
@@ -307,6 +307,8 @@ export async function showMessageMenu(
     ...(editable || broadcastable ? [{ separator: true } as const] : []),
     ...(topic.kind === 'main' && linkable ? [{ id: 'reply', label: message.thread === undefined ? 'Start thread' : 'Open thread' }, { separator: true } as const] : []),
     ...(own && linkable ? [{ id: 'watch-reply', label: 'Tell me if nobody replies', enabled: registry.get(junoNavAtom).mayAuthorize === true }] : []),
+    // The keyboard's way to the reactions dialog; the pointer also has the card's See all.
+    ...(message.reactions.length > 0 ? [{ id: 'reactions', label: 'View reactions' }] : []),
     // Only a message Slack has can be shared, as only it has a link.
     { id: 'forward', label: 'Forward…', ...(linkable && message.kind === 'message' ? {} : { enabled: false }) },
     { id: 'copy-link', label: 'Copy Slack link', ...(linkable ? {} : { enabled: false }) },
@@ -314,7 +316,7 @@ export async function showMessageMenu(
     ...(why === undefined ? [] : [{ separator: true } as const, { id: 'why', label: whyLabel(why.notified) }]),
   ]
   const chosen = await popupContextMenu(items, at)
-  if (chosen === 'edit' || chosen === 'delete' || chosen === 'reply' || chosen === 'forward') return chosen
+  if (chosen === 'edit' || chosen === 'delete' || chosen === 'reply' || chosen === 'forward' || chosen === 'reactions') return chosen
   // Main shows the reply at once and the thread marks it; the outbox sends it. The engine refuses a reply deleted meanwhile.
   if (chosen === 'broadcast') void broadcastMessage(registry, { channelId: topic.channel.id, ts })
   if (chosen === 'watch-reply') await watchReply(registry, { channelId: topic.channel.id, ts, ...(topic.kind === 'thread' && topic.rootTs ? { threadTs: topic.rootTs } : {}) })

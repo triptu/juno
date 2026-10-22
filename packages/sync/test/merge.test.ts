@@ -174,4 +174,3 @@ describe('partial files and videos', () => {
     expect(JSON.parse(merged.row.files_json!)).toEqual([video])
   })
 })
-

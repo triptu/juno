@@ -28,6 +28,8 @@ import {
   ChatUpdateFields,
   ReactionArgs,
   ReactionFields,
+  ReactionsGetArgs,
+  ReactionsGetFields,
 } from './chat.ts'
 import { ErrorResponse, okResponse } from './common.ts'
 import {
@@ -108,6 +110,7 @@ export const Methods = {
   'chat.delete': method(ChatDeleteArgs, ChatDeleteFields),
   'reactions.add': method(ReactionArgs, ReactionFields),
   'reactions.remove': method(ReactionArgs, ReactionFields),
+  'reactions.get': method(ReactionsGetArgs, ReactionsGetFields),
   'search.modules.messages': method(SearchMessagesArgs, SearchMessagesFields),
   'files.getUploadURL': method(FilesGetUploadUrlArgs, FilesGetUploadUrlFields),
   'files.completeUpload': method(FilesCompleteUploadArgs, FilesCompleteUploadFields),

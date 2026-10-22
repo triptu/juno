@@ -24,6 +24,7 @@ import { compareTs, isReply, millisToTs, Ts } from '@juno/slack-schema'
 import type { Clock } from './clock.ts'
 import { threadCounts, threadIndex } from './threadViews.ts'
 import { escapeText, textToBlocks, toMrkdwn, unescapeText } from './richtext.ts'
+import { withListedReactors } from './reactors.ts'
 
 export type ConversationKind = 'public' | 'private' | 'im' | 'mpim'
 
@@ -489,8 +490,8 @@ export class Workspace {
       ts: editTs,
       event_ts: editTs,
       hidden: true,
-      message: { ...message, channel },
-      previous_message: previous,
+      message: { ...withListedReactors(message), channel },
+      previous_message: withListedReactors(previous),
     })
     return message
   }

@@ -1,7 +1,7 @@
 // Every live query statement has an index (performance 6): the plan may not
 // scan messages, topic_index, reactions or topic_overlay. The sidebar's
 // statements, and the topic view's: the Main and thread windows, their
-// reactions and first-reply previews, a channel's active threads, and the New chat
+// reactions and first-reply previews, a channel's active threads, who reacted to a message, and the New chat
 // pickers, All topics (its order, counts and places), and ⌘K's local search.
 import { countsStatement } from '../src/sidebarUnread'
 import { badgeStatement, badgePolicy } from '../src/dockBadge'
@@ -16,6 +16,7 @@ import { messagesByTsStatement, reactionsStatement, rootStatement, threadsStatem
 import { missedHuddleStatement } from '../src/home/huddles'
 import { broadcastTitlesStatement } from '../src/messages/broadcastTitles'
 import { messageUsersStatement } from '../src/messages/query'
+import { whoReactedStatements } from '../src/messages/reactors'
 import { homeStatements } from '../src/home/query'
 import { suggestedStatements } from '../src/home/suggested'
 import { staleStatement } from '../src/home/job'
@@ -158,6 +159,16 @@ describe('query plans', () => {
       const lines = yield* plan(statement.sql, statement.params)
       assert.isFalse(lines.some((line) => /^SCAN (d|conversations)\b/.test(line)), lines.join('\n'))
       assert.isTrue(lines.some((line) => line.includes('conversations_im_user')), lines.join('\n'))
+    }).pipe(Effect.provide(freshStore)),
+  )
+
+  it.effect('reactions.who reads the message and its reactions by key', () =>
+    Effect.gen(function* () {
+      const statements = whoReactedStatements('C0ENG', '1700000000.000100')
+      for (const statement of [statements.message, statements.reactions]) {
+        const lines = yield* plan(statement.sql, statement.params)
+        assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
+      }
     }).pipe(Effect.provide(freshStore)),
   )
 

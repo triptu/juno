@@ -1,0 +1,1 @@
+- 10-22 13:47 · Performance · The who-reacted atom has no idle TTL: closing the last dialog cancels its full-list request, while another open dialog keeps the shared request alive. The dialog keeps placeholder rows until fetched reactor IDs have names. Topic queries retain their 30-second idle TTL.

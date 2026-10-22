@@ -449,7 +449,7 @@ export const CONVERSATIONS: ReadonlyArray<SeedConversation> = [
   },
 ]
 
-function userObject(seed: SeedUser, avatarBase: string): User {
+export function userObject(seed: SeedUser, avatarBase: string): User {
   const [first, ...rest] = seed.realName.split(' ')
   const image = `${avatarBase}/${seed.id}.svg`
   return {
