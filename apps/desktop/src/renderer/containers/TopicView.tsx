@@ -45,8 +45,9 @@ function openReply(id: string, ts: string, event: ActivateEvent): void {
   else openTopicAt(id, ts, { flash: true })
 }
 
-function openReplyInNewTab(id: string, ts: string): void {
-  openTopicAt(id, ts, { newTab: true, flash: true })
+function openReplyInNewTab(id: string, ts: string, event: ActivateEvent): void {
+  if (event.metaKey) openTopicAtInBackground(id, ts)
+  else openTopicAt(id, ts, { newTab: true, flash: true })
 }
 
 /** Where a list's thread links and broadcast replies go; in a peek, to a new tab, so the tab under it stays. */
