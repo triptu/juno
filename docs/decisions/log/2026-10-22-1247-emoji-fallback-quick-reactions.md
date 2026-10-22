@@ -1,0 +1,1 @@
+- 10-22 12:47 · Review · Use the user's quick reactions while the engine's frequent emoji query is pending or fails. Keep the picker's existing first-painted slots until it closes. Tushar requested the fallback from the reviewed picker behavior.
