@@ -39,7 +39,7 @@ function openThread(id: string, event: ActivateEvent): void {
   openTopic(id, { newTab: event.metaKey })
 }
 
-/** A broadcast reply's "replied to a thread" in Main: the thread, at the reply, which flashes; ⌘ opens it in a tab behind this one. */
+/** A broadcast reply's "in <topic title>" in Main: the thread, at the reply, which flashes; ⌘ opens it in a tab behind this one. */
 function openReply(id: string, ts: string, event: ActivateEvent): void {
   if (event.metaKey) openTopicAtInBackground(id, ts)
   else openTopicAt(id, ts, { flash: true })

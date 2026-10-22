@@ -82,7 +82,7 @@ export interface MessageListProps {
    */
   readonly onRowKey?: (ts: string, event: KeyboardEvent<HTMLElement>) => void
   readonly onOpenThread?: (id: string, event: ActivateEvent) => void
-  /** A broadcast reply's "replied to a thread" in Main: the thread `id`, opened at the reply `ts`. */
+  /** A broadcast reply's "in <topic title>" in Main: the thread `id`, opened at the reply `ts`. */
   readonly onOpenReply?: (id: string, ts: string, event: ActivateEvent) => void
   /** The pointer came onto a Main message that has a thread: warm the thread, which a peek or an open may read next. */
   readonly onPrefetchThread?: (id: string) => void

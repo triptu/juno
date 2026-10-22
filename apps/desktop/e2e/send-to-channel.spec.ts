@@ -2,7 +2,9 @@
 // a thread goes to the channel too, as Slack's "Send reply to this channel"
 // does, with `chat.update` and `reply_broadcast`. It shows in Main at once and
 // is marked in the thread. Others' replies and the root have no such item. In
-// Main a broadcast reply's "replied to a thread" opens the thread at it.
+// Main a broadcast reply's "in <topic title>" opens the thread at it.
+import { DatabaseSync } from 'node:sqlite'
+import { join } from 'node:path'
 import type { Locator } from '@playwright/test'
 import { expect, test } from './fixtures'
 import { watchFlashes } from './driver/flashes'
@@ -34,8 +36,10 @@ async function press(juno: Juno, target: Locator): Promise<void> {
   await juno.win.mouse.up()
 }
 
-test('Also send to #eng sends your own reply to the channel, and Main shows it at once', async ({ juno, fake }) => {
+test('Also send to #eng sends your own reply to the channel, and Main shows it at once', async ({ juno, fake }, testInfo) => {
   await openPostgresThread(juno)
+  await juno.setTheme('Dark')
+  await juno.sidebar.row(ROOT, { exact: true }).open()
   const { topic } = juno
   const stored = () => fake.messages('C0ENG').find((message) => message.text === MINE)
 
@@ -52,16 +56,18 @@ test('Also send to #eng sends your own reply to the channel, and Main shows it a
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
   const source = topic.message(MINE).locator('[data-broadcast-source]')
-  await expect(source).toContainText(`replied to a thread: ${ROOT}`)
+  await expect(source).toContainText(`in ${ROOT}`)
   expect(stored()?.subtype).toBeUndefined()
 
   fake.release()
   await expect.poll(() => stored()?.subtype).toBe('thread_broadcast')
-  await expect(source).toContainText(`replied to a thread: ${ROOT}`)
+  await expect(source).toContainText(`in ${ROOT}`)
   const updates = fake.calls.filter((call) => call.method === 'chat.update')
   expect(updates).toHaveLength(1)
   expect(updates[0]!.args).toMatchObject({ channel: 'C0ENG', ts: stored()!.ts, reply_broadcast: 'true' })
   expect(updates[0]!.args['text']).toBeUndefined()
+
+  await juno.win.screenshot({ path: testInfo.outputPath('main-topic-link-dark.png') })
 
   // Sent, the reply's menu no longer offers it.
   await topic.threadLinkUnder(ROOT).open()
@@ -69,7 +75,7 @@ test('Also send to #eng sends your own reply to the channel, and Main shows it a
   expect((await topic.chooseInMessageMenu(MINE, null)).labels).not.toContain('Also send to #eng')
 })
 
-test("replied to a thread in Main opens the thread at the reply, which flashes", async ({ juno, fake }) => {
+test("the topic title in Main opens the topic at the reply, which flashes", async ({ juno, fake }) => {
   const root = fake.messages('C0ENG').find((message) => message.text?.startsWith(ROOT) === true)!
   fake.injectMessage({ channel: 'C0ENG', user: 'U0DEV', text: 'Dry run passed on staging.', threadTs: root.ts, broadcast: true })
   await juno.signIn()
@@ -79,7 +85,7 @@ test("replied to a thread in Main opens the thread at the reply, which flashes",
   const { topic } = juno
 
   const source = topic.message('Dry run passed on staging.').locator('[data-broadcast-source]')
-  await expect(source).toContainText('replied to a thread')
+  await expect(source).toContainText(`in ${ROOT}`)
   await expect(source).toContainText(ROOT)
   await watchFlashes(juno.win)
   await press(juno, source)
@@ -90,4 +96,87 @@ test("replied to a thread in Main opens the thread at the reply, which flashes",
   await expect(topic.message('Dry run passed on staging.')).toContainText('also sent to the channel')
   await expect(topic.message('Dry run passed on staging.').locator('[data-broadcast-source]')).toHaveCount(0)
   await expect.poll(() => juno.win.evaluate(() => (globalThis as unknown as { flashedRows: string[] }).flashedRows.some((row) => row.includes('Dry run passed on staging.'))), { timeout: 10_000 }).toBe(true)
+})
+
+
+function broadcastRows(userData: string, team: string): number {
+  const db = new DatabaseSync(join(userData, 'workspaces', team, 'user.db'), { readOnly: true })
+  try {
+    return Number(db.prepare("SELECT count(*) AS n FROM outbox WHERE kind = 'broadcast'").get()!['n'])
+  } finally {
+    db.close()
+  }
+}
+
+test('a lost broadcast answer and socket event reconcile before the row ends', async ({ juno, fake, userData }) => {
+  await openPostgresThread(juno)
+  const reply = fake.messages('C0ENG').find((message) => message.text === MINE)!
+  fake.holdFrames({ types: ['message'] })
+  fake.loseResponse({ method: 'chat.update' })
+  await juno.topic.chooseInMessageMenu(MINE, 'broadcast')
+  await expect.poll(() => fake.calls.filter((call) => call.method === 'chat.update').length).toBeGreaterThanOrEqual(2)
+  await expect.poll(() => fake.calls.some((call) => call.method === 'conversations.history' && call.args['oldest'] === reply.ts && call.args['latest'] === reply.ts)).toBe(true)
+  await expect.poll(() => broadcastRows(userData, fake.teamId)).toBe(0)
+  fake.releaseFrames({ drop: true })
+  await expect(juno.topic.message(MINE)).toContainText('also sent to the channel')
+  await juno.sidebar.row(ENG_MAIN).open()
+  await expect(juno.topic.message(MINE).locator('[data-broadcast-source]')).toHaveText(`in ${ROOT}`)
+  await juno.win.reload()
+  await juno.waitForSync()
+  await juno.sidebar.row(ENG_MAIN).open()
+  await expect(juno.topic.message(MINE).locator('[data-broadcast-source]')).toHaveText(`in ${ROOT}`)
+})
+
+test('a refused broadcast removes the optimistic copy and mark', async ({ juno, fake, userData }) => {
+  await openPostgresThread(juno)
+  fake.forceError({ method: 'chat.update', error: 'cant_broadcast_message' })
+  fake.holdNext({ method: 'chat.update', before: true })
+  await juno.topic.chooseInMessageMenu(MINE, 'broadcast')
+  await expect(juno.topic.message(MINE)).toContainText('also sent to the channel')
+  await juno.sidebar.row(ENG_MAIN).open()
+  await expect(juno.topic.message(MINE)).toBeVisible()
+  fake.release()
+  await expect.poll(() => broadcastRows(userData, fake.teamId)).toBe(0)
+  await expect(juno.topic.message(MINE)).toHaveCount(0)
+  await juno.topic.threadLinkUnder(ROOT).open()
+  await expect(juno.topic.message(MINE)).not.toContainText('also sent to the channel')
+  expect((await juno.topic.chooseInMessageMenu(MINE, null)).labels).toContain('Also send to #eng')
+})
+
+test('an edit and broadcast of one reply keep their order and separate calls', async ({ juno, fake }) => {
+  await openPostgresThread(juno)
+  fake.holdNext({ method: 'chat.update', before: true })
+  await juno.topic.chooseInMessageMenu(MINE, 'edit')
+  const edit = juno.topic.list.getByRole('textbox', { name: 'Edit message' })
+  const changed = 'Keep the old primary warm until Friday.'
+  await edit.fill(changed)
+  await edit.press('Enter')
+  await expect.poll(() => fake.heldCount({ method: 'chat.update' })).toBe(1)
+  await juno.topic.chooseInMessageMenu(changed, 'broadcast')
+  await expect(juno.topic.message(changed)).toContainText('also sent to the channel')
+  fake.release()
+  await expect.poll(() => fake.messages('C0ENG').find((message) => message.text === changed)?.subtype).toBe('thread_broadcast')
+  const calls = fake.calls.filter((call) => call.method === 'chat.update')
+  expect(calls).toHaveLength(2)
+  expect(calls[0]!.args['text']).toBe(changed)
+  expect(calls[0]!.args['reply_broadcast']).toBeUndefined()
+  expect(calls[1]!.args['text']).toBeUndefined()
+  expect(calls[1]!.args['reply_broadcast']).toBe('true')
+  await juno.sidebar.row(ENG_MAIN).open()
+  await expect(juno.topic.message(changed)).toBeVisible()
+})
+
+test('Main follows a renamed topic title', async ({ juno, fake }) => {
+  const root = fake.messages('C0ENG').find((message) => message.text?.startsWith(ROOT) === true)!
+  fake.injectMessage({ channel: 'C0ENG', user: 'U0DEV', text: 'The rollout is ready.', threadTs: root.ts, broadcast: true })
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row(ENG_MAIN).open()
+  const source = juno.topic.message('The rollout is ready.').locator('[data-broadcast-source]')
+  await expect(source).toHaveText(`in ${ROOT}`)
+  await juno.sidebar.row(ROOT, { exact: true }).chooseInMenu('rename')
+  await juno.rename('Friday rollout')
+  await expect(source).toHaveText('in Friday rollout')
+  await press(juno, source)
+  await juno.topic.expectTitle('Friday rollout')
 })

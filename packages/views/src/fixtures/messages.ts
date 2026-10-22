@@ -206,7 +206,7 @@ export const main = window([
     text: 'Postgres 16 migration plan is up for review. Thursday is the dry run.',
     thread: { id: 'C0ENG:1760000000.000100', replyCount: 14, label: '14 replies', preview: 'Elena: 4 minutes is fine for us.', lastReplyAt: NOW - 4 * MINUTE },
   },
-  { ago: 30, from: people.dev, text: 'Replica lag back under a second.', broadcast: true, broadcastFrom: { id: 'C0ENG:1760000000.000100', preview: 'Postgres 16 migration plan is up for review. Thursday is the dry run.' } },
+  { ago: 30, from: people.dev, text: 'Replica lag back under a second.', broadcast: true, broadcastFrom: { id: 'C0ENG:1760000000.000100', title: 'Postgres 16 migration plan is up…', sensitive: true } },
   {
     ago: 12,
     from: people.priya,

@@ -46,6 +46,7 @@ import { editMarkup, emojiUnicode, messageBody, readableText, splitEmojiName, ty
 import { syncState, StoreReader, type SqlClient, type SqlError } from '@juno/store'
 import { imagesWithoutThumbs, type PendingFile } from '@juno/sync'
 import { windowCovered } from './coverage'
+import { broadcastTitles } from './broadcastTitles'
 import { uploadsUrl } from '../staging'
 import type { ListRun } from '../protocol/live'
 import { personFrom, userName, type UserRow } from '../topicRows'
@@ -262,16 +263,10 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
         for (const reply of withIntents(replies, actions, target)) if (reply.thread_ts !== null && reply.deleted === 0) firstReplies.set(reply.thread_ts, reply)
       }
     }
-    // Main's broadcast replies link back to their thread, with the start of its root.
-    const broadcastRoots = new Map<string, WindowMessage>()
-    if (target.kind === 'main') {
-      const wanted = [...new Set(rows.flatMap((row) => (row.subtype === 'thread_broadcast' && row.thread_ts !== null && row.thread_ts !== row.ts ? [row.thread_ts] : [])))]
-      const shown = new Map(rows.map((row) => [row.ts, row]))
-      const missing = wanted.filter((ts) => !shown.has(ts))
-      const read = missing.length === 0 ? [] : yield* sql.unsafe<WindowMessage>(messagesByTsStatement(target.channel, missing).sql, messagesByTsStatement(target.channel, missing).params)
-      for (const root of [...wanted.flatMap((ts) => (shown.has(ts) ? [shown.get(ts)!] : [])), ...read]) if (root.deleted === 0 && !STUB(root)) broadcastRoots.set(root.ts, root)
-    }
-    const contentRows = [...rows, ...firstReplies.values(), ...[...broadcastRoots.values()].filter((root) => !rows.includes(root))]
+    const sources = yield* broadcastTitles(sql, target.kind === 'main'
+      ? [...new Set(rows.flatMap((row) => row.subtype === 'thread_broadcast' && row.thread_ts !== null && row.thread_ts !== row.ts
+        ? [threadTopicId(target.channel as ChannelId, row.thread_ts as Ts)] : []))] : [], selfId)
+    const contentRows = [...rows, ...firstReplies.values()]
     const repliers = new Map<string, ReadonlyArray<string>>()
     if (target.kind === 'main') {
       for (const row of rows) {
@@ -393,13 +388,12 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       const name = typeof sender === 'string' ? sender : sender == null ? undefined : firstName(userName(sender.id, sender))
       const preview = replyText === '' ? undefined : name ? `${name}: ${replyText}` : replyText
       const broadcastRoot = target.kind === 'main' && row.subtype === 'thread_broadcast' && row.thread_ts !== null && row.thread_ts !== row.ts ? row.thread_ts : undefined
-      const rootBody = broadcastRoot === undefined || !broadcastRoots.has(broadcastRoot) ? undefined : bodies.get(broadcastRoot)
-      const rootText = rootBody === undefined ? '' : readableText(rootBody.body).replace(/\s+/g, ' ').trim().slice(0, 240)
-      const broadcastFrom = broadcastRoot === undefined ? undefined : { id: threadTopicId(target.channel as ChannelId, broadcastRoot as Ts), ...(rootText === '' ? {} : { preview: rootText }) }
+      const broadcastFrom = broadcastRoot === undefined ? undefined : sources.get(broadcastRoot)
       const key = [
         row.version,
         row.subtype,
-        rootText,
+        broadcastFrom?.title,
+        broadcastFrom?.sensitive,
         body.epoch,
         groupStart ? 1 : 0,
         row.reply_count,

@@ -83,7 +83,7 @@ export interface MessageProps {
   /** The inline edit field, in place of the body while the message is edited. */
   readonly editor?: ReactNode
   readonly onOpenThread?: (id: string, event: ActivateEvent) => void
-  /** Main: a broadcast reply's "replied to a thread" opens the thread `id` at the reply `ts`. */
+  /** Main: a broadcast reply's "in <topic title>" opens the thread `id` at the reply `ts`. */
   readonly onOpenReply?: (id: string, ts: string, event: ActivateEvent) => void
   readonly onChannel?: (id: string) => void
   readonly onLink?: (url: string, event: ActivateEvent) => void

@@ -13,8 +13,7 @@ export interface BroadcastSourceProps {
 const HOVER = '@media (hover: hover)'
 
 /**
- * In Main, after a broadcast reply's time: "replied to a thread: Deploy
- * plan for…" (SPEC 7, "Messages"). It opens the thread at the reply on mouse
+ * In Main, after a broadcast reply's time: "in Deploy plan" (SPEC 7, "Messages"). It opens the thread at the reply on mouse
  * down, as a thread link does; ⌘ opens it behind. Muted and underlined on
  * hover, as a shared message's place is. Cut to the header's width.
  */
@@ -23,19 +22,14 @@ export function BroadcastSource({ from, onOpen, tabIndex }: BroadcastSourceProps
     <span
       role="link"
       tabIndex={tabIndex}
-      aria-label={from.preview === undefined ? 'Replied to a thread' : `Replied to a thread: ${from.preview}`}
+      aria-label={`In ${from.title}`}
       data-broadcast-source={from.id}
       {...activateHandlers<HTMLSpanElement>(onOpen)}
       {...stylex.props(styles.link, focusRing.outside)}
     >
       <Text variant="meta" tone="inherit" truncate tooltipWhenTruncated dir="auto" as="span">
-        {'replied to a thread'}
-        {from.preview === undefined ? null : (
-          <>
-            {': '}
-            <span data-sensitive="">{from.preview}</span>
-          </>
-        )}
+        {'in '}
+        <span data-sensitive={from.sensitive ? '' : undefined}>{from.title}</span>
       </Text>
     </span>
   )

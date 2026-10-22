@@ -14,6 +14,7 @@ import * as path from 'node:path'
 import { Store, StoreReader, workspacePathsFromDir, type StoreError } from '@juno/store'
 import { messagesByTsStatement, reactionsStatement, rootStatement, threadsStatements, firstRepliesStatement, windowStatements, type WindowTarget } from '../src/messages/window'
 import { missedHuddleStatement } from '../src/home/huddles'
+import { broadcastTitlesStatement } from '../src/messages/broadcastTitles'
 import { messageUsersStatement } from '../src/messages/query'
 import { homeStatements } from '../src/home/query'
 import { suggestedStatements } from '../src/home/suggested'
@@ -144,7 +145,7 @@ describe('query plans', () => {
           }
         }
       }
-      for (const statement of [rootStatement({ kind: 'thread', channel: 'C0ENG', threadTs: '1700000000.000100' }), reactionsStatement('C0ENG', ['1700000000.000100', '1700000000.000200']), firstRepliesStatement('C0ENG', ['1700000000.000100']), messagesByTsStatement('C0ENG', ['1700000000.000100', '1700000000.000200'])]) {
+      for (const statement of [broadcastTitlesStatement(['t:C0ENG:1700000000.000100']), rootStatement({ kind: 'thread', channel: 'C0ENG', threadTs: '1700000000.000100' }), reactionsStatement('C0ENG', ['1700000000.000100', '1700000000.000200']), firstRepliesStatement('C0ENG', ['1700000000.000100']), messagesByTsStatement('C0ENG', ['1700000000.000100', '1700000000.000200'])]) {
         const lines = yield* plan(statement.sql, statement.params)
         assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
       }

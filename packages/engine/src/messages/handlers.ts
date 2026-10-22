@@ -119,7 +119,7 @@ export const MessagesHandlers = MessagesRoutes.toLayer(
           before: Math.max(0, payload.before ?? MESSAGE_WINDOW_BEFORE),
           limit: Math.max(1, Math.min(MESSAGE_WINDOW_MAX, payload.range.limit)),
         }
-        const keys: InvalidationKeys = { messages: target.kind === 'main' || pendingThread(payload.id) !== undefined ? [payload.id, `channel:${target.channel}`] : [payload.id], users: [], conversations: [], usergroups: [], emoji: [], team: [], sync_state: [], synced_ranges: [target.channel], thread_cursors: target.kind === 'main' ? [] : [payload.id] }
+        const keys: InvalidationKeys = { messages: target.kind === 'main' || pendingThread(payload.id) !== undefined ? [payload.id, `channel:${target.channel}`] : [payload.id], users: [], conversations: [], usergroups: [], emoji: [], team: [], sync_state: [], synced_ranges: [target.channel], ...(target.kind === 'main' ? { topic_overlay: [] } : {}), thread_cursors: target.kind === 'main' ? [] : [payload.id] }
         const setup = Effect.gen(function* () {
           const cache = makeMessageCache()
           const invalidation = yield* Invalidation

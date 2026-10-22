@@ -152,9 +152,9 @@ export const MessageView = Schema.Struct({
   thread: Schema.optionalKey(ThreadLink),
   /**
    * Main only: a thread reply also sent to the channel. `id` is the thread's
-   * topic; `preview` the start of its root's text, when the store has it.
+   * topic; `preview` its resolved topic title's text, when the store has it.
    */
-  broadcastFrom: Schema.optionalKey(Schema.Struct({ id: Schema.String, preview: Schema.optionalKey(Schema.String) })),
+  broadcastFrom: Schema.optionalKey(Schema.Struct({ id: Schema.String, title: Schema.String, sensitive: Schema.Boolean })),
   /**
    * The `client_msg_id` the sending client gave the message. The view keys
    * rows by it when present, so a pending row becomes the stored message in
