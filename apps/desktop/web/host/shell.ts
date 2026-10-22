@@ -13,7 +13,7 @@
  *
  * `stop()` ends all of it and removes the data folder.
  */
-import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { Logger, LogLevel } from 'effect'
@@ -68,11 +68,32 @@ function servedFolders(): string[] {
   return links < 0 ? [repoRoot] : [repoRoot, react.slice(0, links + '/links'.length)]
 }
 
-/** Scratch space: the AgentWork volume when it is mounted (CLAUDE.md), else the system's. */
+/** Whether a process is running. */
+function running(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * A fresh data folder in scratch space: the AgentWork volume when it is
+ * mounted (CLAUDE.md), else the system's. Each folder names the process that
+ * owns it, and folders whose process has gone (a shell killed without a
+ * chance to clean up) are removed first.
+ */
 function scratchFolder(): string {
   const volume = '/Volumes/AgentWork'
-  const parent = existsSync(join(volume, '.fseventsd/no_log')) ? join(volume, 'tmp') : tmpdir()
-  return mkdtempSync(join(existsSync(parent) ? parent : tmpdir(), 'juno-web-'))
+  const wanted = existsSync(join(volume, '.fseventsd/no_log')) ? join(volume, 'tmp') : tmpdir()
+  const parent = existsSync(wanted) ? wanted : tmpdir()
+  for (const name of readdirSync(parent)) {
+    if (!name.startsWith('juno-web-')) continue
+    const owner = Number(/^juno-web-(\d+)-/.exec(name)?.[1])
+    if (Number.isInteger(owner) && !running(owner)) rmSync(join(parent, name), { recursive: true, force: true })
+  }
+  return mkdtempSync(join(parent, `juno-web-${process.pid}-`))
 }
 
 /** What main does for the engine, for a session main already holds: the fake's credentials. */
