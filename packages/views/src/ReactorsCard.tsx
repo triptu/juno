@@ -67,7 +67,7 @@ function Sentence({ names, others }: ReturnType<typeof reactorsLine>) {
       {names.map((name, index) => (
         <Fragment key={index}>
           {index === 0 ? '' : index === last && others === 0 ? ' and ' : ', '}
-          <bdi>{name}</bdi>
+          <bdi {...stylex.props(styles.name)}>{name}</bdi>
         </Fragment>
       ))}
       {others === 0 ? '' : ` and ${others === 1 ? '1 other' : `${others} others`}`}
@@ -160,6 +160,9 @@ const styles = stylex.create({
   sentence: {
     overflowWrap: 'anywhere',
     textWrap: 'pretty',
+  },
+  name: {
+    whiteSpace: 'nowrap',
   },
   // A long emoji name wraps rather than being cut, and See all keeps to the line's end.
   foot: {

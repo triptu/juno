@@ -34,6 +34,12 @@ test('See all on the card opens every reaction, and the strip changes the list',
   await expect(card).toBeVisible()
   await expect(card.locator('[data-reactors-names]')).toHaveText(/^You, .+ and \d+ others$/)
   await expect(card.getByRole('listitem')).toHaveCount(0)
+  // The sentence wraps between people, never between the words of one name.
+  expect(await card.locator('[data-reactors-names] bdi').evaluateAll((names) => names.every((name) => {
+    const range = document.createRange()
+    range.selectNodeContents(name)
+    return new Set([...range.getClientRects()].map((box) => box.top)).size === 1
+  }))).toBe(true)
   const seeAll = card.locator('[data-see-all]')
   await expect(seeAll).toHaveText('See all')
 
