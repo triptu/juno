@@ -10,7 +10,13 @@ export const prefsSet = Rpc.make('prefs.set', {
 })
 /** Whether the engine has a decision provider. No key material crosses the port. */
 export const aiAvailable = liveValueRoute('ai.available', { payload: {}, value: Schema.Boolean })
-export const PrefsRoutes = RpcGroup.make(prefsGet, prefsSet, aiAvailable)
+/** Records a use locally. The engine owns the bounded recency list. */
+export const emojiUse = Rpc.make('emoji.use', {
+  payload: { name: Schema.String.check(Schema.isMinLength(1)) }, success: Schema.Void, error: NotSignedIn,
+})
+/** The open workspace's recent emoji names, newest first. */
+export const emojiRecent = liveValueRoute('emoji.recent', { payload: {}, value: Schema.Array(Schema.String) })
+export const PrefsRoutes = RpcGroup.make(prefsGet, prefsSet, aiAvailable, emojiUse, emojiRecent)
 
 export const sendCheckPrefKeys = ['wrongPlace', 'typos', 'capitalI', 'questionMarks', 'longSentences', 'grammar'] as const
 export type SendCheckPref = typeof sendCheckPrefKeys[number]

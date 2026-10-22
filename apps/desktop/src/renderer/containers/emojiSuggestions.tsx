@@ -1,9 +1,8 @@
 import { useEffect, useId, useMemo, useState, type KeyboardEvent, type RefObject } from 'react'
 import { EMOJI_QUERY_MIN, emojiQueryAt } from '@juno/contract'
-import { composerEmojiAtom, quickReactionsAtom } from '@juno/state'
+import { composerEmojiAtom, noteRecentEmoji, quickReactionsAtom, recentEmojiAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { mentionRowId, type ComposerMention, type EmojiSuggestion } from '@juno/views'
-import { noteRecentEmoji, recentEmoji } from './recentEmoji'
 import { editField, listKey } from './suggestionKeys'
 import { SuggestionList, useSuggestionList } from './suggestionList'
 
@@ -43,7 +42,8 @@ export function useEmojiSuggestions({ text, onChange, field }: Options) {
   const listReady = useSuggestionList(loading)
   const query = typed === undefined || typed.start === dismissed || typed.text.length < EMOJI_QUERY_MIN ? undefined : typed
   const quick = useAtomValue(quickReactionsAtom)
-  const rows = query === undefined || match === undefined ? [] : match(catalog, query.text, recentEmoji(), quick)
+  const recent = useAtomValue(recentEmojiAtom)
+  const rows = query === undefined || match === undefined ? [] : match(catalog, query.text, recent, quick)
   const ids = rows.map((row) => mentionRowId(listId, row.id))
   const activeId = chosen !== undefined && ids.includes(chosen) ? chosen : ids[0]
   const pick = (id: string) => {

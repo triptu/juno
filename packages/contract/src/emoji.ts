@@ -5,6 +5,19 @@
  */
 export { prepareEmojiPicker, type PreparedEmojiPicker, type PickerItem, workspaceEmoji, emojiCatalog, type EmojiCategory } from '@juno/domain'
 
+/** The workspace preference in user.db that holds the emoji used last, newest first (SPEC 7). */
+export const RECENT_EMOJI_PREF = 'recentEmoji'
+
+/** Frequently used holds up to 18. */
+export const MAX_RECENT_EMOJI = 18
+
+/** The names a saved recent-emoji preference holds: its non-empty strings, once each, at most 18. */
+export function recentEmojiFrom(value: unknown): ReadonlyArray<string> {
+  if (!Array.isArray(value)) return []
+  const names = (value as ReadonlyArray<unknown>).filter((name): name is string => typeof name === 'string' && name !== '')
+  return [...new Set(names)].slice(0, MAX_RECENT_EMOJI)
+}
+
 /** A one-click reaction in the message toolbar: a standard emoji (`unicode`) or a custom one (`url`). */
 export interface QuickReaction {
   /** Slack's name, for example `+1`. */

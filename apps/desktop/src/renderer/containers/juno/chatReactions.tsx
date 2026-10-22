@@ -6,11 +6,10 @@
  */
 import { Suspense, useCallback, useEffect, useState, type KeyboardEvent, type RefObject } from 'react'
 import type { ChatItem } from '@juno/agent-contract'
-import { quickReactionsAtom } from '@juno/state'
+import { noteRecentEmoji, quickReactionsAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { Floating, HoverToolbar, type ReactionTarget } from '@juno/views'
 import { EmojiPickerPanel, preloadPicker, usePickerDismiss } from '../emojiPicker'
-import { frequentEmoji, noteRecentEmoji } from '../recentEmoji'
 import { junoCommands } from './actions'
 
 /** The picker's height and its gap: below the button when this much room is there, else above, else inside the list area over the button. */
@@ -86,7 +85,7 @@ export function useReactionPicker(items: ReadonlyArray<ChatItem>, scrollRef: Ref
     <Floating x={picker.x} y={picker.y} placement={picker.placement} layer="picker">
       {picker.full ? (
         <Suspense fallback={null}>
-          <EmojiPickerPanel recent={frequentEmoji(reactions)} onPick={react} onClose={back} />
+          <EmojiPickerPanel onPick={react} onClose={back} />
         </Suspense>
       ) : (
         <div ref={focusFirst} data-juno-reactions="" onKeyDown={onKeyDown}>
