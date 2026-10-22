@@ -36,6 +36,7 @@ import type { Registry } from './client'
 import { traceSend } from './sendTrace'
 import { offerSentSuggestion } from './sentSuggestions'
 import { releaseSidebarTopic } from './sidebar'
+import { markOwnSidebarChange } from './sidebarMoves'
 
 /**
  * Queues the text, and any staged `files`, for `to`. With `draftOf`, that topic's draft is cleared with it.
@@ -45,6 +46,8 @@ export const sendMessage = async (registry: Registry, to: SendTarget, text: stri
   const clientMsgId = crypto.randomUUID()
   const sentAt = performance.now()
   traceSend('send asked', () => ({ clientMsgId: clientMsgId.slice(0, 8), to }))
+  // Its row may move before the engine answers with the topic: the sidebar shows that at once too.
+  markOwnSidebarChange(registry)
   const exit = await runCommand(registry, messagesSend, {
     to, text, startThread, clientMsgId,
     ...(draftOf === undefined ? {} : { draftOf }),

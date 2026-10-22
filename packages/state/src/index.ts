@@ -37,12 +37,12 @@ export {
   sidebarFilterAtom,
   sidebarListAtom,
   sidebarRowAtom,
-  sidebarSectionsAtom,
   setSidebarEngaged,
   traceSidebarHold,
   topicSelectedAtom,
   type SidebarWindow,
 } from './sidebar'
+export { sidebarSectionsAtom } from './sidebarSections'
 export { applyListDelta, emptyWindow, type ListWindow } from './list'
 export { traceSend } from './sendTrace'
 export {
