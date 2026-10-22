@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import type { ReleaseNote } from '@juno/contract'
-import { layout, spacing } from '@juno/tokens/tokens.stylex'
+import { layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Button, Checkbox, ScrollArea, Text } from '@juno/ui'
 
 /**
@@ -94,7 +94,7 @@ export function UpdateSettings({ build, available, enabled, status, whatsNew, on
       {/* Dimmed rather than disabled, so a keyboard press keeps focus on it. */}
       {available ? <Button variant="outline" size="sm" dimmed={busy} onClick={busy ? undefined : onCheck}>Check for updates</Button> : null}
     </div>
-    {status === null ? null : <div {...stylex.props(styles.row)}>
+    {status === null ? null : <div {...stylex.props(styles.row, styles.status)}>
       <Text variant="meta" tone="muted" numeric as="p">{statusLine(status)}</Text>
       <StatusActions status={status} open={open('update')} onRestart={onRestart} onDownload={onDownload} onCopyDetails={onCopyDetails} onWhatsNew={onWhatsNew} />
     </div>}
@@ -113,6 +113,8 @@ const styles = stylex.create({
     flexWrap: 'wrap',
     gap: spacing['--space-3'],
   },
+  // As tall as its buttons, so the line keeps its height from "Checking…" to the answer.
+  status: { minHeight: sizes['--control-28'] },
   notes: {
     display: 'flex',
     flexDirection: 'column',
