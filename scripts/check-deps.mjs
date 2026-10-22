@@ -142,13 +142,19 @@ const unstable = [
     allow: ['packages/state/src/transport.ts', 'packages/engine/src/protocol/runner.ts', 'packages/agent/src/host/port.ts', 'packages/agent/src/serve/runner.ts'],
   },
   {
+    // The web shell's engine socket (docs/development.md, "Web shell"): the client and the server side.
+    label: 'effect/socket and effect/net',
+    spec: /^effect\/(?:socket|net)(?:\/|$)/,
+    allow: ['packages/state/src/socket.ts', 'packages/engine/src/protocol/socket.ts'],
+  },
+  {
     label: 'effect/sql and @effect/sql-sqlite-node',
     spec: /^(?:effect\/sql(?:\/|$)|@effect\/sql-)/,
     allow: ['packages/store/'],
   },
   {
     label: 'other unstable subpaths',
-    spec: /^(?:effect\/(?:http|http-api|socket|persistence|cli|ai|cluster|workflow|observability|process|devtools|eventlog)(?:\/|$)|@effect\/platform)/,
+    spec: /^(?:effect\/(?:http|http-api|persistence|cli|ai|cluster|workflow|observability|process|devtools|eventlog)(?:\/|$)|@effect\/platform)/,
     allow: [],
   },
   {
