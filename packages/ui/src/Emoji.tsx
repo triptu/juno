@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { fonts, sizes } from '@juno/tokens/tokens.stylex'
 
 /** Square size in px: 14 in chips and the hover toolbar, 16 in quick-reaction pills, 20 in the picker, 32 in the reactors card. */
-export type EmojiSize = 14 | 16 | 20 | 32
+type EmojiSize = 14 | 16 | 20 | 32
 
 export interface EmojiProps {
   /** A standard emoji as text. A `:name:` with no image is plain text, not an `Emoji`. */
