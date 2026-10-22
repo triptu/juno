@@ -12,52 +12,9 @@ import { expect, test, type Fixtures } from './fixtures'
 import { answer, JunoChatPane, test as chatTest } from './juno-agent/chat'
 import { expectStableAnchor } from './shiftProbe'
 import { expectRestSurvivesGrowth, expectScrollEscapesGrowth } from './scrollGrowthProbe'
+import { watchArrival, watchEditVisibility, watchResize, type Frame } from './stickBottomProbe'
 
 test.describe.configure({ timeout: 90_000, mode: 'parallel' })
-
-interface Frame {
-  readonly present: boolean
-  readonly inView: boolean
-  readonly distance: number
-}
-
-/**
- * Reads, after every paint, whether the newest `row` that contains `text` exists, is fully inside the scroller
- * `scroller`, and how far the scroller is from its end. The returned function stops and answers the frames from
- * the first that has the row.
- */
-async function watchArrival(page: Page, scroller: string, row: string, text: string): Promise<() => Promise<Frame[]>> {
-  await page.evaluate(
-    ({ scroller, row, text }) => {
-      const state = { frames: [] as Frame[], on: true }
-      ;(window as unknown as { arrival: typeof state }).arrival = state
-      const tick = () => {
-        const list = [...document.querySelectorAll<HTMLElement>(scroller)].find((node) => node.getClientRects().length > 0)
-        if (list !== undefined) {
-          const node = [...list.querySelectorAll(row)].findLast((candidate) => candidate.textContent?.includes(text) === true)
-          const box = list.getBoundingClientRect()
-          const at = node?.getBoundingClientRect()
-          state.frames.push({
-            present: at !== undefined,
-            inView: at !== undefined && at.top >= box.top - 1 && at.bottom <= box.bottom + 1,
-            distance: list.scrollHeight - list.scrollTop - list.clientHeight,
-          })
-        }
-        // After the frame is painted: a resize observer runs after animation frame callbacks, before paint.
-        if (state.on) requestAnimationFrame(() => setTimeout(tick, 0))
-      }
-      requestAnimationFrame(() => setTimeout(tick, 0))
-    },
-    { scroller, row, text },
-  )
-  return () =>
-    page.evaluate(() => {
-      const state = (window as unknown as { arrival: { frames: Frame[]; on: boolean } }).arrival
-      state.on = false
-      const first = state.frames.findIndex((frame) => frame.present)
-      return first < 0 ? [] : state.frames.slice(first)
-    })
-}
 
 /** Every frame from the first that draws the row shows it whole, with the list at its end. */
 function expectHeldAtEnd(frames: Frame[]): void {
@@ -143,6 +100,70 @@ function expectWhole(frames: Frame[], { atEnd }: { readonly atEnd: boolean }): v
 }
 
 const EDITING = '[data-message-row][data-editing]'
+
+for (const place of ['Main', 'topic', 'DM'] as const) {
+  test(`${place}: editing the last message without reactions stays above the composer`, async ({ juno, win, slack, fake }) => {
+    const maya = slack.as('Maya').id
+    const dm = [...fake.workspace.conversations.values()].find((conversation) => conversation.kind === 'im' && conversation.members.has(maya))!
+    const channel = place === 'DM' ? dm.id : slack.channel('eng')
+    const root = place === 'topic' ? fake.workspace.post({ channel, user: maya, text: 'No reactions edit thread', silent: true }) : undefined
+    const thread = root === undefined ? {} : { threadTs: root.ts }
+    for (let i = 0; i < 30; i++) fake.workspace.post({ channel, ...thread, user: slack.as(i % 2 === 0 ? 'Maya' : 'Leo').id, text: `Edit history ${i}`, silent: true })
+    await juno.signIn()
+    await juno.waitForSync()
+    await juno.sidebar.row(place === 'DM' ? 'Maya' : '#eng', { exact: true }).open()
+    const { topic } = juno
+    if (root !== undefined) await topic.list.locator(`[data-thread-link="t:${channel}:${root.ts}"]`).click()
+    await topic.expectMessage('Edit history 29')
+    await topic.toLatest()
+    expect(await longerThanView(topic.scroller)).toBe(true)
+
+    for (const multiline of [false, true]) {
+      for (const grouped of [false, true]) {
+        const name = `${multiline ? 'multiline' : 'one line'}, ${grouped ? 'grouped' : 'name line'}`
+        fake.injectMessage({ channel, ...thread, user: grouped ? fake.workspace.selfId : maya, text: `Previous message for ${name}` })
+        await topic.expectMessage(`Previous message for ${name}`)
+        const firstLine = `My last message: ${name}`
+        await topic.send(multiline ? `${firstLine}\nA second line\nA third line\nA fourth line` : firstLine)
+        await topic.expectSent(firstLine)
+        const row = topic.message(firstLine)
+        await expect(row.locator('[data-message-header]')).toHaveCount(grouped ? 0 : 1)
+        await expect(row.locator('[data-reaction]')).toHaveCount(0)
+        await expect(topic.list.locator('[data-message-row]').last()).toContainText(firstLine)
+
+        for (const method of ['More', 'right click', 'Up then E'] as const) {
+          await test.step(`${name}: ${method}`, async () => {
+            await topic.expectAtBottom()
+            await expect(topic.composer).toHaveValue('')
+            const watched = await watchEditVisibility(win)
+            if (method === 'Up then E') {
+              await topic.composer.press('ArrowUp')
+              await expect(row).toBeFocused()
+              await row.press('e')
+            } else {
+              await row.hover()
+              await juno.chooseNextMenuItem('edit', { hold: true })
+              if (method === 'More') await row.getByRole('button', { name: 'More', exact: true }).click()
+              else await row.click({ button: 'right' })
+              await juno.releaseMenu()
+            }
+            await expect(topic.list.getByRole('textbox', { name: 'Edit message' })).toBeFocused()
+            await expect(topic.list.locator(EDITING).getByRole('button', { name: 'Cancel', exact: true })).toBeVisible()
+            await expect(topic.list.locator(EDITING).getByRole('button', { name: /^Save/ })).toBeVisible()
+            await frames(win, 12)
+            const samples = await watched()
+            await test.info().attach(`${name}-${method}`, { body: JSON.stringify(samples), contentType: 'application/json' })
+            console.log(`${place}, ${name}, ${method}: ${samples.length} frames, hidden below ${Math.max(...samples.map((sample) => sample.hiddenBelow))}px, above ${Math.max(...samples.map((sample) => sample.hiddenAbove))}px`)
+            expect(samples.length).toBeGreaterThanOrEqual(10)
+            expect(samples.filter((sample) => sample.hiddenAbove > 0 || sample.hiddenBelow > 0 || sample.buttons !== 2)).toEqual([])
+            await win.keyboard.press('Escape')
+            await expect(topic.list.locator(EDITING)).toHaveCount(0)
+          })
+        }
+      }
+    }
+  })
+}
 
 test('keeps the last message of Main whole as it grows at the bottom, and still when scrolled up', async ({ juno, win, slack, fake }) => {
   const channel = await openLongMain(juno, fake, slack)
@@ -307,41 +328,6 @@ async function scrolledUpArrival({ juno, win, slack, fake }: Pick<Fixtures, 'jun
     fake.injectMessage({ channel, user: slack.as('Maya').id, text: 'A new message while scrolled up' })
     await juno.topic.expectPill('1 new message')
   })
-}
-
-/**
- * Reads, each time the scroller's box changes size, whether its last row is fully inside it and how far it is from
- * its end. An observer created after the app's runs after it in the same frame, after layout and before paint, so
- * it reads what that frame paints; a read from a task could land after the size change and before the frame.
- * Returns once the observer's own first look is in, and a function that waits for an entry at a height below
- * `below` and answers every entry.
- */
-async function watchResize(page: Page, scroller: string): Promise<(below: number) => Promise<Frame[]>> {
-  await page.evaluate(
-    (scroller) =>
-      new Promise<void>((resolve) => {
-        const list = [...document.querySelectorAll<HTMLElement>(scroller)].find((node) => node.getClientRects().length > 0)!
-        const state = { frames: [] as Frame[], heights: [] as number[], observer: undefined as ResizeObserver | undefined }
-        ;(window as unknown as { resized: typeof state }).resized = state
-        state.observer = new ResizeObserver(() => {
-          const box = list.getBoundingClientRect()
-          const at = [...list.querySelectorAll('[data-message-row]')].at(-1)?.getBoundingClientRect()
-          state.frames.push({ present: at !== undefined, inView: at !== undefined && at.top >= box.top - 1 && at.bottom <= box.bottom + 1, distance: list.scrollHeight - list.scrollTop - list.clientHeight })
-          state.heights.push(list.clientHeight)
-          resolve()
-        })
-        state.observer.observe(list)
-      }),
-    scroller,
-  )
-  return async (below) => {
-    await page.waitForFunction((below) => (window as unknown as { resized: { heights: number[] } }).resized.heights.some((height) => height < below), below)
-    return page.evaluate(() => {
-      const state = (window as unknown as { resized: { frames: Frame[]; observer: ResizeObserver } }).resized
-      state.observer.disconnect()
-      return state.frames
-    })
-  }
 }
 
 /** The chat test with a model that holds its answer to a message with "held" in it until the gate opens. */
