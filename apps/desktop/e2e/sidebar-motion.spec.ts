@@ -145,3 +145,73 @@ test('your own Resolve takes its row out in one frame, with no motion', async ({
   expect(frames[removed]!.tops[below]).toBeCloseTo(frames[removed - 1]!.tops[gone]!, 0)
   expect(frames.every((frame) => frame.animating === 0)).toBe(true)
 })
+
+test('a burst retargets the rows, including a row removed during its slide, and releases every animation', async ({ juno, win, fake }) => {
+  await atTheTop(juno, win)
+  const movers = (await recentIds(juno)).filter((id) => id.startsWith('t:')).slice(2, 4)
+  expect(movers).toHaveLength(2)
+  await win.evaluate(() => {
+    const animations: Animation[] = []
+    const original = Element.prototype.animate
+    Element.prototype.animate = function (frames, options) {
+      const animation = original.call(this, frames, options)
+      if (this.hasAttribute('data-topic-row')) {
+        animation.playbackRate = 0.2
+        animations.push(animation)
+      }
+      return animation
+    }
+    Object.assign(globalThis, { __motionAnimations: animations })
+  })
+  replyIn(fake, movers[0]!, 'The first reply in a burst')
+  await win.waitForFunction((id) => (document.querySelector(`[data-topic-id="${id}"]`)?.getAnimations().length ?? 0) > 0, movers[0])
+  replyIn(fake, movers[1]!, 'The next reply interrupts the slide')
+  await expect.poll(async () => (await recentIds(juno))[0]).toBe(movers[1])
+  const [, channel, threadTs] = movers[0]!.split(':')
+  fake.unfollowThread({ channel: channel!, threadTs: threadTs! })
+  await expect.poll(async () => (await recentIds(juno)).includes(movers[0]!)).toBe(false)
+  await expect.poll(() => win.evaluate(() => {
+    const { __motionAnimations: animations } = globalThis as unknown as { __motionAnimations: Animation[] }
+    return animations.length > 0 && animations.every((animation) => animation.playState === 'idle')
+  })).toBe(true)
+  const tops = await juno.sidebar.rows.evaluateAll((rows) => rows.slice(0, 10).map((row) => row.getBoundingClientRect().top))
+  expect(tops).toEqual([...tops].sort((a, b) => a - b))
+})
+
+test('an outside reply does not animate while scrolled down', async ({ juno, win, fake }) => {
+  await atTheTop(juno, win)
+  const mover = await threadInView(juno)
+  await juno.sidebar.list.evaluate((list) => { list.scrollTop = 180 })
+  await expect.poll(() => juno.sidebar.list.evaluate((list) => list.scrollTop)).toBeGreaterThan(0)
+  await recordFrames(win)
+  replyIn(fake, mover, 'An update while reading farther down')
+  await expect.poll(async () => (await recentIds(juno))[0]).toBe(mover)
+  const frames = await stopFrames(win)
+  expect(frames.every((frame) => frame.animating === 0)).toBe(true)
+})
+
+test('a hidden window updates without starting or retaining row animations', async ({ juno, win, fake, app }) => {
+  await atTheTop(juno, win)
+  const mover = await threadInView(juno)
+  await win.evaluate(() => {
+    let starts = 0
+    const original = Element.prototype.animate
+    Element.prototype.animate = function (frames, options) {
+      if (this.hasAttribute('data-topic-row')) starts++
+      return original.call(this, frames, options)
+    }
+    Object.defineProperty(globalThis, '__motionStarts', { get: () => starts })
+  })
+  // Playwright forces focus/visibility for ordinary input tests; let the native window control it here.
+  const cdp = await win.context().newCDPSession(win)
+  await cdp.send('Emulation.setFocusEmulationEnabled', { enabled: false })
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.hide())
+  await expect.poll(() => win.evaluate(() => document.hidden)).toBe(true)
+  replyIn(fake, mover, 'An outside reply while hidden')
+  await expect.poll(async () => (await recentIds(juno))[0]).toBe(mover)
+  expect(await win.evaluate(() => (globalThis as { __motionStarts?: number }).__motionStarts)).toBe(0)
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.show())
+  await expect.poll(() => win.evaluate(() => document.hidden)).toBe(false)
+  expect(await win.evaluate((selector) => [...document.querySelectorAll(selector)].flatMap((row) => row.getAnimations()).length, ROW)).toBe(0)
+  await cdp.detach()
+})

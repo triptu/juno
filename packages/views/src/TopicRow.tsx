@@ -394,7 +394,7 @@ const styles = stylex.create({
     contentVisibility: 'auto',
     containIntrinsicSize: `auto ${density['--density-row-estimate']}`,
     backgroundColor: {
-      default: 'transparent',
+      default: 'var(--reorder-background, transparent)',
       ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
     },
     // The Resolve check reads this: hidden until the pointer is over the row

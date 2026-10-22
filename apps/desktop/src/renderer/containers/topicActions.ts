@@ -1,4 +1,3 @@
-import { junoNavAtom, junoSettingsNow, watchReply } from '@juno/state/agent'
 /**
  * The topic actions (SPEC 5 "Row actions", inventory 15.1 and 16), for
  * every place that offers them: a sidebar row's check and menu, the
@@ -13,15 +12,12 @@ import {
   notifyChoiceOf,
   readsMarkRead,
   readsMarkUnread,
-  topicMenuItems,
   topicsPin,
   topicsRename,
   topicsReopen,
   topicsResolve,
   topicsUnpin,
-  whyLabel,
   type ContextMenuAt,
-  type ContextMenuItem,
   type MenuCommand,
   type MessageView,
   type NotifyTargetView,
@@ -30,40 +26,29 @@ import {
 } from '@juno/contract'
 import {
   allTopicsRowAtom,
-  broadcastMessage,
   copyText,
-  currentNotificationSettings,
   editUndo,
   flushSidebar,
   ignoreChannel,
-  junoAvailableAtom,
-  loadNotificationSettings,
-  loadWhy,
-  messageLink,
   openInSlack,
-  popupContextMenu,
-  canRedraw,
-  redrawTopic,
   registry,
   releaseSidebarTopic,
   renamingAtom,
   runAction,
-  showToast,
   sidebarRowAtom,
   signedInAtom,
   slackLink,
   threadRootTs,
   topicAtom,
   undoLast,
-  type RedrawProblem,
   type RenameTarget,
   type ToastContent,
 } from '@juno/state'
-import { openSettings, openTopic, openTopicFromList } from './navigation'
-import { runViewMenuAction, viewChoices } from './viewActions'
-import { choiceFor, nativeMenu, setNotifyLevel, showPersonMenu, showWhy } from './notifyActions'
+import { openTopic, openTopicFromList } from './navigation'
+import { runViewMenuAction } from './viewActions'
+import { setNotifyLevel } from './notifyActions'
 import { showWhatJunoKnows } from './juno/actions'
-import { huddleMenuItem, joinHuddleFromMenu } from './huddle/menuItem'
+import { joinHuddleFromMenu } from './huddle/menuItem'
 
 /** What the actions read from a sidebar row or the header's detail. Copy Slack link and Open in Slack need the detail's root. */
 export type ActionTopic = Pick<TopicDetail, 'id' | 'kind' | 'title' | 'channel' | 'unreadCount' | 'pinned' | 'resolved' | 'subscribed'> & {
@@ -106,40 +91,6 @@ export function toggleResolved(id: string): void {
   else resolveTopic(id)
 }
 
-/** Why Redraw art made nothing, said plainly. */
-const REDRAW_PROBLEMS: Record<RedrawProblem, string> = {
-  off: 'AI assist is off',
-  budget: 'Today’s AI limit is reached',
-  'no-key': 'Add an OpenRouter key in Settings › Juno',
-  'no-agent': 'Juno’s agent did not answer the daily limit check',
-  timeout: 'The model took too long',
-  provider: 'The model service returned an error',
-  invalid: 'The model’s drawing could not be used',
-  other: 'Something went wrong',
-}
-
-/** Redraw art: a new drawing from the model, which takes a few seconds; the undo puts the old one back. */
-async function redrawArt(topic: ActionTopic): Promise<void> {
-  const problem = await redrawTopic(registry, topic.id, said('Redrawn', topic))
-  if (problem === 'budget') showToast(registry, { text: await limitReached(), action: { label: 'Change limit', onAction: () => openSettings('ai-activity') } })
-  else if (problem !== undefined) showToast(registry, { text: `Could not redraw · ${REDRAW_PROBLEMS[problem]}` })
-}
-
-const dollars = (value: number): string => `$${value.toFixed(2)}`
-
-/**
- * Which limit stopped a call, from the agent's ledger: today's limit, or the
- * half of it that topic art, titles and Home may use.
- */
-async function limitReached(): Promise<string> {
-  const page = await junoSettingsNow(registry)
-  if (page === undefined) return `Could not redraw · ${REDRAW_PROBLEMS.budget}`
-  if (page.spentTodayUsd < page.limitTodayUsd && page.backgroundTodayUsd >= page.backgroundLimitUsd) {
-    return `Topic art and titles have used their ${dollars(page.backgroundLimitUsd)} of today’s ${dollars(page.limitTodayUsd)} AI limit`
-  }
-  return `Today’s AI limit of ${dollars(page.limitTodayUsd)} is reached`
-}
-
 /** Rename saved: the engine clears the manual title for an empty one or the AI title. */
 export function renameTopic(id: string, title: string): void {
   registry.set(renamingAtom, undefined)
@@ -155,38 +106,15 @@ export function cancelRename(): void {
 }
 
 /** What Notify me applies to: the thread itself, or on Main the channel or DM. */
-function notifyTarget(topic: ActionTopic): { readonly target: NotifyTargetView; readonly label: string } {
+export function notifyTarget(topic: ActionTopic): { readonly target: NotifyTargetView; readonly label: string } {
   return topic.kind === 'main' ? { target: { kind: 'channel', id: topic.channel.id }, label: topic.channel.label } : { target: { kind: 'thread', id: topic.id }, label: topic.title }
 }
 
-/**
- * The topic menu (inventory 15.1), on a sidebar row and the header's title,
- * at the pointer or at `at`. `from` says which title Rename edits. Notify me
- * on a thread is how it is followed: Every message and When it matters
- * follow it in Slack, Never unfollows it (SPEC 5). On Main it is the
- * channel's or DM's choice.
- */
+/** Warms the native topic menu after the first sidebar paint. */
+export const loadTopicMenu = () => import('./topicMenu')
+
 export async function showTopicMenu(topic: ActionTopic, from: RenameTarget['where'], at?: ContextMenuAt): Promise<void> {
-  // Redraw art shows only when a drawing can be made: asked beside the settings, within a fraction of a second.
-  const drawable = canRedraw(registry)
-  const settings = currentNotificationSettings(registry) ?? (await loadNotificationSettings(registry))
-  const notify = notifyTarget(topic)
-  const huddle = huddleMenuItem(topic.channel)
-  const state = {
-    kind: topic.kind,
-    channel: topic.channel,
-    unread: topic.unreadCount > 0,
-    pinned: topic.pinned,
-    resolved: topic.resolved,
-    notify: choiceFor(settings, notify.target, topic.subscribed),
-    canDraw: settings?.aiAssist === true && (await drawable),
-    // Add to view (inventory 15.8) is on Main: the row's channel or DM.
-    ...(topic.kind === 'main' ? { views: viewChoices(topic.channel.id) } : {}),
-    ...(huddle === undefined ? {} : { huddle }),
-    ...(dmPartner(topic) !== undefined && registry.get(junoAvailableAtom) ? { knowsAbout: dmPartner(topic)!.name } : {}),
-  }
-  const chosen = (await popupContextMenu(nativeMenu(topicMenuItems(state), (id) => isLinkable(topic) || (id !== 'copy-link' && id !== 'open-in-slack')), at)) as TopicMenuAction | undefined
-  if (chosen !== undefined) runTopicAction(topic, chosen, from)
+  return (await loadTopicMenu()).showTopicMenu(topic, from, at)
 }
 
 /** The other person of a one-to-one DM, for What Juno knows about them. */
@@ -210,7 +138,7 @@ export function runTopicAction(topic: ActionTopic, chosen: TopicMenuAction, from
     case 'rename':
       return registry.set(renamingAtom, { id, where: from })
     case 'redraw':
-      return void redrawArt(topic)
+      return void loadTopicMenu().then((menu) => menu.redrawArt(topic))
     case 'mark-read':
       return void runAction(registry, readsMarkRead, { id }, said('Marked as read', topic))
     case 'mark-unread':
@@ -256,7 +184,7 @@ export function showTableRowMenu(id: string): void {
   if (topic !== undefined) void showTopicMenu(topic, 'table')
 }
 
-function openTopicInSlack(topic: ActionTopic): void {
+export function openTopicInSlack(topic: ActionTopic): void {
   const session = registry.get(signedInAtom)
   if (session !== undefined) openInSlack({ teamId: session.teamId, channelId: topic.channel.id })
 }
@@ -264,24 +192,6 @@ function openTopicInSlack(topic: ActionTopic): void {
 /** What the message menu leaves to the topic: the edit field, the delete confirm, opening the thread, the Forward sheet, the reactions dialog. */
 export type MessageMenuChoice = 'edit' | 'delete' | 'reply' | 'forward' | 'reactions'
 
-/**
- * "Also send to #eng" on your own thread reply, as Slack's "Send reply to
- * this channel"; "Also send to Main" in a DM or group DM, whose Main is the
- * conversation. Slack has threads in all four kinds.
- */
-export function broadcastLabel(channel: Pick<ActionTopic['channel'], 'kind' | 'name'>): string {
-  return channel.kind === 'public' || channel.kind === 'private' ? `Also send to #${channel.name}` : 'Also send to Main'
-}
-
-/**
- * The message menu (SPEC 7 "More", inventory 15.4 and 15.6), from the
- * toolbar's More and from a right-click: Edit and Delete on your own
- * messages, and on your own reply in a thread Also send to #eng, unless it
- * already was; Start thread or Open thread in Main, View reactions, Forward…, Copy Slack link and Open in Slack,
- * and, on someone else's message, why it did or did not notify. A reply's
- * link carries its thread; a message Slack does not have yet has none. On
- * the sender's name or avatar it is the person menu.
- */
 export async function showMessageMenu(
   topic: ActionTopic,
   message: Pick<MessageView, 'ts' | 'pending' | 'thread' | 'kind' | 'root' | 'broadcast' | 'reactions'>,
@@ -290,40 +200,7 @@ export async function showMessageMenu(
   sender: { readonly id: string; readonly name: string } | undefined,
   onSender: boolean,
 ): Promise<MessageMenuChoice | undefined> {
-  const session = registry.get(signedInAtom)
-  const own = sender !== undefined && sender.id === session?.userId
-  if (onSender && sender !== undefined && !own) {
-    await showPersonMenu(sender, at)
-    return undefined
-  }
-  const { ts } = message
-  const linkable = message.pending === undefined
-  const why = own || !linkable ? undefined : await loadWhy(registry, topic.id, ts)
-  // Only a reply Slack has, as Slack's own client offers it.
-  const broadcastable = own && topic.kind === 'thread' && linkable && message.kind === 'message' && !message.root && !message.broadcast
-  const items: ContextMenuItem[] = [
-    ...(editable ? [{ id: 'edit', label: 'Edit' }, { id: 'delete', label: 'Delete' }] : []),
-    ...(broadcastable ? [{ id: 'broadcast', label: broadcastLabel(topic.channel) }] : []),
-    ...(editable || broadcastable ? [{ separator: true } as const] : []),
-    ...(topic.kind === 'main' && linkable ? [{ id: 'reply', label: message.thread === undefined ? 'Start thread' : 'Open thread' }, { separator: true } as const] : []),
-    ...(own && linkable ? [{ id: 'watch-reply', label: 'Tell me if nobody replies', enabled: registry.get(junoNavAtom).mayAuthorize === true }] : []),
-    // The keyboard's way to the reactions dialog; the pointer also has the card's See all.
-    ...(message.reactions.length > 0 ? [{ id: 'reactions', label: 'View reactions' }] : []),
-    // Only a message Slack has can be shared, as only it has a link.
-    { id: 'forward', label: 'Forward…', ...(linkable && message.kind === 'message' ? {} : { enabled: false }) },
-    { id: 'copy-link', label: 'Copy Slack link', ...(linkable ? {} : { enabled: false }) },
-    { id: 'open-in-slack', label: 'Open in Slack' },
-    ...(why === undefined ? [] : [{ separator: true } as const, { id: 'why', label: whyLabel(why.notified) }]),
-  ]
-  const chosen = await popupContextMenu(items, at)
-  if (chosen === 'edit' || chosen === 'delete' || chosen === 'reply' || chosen === 'forward' || chosen === 'reactions') return chosen
-  // Main shows the reply at once and the thread marks it; the outbox sends it. The engine refuses a reply deleted meanwhile.
-  if (chosen === 'broadcast') void broadcastMessage(registry, { channelId: topic.channel.id, ts })
-  if (chosen === 'watch-reply') await watchReply(registry, { channelId: topic.channel.id, ts, ...(topic.kind === 'thread' && topic.rootTs ? { threadTs: topic.rootTs } : {}) })
-  else if (chosen === 'open-in-slack') openTopicInSlack(topic)
-  else if (chosen === 'why' && why !== undefined) showWhy(topic.id, ts, why, at)
-  else if (chosen === 'copy-link' && session !== undefined) copyText(messageLink(session.workspaceUrl, topic.channel.id, ts, topic.kind === 'thread' ? topic.rootTs : undefined))
-  return undefined
+  return (await loadTopicMenu()).showMessageMenu(topic, message, editable, at, sender, onSender)
 }
 
 /** Whether focus is in a text field that has text, where ⌘Z undoes typing. */

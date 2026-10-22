@@ -49,8 +49,8 @@ export class Player {
    * makes the duration zero.
    */
   capture(before: ReorderMotionProps, { groups, animate, scroller: { current: scroller }, row, rowKey }: ReorderMotionProps): Snapshot | null {
+    if (document.hidden || scroller === null || !scroller.checkVisibility() || scroller.scrollTop > 0.5 || rootDuration('--duration-reorder') < 1 || !animate) return { drawn: undefined }
     if (appendedOnly(before.groups, groups)) return null
-    if (!animate || scroller === null || scroller.scrollTop > 0.5 || rootDuration('--duration-reorder') < 1) return { drawn: undefined }
     // The compositor runs an animation from the frame after it was made, while this
     // thread holds it at its start until it hears back. Put such an animation at the
     // time the compositor drew, so the rows are read where they are on screen.
@@ -60,9 +60,11 @@ export class Player {
     }
     const view = scroller.getBoundingClientRect()
     const drawn = new Map<string, Drawn>()
+    let pastView = false
     for (const el of scroller.querySelectorAll<HTMLElement>(row)) {
+      if (pastView && !this.running.has(el)) continue
       const rect = el.getBoundingClientRect()
-      if (rect.top > view.bottom + BELOW) break
+      if (rect.top > view.bottom + BELOW && !this.running.has(el)) { pastView = true; continue }
       const id = el.getAttribute(rowKey)
       if (id === null || rect.height === 0) continue
       const opacity = this.running.has(el) ? Number(getComputedStyle(el).opacity) : 1
@@ -83,12 +85,18 @@ export class Player {
     const view = scroller.getBoundingClientRect()
     // Read every place first, then start every animation, so the reads lay out once.
     const rows: Array<{ readonly el: HTMLElement; readonly top: number; readonly height: number; readonly from: Drawn | undefined }> = []
+    let pastView = false
     for (const el of scroller.querySelectorAll<HTMLElement>(row)) {
-      const rect = el.getBoundingClientRect()
-      if (rect.top > view.bottom + BELOW) break
       const id = el.getAttribute(rowKey)
-      if (id === null || rect.height === 0) continue
+      if (id === null) continue
       const from = drawn.get(id)
+      if (pastView && from?.seen !== true) continue
+      const rect = el.getBoundingClientRect()
+      if (rect.top > view.bottom + BELOW) {
+        pastView = true
+        if (from?.seen !== true) continue
+      }
+      if (rect.height === 0) continue
       const inView = rect.bottom > view.top && rect.top < view.bottom
       if (from === undefined ? inView : from.seen || inView) rows.push({ el, top: rect.top, height: rect.height, from })
     }
@@ -130,7 +138,7 @@ export class Player {
     if (arriving) this.arriving.add(el)
     if (raised) {
       el.style.zIndex = '1'
-      if (el.getAttribute('aria-current') !== 'true') el.style.backgroundColor = colors['--background-subtle']
+      el.style.setProperty('--reorder-background', colors['--background-subtle'])
       this.raised.add(el)
     }
     const animation = el.animate(keyframes, timing)
@@ -142,18 +150,19 @@ export class Player {
       this.running.delete(el)
       this.arriving.delete(el)
       if (this.raised.delete(el)) lower(el)
-    })
+      animation.cancel()
+    }, { once: true })
   }
 }
 
 /** The same groups, or each only grew at its end: nothing drawn above the new rows moves. */
 function appendedOnly(before: ReadonlyArray<ReadonlyArray<string>>, after: ReadonlyArray<ReadonlyArray<string>>): boolean {
-  return before.length === after.length && before.every((ids, i) => ids === after[i] || after[i]!.length >= ids.length && ids.every((id, j) => after[i]![j] === id))
+  return before.length === after.length && before.every((ids, i) => ids === after[i] || (i === before.length - 1 ? after[i]!.length >= ids.length : after[i]!.length === ids.length) && ids.every((id, j) => after[i]![j] === id))
 }
 
 function lower(el: HTMLElement): void {
   el.style.removeProperty('z-index')
-  el.style.removeProperty('background-color')
+  el.style.removeProperty('--reorder-background')
 }
 
 /** `--ease-out`, for a Web Animation, which cannot read CSS variables. */

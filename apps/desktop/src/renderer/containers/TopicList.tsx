@@ -18,6 +18,7 @@ import {
   sidebarFilterAtom,
   sidebarRowAtom,
   sidebarSectionsAtom,
+  loadSidebarMoves,
   tabsAtom,
   tabTopic,
   topicListAtom,
@@ -32,7 +33,7 @@ import { markFilterChange, takeFilterMark } from './filterMark'
 import { openAllTopics, openTopicFromList, warmTopic } from './navigation'
 import { typeOnRow } from './pageFocus'
 import { useRowAccessory } from './rowAccessories'
-import { cancelRename, renameTopic, resolveTopic, showRowMenu } from './topicActions'
+import { cancelRename, loadTopicMenu, renameTopic, resolveTopic, showRowMenu } from './topicActions'
 import { editSelectedView } from './viewActions'
 
 /**
@@ -248,6 +249,10 @@ export const TopicList = memo(function TopicList() {
   const [pinned, recent] = full ? [sections.pinned, sections.recent] : firstIds(sections.pinned, sections.recent, FIRST_ROWS)
 
   useSnapshotMark()
+  useEffect(() => {
+    const idle = requestIdleCallback(() => { void loadSidebarMoves(); void loadTopicMenu() }, { timeout: 2_000 })
+    return () => cancelIdleCallback(idle)
+  }, [])
 
   // Runs once per new window: the first rows, and each filter change.
   useEffect(() => {

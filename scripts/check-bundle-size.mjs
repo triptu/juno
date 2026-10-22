@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Holds the renderer to the bundle budget in docs/performance.md section 1:
-// initial JS at most 1,105 KB and CSS at most 200 KB, uncompressed. "Initial"
+// initial JS at most 1.1 MB and CSS at most 200 KB, uncompressed. "Initial"
 // means what index.html loads before any user action: its <script> tags,
 // <link rel="modulepreload"> and stylesheets. Lazy chunks are not counted.
 //
@@ -16,7 +16,7 @@ if (process.env.JUNO_UNMINIFIED === '1') {
   process.exit(0)
 }
 
-const JS_BUDGET = 1_105_000
+const JS_BUDGET = 1_100_000
 const CSS_BUDGET = 200_000
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')

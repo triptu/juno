@@ -127,11 +127,12 @@ export function TopicList({
       {isEmpty && empty !== undefined ? (
         <Empty kind={empty} quietDays={quietDays} enter={enterEmpty} onClearFilters={onClearFilters} onViewAll={onViewAll} onEditView={onEditView} />
       ) : (
-        <ReorderMotion groups={shown.map((section) => section.ids)} animate={moves === 'animate'} scroller={scroller} row={ROW} rowKey="data-topic-id">
+        <>
+          <ReorderMotion groups={shown.map((section) => section.ids)} animate={moves === 'animate'} scroller={scroller} row={ROW} rowKey="data-topic-id" />
           {shown.map((section) => (
             <Section key={section.id} section={section} labelled={section.id === 'pinned' || shown.length > 1} renderRow={renderRow} />
           ))}
-        </ReorderMotion>
+        </>
       )}
       {!isEmpty && truncated ? (
         <Text variant="meta" tone="muted" as="p" sx={styles.footer}>
