@@ -1,0 +1,1 @@
+- 10-22 05:04 · Release agent · Local full runs use three gallery workers and three layout-walk parts. Both parts timed out after 20 minutes with two workers while this Mac stayed below its load limit. Keep every state and assertion, and keep the existing timeout.
