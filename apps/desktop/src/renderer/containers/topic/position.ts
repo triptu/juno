@@ -223,6 +223,8 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
     }
     // The scrollTop last seen at the bottom. Holding the end and rows growing above only make it larger.
     let bottomTop = scroller.scrollTop
+    // The rows' height when a scroll last came to rest at the bottom; -1 until one has.
+    let bottomHeight = -1
     const rest = scrollRest(scroller, GESTURE_IDLE)
     const onScroll = () => {
       rest.onScroll()
@@ -235,8 +237,10 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
       const own = takeOwnEnd(scroller)
       if (rest.pending()) return
       if (pinRef.current?.kind === 'row' && Math.abs(scroller.scrollTop - pinnedTopRef.current) > 1) pinRef.current = undefined
-      // Still held with the end away: the end moved under it (an edit box opening). `hold` lets go if the user scrolled up.
-      if (pinRef.current?.kind === 'bottom') hold(scroller, pinRef, pinnedTopRef)
+      // Still held with the end away and the rows grown since: the end moved under it (an edit box opening). With the
+      // rows as they were, the scroll was the user's, near the end, and the list stays where it stopped. `hold` lets
+      // go if the user scrolled up.
+      if (pinRef.current?.kind === 'bottom' && scroller.scrollHeight !== bottomHeight) hold(scroller, pinRef, pinnedTopRef)
       const distance = distanceFromBottom(scroller)
       const bottom = atEndRef.current && distance <= BOTTOM_SLACK
       // At the exact end hold now. Otherwise remember where the user stopped before growth can move the end.
@@ -254,6 +258,7 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
       if (bottom) {
         pinRef.current = { kind: 'bottom' }
         bottomTop = pinnedTopRef.current = scroller.scrollTop
+        bottomHeight = scroller.scrollHeight
       } else if (pinRef.current?.kind === 'bottom') pinRef.current = undefined
       // Anywhere else, the list holds the row it came to rest on. A jump lands on rows still at their size estimate,
       // and Chromium does not anchor on those, so as they reach their real height a frame or two later the rows in view

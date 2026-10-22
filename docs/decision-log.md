@@ -5,6 +5,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
 - 10-22 18:18 · verification · Reach Start thread with Tab and toolbar arrow keys in the existing background-tab check; mouse hover plus programmatic focus can hide the toolbar before the keyboard action. Keep all background-tab, scroll and focus assertions.
+- 10-22 18:08 · release agent · A `scrollend` that finds the bottom held puts it back only when the rows grew since a scroll last came to rest at the bottom. A scroll down that stops within 32 px of the end, with the rows unchanged, stays where it stopped: pulling it the rest of the way moved the row under a still pointer and hid its hover toolbar (the ⌘-click Start thread test failed on main's full run).
 - 10-22 18:00 · emoji search · Show name matches while the emoji search index warms after paint; append keyword matches to the current cold picker query so existing cells and Enter agree.
 - 10-22 18:00 · emoji search · Ship the CLDR Unicode License v3 notice with the desktop app and document the pinned, reproducible catalog generator.
 - 10-22 18:00 · emoji search · Rank curated chat terms above broad CLDR emoji associations; keep workspace names distinct from standard names and shared image URLs, and normalize skin tones in quick-reaction priors.
