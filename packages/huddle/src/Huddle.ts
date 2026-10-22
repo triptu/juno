@@ -4,6 +4,7 @@
  *
  * - `lifecycle.ts`: the model's actions as pure rules.
  * - `media.ts`: the pages' media, as current state.
+ * - `own.ts`: who is in the user's own call and when it started.
  * - `core.ts`: the state, the lock, and the I/O the rules call for.
  * - `attach.ts`: a sync's session, and its end.
  * - `boot.ts`: every workspace's stored leaves, read at boot.
@@ -36,6 +37,7 @@ export interface LeaveStore {
 export interface HuddleSession {
   /** Which workspace's store `leaves` is: its leaves go out only through its own session. */
   readonly workspace: string
+  readonly selfId: string
   /** The session's Slack client. */
   readonly slack: Context.Context<SlackApi | SlackEdge>
   readonly leaves: LeaveStore
@@ -45,6 +47,8 @@ export interface HuddleSession {
   readonly statusRenewMillis?: number
   /** Tests only: how long the user may be alone in a call before Juno leaves (`alone.ts`; the app: 10 minutes). */
   readonly aloneLeaveMillis?: number
+  /** Tests only: how long a channel must be quiet before running huddles are read for it (`INFO_SETTLE_MILLIS`). */
+  readonly infoSettleMillis?: number
 }
 
 /** A socket event, or the `SocketEvents` marker for events dropped while the subscriber fell behind. */

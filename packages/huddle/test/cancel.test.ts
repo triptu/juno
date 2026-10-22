@@ -11,7 +11,7 @@ import { Huddle } from '../src/Huddle'
 
 const PAGE = 11
 const CONNECTION = 7
-const emptyReport: HuddlePageReport = { generation: PAGE, seq: 1, holds: null, received: null, connection: 'connected', muted: false, ended: null }
+const emptyReport: HuddlePageReport = { generation: PAGE, seq: 1, holds: null, received: null, connection: 'connected', muted: false, hasRemote: false, ended: null }
 
 const until = (done: () => boolean) => Effect.sleep(20).pipe(Effect.repeat({ until: done }), Effect.timeoutOption(5_000))
 
@@ -43,7 +43,7 @@ it('hands nothing to a Start cancelled while its answer is stored, leaves its at
     let holdNextWrite = true
     yield* Effect.forkChild(huddle.boot({ workspaces: Effect.succeed(['T1']), read: () => Effect.succeed([]) }))
     yield* huddle.attach({
-      workspace: 'T1',
+      workspace: 'T1', selfId: 'U0ME',
       slack: Context.make(SlackEdge, edge).pipe(Context.add(SlackApi, api)),
       leaves: {
         read: Effect.succeed([]),
