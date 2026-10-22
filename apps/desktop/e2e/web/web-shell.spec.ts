@@ -1,7 +1,7 @@
 import { WebSocket } from 'ws'
 import { expect, test, type Page } from '@playwright/test'
-import { startWebShell, type WebShell } from '../web/host/shell'
-import type { WebPageHandle } from '../web/page/connect'
+import { startWebShell, type WebShell } from '../../web/host/shell'
+import type { WebPageHandle } from '../../web/page/connect'
 
 /**
  * The web shell (`pnpm web`, docs/development.md "Web shell") in Chrome: the
