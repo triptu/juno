@@ -74,7 +74,7 @@ sad sorry|awful bored dejected died disappointed face losing lost sucks|depresse
 |dying feverish heat panting red faced stroke sweating tongue|boiling sweaty spicy burning up sunburn too warm so heatwave
 |blue faced freezing frostbite icicles subzero teeth|shivering chilly winter ice brr so frozen need a jacket
 |dizzy drunk eyes intoxicated mouth tipsy uneven wavy|hungover buzzed confused out of it
-|crossed out dead eyes feels knocked sick tired with|fainted blacked overwhelmed disoriented passed stunned defeated
+dead|crossed out eyes feels knocked sick tired with|fainted blacked overwhelmed disoriented passed stunned defeated
 |confused dizzy hypnotized omg smiley trouble whoa woah woozy|spinning lost cant think brain fog trippy vertigo overstimulated spaced out
 |blown explode mind mindblown no way|insane unbelievable shook holy cow jaw dropped boggling cant believe it whoa
 |cowgirl|howdy yeehaw western sheriff rodeo texas country partner
@@ -115,8 +115,8 @@ sad sorry|awful blame dejected face fail losing unhappy|let down ashamed defeate
 |censor cursing cussing mad pissed swearing|fuming livid furious screaming rage angry so
 |demon devil evil face fairy fairytale fantasy horns purple shade smile tale with|naughty bad idea wicked scheming up to no good sinister troublemaker freaky feeling devious
 |angry demon devil evil face fairy fairytale fantasy horns mischievous purple shade tale with|mad sinister villain furious bad mood wicked annoyed
-|body dead death face fairy fairytale i m lmao monster tale yolo|dying im crying hilarious deceased screaming too funny rip wheezing
-|bone dead death face monster|poison danger pirate deadly toxic hazard warning rip
+dead|body death face fairy fairytale i m lmao monster tale yolo|dying im crying hilarious deceased screaming too funny rip wheezing
+dead|bone death face monster|poison danger pirate deadly toxic hazard warning rip
 |bs comic doo dung face fml monster pile poo smelly smh stink stinks stinky turd of|crap bad awful terrible garbage oops mess yuck gross
 ||fool idiot foolish circus im stupid acting a you joker embarrassing clowning
 |creature devil face fairy fairytale fantasy mask monster scary tale|oni demon beast spooky villain
@@ -144,7 +144,7 @@ lol|animal face laugh laughing tear tears with of|lmao haha dying crying kitty t
 |143 emotion excited growing heart ily kisses muah nervous pulse xoxo|thumping flutter butterflies overjoyed expanding so much love
 |143 beating cardio emotion heart ily love pulsating pulse|fluttering palpitations thumping racing so sweet warm fuzzies
 |143 adorbs anniversary emotion heart|in love whirlwind together sweetheart connected couple
-|143 anniversary date dating emotion heart ily kisses love loving xoxo|crush bff sweetheart cuties besties thinking of you sweet
+|143 anniversary date dating emotion heart ily kisses love loving xoxo|crush bff sweetheart cuties besties sweet
 |143 emotion hearth purple white|cute sweet icon symbol vibe badge
 |punctuation|love it emphasis absolutely totally definitely with feeling
 sad|break crushed emotion heartbroken lonely|hurting dumped rejected grief devastated unhappy it hurts miss you
@@ -656,7 +656,7 @@ thanks thank sorry apology|ask beg bowing favor forgive gesture meditate meditat
 |animal disease insect maggot pest rotting|buzzing annoying swat trash
 |animal annelid earthworm parasite|bait slimy fishing gross
 |amoeba bacteria science virus|germs sick infected illness covid biohazard
-|anniversary birthday date flower love plant romance|congrats flowers thank you congratulations feel better thinking of for mothers day
+|anniversary birthday date flower love plant romance|congrats flowers thank you congratulations feel better for mothers day
 |flower plant spring springtime|cute pretty japan sakura soft aesthetic bloom girly
 ||well done good job stamp grade
 |beauty buddhism calm flower hinduism peace purity serenity|meditation zen yoga spiritual mindful
