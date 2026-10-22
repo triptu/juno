@@ -19,6 +19,7 @@ The wire between Juno's processes. Names, schemas and types only; no logic. See 
 ## Public API
 
 - Declare a stream route with `liveValueRoute(tag, { value, payload? })` or `liveListRoute(tag, { row, payload? })`. The list route adds `range: ListRange` to the payload, and rows carry `id` and `rev`.
+- `LiveMeta.own` marks a list update that includes a renderer command write; movement caused by it is instant. It is absent for independent sync updates.
 - Declare a command with `Rpc.make(tag, { payload, success, error })`.
 - Import from `@juno/contract`. The preload imports only `@juno/contract/channels`.
 - `routes/messages.ts` is the topic view: `messages.list` (a window of `MessageView` rows around an anchor ts), `topics.get` (the header, `TopicDetail`), `channel.threads` (Main's active threads, `ThreadSummary`), and the two commands that call Slack, `topics.open` and `messages.loadOlder`. Rows name people by id; the people travel in the delta's `refs`.

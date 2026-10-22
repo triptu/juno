@@ -56,6 +56,8 @@ export const LiveMeta = Schema.Struct({
   encodeMs: Schema.Number,
   /** Engine clock (epoch milliseconds) when the message was built. */
   at: Schema.Number,
+  /** This update includes a write from a renderer command; its movement is instant. */
+  own: Schema.optionalKey(Schema.Boolean),
   /** Rows in the whole list, not just the window, when the engine knows. */
   total: Schema.optionalKey(Schema.Int),
   /** The initial window is covered: fetched message history, or completed cold sync for topic-list membership. */

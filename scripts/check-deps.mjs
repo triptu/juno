@@ -128,6 +128,7 @@ const unstable = [
     allow: ['packages/store/src/invalidation.ts'],
   },
   { label: '@effect/atom-react', spec: /^@effect\/atom-react(?:\/|$)/, allow: ['packages/state/src/react.ts'] },
+  { label: 'RpcMiddleware', spec: /^effect\/rpc\/RpcMiddleware$/, allow: ['packages/engine/src/protocol/server.ts'] },
   {
     label: 'effect/rpc',
     spec: /^effect\/rpc(?:\/|$)/,

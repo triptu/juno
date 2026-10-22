@@ -6,8 +6,8 @@
 import { Option } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
 import { sameOrder } from './list'
-import { sidebarListAtom } from './sidebar'
-import { sidebarMoves, sidebarOwnAtom, type SidebarMoves } from './sidebarMoves'
+import { sidebarInstantAtom, sidebarListAtom } from './sidebar'
+import type { sidebarMoves, SidebarMoves } from './sidebarMoves'
 import type { TopicListFilter } from './topics'
 
 export interface SidebarSections {
@@ -25,7 +25,7 @@ export interface SidebarSections {
   readonly moves: SidebarMoves
 }
 
-const sameSections = (a: SidebarSections, b: SidebarSections): boolean =>
+const sameSections = (a: Omit<SidebarSections, 'moves'>, b: Omit<SidebarSections, 'moves'>): boolean =>
   a.ready === b.ready && a.total === b.total && a.filter === b.filter && sameOrder(a.pinned, b.pinned) && sameOrder(a.recent, b.recent)
 
 /**
@@ -34,9 +34,19 @@ const sameSections = (a: SidebarSections, b: SidebarSections): boolean =>
  * (a new preview, a count) re-renders that row and nothing else. A new
  * split says whether its change may slide (`moves`).
  */
-export const sidebarSectionsAtom = Atom.make((get): SidebarSections => {
+let moves: typeof sidebarMoves | undefined
+
+/** Loaded on idle by the sidebar; earlier changes simply take their places. */
+export async function loadSidebarMoves(): Promise<void> {
+  moves = (await import('./sidebarMoves')).sidebarMoves
+}
+
+interface TrackedSections extends SidebarSections { readonly instant: number }
+
+// Keep bookkeeping even when the shown order is equal (a row can become retained without moving).
+const trackedSectionsAtom = Atom.make((get): TrackedSections => {
   const window = get(sidebarListAtom)
-  const own = get(sidebarOwnAtom)
+  const instant = get(sidebarInstantAtom)
   const pinned: string[] = []
   const recent: string[] = []
   for (const id of window.order) {
@@ -46,7 +56,11 @@ export const sidebarSectionsAtom = Atom.make((get): SidebarSections => {
     else recent.push(id)
   }
   const ready = window.meta.seq > 0 && window.meta.windowCovered !== false
-  const next = { ready, pinned, recent, total: window.meta.total, filter: window.filter, retained: window.retained }
-  const before = Option.getOrUndefined(get.self<SidebarSections>())
-  return { ...next, moves: sidebarMoves(before, next, own, Date.now(), window.building === true) }
-}).pipe(Atom.withEquality(sameSections))
+  const next = { ready, pinned, recent, total: window.meta.total, filter: window.filter, retained: window.retained, instant }
+  const before = Option.getOrUndefined(get.self<TrackedSections>())
+  const changed = before === undefined || !sameSections(before, next)
+  const own = window.meta.own === true || before?.instant !== instant
+  return { ...next, moves: changed ? moves?.(before, next, own, window.building === true) ?? 'instant' : before.moves }
+})
+
+export const sidebarSectionsAtom = Atom.make((get) => get(trackedSectionsAtom)).pipe(Atom.withEquality(sameSections))

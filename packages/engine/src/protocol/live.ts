@@ -27,7 +27,7 @@
  */
 import { EngineTiming } from '../config'
 import { Clock, Effect, Option, Result, Schedule, Stream } from 'effect'
-import { liveQuery, type InvalidationKeys } from '@juno/store'
+import { QueryCause, liveQuery, type InvalidationKeys } from '@juno/store'
 import type { OpenWorkspace } from '../workspace'
 import { LIVE_DELTA_MAX_BYTES, LIVE_SNAPSHOT_MAX_BYTES, type ChannelRef, type ListDelta, type LiveMeta, type LiveValue, type Person, type Refs, type TopicArt } from '@juno/contract'
 
@@ -35,6 +35,7 @@ import { LIVE_DELTA_MAX_BYTES, LIVE_SNAPSHOT_MAX_BYTES, type ChannelRef, type Li
 export interface Timed<A> {
   readonly value: A
   readonly queryMs: number
+  readonly own?: boolean
 }
 
 /** Measures `query`. Wrap the query a handler gives the store's `liveQuery` with this. */
@@ -42,7 +43,7 @@ export const timed = <A, E, R>(query: Effect.Effect<A, E, R>): Effect.Effect<Tim
   Effect.gen(function* () {
     const start = performance.now()
     const value = yield* query
-    return { value, queryMs: performance.now() - start }
+    return { value, queryMs: performance.now() - start, ...((yield* QueryCause).own ? { own: true } : {}) }
   })
 
 /**
@@ -210,7 +211,7 @@ export function serveLiveList<Row extends RowLike, E, SE, R>(
         for (const channel of channels) sentChannels.set(channel.id, channel)
         for (const drawing of art) sentArt.set(drawing.id, drawing)
         windowCovered = run.windowCovered
-        const meta: LiveMeta = { ...(windowCovered === undefined ? {} : { windowCovered }), seq: ++seq, queryMs, encodeMs, at, ...(run.total === undefined ? {} : { total: run.total }) }
+        const meta: LiveMeta = { ...(windowCovered === undefined ? {} : { windowCovered }), seq: ++seq, queryMs, encodeMs, at, ...(outcome.success.own ? { own: true } : {}), ...(run.total === undefined ? {} : { total: run.total }) }
         return Option.some({ reset, order, upsert, remove, ...(refs === undefined ? {} : { refs }), meta })
       }),
     ),

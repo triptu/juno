@@ -42,7 +42,7 @@ export {
   topicSelectedAtom,
   type SidebarWindow,
 } from './sidebar'
-export { sidebarSectionsAtom } from './sidebarSections'
+export { loadSidebarMoves, sidebarSectionsAtom } from './sidebarSections'
 export { applyListDelta, emptyWindow, type ListWindow } from './list'
 export { traceSend } from './sendTrace'
 export {

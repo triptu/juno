@@ -11,7 +11,6 @@ import { messagesForward, type MessageView, type Person, type SendTarget } from 
 import { runCommand } from './atoms'
 import type { Registry } from './client'
 import { releaseSidebarTopic } from './sidebar'
-import { markOwnSidebarChange } from './sidebarMoves'
 
 /** The message the open sheet forwards, as the list showed it, with its sender and where it was posted ("#eng"). */
 export interface ForwardSheetState {
@@ -25,7 +24,6 @@ export const forwardSheetAtom = Atom.make<ForwardSheetState | undefined>(undefin
 
 /** Queues a forward of the stored message `source` to `to`'s Main, with `note` above it. Resolves with the `Exit`; on success, the destination's topic. */
 export const forwardMessage = async (registry: Registry, to: SendTarget, note: string, source: { readonly channelId: string; readonly ts: string }) => {
-  markOwnSidebarChange(registry)
   const exit = await runCommand(registry, messagesForward, { to, note, clientMsgId: crypto.randomUUID(), source })
   // Your own forward moves the destination's row at once, as a send does.
   if (exit._tag === 'Success') releaseSidebarTopic(registry, exit.value.topicId)
