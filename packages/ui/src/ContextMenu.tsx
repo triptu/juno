@@ -66,8 +66,8 @@ const isItem = (entry: ContextMenuEntry): entry is ContextMenuItem => !('separat
  * material, opening downward from the pointer. It may turn into a larger
  * panel in motion (`morph`). The highlight is focus: the pointer focuses
  * the row it moves over, and the arrows move it, so the two never disagree.
- * A click or Enter chooses; typed letters jump to a row. Esc, a press
- * outside, a scroll, the window losing focus or resizing close it. One
+ * A click or Enter chooses; typed letters jump to a row. Esc, a press or
+ * a wheel turn outside, the window losing focus or resizing close it. One
  * instance for the window, rendered on demand in a portal on `body`.
  */
 export function ContextMenu({ anchor, items, header, label, onSelect, onClose, panelWidth, morph, inline = false }: ContextMenuProps) {

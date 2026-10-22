@@ -70,24 +70,26 @@ export function placeMorph(menu: Box, size: Size, side: MenuSide, view: Size, ed
 /** `value` inside `[low, high]`; `low` wins when the view is too small for both. */
 const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(value, high))
 
-/** A press, a wheel or a scroll outside the menu, the window losing focus or resizing close it. Esc is the menu's own key. */
+/**
+ * A press or a wheel turn outside the menu, the window losing focus or
+ * resizing close it. Esc is the menu's own key. A list scrolling by itself
+ * (a message arriving, or deleted under the menu) does not.
+ */
 export function useDismiss(ref: RefObject<HTMLDivElement | null>, closeRef: RefObject<() => void>, inline: boolean): void {
   useEffect(() => {
     if (inline) return
     const close = () => closeRef.current()
-    // A scroll inside the menu (its emoji picker) is the menu's own.
+    // A wheel inside the menu (its emoji picker) is the menu's own.
     const outside = (event: Event) => {
       if (!(event.target instanceof Node) || ref.current?.contains(event.target) !== true) close()
     }
     window.addEventListener('pointerdown', outside, true)
     window.addEventListener('wheel', outside, { capture: true, passive: true })
-    window.addEventListener('scroll', outside, true)
     window.addEventListener('blur', close)
     window.addEventListener('resize', close)
     return () => {
       window.removeEventListener('pointerdown', outside, true)
       window.removeEventListener('wheel', outside, true)
-      window.removeEventListener('scroll', outside, true)
       window.removeEventListener('blur', close)
       window.removeEventListener('resize', close)
     }
