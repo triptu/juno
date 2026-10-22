@@ -86,15 +86,36 @@ function roomForPanel(registry: Registry): boolean {
   return window.innerWidth - (sidebar.collapsed ? 0 : sidebar.width) >= MIN_ROOM
 }
 
-export function openWebPanel(registry: Registry, url: string): void {
+/** Whether this window can show `url` in Juno, regardless of the saved default. */
+export function canOpenWebPanel(registry: Registry, url: string): boolean {
+  return activeTab(registry.get(tabsAtom)) !== undefined && webPanelCanShow(url) && roomForPanel(registry)
+}
+
+/** Whether a plain click on this web link opens it in Juno. */
+export function webPanelOpensInJuno(registry: Registry, url: string): boolean {
+  return registry.get(webPanelOnAtom) && canOpenWebPanel(registry, url)
+}
+
+function showWebPanel(registry: Registry, url: string): void {
   const tab = activeTab(registry.get(tabsAtom))
-  if (tab === undefined || !registry.get(webPanelOnAtom) || !webPanelCanShow(url) || !roomForPanel(registry)) {
-    openExternal(url)
-    return
-  }
+  if (tab === undefined) return
   setJunoPanelOpen(registry, false)
   registry.set(webPanelStateAtom, undefined)
   registry.set(webPanelAtom, { tabId: tab.id, url, opened: (registry.get(webPanelAtom)?.opened ?? 0) + 1 })
+}
+
+export function openWebPanel(registry: Registry, url: string): void {
+  if (!webPanelOpensInJuno(registry, url)) {
+    openExternal(url)
+    return
+  }
+  showWebPanel(registry, url)
+}
+
+/** Opens in Juno even when the saved default is the browser; impossible links still use the browser. */
+export function openWebPanelInJuno(registry: Registry, url: string): void {
+  if (canOpenWebPanel(registry, url)) showWebPanel(registry, url)
+  else openExternal(url)
 }
 
 export function closeWebPanel(registry: Registry): void {

@@ -241,7 +241,7 @@ export {
   setJunoPanelOpen,
   setJunoPanelWidth,
 } from './junoPanel'
-export { closeWebPanel, followWebPanel, openWebPanel, setWebPanelOn, webPanelAtom, webPanelOnAtom, webPanelStateAtom } from './webPanel'
+export { canOpenWebPanel, closeWebPanel, followWebPanel, openWebPanel, openWebPanelInJuno, setWebPanelOn, webPanelAtom, webPanelOnAtom, webPanelOpensInJuno, webPanelStateAtom } from './webPanel'
 export {
   holdHome,
   homeAppears,

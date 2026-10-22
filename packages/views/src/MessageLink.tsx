@@ -38,7 +38,7 @@ export function MessageLink({ url, onLink, linkInfo, tabIndex, quiet = false, ch
     if (inApp && described?.url !== url) void linkInfo?.describe(url).then((place) => place === undefined || setDescribed({ url, place }))
   }
   return (
-    <a href={url} title={title} onClick={open} onMouseEnter={describe} draggable={false} tabIndex={tabIndex} data-in-app={inApp ? '' : undefined} {...stylex.props(styles.link, quiet && styles.quiet, focusRing.outside, inApp ? styles.inAppLink : styles.outLink)}>
+    <a href={url} title={title} onClick={open} onMouseEnter={describe} draggable={false} tabIndex={tabIndex} data-message-link={url} data-in-app={inApp ? '' : undefined} {...stylex.props(styles.link, quiet && styles.quiet, focusRing.outside, inApp ? styles.inAppLink : styles.outLink)}>
       {children}
     </a>
   )

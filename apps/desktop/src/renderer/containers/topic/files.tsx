@@ -8,12 +8,15 @@ import { chunk } from '../chunks'
 const viewer = chunk(() => import('../TopicViewerPanel'))
 const TopicViewerPanel = viewer.component((module) => module.default)
 
-/** Fetch the viewer's chunk once a topic has painted, so the first open does not wait for it. */
+/** Fetch topic-only chunks once a topic has painted, so the first open does not wait for them. */
 let viewerLoaded = false
 function preloadViewer(): void {
   if (viewerLoaded) return
   viewerLoaded = true
-  window.requestIdleCallback(() => void viewer.load())
+  window.requestIdleCallback(() => {
+    void viewer.load()
+    void import('../linkMenu')
+  })
 }
 
 /** Download on a file row or in the viewer: main saves it into ~/Downloads and shows it in Finder. */
