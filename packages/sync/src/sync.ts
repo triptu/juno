@@ -119,6 +119,8 @@ export interface TopicFetcher {
   readonly acted: (acted: Acted, alongside: Effect.Effect<unknown, SqlError, StoreWriter | Invalidation>) => Effect.Effect<void, SqlError>
   /** Asks `nameUsers` for users the store lacks, as a page that names them would (`wantUsers`). Returns at once; the names land in `users`. */
   readonly wantUsers: (ids: ReadonlyArray<string>) => Effect.Effect<void>
+  /** Fetches everyone who reacted to a stored message and stores them (`whoReacted.ts`). True when the store took the answer. Not retried on the background lane. */
+  readonly reactors: (channel: string, ts: string) => Effect.Effect<boolean, OpenError>
 }
 
 export type SyncServices = SlackApi | SlackEdge | SlackSocket | SlackSession | StoreWriter | StoreReader | Invalidation

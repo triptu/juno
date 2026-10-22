@@ -2,7 +2,7 @@
 // and an edit arrive in any order.
 import { describe, expect, it } from 'vitest'
 import { Ts, type Message } from '@juno/slack-schema'
-import { mergeMessage, mergeRootCounters, mergeTombstone, stubRoot, toMessageRow } from '../src/index'
+import { mergeMessage, mergeRootCounters, mergeTombstone, reactorsToStore, stubRoot, toMessageRow } from '../src/index'
 
 const C = 'C0ENG'
 const ts = (n: number): Ts => Ts.make(`1700000${String(n).padStart(3, '0')}.000100`)
@@ -165,3 +165,17 @@ describe('partial files and videos', () => {
   })
 })
 
+
+describe('reactorsToStore', () => {
+  const full = { count: 4, users: ['U1', 'U2', 'U3', 'U4'] }
+  it.each([
+    ['nothing stored', { count: 4, users: ['U1', 'U2'] }, undefined, ['U1', 'U2']],
+    ['a cut list, the full one stored', { count: 4, users: ['U1', 'U2'] }, full, full.users],
+    ['a complete list, the stored one longer', { count: 2, users: ['U1', 'U2'] }, full, ['U1', 'U2']],
+    ['a cut list with a new count', { count: 5, users: ['U1', 'U2'] }, full, ['U1', 'U2']],
+    ['a cut list naming someone the stored one lacks', { count: 4, users: ['U1', 'U9'] }, full, ['U1', 'U9']],
+    ['a cut list, the stored one no longer', { count: 4, users: ['U1', 'U2'] }, { count: 4, users: ['U2', 'U1'] }, ['U1', 'U2']],
+  ] as const)('%s', (_, incoming, stored, expected) => {
+    expect(reactorsToStore(incoming, stored)).toEqual(expected)
+  })
+})

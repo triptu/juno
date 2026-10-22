@@ -237,6 +237,27 @@ export interface RootCounters {
   readonly reply_users?: ReadonlyArray<string>
 }
 
+/** Who reacted with one emoji and how many did: `users` may be fewer than `count`. */
+export interface Reactors {
+  readonly count: number
+  readonly users: ReadonlyArray<string>
+}
+
+/**
+ * The people to store for a reaction a page or event states. Slack may list
+ * fewer people than `count` on a message; the full list comes from
+ * `reactions.get` with `full`. A stored list that is longer, for the same
+ * count, and holds everyone the incoming one lists, is kept: the incoming
+ * list says nothing new about who reacted. Any other change takes the
+ * incoming list, and the next "who reacted" fetches the full one again.
+ */
+export function reactorsToStore(incoming: Reactors, stored: Reactors | undefined): ReadonlyArray<string> {
+  if (stored === undefined || incoming.users.length >= incoming.count) return incoming.users
+  if (stored.count !== incoming.count || stored.users.length <= incoming.users.length || stored.users.length > stored.count) return incoming.users
+  const known = new Set(stored.users)
+  return incoming.users.every((user) => known.has(user)) ? stored.users : incoming.users
+}
+
 /** `message_replied` and search matches: counters take the maximum, never a smaller value. */
 export function mergeRootCounters(existing: MessageRow, counters: RootCounters, source: MergeSource): MergeResult {
   const replyCount = Math.max(existing.reply_count, counters.reply_count ?? 0)

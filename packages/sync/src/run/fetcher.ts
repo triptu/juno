@@ -3,6 +3,7 @@ import { trackFetch } from '../context'
 import { applyActed, applyOpened, applySent } from '../events'
 import { fetchOlder, fetchTopic, type FetchLane, type FetchReport, type OpenError } from '../open'
 import { wantUsers } from '../users'
+import { fetchFullReactions } from '../whoReacted'
 import { queueTopicFiles } from './files'
 
 import type { SyncServices, TopicFetcher } from '../sync'
@@ -46,6 +47,7 @@ export const makeTopicFetcher = (runtime: SyncRuntime) => Effect.gen(function* (
     sent: (sent) => applySent(ctx, sent).pipe(Effect.provide(services)),
     acted: (acted, alongside) => applyActed(ctx, acted, alongside).pipe(Effect.provide(services)),
     wantUsers: (ids) => Effect.sync(() => wantUsers(ctx, ids)),
+    reactors: (channel, ts) => trackFetch(ctx, fetchFullReactions(ctx, channel, ts)).pipe(Effect.provide(services)),
   }
   return fetcher
 })
