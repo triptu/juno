@@ -3,28 +3,27 @@ import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlas
 import { useDeferredValue, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
 import { matchEmoji, type PickerItem as Item, type PreparedEmojiPicker } from '@juno/contract'
-import { accent, colors, layout, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
+import { itemKey, neighbour, normalize, type Section } from './emojiPickerModel'
+import { accent, colors, layout, menu, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { ScrollArea, Surface, Text, TextField } from '@juno/ui'
 
 export interface EmojiPickerProps {
   readonly data: PreparedEmojiPicker
   /** Recently used names (Slack names), shown first as "Frequently used" when non-empty. */
   readonly recent?: ReadonlyArray<string>
-  /** A Slack emoji name: "+1", "partying_face", a custom name. */
-  readonly onPick: (name: string, unicode?: string) => void
+  /** A Slack emoji name: "+1", "partying_face", a custom name; its glyph, or a custom emoji's image. */
+  readonly onPick: (name: string, unicode?: string, url?: string) => void
   /** Esc. */
   readonly onClose: () => void
   /** Names already chosen (Settings' quick reactions): drawn as chosen and not picked again. */
   readonly selected?: ReadonlyArray<{ readonly name: string; readonly url?: string }>
   /** The search to open with. For fixtures; the app opens the picker empty. */
   readonly initialQuery?: string
-}
-
-interface Section {
-  readonly key: string
-  /** None for search results. */
-  readonly heading?: string
-  readonly items: ReadonlyArray<Item>
+  /**
+   * `popover`: its own floating surface. `menu`: no surface of its own, drawn
+   * on the message menu's material, which turns into it (More reactions).
+   */
+  readonly material?: 'popover' | 'menu'
 }
 
 const COLUMNS = 9
@@ -36,7 +35,7 @@ const EMPTY: ReadonlyArray<never> = []
 const NONE: ReadonlySet<string> = new Set()
 
 /** A windowed grid: only nearby rows mount, including in a large workspace or search. */
-export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, onClose, initialQuery = '' }: EmojiPickerProps) {
+export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, onClose, initialQuery = '', material = 'popover' }: EmojiPickerProps) {
   const [query, setQuery] = useState(initialQuery)
   const [failed, setFailed] = useState<ReadonlySet<string>>(NONE)
   const [focused, setFocused] = useState<number | undefined>(undefined)
@@ -138,6 +137,9 @@ export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, on
     virtualizer.scrollToOffset(0)
   }, [search, virtualizer])
 
+  const pick = (item: Item) => onPick(item.name, item.unicode, item.unicode === undefined ? item.url : undefined)
+  const inMenu = material === 'menu'
+
   const onPanelKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key !== 'Escape') return
     event.preventDefault()
@@ -152,7 +154,7 @@ export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, on
       const match = typed === '' ? undefined : matchEmoji(all, typed, recent, [], Infinity).find((item) => !isChosen(item))
       if (match === undefined) return
       event.preventDefault()
-      onPick(match.name, match.unicode)
+      pick(match)
     } else if (event.key === 'ArrowDown') {
       if (grid.count === 0) return
       event.preventDefault()
@@ -164,7 +166,7 @@ export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, on
     const from = event.target
     if (!(from instanceof HTMLElement) || from.dataset['cell'] === undefined) return
     const index = pendingFocus.current ?? Number(from.dataset['cell'])
-    const target = neighbour(sections, index, event.key)
+    const target = neighbour(sections, index, event.key, COLUMNS)
     if (target === undefined) return
     event.preventDefault()
     if (target === null) scrollerRef.current?.closest('[data-emoji-picker]')?.querySelector('input')?.focus()
@@ -174,11 +176,11 @@ export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, on
   const onGridClick = (event: MouseEvent<HTMLElement>) => {
     const button = (event.target as Element).closest<HTMLElement>('button[data-emoji]')
     const item = grid.itemAt(Number(button?.dataset['cell']))
-    if (item !== undefined && !isChosen(item)) onPick(item.name, item.unicode)
+    if (item !== undefined && !isChosen(item)) pick(item)
   }
 
-  return (
-    <Surface kind="popover" padding="none" role="dialog" aria-label="Emoji" data-emoji-picker="" onKeyDown={onPanelKeyDown} sx={styles.panel}>
+  const body = (
+    <>
       <div {...stylex.props(styles.header)}>
         <TextField
           size={30}
@@ -205,7 +207,7 @@ export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, on
           {grid.groups.map(({ section, top, height }) => (
             <div key={section.key} role="group" aria-label={section.heading} data-emoji-section="" {...stylex.props(styles.group(height))}>
               {section.heading === undefined ? null : (
-                <div {...stylex.props(styles.heading)}>
+                <div {...stylex.props(styles.heading, inMenu && styles.headingInMenu)}>
                   <Text variant="tag" tone="muted" as="h3" sx={styles.headingText}>{section.heading}</Text>
                 </div>
               )}
@@ -226,7 +228,7 @@ export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, on
                           aria-label={chosen ? `:${item.name}:, added` : `:${item.name}:`}
                           aria-disabled={chosen || undefined}
                           title={chosen ? `:${item.name}: is added` : `:${item.name}:`}
-                          {...stylex.props(styles.cell, chosen && styles.chosen)}
+                          {...stylex.props(styles.cell, inMenu && styles.cellInMenu, chosen && styles.chosen)}
                         >
                           {item.unicode !== undefined ? item.unicode : item.url === undefined || failed.has(itemKey(item)) ? <span aria-hidden="true" {...stylex.props(styles.fallback)}><span data-emoji-placeholder="" {...stylex.props(styles.placeholder)} /></span> : (
                             <img src={item.url} alt="" draggable={false} loading="lazy" decoding="async" onError={() => setFailed((names) => new Set(names).add(itemKey(item)))} {...stylex.props(styles.image)} />
@@ -242,53 +244,18 @@ export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, on
         </div>
         {results !== undefined && grid.count === 0 ? <Text variant="ui" tone="muted" as="div" sx={styles.noMatch}>No match.</Text> : null}
       </ScrollArea>
+    </>
+  )
+  // In the menu its keys are its own (`data-menu-own-keys`, `ContextMenu`), Esc aside.
+  return inMenu ? (
+    <div role="group" aria-label="Emoji" data-emoji-picker="" data-menu-own-keys="" onKeyDown={onPanelKeyDown} {...stylex.props(styles.panel, styles.inMenu)}>
+      {body}
+    </div>
+  ) : (
+    <Surface kind="popover" padding="none" role="dialog" aria-label="Emoji" data-emoji-picker="" onKeyDown={onPanelKeyDown} sx={styles.panel}>
+      {body}
     </Surface>
   )
-}
-
-const itemKey = (item: Item) => `${item.unicode === undefined ? 'workspace' : 'standard'}:${item.name}`
-
-/** Search text as a name: lowercase, no colons, spaces as underscores (":Party face" finds partying_face). */
-function normalize(query: string): string {
-  return query.trim().toLowerCase().replace(/:/g, '').replace(/\s+/g, '_')
-}
-
-/**
- * Where an arrow key moves focus from `from`: the next or previous emoji,
- * or the same column one row up or down, across section edges. `null` means
- * the search field; `undefined` means the key is not an arrow.
- * Uses the complete section order, including rows outside the viewport.
- */
-function neighbour(sections: ReadonlyArray<Section>, from: number, key: string): number | null | undefined {
-  const groups = sections.filter((section) => section.items.length > 0)
-  let start = 0
-  const s = groups.findIndex((section) => {
-    if (from < start + section.items.length) return true
-    start += section.items.length
-    return false
-  })
-  const cells = groups[s]?.items
-  if (cells === undefined) return undefined
-  const i = from - start
-  const column = i % COLUMNS
-  const previous = groups[s - 1]?.items
-  const next = groups[s + 1]?.items
-  switch (key) {
-    case 'ArrowLeft': return Math.max(0, from - 1)
-    case 'ArrowRight': return Math.min(groups.reduce((count, group) => count + group.items.length, 0) - 1, from + 1)
-    case 'ArrowUp': {
-      if (i >= COLUMNS) return from - COLUMNS
-      if (previous === undefined) return null
-      const lastRow = Math.floor((previous.length - 1) / COLUMNS) * COLUMNS
-      return start - previous.length + Math.min(lastRow + column, previous.length - 1)
-    }
-    case 'ArrowDown': {
-      if (i + COLUMNS < cells.length) return from + COLUMNS
-      if (Math.floor(i / COLUMNS) < Math.floor((cells.length - 1) / COLUMNS)) return start + cells.length - 1
-      return next === undefined ? from : start + cells.length + Math.min(column, next.length - 1)
-    }
-    default: return undefined
-  }
 }
 
 // The emoji glyph and custom images in a 32px cell.
@@ -334,6 +301,19 @@ const styles = stylex.create({
     // In line with the glyphs, which sit centred in their cells.
     paddingInline: spacing['--space-1-5'],
     backgroundColor: colors['--surface-raised'],
+  },
+  // On the menu's material the headings have no fill of their own: they blur the emoji scrolling under them into it.
+  headingInMenu: {
+    backgroundColor: 'transparent',
+    backdropFilter: menu['--menu-backdrop'],
+  },
+  // Opaque: the menu's text colour is translucent, and Chromium draws a colour emoji with its text colour's alpha.
+  cellInMenu: {
+    color: menu['--menu-emoji'],
+  },
+  // The menu's corners, so a scrolled emoji never shows past them.
+  inMenu: {
+    borderRadius: menu['--menu-radius'],
   },
   headingText: {
     margin: 0,
