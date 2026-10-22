@@ -52,7 +52,7 @@ Startup merges both maps before opening a port and throws on a duplicate method 
 
 `pnpm --filter @juno/fake-slack test`. The tests call the fake over real HTTP and websockets: auth failures, pagination, posting and echoes, the upload flow, and each control. Any behaviour the client tests rely on is checked here first.
 
-`holdNext`, `heldCount` and `release` also cover edge methods using the `edge:` prefix, for example `edge:users/info`. This lets desktop tests delay sender resolution independently of history. Use `file:bytes` to hold thumbnail or download bytes until the test explicitly releases them.
+`holdNext`, `heldCount` and `release` also cover edge methods using the `edge:` prefix, for example `edge:users/info`. This lets desktop tests delay sender resolution independently of history. Use `file:bytes` to hold thumbnail or download bytes until the test explicitly releases them, and `picture:small`, `picture:large` or `picture:<file name>` to hold Juno's picture files.
 
 `unfurlFixtures(base)` supplies invented X image/text posts, failed images, YouTube, GitHub, Google Docs and generic previews. `tableBlock(rows, columnSettings?)` builds a `table` block as Slack sends it: each cell a `rich_text` block from words or inline elements, `null` for an empty cell. `sharedMessage(base, channel, message, author)` turns a posted message into the attachment Slack sends when it is shared into another conversation. Avatar responses require the fake session cookie, so desktop tests exercise the authenticated image path.
 

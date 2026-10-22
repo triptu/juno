@@ -344,6 +344,11 @@ export class FakeSlack {
     return this.server.pictureRequests
   }
 
+  /** Every large picture file is a 2400-pixel image, as the real ones are, so it takes as long to decode. */
+  fullSizePictures(): void {
+    this.server.largePictureBytes = samplePng(2400, 1600)
+  }
+
   heldCount(input: { method?: string } = {}): number {
     return this.server.heldCount(input.method)
   }
