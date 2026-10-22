@@ -27,12 +27,6 @@ export function Emoji({ glyph, size = 14 }: EmojiProps) {
   )
 }
 
-// Each size draws from its own bitmap in the emoji font, so how far the emoji sits off its square's centre changes with
-// the size. Measured at 2x from screenshots (`emoji-align.spec.ts`), not derived: re-measure if a size changes.
-const SHIFT_16 = '-1px' // tokens-allow: a 16px emoji draws a pixel low in its square
-const SHIFT_20 = '0.5px' // tokens-allow: a 20px emoji draws half a pixel high in its square
-const SHIFT_32 = '1px' // tokens-allow: a 32px emoji draws a pixel high in its square
-
 const styles = stylex.create({
   glyph: {
     display: 'inline-block',
@@ -46,7 +40,7 @@ const styles = stylex.create({
 
 const sizeStyles = stylex.create({
   14: { fontSize: sizes['--icon-14'], transform: `translateY(${sizes['--emoji-14-shift']})` },
-  16: { fontSize: sizes['--icon-16'], transform: `translateY(${SHIFT_16})` },
-  20: { fontSize: sizes['--icon-20'], transform: `translateY(${SHIFT_20})` },
-  32: { fontSize: sizes['--control-32'], transform: `translateY(${SHIFT_32})` },
+  16: { fontSize: sizes['--icon-16'], transform: `translateY(${sizes['--emoji-16-shift']})` },
+  20: { fontSize: sizes['--icon-20'], transform: `translateY(${sizes['--emoji-20-shift']})` },
+  32: { fontSize: sizes['--control-32'], transform: `translateY(${sizes['--emoji-32-shift']})` },
 })

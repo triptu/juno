@@ -66,8 +66,6 @@ function ReactionChips({ reactions, onToggle, people, onSeeAll }: { readonly rea
   )
 }
 
-const COUNT_SHIFT = '-0.5px' // tokens-allow: measured at 2x (`emoji-align.spec.ts`)
-
 const styles = stylex.create({
   row: {
     display: 'flex',
@@ -84,7 +82,7 @@ const styles = stylex.create({
   },
   // Figtree's figures, centred in their line, draw half a pixel under the chip's centre line, where the emoji is.
   count: {
-    transform: `translateY(${COUNT_SHIFT})`,
+    transform: `translateY(${sizes['--reaction-count-shift']})`,
   },
   image: {
     width: sizes['--icon-14'],
