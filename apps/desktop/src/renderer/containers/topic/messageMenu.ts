@@ -120,7 +120,7 @@ function choose(id: string, now: MessageView, input: MenuInput, selection: strin
       if (selection === undefined) selectWords(scrollRef.current, now.ts)
       return void askJunoAboutSelection()
     case 'copy':
-      return copyText(text())
+      return void copyText(text())
     case 'forward':
       return now.pending === undefined && now.kind === 'message' ? openForward(channel, now, latest.current) : undefined
     case 'open-in-slack':
