@@ -50,9 +50,14 @@ test('image menus copy image data, download, open a temporary copy and open the 
   expect(opened).toContain('/Temp/')
   expect((await readFile(opened)).equals(await readFile(join(downloads, 'image-menu.png')))).toBe(true)
 
-  const textMenu = await choose(juno, row.getByText('Image menu sample', { exact: true }), null)
+  // The message's text keeps the message's own menu, not a native image menu.
+  const asked = await juno.menusAsked()
+  const text = await juno.topic.messageMenu('Image menu sample')
+  const textMenu = await text.labels()
   expect(textMenu).toContain('Start thread')
   expect(textMenu).not.toContain('Copy image')
+  await text.close()
+  expect(await juno.menusAsked()).toBe(asked)
 
   expect(await choose(juno, image, 'open')).toEqual(IMAGE_ITEMS)
   const viewer = juno.win.locator('[data-media-viewer]')
