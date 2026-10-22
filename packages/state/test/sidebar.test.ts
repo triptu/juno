@@ -7,7 +7,7 @@ import { activateTab, closeTab, noTabs, openPlace, topicPlace } from '../src/tab
 const topicRow = (id: string): TopicRow => ({
   id, rev: 1, kind: 'thread', section: 'recent', status: 'open', title: id, titleSource: 'fallback',
   preview: { sender: 'Dev', text: 'Hello' }, messageCount: 2, unreadCount: 1, unreadExact: true,
-  mentionsMe: true, tags: [], pinned: false, resolved: false, canResolveOnHover: true,
+  mentionsMe: true, tags: [], pinned: false, resolved: false,
   subscribed: true, newThreads: 0, lastActivityTs: '1.000000', lastActivityAt: 1000,
   channel: { id: 'C1', kind: 'public', name: 'eng', label: '#eng', tint: 'public', icon: 'hash', color: 'cyan' },
   participants: [],

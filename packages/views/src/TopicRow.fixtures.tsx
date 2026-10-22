@@ -12,7 +12,6 @@ const one = (row: TopicRowProps['row'], extra: Partial<TopicRowProps> = {}): Top
   row,
   time: relativeTime(row.lastActivityAt, NOW),
   onOpen: noop,
-  onResolve: noop,
   ...extra,
 })
 
@@ -123,7 +122,7 @@ export default defineFixtures(
       mention: state(rows.hiring),
       selected: state(rows.postgres, { selected: true }),
       'selected-unread': state(rows.roadmap, { selected: true }),
-      // Rename from the row's menu: the title is a field, preselected; no Resolve.
+      // Rename from the row's menu: the title is a field, preselected.
       renaming: state(rows.postgres, { renaming: true, onRename: noop, onRenameCancel: noop }),
       'renaming-selected': state(rows.roadmap, { renaming: true, selected: true, onRename: noop, onRenameCancel: noop }),
     },
@@ -211,9 +210,7 @@ export default defineFixtures(
     },
     Interaction: {
       hover: state(rows.postgres, {}, { hover: ROW }),
-      'hover-resolve': state(rows.postgres, {}, { hover: 'button' }),
       focus: state(rows.postgres, {}, { focus: ROW }),
-      'focus-resolve': state(rows.postgres, {}, { focus: 'button' }),
       press: state(rows.postgres, {}, { press: ROW }),
       'hover-resolved': state(rows.notes, {}, { hover: ROW }),
     },

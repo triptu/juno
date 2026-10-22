@@ -28,9 +28,8 @@ async function resolveTopic({ juno, slack }: Pick<Fixtures, 'juno' | 'slack'>): 
   await roadmap.expectUnread(3)
   slack.resetCalls()
 
-  // The hover check.
-  await roadmap.hover()
-  await roadmap.resolveButton.click()
+  // From the row's menu.
+  await roadmap.chooseInMenu('resolve')
   await roadmap.expectAbsent()
   await juno.expectToast(`Resolved · ${ROADMAP}`)
   // Resolve marks read in Slack too; it never unfollows.
@@ -41,7 +40,7 @@ async function resolveTopic({ juno, slack }: Pick<Fixtures, 'juno' | 'slack'>): 
   await roadmap.expectVisible()
   await roadmap.expectUnread(3)
 
-  // Resolved again from the menu, then a reply from someone else brings it back, tagged.
+  // Resolved again, then a reply from someone else brings it back, tagged.
   await roadmap.chooseInMenu('resolve')
   await roadmap.expectAbsent()
   slack.as('Maya').replyIn(ROADMAP, 'One more thing on the proposal.')

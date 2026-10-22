@@ -71,7 +71,7 @@ export function SignedIn({ width, hidden = false, fullScreen = false, peek, page
             renderRow={(id) => {
               const row = rowsById.get(id)
               return row === undefined ? null : (
-                <TopicRow key={id} row={row} time={relativeTime(row.lastActivityAt, NOW)} selected={id === rows.postgres.id} tabbable={id === rows.postgres.id} onOpen={noop} onResolve={noop} />
+                <TopicRow key={id} row={row} time={relativeTime(row.lastActivityAt, NOW)} selected={id === rows.postgres.id} tabbable={id === rows.postgres.id} onOpen={noop} />
               )
             }}
           />

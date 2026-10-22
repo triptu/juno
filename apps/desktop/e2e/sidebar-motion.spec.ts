@@ -134,9 +134,8 @@ test('your own Resolve takes its row out in one frame, with no motion', async ({
   const below = ids[2]!
   const title = await juno.sidebar.list.locator(`[data-topic-id="${gone}"]`).evaluate((el) => document.getElementById(el.getAttribute('aria-labelledby') ?? '')?.textContent ?? '')
   const row = juno.sidebar.row(title, { exact: true })
-  await row.root.hover()
   await recordFrames(win)
-  await row.resolveButton.click()
+  await row.chooseInMenu('resolve')
   await expect.poll(async () => (await recentIds(juno)).includes(gone)).toBe(false)
   const frames = await stopFrames(win)
   const removed = frames.findIndex((frame) => !frame.order.includes(gone))

@@ -33,7 +33,7 @@ import { markFilterChange, takeFilterMark } from './filterMark'
 import { openAllTopics, openTopicFromList, warmTopic } from './navigation'
 import { typeOnRow } from './pageFocus'
 import { useRowAccessory } from './rowAccessories'
-import { cancelRename, loadTopicMenu, renameTopic, resolveTopic, showRowMenu } from './topicActions'
+import { cancelRename, loadTopicMenu, renameTopic, showRowMenu } from './topicActions'
 import { editSelectedView } from './viewActions'
 
 /**
@@ -111,7 +111,7 @@ function useReleaseOnUnmount(): void {
 }
 
 
-/** A row got focus: Tab comes back to it, and reaches its Resolve button next. */
+/** A row got focus: Tab comes back to it. */
 function focusRow(id: string): void {
   registry.set(focusedTopicAtom, id)
 }
@@ -150,7 +150,6 @@ const Row = memo(function Row({ id }: { readonly id: string }) {
       partnerActive={partnerActive}
       {...(accessory === undefined ? {} : { accessory: accessory.node, accessoryLabel: accessory.label })}
       onOpen={open}
-      onResolve={resolveTopic}
       onPrefetch={warmTopic}
       onContextMenu={showRowMenu}
       renaming={renaming}

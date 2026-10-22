@@ -173,7 +173,7 @@ While the pointer is over the topic list, or keyboard focus is in it, the list h
 
 ### Row actions
 
-- **Hover** (or keyboard focus) shows an icon-only **Resolve** button (a check) over the right end of the last line (the meta line, or the preview line of a DM's Main): whatever reaches the end of that line fades out under it. It takes no space while hidden, and nothing shifts. Its tooltip and accessible name say "Resolve" (with the topic title for screen readers). Resolving hides the row, marks it read and shows a toast with Undo. ⌘Z also undoes. Main threads resolve the same way.
+- **Resolve** is in the row's menu (right-click), the topic header and ⌘K. Hovering a row shows only its hover fill; no button appears. Resolving hides the row, marks it read and shows a toast with Undo. ⌘Z also undoes. Main threads resolve the same way.
 - **Context menu** (right-click, or the context-menu key; in an open topic, ⋯ in the header or a right-click on its title):
   - Open in new tab (⌘-click)
   - Rename

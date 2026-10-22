@@ -3,8 +3,8 @@ import { expectNoLayoutShift } from '@juno/testing/layout-shift'
 import { openState, type Route } from './support'
 
 /**
- * Sidebar rows and the topic list as views: what a row says and shows, its
- * Resolve slot, the title tooltip and the list's scrollbar. The app's e2e
+ * Sidebar rows and the topic list as views: what a row says and shows, the
+ * title tooltip and the list's scrollbar. The app's e2e
  * tests cover where rows come from and how they change.
  */
 
@@ -103,36 +103,7 @@ test('a title cut off by the row shows in full on hover, and one that fits shows
   await expect(short).not.toHaveAttribute('title')
 })
 
-test('hovering a row shows Resolve in its reserved slot without moving anything, and keyboard focus shows it too', async ({ page }) => {
-  await open(page, 'TopicRow', 'state/read')
-  const postgres = row(page, 'Postgres 16')
-  const resolve = postgres.getByRole('button', { name: /^Resolve Postgres 16/ })
-  const slot = resolve.locator('..')
-  await expect(slot).toHaveCSS('opacity', '0')
-  await expectNoLayoutShift(page, () => postgres.hover())
-  await expect(slot).toHaveCSS('opacity', '1')
-  await expect(resolve).toHaveAttribute('data-tooltip', 'Resolve')
-
-  // Leaving hides it again.
-  await expectNoLayoutShift(page, () => page.mouse.move(0, 0))
-  await expect(slot).toHaveCSS('opacity', '0')
-
-  // A mouse press focuses the row, but that is not keyboard focus.
-  await postgres.click()
-  await page.mouse.move(0, 0)
-  await expect(postgres).toBeFocused()
-  await expect(slot).toHaveCSS('opacity', '0')
-
-  // Keyboard focus shows it, and Tab reaches it.
-  await page.keyboard.press('Shift')
-  await expectNoLayoutShift(page, () => postgres.focus())
-  await expect(slot).toHaveCSS('opacity', '1')
-  await page.keyboard.press('Tab')
-  await expect(resolve).toBeFocused()
-  await expect(slot).toHaveCSS('opacity', '1')
-})
-
-test('the place line sits at one height with or without Resolve: renaming, and a resolved row', async ({ page }) => {
+test('the place line sits at one height on every row: renaming, and a resolved row', async ({ page }) => {
   const placeTop = (id: string) =>
     page.evaluate((topicId) => {
       const row = document.querySelector(`[data-topic-id="${topicId}"]`)!

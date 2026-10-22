@@ -115,13 +115,9 @@ export function sidebarPlacement(topic: Topic, ctx: RuleContext): SidebarPlaceme
   return status === 'open' && isSidebarCandidate(topic) ? 'recent' : 'hidden'
 }
 
-/** A pinned resolved row is dimmed with a check and has no hover Resolve. */
+/** A pinned resolved row is dimmed with a check. */
 export function showsResolvedCheck(topic: Topic, ctx: RuleContext): boolean {
   return sidebarPlacement(topic, ctx) === 'pinned' && isResolved(topic)
-}
-
-export function canResolveOnHover(topic: Topic): boolean {
-  return !isResolved(topic)
 }
 
 export const RowTag = Schema.Literals(['main', 'reopened', 'unsubscribed'])

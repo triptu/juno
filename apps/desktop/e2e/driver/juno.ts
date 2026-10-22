@@ -106,13 +106,8 @@ export class SidebarRow {
     readonly title: string,
     exact = false,
   ) {
-    // Rows are focusable list items named by their title (a button would
-    // flatten the Resolve button inside it).
+    // Rows are focusable list items named by their title.
     this.root = win.getByRole('listitem', { name: new RegExp(`^${escapeRegExp(title)}${exact ? '$' : ''}`) })
-  }
-
-  get resolveButton() {
-    return this.root.getByRole('button', { name: new RegExp(`^Resolve ${escapeRegExp(this.title)}`) })
   }
 
   /** The presence dot on a DM's photo, while Slack shows the person active. */

@@ -1,6 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
 import { BellSlash } from '@phosphor-icons/react/dist/icons/BellSlash'
-import { Check } from '@phosphor-icons/react/dist/icons/Check'
 import { CheckCircle } from '@phosphor-icons/react/dist/icons/CheckCircle'
 import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
 import { memo, useId, type FocusEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
@@ -14,11 +13,9 @@ import {
   focusRing,
   GroupAvatar,
   Icon,
-  IconButton,
   pointerMoved,
   PresenceDot,
   Text,
-  tooltip,
   TopicArt,
   type ActivateEvent,
   type AvatarStackPerson,
@@ -38,11 +35,10 @@ export interface TopicRowProps {
   readonly tabbable?: boolean
   /** Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onOpen: (id: string, event: ActivateEvent) => void
-  readonly onResolve: (id: string) => void
   /** Pointer enter or keyboard focus: warm the topic's query. Not when the row scrolls under a still pointer. */
   readonly onPrefetch?: (id: string) => void
   readonly onContextMenu?: (id: string, event: MouseEvent<HTMLDivElement>) => void
-  /** The title is a field for Rename: the row does not open and shows no Resolve until it ends. */
+  /** The title is a field for Rename: the row does not open until it ends. */
   readonly renaming?: boolean
   /** Rename saved (Enter or leaving the field) with the text as typed. */
   readonly onRename?: (id: string, title: string) => void
@@ -64,9 +60,6 @@ export interface TopicRowProps {
 }
 
 const HOVER = '@media (hover: hover)'
-// Only the mask's alpha counts; the colours are not painted.
-const PLACE_MASK = `linear-gradient(to left, transparent ${sizes['--control-22']}, black calc(${sizes['--control-22']} + ${spacing['--space-3']}))` // tokens-allow: mask alpha, not a colour
-
 
 const REOPENED_TITLE = 'New activity after it was resolved'
 const PRIVATE_TITLE = 'Private channel'
@@ -80,13 +73,11 @@ const PRIVATE_TITLE = 'Private channel'
  * row's title is semibold and its preview steps up between the two. A Main (a channel's, a DM's or a group DM's) has no meta line and no
  * Main tag: Main is the default and its title already names the place, so
  * the row is two lines and shorter, and its `accessory`, a Reopened tag or
- * the new-thread count follows the title. The Resolve check overlays the
- * end of the last line on hover or keyboard focus and takes no space, so
- * nothing ever moves. The row activates on mouse down; Resolve on click.
+ * the new-thread count follows the title. The row activates on mouse down.
+ * Resolve is in its menu (right-click), the topic header and ⌘K.
  *
- * The row is a focusable list item, not a button: a button's children are
- * presentational, so the Resolve button inside it would be flattened away.
- * Enter and Space open it, as on a button.
+ * The row is a focusable list item, named by its title. Enter and Space
+ * open it, as on a button.
  */
 export const TopicRow = memo(function TopicRow({
   row,
@@ -94,7 +85,6 @@ export const TopicRow = memo(function TopicRow({
   selected = false,
   tabbable = true,
   onOpen,
-  onResolve,
   onPrefetch,
   onContextMenu,
   renaming = false,
@@ -125,7 +115,6 @@ export const TopicRow = memo(function TopicRow({
   const state = rowState(row, unreadLabel, threads > 0 ? threadsLabel : undefined, main ? accessoryLabel : undefined, active)
   const people: ReadonlyArray<AvatarStackPerson> = row.participants.map((person) => stackPerson(person))
   const hasPeople = people.length > 0
-  const resolvable = row.canResolveOnHover && !renaming
   // Line three's tags, or line one's on a two-line row. Never a Main tag: Main is the default.
   const tags = (
     <>
@@ -144,28 +133,12 @@ export const TopicRow = memo(function TopicRow({
       ) : null}
     </>
   )
-  const resolve = resolvable ? (
-    <span {...stylex.props(styles.actionSlot, twoLine && styles.actionSlotLine2)}>
-      <IconButton
-        icon={Check}
-        label={`Resolve ${row.title}`}
-        {...tooltip('Resolve')}
-        size={22}
-        iconSize={13}
-        radius="full"
-        variant="raised"
-        tabIndex={tabbable ? 0 : -1}
-        onClick={() => onResolve(row.id)}
-      />
-    </span>
-  ) : null
-
   const hasTrail = hasPeople || row.mentionsMe || unread
   // The preview, then who wrote the unread messages beside the @ and the
   // count, all at the line's end. Nothing is kept for any of them when
   // absent: the preview takes the space.
   const line2 = (
-    <span {...stylex.props(styles.line2, !unread && styles.readLine2, twoLine && resolvable && styles.underMask)}>
+    <span {...stylex.props(styles.line2, !unread && styles.readLine2)}>
       {/* The message sets the direction; the sender is isolated so a Latin
           name before Arabic text, or the reverse, keeps its own order. */}
       <Text variant="preview" tone={unread && !quiet ? 'secondary' : 'muted'} truncate as="span" dir="auto" id={previewId} data-sensitive="" data-row-part="preview" sx={styles.preview}>
@@ -281,17 +254,10 @@ export const TopicRow = memo(function TopicRow({
             {time}
           </Text>
         </span>
-        {twoLine ? (
-          <span {...stylex.props(styles.line2Last)}>
-            {line2}
-            {resolve}
-          </span>
-        ) : (
-          line2
-        )}
+        {line2}
         {twoLine ? null : (
           <span {...stylex.props(styles.line3)}>
-            <span {...stylex.props(styles.where, resolvable && styles.whereUnderAction)}>
+            <span {...stylex.props(styles.where)}>
               <span {...stylex.props(styles.place)}>
                 <span {...stylex.props(styles.glyph)} title={row.channel.kind === 'private' ? PRIVATE_TITLE : undefined}>
                   <Icon icon={kindIcon(row.channel.kind)} size={13} {...(row.channel.kind === 'private' ? { label: PRIVATE_TITLE } : {})} />
@@ -302,7 +268,6 @@ export const TopicRow = memo(function TopicRow({
               </span>
               {tags}
             </span>
-            {resolve}
           </span>
         )}
       </span>
@@ -400,30 +365,11 @@ const styles = stylex.create({
       default: 'var(--reorder-background, transparent)',
       ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
     },
-    // The Resolve check reads this: hidden until the pointer is over the row
-    // or keyboard focus is on the row or the check itself (a mouse press
-    // leaves focus on the row too, and must not show it). Only opacity
-    // changes, so nothing moves.
-    '--row-action-opacity': {
-      default: '0',
-      ':hover': { default: null, [HOVER]: '1' },
-      ':focus-visible': '1',
-      ':has(:focus-visible)': '1',
-    },
     // A read row's preview: its own colour at rest, muted on hover, where the
     // lower colour would fall under 4.5:1. The selected row sets it again.
     '--row-read-preview': {
       default: colors['--foreground-preview-read'],
       ':hover': { default: null, [HOVER]: colors['--foreground-muted'] },
-    },
-    // While Resolve shows over the end of the last line, what reaches it
-    // (the place, or a two-line row's preview and counts) fades out under it
-    // instead of running beneath the button.
-    '--row-place-mask': {
-      default: 'none',
-      ':hover': { default: null, [HOVER]: PLACE_MASK },
-      ':focus-visible': PLACE_MASK,
-      ':has(:focus-visible)': PLACE_MASK,
     },
   },
   // A Main has no meta line, so its minimum and off-screen estimate are shorter.
@@ -558,10 +504,6 @@ const styles = stylex.create({
   readLine2: {
     '--foreground-muted': 'var(--row-read-preview)',
   },
-  // The last line of a two-line row, which Resolve overlays.
-  line2Last: {
-    position: 'relative',
-  },
   preview: {
     flexGrow: 1,
     minWidth: 0,
@@ -580,21 +522,14 @@ const styles = stylex.create({
     alignItems: 'center',
     flexShrink: 0,
   },
-  // On a two-line row Resolve overlays the preview line's end, and what
-  // reaches it fades out under it, as on the meta line.
-  underMask: {
-    maskImage: 'var(--row-place-mask)',
-  },
   badges: {
     display: 'inline-flex',
     alignItems: 'center',
     gap: spacing['--space-1'],
     flexShrink: 0,
   },
-  // The place and its tags in one run, so the tags never float. Resolve overlays the end of the line in the same
-  // cell, so it takes no space when hidden.
-  // As tall as Resolve whether or not the row has it (a resolved row, a row
-  // being renamed), so the place sits at one height on every row.
+  // The place and its tags in one run, so the tags never float. One 22px
+  // line on every row, so rows keep the height they have always had.
   line3: {
     display: 'grid',
     gridTemplateColumns: 'minmax(0, 1fr)',
@@ -629,28 +564,5 @@ const styles = stylex.create({
     alignItems: 'center',
     gap: spacing['--space-1'],
     flexShrink: 0,
-  },
-  // Over the end of the line, in the line's one cell, so it adds no width.
-  actionSlot: {
-    gridRow: 1,
-    gridColumn: 1,
-    justifySelf: 'end',
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: sizes['--control-22'],
-    height: sizes['--control-22'],
-    opacity: 'var(--row-action-opacity)',
-  },
-  // Line two is shorter than the button, so it is centred on the line
-  // without making it taller.
-  actionSlotLine2: {
-    position: 'absolute',
-    insetInlineEnd: 0,
-    insetBlock: 0,
-    marginBlock: 'auto',
-  },
-  whereUnderAction: {
-    maskImage: 'var(--row-place-mask)',
   },
 })

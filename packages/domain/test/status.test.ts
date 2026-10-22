@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   allTopicsList,
-  canResolveOnHover,
   filterDots,
   rowTags,
   showsReopenedTag,
@@ -119,7 +118,6 @@ describe('sidebar placement', () => {
     const pinnedResolved = topic({ overlay: { pinnedAt: NOW, resolvedAt: NOW, resolvedActivityTs: ts(NOW - HOUR) } })
     expect(sidebarPlacement(pinnedResolved, ctx)).toBe('pinned')
     expect(showsResolvedCheck(pinnedResolved, ctx)).toBe(true)
-    expect(canResolveOnHover(pinnedResolved)).toBe(false)
     expect(showsResolvedCheck(topic({ overlay: { pinnedAt: NOW } }), ctx)).toBe(false)
   })
 

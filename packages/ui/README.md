@@ -55,7 +55,7 @@ Things that navigate (`ListRow` with `onSelect`, `Tab`, `OptionRow`, `NavItem`) 
 - Primary button of the primary pointer only. The secondary button goes to `onContextMenu`; ctrl-click is left alone because on macOS it is the context menu.
 - ⌘, shift and alt are passed through in the `ActivateEvent` so the owner can open in a new tab.
 - Enter and Space activate from the keyboard, once per press: holding the key does not repeat. A click with `detail === 0` (assistive technology) activates too. Real clicks are ignored because the press already fired.
-- A press that starts inside a nested control (a Resolve button, a close button, a link, or anything marked `data-no-activate`) is ignored; the control handles itself.
+- A press that starts inside a nested control (a close button, a link, or anything marked `data-no-activate`) is ignored; the control handles itself.
 - Pressing and dragging away is harmless: the activation already happened on the press and nothing waits for the release.
 - Touch pointers wait for the click so a scroll gesture is not a navigation.
 

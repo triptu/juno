@@ -365,7 +365,7 @@ Sizes are the Figtree values; the prototype's Inter value is half a pixel smalle
 | Table header | 11.5px | 500 | normal | 0 | muted | All topics columns |
 | New divider | 11.5px | 600 | normal | 0 | `--hl` | "3 new", and the Juno chat's day label ("Today") in muted |
 | Tag | 11.5px | 500 | 18px box | 0 | subtle / muted | Main, Reopened, counts, @, confidence badge, menu hints, ⌘ hints |
-| Tag small | 12px | 500 / 400 | | 0 | | Row Resolve button, card footnotes, "Use", Mark read |
+| Tag small | 12px | 500 / 400 | | 0 | | Card footnotes, "Use", Mark read |
 | Meta | 12.5px | 400 | normal | 0 | muted | Row line 3, times, message timestamps, card headers, status chips (500), bubble name line, log reasons, the page header's 24px context pill (600) and island buttons (500) |
 | Pill | 13px | 600 (+400 kind) | 26px box | 0 | tint fg | Context pill (the header's 24px pill takes the Meta size), scope chip (500) |
 | Small button | 13px | 500 | 28px box | 0 | | Resolve (hint), Fix and send, Stop ignoring, Not yet |
@@ -443,7 +443,7 @@ Odd values the prototype uses once (3, 5, 9, 18) are component-local; keep them 
 | `--radius-toast` | 14 | Toast |
 | `--radius-bubble` | 16 | Message bubbles (tail corner 4) |
 | `--radius-panel` | 18 | The Juno panel: half its 36px header row, so the 28px controls 4px in nest in its corners |
-| `--radius-tag` | 999 | Tags, count badges, @ tag, status chips, decision chips, scope chip, confidence badge, reaction chips, inline @person and #channel chips (padding 0 5), the row Resolve button (22) and the toast Undo button (26) |
+| `--radius-tag` | 999 | Tags, count badges, @ tag, status chips, decision chips, scope chip, confidence badge, reaction chips, inline @person and #channel chips (padding 0 5) and the toast Undo button (26) |
 | `--radius-pill` | 999 | Context pill (header, To field, send card); the 32px and taller buttons (Discard/Send, Sign in); the page header's islands, title button and island buttons |
 | `--radius-full` | 999 | Avatars, attach/send buttons, colour swatches |
 
@@ -523,7 +523,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | --- | --- | --- |
 | `--control-18` | 18px | Tags and count badges (implemented as `--control-<px>`; the names below map to `--control-20` … `--control-44`) |
 | `--control-xs` | 20px | Tab close, scope chip close, digest chip close |
-| `--control-sm` | 22px | Row Resolve button, status chips |
+| `--control-sm` | 22px | Status chips, the sidebar row's meta line height |
 | `--control-md-` | 24px | Reaction chip, segmented-control segment, summary chips |
 | `--control-md` | 26px | Context pill, thread link, toast Undo, rule remove |
 | `--control` | 28px | Quick filters, status chips (All topics), small buttons, attach/send, To pill, digest chips |
