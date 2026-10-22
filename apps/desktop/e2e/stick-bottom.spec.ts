@@ -1,7 +1,8 @@
 // At the bottom the list keeps its bottom (SPEC 7, "Stable geometry"): a message that arrives while the user sits
 // at the end of a list longer than the view is fully in view on the first frame that draws it, and the list stays
 // at its end. Sitting there includes turning the wheel down at the end and clicking a message, which scroll
-// nothing. Scrolled up, an arriving message moves nothing and the pill shows.
+// nothing. The last message growing at the bottom (a reaction, its edit box) stays whole above the composer, and an
+// edit box started just above the bottom shows whole too. Scrolled up, an arriving message or a reaction moves nothing.
 import type { Locator, Page } from '@playwright/test'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 import type { FakeSlack } from '@juno/fake-slack'
@@ -10,6 +11,7 @@ import type { Slack } from './driver/slack'
 import { expect, test, type Fixtures } from './fixtures'
 import { answer, JunoChatPane, test as chatTest } from './juno-agent/chat'
 import { expectStableAnchor } from './shiftProbe'
+import { expectRestSurvivesGrowth, expectScrollEscapesGrowth } from './scrollGrowthProbe'
 
 test.describe.configure({ timeout: 90_000, mode: 'parallel' })
 
@@ -134,6 +136,144 @@ test('keeps Main at the bottom through arrivals and composer growth, and holds i
   await test.step('scrolled up in Main, a new message moves nothing and shows the pill', () => scrolledUpArrival(context))
 })
 
+/** Every frame from the first that draws the element shows it whole, at the list's end or anywhere in view. */
+function expectWhole(frames: Frame[], { atEnd }: { readonly atEnd: boolean }): void {
+  expect(frames.length, 'the element is drawn').toBeGreaterThan(1)
+  expect(frames.filter((frame) => !frame.inView || (atEnd && frame.distance > 1))).toEqual([])
+}
+
+const EDITING = '[data-message-row][data-editing]'
+
+test('keeps the last message of Main whole as it grows at the bottom, and still when scrolled up', async ({ juno, win, slack, fake }) => {
+  const channel = await openLongMain(juno, fake, slack)
+  const { topic } = juno
+
+  await test.step('at the bottom, a reaction from someone else on the last message shows whole', async () => {
+    const text = 'A message Leo reacts to'
+    const message = fake.injectMessage({ channel, user: slack.as('Maya').id, text })
+    await topic.expectMessage(text)
+    await topic.expectAtBottom()
+    const watched = await watchArrival(win, TOPIC_SCROLLER, '[data-message-row]', text)
+    fake.addReaction({ channel, ts: message.ts, name: 'eyes', user: slack.as('Leo').id })
+    await expect(topic.message(text).getByRole('button', { name: /👀/ })).toBeVisible()
+    await frames(win, 5)
+    expectWhole(await watched(), { atEnd: true })
+  })
+
+  const own = 'My message to react to and edit'
+  await test.step('at the bottom, the user’s own reaction on the last message shows whole', async () => {
+    await topic.send(own)
+    await topic.expectSent(own)
+    await topic.expectAtBottom()
+    const row = topic.message(own)
+    await row.hover()
+    const watched = await watchArrival(win, TOPIC_SCROLLER, '[data-message-row]', own)
+    await row.getByRole('button', { name: 'React 👍' }).click()
+    await expect(row.getByRole('button', { name: '1 👍, including you' })).toBeVisible()
+    await frames(win, 5)
+    expectWhole(await watched(), { atEnd: true })
+  })
+
+  await test.step('at the bottom, editing the last message shows the whole edit box', async () => {
+    await win.mouse.move(0, 0)
+    await topic.composer.focus()
+    await topic.composer.press('ArrowUp')
+    await expect(topic.message(own)).toBeFocused()
+    const watched = await watchArrival(win, TOPIC_SCROLLER, EDITING, '')
+    await topic.message(own).press('e')
+    await expect(topic.list.getByRole('textbox', { name: 'Edit message' })).toBeFocused()
+    await frames(win, 5)
+    expectWhole(await watched(), { atEnd: true })
+    await win.keyboard.press('Escape')
+    await expect(topic.list.locator(EDITING)).toHaveCount(0)
+  })
+
+  await test.step('just above the bottom, editing the last message from its menu shows the whole edit box', async () => {
+    await topic.expectAtBottom()
+    await topic.scrollUp(40)
+    expect(await distance(topic.scroller)).toBeGreaterThan(32)
+    const row = topic.message(own)
+    await row.hover()
+    const watched = await watchArrival(win, TOPIC_SCROLLER, EDITING, '')
+    await juno.chooseNextMenuItem('edit', { hold: true })
+    await row.getByRole('button', { name: 'More', exact: true }).click()
+    await juno.releaseMenu()
+    await expect(topic.list.getByRole('textbox', { name: 'Edit message' })).toBeFocused()
+    await frames(win, 5)
+    expectWhole(await watched(), { atEnd: false })
+    await win.keyboard.press('Escape')
+    await expect(topic.list.locator(EDITING)).toHaveCount(0)
+  })
+
+  await test.step('scrolled up, a reaction on the last message moves nothing', async () => {
+    const text = 'The last message, reacted to while scrolled up'
+    await topic.send(text)
+    await topic.expectSent(text)
+    await topic.expectAtBottom()
+    await topic.scrollUp(600)
+    const top = await topic.scroller.evaluate((node) => node.scrollTop)
+    const ts = fake.messages(channel).find((m) => m.text === text)!.ts
+    await expectStableAnchor(win, '[data-topic-view] [data-message-row]', async () => {
+      fake.addReaction({ channel, ts, name: 'tada', user: slack.as('Maya').id })
+      await expect(topic.message(text).getByRole('button', { name: /🎉/ })).toHaveCount(1)
+    })
+    expect(await topic.scroller.evaluate((node) => node.scrollTop)).toBe(top)
+  })
+})
+
+test('releases the bottom during an upward gesture and uses the resting threshold for later growth', async ({ juno, win, slack, fake }) => {
+  const channel = await openLongMain(juno, fake, slack)
+  const { topic } = juno
+  const last = fake.messages(channel).find((message) => message.text === 'Earlier message 29')!
+  const grown = 'The last message grows\nAnother line\nAnd another line'
+
+  await test.step('growth during a continuous upward gesture does not pull the list back down', async () => {
+    const box = (await topic.scroller.boundingBox())!
+    const start = await topic.scroller.evaluate((node) => node.scrollTop)
+    const cdp = await win.context().newCDPSession(win)
+    try {
+      const gesture = cdp.send('Input.synthesizeScrollGesture', { x: box.x + box.width / 2, y: box.y + box.height / 2, yDistance: 900, speed: 600, gestureSourceType: 'mouse', preventFling: false })
+      try {
+        await expect.poll(() => topic.scroller.evaluate((node) => node.scrollTop)).toBeLessThan(start - 64)
+        fake.editMessage({ channel, ts: last.ts, text: grown })
+        await topic.expectMessage('The last message grows')
+        expect(await topic.scroller.evaluate((node) => node.scrollTop)).toBeLessThan(start - 64)
+      } finally {
+        await gesture
+      }
+    } finally {
+      await cdp.detach()
+    }
+    expect(await distance(topic.scroller)).toBeGreaterThan(600)
+  })
+
+  await test.step('resting within 32px holds the bottom on growth', async () => {
+    await topic.toLatest()
+    await topic.scrollUp(16)
+    expect(await distance(topic.scroller)).toBeLessThanOrEqual(32)
+    fake.editMessage({ channel, ts: last.ts, text: `${grown}\nOne more line` })
+    await topic.expectMessage('One more line')
+    await frames(win, 5)
+    expect(await distance(topic.scroller)).toBeLessThanOrEqual(1)
+  })
+
+  await test.step('resting outside 32px leaves the viewport alone on growth', async () => {
+    await topic.scrollUp(40)
+    expect(await distance(topic.scroller)).toBeGreaterThan(32)
+    const top = await topic.scroller.evaluate((node) => node.scrollTop)
+    await expectStableAnchor(win, '[data-topic-view] [data-message-row]', async () => {
+      fake.editMessage({ channel, ts: last.ts, text: `${grown}\nOne more line\nThe final line` })
+      await topic.expectMessage('The final line')
+    })
+    expect(await topic.scroller.evaluate((node) => node.scrollTop)).toBe(top)
+  })
+})
+
+test('an upward gesture escapes concurrent column growth from the first scroll frame', async ({ juno, win, slack, fake }) => {
+  await openLongMain(juno, fake, slack)
+  await expectScrollEscapesGrowth(win, juno.topic.scroller, juno.topic.list.locator('[data-message-row]').last())
+})
+
 async function mainArrival({ juno, win, slack, fake }: Pick<Fixtures, 'juno' | 'win' | 'slack' | 'fake'>): Promise<void> {
   const channel = slack.channel('eng')
   await juno.topic.message('Earlier message 29').click()
@@ -255,4 +395,6 @@ heldTest('the Juno panel at the bottom keeps a new answer fully in view', async 
   await panel.expectJuno(`You said: ${ask}`)
   await frames(win, 5)
   expectHeldAtEnd(await watched())
+  await expectRestSurvivesGrowth(scroller, '[data-chat-juno]')
+  await expectScrollEscapesGrowth(win, scroller, scroller.locator('[data-chat-juno]').last())
 })

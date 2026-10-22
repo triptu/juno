@@ -18,7 +18,8 @@ import { useAtomValue } from '@juno/state/react'
 import { flashChatRow } from '@juno/views'
 import { onLeaveTab, takeOpenStart } from '../navigation'
 import { takeSendMark } from '../sendMark'
-import { BOTTOM_SLACK, distanceFromBottom, dividerTop, hold, rowInView, rowSelector, snapshotOf, type Pin } from './scroll'
+import { scrollRest } from '../scrollRest'
+import { BOTTOM_SLACK, distanceFromBottom, dividerTop, hold, rowInView, rowSelector, snapshotOf, takeOwnEnd, type Pin } from './scroll'
 
 /** A scroll of the user's that moved the list this recently, in milliseconds, is still going on. */
 const GESTURE_IDLE = 100
@@ -80,6 +81,7 @@ export function useOpenPosition(position: Position, view: string, readOnly: bool
     const bottom = atEnd && distance <= BOTTOM_SLACK
     if (bottom) {
       pinRef.current = { kind: 'bottom' }
+      pinnedTopRef.current = scroller.scrollTop
       heldForRef.current = { rows: list.rows, size: `${window.innerWidth}x${window.innerHeight}` }
     }
     setAtBottom(bottom)
@@ -138,8 +140,10 @@ export function useHeldPosition(position: Position, list: MessageWindow): void {
     if (scroller !== null && positioned) hold(scroller, pinRef, pinnedTopRef)
   }, [positioned, first, drawnAll, heldAt, list.rows, scrollRef, pinRef, pinnedTopRef])
 
-  // The list's box changes size (the window, the composer growing, the Juno panel beside it); at the bottom, stay
-  // there. The observer sees only the scroller's own box, and runs after layout and before the frame's paint.
+  // The list's box changes size (the window, the composer growing, the Juno panel beside it), or its rows do (a
+  // reaction, an edit box, an image or unfurl loading); at the bottom, stay there. A row growing with no change to
+  // the window's rows, such as the edit box opening, reaches no layout effect, so the observer watches the column of
+  // rows as well as the scroller's own box. It runs after layout and before the frame's paint.
   useEffect(() => {
     const scroller = scrollRef.current
     if (scroller === null) return
@@ -147,6 +151,7 @@ export function useHeldPosition(position: Position, list: MessageWindow): void {
       if (pinRef.current?.kind === 'bottom') hold(scroller, pinRef, pinnedTopRef)
     })
     observer.observe(scroller)
+    for (const column of scroller.children) observer.observe(column)
     return () => observer.disconnect()
   }, [scrollRef, pinRef, pinnedTopRef])
 }
@@ -169,8 +174,9 @@ export function useFirstFrame(position: Position, id: string, list: MessageWindo
 }
 
 /**
- * Stick to the bottom: a message that arrives, or a row that grows (a reaction, an edit), while at the
- * bottom is scrolled into view before paint. Rows keep their identity until a row changes, so a tab
+ * Stick to the bottom: a message that arrives, or a row that changes (a reaction, an edit), while at the
+ * bottom is scrolled into view before paint; a row that grows with no change to the rows is held by
+ * `useHeldPosition`'s observer. Rows keep their identity until a row changes, so a tab
  * shown again with nothing new and the same window size is still at the bottom (Chromium keeps a
  * hidden scroller's offset), and skips the layout that reading the position would force.
  */
@@ -217,30 +223,37 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
     }
     // The scrollTop last seen at the bottom. Holding the end and rows growing above only make it larger.
     let bottomTop = scroller.scrollTop
+    const rest = scrollRest(scroller, GESTURE_IDLE)
     const onScroll = () => {
+      rest.onScroll()
       if (pinRef.current?.kind !== 'bottom') return
       const top = scroller.scrollTop
       if (top < bottomTop - 1 && distanceFromBottom(scroller) > 1) pinRef.current = undefined
       else bottomTop = top
     }
-    // As the tab is left, the position is recorded from what is on screen then, since the rows can change after the
-    // scroll ended (an older page, a reaction), and that row is held while the tab is hidden: input that scrolled
-    // nothing (a click on a message) let go of the held row and ended no scroll, and what changes while the tab is
-    // hidden is laid out with nothing to anchor on. A gesture still going on is not held against.
-    const leave = () => {
-      const inView = rowInView(scroller)
-      registry.set(scrollSnapshotAtom(view), inView === undefined ? undefined : { anchorKey: inView.anchorKey, offset: inView.offset })
-      if (inView === undefined || pinRef.current !== undefined || gesture.going()) return
-      pinRef.current = { kind: 'row', element: inView.element, offset: inView.offset }
-      pinnedTopRef.current = scroller.scrollTop
-    }
     const onScrollEnd = () => {
+      const own = takeOwnEnd(scroller)
+      if (rest.pending()) return
       if (pinRef.current?.kind === 'row' && Math.abs(scroller.scrollTop - pinnedTopRef.current) > 1) pinRef.current = undefined
+      // Still held with the end away: the end moved under it (an edit box opening). `hold` lets go if the user scrolled up.
+      if (pinRef.current?.kind === 'bottom') hold(scroller, pinRef, pinnedTopRef)
       const distance = distanceFromBottom(scroller)
       const bottom = atEndRef.current && distance <= BOTTOM_SLACK
+      // At the exact end hold now. Otherwise remember where the user stopped before growth can move the end.
+      if (own && pinRef.current?.kind !== 'bottom' && distance > 1) {
+        rest.defer(() => {
+          if (bottom && atEndRef.current) {
+            pinRef.current = { kind: 'bottom' }
+            pinnedTopRef.current = scroller.scrollTop
+            hold(scroller, pinRef, pinnedTopRef)
+          }
+          onScrollEnd()
+        })
+        return
+      }
       if (bottom) {
         pinRef.current = { kind: 'bottom' }
-        bottomTop = scroller.scrollTop
+        bottomTop = pinnedTopRef.current = scroller.scrollTop
       } else if (pinRef.current?.kind === 'bottom') pinRef.current = undefined
       // Anywhere else, the list holds the row it came to rest on. A jump lands on rows still at their size estimate,
       // and Chromium does not anchor on those, so as they reach their real height a frame or two later the rows in view
@@ -249,12 +262,7 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
       // later task, and on a loaded machine Chromium laid the rows out first, for frames on end. A row already laid
       // out is an anchor, and changing the eager rows after every step of a scroll restyled hundreds of elements, so
       // it only gets the pin.
-      const inView = pinRef.current === undefined ? rowInView(scroller) : undefined
-      if (inView !== undefined) {
-        pinRef.current = { kind: 'row', element: inView.element, offset: inView.offset }
-        pinnedTopRef.current = scroller.scrollTop
-        if (inView.element.firstElementChild?.checkVisibility({ contentVisibilityAuto: true }) === false) flushSync(() => setHeldAt(inView.anchorKey))
-      }
+      const inView = holdRestingRow(scroller, pinRef, pinnedTopRef, setHeldAt)
       setAtBottom(bottom)
       setFar(distance > scroller.clientHeight)
       if (bottom) setSeenTs(lastRef.current)
@@ -266,15 +274,39 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
     scroller.addEventListener('scrollend', onScrollEnd)
     // After the listeners above, so it sees the bottom let go in the same scroll.
     const gesture = watchGesture(scroller, pinRef)
-    const stopLeaving = readOnly ? () => {} : onLeaveTab(view, leave)
+    const stopLeaving = readOnly ? () => {} : onLeaveTab(view, () => rememberPosition(scroller, view, pinRef, pinnedTopRef, gesture.going()))
     return () => {
       for (const type of inputs) scroller.removeEventListener(type, letGo)
       scroller.removeEventListener('scroll', onScroll)
       scroller.removeEventListener('scrollend', onScrollEnd)
       gesture.stop()
       stopLeaving()
+      rest.cancel()
     }
   }, [view, readOnly, scrollRef, pinRef, pinnedTopRef, setAtBottom, setFar, setSeenTs, setHeldAt, lastRef, atEndRef])
+}
+
+// As the tab is left, the position is recorded from what is on screen then, since the rows can change after the
+// scroll ended (an older page, a reaction), and that row is held while the tab is hidden: input that scrolled
+// nothing (a click on a message) let go of the held row and ended no scroll, and what changes while the tab is
+// hidden is laid out with nothing to anchor on. A gesture still going on is not held against.
+function rememberPosition(scroller: HTMLElement, view: string, pinRef: Position['pinRef'], pinnedTopRef: Position['pinnedTopRef'], moving: boolean): void {
+  const inView = rowInView(scroller)
+  registry.set(scrollSnapshotAtom(view), inView === undefined ? undefined : { anchorKey: inView.anchorKey, offset: inView.offset })
+  if (inView === undefined || pinRef.current !== undefined || moving) return
+  pinRef.current = { kind: 'row', element: inView.element, offset: inView.offset }
+  pinnedTopRef.current = scroller.scrollTop
+}
+
+/** Holds the row at rest, laying out estimated rows before the next paint. */
+function holdRestingRow(scroller: HTMLElement, pinRef: Position['pinRef'], pinnedTopRef: Position['pinnedTopRef'], setHeldAt: Position['setHeldAt']) {
+  const inView = pinRef.current === undefined ? rowInView(scroller) : undefined
+  if (inView !== undefined) {
+    pinRef.current = { kind: 'row', element: inView.element, offset: inView.offset }
+    pinnedTopRef.current = scroller.scrollTop
+    if (inView.element.firstElementChild?.checkVisibility({ contentVisibilityAuto: true }) === false) flushSync(() => setHeldAt(inView.anchorKey))
+  }
+  return inView
 }
 
 /**
@@ -322,7 +354,10 @@ export function useJumpToLatest(position: Position, view: string, list: MessageW
     setAtBottom(true)
     setFar(false)
     if (!atEnd) registry.set(messageWindowSpecAtom(view), bottomWindow)
-    if (scroller !== null) hold(scroller, pinRef, pinnedTopRef)
+    if (scroller !== null) {
+      pinnedTopRef.current = scroller.scrollTop
+      hold(scroller, pinRef, pinnedTopRef)
+    }
     setSeenTs(last)
   }, [view, last, atEnd, scrollRef, pinRef, pinnedTopRef, setAtBottom, setFar, setSeenTs])
 }

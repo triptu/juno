@@ -7,6 +7,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type Dispatch, type RefOb
 import type { BubbleId, ChatItem, ChatPage, ReplyTarget } from '@juno/agent-contract'
 import { afterPaint, measure } from '@juno/state/perf'
 import { flashChatRow } from '@juno/views'
+import { scrollRest } from '../scrollRest'
 import { junoCommands, takePanelOpenStart } from './actions'
 import { anchorOf, OVERLAP, WINDOW, type Window } from './chatWindow'
 
@@ -32,6 +33,32 @@ function tailRows(): number {
 }
 
 const distanceFromBottom = (scroller: HTMLElement) => scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight
+
+/** The scrollTop each chat list last held its bottom at, for `holdEnd`. */
+const heldTops = new WeakMap<HTMLElement, number>()
+/** Lists whose own scroll to the end has not ended yet: a `scrollend` follows each, also during the owner's scroll. */
+const ownEnds = new WeakSet<HTMLElement>()
+/** How long nothing scrolls before a scroll's resting place is decided, after the list's own scroll ended. */
+const SETTLE_MS = 100
+
+/** Scrolls to the end and remembers where. Anything that starts holding the bottom calls this or records the place. */
+export function toEnd(scroller: HTMLElement): void {
+  const top = scroller.scrollTop
+  scroller.scrollTop = scroller.scrollHeight
+  heldTops.set(scroller, scroller.scrollTop)
+  if (scroller.scrollTop !== top) ownEnds.add(scroller)
+}
+
+/**
+ * Holds the bottom, or lets go when the list moved up from where it was last held and is away from the end: the
+ * owner's scroll is already in `scrollTop` when this runs, but its `scroll` event, which lets go, may come after it
+ * in the frame, as when a row grows during a wheel gesture.
+ */
+function holdEnd(scroller: HTMLElement, pinnedRef: RefObject<boolean>): void {
+  if (!pinnedRef.current) return
+  if (scroller.scrollTop < (heldTops.get(scroller) ?? 0) - 1 && distanceFromBottom(scroller) > 1) pinnedRef.current = false
+  else toEnd(scroller)
+}
 
 type Scroller = RefObject<HTMLElement | null>
 type SetWindow = Dispatch<SetStateAction<Window>>
@@ -87,8 +114,9 @@ export function useChatPosition(column: 'page' | 'panel', loaded: boolean, items
       const padding = Number.parseFloat(getComputedStyle(scroller).scrollPaddingTop) || 0
       scroller.scrollTop += divider.getBoundingClientRect().top - scroller.getBoundingClientRect().top - padding - DIVIDER_GAP
       pinnedRef.current = distanceFromBottom(scroller) <= BOTTOM_SLACK
+      heldTops.set(scroller, scroller.scrollTop)
     } else {
-      scroller.scrollTop = scroller.scrollHeight
+      toEnd(scroller)
       pinnedRef.current = true
     }
     setAtBottom(pinnedRef.current)
@@ -118,22 +146,22 @@ export function useBubbleMeasure(items: ReadonlyArray<ChatItem>) {
 
 /**
  * At the bottom, a change to the rows (a bubble, the status bubble, a send, a reaction) is scrolled into view
- * before paint, and so is the list's box changing size (the window, the composer growing). The observer sees only
- * the scroller's own box, and runs after layout and before the frame's paint.
+ * before paint, and so is the list's box or its column of rows changing size (the window, the composer growing, a
+ * row growing after its commit, as a card or an image lays out). The observer runs after layout and before the
+ * frame's paint.
  */
 export function useStickToBottom(scrollRef: Scroller, pinnedRef: RefObject<boolean>, positioned: boolean, items: ReadonlyArray<ChatItem>, moreBelow: boolean): void {
   useLayoutEffect(() => {
     const scroller = scrollRef.current
     if (scroller === null || !positioned) return
-    if (pinnedRef.current && !moreBelow) scroller.scrollTop = scroller.scrollHeight
+    if (!moreBelow) holdEnd(scroller, pinnedRef)
   }, [positioned, items, moreBelow, scrollRef, pinnedRef])
   useEffect(() => {
     const scroller = scrollRef.current
     if (scroller === null || !positioned || moreBelow) return
-    const observer = new ResizeObserver(() => {
-      if (pinnedRef.current) scroller.scrollTop = scroller.scrollHeight
-    })
+    const observer = new ResizeObserver(() => holdEnd(scroller, pinnedRef))
     observer.observe(scroller)
+    for (const column of scroller.children) observer.observe(column)
     return () => observer.disconnect()
   }, [positioned, moreBelow, scrollRef, pinnedRef])
 }
@@ -149,16 +177,37 @@ export function useScrollRelease(scrollRef: Scroller, pinnedRef: RefObject<boole
     if (scroller === null) return
     // The scrollTop last seen at the bottom. Holding the end and rows growing above only make it larger.
     let bottomTop = scroller.scrollTop
+    const rest = scrollRest(scroller, SETTLE_MS)
     const onScroll = () => {
+      rest.onScroll()
       if (!pinnedRef.current) return
       const top = scroller.scrollTop
       if (top < bottomTop - 1 && distanceFromBottom(scroller) > 1) pinnedRef.current = false
       else bottomTop = top
     }
     const onScrollEnd = () => {
-      const bottom = !pageRef.current.moreBelow && distanceFromBottom(scroller) <= BOTTOM_SLACK
+      const own = ownEnds.delete(scroller)
+      if (rest.pending()) return
+      // Still held and the end away: the end moved under it, and this event came before the resize observer.
+      if (!pageRef.current.moreBelow) holdEnd(scroller, pinnedRef)
+      const distance = distanceFromBottom(scroller)
+      const bottom = !pageRef.current.moreBelow && distance <= BOTTOM_SLACK
+      // At the exact end hold now; a deferred near-bottom rest keeps its decision if rows grow in the meantime.
+      if (own && !pinnedRef.current && distance > 1) {
+        rest.defer(() => {
+          if (bottom && !pageRef.current.moreBelow) {
+            pinnedRef.current = true
+            toEnd(scroller)
+          }
+          onScrollEnd()
+        })
+        return
+      }
       pinnedRef.current = bottom
-      if (bottom) bottomTop = scroller.scrollTop
+      if (bottom) {
+        bottomTop = scroller.scrollTop
+        heldTops.set(scroller, bottomTop)
+      }
       setAtBottom(bottom)
     }
     scroller.addEventListener('scroll', onScroll, { passive: true })
@@ -166,6 +215,7 @@ export function useScrollRelease(scrollRef: Scroller, pinnedRef: RefObject<boole
     return () => {
       scroller.removeEventListener('scroll', onScroll)
       scroller.removeEventListener('scrollend', onScrollEnd)
+      rest.cancel()
     }
   }, [scrollRef, pinnedRef, pageRef, setAtBottom])
 }

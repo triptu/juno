@@ -28,8 +28,8 @@ export interface InlineEditProps {
 /**
  * Editing one of your own messages in place (SPEC section 7; ADR 0010): the
  * message's body becomes a field with its text, focused with the caret at
- * the end. Enter saves, Shift Enter adds a line, Esc cancels; Cancel and
- * Save under it do the same. The field grows with its text like the
+ * the end and scrolled into view whole. Enter saves, Shift Enter adds a
+ * line, Esc cancels; Cancel and Save under it do the same. The field grows with its text like the
  * composer, up to the composer's height. `:emoji:` suggestions open above
  * it as in the composer, and take their keys first. Markup shows as it
  * will look, as in the composer.
@@ -37,12 +37,15 @@ export interface InlineEditProps {
 export function InlineEdit({ value, onChange, onSave, onCancel, fieldRef, mention, onFieldKey, onCaret, format }: InlineEditProps) {
   const own = useRef<HTMLTextAreaElement>(null)
   const field = fieldRef ?? own
-  // Focus once, with the caret after the text, before the first paint.
+  const root = useRef<HTMLDivElement>(null)
+  // Focus once, with the caret after the text, before the first paint. The field and its buttons are taller than the
+  // body they replace, so a message near the bottom of the list is scrolled until they show whole.
   useLayoutEffect(() => {
     const element = field.current
     if (element === null) return
     element.focus({ preventScroll: true })
     element.setSelectionRange(element.value.length, element.value.length)
+    root.current?.scrollIntoView({ block: 'nearest', behavior: 'instant' })
   }, [field])
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     // The list's keys (arrows, E, Delete) never act on the row while its field has focus.
@@ -57,7 +60,7 @@ export function InlineEdit({ value, onChange, onSave, onCancel, fieldRef, mentio
     }
   }
   return (
-    <div data-inline-edit="" {...stylex.props(styles.root)}>
+    <div ref={root} data-inline-edit="" {...stylex.props(styles.root)}>
       <Surface kind="field" sx={styles.box}>
         <Textarea
           ref={field}

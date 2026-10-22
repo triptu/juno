@@ -13,7 +13,7 @@ import { openSlackMessage, openTopic } from '../navigation'
 import { chunk } from '../chunks'
 import { openWebLink } from '../slackLinks'
 import { junoCommands } from './actions'
-import { scrollToRow } from './chatScroll'
+import { scrollToRow, toEnd } from './chatScroll'
 import { latest, type Window } from './chatWindow'
 
 const messages = messageActions(registry)
@@ -41,7 +41,7 @@ export function useChatSend({ contextOf, onSent, quote, setQuote, sentAtRef, new
     setAtBottom(true)
     if (pageRef.current.moreBelow) setWindow(latest)
     const scroller = scrollRef.current
-    if (scroller !== null) scroller.scrollTop = scroller.scrollHeight
+    if (scroller !== null) toEnd(scroller)
   }
 
   const send = (text: string, files: ReadonlyArray<JunoFileInput> = [], mentions: ReadonlyArray<ChatMention> = []) => {
