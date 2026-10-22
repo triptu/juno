@@ -1,6 +1,6 @@
 /**
- * `ActionWorker`: sends edits, deletes and reactions (architecture 5.7,
- * specs/outbox.qnt). The rows are written by the commands
+ * `ActionWorker`: sends edits, deletes, reactions and broadcasts
+ * (architecture 5.7, specs/outbox.qnt). The rows are written by the commands
  * (`actions.ts`, `@juno/sync` `actions.ts`).
  *
  * Edits and deletes keep channel order. Reactions wait only for earlier
@@ -15,7 +15,10 @@
  * - The call goes out through `Outbox.send`. Unlike a post these calls can
  *   be repeated safely: an edit sets the text again, and Slack's answers to
  *   a repeat (`message_not_found` after a delete, `already_reacted` after an
- *   add, `no_reaction` after a remove) mean the change is there. For a
+ *   add, `no_reaction` after a remove) mean the change is there. A repeated
+ *   broadcast is refused (`cant_broadcast_message`), as one Slack does not
+ *   allow is; the row ends either way and the `message_changed` Slack sent
+ *   for the first call says what Slack has. For a
  *   reaction `message_not_found` is a refusal: Slack does not have the
  *   message, so it does not have the reaction either.
  * - Success stores the change as the socket event would and ends the row in
@@ -93,6 +96,7 @@ const alreadyDone = (action: PendingAction, code: string): boolean => {
     case 'react':
       return code === (action.payload.want === true ? 'already_reacted' : 'no_reaction')
     case 'edit':
+    case 'broadcast':
       return false
   }
 }
@@ -148,6 +152,11 @@ export class ActionWorker extends Context.Service<
             return outbox
               .sendChecked((api) => api.call('chat.delete', { channel, ts: ts as Ts }, { beforeSend: check, singleAttempt: true }))
               .pipe(Effect.as({ kind: 'deleted', channel, ts } as const))
+          case 'broadcast':
+            // Observed live: `reply_broadcast` alone, with no text, sends the reply to the channel as it is.
+            return outbox
+              .send((api) => api.call('chat.update', { channel, ts: ts as Ts, reply_broadcast: true }, { singleAttempt: true }))
+              .pipe(Effect.as({ kind: 'broadcast', channel, ts } as const))
           case 'react': {
             const name = action.payload.name ?? ''
             const added = action.payload.want === true

@@ -21,6 +21,7 @@ import {
   messagesDelete,
   messagesDiscard,
   messagesEdit,
+  messagesBroadcast,
   messagesReact,
   messagesResolveAction,
   messagesRetry,
@@ -104,6 +105,9 @@ export const editMessage = (registry: Registry, message: MessageRef, text: strin
 
 /** Deletes an own message. It leaves the list at once; the outbox sends it. */
 export const deleteMessage = (registry: Registry, message: MessageRef) => runCommand(registry, messagesDelete, { message })
+
+/** Also sends an own thread reply to the channel. Main shows it at once; the outbox sends it. */
+export const broadcastMessage = (registry: Registry, message: MessageRef) => runCommand(registry, messagesBroadcast, { message })
 
 /** Adds (`on`) or removes the user's reaction `name`. The chip changes at once; the outbox sends it. */
 export const reactToMessage = (registry: Registry, message: MessageRef, name: string, on: boolean) => runCommand(registry, messagesReact, { message, name, on })

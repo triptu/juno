@@ -12,6 +12,6 @@ export const outboxCounts = Effect.gen(function* () {
       WHEN json_extract(payload_json, '$.failed') IS NOT NULL THEN 'failed'
       WHEN depends_on IS NOT NULL THEN 'waiting'
       WHEN attempts > 0 THEN 'retrying' ELSE 'queued' END AS state, count(*) AS count
-    FROM outbox WHERE kind IN ('mark', 'edit', 'delete', 'react') GROUP BY kind, state`
+    FROM outbox WHERE kind IN ('mark', 'edit', 'delete', 'react', 'broadcast') GROUP BY kind, state`
   return yield* Schema.decodeUnknownEffect(Schema.Array(OutboxCount))(rows)
 })

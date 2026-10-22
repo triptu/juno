@@ -17,10 +17,11 @@ module outboxProtocol {
     // A post claimed while Juno saw the socket down.
     claimedOffline: bool,
     label: str, target: int,
-    // One action row per message (edit, delete or reaction toggle): none,
-    // waiting, transit, accepted, done, dropped, or failed (a defect, exhausted
-    // retries, or a refused reaction, with Retry and Dismiss). Kind
-    // `change` is an edit, `react` a reaction toggle; `delete` replaces them.
+    // One action row per message (edit, broadcast, delete or reaction toggle):
+    // none, waiting, transit, accepted, done, dropped, or failed (a defect,
+    // exhausted retries, or a refused reaction, with Retry and Dismiss). Kind
+    // `change` is an edit or a broadcast (the reply also sent to the channel),
+    // `react` a reaction toggle; `delete` replaces them.
     // `stale` holds rows whose intent changed while a call was out.
     // `actSent` records every action call that left Juno; `acted` every
     // message Slack applied one to.

@@ -291,6 +291,20 @@ export const writeDeleted = (ctx: SyncContext, channel: string, deletedTs: strin
     yield* reindexTopics(topics, reindexOptions(ctx))
   })
 
+/**
+ * One of the user's replies Slack has also sent to the channel. Only the
+ * subtype changes: the reply keeps its content, which the `message_changed`
+ * that follows also carries.
+ */
+const writeBroadcast = (ctx: SyncContext, channel: string, ts: string): Effect.Effect<void, SqlError, Services> =>
+  Effect.gen(function* () {
+    const existing = yield* readMessage(channel, ts)
+    if (existing === undefined || existing.deleted === 1 || existing.subtype === 'thread_broadcast') return
+    const row = { ...existing, subtype: 'thread_broadcast', version: existing.version + 1 }
+    yield* writeMessage(row)
+    yield* reindexTopics(topicsOfMessages([row]), reindexOptions(ctx))
+  })
+
 interface ReactionChange {
   readonly channel: string
   readonly ts: string
@@ -314,6 +328,7 @@ export type Acted =
   | { readonly kind: 'edited'; readonly channel: string; readonly message: Message }
   | { readonly kind: 'deleted'; readonly channel: string; readonly ts: string }
   | { readonly kind: 'reacted'; readonly channel: string; readonly ts: string; readonly name: string; readonly added: boolean }
+  | { readonly kind: 'broadcast'; readonly channel: string; readonly ts: string }
 
 /**
  * Stores what Slack accepted as the socket event would store it, and runs
@@ -339,6 +354,9 @@ export const applyActed = <E>(
             break
           case 'reacted':
             yield* writeReaction(ctx, { channel: acted.channel, ts: acted.ts, name: acted.name, user: ctx.me.userId, added: acted.added }, eventTs)
+            break
+          case 'broadcast':
+            yield* writeBroadcast(ctx, acted.channel, acted.ts)
             break
         }
         yield* alongside

@@ -1,7 +1,8 @@
 /**
- * Edits, deletes and reactions on messages (architecture 5.7,
- * specs/outbox.qnt). Each is an `outbox` row: `edit` and `delete` per
- * message, `react` per message and emoji. `messages.list` shows the row's
+ * Edits, deletes, reactions and broadcasts on messages (architecture 5.7,
+ * specs/outbox.qnt). Each is an `outbox` row: `edit`, `delete` and
+ * `broadcast` (a reply also sent to the channel) per message, `react` per
+ * message and emoji. `messages.list` shows the row's
  * intent over the stored message until the row ends, so the user sees the
  * change at once and a socket event or page that lands meanwhile cannot
  * undo it. The engine's `ActionWorker` sends the rows; these functions are
@@ -24,14 +25,17 @@
  * dropped unsent, so an add and a remove cancel. A delete drops the
  * message's other rows.
  */
+import { mainTopicId, type ChannelId } from '@juno/domain'
 import { Invalidation, StoreWriter, type MessageRow, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
 import { messageTopics } from './keys'
 import { postTopic, readPost, recordOwnDelete, type PendingPost } from './posts'
 
-export type ActionKind = 'edit' | 'delete' | 'react'
+export type ActionKind = 'edit' | 'delete' | 'react' | 'broadcast'
 
-const KINDS: ReadonlyArray<ActionKind> = ['edit', 'delete', 'react']
+const KINDS: ReadonlyArray<ActionKind> = ['edit', 'delete', 'react', 'broadcast']
+/** The kinds as an SQL list, for `kind IN (...)`. */
+export const ACTION_KINDS_SQL = KINDS.map((kind) => `'${kind}'`).join(', ')
 
 export interface ActionPayload {
   /** The message's ts, when Slack's ts was known when the row was written. */
@@ -99,7 +103,7 @@ export const touch = (topics: ReadonlyArray<string>) => Invalidation.use((i) => 
 /** Every pending action, oldest first. A failed action waits for the user, not the worker, and is left out. */
 export const pendingActions: Effect.Effect<ReadonlyArray<PendingAction>, SqlError, StoreWriter> = Effect.gen(function* () {
   const sql = yield* StoreWriter
-  const rows = yield* sql.unsafe<ActionRow>(`SELECT ${COLUMNS} FROM outbox WHERE kind IN ('edit', 'delete', 'react') AND json_extract(payload_json, '$.failed') IS NULL ORDER BY id`)
+  const rows = yield* sql.unsafe<ActionRow>(`SELECT ${COLUMNS} FROM outbox WHERE kind IN (${ACTION_KINDS_SQL}) AND json_extract(payload_json, '$.failed') IS NULL ORDER BY id`)
   return rows.map(toAction)
 })
 
@@ -107,7 +111,7 @@ export const pendingActions: Effect.Effect<ReadonlyArray<PendingAction>, SqlErro
 const channelActions = (channel: string): Effect.Effect<ReadonlyArray<PendingAction>, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
-    const rows = yield* sql.unsafe<ActionRow>(`SELECT ${COLUMNS} FROM outbox WHERE target_key = ? AND kind IN ('edit', 'delete', 'react') ORDER BY id`, [channel])
+    const rows = yield* sql.unsafe<ActionRow>(`SELECT ${COLUMNS} FROM outbox WHERE target_key = ? AND kind IN (${ACTION_KINDS_SQL}) ORDER BY id`, [channel])
     return rows.map(toAction)
   })
 
@@ -241,6 +245,35 @@ export const queueEdit = (input: EditInput): Effect.Effect<ActionRefusal | undef
     return undefined
   })
 
+export interface BroadcastInput {
+  readonly ref: MessageRef
+  readonly selfId: string
+  readonly now: number
+}
+
+/**
+ * Broadcast: the user's own thread reply is also sent to the channel. Only a
+ * reply Slack has, as Slack's own client offers it: not a root, not a reply
+ * already sent, not a post still pending. The row's topics are the thread
+ * and Main, which shows the reply until Slack has it (`messages.list`). A
+ * second broadcast of the same reply writes nothing.
+ */
+export const queueBroadcast = (input: BroadcastInput): Effect.Effect<ActionRefusal | undefined, SqlError, StoreWriter | Invalidation> =>
+  Effect.gen(function* () {
+    const target = yield* resolveTarget(input.ref)
+    if (target === undefined || (target.kind === 'stored' && target.row.deleted === 1)) return 'missing'
+    if (target.kind === 'pending') return 'not-sent'
+    const { row } = target
+    if (row.user_id !== input.selfId) return 'not-own'
+    if (row.thread_ts === null || row.thread_ts === row.ts) return 'missing'
+    const actions = yield* actionsOn(target)
+    if (actions.some((action) => action.kind === 'delete')) return 'missing'
+    if (row.subtype === 'thread_broadcast' || actions.some((action) => action.kind === 'broadcast')) return undefined
+    const { channel, dependsOn, ...fields } = targetFields(target)
+    yield* insertAction('broadcast', channel, dependsOn, { ...fields, topics: [...fields.topics, mainTopicId(channel as ChannelId)] }, input.now)
+    return undefined
+  })
+
 export interface DeleteInput {
   readonly ref: MessageRef
   readonly selfId: string
@@ -330,7 +363,7 @@ export const settleOnFailedPost = (action: PendingAction, post: PendingPost): Ef
  * After a call Slack accepted. An edit ends unless a newer edit replaced
  * its text meanwhile (`rev`); a reaction ends unless the user toggled it
  * again, in which case Slack's state becomes the new `base` and the row is
- * sent again; a delete always ends, and the user's delete of one of Juno's
+ * sent again; a delete and a broadcast always end, and the user's delete of one of Juno's
  * posts is recorded, so a network copy stored later goes too (`sent.ts`).
  * Answers whether the row ended.
  */

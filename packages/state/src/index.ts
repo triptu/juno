@@ -129,6 +129,7 @@ export {
 } from './homeDraft'
 export { composerEmojiAtom, mentionChannelsAtom, mentionGroupsAtom, mentionPeopleAtom, onFirstMentionAnswer, type MentionPlace } from './mentions'
 export {
+  broadcastMessage,
   checkMessage,
   deleteMessage,
   discardMessage,
