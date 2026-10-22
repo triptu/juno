@@ -1,0 +1,1 @@
+- 10-22 14:34 · Tushar · The selection toolbar is icon only, so it looks cleaner: Quote and Ask Juno are the hover toolbar's 24px round buttons, named by their tooltips ("Quote", "Ask Juno ⌘J"). Ask Juno uses the topic header's outline sparkle, not the filled duotone one.

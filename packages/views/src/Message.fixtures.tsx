@@ -2,6 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { layout } from '@juno/tokens/tokens.stylex'
 import { defineFixtures, hueForId, scene, type Fixture, type FixtureFrame } from '@juno/ui'
 import { codeBlocks } from './fixtures/code'
+import { richText } from './fixtures/richText'
 import { tableMessages } from './fixtures/tables'
 import { failedSend, hostile, longFirstLine, main, mentions, sending, thread } from './fixtures/messages'
 import { NOW } from './fixtures/topics'
@@ -86,6 +87,12 @@ export default defineFixtures(
     // Code blocks: tagged (the tag line is not shown), detected, a stack trace left plain, and a long one.
     Code: {
       'code-blocks': one(codeBlocks[0]!, { startsGroup: true }),
+    },
+    // Links, lists, a nested list, a quote, a long URL and a code block: every block wraps inside the
+    // text column, hovered so the row's background shows its edge, at a thread panel's width and a wide pane's.
+    'Rich text': {
+      narrow: one(richText[0]!, { startsGroup: true }, { width: 360, hover: '[data-message-row]' }),
+      wide: one(richText[0]!, { startsGroup: true }, { width: 720, hover: '[data-message-row]' }),
     },
     // Tables: a status table with mentions, a link, code and an empty cell; a wide one that scrolls in its box; a tall one cut at ten rows; a table alone; a wrapped column at a narrow width; a cell with a tab and two paragraphs; and a row that is not the tab stop.
     Table: {

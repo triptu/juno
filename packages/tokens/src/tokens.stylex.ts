@@ -567,6 +567,9 @@ export const fonts = stylex.defineVars({
   '--font-sans': "'Figtree Variable', 'Figtree', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
   '--font-serif': "'Instrument Serif', ui-serif, 'Iowan Old Style', Georgia, serif",
   '--font-mono': "'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace",
+  // An emoji drawn on its own (a quick reaction), so its box takes the emoji
+  // font's metrics, not Figtree's.
+  '--font-emoji': "'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif",
 })
 
 export const weights = stylex.defineVars({
@@ -1092,6 +1095,10 @@ export const sizes = stylex.defineVars({
   '--icon-16': '16px',
   '--icon-18': '18px',
   '--icon-20': '20px',
+  // A 14px Apple Color Emoji in a 14px box with line-height 1 draws half a
+  // pixel low (the font puts its baseline there); this moves it back up, so
+  // its centre is the box's centre.
+  '--emoji-14-shift': '-0.5px',
 
   // Spot illustrations: 96 wide in lists, 120 in the workspace. The Juno
   // figure alone is 40.

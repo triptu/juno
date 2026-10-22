@@ -1,7 +1,7 @@
 import { menuTriggerHandlers } from './menuTrigger'
 import * as stylex from '@stylexjs/stylex'
 import type { ButtonHTMLAttributes } from 'react'
-import { colors, radii, sizes } from '@juno/tokens/tokens.stylex'
+import { colors, fonts, radii, sizes } from '@juno/tokens/tokens.stylex'
 import { focusRing } from './focusRing'
 import { interactive } from './internal/interactive'
 import { tooltip } from './Tooltip'
@@ -23,6 +23,10 @@ export interface EmojiButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEl
  * the hover toolbar, the same size as its icon buttons. The emoji is 14px,
  * a step under the toolbar's 15px icons, since a colour glyph reads larger
  * than a Phosphor outline. Same feedback as `IconButton`.
+ *
+ * The emoji is set in the emoji font in a 14px square, so flex centres the
+ * square, not Figtree's line box: in Figtree's line the emoji drew 1.25px
+ * high, and its 18px advance put it 2px left of centre.
  */
 export function EmojiButton({ emoji, src, label, noTooltip = false, type = 'button', ...rest }: EmojiButtonProps) {
   return (
@@ -60,9 +64,14 @@ const styles = stylex.create({
       ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
     },
   },
+  // The emoji's advance is wider than its square; the extra runs out of the box to the right, unseen.
   glyph: {
+    width: sizes['--icon-14'],
+    height: sizes['--icon-14'],
+    fontFamily: fonts['--font-emoji'],
     fontSize: sizes['--icon-14'],
     lineHeight: 1,
+    transform: `translateY(${sizes['--emoji-14-shift']})`,
   },
   image: {
     width: sizes['--icon-14'],

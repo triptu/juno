@@ -1,10 +1,11 @@
 import * as stylex from '@stylexjs/stylex'
 import { Quotes } from '@phosphor-icons/react/dist/icons/Quotes'
+import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import type { MouseEvent, ReactNode } from 'react'
 import { junoPanelCopy } from '@juno/agent-contract'
 import { menuKeys } from '@juno/contract/channels'
 import { spacing, z } from '@juno/tokens/tokens.stylex'
-import { Button, SparkleDuotone, Surface, tooltip } from '@juno/ui'
+import { IconButton, Surface } from '@juno/ui'
 
 /**
  * Where a floating element sits, in CSS pixels from the top left of the
@@ -31,11 +32,13 @@ export interface FloatingProps {
 /**
  * Floats a panel or a button over the message list, outside the rows,
  * whose paint containment would clip it. The container measures once and
- * passes the point; nothing here reads layout.
+ * passes the point; nothing here reads layout. The point is rounded to whole
+ * pixels: a selection's edges rarely are, and the icons inside would then
+ * draw off their buttons' centres.
  */
 export function Floating({ x, y, placement, layer, children }: FloatingProps) {
   return (
-    <div data-floating={layer} {...stylex.props(styles.base, layer === 'picker' ? styles.picker : styles.selection, styles.at(x, y), placements[placement])}>
+    <div data-floating={layer} {...stylex.props(styles.base, layer === 'picker' ? styles.picker : styles.selection, styles.at(Math.round(x), Math.round(y)), placements[placement])}>
       {children}
     </div>
   )
@@ -60,29 +63,29 @@ const pressProps = (action: () => void) => ({
   },
 })
 
-/** The floating toolbar over a text selection in a message (inventory 6.6): Quote, and Ask Juno while AI assist is on. */
+/**
+ * The floating toolbar over a text selection in a message (inventory 6.6):
+ * Quote, and Ask Juno while AI assist is on. Icon only, in the hover
+ * toolbar's 24px round buttons; the tooltip names each. Ask Juno has the
+ * header's outline sparkle.
+ */
 export function SelectionToolbar({ onQuote, onAskJuno }: SelectionToolbarProps) {
   return (
     <Surface kind="toolbar" padding="none" radius="pill" role="toolbar" aria-label="Selection" data-selection-toolbar="" sx={styles.toolbar}>
-      <Button variant="ghost" size="xs" tone="subtle" iconStart={Quotes} data-selection-quote="" {...pressProps(onQuote)}>
-        Quote
-      </Button>
+      <IconButton icon={Quotes} label="Quote" size={24} {...pressProps(onQuote)} />
       {onAskJuno === undefined ? null : (
-        <Button variant="ghost" size="xs" tone="subtle" iconStart={SparkleDuotone} data-selection-ask-juno="" aria-keyshortcuts="Meta+J" {...tooltip(junoPanelCopy.askJunoTip, menuKeys('juno.toggle'))} {...pressProps(onAskJuno)}>
-          {junoPanelCopy.askJuno}
-        </Button>
+        <IconButton icon={Sparkle} label={junoPanelCopy.askJuno} shortcut={menuKeys('juno.toggle')} size={24} aria-keyshortcuts="Meta+J" {...pressProps(onAskJuno)} />
       )}
     </Surface>
   )
 }
 
 const styles = stylex.create({
-  // The hover toolbar's height: 22px buttons, a 2px inset and the 1px border.
+  // The hover toolbar's shell: 24px buttons, a 1px inset and the 1px border.
   toolbar: {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: spacing['--space-0-5'],
-    padding: spacing['--space-0-5'],
+    padding: spacing['--space-pixel'],
   },
   base: {
     position: 'absolute',
