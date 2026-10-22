@@ -61,6 +61,14 @@ export const ChatShareMessageFields = { channel: S.String, ts: Ts } as const
 
 // chat.update
 
+/**
+ * An edit, or with `reply_broadcast` and nothing else a thread reply also
+ * sent to the channel, as the official client's "Send reply to this
+ * channel" does. Slack refuses both in one call
+ * (`no_dual_broadcast_content_update`), and a root or a reply already sent
+ * with `cant_broadcast_message` (research `slack-data-access.md`, "Send an
+ * existing reply to the channel").
+ */
 export const ChatUpdateArgs = S.Struct({
   channel: S.String,
   ts: Ts,
@@ -68,6 +76,7 @@ export const ChatUpdateArgs = S.Struct({
   blocks: opt(FormJson(Blocks)),
   markdown_text: opt(S.String),
   file_ids: opt(FormJson(S.Array(S.String))),
+  reply_broadcast: opt(FormBoolean),
   skip_dlp_user_warning: opt(FormBoolean),
 })
 export type ChatUpdateArgs = typeof ChatUpdateArgs.Type
