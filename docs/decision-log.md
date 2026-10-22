@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-22 19:13 · emoji search · For queries of at least three characters, rank a whole CLDR or everyday-phrase word below whole names and curated words but above a name that merely starts with the query. Rank a flag's bare two-letter code below whole phrase words unless `flag` is included; keep country names as normal CLDR matches. Curate `dead` for the skull, skull and crossbones and dizzy face, and remove `thinking of you` from two hearts and bouquet so a partial `think` does not find them.
 - 10-22 19:05 · emoji search · Add model-written everyday phrases per standard emoji (google/gemini-3.8-flash, about $0.26 once, checked in as scripts/emoji-intent.json; 8 to 15 short lowercase chat phrases for common emoji, 2 to 6 for rare ones, none for flags and keycaps, no names, brands or offensive words, hand overrides win). Phrases match on their words and rank just below whole CLDR words and above CLDR prefixes, so every result that matched before keeps its place.
 - 10-22 19:00 · Tushar · Each changelog section is a short list of highlights the release agent writes, not one line per commit. The scripts only publish `--notes` and list the commits as input.
 - 10-22 18:18 · verification · Reach Start thread with Tab and toolbar arrow keys in the existing background-tab check; mouse hover plus programmatic focus can hide the toolbar before the keyboard action. Keep all background-tab, scroll and focus assertions.
