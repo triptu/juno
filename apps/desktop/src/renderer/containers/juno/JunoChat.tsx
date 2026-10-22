@@ -1,14 +1,14 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { chatCopy, type ChatPage, type JunoPage, type Quote, type SendContext } from '@juno/agent-contract'
 import { junoDraftAtom, junoPicksAtom, nowAtom, registry, type MentionPlace } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { JunoChatFrame, JunoChatList, JunoComposer, NewMessagesPill } from '@juno/views'
 import { useChatActions, useChatSend, useFocusRequest, useRemoval } from './chatActions'
-import { useReactionPicker } from './chatReactions'
 import { useBubbleMeasure, useChatPosition, useEdges, useReadMarks, useScrollRelease, useStickToBottom } from './chatScroll'
 import { useAgentState, useChatItems, useChatWindow } from './chatWindow'
 import { useChatFiles } from './chatFiles'
 import { useMentions } from '../mentions'
+import { preloadMessageMenu } from '../messageMenu'
 
 const NO_PLACE: MentionPlace = {}
 
@@ -87,8 +87,8 @@ export function JunoChat({ column, draftKey, header, contextOf, composerContext,
   const { toBottom, send } = useChatSend({ contextOf, onSent, quote, setQuote, sentAtRef, newestBubbleId, scrollRef, pinnedRef, pageRef, setAtBottom, setWindow })
   const files = useChatFiles(draftKey, draft, setDraft, send)
   const { setRemoval, sheet } = useRemoval(now)
-  const reactions = useReactionPicker(items, scrollRef)
-  const actions = useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote, openPicker: reactions.open, setRemoval, openPage: onOpenPage })
+  useEffect(preloadMessageMenu, [])
+  const actions = useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote, setRemoval, openPage: onOpenPage })
 
   return (
     <>
@@ -118,7 +118,6 @@ export function JunoChat({ column, draftKey, header, contextOf, composerContext,
           hasFiles={files.hasFiles}
         />
       }
-      floating={reactions.floating}
     >
       <JunoChatList
         column={column}
