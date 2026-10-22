@@ -1,0 +1,1 @@
+- 10-22 14:21 · pictures · The picture page swaps to the large image only after it is decoded, with no blank frame (Tushar, 10-22); it opens with the small file Home showed and decodes the pictures ← and → open ahead.

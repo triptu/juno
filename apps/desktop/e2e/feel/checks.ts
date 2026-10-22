@@ -88,7 +88,8 @@ export const shotsOf = (evidence: Evidence, frames: ReadonlyArray<ProbeFrame>) =
 function pixelsIn(evidence: Evidence, window: Window): ReadonlyArray<ShotPixels> {
   const from = markFrame(evidence.recording, window.from, 0)
   const to = markFrame(evidence.recording, window.to, Infinity)
-  return evidence.pixels.filter((p) => p.frame !== null && p.frame >= from && p.frame < to)
+  const shows = (index: number) => window.where === undefined || (evidence.recording.frames[index] !== undefined && window.where(evidence.recording.frames[index].values))
+  return evidence.pixels.filter((p) => p.frame !== null && p.frame >= from && p.frame < to && shows(p.frame))
 }
 
 export const pass = (name: string, detail: string, shots: ReadonlyArray<number> = []): Verdict => ({ name, status: 'pass', detail, shots })

@@ -344,7 +344,7 @@ const regressions = [
 const drained = new Set(['outbox', 'catchup', 'metadata', 'mutation-repair'])
 
 const selectedSpec = huddleOnly ? 'huddle.qnt' : actionsOnly ? 'agent-actions.qnt' : recoveryOnly ? 'agent-recovery.qnt' : memoryOnly ? 'agent-memory.qnt' : outboxOnly ? 'outbox.qnt' : undefined
-for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith('.qnt') && (!selectedSpec || name === selectedSpec || (recoveryOnly && name === 'agent-recovery-replay.qnt'))).toSorted()) {
+for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith('.qnt') && (!selectedSpec || name === selectedSpec || (huddleOnly && name === 'huddle-room.qnt') || (recoveryOnly && name === 'agent-recovery-replay.qnt'))).toSorted()) {
   quint(['typecheck', `specs/${file}`])
 }
 
@@ -358,6 +358,9 @@ if (!huddleOnly && !memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly)
       drained.has(file) ? { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true } : {})
     simulate(file, `${schedule}BugStep`, invariant, `${name}-bug.itf.json`, true)
   }
+  simulate('outbox', 'simulationStep', 'invariants', 'broadcast-random.itf.json', false, true, { main: 'broadcastOutbox', witnesses: [] })
+  simulate('outbox', 'lostStep', 'invariants', 'broadcast-lost.itf.json', false, false, { main: 'broadcastOutbox', steps: 11 })
+  simulate('outbox', 'lostBugStep', 'invariants', 'broadcast-lost-bug.itf.json', true, false, { main: 'broadcastOutbox', steps: 11 })
   for (const schedule of [...outboxSchedules, 'boundedAction', 'defectAction', 'expiredReaction']) {
     simulate('outbox', `${schedule}Step`, 'invariants', `outbox-${schedule}.itf.json`, false, false,
       { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true })
@@ -382,12 +385,14 @@ if (!huddleOnly && !memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly)
 if (!outboxOnly && !memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
   simulate('huddle', 'simulationStep', 'invariants', 'huddle.itf.json', false, true,
     { samples: tracesOnly ? 100 : 1000, steps: 96, witnesses: ['reachedAgreement'] })
+  simulate('huddle-room', 'step', 'invariants', 'huddle-room.itf.json', false, false,
+    { main: 'huddle_room', samples: 1000, steps: 48 })
   const pairs = [
     ['ghost', 'noGhost'], ['oneCall', 'oneCall'], ['cancel', 'leaveDuringJoin'],
     ['stale', 'noStaleLeave'], ['overflow', 'matchingState'], ['otherDevice', 'otherDevice'], ['refusedLeave', 'noGhost'],
     ['pageDuringJoin', 'drainBound'], ['earlyReport', 'drainBound'],
     ['lostStart', 'drainBound'], ['workspaceRestart', 'oneCall'], ['unlistedPage', 'drainBound'],
-    ['cancelDuringPersist', 'drainBound'],
+    ['cancelDuringPersist', 'drainBound'], ['laggingInfo', 'matchingState'],
   ]
   for (const [schedule, invariant] of pairs) {
     simulate('huddle', `${schedule}BugStep`, invariant, `huddle-${schedule}-bug.itf.json`, true)

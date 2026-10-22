@@ -3,7 +3,7 @@ import type { TopicDetail } from '@juno/contract'
 import { acknowledgeTopic, updateTabs, selectedTopicAtom, discardMessage, messageListAtom, nowAtom, retryMessage, registry, scrollSnapshotAtom, topicAtom, topicView, traceSend, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { chunk, hueFor, MessageList, NewMessagesPill, TopicView as TopicViewFrame, type ActivateEvent, type MediaViewing } from '@juno/views'
-import { closeTabById, openTopic, warmTopic } from './navigation'
+import { closeTabById, openTopic, openTopicAt, openTopicAtInBackground, warmTopic } from './navigation'
 import { useMessageActions, type ComposerHandle, type MessageActionsOutput } from './messageActions'
 import { showPersonMenu } from './notifyActions'
 import { takeComposerFocus } from './pageFocus'
@@ -38,6 +38,21 @@ const TIME_STEP = 10 * 60_000
 function openThread(id: string, event: ActivateEvent): void {
   openTopic(id, { newTab: event.metaKey })
 }
+
+/** A broadcast reply's "in <topic title>" in Main: the thread, at the reply, which flashes; ⌘ opens it in a tab behind this one. */
+function openReply(id: string, ts: string, event: ActivateEvent): void {
+  if (event.metaKey) openTopicAtInBackground(id, ts)
+  else openTopicAt(id, ts, { flash: true })
+}
+
+function openReplyInNewTab(id: string, ts: string, event: ActivateEvent): void {
+  if (event.metaKey) openTopicAtInBackground(id, ts)
+  else openTopicAt(id, ts, { newTab: true, flash: true })
+}
+
+/** Where a list's thread links and broadcast replies go; in a peek, to a new tab, so the tab under it stays. */
+const THREAD_LINKS = { onOpenThread: openThread, onOpenReply: openReply }
+const PEEK_THREAD_LINKS = { onOpenThread: openThreadInNewTab, onOpenReply: openReplyInNewTab }
 
 const personMenu = (person: { readonly id: string; readonly name: string }) => void showPersonMenu(person)
 const openPersonDm = (id: string, behind: boolean) => void openPerson(id, behind)
@@ -208,7 +223,7 @@ function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps)
       popover={peek}
       anchorRef={position.anchorRef}
       hueOf={hueOf}
-      onOpenThread={readOnly ? openThreadInNewTab : openThread}
+      {...(readOnly ? PEEK_THREAD_LINKS : THREAD_LINKS)}
       onPrefetchThread={warmTopic}
       onChannel={scopeToChannel}
       onPerson={openPersonDm}

@@ -21,6 +21,9 @@
  *   the outbox sends it. A message Slack may not have yet waits for it
  *   (`depends_on`). Neither has an undo (ADR 0010).
  * - `messages.react`: adds or removes the user's reaction, the same way.
+ * - `messages.broadcast`: also sends the user's own thread reply to the
+ *   channel (Slack's "also send to the channel"), the same way: Main shows
+ *   the reply at once and the outbox sends it with `chat.update`.
  * - `messages.precheck`: while typing pauses in Main, asks the route model
  *   whether the draft reads like a reply to one of the channel's latest
  *   topics (`routeCheck`) and stores the answer. Nothing else is asked while
@@ -129,7 +132,14 @@ export const messagesReact = Rpc.make('messages.react', {
   error: MessageActionError,
 })
 
-/** Retry or dismiss a failed edit or delete without rebuilding its saved intent. */
+/**
+ * Also send an own thread reply to the channel. `NotFound` when it is gone,
+ * not the user's, not a reply, or not in Slack yet. A reply already sent
+ * changes nothing.
+ */
+export const messagesBroadcast = Rpc.make('messages.broadcast', { payload: { message: MessageRef }, success: Schema.Void, error: MessageActionError })
+
+/** Retry or dismiss a failed edit, delete or broadcast without rebuilding its saved intent. */
 export const messagesResolveAction = Rpc.make('messages.resolveAction', {
   payload: { id: Schema.Int, retry: Schema.Boolean }, success: Schema.Void, error: NotSignedIn,
 })
@@ -193,4 +203,4 @@ export const draftsGet = liveValueRoute('drafts.get', { payload: { topicId: Sche
 /** Replaces a topic's draft; an empty or blank text deletes it. */
 export const draftsSet = Rpc.make('drafts.set', { payload: { topicId: Schema.String, text: Schema.String }, success: Schema.Void, error: NotSignedIn })
 
-export const SendRoutes = RpcGroup.make(messagesResolveAction, messagesSend, messagesForward, messagesRetry, messagesDiscard, messagesEdit, messagesDelete, messagesReact, messagesCheck, messagesPrecheck, messagesPostcheck, messagesGrammar, draftsGet, draftsSet)
+export const SendRoutes = RpcGroup.make(messagesResolveAction, messagesSend, messagesForward, messagesRetry, messagesDiscard, messagesEdit, messagesDelete, messagesBroadcast, messagesReact, messagesCheck, messagesPrecheck, messagesPostcheck, messagesGrammar, draftsGet, draftsSet)

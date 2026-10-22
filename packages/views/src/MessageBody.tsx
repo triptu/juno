@@ -261,6 +261,11 @@ const styles = stylex.create({
     flexDirection: 'column',
     gap: spacing['--space-0-5'],
     minWidth: 0,
+    // The column sizes the body to its content, but never below its widest
+    // fixed box: a link preview's 360px picture made the body wider than a
+    // narrow column, and every line wrapped past the row. Capped, the picture
+    // shrinks to fit and the text wraps inside the column.
+    maxWidth: '100%',
     fontFamily: text['--text-body-family'],
     fontSize: text['--text-body-size'],
     fontWeight: text['--text-body-weight'],

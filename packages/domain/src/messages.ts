@@ -6,11 +6,21 @@ export interface GroupMessage {
   readonly body: MessageBody
   readonly isThreadRoot: boolean
   readonly startsAfterDivider?: boolean
+  /** A thread reply also sent to the channel: its header says so, so it stands alone. */
+  readonly broadcast?: boolean
 }
 
-/** Quotes, roots and the unread divider break consecutive messages from one sender. */
+/** Quotes, roots, broadcast replies and the unread divider break consecutive messages from one sender. */
 export function startsGroup(prev: GroupMessage | undefined, next: GroupMessage): boolean {
-  return prev === undefined || prev.senderId !== next.senderId || next.isThreadRoot || next.startsAfterDivider === true || next.body.blocks.some((block) => block.kind === 'quote')
+  return (
+    prev === undefined ||
+    prev.senderId !== next.senderId ||
+    next.isThreadRoot ||
+    next.startsAfterDivider === true ||
+    next.broadcast === true ||
+    prev.broadcast === true ||
+    next.body.blocks.some((block) => block.kind === 'quote')
+  )
 }
 
 export function threadLinkLabel(replyCount: number): string {

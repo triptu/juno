@@ -52,7 +52,7 @@ export default defineFixtures(
       'nine people': fixture(page({ people: [you, ...others(9, { muted: ['U0MAYA', 'U0SAM'] })] }, { duration: '1:02:33' })),
       'you speaking': fixture(page({ people: [{ ...you, speaking: true }, ...others(2)] })),
       'you muted': fixture(page({ people: [{ ...you, muted: true }, ...others(2)] }, { muted: true })),
-      alone: fixture(page({ people: [you] })),
+      alone: fixture(page({ people: [you] }, { alone: true })),
       dm: fixture(page({ place: maya, people: [you, ...others(1)] })),
       'no thread yet': fixture(page({ onOpenThread: undefined })),
     },

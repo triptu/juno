@@ -19,6 +19,8 @@ export interface HuddleInState extends HuddleControlsState, HuddleControlsAction
   readonly sharingSource?: HuddleOwnSource
   /** Said once to a screen reader: "Maya joined", "Muted". The status line's notices are said too; the duration never is. */
   readonly announcement?: string
+  /** Slack says the user is the only one in the huddle. Unset while Juno does not know who is in it. */
+  readonly alone?: boolean
 }
 
 /** The huddle runs and the user is not in it. `switching`: they are in another, so Join leaves it. */
@@ -74,7 +76,6 @@ export interface HuddlePageProps {
  * the controls in an island where a topic's composer sits.
  */
 export function HuddlePage({ place, state, people, shares = [], renderShare, renderOwnShare, expandedShare, onExpandShare, onPlace, onOpenThread, devices }: HuddlePageProps) {
-  const others = people.filter((person) => person.you !== true)
   const status =
     state.kind === 'in'
       ? statusLine({
@@ -83,7 +84,7 @@ export function HuddlePage({ place, state, people, shares = [], renderShare, ren
           sharers: shares.map((share) => share.ownerName),
           sharing: state.sharing,
           ...(state.sharingSource === undefined ? {} : { sharingSource: state.sharingSource.name }),
-          alone: others.length === 0,
+          alone: state.alone === true,
           duration: state.duration,
         })
       : state.kind === 'out'

@@ -6,7 +6,7 @@ import { dismiss, incomingOf, lookAt, noIncoming, offer, settle, NEW_HUDDLE_MILL
 const NOW = 1_790_000_000_000
 const SELF = 'U0ME'
 const huddle = (over: Partial<RunningHuddle> = {}): RunningHuddle => ({ callId: 'R1', participants: ['U0MAYA'], startedAt: NOW - 2_000, threadTs: null, createdBy: 'U0MAYA', ...over })
-const idle: HuddleCall = { phase: 'idle', channelId: null, callId: null, attendeeId: null, participants: [], startedAt: null, connection: null, muted: false, ended: null }
+const idle: HuddleCall = { phase: 'idle', channelId: null, callId: null, attendeeId: null, participants: [], startedAt: null, joinedAt: null, connection: null, muted: false, ended: null }
 const inCall = (channelId: string): HuddleCall => ({ ...idle, phase: 'joined', channelId, callId: 'R9' })
 
 const offered = (running: RunningHuddles, call: HuddleCall = idle) => {

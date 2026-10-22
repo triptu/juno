@@ -198,6 +198,7 @@ async function report(force = false): Promise<void> {
     // The engine reads the connection only while the page holds a session.
     connection: live ? state : 'connecting',
     muted: snapshot?.local.muted ?? false,
+    hasRemote: (snapshot?.remotes.length ?? 0) > 0,
     ended,
   } as const
   const key = JSON.stringify(body)

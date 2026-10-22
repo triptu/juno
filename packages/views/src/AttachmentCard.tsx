@@ -131,7 +131,8 @@ const styles = stylex.create({
   // Message text: selectable, with the arrow.
   fileText: { cursor: 'default' },
   place: { display: 'inline-flex', alignItems: 'center', gap: spacing['--space-1'], verticalAlign: 'bottom' },
-  imageBox: (width: number, height: number) => ({ position: 'relative', flexShrink: 0, width, height, maxWidth: '100%', aspectRatio: `${width} / ${height}`, backgroundColor: colors['--background-subtle'], borderRadius: radii['--radius-md'], overflow: 'hidden' }),
+  // The ratio sets the height, so a picture narrowed to fit the column keeps its shape.
+  imageBox: (width: number, height: number) => ({ position: 'relative', flexShrink: 0, width, maxWidth: '100%', aspectRatio: `${width} / ${height}`, backgroundColor: colors['--background-subtle'], borderRadius: radii['--radius-md'], overflow: 'hidden' }),
   image: { position: 'absolute', inset: 0, display: 'block', width: '100%', height: '100%', objectFit: 'contain' },
 })
 // The bar is the card's only colour, so it takes the status colour itself:

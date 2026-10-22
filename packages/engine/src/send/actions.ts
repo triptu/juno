@@ -1,5 +1,5 @@
 /**
- * Edit, delete and react (spec section 7; architecture 5.7). Each command
+ * Edit, delete, react and broadcast (spec section 7; architecture 5.7). Each command
  * writes its outbox row (or rewrites a post Slack has not got) in one
  * transaction and answers; `ActionWorker` sends it. None has an undo
  * (ADR 0010).
@@ -13,7 +13,7 @@ import { Clock, Effect } from 'effect'
 import { NotFound, NotSignedIn, Rejected, type MessageActionError, type MessageRef } from '@juno/contract'
 import { composeEdit, type MessageContent, type MentionTargets } from '@juno/richtext'
 import { StoreWriter, transaction, type Invalidation, type SqlError } from '@juno/store'
-import { resolveFailedAction, queueDelete, queueEdit, queueReaction, resolveTarget, storedMe, type ActionRefusal, type MessageRef as StoreRef } from '@juno/sync'
+import { resolveFailedAction, queueBroadcast, queueDelete, queueEdit, queueReaction, resolveTarget, storedMe, type ActionRefusal, type MessageRef as StoreRef } from '@juno/sync'
 import { userName, type UserRow } from '../topicRows'
 import { Workspace } from '../workspace'
 
@@ -115,6 +115,12 @@ export const editMessage = (message: MessageRef, text: string): Effect.Effect<vo
 export const deleteMessage = (message: MessageRef): Effect.Effect<void, MessageActionError, Workspace> =>
   Effect.gen(function* () {
     const refusal = yield* inWorkspace((selfId, now) => queueDelete({ ref: toStoreRef(message), selfId, now }))
+    yield* refused(message, refusal)
+  })
+
+export const broadcastMessage = (message: MessageRef): Effect.Effect<void, MessageActionError, Workspace> =>
+  Effect.gen(function* () {
+    const refusal = yield* inWorkspace((selfId, now) => queueBroadcast({ ref: toStoreRef(message), selfId, now }))
     yield* refused(message, refusal)
   })
 

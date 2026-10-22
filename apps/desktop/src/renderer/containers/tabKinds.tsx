@@ -9,6 +9,7 @@ import { mainTopicOf, type TopicDetail } from '@juno/contract'
 import { pictureTitle, registry, topicAtom, type Place } from '@juno/state'
 import type { WorkspaceTab, WorkspaceTabIcon } from '@juno/views'
 import { chunk } from './chunks'
+import { gallery } from './galleryChunk'
 import { HomePage } from './Home'
 import { huddleTabTitle } from './huddle/title'
 import { JunoPageTab, JunoTab } from './juno/lazy'
@@ -24,8 +25,7 @@ export const loadSettingsTab = settings.load
 const devLog = chunk(() => import('./DevLog'))
 const DevLogTab = devLog.component((module) => module.DevLogTab)
 
-// The gallery and the picture page load when a gallery tab first shows (SPEC 12, "Pictures and the gallery").
-const gallery = chunk(() => import('./Gallery'))
+// The gallery and the picture page load when a gallery tab first shows, or earlier (`galleryChunk.ts`).
 const GalleryTab = gallery.component((module) => module.GalleryTab)
 
 // The huddle page loads when a huddle tab first shows.

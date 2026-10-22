@@ -17,6 +17,7 @@ import { PersonLink } from './personLink'
 import { Reactions } from './Reactions'
 import { TextButton } from './juno-chat/TextButton'
 import { ThreadLink } from './ThreadLink'
+import { BroadcastSource } from './BroadcastSource'
 import { clockTime, fullTime } from './time'
 
 /**
@@ -84,6 +85,8 @@ export interface MessageProps {
   /** The inline edit field, in place of the body while the message is edited. */
   readonly editor?: ReactNode
   readonly onOpenThread?: (id: string, event: ActivateEvent) => void
+  /** Main: a broadcast reply's "in <topic title>" opens the thread `id` at the reply `ts`. */
+  readonly onOpenReply?: (id: string, ts: string, event: ActivateEvent) => void
   readonly onChannel?: (id: string) => void
   readonly onLink?: (url: string, event: ActivateEvent) => void
   /** Which links open inside Juno, and where they go (`MessageBody`). Stable for the list's life. */
@@ -227,6 +230,7 @@ export const Message = memo(function Message({
   editor,
   suggestion,
   onOpenThread,
+  onOpenReply,
   onChannel,
   onLink,
   linkInfo,
@@ -341,7 +345,9 @@ export const Message = memo(function Message({
             <Text variant="meta" tone="muted" numeric as="time" title={fullTime(message.at)} sx={styles.time}>
               {time}
             </Text>
-            {message.broadcast ? (
+            {message.broadcastFrom !== undefined && onOpenReply !== undefined ? (
+              <BroadcastSource from={message.broadcastFrom} onOpen={(event) => onOpenReply(message.broadcastFrom!.id, message.ts, event)} tabIndex={tabbable ? 0 : -1} />
+            ) : message.broadcast ? (
               <Text variant="meta" tone="muted" truncate>
                 also sent to the channel
               </Text>
@@ -373,7 +379,7 @@ export const Message = memo(function Message({
         <Reactions reactions={message.reactions} onToggle={toggle} people={reactors ?? NO_PEOPLE} onSeeAll={seeAll} />
         {message.actionIssue !== undefined ? (
           <Text variant="meta" tone="muted" as="p" sx={styles.failed}>
-            {message.actionIssue.kind === 'edit' ? 'Edit not sent.' : 'Delete not sent.'}{' '}
+            {message.actionIssue.kind === 'edit' ? 'Edit not sent.' : message.actionIssue.kind === 'broadcast' ? 'Not sent to the channel.' : 'Delete not sent.'}{' '}
             <TextButton tone="default" onClick={() => actions?.onResolveAction?.(message.actionIssue!.id, true)}>Retry</TextButton>
             {' · '}
             <TextButton tone="default" onClick={() => actions?.onResolveAction?.(message.actionIssue!.id, false)}>Dismiss</TextButton>

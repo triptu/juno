@@ -58,25 +58,25 @@ const base: Omit<WorkspaceProps, 'children'> = { tabs: [tabs.postgres, tabs.dens
 
 const postgresPage = (
   <TopicView header={<TopicHeader detail={details.postgres} onMenu={noop} onPill={noop} onResolve={noop} juno={{ open: false, onToggle: noop }} />} composer={<ComposerSlot placeholder="Reply" />}>
-    <MessageList items={thread} main={false} now={NOW} onOpenThread={noop} onChannel={noop} onLink={noop} />
+    <MessageList items={thread} main={false} now={NOW} onOpenThread={noop} onOpenReply={noop} onChannel={noop} onLink={noop} />
   </TopicView>
 )
 
 const postgresPanelPage = (
   <TopicView header={<TopicHeader detail={details.postgres} onMenu={noop} onPill={noop} onResolve={noop} juno={{ open: true, onToggle: noop }} />} composer={<ComposerSlot placeholder="Reply" />}>
-    <MessageList items={thread} main={false} now={NOW} onOpenThread={noop} onChannel={noop} onLink={noop} />
+    <MessageList items={thread} main={false} now={NOW} onOpenThread={noop} onOpenReply={noop} onChannel={noop} onLink={noop} />
   </TopicView>
 )
 
 const engPage = (
   <TopicView header={<TopicHeader detail={details.engMain} onMenu={noop} onPill={noop} juno={{ open: false, onToggle: noop }} />} composer={<ComposerSlot placeholder="Message #eng" />}>
-    <MessageList items={main} main now={NOW} dividerBefore={mainDividerBefore} onOpenThread={noop} onChannel={noop} onLink={noop} />
+    <MessageList items={main} main now={NOW} dividerBefore={mainDividerBefore} onOpenThread={noop} onOpenReply={noop} onChannel={noop} onLink={noop} />
   </TopicView>
 )
 
 const engPanelPage = (
   <TopicView header={<TopicHeader detail={details.engMain} onMenu={noop} onPill={noop} juno={{ open: true, onToggle: noop }} />} composer={<ComposerSlot placeholder="Message #eng" />}>
-    <MessageList items={main} main now={NOW} dividerBefore={mainDividerBefore} onOpenThread={noop} onChannel={noop} onLink={noop} />
+    <MessageList items={main} main now={NOW} dividerBefore={mainDividerBefore} onOpenThread={noop} onOpenReply={noop} onChannel={noop} onLink={noop} />
   </TopicView>
 )
 
@@ -85,7 +85,7 @@ const topicPage = (detail: TopicDetail, items: ReadonlyArray<MessageListItem>, p
   const isMain = detail.kind === 'main'
   return (
     <TopicView header={<TopicHeader detail={detail} onMenu={noop} onPill={noop} juno={{ open: false, onToggle: noop }} {...(isMain ? {} : { onResolve: noop, onFollow: noop })} />} composer={<ComposerSlot placeholder={placeholder} />}>
-      <MessageList items={items} main={isMain} now={NOW} onOpenThread={noop} onChannel={noop} onLink={noop} />
+      <MessageList items={items} main={isMain} now={NOW} onOpenThread={noop} onOpenReply={noop} onChannel={noop} onLink={noop} />
     </TopicView>
   )
 }

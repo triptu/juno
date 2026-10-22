@@ -57,7 +57,7 @@ export {
   type PendingPost,
   type PendingShare,
 } from './posts'
-export { type Acted } from './events'
+export { type Acted } from './acted'
 export {
   actionDone,
   deferAction,
@@ -69,12 +69,14 @@ export {
   queueDelete,
   queueEdit,
   resolveTarget,
+  ACTION_KINDS_SQL,
   settleOnFailedPost,
   type ActionRefusal,
   type MessageRef,
   type PendingAction,
 } from './actions'
 export { isFailed, markStalled, queueReaction } from './reactions'
+export { queueBroadcast } from './broadcasts'
 export { checkCopyDelete } from './sent'
 
 export { startThread } from './startedThreads'

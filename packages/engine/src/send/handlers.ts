@@ -16,7 +16,7 @@ import { Outbox } from '../outbox'
 import { retryFirstRun, serveLiveValue, timed } from '../protocol/live'
 import { Workspace } from '../workspace'
 import { ActionWorker } from './actionWorker'
-import { deleteMessage, editMessage, reactToMessage, resolveMessageAction } from './actions'
+import { broadcastMessage, deleteMessage, editMessage, reactToMessage, resolveMessageAction } from './actions'
 import { checkMessage, dailyBudget, grammarForSent, postcheckMessage, precheckMessage, ROUTE_DAILY_BUDGET } from './checks'
 import { grammarChecks } from './grammar'
 import { discardMessage, retryMessage, sendMessage } from './commands'
@@ -77,6 +77,7 @@ export const SendHandlers = SendRoutes.toLayer(
       'messages.retry': ({ clientMsgId }) => provide(retryMessage(clientMsgId)),
       'messages.discard': ({ clientMsgId }) => provide(discardMessage(clientMsgId)),
       'messages.edit': ({ message, text }) => provide(editMessage(message, text)),
+      'messages.broadcast': ({ message }) => provide(broadcastMessage(message)),
       'messages.delete': ({ message }) => provide(deleteMessage(message)),
       'messages.resolveAction': ({ id, retry }) => provide(resolveMessageAction(id, retry)),
       'messages.react': ({ message, name, on }) => provide(reactToMessage(message, name, on)),

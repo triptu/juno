@@ -138,7 +138,23 @@ export const MessagesHandlers = MessagesRoutes.toLayer(
               Effect.runSync(invalidation.invalidate({ messages: [payload.id] }))
             }))
           }
-          yield* Effect.addFinalizer(() => Effect.sync(() => watched.forEach((cancel) => cancel())))
+          const titleWatches = new Map<string, () => void>()
+          cache.watchBroadcastTitles = (ids) => {
+            const current = new Set(ids)
+            for (const [id, cancel] of titleWatches) if (!current.has(id)) {
+              cancel()
+              titleWatches.delete(id)
+            }
+            for (const id of current) if (!titleWatches.has(id)) {
+              titleWatches.set(id, invalidation.subscribeUnsafe({ topic_overlay: [id] }, () => {
+                Effect.runSync(invalidation.invalidate({ messages: [payload.id] }))
+              }))
+            }
+          }
+          yield* Effect.addFinalizer(() => Effect.sync(() => {
+            watched.forEach((cancel) => cancel())
+            titleWatches.forEach((cancel) => cancel())
+          }))
           return Effect.flatMap(resolveStartedThread(payload.id), id => listMessages(targetOf(id)!, range, cache))
         })
         return serveLiveList(runs(keys, setup), { encodeRow: encodeMessage, measure }).pipe(retryFirstRun('messages.list'), Stream.orDie)

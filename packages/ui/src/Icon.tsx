@@ -31,6 +31,14 @@ export interface IconProps {
    * assistive technology.
    */
   readonly label?: string
+  /**
+   * Draws an odd size in a box 1px larger, with half a pixel of room each
+   * side, for an icon centred in an even box: `both` in a square button (a
+   * 15px icon in a 24px one), `block` beside a label (a 13px icon in a 22px
+   * button). The browser puts an SVG's box on whole pixels, so an odd box
+   * there would draw half a pixel low (and right).
+   */
+  readonly evenBox?: 'both' | 'block'
 }
 
 /** The weight a size gets when none is named. */
@@ -43,18 +51,31 @@ export function defaultIconWeight(size: IconSize): IconWeight {
  * fill marks state. The weight comes from the size unless named, so call
  * sites only say `fill`. A duotone icon (`duotone.ts`) draws duotone whatever the weight.
  */
-export function Icon({ icon: Glyph, size = 16, weight, active = false, dim = false, label }: IconProps) {
+export function Icon({ icon: Glyph, size = 16, weight, active = false, dim = false, label, evenBox }: IconProps) {
   const resolved: PhosphorWeight = weight ?? (active ? 'fill' : defaultIconWeight(size))
+  const padBlock = evenBox !== undefined && size % 2 === 1
+  const padInline = evenBox === 'both' && padBlock
+  // Half a pixel at this size, in the icon's 256-unit grid.
+  const half = 128 / size
+  const width = (padInline ? size + 1 : size) as IconSize
+  const height = (padBlock ? size + 1 : size) as IconSize
   return (
     <Glyph
       size={size}
+      {...(padBlock
+        ? {
+            width,
+            height,
+            viewBox: `${padInline ? -half : 0} ${-half} ${padInline ? 256 + 2 * half : 256} ${256 + 2 * half}`,
+          }
+        : {})}
       weight={resolved}
       color="currentColor"
       aria-hidden={label ? undefined : true}
       aria-label={label}
       role={label ? 'img' : undefined}
       focusable={false}
-      {...stylex.props(styles.icon, sizeStyles[size], dim && styles.dim)}
+      {...stylex.props(styles.icon, widths[width], heights[height], dim && styles.dim)}
     />
   )
 }
@@ -70,12 +91,22 @@ const styles = stylex.create({
   },
 })
 
-const sizeStyles = stylex.create({
-  12: { width: sizes['--icon-12'], height: sizes['--icon-12'] },
-  13: { width: sizes['--icon-13'], height: sizes['--icon-13'] },
-  14: { width: sizes['--icon-14'], height: sizes['--icon-14'] },
-  15: { width: sizes['--icon-15'], height: sizes['--icon-15'] },
-  16: { width: sizes['--icon-16'], height: sizes['--icon-16'] },
-  18: { width: sizes['--icon-18'], height: sizes['--icon-18'] },
-  20: { width: sizes['--icon-20'], height: sizes['--icon-20'] },
+const widths = stylex.create({
+  12: { width: sizes['--icon-12'] },
+  13: { width: sizes['--icon-13'] },
+  14: { width: sizes['--icon-14'] },
+  15: { width: sizes['--icon-15'] },
+  16: { width: sizes['--icon-16'] },
+  18: { width: sizes['--icon-18'] },
+  20: { width: sizes['--icon-20'] },
+})
+
+const heights = stylex.create({
+  12: { height: sizes['--icon-12'] },
+  13: { height: sizes['--icon-13'] },
+  14: { height: sizes['--icon-14'] },
+  15: { height: sizes['--icon-15'] },
+  16: { height: sizes['--icon-16'] },
+  18: { height: sizes['--icon-18'] },
+  20: { height: sizes['--icon-20'] },
 })

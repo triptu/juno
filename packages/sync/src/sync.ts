@@ -24,7 +24,8 @@ import { SlackApi, SlackAuthRequired, SlackEdge, SlackSession, SlackSocket, type
 import { Invalidation, StoreReader, StoreWriter, transaction, type SqlError } from '@juno/store'
 import { Effect, FiberSet, Scope, Stream } from 'effect'
 import { upgradeIndex } from './upgrade'
-import { applyOpened, applySent, type Acted } from './events'
+import { applyOpened, applySent } from './events'
+import type { Acted } from './acted'
 import type { FetchReport, OpenError } from './open'
 import { makeBootLoop } from './run/boot'
 import { makeTopicFetcher } from './run/fetcher'
@@ -115,7 +116,7 @@ export interface TopicFetcher {
   readonly opened: (channel: Parameters<typeof applyOpened>[1]) => Effect.Effect<void, SqlError>
   /** Stores what Juno's own send got back, in the sync's context (`applySent`). */
   readonly sent: (sent: Parameters<typeof applySent>[1]) => Effect.Effect<void, SqlError>
-  /** Stores an edit, delete or reaction Slack accepted, with `alongside` in the same transaction (`applyActed`). */
+  /** Stores an edit, delete, reaction or broadcast Slack accepted, with `alongside` in the same transaction (`applyActed`). */
   readonly acted: (acted: Acted, alongside: Effect.Effect<unknown, SqlError, StoreWriter | Invalidation>) => Effect.Effect<void, SqlError>
   /** Asks `nameUsers` for users the store lacks, as a page that names them would (`wantUsers`). Returns at once; the names land in `users`. */
   readonly wantUsers: (ids: ReadonlyArray<string>) => Effect.Effect<void>

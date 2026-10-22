@@ -6,7 +6,7 @@ import { ImageSquare } from '@phosphor-icons/react/dist/icons/ImageSquare'
 import { useId, type MouseEvent } from 'react'
 import { accent, colors, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { activateHandlers, Button, Icon, IconButton, Text, type ActivateEvent } from '@juno/ui'
-import { PictureImage, type PictureCardView } from './PictureImage'
+import { PictureImage, PicturesAhead, type PictureCardView } from './PictureImage'
 import type { PictureLineView } from './PictureLine'
 import { PictureScale, type PictureScaleView } from './PictureScale'
 
@@ -27,8 +27,12 @@ export interface PictureStoryView extends PictureCardView {
 
 export interface PicturePageProps {
   readonly picture: PictureStoryView
-  /** The large file, else the small one scaled, else undefined while neither is on this Mac. */
-  readonly src: string | undefined
+  /** The small file, once it is on this Mac: the picture shows it until the large one is decoded, and the scale draws it. */
+  readonly small: string | undefined
+  /** The large file, once it is on this Mac. */
+  readonly large: string | undefined
+  /** The small files of the pictures ← and → open, decoded ahead so a step shows its picture in its first frame. */
+  readonly ahead?: ReadonlyArray<string>
   /** All pictures: the gallery, in this tab, or a new one with ⌘. */
   readonly onAllPictures: (event: ActivateEvent) => void
   /** The previous or next picture in the gallery's order. */
@@ -47,7 +51,7 @@ export interface PicturePageProps {
  * Below about 900px of width the label goes under the picture and the page
  * scrolls.
  */
-export function PicturePage({ picture, src, onAllPictures, onStep, onOpenLink }: PicturePageProps) {
+export function PicturePage({ picture, small, large, ahead = [], onAllPictures, onStep, onOpenLink }: PicturePageProps) {
   const titleId = useId()
   const link = (url: string) => (event: MouseEvent) => {
     event.preventDefault()
@@ -67,7 +71,7 @@ export function PicturePage({ picture, src, onAllPictures, onStep, onOpenLink }:
         </div>
         <div {...stylex.props(styles.wall)}>
           <div {...stylex.props(styles.frame, styles.fit(picture.ratio))}>
-            <PictureImage src={src} ratio={picture.ratio} alt={picture.caption} />
+            <PictureImage src={large ?? small} ratio={picture.ratio} alt={picture.caption} />
           </div>
         </div>
         <div {...stylex.props(styles.label)}>
@@ -94,7 +98,7 @@ export function PicturePage({ picture, src, onAllPictures, onStep, onOpenLink }:
           <Text variant="body" tone="secondary" as="p" selectable sx={styles.about}>
             {picture.about}
           </Text>
-          {picture.scale === undefined ? null : <PictureScale scale={picture.scale} src={src} />}
+          {picture.scale === undefined ? null : <PictureScale scale={picture.scale} src={small ?? large} />}
           <footer {...stylex.props(styles.foot)}>
             <a data-picture-learn-more="" href={picture.learnMore.url} onClick={link(picture.learnMore.url)} {...stylex.props(styles.link)}>
               {picture.learnMore.label}
@@ -106,6 +110,7 @@ export function PicturePage({ picture, src, onAllPictures, onStep, onOpenLink }:
           </footer>
         </div>
       </div>
+      <PicturesAhead srcs={ahead} />
     </article>
   )
 }

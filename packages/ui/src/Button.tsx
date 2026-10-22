@@ -106,7 +106,7 @@ export function Button({
   const filter = variant === 'filter'
   const effectiveSize: ButtonSize = filter ? 'sm' : size
   const iconPx = iconBySize[effectiveSize]
-  const iconProps = iconWeight === undefined ? { size: iconPx } : { size: iconPx, weight: iconWeight }
+  const iconProps = { size: iconPx, evenBox: 'block' as const, ...(iconWeight === undefined ? {} : { weight: iconWeight }) }
   const popup = rest['aria-haspopup'] ?? (expanded === undefined ? undefined : 'dialog')
   return (
     <button

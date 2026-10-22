@@ -26,6 +26,7 @@ import { MessageBody } from '../body'
 import { Person } from '../refs'
 import { NotFound, NotSignedIn } from '../errors'
 import { liveListRoute, liveValueRoute, RowFields } from '../live'
+import { FileView } from './files'
 import { RowChannel, TitleSource, TopicStatus } from './topics'
 
 // Windows
@@ -78,59 +79,6 @@ export const ReactionIssue = Schema.Struct({
   state: Schema.Literals(['failed', 'waiting']),
 })
 export type ReactionIssue = typeof ReactionIssue.Type
-
-/**
- * A thumbnail the view can show at once with `aspect-ratio: width / height`
- * (performance 3.3: late images never move what the user reads).
- * `src` is `juno://files/<file id>/<variant>?url=<encoded Slack thumb url>`:
- * main serves it from the Slack session (architecture 9) and fetches only
- * Slack file hosts.
- */
-export const FileThumb = Schema.Struct({ src: Schema.String, width: Schema.Int, height: Schema.Int })
-export type FileThumb = typeof FileThumb.Type
-
-export const FileKind = Schema.Literals(['image', 'video', 'audio', 'pdf', 'html', 'text', 'file', 'deleted'])
-export type FileKind = typeof FileKind.Type
-
-/** How the viewer draws a `text` file (`@juno/domain` `fileTextKind`). */
-export const FileTextKind = Schema.Literals(['markdown', 'csv', 'json', 'code', 'plain'])
-export type FileTextKind = typeof FileTextKind.Type
-
-/**
- * A file on a message. An image has `thumb` when Slack made one; an image
- * without dimensions is a card of fixed height. `audio`, `pdf`, `html` and
- * `text` files are cards that open in the media viewer; `file` is a card
- * with Quick Look. `deleted` is a file Slack no longer serves. `@juno/domain`
- * `fileMediaKind` decides the kind.
- */
-export const FileView = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
-  kind: FileKind,
-  mimetype: Schema.optionalKey(Schema.String),
-  /** Bytes. */
-  size: Schema.optionalKey(Schema.Number),
-  /** The original's dimensions, when Slack knows them. */
-  width: Schema.optionalKey(Schema.Int),
-  height: Schema.optionalKey(Schema.Int),
-  thumb: Schema.optionalKey(FileThumb),
-  /** An image at full size for the viewer, a `juno://files` url like `thumb.src`. */
-  full: Schema.optionalKey(Schema.String),
-  /** A video the viewer plays, a `juno://files/<id>/video` url main streams from Slack. `thumb` is its poster. */
-  video: Schema.optionalKey(Schema.String),
-  /** An audio file or voice clip the player plays, a `juno://files/<id>/audio` url main streams from Slack, and its length when Slack gives it. */
-  audio: Schema.optionalKey(Schema.String),
-  durationMs: Schema.optionalKey(Schema.Number),
-  /** A pdf, html or text file as Slack serves it, a `juno://files/<id>/content/<name>` url, for the viewer. */
-  content: Schema.optionalKey(Schema.String),
-  /** How the viewer draws a `text` file; for code its language as a reader names it ("Python"); its lines when Slack counted them (a snippet). */
-  textKind: Schema.optionalKey(FileTextKind),
-  language: Schema.optionalKey(Schema.String),
-  lines: Schema.optionalKey(Schema.Int),
-  /** Slack's download url, which main fetches on the Slack session. Absent for a file still being sent. */
-  download: Schema.optionalKey(Schema.String),
-})
-export type FileView = typeof FileView.Type
 
 /** Main thread link (inventory 6.7). replierIds are the first three Slack reply_users, joined through refs.people. */
 export const ThreadLink = Schema.Struct({
@@ -198,10 +146,15 @@ export const MessageView = Schema.Struct({
   reactions: Schema.Array(ReactionView),
   /** The newest of the user's reaction changes Slack has not taken, when there is one. */
   reactionIssue: Schema.optionalKey(ReactionIssue),
-  actionIssue: Schema.optionalKey(Schema.Struct({ id: Schema.Int, kind: Schema.Literals(['edit', 'delete']) })),
+  actionIssue: Schema.optionalKey(Schema.Struct({ id: Schema.Int, kind: Schema.Literals(['edit', 'delete', 'broadcast']) })),
   files: Schema.Array(FileView),
   /** Main only: the message has a thread. */
   thread: Schema.optionalKey(ThreadLink),
+  /**
+   * Main only: a thread reply also sent to the channel. `id` is the thread's
+   * topic; `preview` its resolved topic title's text, when the store has it.
+   */
+  broadcastFrom: Schema.optionalKey(Schema.Struct({ id: Schema.String, title: Schema.String, sensitive: Schema.Boolean })),
   /**
    * The `client_msg_id` the sending client gave the message. The view keys
    * rows by it when present, so a pending row becomes the stored message in

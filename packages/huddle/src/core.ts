@@ -28,6 +28,7 @@ import type { HuddleSession } from './Huddle'
 import { failureOf } from './failure'
 import * as L from './lifecycle'
 import { noMedia, pageState, type MediaView, type Received } from './media'
+import { callRoom, followOwn, joinedOwn, type OwnRoom } from './own'
 import { applyJoined, toRunningHuddles, type Running } from './running'
 import { codeOf, joinedFrom, joinRequest, leaveRequest, toHuddleError } from './slack'
 import { keepStatus } from './status'
@@ -41,6 +42,10 @@ export interface Info {
   readonly dirty: Set<string>
   /** Bumped per channel by each room frame. */
   readonly frameGen: Map<string, number>
+  /** When each due channel may be read: Slack's edge lags its socket, so a read waits until the channel has been quiet a while (`reads.ts`). */
+  readonly quietAt: Map<string, number>
+  /** The same for the full read after a connect or `Overflowed`. */
+  allQuietAt: number
   readonly wake: Queue.Queue<void>
 }
 
@@ -97,14 +102,16 @@ export interface Core {
   status: { readonly attendeeId: string; readonly fiber: Fiber.Fiber<never> } | undefined
   /** The user alone in the live call, and the timer that leaves it (`alone.ts`). */
   alone: { readonly since: Alone; readonly fiber: Fiber.Fiber<void> } | undefined
+  /** What Juno last knew of the room of the live call, if any. */
+  own: OwnRoom | undefined
 }
 
 /** The pages' current state, for the rules. */
 export const view = (core: Core): MediaView => ({ pages: core.pages, reports: core.reports, handed: core.handed })
 
-const toCall = (s: L.Lifecycle, media: MediaView, running: Running): HuddleCall => {
+const toCall = (s: L.Lifecycle, media: MediaView, running: Running, own: OwnRoom | undefined): HuddleCall => {
   const channelId = L.callChannel(s) ?? null
-  const entry = channelId === null ? undefined : running.get(channelId)
+  const room = callRoom(s, running, own)
   const identity = s.current?.identity
   const session = L.currentMedia(s, media)
   return {
@@ -112,8 +119,9 @@ const toCall = (s: L.Lifecycle, media: MediaView, running: Running): HuddleCall 
     channelId,
     callId: identity?.callId ?? null,
     attendeeId: identity?.attendeeId ?? null,
-    participants: entry?.participants ?? [],
-    startedAt: entry?.startedAt ?? null,
+    participants: room?.participants ?? [],
+    startedAt: room?.startedAt ?? null,
+    joinedAt: identity !== undefined && own?.attendeeId === identity.attendeeId ? own.joinedAt : null,
     connection: session?.connection ?? null,
     muted: session?.muted ?? false,
     ended: s.ended ?? null,
@@ -134,10 +142,11 @@ export const makeCore = Effect.gen(function* () {
     handed: new Map(),
     booting: undefined,
     attempts: new Map(),
-    callRef: yield* SubscriptionRef.make(toCall(L.initial, noMedia, new Map())),
+    callRef: yield* SubscriptionRef.make(toCall(L.initial, noMedia, new Map(), undefined)),
     runningRef: yield* SubscriptionRef.make<RunningHuddles>({}),
     status: undefined,
     alone: undefined,
+    own: undefined,
   }
   return core
 })
@@ -151,11 +160,13 @@ const followAlone = (core: Core, to: Attached | undefined) =>
   Effect.gen(function* () {
     const now = yield* Clock.currentTimeMillis
     const current = core.s.current?.identity
-    const connection = L.currentMedia(core.s, view(core))?.connection
+    const media = L.currentMedia(core.s, view(core))
     const next = aloneNow(core.alone?.since, {
       attendeeId: current?.attendeeId,
-      live: connection === 'connected' || connection === 'reconnecting',
-      participants: current === undefined ? [] : core.running.get(current.channelId)?.participants ?? [],
+      live: media?.connection === 'connected' || media?.connection === 'reconnecting',
+      selfId: to?.session.selfId,
+      hasRemote: media?.hasRemote ?? false,
+      participants: current === undefined ? [] : callRoom(core.s, core.running, core.own)?.participants ?? [],
     }, now)
     if (core.alone?.since === next) return
     const before = core.alone
@@ -172,8 +183,9 @@ const followAlone = (core: Core, to: Attached | undefined) =>
 
 /** Sends the call and the running huddles to subscribers. Under the lock. */
 export const publish = (core: Core) =>
-  followAlone(core, core.attached).pipe(
-    Effect.andThen(Effect.suspend(() => SubscriptionRef.set(core.callRef, toCall(core.s, view(core), core.running)))),
+  Effect.sync(() => followOwn(core)).pipe(
+    Effect.andThen(followAlone(core, core.attached)),
+    Effect.andThen(Effect.suspend(() => SubscriptionRef.set(core.callRef, toCall(core.s, view(core), core.running, core.own)))),
     Effect.andThen(Effect.suspend(() => SubscriptionRef.set(core.runningRef, toRunningHuddles(core.running)))),
   )
 
@@ -187,11 +199,27 @@ export const settleWaiters = (core: Core) =>
     return Effect.forEach(done, ([, waiter]) => Deferred.succeed(waiter.deferred, { _tag: 'cancelled' }), { discard: true })
   })
 
+/**
+ * How long a channel must be quiet before `huddles/info` is read for it.
+ * Slack's edge answers from a moment ago: the spike saw it list the user as
+ * active after their media stopped, and a read about three seconds later
+ * list the change (research section 6). Read sooner, it can undo what a
+ * frame just said, and nothing would read the channel again.
+ */
+export const INFO_SETTLE_MILLIS = 3_000
+
+/** Slack may have changed `channel` (or every channel) just now: it is read once it has been quiet for the settle time. */
 export const markDue = (to: Attached, channel: string | 'all') =>
-  Effect.suspend(() => {
-    if (channel === 'all') to.info.dirtyAll = true
-    else to.info.dirty.add(channel)
-    return Queue.offer(to.info.wake, undefined)
+  Effect.gen(function* () {
+    const quietAt = (yield* Clock.currentTimeMillis) + (to.session.infoSettleMillis ?? INFO_SETTLE_MILLIS)
+    if (channel === 'all') {
+      to.info.dirtyAll = true
+      to.info.allQuietAt = quietAt
+    } else {
+      to.info.dirty.add(channel)
+      to.info.quietAt.set(channel, quietAt)
+    }
+    yield* Queue.offer(to.info.wake, undefined)
   })
 
 /** Rewrites the workspace's stored list. A failure is logged and kept for the next change to try again. */
@@ -231,7 +259,9 @@ const answered = (core: Core, to: Attached, intent: L.Intent, answer: Result.Res
     if (delivered) waiter.state = 'delivered'
     core.s = L.answerJoin(core.s, delivered ? record : { ...record, generation: null }, workspace)
     if (delivered) core.handed.set(identity.attendeeId, waiter.connection)
-    if (Result.isSuccess(answer)) core.running = applyJoined(core.running, identity.channelId, identity.callId, answer.success.huddle)
+    const huddle = Result.isSuccess(answer) ? answer.success.huddle : undefined
+    core.running = applyJoined(core.running, identity.channelId, identity.callId, huddle)
+    if (delivered) core.own = joinedOwn(identity, core.running, huddle, yield* Clock.currentTimeMillis)
     yield* markDue(to, identity.channelId)
     if (!delivered) return
     yield* Deferred.succeed(waiter.deferred, { _tag: 'joined', channelId: identity.channelId, callId: identity.callId, attendeeId: identity.attendeeId, credentials })

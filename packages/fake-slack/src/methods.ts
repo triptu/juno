@@ -405,6 +405,14 @@ export const coreMethods = {
     if (existing === undefined) return new ApiError('message_not_found')
     if (existing.user !== ws.selfId) return new ApiError('cant_update_message')
     const text = args.text ?? args.markdown_text
+    if (args.reply_broadcast === true) {
+      // Observed live: content and a broadcast in one call are refused, and so are a root, a message outside a thread and a reply already sent.
+      if (text !== undefined || args.blocks !== undefined) return new ApiError('no_dual_broadcast_content_update')
+      if (!isReply(existing) || existing.subtype === 'thread_broadcast') return new ApiError('cant_broadcast_message')
+      const message = ws.broadcast(args.channel, args.ts)
+      const { ts: _ts, ...partial } = withChannel(ws, args.channel, message)
+      return { channel: args.channel, ts: args.ts, text: message.text ?? '', message: partial }
+    }
     if ((text === undefined || text === '') && args.blocks === undefined) return new ApiError('no_text')
     const message = ws.edit(args.channel, args.ts, text ?? '', ws.selfId, args.text !== undefined, args.blocks)
     // chat.update returns a partial message; its timestamp is on the envelope.

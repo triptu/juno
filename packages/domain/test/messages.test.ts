@@ -11,6 +11,8 @@ describe('message headers', () => {
     ['quote', message, { ...message, body: { blocks: [{ kind: 'quote', children: [{ kind: 'text', text: 'Can we ship?' }] }] } }, true],
     ['thread root', message, { ...message, isThreadRoot: true }, true],
     ['new divider', message, { ...message, startsAfterDivider: true }, true],
+    ['reply also sent to the channel', message, { ...message, broadcast: true }, true],
+    ['after a reply also sent to the channel', { ...message, broadcast: true }, message, true],
   ] satisfies ReadonlyArray<readonly [string, GroupMessage | undefined, GroupMessage, boolean]>)('%s', (_, prev, next, expected) => {
     expect(startsGroup(prev, next)).toBe(expected)
   })

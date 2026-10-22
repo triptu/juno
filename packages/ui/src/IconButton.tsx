@@ -139,22 +139,22 @@ export function IconButton({
       {toggle ? (
         <span {...stylex.props(styles.pair)}>
           <span {...stylex.props(styles.layer, pressed && styles.outlineHidden)}>
-            {iconWeight === undefined ? <Icon icon={icon} size={px} /> : <Icon icon={icon} size={px} weight={iconWeight} />}
+            {iconWeight === undefined ? <Icon icon={icon} size={px} evenBox="both" /> : <Icon icon={icon} size={px} evenBox="both" weight={iconWeight} />}
           </span>
           <span {...stylex.props(styles.layer, pressed ? styles.filledShown : styles.filledHidden)}>
-            <Icon icon={icon} size={px} weight="fill" />
+            <Icon icon={icon} size={px} evenBox="both" weight="fill" />
           </span>
         </span>
       ) : iconTint !== undefined ? (
         <span data-icon-tint={iconTint} {...stylex.props(styles.tint, tintColors[iconTint])}>
-          {iconWeight === undefined ? <Icon icon={icon} size={px} /> : <Icon icon={icon} size={px} weight={iconWeight} />}
+          {iconWeight === undefined ? <Icon icon={icon} size={px} evenBox="both" /> : <Icon icon={icon} size={px} evenBox="both" weight={iconWeight} />}
         </span>
       ) : current ? (
-        <Icon icon={icon} size={px} weight="fill" />
+        <Icon icon={icon} size={px} evenBox="both" weight="fill" />
       ) : iconWeight === undefined ? (
-        <Icon icon={icon} size={px} />
+        <Icon icon={icon} size={px} evenBox="both" />
       ) : (
-        <Icon icon={icon} size={px} weight={iconWeight} />
+        <Icon icon={icon} size={px} evenBox="both" weight={iconWeight} />
       )}
     </button>
   )

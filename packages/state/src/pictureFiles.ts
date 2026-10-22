@@ -12,15 +12,20 @@ import type { Registry } from './client'
 import { readPictures, rememberTitles, writePictures } from './homePictures'
 
 let catalog: Promise<ReadonlyArray<Picture>> | undefined
+let loaded: ReadonlyArray<Picture> | undefined
 
 /** The catalog, from its own chunk, once. */
 export function loadPictures(): Promise<ReadonlyArray<Picture>> {
   catalog ??= import('@juno/pictures/catalog').then((module) => {
     rememberTitles(module.PICTURES)
+    loaded = module.PICTURES
     return module.PICTURES
   })
   return catalog
 }
+
+/** The catalog once it has loaded, so a page can draw in the same render instead of suspending on a settled promise. */
+export const loadedPictures = (): ReadonlyArray<Picture> | undefined => loaded
 
 
 /** The files on disk, as `<id>-<size>`, so the gallery shows a picture as soon as it has it. */
@@ -32,6 +37,11 @@ function addFiles(registry: Registry, keys: ReadonlyArray<string>): void {
   const files = registry.get(pictureFilesAtom)
   if (keys.every((key) => files.has(key))) return
   registry.set(pictureFilesAtom, new Set([...files, ...keys]))
+}
+
+/** A file Home showed from disk, so the picture page it opens has it in its first frame. */
+export function notePicture(registry: Registry, id: string, size: PictureSize): void {
+  addFiles(registry, [fileKey(id, size)])
 }
 
 /** Has the engine download one file unless it is on disk; true when it is there. */
