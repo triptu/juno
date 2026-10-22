@@ -537,8 +537,10 @@ not resolve on its own, so `pnpm sync:live` starts Node with
 
 ## IPC with main
 
-`packages/contract/src/shell.ts` defines `ShellRoutes`: a channel name (from
-`channels.ts`), an input schema and an output schema each. Main registers handlers
+`packages/contract/src/shellRoutes.ts` defines `ShellRoutes`: a channel name (from
+`channels.ts`), an input schema and an output schema each. Only main reads it, so
+it has its own module and the renderer's start bundle leaves it out; the schemas
+live in `shell.ts`. Main registers handlers
 through `handle()` in `src/main/ipc.ts`, which checks the sender is the main frame
 of one of our windows showing `juno://app/` (or the Vite dev URL), decodes the
 input and encodes the output. The preload turns each route into one function on
@@ -546,7 +548,7 @@ input and encodes the output. The preload turns each route into one function on
 and exposes it as an atom.
 
 `packages/contract/src/channels.ts` has no runtime imports. The preload bundles only
-that file so it stays under a kilobyte. Schemas live in `shell.ts`.
+that file so it stays under a kilobyte.
 
 ## Adding a feature
 

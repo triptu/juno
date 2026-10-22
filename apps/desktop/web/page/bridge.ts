@@ -81,6 +81,7 @@ const bridge: JunoBridge = {
     get: () => Promise.resolve(noUpdates),
     set: () => Promise.resolve(noUpdates),
     restart: nothing,
+    check: () => Promise.resolve(noUpdates),
     download: () => Promise.resolve(noUpdates),
     notes: () => Promise.resolve({ kind: 'failed' }),
     onChange: never,
