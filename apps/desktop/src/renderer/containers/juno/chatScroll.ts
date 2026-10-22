@@ -7,6 +7,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type Dispatch, type RefOb
 import type { BubbleId, ChatItem, ChatPage, ReplyTarget } from '@juno/agent-contract'
 import { afterPaint, measure } from '@juno/state/perf'
 import { flashChatRow } from '@juno/views'
+import { scrollRest } from '../scrollRest'
 import { junoCommands, takePanelOpenStart } from './actions'
 import { anchorOf, OVERLAP, WINDOW, type Window } from './chatWindow'
 
@@ -176,9 +177,9 @@ export function useScrollRelease(scrollRef: Scroller, pinnedRef: RefObject<boole
     if (scroller === null) return
     // The scrollTop last seen at the bottom. Holding the end and rows growing above only make it larger.
     let bottomTop = scroller.scrollTop
-    let settle: ReturnType<typeof setTimeout> | undefined
+    const rest = scrollRest(scroller, SETTLE_MS)
     const onScroll = () => {
-      clearTimeout(settle)
+      rest.onScroll()
       if (!pinnedRef.current) return
       const top = scroller.scrollTop
       if (top < bottomTop - 1 && distanceFromBottom(scroller) > 1) pinnedRef.current = false
@@ -186,15 +187,22 @@ export function useScrollRelease(scrollRef: Scroller, pinnedRef: RefObject<boole
     }
     const onScrollEnd = () => {
       const own = ownEnds.delete(scroller)
+      if (rest.pending()) return
       // Still held and the end away: the end moved under it, and this event came before the resize observer.
       if (!pageRef.current.moreBelow) holdEnd(scroller, pinnedRef)
-      // The end of the list's own scroll, let go of since: the owner is scrolling up while rows grow, and their scroll
-      // ends later. Where the list rests is decided once nothing has scrolled for a moment.
-      if (own && !pinnedRef.current) {
-        settle = setTimeout(onScrollEnd, SETTLE_MS)
+      const distance = distanceFromBottom(scroller)
+      const bottom = !pageRef.current.moreBelow && distance <= BOTTOM_SLACK
+      // At the exact end hold now; a deferred near-bottom rest keeps its decision if rows grow in the meantime.
+      if (own && !pinnedRef.current && distance > 1) {
+        rest.defer(() => {
+          if (bottom && !pageRef.current.moreBelow) {
+            pinnedRef.current = true
+            toEnd(scroller)
+          }
+          onScrollEnd()
+        })
         return
       }
-      const bottom = !pageRef.current.moreBelow && distanceFromBottom(scroller) <= BOTTOM_SLACK
       pinnedRef.current = bottom
       if (bottom) {
         bottomTop = scroller.scrollTop
@@ -207,7 +215,7 @@ export function useScrollRelease(scrollRef: Scroller, pinnedRef: RefObject<boole
     return () => {
       scroller.removeEventListener('scroll', onScroll)
       scroller.removeEventListener('scrollend', onScrollEnd)
-      clearTimeout(settle)
+      rest.cancel()
     }
   }, [scrollRef, pinnedRef, pageRef, setAtBottom])
 }

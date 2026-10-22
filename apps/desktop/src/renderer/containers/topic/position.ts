@@ -18,6 +18,7 @@ import { useAtomValue } from '@juno/state/react'
 import { flashChatRow } from '@juno/views'
 import { onLeaveTab, takeOpenStart } from '../navigation'
 import { takeSendMark } from '../sendMark'
+import { scrollRest } from '../scrollRest'
 import { BOTTOM_SLACK, distanceFromBottom, dividerTop, hold, rowInView, rowSelector, snapshotOf, takeOwnEnd, type Pin } from './scroll'
 
 /** A scroll of the user's that moved the list this recently, in milliseconds, is still going on. */
@@ -222,35 +223,34 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
     }
     // The scrollTop last seen at the bottom. Holding the end and rows growing above only make it larger.
     let bottomTop = scroller.scrollTop
-    let settle: ReturnType<typeof setTimeout> | undefined
+    const rest = scrollRest(scroller, GESTURE_IDLE)
     const onScroll = () => {
-      clearTimeout(settle)
+      rest.onScroll()
       if (pinRef.current?.kind !== 'bottom') return
       const top = scroller.scrollTop
       if (top < bottomTop - 1 && distanceFromBottom(scroller) > 1) pinRef.current = undefined
       else bottomTop = top
     }
-    // As the tab is left, the position is recorded from what is on screen then, since the rows can change after the
-    // scroll ended (an older page, a reaction), and that row is held while the tab is hidden: input that scrolled
-    // nothing (a click on a message) let go of the held row and ended no scroll, and what changes while the tab is
-    // hidden is laid out with nothing to anchor on. A gesture still going on is not held against.
-    const leave = () => {
-      const inView = rowInView(scroller)
-      registry.set(scrollSnapshotAtom(view), inView === undefined ? undefined : { anchorKey: inView.anchorKey, offset: inView.offset })
-      if (inView === undefined || pinRef.current !== undefined || gesture.going()) return
-      pinRef.current = { kind: 'row', element: inView.element, offset: inView.offset }
-      pinnedTopRef.current = scroller.scrollTop
-    }
     const onScrollEnd = () => {
       const own = takeOwnEnd(scroller)
+      if (rest.pending()) return
       if (pinRef.current?.kind === 'row' && Math.abs(scroller.scrollTop - pinnedTopRef.current) > 1) pinRef.current = undefined
       // Still held with the end away: the end moved under it (an edit box opening). `hold` lets go if the user scrolled up.
       if (pinRef.current?.kind === 'bottom') hold(scroller, pinRef, pinnedTopRef)
-      // The list's own scroll to the bottom ended after the user let go of it: they are still scrolling up, so where the
-      // list rests is decided once nothing has scrolled for a moment, not here within 32px of the end.
-      if (own && pinRef.current?.kind !== 'bottom') return void (settle = setTimeout(onScrollEnd, GESTURE_IDLE))
       const distance = distanceFromBottom(scroller)
       const bottom = atEndRef.current && distance <= BOTTOM_SLACK
+      // At the exact end hold now. Otherwise remember where the user stopped before growth can move the end.
+      if (own && pinRef.current?.kind !== 'bottom' && distance > 1) {
+        rest.defer(() => {
+          if (bottom && atEndRef.current) {
+            pinRef.current = { kind: 'bottom' }
+            pinnedTopRef.current = scroller.scrollTop
+            hold(scroller, pinRef, pinnedTopRef)
+          }
+          onScrollEnd()
+        })
+        return
+      }
       if (bottom) {
         pinRef.current = { kind: 'bottom' }
         bottomTop = pinnedTopRef.current = scroller.scrollTop
@@ -262,12 +262,7 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
       // later task, and on a loaded machine Chromium laid the rows out first, for frames on end. A row already laid
       // out is an anchor, and changing the eager rows after every step of a scroll restyled hundreds of elements, so
       // it only gets the pin.
-      const inView = pinRef.current === undefined ? rowInView(scroller) : undefined
-      if (inView !== undefined) {
-        pinRef.current = { kind: 'row', element: inView.element, offset: inView.offset }
-        pinnedTopRef.current = scroller.scrollTop
-        if (inView.element.firstElementChild?.checkVisibility({ contentVisibilityAuto: true }) === false) flushSync(() => setHeldAt(inView.anchorKey))
-      }
+      const inView = holdRestingRow(scroller, pinRef, pinnedTopRef, setHeldAt)
       setAtBottom(bottom)
       setFar(distance > scroller.clientHeight)
       if (bottom) setSeenTs(lastRef.current)
@@ -279,16 +274,39 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
     scroller.addEventListener('scrollend', onScrollEnd)
     // After the listeners above, so it sees the bottom let go in the same scroll.
     const gesture = watchGesture(scroller, pinRef)
-    const stopLeaving = readOnly ? () => {} : onLeaveTab(view, leave)
+    const stopLeaving = readOnly ? () => {} : onLeaveTab(view, () => rememberPosition(scroller, view, pinRef, pinnedTopRef, gesture.going()))
     return () => {
       for (const type of inputs) scroller.removeEventListener(type, letGo)
       scroller.removeEventListener('scroll', onScroll)
       scroller.removeEventListener('scrollend', onScrollEnd)
       gesture.stop()
       stopLeaving()
-      clearTimeout(settle)
+      rest.cancel()
     }
   }, [view, readOnly, scrollRef, pinRef, pinnedTopRef, setAtBottom, setFar, setSeenTs, setHeldAt, lastRef, atEndRef])
+}
+
+// As the tab is left, the position is recorded from what is on screen then, since the rows can change after the
+// scroll ended (an older page, a reaction), and that row is held while the tab is hidden: input that scrolled
+// nothing (a click on a message) let go of the held row and ended no scroll, and what changes while the tab is
+// hidden is laid out with nothing to anchor on. A gesture still going on is not held against.
+function rememberPosition(scroller: HTMLElement, view: string, pinRef: Position['pinRef'], pinnedTopRef: Position['pinnedTopRef'], moving: boolean): void {
+  const inView = rowInView(scroller)
+  registry.set(scrollSnapshotAtom(view), inView === undefined ? undefined : { anchorKey: inView.anchorKey, offset: inView.offset })
+  if (inView === undefined || pinRef.current !== undefined || moving) return
+  pinRef.current = { kind: 'row', element: inView.element, offset: inView.offset }
+  pinnedTopRef.current = scroller.scrollTop
+}
+
+/** Holds the row at rest, laying out estimated rows before the next paint. */
+function holdRestingRow(scroller: HTMLElement, pinRef: Position['pinRef'], pinnedTopRef: Position['pinnedTopRef'], setHeldAt: Position['setHeldAt']) {
+  const inView = pinRef.current === undefined ? rowInView(scroller) : undefined
+  if (inView !== undefined) {
+    pinRef.current = { kind: 'row', element: inView.element, offset: inView.offset }
+    pinnedTopRef.current = scroller.scrollTop
+    if (inView.element.firstElementChild?.checkVisibility({ contentVisibilityAuto: true }) === false) flushSync(() => setHeldAt(inView.anchorKey))
+  }
+  return inView
 }
 
 /**
