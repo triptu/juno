@@ -57,7 +57,7 @@ test('See all on the card opens every reaction, and the strip changes the list',
   // Keep the final row geometry while known reactor IDs still await their names.
   await expect.poll(() => fake.heldCount()).toBe(1)
   await expect(dialog.locator('[aria-busy]')).toHaveAttribute('aria-busy', 'true')
-  await expect(people).toHaveCount(40)
+  await expect(dialog.getByRole('tabpanel').getByRole('listitem', { includeHidden: true })).toHaveCount(40)
   expect(await people.filter({ hasText: /\S/ }).count()).toBeLessThan(40)
   fake.release()
   // Slack's page named 25; the dialog asks for the rest, and every name arrives.
