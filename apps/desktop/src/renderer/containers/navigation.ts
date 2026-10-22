@@ -816,6 +816,8 @@ export function runMenuCommand(command: MenuCommand): void {
       return
     case 'settings.open':
       return openSettings()
+    case 'settings.about':
+      return openSettings('about')
     case 'tour.show':
       return showTheTour()
     case 'huddle.show':
