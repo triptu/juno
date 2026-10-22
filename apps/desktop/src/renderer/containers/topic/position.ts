@@ -18,7 +18,7 @@ import { useAtomValue } from '@juno/state/react'
 import { flashChatRow } from '@juno/views'
 import { onLeaveTab, takeOpenStart } from '../navigation'
 import { takeSendMark } from '../sendMark'
-import { BOTTOM_SLACK, distanceFromBottom, dividerTop, hold, rowInView, rowSelector, snapshotOf, type Pin } from './scroll'
+import { BOTTOM_SLACK, distanceFromBottom, dividerTop, hold, rowInView, rowSelector, snapshotOf, takeOwnEnd, type Pin } from './scroll'
 
 /** A scroll of the user's that moved the list this recently, in milliseconds, is still going on. */
 const GESTURE_IDLE = 100
@@ -80,6 +80,7 @@ export function useOpenPosition(position: Position, view: string, readOnly: bool
     const bottom = atEnd && distance <= BOTTOM_SLACK
     if (bottom) {
       pinRef.current = { kind: 'bottom' }
+      pinnedTopRef.current = scroller.scrollTop
       heldForRef.current = { rows: list.rows, size: `${window.innerWidth}x${window.innerHeight}` }
     }
     setAtBottom(bottom)
@@ -221,7 +222,10 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
     }
     // The scrollTop last seen at the bottom. Holding the end and rows growing above only make it larger.
     let bottomTop = scroller.scrollTop
+    // A resting place decided once nothing has scrolled for a moment (`onScrollEnd`).
+    let settle: ReturnType<typeof setTimeout> | undefined
     const onScroll = () => {
+      clearTimeout(settle)
       if (pinRef.current?.kind !== 'bottom') return
       const top = scroller.scrollTop
       if (top < bottomTop - 1 && distanceFromBottom(scroller) > 1) pinRef.current = undefined
@@ -239,16 +243,24 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
       pinnedTopRef.current = scroller.scrollTop
     }
     const onScrollEnd = () => {
+      const own = takeOwnEnd(scroller)
       if (pinRef.current?.kind === 'row' && Math.abs(scroller.scrollTop - pinnedTopRef.current) > 1) pinRef.current = undefined
-      // A scroll up lets go of the bottom in `onScroll`, so a scroll that ends with the bottom still held and the end
-      // away is the end moving under it: an edit box that scrolls itself into view as it opens grows its row, and
-      // this event comes before the resize observer in that frame. The bottom is held again, not let go.
+      // A scroll that ends with the bottom still held and the end away is the end moving under it: an edit box that
+      // scrolls itself into view as it opens grows its row, and this event comes before the resize observer in that
+      // frame. The bottom is held again; `hold` lets go instead if the user scrolled up.
       if (pinRef.current?.kind === 'bottom') hold(scroller, pinRef, pinnedTopRef)
+      // The end of the list's own scroll to the bottom, let go of since: the user is scrolling up while rows grow, and
+      // their scroll ends later. Taking the bottom here, within 32px of it, would pull them back down on the next
+      // growth. Where the list rests is decided once nothing has scrolled for a moment, in case both ended as this one event.
+      if (own && pinRef.current?.kind !== 'bottom') {
+        settle = setTimeout(onScrollEnd, GESTURE_IDLE)
+        return
+      }
       const distance = distanceFromBottom(scroller)
       const bottom = atEndRef.current && distance <= BOTTOM_SLACK
       if (bottom) {
         pinRef.current = { kind: 'bottom' }
-        bottomTop = scroller.scrollTop
+        bottomTop = pinnedTopRef.current = scroller.scrollTop
       } else if (pinRef.current?.kind === 'bottom') pinRef.current = undefined
       // Anywhere else, the list holds the row it came to rest on. A jump lands on rows still at their size estimate,
       // and Chromium does not anchor on those, so as they reach their real height a frame or two later the rows in view
@@ -281,6 +293,7 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
       scroller.removeEventListener('scrollend', onScrollEnd)
       gesture.stop()
       stopLeaving()
+      clearTimeout(settle)
     }
   }, [view, readOnly, scrollRef, pinRef, pinnedTopRef, setAtBottom, setFar, setSeenTs, setHeldAt, lastRef, atEndRef])
 }
@@ -330,7 +343,10 @@ export function useJumpToLatest(position: Position, view: string, list: MessageW
     setAtBottom(true)
     setFar(false)
     if (!atEnd) registry.set(messageWindowSpecAtom(view), bottomWindow)
-    if (scroller !== null) hold(scroller, pinRef, pinnedTopRef)
+    if (scroller !== null) {
+      pinnedTopRef.current = scroller.scrollTop
+      hold(scroller, pinRef, pinnedTopRef)
+    }
     setSeenTs(last)
   }, [view, last, atEnd, scrollRef, pinRef, pinnedTopRef, setAtBottom, setFar, setSeenTs])
 }

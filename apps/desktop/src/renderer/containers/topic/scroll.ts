@@ -110,16 +110,35 @@ export function snapshotOf(scroller: HTMLElement): ScrollSnapshot | undefined {
  */
 export type Pin = { readonly kind: 'bottom' } | { readonly kind: 'row'; readonly element: Element; readonly offset: number }
 
-/** Puts the pinned row or the bottom back, and remembers the scrollTop it set. A row that left the list ends the pin. */
+/** Lists whose scroll to the bottom by `hold` has not ended yet (see `takeOwnEnd`). */
+const ownEnds = new WeakSet<HTMLElement>()
+
+/**
+ * Whether a `scrollend` ends the list's own scroll to the bottom, rather than only the user's: one comes after every
+ * `hold` that moved the list, also while the user's own scroll goes on.
+ */
+export function takeOwnEnd(scroller: HTMLElement): boolean {
+  return ownEnds.delete(scroller)
+}
+
+/**
+ * Puts the pinned row or the bottom back, and remembers the scrollTop it set. A row that left the list ends the pin.
+ * The bottom also ends when the list moved up from where it was last held and is away from the end: the user's
+ * scroll is already in `scrollTop` when this runs, but its `scroll` event, which lets go, may come after it in the
+ * frame, as when a row grows during a wheel gesture. Content that shrinks leaves the list at the end, so it holds.
+ */
 export function hold(scroller: HTMLElement, pin: RefObject<Pin | undefined>, pinnedTop: RefObject<number>): void {
   const held = pin.current
   if (held === undefined) return
-  if (held.kind === 'row' && !held.element.isConnected) {
+  if ((held.kind === 'row' && !held.element.isConnected) || (held.kind === 'bottom' && scroller.scrollTop < pinnedTop.current - 1 && distanceFromBottom(scroller) > 1)) {
     pin.current = undefined
     return
   }
-  if (held.kind === 'bottom') scroller.scrollTop = scroller.scrollHeight
-  else scroller.scrollTop += held.element.getBoundingClientRect().top - scroller.getBoundingClientRect().top - held.offset
+  if (held.kind === 'bottom') {
+    const top = scroller.scrollTop
+    scroller.scrollTop = scroller.scrollHeight
+    if (scroller.scrollTop !== top) ownEnds.add(scroller)
+  } else scroller.scrollTop += held.element.getBoundingClientRect().top - scroller.getBoundingClientRect().top - held.offset
   pinnedTop.current = scroller.scrollTop
 }
 
