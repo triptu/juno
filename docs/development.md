@@ -722,7 +722,7 @@ At the end of each UI milestone, run these reviews in parallel and turn the find
   (`perf.ts`, `port.ts`), never through the DOM lib's names.
 - **Node and DOM `MessagePort`s** have the same `addEventListener` surface at runtime
   but different typings; tests cast Node ports to `PortLike` / `MessagePortLike`.
-- **Renderer bundle size.** The budget is 1.1 MB of initial JS and 200 KB of CSS
+- **Renderer bundle size.** The budget is 1,105 KB of initial JS and 200 KB of CSS
   (`docs/performance.md`); `pnpm build` runs `scripts/check-bundle-size.mjs` and fails
   over it. The M1 shell is 426.1 KB of JS (138.6 KB gzip) and 68.7 KB of CSS, minified.
   electron-vite does not minify by default, so the config sets `minify: 'esbuild'` for
