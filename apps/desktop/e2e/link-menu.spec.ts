@@ -1,8 +1,9 @@
 // Native menus on links in messages (SPEC 8, "Links"): their actions are
-// about the link itself, not the message around it.
+// about the link itself, not the message around it. Message text keeps the
+// message's own menu.
 import type { Locator } from '@playwright/test'
 import { expect, test } from './fixtures'
-import type { Juno } from './driver/juno'
+import { MessageMenuDriver, type Juno } from './driver/juno'
 
 test.use({ synced: true })
 
@@ -52,17 +53,21 @@ test('web and email links have link menus; message text keeps the message menu',
   expect(await choose(juno, slack, 'copy-link')).toEqual(['Open link', 'Open in background · ⌘ click', '-', 'Copy link'])
   await expect.poll(() => juno.clipboard()).toBe(slackUrl)
 
-  // A selection takes precedence when the right-click point is inside it.
+  // A selection takes precedence when the right-click point is inside it: the message's own menu opens, not a native link menu.
   await web.selectText()
-  const selectedMenu = await choose(juno, web, null)
+  const asked = await juno.menusAsked()
+  const selected = await new MessageMenuDriver(juno.win).openOn(web)
+  const selectedMenu = await selected.labels()
   expect(selectedMenu).toContain('Start thread')
-  expect(selectedMenu).toContain('Copy Slack link')
+  expect(selectedMenu).toContain('Open in Slack')
   expect(selectedMenu).not.toContain('Copy link')
+  await selected.close()
 
-  await juno.chooseNextMenuItem(null)
-  await juno.topic.message('Plain message menu sample').click({ button: 'right' })
-  const messageMenu = await juno.lastMenu()
-  expect(messageMenu.labels).toContain('Start thread')
-  expect(messageMenu.labels).toContain('Copy Slack link')
-  expect(messageMenu.labels).not.toContain('Copy link')
+  const plain = await juno.topic.messageMenu('Plain message menu sample')
+  const messageMenu = await plain.labels()
+  expect(messageMenu).toContain('Start thread')
+  expect(messageMenu).toContain('Open in Slack')
+  expect(messageMenu).not.toContain('Copy link')
+  await plain.close()
+  expect(await juno.menusAsked()).toBe(asked)
 })
