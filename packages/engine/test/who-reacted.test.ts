@@ -138,11 +138,25 @@ describe('who reacted: concurrent fetches', () => {
     await waitFor(() => engine.fake.heldCount() === 1 ? true : undefined, WAIT_MS, 'held full fetch')
     const second = who({ ...engine, registry: engine.openWindow() }, seed)
     await second.until((value) => value.loading, 'second loading')
+    first.close()
     engine.fake.release()
-    await first.until((value) => !value.loading && reaction(value, '+1')?.users.length === 40, 'first complete')
     await second.until((value) => !value.loading && reaction(value, '+1')?.users.length === 40, 'second complete')
     expect(apiCalls(engine, 'reactions.get')).toHaveLength(1)
+    second.close()
+  })
+
+  it('cancels when the last dialog closes so reopening starts a fresh read', async () => {
+    const engine = await booted()
+    const seed = await seeded(engine)
+    engine.fake.holdNext({ method: 'reactions.get', times: 2 })
+    const first = who(engine, seed)
+    await waitFor(() => engine.fake.heldCount() === 1 ? true : undefined, WAIT_MS, 'first held')
     first.close()
+    const second = who({ ...engine, registry: engine.openWindow() }, seed)
+    // No 30-second topic idle TTL: the old request no longer owns the pending slot.
+    await waitFor(() => engine.fake.heldCount() === 2 ? true : undefined, 5_000, 'fresh request after close')
+    engine.fake.release()
+    await second.until((value) => !value.loading && reaction(value, '+1')?.users.length === 40, 'reopened complete')
     second.close()
   })
 

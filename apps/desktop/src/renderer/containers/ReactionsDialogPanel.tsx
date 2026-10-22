@@ -44,7 +44,8 @@ function entry(reaction: { readonly name: string; readonly count: number; readon
 function fromEngine(who: WhoReacted): { readonly reactions: ReadonlyArray<ReactionsDialogEntry>; readonly loading: boolean } {
   const known = new Map(who.people.map((person) => [person.id, person]))
   const reactions = who.reactions.map((reaction) => entry(reaction, reaction.users.flatMap((id, index) => reactor(id, known.get(id), reaction.me && index === 0))))
-  return { reactions, loading: who.loading }
+  const unnamed = who.reactions.some((reaction) => reaction.users.some((id) => !known.has(id)))
+  return { reactions, loading: who.loading || unnamed }
 }
 
 /** The first frame, from the window: up to ten people a reaction, the rest waiting for the engine. */

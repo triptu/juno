@@ -74,9 +74,11 @@ export const messagesAtom = (id: string, window: MessageWindowSpec = bottomWindo
 export const topicAtom = (id: string) => topicFamily({ id })
 
 const whoReactedFamily = liveQuery(reactionsWho)
+// Dialog subscriptions stop on close instead of staying warm like topic tabs.
+const mountedReactors = Atom.family((atom: ReturnType<typeof whoReactedFamily>) => Atom.setIdleTTL(atom, 0))
 
 /** Everyone who reacted to a message (`reactions.who`): `WhoReacted`, or `null` for a message the store does not have. */
-export const whoReactedAtom = (channel: string, ts: string) => whoReactedFamily({ channel, ts })
+export const whoReactedAtom = (channel: string, ts: string) => mountedReactors(whoReactedFamily({ channel, ts }))
 
 /** A channel's threads with activity in the quiet window, newest first. `meta.total` is how many there are. */
 export const channelThreadsAtom = (channel: string, limit: number = THREADS_WINDOW_MAX) => threadsFamily({ channel, range: { limit } })

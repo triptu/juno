@@ -44,6 +44,7 @@ test('See all on the card opens every reaction, and the strip changes the list',
   await expect(seeAll).toHaveText('See all')
 
   // See all opens the dialog on 👍, listing all forty, you first.
+  fake.holdNext({ method: 'edge:users/info' })
   await seeAll.click()
   const dialog = juno.win.getByRole('dialog', { name: 'Reactions' })
   await expect(dialog).toBeVisible()
@@ -53,6 +54,12 @@ test('See all on the card opens every reaction, and the strip changes the list',
   await expect(strip.getByRole('tab', { selected: true })).toHaveAccessibleName('40 👍, including you')
   await expect(strip.getByRole('tab', { selected: true })).toBeFocused()
   const people = dialog.getByRole('tabpanel').getByRole('listitem')
+  // Keep the final row geometry while known reactor IDs still await their names.
+  await expect.poll(() => fake.heldCount()).toBe(1)
+  await expect(dialog.locator('[aria-busy]')).toHaveAttribute('aria-busy', 'true')
+  await expect(people).toHaveCount(40)
+  expect(await people.filter({ hasText: /\S/ }).count()).toBeLessThan(40)
+  fake.release()
   // Slack's page named 25; the dialog asks for the rest, and every name arrives.
   await expect(people.filter({ hasText: /\S/ })).toHaveCount(40)
   await expect(people.first()).toHaveText(/You$/)
