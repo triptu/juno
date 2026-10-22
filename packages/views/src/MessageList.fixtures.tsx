@@ -71,11 +71,19 @@ const CHIPPED = 3
  * goes. The test drives each step through `window.__fixtureControls` and
  * checks what moved.
  */
-/** The delete is asked for a frame after the list has its scroll, as in the app, where it is asked of a list at rest. */
-function useAskAfterScroll(): boolean {
+/**
+ * The delete is asked for a frame after the list has its scroll, as in the
+ * app, where it is asked of a list at rest; `settle` runs first in that frame,
+ * once the rows have laid out.
+ */
+function useAskAfterScroll(settle?: () => void): boolean {
   const [asking, setAsking] = useState(false)
+  const settleRef = useRef(settle)
   useEffect(() => {
-    const frame = requestAnimationFrame(() => setAsking(true))
+    const frame = requestAnimationFrame(() => {
+      settleRef.current?.()
+      setAsking(true)
+    })
     return () => cancelAnimationFrame(frame)
   }, [])
   return asking
@@ -115,7 +123,11 @@ const tallLast = messageWindow([
  */
 function TallLastRow() {
   const scrollRef = useRef<HTMLElement>(null)
-  const asking = useAskAfterScroll()
+  // The tall row lays out after the first scroll and grows the list: back to its end.
+  const asking = useAskAfterScroll(() => {
+    const scroller = scrollRef.current
+    if (scroller != null) scroller.scrollTop = scroller.scrollHeight
+  })
   useLayoutEffect(() => {
     const scroller = scrollRef.current
     if (scroller != null) scroller.scrollTop = scroller.scrollHeight
