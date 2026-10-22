@@ -1,6 +1,8 @@
 import { Headphones } from '@phosphor-icons/react/dist/icons/Headphones'
+import { useState } from 'react'
 import { defineFixtures, Icon, scene, type FixtureFrame } from '@juno/ui'
 import { art, channels, newThreadsById, NOW, people, rows } from './fixtures/topics'
+import { useFixtureControl } from './juno-chat/fixtures/control'
 import { relativeTime } from './time'
 import { TopicRow, type TopicRowProps } from './TopicRow'
 
@@ -75,6 +77,39 @@ const vendorsPeople: TopicRowProps['row'] = {
   unreadCount: 2,
   tags: ['reopened'],
   art: art.coins,
+}
+
+/** Unread rows that a person opens, as the sidebar has them: a short and a long title, a DM and a group DM, with and without an @. */
+const toggled: ReadonlyArray<TopicRowProps['row']> = [
+  rows.roadmap,
+  rows.hiring,
+  { ...rows.long, unreadCount: 4, participants: [people.priya, people.maya] },
+  { ...rows.long, id: `${rows.long.id}-mention`, unreadCount: 1, mentionsMe: true, participants: [people.priya] },
+  { ...rows.mayaMain, unreadCount: 2 },
+  { ...rows.mayaMain, id: 'm:D0SAM', title: 'Sam Okafor', channel: channels.sam, unreadCount: 1, mentionsMe: true },
+  { ...rows.lunch, unreadCount: 3 },
+  { ...rows.lunch, id: 'G0MAYALEO:main-mention', unreadCount: 1, mentionsMe: true },
+]
+
+/** What reading a row changes, as the engine shapes it: no count, no @, no unread people. */
+const asRead = (row: TopicRowProps['row']): TopicRowProps['row'] => ({ ...row, unreadCount: 0, mentionsMe: false, participants: [] })
+
+/**
+ * The rows above, unread until the test reads them all at once through
+ * `window.__fixtureControls.read`, as opening a row reads it in the app;
+ * calling it again makes them unread. A control, not a press, so the shift
+ * walk's presses leave the state as it is.
+ */
+function ReadToggle() {
+  const [read, setRead] = useState(false)
+  useFixtureControl('read', () => setRead((was) => !was))
+  return (
+    <div style={column}>
+      {toggled.map((row) => (
+        <TopicRow key={row.id} {...one(read ? asRead(row) : row)} />
+      ))}
+    </div>
+  )
 }
 
 export default defineFixtures(
@@ -225,6 +260,10 @@ export default defineFixtures(
         ),
         { hover: ROW },
       ),
+    },
+    // Reading the rows (and making them unread again) moves nothing in them: shift.spec.ts drives it.
+    Read: {
+      toggle: scene(() => <ReadToggle />),
     },
     Overview: {
       'all-states': scene(() => (
