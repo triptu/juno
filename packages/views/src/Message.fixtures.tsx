@@ -125,7 +125,7 @@ export default defineFixtures(
       hover: one(first, {}, { hover: '[data-message-row]' }),
       'hover-continuation': one(grouped, {}, { hover: '[data-message-row]' }),
       'hover-main': one(withThread, { main: true, actions: noopActions }, { hover: '[data-message-row]' }),
-      // Its menu is open: the row keeps its hover fill.
+      // Its menu is open: the row takes a faint fill.
       'menu-open': one(first, { actions: noopActions, active: true }),
       focus: one(first, { actions: noopActions }, { focus: '[data-message-row]' }),
     },

@@ -22,7 +22,7 @@ Warm paper. HSL values are the source of truth; hex is the sRGB result for desig
 | `--background-subtle` | `hsla(48, 35%, 97%, 1)` | #FAF9F5 | css | Sidebar, tab strip |
 | `--surface-default` | `hsla(48, 30%, 98%, 1)` | #FBFBF8 | css | Popovers, cards, inputs, composer |
 | `--surface-hover` | `hsla(48, 30%, 94%, 1)` | #F4F2EB | css | Hover on rows, menu items, icon buttons, and an open ghost trigger (⋯, avatar); send-check bar; segmented control track |
-| `--message-hover` | `hsla(48, 43%, 96.7%, 1)` | #FAF9F3 | message actions 10-22 | A message under the pointer, and one with its menu open, being edited or confirming a delete. 1.02:1 on the page, about a third of the step to `--surface-hover` (1.08:1): with no controls on hover the fill only says which message the pointer is on, so a list stays calm (half the step, 10-22 morning, still drew the eye); muted text 4.82:1 on it |
+| `--message-menu-open` | `hsla(48, 43%, 96.7%, 1)` | #FAF9F3 | message actions 10-22 | A message whose menu, or the emoji picker the menu turned into, is open, so it is clear which message the menu belongs to. A message under the pointer has no fill (10-23). 1.02:1 on the page, about a third of the step to `--surface-hover` (1.08:1); muted text 4.82:1 on it |
 | `--surface-active` | `hsla(48, 30%, 92%, 1)` | #F1EEE4 | css | Reserved (unused in prototype) |
 | `--surface-raised` | `hsla(48, 30%, 98%, 1)` | #FBFBF8 | proposed | Selected segment of a segmented control; must read as raised over `--surface-hover` in both themes |
 | `--peek-surface` | `hsla(48, 22%, 96%, 1)` | #F7F6F3 | review 10-18 | Peek only: a neutral warm surface distinct from the page; paired with `--peek-shadow` |
@@ -69,7 +69,7 @@ A warm-neutral near-black: the same paper seen at night, not a cool system grey.
 | `--background-subtle` | #151411 | 0.19 | 1.05:1 under the page | redesign |
 | `--surface-default` | #252421 | 0.26 | 1.13:1 over the page | redesign |
 | `--surface-hover` | #2D2B28 | 0.29 | 1.31:1 over the sidebar | redesign |
-| `--message-hover` | #211F1C | 0.226 | 1.07:1 over the page, about a third of the step to `--surface-hover` (1.24:1); muted text 6.15:1 | message actions 10-22 |
+| `--message-menu-open` | #211F1C | 0.226 | 1.07:1 over the page, about a third of the step to `--surface-hover` (1.24:1); muted text 6.15:1 | message actions 10-22 |
 | `--surface-active` | #32302D | 0.31 | | redesign |
 | `--surface-raised` | #373532 | 0.33 | 1.43:1 over the page, 1.27:1 over a card | redesign |
 | `--peek-surface` | #373532 | 0.33 | Same as the existing raised popover; dark Peek is unchanged | review 10-18 |

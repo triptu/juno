@@ -69,7 +69,7 @@ export interface MessageListProps {
   readonly hueOf?: (id: string) => HueName
   /** What rows' own controls do, created once. Without them rows have none (a preview). */
   readonly actions?: MessageActions
-  /** The row whose menu, emoji picker or reactions dialog is open: it keeps its hover fill. */
+  /** The row whose menu, or the emoji picker the menu turned into, is open: it takes a faint fill. */
   readonly activeMessage?: string | undefined
   /** The row that asks to confirm a delete. */
   readonly confirmingDelete?: string | undefined

@@ -169,7 +169,7 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
       void editField.load()
       handlers.selectNewest()
     },
-    activeMessage: reactions?.ts ?? menuMessage,
+    activeMessage: menuMessage,
     confirmingDelete: confirming?.ts,
     editing: editingRow,
     floating: (

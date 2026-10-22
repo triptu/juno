@@ -65,7 +65,7 @@ export interface MessageProps {
   readonly hueOf: (id: string) => HueName
   /** What the row's own controls do. */
   readonly actions?: MessageActions
-  /** Its menu, the emoji picker it turned into or the reactions dialog is open: the row keeps its hover fill. */
+  /** Its menu, or the emoji picker the menu turned into, is open: the row takes a faint fill. */
   readonly active?: boolean
   /** It asks to confirm a delete, at its top right. */
   readonly confirmingDelete?: boolean
@@ -99,8 +99,6 @@ export interface MessageProps {
   /** How far a sending message's files have uploaded, 0 to 1. */
   readonly progress?: number | undefined
 }
-
-const HOVER = '@media (hover: hover)'
 
 const NO_PEOPLE: ReadonlyMap<string, Person> = new Map()
 
@@ -252,6 +250,7 @@ export const Message = memo(function Message({
         eager && styles.rowEager,
         header && !flush && styles.rowGroupStart,
         (active || confirmingDelete || editor !== undefined) && styles.rowHeld,
+        active && styles.rowMenuOpen,
         editor !== undefined && styles.rowEditing,
         message.mentionsMe && styles.rowMention,
       )}
@@ -451,10 +450,8 @@ const styles = stylex.create({
     // A number at rest, never auto: a row raised over its neighbours while it
     // asks to confirm a delete only changes its order (performance.md 8.14).
     zIndex: z['--z-row'],
-    backgroundColor: {
-      default: 'transparent',
-      ':hover': { default: null, [HOVER]: colors['--message-hover'] },
-    },
+    // No hover fill: a message under the pointer looks as it does at rest.
+    backgroundColor: 'transparent',
   },
   rowEager: {
     contentVisibility: 'visible',
@@ -465,21 +462,21 @@ const styles = stylex.create({
     contain: 'layout style',
     contentVisibility: 'visible',
   },
-  // Its menu or picker open, being edited, or asking to confirm a delete: the row keeps its hover fill until that ends,
-  // and paints over its neighbours, which the confirm overlaps.
+  // Its menu or picker open, being edited, or asking to confirm a delete: the row paints over its neighbours, which
+  // the confirm overlaps.
   rowHeld: {
     zIndex: z['--z-toolbar'],
-    backgroundColor: colors['--message-hover'],
+  },
+  // Its menu or the emoji picker grown from it is open: a faint fill says which message the menu belongs to.
+  rowMenuOpen: {
+    backgroundColor: colors['--message-menu-open'],
   },
   rowGroupStart: {
     marginTop: density['--density-message-group-gap'],
   },
-  // Mentions you (SPEC section 7): the tint stays, hovered or not.
+  // Mentions you (SPEC section 7): the tint stays, its menu open or not.
   rowMention: {
-    backgroundColor: {
-      default: tints['--tint-mention-bg'],
-      ':hover': { default: null, [HOVER]: tints['--tint-mention-bg'] },
-    },
+    backgroundColor: tints['--tint-mention-bg'],
   },
   gutter: {
     display: 'inline-flex',

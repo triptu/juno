@@ -2,9 +2,9 @@ import { expect, test, type Page } from '@playwright/test'
 import { openState, type Route } from './support'
 
 /**
- * A message under the pointer (inventory 6.1): a quiet fill of its own,
- * `--message-hover`, and the arrow cursor over its text, which stays
- * selectable. Only editable text shows the text cursor (SPEC 16).
+ * A message under the pointer (inventory 6.1) looks as it does at rest: no
+ * fill. The arrow cursor shows over its text, which stays selectable. Only
+ * editable text shows the text cursor (SPEC 16).
  */
 
 const open = (page: Page, theme: 'light' | 'dark' = 'light') =>
@@ -13,18 +13,10 @@ const open = (page: Page, theme: 'light' | 'dark' = 'light') =>
 const row = (page: Page) => page.locator('[data-message-row]').nth(2)
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`a hovered message takes the message hover fill, in ${theme}`, async ({ page }) => {
+  test(`a hovered message takes no fill, in ${theme}`, async ({ page }) => {
     await open(page, theme)
     await row(page).locator('[data-msg-text]').first().hover()
-    const fill = await page.evaluate(() => {
-      const probe = document.createElement('div')
-      probe.style.backgroundColor = 'var(--message-hover)'
-      document.body.append(probe)
-      const value = getComputedStyle(probe).backgroundColor
-      probe.remove()
-      return value
-    })
-    await expect(row(page)).toHaveCSS('background-color', fill)
+    await expect(row(page)).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
   })
 }
 

@@ -122,7 +122,7 @@ export default defineFixtures(
     },
     Interaction: {
       'hover-resize-edge': scene(() => <SignedIn />, { hover: '[role="separator"][aria-label="Resize sidebar"]' }),
-      // The pointer over one message in an open topic: the row's faint hover fill (--message-hover) and no controls.
+      // The pointer over one message in an open topic: no fill and no controls.
       'hover-message': scene(() => <SignedIn page={topicPage} />, { width: 1200, height: 800, hover: '[data-message-row]:nth-of-type(4) [data-msg-text]' }),
     },
   },

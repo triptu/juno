@@ -29,9 +29,9 @@ export const colors = stylex.defineVars({
   '--background-subtle': 'hsla(48, 35%, 97%, 1)',
   '--surface-default': 'hsla(48, 30%, 98%, 1)',
   '--surface-hover': 'hsla(48, 30%, 94%, 1)',
-  // A message under the pointer, or with its menu open: a third of the step
-  // from the page to --surface-hover, so a list of messages stays calm.
-  '--message-hover': 'hsla(48, 43%, 96.7%, 1)',
+  // A message with its menu open, so it is clear which message the menu
+  // belongs to: a third of the step from the page to --surface-hover.
+  '--message-menu-open': 'hsla(48, 43%, 96.7%, 1)',
   '--surface-active': 'hsla(48, 30%, 92%, 1)',
   '--peek-surface': 'hsla(48, 22%, 96%, 1)',
   // A surface that sits on top of --surface-hover and must read as raised in

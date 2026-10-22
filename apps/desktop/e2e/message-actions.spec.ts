@@ -146,19 +146,23 @@ async function reactToMessage({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): 
   await expect(row.getByRole('button', { name: '1 👀', exact: true })).toBeVisible()
   await expect.poll(() => reactionsOf().find((r) => r.name === 'eyes')?.count).toBe(1)
 
-  // While its menu is open the message keeps its hover fill; More reactions turns the menu into the picker.
+  // Hovering a message adds no fill. While its menu is open, and the picker More reactions turns it into, the message
+  // takes a faint fill, so it is clear which message the menu belongs to.
+  const clear = 'rgba(0, 0, 0, 0)'
   await row.hover()
-  const hovered = await row.evaluate((element) => getComputedStyle(element).backgroundColor)
+  await expect(row).toHaveCSS('background-color', clear)
   const open = await topic.messageMenu('Staging is green again')
   await juno.win.mouse.move(0, 0)
   await expect(row).toHaveAttribute('data-popover-active', '')
-  await expect(row).toHaveCSS('background-color', hovered)
+  await expect(row).not.toHaveCSS('background-color', clear)
   await open.more.click()
   await expect(open.search).toBeFocused()
+  await expect(row).not.toHaveCSS('background-color', clear)
   await open.search.fill('rocket')
   await open.search.press('Enter')
   await expect(open.root).toHaveCount(0)
   await expect(row).not.toHaveAttribute('data-popover-active')
+  await expect(row).toHaveCSS('background-color', clear)
   await expect(row.getByRole('button', { name: '1 🚀, including you' })).toBeVisible()
   await expect.poll(() => reactionsOf().some((r) => r.name === 'rocket')).toBe(true)
 }

@@ -269,7 +269,7 @@ export default defineFixtures(
     Interaction: {
       hover: state({ items: thread, main: false }, { hover: `${ROW}:nth-of-type(4)` }),
       'hover-grouped': state({ items: thread, main: false }, { hover: `${ROW}:nth-of-type(6)` }),
-      // Its menu is open: the row keeps its hover fill.
+      // Its menu is open: the row takes a faint fill.
       'menu-open': state({ items: thread, main: false, actions: noopActions, activeMessage: thread[3]!.message.ts }),
       // A delete waits for its confirm, which straddles the row's top edge above the first line: on a header row, on
       // a grouped row, and inside the first row at the list's top.

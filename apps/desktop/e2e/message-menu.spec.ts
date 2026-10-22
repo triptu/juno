@@ -54,7 +54,7 @@ test('a right-click opens the menu as it comes up, over the same message, with t
     // Ask Juno shows while AI assist is on.
     const labels = (await menu.labels()).filter((label) => label !== 'Ask Juno')
     expect(labels).toEqual(['Start thread', 'Quote', '-', 'Copy text', 'Forward…', 'Open in Slack'])
-    // The message keeps its hover fill while its menu is open.
+    // The message takes its faint fill while its menu is open.
     await expect(target).toHaveAttribute('data-popover-active', '')
     await menu.close()
     await expect(target).not.toHaveAttribute('data-popover-active')

@@ -1,0 +1,1 @@
+- 10-23 00:35 · message hover · A message under the pointer has no fill. Only a message whose menu, or the picker the menu turned into, is open takes a faint fill (`--message-menu-open`, renamed from `--message-hover`), so it is clear which message the menu belongs to (owner).
