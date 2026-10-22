@@ -1,13 +1,14 @@
+import { WebSocket } from 'ws'
 import { expect, test, type Page } from '@playwright/test'
-import { startWebShell, type WebShell } from '@juno/desktop/web'
-import type { WebPageHandle } from '@juno/desktop/web/page'
+import { startWebShell, type WebShell } from '../web/host/shell'
+import type { WebPageHandle } from '../web/page/connect'
 
 /**
  * The web shell (`pnpm web`, docs/development.md "Web shell") in Chrome: the
  * real renderer over the engine's WebSocket, with the page's bridge in place
  * of Electron's. Opens Main of a seeded channel, sends, reacts, copies a
  * link through the HTML context menu, and sends again after the socket
- * drops. Opens no gallery page.
+ * drops.
  */
 let shell: WebShell
 
@@ -17,6 +18,7 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   await shell?.stop()
+  if (shell) await expect(fetch(shell.url)).rejects.toThrow()
 })
 
 const connection = (page: Page) => page.evaluate(() => (window as unknown as { __junoWeb?: WebPageHandle }).__junoWeb?.connection())
@@ -66,6 +68,18 @@ test('the web shell reads, sends and reacts through the engine socket', async ({
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toMatch(/\/archives\/C0ENG\b/)
   })
 
+  await test.step('closing a second page leaves the first client working', async () => {
+    const second = await context.newPage()
+    try {
+      await second.goto(shell.url)
+      await expect.poll(() => connection(second), { timeout: 30_000 }).toBe('connected')
+      await expect(second.getByRole('complementary', { name: 'Sidebar' })).toHaveAttribute('aria-busy', 'false')
+    } finally {
+      await second.close()
+    }
+    expect(await connection(page)).toBe('connected')
+  })
+
   await test.step('after the socket drops, the page reconnects and sends again', async () => {
     shell.dropEngineSockets()
     await expect.poll(() => connection(page)).toBe('reconnecting')
@@ -77,4 +91,22 @@ test('the web shell reads, sends and reacts through the engine socket', async ({
     await expect.poll(() => shell.fake.messages('C0ENG').some((each) => each.text === again)).toBe(true)
     await expect(message(again)).not.toHaveAttribute('data-pending', /.*/)
   })
+})
+
+
+test('the host rejects foreign socket origins and files outside the fake', async () => {
+  const address = new URL('/__juno/engine', shell.url)
+  address.protocol = 'ws:'
+  for (const origin of [undefined, 'null', 'not a URL', 'http://example.invalid']) {
+    const opened = await new Promise<boolean>((resolve) => {
+      const socket = new WebSocket(address, { origin, handshakeTimeout: 2000 })
+      socket.once('open', () => { socket.terminate(); resolve(true) })
+      socket.once('error', () => resolve(false))
+    })
+    expect(opened).toBe(false)
+  }
+  const response = await fetch(new URL(`/__juno/download?${new URLSearchParams({ url: 'https://slack.com/', name: 'blocked' })}`, shell.url))
+  expect(response.status).toBe(404)
+  const outside = await fetch(new URL('/@fs/etc/passwd', shell.url))
+  expect(outside.status).toBe(403)
 })

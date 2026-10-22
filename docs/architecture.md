@@ -48,7 +48,7 @@ Three rules:
 
 ### 2.1 Why a utility process (ADR 0001)
 
-`node:sqlite` is synchronous and `client.userBoot` is megabytes of JSON. In main, those stalls freeze native menus, window dragging and every IPC call. In a utility process they stall nothing the user sees, a crash does not take the window down, and the engine stays a Node program that tests can run against `fake-slack` without Electron. The engine only depends on a MessagePort-shaped `Transport`, so it could be hosted in main with no package changes if ever needed.
+`node:sqlite` is synchronous and `client.userBoot` is megabytes of JSON. In main, those stalls freeze native menus, window dragging and every IPC call. In a utility process they stall nothing the user sees, a crash does not take the window down, and the engine stays a Node program that tests can run against `fake-slack` without Electron. The engine accepts a MessagePort-shaped `Transport` or the web shell’s `SocketTransport`, so it could be hosted in main with no package changes if ever needed.
 
 ### 2.2 Network: Electron `net` inside the engine (ADR 0007)
 
@@ -162,7 +162,6 @@ flowchart TD
   desktop --> huddle_views & huddle_media
   gallery[apps/gallery] --> views & ui & tokens & highlight
   gallery -.tests.-> testing[testing]
-  gallery -.tests.-> desktop
   agent_contract[agent-contract] --> agent_cards[agent-cards]
   agent --> agent_memory[agent-memory] & agent_cards & agent_contract & ai_failure
   agent_juno[agent-juno] --> agent_contract & domain & contract
@@ -211,7 +210,7 @@ The bottom block is Juno Agent (section 10, ADR 0012). Its one edge outside the 
 | `@juno/agent-testing` | agent test doubles | the scripted model and compactor, the fake Codex binary, the fake Notion, Littlebird and T3 MCP servers, hostile Slack fixtures and the crash harness (`agent-memory` is a test-only dependency); later the memory simulator | be imported by any `src` |
 | `apps/gallery` | review | browser-only fixture gallery (one state at a time), its screenshot project and its behaviour project, including the layout-shift guard (`pnpm test:gallery`) | Electron |
 
-`testDeps` in a package.json names a devDependency that tests may import and src may not: `engine` uses `state` (the real client against the real server), `slack` uses `fake-slack`, and `gallery` uses `desktop` (the web shell's smoke test).
+`testDeps` in a package.json names a devDependency that tests may import and src may not: `engine` uses `state` (the real client against the real server) and `slack` uses `fake-slack`.
 
 What `check-deps` fails on, beyond the graph (all of it runs in `pnpm lint`):
 

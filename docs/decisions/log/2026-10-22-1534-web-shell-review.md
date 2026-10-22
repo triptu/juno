@@ -1,0 +1,1 @@
+- 10-22 15:34 · web shell · Keep the browser smoke test in the desktop Playwright suite, so the gallery has no desktop dependency and affected keeps its conservative gallery mapping. Restrict host HTTP requests to the fake origin, retain Vite’s host check on the LAN, and install shutdown handling before startup; close engine sockets before Vite stops.

@@ -365,9 +365,6 @@ importers:
         specifier: 19.3.0
         version: 19.3.0(react@19.3.0)
     devDependencies:
-      '@juno/desktop':
-        specifier: workspace:*
-        version: link:../desktop
       '@juno/testing':
         specifier: workspace:*
         version: link:../../packages/testing

@@ -5,10 +5,6 @@
   "private": true,
   "description": "Juno desktop app (Electron shell).",
   "main": "./out/main/index.js",
-  "exports": {
-    "./web": "./web/host/shell.ts",
-    "./web/page": "./web/page/connect.ts"
-  },
   "files": [
     "out"
   ],
