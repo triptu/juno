@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-22 19:05 · emoji search · Add model-written everyday phrases per standard emoji (google/gemini-3.8-flash, about $0.26 once, checked in as scripts/emoji-intent.json; 8 to 15 short lowercase chat phrases for common emoji, 2 to 6 for rare ones, none for flags and keycaps, no names, brands or offensive words, hand overrides win). Phrases match on their words and rank just below whole CLDR words and above CLDR prefixes, so every result that matched before keeps its place.
 - 10-22 18:18 · verification · Reach Start thread with Tab and toolbar arrow keys in the existing background-tab check; mouse hover plus programmatic focus can hide the toolbar before the keyboard action. Keep all background-tab, scroll and focus assertions.
 - 10-22 18:08 · release agent · A `scrollend` that finds the bottom held puts it back only when the rows grew since a scroll last came to rest at the bottom. A scroll down that stops within 32 px of the end, with the rows unchanged, stays where it stopped: pulling it the rest of the way moved the row under a still pointer and hid its hover toolbar (the ⌘-click Start thread test failed on main's full run).
 - 10-22 18:00 · emoji search · Show name matches while the emoji search index warms after paint; append keyword matches to the current cold picker query so existing cells and Enter agree.
