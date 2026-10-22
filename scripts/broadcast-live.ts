@@ -23,7 +23,6 @@
  * values matched. No token, cookie, id, name or message text is printed.
  */
 import { randomUUID } from 'node:crypto'
-import { createRequire } from 'node:module'
 import { readCachedSession } from './live-common.ts'
 
 if (process.env.JUNO_LIVE !== '1') {
@@ -32,9 +31,6 @@ if (process.env.JUNO_LIVE !== '1') {
 }
 
 type Json = Record<string, unknown>
-
-const require = createRequire(new URL('../packages/slack/package.json', import.meta.url))
-const WebSocket = require('ws') as typeof import('ws').WebSocket
 
 const cached = await readCachedSession(process.argv.includes('--team') ? process.argv[process.argv.indexOf('--team') + 1] : undefined)
 if (cached === undefined) {
@@ -86,7 +82,7 @@ const shape = (message: Json | undefined, rootTs: string) =>
 
 const report: Record<string, unknown> = {}
 const frames: Array<Json> = []
-let socket: InstanceType<typeof WebSocket> | undefined
+let socket: WebSocket | undefined
 try {
   const auth = await call('auth.test', {})
   const boot = await call('client.userBoot', { version_all_channels: 'false' })
@@ -105,11 +101,12 @@ try {
     url.searchParams.set('lazy_channels', '1')
     url.searchParams.set('batch_presence_aware', '1')
     if (typeof ws.routing_context === 'string') url.searchParams.set('gateway_server', ws.routing_context)
-    socket = new WebSocket(url.toString(), { headers: { cookie, origin: 'https://app.slack.com' } })
+    // Node's WebSocket (undici) takes upgrade headers in its init object.
+    socket = new WebSocket(url.toString(), { headers: { cookie, origin: 'https://app.slack.com' } } as unknown as string[])
     const hello = new Promise<boolean>((resolve) => {
       const timer = setTimeout(() => resolve(false), 15_000)
-      socket?.on('message', (data) => {
-        const frame = JSON.parse(String(data)) as Json
+      socket?.addEventListener('message', (event) => {
+        const frame = JSON.parse(String(event.data)) as Json
         if (frame.type === 'hello') {
           clearTimeout(timer)
           resolve(true)
