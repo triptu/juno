@@ -57,11 +57,13 @@ export {
   messageWindowSpecAtom,
   openTopic,
   prefetchTopic,
+  reactionsWhoAtom,
   refreshMessages,
   topicAtom,
   topicOfView,
   topicStartKnownAtom,
   topicView,
+  whoReactedAtom,
   type MessageWindow,
   type MessageWindowSpec,
 } from './messages'

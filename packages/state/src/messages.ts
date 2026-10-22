@@ -5,6 +5,11 @@
  * - `messagesAtom(id, window)`: one window of a topic's messages.
  * - `topicAtom(id)`: the header, `TopicDetail | null`.
  * - `channelThreadsAtom(channel)`: Main's active threads.
+ * - `whoReactedAtom(channel, ts)`: everyone who reacted to a message, for
+ *   the "who reacted" dialog. Mount it only while the dialog is open: the
+ *   subscription may fetch the full list from Slack once.
+ * - `reactionsWhoAtom(channel, ts)`: everyone who reacted to one message,
+ *   for the reactions dialog; mounting it may ask Slack for the full list.
  *
  * What a topic tab reads, so the list never shows an empty frame when its
  * window moves (performance 5.3). Both are keyed by a view, `topicView(id,
@@ -31,6 +36,7 @@ import {
   messagesLoadOlder,
   messagesLocate,
   peopleLocate,
+  reactionsWho,
   THREADS_WINDOW_MAX,
   topicsGet,
   topicsOpen,
@@ -57,6 +63,7 @@ export const bottomWindow: MessageWindowSpec = { limit: MESSAGE_WINDOW_DEFAULT }
 const listFamily = liveQuery(messagesList)
 const topicFamily = liveQuery(topicsGet)
 const threadsFamily = liveQuery(channelThreads)
+const whoFamily = liveQuery(reactionsWho)
 
 /** One window of a topic's messages, oldest first. */
 export const messagesAtom = (id: string, window: MessageWindowSpec = bottomWindow) =>
@@ -69,8 +76,16 @@ export const messagesAtom = (id: string, window: MessageWindowSpec = bottomWindo
 /** The topic header. `null` for a topic the store does not know. */
 export const topicAtom = (id: string) => topicFamily({ id })
 
+const whoReactedFamily = liveQuery(reactionsWho)
+
+/** Everyone who reacted to a message (`reactions.who`): `WhoReacted`, or `null` for a message the store does not have. */
+export const whoReactedAtom = (channel: string, ts: string) => whoReactedFamily({ channel, ts })
+
 /** A channel's threads with activity in the quiet window, newest first. `meta.total` is how many there are. */
 export const channelThreadsAtom = (channel: string, limit: number = THREADS_WINDOW_MAX) => threadsFamily({ channel, range: { limit } })
+
+/** Everyone who reacted to one message. `null` for a message the store does not have. */
+export const reactionsWhoAtom = (channel: string, ts: string) => whoFamily({ channel, ts })
 
 /** Every thread the store knows in a channel, open ones first, then the resolved ones: the header's topic switcher. */
 export const channelTopicsAtom = (channel: string) => threadsFamily({ channel, all: true, range: { limit: THREADS_WINDOW_MAX } })
