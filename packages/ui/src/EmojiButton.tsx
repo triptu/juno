@@ -30,6 +30,7 @@ export interface EmojiButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEl
  * left of centre.
  */
 export function EmojiButton({ emoji, src, label, noTooltip = false, type = 'button', ...rest }: EmojiButtonProps) {
+  'use no memo' // Shown only in the one toolbar on screen; the compiler's cache would only add bytes to the start bundle.
   return (
     <button
       type={type}
