@@ -8,7 +8,7 @@ import { interactive } from './internal/interactive'
 import { tintColors, type IconTint } from './internal/tint'
 import { tooltip } from './Tooltip'
 
-export type IconButtonSize = 20 | 22 | 26 | 28 | 30 | 32 | 36
+export type IconButtonSize = 20 | 22 | 24 | 26 | 28 | 30 | 32 | 36
 export type IconButtonRadius = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full'
 /** `island`: a control in a page header's island (inventory 5), with the island's own hover and pressed fills. */
 export type IconButtonVariant = 'ghost' | 'secondary' | 'primary' | 'raised' | 'island'
@@ -49,10 +49,11 @@ export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEle
 // StyleX cannot read constants from other modules.
 const HOVER = '@media (hover: hover)'
 
-// The 28px button is the hover-toolbar button: 12 inside the toolbar's 16.
+// The 24px button is the hover-toolbar button: round, inside the toolbar's pill.
 const radiusBySize: Record<IconButtonSize, IconButtonRadius> = {
   20: 'xs',
   22: 'xs',
+  24: 'full',
   26: 'md',
   28: 'xl',
   30: 'lg',
@@ -68,6 +69,7 @@ const smallSizes: ReadonlySet<IconButtonSize> = new Set([20, 22])
 const iconBySize: Record<IconButtonSize, IconSize> = {
   20: 12,
   22: 12,
+  24: 15,
   26: 13,
   28: 18,
   30: 18,
@@ -213,6 +215,7 @@ const styles = stylex.create({
 const sizeStyles = stylex.create({
   20: { width: sizes['--control-20'], height: sizes['--control-20'] },
   22: { width: sizes['--control-22'], height: sizes['--control-22'] },
+  24: { width: sizes['--control-24'], height: sizes['--control-24'] },
   26: { width: sizes['--control-26'], height: sizes['--control-26'] },
   28: { width: sizes['--control-28'], height: sizes['--control-28'] },
   30: { width: sizes['--control-30'], height: sizes['--control-30'] },

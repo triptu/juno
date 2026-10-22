@@ -84,7 +84,8 @@ export default defineFixtures(IconButton, {
         <IconButton icon={X} label="Close" size={20} />
         <IconButton icon={X} label="Dismiss" size={22} radius="sm" />
         <IconButton icon={X} label="Remove rule" size={26} iconSize={13} tone="muted" />
-        <IconButton icon={Smiley} label="More reactions" size={28} />
+        <IconButton icon={Smiley} label="More reactions" size={24} />
+        <IconButton icon={Plus} label="New tab" size={28} iconSize={16} />
         <IconButton icon={Moon} label="Toggle theme" size={30} />
         <IconButton icon={Bell} label="Subscribe" size={32} />
         <IconButton icon={DotsThree} label="More" size={32} iconWeight="bold" />
