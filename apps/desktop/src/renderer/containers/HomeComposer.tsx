@@ -1,3 +1,4 @@
+import { chunk, usePreloaded } from './chunks'
 import { memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { encodeMentions, type PickConversation, type PickConversations } from '@juno/contract'
 import {
@@ -18,7 +19,7 @@ import {
 } from '@juno/state'
 import { junoNavAtom, junoReadsImagesAtom } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
-import { AttachmentNote, Composer, destinationLabel, holdKeys, notSentText, releaseKeys, SendToList, sendToRowId, type ComposerMention } from '@juno/views'
+import { AttachmentNote, Composer, destinationLabel, holdKeys, notSentText, releaseKeys, sendToRowId, type ComposerMention } from '@juno/views'
 import { takeAttachments, useAttachments } from './attachments'
 import { useComposerMarkup } from './composerMarkup'
 import { useFocusOnShow, useFocusRequest } from './homeFocus'
@@ -27,10 +28,14 @@ import { WriteTop } from './homeWriteTop'
 import { junoCommands } from './juno/actions'
 import { chatMentions } from './juno/chatMentions'
 import { leaveComposer, takeForJuno, useJunoFiles } from './juno/junoFiles'
+
 import { useMentions } from './mentions'
 import { openJuno, openTopicInBackground } from './navigation'
 import { useHeld } from './pickerRows'
 import type { Destination } from './sendChecks'
+
+const sendToPanel = chunk(() => import('./SendToListPanel'))
+const SendToList = sendToPanel.component((module) => module.SendToList)
 
 /** A key typed on the chip goes into the field, as a token field does, and focus stays there. */
 function typeIn(field: HTMLTextAreaElement | null, text: string): void {
@@ -292,7 +297,8 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
   useFocusOnShow(inputRef, focusField)
 
   const { sending, send } = useSend(tabId, files.files.length > 0, junoOn, destination.openList)
-  const sendToList = sendToMention(sendTo, listId)
+  const sendToReady = usePreloaded(sendToPanel, sendTo.open)
+  const sendToList = sendToReady ? sendToMention(sendTo, listId) : undefined
   const checks = useHomeSendChecks(draft.draft, sendTarget(draft), (body, to) => void send(body, to), draft.conversation)
 
   const mentions = useMentions({

@@ -3,6 +3,7 @@ import type { PickConversation } from '@juno/contract'
 import { colors, layout, spacing, z } from '@juno/tokens/tokens.stylex'
 import { Kbd, OptionGroupLabel, OptionList, OptionRow, Surface, Text } from '@juno/ui'
 import { DestinationMark } from './DestinationMark'
+import { destinationLabel, sendToRowId } from './homeDestination'
 
 /**
  * Home's writing block (SPEC section 12, "Writing"): the destination chip,
@@ -10,10 +11,6 @@ import { DestinationMark } from './DestinationMark'
  * container puts `HomeWriteTop` in the composer's `above` slot and
  * `SendToList` in its suggestions slot.
  */
-
-const isChannel = (conversation: PickConversation) => conversation.kind === 'public' || conversation.kind === 'private'
-/** "#eng" or "Maya Chen": as the chip and the list's footer name it. */
-export const destinationLabel = (conversation: PickConversation): string => (isChannel(conversation) ? `#${conversation.name}` : conversation.name)
 
 export interface SendToListProps {
   /** People for a first @, channels for a first #. */
@@ -25,9 +22,6 @@ export interface SendToListProps {
   readonly onActivate: (key: string) => void
   readonly onPick: (key: string) => void
 }
-
-/** A row's element id in `SendToList`, for `aria-activedescendant`. */
-export const sendToRowId = (listId: string, key: string) => `${listId}-${key}`
 
 /**
  * The rows a first @ or # opens while Juno is chosen. It suggests and never
