@@ -60,6 +60,7 @@ module reactors {
   val preservesConcurrentWrite = s.label == "superseded" implies s.known == s.priorKnown and s.count == s.priorCount
   val pageDropsUnprovenNames = s.label == "page" implies s.known.subseteq(s.server)
   val sharedRequest = s.label == "join" implies s.calls == s.priorCalls
+  val reachedAgreement = not(s.pending) and s.known == s.server
   val invariants = preservesConcurrentWrite and pageDropsUnprovenNames and sharedRequest
   action simulationStep = all {
     any { request, finish, add, remove, swapUnseen, page },
