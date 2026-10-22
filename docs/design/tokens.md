@@ -648,7 +648,7 @@ Floating surfaces have `border: 1px solid transparent` plus the shadow, never a 
 
 ## 8. Motion
 
-Buttons, toggles, menus and popovers answer at once. Buttons have no press motion or toggle spring. Toasts and empty states may enter with motion. Every duration and curve is a token; none is written in a component.
+Buttons, toggles, menus and popovers answer at once. Buttons have no press motion or toggle spring. Toasts and empty states may enter with motion. Motion that shows a change from elsewhere in place is welcome (sidebar rows sliding when someone else's message reorders them); the user's own actions never animate. Every duration and curve is a token; none is written in a component.
 
 | Token | Value | Use |
 | --- | --- | --- |
@@ -657,7 +657,8 @@ Buttons, toggles, menus and popovers answer at once. Buttons have no press motio
 | `--delay-pending` | 800ms | How long a send may take before its pending row dims |
 | `--stagger` | 80ms | Between the parts of an empty state as they enter |
 | `--duration-pulse` | 2400ms | One breath of an incoming huddle's glow (huddles 10-20), read from the root by its Web Animation. Not shortened for reduced motion: the card does not start the pulse there |
-| `--ease-out` | `cubic-bezier(0.2, 0, 0, 1)` | Non-button entrances and exits |
+| `--ease-out` | `cubic-bezier(0.2, 0, 0, 1)` | Non-button entrances and exits, and sidebar rows sliding to new places |
+| `--duration-reorder` | 220ms | Sidebar rows sliding to their new places when a change from elsewhere reorders the list at its top (SPEC 5, "Letting go"); 0 under reduced motion |
 | `--rise-toast`, `--rise-stagger` | 8px, 6px | How far a toast and an empty-state part rise as they enter |
 | `--duration-gather`, `--duration-settle` | 600ms, 900ms | The sign-in page's entrance, once: the mark's dots gather into the j; the pebbles fade in and settle |
 | `--rise-settle` | 6px | How far a sign-in pebble settles as it enters |

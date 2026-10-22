@@ -790,7 +790,9 @@ export const text = stylex.defineVars({
  * it (a reaction landing, a toggle filling, a resolve check). Menus and
  * popovers enter in 80ms; other entrances are 240ms, exits 150ms, pops
  * 220ms; rows, tabs and typing never animate, except a tab being dragged,
- * whose neighbours slide aside over --duration-fast.
+ * whose neighbours slide aside over --duration-fast, and sidebar rows that
+ * news from elsewhere reorders at the top, which slide over
+ * --duration-reorder.
  *
  * Reduced motion collapses every duration, the scales and the distances
  * through the token itself, so components use these without a media query.
@@ -813,6 +815,12 @@ export const motion = stylex.defineVars({
     [REDUCED_MOTION]: '0ms',
   },
   '--ease-out': 'cubic-bezier(0.2, 0, 0, 1)',
+  // Sidebar rows moving to their new places when activity from elsewhere
+  // reorders the list at the top (SPEC 5, "Holding the order").
+  '--duration-reorder': {
+    default: '220ms',
+    [REDUCED_MOTION]: '0.01ms',
+  },
   // One breath of the incoming huddle's pulse. Reduced motion stops the pulse instead.
   '--duration-pulse': '2400ms',
   // Entrances: the toast rises 8px, each part of an empty state rises 6px.
