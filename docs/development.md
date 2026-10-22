@@ -47,6 +47,7 @@ Run these from the repo root.
 | `pnpm test:gallery` | Builds the gallery and runs only its behaviour tests (mouse-down activation, cursor rule, state switcher, layout-shift guard). |
 | `pnpm test:feel` | Builds, then records the feel suite against the fake Slack: slow-motion videos, filmstrips and frame checks in `apps/desktop/feel-report/`. See "The feel suite". |
 | `pnpm gallery` | Starts the fixture gallery at http://localhost:4174 (browser only, no Electron). |
+| `pnpm web` | Starts the web shell: the real app in a browser against a fake Slack, for UI-only work. No build, no Electron. `--host` listens on the LAN. See "Web shell". |
 | `pnpm gallery:shots` | Builds the gallery and screenshots every state in light and dark into `apps/gallery/shots/<Component>/<group>/<state>-<theme>.png`. |
 | `pnpm specs:check` | Checks every Quint spec in `specs/`, including the broken and corrected pairs for Juno Agent. Runs simulations three at a time, the Apalache checks on one shared server, and skips checks that passed before with the same inputs (see "Faster test runs"). `--memory`, `--actions` or `--recovery` selects one agent spec. See `specs/README.md`. |
 | `pnpm specs:conformance` | Generates Quint traces of `specs/outbox.qnt` and replays them against the engine and the fake Slack (`specs/README.md`, "Conformance"). About 30 s on a remote machine when its traces are cached. |
@@ -657,6 +658,30 @@ The guard and the focus-ring check walk many states on one page, and a state cha
 The 10-18 shift-walk hang looked like a close stuck in `pages.close()`, but a repeat of the RemoveCard states failed 20 of 20 walks at `remove/click-then-working`: pressing the last control makes the card working and disables that control, then the guard's keyboard-focus action on it waited until the test deadline. When Playwright aborted the test, context cleanup saw an already closed browser. Closing the page before the context did not fix that action. The guard now checks focus and blur before press and release, while the control is still interactive, and gives each state 30 s to finish. `walkPages()` closes the page with `runBeforeUnload: false` before closing its context, bounds each close at 5 s, and closes the worker browser with a clear failure if the context cannot close. This keeps a stuck context from silently retaining a renderer across rollovers.
 
 After the change, two full remote gallery runs in a row passed all 305 tests: 178 s with 13.0 GB peak used and 2.7 GB available, then 171 s with 12.8 GB peak used and 2.8 GB available. Both used the standard 8x16 machine and 24 gallery workers. The focused RemoveCard walk also passed three repeats at 24 workers after the interaction order changed.
+
+## Web shell
+
+`pnpm web` runs the real renderer in a browser, for UI-only work, with no build and no Electron. One Node process holds three things:
+
+- a fake Slack with the default seed the e2e and feel tests use;
+- the engine on a fresh temporary data folder, already signed in to the fake;
+- Vite in dev mode (HMR) serving the renderer.
+
+The page reaches the engine over a WebSocket that carries the same `effect/rpc` routes as the Electron port. It answers `window.juno` itself (`apps/desktop/web/page/bridge.ts`). The command prints one line with the app's address and the fake Slack's control API. Post to `<control>/<name>` to send messages, reactions and socket events while you look at the page; the controls are listed in `packages/fake-slack/README.md`.
+
+- **Ports.** Each worktree gets its own port, derived from its path like the gallery's, so two worktrees never clash. `JUNO_WEB_PORT` overrides it. The shell listens on 127.0.0.1; `--host` listens on the LAN, and the fake Slack stays on this Mac.
+- **Stopping.** Ctrl-C stops everything and deletes the data folder. So does the end of the process that started it. Each shell holds a few hundred MB, so stop it when you are done.
+- **Code.** `apps/desktop/web`: `host/` runs in Node, `page/` in the browser. The socket transport is `packages/state/src/socket.ts` and `packages/engine/src/protocol/socket.ts`. Nothing in `apps/desktop/src` imports the shell (`check-deps`), so it never reaches the Electron app.
+- **Test.** `apps/gallery/web-shell.spec.ts` starts the shell in-process and checks in Chrome that a channel's Main reads, a message sends, a reaction lands, a context menu item works and the page reconnects after the socket drops. `pnpm affected` runs it when the shell, the socket transport or the engine changes.
+
+What it cannot do:
+
+- Native menus and window chrome. Context menus are a plain HTML list. App-menu shortcuts work only where the browser does not keep the key for itself.
+- Huddles, the Juno Agent's providers and Codex, notifications, the web panel, Quick Look, folder pickers, Open in Slack and updates. These answer "unavailable" or do nothing.
+- Files from anywhere but the fake Slack. Other images show a grey placeholder.
+- Perf and feel numbers. It is a dev build with React in development mode and no Content Security Policy, so those come from Electron only (`pnpm perf`, `pnpm test:feel`).
+
+Desktop e2e on Electron stays the merge gate.
 
 ## The feel suite
 
