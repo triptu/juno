@@ -180,8 +180,16 @@ export function useScrollRelease(scrollRef: Scroller, pinnedRef: RefObject<boole
     const rest = scrollRest(scroller, SETTLE_MS)
     const onScroll = () => {
       rest.onScroll()
-      if (!pinnedRef.current) return
       const top = scroller.scrollTop
+      // The owner's scroll reached the end: hold it now, not when the scroll ends, which a held scrollbar thumb or
+      // fingers resting on the trackpad put off while a bubble arrives.
+      if (!pinnedRef.current && !pageRef.current.moreBelow && distanceFromBottom(scroller) <= 1) {
+        pinnedRef.current = true
+        bottomTop = top
+        heldTops.set(scroller, top)
+        return
+      }
+      if (!pinnedRef.current) return
       if (top < bottomTop - 1 && distanceFromBottom(scroller) > 1) pinnedRef.current = false
       else bottomTop = top
     }
