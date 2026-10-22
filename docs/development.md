@@ -1357,8 +1357,9 @@ following `.claude/skills/do-release/SKILL.md`, which also covers the update tok
 `pnpm release:scheduled --dry-run` to inspect the current refs, records and
 GitHub release without fetching, building, committing or publishing.
 
-The command fetches `origin/main` and chooses its newest commit covered by an
-eligible full run. There is no minimum gap between releases. It does nothing if that source is
+The command fetches `origin/main` and searches its full ancestry, newest descendants
+first, for a commit covered by an eligible full run. A verified source remains
+eligible when it enters main through a merge's second parent. There is no minimum gap between releases. It does nothing if that source is
 already released or there are no user-facing changes. It refuses
 to release an ancestor of the last released source. GitHub release metadata
 records both the source and build commits; older releases use their
@@ -1370,6 +1371,9 @@ lock, and the packaged smoke with `JUNO_E2E_AI_JOBS=1`. Packaging uses release
 priority when the installed heavy lock supports it. Notes use commit subjects
 since the last release, omit test and merge maintenance, and group changes by
 area. Keep product commit subjects plain enough to read as release notes.
+Pass `--notes <file>` to use reviewed changelog lines instead; the dry run shows
+those same lines. This does not bypass the full-run gate or the check for
+user-facing changes.
 
 The command uses the existing `gh` login and requires `JUNO_UPDATE_TOKEN` in its
 environment. Supply it through the existing secure release setup, never in a

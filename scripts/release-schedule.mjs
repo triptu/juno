@@ -3,7 +3,7 @@ import { assessRecord, compatible, git, isAncestor } from './release-gate.mjs'
 export function selectCommit(root, tip, records) {
   const eligible = records.filter((record) => assessRecord(record) && isAncestor(root, record.commit, tip))
   if (!eligible.length) return null
-  for (const commit of git(root, 'rev-list', '--first-parent', tip).split('\n')) {
+  for (const commit of git(root, 'rev-list', '--topo-order', tip).split('\n')) {
     const record = eligible.find((entry) => compatible(root, entry.commit, commit))
     if (record) return commit
   }
@@ -20,6 +20,7 @@ export function releaseDue({ candidate, previous }) {
 export function releaseNotes(subjects) {
   const areas = new Map()
   for (const raw of subjects) {
+    if (!raw.trim()) continue
     const subject = raw.replace(/^(fix|feat|perf)(\([^)]*\))?:\s*/i, '')
     if (/^(Merge |Release \d|Set version to \d|Revert |test[(: ]|docs?[(: ]|chore[(: ]|ci[(: ]|build[(: ])/i.test(raw)
       || /\b(test|tests|spec|specs|coverage|fixture|fixtures|quint|lint|typecheck|worktree|keeper)\b/i.test(subject)) continue

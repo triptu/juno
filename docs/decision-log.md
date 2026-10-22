@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-22 13:02 · release · Search all of main's ancestors for verified release sources, including second parents; accept reviewed notes without bypassing either release gate.
 - 10-22 12:47 · Review · Use the user's quick reactions while the engine's frequent emoji query is pending or fails. Keep the picker's existing first-painted slots until it closes. Tushar requested the fallback from the reviewed picker behavior.
 - 10-22 12:37 · Implementation · Rank the picker's Frequently used in the engine: local picks first, cached Slack emoji_use counts next, quick reactions last, at most 18 without repeated emoji. Resolve aliases and combine skin-tone counts as Slack's bundle does; skip unknown and deleted names. Keep local recency separate for composer suggestions. Reuse startup prefs and socket invalidation instead of adding a Slack call or overwriting local choices. Tushar requested this order.
 - 10-22 12:27 · palette-stable-results · Both ⌘K tabs retain the last rendered answer, including "No matches." and delayed Slack or command rows, until the next local answer arrives. The displayed answer's readiness is separate from the current input's loading state. Clearing selects the warm empty-query state immediately; answers from older edits cannot replace newer results. The search divider appears only with a body.

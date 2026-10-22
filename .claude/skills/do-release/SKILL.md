@@ -23,7 +23,7 @@ Run these from a Juno checkout with dependencies installed (not the main checkou
    JUNO_UPDATE_TOKEN="$(security find-generic-password -w -s juno-update-token -a juno)" pnpm release:scheduled
    ```
 
-   It picks the commit, bumps the patch version in a scratch worktree, packages through the heavy lock, runs the packaged smoke (`test:package`), uploads, writes `CHANGELOG.md` in the releases repository and pushes a `Set version to x.y.z after release` commit to main. There is no minimum gap between releases. It refuses if nothing user-facing changed; tell Tushar that rather than working around it.
+   It picks the commit, bumps the patch version in a scratch worktree, packages through the heavy lock, runs the packaged smoke (`test:package`), uploads, writes `CHANGELOG.md` in the releases repository and pushes a `Set version to x.y.z after release` commit to main. Add `--notes <file>` to use reviewed changelog lines; use the same flag on the dry run to inspect them first. There is no minimum gap between releases. It refuses if nothing user-facing changed; tell Tushar that rather than working around it.
 4. **Check.** `gh release view v<version> --repo triptu/juno-releases` shows the DMG, its block map and `latest-mac.yml`, marked latest. `git log origin/main -1` shows the version commit.
 5. **Report** the version, the source commit, the changelog lines and whether it was urgent.
 
@@ -38,6 +38,6 @@ If a step fails after the upload, rerun the same command: it finishes only the m
 - **Never print the token.** Pass it only through the inline `$(security …)` above. Never echo it, write it to a file, or put it in a log, commit or prompt.
 - **Releases are unsigned.** This Mac has no Developer ID identity, so do not set `JUNO_RELEASE=1`. Installs update by downloading the DMG. Signing needs credentials only Tushar has ("What the owner provides").
 - **The releases repository holds only releases and `CHANGELOG.md`.** Every install can read it with the shipped token (ADR 0016). Never push code, notes, logs or anything else there.
-- **Changelog lines are for the person using Juno**: plain, short, SPEC section 17 style. `release:scheduled` writes them from commit subjects; with `release:publish --notes`, write them yourself.
+- **Changelog lines are for the person using Juno**: plain, short, SPEC section 17 style. `release:scheduled` writes them from commit subjects by default; `release:scheduled --notes <file>` and `release:publish --notes <file>` use lines you write yourself.
 - **Versions only go up.** Never delete or replace a published stable release. A `--prerelease` test upload may be deleted afterwards with `gh release delete v<version> --repo triptu/juno-releases --cleanup-tag --yes`.
 - One remote run at a time, and stop only your own processes.
