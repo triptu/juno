@@ -1,0 +1,1 @@
+- 10-22 06:08 · Release agent · Restore the surrounding eager rows when a scroll ends on skipped content. Laying out only the landing row let nearby row heights move it 201 px after scrollend on this Mac. Keep the synchronous commit and visibility guard.

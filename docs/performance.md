@@ -283,7 +283,8 @@ Menu and popover buttons use `menuTriggerHandlers` in `@juno/ui`: primary mouse 
 
 ### 4.5 Scroll restoration
 
-- Each tab records `{ anchorKey, offset }` on `scrollend` (debounced by the browser) and again just before another tab replaces it. The second record is the one that counts after a jump: the rows a jump brings near the view reach their real height frames after `scrollend`, and Chromium does not always anchor that change, so the rows on screen move after the first record. Restoring uses the anchor row's position after mount, before the first paint.
+- Each tab records `{ anchorKey, offset }` on `scrollend` and immediately before leaving the tab. Record the first row whose top is in view, or the row spanning the view if it is taller. Restore that row's offset in a layout effect before the first paint.
+- A scroll that ends away from the bottom holds that row. If its content is still at its size estimate, lay out the surrounding window of rows in a synchronous `scrollend` commit and restore the pin before paint. Drawing only the landing row lets nearby height changes move it later. Rows already laid out only get the pin.
 - Window resize keeps the anchor row in place (Chromium's anchoring does this for in-flow lists).
 - Sidebar scroll position survives filter changes only when the filter result contains the anchor row; otherwise the list starts at the top.
 

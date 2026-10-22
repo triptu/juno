@@ -127,16 +127,15 @@ export function hold(scroller: HTMLElement, pin: RefObject<Pin | undefined>, pin
  * The rows laid out in full rather than at their size estimate, so the
  * position set before the first paint is where they end up: a window's
  * worth around the open position, a window's worth around
- * the row held during a source jump or an older page (`heldAt`), the last window's worth,
- * where new messages arrive and the bottom is held, and the row a scroll landed on while it was
- * still at its estimate (`landedAt`), so Chromium anchors on it as the rows around it grow. A page row drawn at its
+ * the row held during a source jump or an older page (`heldAt`), and the last window's worth,
+ * where new messages arrive and the bottom is held. A page row drawn at its
  * estimate between the top of the view and the held row would grow a frame
  * later and move what is on screen; the page's rows are new, so laying them
  * out in full moves nothing. Everywhere else the browser's scroll anchoring
  * absorbs rows growing as they come into view.
  */
-export function eagerRows(order: ReadonlyArray<string>, openAt: number, heldAt: number, rows: number, landedAt?: string): ReadonlySet<string> {
-  const eager = new Set<string>(landedAt === undefined ? [] : [landedAt])
+export function eagerRows(order: ReadonlyArray<string>, openAt: number, heldAt: number, rows: number): ReadonlySet<string> {
+  const eager = new Set<string>()
   for (let i = Math.max(0, openAt - rows); i < Math.min(order.length, openAt + rows); i++) eager.add(order[i]!)
   for (let i = Math.max(0, heldAt - rows); heldAt >= 0 && i < Math.min(order.length, heldAt + rows); i++) eager.add(order[i]!)
   for (let i = Math.max(0, order.length - rows); i < order.length; i++) eager.add(order[i]!)

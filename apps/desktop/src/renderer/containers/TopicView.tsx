@@ -191,7 +191,7 @@ function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps)
   const from = position.drawnAll ? 0 : Math.max(0, openAt - rows)
   const shown = from === 0 ? items : items.slice(from)
   const held = flash?.ts ?? position.heldAt
-  const eager = eagerRows(list.order, openAt, held === undefined ? -1 : list.order.indexOf(held), rows, position.landedAt)
+  const eager = eagerRows(list.order, openAt, held === undefined ? -1 : list.order.indexOf(held), rows)
   const pill = newMessages(position, list)
   const messages = (
     <MessageList
