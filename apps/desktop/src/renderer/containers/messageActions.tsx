@@ -146,13 +146,13 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
                   setEditing(undefined)
                   composer.current?.focus()
                 }}
-                onSave={() => {
+                onSave={(encoded) => {
                   const message = rowMessage(editing.ts)
                   if (message === undefined || editing.savedRev !== undefined || editing.text.trim() === '') return
                   composer.current?.focus()
                   if (editing.text === message.editText) return setEditing(undefined)
                   setEditing({ ...editing, savedRev: message.rev })
-                  void editMessage(registry, refOf(channel, message), editing.text).then((exit) => {
+                  void editMessage(registry, refOf(channel, message), encoded).then((exit) => {
                     if (exit._tag === 'Failure') setEditing(undefined)
                   })
                 }}

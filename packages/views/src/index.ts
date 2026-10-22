@@ -8,7 +8,7 @@ export { AttachmentChips, type AttachmentChipsProps } from './AttachmentChips'
 export { AttachmentNote } from './AttachmentNote'
 
 export { AudienceWarning } from './AudienceWarning'
-export { Composer, type ComposerMention, type ComposerPopover } from './Composer'
+export { Composer, type ComposerMention, type ComposerPaste, type ComposerPopover } from './Composer'
 export { LinkEditor } from './LinkEditor'
 export { MentionSuggestions, type EmojiSuggestion } from './MentionSuggestions'
 export { mentionRowId } from './mentionRowId'

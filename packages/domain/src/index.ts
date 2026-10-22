@@ -31,6 +31,8 @@ export { workspaceEmoji, emojiCatalog, UNKNOWN_PERSON, type EmojiCategory } from
 export { markupLayout, toggleMarkup, type MarkupLayout, type MarkupStyle } from '@juno/richtext'
 // A Markdown file as a body, for the media viewer's text items, for the renderer through @juno/contract.
 export { bodyFromMarkdown, tableText } from '@juno/richtext'
+// Rich clipboard HTML as composer text and linked-word ranges.
+export { clipboardHtml } from '@juno/richtext'
 export * from './composer-mentions'
 export * from './composer-emoji'
 export * from './composer-links'

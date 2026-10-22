@@ -1,7 +1,7 @@
 import { preloadAfterSidebar } from './preloadAfterSidebar'
 import { chunk, usePreloaded } from './chunks'
 import { memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { encodeMentions, type PickConversation, type PickConversations } from '@juno/contract'
+import { encodeDraft, moveLinks, type PickConversation, type PickConversations } from '@juno/contract'
 import {
   attachmentsAtom,
   emptyHomeDraft,
@@ -23,6 +23,7 @@ import { useAtomValue } from '@juno/state/react'
 import { AttachmentNote, Composer, destinationLabel, holdKeys, notSentText, releaseKeys, sendToRowId, type ComposerMention } from '@juno/views'
 import { takeAttachments, useAttachments } from './attachments'
 import { useComposerMarkup } from './composerMarkup'
+import { useComposerLinks } from './composerLinks'
 import { useFocusOnShow, useFocusRequest } from './homeFocus'
 import { useHomeSendChecks } from './homeSendChecks'
 import { WriteTop } from './homeWriteTop'
@@ -199,7 +200,8 @@ async function deliver(tabId: string, body: string, to: Destination, junoOn: boo
   const startsThread = target.kind === 'channel' && target.threadTs === undefined && current.conversation?.kind !== 'im'
   // The field empties at once, as a topic's does, so what is typed while the send waits (a DM to open) is kept.
   setHomeDraft(registry, tabId, emptyHomeDraft)
-  const exit = await sendMessage(registry, target, encodeMentions(body, current.mentions), undefined, attached.ids, startsThread)
+  const sentLinks = body === current.draft ? current.links ?? [] : moveLinks(current.draft, body, current.links ?? [])
+  const exit = await sendMessage(registry, target, encodeDraft(body, current.mentions, sentLinks), undefined, attached.ids, startsThread)
   if (exit._tag === 'Success') {
     // The topic opens in a tab behind Home, right after it, unless a tab shows it already; Home stays active (SPEC 12).
     openTopicInBackground(exit.value.topicId, { after: tabId, unlessShown: true })
@@ -228,7 +230,7 @@ export function useDestination(tabId: string, focusField: () => void) {
   }
   const choose = (conversation: PickConversation | undefined, clearText = false) => {
     const current = registry.get(homeDraftAtom(tabId))
-    setHomeDraft(registry, tabId, clearText ? { ...pickConversation(current, conversation), draft: '', mentions: [] } : pickConversation(current, conversation))
+    setHomeDraft(registry, tabId, clearText ? { ...pickConversation(current, conversation), draft: '', mentions: [], links: [] } : pickConversation(current, conversation))
     setOpen(false)
     setQuery('')
     focusField()
@@ -263,6 +265,26 @@ function useHomeFiles(tabId: string, toJuno: boolean) {
 
 export interface HomeComposerProps {
   readonly tabId: string
+}
+
+function homeFieldKey(
+  event: KeyboardEvent<HTMLTextAreaElement>,
+  sendTo: ReturnType<typeof useSendTo>,
+  destination: ReturnType<typeof useDestination>,
+  markup: ReturnType<typeof useComposerMarkup>,
+  marks: ReadonlyArray<{ readonly start: number; readonly end: number }>,
+  toSlack: boolean,
+): boolean {
+  if (event.nativeEvent.isComposing) return false
+  if (sendTo.onKey(event)) return true
+  // A held Backspace that just cleared the text keeps the destination; only a new press goes back to Juno.
+  if (event.key === 'Backspace' && toSlack && event.currentTarget.value === '' && !event.metaKey && !event.repeat) {
+    event.preventDefault()
+    destination.choose(undefined)
+    return true
+  }
+  if (markup.onKey(event, marks)) return true
+  return false
 }
 
 /**
@@ -302,11 +324,22 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
   const sendToList = sendToReady ? sendToMention(sendTo, listId) : undefined
   const checks = useHomeSendChecks(draft.draft, sendTarget(draft), (body, to) => void send(body, to), draft.conversation)
 
+  const links = useComposerLinks({
+    field: inputRef,
+    initialText: draft.draft,
+    initial: draft.links ?? [],
+    onChange: (text) => set({ ...latest(), draft: text, links: links.current() }),
+  })
+  useLayoutEffect(() => links.reset(draft.draft, draft.links ?? []), [draft.draft, draft.links, links])
+
   const mentions = useMentions({
     text: draft.draft,
     picks: draft.mentions,
     onPicks: (picks) => set({ ...latest(), mentions: picks }),
-    onChange: (text) => set({ ...latest(), draft: text }),
+    onChange: (text) => {
+      links.moved(text)
+      set({ ...latest(), draft: text, links: links.current() })
+    },
     field: inputRef,
     place: { channel: draft.conversation?.channelId, threadTs: draft.thread?.rootTs },
     // A first @ or # with Juno chosen is the "Send to" list's (SPEC 12).
@@ -314,25 +347,14 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
   })
   const toSlack = draft.conversation !== undefined
   const markup = useComposerMarkup(toSlack)
-
-  const onFieldKey = (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
-    if (event.nativeEvent.isComposing) return false
-    if (sendTo.onKey(event)) return true
-    // A held Backspace that just cleared the text keeps the destination; only a new press goes back to Juno.
-    if (event.key === 'Backspace' && toSlack && event.currentTarget.value === '' && !event.metaKey && !event.repeat) {
-      event.preventDefault()
-      destination.choose(undefined)
-      return true
-    }
-    if (markup.onKey(event, mentions.marks)) return true
-    return mentions.onFieldKey(event)
-  }
+  const linkMarks = links.shown(draft.draft, draft.mentions).map((link) => ({ start: link.start, end: link.end, look: 'link' as const }))
+  const marks = [...mentions.marks.filter((mark) => !linkMarks.some((link) => mark.start < link.end && mark.end > link.start)), ...linkMarks].toSorted((left, right) => left.start - right.start)
 
   return (
     <Composer
       value={draft.draft}
-      marks={mentions.marks}
-      {...markup.format(draft.draft, mentions.marks)}
+      marks={marks}
+      {...markup.format(draft.draft, marks)}
       onCaret={mentions.onCaret}
       {...(mentions.mention === undefined ? {} : { mention: mentions.mention })}
       {...(sendToList === undefined ? {} : { mention: sendToList })}
@@ -340,7 +362,8 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
         sendTo.typed(value)
         mentions.onChange(value, caret)
       }}
-      onFieldKey={onFieldKey}
+      onFieldKey={(event) => homeFieldKey(event, sendTo, destination, markup, marks, toSlack) || mentions.onFieldKey(event)}
+      onPasteText={toSlack ? links.onPasteText : undefined}
       onSend={() => {
         if (!sending && !files.files.some((file) => file.state === 'staging')) checks.send()
       }}

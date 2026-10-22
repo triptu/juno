@@ -65,12 +65,18 @@ export interface ComposerProps {
   readonly onFieldKey?: (event: KeyboardEvent<HTMLTextAreaElement>) => boolean
   /** The caret moved without the text changing: a click or an arrow key. */
   readonly onCaret?: (caret: number) => void
-  /** A paste with text and no files; true when the owner took it (a URL over selected words). */
-  readonly onPasteText?: (text: string, field: HTMLTextAreaElement) => boolean
+  /** A paste with text and no files; true when the owner inserted it itself. */
+  readonly onPasteText?: (paste: ComposerPaste, field: HTMLTextAreaElement) => boolean
   /** A click in the field, after the caret moved to it: ⌘-click opens a link. */
   readonly onFieldClick?: (event: MouseEvent<HTMLTextAreaElement>) => void
   /** The link editor, while it is open. */
   readonly popover?: ComposerPopover
+}
+
+/** The useful text flavors a clipboard paste exposes to a textarea. */
+export interface ComposerPaste {
+  readonly plain: string
+  readonly html: string
 }
 
 /** The field's side of the @ and # suggestions: chips, the caret, the list's anchor and its ARIA wiring. */
@@ -96,8 +102,8 @@ export function transfers(onFiles: ComposerProps['onFiles'], onPasteText: Compos
   const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
     const files = Array.from(event.clipboardData.files)
     if (files.length === 0 || onFiles === undefined) {
-      const pasted = event.clipboardData.getData('text/plain')
-      if (files.length === 0 && pasted !== '' && onPasteText?.(pasted, event.currentTarget) === true) event.preventDefault()
+      const pasted = { plain: event.clipboardData.getData('text/plain'), html: event.clipboardData.getData('text/html') }
+      if (files.length === 0 && (pasted.plain !== '' || pasted.html !== '') && onPasteText?.(pasted, event.currentTarget) === true) event.preventDefault()
       return
     }
     event.preventDefault()

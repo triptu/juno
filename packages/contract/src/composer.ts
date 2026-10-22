@@ -13,7 +13,6 @@ export {
   shownLinks,
   type LinkRange,
   defaultPersonColor,
-  encodeMentions,
   insertMention,
   mentionQueryAt,
   mentionTokens,
@@ -34,3 +33,4 @@ export {
   type MarkupLayout,
   type MarkupStyle,
 } from '@juno/domain'
+export { clipboardHtml } from '@juno/domain'

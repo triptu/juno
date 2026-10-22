@@ -1,0 +1,1 @@
+- 10-22 23:08 · rich clipboard · Rich clipboard HTML is reduced to the composer's own markup and linked-word model in `@juno/richtext`; only HTTP, HTTPS and email links survive, while presentation and executable content are dropped.
