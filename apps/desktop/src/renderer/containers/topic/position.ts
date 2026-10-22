@@ -18,6 +18,7 @@ import { useAtomValue } from '@juno/state/react'
 import { flashChatRow } from '@juno/views'
 import { onLeaveTab, takeOpenStart } from '../navigation'
 import { takeSendMark } from '../sendMark'
+import { watchUpwardInput } from '../scrollInput'
 import { scrollRest } from '../scrollRest'
 import { BOTTOM_SLACK, distanceFromBottom, dividerTop, hold, rowInView, rowSelector, snapshotOf, takeOwnEnd, type Pin } from './scroll'
 
@@ -275,12 +276,14 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
     scroller.addEventListener('scrollend', onScrollEnd)
     // After the listeners above, so it sees the bottom let go in the same scroll.
     const gesture = watchGesture(scroller, pinRef)
+    const stopInput = watchUpwardInput(scroller)
     const stopLeaving = readOnly ? () => {} : onLeaveTab(view, () => rememberPosition(scroller, view, pinRef, pinnedTopRef, gesture.going()))
     return () => {
       for (const type of inputs) scroller.removeEventListener(type, letGo)
       scroller.removeEventListener('scroll', onScroll)
       scroller.removeEventListener('scrollend', onScrollEnd)
       gesture.stop()
+      stopInput()
       stopLeaving()
       rest.cancel()
     }

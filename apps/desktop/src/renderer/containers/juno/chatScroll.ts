@@ -7,6 +7,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type Dispatch, type RefOb
 import type { BubbleId, ChatItem, ChatPage, ReplyTarget } from '@juno/agent-contract'
 import { afterPaint, measure } from '@juno/state/perf'
 import { flashChatRow } from '@juno/views'
+import { scrollingUp, watchUpwardInput } from '../scrollInput'
 import { scrollRest } from '../scrollRest'
 import { junoCommands, takePanelOpenStart } from './actions'
 import { anchorOf, OVERLAP, WINDOW, type Window } from './chatWindow'
@@ -50,13 +51,15 @@ export function toEnd(scroller: HTMLElement): void {
 }
 
 /**
- * Holds the bottom, or lets go when the list moved up from where it was last held and is away from the end: the
- * owner's scroll is already in `scrollTop` when this runs, but its `scroll` event, which lets go, may come after it
- * in the frame, as when a row grows during a wheel gesture.
+ * Holds the bottom, or lets go when the owner is scrolling up (`scrollingUp`) and the list moved up from where it was
+ * last held and is away from the end: the owner's scroll is already in `scrollTop` when this runs, but its `scroll`
+ * event, which lets go, may come after it in the frame, as when a row grows during a wheel gesture. With no such
+ * input the list moved through scroll anchoring, as when a full window drops its first row for a new one, and it
+ * holds.
  */
 function holdEnd(scroller: HTMLElement, pinnedRef: RefObject<boolean>): void {
   if (!pinnedRef.current) return
-  if (scroller.scrollTop < (heldTops.get(scroller) ?? 0) - 1 && distanceFromBottom(scroller) > 1) pinnedRef.current = false
+  if (scroller.scrollTop < (heldTops.get(scroller) ?? 0) - 1 && distanceFromBottom(scroller) > 1 && scrollingUp(scroller)) pinnedRef.current = false
   else toEnd(scroller)
 }
 
@@ -220,9 +223,11 @@ export function useScrollRelease(scrollRef: Scroller, pinnedRef: RefObject<boole
     }
     scroller.addEventListener('scroll', onScroll, { passive: true })
     scroller.addEventListener('scrollend', onScrollEnd)
+    const stopInput = watchUpwardInput(scroller)
     return () => {
       scroller.removeEventListener('scroll', onScroll)
       scroller.removeEventListener('scrollend', onScrollEnd)
+      stopInput()
       rest.cancel()
     }
   }, [scrollRef, pinnedRef, pageRef, setAtBottom])
