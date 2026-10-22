@@ -1,34 +1,35 @@
 /**
- * What a topic's messages do (SPEC section 7: the hover toolbar, More,
- * Keyboard, Quoting and reactions), wired to the engine.
+ * What a topic's messages do (SPEC section 7: the message menu, Keyboard,
+ * Quoting and reactions), wired to the engine.
  *
- * - The toolbar: the quick reactions (Settings › Appearance), the emoji picker, Quote, Reply
- *   in thread (Main) and More, the message menu.
- * - Your own messages: Edit turns the body into a field in place; Delete
- *   asks once in the toolbar's place (ADR 0010). Neither has an undo.
+ * - The menu, on a right-click, the context-menu key or ⇧F10: the emoji
+ *   grid (the quick reactions from Settings › Appearance first) and More
+ *   reactions, then the message's actions (`topic/messageMenu.ts`).
+ * - Your own messages: Edit turns the body into a field in place; Delete…
+ *   asks once at the message's top right (ADR 0010). Neither has an undo.
  * - The keyboard: ↑ in an empty composer selects the newest message, ↑ and
  *   ↓ move, Esc goes back to the composer. On your own selected message E
  *   edits, and Delete or Backspace asks to delete; Enter confirms and Esc
  *   cancels.
- * - Quote: the whole message from the toolbar, or the selected text from
- *   the selection's floating toolbar, as "> " lines at the end of the draft.
- *   Its Ask Juno takes the selection to the Juno panel instead.
+ * - Quote: the whole message from the menu, or the selected text from the
+ *   menu or the selection's bar, as "> " lines at the end of the draft.
+ *   Ask Juno takes it to the Juno panel instead.
  *
  * Every change is a command that writes locally and answers at once; the
  * list shows it from the engine's next window. The edit field stays until
  * that window has the new text, so the old text never flashes back.
  */
-import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import type { TopicDetail } from '@juno/contract'
-import { resolveMessageAction, editMessage, junoAvailableAtom, quickReactionsAtom, registry, type MessageWindow } from '@juno/state'
+import { resolveMessageAction, editMessage, junoAvailableAtom, registry, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import type { MessageActions } from '@juno/views'
 import { chunk, usePreloaded } from './chunks'
 import { landedTs, refOf } from './messageRows'
-import { rowHandlers, useMessageCommands, type Confirming, type Editing, type Picker, type SeeingReactions } from './topic/messageCommands'
+import { preloadMessageMenu, useMessageMenuOpen } from './messageMenu'
+import { rowHandlers, useMessageCommands, type Confirming, type Editing, type SeeingReactions } from './topic/messageCommands'
 import { useSentSuggestions } from './topic/sentSuggestion'
-import { preloadPicker, usePickerDismiss } from './emojiPicker'
-import { floatingOf, useSelectionQuote } from './topic/messageOverlays'
+import { selectionBar, useSelectionQuote } from './topic/messageOverlays'
 
 // The edit field shows only after Edit or E, so it loads when idle once a topic has mounted.
 const editField = chunk(() => import('./EditFieldPanel'))
@@ -64,7 +65,7 @@ export interface MessageActionsOutput {
   readonly onMessageMenu: (ts: string, at: { readonly clientX: number; readonly clientY: number }, onSender: boolean) => void
   /** ↑ in an empty composer. */
   readonly selectNewest: () => void
-  /** The emoji picker or the selection's toolbar, for `TopicView`'s floating slot. */
+  /** The selection's bar and the reactions dialog, for `TopicView`'s floating slot. */
   readonly floating: ReactNode
 }
 
@@ -111,23 +112,20 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
   const channel = detail.channel.id
   const { editing, setEditing, confirming, setConfirming, latest } = useEditState(detail, list)
   const suggestions = useSentSuggestions(list, setEditing, editing)
-  const [picker, setPicker] = useState<Picker | undefined>(undefined)
   const [menuMessage, setMenuMessage] = useState<string | undefined>(undefined)
   const [reactions, setReactions] = useState<SeeingReactions | undefined>(undefined)
-  useEffect(preloadPicker, [])
+  useEffect(preloadMessageMenu, [])
   const reactionsReady = usePreloaded(reactionsDialog, reactions !== undefined)
 
-  const commands = useMessageCommands({ channel, scrollRef, composer, latest, setEditing, setConfirming, setPicker, setMenuMessage, setReactions })
-  // The rows re-render only when the quick reactions change.
-  const quick = useAtomValue(quickReactionsAtom)
+  const commands = useMessageCommands({ channel, scrollRef, composer, latest, setEditing, setConfirming, setMenuMessage, setReactions })
   // Ask Juno on a selection shows only while AI assist is on.
   const juno = useAtomValue(junoAvailableAtom)
-  const actions = useMemo(() => ({ ...commands, quickReactions: quick, onResolveAction: (id: number, retry: boolean) => { void resolveMessageAction(registry, id, retry) } }), [commands, quick])
+  const actions = useMemo(() => ({ ...commands, onResolveAction: (id: number, retry: boolean) => { void resolveMessageAction(registry, id, retry) } }), [commands])
   const rowMessage = (ts: string) => latest.current.list.rows.get(ts)
   // The hooks below run their effects after the ones above, as when this was one function.
   const [selection, setSelection] = useSelectionQuote(scrollRef)
-  const dismissPicker = useCallback(() => setPicker(undefined), [])
-  usePickerDismiss(picker !== undefined, dismissPicker)
+  // The selection's bar steps aside while a message menu is open.
+  const menuOpen = useMessageMenuOpen()
   const editReady = usePreloaded(editField, editing !== undefined)
 
   // The edit field in place of the row's body, once its chunk is here. Saving keeps it until the window has the new text.
@@ -171,12 +169,12 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
       void editField.load()
       handlers.selectNewest()
     },
-    activeMessage: picker?.ts ?? reactions?.ts ?? menuMessage,
+    activeMessage: reactions?.ts ?? menuMessage,
     confirmingDelete: confirming?.ts,
     editing: editingRow,
     floating: (
       <>
-        {floatingOf(picker, setPicker, selection, setSelection, rowMessage, actions.react, scrollRef, composer, juno)}
+        {menuOpen ? null : selectionBar(selection, setSelection, composer, juno)}
         {reactions !== undefined && reactionsReady ? <ReactionsDialog key={reactions.ts} channel={channel} seeing={reactions} message={rowMessage(reactions.ts)} people={latest.current.list.refs.people} onSelect={(name) => setReactions((now) => (now === undefined ? now : { ...now, name }))} onClose={() => setReactions(undefined)} /> : null}
       </>
     ),

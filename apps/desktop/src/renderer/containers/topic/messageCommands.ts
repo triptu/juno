@@ -1,21 +1,20 @@
 /**
  * The commands behind a topic's message actions (see `../messageActions`):
- * the handlers the rows get, created once per topic, and the row keys.
+ * the handlers the rows get and the message menu's, created once per topic,
+ * and the row keys.
  */
 import { useMemo, type Dispatch, type KeyboardEvent, type RefObject, type SetStateAction } from 'react'
 import type { MessageView, TopicDetail } from '@juno/contract'
-import { deleteMessage, forwardSheetAtom, noteRecentEmoji, reactToMessage, registry, type MessageWindow } from '@juno/state'
-import type { MenuAnchor, MessageActions } from '@juno/views'
+import { deleteMessage, noteRecentEmoji, reactToMessage, registry, type MessageWindow } from '@juno/state'
+import type { MenuAt, MenuPoint, MessageActions } from '@juno/views'
 import type { ComposerHandle } from '../messageActions'
-import { isOwnEditable, landedTs, refOf } from '../messageRows'
+import { withMenus } from '../messageMenu'
+import { isOwnEditable, refOf } from '../messageRows'
 import { openTopic, openTopicInBackground } from '../navigation'
-import { showMessageMenu } from '../topicActions'
+import type { MenuInput } from './messageMenu'
 
 const ROW = '[data-message-row]'
-const rowOf = (scroller: HTMLElement | null, ts: string) => scroller?.querySelector<HTMLElement>(`${ROW}[data-message-row="${CSS.escape(ts)}"]`) ?? null
-
-/** The picker's height and the gap under its anchor, for choosing whether it opens below or above (`--emoji-picker-height`). */
-const PICKER_ROOM = 368
+export const rowOf = (scroller: HTMLElement | null, ts: string) => scroller?.querySelector<HTMLElement>(`${ROW}[data-message-row="${CSS.escape(ts)}"]`) ?? null
 
 /** The topic's middle area, which the floating picker and Quote button are placed in. */
 export const middleOf = (scrollRef: RefObject<HTMLElement | null>) => scrollRef.current?.closest<HTMLElement>('[data-topic-middle]') ?? null
@@ -27,8 +26,8 @@ export function focusRow(scrollRef: RefObject<HTMLElement | null>, ts: string): 
   row.scrollIntoView({ block: 'nearest', behavior: 'instant' })
 }
 
-/** The text a whole-message quote takes: the body as the list draws it, mentions as their names. */
-function textOf(scroller: HTMLElement | null, ts: string): string {
+/** The text a whole-message quote or copy takes: the body as the list draws it, mentions as their names. */
+export function textOf(scroller: HTMLElement | null, ts: string): string {
   const body = rowOf(scroller, ts)?.querySelector<HTMLElement>('[data-msg-text]')
   return body?.innerText.trim() ?? ''
 }
@@ -52,13 +51,6 @@ export interface SeeingReactions {
   readonly anchor: HTMLElement
 }
 
-export interface Picker {
-  readonly ts: string
-  readonly x: number
-  readonly y: number
-  readonly placement: 'below-end' | 'above-end'
-}
-
 /** The latest window and state, for callbacks created once. */
 export type Latest = RefObject<{ readonly list: MessageWindow; readonly editing: Editing | undefined; readonly confirming: Confirming | undefined; readonly detail: TopicDetail }>
 
@@ -69,37 +61,33 @@ interface CommandsInput {
   readonly latest: Latest
   readonly setEditing: Dispatch<SetStateAction<Editing | undefined>>
   readonly setConfirming: Dispatch<SetStateAction<Confirming | undefined>>
-  readonly setPicker: Dispatch<SetStateAction<Picker | undefined>>
   readonly setMenuMessage: Dispatch<SetStateAction<string | undefined>>
   readonly setReactions: Dispatch<SetStateAction<SeeingReactions | undefined>>
 }
 
-/** Forward… opens the sheet with the message as the list shows it, its sender and where it was posted (SPEC 7, "Forward"). */
-function openForward(channel: string, message: MessageView, { list, detail }: NonNullable<Latest['current']>): void {
-  const sender = message.senderId === undefined ? undefined : list.refs.people.get(message.senderId)
-  registry.set(forwardSheetAtom, { channelId: channel, message, sender, place: detail.channel.label })
-}
-
-/** The picker under the message's toolbar, or above it near the bottom of the list. */
-function pickerAt(scrollRef: RefObject<HTMLElement | null>, message: MessageView, at: MenuAnchor): Picker | undefined {
-  const area = middleOf(scrollRef)
-  const toolbar = rowOf(scrollRef.current, message.ts)?.querySelector('[role="toolbar"]')
-  if (area === null) return undefined
-  const origin = area.getBoundingClientRect()
-  const box = toolbar?.getBoundingClientRect() ?? { right: at.x, bottom: at.y, top: at.y }
-  const below = box.bottom + PICKER_ROOM <= origin.bottom
-  return { ts: message.ts, x: box.right - origin.left, y: (below ? box.bottom : box.top) - origin.top, placement: below ? 'below-end' : 'above-end' }
+/**
+ * Where a message's menu opens: at the pointer for a right-click, and from
+ * the keyboard under the row's first line, at its text. A context-menu key
+ * press reports a point that may be anywhere; inside the row it is kept.
+ */
+export function anchorFor(row: HTMLElement, at: MenuAt | undefined): MenuPoint {
+  const box = row.getBoundingClientRect()
+  if (at !== undefined && at.clientX > box.left && at.clientX < box.right && at.clientY > box.top && at.clientY < box.bottom) return { x: at.clientX, y: at.clientY }
+  const text = row.querySelector<HTMLElement>('[data-msg-text]')
+  const top = text?.getBoundingClientRect() ?? box
+  const line = text === null ? 0 : Number.parseFloat(getComputedStyle(text).lineHeight) || 0
+  return { x: top.left, y: Math.min(box.bottom, top.top + line) }
 }
 
 /** View reactions in the message menu: the dialog on the first emoji, under its chip. */
-function firstReaction(scrollRef: RefObject<HTMLElement | null>, message: MessageView): SeeingReactions | undefined {
+export function firstReaction(scrollRef: RefObject<HTMLElement | null>, message: MessageView): SeeingReactions | undefined {
   const chip = rowOf(scrollRef.current, message.ts)?.querySelector<HTMLElement>('[data-reaction]')
   const first = message.reactions[0]
   return chip === null || chip === undefined || first === undefined ? undefined : { ts: message.ts, name: first.name, anchor: chip }
 }
 
 /** The rows' handlers, created once per topic (performance 5.1); they read the latest state through `latest`. */
-export function useMessageCommands({ channel, scrollRef, composer, latest, setEditing, setConfirming, setPicker, setMenuMessage, setReactions }: CommandsInput) {
+export function useMessageCommands({ channel, scrollRef, composer, latest, setEditing, setConfirming, setMenuMessage, setReactions }: CommandsInput) {
   return useMemo(() => {
     const react = (message: MessageView, name: string, on?: boolean) => {
       const mine = message.reactions.find((reaction) => reaction.name === name)?.me === true
@@ -125,6 +113,8 @@ export function useMessageCommands({ channel, scrollRef, composer, latest, setEd
         if (exit._tag === 'Failure') setConfirming(undefined)
       })
     }
+    // ⌘-click or ⌘Enter opens the thread in a background tab: this tab, its scroll and its focus stay (SPEC 7).
+    const reply = (message: MessageView, options?: { readonly newTab: boolean }) => (options?.newTab === true ? openTopicInBackground : openTopic)(`t:${channel}:${message.ts}`)
     const handlers: MessageActions & {
       readonly react: typeof react
       readonly startEdit: typeof startEdit
@@ -133,12 +123,6 @@ export function useMessageCommands({ channel, scrollRef, composer, latest, setEd
       react,
       startEdit,
       askDelete,
-      onReact: (message, name) => react(message, name),
-      onMoreReactions: (message, at: MenuAnchor) => setPicker((current) => pickerAt(scrollRef, message, at) ?? current),
-      onQuote: (message) => composer.current?.quote(textOf(scrollRef.current, message.ts)),
-      // ⌘-click or ⌘Enter opens the thread in a background tab: this tab, its scroll and its focus stay (SPEC 7).
-      onReply: (message, options) => (options?.newTab === true ? openTopicInBackground : openTopic)(`t:${channel}:${message.ts}`),
-      onMore: (message, at) => void menu(message, at),
       onSeeReactions: (message, name, chip) => setReactions({ ts: message.ts, name, anchor: chip }),
       onConfirmDelete: confirmDelete,
       onCancelDelete: () => {
@@ -147,26 +131,9 @@ export function useMessageCommands({ channel, scrollRef, composer, latest, setEd
         if (ts !== undefined) focusRow(scrollRef, ts)
       },
     }
-    const menu = async (message: MessageView, at: MenuAnchor, onSender = false) => {
-      const people = latest.current.list.refs.people
-      const sender = message.senderId === undefined ? undefined : { id: message.senderId, name: people.get(message.senderId)?.name ?? message.senderId }
-      setMenuMessage(message.ts)
-      let chosen: Awaited<ReturnType<typeof showMessageMenu>>
-      try {
-        chosen = await showMessageMenu(latest.current.detail, message, isOwnEditable(message), at, sender, onSender)
-      } finally {
-        setMenuMessage(undefined)
-      }
-      // The message may have been edited or deleted while the menu was open: act on it as it is now.
-      const rows = latest.current.list.rows
-      const now = rows.get(message.ts) ?? rows.get(landedTs(rows, message.ts) ?? '')
-      if (now === undefined) return
-      if (chosen === 'edit' && isOwnEditable(now)) startEdit(now)
-      else if (chosen === 'delete' && isOwnEditable(now)) askDelete(now)
-      else if (chosen === 'reply') handlers.onReply?.(now)
-      else if (chosen === 'forward' && now.pending === undefined) openForward(channel, now, latest.current)
-      else if (chosen === 'reactions') setReactions((current) => firstReaction(scrollRef, now) ?? current)
-    }
+    // The menu and what its rows do load when idle (`../messageMenu.tsx`).
+    const input: MenuInput = { channel, scrollRef, composer, latest, setMenuMessage, setReactions, react, startEdit, askDelete, reply }
+    const menu = (message: MessageView, anchor: MenuPoint, onSender = false) => withMenus((menus) => menus.topicMenu(input, message, anchor, onSender))
     return { ...handlers, menu }
     // `channel` is fixed for a topic tab; the rest is read through refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -208,6 +175,14 @@ export function rowHandlers(actions: MessageCommands, rowMessage: (ts: string) =
         event.preventDefault()
         composer.current?.focus()
         return
+      // ⇧F10 opens the selected message's menu, as the context-menu key does.
+      case 'F10': {
+        const row = rowOf(scrollRef.current, ts)
+        if (!event.shiftKey || row === null) return
+        event.preventDefault()
+        actions.menu(message, anchorFor(row, undefined))
+        return
+      }
     }
   }
 
@@ -224,9 +199,10 @@ export function rowHandlers(actions: MessageCommands, rowMessage: (ts: string) =
     if (message !== undefined) actions.react(message, name)
   }
 
-  const onMessageMenu = (ts: string, at: { readonly clientX: number; readonly clientY: number }, onSender: boolean) => {
+  const onMessageMenu = (ts: string, at: MenuAt, onSender: boolean) => {
     const message = rowMessage(ts)
-    if (message !== undefined) void actions.menu(message, { x: at.clientX, y: at.clientY }, onSender)
+    const row = rowOf(scrollRef.current, ts)
+    if (message !== undefined && row !== null) actions.menu(message, anchorFor(row, at), onSender)
   }
 
   return { onRowKey, selectNewest, onToggleReaction, onMessageMenu }

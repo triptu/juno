@@ -1,8 +1,9 @@
-import { junoNavAtom, junoSettingsNow, watchReply } from '@juno/state/agent'
+import { junoSettingsNow } from '@juno/state/agent'
 /**
  * The topic actions (SPEC 5 "Row actions", inventory 15.1 and 16), for
  * every place that offers them: a sidebar row's check and menu, the
- * header's Resolve or Reopen and its title menu, and the message menu.
+ * header's Resolve or Reopen and its title menu, and the message menu's
+ * Open in Slack.
  *
  * Each action runs its command through `runAction`, which keeps the undo
  * the engine returned and shows the toast. ⌘Z (Edit › Undo) undoes typing
@@ -19,18 +20,14 @@ import {
   topicsReopen,
   topicsResolve,
   topicsUnpin,
-  whyLabel,
   type ContextMenuAt,
-  type ContextMenuItem,
   type MenuCommand,
-  type MessageView,
   type NotifyTargetView,
   type TopicDetail,
   type TopicMenuAction,
 } from '@juno/contract'
 import {
   allTopicsRowAtom,
-  broadcastMessage,
   copyText,
   currentNotificationSettings,
   editUndo,
@@ -38,8 +35,6 @@ import {
   ignoreChannel,
   junoAvailableAtom,
   loadNotificationSettings,
-  loadWhy,
-  messageLink,
   openInSlack,
   popupContextMenu,
   canRedraw,
@@ -61,7 +56,7 @@ import {
 } from '@juno/state'
 import { openSettings, openTopic, openTopicFromList } from './navigation'
 import { runViewMenuAction, viewChoices } from './viewActions'
-import { choiceFor, nativeMenu, setNotifyLevel, showPersonMenu, showWhy } from './notifyActions'
+import { choiceFor, nativeMenu, setNotifyLevel } from './notifyActions'
 import { showWhatJunoKnows } from './juno/actions'
 import { huddleMenuItem, joinHuddleFromMenu } from './huddle/menuItem'
 
@@ -256,13 +251,11 @@ export function showTableRowMenu(id: string): void {
   if (topic !== undefined) void showTopicMenu(topic, 'table')
 }
 
-function openTopicInSlack(topic: ActionTopic): void {
+/** Open in Slack: the topic's channel in the Slack app. */
+export function openTopicInSlack(topic: ActionTopic): void {
   const session = registry.get(signedInAtom)
   if (session !== undefined) openInSlack({ teamId: session.teamId, channelId: topic.channel.id })
 }
-
-/** What the message menu leaves to the topic: the edit field, the delete confirm, opening the thread, the Forward sheet, the reactions dialog. */
-export type MessageMenuChoice = 'edit' | 'delete' | 'reply' | 'forward' | 'reactions'
 
 /**
  * "Also send to #eng" on your own thread reply, as Slack's "Send reply to
@@ -271,59 +264,6 @@ export type MessageMenuChoice = 'edit' | 'delete' | 'reply' | 'forward' | 'react
  */
 export function broadcastLabel(channel: Pick<ActionTopic['channel'], 'kind' | 'name'>): string {
   return channel.kind === 'public' || channel.kind === 'private' ? `Also send to #${channel.name}` : 'Also send to Main'
-}
-
-/**
- * The message menu (SPEC 7 "More", inventory 15.4 and 15.6), from the
- * toolbar's More and from a right-click: Edit and Delete on your own
- * messages, and on your own reply in a thread Also send to #eng, unless it
- * already was; Start thread or Open thread in Main, View reactions, Forward…, Copy Slack link and Open in Slack,
- * and, on someone else's message, why it did or did not notify. A reply's
- * link carries its thread; a message Slack does not have yet has none. On
- * the sender's name or avatar it is the person menu.
- */
-export async function showMessageMenu(
-  topic: ActionTopic,
-  message: Pick<MessageView, 'ts' | 'pending' | 'thread' | 'kind' | 'root' | 'broadcast' | 'reactions'>,
-  editable: boolean,
-  at: ContextMenuAt,
-  sender: { readonly id: string; readonly name: string } | undefined,
-  onSender: boolean,
-): Promise<MessageMenuChoice | undefined> {
-  const session = registry.get(signedInAtom)
-  const own = sender !== undefined && sender.id === session?.userId
-  if (onSender && sender !== undefined && !own) {
-    await showPersonMenu(sender, at)
-    return undefined
-  }
-  const { ts } = message
-  const linkable = message.pending === undefined
-  const why = own || !linkable ? undefined : await loadWhy(registry, topic.id, ts)
-  // Only a reply Slack has, as Slack's own client offers it.
-  const broadcastable = own && topic.kind === 'thread' && linkable && message.kind === 'message' && !message.root && !message.broadcast
-  const items: ContextMenuItem[] = [
-    ...(editable ? [{ id: 'edit', label: 'Edit' }, { id: 'delete', label: 'Delete' }] : []),
-    ...(broadcastable ? [{ id: 'broadcast', label: broadcastLabel(topic.channel) }] : []),
-    ...(editable || broadcastable ? [{ separator: true } as const] : []),
-    ...(topic.kind === 'main' && linkable ? [{ id: 'reply', label: message.thread === undefined ? 'Start thread' : 'Open thread' }, { separator: true } as const] : []),
-    ...(own && linkable ? [{ id: 'watch-reply', label: 'Tell me if nobody replies', enabled: registry.get(junoNavAtom).mayAuthorize === true }] : []),
-    // The keyboard's way to the reactions dialog; the pointer also has the card's See all.
-    ...(message.reactions.length > 0 ? [{ id: 'reactions', label: 'View reactions' }] : []),
-    // Only a message Slack has can be shared, as only it has a link.
-    { id: 'forward', label: 'Forward…', ...(linkable && message.kind === 'message' ? {} : { enabled: false }) },
-    { id: 'copy-link', label: 'Copy Slack link', ...(linkable ? {} : { enabled: false }) },
-    { id: 'open-in-slack', label: 'Open in Slack' },
-    ...(why === undefined ? [] : [{ separator: true } as const, { id: 'why', label: whyLabel(why.notified) }]),
-  ]
-  const chosen = await popupContextMenu(items, at)
-  if (chosen === 'edit' || chosen === 'delete' || chosen === 'reply' || chosen === 'forward' || chosen === 'reactions') return chosen
-  // Main shows the reply at once and the thread marks it; the outbox sends it. The engine refuses a reply deleted meanwhile.
-  if (chosen === 'broadcast') void broadcastMessage(registry, { channelId: topic.channel.id, ts })
-  if (chosen === 'watch-reply') await watchReply(registry, { channelId: topic.channel.id, ts, ...(topic.kind === 'thread' && topic.rootTs ? { threadTs: topic.rootTs } : {}) })
-  else if (chosen === 'open-in-slack') openTopicInSlack(topic)
-  else if (chosen === 'why' && why !== undefined) showWhy(topic.id, ts, why, at)
-  else if (chosen === 'copy-link' && session !== undefined) copyText(messageLink(session.workspaceUrl, topic.channel.id, ts, topic.kind === 'thread' ? topic.rootTs : undefined))
-  return undefined
 }
 
 /** Whether focus is in a text field that has text, where ⌘Z undoes typing. */

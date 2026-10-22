@@ -1,22 +1,20 @@
 /**
  * What a topic's message actions draw over the list (see `../messageActions`):
- * the emoji picker and the selection's toolbar (Quote, Ask Juno). Its
- * hooks stay out of the React Compiler, as `useMessageActions` does.
+ * the selection's bar (Quote, Ask Juno). Its hooks stay out of the React
+ * Compiler, as `useMessageActions` does.
  */
-import { Suspense, useEffect, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
-import type { MessageView } from '@juno/contract'
+import { useEffect, useState, type Dispatch, type RefObject, type SetStateAction } from 'react'
 import { Floating, SelectionToolbar } from '@juno/views'
-import { EmojiPickerPanel } from '../emojiPicker'
 import { askJunoAboutSelection } from '../juno/actions'
 import type { ComposerHandle } from '../messageActions'
-import { focusRow, middleOf, type Picker } from './messageCommands'
+import { middleOf } from './messageCommands'
 
 /** The node is inside a message's text in this list. */
 const inMessageText = (node: Node | null, scroller: HTMLElement) => (node instanceof Element ? node : node?.parentElement)?.closest('[data-msg-text]') != null && scroller.contains(node)
 
 type Selection = { readonly x: number; readonly y: number }
 
-/** The selection's toolbar: shown when a drag or a Shift-arrow selection ends inside a message's text. */
+/** The selection's bar: shown when a drag or a Shift-arrow selection ends inside a message's text. */
 export function useSelectionQuote(scrollRef: RefObject<HTMLElement | null>) {
   'use no memo'
   const [selection, setSelection] = useState<Selection | undefined>(undefined)
@@ -56,18 +54,9 @@ export function useSelectionQuote(scrollRef: RefObject<HTMLElement | null>) {
   return [selection, setSelection] as const
 }
 
-/** The emoji picker or the selection's toolbar, for `TopicView`'s floating slot. Ask Juno shows only while `juno` (AI assist on). */
-export function floatingOf(
-  picker: Picker | undefined,
-  setPicker: Dispatch<SetStateAction<Picker | undefined>>,
-  selection: Selection | undefined,
-  setSelection: Dispatch<SetStateAction<Selection | undefined>>,
-  rowMessage: (ts: string) => MessageView | undefined,
-  react: (message: MessageView, name: string) => void,
-  scrollRef: RefObject<HTMLElement | null>,
-  composer: RefObject<ComposerHandle | null>,
-  juno: boolean,
-) {
+/** The selection's bar, for `TopicView`'s floating slot. Ask Juno shows only while `juno` (AI assist on). */
+export function selectionBar(selection: Selection | undefined, setSelection: Dispatch<SetStateAction<Selection | undefined>>, composer: RefObject<ComposerHandle | null>, juno: boolean) {
+  if (selection === undefined) return null
   const quoteSelection = () => {
     const current = window.getSelection()
     const text = current?.toString().trim() ?? ''
@@ -79,27 +68,9 @@ export function floatingOf(
     setSelection(undefined)
     askJunoAboutSelection()
   }
-
-  const closePicker = () => {
-    const ts = picker?.ts
-    setPicker(undefined)
-    if (ts !== undefined) focusRow(scrollRef, ts)
-  }
-  const pick = (name: string) => {
-    const message = picker === undefined ? undefined : rowMessage(picker.ts)
-    setPicker(undefined)
-    if (message !== undefined) react(message, name)
-  }
-
-  return picker !== undefined ? (
-    <Suspense fallback={null}>
-      <Floating x={picker.x} y={picker.y} placement={picker.placement} layer="picker">
-        <EmojiPickerPanel onPick={pick} onClose={closePicker} />
-      </Floating>
-    </Suspense>
-  ) : selection !== undefined ? (
-    <Floating x={selection.x} y={selection.y} placement="above-center" layer="selection">
+  return (
+    <Floating x={selection.x} y={selection.y}>
       <SelectionToolbar onQuote={quoteSelection} {...(juno ? { onAskJuno: askJuno } : {})} />
     </Floating>
-  ) : null
+  )
 }
