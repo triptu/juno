@@ -152,13 +152,9 @@ type Corner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
  * the motion: the surface only grows, and the corner named stays where the
  * menu's was, to a pixel.
  */
-async function morphAt(juno: Juno, at: { readonly x: number; readonly y: number }, corner: Corner): Promise<void> {
+async function morphAt(juno: Juno, at: { readonly target: Locator; readonly position: { readonly x: number; readonly y: number } }, corner: Corner): Promise<void> {
   const { win } = juno
-  await win.mouse.move(at.x, at.y)
-  await win.mouse.down({ button: 'right' })
-  await win.mouse.up({ button: 'right' })
-  const menu: MessageMenuDriver = juno.messageMenu
-  await expect(menu.root).toBeVisible()
+  const menu: MessageMenuDriver = await juno.messageMenu.openOn(at.target, at.position)
   const before = await boxOf(menu.root)
   // The material is the menu's first layer once it morphs; read its box every frame until the motion ends.
   const frames = win.evaluate(
@@ -200,15 +196,17 @@ async function morphAt(juno: Juno, at: { readonly x: number; readonly y: number 
   await expect(menu.root).toHaveCount(0)
 }
 
-/** A point on a row's text: near its start, or past where the picker would fit to the right of the window. */
-async function pointOn(win: Page, row: Locator, side: 'left' | 'right'): Promise<{ readonly x: number; readonly y: number }> {
+/** A point on a row's words: near their start, or near their end, past where the picker would fit to the right. */
+async function pointOn(win: Page, row: Locator, side: 'left' | 'right') {
   // On the words, not the avatar or the name, which have the person's menu.
-  const text = await boxOf(row.locator('[data-msg-text]').first())
+  const target = row.locator('[data-msg-text]').first()
+  await target.scrollIntoViewIfNeeded()
+  const text = await boxOf(target)
   const width = await win.evaluate(() => window.innerWidth)
-  const x = side === 'left' ? text.left + 24 : text.right - 24
+  const x = side === 'left' ? 24 : text.width - 24
   // The picker fits to the right of a point near the start, and not of one near the end.
-  expect(x + 1 + 314 + 6 <= width).toBe(side === 'left')
-  return { x, y: text.top + 10 }
+  expect(text.left + x + 1 + 314 + 6 <= width).toBe(side === 'left')
+  return { target, position: { x, y: 10 } }
 }
 
 test('More reactions grows the picker from the corner of the menu that stays put, near every edge of the window', async ({ juno, fake }) => {
