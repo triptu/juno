@@ -1,46 +1,31 @@
 import { defineFixtures, fixture } from '@juno/ui'
-import { hueFor } from './look'
+import { asReactor, crowd, customEmoji, manyReactions } from './fixtures/reactions'
 import { me } from './fixtures/messages'
 import { people } from './fixtures/topics'
-import type { Person } from '@juno/contract'
-import { ReactorsCard, type Reactor } from './ReactorsCard'
+import { ReactorsCard } from './ReactorsCard'
 
-const reactor = (person: Person, you = false): Reactor => ({
-  id: person.id,
-  name: person.name,
-  you,
-  hue: hueFor(person.color, person.id),
-  ...(person.avatarUrl === undefined ? {} : { avatarUrl: person.avatarUrl }),
-})
-
-const crowd: ReadonlyArray<Person> = [
-  me,
-  people.maya,
-  people.leo,
-  people.dev,
-  people.sam,
-  people.priya,
-  people.jonas,
-  people.elena,
-  people.mohammed,
-  people.unicorn,
-]
-
-const blob = `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="14" fill="#E39A3B"/><circle cx="11" cy="13" r="2" fill="#2B1E00"/><circle cx="21" cy="13" r="2" fill="#2B1E00"/><path d="M10 20c3 4 9 4 12 0" stroke="#2B1E00" stroke-width="2" fill="none" stroke-linecap="round"/></svg>')}`
+const seeAll = () => {}
+const tada = manyReactions[0]!
 
 export default defineFixtures(ReactorsCard, {
   // Who reacted, from the reaction chip under a message.
   Reactors: {
-    one: fixture({ name: 'eyes', emoji: '👀', reactors: [reactor(people.maya)], others: 0 }),
-    three: fixture({ name: '+1', emoji: '👍', reactors: [reactor(me, true), reactor(people.leo), reactor(people.sam)], others: 0 }),
-    // Fifteen: ten named, you first, then the rest of the count.
-    fifteen: fixture({ name: 'tada', emoji: '🎉', reactors: crowd.map((person, i) => reactor(person, i === 0)), others: 5 }),
+    one: fixture({ name: 'eyes', emoji: '👀', reactors: [asReactor(people.maya)], count: 1, onSeeAll: seeAll }),
+    three: fixture({ name: '+1', emoji: '👍', reactors: [asReactor(me), asReactor(people.leo), asReactor(people.sam)], count: 3, onSeeAll: seeAll }),
+    // Six names fit, so all six are named and there is nothing more to see.
+    six: fixture({ name: 'heart', emoji: '❤️', reactors: crowd.slice(1, 7).map(asReactor), count: 6, onSeeAll: seeAll }),
+    // Forty: ten known, you first; the sentence stops at about two lines and See all opens the dialog.
+    forty: fixture({ name: 'tada', emoji: '🎉', reactors: tada.people.slice(0, 10), count: 40, onSeeAll: seeAll }),
+    'see-all-hover': fixture({ name: 'tada', emoji: '🎉', reactors: tada.people.slice(0, 10), count: 40, onSeeAll: seeAll }, { hover: '[data-see-all]' }),
+    // In a peek the chips are labels: no dialog, so no See all.
+    'forty-no-dialog': fixture({ name: 'tada', emoji: '🎉', reactors: tada.people.slice(0, 10), count: 40 }),
   },
   Data: {
     // Slack listed fewer people than its count.
-    partial: fixture({ name: 'white_check_mark', emoji: '✅', reactors: [reactor(people.dev), reactor(people.priya)], others: 4 }),
-    'nobody-listed': fixture({ name: 'rocket', emoji: '🚀', reactors: [], others: 3 }),
-    custom: fixture({ name: 'party-blob', emoji: ':party-blob:', url: blob, reactors: [reactor(people.elena), reactor(people.jonas)], others: 1 }),
-    'long-name': fixture({ name: 'face_with_open_eyes_and_hand_over_mouth', emoji: '🫢', reactors: [reactor({ id: 'U0LONG', name: 'Maximilian-Alexander Fitzgerald-Montgomery-Rutherford', color: 'jordy' })], others: 0 }),
+    partial: fixture({ name: 'white_check_mark', emoji: '✅', reactors: [asReactor(people.dev), asReactor(people.priya)], count: 6, onSeeAll: seeAll }),
+    'nobody-listed': fixture({ name: 'rocket', emoji: '🚀', reactors: [], count: 3, onSeeAll: seeAll }),
+    custom: fixture({ name: 'party-blob', emoji: ':party-blob:', url: customEmoji['party-blob'], reactors: [asReactor(people.elena), asReactor(people.jonas)], count: 2, onSeeAll: seeAll }),
+    'long-name': fixture({ name: 'face_with_open_eyes_and_hand_over_mouth', emoji: '🫢', reactors: [asReactor({ id: 'U0LONG', name: 'Maximilian-Alexander Fitzgerald-Montgomery-Rutherford', color: 'jordy' })], count: 1, onSeeAll: seeAll }),
+    'long-names-many': fixture({ name: 'raised_hands', emoji: '🙌', reactors: crowd.slice(18, 28).map(asReactor), count: 14, onSeeAll: seeAll }),
   },
 })

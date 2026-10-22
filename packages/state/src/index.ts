@@ -62,6 +62,7 @@ export {
   topicOfView,
   topicStartKnownAtom,
   topicView,
+  whoReactedAtom,
   type MessageWindow,
   type MessageWindowSpec,
 } from './messages'

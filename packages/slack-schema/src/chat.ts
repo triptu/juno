@@ -8,7 +8,7 @@ import { Schema as S } from 'effect'
 import { Blocks } from './blocks.ts'
 import { FormBoolean, FormJson, RawObject } from './common.ts'
 import { Ts } from './ts.ts'
-import { Message } from './message.ts'
+import { Message, Reaction } from './message.ts'
 
 const opt = S.optionalKey
 
@@ -87,3 +87,13 @@ export const ChatDeleteFields = { channel: S.String, ts: Ts } as const
 export const ReactionArgs = S.Struct({ channel: S.String, timestamp: Ts, name: S.String })
 export type ReactionArgs = typeof ReactionArgs.Type
 export const ReactionFields = {} as const
+
+// reactions.get
+// A message's `reactions[].users` may list fewer people than `count`; with
+// `full` Slack lists everyone (research section 10, "Who reacted"). Only the
+// message's reactions are decoded; a file's are not used.
+// https://docs.slack.dev/reference/methods/reactions.get
+
+export const ReactionsGetArgs = S.Struct({ channel: S.String, timestamp: Ts, full: opt(FormBoolean) })
+export type ReactionsGetArgs = typeof ReactionsGetArgs.Type
+export const ReactionsGetFields = { message: opt(S.Struct({ reactions: opt(S.Array(Reaction)) })) } as const

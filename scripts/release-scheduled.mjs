@@ -12,7 +12,7 @@ import { syncReleasedVersion } from './release-main.mjs'
 import { mainCheckout, worktreeFolder } from './worktree-folder.mjs'
 
 const root = resolve(import.meta.dirname, '..')
-const { values } = parseArgs({ options: { 'dry-run': { type: 'boolean', default: false }, repo: { type: 'string', default: 'triptu/juno-releases' } } })
+const { values } = parseArgs({ options: { 'dry-run': { type: 'boolean', default: false }, repo: { type: 'string', default: 'triptu/juno-releases' }, notes: { type: 'string' } } })
 const status = statusFolder(root)
 const lock = join(status, 'release-scheduled.lock')
 const run = (command, args, cwd = root, env = {}) => execFileSync(command, args, { cwd, stdio: 'inherit', env: { ...process.env, ...env } })
@@ -56,8 +56,10 @@ async function scheduled() {
   const parts = base.split('.').map(Number)
   const version = `${parts[0]}.${parts[1]}.${parts[2] + 1}`
   const subjects = git(root, 'log', '--no-merges', '--reverse', '--format=%s', previous ? `${previous}..${candidate}` : candidate, '--', 'apps/desktop/src', 'assets', ':(glob)packages/*/src/**').split('\n')
-  const notes = releaseNotes(subjects)
-  if (!notes.trim()) { console.log('release:scheduled: no action: no user-facing changes since the last release'); return }
+  const generated = releaseNotes(subjects)
+  if (!generated.trim()) { console.log('release:scheduled: no action: no user-facing changes since the last release'); return }
+  const notes = values.notes ? readFileSync(values.notes, 'utf8') : generated
+  if (!notes.trim()) throw new Error('release notes must not be empty')
   console.log(`release:scheduled: would release ${version} from ${candidate}\n${notes}`)
   if (values['dry-run']) return
   if (!process.env.JUNO_UPDATE_TOKEN) throw new Error('JUNO_UPDATE_TOKEN is required for the packaged updater')

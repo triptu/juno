@@ -7,6 +7,7 @@ import { threadIndex } from './threadViews.ts'
 import type { CountEntry, Message, MethodArgs, MethodName, MethodOk, SearchMatch, ThreadView } from '@juno/slack-schema'
 import { compareTs, isReply, permalinkPath, Ts } from '@juno/slack-schema'
 import { fileObject } from './files.ts'
+import { withListedReactors } from './reactors.ts'
 import { blocksToText } from './richtext.ts'
 import { edgeUserObject, NEVER_READ, type Workspace } from './state.ts'
 
@@ -67,8 +68,9 @@ export function requireConversation(ctx: MethodContext, channel: string, needMem
   return conversation
 }
 
+/** A message as pages carry it: its channel, thread fields, and reactors cut as Slack cuts them (`reactors.ts`). */
 function withChannel(ws: Workspace, channel: string, message: Message): Message {
-  return ws.withThreadFields({ ...message, channel })
+  return ws.withThreadFields({ ...withListedReactors(message), channel })
 }
 
 /** Conditional pages keep paging over all messages, even when their bodies are omitted. */

@@ -15,6 +15,7 @@ import { FakeServer, type CallRecord, type ReceivedFrame, type GatedCall, type G
 import { asTs, Workspace, type Subscription } from './state.ts'
 import { fileObject, partialFileObject } from './files.ts'
 import { samplePng } from './samples.ts'
+import { seedManyReactions, type ManyReactionsInput, type ManyReactionsSeed } from './seeds/manyReactions.ts'
 
 export { AUTO_AWAY_MILLIS } from './server.ts'
 export type { CallRecord, ReceivedFrame, GatedCall, GateDecision, Session } from './server.ts'
@@ -214,6 +215,17 @@ export class FakeSlack {
   addReaction(input: { channel: string; ts: string; name: string; user?: string }): void {
     const failure = this.workspace.react(input.channel, asTs(input.ts), input.name, input.user ?? 'U0MAYA', true)
     if (failure !== undefined) throw new Error(failure)
+  }
+
+  /**
+   * A message with 40 people on one emoji and 12 emoji in all, custom ones
+   * included, from people with long names (`seeds/manyReactions.ts`). Pages
+   * list at most `REACTORS_LISTED` people per emoji. Without `silent` the
+   * post sends its socket events; the reactions never do, so the app sees
+   * them on the next page of the channel, such as opening its Main.
+   */
+  seedManyReactions(input: ManyReactionsInput = {}): ManyReactionsSeed {
+    return seedManyReactions(this.workspace, `${this.url}/avatars`, input)
   }
 
   removeReaction(input: { channel: string; ts: string; name: string; user?: string }): void {
@@ -556,5 +568,7 @@ export { largeSeed, LARGE_SEED_DEFAULTS } from './seeds/large.ts'
 
 export { topic300Seed, TOPIC300_MAIN_CHANNEL, TOPIC300_THREAD_CHANNEL } from './seeds/topic300.ts'
 export { CODE_BLOCK_COUNT, codeBlocksSeed } from './seeds/codeBlocks.ts'
+export type { ManyReactionsInput, ManyReactionsSeed } from './seeds/manyReactions.ts'
+export { REACTORS_LISTED } from './reactors.ts'
 export { sharedMessage, unfurlFixtures } from './unfurls.ts'
 export { tableBlock } from './tables.ts'

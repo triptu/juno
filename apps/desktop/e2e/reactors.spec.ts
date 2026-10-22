@@ -1,7 +1,8 @@
 /**
  * Who reacted (SPEC 7): hovering a reaction chip shows a card with the
- * emoji, its name and the people who reacted, you first. The pointer can
- * move into the card, and a click on the chip still toggles your reaction.
+ * emoji, the people who reacted as one sentence, you first, and the emoji's
+ * name. The pointer can move into the card, and a click on the chip still
+ * toggles your reaction.
  */
 import { expect, test } from './fixtures'
 
@@ -25,9 +26,11 @@ test('hovering a reaction chip shows who reacted, and a click still toggles it',
   const chip = row.getByRole('button', { name: '2 🎉, including you' })
   await chip.scrollIntoViewIfNeeded()
   await chip.hover()
-  const card = juno.win.getByRole('tooltip').filter({ hasText: ':tada:' })
+  const card = juno.win.getByRole('tooltip').filter({ hasText: 'reacted with :tada:' })
   await expect(card).toBeVisible()
-  await expect(card.getByRole('listitem')).toHaveText([/You$/, /Jonas$/])
+  // Everyone is named, so there is nothing more to see.
+  await expect(card.locator('[data-reactors-names]')).toHaveText(/^You and Jonas\b/)
+  await expect(card.locator('[data-see-all]')).toHaveCount(0)
   await expect(chip).toHaveAttribute('aria-describedby', (await card.getAttribute('id'))!)
 
   // Into the card: it stays.

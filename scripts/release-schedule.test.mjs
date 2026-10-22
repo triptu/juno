@@ -49,9 +49,15 @@ console.log(JSON.stringify(process.argv[3] === 'list' ? [{tagName:'v0.1.8',isDra
   const output = execFileSync(process.execPath, [runner, '--dry-run'], { cwd: root, env: { ...process.env, PATH: `${bin}:${process.env.PATH}` }, encoding: 'utf8' })
   assert.match(output, new RegExp(`would release 0\\.1\\.9 from ${candidate}`))
   assert.match(output, /Messages: Fix message edits after reconnect/)
+  const notes = join(root, 'notes.md')
+  writeFileSync(notes, '- Keep your place after scrolling.\n')
+  const reviewed = execFileSync(process.execPath, [runner, '--dry-run', '--notes', notes], { cwd: root, env: { ...process.env, PATH: `${bin}:${process.env.PATH}` }, encoding: 'utf8' })
+  assert.match(reviewed, /Keep your place after scrolling/)
+  assert.doesNotMatch(reviewed, /Messages: Fix message edits after reconnect/)
 })
 
 test('notes group user changes and omit merge and test maintenance subjects', () => {
+  assert.equal(releaseNotes(['', '  ']).trim(), '')
   const notes = releaseNotes(['Merge ci-fix', 'Release 0.1.7', 'Set version to 0.1.8 after release', 'Refresh the coverage map', 'Fix message edits after reconnect', 'Keep sidebar rows steady', 'Fix message edits after reconnect'])
   assert.equal(notes, '- Messages: Fix message edits after reconnect.\n- Navigation: Keep sidebar rows steady.\n')
 })
@@ -68,4 +74,24 @@ test('selects the newest compatible main commit, leaving untested production cha
   const record = { commit: first, passed: true, suites: ['test', 'specs:check', 'test:gallery', 'test:desktop'].map((suite) => ({ suite, code: 0 })) }
   assert.equal(selectCommit(root, tip, [record]), docs)
   assert.equal(selectCommit(root, tip, []), null)
+})
+
+test('finds a verified source merged through the second parent without releasing untested code', (t) => {
+  mkdirSync(scratchFolder(), { recursive: true })
+  const root = mkdtempSync(join(scratchFolder(), 'release-merged-source-test-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  git(root, 'init', '-q', '-b', 'main')
+  git(root, 'config', 'user.name', 'Test')
+  git(root, 'config', 'user.email', 'test@example.com')
+  const commit = (file) => { writeFileSync(join(root, file), file); git(root, 'add', '.'); git(root, 'commit', '-qm', file); return git(root, 'rev-parse', 'HEAD') }
+  const previous = commit('app.js')
+  git(root, 'branch', 'feature')
+  const verified = commit('gallery.js')
+  const docs = commit('README.md')
+  git(root, 'checkout', '-q', 'feature')
+  commit('search.js')
+  git(root, 'merge', '--no-ff', '-qm', 'Merge main', 'main')
+  const tip = git(root, 'rev-parse', 'HEAD')
+  const record = (commit) => ({ commit, passed: true, suites: ['test', 'specs:check', 'test:gallery', 'test:desktop'].map((suite) => ({ suite, code: 0 })) })
+  assert.equal(selectCommit(root, tip, [record(verified), record(previous)]), docs)
 })

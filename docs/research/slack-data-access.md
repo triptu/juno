@@ -680,3 +680,20 @@ Run with the owner's permission on the cached session. Writes went only to the s
 - **Upload.** A 320×200 generated PNG with a caption, pasted into the self-DM's composer: sent in 2.5 s, in Slack once with its file, Slack's thumbnail shown within 30 s, the viewer showed it, and Download saved the same bytes that were sent.
 - **Offline chat.** Not run live. Pointing the `persist:slack` session at a dead proxy does not take Juno offline: the open socket keeps its connection and pings, so the offline line never showed in 240 s. A live check needs the network itself off.
 - **Presence.** See section 3, Presence.
+
+### Who reacted (2026-10-22)
+
+Slack's docs say a message's `reactions[].users` may list fewer people than `count`, and that `reactions.get` with `full=true` lists everyone. Whether and where Juno's pages cut the list decides whether the "who reacted" dialog needs that call. `JUNO_LIVE=1 pnpm probe:live -- --only reactions`, read-only: `client.counts`, `client.userBoot`, one history page (100) of each of the 30 most recently active conversations and five of the general channel, then `reactions.get` without and with `full` for the three messages with the largest counts. 43 calls, no rate limit, nothing failed or failed to decode. Counts only.
+
+| Count | Reactions | `users` shorter than `count` |
+| --- | --- | --- |
+| 1 | 667 | 0 |
+| 2 to 5 | 405 | 0 |
+| 6 to 10 | 247 | 0 |
+| 11 to 20 | 154 | 0 |
+| 21 to 50 | 14 | 0 |
+
+- 3,359 messages, 899 with reactions, 1,487 reactions. The largest count was 25, with 25 users listed. No reaction was cut short.
+- `reactions.get` for the three messages (counts 25, 22, 22 and smaller): every reaction listed `count` people, with and without `full`.
+
+So up to a count of 25, pages list everyone; above that it is Unknown, as is whether a cut list always includes the signed-in user (`me` is read from the list). Juno stores what a page lists, and the dialog's subscription calls `reactions.get` with `full` once per incomplete stored snapshot (`packages/sync/src/whoReacted.ts`). A later truncated page replaces the stored list and the open dialog refetches it; the same count and listed people do not prove the omitted people are unchanged. The fake cuts lists at 25 so tests exercise the full fetch.

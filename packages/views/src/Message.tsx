@@ -36,6 +36,8 @@ export interface MessageActions {
   readonly onReply?: (message: MessageView, options?: { readonly newTab: boolean }) => void
   /** The message menu at `at`. */
   readonly onMore: (message: MessageView, at: MenuAnchor) => void
+  /** Opens the reactions dialog on one emoji, under its chip (the card's See all). */
+  readonly onSeeReactions?: (message: MessageView, name: string, chip: HTMLElement) => void
   readonly onConfirmDelete: (message: MessageView) => void
   readonly onCancelDelete: () => void
 }
@@ -249,6 +251,8 @@ export const Message = memo(function Message({
     else event.currentTarget.style.removeProperty('--row-toolbar-display')
   }
   const toggle = onToggleReaction === undefined ? undefined : (reaction: string) => onToggleReaction(message.ts, reaction)
+  const seeReactions = actions?.onSeeReactions
+  const seeAll = seeReactions === undefined ? undefined : (name: string, chip: HTMLElement) => seeReactions(message, name, chip)
   const openMedia =
     onOpenMedia === undefined
       ? undefined
@@ -366,7 +370,7 @@ export const Message = memo(function Message({
           tabbable={tabbable}
           progress={pending === 'sending' ? progress : undefined}
         />
-        <Reactions reactions={message.reactions} onToggle={toggle} people={reactors ?? NO_PEOPLE} />
+        <Reactions reactions={message.reactions} onToggle={toggle} people={reactors ?? NO_PEOPLE} onSeeAll={seeAll} />
         {message.actionIssue !== undefined ? (
           <Text variant="meta" tone="muted" as="p" sx={styles.failed}>
             {message.actionIssue.kind === 'edit' ? 'Edit not sent.' : 'Delete not sent.'}{' '}

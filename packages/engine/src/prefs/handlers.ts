@@ -7,7 +7,7 @@ import { AiCredentials } from '../aiCredentials'
 import { EngineConfig } from '../config'
 import { MarkWorker } from '../markWorker'
 import { Workspace } from '../workspace'
-import { queryRecentEmoji, useEmoji } from './emoji'
+import { queryRecentEmoji, queryFrequentEmoji, useEmoji } from './emoji'
 
 export const PrefsHandlers = PrefsRoutes.toLayer(
   Effect.gen(function* () {
@@ -16,6 +16,7 @@ export const PrefsHandlers = PrefsRoutes.toLayer(
     const workspace = yield* Workspace
     const worker = yield* MarkWorker
     return {
+      'emoji.frequent': () => serveWorkspaceValue(workspace.changes, 'emoji.frequent', ['prefs', 'team', 'emoji'], queryFrequentEmoji),
       'emoji.recent': () => serveWorkspaceValue(workspace.changes, 'emoji.recent', keys.prefs, queryRecentEmoji),
       'emoji.use': ({ name }) => Effect.gen(function* () {
         const open = yield* workspace.current

@@ -76,7 +76,7 @@ interface CachedBody {
  * person, `dm` is their DM and `dm_main` the same once it has a Main, which
  * is what a click opens; null for anyone else.
  */
-type MessageUser = UserRow & { readonly is_bot: 0 | 1; readonly deleted: 0 | 1; readonly dm: string | null; readonly dm_main: string | null }
+export type MessageUser = UserRow & { readonly is_bot: 0 | 1; readonly deleted: 0 | 1; readonly dm: string | null; readonly dm_main: string | null }
 
 /** The users `ids` names, with the DM of each app and deactivated person (`MessageUser`), through `conversations_im_user`. */
 export function messageUsersStatement(ids: ReadonlyArray<string>): { readonly sql: string; readonly params: ReadonlyArray<unknown> } {
@@ -95,10 +95,10 @@ export function messageUsersStatement(ids: ReadonlyArray<string>): { readonly sq
  * does not know, or an app or deactivated person whose DM has no Main. A
  * person with no DM still opens Home addressed to them. Undefined: not read yet.
  */
-const unreachable = (user: MessageUser | null | undefined): boolean => user === null || ((user?.is_bot === 1 || user?.deleted === 1) && user.dm_main === null)
+export const unreachable = (user: MessageUser | null | undefined): boolean => user === null || ((user?.is_bot === 1 || user?.deleted === 1) && user.dm_main === null)
 
 /** `person` with its `unreachable` flag set to `flag`, the same object when it already is. */
-function reach(person: Person, flag: boolean): Person {
+export function reach(person: Person, flag: boolean): Person {
   if ((person.unreachable === true) === flag) return person
   if (flag) return { ...person, unreachable: true }
   const { unreachable: _unreachable, ...rest } = person
@@ -459,7 +459,7 @@ const readUsergroups = (sql: SqlClient.SqlClient, cache: MessageCache, ids: Iter
   })
 
 /** Custom emoji by name, following an alias to another custom emoji (`alias:name`) up to three times. */
-const readEmoji = (sql: SqlClient.SqlClient, cache: MessageCache, names: Iterable<string>) =>
+export const readEmoji = (sql: SqlClient.SqlClient, cache: Pick<MessageCache, 'emoji' | 'emojiAliases'>, names: Iterable<string>) =>
   Effect.gen(function* () {
     let missing = [...names].filter((name) => !cache.emoji.has(name))
     const aliases = new Map<string, string>()
@@ -508,6 +508,18 @@ function threadLink(
   }
 }
 
+/** A reaction's emoji as the views draw it: a standard emoji's text, or a custom emoji's image, from the emoji `readEmoji` read. */
+export function reactionEmoji(name: string, cache: Pick<MessageCache, 'emoji' | 'emojiAliases'>): { readonly unicode?: string; readonly url?: string } {
+  const standard = emojiUnicode(name)
+  if (standard !== undefined) return { unicode: standard }
+  const base = splitEmojiName(name).name
+  const url = cache.emoji.get(base) ?? undefined
+  if (url !== undefined) return { url }
+  const alias = cache.emojiAliases.get(base)
+  const unicode = alias === undefined ? undefined : emojiUnicode(alias)
+  return unicode === undefined ? {} : { unicode }
+}
+
 interface ShapeInput {
   readonly groupStart: boolean
   readonly isRoot: boolean
@@ -524,19 +536,13 @@ interface ShapeInput {
 function shapeRow(row: WindowMessage, body: CachedBody, input: ShapeInput): MessageView {
   const kind = row.deleted === 1 ? 'deleted' : STUB(row) ? 'unloaded' : 'message'
   const reactions: Array<ReactionView> = input.reactions.map((reaction) => {
-    const standard = emojiUnicode(reaction.name)
-    const base = splitEmojiName(reaction.name).name
-    const url = standard === undefined ? (input.cache.emoji.get(base) ?? undefined) : undefined
-    const alias = standard === undefined && url === undefined ? input.cache.emojiAliases.get(base) : undefined
-    const unicode = standard ?? (alias === undefined ? undefined : emojiUnicode(alias))
     const users = shownReactors(reaction.users, reaction.me === 1, input.selfId)
     return {
       name: reaction.name,
       count: reaction.count,
       me: reaction.me === 1,
       ...(users.length === 0 ? {} : { users }),
-      ...(unicode === undefined ? {} : { unicode }),
-      ...(url === undefined ? {} : { url }),
+      ...reactionEmoji(reaction.name, input.cache),
     }
   })
   const fields: Omit<MessageView, 'rev'> = {
@@ -590,7 +596,7 @@ function contentVersion(text: string, blocksJson: string | null): number {
 
 // Edits, deletes and reactions not yet in Slack
 
-interface ActionRow {
+export interface ActionRow {
   readonly created_at: string
   readonly id: number
   readonly kind: 'edit' | 'delete' | 'react'
@@ -598,7 +604,7 @@ interface ActionRow {
 }
 
 /** What the user has asked for one message: the text of an edit, a delete, reactions by name, and the newest reaction Slack has not taken. */
-interface Intent {
+export interface Intent {
   edit?: { readonly text: string; readonly blocksJson: string | null }
   deleted: boolean
   readonly reactions: Map<string, boolean>
@@ -607,11 +613,11 @@ interface Intent {
 }
 
 /** Intents by the message's ts and by its `client_msg_id`, for posts Slack did not have when the user acted. */
-type Intents = { readonly size: number; readonly byTs: Map<string, Intent>; readonly byClientMsgId: Map<string, Intent> }
+export type Intents = { readonly size: number; readonly byTs: Map<string, Intent>; readonly byClientMsgId: Map<string, Intent> }
 
 const emptyIntents: Intents = { size: 0, byTs: new Map(), byClientMsgId: new Map() }
 
-function intentsOf(rows: ReadonlyArray<ActionRow>): Intents {
+export function intentsOf(rows: ReadonlyArray<ActionRow>): Intents {
   const byTs = new Map<string, Intent>()
   const byClientMsgId = new Map<string, Intent>()
   for (const row of rows) {
@@ -632,7 +638,7 @@ function intentsOf(rows: ReadonlyArray<ActionRow>): Intents {
   return { size: rows.length, byTs, byClientMsgId }
 }
 
-const intentOf = (intents: Intents, row: Pick<WindowMessage, 'ts' | 'client_msg_id'>): Intent | undefined =>
+export const intentOf = (intents: Intents, row: Pick<WindowMessage, 'ts' | 'client_msg_id'>): Intent | undefined =>
   intents.size === 0 ? undefined : (intents.byTs.get(row.ts) ?? (row.client_msg_id === null ? undefined : intents.byClientMsgId.get(row.client_msg_id)))
 
 /**
@@ -659,9 +665,8 @@ function withIntents(rows: ReadonlyArray<WindowMessage>, intents: Intents, targe
   return out
 }
 
-/** Stored reactions with the user's own intents applied: theirs counted in or out, an emptied chip gone, a new one last. */
 /** A reaction as the store holds it: `users` is who Slack listed, which may be fewer than `count`. */
-interface StoredReaction {
+export interface StoredReaction {
   readonly name: string
   readonly count: number
   readonly me: 0 | 1
@@ -671,13 +676,19 @@ interface StoredReaction {
 /** How many people a reaction's popover names; the rest are "and N others". */
 const REACTORS_SHOWN = 10
 
-/** The reactors the view gets: you first when you reacted, then the others in Slack's order, at most REACTORS_SHOWN. */
-function shownReactors(users: ReadonlyArray<string>, me: boolean, selfId: string | undefined): ReadonlyArray<string> {
+/** Who reacted, in the order the views name them: you first when you reacted, then the others in Slack's order. */
+export function orderedReactors(users: ReadonlyArray<string>, me: boolean, selfId: string | undefined): ReadonlyArray<string> {
   const others = users.filter((id) => id !== selfId)
-  return (me && selfId !== undefined ? [selfId, ...others] : others).slice(0, REACTORS_SHOWN)
+  return me && selfId !== undefined ? [selfId, ...others] : others
 }
 
-function withReactionIntents(stored: ReadonlyArray<StoredReaction>, intents: ReadonlyMap<string, boolean>, selfId: string | undefined): ReadonlyArray<StoredReaction> {
+/** The reactors a message row gets: `orderedReactors`, at most REACTORS_SHOWN. The "who reacted" dialog gets them all (`reactors.ts`). */
+const shownReactors = (users: ReadonlyArray<string>, me: boolean, selfId: string | undefined): ReadonlyArray<string> =>
+  orderedReactors(users, me, selfId).slice(0, REACTORS_SHOWN)
+
+/** Stored reactions with the user's own intents applied: theirs counted in or out, an emptied chip gone, a new one last. */
+
+export function withReactionIntents(stored: ReadonlyArray<StoredReaction>, intents: ReadonlyMap<string, boolean>, selfId: string | undefined): ReadonlyArray<StoredReaction> {
   const out: Array<StoredReaction> = []
   const without = (users: ReadonlyArray<string>) => users.filter((id) => id !== selfId)
   for (const reaction of stored) {

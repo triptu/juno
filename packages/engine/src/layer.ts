@@ -34,6 +34,7 @@ import { PrefsHandlers } from './prefs/handlers'
 import { PresenceHandlers } from './presence/handlers'
 import { OthersPresence } from './presence/service'
 import { MessagesHandlers } from './messages/handlers'
+import { WhoReactedHandlers } from './messages/reactorsHandlers'
 import { MentionsHandlers } from './mentions/handlers'
 import { NewChatHandlers } from './newchat/handlers'
 import { NotificationsHandlers } from './notifications/handlers'
@@ -130,6 +131,7 @@ export const Handlers = Layer.mergeAll(StatusHandlers, SessionHandlers, TopicsHa
   Layer.merge(PresenceHandlers),
   Layer.merge(DevLogHandlers),
   Layer.merge(PicturesHandlers),
+  Layer.merge(WhoReactedHandlers),
 )
 
 /** The engine's side of the AgentHost port (ADR 0012): `JunoHost` over `Services`, with the engine phase from the status feature. */

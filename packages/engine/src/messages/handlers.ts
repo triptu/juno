@@ -59,7 +59,7 @@ const targetOf = (id: string): WindowTarget | undefined => {
 }
 
 /** Slack's answer as the contract says it (architecture 2.6). A decode or store error is a bug and dies. */
-const outcomeOf = (error: SlackApiError | SqlError): Effect.Effect<FetchOutcome> => {
+export const outcomeOf = (error: SlackApiError | SqlError): Effect.Effect<FetchOutcome> => {
   switch (error._tag) {
     case 'SlackTransportError':
       return Effect.succeed('offline')
