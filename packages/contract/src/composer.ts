@@ -28,6 +28,7 @@ export {
   emojiQueryAt,
   matchEmoji,
   mergeEmoji,
+  warmEmojiSearch,
   markupLayout,
   toggleMarkup,
   type MarkupLayout,

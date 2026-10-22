@@ -40,5 +40,5 @@ export { indexSubject, matchSubject, rankSearchResults, searchWords, type Indexe
 export { prepareEmojiPicker, type PreparedEmojiPicker, type PickerItem } from './emoji-picker'
 
 export { customEmoji } from './custom-emoji'
-export { matchEmoji, mergeEmoji } from './emoji-ranking'
+export { matchEmoji, mergeEmoji, warmEmojiSearch } from './emoji-ranking'
 export { dockBadgeActive, type BadgeTopic, type BadgeContext } from './dockBadge'
