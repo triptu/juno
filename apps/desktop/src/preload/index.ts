@@ -57,7 +57,7 @@ const bridge: JunoBridge = {
   app: {
     getInfo: () => ipcRenderer.invoke(Channels.appGetInfo),
     diagnostics: () => ipcRenderer.invoke(Channels.appDiagnostics),
-    logDiagnostics: () => ipcRenderer.invoke(Channels.appLogDiagnostics),
+    copyDiagnostics: (input) => ipcRenderer.invoke(Channels.appCopyDiagnostics, input),
     copySyncLog: (input) => ipcRenderer.invoke(Channels.appCopySyncLog, input),
     showLogs: () => ipcRenderer.invoke(Channels.appShowLogs),
     reportStagingFailure: (failure) => ipcRenderer.invoke(Channels.appReportStagingFailure, failure),

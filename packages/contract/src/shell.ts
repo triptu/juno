@@ -306,10 +306,13 @@ export function webPanelCanShow(url: string): boolean {
   return !BROWSER_ONLY_HOSTS.includes(hostname)
 }
 
-export const LogDiagnostics = Schema.Struct({
-  osVersion: Schema.String,
-  logs: Schema.Array(Schema.Struct({ process: Schema.Literals(['main', 'engine', 'agent']), lines: Schema.Array(Schema.String) })),
-})
+/**
+ * Copy diagnostics: the report the window builds (versions, processes, view,
+ * outbox counts). Main adds the logs, so they never pass through the window,
+ * and the window's clipboard route stays short.
+ */
+export const DiagnosticsCopy = Schema.Struct({ report: Schema.String.check(Schema.isMaxLength(16 * 1024)) })
+export type DiagnosticsCopy = typeof DiagnosticsCopy.Type
 /** What the sync notice's Copy log names: the engine phase's tag and, when it failed, why. */
 export const SyncLogInput = Schema.Struct({
   phase: Schema.String.check(Schema.isPattern(/^[a-z-]{1,32}$/)),

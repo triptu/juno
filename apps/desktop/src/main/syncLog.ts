@@ -2,11 +2,12 @@
  * The sync notice's Copy log (SPEC section 5, item 5): a block the user can
  * paste to us. The app and macOS versions, the sync phase and its reason, and
  * the last lines of engine.log, which the log writer has already filtered
- * (logging.ts `safeDetails`). Nothing else is added.
+ * (logging.ts `safeDetails`). Nothing else is added. Copy diagnostics in
+ * Settings › About ends with the same kind of lines, also added here in main.
  */
 import { release } from 'node:os'
 import type { SyncLogInput } from '@juno/contract'
-import { lastLines } from '../logging'
+import { lastLines, warningLines } from '../logging'
 
 /** How many engine.log lines the block carries. */
 export const SYNC_LOG_LINES = 200
@@ -25,5 +26,14 @@ export async function syncLogText(version: string, { phase, reason }: SyncLogInp
     `engine.log, last ${lines.length} lines:`,
     ...(lines.length ? lines : ['  None']),
     '',
+  ].join('\n')
+}
+
+/** What Copy diagnostics adds in main after About's report: the macOS version and the last 50 warnings and errors of each process. */
+export async function diagnosticsLogText(): Promise<string> {
+  const logs = await warningLines()
+  return [
+    osVersion(),
+    ...logs.flatMap((log) => ['', `${log.process}: last 50 warnings and errors`, ...(log.lines.length ? log.lines : ['  None'])]),
   ].join('\n')
 }

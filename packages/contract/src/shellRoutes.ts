@@ -16,10 +16,10 @@ import {
   ContextMenuItems,
   DensitySchema,
   Diagnostics,
+  DiagnosticsCopy,
   DownloadResult,
   HuddleMenu,
   HuddleRegistration,
-  LogDiagnostics,
   NotificationPermission,
   PortRequestResult,
   ProviderChange,
@@ -38,7 +38,7 @@ import {
 } from './shell'
 
 export const ShellRoutes = {
-  [Channels.appLogDiagnostics]: { input: Schema.Void, output: LogDiagnostics },
+  [Channels.appCopyDiagnostics]: { input: DiagnosticsCopy, output: Schema.Literals(['copied', 'failed']) },
   [Channels.appCopySyncLog]: { input: SyncLogInput, output: Schema.Literals(['copied', 'failed']) },
   [Channels.appShowLogs]: { input: Schema.Void, output: Schema.Void },
   [Channels.updatesGet]: { input: Schema.Void, output: UpdateState },

@@ -89,7 +89,7 @@ const bridge: JunoBridge = {
   app: {
     getInfo: () => Promise.resolve({ name: 'Juno', version: 'web', platform: 'darwin', electron: '' }),
     diagnostics: () => Promise.resolve({ processes: [], engine: 'web shell', agent: 'stopped', uptime: performance.now() / 1000, window: document.hasFocus() ? 'window focused' : 'window hidden' }),
-    logDiagnostics: () => Promise.resolve({ osVersion: navigator.userAgent, logs: [] }),
+    copyDiagnostics: (input) => navigator.clipboard.writeText((input as { report: string }).report).then(() => 'copied', () => 'failed'),
     copySyncLog: () => Promise.resolve('failed'),
     showLogs: nothing,
     reportStagingFailure: nothing,

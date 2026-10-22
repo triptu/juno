@@ -25,7 +25,7 @@ export const Channels = {
   appGetInfo: 'app.getInfo',
   /** Settings › About's diagnostics: each process's CPU and memory, and what the engine and agent supervisors are doing. */
   appDiagnostics: 'app.diagnostics',
-  appLogDiagnostics: 'app.logDiagnostics',
+  appCopyDiagnostics: 'app.copyDiagnostics',
   /** The sync notice's Copy log: main puts the app and macOS versions, the sync phase and the end of engine.log on the clipboard. */
   appCopySyncLog: 'app.copySyncLog',
   appShowLogs: 'app.showLogs',
@@ -200,7 +200,8 @@ export interface JunoBridge {
     /** A `Diagnostics`, answered by main. */
     readonly diagnostics: () => Promise<unknown>
     readonly reportStagingFailure: (failure: { readonly id: string; readonly reason: AttachmentFailure; readonly offset: number }) => Promise<void>
-    readonly logDiagnostics: () => Promise<unknown>
+    /** A `DiagnosticsCopy`; main adds the macOS version and recent warnings, writes the clipboard and answers 'copied' or 'failed'. */
+    readonly copyDiagnostics: (input: unknown) => Promise<unknown>
     /** A `SyncLogInput`; answers 'copied' or 'failed'. */
     readonly copySyncLog: (input: unknown) => Promise<unknown>
     readonly showLogs: () => Promise<unknown>

@@ -189,11 +189,7 @@ export async function popupContextMenu(items: ReadonlyArray<ContextMenuItem>, at
 
 /** Puts text on the clipboard. */
 export function copyText(text: string): void {
-  void writeClipboardText(text).catch(() => {})
-}
-
-export async function writeClipboardText(text: string): Promise<void> {
-  await window.juno.clipboard.writeText(text)
+  window.juno.clipboard.writeText(text).catch(() => {})
 }
 
 /** Opens a conversation in the Slack app. */

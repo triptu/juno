@@ -7,7 +7,7 @@
  */
 import { Effect, Schema } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
-import { AppState, Diagnostics, LogDiagnostics, SyncLogInput, engineOutbox, type AppInfo, type ProcessReading } from '@juno/contract'
+import { AppState, Diagnostics, DiagnosticsCopy, SyncLogInput, engineOutbox, type AppInfo, type ProcessReading } from '@juno/contract'
 import type { JunoBridge } from '@juno/contract/channels'
 import { command } from './atoms'
 import * as AtomRegistry from 'effect/reactivity/AtomRegistry'
@@ -81,17 +81,15 @@ async function readOutbox() {
   return Effect.runPromiseExit(AtomRegistry.getResult(registry, atom, { suspendOnWaiting: true }).pipe(Effect.timeout(2_000))).finally(unmount)
 }
 
-export async function diagnosticDetails(): Promise<string> {
-  const [logs, outbox] = await Promise.all([
-    window.juno.app.logDiagnostics().then(Schema.decodeUnknownSync(LogDiagnostics)),
-    readOutbox(),
-  ])
-  return [
-    logs.osVersion,
+/** Copy diagnostics: `report` and the outbox counts go to main, which adds the macOS version and each process's recent warnings and writes the clipboard. */
+export async function copyDiagnostics(report: string): Promise<boolean> {
+  const outbox = await readOutbox()
+  const text = [
+    report,
     'Outbox counts by kind and state:',
     ...(outbox._tag === 'Failure' || outbox.value === null ? ['  Unavailable'] : outbox.value.length === 0 ? ['  Empty'] : outbox.value.map((row) => `  ${row.kind} ${row.state}: ${row.count}`)),
-    ...logs.logs.flatMap((log) => ['', `${log.process}: last 50 warnings and errors`, ...(log.lines.length ? log.lines : ['  None'])]),
   ].join('\n')
+  return (await window.juno.app.copyDiagnostics(Schema.encodeSync(DiagnosticsCopy)({ report: text }))) === 'copied'
 }
 
 export async function showLogs(): Promise<void> { await window.juno.app.showLogs() }
