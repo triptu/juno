@@ -6,6 +6,7 @@ import { z } from '@juno/tokens/tokens.stylex'
 import { chunk } from '@juno/ui'
 import { hueFor } from './look'
 import type { Reactor } from './ReactorsCard'
+import { placeNear } from './reactorsPlace'
 
 // The card loads during the hover delay, so it stays out of the start bundle.
 const reactorsCard = chunk(() => import('./ReactorsCard'))
@@ -13,11 +14,10 @@ const ReactorsCard = reactorsCard.component((module) => module.ReactorsCard)
 
 /** How long the pointer or keyboard focus rests on a chip before its card shows: the tooltip's delay, as on macOS. */
 const DELAY_MS = 700
+/** The reactions dialog (`ReactionsPopover`), which no card shows over. */
+const DIALOG = '[data-reactions-dialog]'
 /** Time to cross the gap from the chip into the card before it hides. */
 const GRACE_MS = 150
-/** The card's gap from the chip, and from the window's edges (`--space-1-5`, `--space-2`). */
-const GAP = 6
-const EDGE = 8
 
 /**
  * The reactors of one reaction that the window's people know. When you
@@ -32,16 +32,6 @@ export function reactorsOf(reaction: ReactionView, people: ReadonlyMap<string, P
   })
 }
 
-/** Under the chip, its start on the chip's, moved in to stay inside the window; over it when there is no room below. */
-function place(card: HTMLElement, chip: HTMLElement): void {
-  const anchor = chip.getBoundingClientRect()
-  const box = card.getBoundingClientRect()
-  const x = Math.max(EDGE, Math.min(anchor.left, window.innerWidth - EDGE - box.width))
-  const below = anchor.bottom + GAP
-  const y = below + box.height <= window.innerHeight - EDGE ? below : Math.max(EDGE, anchor.top - GAP - box.height)
-  card.style.translate = `${Math.round(x)}px ${Math.round(y)}px`
-}
-
 interface Open {
   readonly name: string
   readonly chip: HTMLElement
@@ -54,7 +44,7 @@ interface Open {
  * after a press it stays hidden until the pointer leaves that chip. It is
  * fixed in a portal on `body`, so it moves nothing.
  */
-export function useReactorsPopover(reactions: ReadonlyArray<ReactionView>, people: ReadonlyMap<string, Person> | undefined) {
+export function useReactorsPopover(reactions: ReadonlyArray<ReactionView>, people: ReadonlyMap<string, Person> | undefined, onSeeAll?: (name: string, chip: HTMLElement) => void) {
   const id = useId()
   const [open, setOpen] = useState<Open | undefined>(undefined)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -67,10 +57,10 @@ export function useReactorsPopover(reactions: ReadonlyArray<ReactionView>, peopl
     clearTimeout(timer.current)
     timer.current = setTimeout(run, ms)
   }
-  // From one chip to the next while a card shows, the next one's shows at once.
+  // From one chip to the next while a card shows, the next one's shows at once. None shows while the reactions dialog is open.
   const show = (name: string, chip: HTMLElement) => {
     void reactorsCard.load()
-    if (people !== undefined && chip !== muted.current) later(() => setOpen({ name, chip }), open === undefined ? DELAY_MS : 0)
+    if (people !== undefined && chip !== muted.current) later(() => document.querySelector(DIALOG) === null && setOpen({ name, chip }), open === undefined ? DELAY_MS : 0)
   }
   const hideSoon = () => hide(true)
   const hide = (wait: boolean) => (wait ? later(() => setOpen(undefined), GRACE_MS) : (clearTimeout(timer.current), setOpen(undefined)))
@@ -83,7 +73,7 @@ export function useReactorsPopover(reactions: ReadonlyArray<ReactionView>, peopl
   useLayoutEffect(() => {
     const card = cardRef.current
     if (open === undefined || card === null) return
-    place(card, open.chip)
+    placeNear(card, open.chip)
     open.chip.setAttribute('aria-describedby', id)
     return () => open.chip.removeAttribute('aria-describedby')
   }, [open, id, ready])
@@ -107,7 +97,16 @@ export function useReactorsPopover(reactions: ReadonlyArray<ReactionView>, peopl
   })
 
   const reaction = open === undefined || !open.chip.isConnected ? undefined : reactions.find((each) => each.name === open.name)
-  const card = reaction === undefined || people === undefined || !ready ? null : <ReactorsLayer reaction={reaction} people={people} id={id} layerRef={cardRef} onEnter={cancel} onLeave={hideSoon} />
+  // See all hands over to the dialog: the card goes, and stays away until the pointer leaves the chip.
+  const seeAll =
+    onSeeAll === undefined || open === undefined
+      ? undefined
+      : () => {
+          muted.current = open.chip
+          hide(false)
+          onSeeAll(open.name, open.chip)
+        }
+  const card = reaction === undefined || people === undefined || !ready ? null : <ReactorsLayer reaction={reaction} people={people} id={id} layerRef={cardRef} onEnter={cancel} onLeave={hideSoon} onSeeAll={seeAll} />
   return { chipProps, card }
 }
 
@@ -135,10 +134,11 @@ interface ReactorsLayerProps {
   readonly layerRef: RefObject<HTMLDivElement | null>
   readonly onEnter: () => void
   readonly onLeave: () => void
+  readonly onSeeAll: (() => void) | undefined
 }
 
 /** The card for one reaction, fixed in a portal on `body`. */
-function ReactorsLayer({ reaction, people, id, layerRef, onEnter, onLeave }: ReactorsLayerProps) {
+function ReactorsLayer({ reaction, people, id, layerRef, onEnter, onLeave, onSeeAll }: ReactorsLayerProps) {
   const reactors = reactorsOf(reaction, people)
   return createPortal(
     <div ref={layerRef} {...stylex.props(styles.layer)}>
@@ -148,7 +148,8 @@ function ReactorsLayer({ reaction, people, id, layerRef, onEnter, onLeave }: Rea
         emoji={reaction.unicode ?? `:${reaction.name}:`}
         {...(reaction.url === undefined ? {} : { url: reaction.url })}
         reactors={reactors}
-        others={Math.max(0, reaction.count - reactors.length)}
+        count={Math.max(reaction.count, reactors.length)}
+        {...(onSeeAll === undefined ? {} : { onSeeAll })}
         onPointerEnter={onEnter}
         onPointerLeave={onLeave}
       />
@@ -158,7 +159,7 @@ function ReactorsLayer({ reaction, people, id, layerRef, onEnter, onLeave }: Rea
 }
 
 const styles = stylex.create({
-  // Fixed over the window, moved into place by `place` before it paints.
+  // Fixed over the window, moved into place by `placeNear` before it paints.
   layer: {
     position: 'fixed',
     top: 0,
