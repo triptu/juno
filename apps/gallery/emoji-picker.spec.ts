@@ -85,7 +85,8 @@ test('an alias saved in Settings marks its canonical emoji chosen in browse mode
 test('workspace aliases of standard emoji find their canonical glyph', async ({ page }) => {
   const picker = await regression(page)
   await picker.getByRole('textbox').fill('approval')
-  await expect(picker.locator('[data-emoji-results] [data-emoji]')).toHaveCount(1)
+  // The alias is an exact name, so it leads keyword matches such as 👏.
+  await expect(picker.locator('[data-emoji-results] [data-emoji]').first()).toHaveAttribute('data-emoji', '+1')
   await picker.getByRole('textbox').press('Enter')
   await expect(page.getByRole('status', { name: 'Picked emoji' })).toHaveText('+1')
   await expect(page.getByRole('status', { name: 'Picked glyph' })).toHaveText('👍')

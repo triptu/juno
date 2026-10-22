@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedOn": "2026-10-21",
+  "recordedOn": "2026-10-22",
   "counts": {
     "unusedFiles": 0,
     "unusedExports": 0,
@@ -40,8 +40,8 @@
     "packages/fake-slack/src/methods.ts",
     "packages/fake-slack/src/server.ts",
     "packages/fake-slack/src/state.ts",
-    "packages/pictures/src/thoughts.ts",
     "packages/richtext/src/emoji-catalog.ts",
+    "packages/richtext/src/emoji-keywords.ts",
     "packages/richtext/test/rendering.test.ts",
     "packages/state/src/tabs.ts",
     "packages/sync/src/boot.ts",
