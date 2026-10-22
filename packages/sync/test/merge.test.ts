@@ -12,6 +12,16 @@ const event = (at: number) => ({ kind: 'event' as const, eventTs: ts(at) })
 const partial = (at: number) => ({ kind: 'partial' as const, requestedAt: ts(at) })
 
 describe('mergeMessage', () => {
+  it('restores broadcasts from Slack flags and keeps them across older content', () => {
+    const reply = message({ ts: ts(2), thread_ts: ts(1), text: 'Updated plan', edited: { ts: ts(4) } })
+    const stored = toMessageRow(C, reply)
+    const incoming = message({ ts: ts(2), thread_ts: ts(1), text: 'Old plan', reply_broadcast: true })
+    expect(mergeMessage(undefined, incoming, C, page(5)).row.subtype).toBe('thread_broadcast')
+    const broadcast = mergeMessage(stored, incoming, C, event(5))
+    expect(broadcast.row).toMatchObject({ subtype: 'thread_broadcast', text: 'Updated plan' })
+    expect(mergeMessage(broadcast.row, { ...reply, subtype: 'file_share' }, C, page(3)).row.subtype).toBe('thread_broadcast')
+  })
+
   it('does not rewrite an unchanged Slack message because it has cached notification attention', () => {
     const incoming = message({ ts: ts(1) })
     const stored = { ...toMessageRow(C, incoming), attention: 2, attention_context: '{"userId":"U0SELF"}' }
