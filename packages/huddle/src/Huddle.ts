@@ -45,6 +45,8 @@ export interface HuddleSession {
   readonly statusRenewMillis?: number
   /** Tests only: how long the user may be alone in a call before Juno leaves (`alone.ts`; the app: 10 minutes). */
   readonly aloneLeaveMillis?: number
+  /** Tests only: how long a channel must be quiet before running huddles are read for it (`INFO_SETTLE_MILLIS`). */
+  readonly infoSettleMillis?: number
 }
 
 /** A socket event, or the `SocketEvents` marker for events dropped while the subscriber fell behind. */

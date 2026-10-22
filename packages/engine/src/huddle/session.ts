@@ -105,6 +105,7 @@ export const HuddleSessions = Layer.effectDiscard(Effect.gen(function* () {
       workspace: open.id,
       statusRenewMillis: timing.huddleStatusRenewMillis,
       aloneLeaveMillis: timing.huddleAloneMillis,
+      infoSettleMillis: timing.huddleInfoSettleMillis,
       slack: context,
       leaves: {
         read: readRecords.pipe(

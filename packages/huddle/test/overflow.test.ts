@@ -28,6 +28,7 @@ it('reads running huddles after an overflow that dropped the reconnect', async (
       slack: Context.make(SlackEdge, edge).pipe(Context.add(SlackApi, api)),
       leaves: { read: Effect.succeed([]), write: () => Effect.void },
       channels: Effect.succeed(['C1']),
+      infoSettleMillis: 100,
     })
     yield* listen({ _tag: 'Connected', fast: false })
     yield* readsAfter(1)

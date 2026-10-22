@@ -41,6 +41,10 @@ export interface Info {
   readonly dirty: Set<string>
   /** Bumped per channel by each room frame. */
   readonly frameGen: Map<string, number>
+  /** When each due channel may be read: Slack's edge lags its socket, so a read waits until the channel has been quiet a while (`reads.ts`). */
+  readonly quietAt: Map<string, number>
+  /** The same for the full read after a connect or `Overflowed`. */
+  allQuietAt: number
   readonly wake: Queue.Queue<void>
 }
 
@@ -187,11 +191,27 @@ export const settleWaiters = (core: Core) =>
     return Effect.forEach(done, ([, waiter]) => Deferred.succeed(waiter.deferred, { _tag: 'cancelled' }), { discard: true })
   })
 
+/**
+ * How long a channel must be quiet before `huddles/info` is read for it.
+ * Slack's edge answers from a moment ago: the spike saw it list the user as
+ * active after the room frame said they had left, and list the change about
+ * three seconds after the leave (research section 6). Read sooner, it can
+ * undo what a frame just said, and nothing would read the channel again.
+ */
+export const INFO_SETTLE_MILLIS = 3_000
+
+/** Slack may have changed `channel` (or every channel) just now: it is read once it has been quiet for the settle time. */
 export const markDue = (to: Attached, channel: string | 'all') =>
-  Effect.suspend(() => {
-    if (channel === 'all') to.info.dirtyAll = true
-    else to.info.dirty.add(channel)
-    return Queue.offer(to.info.wake, undefined)
+  Effect.gen(function* () {
+    const quietAt = (yield* Clock.currentTimeMillis) + (to.session.infoSettleMillis ?? INFO_SETTLE_MILLIS)
+    if (channel === 'all') {
+      to.info.dirtyAll = true
+      to.info.allQuietAt = quietAt
+    } else {
+      to.info.dirty.add(channel)
+      to.info.quietAt.set(channel, quietAt)
+    }
+    yield* Queue.offer(to.info.wake, undefined)
   })
 
 /** Rewrites the workspace's stored list. A failure is logged and kept for the next change to try again. */

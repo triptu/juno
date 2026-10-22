@@ -97,6 +97,8 @@ parent.on('message', (event) => {
               // Electron and the fake run in separate real processes, on a shared runner.
               socketHelloTimeoutMillis: productionTiming.socketHelloTimeoutMillis,
               socketPongTimeoutMillis: productionTiming.socketPongTimeoutMillis,
+              // Stands for how far Slack's edge lags its socket, which the fake keeps in real time (`setHuddleInfoLag`).
+              huddleInfoSettleMillis: productionTiming.huddleInfoSettleMillis,
             } }
           : {}),
       })
