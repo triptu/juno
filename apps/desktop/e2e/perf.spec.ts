@@ -180,34 +180,38 @@ test('row hover to paint', async ({ juno, win }) => {
   test.setTimeout(120_000)
   await juno.signIn()
   await juno.waitForSync()
-  const rows = juno.sidebar.rows
-  const count = Math.min(await rows.count(), 9)
-  const samples: number[] = []
-  for (let i = 0; i < count; i++) {
-    const row = rows.nth(i)
-    await row.scrollIntoViewIfNeeded()
-    const box = (await row.boundingBox())!
-    await win.mouse.move(900, 400)
-    await win.waitForTimeout(100)
-    // The row records the pointerover and the first moment after the next presented frame.
-    await row.evaluate((node) => {
-      const w = window as unknown as { __hoverSample?: Promise<number> }
-      w.__hoverSample = new Promise((resolve) => {
-        node.addEventListener(
-          'pointerover',
-          (event) => {
-            const start = event.timeStamp
-            requestAnimationFrame(() => setTimeout(() => resolve(performance.now() - start), 0))
-          },
-          { once: true },
-        )
+  const measureHovers = async () => {
+    const rows = juno.sidebar.rows
+    const count = Math.min(await rows.count(), 9)
+    const samples: number[] = []
+    for (let i = 0; i < count; i++) {
+      const row = rows.nth(i)
+      await row.scrollIntoViewIfNeeded()
+      const box = (await row.boundingBox())!
+      await win.mouse.move(900, 400)
+      await win.waitForTimeout(100)
+      // The row records the pointerover and the first moment after the next presented frame.
+      await row.evaluate((node) => {
+        const w = window as unknown as { __hoverSample?: Promise<number> }
+        w.__hoverSample = new Promise((resolve) => {
+          node.addEventListener(
+            'pointerover',
+            (event) => {
+              const start = event.timeStamp
+              requestAnimationFrame(() => setTimeout(() => resolve(performance.now() - start), 0))
+            },
+            { once: true },
+          )
+        })
       })
-    })
-    await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-    samples.push(await win.evaluate(() => (window as unknown as { __hoverSample: Promise<number> }).__hoverSample))
+      await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+      samples.push(await win.evaluate(() => (window as unknown as { __hoverSample: Promise<number> }).__hoverSample))
+    }
+    const hover = stats('row hover (pointerover event) to next frame presented', samples)
+    within('row hover, p95', hover.p95, oneFrameBudget(await refreshInterval(win)))
   }
-  const hover = stats('row hover (pointerover event) to next frame presented', samples)
-  within('row hover, p95', hover.p95, oneFrameBudget(await refreshInterval(win)))
+  if (process.env['JUNO_PERF_TRACE'] !== undefined) await traced(win, 'row-hover', measureHovers)
+  else await measureHovers()
 })
 
 /** Records the next pointerdown on the sidebar's Home button to Home painted in `window.__homeSample`. */
