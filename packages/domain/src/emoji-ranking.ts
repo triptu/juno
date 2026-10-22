@@ -24,7 +24,7 @@ const POPULAR = [
   '👌', '🚀', '✨', '👎', '🙅‍♀️', '🚫', '⛔', '😮', '🤦', '🤷', '😬', '🙈', '💔', '😞', '😔', '🥲', '😡', '👋',
   '☕', '🤩', '🥰', '😘',
   '😴', '😱', '🤯', '😳', '🙃', '😐', '🙄', '😤', '😩', '😕', '☹', '🙁', '😿', '💀', '👻', '💩', '🤖', '❌',
-  '✔', '☑', '💰', '💸', '🤑', '🍕', '🍺', '🍻', '🐶', '🐱', '⭐', '🌟', '☀', '🌧', '🐛', '🚢', '🎊', '🤝',
+  '✔', '☑', '💰', '💸', '🤑', '🍕', '🍺', '🍻', '🐶', '🐱', '⭐', '🌟', '☀', '🌧', '🐛', '🚢', '🎊', '🤝', '🆘', '🛟',
 ]
 
 /** What the search knows about a row: its names, its words and where it ranks among equals. */
@@ -40,6 +40,7 @@ interface Entry<E> {
   readonly nameWords: ReadonlyArray<ReadonlyArray<string>>
   /** Each name without separators, so `thumbs up` and `thumbsup` are the same. */
   readonly compact: ReadonlyArray<string>
+  readonly related: ReadonlyArray<string>
   readonly keywords: ReadonlyArray<string>
   /** Every name word and keyword after a space, to reject a row with one `includes`. */
   readonly words: string
@@ -55,16 +56,16 @@ const plain = (glyph: string) => glyph.replaceAll('️', '')
 const wordsOf = (text: string): ReadonlyArray<string> => text.toLowerCase().replace(/(?!^)-/g, ' ').split(/[\s_:]+/).filter((word) => word !== '')
 
 /** Each standard glyph's search words and catalog position. Built on the first search. */
-let standard: ReadonlyMap<string, { readonly keywords: ReadonlyArray<string>; readonly order: number }> | undefined
+let standard: ReadonlyMap<string, { readonly keywords: ReadonlyArray<string>; readonly related: ReadonlyArray<string>; readonly order: number }> | undefined
 function standardInfo() {
   if (standard !== undefined) return standard
   const lines = emojiKeywordData.split('\n')
-  const info = new Map<string, { keywords: ReadonlyArray<string>; order: number }>()
+  const info = new Map<string, { keywords: ReadonlyArray<string>; related: ReadonlyArray<string>; order: number }>()
   let order = 0
   for (const category of emojiCatalog) {
     for (const emoji of category.emoji) {
-      const line = lines[order] ?? ''
-      info.set(plain(emoji.unicode), { keywords: line === '' ? [] : line.split(' '), order })
+      const [chat = '', related = ''] = (lines[order] ?? '').split('|')
+      info.set(plain(emoji.unicode), { keywords: chat === '' ? [] : chat.split(' '), related: related === '' ? [] : related.split(' '), order })
       order += 1
     }
   }
@@ -74,22 +75,23 @@ function standardInfo() {
 
 type Row = Omit<EmojiChoice, 'id' | 'insert'> & { readonly insert?: string; readonly unicode?: string }
 
-function entryOf<E extends Row>(row: E): Entry<E> {
+function entryOf<E extends Row>(row: E, withKeywords = true, order = Infinity): Entry<E> {
   const glyph = row.url === undefined ? row.unicode ?? row.insert : undefined
-  const info = glyph === undefined ? undefined : standardInfo().get(plain(glyph))
+  const info = !withKeywords || glyph === undefined ? undefined : standardInfo().get(plain(glyph).replace(/[\u{1F3FB}-\u{1F3FF}]/gu, ''))
   const names = row.keys ?? [row.name, ...row.aliases ?? []].map((name) => name.toLowerCase())
   const nameWords = names.map(wordsOf)
   const keywords = info?.keywords ?? []
   return {
     row,
-    key: glyph === undefined ? `w:${row.insert ?? row.url ?? row.name}` : `g:${plain(glyph)}`,
+    key: glyph === undefined ? `w:${row.insert ?? row.name}` : `g:${plain(glyph)}`,
     custom: glyph === undefined,
-    order: info?.order ?? Infinity,
+    order: info?.order ?? order,
     names,
     nameWords,
     compact: nameWords.map((words) => words.join('')),
     keywords,
-    words: ` ${[...nameWords.flat(), ...keywords].join(' ')}`,
+    related: info?.related ?? [],
+    words: ` ${[...nameWords.flat(), ...keywords, ...info?.related ?? []].join(' ')}`,
   }
 }
 
@@ -112,6 +114,8 @@ function indexOf<E extends Row>(rows: ReadonlyArray<E>): ReadonlyArray<Entry<E>>
   return index
 }
 
+export const isEmojiSearchWarm = (rows: ReadonlyArray<Row>): boolean => indexes.has(rows)
+
 /** Builds the search index for `rows` ahead of the first keystroke: about 10 ms for the standard emoji. */
 export function warmEmojiSearch(rows: ReadonlyArray<Row>): void {
   indexOf(rows)
@@ -122,7 +126,8 @@ const NONE = 99
  * Match tiers, best first:
  * 0 a name or alias is the query; 1 every query word is a name word or keyword;
  * 2 a name starts with the query; 3 every query word starts a name word;
- * 4 every query word starts a name word or keyword; 5, only when nothing else matched, a typo away.
+ * 4 every query word starts a name word or curated keyword; 5 a CLDR word;
+ * 6 a CLDR word prefix; 7, only when nothing else matched, a typo away.
  */
 function tierOf(entry: Entry<Row>, query: Query): { readonly tier: number; readonly byName: boolean } {
   let tier = NONE
@@ -146,6 +151,10 @@ function tierOf(entry: Entry<Row>, query: Query): { readonly tier: number; reado
         if (own === word) { best = 1; break }
         if (best > 4 && own.startsWith(word)) best = 4
       }
+    }
+    if (best > 5) for (const own of entry.related) {
+      if (own === word) { best = 5; break }
+      if (own.startsWith(word)) best = 6
     }
     worst = Math.max(worst, best)
     named &&= found
@@ -183,20 +192,20 @@ function nearly(word: string, own: string): boolean {
  * popular emoji, then name matches before keyword matches, standard before workspace, and catalog or name order.
  * A typo is forgiven only when nothing matches as typed. Each emoji appears once, under its best-matching name.
  */
-export function matchEmoji<E extends Row>(rows: ReadonlyArray<E>, search: string, frequent: ReadonlyArray<string>, quick: ReadonlyArray<EmojiPrior>, limit = EMOJI_ROWS_MAX): ReadonlyArray<E> {
+export function matchEmoji<E extends Row>(rows: ReadonlyArray<E>, search: string, frequent: ReadonlyArray<string>, quick: ReadonlyArray<EmojiPrior>, limit = EMOJI_ROWS_MAX, ready = true): ReadonlyArray<E> {
   const words = wordsOf(search)
   if (words.length === 0) return []
   const query = { words, compact: words.join('') }
-  const index = indexOf(rows)
+  const index = ready ? indexOf(rows) : rows.map((row, order) => entryOf(row, false, order))
   const found: Array<{ readonly entry: Entry<E>; readonly tier: number; readonly byName: boolean }> = []
   for (const entry of index) {
     if (!entry.compact.some((compact) => compact.startsWith(query.compact)) && !words.every((word) => entry.words.includes(` ${word}`))) continue
     const { tier, byName } = tierOf(entry, query)
     if (tier !== NONE) found.push({ entry, tier, byName })
   }
-  if (found.length === 0) {
+  if (ready && found.length === 0) {
     for (const entry of index) {
-      if (words.every((word) => entry.nameWords.some((own) => own.some((name) => nearly(word, name))) || entry.keywords.some((own) => nearly(word, own)))) found.push({ entry, tier: 5, byName: false })
+      if (words.every((word) => entry.nameWords.some((own) => own.some((name) => nearly(word, name))) || [...entry.keywords, ...entry.related].some((own) => nearly(word, own)))) found.push({ entry, tier: 7, byName: false })
     }
   }
   const rank = priors(index, frequent, quick)
@@ -218,18 +227,18 @@ function priors(index: ReadonlyArray<Entry<Row>>, frequent: ReadonlyArray<string
   const rank = new Map<string, number>()
   const add = (key: string | undefined) => { if (key !== undefined && !rank.has(key)) rank.set(key, rank.size) }
   for (const name of frequent) add(keys.get(splitEmojiName(name.toLowerCase()).name))
-  for (const reaction of quick) add(reaction.url === undefined ? `g:${plain(reaction.unicode)}` : keys.get(reaction.name.toLowerCase()))
+  for (const reaction of quick) add(reaction.url === undefined ? `g:${plain(reaction.unicode).replace(/[\u{1F3FB}-\u{1F3FF}]/gu, '')}` : keys.get(reaction.name.toLowerCase()))
   for (const glyph of POPULAR) add(`g:${plain(glyph)}`)
   return rank
 }
 
-/** Every name to its emoji's key, the first row winning, built once per row list. */
+/** Workspace names override standard names, as Slack resolves a saved shortcode. */
 const names = new WeakMap<ReadonlyArray<Entry<Row>>, ReadonlyMap<string, string>>()
 function keysByName(index: ReadonlyArray<Entry<Row>>): ReadonlyMap<string, string> {
   let keys = names.get(index)
   if (keys === undefined) {
     const map = new Map<string, string>()
-    for (const entry of index) for (const name of entry.names) if (!map.has(name)) map.set(name, entry.key)
+    for (const entry of index) for (const name of entry.names) if (!map.has(name) || entry.custom) map.set(name, entry.key)
     names.set(index, keys = map)
   }
   return keys
