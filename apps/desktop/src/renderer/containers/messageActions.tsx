@@ -34,7 +34,7 @@ import { selectionBar, useSelectionQuote } from './topic/messageOverlays'
 // The edit field shows only after Edit or E, so it loads when idle once a topic has mounted.
 const editField = chunk(() => import('./EditFieldPanel'))
 const EditField = editField.component((module) => module.EditField)
-// The reactions dialog opens from a card's See all or the message menu, so it loads when idle too.
+// The reactions dialog opens from a card's See all, so it loads when idle too.
 const reactionsDialog = chunk(() => import('./ReactionsDialogPanel'))
 const ReactionsDialog = reactionsDialog.component((module) => module.ReactionsDialogPanel)
 

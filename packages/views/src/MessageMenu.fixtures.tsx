@@ -48,7 +48,6 @@ const mainSelection: ReadonlyArray<MessageMenuEntry> = [
   { id: 'copy', label: 'Copy', icon: 'copy' },
   { id: 'forward', label: 'Forward…', icon: 'forward' },
   { id: 'open-in-slack', label: 'Open in Slack', icon: 'open' },
-  { id: 'reactions', label: 'View reactions', icon: 'reactions' },
 ]
 /** Your own reply in a thread. */
 const own: ReadonlyArray<MessageMenuEntry> = [

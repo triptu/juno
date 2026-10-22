@@ -14,7 +14,7 @@ import { openMessageMenu } from '../messageMenu'
 import { isOwnEditable, landedTs } from '../messageRows'
 import { showPersonMenu } from '../notifyActions'
 import { broadcastLabel, openTopicInSlack, type ActionTopic } from '../topicActions'
-import { firstReaction, rowOf, textOf, type Latest, type SeeingReactions } from './messageCommands'
+import { rowOf, textOf, type Latest } from './messageCommands'
 
 const SEPARATOR: MessageMenuEntry = { separator: true }
 const item = (id: string, label: string, icon: MessageMenuIcon, disabled = false): MessageMenuEntry => ({ id, label, icon, ...(disabled ? { disabled } : {}) })
@@ -35,7 +35,7 @@ export interface MenuFacts {
 
 /**
  * The rows, in groups: Start thread or Open thread (Main), Quote, Ask Juno;
- * Copy text, Forward…, Open in Slack, View reactions; on your own, Also send
+ * Copy text, Forward…, Open in Slack; on your own, Also send
  * to #eng (a thread reply) and Tell me if nobody replies; then Edit and Delete….
  */
 export function topicMenuItems({ topic, message, editable, own, selection, juno, mayWatch }: MenuFacts): ReadonlyArray<MessageMenuEntry> {
@@ -51,8 +51,6 @@ export function topicMenuItems({ topic, message, editable, own, selection, juno,
     item('copy', selection === undefined ? 'Copy text' : 'Copy', 'copy'),
     item('forward', 'Forward…', 'forward', !linkable || message.kind !== 'message'),
     item('open-in-slack', 'Open in Slack', 'open'),
-    // The keyboard's way to the reactions dialog; the pointer also has the card's See all.
-    ...(message.reactions.length > 0 ? [item('reactions', 'View reactions', 'reactions')] : []),
     ...(broadcastable || (own && linkable) ? [SEPARATOR] : []),
     ...(broadcastable ? [item('broadcast', broadcastLabel(topic.channel), 'broadcast')] : []),
     ...(own && linkable ? [item('watch-reply', 'Tell me if nobody replies', 'bell', !mayWatch)] : []),
@@ -95,7 +93,6 @@ export interface MenuInput {
   readonly composer: RefObject<ComposerHandle | null>
   readonly latest: Latest
   readonly setMenuMessage: Dispatch<SetStateAction<string | undefined>>
-  readonly setReactions: Dispatch<SetStateAction<SeeingReactions | undefined>>
   /** Toggles your reaction; `on` forces it. */
   readonly react: (message: MessageView, name: string, on?: boolean) => void
   readonly startEdit: (message: MessageView) => void
@@ -110,7 +107,7 @@ export interface MenuInput {
  * it in a background tab: this tab, its scroll and its focus stay (SPEC 7).
  */
 function choose(id: string, now: MessageView, input: MenuInput, selection: string | undefined, metaKey: boolean): void {
-  const { channel, scrollRef, composer, latest, setReactions, startEdit, askDelete, reply } = input
+  const { channel, scrollRef, composer, latest, startEdit, askDelete, reply } = input
   const { detail } = latest.current
   const text = () => selection ?? textOf(scrollRef.current, now.ts)
   switch (id) {
@@ -128,8 +125,6 @@ function choose(id: string, now: MessageView, input: MenuInput, selection: strin
       return now.pending === undefined && now.kind === 'message' ? openForward(channel, now, latest.current) : undefined
     case 'open-in-slack':
       return openTopicInSlack(detail)
-    case 'reactions':
-      return setReactions((current) => firstReaction(scrollRef, now) ?? current)
     case 'broadcast':
       // Main shows the reply at once and the thread marks it; the outbox sends it. The engine refuses a reply deleted meanwhile.
       return void broadcastMessage(registry, { channelId: detail.channel.id, ts: now.ts })

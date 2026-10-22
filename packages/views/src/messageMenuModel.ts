@@ -20,7 +20,7 @@ export interface GridReaction {
 export const GRID_REACTIONS = 11
 
 /** The icons a menu row may have, by name, so containers need no icon set. */
-export type MessageMenuIcon = 'thread' | 'reply' | 'quote' | 'juno' | 'copy' | 'forward' | 'open' | 'bell' | 'edit' | 'delete' | 'pin' | 'broadcast' | 'reactions'
+export type MessageMenuIcon = 'thread' | 'reply' | 'quote' | 'juno' | 'copy' | 'forward' | 'open' | 'bell' | 'edit' | 'delete' | 'pin' | 'broadcast'
 
 /** A row of the message menu, or a separator between groups. */
 export type MessageMenuEntry = { readonly id: string; readonly label: string; readonly icon: MessageMenuIcon; readonly disabled?: boolean } | { readonly separator: true }

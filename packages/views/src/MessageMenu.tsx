@@ -9,7 +9,6 @@ import { Megaphone } from '@phosphor-icons/react/dist/icons/Megaphone'
 import { PencilSimple } from '@phosphor-icons/react/dist/icons/PencilSimple'
 import { PushPin } from '@phosphor-icons/react/dist/icons/PushPin'
 import { Quotes } from '@phosphor-icons/react/dist/icons/Quotes'
-import { Smiley } from '@phosphor-icons/react/dist/icons/Smiley'
 import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { Trash } from '@phosphor-icons/react/dist/icons/Trash'
 import { useLayoutEffect, useState } from 'react'
@@ -37,7 +36,6 @@ const ICONS: Record<MessageMenuIcon, PhosphorIcon> = {
   delete: Trash,
   pin: PushPin,
   broadcast: Megaphone,
-  reactions: Smiley,
 }
 
 const withIcons = (items: ReadonlyArray<MessageMenuEntry>): ReadonlyArray<ContextMenuEntry> =>

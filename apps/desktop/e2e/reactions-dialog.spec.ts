@@ -84,18 +84,11 @@ test('See all on the card opens every reaction, and the strip changes the list',
   await expect(chip).toBeFocused()
 })
 
-test('View reactions in the message menu opens the dialog on the first emoji', async ({ juno, fake }) => {
+test('the message menu has no View reactions: the chip’s card opens the dialog', async ({ juno, fake }) => {
   fake.seedManyReactions({ channel: 'C0ENG' })
   await juno.sidebar.row('#eng').open()
   const row = juno.topic.message(TEXT)
   await expect(row.getByRole('button', { name: '40 👍, including you' })).toBeVisible()
   const { labels } = await juno.topic.chooseInMessageMenu(TEXT, null)
-  expect(labels.indexOf('View reactions')).toBe(labels.indexOf('Open in Slack') + 1)
-  await juno.topic.chooseInMessageMenu(TEXT, 'reactions')
-  const dialog = juno.win.getByRole('dialog', { name: 'Reactions' })
-  await expect(dialog.getByRole('tab', { selected: true })).toHaveAccessibleName('40 👍, including you')
-  // A press outside closes it.
-  await juno.topic.expectTitle('Main')
-  await juno.win.mouse.click(5, 300)
-  await expect(dialog).toHaveCount(0)
+  expect(labels).not.toContain('View reactions')
 })

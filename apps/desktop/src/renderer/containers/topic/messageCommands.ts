@@ -79,13 +79,6 @@ export function anchorFor(row: HTMLElement, at: MenuAt | undefined): MenuPoint {
   return { x: top.left, y: Math.min(box.bottom, top.top + line) }
 }
 
-/** View reactions in the message menu: the dialog on the first emoji, under its chip. */
-export function firstReaction(scrollRef: RefObject<HTMLElement | null>, message: MessageView): SeeingReactions | undefined {
-  const chip = rowOf(scrollRef.current, message.ts)?.querySelector<HTMLElement>('[data-reaction]')
-  const first = message.reactions[0]
-  return chip === null || chip === undefined || first === undefined ? undefined : { ts: message.ts, name: first.name, anchor: chip }
-}
-
 /** The rows' handlers, created once per topic (performance 5.1); they read the latest state through `latest`. */
 export function useMessageCommands({ channel, scrollRef, composer, latest, setEditing, setConfirming, setMenuMessage, setReactions }: CommandsInput) {
   return useMemo(() => {
@@ -132,7 +125,7 @@ export function useMessageCommands({ channel, scrollRef, composer, latest, setEd
       },
     }
     // The menu and what its rows do load when idle (`../messageMenu.tsx`).
-    const input: MenuInput = { channel, scrollRef, composer, latest, setMenuMessage, setReactions, react, startEdit, askDelete, reply }
+    const input: MenuInput = { channel, scrollRef, composer, latest, setMenuMessage, react, startEdit, askDelete, reply }
     const menu = (message: MessageView, anchor: MenuPoint, onSender = false) => withMenus((menus) => menus.topicMenu(input, message, anchor, onSender))
     return { ...handlers, menu }
     // `channel` is fixed for a topic tab; the rest is read through refs.
