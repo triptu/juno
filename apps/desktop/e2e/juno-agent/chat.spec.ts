@@ -85,6 +85,20 @@ test('the Juno tab sends a message at once and shows the answer, both ways a rea
   await expect(rich).not.toContainText('*')
 })
 
+test('Copy in a chat message\'s menu puts all of a long message on the clipboard', async ({ juno }) => {
+  await ready(juno)
+  await junoNav(juno).click()
+  const chat = JunoChatPane.tab(juno.win)
+  // Over the old 2048-character limit and like a long Slack message: 5,000 characters of plain words.
+  const long = 'Notes for the copy check, one line of many. '.repeat(114).slice(0, 5_000).trim()
+  await chat.send(long)
+  await chat.expectOwner(long.slice(0, 200))
+  await juno.app.evaluate(({ clipboard }) => clipboard.clear())
+  await (await chat.menu(long.slice(0, 200), { owner: true })).choose('copy')
+  await expect.poll(() => juno.clipboard()).toBe(long)
+  await expect(juno.win.getByText('Could not copy')).toHaveCount(0)
+})
+
 test('two Juno tabs show the one chat: a message sent in one shows in both', async ({ juno }) => {
   await ready(juno)
   await junoNav(juno).click()

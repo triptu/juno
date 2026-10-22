@@ -58,6 +58,11 @@ export function safeDetails(value: unknown, depth = 0, seen = new Set<unknown>()
       if (typeof field === 'string' && allowed.includes(field)) parts.push(`${key}=${field}`)
     }
   }
+  if ('channel' in value) {
+    // An IPC channel name from main's own route table, such as "clipboard.writeText".
+    const channel: unknown = Reflect.get(value, 'channel')
+    if (typeof channel === 'string' && channel.length <= 80 && /^[a-z]+(?:\.[a-zA-Z]+)+$/.test(channel)) parts.push(`channel=${channel}`)
+  }
   for (const key of FIELDS) {
     if (!(key in value)) continue
     const field: unknown = Reflect.get(value, key)

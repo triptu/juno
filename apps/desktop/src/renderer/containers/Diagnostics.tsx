@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Effect } from 'effect'
 import type { Diagnostics as Reading } from '@juno/contract'
-import { appInfoAtom, appStateAtom, writeClipboardText, diagnosticDetails, showLogs, describeTabs, diagnosticsReport, formatCpu, readDiagnostics, tabsAtom } from '@juno/state'
+import { appInfoAtom, appStateAtom, copyDiagnostics, showLogs, describeTabs, diagnosticsReport, formatCpu, readDiagnostics, tabsAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { ProcessesView, type ProcessRow } from '@juno/views'
 import { EngineStatus, useEngineLine } from './EngineStatus'
@@ -42,9 +42,9 @@ export function Diagnostics() {
     clearTimeout(cleared.current)
     void Effect.runPromise(readDiagnostics).then(async (fresh) => {
       setReading(fresh)
-      const details = await diagnosticDetails()
-      await writeClipboardText(`${diagnosticsReport({ app: app._tag === 'Success' ? app.value : undefined, diagnostics: fresh, engineLine: line, view, tabs, at: new Date() })}\n${details}`)
-      setCopied('Copied')
+      // Main logs a failure there, with no content.
+      const copied = await copyDiagnostics(diagnosticsReport({ app: app._tag === 'Success' ? app.value : undefined, diagnostics: fresh, engineLine: line, view, tabs, at: new Date() }))
+      setCopied(copied ? 'Copied' : 'Could not copy')
     }).catch(() => setCopied('Could not copy')).finally(() => {
       cleared.current = setTimeout(() => setCopied(undefined), 2_000)
     })

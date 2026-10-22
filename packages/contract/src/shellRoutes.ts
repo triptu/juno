@@ -16,10 +16,10 @@ import {
   ContextMenuItems,
   DensitySchema,
   Diagnostics,
+  DiagnosticsCopy,
   DownloadResult,
   HuddleMenu,
   HuddleRegistration,
-  LogDiagnostics,
   NotificationPermission,
   PortRequestResult,
   ProviderChange,
@@ -38,7 +38,7 @@ import {
 } from './shell'
 
 export const ShellRoutes = {
-  [Channels.appLogDiagnostics]: { input: Schema.Void, output: LogDiagnostics },
+  [Channels.appCopyDiagnostics]: { input: DiagnosticsCopy, output: Schema.Literals(['copied', 'failed']) },
   [Channels.appCopySyncLog]: { input: SyncLogInput, output: Schema.Literals(['copied', 'failed']) },
   [Channels.appShowLogs]: { input: Schema.Void, output: Schema.Void },
   [Channels.updatesGet]: { input: Schema.Void, output: UpdateState },
@@ -99,7 +99,8 @@ export const ShellRoutes = {
     output: DownloadResult,
   },
   [Channels.clipboardWriteImage]: { input: Schema.Struct({ src: Schema.String.check(Schema.isMaxLength(8192)) }), output: Schema.Literals(['copied', 'failed']) },
-  [Channels.clipboardWriteText]: { input: Schema.Struct({ text: Schema.String.check(Schema.isMaxLength(2048)) }), output: Schema.Void },
+  // Room for Slack's longest message (40,000 characters) with some to spare. Logs are copied in main, never through here.
+  [Channels.clipboardWriteText]: { input: Schema.Struct({ text: Schema.String.check(Schema.isMaxLength(64 * 1024)) }), output: Schema.Void },
   [Channels.shellEditUndo]: { input: Schema.Void, output: Schema.Void },
   [Channels.notificationsViewing]: { input: Schema.Struct({ topicId: Schema.NullOr(Schema.String) }), output: Schema.Void },
   [Channels.notificationsContentShown]: { input: Schema.Void, output: Schema.Void },

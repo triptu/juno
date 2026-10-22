@@ -18,6 +18,13 @@ it('keeps only checked schema paths and issue kinds on SlackDecodeError', () => 
   for (const kind of ['wrong_type', 'invalid']) expect(safeDetails({ _tag: 'SlackDecodeError', schemaPath: 'threads[0].root_msg', issueKind: kind })).toContain(`issueKind=${kind}`)
 })
 
+it('keeps a checked IPC channel name and drops any other string in its place', () => {
+  expect(safeDetails({ channel: 'clipboard.writeText', cause: { _tag: 'SchemaError' } })).toBe('channel=clipboard.writeText cause=SchemaError')
+  for (const channel of ['private message text', 'clipboard', '/Users/private/file', 'app.copy diagnostics', `app.${'a'.repeat(80)}`, 42]) {
+    expect(safeDetails({ channel })).toBe('')
+  }
+})
+
 it('writes the Slack cause and method for a boot warning without the decode message', async () => {
   const folder = await mkdtemp(join(tmpdir(), 'juno-logs-'))
   const logger = createLog('engine', folder)

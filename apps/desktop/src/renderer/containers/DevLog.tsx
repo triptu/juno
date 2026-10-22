@@ -55,10 +55,12 @@ export function DevLogTab() {
       detail={detail}
       copied={copied}
       onCopy={(value) => {
-        copyText(value)
-        setCopied('Copied')
-        clearTimeout(copiedTimer.current)
-        copiedTimer.current = setTimeout(() => setCopied(undefined), COPIED_MS)
+        void copyText(value).then((done) => {
+          if (!done) return
+          setCopied('Copied')
+          clearTimeout(copiedTimer.current)
+          copiedTimer.current = setTimeout(() => setCopied(undefined), COPIED_MS)
+        })
       }}
       onShowMore={paused === undefined && total !== undefined && total > rows.length && limit < DEV_LOG_CAPACITY
         ? () => registry.set(devLogLimitAtom, Math.min(DEV_LOG_CAPACITY, limit + DEV_LOG_PAGE))

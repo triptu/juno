@@ -74,6 +74,7 @@ export async function showLinkMenu(url: string, at: { readonly x: number; readon
     case 'open-juno':
       return openWebPanelInJuno(registry, url)
     case 'copy-link':
-      return copyText(url)
+      await copyText(url)
+      return
   }
 }

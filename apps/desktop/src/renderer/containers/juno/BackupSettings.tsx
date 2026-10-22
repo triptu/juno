@@ -88,8 +88,7 @@ export function useBackupSettings(): { readonly props: BackupProps; readonly she
         phrase={sheet.phrase}
         copied={sheet.copied}
         onCopy={() => {
-          copyText(sheet.phrase)
-          setSheet({ ...sheet, copied: true })
+          void copyText(sheet.phrase).then((done) => { if (done) setSheet({ ...sheet, copied: true }) })
         }}
         onDone={close}
       />

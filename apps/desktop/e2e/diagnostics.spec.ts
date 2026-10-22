@@ -12,9 +12,10 @@ test('About shows every process, copies content-free diagnostics and rotates eac
   const folder = join(userData, 'logs')
   await mkdir(folder, { recursive: true })
   for (const name of ['main', 'engine', 'agent']) {
-    // A full previous log makes the real process writer rotate on its first append.
-    const warning = `2026-10-18T00:00:00.000Z WARN ${name} outbox row failed rowId=42\n`
-    await writeFile(join(folder, `${name}.log`), ' '.repeat(LOG_LIMIT - warning.length - 1) + '\n' + warning)
+    // A full previous log makes the real process writer rotate on its first append. Fifty warnings each, as
+    // a long-running install has, make the report far longer than a link or a line of text.
+    const warnings = Array.from({ length: 50 }, (_, n) => `2026-10-18T00:00:00.000Z WARN ${name} outbox row failed rowId=${n + 1}\n`).join('')
+    await writeFile(join(folder, `${name}.log`), ' '.repeat(LOG_LIMIT - warnings.length - 1) + '\n' + warnings)
   }
   const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, agent: true })
   try {
@@ -29,9 +30,11 @@ test('About shows every process, copies content-free diagnostics and rotates eac
     await juno.openSettings('About')
     const table = win.getByRole('region', { name: 'Processes' })
     for (const name of processes) await expect(table.locator(`[data-process="${name}"]`)).toBeVisible()
+    await app.evaluate(({ clipboard }) => clipboard.clear())
     await win.getByRole('button', { name: 'Copy diagnostics', exact: true }).click()
     await expect(win.getByText('Copied', { exact: true })).toBeVisible()
     const report = await app.evaluate(({ clipboard }) => clipboard.readText())
+    expect(report.length).toBeGreaterThan(4096)
     expect(report).toContain('Juno diagnostics')
     expect(report).toContain('Outbox counts by kind and state:')
     expect(report).toContain('post failed: 1')
@@ -40,7 +43,8 @@ test('About shows every process, copies content-free diagnostics and rotates eac
     for (const name of processes) expect(report).toContain(name)
     for (const name of ['main', 'engine', 'agent']) {
       expect(report).toContain(`${name}: last 50 warnings and errors`)
-      expect(report).toContain(`WARN ${name} outbox row failed rowId=42`)
+      // The newest seeded warning. Warnings this run writes may push the oldest out of the last 50.
+      expect(report).toMatch(new RegExp(`WARN ${name} outbox row failed rowId=50$`, 'm'))
       await expect.poll(async () => (await stat(join(folder, `${name}.log`))).size).toBeGreaterThan(0)
       expect((await stat(join(folder, `${name}.log`))).size).toBeLessThan(LOG_LIMIT)
       expect((await stat(join(folder, `${name}.log.1`))).size).toBe(LOG_LIMIT)
