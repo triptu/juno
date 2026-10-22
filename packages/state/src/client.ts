@@ -1,17 +1,18 @@
 /**
- * The engine client: one `AtomRpc` service over the port protocol, living in
+ * The engine client: one `AtomRpc` service over a client protocol, living in
  * an atom runtime so its scope outlives any single atom (ADR 0009).
  *
- * The port connection is an atom, set per registry: the renderer sets it once
- * at start on the app registry; a test makes its own registry with
- * `makeRegistry()` and gives it a Node `MessageChannel`.
+ * The protocol is an atom, set per registry: the renderer sets it once at
+ * start on the app registry, over the port from main (`configureConnection`)
+ * or, in the web shell, over a WebSocket (`@juno/state/socket`); a test makes
+ * its own registry with `makeRegistry()` and gives it a Node `MessageChannel`.
  */
 import * as Atom from 'effect/reactivity/Atom'
 import * as AtomRegistry from 'effect/reactivity/AtomRegistry'
 import * as AtomRpc from 'effect/reactivity/AtomRpc'
 import { AllRoutes } from '@juno/contract'
 import { EngineFailed, requestEngineRestart } from './port'
-import { portProtocol, type PortConnection } from './transport'
+import { portProtocol, type EngineProtocol, type PortConnection } from './transport'
 
 /** A set of atom values. The app has one; tests make one each. */
 export type Registry = AtomRegistry.AtomRegistry
@@ -33,23 +34,35 @@ const noConnection: PortConnection = {
   acquire: () => Promise.reject(new Error('no engine port connection configured')),
 }
 
-/** Set once by the renderer (or a test) before the first live query. */
-export const portConnectionAtom = Atom.make<PortConnection>(noConnection).pipe(Atom.keepAlive)
+/** How the client reaches the engine. Set once by the renderer (or a test) before the first live query. */
+export const engineProtocolAtom = Atom.make<EngineProtocol>(portProtocol(noConnection)).pipe(Atom.keepAlive)
 
-export function configureConnection(target: Registry, connection: PortConnection): void {
+/** Reports a transport's opens and closes as the registry's `connectionStateAtom`. */
+export function connectionReporter(target: Registry): (state: 'connected' | 'disconnected') => void {
   let everConnected = false
-  target.set(portConnectionAtom, {
-    acquire: () =>
-      connection.acquire().catch((cause: unknown) => {
-        if (cause instanceof EngineFailed) target.set(connectionStateAtom, 'failed')
-        throw cause
-      }),
-    onState: (state) => {
-      connection.onState?.(state)
-      if (state === 'connected') everConnected = true
-      target.set(connectionStateAtom, state === 'connected' ? 'connected' : everConnected ? 'reconnecting' : 'connecting')
-    },
-  })
+  return (state) => {
+    if (state === 'connected') everConnected = true
+    target.set(connectionStateAtom, state === 'connected' ? 'connected' : everConnected ? 'reconnecting' : 'connecting')
+  }
+}
+
+/** The engine over one port at a time, from main (the renderer) or a `MessageChannel` (tests). */
+export function configureConnection(target: Registry, connection: PortConnection): void {
+  const report = connectionReporter(target)
+  target.set(
+    engineProtocolAtom,
+    portProtocol({
+      acquire: () =>
+        connection.acquire().catch((cause: unknown) => {
+          if (cause instanceof EngineFailed) target.set(connectionStateAtom, 'failed')
+          throw cause
+        }),
+      onState: (state) => {
+        connection.onState?.(state)
+        report(state)
+      },
+    }),
+  )
 }
 
 /**
@@ -63,6 +76,6 @@ export async function restartEngine(target: Registry): Promise<void> {
 
 export class EngineClient extends AtomRpc.Service<EngineClient>()('juno/state/EngineClient', {
   group: AllRoutes,
-  protocol: (get) => portProtocol(get(portConnectionAtom)),
+  protocol: (get) => get(engineProtocolAtom),
   disableTracing: true,
 }) {}

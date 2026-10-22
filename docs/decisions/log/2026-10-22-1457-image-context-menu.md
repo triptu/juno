@@ -1,0 +1,1 @@
+- 10-22 14:57 · Tushar · An image preview's native menu is Open, Open in Preview, a separator, Copy image, Copy link when the file action has a Slack permalink, then Download; the full viewer omits Open. Open in Preview uses the authenticated temporary-file path and the system's default image handler.

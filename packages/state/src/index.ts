@@ -1,5 +1,5 @@
 export { liveQuery, runCommand, type LiveListAtom, type LiveValueAtom } from './atoms'
-export { configureConnection, connectionStateAtom, makeRegistry, registry, restartEngine, type Registry } from './client'
+export { configureConnection, connectionStateAtom, makeRegistry, registry, restartEngine, type ConnectionState, type Registry } from './client'
 export { engineStatusAtom, pingCommand, syncFailureAtom, syncNoticeAtom, syncProgressAtom } from './engine'
 export { appStateAtom, copySyncLog, describeTabs, diagnosticDetails, showLogs, diagnosticsReport, formatCpu, readDiagnostics, reportAppStateAtom } from './diagnostics'
 export { importFromSlackAppCommand, junoSetupPendingAtom, sessionStatusAtom, sessionProfileAtom, sessionUnknownAtom, signedInAtom, signOutCommand } from './session'

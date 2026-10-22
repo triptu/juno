@@ -47,6 +47,8 @@ export interface MediaViewerProps extends DocumentLinks {
   readonly loadText?: LoadFileText | undefined
   /** With it, an image has Copy image. */
   readonly onCopyImage?: ((file: FileView) => void) | undefined
+  /** Right-click on the full image. The container owns the native menu. */
+  readonly onImageMenu?: ((file: FileView, event: MouseEvent<Element>) => void) | undefined
 }
 
 /**
@@ -67,7 +69,7 @@ export interface MediaViewerProps extends DocumentLinks {
  * the topic under it inert, so Tab goes from its controls on to the sidebar
  * and the tab strip. A hidden tab keeps it open at its item.
  */
-export function MediaViewer({ viewing, now, opener, onClose, onShowItem, onDownload, onQuickLook, onOpenInBrowser, onCopyImage, loadText, onLink, linkInfo }: MediaViewerProps) {
+export function MediaViewer({ viewing, now, opener, onClose, onShowItem, onDownload, onQuickLook, onOpenInBrowser, onCopyImage, onImageMenu, loadText, onLink, linkInfo }: MediaViewerProps) {
   const { items } = viewing
   const [index, setIndex] = useState(() => Math.min(Math.max(0, viewing.index), items.length - 1))
   const file = items[index]!
@@ -118,7 +120,7 @@ export function MediaViewer({ viewing, now, opener, onClose, onShowItem, onDownl
         <div onClick={onBackdrop} {...stylex.props(styles.fit)}>
           {/* Keyed by item: a new one fades in, its full image starts unloaded and a text file is read again. */}
           {isMedia(file) ? (
-            <Item key={index} file={file} position={index + 1} />
+            <Item key={index} file={file} position={index + 1} onImageMenu={onImageMenu} />
           ) : (
             <div key={index} data-viewer-item={index + 1} data-viewer-kind={file.kind} {...stylex.props(styles.frame, ...documentBox(file))}>
               <ViewerDocument file={file} now={now} loadText={loadText} onLink={onLink} linkInfo={linkInfo} />
@@ -231,14 +233,13 @@ function ViewerBar({ file, items, meta, at, onClose, onDownload, onQuickLook, on
 }
 
 /** One item in a box fitted to the stage: the thumbnail at once, the full image fading in over it, or the video over its poster. An image zooms (`useZoom`). */
-function Item({ file, position }: { readonly file: MediaFile; readonly position: number }) {
+function Item({ file, position, onImageMenu }: { readonly file: MediaFile; readonly position: number; readonly onImageMenu: MediaViewerProps['onImageMenu'] }) {
   const [loaded, setLoaded] = useState(false)
   const { frame, content, zoomed } = useZoom(file.kind === 'image')
   const full = file.kind === 'image' ? file.full : undefined
-  const width = file.width ?? file.thumb.width
-  const height = file.height ?? file.thumb.height
+  const { width = file.thumb.width, height = file.thumb.height } = file
   return (
-    <div ref={frame} data-viewer-item={position} {...stylex.props(styles.frame, styles.fitted(width, height), zoomed && styles.zoomed)}>
+    <div ref={frame} data-viewer-item={position} onContextMenu={file.kind === 'image' && onImageMenu !== undefined ? (event) => { event.preventDefault(); onImageMenu(file, event) } : undefined} {...stylex.props(styles.frame, styles.fitted(width, height), zoomed && styles.zoomed)}>
       {/* One transform for both images, so the full image stays over the thumbnail. */}
       <div ref={content} data-viewer-zoom="" {...stylex.props(styles.zoom)}>
         <img src={file.thumb.src} alt="" draggable={false} decoding="async" {...stylex.props(styles.image)} />

@@ -11,6 +11,18 @@ const excludedTags = [
 
 export default defineConfig({
   testDir: 'e2e',
+  projects: [
+    { name: 'electron', testIgnore: 'web-shell.spec.ts' },
+    {
+      name: 'web',
+      testMatch: 'web-shell.spec.ts',
+      use: {
+        channel: process.env.GALLERY_BROWSER === 'chromium' ? undefined : 'chrome',
+        viewport: { width: 1280, height: 800 },
+        reducedMotion: 'reduce',
+      },
+    },
+  ],
   // e2e/coverage.ts records which source files each spec runs, under JUNO_COVERAGE=1.
   globalSetup: ['./e2e/build.ts', './e2e/coverage.ts'],
   timeout: 30_000,

@@ -11,7 +11,7 @@ import type { PhosphorIcon } from './Icon'
  * The icons drawn in their duotone weight, and the only way to draw one.
  *
  * Each Phosphor icon ships every weight in one module. The desktop build
- * (`phosphorWeights` in `apps/desktop/electron.vite.config.ts`) keeps the
+ * (`phosphorWeights` in `apps/desktop/renderer.vite.ts`) keeps the
  * duotone weight only for the icons imported here, about 40 KB of the start
  * bundle. `IconWeight` has no duotone, so a duotone icon must come from
  * this file, and `scripts/check-duotone.mjs` fails on the weight's name

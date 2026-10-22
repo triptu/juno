@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // The desktop build keeps each Phosphor icon's duotone weight only for the
 // icons packages/ui/src/duotone.ts imports (`phosphorWeights` in
-// apps/desktop/electron.vite.config.ts). Any other icon asked for duotone
+// apps/desktop/renderer.vite.ts). Any other icon asked for duotone
 // would draw nothing. `IconWeight` has no duotone, so the types send every
 // duotone icon through duotone.ts; this check closes the rest: it fails on
 // the weight's name as a string anywhere else (a Phosphor icon drawn
@@ -16,7 +16,7 @@ const roots = ['apps', 'packages']
 const skip = new Set(['node_modules', 'out', 'dist', 'release', 'test-results', 'playwright-report'])
 const extensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs'])
 const list = 'packages/ui/src/duotone.ts'
-const allowed = new Set([list, 'apps/desktop/electron.vite.config.ts'])
+const allowed = new Set([list, 'apps/desktop/renderer.vite.ts'])
 const pattern = /['"`]duotone['"`]/
 
 async function* walk(dir) {
