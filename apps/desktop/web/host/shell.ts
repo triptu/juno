@@ -18,7 +18,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { Logger, LogLevel } from 'effect'
 import { createServer, type Plugin, type ViteDevServer } from 'vite'
-import { WebSocketServer } from 'ws'
+import { WebSocketServer, type WebSocket } from 'ws'
 import type { SessionSecrets } from '@juno/contract'
 import { memoryHost, socketTransport, startEngine, type EngineHandle } from '@juno/engine'
 import { startFakeSlack, type Credentials, type FakeSlack } from '@juno/fake-slack'
@@ -135,8 +135,14 @@ function fakeMain(fake: FakeSlack, credentials: Credentials) {
   return { host, httpTransport, cookie }
 }
 
+/** Whether an upgrade's `Origin` names the host it was sent to. A missing or malformed one does not. */
+function sameOrigin(origin: string | undefined, host: string | undefined): boolean {
+  if (origin === undefined || !URL.canParse(origin)) return false
+  return new URL(origin).host === host
+}
+
 /** Serves the page entry in place of the renderer's, the engine socket and the files, on Vite's server. */
-function webShellPlugin(onSocket: (socket: import('ws').WebSocket) => void, files: FileSource): Plugin {
+function webShellPlugin(onSocket: (socket: WebSocket) => void, files: FileSource): Plugin {
   const sockets = new WebSocketServer({ noServer: true })
   return {
     name: 'juno:web-shell',
@@ -153,8 +159,7 @@ function webShellPlugin(onSocket: (socket: import('ws').WebSocket) => void, file
       server.httpServer?.on('upgrade', (request, socket, head) => {
         if (new URL(request.url ?? '/', 'http://web-shell').pathname !== ENGINE_SOCKET_PATH) return
         // Only the page itself: another site open in the browser must not reach the engine.
-        const origin = request.headers.origin
-        if (origin === undefined || new URL(origin).host !== request.headers.host) {
+        if (!sameOrigin(request.headers.origin, request.headers.host)) {
           socket.destroy()
           return
         }
@@ -186,7 +191,7 @@ export async function startWebShell(options: WebShellOptions): Promise<WebShell>
       { host: main.host, httpTransport: main.httpTransport, logger: engineLogger },
     )
     cleanups.push(() => engine.stop())
-    const open = new Set<import('ws').WebSocket>()
+    const open = new Set<WebSocket>()
     const server: ViteDevServer = await createServer({
       configFile: false,
       root: rendererDir,
