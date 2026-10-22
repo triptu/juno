@@ -24,6 +24,7 @@ export {
   unicodeFromHex,
   type EmojiCategory,
 } from './emoji'
+export { keywordData as emojiKeywordData } from './emoji-keywords'
 
 export { messageTitle } from './title'
 
