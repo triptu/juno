@@ -138,8 +138,10 @@ export function useHeldPosition(position: Position, list: MessageWindow): void {
     if (scroller !== null && positioned) hold(scroller, pinRef, pinnedTopRef)
   }, [positioned, first, drawnAll, heldAt, list.rows, scrollRef, pinRef, pinnedTopRef])
 
-  // The list's box changes size (the window, the composer growing, the Juno panel beside it); at the bottom, stay
-  // there. The observer sees only the scroller's own box, and runs after layout and before the frame's paint.
+  // The list's box changes size (the window, the composer growing, the Juno panel beside it), or its rows do (a
+  // reaction, an edit box, an image or unfurl loading); at the bottom, stay there. A row growing with no change to
+  // the window's rows, such as the edit box opening, reaches no layout effect, so the observer watches the column of
+  // rows as well as the scroller's own box. It runs after layout and before the frame's paint.
   useEffect(() => {
     const scroller = scrollRef.current
     if (scroller === null) return
@@ -147,6 +149,7 @@ export function useHeldPosition(position: Position, list: MessageWindow): void {
       if (pinRef.current?.kind === 'bottom') hold(scroller, pinRef, pinnedTopRef)
     })
     observer.observe(scroller)
+    for (const column of scroller.children) observer.observe(column)
     return () => observer.disconnect()
   }, [scrollRef, pinRef, pinnedTopRef])
 }
@@ -169,8 +172,9 @@ export function useFirstFrame(position: Position, id: string, list: MessageWindo
 }
 
 /**
- * Stick to the bottom: a message that arrives, or a row that grows (a reaction, an edit), while at the
- * bottom is scrolled into view before paint. Rows keep their identity until a row changes, so a tab
+ * Stick to the bottom: a message that arrives, or a row that changes (a reaction, an edit), while at the
+ * bottom is scrolled into view before paint; a row that grows with no change to the rows is held by
+ * `useHeldPosition`'s observer. Rows keep their identity until a row changes, so a tab
  * shown again with nothing new and the same window size is still at the bottom (Chromium keeps a
  * hidden scroller's offset), and skips the layout that reading the position would force.
  */
@@ -236,6 +240,10 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
     }
     const onScrollEnd = () => {
       if (pinRef.current?.kind === 'row' && Math.abs(scroller.scrollTop - pinnedTopRef.current) > 1) pinRef.current = undefined
+      // A scroll up lets go of the bottom in `onScroll`, so a scroll that ends with the bottom still held and the end
+      // away is the end moving under it: an edit box that scrolls itself into view as it opens grows its row, and
+      // this event comes before the resize observer in that frame. The bottom is held again, not let go.
+      if (pinRef.current?.kind === 'bottom') hold(scroller, pinRef, pinnedTopRef)
       const distance = distanceFromBottom(scroller)
       const bottom = atEndRef.current && distance <= BOTTOM_SLACK
       if (bottom) {

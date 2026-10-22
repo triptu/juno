@@ -118,8 +118,9 @@ export function useBubbleMeasure(items: ReadonlyArray<ChatItem>) {
 
 /**
  * At the bottom, a change to the rows (a bubble, the status bubble, a send, a reaction) is scrolled into view
- * before paint, and so is the list's box changing size (the window, the composer growing). The observer sees only
- * the scroller's own box, and runs after layout and before the frame's paint.
+ * before paint, and so is the list's box or its column of rows changing size (the window, the composer growing, a
+ * row growing after its commit, as a card or an image lays out). The observer runs after layout and before the
+ * frame's paint.
  */
 export function useStickToBottom(scrollRef: Scroller, pinnedRef: RefObject<boolean>, positioned: boolean, items: ReadonlyArray<ChatItem>, moreBelow: boolean): void {
   useLayoutEffect(() => {
@@ -134,6 +135,7 @@ export function useStickToBottom(scrollRef: Scroller, pinnedRef: RefObject<boole
       if (pinnedRef.current) scroller.scrollTop = scroller.scrollHeight
     })
     observer.observe(scroller)
+    for (const column of scroller.children) observer.observe(column)
     return () => observer.disconnect()
   }, [positioned, moreBelow, scrollRef, pinnedRef])
 }
@@ -156,6 +158,8 @@ export function useScrollRelease(scrollRef: Scroller, pinnedRef: RefObject<boole
       else bottomTop = top
     }
     const onScrollEnd = () => {
+      // Still held: the scroll did not go up, so the end moved under it, and this event came before the resize observer.
+      if (pinnedRef.current && !pageRef.current.moreBelow) scroller.scrollTop = scroller.scrollHeight
       const bottom = !pageRef.current.moreBelow && distanceFromBottom(scroller) <= BOTTOM_SLACK
       pinnedRef.current = bottom
       if (bottom) bottomTop = scroller.scrollTop
