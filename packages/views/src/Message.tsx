@@ -111,8 +111,8 @@ const NO_PEOPLE: ReadonlyMap<string, Person> = new Map()
 const STRADDLE = `(${density['--density-message-padding-block']} - ${spacing['--space-0-5']})`
 
 /**
- * Where the delete confirm goes, decided as it shows and when the list
- * stops scrolling (never per frame). It rises above
+ * Where the delete confirm goes, decided once as it shows, so it never
+ * jumps while it waits. It rises above
  * the row's top edge unless that would put it under the header band at the
  * list's top, where the band's fade washes it out and the list clips it. A
  * row whose top is in view then takes it inside its top edge, over the right
@@ -357,18 +357,12 @@ export const Message = memo(function Message({
   )
 })
 
-/** The delete confirm in its slot at the row's top right, placed against the list's header band as it shows and when the list stops scrolling. */
+/** The delete confirm in its slot at the row's top right, placed against the list's header band as it shows. */
 function ConfirmSlot({ onConfirm, onCancel }: { readonly onConfirm: () => void; readonly onCancel: () => void }) {
   const ref = useRef<HTMLSpanElement>(null)
   useLayoutEffect(() => {
     const row = ref.current?.closest<HTMLElement>('[data-message-row]')
-    const scroller = row?.closest('[data-scroll-area]')
-    if (row == null || scroller == null) return
-    placeConfirm(row)
-    // Placed again when the list stops scrolling under it, never per frame.
-    const place = () => placeConfirm(row)
-    scroller.addEventListener('scrollend', place)
-    return () => scroller.removeEventListener('scrollend', place)
+    if (row != null) placeConfirm(row)
   }, [])
   return (
     <span ref={ref} {...stylex.props(styles.confirm)}>

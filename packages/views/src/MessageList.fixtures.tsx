@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { MessageView } from '@juno/contract'
 import { defineFixtures, fixture, scene, TooltipLayer, type FixtureFrame } from '@juno/ui'
 import { useFixtureControl } from './juno-chat/fixtures/control'
@@ -71,6 +71,16 @@ const CHIPPED = 3
  * goes. The test drives each step through `window.__fixtureControls` and
  * checks what moved.
  */
+/** The delete is asked for a frame after the list has its scroll, as in the app, where it is asked of a list at rest. */
+function useAskAfterScroll(): boolean {
+  const [asking, setAsking] = useState(false)
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setAsking(true))
+    return () => cancelAnimationFrame(frame)
+  }, [])
+  return asking
+}
+
 /**
  * The list opened scrolled so its first row's name line is under the header
  * band's place (`scroll-padding-top`) while its text shows, and that row asks
@@ -79,6 +89,7 @@ const CHIPPED = 3
  */
 function ScrolledUnderBand() {
   const scrollRef = useRef<HTMLElement>(null)
+  const asking = useAskAfterScroll()
   useLayoutEffect(() => {
     const scroller = scrollRef.current
     const row = scroller?.querySelector<HTMLElement>(ROW)
@@ -86,7 +97,7 @@ function ScrolledUnderBand() {
     const listTop = scroller.getBoundingClientRect().top + Number.parseFloat(getComputedStyle(scroller).scrollPaddingTop)
     scroller.scrollTop += row.getBoundingClientRect().top - listTop + 16
   }, [])
-  return <MessageList {...base} items={thread} main={false} actions={noopActions} confirmingDelete={thread[0]!.message.ts} scrollRef={scrollRef} />
+  return <MessageList {...base} items={thread} main={false} actions={noopActions} confirmingDelete={asking ? thread[0]!.message.ts : undefined} scrollRef={scrollRef} />
 }
 
 /** A long report last, taller than its frame, as a feedback channel's newest message often is. */
@@ -104,11 +115,12 @@ const tallLast = messageWindow([
  */
 function TallLastRow() {
   const scrollRef = useRef<HTMLElement>(null)
+  const asking = useAskAfterScroll()
   useLayoutEffect(() => {
     const scroller = scrollRef.current
     if (scroller != null) scroller.scrollTop = scroller.scrollHeight
   }, [])
-  return <MessageList {...base} items={tallLast} main={false} actions={noopActions} confirmingDelete={tallLast[tallLast.length - 1]!.message.ts} scrollRef={scrollRef} />
+  return <MessageList {...base} items={tallLast} main={false} actions={noopActions} confirmingDelete={asking ? tallLast[tallLast.length - 1]!.message.ts : undefined} scrollRef={scrollRef} />
 }
 
 function ReactionChanges() {
