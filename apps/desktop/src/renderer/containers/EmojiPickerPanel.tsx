@@ -19,13 +19,10 @@ export interface EmojiPickerPanelProps {
 
 export default function EmojiPickerPanel({ onPick, onClose }: EmojiPickerPanelProps) {
   const recent = useAtomValue(frequentEmojiAtom)
-  const [recentSnapshot, setRecentSnapshot] = useState(recent)
-  if (recentSnapshot === undefined && recent !== undefined) setRecentSnapshot(recent)
   const current = useAtomValue(emojiPickerDataAtom(emojiCatalog))
   const [snapshot, setSnapshot] = useState(current)
   if (snapshot === undefined && current !== undefined) setSnapshot(current)
   // Table changes take effect on the next open, so cells never move under a pending click.
   const answer = snapshot ?? current
-  if (recentSnapshot === undefined) return null
-  return <EmojiPicker data={answer?.data ?? standardEmojiPickerData} recent={recentSnapshot} onPick={onPick} onClose={onClose} />
+  return <EmojiPicker data={answer?.data ?? standardEmojiPickerData} recent={recent} onPick={onPick} onClose={onClose} />
 }

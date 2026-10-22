@@ -42,4 +42,3 @@ export { prepareEmojiPicker, type PreparedEmojiPicker, type PickerItem } from '.
 export { customEmoji } from './custom-emoji'
 export { matchEmoji, mergeEmoji } from './emoji-ranking'
 export { dockBadgeActive, type BadgeTopic, type BadgeContext } from './dockBadge'
-export { RecentEmoji, recentEmojiFrom, recordEmojiUse, frequentEmoji } from './recentEmoji'

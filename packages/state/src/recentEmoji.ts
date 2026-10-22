@@ -1,22 +1,28 @@
+/**
+ * The emoji used last (SPEC 7). The engine keeps them in the workspace's
+ * user.db preferences; this keeps one subscription for the whole session.
+ */
 import * as Atom from 'effect/reactivity/Atom'
-import { emojiRecent, emojiUse } from '@juno/contract'
+import * as AsyncResult from 'effect/reactivity/AsyncResult'
+import { emojiRecent, emojiUse, MAX_RECENT_EMOJI } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import { registry } from './client'
+import { quickReactionsAtom } from './quickReactions'
 
 const savedRecentEmojiAtom = liveQuery(emojiRecent)({})
 
-/** Undefined until local prefs arrive, so the picker never paints a temporary list. */
-export const recentEmojiAtom = Atom.make((get): ReadonlyArray<string> | undefined => {
+/** Newest first. Empty until the saved list arrives. */
+export const recentEmojiAtom = Atom.make((get): ReadonlyArray<string> => {
   const saved = get(savedRecentEmojiAtom)
-  return saved._tag === 'Success' ? saved.value.recent : undefined
+  return AsyncResult.isSuccess(saved) ? saved.value : []
 }).pipe(Atom.keepAlive)
 
-export const frequentEmojiAtom = Atom.make((get) => {
-  const saved = get(savedRecentEmojiAtom)
-  return saved._tag === 'Success' ? saved.value.frequent : undefined
-}).pipe(Atom.keepAlive)
+/** The picker's Frequently used: the recent names, then the quick reactions. */
+export const frequentEmojiAtom = Atom.make((get) =>
+  [...new Set([...get(recentEmojiAtom), ...get(quickReactionsAtom).map((reaction) => reaction.name)])].slice(0, MAX_RECENT_EMOJI),
+).pipe(Atom.keepAlive)
 
-/** Only the engine updates recency; all pickers and composers share its live value. */
+/** Records a pick. The engine saves it and every picker and composer sees the new order. */
 export function noteRecentEmoji(name: string): void {
   void runCommand(registry, emojiUse, { name })
 }

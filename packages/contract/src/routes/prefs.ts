@@ -1,7 +1,6 @@
 import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
 import { NotSignedIn } from '../errors'
-import { RecentEmoji } from '@juno/domain'
 import { liveValueRoute } from '../live'
 
 /** One workspace preference. Missing keys are null; values must be JSON. */
@@ -15,9 +14,8 @@ export const aiAvailable = liveValueRoute('ai.available', { payload: {}, value: 
 export const emojiUse = Rpc.make('emoji.use', {
   payload: { name: Schema.String.check(Schema.isMinLength(1)) }, success: Schema.Void, error: NotSignedIn,
 })
-export const emojiRecent = liveValueRoute('emoji.recent', {
-  payload: {}, value: Schema.Struct({ recent: RecentEmoji, frequent: RecentEmoji }),
-})
+/** The open workspace's recent emoji names, newest first. */
+export const emojiRecent = liveValueRoute('emoji.recent', { payload: {}, value: Schema.Array(Schema.String) })
 export const PrefsRoutes = RpcGroup.make(prefsGet, prefsSet, aiAvailable, emojiUse, emojiRecent)
 
 export const sendCheckPrefKeys = ['wrongPlace', 'typos', 'capitalI', 'questionMarks', 'longSentences', 'grammar'] as const

@@ -21,8 +21,6 @@ interface QuickReactionPickerProps {
 /** The picker for Settings' quick reactions: custom emoji too, and the pick as the toolbar draws it. */
 export default function QuickReactionPicker({ selected, onPick, onClose }: QuickReactionPickerProps) {
   const recent = useAtomValue(frequentEmojiAtom)
-  const [recentSnapshot, setRecentSnapshot] = useState(recent)
-  if (recentSnapshot === undefined && recent !== undefined) setRecentSnapshot(recent)
   const current = useAtomValue(emojiPickerDataAtom(emojiCatalog))
   const [snapshot, setSnapshot] = useState(current)
   if (snapshot === undefined && current !== undefined) setSnapshot(current)
@@ -34,6 +32,5 @@ export default function QuickReactionPicker({ selected, onPick, onClose }: Quick
     const own = data.byName.get(name)
     if (own?.url !== undefined) return onPick({ name, unicode: `:${name}:`, url: own.url })
   }
-  if (recentSnapshot === undefined) return null
-  return <EmojiPicker data={data} recent={recentSnapshot} selected={selected} onPick={pick} onClose={onClose} />
+  return <EmojiPicker data={data} recent={recent} selected={selected} onPick={pick} onClose={onClose} />
 }
