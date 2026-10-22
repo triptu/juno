@@ -22,6 +22,7 @@ import { attachedFiles, attachLocal, attachmentsAtom, registry, removeAttachment
 import { junoReadsImagesAtom } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
 import { chunk } from '../chunks'
+import { preloadAfterSidebar } from '../preloadAfterSidebar'
 
 const reader = chunk(() => import('./junoFileRead'))
 
@@ -74,10 +75,7 @@ export function leaveComposer(key: string, ids: ReadonlyArray<string>): void {
  * any others stay. `hasFiles` when a send would carry some.
  */
 export function useJunoFiles(key: string, files: ReadonlyArray<Attachment>, active: boolean, where: 'home' | 'chat') {
-  useEffect(() => {
-    const idle = requestIdleCallback(() => void reader.load(), { timeout: 5_000 })
-    return () => cancelIdleCallback(idle)
-  }, [])
+  useEffect(() => preloadAfterSidebar(() => void reader.load()), [])
   const readsImages = useAtomValue(junoReadsImagesAtom)
   const [failed, setFailed] = useState<ReadonlySet<string>>(() => new Set())
   useEffect(() => {

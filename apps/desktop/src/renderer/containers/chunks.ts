@@ -8,14 +8,16 @@ export { chunk } from '@juno/views'
  * caller mounts, and at once when `wanted` comes first. True once it has
  * loaded, so a caller that draws the part only then never suspends.
  */
-export function usePreloaded(part: Pick<ReturnType<typeof chunk>, 'load' | 'useReady'>, wanted: boolean): boolean {
+export function usePreloaded(part: Pick<ReturnType<typeof chunk>, 'load' | 'useReady'>, wanted: boolean, schedule: (load: () => void) => () => void = onIdle): boolean {
   const ready = part.useReady()
-  useEffect(() => {
-    const idle = requestIdleCallback(() => void part.load(), { timeout: 5_000 })
-    return () => cancelIdleCallback(idle)
-  }, [part])
+  useEffect(() => schedule(() => void part.load()), [part, schedule])
   useEffect(() => {
     if (wanted && !ready) void part.load()
   }, [part, wanted, ready])
   return ready
+}
+
+function onIdle(load: () => void): () => void {
+  const idle = requestIdleCallback(load, { timeout: 5_000 })
+  return () => cancelIdleCallback(idle)
 }

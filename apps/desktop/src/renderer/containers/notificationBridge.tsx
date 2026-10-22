@@ -1,3 +1,4 @@
+import { preloadAfterSidebar } from './preloadAfterSidebar'
 /**
  * The renderer's side of OS notifications (architecture 11): it tells main
  * which topic is on screen while the window has focus, so the engine does
@@ -75,6 +76,6 @@ export function useNotificationBridge(): void {
 /** Warm the explanation on idle, before a message menu can open it. */
 export function WhyLayer() {
   const wanted = useAtomValue(whyPopoverAtom) !== undefined
-  const ready = usePreloaded(whyPanel, wanted)
+  const ready = usePreloaded(whyPanel, wanted, preloadAfterSidebar)
   return wanted && ready ? <WhyPopoverPanel /> : null
 }

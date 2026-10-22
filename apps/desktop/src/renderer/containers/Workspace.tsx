@@ -35,6 +35,7 @@ import { closeTabById, loadAllTopicsPage, moveTabTo, openNewTab, runMenuCommand,
 import { runUndoCommand } from './topicActions'
 import { focusPage, forcePageFocus, pageComposer, takeForcedPageFocus, takeTypedAhead } from './pageFocus'
 import { loadSettingsTab, tabKindOf } from './tabKinds'
+import { preloadAfterSidebar } from './preloadAfterSidebar'
 import { loadChannelMenu } from './placeMenus'
 import { TitlebarNav } from './TitlebarNav'
 
@@ -153,12 +154,9 @@ function useWorkspaceEffects(active: string | undefined): void {
   useEffect(() => {
     const idle = requestIdleCallback(
       () => {
-        void loadMessageTools()
-        void loadChannelMenu()
         void loadSettingsTab()
         void loadAllTopicsPage()
         if (registry.get(junoAvailableAtom)) {
-          void preloadAgentClient()
           void loadJuno()
         }
       },
@@ -166,6 +164,11 @@ function useWorkspaceEffects(active: string | undefined): void {
     )
     return () => cancelIdleCallback(idle)
   }, [])
+  useEffect(() => preloadAfterSidebar(() => {
+    void loadMessageTools()
+    void loadChannelMenu()
+    if (registry.get(junoAvailableAtom)) void preloadAgentClient()
+  }), [])
   useEffect(() => {
     document.addEventListener('focusin', onFocusIn)
     return () => document.removeEventListener('focusin', onFocusIn)

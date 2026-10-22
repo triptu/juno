@@ -1,3 +1,4 @@
+import { preloadAfterSidebar } from './preloadAfterSidebar'
 import { chunk, usePreloaded } from './chunks'
 import { memo, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { encodeMentions, type PickConversation, type PickConversations } from '@juno/contract'
@@ -297,7 +298,7 @@ export const HomeComposer = memo(function HomeComposer({ tabId }: HomeComposerPr
   useFocusOnShow(inputRef, focusField)
 
   const { sending, send } = useSend(tabId, files.files.length > 0, junoOn, destination.openList)
-  const sendToReady = usePreloaded(sendToPanel, sendTo.open)
+  const sendToReady = usePreloaded(sendToPanel, sendTo.open, preloadAfterSidebar)
   const sendToList = sendToReady ? sendToMention(sendTo, listId) : undefined
   const checks = useHomeSendChecks(draft.draft, sendTarget(draft), (body, to) => void send(body, to), draft.conversation)
 
