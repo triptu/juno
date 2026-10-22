@@ -7,7 +7,7 @@ The only place a colour, size, radius, shadow, font or duration is written down.
 | File | What it holds |
 | --- | --- |
 | `src/tokens.stylex.ts` | Every variable group with its light, Coral value. |
-| `src/themes.stylex.ts` | `dark` (colours, shadows, swatches, art, code colours, the two-copy switch) and a light and a dark theme for each of the eight accents. |
+| `src/themes.stylex.ts` | `dark` (colours, shadows, swatches, art, code colours, the menu material, the two-copy switch) and a light and a dark theme for each of the eight accents. |
 | `src/global.css` | Body defaults, scrollbars, `::selection`, reduced motion, theme-switch suppression, and the `::highlight(syntax-*)` rules that colour code. |
 | `src/fonts.css` | `@font-face` imports for Figtree, Instrument Serif and JetBrains Mono from `@fontsource`. |
 
@@ -32,7 +32,8 @@ Import tokens through the subpath, never a barrel: `import { colors } from '@jun
 | `weights` | `--weight-regular` / `-medium` / `-semibold` | 400 / 500 / 600 |
 | `tracking` | `--tracking-tight` / `-normal` / `-wide` / `-none` | letter spacing |
 | `text` | `--text-<role>-family` / `-size` / `-weight` / `-leading` / `-tracking` | one complete setting per type role (`ui`, `meta`, `body`, `row-title`, `page-title`, ...) |
-| `motion` | `--duration-fast`, `--ease-out`, `--toast-life-*` | durations collapse under `prefers-reduced-motion` by themselves |
+| `motion` | `--duration-fast`, `--ease-out`, `--duration-morph`, `--ease-morph`, `--toast-life-*` | durations collapse under `prefers-reduced-motion` by themselves |
+| `menu` | `--menu-*` | the message menu drawn like a macOS menu: its material, font, rows, separators and emoji grid; dark values in `darkMenu` |
 | `layout` | `--sidebar-width`, `--titlebar-height`, `--tab-height`, `--reading-width`, `--page-width*`, `--menu-width*`, ... | fixed shell dimensions |
 | `sizes` | `--control-<px>`, `--tile-<px>`, `--avatar-<px>`, `--initials-<px>`, `--icon-<px>`, misc | control, tile, avatar and icon sizes named by pixel value |
 | `z` | `--z-<layer>` | stacking order from `toolbar` (2) to `toast` (45) |
@@ -53,7 +54,7 @@ Apps call `applyTheme(theme, accent)` from `@juno/ui` (re-exported by `@juno/vie
 
 - Never `cursor: pointer`. `global.css` sets the arrow cursor on the body and the text cursor on text inputs and textareas; checkboxes, radios and ranges keep the arrow.
 - The muted grey is `hsla(48, 5%, 42%)`, darker than the handoff, so meta text reaches 4.5:1 on paper. Muted text may sit on `--background`, `--background-subtle`, `--surface-default`, `--surface-hover` and `--surface-raised`; on `--secondary-*` fills use `--foreground-subtle`.
-- Dark is a warm-neutral near-black with three layers (sidebar below the page, cards above it, popovers and the hover toolbar on `--surface-raised` above that), not the handoff's cool flat grey. `docs/design/tokens.md` 1.2 has the values and the measured pairs; `docs/design/dark-theme/` the before and after.
+- Dark is a warm-neutral near-black with three layers (sidebar below the page, cards above it, popovers and toolbars on `--surface-raised` above that), not the handoff's cool flat grey. `docs/design/tokens.md` 1.2 has the values and the measured pairs; `docs/design/dark-theme/` the before and after.
 - `--focus-ring` is the accent's text colour (4.5:1 or better on the page for every accent; ink keeps the info blue), never the pale selection colour. `--selection-background` is the accent at 28% over the page and is for text selection only.
 - The cyan accent takes near-black `--hl-fg`; its off-white text would be 3.8:1. The sidebar's counters take `--hl-count` and `--hl-count-fg`, the accent at reduced brightness with 4.5:1 text (`docs/design/tokens.md` 1.3). The @you chip takes `--hl-mention` and `--hl-mention-fg`, held to 6:1.
 - Floating surfaces use `--pop-shadow`, Peek’s `--peek-shadow`, or `--card-ring` with a transparent 1px border, never a coloured border. Inputs keep `--input-border`.
