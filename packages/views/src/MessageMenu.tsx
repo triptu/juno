@@ -128,7 +128,24 @@ function ReactionGrid({ reactions, onReact, onMore, spaced }: ReactionGridProps)
           )}
         </button>
       ))}
-      <button type="button" tabIndex={-1} data-menu-cell="" data-grid-more="" aria-label="More reactions" aria-haspopup="dialog" onClick={onMore} {...stylex.props(styles.cell, styles.more)}>
+      <button
+        type="button"
+        tabIndex={-1}
+        data-menu-cell=""
+        data-grid-more=""
+        aria-label="More reactions"
+        aria-haspopup="dialog"
+        // A popover trigger: it opens as the primary button goes down, as every menu and popover does; Enter opens it from the keys.
+        onPointerDown={(event) => {
+          if (event.pointerType !== 'mouse' || event.button !== 0 || event.ctrlKey) return
+          event.preventDefault()
+          onMore()
+        }}
+        onClick={(event) => {
+          if (event.detail === 0 || (event.nativeEvent instanceof PointerEvent && event.nativeEvent.pointerType !== 'mouse')) onMore()
+        }}
+        {...stylex.props(styles.cell, styles.more)}
+      >
         <Icon icon={SmileyPlus} size={16} />
       </button>
     </div>
