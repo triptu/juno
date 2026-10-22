@@ -8,7 +8,7 @@ import { QuoteStub } from './QuoteStub'
 import { ReactionBadge } from './ReactionBadge'
 import { JunoRichText } from './JunoRichText'
 import { groupGap, isGroupEnd, rowStyles } from './rows'
-import { fullTime, messageTime } from '../time'
+import { fullTime, messageHeaderTime } from '../time'
 
 export interface JunoBubbleProps {
   readonly item: JunoBubbleItem
@@ -57,7 +57,7 @@ export const JunoBubble = memo(function JunoBubble({ item, now, actions, enter =
         </div>
         {compact ? null : (
           <Text variant="tag" tone="muted" numeric as="time" title={fullTime(item.at)} sx={rowStyles.time}>
-            {messageTime(item.at, now)}
+            {messageHeaderTime(item.at, now)}
           </Text>
         )}
       </div>

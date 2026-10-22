@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clockTime, hourLabel, messageTime, relativeTime } from '../src/index'
+import { clockTime, hourLabel, messageHeaderTime, messageTime, relativeTime } from '../src/index'
 import { DAY, HOUR, NOW } from './fixtures'
 
 const MINUTE = 60_000
@@ -38,6 +38,14 @@ describe('message time', () => {
     expect(messageTime(Date.UTC(2026, 9, 10, 20, 0), NOW, tz)).toBe('Sat')
     expect(messageTime(Date.UTC(2026, 9, 3, 20, 0), NOW, tz)).toBe('Oct 3')
     expect(messageTime(Date.UTC(2025, 9, 3, 20, 0), NOW, tz)).toBe('Oct 3, 2025')
+  })
+
+  it('keeps the clock in a message header on every day', () => {
+    expect(messageHeaderTime(Date.UTC(2026, 9, 12, 9, 12), NOW, tz)).toBe('9:12')
+    expect(messageHeaderTime(Date.UTC(2026, 9, 11, 15, 42), NOW, tz)).toBe('Yesterday 15:42')
+    expect(messageHeaderTime(Date.UTC(2026, 9, 10, 20, 5), NOW, tz)).toBe('Oct 10, 20:05')
+    expect(messageHeaderTime(Date.UTC(2026, 0, 3, 8, 0), NOW, tz)).toBe('Jan 3, 8:00')
+    expect(messageHeaderTime(Date.UTC(2025, 9, 16, 15, 42), NOW, tz)).toBe('Oct 16, 2025, 15:42')
   })
 
   it('respects the calendar day in the given time zone', () => {

@@ -10,7 +10,7 @@ import { noopActions } from './fixtures/actions'
 import { InlineEdit } from './InlineEdit'
 import { Message, type MessageProps } from './Message'
 import type { MessageListItem } from './MessageList'
-import { messageTime } from './time'
+import { messageHeaderTime } from './time'
 
 const noop = () => {}
 
@@ -27,7 +27,7 @@ const one = (item: MessageListItem, extra: Partial<MessageProps> = {}, frame?: F
         <Message
           message={item.message}
           sender={item.sender}
-          time={messageTime(item.message.at, NOW)}
+          time={messageHeaderTime(item.message.at, NOW)}
           now={NOW}
           main={false}
           startsGroup={false}

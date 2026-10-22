@@ -9,7 +9,7 @@ import { QuoteStub } from './QuoteStub'
 import { ReactionBadge } from './ReactionBadge'
 import { groupGap, isGroupEnd, rowStyles } from './rows'
 import { TextButton } from './TextButton'
-import { fullTime, messageTime } from '../time'
+import { fullTime, messageHeaderTime } from '../time'
 
 export interface OwnerBubbleProps {
   readonly item: OwnerMessageItem
@@ -50,7 +50,7 @@ export const OwnerBubble = memo(function OwnerBubble({ item, now, actions, eager
       ) : null}
       <div {...stylex.props(rowStyles.row, rowStyles.contained, eager && rowStyles.eager, styles.row)}>
         <Text variant="tag" tone="muted" numeric as="time" title={fullTime(item.at)} sx={rowStyles.time}>
-          {messageTime(item.at, now)}
+          {messageHeaderTime(item.at, now)}
         </Text>
         <div {...stylex.props(styles.content)}>
           {files !== undefined ? (

@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-23 00:50 · header times · A message header's time always has the clock ("Yesterday 15:42", "Oct 16, 15:42", "Oct 16, 2025, 15:42"), since headers repeat after ten quiet minutes and a date alone would not tell them apart. Juno chat bubble times follow. The app's 24-hour clock stays; it has no 12-hour setting (owner).
 - 10-23 00:35 · message hover · A message under the pointer has no fill. Only a message whose menu, or the picker the menu turned into, is open takes a faint fill (`--message-menu-open`, renamed from `--message-hover`), so it is clear which message the menu belongs to (owner).
 - 10-23 00:15 · sidebar resolve · A sidebar row has no hover Resolve button. Resolve is in the row's menu, the topic header and ⌘K; rows keep their height and hovering adds only the fill (owner).
 - 10-22 23:08 · rich clipboard · Rich clipboard HTML is reduced to the composer's own markup and linked-word model in `@juno/richtext`; only HTTP, HTTPS and email links survive, while presentation and executable content are dropped.

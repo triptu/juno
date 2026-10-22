@@ -10,7 +10,7 @@ import { inField } from './fieldMenu'
 import { openOnRelease, type MenuAt } from './menuRelease'
 import { NewDivider } from './NewDivider'
 import { PersonLinks, press } from './personLink'
-import { messageTime } from './time'
+import { messageHeaderTime } from './time'
 
 /** One row as the container holds it: the message and its sender from the window's refs. */
 export interface MessageListItem {
@@ -345,7 +345,7 @@ export function MessageList({
                 sender={item.sender}
                 {...(item.repliers === undefined ? {} : { repliers: item.repliers })}
                 {...(item.reactors === undefined ? {} : { reactors: item.reactors })}
-                time={messageTime(item.message.at, now)}
+                time={messageHeaderTime(item.message.at, now)}
                 now={now}
                 main={main}
                 startsGroup={atDivider}
