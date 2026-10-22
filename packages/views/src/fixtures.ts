@@ -44,6 +44,7 @@ import ProcessesView from './ProcessesView.fixtures'
 import DevLogPage from './DevLogPage.fixtures'
 import Reactions from './Reactions.fixtures'
 import ReactorsCard from './ReactorsCard.fixtures'
+import ReactionsDialog from './ReactionsDialog.fixtures'
 import SendCheckBar from './SendCheckBar.fixtures'
 import SessionView from './SessionView.fixtures'
 import SetUpJunoView from './SetUpJunoView.fixtures'
@@ -156,6 +157,7 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   RecoveryPhraseSheet: phraseSheet,
   Reactions,
   ReactorsCard,
+  ReactionsDialog,
   PinList,
   RemoveCard: removeCard,
   RemoveSheet,
