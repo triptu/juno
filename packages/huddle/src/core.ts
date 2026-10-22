@@ -236,9 +236,9 @@ export const settleWaiters = (core: Core) =>
 /**
  * How long a channel must be quiet before `huddles/info` is read for it.
  * Slack's edge answers from a moment ago: the spike saw it list the user as
- * active after the room frame said they had left, and list the change about
- * three seconds after the leave (research section 6). Read sooner, it can
- * undo what a frame just said, and nothing would read the channel again.
+ * active after their media stopped, and a read about three seconds later
+ * list the change (research section 6). Read sooner, it can undo what a
+ * frame just said, and nothing would read the channel again.
  */
 export const INFO_SETTLE_MILLIS = 3_000
 
