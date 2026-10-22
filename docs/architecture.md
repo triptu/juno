@@ -82,7 +82,7 @@ Custom protocols are not supported in utility processes (checked), so `juno://fi
 
 The web shell (`pnpm web`, `docs/development.md`) runs the same renderer and engine without Electron. The renderer ↔ engine row becomes a WebSocket carrying the same routes, and the renderer ↔ main row becomes a `JunoBridge` answered in the page (`apps/desktop/web`).
 
-Every payload is an Effect `Schema` in `@juno/contract` (`protocol.ts` for the parentPort messages and the handoff, `shell.ts` for the invoke routes (`ShellRoutes`), `channels.ts` for their names), decoded on receipt. The preload imports only `@juno/contract/channels` (names and types, no runtime imports). Main checks `event.senderFrame.url` against `juno://app/` (or the Vite dev URL in dev).
+Every payload is an Effect `Schema` in `@juno/contract` (`protocol.ts` for the parentPort messages and the handoff, `shell.ts` for the invoke routes' schemas and `shellRoutes.ts` for the map of them (`ShellRoutes`), `channels.ts` for their names), decoded on receipt. The preload imports only `@juno/contract/channels` (names and types, no runtime imports). Main checks `event.senderFrame.url` against `juno://app/` (or the Vite dev URL in dev).
 
 ### 2.5 Engine lifecycle
 
