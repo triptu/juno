@@ -1100,6 +1100,12 @@ export const sizes = stylex.defineVars({
   // pixel low (the font puts its baseline there); this moves it back up, so
   // its centre is the box's centre.
   '--emoji-14-shift': '-0.5px',
+  // Measured at 2x from emoji-align.spec.ts; each size draws from a different bitmap.
+  '--emoji-16-shift': '-1px',
+  '--emoji-20-shift': '0.5px',
+  '--emoji-32-shift': '1px',
+  // Aligns Figtree's figures with the centre line of a reaction chip.
+  '--reaction-count-shift': '-0.5px',
 
   // Spot illustrations: 96 wide in lists, 120 in the workspace. The Juno
   // figure alone is 40.
