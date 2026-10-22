@@ -14,7 +14,6 @@ export const junoPageTitles = {
 export const junoPanelCopy = {
   /** The selection toolbar's button beside Quote (SPEC 7, Quoting). */
   askJuno: 'Ask Juno',
-  askJunoTip: 'Ask Juno about the selection',
 } as const
 
 export const junoAskCopy = {
