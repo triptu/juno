@@ -126,6 +126,8 @@ export interface MessageCache {
   people: Map<string, Person>
   /** Set by the subscription: forget the lookups and run again once this Main exists. */
   watchMain?: (topicId: string) => void
+  /** Watch only the source topics in this window for renamed or AI titles. */
+  watchBroadcastTitles?: (ids: ReadonlyArray<string>) => void
   selfId: string | undefined
   membership: string
 }
@@ -266,6 +268,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     const sources = yield* broadcastTitles(sql, target.kind === 'main'
       ? [...new Set(rows.flatMap((row) => row.subtype === 'thread_broadcast' && row.thread_ts !== null && row.thread_ts !== row.ts
         ? [threadTopicId(target.channel as ChannelId, row.thread_ts as Ts)] : []))] : [], selfId)
+    cache.watchBroadcastTitles?.([...sources.values()].map((source) => source.id))
     const contentRows = [...rows, ...firstReplies.values()]
     const repliers = new Map<string, ReadonlyArray<string>>()
     if (target.kind === 'main') {

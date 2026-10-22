@@ -119,7 +119,7 @@ export const MessagesHandlers = MessagesRoutes.toLayer(
           before: Math.max(0, payload.before ?? MESSAGE_WINDOW_BEFORE),
           limit: Math.max(1, Math.min(MESSAGE_WINDOW_MAX, payload.range.limit)),
         }
-        const keys: InvalidationKeys = { messages: target.kind === 'main' || pendingThread(payload.id) !== undefined ? [payload.id, `channel:${target.channel}`] : [payload.id], users: [], conversations: [], usergroups: [], emoji: [], team: [], sync_state: [], synced_ranges: [target.channel], ...(target.kind === 'main' ? { topic_overlay: [] } : {}), thread_cursors: target.kind === 'main' ? [] : [payload.id] }
+        const keys: InvalidationKeys = { messages: target.kind === 'main' || pendingThread(payload.id) !== undefined ? [payload.id, `channel:${target.channel}`] : [payload.id], users: [], conversations: [], usergroups: [], emoji: [], team: [], sync_state: [], synced_ranges: [target.channel], thread_cursors: target.kind === 'main' ? [] : [payload.id] }
         const setup = Effect.gen(function* () {
           const cache = makeMessageCache()
           const invalidation = yield* Invalidation
@@ -138,7 +138,23 @@ export const MessagesHandlers = MessagesRoutes.toLayer(
               Effect.runSync(invalidation.invalidate({ messages: [payload.id] }))
             }))
           }
-          yield* Effect.addFinalizer(() => Effect.sync(() => watched.forEach((cancel) => cancel())))
+          const titleWatches = new Map<string, () => void>()
+          cache.watchBroadcastTitles = (ids) => {
+            const current = new Set(ids)
+            for (const [id, cancel] of titleWatches) if (!current.has(id)) {
+              cancel()
+              titleWatches.delete(id)
+            }
+            for (const id of current) if (!titleWatches.has(id)) {
+              titleWatches.set(id, invalidation.subscribeUnsafe({ topic_overlay: [id] }, () => {
+                Effect.runSync(invalidation.invalidate({ messages: [payload.id] }))
+              }))
+            }
+          }
+          yield* Effect.addFinalizer(() => Effect.sync(() => {
+            watched.forEach((cancel) => cancel())
+            titleWatches.forEach((cancel) => cancel())
+          }))
           return Effect.flatMap(resolveStartedThread(payload.id), id => listMessages(targetOf(id)!, range, cache))
         })
         return serveLiveList(runs(keys, setup), { encodeRow: encodeMessage, measure }).pipe(retryFirstRun('messages.list'), Stream.orDie)
