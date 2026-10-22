@@ -18,6 +18,7 @@
  * without replies. A deleted root with replies keeps its place.
  */
 import type { MessageRow } from '@juno/store'
+import { ACTION_KINDS_SQL } from '@juno/sync'
 
 /** The condition of the `messages_main` partial index, as the migration writes it. */
 export const MAIN_CONDITION = `(thread_ts IS NULL OR thread_ts = ts OR subtype = 'thread_broadcast')`
@@ -99,9 +100,14 @@ export function pendingStatement(target: WindowTarget): Statement {
       : { sql: `SELECT ${columns} FROM pending_messages WHERE channel = ? AND thread_ts = ? ORDER BY created_at, client_msg_id`, params: [target.channel, target.threadTs] }
 }
 
-/** Juno's own edits, deletes and reactions in a channel that Slack has not confirmed (architecture 5.7), through `outbox_target`. */
+/** Juno's own edits, deletes, reactions and broadcasts in a channel that Slack has not confirmed (architecture 5.7), through `outbox_target`. */
 export function actionsStatement(channel: string): Statement {
-  return { sql: `SELECT id, kind, payload_json, created_at FROM outbox WHERE target_key = ? AND kind IN ('edit', 'delete', 'react') ORDER BY id`, params: [channel] }
+  return { sql: `SELECT id, kind, payload_json, created_at FROM outbox WHERE target_key = ? AND kind IN (${ACTION_KINDS_SQL}) ORDER BY id`, params: [channel] }
+}
+
+/** Messages of a channel by ts, by primary key: replies being sent to the channel, and the roots Main's broadcast replies link to. */
+export function messagesByTsStatement(channel: string, ts: ReadonlyArray<string>): Statement {
+  return { sql: `SELECT ${MESSAGE_COLUMNS} FROM messages WHERE channel = ? AND ts IN (${ts.map(() => '?').join(', ')})`, params: [channel, ...ts] }
 }
 
 /** Network copies of Juno's posts that stay hidden though not deleted (file copies, ADR 0014), by primary key. */

@@ -496,6 +496,37 @@ export class Workspace {
     return message
   }
 
+  /**
+   * A reply also sent to the channel after it was posted, as `chat.update`
+   * with `reply_broadcast` does: the same message, now `thread_broadcast`
+   * with its root, announced by one `message_changed`.
+   */
+  broadcast(channel: string, ts: string): Message {
+    const list = this.all(channel)
+    const index = list.findIndex((m) => m.ts === ts)
+    const previous = list[index]
+    if (previous === undefined || previous.thread_ts === undefined) throw new Error('message_not_found')
+    const root = this.find(channel, previous.thread_ts)
+    if (root === undefined) throw new Error('thread_not_found')
+    const eventTs = this.eventTs()
+    const message: Message = { ...previous, subtype: 'thread_broadcast', root: stripRoot(root) }
+    list[index] = message
+    this.messageVersions.set(`${channel}:${ts}`, eventTs)
+    this.mutationUpdated.set(channel, eventTs)
+    this.#touchConversation(channel)
+    this.emit({
+      type: 'message',
+      subtype: 'message_changed',
+      channel,
+      ts: eventTs,
+      event_ts: eventTs,
+      hidden: true,
+      message: { ...message, channel },
+      previous_message: previous,
+    })
+    return message
+  }
+
   remove(channel: string, ts: Ts): void {
     const list = this.all(channel)
     const index = list.findIndex((m) => m.ts === ts)

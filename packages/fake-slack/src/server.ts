@@ -115,6 +115,8 @@ export class FakeServer {
   readonly pictureRequests: string[] = []
   /** The picture store answers 404 to everything, as when it cannot be reached. */
   picturesDown = false
+  /** Served for every large picture file in place of the shared WebP: a file as big as a real one, so it decodes as slowly. */
+  largePictureBytes: Buffer | undefined
   readonly sockets = new Set<WebSocket>()
   /** Frames clients sent on the socket, other than `ping`, oldest first. */
   readonly received: ReceivedFrame[] = []
@@ -600,8 +602,11 @@ export class FakeServer {
     }
     if (path.startsWith('/pictures/') && method === 'GET') {
       const name = path.slice('/pictures/'.length)
-      const bytes = this.picturesDown ? undefined : pictureBytes(name)
       this.pictureRequests.push(name)
+      const large = name.endsWith('-large.webp')
+      await this.#hold(this.#holds, large ? 'picture:large' : 'picture:small', { name })
+      await this.#hold(this.#holds, `picture:${name}`, { name })
+      const bytes = this.picturesDown ? undefined : large && this.largePictureBytes !== undefined && pictureBytes(name) !== undefined ? this.largePictureBytes : pictureBytes(name)
       if (bytes === undefined) return json(response, 404, { ok: false, error: 'not_found' })
       response.writeHead(200, { 'content-type': 'image/webp', 'content-length': String(bytes.length) })
       response.end(bytes)

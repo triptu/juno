@@ -128,3 +128,33 @@ test('at scroll top the first row starts 24px under the islands, as the last end
   await open(page, 'MessageList', 'thread/long')
   expect(await page.evaluate(() => document.querySelector('[data-message-row]')!.getBoundingClientRect().top)).toBe(more)
 })
+
+// A link preview's picture is 360px wide. The body once took that as its least width, so in a narrow
+// column it grew past the row and every line of a list wrapped past the row's hover background.
+for (const id of ['rich-text/narrow', 'rich-text/wide']) {
+  test(`${id}: every block and every word ends inside the message's text column`, async ({ page }) => {
+    await open(page, 'Message', id)
+    const measured = await page.evaluate(() => {
+      const row = document.querySelector('[data-message-row]')!
+      const column = row.children[1]!.getBoundingClientRect().right
+      const body = row.querySelector('[data-msg-text]')!
+      const blocks = [...body.children].map((block) => ({ block: block.tagName, right: block.getBoundingClientRect().right }))
+      // Visible characters only: under pre-wrap the space that ends a line hangs past the edge, unpainted.
+      const words: { word: string; right: number }[] = []
+      const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT)
+      for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+        for (const match of (node.textContent ?? '').matchAll(/\S+/g)) {
+          const range = document.createRange()
+          range.setStart(node, match.index)
+          range.setEnd(node, match.index + match[0].length)
+          for (const rect of range.getClientRects()) words.push({ word: match[0], right: rect.right })
+        }
+      }
+      return { column, body: body.getBoundingClientRect().right, blocks, words }
+    })
+    expect(measured.words.length).toBeGreaterThan(50)
+    expect(measured.body, 'the body ends inside the column').toBeLessThanOrEqual(measured.column + 0.5)
+    for (const block of measured.blocks) expect(block.right, `${block.block} ends inside the column`).toBeLessThanOrEqual(measured.column + 0.5)
+    expect(measured.words.filter((word) => word.right > measured.column + 0.5), 'words past the column').toEqual([])
+  })
+}

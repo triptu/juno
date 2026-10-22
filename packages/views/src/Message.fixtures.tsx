@@ -2,6 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { layout } from '@juno/tokens/tokens.stylex'
 import { defineFixtures, hueForId, scene, type Fixture, type FixtureFrame } from '@juno/ui'
 import { codeBlocks } from './fixtures/code'
+import { richText } from './fixtures/richText'
 import { tableMessages } from './fixtures/tables'
 import { failedSend, hostile, longFirstLine, main, mentions, sending, thread } from './fixtures/messages'
 import { NOW } from './fixtures/topics'
@@ -34,6 +35,7 @@ const one = (item: MessageListItem, extra: Partial<MessageProps> = {}, frame?: F
           tabbable
           hueOf={hueForId}
           onOpenThread={noop}
+          onOpenReply={noop}
           onChannel={noop}
           onLink={noop}
           {...extra}
@@ -51,6 +53,8 @@ const deleted = hostile[3]!
 const unloaded = hostile[4]!
 const edited = thread[9]!
 const broadcast = main[8]!
+// The same reply as its thread shows it: marked, with no link back.
+const { broadcastFrom: _from, ...broadcastInThread } = broadcast.message
 const longLine = longFirstLine[0]!
 const longLineContinuation = longFirstLine[1]!
 const pendingRow = sending[2]!
@@ -71,7 +75,9 @@ export default defineFixtures(
       continuation: one(grouped),
       'mentions-you': one(mention),
       edited: one(edited),
-      broadcast: one(broadcast, { startsGroup: true }),
+      broadcast: one({ ...broadcast, message: broadcastInThread }, { startsGroup: true }),
+      // In Main a broadcast reply links back to its thread.
+      'broadcast-main': one(broadcast, { startsGroup: true, main: true }),
       'thread-link': one(withThread, { main: true }),
       deleted: one(deleted),
       unloaded: one(unloaded),
@@ -81,6 +87,12 @@ export default defineFixtures(
     // Code blocks: tagged (the tag line is not shown), detected, a stack trace left plain, and a long one.
     Code: {
       'code-blocks': one(codeBlocks[0]!, { startsGroup: true }),
+    },
+    // Links, lists, a nested list, a quote, a long URL and a code block: every block wraps inside the
+    // text column, hovered so the row's background shows its edge, at a thread panel's width and a wide pane's.
+    'Rich text': {
+      narrow: one(richText[0]!, { startsGroup: true }, { width: 360, hover: '[data-message-row]' }),
+      wide: one(richText[0]!, { startsGroup: true }, { width: 720, hover: '[data-message-row]' }),
     },
     // Tables: a status table with mentions, a link, code and an empty cell; a wide one that scrolls in its box; a tall one cut at ten rows; a table alone; a wrapped column at a narrow width; a cell with a tab and two paragraphs; and a row that is not the tab stop.
     Table: {

@@ -358,6 +358,9 @@ if (!huddleOnly && !memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly)
       drained.has(file) ? { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true } : {})
     simulate(file, `${schedule}BugStep`, invariant, `${name}-bug.itf.json`, true)
   }
+  simulate('outbox', 'simulationStep', 'invariants', 'broadcast-random.itf.json', false, true, { main: 'broadcastOutbox', witnesses: [] })
+  simulate('outbox', 'lostStep', 'invariants', 'broadcast-lost.itf.json', false, false, { main: 'broadcastOutbox', steps: 11 })
+  simulate('outbox', 'lostBugStep', 'invariants', 'broadcast-lost-bug.itf.json', true, false, { main: 'broadcastOutbox', steps: 11 })
   for (const schedule of [...outboxSchedules, 'boundedAction', 'defectAction', 'expiredReaction']) {
     simulate('outbox', `${schedule}Step`, 'invariants', `outbox-${schedule}.itf.json`, false, false,
       { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true })
