@@ -74,4 +74,3 @@ export function PlacePicker({ place, open, onOpen, query, onQuery, conversations
     </Popover>
   )
 }
-

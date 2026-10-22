@@ -68,4 +68,3 @@ export const About = Schema.Union([
   Schema.TaggedStruct('channel', { channelId: Schema.String, name: Schema.String, tint: PlaceTint }),
 ])
 export type About = typeof About.Type
-

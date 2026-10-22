@@ -2,7 +2,7 @@ import { junoAvailableAtom, whyPopoverAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { WhyPopover } from '@juno/views'
 import { tellJunoAbout } from './juno/actions'
-import { messageQuote } from './juno/topicContext'
+import { messageQuote } from './juno/topicSelection'
 import { changeFromWhy, closeWhy } from './notifyActions'
 
 /** Tell Juno: the Juno chat beside the topic with the message quoted, read before the popover closes. */
@@ -26,4 +26,3 @@ export function WhyPopoverPanel() {
         : undefined
   return <WhyPopover at={at} title={why.title} reason={why.reason} {...(action === undefined ? {} : { action })} onClose={closeWhy} />
 }
-
