@@ -5,6 +5,10 @@
   "private": true,
   "description": "Juno desktop app (Electron shell).",
   "main": "./out/main/index.js",
+  "exports": {
+    "./web": "./web/host/shell.ts",
+    "./web/page": "./web/page/connect.ts"
+  },
   "files": [
     "out"
   ],
@@ -46,6 +50,7 @@
     "@types/node": "24.19.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "@types/ws": "8.18.2",
     "@vitejs/plugin-react": "5.2.0",
     "babel-plugin-react-compiler": "1.0.0",
     "effect": "4.0.3",
@@ -57,7 +62,8 @@
     "typescript": "7.0.2",
     "unplugin": "2.3.11",
     "vite": "7.3.7",
-    "vitest": "5.0.4"
+    "vitest": "5.0.4",
+    "ws": "8.22.0"
   },
   "juno": {
     "allowedDeps": [

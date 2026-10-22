@@ -1,0 +1,186 @@
+/**
+ * `window.juno` in the web shell: the `JunoBridge` the preload gives the
+ * renderer in Electron, answered in the page with browser APIs. Every answer
+ * has the shape the shell routes declare (`@juno/contract`'s `ShellRoutes`),
+ * since the renderer decodes them.
+ *
+ * - Clipboard: `navigator.clipboard`. Open external: a new browser tab.
+ *   Downloads: the browser's own, through the host.
+ * - Launch preferences: localStorage (`launch.ts`).
+ * - Context menus: a plain HTML menu (`menu.ts`).
+ * - App-menu shortcuts: a key the page did not handle becomes its menu
+ *   command, as macOS hands it to the app menu. The browser keeps some
+ *   (⌘T, ⌘N, ⌘W) for itself.
+ * - Not in a browser: the engine and agent ports (the engine comes over the
+ *   socket), huddle media and screen sharing, the Juno Agent's providers and
+ *   Codex, notifications, the web panel, Quick Look, folder pickers, Open in
+ *   Slack, updates. Those answer "unavailable" or do nothing.
+ */
+import { menuShortcuts, type JunoBridge, type MenuCommand } from '@juno/contract/channels'
+import { DOWNLOAD_PATH } from '../paths'
+import { saveLaunch, savedLaunch } from './launch'
+import { popupMenu } from './menu'
+import { pageUrl } from './urls'
+
+const nothing = (): Promise<undefined> => Promise.resolve(undefined)
+const never = (): (() => void) => () => {}
+const noProvider = { active: null, openRouter: { key: 'missing' }, custom: { baseUrl: '', key: 'missing' } } as const
+const noUpdates = { kind: 'unavailable' } as const
+const noSources = { permission: 'denied', sources: [] } as const
+const noPermission = { authorization: 'unknown', badges: 'unknown' } as const
+
+const menuListeners = new Set<(command: MenuCommand) => void>()
+
+/** An accelerator ("CommandOrControl+Shift+[") as a test on a key event. */
+function matches(accelerator: string, event: KeyboardEvent): boolean {
+  const parts = accelerator.split('+')
+  const key = parts.at(-1) ?? ''
+  const wants = new Set(parts.slice(0, -1))
+  const command = wants.has('CommandOrControl') || wants.has('Command')
+  if (event.metaKey !== command || event.ctrlKey !== wants.has('Control') || event.altKey !== (wants.has('Alt') || wants.has('Option')) || event.shiftKey !== wants.has('Shift')) return false
+  if (key === 'Space') return event.code === 'Space'
+  return event.key.toLowerCase() === key.toLowerCase() || event.code === `Key${key.toUpperCase()}`
+}
+
+function menuCommandFor(event: KeyboardEvent): MenuCommand | undefined {
+  for (const [command, accelerator] of Object.entries(menuShortcuts)) if (matches(accelerator, event)) return command as MenuCommand
+  if (event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && /^[1-9]$/.test(event.key)) return `tab.select.${Number(event.key) as 1}`
+  return undefined
+}
+
+/** After the page's own handlers: a key nothing took goes to the "app menu". */
+function forwardMenuKeys(): void {
+  window.addEventListener('keydown', (event) => {
+    if (event.defaultPrevented || menuListeners.size === 0) return
+    const command = menuCommandFor(event)
+    if (command === undefined) return
+    event.preventDefault()
+    for (const listener of menuListeners) listener(command)
+  })
+}
+
+function download(url: string, name: string): void {
+  const link = document.createElement('a')
+  link.href = `${DOWNLOAD_PATH}?${new URLSearchParams({ url, name }).toString()}`
+  link.download = name
+  link.click()
+}
+
+async function copyImage(src: string): Promise<'copied' | 'failed'> {
+  try {
+    const blob = await (await fetch(pageUrl(src))).blob()
+    await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })])
+    return 'copied'
+  } catch {
+    return 'failed'
+  }
+}
+
+const bridge: JunoBridge = {
+  updates: {
+    get: () => Promise.resolve(noUpdates),
+    set: () => Promise.resolve(noUpdates),
+    restart: nothing,
+    download: () => Promise.resolve(noUpdates),
+    notes: () => Promise.resolve({ kind: 'failed' }),
+    onChange: never,
+  },
+  app: {
+    getInfo: () => Promise.resolve({ name: 'Juno', version: 'web', platform: 'darwin', electron: '' }),
+    diagnostics: () => Promise.resolve({ processes: [], engine: 'web shell', agent: 'stopped', uptime: performance.now() / 1000, window: document.hasFocus() ? 'window focused' : 'window hidden' }),
+    logDiagnostics: () => Promise.resolve({ osVersion: navigator.userAgent, logs: [] }),
+    copySyncLog: () => Promise.resolve('failed'),
+    showLogs: nothing,
+    reportStagingFailure: nothing,
+    reportState: nothing,
+  },
+  engine: {
+    // The engine comes over the socket (`@juno/state/socket`); nothing asks for a port.
+    requestPort: () => Promise.resolve('failed'),
+    restart: nothing,
+  },
+  agent: {
+    requestPort: () => Promise.resolve('failed'),
+    setOpenRouterKey: () => Promise.resolve('failed'),
+    provider: () => Promise.resolve(noProvider),
+    setProvider: () => Promise.resolve('failed'),
+    codex: () => Promise.resolve('missing'),
+    codexSignIn: () => Promise.resolve('missing'),
+    onProvider: never,
+    chooseFolder: () => Promise.resolve(null),
+    recoveryPhrase: () => Promise.resolve(null),
+    typeRecoveryPhrase: () => Promise.resolve('failed'),
+  },
+  launch: {
+    setTheme: (theme) => Promise.resolve(saveLaunch('theme', theme)),
+    setAccent: (accent) => Promise.resolve(saveLaunch('accent', accent)),
+    setTopicTitleLines: (lines) => Promise.resolve(saveLaunch('topicTitleLines', lines)),
+    setDensity: (density) => Promise.resolve(saveLaunch('density', density)),
+    setPrivacy: (privacy) => Promise.resolve(saveLaunch('privacy', privacy ? 'on' : undefined)),
+    setSidebar: ({ width, collapsed }) => Promise.resolve(saveLaunch('sidebar', `${width}${collapsed ? '-hidden' : ''}`)),
+    onPrivacy: never,
+  },
+  window: { onFullScreen: never },
+  sharing: {
+    get: () => Promise.resolve({ hide: savedLaunch('hideWhileSharing') !== 'false', detection: 'missing' }),
+    set: (hide) => {
+      saveLaunch('hideWhileSharing', String(hide))
+      return Promise.resolve({ hide, detection: 'missing' })
+    },
+  },
+  huddle: {
+    // The fake media session, so the huddle views load; the host gives the engine no huddle pages, so a join fails.
+    register: () => Promise.resolve({ generation: 1, fakeMedia: true }),
+    setMenu: nothing,
+    openMicrophoneSettings: nothing,
+    shareSources: () => Promise.resolve(noSources),
+    allowScreenRecording: () => Promise.resolve(noSources),
+    openScreenRecordingSettings: nothing,
+    shareWindowOpen: () => Promise.resolve(false),
+  },
+  contextMenu: { popup: (items, at) => popupMenu(items, at) },
+  shell: {
+    openExternal: (url) => {
+      if (/^https?:\/\//i.test(url)) window.open(url, '_blank', 'noopener')
+      return nothing()
+    },
+    openInSlack: nothing,
+    editUndo: () => {
+      document.execCommand('undo')
+      return nothing()
+    },
+    downloadFile: ({ url, name }) => {
+      download(url, name)
+      return Promise.resolve('saved')
+    },
+    openFile: () => Promise.resolve('failed'),
+  },
+  files: { quickLook: () => Promise.resolve('failed') },
+  clipboard: {
+    writeText: (text) => navigator.clipboard.writeText(text),
+    writeImage: copyImage,
+  },
+  menu: {
+    onCommand: (listener) => {
+      menuListeners.add(listener)
+      return () => {
+        menuListeners.delete(listener)
+      }
+    },
+  },
+  notifications: {
+    contentShown: nothing,
+    setViewing: nothing,
+    onOpen: never,
+    test: nothing,
+    permission: () => Promise.resolve(noPermission),
+    requestPermission: () => Promise.resolve(noPermission),
+    openSettings: nothing,
+  },
+  webPanel: { show: nothing, setBounds: nothing, hide: nothing, close: nothing, onState: never },
+}
+
+export function installBridge(): void {
+  Object.assign(window, { juno: bridge })
+  forwardMenuKeys()
+}

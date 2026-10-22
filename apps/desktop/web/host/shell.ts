@@ -1,0 +1,214 @@
+/**
+ * The web shell (`docs/development.md`, "Web shell"): the real renderer in a
+ * browser, for UI work without building or launching Electron. One Node
+ * process holds all of it:
+ *
+ * - a fake Slack seeded with the default seed the e2e and feel tests use,
+ *   on a free port, with its control API;
+ * - the engine on a fresh data folder, signed in to the fake, with the
+ *   fake AI, serving its routes over WebSockets (`socketTransport`);
+ * - Vite in dev mode (HMR) serving the renderer with the web page entry
+ *   (`../page/main.ts`), the engine socket and `/__juno/` files on the same
+ *   port.
+ *
+ * `stop()` ends all of it and removes the data folder.
+ */
+import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { Logger, LogLevel } from 'effect'
+import { createServer, type Plugin, type ViteDevServer } from 'vite'
+import { WebSocketServer } from 'ws'
+import type { SessionSecrets } from '@juno/contract'
+import { memoryHost, socketTransport, startEngine, type EngineHandle } from '@juno/engine'
+import { startFakeSlack, type Credentials, type FakeSlack } from '@juno/fake-slack'
+import { HttpTransport } from '@juno/slack'
+import { rendererPlugins } from '../../renderer.vite'
+import { ENGINE_SOCKET_PATH } from '../paths'
+import { serveFile, type FileSource } from './files'
+
+const desktopDir = resolve(import.meta.dirname, '../..')
+const repoRoot = resolve(desktopDir, '../..')
+const rendererDir = join(desktopDir, 'src/renderer')
+const pageEntry = resolve(import.meta.dirname, '../page/main.ts')
+const STOP_STEP_MS = 1500
+
+export interface WebShellOptions {
+  /** The app's port; 0 picks a free one. */
+  readonly port: number
+  /** The interface to listen on: 127.0.0.1, or 0.0.0.0 for the LAN (`--host`). */
+  readonly host?: string
+  /** Vite's log level; the command line keeps it to warnings. */
+  readonly logLevel?: 'info' | 'warn' | 'error' | 'silent'
+}
+
+export interface WebShell {
+  /** The app's address. */
+  readonly url: string
+  /** The fake Slack's control API: `POST <controlUrl>/<name>` with a JSON body. */
+  readonly controlUrl: string
+  readonly fake: FakeSlack
+  /** Closes every engine socket, as a dropped connection would; the page dials again. */
+  readonly dropEngineSockets: () => void
+  readonly stop: () => Promise<void>
+}
+
+/** The engine's warnings and errors; its info lines (migrations, sync steps) stay out of the shell's output. */
+const engineLogger = Logger.make<unknown, void>((options) => {
+  if (LogLevel.isGreaterThanOrEqualTo(options.logLevel, 'Warn')) Logger.defaultLogger.log(options)
+})
+
+/**
+ * The folders Vite may serve files from: the repo, and pnpm's store, where
+ * packages such as the fonts really live (`virtualStoreType: global`).
+ */
+function servedFolders(): string[] {
+  const react = realpathSync(join(desktopDir, 'node_modules/react'))
+  const links = react.lastIndexOf('/links/')
+  return links < 0 ? [repoRoot] : [repoRoot, react.slice(0, links + '/links'.length)]
+}
+
+/** Scratch space: the AgentWork volume when it is mounted (CLAUDE.md), else the system's. */
+function scratchFolder(): string {
+  const volume = '/Volumes/AgentWork'
+  const parent = existsSync(join(volume, '.fseventsd/no_log')) ? join(volume, 'tmp') : tmpdir()
+  return mkdtempSync(join(existsSync(parent) ? parent : tmpdir(), 'juno-web-'))
+}
+
+/** What main does for the engine, for a session main already holds: the fake's credentials. */
+function fakeMain(fake: FakeSlack, credentials: Credentials) {
+  const host = memoryHost()
+  let current: Credentials | undefined = credentials
+  const secrets = (c: Credentials): SessionSecrets => ({ teamId: c.teamId, userId: c.userId, workspaceUrl: c.url, token: c.token, teamName: 'Juno Fake' })
+  let stored: SessionSecrets | null = secrets(credentials)
+  host.onEngine((message) => {
+    switch (message._tag) {
+      case 'requestSecrets':
+        host.deliver({ _tag: 'secrets', secrets: stored })
+        return
+      case 'importFromSlackApp':
+        current = fake.signIn()
+        host.deliver({ _tag: 'secrets', secrets: secrets(current) })
+        return
+      case 'storeSecrets':
+        stored = message.secrets
+        host.deliver({ _tag: 'secretsStored' })
+        return
+      case 'signOut':
+        stored = null
+        current = undefined
+        host.deliver({ _tag: 'signedOut' })
+        return
+      case 'handshake':
+        host.deliver({ _tag: 'handshake', id: message.id, cookie: current === undefined ? '' : `d=${current.cookie}`, origin: 'https://app.slack.com', userAgent: 'Juno web shell', proxy: 'DIRECT' })
+        return
+      default:
+        return
+    }
+  })
+  const cookie = () => (current === undefined ? '' : `d=${current.cookie}`)
+  // The cookie Chromium would attach on the Slack session.
+  const httpTransport = HttpTransport.nodeFetch({
+    fetch: (input, init) => fetch(input, { ...init, headers: { ...(init?.headers as Record<string, string>), cookie: cookie() } }),
+  })
+  return { host, httpTransport, cookie }
+}
+
+/** Serves the page entry in place of the renderer's, the engine socket and the files, on Vite's server. */
+function webShellPlugin(onSocket: (socket: import('ws').WebSocket) => void, files: FileSource): Plugin {
+  const sockets = new WebSocketServer({ noServer: true })
+  return {
+    name: 'juno:web-shell',
+    transformIndexHtml: {
+      order: 'pre',
+      handler: (html) => html.replace('src="./main.tsx"', `src="/@fs${pageEntry}"`),
+    },
+    configureServer(server) {
+      server.middlewares.use((request, response, next) => {
+        serveFile(request, response, files).then((served) => {
+          if (!served) next()
+        }, next)
+      })
+      server.httpServer?.on('upgrade', (request, socket, head) => {
+        if (new URL(request.url ?? '/', 'http://web-shell').pathname !== ENGINE_SOCKET_PATH) return
+        // Only the page itself: another site open in the browser must not reach the engine.
+        const origin = request.headers.origin
+        if (origin === undefined || new URL(origin).host !== request.headers.host) {
+          socket.destroy()
+          return
+        }
+        sockets.handleUpgrade(request, socket, head, onSocket)
+      })
+    },
+  }
+}
+
+export async function startWebShell(options: WebShellOptions): Promise<WebShell> {
+  const host = options.host ?? '127.0.0.1'
+  const userData = scratchFolder()
+  const cleanups: Array<() => unknown> = [() => rmSync(userData, { recursive: true, force: true })]
+  // Last started, first stopped. A step that hangs gives up after a while, so the data folder still goes.
+  const stop = async () => {
+    for (const cleanup of cleanups.splice(0).toReversed()) {
+      const step = Promise.resolve().then(cleanup).catch((cause: unknown) => console.error('web shell: stop failed', cause))
+      await Promise.race([step, new Promise((resolve) => setTimeout(resolve, STOP_STEP_MS).unref())])
+    }
+  }
+  try {
+    const fake = await startFakeSlack({ seedTime: Date.now() })
+    cleanups.push(() => fake.close())
+    const main = fakeMain(fake, fake.signIn())
+    const transport = socketTransport({ host, port: options.port })
+    const engine: EngineHandle = await startEngine(
+      transport,
+      { userData, e2e: true, dev: true, fakeSlackUrl: fake.url, ai: 'fake', aiJobs: false },
+      { host: main.host, httpTransport: main.httpTransport, logger: engineLogger },
+    )
+    cleanups.push(() => engine.stop())
+    const open = new Set<import('ws').WebSocket>()
+    const server: ViteDevServer = await createServer({
+      configFile: false,
+      root: rendererDir,
+      cacheDir: join(desktopDir, 'node_modules/.vite-web'),
+      clearScreen: false,
+      logLevel: options.logLevel ?? 'warn',
+      plugins: [
+        ...rendererPlugins({ repoRoot, minify: false, reportSkipped: false }),
+        webShellPlugin(
+          (socket) => {
+            open.add(socket)
+            socket.on('close', () => open.delete(socket))
+            transport.add(socket)
+          },
+          { origin: new URL(fake.url).origin, cookie: main.cookie, userData },
+        ),
+      ],
+      server: {
+        host,
+        port: options.port,
+        strictPort: true,
+        allowedHosts: host === '127.0.0.1' ? [] : true,
+        fs: { allow: servedFolders() },
+        // Transform the page's modules while nobody is looking yet, so the first load is quicker.
+        warmup: { clientFiles: [pageEntry] },
+      },
+      optimizeDeps: { entries: [pageEntry], include: ['react/compiler-runtime'], holdUntilCrawlEnd: false },
+    })
+    cleanups.push(() => server.close())
+    await server.listen()
+    const address = server.httpServer?.address()
+    const port = typeof address === 'object' && address !== null ? address.port : options.port
+    return {
+      url: `http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${port}/`,
+      controlUrl: `${fake.url}/control`,
+      fake,
+      dropEngineSockets: () => {
+        for (const socket of open) socket.terminate()
+      },
+      stop,
+    }
+  } catch (cause) {
+    await stop()
+    throw cause
+  }
+}

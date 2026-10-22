@@ -41,8 +41,11 @@ export default {
         'src/engine/index.ts',
         'src/preload/index.ts',
         'src/renderer/index.html',
+        // The web shell (`pnpm web`): its host and the page entry it serves.
+        'web/host/cli.ts',
+        'web/page/main.ts',
       ],
-      project: ['src/**/*.{ts,tsx}', 'e2e/**/*.ts', 'packaging/**/*.ts', 'build/*.cjs', '*.config.ts', '*.vite.ts'],
+      project: ['src/**/*.{ts,tsx}', 'e2e/**/*.ts', 'packaging/**/*.ts', 'build/*.cjs', 'web/**/*.ts', '*.config.ts', '*.vite.ts'],
       playwright: { config: ['playwright*.config.ts'] },
       vite: { config: ['electron.vite.config.ts'] },
     },

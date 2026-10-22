@@ -228,6 +228,7 @@ apps/desktop            The Electron app. Thin wiring only.
   src/preload           contextBridge. Exposes window.juno and forwards the engine port.
   src/renderer          React root, global.css, containers (wire atoms to views).
   e2e                   Playwright tests and the Electron launch fixture.
+  web                   The web shell (pnpm web): host/ in Node, page/ in the browser. Never in the app.
   electron.vite.config.ts
   renderer.vite.ts      The renderer's Vite plugins, shared by the app build and the web shell.
   electron-builder.yml
