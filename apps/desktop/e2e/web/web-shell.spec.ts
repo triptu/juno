@@ -1,6 +1,6 @@
 import { WebSocket } from 'ws'
 import { expect, test, type Page } from '@playwright/test'
-import { startWebShell, type WebShell } from '../../web/host/shell'
+import { launchWebShell, messages as fakeMessages } from './host'
 import type { WebPageHandle } from '../../web/page/connect'
 
 /**
@@ -10,10 +10,10 @@ import type { WebPageHandle } from '../../web/page/connect'
  * link through the HTML context menu, and sends again after the socket
  * drops.
  */
-let shell: WebShell
+let shell: Awaited<ReturnType<typeof launchWebShell>>
 
 test.beforeAll(async () => {
-  shell = await startWebShell({ port: 0, logLevel: 'error' })
+  shell = await launchWebShell()
 })
 
 test.afterAll(async () => {
@@ -27,6 +27,11 @@ test('the web shell reads, sends and reacts through the engine socket', async ({
   // The first load transforms the renderer's modules in the host's Vite.
   test.setTimeout(180_000)
   await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(shell.url).origin })
+  let dropEngineSocket: () => Promise<void> = async () => { throw new Error('The page has not connected') }
+  await page.routeWebSocket('**/__juno/engine', (socket) => {
+    const server = socket.connectToServer()
+    dropEngineSocket = () => server.close()
+  })
   await page.goto(shell.url, { timeout: 120_000 })
   await expect.poll(() => connection(page), { timeout: 120_000 }).toBe('connected')
   const sidebar = page.getByRole('complementary', { name: 'Sidebar' })
@@ -49,7 +54,7 @@ test('the web shell reads, sends and reacts through the engine socket', async ({
     await composer.press('Enter')
     await expect(message(text)).toHaveCount(1)
     await expect(message(text)).not.toHaveAttribute('data-pending', /.*/)
-    await expect.poll(() => shell.fake.messages('C0ENG').some((each) => each.text === text)).toBe(true)
+    await expect.poll(() => fakeMessages(shell.controlUrl)).toEqual(expect.arrayContaining([expect.objectContaining({ text })]))
   })
 
   await test.step('a quick reaction reaches Slack', async () => {
@@ -57,7 +62,7 @@ test('the web shell reads, sends and reacts through the engine socket', async ({
     await row.hover()
     await row.getByRole('button', { name: 'React 👍' }).click()
     await expect(row.getByRole('button', { name: '1 👍, including you' })).toBeVisible()
-    await expect.poll(() => shell.fake.messages('C0ENG').find((each) => each.text === text)?.reactions?.map((each) => each.name)).toEqual(['+1'])
+    await expect.poll(() => fakeMessages(shell.controlUrl)).toEqual(expect.arrayContaining([expect.objectContaining({ text, reactions: [expect.objectContaining({ name: '+1' })] })]))
   })
 
   await test.step('the context menu is a page menu whose items work', async () => {
@@ -81,14 +86,14 @@ test('the web shell reads, sends and reacts through the engine socket', async ({
   })
 
   await test.step('after the socket drops, the page reconnects and sends again', async () => {
-    shell.dropEngineSockets()
+    await dropEngineSocket()
     await expect.poll(() => connection(page)).toBe('reconnecting')
     await expect.poll(() => connection(page), { timeout: 30_000 }).toBe('connected')
     const again = 'Sent again after a reconnect'
     const composer = topic.locator('[data-composer] textarea')
     await composer.fill(again)
     await composer.press('Enter')
-    await expect.poll(() => shell.fake.messages('C0ENG').some((each) => each.text === again)).toBe(true)
+    await expect.poll(() => fakeMessages(shell.controlUrl)).toEqual(expect.arrayContaining([expect.objectContaining({ text: again })]))
     await expect(message(again)).not.toHaveAttribute('data-pending', /.*/)
   })
 })

@@ -48,9 +48,6 @@ export interface WebShell {
   readonly url: string
   /** The fake Slack's control API: `POST <controlUrl>/<name>` with a JSON body. */
   readonly controlUrl: string
-  readonly fake: FakeSlack
-  /** Closes every engine socket, as a dropped connection would; the page dials again. */
-  readonly dropEngineSockets: () => void
   readonly stop: () => Promise<void>
 }
 
@@ -176,6 +173,24 @@ function webShellPlugin(httpServer: Server, onSocket: (socket: WebSocket) => voi
   }
 }
 
+function listen(server: Server, port: number, host: string): Promise<void> {
+  return new Promise((done, reject) => {
+    server.once('error', reject)
+    server.listen(port, host, () => {
+      server.removeListener('error', reject)
+      done()
+    })
+  })
+}
+
+function closeHttp(server: Server): Promise<void> {
+  return new Promise((done, reject) => {
+    if (!server.listening) return done()
+    server.close((error) => error === undefined ? done() : reject(error))
+    server.closeAllConnections()
+  })
+}
+
 export async function startWebShell(options: WebShellOptions): Promise<WebShell> {
   const host = options.host ?? '127.0.0.1'
   const userData = scratchFolder()
@@ -232,32 +247,18 @@ export async function startWebShell(options: WebShellOptions): Promise<WebShell>
       },
       optimizeDeps: { entries: [pageEntry], include: ['react/compiler-runtime'], holdUntilCrawlEnd: false },
     })
-    cleanups.push(() => new Promise<void>((resolve, reject) => {
-      if (!httpServer.listening) return resolve()
-      httpServer.close((error) => error === undefined ? resolve() : reject(error))
-      httpServer.closeAllConnections()
-    }))
+    cleanups.push(() => closeHttp(httpServer))
     cleanups.push(() => server.close())
     cleanups.push(() => {
       for (const socket of open) socket.terminate()
     })
     httpServer.on('request', server.middlewares)
-    await new Promise<void>((resolve, reject) => {
-      httpServer.once('error', reject)
-      httpServer.listen(options.port, host, () => {
-        httpServer.removeListener('error', reject)
-        resolve()
-      })
-    })
+    await listen(httpServer, options.port, host)
     const address = httpServer.address()
     const port = typeof address === 'object' && address !== null ? address.port : options.port
     return {
       url: `http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${port}/`,
       controlUrl: `${fake.url}/control`,
-      fake,
-      dropEngineSockets: () => {
-        for (const socket of open) socket.terminate()
-      },
       stop,
     }
   } catch (cause) {

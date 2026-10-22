@@ -673,7 +673,7 @@ The page reaches the engine over a WebSocket that carries the same `effect/rpc` 
 - **Ports.** Each worktree gets its own port, derived from its path like the gallery's, with a strict port check to catch collisions. `JUNO_WEB_PORT` overrides it. The shell listens on 127.0.0.1; `--host` listens on the LAN, and the fake Slack stays on this Mac.
 - **Stopping.** Ctrl-C stops everything and deletes the data folder. So does the end of the process that started it. A shell killed before it can clean up leaves its folder, and the next `pnpm web` deletes it. Each shell holds a few hundred MB, so stop it when you are done.
 - **Code.** `apps/desktop/web`: `host/` runs in Node, `page/` in the browser. The socket transport is `packages/state/src/socket.ts` and `packages/engine/src/protocol/socket.ts`. Nothing in `apps/desktop/src` imports the shell (`check-deps`), so it never reaches the Electron app.
-- **Test.** `apps/desktop/e2e/web/web-shell.spec.ts` runs in the desktop suite’s `web` Playwright project, starts the shell in-process and checks in Chrome that a channel's Main reads, a message sends, a reaction lands, a context menu item works and the page reconnects after the socket drops. `pnpm affected` runs it when the shell, the socket transport or the engine changes.
+- **Test.** `apps/desktop/e2e/web/web-shell.spec.ts` runs in the desktop suite’s `web` Playwright project, starts the CLI and checks in Chrome that a channel's Main reads, a message sends, a reaction lands, a context menu item works and the page reconnects after the socket drops. `pnpm affected` runs it when the shell, the socket transport or the engine changes.
 
 What it cannot do:
 
