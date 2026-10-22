@@ -52,10 +52,10 @@ Button with only an icon. `label` is required and doubles as the tooltip (`noToo
 
 | Prop | Values |
 | --- | --- |
-| `size` | 20, 22, 26, 28, 30, 32, 36 |
-| `radius` | derived (4 for 20–22, 6 for 26, 12 for 28 (the hover-toolbar button), 8 for 30+), or `sm` (5, dismiss), `full` (attach, send) |
+| `size` | 20, 22, 24, 26, 28, 30, 32, 36 |
+| `radius` | derived (4 for 20–22, round for 24 (the hover-toolbar button, with a 15px icon), 6 for 26, 12 for 28, 8 for 30+), or `sm` (5, dismiss), `full` (attach, send) |
 
-`EmojiButton`: the 28px hover-toolbar button whose icon is an emoji (`emoji` as text, or `src` for a custom emoji's image, with `emoji` as the alt), radius 12, the same feedback as `IconButton`. Needs a `label` ("React 👍").
+`EmojiButton`: the 24px round hover-toolbar button whose icon is a 14px emoji (`emoji` as text, or `src` for a custom emoji's image, with `emoji` as the alt), the same feedback as `IconButton`. Needs a `label` ("React 👍").
 | `variant` | `ghost` (default), `secondary`, `primary` (send), `raised`, `island` (a page header island's control: hover and open `--secondary-default`, pressed toggle `--secondary-hover`) |
 | `tone` | `subtle` (default), `muted`, `default` for ghost |
 | `icon`, `iconSize`, `iconWeight`, `dimmed` | as Button. Icon 12 / 12 / 13 / 18 / 18 / 18 / 20 by size; the send arrow passes `iconWeight="bold"`, attach `iconSize={20}` |

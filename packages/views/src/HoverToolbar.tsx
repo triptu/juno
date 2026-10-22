@@ -48,17 +48,17 @@ function below(event: MouseEvent<HTMLElement>): MenuAnchor {
 
 // In a message row (the `message` container in `Message.tsx`), quick reaction
 // i shows only while the row is wide enough for the Main toolbar with i + 1
-// reactions: 133px of buttons, rule and padding, plus 30px a reaction (a 28px
-// button and its 2px gap). So a narrow row drops reactions from the end and
-// the toolbar never runs past the row's start; More reactions always shows.
+// reactions: 109px of buttons, rule, inset and border, plus 24px a reaction.
+// So a narrow row drops reactions from the end and the toolbar never runs
+// past the row's start; More reactions always shows.
 const FITS = [
-  '@container message (width < 163px)',
-  '@container message (width < 193px)',
-  '@container message (width < 223px)',
+  '@container message (width < 133px)',
+  '@container message (width < 157px)',
+  '@container message (width < 181px)',
+  '@container message (width < 205px)',
+  '@container message (width < 229px)',
   '@container message (width < 253px)',
-  '@container message (width < 283px)',
-  '@container message (width < 313px)',
-  '@container message (width < 343px)',
+  '@container message (width < 277px)',
 ] as const
 
 /**
@@ -79,14 +79,14 @@ export function HoverToolbar({ main = false, hasThread = false, reactions = DEFA
   const tab = (key: string) => (key === stop ? tabIndex : -1)
   if (confirmDelete !== undefined) {
     return (
-      <Surface kind="toolbar" padding="xs" role="group" aria-label="Delete this message?" data-delete-confirm="" sx={[styles.toolbar, styles.confirm]}>
+      <Surface kind="toolbar" padding="none" radius="pill" role="group" aria-label="Delete this message?" data-delete-confirm="" sx={[styles.toolbar, styles.confirm]}>
         <Text variant="meta" tone="default" as="span" sx={styles.question}>
           Delete this message?
         </Text>
-        <Button variant="ghost" size="sm" tone="subtle" onClick={confirmDelete.onCancel}>
+        <Button variant="ghost" size="xs" tone="subtle" onClick={confirmDelete.onCancel}>
           Cancel
         </Button>
-        <Button variant="primary" size="sm" kbd="↵" onClick={confirmDelete.onConfirm}>
+        <Button variant="primary" size="xs" kbd="↵" onClick={confirmDelete.onConfirm}>
           Delete
         </Button>
       </Surface>
@@ -95,7 +95,8 @@ export function HoverToolbar({ main = false, hasThread = false, reactions = DEFA
   return (
     <Surface
       kind="toolbar"
-      padding="xs"
+      padding="none"
+      radius="pill"
       role="toolbar"
       aria-label={label}
       onFocus={(event) => {
@@ -113,13 +114,13 @@ export function HoverToolbar({ main = false, hasThread = false, reactions = DEFA
       <span {...stylex.props(styles.separator)}>
         <Divider vertical inset="none" />
       </span>
-      <IconButton icon={Smiley} label="More reactions" aria-haspopup="dialog" size={28} data-toolbar-item="more-reactions" tabIndex={tab('more-reactions')} onClick={onMoreReactions === undefined ? undefined : (event) => onMoreReactions(below(event))} />
-      {onQuote !== undefined ? <IconButton icon={Quotes} label="Quote" size={28} data-toolbar-item="quote" tabIndex={tab('quote')} onClick={onQuote} /> : null}
+      <IconButton icon={Smiley} label="More reactions" aria-haspopup="dialog" size={24} data-toolbar-item="more-reactions" tabIndex={tab('more-reactions')} onClick={onMoreReactions === undefined ? undefined : (event) => onMoreReactions(below(event))} />
+      {onQuote !== undefined ? <IconButton icon={Quotes} label="Quote" size={24} data-toolbar-item="quote" tabIndex={tab('quote')} onClick={onQuote} /> : null}
       {main ? (
         <IconButton
           icon={ChatsCircle}
           label={hasThread ? 'Open thread' : 'Start thread'}
-          size={28}
+          size={24}
           data-toolbar-item="reply"
           tabIndex={tab('reply')}
           // ⌘-click leaves focus where it was: the thread opens behind this tab.
@@ -128,7 +129,7 @@ export function HoverToolbar({ main = false, hasThread = false, reactions = DEFA
           onKeyDown={onReply === undefined ? undefined : (event) => replyKey(event, onReply)}
         />
       ) : null}
-      {onMore !== undefined ? <IconButton icon={DotsThree} label="More" aria-haspopup="menu" size={28} data-toolbar-item="more" tabIndex={tab('more')} onClick={(event) => onMore(below(event))} /> : null}
+      {onMore !== undefined ? <IconButton icon={DotsThree} label="More" aria-haspopup="menu" size={24} data-toolbar-item="more" tabIndex={tab('more')} onClick={(event) => onMore(below(event))} /> : null}
     </Surface>
   )
 }
@@ -155,13 +156,16 @@ function replyKey(event: KeyboardEvent<HTMLButtonElement>, onReply: (options: { 
 }
 
 const styles = stylex.create({
+  // 24px buttons, a 1px inset and the 1px border: --toolbar-height.
   toolbar: {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: spacing['--space-0-5'],
+    padding: spacing['--space-pixel'],
   },
+  // 22px buttons, so the same height with a 2px inset.
   confirm: {
     gap: spacing['--space-1'],
+    padding: spacing['--space-0-5'],
   },
   question: {
     paddingInline: spacing['--space-2'],
@@ -172,7 +176,7 @@ const styles = stylex.create({
     display: 'inline-flex',
     alignSelf: 'stretch',
     paddingBlock: spacing['--space-1'],
-    marginInline: spacing['--space-0-5'],
+    marginInline: spacing['--space-1'],
   },
 })
 

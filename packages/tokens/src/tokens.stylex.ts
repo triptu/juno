@@ -505,12 +505,12 @@ export const radii = stylex.defineVars({
   '--radius-md': '6px',
   '--radius-md-plus': '7px',
   '--radius-lg': '8px',
-  // Nav and filter buttons, hover-toolbar buttons, 30px buttons, 32-36px
-  // tiles, the To field.
+  // Nav and filter buttons, 28px and 30px buttons, 32-36px tiles, the To
+  // field.
   '--radius-xl': '12px',
   // Flat message hover row.
   '--radius-2xl': '14px',
-  // Sidebar and list rows, the 44px channel tile, the hover toolbar.
+  // Sidebar and list rows, the 44px channel tile.
   '--radius-3xl': '16px',
   // Cards and settings groups.
   '--radius-card': '20px',
@@ -906,13 +906,14 @@ export const layout = stylex.defineVars({
   '--composer-padding-block': '9px',
   '--assistant-input-max-height': '160px',
   '--code-block-max-height': '150px',
-  // The message hover toolbar's height. It straddles the row's top edge, so
-  // a header keeps no room for it.
-  '--toolbar-height': '36px',
+  // The message hover toolbar's height: 24px buttons, a 1px inset and its
+  // 1px border. It straddles the row's top edge, so a header keeps no room
+  // for it.
+  '--toolbar-height': '28px',
   // How far a message row may paint outside its box: the toolbar's height
   // and its shadow, for the toolbar above (or flipped below) the row. A length, not
   // a calc(): Chromium ignores calc() in overflow-clip-margin.
-  '--toolbar-clip-margin': '44px',
+  '--toolbar-clip-margin': '36px',
   // Image thumbnails in a message: never wider or taller than this, scaled
   // by their own aspect ratio. File cards share the width.
   '--thumb-max-width': '360px',

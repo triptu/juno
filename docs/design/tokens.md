@@ -422,7 +422,7 @@ Odd values the prototype uses once (3, 5, 9, 18) are component-local; keep them 
 
 ## 4. Radii
 
-[css] `--radius-sm 4`, `--radius-md 6`, `--radius-lg 8`, `--radius-xl 10`. The prototype also uses 5, 7, 9, 12, 13, 14, 16 and 999. The friendly layer (`friendly-layer.md` §3) makes every label a pill and gives containers one step more radius; the options review (`friendly-layer/options.html`, D1 "rounder") then took rows and tiles to 16, cards to 20, nav and filter buttons to 12, the composer and the 32px and taller buttons to pills, the hover toolbar to 16 with 12 buttons, and replaced the card and popover rings with wide soft shadows. Full set:
+[css] `--radius-sm 4`, `--radius-md 6`, `--radius-lg 8`, `--radius-xl 10`. The prototype also uses 5, 7, 9, 12, 13, 14, 16 and 999. The friendly layer (`friendly-layer.md` §3) makes every label a pill and gives containers one step more radius; the options review (`friendly-layer/options.html`, D1 "rounder") then took rows and tiles to 16, cards to 20, nav and filter buttons to 12, the composer and the 32px and taller buttons to pills, the hover toolbar to 16 with 12 buttons (since 10-22 a small pill with 24px round buttons), and replaced the card and popover rings with wide soft shadows. Full set:
 
 | Token | px | Use |
 | --- | --- | --- |
@@ -432,9 +432,9 @@ Odd values the prototype uses once (3, 5, 9, 18) are component-local; keep them 
 | `--radius-md` | 6 | Menu items, small buttons (28), quote block, thread link, 24px channel tiles |
 | `--radius-md-plus` | 7 | Selects, the segmented track, topic-list items in Juno cards, 28px channel tiles |
 | `--radius-lg` | 8 | 28px buttons, icon buttons (30–32), tabs (top corners), palette items, inputs, send-check bar, option buttons, 28px channel tiles |
-| `--radius-xl` | 12 | Nav items, filter buttons, 30px buttons, hover-toolbar buttons (28), 32–36px channel tiles |
+| `--radius-xl` | 12 | Nav items, filter buttons, 28px and 30px buttons, 32–36px channel tiles |
 | `--radius-2xl` | 14 | Flat message hover row |
-| `--radius-3xl` | 16 | Sidebar and list rows (and the selected row), 44px channel tile, hover toolbar |
+| `--radius-3xl` | 16 | Sidebar and list rows (and the selected row), 44px channel tile |
 | `--radius-card` | 20 | Cards (settled hint, Juno cards) and settings groups |
 | `--radius-composer` | 20 | The composer frame: a pill at its 40px single-line height, and the same corner once it has grown, so a tall draft is not a capsule |
 | `--radius-menu` | 13 | Context menu, avatar menu, mention popover, New chat pickers |
@@ -448,7 +448,7 @@ Odd values the prototype uses once (3, 5, 9, 18) are component-local; keep them 
 
 A label is a pill; a control or a container is a rounded rectangle. Pills never nest in pills.
 
-**Nesting rule (SPEC §16):** outer radius = inner radius + padding. Pairs: palette 14 = item 8 + padding 6; Juno topics card 20 = item 12 + padding 8 (the items use `--radius-xl`); segmented control 7 = segment 5 + padding 2; menus 13 = item 6 + padding 6 + 1 border; hover toolbar 16 = button 12 + padding 2 + 2 (off by two: the sheet's values, kept so the toolbar matches the rows); card 20 = inset block 8 + padding 12; settings group 20 = row 16 + 4; card row 16 = tile 16 only by eye (the tile is not inset evenly). When building a new container, compute it; do not pick from the table.
+**Nesting rule (SPEC §16):** outer radius = inner radius + padding. Pairs: palette 14 = item 8 + padding 6; Juno topics card 20 = item 12 + padding 8 (the items use `--radius-xl`); segmented control 7 = segment 5 + padding 2; menus 13 = item 6 + padding 6 + 1 border; hover toolbar: a pill around 24px round buttons; card 20 = inset block 8 + padding 12; settings group 20 = row 16 + 4; card row 16 = tile 16 only by eye (the tile is not inset evenly). When building a new container, compute it; do not pick from the table.
 
 ## 5. Sizes
 
@@ -505,8 +505,8 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--search-field-width` | 260px filter search; `--keyword-field-width` 160px keyword rule input |
 | `--all-topics-columns` | All topics table grid: `minmax(200px, 1fr) minmax(0, 150px) 104px 44px 84px` |
 | `--code-block-max-height` | 150px, then the block scrolls inside; the wheel goes on to the page at its edges |
-| `--toolbar-clip-margin` | 44px: how far a message row may paint outside its box (the 36px toolbar and its shadow), so the toolbar can sit above the row, or below it when flipped. A plain length: Chromium ignores `calc()` in `overflow-clip-margin` |
-| `--toolbar-height` | 36px. The message hover toolbar's height. It straddles the row's top edge, its bottom 2px into the row (the row's top padding less 2px; none in compact), so no header keeps room for it (inventory 6.5). The Main toolbar measures 223px with More (M6b) |
+| `--toolbar-clip-margin` | 36px: how far a message row may paint outside its box (the 28px toolbar and its shadow), so the toolbar can sit above the row, or below it when flipped. A plain length: Chromium ignores `calc()` in `overflow-clip-margin` |
+| `--toolbar-height` | 28px. The message hover toolbar's height: 24px buttons, a 1px inset and the 1px border (10-22, down from 36). It straddles the row's top edge, its bottom 2px into the row (the row's top padding less 2px; none in compact), so no header keeps room for it (inventory 6.5). The Main toolbar measures 181px with three reactions and More |
 | `--thumb-max-width` / `--thumb-max-height` | 360px / 240px. A lone image thumbnail in a message is scaled by its own aspect ratio inside this box, and the box is sized before the bytes arrive (performance.md 3.3). Several images in a message are one grid of this size, two columns, gap 6. File cards are `--thumb-max-width` wide |
 | `--thumb-tile-height` | 117px. A tile of that grid when it has two rows: two rows and the gap fill `--thumb-max-height`. |
 | `--filmstrip-thumb` | 56px. A square picture in the media viewer's filmstrip. |
@@ -524,7 +524,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--control-sm` | 22px | Row Resolve button, status chips |
 | `--control-md-` | 24px | Reaction chip, segmented-control segment, summary chips |
 | `--control-md` | 26px | Context pill, thread link, toast Undo, rule remove |
-| `--control` | 28px | Quick filters, status chips (All topics), small buttons, attach/send, hover-toolbar buttons, To pill, digest chips |
+| `--control` | 28px | Quick filters, status chips (All topics), small buttons, attach/send, To pill, digest chips |
 | `--control-lg-` | 30px | Titlebar icon buttons, selects (All topics), card actions, Quote button, empty-state button, context menu item |
 | `--control-lg` | 32px | Nav buttons, menu items, rule selects, Add |
 | `--control-xl-` | 34px | Filter search, suggestion chips, Open notification settings, To-picker rows |
@@ -551,7 +551,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 
 ### Icons
 
-Phosphor (`@phosphor-icons/react`, imported per icon). Weight by size: `bold` at 12–14, `regular` at 15–20. `fill` marks active and selected states. `duotone` only for the Juno nav item, the Juno mark and illustrations, as the icons in `packages/ui/src/duotone.ts`. Sizes (`--icon-12` … `--icon-20`): 12 (badges, chip close), 13 (row meta, tags, tab close), 14 (pills, cards, thread link, catch-up sparkle), 15 (tab icon), 16 (nav, menu items, buttons, title sparkle), 18 (icon buttons, hover toolbar, palette rows, send), 20 (attach, palette search). Tab icons sit at 0.75 opacity; a tab's art or photo dims to the same 0.75 on an inactive tab and comes up to full on hover and on the active tab. There is no stroke token; Phosphor is filled paths and the weight is the variant. The mapping from the Lucide names the prototype used is in `friendly-layer.md` §2.3.
+Phosphor (`@phosphor-icons/react`, imported per icon). Weight by size: `bold` at 12–14, `regular` at 15–20. `fill` marks active and selected states. `duotone` only for the Juno nav item, the Juno mark and illustrations, as the icons in `packages/ui/src/duotone.ts`. Sizes (`--icon-12` … `--icon-20`): 12 (badges, chip close), 13 (row meta, tags, tab close), 14 (pills, cards, thread link, catch-up sparkle), 15 (tab icon, hover toolbar), 16 (nav, menu items, buttons, title sparkle), 18 (icon buttons, palette rows, send), 20 (attach, palette search). Tab icons sit at 0.75 opacity; a tab's art or photo dims to the same 0.75 on an inactive tab and comes up to full on hover and on the active tab. There is no stroke token; Phosphor is filled paths and the weight is the variant. The mapping from the Lucide names the prototype used is in `friendly-layer.md` §2.3.
 
 ### Juno chat
 
