@@ -116,6 +116,7 @@ export interface Core {
   status: { readonly attendeeId: string; readonly fiber: Fiber.Fiber<never> } | undefined
   /** The user alone in the live call, and the timer that leaves it (`alone.ts`). */
   alone: { readonly since: Alone; readonly fiber: Fiber.Fiber<void> } | undefined
+  /** What Juno last knew of the room of the live call, if any. */
   own: OwnRoom | undefined
 }
 
