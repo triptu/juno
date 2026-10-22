@@ -673,10 +673,11 @@ export const text = stylex.defineVars({
   '--text-preview-weight': '400',
   '--text-preview-leading': '1.45',
   '--text-preview-tracking': '0',
-  // A read sidebar row's preview, half a pixel below the preview. The leading
-  // is the preview's line box (13.5px at 1.45), so the row keeps its height.
-  '--text-preview-read-size': '13px',
-  '--text-preview-read-leading': '19.575px',
+  // A sidebar row's preview, read or unread: half a pixel below the preview,
+  // in the preview's line box (13.5px at 1.45). One size in both states, so
+  // reading a row moves no letter.
+  '--text-row-preview-size': '13px',
+  '--text-row-preview-leading': '19.575px',
 
   // Card bodies, reply options, picker rows.
   '--text-body-small-family': fonts['--font-sans'],

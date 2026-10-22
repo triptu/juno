@@ -5,7 +5,7 @@ import { CheckCircle } from '@phosphor-icons/react/dist/icons/CheckCircle'
 import { ChatsCircle } from '@phosphor-icons/react/dist/icons/ChatsCircle'
 import { memo, useId, type FocusEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
 import type { TopicRow as TopicRowModel } from '@juno/contract'
-import { colors, density, opacity, radii, sizes, spacing, text, tints } from '@juno/tokens/tokens.stylex'
+import { colors, density, opacity, radii, sizes, spacing, text, tints, weights } from '@juno/tokens/tokens.stylex'
 import {
   activateHandlers,
   Avatar,
@@ -248,20 +248,23 @@ export const TopicRow = memo(function TopicRow({
           {renaming ? (
             <RenameField title={row.title} size="row" onSave={(title) => onRename?.(row.id, title)} onCancel={() => onRenameCancel?.(row.id)} />
           ) : (
-            <Text
-              variant="rowTitle"
-              tone={quiet ? 'subtle' : 'default'}
-              weight={unread ? 'semibold' : undefined}
-              topicTitle
-              dir="auto"
-              id={titleId}
-              data-row-part="title"
-              data-sensitive={row.titleSensitive === true ? '' : undefined}
-              tooltipWhenTruncated
-              sx={styles.title}
-            >
-              {row.title}
-            </Text>
+            // As wide as the semibold title in both states, so reading the row
+            // moves nothing that follows the title.
+            <span {...stylex.props(styles.titleBox)} data-bold-title={row.title}>
+              <Text
+                variant="rowTitle"
+                tone={quiet ? 'subtle' : 'default'}
+                weight={unread ? 'semibold' : undefined}
+                topicTitle
+                dir="auto"
+                id={titleId}
+                data-row-part="title"
+                data-sensitive={row.titleSensitive === true ? '' : undefined}
+                tooltipWhenTruncated
+              >
+                {row.title}
+              </Text>
+            </span>
           )}
           {twoLine && (mark || reopened || threads > 0) ? (
             <span {...stylex.props(styles.titleTags)}>
@@ -488,11 +491,28 @@ const styles = stylex.create({
     flexShrink: 0,
     color: tints['--tint-resolved-fg'],
   },
-  title: {
+  // The title and, under it, an invisible semibold copy with no height (a
+  // pseudo-element, so it is not text in the page). The box is the wider of
+  // the two, so the title's box keeps its width when the row is read and the
+  // weight drops; the letters inside still narrow slightly.
+  titleBox: {
+    display: 'flex',
+    flexDirection: 'column',
     flexGrow: 0,
     flexShrink: 1,
     flexBasis: 'auto',
     minWidth: 0,
+    '::after': {
+      content: 'attr(data-bold-title)',
+      height: 0,
+      overflow: 'hidden',
+      visibility: 'hidden',
+      whiteSpace: 'nowrap',
+      fontFamily: text['--text-row-title-family'],
+      fontSize: text['--text-row-title-size'],
+      fontWeight: weights['--weight-semibold'],
+      letterSpacing: text['--text-row-title-tracking'],
+    },
   },
   // A two-line row's accessory, Reopened tag and thread count, after the title.
   titleTags: {
@@ -524,18 +544,19 @@ const styles = stylex.create({
     marginInlineStart: 'auto',
     paddingInlineStart: spacing['--space-1'],
   },
+  // The preview has one size, read or unread, so reading the row changes only
+  // its colour and no letter moves.
   line2: {
     display: 'flex',
     alignItems: 'flex-start',
     gap: spacing['--space-2'],
     minWidth: 0,
+    '--text-preview-size': text['--text-row-preview-size'],
+    '--text-preview-leading': text['--text-row-preview-leading'],
   },
-  // A read row's preview takes its own colour and size; the trail's chips
-  // set their own colours.
+  // A read row's preview takes its own colour; the trail's chips set their own colours.
   readLine2: {
     '--foreground-muted': 'var(--row-read-preview)',
-    '--text-preview-size': text['--text-preview-read-size'],
-    '--text-preview-leading': text['--text-preview-read-leading'],
   },
   // The last line of a two-line row, which Resolve overlays.
   line2Last: {
