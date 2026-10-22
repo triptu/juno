@@ -137,7 +137,7 @@ export function SettingsAppearance({ sidebarPresence, quickReactions, ...props }
       </Surface>
       {sidebarPresence === undefined ? null : <PresenceSection {...sidebarPresence} />}
       {quickReactions === undefined ? null : (
-        <Section heading="Quick reactions" sub="One click each in the toolbar over a message. Up to 7.">
+        <Section heading="Quick reactions" sub="First in the emoji grid when you right-click a message. Up to 11.">
           <Surface kind="group" padding="md" sx={styles.card}>
             {quickReactions}
           </Surface>

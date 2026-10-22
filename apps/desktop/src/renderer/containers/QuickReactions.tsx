@@ -1,8 +1,8 @@
 /**
- * Settings › Appearance › Quick reactions (SPEC 14): the message toolbar's
- * one-click reactions, saved as the `quickReactions` preference in user.db.
- * Add opens the message toolbar's emoji picker with the workspace's custom
- * emoji, from the picker's own chunk, with the chosen ones marked.
+ * Settings › Appearance › Quick reactions (SPEC 14): the first emoji of the
+ * message menu's grid, saved as the `quickReactions` preference in user.db.
+ * Add opens the emoji picker with the workspace's custom emoji, from the
+ * picker's own chunk, with the chosen ones marked.
  */
 import { useState } from 'react'
 import { quickReactionsAtom, registry, setQuickReactions } from '@juno/state'

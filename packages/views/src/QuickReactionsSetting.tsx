@@ -10,7 +10,7 @@ import { Button, IconButton, Text } from '@juno/ui'
 const HOVER = '@media (hover: hover)'
 
 export interface QuickReactionsSettingProps {
-  /** In toolbar order. */
+  /** In the order the message menu's grid shows them. */
   readonly reactions: ReadonlyArray<QuickReaction>
   readonly onChange: (reactions: ReadonlyArray<QuickReaction>) => void
   /** Add: the container opens the emoji picker and passes it in `picker`. */
@@ -33,9 +33,9 @@ const isDefault = (reactions: ReadonlyArray<QuickReaction>) =>
   reactions.length === DEFAULT_QUICK_REACTIONS.length && reactions.every((reaction, i) => reaction.name === DEFAULT_QUICK_REACTIONS[i]!.name)
 
 /**
- * Settings › Appearance › Quick reactions (SPEC 14): the toolbar's one-click
- * reactions as a row of pills in toolbar order, then Add, which opens the
- * emoji picker as a popover under Add, up to seven. The picker is fixed in a
+ * Settings › Appearance › Quick reactions (SPEC 14): the first emoji of the
+ * message menu's grid as a row of pills in their order, then Add, which
+ * opens the emoji picker as a popover under Add, up to eleven. The picker is fixed in a
  * portal on `body`, so the card never clips it and never grows for it. A
  * pill drags to a new place. From the keyboard
  * ← and → move between pills, ⌥← and ⌥→ move the pill, and Delete removes
@@ -76,7 +76,7 @@ export function QuickReactionsSetting({ reactions, onChange, onAdd, picker, onCl
             />
           ))}
         </div>
-        {/* Dimmed, not disabled, at seven: it keeps focus and its tooltip says why. */}
+        {/* Dimmed, not disabled, when full: it keeps focus and its tooltip says why. */}
         <div ref={addRef} {...stylex.props(styles.add)}>
           <IconButton
             icon={Plus}

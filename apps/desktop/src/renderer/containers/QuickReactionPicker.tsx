@@ -1,7 +1,7 @@
 import { useState } from 'react'
 /**
- * The emoji picker for Settings' quick reactions, loaded on its own like
- * `EmojiPickerPanel`, so the catalog is not in the first bundle.
+ * The emoji picker for Settings' quick reactions, loaded on its own, so the
+ * catalog is not in the first bundle.
  */
 import { emojiCatalog, type QuickReaction } from '@juno/contract'
 import { emojiPickerDataAtom, standardEmojiPickerData, warmWorkspaceEmoji } from '@juno/state/emoji'
@@ -18,7 +18,7 @@ interface QuickReactionPickerProps {
   readonly onClose: () => void
 }
 
-/** The picker for Settings' quick reactions: custom emoji too, and the pick as the toolbar draws it. */
+/** The picker for Settings' quick reactions: custom emoji too, and the pick as the message menu's grid draws it. */
 export default function QuickReactionPicker({ selected, onPick, onClose }: QuickReactionPickerProps) {
   const recent = useAtomValue(frequentEmojiAtom)
   const current = useAtomValue(emojiPickerDataAtom(emojiCatalog))

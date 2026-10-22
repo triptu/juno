@@ -1,6 +1,6 @@
 /**
- * The quick reactions (SPEC 7, 14): the one-click reactions in the message
- * toolbar, in order, up to seven. One workspace preference in user.db,
+ * The quick reactions (SPEC 7, 14): the first emoji of the message menu's
+ * grid, in order, up to eleven. One workspace preference in user.db,
  * `quickReactions`; 👍 ✅ 👀 until the user chooses.
  */
 import * as Atom from 'effect/reactivity/Atom'
