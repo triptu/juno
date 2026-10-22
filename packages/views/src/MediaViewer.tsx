@@ -239,7 +239,7 @@ function Item({ file, position, onImageMenu }: { readonly file: MediaFile; reado
   const full = file.kind === 'image' ? file.full : undefined
   const { width = file.thumb.width, height = file.thumb.height } = file
   return (
-    <div ref={frame} data-viewer-item={position} onContextMenu={file.kind === 'image' && onImageMenu !== undefined ? (event) => onImageMenu(file, event) : undefined} {...stylex.props(styles.frame, styles.fitted(width, height), zoomed && styles.zoomed)}>
+    <div ref={frame} data-viewer-item={position} onContextMenu={file.kind === 'image' && onImageMenu !== undefined ? (event) => { event.preventDefault(); onImageMenu(file, event) } : undefined} {...stylex.props(styles.frame, styles.fitted(width, height), zoomed && styles.zoomed)}>
       {/* One transform for both images, so the full image stays over the thumbnail. */}
       <div ref={content} data-viewer-zoom="" {...stylex.props(styles.zoom)}>
         <img src={file.thumb.src} alt="" draggable={false} decoding="async" {...stylex.props(styles.image)} />

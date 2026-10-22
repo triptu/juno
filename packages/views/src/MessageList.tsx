@@ -185,23 +185,23 @@ function onKeyDown(event: KeyboardEvent<HTMLDivElement>, onRowKey: MessageListPr
 interface Menus {
   readonly onMessageMenu: MessageListProps['onMessageMenu']
   readonly onImageMenu: MessageListProps['onImageMenu']
-  readonly onPersonMenu: ((person: { readonly id: string; readonly name: string }, event: MouseEvent) => void) | undefined
-  readonly onChannelMenu: ((channel: { readonly id: string; readonly name: string }, event: MouseEvent) => void) | undefined
+  readonly onPersonMenu: MessageListProps['onPersonMenu']
+  readonly onChannelMenu: MessageListProps['onChannelMenu']
 }
 
 /**
- * One handler for every row: an @person or #channel chip under the pointer
- * gets its own menu, otherwise the row under the pointer, or the focused row
- * for the context-menu key. A field keeps the text menu (`inField`).
+ * One handler for every row: an image, @person or #channel chip under the
+ * pointer gets its own menu, otherwise the row under the pointer, or the
+ * focused row for the context-menu key. A field keeps the text menu (`inField`).
  */
 function messageMenu(event: MouseEvent, { onMessageMenu, onImageMenu, onPersonMenu, onChannelMenu }: Menus) {
   const target = event.target
   if (!(target instanceof Element) || inField(event)) return
   const ts = target.closest<HTMLElement>(ROW)?.dataset.messageRow
   const image = target.closest<HTMLElement>('[data-thumbnail]')?.dataset.thumbnail
-  if (image && ts !== undefined) {
+  if (image !== undefined && ts !== undefined && onImageMenu !== undefined) {
     event.preventDefault()
-    onImageMenu?.(ts, image, event)
+    onImageMenu(ts, image, event)
     return
   }
   const person = onPersonMenu === undefined ? null : target.closest<HTMLElement>('[data-person]')
@@ -216,8 +216,7 @@ function messageMenu(event: MouseEvent, { onMessageMenu, onImageMenu, onPersonMe
     onChannelMenu({ id: channel.dataset.channel ?? '', name: channel.dataset.channelName ?? '' }, event)
     return
   }
-  if (onMessageMenu === undefined) return
-  if (ts === undefined) return
+  if (onMessageMenu === undefined || ts === undefined) return
   event.preventDefault()
   onMessageMenu(ts, event, target.closest('[data-sender]') !== null)
 }

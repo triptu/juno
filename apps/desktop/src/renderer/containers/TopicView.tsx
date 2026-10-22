@@ -11,7 +11,7 @@ import { scopeToChannel, showChannelMenu } from './placeMenus'
 import { messageLinkInfo, openMessageLink, openPerson } from './slackLinks'
 import { attach } from './attachments'
 import { TopicComposer } from './TopicComposer'
-import { downloadMessageFile, openPreviewImage, quickLookMessageFile, showMessageImageMenu, useTopicFiles } from './topic/files'
+import { downloadMessageFile, quickLookMessageFile, showMessageImageMenu, useTopicFiles } from './topic/files'
 import { useTopicHeader } from './topic/header'
 import { useOlderPages } from './topic/older'
 import { listStatus, markRead, useDivider, useMarkRead, useTopicFetch, useWindowFocused, windowShown } from './topic/opening'
@@ -118,17 +118,6 @@ function openThreadInNewTab(id: string): void {
   openTopic(id, { newTab: true })
 }
 
-/**
- * A topic's latest messages, read-only, for peek (spec section 5). The list alone, with no header or
- * composer, in `readOnly` mode (see `TopicProps`).
- */
-export const TopicPreview = memo(function TopicPreview({ id, peek = false }: { readonly id: string; readonly peek?: boolean }) {
-  const result = useAtomValue(topicAtom(id))
-  const detail = result._tag === 'Success' ? result.value : undefined
-  if (detail == null) return null
-  return <Topic key={id} id={id} view={id} detail={detail} readOnly peek={peek} />
-})
-
 interface TopicProps {
   readonly id: string
   /**
@@ -146,6 +135,8 @@ interface TopicProps {
   readonly readOnly?: boolean
   /** In the peek popover: no floating header over the list, and the popover's tighter column. */
   readonly peek?: boolean
+  /** A read-only preview opens media in its owning topic. */
+  readonly onOpenPreviewMedia?: (viewing: MediaViewing) => void
 }
 
 /** What a tab's rows do beyond reading: open images, retry and discard sends, the message actions and the menus. */
@@ -172,7 +163,7 @@ function rowActions(list: MessageWindow, messageActions: MessageActionsOutput) {
 /** Download and Quick Look on a file card, one object for the app's life (performance 5.1). */
 const FILE_ACTIONS = { onDownload: downloadMessageFile, onQuickLook: quickLookMessageFile } as const
 
-function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps) {
+export function Topic({ id, view, detail, readOnly = false, peek = false, onOpenPreviewMedia }: TopicProps) {
   const list = useAtomValue(messageListAtom(view))
   useReactionFailureToast(list)
   const now = useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP) * TIME_STEP)
@@ -183,7 +174,7 @@ function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps)
   const loading = useTopicFetch(detail.id, view)
   const showWindow = windowShown(position.positioned, list, readAtOpen, loading.fetchState)
   const files = useTopicFiles(view)
-  const openMedia = readOnly ? (viewing: MediaViewing) => openPreviewImage(id, viewing) : files.setViewing
+  const openMedia = onOpenPreviewMedia ?? files.setViewing
   useOpenPosition(position, view, readOnly, list, showWindow)
   const flash = useMessageFlash(position, detail.id, readOnly, list)
   useHeldPosition(position, list)

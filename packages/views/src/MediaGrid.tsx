@@ -30,6 +30,14 @@ export const isDocument = (file: FileView): boolean =>
 
 /** Every file of a message the viewer can show, in Slack's order: what its filmstrip and arrows move through. */
 export const viewableOf = (files: ReadonlyArray<FileView>): ReadonlyArray<FileView> => files.filter((file) => isMedia(file) || isDocument(file))
+
+/** The viewer's files and selected item for one message. */
+export function viewingOf(files: ReadonlyArray<FileView>, fileId: string, sender: string, at: number) {
+  const items = viewableOf(files)
+  const index = items.findIndex((file) => file.id === fileId)
+  return index < 0 ? undefined : { items, index, sender, at }
+}
+
 export interface MediaGridProps {
   readonly media: ReadonlyArray<MediaFile>
   readonly onOpen: ((file: FileView) => void) | undefined

@@ -6,7 +6,7 @@ import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
 import { Avatar, focusRing, Icon, pointerMoved, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { SharedFileLines, type FileBlock } from './AttachmentCard'
 import { Files } from './FileCard'
-import { viewableOf } from './MediaGrid'
+import { viewingOf } from './MediaGrid'
 import type { MediaViewing } from './MediaViewer'
 import type { MenuAnchor } from './header/HeaderControls'
 import { HoverToolbar } from './HoverToolbar'
@@ -261,8 +261,8 @@ export const Message = memo(function Message({
     onOpenMedia === undefined
       ? undefined
       : (file: FileView) => {
-          const items = viewableOf(message.files)
-          onOpenMedia({ items, index: Math.max(0, items.findIndex((each) => each === file)), sender: name, at: message.at })
+          const viewing = viewingOf(message.files, file.id, name, message.at)
+          if (viewing !== undefined) onOpenMedia(viewing)
         }
   // A shared message's files are drawn in its card; the rest under the body.
   const carded = cardFileIds(message)
