@@ -4,7 +4,7 @@
  */
 import { useMemo, type Dispatch, type KeyboardEvent, type RefObject, type SetStateAction } from 'react'
 import type { MessageView, TopicDetail } from '@juno/contract'
-import { broadcastMessage, deleteMessage, forwardSheetAtom, noteRecentEmoji, reactToMessage, registry, type MessageWindow } from '@juno/state'
+import { deleteMessage, forwardSheetAtom, noteRecentEmoji, reactToMessage, registry, type MessageWindow } from '@juno/state'
 import type { MenuAnchor, MessageActions } from '@juno/views'
 import type { ComposerHandle } from '../messageActions'
 import { isOwnEditable, landedTs, refOf } from '../messageRows'
@@ -146,8 +146,6 @@ export function useMessageCommands({ channel, scrollRef, composer, latest, setEd
       else if (chosen === 'delete' && isOwnEditable(now)) askDelete(now)
       else if (chosen === 'reply') handlers.onReply?.(now)
       else if (chosen === 'forward' && now.pending === undefined) openForward(channel, now, latest.current)
-      // Main shows the reply at once and the thread marks it; the outbox sends it (SPEC 7, "More").
-      else if (chosen === 'broadcast' && now.pending === undefined && !now.broadcast) void broadcastMessage(registry, refOf(channel, now))
     }
     return { ...handlers, menu }
     // `channel` is fixed for a topic tab; the rest is read through refs.

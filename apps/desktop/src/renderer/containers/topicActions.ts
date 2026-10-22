@@ -30,6 +30,7 @@ import {
 } from '@juno/contract'
 import {
   allTopicsRowAtom,
+  broadcastMessage,
   copyText,
   currentNotificationSettings,
   editUndo,
@@ -260,8 +261,8 @@ function openTopicInSlack(topic: ActionTopic): void {
   if (session !== undefined) openInSlack({ teamId: session.teamId, channelId: topic.channel.id })
 }
 
-/** What the message menu leaves to the topic: the edit field, the delete confirm, opening the thread, the Forward sheet, sending a reply to the channel. */
-export type MessageMenuChoice = 'edit' | 'delete' | 'reply' | 'forward' | 'broadcast'
+/** What the message menu leaves to the topic: the edit field, the delete confirm, opening the thread, the Forward sheet. */
+export type MessageMenuChoice = 'edit' | 'delete' | 'reply' | 'forward'
 
 /**
  * "Also send to #eng" on your own thread reply, as Slack's "Send reply to
@@ -313,7 +314,9 @@ export async function showMessageMenu(
     ...(why === undefined ? [] : [{ separator: true } as const, { id: 'why', label: whyLabel(why.notified) }]),
   ]
   const chosen = await popupContextMenu(items, at)
-  if (chosen === 'edit' || chosen === 'delete' || chosen === 'reply' || chosen === 'forward' || chosen === 'broadcast') return chosen
+  if (chosen === 'edit' || chosen === 'delete' || chosen === 'reply' || chosen === 'forward') return chosen
+  // Main shows the reply at once and the thread marks it; the outbox sends it. The engine refuses a reply deleted meanwhile.
+  if (chosen === 'broadcast') void broadcastMessage(registry, { channelId: topic.channel.id, ts })
   if (chosen === 'watch-reply') await watchReply(registry, { channelId: topic.channel.id, ts, ...(topic.kind === 'thread' && topic.rootTs ? { threadTs: topic.rootTs } : {}) })
   else if (chosen === 'open-in-slack') openTopicInSlack(topic)
   else if (chosen === 'why' && why !== undefined) showWhy(topic.id, ts, why, at)

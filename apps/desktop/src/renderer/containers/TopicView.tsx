@@ -49,6 +49,10 @@ function openReplyInNewTab(id: string, ts: string): void {
   openTopicAt(id, ts, { newTab: true, flash: true })
 }
 
+/** Where a list's thread links and broadcast replies go; in a peek, to a new tab, so the tab under it stays. */
+const THREAD_LINKS = { onOpenThread: openThread, onOpenReply: openReply }
+const PEEK_THREAD_LINKS = { onOpenThread: openThreadInNewTab, onOpenReply: openReplyInNewTab }
+
 const personMenu = (person: { readonly id: string; readonly name: string }) => void showPersonMenu(person)
 const openPersonDm = (id: string, behind: boolean) => void openPerson(id, behind)
 const DeactivatedNote = chunk(() => import('./topic/deactivated')).component((module) => module.DeactivatedNote)
@@ -218,8 +222,7 @@ function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps)
       popover={peek}
       anchorRef={position.anchorRef}
       hueOf={hueOf}
-      onOpenThread={readOnly ? openThreadInNewTab : openThread}
-      onOpenReply={readOnly ? openReplyInNewTab : openReply}
+      {...(readOnly ? PEEK_THREAD_LINKS : THREAD_LINKS)}
       onPrefetchThread={warmTopic}
       onChannel={scopeToChannel}
       onPerson={openPersonDm}
