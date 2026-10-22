@@ -39,6 +39,12 @@ const applyRead = (core: Core, to: Attached, read: Read, huddles: ReadonlyArray<
     let next = applyInfo(core.running, fresh, huddles)
     // A full read also drops channels the user is no longer in.
     if (read.all) next = applyInfo(next, [...next.keys()].filter((channel) => !read.ids.has(channel)), [])
+    // Evidence for the log: Slack stopped listing the huddle the user is in, though no frame said it ended.
+    const call = core.s.current?.identity
+    const listed = call === undefined ? undefined : core.running.get(call.channelId)
+    if (call !== undefined && listed?.callId === call.callId && next.get(call.channelId)?.callId !== call.callId) {
+      yield* Effect.logWarning('huddle: a read stopped listing the call', { count: listed.participants.length })
+    }
     core.running = next
     if (info.dirty.size > 0) yield* Queue.offer(info.wake, undefined)
     yield* publish(core)
