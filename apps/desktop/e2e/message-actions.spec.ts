@@ -146,25 +146,39 @@ async function reactToMessage({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): 
   await expect(row.getByRole('button', { name: '1 👀', exact: true })).toBeVisible()
   await expect.poll(() => reactionsOf().find((r) => r.name === 'eyes')?.count).toBe(1)
 
-  // Hovering a message adds no fill. While its menu is open, and the picker More reactions turns it into, the message
-  // takes a faint fill, so it is clear which message the menu belongs to.
-  const clear = 'rgba(0, 0, 0, 0)'
+  // A mention keeps its tint, hovered or with its menu open (SPEC 7).
+  const mentionTint = await row.evaluate((element) => getComputedStyle(element).backgroundColor)
   await row.hover()
-  await expect(row).toHaveCSS('background-color', clear)
-  const open = await topic.messageMenu('Staging is green again')
+  await expect(row).toHaveCSS('background-color', mentionTint)
+  const mentionMenu = await topic.messageMenu('Staging is green again')
   await juno.win.mouse.move(0, 0)
   await expect(row).toHaveAttribute('data-popover-active', '')
-  await expect(row).not.toHaveCSS('background-color', clear)
+  await expect(row).toHaveCSS('background-color', mentionTint)
+  await mentionMenu.close()
+
+  // Hovering a plain message adds no fill. While its menu is open, and the picker More reactions turns it into, the
+  // message takes a faint fill, so it is clear which message the menu belongs to.
+  fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Preview builds are back to five minutes' })
+  const plain = topic.message('Preview builds are back to five minutes')
+  await expect(plain).toBeVisible()
+  const plainTs = fake.messages('C0ENG').find((m) => m.text === 'Preview builds are back to five minutes')!.ts
+  const clear = 'rgba(0, 0, 0, 0)'
+  await plain.hover()
+  await expect(plain).toHaveCSS('background-color', clear)
+  const open = await topic.messageMenu('Preview builds are back to five minutes')
+  await juno.win.mouse.move(0, 0)
+  await expect(plain).toHaveAttribute('data-popover-active', '')
+  await expect(plain).not.toHaveCSS('background-color', clear)
   await open.more.click()
   await expect(open.search).toBeFocused()
-  await expect(row).not.toHaveCSS('background-color', clear)
+  await expect(plain).not.toHaveCSS('background-color', clear)
   await open.search.fill('rocket')
   await open.search.press('Enter')
   await expect(open.root).toHaveCount(0)
-  await expect(row).not.toHaveAttribute('data-popover-active')
-  await expect(row).toHaveCSS('background-color', clear)
-  await expect(row.getByRole('button', { name: '1 🚀, including you' })).toBeVisible()
-  await expect.poll(() => reactionsOf().some((r) => r.name === 'rocket')).toBe(true)
+  await expect(plain).not.toHaveAttribute('data-popover-active')
+  await expect(plain).toHaveCSS('background-color', clear)
+  await expect(plain.getByRole('button', { name: '1 🚀, including you' })).toBeVisible()
+  await expect.poll(() => (fake.messages('C0ENG').find((m) => m.ts === plainTs)?.reactions ?? []).some((r) => r.name === 'rocket')).toBe(true)
 }
 
 async function quoteMessage({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
