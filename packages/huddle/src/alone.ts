@@ -19,13 +19,15 @@ export interface CallNow {
   readonly attendeeId: string | undefined
   /** Its media is up (connected or reconnecting). */
   readonly live: boolean
+  readonly selfId: string | undefined
+  readonly hasRemote: boolean
   /** User ids in the huddle, the user included; empty while Slack has not said. */
   readonly participants: ReadonlyArray<string>
 }
 
 /** Whether the user is alone now, keeping the earlier start while they stay alone in the same call. */
 export const aloneNow = (before: Alone | undefined, call: CallNow, now: number): Alone | undefined => {
-  if (call.attendeeId === undefined || !call.live || new Set(call.participants).size !== 1) return undefined
+  if (call.attendeeId === undefined || !call.live || call.hasRemote || call.selfId === undefined || !call.participants.includes(call.selfId) || new Set(call.participants).size !== 1) return undefined
   return before?.attendeeId === call.attendeeId ? before : { attendeeId: call.attendeeId, since: now }
 }
 

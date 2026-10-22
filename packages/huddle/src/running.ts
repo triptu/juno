@@ -74,7 +74,7 @@ export function decodeRoomFrame(raw: unknown): RoomFrame | undefined {
 const tsAfter = (a: string, b: string) => Number(a) > Number(b)
 
 /** Whether `frame` may change `entry`: about the huddle it shows and newer than its last frame, or the channel shows none. */
-export function applies(entry: Entry | undefined, frame: RoomFrame): boolean {
+export function applies(entry: Pick<Entry, 'callId' | 'eventTs'> | undefined, frame: RoomFrame): boolean {
   if (entry === undefined) return true
   if (entry.callId !== frame.roomId) return false
   return frame.eventTs === undefined || entry.eventTs === undefined || tsAfter(frame.eventTs, entry.eventTs)

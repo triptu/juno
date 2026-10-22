@@ -135,6 +135,7 @@ module huddle {
       unsent: st.unsent.union(Set(a)), recWs: st.recWs.set(a, st.ws), holder: st.holder.set(a, 0),
       staleGone: if (bug == 8) st.staleGone.union(Set(a)) else st.staleGone,
       cancelled: if (st.cancel) st.cancelled.union(Set(a)) else st.cancelled,
+      dirty: true, settling: true, epoch: st.epoch + 1,
       persisted: a, persistGen: g, persistConn: st.requestConn, persistCancel: st.cancel, persistBug: bug,
       persistCaller: not(st.startCancelled), phase: "joining", label: "answer" }
   }
@@ -560,9 +561,9 @@ module huddle {
       else if (turn == 7) stopReported(1, "left") else if (turn == 8) clearLeave(1)
       else if (turn == 9) finishQuit else seal
     ) else if (which == 8) (
-      if (turn == 4) fetchInfo else if (turn == 5) disconnect
-      else if (turn == 6) slackChange(2) else if (turn == 7) reconnect
-      else if (turn == 8) answerInfo else seal
+      if (turn == 4) settle else if (turn == 5) fetchInfo else if (turn == 6) disconnect
+      else if (turn == 7) slackChange(2) else if (turn == 8) reconnect
+      else if (turn == 9) answerInfo else seal
     ) else if (which == 9) (
       if (turn == 4) stopReported(1, "connectionLost")
       else if (turn == 5) reconcile(0) else seal

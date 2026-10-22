@@ -37,6 +37,7 @@ export interface LeaveStore {
 export interface HuddleSession {
   /** Which workspace's store `leaves` is: its leaves go out only through its own session. */
   readonly workspace: string
+  readonly selfId: string
   /** The session's Slack client. */
   readonly slack: Context.Context<SlackApi | SlackEdge>
   readonly leaves: LeaveStore

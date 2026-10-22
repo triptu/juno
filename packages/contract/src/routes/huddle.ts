@@ -153,6 +153,8 @@ export const HuddlePageReport = Schema.Struct({
   received: Schema.NullOr(Schema.String),
   connection: Schema.Literals(['connecting', 'connected', 'reconnecting']),
   muted: Schema.Boolean,
+  /** Another attendee is present in the media session, even if Slack's room list has not caught up. */
+  hasRemote: Schema.Boolean,
   /** The last session the page ended, and why. `left`: the engine's call no longer named it. */
   ended: Schema.NullOr(Schema.Struct({ attendeeId: Schema.String, reason: HuddleMediaEnd })),
 })

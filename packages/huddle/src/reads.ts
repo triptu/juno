@@ -18,6 +18,7 @@ import { markDue, publish, type Attached, type Core } from './core'
 import type { HuddleListener } from './Huddle'
 import { applyInfo, applyRoomFrame, decodeRoomFrame } from './running'
 import { infoRequest } from './slack'
+import { readOwn, frameOwn } from './own'
 
 /** How long reads wait after the first change, so a burst of frames costs one read. */
 export const INFO_DEBOUNCE_MILLIS = 150
@@ -28,7 +29,7 @@ const applyRead = (core: Core, to: Attached, read: Read, huddles: ReadonlyArray<
     const info = to.info
     if (core.attached !== to) return
     // A gap while the read was out: the whole answer may predate what was lost (model `discardInfo`).
-    if (read.gap !== info.gap || info.connection === 'down') {
+    if (read.gap !== info.gap || info.connection === 'down' || read.at < info.allQuietAt) {
       if (read.all) info.dirtyAll = true
       for (const id of read.ids) info.dirty.add(id)
       return yield* Queue.offer(info.wake, undefined)
@@ -38,13 +39,14 @@ const applyRead = (core: Core, to: Attached, read: Read, huddles: ReadonlyArray<
     for (const id of read.ids) if (!fresh.includes(id)) info.dirty.add(id)
     let next = applyInfo(core.running, fresh, huddles)
     // A full read also drops channels the user is no longer in.
-    if (read.all) next = applyInfo(next, [...next.keys()].filter((channel) => !read.ids.has(channel)), [])
+    if (read.all) next = applyInfo(next, [...next.keys()].filter((channel) => !read.ids.has(channel) && !info.dirty.has(channel)), [])
     // Evidence for the log: Slack stopped listing the huddle the user is in, though no frame said it ended.
     const call = core.s.current?.identity
     const listed = call === undefined ? undefined : core.running.get(call.channelId)
     if (call !== undefined && listed?.callId === call.callId && next.get(call.channelId)?.callId !== call.callId) {
       yield* Effect.logWarning('huddle: a read stopped listing the call', { count: listed.participants.length })
     }
+    readOwn(core, fresh, next)
     core.running = next
     if (info.dirty.size > 0) yield* Queue.offer(info.wake, undefined)
     yield* publish(core)
@@ -83,13 +85,14 @@ export const reader = (core: Core, to: Attached) =>
       yield* Effect.sleep(INFO_DEBOUNCE_MILLIS)
       if (info.connection === 'down' || (!info.dirtyAll && info.dirty.size === 0)) continue
       const now = yield* Clock.currentTimeMillis
-      const quiet = (id: string) => (info.quietAt.get(id) ?? 0) <= now
+      const quietAt = (id: string) => Math.max(info.allQuietAt, info.quietAt.get(id) ?? 0)
+      const quiet = (id: string) => quietAt(id) <= now
       const all = info.dirtyAll && info.allQuietAt <= now
-      // The rest wait until they are quiet. A full read asks for them too, but they stay due and their answer is not taken.
-      const waiting = [...(info.dirtyAll && !all ? [info.allQuietAt] : []), ...[...info.dirty].filter((id) => !quiet(id)).map((id) => info.quietAt.get(id) ?? 0)]
+      // A reconnect's quiet window also covers channels already due before the gap.
+      const waiting = [...(info.dirtyAll && !all ? [info.allQuietAt] : []), ...[...info.dirty].filter((id) => !quiet(id)).map(quietAt)]
       if (waiting.length > 0) yield* wakeWhenQuiet(Math.min(...waiting), now)
-      const ids = new Set(all ? info.dirty : [...info.dirty].filter(quiet))
-      if (all) for (const channel of yield* to.session.channels) ids.add(channel)
+      const ids = new Set([...info.dirty].filter(quiet))
+      if (all) for (const channel of yield* to.session.channels) if (quiet(channel)) ids.add(channel)
       // The first sync has not stored the conversations yet.
       if (all && ids.size === 0) yield* retryLater
       if (ids.size === 0) continue
@@ -121,6 +124,7 @@ export const listener = (core: Core, to: Attached): HuddleListener => (input) =>
         if (frame === undefined) return
         // The running list may change and the channel is due for a read; the call never changes.
         info.frameGen.set(frame.channelId, (info.frameGen.get(frame.channelId) ?? 0) + 1)
+        frameOwn(core, frame)
         core.running = applyRoomFrame(core.running, frame)
         yield* markDue(to, frame.channelId)
         return yield* publish(core)

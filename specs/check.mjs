@@ -344,7 +344,7 @@ const regressions = [
 const drained = new Set(['outbox', 'catchup', 'metadata', 'mutation-repair'])
 
 const selectedSpec = huddleOnly ? 'huddle.qnt' : actionsOnly ? 'agent-actions.qnt' : recoveryOnly ? 'agent-recovery.qnt' : memoryOnly ? 'agent-memory.qnt' : outboxOnly ? 'outbox.qnt' : undefined
-for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith('.qnt') && (!selectedSpec || name === selectedSpec || (recoveryOnly && name === 'agent-recovery-replay.qnt'))).toSorted()) {
+for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith('.qnt') && (!selectedSpec || name === selectedSpec || (huddleOnly && name === 'huddle-room.qnt') || (recoveryOnly && name === 'agent-recovery-replay.qnt'))).toSorted()) {
   quint(['typecheck', `specs/${file}`])
 }
 
@@ -385,6 +385,8 @@ if (!huddleOnly && !memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly)
 if (!outboxOnly && !memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
   simulate('huddle', 'simulationStep', 'invariants', 'huddle.itf.json', false, true,
     { samples: tracesOnly ? 100 : 1000, steps: 96, witnesses: ['reachedAgreement'] })
+  simulate('huddle-room', 'step', 'invariants', 'huddle-room.itf.json', false, false,
+    { main: 'huddle_room', samples: 1000, steps: 48 })
   const pairs = [
     ['ghost', 'noGhost'], ['oneCall', 'oneCall'], ['cancel', 'leaveDuringJoin'],
     ['stale', 'noStaleLeave'], ['overflow', 'matchingState'], ['otherDevice', 'otherDevice'], ['refusedLeave', 'noGhost'],

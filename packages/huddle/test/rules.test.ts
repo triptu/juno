@@ -92,7 +92,7 @@ interface ViewInput {
 /** The pages' state: main lists `live` and gave out up to `maxIssued`; each page's latest report; this process's hand-offs. */
 const view = ({ live = [G1], maxIssued = Math.max(G1, ...live), reports = [], handed = [], reported = true }: ViewInput = {}): MediaView => ({
   pages: { reported, live: new Set(live), maxIssued: reported ? maxIssued : 0 },
-  reports: new Map(reports.map(({ on = 1, ...r }) => [r.generation, { connection: on, report: { seq: 1, holds: null, received: null, connection: 'connected', muted: false, ended: null, ...r } }])),
+  reports: new Map(reports.map(({ on = 1, ...r }) => [r.generation, { connection: on, report: { seq: 1, holds: null, received: null, connection: 'connected', muted: false, hasRemote: false, ended: null, ...r } }])),
   handed: new Map(handed.map((h) => (typeof h === 'string' ? [h, 1] : h))),
 })
 /** G1 holds A1's session, after its hand-off. */
@@ -216,8 +216,8 @@ describe('lifecycle: leaves', () => {
 
 describe('leaving after 10 minutes alone', () => {
   const MINUTE = 60_000
-  const call = (participants: ReadonlyArray<string>, over: Partial<{ attendeeId: string | undefined; live: boolean }> = {}) =>
-    ({ attendeeId: 'A1', live: true, participants, ...over })
+  const call = (participants: ReadonlyArray<string>, over: Partial<{ attendeeId: string | undefined; live: boolean; hasRemote: boolean }> = {}) =>
+    ({ attendeeId: 'A1', live: true, selfId: 'U0ME', hasRemote: false, participants, ...over })
 
   it('counts from when the live call has nobody else, and leaves 10 minutes later', () => {
     let alone = aloneNow(undefined, call(['U0ME']), 0)
@@ -241,6 +241,8 @@ describe('leaving after 10 minutes alone', () => {
     expect(aloneNow(undefined, call(['U0ME'], { live: false }), 0)).toBeUndefined()
     expect(aloneNow(undefined, call([], { attendeeId: undefined }), 0)).toBeUndefined()
     expect(aloneNow(undefined, call([]), 0)).toBeUndefined()
+    expect(aloneNow(undefined, call(['U0MAYA']), 0)).toBeUndefined()
+    expect(aloneNow(undefined, call(['U0ME'], { hasRemote: true }), 0)).toBeUndefined()
   })
 
   it('starts over for a new call', () => {

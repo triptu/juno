@@ -24,6 +24,7 @@
  * workspace the user left before the engine restarted.
  */
 import { Effect, Layer, Schema, Stream } from 'effect'
+import { SlackSession } from '@juno/slack'
 import { Huddle, HuddleStoreError } from '@juno/huddle'
 import { listWorkspaces, peekUserPref, prefs, StoreReader, transaction } from '@juno/store'
 import { EngineConfig, EngineTiming } from '../config'
@@ -103,6 +104,7 @@ export const HuddleSessions = Layer.effectDiscard(Effect.gen(function* () {
     if (open === undefined) return ignore
     const listener = yield* huddle.attach({
       workspace: open.id,
+      selfId: (yield* SlackSession).userId,
       statusRenewMillis: timing.huddleStatusRenewMillis,
       aloneLeaveMillis: timing.huddleAloneMillis,
       infoSettleMillis: timing.huddleInfoSettleMillis,

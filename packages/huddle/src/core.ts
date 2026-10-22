@@ -28,8 +28,8 @@ import type { HuddleSession } from './Huddle'
 import { failureOf } from './failure'
 import * as L from './lifecycle'
 import { noMedia, pageState, type MediaView, type Received } from './media'
-import { callRoom, followOwn, type OwnRoom } from './own'
-import { applyJoined, secondsToMillis, toRunningHuddles, type Running } from './running'
+import { callRoom, followOwn, joinedOwn, type OwnRoom } from './own'
+import { applyJoined, toRunningHuddles, type Running } from './running'
 import { codeOf, joinedFrom, joinRequest, leaveRequest, toHuddleError } from './slack'
 import { keepStatus } from './status'
 
@@ -160,10 +160,12 @@ const followAlone = (core: Core, to: Attached | undefined) =>
   Effect.gen(function* () {
     const now = yield* Clock.currentTimeMillis
     const current = core.s.current?.identity
-    const connection = L.currentMedia(core.s, view(core))?.connection
+    const media = L.currentMedia(core.s, view(core))
     const next = aloneNow(core.alone?.since, {
       attendeeId: current?.attendeeId,
-      live: connection === 'connected' || connection === 'reconnecting',
+      live: media?.connection === 'connected' || media?.connection === 'reconnecting',
+      selfId: to?.session.selfId,
+      hasRemote: media?.hasRemote ?? false,
       participants: current === undefined ? [] : callRoom(core.s, core.running, core.own)?.participants ?? [],
     }, now)
     if (core.alone?.since === next) return
@@ -259,10 +261,7 @@ const answered = (core: Core, to: Attached, intent: L.Intent, answer: Result.Res
     if (delivered) core.handed.set(identity.attendeeId, waiter.connection)
     const huddle = Result.isSuccess(answer) ? answer.success.huddle : undefined
     core.running = applyJoined(core.running, identity.channelId, identity.callId, huddle)
-    if (delivered) {
-      const startedAt = secondsToMillis(huddle?.date_start)
-      core.own = { attendeeId: identity.attendeeId, callId: identity.callId, participants: huddle?.participants ?? [], startedAt, joinedAt: yield* Clock.currentTimeMillis }
-    }
+    if (delivered) core.own = joinedOwn(identity, core.running, huddle, yield* Clock.currentTimeMillis)
     yield* markDue(to, identity.channelId)
     if (!delivered) return
     yield* Deferred.succeed(waiter.deferred, { _tag: 'joined', channelId: identity.channelId, callId: identity.callId, attendeeId: identity.attendeeId, credentials })
