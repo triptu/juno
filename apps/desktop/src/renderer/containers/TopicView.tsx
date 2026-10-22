@@ -3,7 +3,7 @@ import type { TopicDetail } from '@juno/contract'
 import { acknowledgeTopic, updateTabs, selectedTopicAtom, discardMessage, messageListAtom, nowAtom, retryMessage, registry, scrollSnapshotAtom, topicAtom, topicView, traceSend, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { chunk, hueFor, MessageList, NewMessagesPill, TopicView as TopicViewFrame, type ActivateEvent, type MediaViewing } from '@juno/views'
-import { closeTabById, openTopic, warmTopic } from './navigation'
+import { closeTabById, openTopic, openTopicAt, openTopicAtInBackground, warmTopic } from './navigation'
 import { useMessageActions, type ComposerHandle, type MessageActionsOutput } from './messageActions'
 import { showPersonMenu } from './notifyActions'
 import { takeComposerFocus } from './pageFocus'
@@ -37,6 +37,16 @@ const TIME_STEP = 10 * 60_000
 
 function openThread(id: string, event: ActivateEvent): void {
   openTopic(id, { newTab: event.metaKey })
+}
+
+/** A broadcast reply's "replied to a thread" in Main: the thread, at the reply, which flashes; ⌘ opens it in a tab behind this one. */
+function openReply(id: string, ts: string, event: ActivateEvent): void {
+  if (event.metaKey) openTopicAtInBackground(id, ts)
+  else openTopicAt(id, ts, { flash: true })
+}
+
+function openReplyInNewTab(id: string, ts: string): void {
+  openTopicAt(id, ts, { newTab: true, flash: true })
 }
 
 const personMenu = (person: { readonly id: string; readonly name: string }) => void showPersonMenu(person)
@@ -209,6 +219,7 @@ function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps)
       anchorRef={position.anchorRef}
       hueOf={hueOf}
       onOpenThread={readOnly ? openThreadInNewTab : openThread}
+      onOpenReply={readOnly ? openReplyInNewTab : openReply}
       onPrefetchThread={warmTopic}
       onChannel={scopeToChannel}
       onPerson={openPersonDm}
