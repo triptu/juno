@@ -1,0 +1,1 @@
+- 10-22 06:15 · Release agent · Use an English sentence and the unambiguous misspelling `recieve` in the native spelling test. macOS detects `teh fix` as Indonesian, and Chromium rechecks the word alone; keep the correction, menu order and edit-item assertions.

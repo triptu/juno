@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-22 06:15 · Release agent · Use an English sentence and the unambiguous misspelling `recieve` in the native spelling test. macOS detects `teh fix` as Indonesian, and Chromium rechecks the word alone; keep the correction, menu order and edit-item assertions.
 - 10-22 06:08 · Release agent · Restore the surrounding eager rows when a scroll ends on skipped content. Laying out only the landing row let nearby row heights move it 201 px after scrollend on this Mac. Keep the synchronous commit and visibility guard.
 - 10-22 05:04 · Release agent · Local full runs use three gallery workers and three layout-walk parts. Both parts timed out after 20 minutes with two workers while this Mac stayed below its load limit. Keep every state and assertion, and keep the existing timeout.
 - 10-22 04:15 · Tushar · The gallery adds ancient and early art, an Objects group and BCE timeline groups; most Islamic works removed (Tushar, 10-22). 37 works from cave art to Hindu sculpture, Mesopotamia and the Maya join; seven Islamic works go; By time shows "Before 10,000 BCE", millennia BCE, then centuries; licences no longer rule a picture out, and every picture keeps its credit.

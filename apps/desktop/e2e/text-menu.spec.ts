@@ -56,7 +56,8 @@ async function pickASpellingGuess(juno: Juno): Promise<void> {
   const composer = juno.topic.composer
   await composer.fill('')
   await composer.click()
-  await composer.pressSequentially('teh fix ')
+  // Native spelling checks the sentence's language and rechecks the word alone.
+  await composer.pressSequentially('recieve message is ready to send ')
   const word = await firstWord(composer)
 
   // Chromium marks the word a moment after it is typed (on Linux once its dictionary has loaded).
@@ -69,18 +70,18 @@ async function pickASpellingGuess(juno: Juno): Promise<void> {
       },
       { timeout: 60_000, intervals: [500] },
     )
-    .toContain('Learn Spelling')
+    .toEqual(expect.arrayContaining(['Learn Spelling', 'receive']))
   const { labels } = await juno.lastMenu()
-  expect(labels).toContain('the')
+  expect(labels).toContain('receive')
   // Guesses come first, then Learn Spelling, then the edit items.
-  expect(labels.indexOf('the')).toBeLessThan(labels.indexOf('Learn Spelling'))
+  expect(labels.indexOf('receive')).toBeLessThan(labels.indexOf('Learn Spelling'))
   // Paste is off when the clipboard is empty, so ignore whether each is on.
   expect(names(labels.slice(-5))).toEqual(EDIT_ITEMS)
 
-  await juno.chooseNextMenuItem('replace:the')
+  await juno.chooseNextMenuItem('replace:receive')
   await composer.click({ button: 'right', position: word })
   await juno.lastMenu()
-  await expect(composer).toHaveValue('the fix ')
+  await expect(composer).toHaveValue('receive message is ready to send ')
 }
 
 async function junoMenusWin(juno: Juno): Promise<void> {
