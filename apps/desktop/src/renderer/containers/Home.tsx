@@ -1,11 +1,12 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { homeHuddleSeen, viewsSortChannel, type HomeItem } from '@juno/contract'
-import { closeWelcome, forgetPicture, holdHome, homeAppears, homeHeading, homeItemLimit, homePicturesOnAtom, homeViewAtom, markFollowUpDone, markMovesSeen, markMovesShown, nowAtom, peekKeyAtom, pictureUrl, preparePicture, registry, resolveAllTopics, runAction, runCommand, showToast, syncProgressAtom, takePicture, welcomeAtom, withAsks } from '@juno/state'
+import { closeWelcome, forgetPicture, holdHome, homeAppears, homeHeading, homeItemLimit, homePicturesOnAtom, homeViewAtom, markFollowUpDone, markMovesSeen, markMovesShown, notePicture, nowAtom, peekKeyAtom, pictureUrl, preparePicture, registry, resolveAllTopics, runAction, runCommand, showToast, syncProgressAtom, takePicture, welcomeAtom, withAsks } from '@juno/state'
 import { homeAsksAtom, junoPageActions } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
 import { junoAskCopy } from '@juno/agent-contract'
 import { Home, HomeSyncLine, WelcomeCard, type ActivateEvent } from '@juno/views'
 import { chunk, usePreloaded } from './chunks'
+import { gallery } from './galleryChunk'
 import { HomeComposer } from './HomeComposer'
 import { openGallery, openJuno, openTopic } from './navigation'
 import { showChannelMenu } from './placeMenus'
@@ -25,7 +26,10 @@ function openItem(topicId: string, event: ActivateEvent): void {
 function pictureProps(picture: NonNullable<ReturnType<typeof takePicture>>) {
   return {
     picture: { src: pictureUrl(picture.id, 'small'), title: picture.title, artist: picture.artist, date: picture.date, ratio: picture.ratio, line: picture.line },
-    onOpenPicture: (event: ActivateEvent) => openGallery(picture.id, { newTab: event.metaKey }),
+    onOpenPicture: (event: ActivateEvent) => {
+      notePicture(registry, picture.id, 'small')
+      openGallery(picture.id, { newTab: event.metaKey })
+    },
     onPictureMissing: () => forgetPicture(picture.id),
   }
 }
@@ -188,13 +192,17 @@ function useWelcome() {
 
 /**
  * Home's picture (SPEC 12, "A picture"): when idle after Home paints, the next picture is picked and downloaded,
- * so the next caught-up Home has it on disk in its first frame.
+ * so the next caught-up Home has it on disk in its first frame, and the picture page's code loads, so opening the
+ * picture shows its page in the next frame.
  */
 function usePicture(): void {
   const on = useAtomValue(homePicturesOnAtom)
   useEffect(() => {
     if (!on) return
-    const idle = requestIdleCallback(() => void preparePicture(registry, new Date()), { timeout: 5_000 })
+    const idle = requestIdleCallback(() => {
+      void preparePicture(registry, new Date())
+      void gallery.load()
+    }, { timeout: 5_000 })
     return () => cancelIdleCallback(idle)
   }, [on])
 }

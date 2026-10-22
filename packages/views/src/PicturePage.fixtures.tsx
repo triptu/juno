@@ -4,7 +4,7 @@ import { PicturePage, type PicturePageProps } from './PicturePage'
 
 const noop = () => {}
 
-const base: PicturePageProps = { picture: pictureStory, src: storySource, onAllPictures: noop, onStep: noop, onOpenLink: noop }
+const base: PicturePageProps = { picture: pictureStory, small: storySource, large: storySource, onAllPictures: noop, onStep: noop, onOpenLink: noop }
 const page = (props: Partial<PicturePageProps> = {}, frame: FixtureFrame = { width: 1200, height: 760 }) =>
   scene<PicturePageProps>(() => <PicturePage {...base} {...props} />, { ...frame, padded: false })
 
@@ -14,9 +14,9 @@ export default defineFixtures(PicturePage, {
     // A quote with who said it and its context, the size beside a person, the link and the credit.
     painting: page(),
     // A fact for the line, and how far in light-years.
-    space: page({ picture: spaceStory, src: spaceSource }),
+    space: page({ picture: spaceStory, small: spaceSource, large: spaceSource }),
     // A picture of Earth from far away: how far in kilometres, and how long light takes.
-    earth: page({ picture: earthStory, src: earthSource }),
+    earth: page({ picture: earthStory, small: earthSource, large: earthSource }),
     // A canvas taller than a person.
     'large-canvas': page({ picture: largeStory }),
     // No scale data: nothing is reserved for it.
@@ -24,7 +24,7 @@ export default defineFixtures(PicturePage, {
     // A tall picture fits the page's height; the label keeps its width.
     tall: page({ picture: { ...pictureStory, ratio: 0.65 } }),
     // Before the file is on this Mac: the box at the picture's shape, in the secondary fill.
-    'no-file': page({ src: undefined }),
+    'no-file': page({ small: undefined, large: undefined }),
   },
   Size: {
     // Under 900px the label goes under the picture and the page scrolls.
