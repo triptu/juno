@@ -61,7 +61,7 @@ const DeactivatedNote = chunk(() => import('./topic/deactivated')).component((mo
 const retry = (clientMsgId: string) => void retryMessage(registry, clientMsgId)
 const discard = (clientMsgId: string) => void discardMessage(registry, clientMsgId)
 
-/** Link-menu code is loaded only on the first right-click, keeping it out of the 1.1 MB startup bundle. */
+/** Open the link menu prefetched after a topic paints, or fetch it immediately if needed. */
 function showMessageLinkMenu(url: string, event: MouseEvent): void {
   const at = { x: event.clientX, y: event.clientY }
   void import('./linkMenu').then((menu) => menu.showLinkMenu(url, at))
