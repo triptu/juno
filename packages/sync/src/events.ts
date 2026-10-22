@@ -259,7 +259,7 @@ export const applyOpened = (fence: MetadataFence, channel: Channel): Effect.Effe
   )
 
 /** An edited message (`message_changed`, or Juno's own edit answered). */
-const writeChanged = (ctx: SyncContext, channel: string, message: Message, eventTs: string): Effect.Effect<void, SqlError, Services> =>
+export const writeChanged = (ctx: SyncContext, channel: string, message: Message, eventTs: string): Effect.Effect<void, SqlError, Services> =>
   Effect.gen(function* () {
     const rows = yield* mergeOne(ctx, channel, message, { kind: 'event', eventTs })
     yield* reindexTopics(topicsOfMessages(rows), reindexOptions(ctx))
@@ -291,20 +291,6 @@ export const writeDeleted = (ctx: SyncContext, channel: string, deletedTs: strin
     yield* reindexTopics(topics, reindexOptions(ctx))
   })
 
-/**
- * One of the user's replies Slack has also sent to the channel. Only the
- * subtype changes: the reply keeps its content, which the `message_changed`
- * that follows also carries.
- */
-const writeBroadcast = (ctx: SyncContext, channel: string, ts: string): Effect.Effect<void, SqlError, Services> =>
-  Effect.gen(function* () {
-    const existing = yield* readMessage(channel, ts)
-    if (existing === undefined || existing.deleted === 1 || existing.subtype === 'thread_broadcast') return
-    const row = { ...existing, subtype: 'thread_broadcast', version: existing.version + 1 }
-    yield* writeMessage(row)
-    yield* reindexTopics(topicsOfMessages([row]), reindexOptions(ctx))
-  })
-
 interface ReactionChange {
   readonly channel: string
   readonly ts: string
@@ -314,54 +300,13 @@ interface ReactionChange {
 }
 
 /** One user's reaction added or removed (`reaction_added` and `reaction_removed`, or Juno's own answered). */
-const writeReaction = (ctx: SyncContext, change: ReactionChange, eventTs: string): Effect.Effect<void, SqlError, Services> =>
+export const writeReaction = (ctx: SyncContext, change: ReactionChange, eventTs: string): Effect.Effect<void, SqlError, Services> =>
   Effect.gen(function* () {
     const existing = yield* readMessage(change.channel, change.ts)
     if (existing === undefined) return yield* noteLateReaction(ctx, change.channel, change.ts, eventTs)
     yield* changeReaction(existing, change.name, change.user, change.added, ctx.me.userId)
     const last = existing.last_event_ts === null ? eventTs : compareTs(eventTs, existing.last_event_ts) > 0 ? eventTs : existing.last_event_ts
     if (last !== existing.last_event_ts) yield* writeMessage({ ...existing, last_event_ts: last, version: existing.version + 1 })
-  })
-
-/** What Slack accepted from one of Juno's own edits, deletes or reactions (`ActionWorker`). */
-export type Acted =
-  | { readonly kind: 'edited'; readonly channel: string; readonly message: Message }
-  | { readonly kind: 'deleted'; readonly channel: string; readonly ts: string }
-  | { readonly kind: 'reacted'; readonly channel: string; readonly ts: string; readonly name: string; readonly added: boolean }
-  | { readonly kind: 'broadcast'; readonly channel: string; readonly ts: string }
-
-/**
- * Stores what Slack accepted as the socket event would store it, and runs
- * `alongside` (which ends the outbox row) in the same transaction, so the
- * view goes from the row's intent to the stored message with nothing in
- * between. The event, when it comes, changes nothing more.
- */
-export const applyActed = <E>(
-  ctx: SyncContext,
-  acted: Acted,
-  alongside: Effect.Effect<unknown, E, Services>,
-): Effect.Effect<void, SqlError | E, Services> =>
-  Effect.gen(function* () {
-    const eventTs = millisToTs(yield* Clock.currentTimeMillis)
-    yield* transaction(
-      Effect.gen(function* () {
-        switch (acted.kind) {
-          case 'edited':
-            yield* writeChanged(ctx, acted.channel, acted.message, acted.message.edited?.ts ?? eventTs)
-            break
-          case 'deleted':
-            yield* writeDeleted(ctx, acted.channel, acted.ts, { kind: 'event', eventTs })
-            break
-          case 'reacted':
-            yield* writeReaction(ctx, { channel: acted.channel, ts: acted.ts, name: acted.name, user: ctx.me.userId, added: acted.added }, eventTs)
-            break
-          case 'broadcast':
-            yield* writeBroadcast(ctx, acted.channel, acted.ts)
-            break
-        }
-        yield* alongside
-      }),
-    )
   })
 
 const applyMessageFrame = (ctx: SyncContext, frame: Extract<RtmFrame, { type: 'message' }>, now: number): Effect.Effect<void, SqlError, Services> => {

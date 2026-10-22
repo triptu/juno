@@ -25,7 +25,6 @@
  * dropped unsent, so an add and a remove cancel. A delete drops the
  * message's other rows.
  */
-import { mainTopicId, type ChannelId } from '@juno/domain'
 import { Invalidation, StoreWriter, type MessageRow, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
 import { messageTopics } from './keys'
@@ -242,35 +241,6 @@ export const queueEdit = (input: EditInput): Effect.Effect<ActionRefusal | undef
     if (target.kind === 'stored' && target.row.text === input.text) return undefined
     const { channel, dependsOn, ...fields } = targetFields(target)
     yield* insertAction('edit', channel, dependsOn, { ...fields, text: input.text, blocksJson: input.blocksJson, rev: 1 }, input.now)
-    return undefined
-  })
-
-export interface BroadcastInput {
-  readonly ref: MessageRef
-  readonly selfId: string
-  readonly now: number
-}
-
-/**
- * Broadcast: the user's own thread reply is also sent to the channel. Only a
- * reply Slack has, as Slack's own client offers it: not a root, not a reply
- * already sent, not a post still pending. The row's topics are the thread
- * and Main, which shows the reply until Slack has it (`messages.list`). A
- * second broadcast of the same reply writes nothing.
- */
-export const queueBroadcast = (input: BroadcastInput): Effect.Effect<ActionRefusal | undefined, SqlError, StoreWriter | Invalidation> =>
-  Effect.gen(function* () {
-    const target = yield* resolveTarget(input.ref)
-    if (target === undefined || (target.kind === 'stored' && target.row.deleted === 1)) return 'missing'
-    if (target.kind === 'pending') return 'not-sent'
-    const { row } = target
-    if (row.user_id !== input.selfId) return 'not-own'
-    if (row.thread_ts === null || row.thread_ts === row.ts) return 'missing'
-    const actions = yield* actionsOn(target)
-    if (actions.some((action) => action.kind === 'delete')) return 'missing'
-    if (row.subtype === 'thread_broadcast' || actions.some((action) => action.kind === 'broadcast')) return undefined
-    const { channel, dependsOn, ...fields } = targetFields(target)
-    yield* insertAction('broadcast', channel, dependsOn, { ...fields, topics: [...fields.topics, mainTopicId(channel as ChannelId)] }, input.now)
     return undefined
   })
 

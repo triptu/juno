@@ -1,6 +1,7 @@
 import { Effect, FiberSet } from 'effect'
 import { trackFetch } from '../context'
-import { applyActed, applyOpened, applySent } from '../events'
+import { applyActed } from '../acted'
+import { applyOpened, applySent } from '../events'
 import { fetchOlder, fetchTopic, type FetchLane, type FetchReport, type OpenError } from '../open'
 import { wantUsers } from '../users'
 import { queueTopicFiles } from './files'
