@@ -6,7 +6,8 @@
   "description": "Juno desktop app (Electron shell).",
   "main": "./out/main/index.js",
   "files": [
-    "out"
+    "out",
+    "THIRD_PARTY_NOTICES.txt"
   ],
   "scripts": {
     "dev": "node ../../scripts/without-run-as-node.mjs electron-vite dev",

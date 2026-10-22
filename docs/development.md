@@ -110,6 +110,8 @@ What changes with it:
 - **The app under test gets neither.** pnpm passes that `NODE_PATH` and resolve hook to everything it runs, Electron included. The e2e fixture (`apps/desktop/e2e/fixtures.ts`) drops both, as the packaged app has neither; with them, a Home send to a DM did not arrive in one e2e test.
 - **Remote runs** install in their image the same way.
 
+Regenerate the standard emoji catalog and search keywords with `node scripts/emoji-catalog.mjs` (pinned sources; local input paths are documented at the top of the script); its CLDR notice ships in `apps/desktop/THIRD_PARTY_NOTICES.txt`.
+
 ## Decision log
 
 Add one file per decision under `docs/decisions/log/`, named

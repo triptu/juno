@@ -1,0 +1,1 @@
+- 10-22 18:00 · emoji search · Ship the CLDR Unicode License v3 notice with the desktop app and document the pinned, reproducible catalog generator.

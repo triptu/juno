@@ -1,0 +1,1 @@
+- 10-22 18:00 · emoji search · Rank curated chat terms above broad CLDR emoji associations; keep workspace names distinct from standard names and shared image URLs, and normalize skin tones in quick-reaction priors.

@@ -7,6 +7,7 @@ directories:
 files:
   - out/**
   - package.json
+  - THIRD_PARTY_NOTICES.txt
   # The updater's repository and read-only token, written by build/package.cjs when JUNO_UPDATE_TOKEN is set.
   - update.json
   - "!**/*.map"
