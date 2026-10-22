@@ -26,9 +26,9 @@ interface Item {
 async function measure(page: Page, bar: Locator): Promise<{ readonly height: number; readonly items: ReadonlyArray<Item> }> {
   await expect(bar).toBeVisible()
   // The page around the bar, on whole pixels, so a bar off the pixel grid is measured where it really is.
-  const box = (await bar.boundingBox())!
-  const clip = { x: Math.floor(box.x), y: Math.floor(box.y), width: Math.ceil(box.x + box.width) - Math.floor(box.x), height: Math.ceil(box.y + box.height) - Math.floor(box.y) }
-  const shot = await page.screenshot({ clip, animations: 'disabled' })
+  const outer = (await bar.boundingBox())!
+  const area = { x: Math.floor(outer.x), y: Math.floor(outer.y), width: Math.ceil(outer.x + outer.width) - Math.floor(outer.x), height: Math.ceil(outer.y + outer.height) - Math.floor(outer.y) }
+  const shot = await page.screenshot({ clip: area, animations: 'disabled' })
   return bar.evaluate(
     async (element, { png, clip }) => {
       const box = element.getBoundingClientRect()
@@ -77,7 +77,7 @@ async function measure(page: Page, bar: Locator): Promise<{ readonly height: num
       })
       return { height: box.height, items }
     },
-    { png: shot.toString('base64'), clip },
+    { png: shot.toString('base64'), clip: area },
   )
 }
 
@@ -96,9 +96,13 @@ const spacing = (bar: Locator) =>
     }
   })
 
+// Juno ships on macOS, where emoji are Apple Color Emoji. A Linux runner draws them in Noto Color Emoji, which puts the
+// emoji in the middle of its advance rather than at its start, so there a text emoji is not checked; images and icons are.
+const textEmoji = (name: string) => process.platform !== 'darwin' && /^React [^:]/.test(name)
+
 function expectCentred(found: { readonly height: number; readonly items: ReadonlyArray<Item> }): void {
   expect(found.items.length).toBeGreaterThan(0)
-  for (const item of found.items) {
+  for (const item of found.items.filter((each) => !textEmoji(each.name))) {
     const detail = JSON.stringify(item)
     expect(Math.abs(item.ink.y - found.height / 2), `${item.name} off the bar's centre line: ${detail}`).toBeLessThan(0.5)
     expect(Math.abs(item.ink.x - item.button.x), `${item.name} off its button's centre: ${detail}`).toBeLessThan(0.5)
