@@ -17,11 +17,11 @@ module outboxProtocol {
     // A post claimed while Juno saw the socket down.
     claimedOffline: bool,
     label: str, target: int,
-    // One action row per message (edit, broadcast, delete or reaction toggle):
-    // none, waiting, transit, accepted, done, dropped, or failed (a defect,
-    // exhausted retries, or a refused reaction, with Retry and Dismiss). Kind
-    // `change` is an edit or a broadcast (the reply also sent to the channel),
-    // `react` a reaction toggle; `delete` replaces them.
+    // One action row per message (edit, delete or reaction toggle): none,
+    // waiting, transit, accepted, done, dropped, or failed (a defect, exhausted
+    // retries, or a refused reaction, with Retry and Dismiss). Kind
+    // `change` is an edit, `react` a reaction toggle; `delete` replaces them.
+    // Separate edit/broadcast rows are modelled by broadcastOutbox below.
     // `stale` holds rows whose intent changed while a call was out.
     // `actSent` records every action call that left Juno; `acted` every
     // message Slack applied one to.
@@ -946,4 +946,81 @@ module outboxProtocol {
 
 module outbox {
   import outboxProtocol(drafts = Set(1, 2), fetchLimit = 2, drainLimit = 48).*
+}
+
+// Companion to outboxProtocol: an edit and a broadcast of the same stored
+// reply occupy separate rows. Content, post creation, delete and wall-clock
+// backoff remain in the main model. Here the socket echo may never arrive.
+module broadcastOutbox {
+  var b: { rows: int -> str, order: List[int], flight: int,
+    serverBroadcast: bool, localBroadcast: bool, edited: bool, attempts: int -> int }
+  var tick: int
+  action init = all {
+    b' = { rows: Map(1 -> "none", 2 -> "none"), order: [], flight: 0,
+      serverBroadcast: false, localBroadcast: false, edited: false, attempts: Map(1 -> 0, 2 -> 0) },
+    tick' = 0
+  }
+  // 1 is an edit (text only), 2 a broadcast (reply_broadcast only).
+  action queue(k: int): bool = all {
+    b.rows.get(k) == "none",
+    b' = { ...b, rows: b.rows.set(k, "waiting"), order: b.order.append(k) }
+  }
+  def pending(k: int): bool = Set("waiting", "transit", "accepted", "checking").contains(b.rows.get(k))
+  action startCall(k: int): bool = all {
+    b.flight == 0, b.rows.get(k) == "waiting",
+    b.order.select(j => pending(j)).head() == k,
+    b' = { ...b, flight: k, rows: b.rows.set(k, "transit") }
+  }
+  action accept = all {
+    b.flight != 0, b.rows.get(b.flight) == "transit",
+    b.flight == 1 or not(b.serverBroadcast),
+    b' = { ...b, rows: b.rows.set(b.flight, "accepted"),
+      edited: b.edited or b.flight == 1, serverBroadcast: b.serverBroadcast or b.flight == 2 }
+  }
+  action answer = all {
+    b.flight != 0, b.rows.get(b.flight) == "accepted",
+    b' = { ...b, flight: 0, rows: b.rows.set(b.flight, "done"),
+      localBroadcast: b.localBroadcast or b.flight == 2 }
+  }
+  // A lost answer, failed lookup or transient refusal consumes the same
+  // persisted retry budget. The next edit waits while the broadcast waits.
+  action loseExchange = all {
+    b.flight != 0,
+    b' = { ...b, flight: 0, attempts: b.attempts.set(b.flight, b.attempts.get(b.flight) + 1),
+      rows: b.rows.set(b.flight, if (b.attempts.get(b.flight) >= 4) "failed" else "waiting") }
+  }
+  action refuse = all {
+    b.flight == 2, b.rows.get(2) == "transit",
+    b' = { ...b, rows: b.rows.set(2, "checking") }
+  }
+  // cant_broadcast_message means either already broadcast or forbidden.
+  // A bounded history lookup distinguishes them before ending the row.
+  action lookupWith(guard: bool): bool = all {
+    b.flight == 2, b.rows.get(2) == "checking",
+    b' = { ...b, flight: 0, rows: b.rows.set(2, if (guard and b.serverBroadcast) "done" else "dropped"),
+      localBroadcast: if (guard) b.serverBroadcast else b.localBroadcast }
+  }
+  action echo = all {
+    b.serverBroadcast, not(b.localBroadcast), b' = { ...b, localBroadcast: true }
+  }
+  val invariants = all {
+    Set("done", "dropped").contains(b.rows.get(2)) implies b.localBroadcast == b.serverBroadcast,
+    b.localBroadcast implies b.serverBroadcast,
+    Set(1, 2).forall(k => b.attempts.get(k) <= 5),
+    b.flight == 0 or b.rows.get(b.flight) != "waiting"
+  }
+  action simulationStep = all {
+    any { queue(1), queue(2), startCall(1), startCall(2), accept, answer, loseExchange, refuse, lookupWith(true), echo },
+    tick' = tick + 1
+  }
+  action lostWith(guard: bool): bool = all {
+    if (tick == 0) queue(2) else if (tick == 1) queue(1) else
+    if (tick == 2) startCall(2) else if (tick == 3) accept else
+    if (tick == 4) loseExchange else if (tick == 5) startCall(2) else
+    if (tick == 6) refuse else if (tick == 7) lookupWith(guard) else
+    if (tick == 8) startCall(1) else if (tick == 9) accept else answer,
+    tick' = tick + 1
+  }
+  action lostStep = lostWith(true)
+  action lostBugStep = lostWith(false)
 }

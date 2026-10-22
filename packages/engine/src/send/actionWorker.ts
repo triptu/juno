@@ -17,8 +17,8 @@
  *   a repeat (`message_not_found` after a delete, `already_reacted` after an
  *   add, `no_reaction` after a remove) mean the change is there. A repeated
  *   broadcast is refused (`cant_broadcast_message`), as one Slack does not
- *   allow is; the row ends either way and the `message_changed` Slack sent
- *   for the first call says what Slack has. For a
+ *   allow is; read that timestamp in Main before ending the row, since both
+ *   the first answer and its socket event may have been lost. For a
  *   reaction `message_not_found` is a refusal: Slack does not have the
  *   message, so it does not have the reaction either.
  * - Success stores the change as the socket event would and ends the row in
@@ -156,7 +156,14 @@ export class ActionWorker extends Context.Service<
             // Observed live: `reply_broadcast` alone, with no text, sends the reply to the channel as it is.
             return outbox
               .send((api) => api.call('chat.update', { channel, ts: ts as Ts, reply_broadcast: true }, { singleAttempt: true }))
-              .pipe(Effect.as({ kind: 'broadcast', channel, ts } as const))
+              .pipe(
+                Effect.catchTag('Rejected', (error) => error.code !== 'cant_broadcast_message' ? Effect.fail(error) :
+                  outbox.lookup((api) => api.call('conversations.history', { channel, oldest: ts, latest: ts, inclusive: true, limit: 1 }, { singleAttempt: true })).pipe(
+                    Effect.flatMap((page) => page.messages.some((message) => message.ts === ts && (message.subtype === 'thread_broadcast' || message.reply_broadcast === true))
+                      ? Effect.void : Effect.fail(error)),
+                  )),
+                Effect.as({ kind: 'broadcast', channel, ts } as const),
+              )
           case 'react': {
             const name = action.payload.name ?? ''
             const added = action.payload.want === true
