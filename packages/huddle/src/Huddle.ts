@@ -4,6 +4,7 @@
  *
  * - `lifecycle.ts`: the model's actions as pure rules.
  * - `media.ts`: the pages' media, as current state.
+ * - `own.ts`: who is in the user's own call and when it started.
  * - `core.ts`: the state, the lock, and the I/O the rules call for.
  * - `attach.ts`: a sync's session, and its end.
  * - `boot.ts`: every workspace's stored leaves, read at boot.

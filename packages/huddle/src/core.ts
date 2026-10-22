@@ -28,6 +28,7 @@ import type { HuddleSession } from './Huddle'
 import { failureOf } from './failure'
 import * as L from './lifecycle'
 import { noMedia, pageState, type MediaView, type Received } from './media'
+import { callRoom, followOwn, type OwnRoom } from './own'
 import { applyJoined, secondsToMillis, toRunningHuddles, type Running } from './running'
 import { codeOf, joinedFrom, joinRequest, leaveRequest, toHuddleError } from './slack'
 import { keepStatus } from './status'
@@ -55,21 +56,6 @@ export interface Attached {
   readonly info: Info
   /** The workspace's stored leaves were read. Until then no join is sent and nothing stored is rewritten. */
   loaded: boolean
-}
-
-/**
- * What Juno last knew of the room of the user's own call: who is in it and
- * when it started, from the join answer, then from the running list while
- * that lists the room. A read that does not list the room the user is
- * talking in leaves the call as it was.
- */
-export interface OwnRoom {
-  readonly attendeeId: string
-  readonly callId: string
-  readonly participants: ReadonlyArray<string>
-  readonly startedAt: number | null
-  /** When Slack answered the join. */
-  readonly joinedAt: number
 }
 
 /** Renderer page generations as main reports them (`media.ts`). */
@@ -122,29 +108,6 @@ export interface Core {
 
 /** The pages' current state, for the rules. */
 export const view = (core: Core): MediaView => ({ pages: core.pages, reports: core.reports, handed: core.handed })
-
-/**
- * The room of the call: its running entry while that is about the call's
- * room, else what Juno last knew of it. Before Slack answers the join, the
- * huddle being joined.
- */
-const callRoom = (s: L.Lifecycle, running: Running, own: OwnRoom | undefined): { readonly participants: ReadonlyArray<string>; readonly startedAt: number | null } | undefined => {
-  const channelId = L.callChannel(s)
-  const entry = channelId === undefined ? undefined : running.get(channelId)
-  const identity = s.current?.identity
-  if (identity === undefined || entry?.callId === identity.callId) return entry
-  return own?.attendeeId === identity.attendeeId ? own : undefined
-}
-
-/** Keeps `own` up to date with the running list, under the lock. */
-const followOwn = (core: Core) => {
-  const identity = core.s.current?.identity
-  const own = core.own
-  if (identity === undefined || own?.attendeeId !== identity.attendeeId) return
-  const entry = core.running.get(identity.channelId)
-  if (entry?.callId !== identity.callId || (entry.participants === own.participants && entry.startedAt === own.startedAt)) return
-  core.own = { ...own, participants: entry.participants, startedAt: entry.startedAt ?? own.startedAt }
-}
 
 const toCall = (s: L.Lifecycle, media: MediaView, running: Running, own: OwnRoom | undefined): HuddleCall => {
   const channelId = L.callChannel(s) ?? null
