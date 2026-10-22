@@ -220,6 +220,54 @@ test('keeps the last message of Main whole as it grows at the bottom, and still 
   })
 })
 
+test('releases the bottom during an upward gesture and uses the resting threshold for later growth', async ({ juno, win, slack, fake }) => {
+  const channel = await openLongMain(juno, fake, slack)
+  const { topic } = juno
+  const last = fake.messages(channel).find((message) => message.text === 'Earlier message 29')!
+  const grown = 'The last message grows\nAnother line\nAnd another line'
+
+  await test.step('growth during a continuous upward gesture does not pull the list back down', async () => {
+    const box = (await topic.scroller.boundingBox())!
+    const start = await topic.scroller.evaluate((node) => node.scrollTop)
+    const cdp = await win.context().newCDPSession(win)
+    try {
+      const gesture = cdp.send('Input.synthesizeScrollGesture', { x: box.x + box.width / 2, y: box.y + box.height / 2, yDistance: 900, speed: 600, gestureSourceType: 'mouse', preventFling: false })
+      try {
+        await expect.poll(() => topic.scroller.evaluate((node) => node.scrollTop)).toBeLessThan(start - 64)
+        fake.editMessage({ channel, ts: last.ts, text: grown })
+        await topic.expectMessage('The last message grows')
+        expect(await topic.scroller.evaluate((node) => node.scrollTop)).toBeLessThan(start - 64)
+      } finally {
+        await gesture
+      }
+    } finally {
+      await cdp.detach()
+    }
+    expect(await distance(topic.scroller)).toBeGreaterThan(600)
+  })
+
+  await test.step('resting within 32px holds the bottom on growth', async () => {
+    await topic.toLatest()
+    await topic.scrollUp(16)
+    expect(await distance(topic.scroller)).toBeLessThanOrEqual(32)
+    fake.editMessage({ channel, ts: last.ts, text: `${grown}\nOne more line` })
+    await topic.expectMessage('One more line')
+    await frames(win, 5)
+    expect(await distance(topic.scroller)).toBeLessThanOrEqual(1)
+  })
+
+  await test.step('resting outside 32px leaves the viewport alone on growth', async () => {
+    await topic.scrollUp(40)
+    expect(await distance(topic.scroller)).toBeGreaterThan(32)
+    const top = await topic.scroller.evaluate((node) => node.scrollTop)
+    await expectStableAnchor(win, '[data-topic-view] [data-message-row]', async () => {
+      fake.editMessage({ channel, ts: last.ts, text: `${grown}\nOne more line\nThe final line` })
+      await topic.expectMessage('The final line')
+    })
+    expect(await topic.scroller.evaluate((node) => node.scrollTop)).toBe(top)
+  })
+})
+
 async function mainArrival({ juno, win, slack, fake }: Pick<Fixtures, 'juno' | 'win' | 'slack' | 'fake'>): Promise<void> {
   const channel = slack.channel('eng')
   await juno.topic.message('Earlier message 29').click()
