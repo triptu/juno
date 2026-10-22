@@ -21,14 +21,14 @@ test('cold picker paints Frequently used complete and keeps its first cell still
     await second.sidebar.row('#eng').open()
     const row = second.topic.list.locator('[data-message-row]').last()
     const menu = await second.messageMenu.openOnRow(row)
-    // Sampled once the menu has turned into the picker: during the morph every cell moves with it.
+    // Sampled once the menu has turned into the picker (its Web Animations, not the placeholders' CSS ones): during the morph every cell moves with it.
     const frames = again.win.evaluate(() => new Promise<Array<{ names: Array<string | null>; top: number }>>((resolve) => {
       const result: Array<{ names: Array<string | null>; top: number }> = []
       let remaining = 180
       const tick = () => {
         const group = document.querySelector('[data-emoji-picker] [role="group"]')
         const cell = group?.querySelector('[data-emoji]')
-        const moving = document.querySelector('[data-context-menu]')?.getAnimations({ subtree: true }).some((animation) => animation.playState === 'running') === true
+        const moving = document.querySelector('[data-context-menu]')?.getAnimations({ subtree: true }).some((animation) => !(animation instanceof CSSAnimation) && !(animation instanceof CSSTransition) && animation.playState === 'running') === true
         if (cell !== undefined && cell !== null && !moving) result.push({ names: Array.from(group!.querySelectorAll('[data-emoji]'), (node) => node.getAttribute('data-emoji')), top: cell.getBoundingClientRect().top })
         if (--remaining === 0) resolve(result)
         else requestAnimationFrame(tick)

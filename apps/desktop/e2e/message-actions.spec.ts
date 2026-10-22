@@ -235,7 +235,7 @@ async function menuActions({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Pro
     await expect(row).toHaveAttribute('data-popover-active', '')
     // Ask Juno shows while AI assist is on, and Tell me if nobody replies is enabled once Juno may schedule.
     const labels = (await menu.labels()).filter((label) => label !== 'Ask Juno').map((label) => label.replace(/^\((.*)\)$/, '$1'))
-    expect(labels).toEqual(['Quote', '-', 'Copy text', 'Forward…', 'Open in Slack', '-', 'Tell me if nobody replies', '-', 'Edit', 'Delete…'])
+    expect(labels).toEqual(['Start thread', 'Quote', '-', 'Copy text', 'Forward…', 'Open in Slack', '-', 'Tell me if nobody replies', '-', 'Edit', 'Delete…'])
     await menu.choose('edit')
     const editing = topic.list.locator('[data-editing]')
     const field = editing.getByRole('textbox', { name: 'Edit message' })

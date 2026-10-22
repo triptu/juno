@@ -15,7 +15,7 @@ test.describe.configure({ timeout: 120_000 })
 const MINUTE = 60_000
 
 /** Waits until every animation in the menu has finished: the morph. */
-const settled = (menu: Locator) => menu.evaluate((node) => Promise.all(node.getAnimations({ subtree: true }).map((animation) => animation.finished)).then(() => undefined))
+const settled = (menu: Locator) => menu.evaluate((node) => Promise.all(node.getAnimations({ subtree: true }).filter((animation) => !(animation instanceof CSSAnimation) && !(animation instanceof CSSTransition)).map((animation) => animation.finished)).then(() => undefined))
 
 const boxOf = async (locator: Locator) => {
   const box = (await locator.boundingBox())!
@@ -168,7 +168,7 @@ async function morphAt(juno: Juno, at: { readonly x: number; readonly y: number 
           if (root !== null) {
             const box = (root.firstElementChild as HTMLElement).getBoundingClientRect()
             seen.push({ left: box.left, top: box.top, right: box.right, bottom: box.bottom })
-            if (root.getAnimations({ subtree: true }).every((animation) => animation.playState !== 'running') && seen.length > 1) return resolve(seen)
+            if (root.getAnimations({ subtree: true }).every((animation) => animation instanceof CSSAnimation || animation instanceof CSSTransition || animation.playState !== 'running') && seen.length > 1) return resolve(seen)
           }
           requestAnimationFrame(tick)
         }
