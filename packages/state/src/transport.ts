@@ -68,8 +68,11 @@ const platform = Worker.makePlatform<PortConnection>()({
  */
 const IN_FLIGHT_PER_PORT = 1 << 20
 
+/** A client `Protocol` for the engine: this one, or the web shell's socket (`socket.ts`). */
+export type EngineProtocol = Layer.Layer<RpcClient.Protocol, WorkerError.WorkerError>
+
 /** A client `Protocol` over one port at a time. */
-export function portProtocol(connection: PortConnection): Layer.Layer<RpcClient.Protocol, WorkerError.WorkerError> {
+export function portProtocol(connection: PortConnection): EngineProtocol {
   return RpcClient.layerProtocolWorker({ size: 1, concurrency: IN_FLIGHT_PER_PORT }).pipe(
     Layer.provide(Layer.mergeAll(Layer.succeed(Worker.WorkerPlatform, platform), Worker.layerSpawner(() => connection))),
   )
