@@ -20,21 +20,23 @@ test('cold picker paints Frequently used complete and keeps its first cell still
     await holdWorkspaceEmoji(again.win)
     await second.sidebar.row('#eng').open()
     const row = second.topic.list.locator('[data-message-row]').last()
-    await row.hover()
+    const menu = await second.messageMenu.openOnRow(row)
+    // Sampled once the menu has turned into the picker: during the morph every cell moves with it.
     const frames = again.win.evaluate(() => new Promise<Array<{ names: Array<string | null>; top: number }>>((resolve) => {
       const result: Array<{ names: Array<string | null>; top: number }> = []
       let remaining = 180
       const tick = () => {
         const group = document.querySelector('[data-emoji-picker] [role="group"]')
         const cell = group?.querySelector('[data-emoji]')
-        if (cell !== undefined && cell !== null) result.push({ names: Array.from(group!.querySelectorAll('[data-emoji]'), (node) => node.getAttribute('data-emoji')), top: cell.getBoundingClientRect().top })
+        const moving = document.querySelector('[data-context-menu]')?.getAnimations({ subtree: true }).some((animation) => animation.playState === 'running') === true
+        if (cell !== undefined && cell !== null && !moving) result.push({ names: Array.from(group!.querySelectorAll('[data-emoji]'), (node) => node.getAttribute('data-emoji')), top: cell.getBoundingClientRect().top })
         if (--remaining === 0) resolve(result)
         else requestAnimationFrame(tick)
       }
       requestAnimationFrame(tick)
     }))
-    await row.getByRole('button', { name: 'More reactions' }).click()
-    const picker = again.win.getByRole('dialog', { name: 'Emoji' })
+    await menu.more.click()
+    const picker = again.win.locator('[data-emoji-picker]')
     await expect.poll(() => again.win.evaluate(() => window.emojiGate.count())).toBeGreaterThan(0)
     const recent = picker.getByRole('group', { name: 'Frequently used' })
     const pending = recent.locator('[data-emoji="hello_juno"]')

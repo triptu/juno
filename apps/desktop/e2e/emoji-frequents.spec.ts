@@ -12,8 +12,7 @@ test('frequently used emoji survive a restart and an update from their first pic
   await juno.sidebar.row('#eng').open()
   const row = juno.topic.list.locator('[data-message-row]').last()
   const ts = await row.getAttribute('data-message-row')
-  await row.hover()
-  await row.getByRole('button', { name: 'More reactions' }).click()
+  await (await juno.messageMenu.openOnRow(row)).more.click()
   const frequents = () => juno.win.getByRole('group', { name: 'Frequently used' }).locator('[data-emoji]')
   await expect.poll(() => frequents().evaluateAll((cells) => cells.map((cell) => cell.getAttribute('data-emoji')))).toEqual([
     'juno_wave', '+1', 'tada', 'eyes', 'white_check_mark',
@@ -25,8 +24,7 @@ test('frequently used emoji survive a restart and an update from their first pic
   await search.press('Enter')
   await expect(row.getByRole('button', { name: '1 🚀, including you' })).toBeVisible()
   await expect.poll(() => fake.messages('C0ENG').find((message) => message.ts === ts)?.reactions?.some((reaction) => reaction.name === 'rocket')).toBe(true)
-  await row.hover()
-  await row.getByRole('button', { name: 'More reactions' }).click()
+  await (await juno.messageMenu.openOnRow(row)).more.click()
   await expect.poll(() => frequents().evaluateAll((cells) => cells.map((cell) => cell.getAttribute('data-emoji')))).toEqual([
     'rocket', 'tada', 'eyes', '+1', 'white_check_mark',
   ])
@@ -40,7 +38,7 @@ test('frequently used emoji survive a restart and an update from their first pic
       await second.waitForSync()
       await second.sidebar.row('#eng').open()
       const message = second.topic.list.locator('[data-message-row]').last()
-      await message.hover()
+      const menu = await second.messageMenu.openOnRow(message)
       const firstPaint = again.win.evaluate(() => new Promise<string | null>((resolve) => {
         const sample = () => {
           const picker = document.querySelector('[data-emoji-picker]')
@@ -49,7 +47,7 @@ test('frequently used emoji survive a restart and an update from their first pic
         }
         requestAnimationFrame(sample)
       }))
-      await message.getByRole('button', { name: 'More reactions' }).click()
+      await menu.more.click()
       const frequent = again.win.getByRole('group', { name: 'Frequently used' }).locator('[data-emoji]').first()
       await expect(frequent).toHaveAttribute('data-emoji', 'rocket')
       expect(await firstPaint).toBe('rocket')

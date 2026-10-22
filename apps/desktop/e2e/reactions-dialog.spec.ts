@@ -90,7 +90,7 @@ test('View reactions in the message menu opens the dialog on the first emoji', a
   const row = juno.topic.message(TEXT)
   await expect(row.getByRole('button', { name: '40 👍, including you' })).toBeVisible()
   const { labels } = await juno.topic.chooseInMessageMenu(TEXT, null)
-  expect(labels.indexOf('View reactions')).toBe(labels.indexOf('Forward…') - 1)
+  expect(labels.indexOf('View reactions')).toBe(labels.indexOf('Open in Slack') + 1)
   await juno.topic.chooseInMessageMenu(TEXT, 'reactions')
   const dialog = juno.win.getByRole('dialog', { name: 'Reactions' })
   await expect(dialog.getByRole('tab', { selected: true })).toHaveAccessibleName('40 👍, including you')

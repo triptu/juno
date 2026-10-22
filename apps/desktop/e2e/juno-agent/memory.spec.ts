@@ -172,15 +172,13 @@ test('Remember this and Remove in an owner message\'s menu pin it and remove it 
     selection?.addRange(range)
   }, FACT)
 
-  await juno.chooseNextMenuItem('remember')
-  await chat.ownerBubble(FACT).click({ button: 'right' })
+  await (await chat.menu(FACT, { owner: true })).choose('remember')
   await openPage(juno, 'What Juno remembers')
   await expect(pins(juno)).toContainText(FACT)
   await expect(pins(juno)).not.toContainText('Ask the owner')
 
   chat = await openChat(juno)
-  await juno.chooseNextMenuItem('remove')
-  await chat.ownerBubble(FACT).click({ button: 'right' })
+  await (await chat.menu(FACT, { owner: true })).choose('remove')
   const sheet = juno.win.getByRole('dialog', { name: 'Remove from Juno' })
   await sheet.getByRole('button', { name: 'Remove', exact: true }).click()
   await expect(sheet).toHaveCount(0)

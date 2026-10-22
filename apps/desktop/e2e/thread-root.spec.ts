@@ -33,11 +33,9 @@ async function startThreadOn(juno: Juno, open: () => Promise<void>, text: string
   await open()
   const { topic } = juno
   await topic.expectTitle('Main')
-  const message = topic.message(text)
-  await message.scrollIntoViewIfNeeded()
-  await message.hover()
+  const menu = await topic.messageMenu(text)
   const seen = await watchEmpty(juno.win)
-  await message.getByRole('button', { name: 'Start thread' }).click()
+  await menu.choose('reply')
 
   // The root shows as soon as the thread does, before any reply.
   await expect(topic.composer).toHaveAttribute('aria-label', 'Reply')

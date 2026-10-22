@@ -39,7 +39,8 @@ test('Forward… shares a message into a channel with a note', async ({ juno, fa
 
   const { labels } = await juno.topic.chooseInMessageMenu(HANDOFF, null)
   expect(labels.indexOf('Forward…')).toBeGreaterThan(-1)
-  expect(labels.indexOf('Forward…')).toBe(labels.indexOf('Copy Slack link') - 1)
+  expect(labels.indexOf('Forward…')).toBe(labels.indexOf('Open in Slack') - 1)
+  expect(labels).not.toContain('Copy Slack link')
 
   await forward(juno, HANDOFF, 'product', 'For the roadmap review')
   await juno.expectToast('Forwarded to #product')

@@ -16,9 +16,7 @@ const CONFIRMED = 'Confirmed, p95 back to 210ms.'
 test('hovering a reaction chip shows who reacted, and a click still toggles it', async ({ juno }) => {
   await juno.sidebar.row('#incidents').open()
   const { topic } = juno
-  const root = topic.message('p95 on /v2/search jumped')
-  await root.hover()
-  await root.getByRole('button', { name: 'Open thread' }).click()
+  await (await topic.messageMenu('p95 on /v2/search jumped')).choose('reply')
   await expect(topic.message(CONFIRMED)).toBeVisible()
 
   // The fake lists two people on 🎉: Jonas and you.

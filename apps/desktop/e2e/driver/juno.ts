@@ -746,6 +746,11 @@ export class Juno {
     return chooseNextMenuItem(this.win, id, options)
   }
 
+  /** The message menu, open or not. */
+  get messageMenu(): MessageMenuDriver {
+    return new MessageMenuDriver(this.win)
+  }
+
   /** What the last native menu showed, once it took the item `chooseNextMenuItem` set. */
   lastMenu(): Promise<{ readonly labels: string[]; readonly at: { readonly x: number; readonly y: number } | null }> {
     return lastMenu(this.win)
@@ -1008,11 +1013,6 @@ export class Juno {
     await this.app.evaluate((_electron, value) => (globalThis as unknown as { junoTest: { frontmost: (f: boolean) => void } }).junoTest.frontmost(value), frontmost)
   }
 
-  /** The why popover (inventory 15.4), by its title. */
-  whyPopover(title: string | RegExp): Locator {
-    return this.win.getByRole('dialog', { name: title })
-  }
-
   /**
    * Waits until the engine is live and its sync cycle has ended: the sidebar
    * is no longer `aria-busy`. A cycle goes on after "Engine live" with work
@@ -1179,6 +1179,100 @@ export type TopicMenuItem =
 export type AllTopicsChipName = 'All' | 'Open' | 'Resolved' | 'Quiet' | 'Unfollowed'
 
 /** One row of the All topics table, found by the start of its title. */
+/**
+ * The message menu (SPEC 7, "Message menu"): a right-click on a message or
+ * a Juno bubble opens it when the click completes. One for the window, in a
+ * portal on `body`.
+ */
+export class MessageMenuDriver {
+  readonly root: Locator
+
+  constructor(readonly win: Page) {
+    this.root = win.locator('[data-context-menu]')
+  }
+
+  /**
+   * Right-clicks `target` at `position` (its centre by default): the button
+   * goes down and comes up there, and the menu opens on the way up. With
+   * `scroll: false` the list is left where it is.
+   */
+  async openOn(target: Locator, position?: { readonly x: number; readonly y: number }, options: { readonly scroll?: boolean } = {}): Promise<MessageMenuDriver> {
+    if (options.scroll !== false) await target.scrollIntoViewIfNeeded()
+    const box = (await target.boundingBox())!
+    const at = position === undefined ? { x: box.x + box.width / 2, y: box.y + Math.min(box.height / 2, 12) } : { x: box.x + position.x, y: box.y + position.y }
+    await this.win.mouse.move(at.x, at.y)
+    await this.win.mouse.down({ button: 'right' })
+    await this.win.mouse.up({ button: 'right' })
+    await expect(this.root).toBeVisible()
+    return this
+  }
+
+  /** Right-clicks a message row's text and returns the open menu. */
+  openOnRow(row: Locator, options: { readonly scroll?: boolean } = {}): Promise<MessageMenuDriver> {
+    return this.openOn(row.locator('[data-msg-text]').first(), options.scroll === false ? { x: 8, y: 8 } : undefined, options)
+  }
+
+  /** A row by its id (`data-menu-item`): `quote`, `copy`, `edit`, `delete`, `reply`, `remember`, `remove`… */
+  item(id: string): Locator {
+    return this.root.locator(`[data-menu-item="${id}"]`)
+  }
+
+  /** A grid cell by its emoji's Slack name. */
+  cell(name: string): Locator {
+    return this.root.locator(`[data-grid-reaction="${name}"]`)
+  }
+
+  /** The grid's last cell, which turns the menu into the emoji picker. */
+  get more(): Locator {
+    return this.root.locator('[data-grid-more]')
+  }
+
+  get search(): Locator {
+    return this.root.getByRole('textbox', { name: 'Search emoji' })
+  }
+
+  /** The rows' labels in order: "-" for a separator, "(label)" for a disabled row. */
+  labels(): Promise<string[]> {
+    return this.root.evaluate((root) =>
+      [...root.querySelectorAll('[role="menuitem"], [role="separator"]')].filter((node) => node.closest('[inert]') === null).map((node) =>
+        node.getAttribute('role') === 'separator' ? '-' : node.getAttribute('aria-disabled') === 'true' ? `(${node.textContent ?? ''})` : (node.textContent ?? ''),
+      ),
+    )
+  }
+
+  /** The grid's emoji names, in order. */
+  grid(): Promise<string[]> {
+    return this.root.locator('[data-grid-reaction]').evaluateAll((cells) => cells.map((cell) => cell.getAttribute('data-grid-reaction') ?? ''))
+  }
+
+  /** Clicks the row `id`; the menu closes. */
+  async choose(id: string): Promise<void> {
+    await this.item(id).click()
+    await expect(this.root).toHaveCount(0)
+  }
+
+  /** Clicks the cell of the emoji named `name`; the menu closes. */
+  async react(name: string): Promise<void> {
+    await this.cell(name).click()
+    await expect(this.root).toHaveCount(0)
+  }
+
+  /** More reactions, then a search and its match, picked from the results. */
+  async reactWithPicker(search: string, name: string): Promise<void> {
+    await this.more.click()
+    await expect(this.search).toBeFocused()
+    await this.search.fill(search)
+    await this.root.locator('[data-emoji-results]').getByRole('button', { name: `:${name}:`, exact: true }).click()
+    await expect(this.root).toHaveCount(0)
+  }
+
+  /** Esc: the menu closes with nothing chosen. */
+  async close(): Promise<void> {
+    await this.win.keyboard.press('Escape')
+    await expect(this.root).toHaveCount(0)
+  }
+}
+
 export class AllTopicsRow {
   readonly root: Locator
 
@@ -1518,14 +1612,28 @@ export class TopicPane {
 
   /**
    * Right-clicks the message that starts with `text` and picks `item` in its
-   * menu; on its sender's name with `onSender`. Returns the menu's labels.
+   * menu, or closes it with Esc for null. Returns the menu's labels ("-" a
+   * separator, "(label)" disabled). On someone else's name or avatar, with
+   * `onSender`, the person menu is native and `item` is its id.
    */
   async chooseInMessageMenu(text: string, item: string | null, options: { readonly onSender?: boolean } = {}): Promise<{ readonly labels: string[] }> {
-    await chooseNextMenuItem(this.win, item)
     const message = this.message(text)
-    await message.scrollIntoViewIfNeeded()
-    await (options.onSender === true ? message.locator('[data-sender]').last() : message).click({ button: 'right' })
-    return lastMenu(this.win)
+    if (options.onSender === true) {
+      await chooseNextMenuItem(this.win, item)
+      await message.scrollIntoViewIfNeeded()
+      await message.locator('[data-sender]').last().click({ button: 'right' })
+      return lastMenu(this.win)
+    }
+    const menu = await this.messageMenu(text)
+    const labels = await menu.labels()
+    if (item === null) await menu.close()
+    else await menu.choose(item)
+    return { labels }
+  }
+
+  /** Right-clicks the message that starts with `text` and returns its open menu. */
+  messageMenu(text: string): Promise<MessageMenuDriver> {
+    return new MessageMenuDriver(this.win).openOn(this.message(text).locator('[data-msg-text]').first())
   }
 
   /** A message by its body text, excluding thread-link previews. */

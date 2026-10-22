@@ -467,7 +467,7 @@ for (const { kind, query } of [{ kind: 'mention', query: '@ma' }, { kind: 'emoji
 }
 
 /** Measures the first frame containing the finished content, starting at the actual input. */
-async function firstOpen(win: Page, eventType: 'click' | 'pointerdown', selector: string, action: () => Promise<void>): Promise<number> {
+async function firstOpen(win: Page, eventType: 'click' | 'pointerdown' | 'pointerup', selector: string, action: () => Promise<void>): Promise<number> {
   await win.evaluate(({ selector, eventType }) => {
     const w = window as unknown as { __firstOpen: Promise<number> }
     w.__firstOpen = new Promise((resolve) => {
@@ -514,10 +514,14 @@ test('first open in a second app: account menu, topic switcher, emoji picker and
     })
     await expect(again.win.getByRole('textbox', { name: 'Search this channel' })).toBeFocused()
     await again.win.keyboard.press('Escape')
+    // The message menu opens as the right-click comes up, then More reactions turns it into the emoji picker.
     const row = fresh.topic.list.locator('[data-message-row]').last()
-    await row.hover()
+    const text = (await row.locator('[data-msg-text]').first().boundingBox())!
+    await again.win.mouse.move(text.x + 8, text.y + 8)
+    await again.win.mouse.down({ button: 'right' })
+    within('message menu, first open', stats('message menu, first open in a second app', [await firstOpen(again.win, 'pointerup', '[data-context-menu] [data-menu-cell]', () => again.win.mouse.up({ button: 'right' }))]).p95, 50)
     await measure('emoji picker', '[data-emoji-picker] [data-emoji]', async () => {
-      await row.getByRole('button', { name: 'More reactions' }).hover()
+      await fresh.messageMenu.more.hover()
       await press(again.win)
     })
     await expect(again.win.getByRole('textbox', { name: 'Search emoji' })).toBeFocused()
@@ -1094,19 +1098,12 @@ test.describe('topic view', () => {
         expect(distances.length).toBeGreaterThan(5)
         expect(Math.max(...distances)).toBeLessThanOrEqual(2)
       }
-      // Every row renders its hover toolbar; only a shown one should be laid out (performance.md 8).
+      // Rows have no hover controls: the message menu is one for the window, drawn on demand (performance.md 8).
       const dom = await running.win.evaluate(() => {
         const view = [...document.querySelectorAll<HTMLElement>('[data-topic-view]')].find((node) => node.offsetParent !== null)
-        const toolbars = [...(view?.querySelectorAll('[role="toolbar"][aria-label="Message actions"]') ?? [])]
-        return {
-          rows: view?.querySelectorAll('[data-message-row]').length ?? 0,
-          elements: view?.getElementsByTagName('*').length ?? 0,
-          toolbars: toolbars.length,
-          inToolbars: toolbars.reduce((sum, bar) => sum + bar.getElementsByTagName('*').length + 1, 0),
-          laidOut: toolbars.filter((bar) => bar.getClientRects().length > 0).length,
-        }
+        return { rows: view?.querySelectorAll('[data-message-row]').length ?? 0, elements: view?.getElementsByTagName('*').length ?? 0 }
       })
-      console.log(`topic open DOM: ${dom.rows} rows, ${dom.elements} elements, ${dom.toolbars} hover toolbars with ${dom.inToolbars} elements, ${dom.laidOut} of them laid out`)
+      console.log(`topic open DOM: ${dom.rows} rows, ${dom.elements} elements`)
       const oneFrame = oneFrameBudget(await refreshInterval(running.win))
       within('topic open cached, p95', stats('topic open, cached 300 rows, press to rows painted at position (juno.topic-open)', cached).p95, 50)
       within('topic open prefetched, p95', stats('topic open, prefetched (juno.topic-open)', prefetched).p95, oneFrame)

@@ -3,6 +3,7 @@
 import { startFakeOpenRouter, type FakeOpenRouter, type OpenRouterRequest } from '@juno/agent-testing/openrouter'
 import type { Locator, Page } from '@playwright/test'
 import { expect, launchApp, test as base } from '../fixtures'
+import { MessageMenuDriver } from '../driver/juno'
 
 /**
  * The model the e2e agent talks to. It answers each message by echoing its
@@ -99,40 +100,42 @@ export class JunoChatPane {
     await expect(this.junoBubble(text)).toBeVisible({ timeout: 15_000 })
   }
 
-  /** The open quick reactions of a bubble or card, as a topic message's toolbar shows them. */
+  /** The open message menu: one for the window, outside the chat. */
   get reactions(): Locator {
-    return this.root.locator('[data-juno-reactions]')
+    return this.win.locator('[data-context-menu]')
   }
 
-  /** Opens a bubble's quick reactions. */
-  async openReactions(bubble: string): Promise<void> {
-    const row = this.junoBubble(bubble)
-    await row.hover()
-    await row.getByRole('button', { name: 'React' }).click()
-    await expect(this.reactions).toBeVisible()
+  /** Right-clicks a Juno bubble, or with `owner` your own, and returns its menu. */
+  menu(bubble: string, options: { readonly owner?: boolean } = {}): Promise<MessageMenuDriver> {
+    const row = options.owner === true ? this.ownerBubble(bubble) : this.junoBubble(bubble)
+    return new MessageMenuDriver(this.win).openOn(row.locator('[data-chat-run], p').first())
   }
 
-  /** A quick reaction (👍 ✅ 👀 by default). */
+  /** Opens a bubble's menu, whose grid starts with the quick reactions. */
+  async openReactions(bubble: string): Promise<MessageMenuDriver> {
+    const menu = await this.menu(bubble)
+    await expect(menu.root.locator('[data-reaction-grid]')).toBeVisible()
+    return menu
+  }
+
+  /** A quick reaction (👍 ✅ 👀 by default), from the menu's grid. */
   async react(bubble: string, emoji: string): Promise<void> {
-    await this.openReactions(bubble)
-    await this.reactions.getByRole('button', { name: `React ${emoji}` }).click()
+    const menu = await this.openReactions(bubble)
+    await menu.root.getByRole('button', { name: `React ${emoji}` }).click()
+    await expect(menu.root).toHaveCount(0)
   }
 
   /**
-   * Any emoji, through More reactions and the emoji picker's search. Picks from the results: until the search
-   * renders, the browse grid's button matches too, and a click that found it waits on it once the grid is hidden.
+   * Any emoji, through More reactions, which turns the menu into the emoji picker, and its search. Picks from the
+   * results: until the search renders, the browse grid's button matches too.
    */
   async reactWithPicker(bubble: string, search: string, name: string): Promise<void> {
-    await this.openReactions(bubble)
-    await this.reactions.getByRole('button', { name: 'More reactions' }).click()
-    const picker = this.root.locator('[data-emoji-picker]')
-    await picker.getByRole('textbox', { name: 'Search emoji' }).fill(search)
-    await picker.locator('[data-emoji-results]').getByRole('button', { name: `:${name}:`, exact: true }).click()
+    const menu = await this.openReactions(bubble)
+    await menu.reactWithPicker(search, name)
   }
 
   async reply(bubble: string): Promise<void> {
-    const row = this.junoBubble(bubble)
-    await row.hover()
-    await row.getByRole('button', { name: 'Reply' }).click()
+    await (await this.menu(bubble)).choose('reply')
   }
+
 }

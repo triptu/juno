@@ -155,12 +155,12 @@ test('a Juno bubble takes a quick reaction and any emoji from the picker, and it
     await panel.expectJuno(`You said: note ${n}`)
   }
 
-  // A quick reaction, from the toolbar a topic's messages use: the badge shows at once.
+  // A quick reaction, from the grid of the menu a topic's messages use: the badge shows at once.
   await panel.react('You said: note 6', '👍')
   await expect(panel.reactions).toHaveCount(0)
   await expect(panel.junoBubble('You said: note 6').getByLabel('Reacted 👍')).toBeVisible()
 
-  // Any emoji: More reactions opens the emoji picker; search, then pick. Juno hears it.
+  // Any emoji: More reactions turns the menu into the emoji picker; search, then pick. Juno hears it.
   await panel.reactWithPicker('You said: note 5', 'rocket', 'rocket')
   await expect(panel.root.locator('[data-emoji-picker]')).toHaveCount(0)
   await expect(panel.junoBubble('You said: note 5').getByLabel('Reacted 🚀')).toBeVisible()

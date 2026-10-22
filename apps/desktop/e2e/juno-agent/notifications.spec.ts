@@ -1,4 +1,4 @@
-// A DM outside notification hours is held quietly; Tell Juno quotes a message beside the topic.
+// A DM outside notification hours is held quietly; Ask Juno in a message's menu quotes it beside the topic.
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import type { Juno } from '../driver/juno'
@@ -45,14 +45,6 @@ async function setHours(juno: Juno, saved: ReadSettings, edge: 'from' | 'to', mi
   await expect(select).toHaveValue(String(Math.floor(minutes / 30) * 30))
 }
 
-/** Equal endpoints mean off, so use a twelve-hour window centred on now. */
-async function coverNow(juno: Juno, saved: ReadSettings): Promise<void> {
-  await everyDay(juno, saved)
-  const middle = Math.floor(minutesNow() / 30) * 30
-  await setHours(juno, saved, 'from', (middle + 18 * 60) % 1440)
-  await setHours(juno, saved, 'to', (middle + 6 * 60) % 1440)
-}
-
 /** A twelve-hour window that starts six hours from now, so now is outside it. */
 async function excludeNow(juno: Juno, saved: ReadSettings): Promise<void> {
   await everyDay(juno, saved)
@@ -87,21 +79,12 @@ test('outside notification hours a DM is held with its reason and shows no notif
   expect(model.inputs()).toHaveLength(0)
 })
 
-test('Tell Juno in the why popover opens the chat beside the topic with the message quoted', async ({ juno, slack, userData, fake }) => {
+test('Ask Juno in a message’s menu opens the chat beside the topic with the message quoted', async ({ juno, slack }) => {
   await ready(juno)
-  // Notification hours hold now, so Juno decides the DM.
-  await juno.openNotifications()
-  await coverNow(juno, () => savedSettings(userData, fake.teamId))
-
   slack.as('Maya').dm('Are we still on for the board deck review?')
   await juno.sidebar.row('Maya', { exact: true }).open()
   await juno.topic.expectMessage('Are we still on for the board deck review?')
-  const menu = await juno.topic.chooseInMessageMenu('Are we still on for the board deck review?', 'why')
-  expect(menu.labels.some((label) => label.startsWith('Why'))).toBe(true)
-  const why = juno.whyPopover(/notif/i)
-  await expect(why).toContainText('Juno:')
-  await why.getByRole('button', { name: 'Tell Juno' }).click()
-  await expect(why).toHaveCount(0)
+  await juno.topic.chooseInMessageMenu('Are we still on for the board deck review?', 'ask-juno')
 
   const panel = JunoChatPane.panel(juno.win)
   const quote = juno.win.locator('aside[data-juno-panel] [data-panel-selection]')
