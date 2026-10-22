@@ -25,7 +25,7 @@ import {
 } from '@juno/state'
 import { JUNO_PANEL_WIDTH } from '@juno/contract'
 import { useAtomValue } from '@juno/state/react'
-import { holdKeys, Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab } from '@juno/views'
+import { holdKeys, loadMessageTools, Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab } from '@juno/views'
 import { chunk, usePreloaded } from './chunks'
 import { runJunoShortcut } from './juno/actions'
 import { JunoPanel, loadJuno } from './juno/lazy'
@@ -34,6 +34,7 @@ import { closeTabById, loadAllTopicsPage, moveTabTo, openNewTab, runMenuCommand,
 import { runUndoCommand } from './topicActions'
 import { focusPage, forcePageFocus, pageComposer, takeForcedPageFocus, takeTypedAhead } from './pageFocus'
 import { loadSettingsTab, tabKindOf } from './tabKinds'
+import { loadChannelMenu } from './placeMenus'
 import { TitlebarNav } from './TitlebarNav'
 
 // The web panel warms on idle, outside the startup bundle.
@@ -151,6 +152,8 @@ function useWorkspaceEffects(active: string | undefined): void {
   useEffect(() => {
     const idle = requestIdleCallback(
       () => {
+        void loadMessageTools()
+        void loadChannelMenu()
         void loadSettingsTab()
         void loadAllTopicsPage()
         if (registry.get(junoAvailableAtom)) void loadJuno()
