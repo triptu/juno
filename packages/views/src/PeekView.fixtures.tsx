@@ -64,7 +64,7 @@ function EngMain() {
       header={<TopicHeader detail={details.engMain} onMenu={noop} onPill={noop} juno={{ open: false, onToggle: noop }} />}
       composer={<ComposerSlot placeholder="Message #eng" />}
     >
-      <MessageList items={main} main now={NOW} onOpenThread={noop} onChannel={noop} onLink={noop} />
+      <MessageList items={main} main now={NOW} onOpenThread={noop} onOpenReply={noop} onChannel={noop} onLink={noop} />
     </TopicView>
   )
 }

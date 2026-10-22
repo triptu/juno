@@ -198,10 +198,16 @@ export const MessageView = Schema.Struct({
   reactions: Schema.Array(ReactionView),
   /** The newest of the user's reaction changes Slack has not taken, when there is one. */
   reactionIssue: Schema.optionalKey(ReactionIssue),
-  actionIssue: Schema.optionalKey(Schema.Struct({ id: Schema.Int, kind: Schema.Literals(['edit', 'delete']) })),
+  /** An edit, delete or broadcast that could not be sent, with Retry and Dismiss. */
+  actionIssue: Schema.optionalKey(Schema.Struct({ id: Schema.Int, kind: Schema.Literals(['edit', 'delete', 'broadcast']) })),
   files: Schema.Array(FileView),
   /** Main only: the message has a thread. */
   thread: Schema.optionalKey(ThreadLink),
+  /**
+   * Main only: a thread reply also sent to the channel. `id` is the thread's
+   * topic; `preview` the start of its root's text, when the store has it.
+   */
+  broadcastFrom: Schema.optionalKey(Schema.Struct({ id: Schema.String, preview: Schema.optionalKey(Schema.String) })),
   /**
    * The `client_msg_id` the sending client gave the message. The view keys
    * rows by it when present, so a pending row becomes the stored message in

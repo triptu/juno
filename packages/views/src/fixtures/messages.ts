@@ -100,6 +100,8 @@ interface MessageInput {
   readonly edited?: boolean
   readonly mentionsMe?: boolean
   readonly broadcast?: boolean
+  /** Main: the thread a broadcast reply came from. */
+  readonly broadcastFrom?: MessageView['broadcastFrom']
   readonly root?: boolean
   readonly groupStart?: boolean
   /** Keeps `ts` unique for two messages in the same minute. */
@@ -118,7 +120,7 @@ export function message(input: MessageInput, previous?: MessageListItem): Messag
   const ts = input.pending === undefined ? `${Math.floor(at / 1000)}.${String(seq).padStart(6, '0')}` : pendingRowId(`fixture-${seq}`)
   const blocks = input.blocks ?? (input.text === undefined ? [] : [p(input.text)])
   const hasQuote = blocks.some((block) => block.kind === 'quote')
-  const groupStart = input.groupStart ?? (previous === undefined || previous.message.senderId !== input.from?.id || input.root === true || hasQuote)
+  const groupStart = input.groupStart ?? (previous === undefined || previous.message.senderId !== input.from?.id || input.root === true || hasQuote || input.broadcast === true || previous.message.broadcast)
   const view: MessageView = {
     id: ts,
     rev: 1,
@@ -136,6 +138,7 @@ export function message(input: MessageInput, previous?: MessageListItem): Messag
     reactions: input.reactions ?? [],
     files: input.files ?? [],
     ...(input.thread === undefined ? {} : { thread: input.thread }),
+    ...(input.broadcastFrom === undefined ? {} : { broadcastFrom: input.broadcastFrom }),
     ...(input.pending === undefined ? {} : { clientMsgId: `fixture-${seq}`, pending: input.pending }),
   }
   return { message: view, sender: input.from }
@@ -203,7 +206,7 @@ export const main = window([
     text: 'Postgres 16 migration plan is up for review. Thursday is the dry run.',
     thread: { id: 'C0ENG:1760000000.000100', replyCount: 14, label: '14 replies', preview: 'Elena: 4 minutes is fine for us.', lastReplyAt: NOW - 4 * MINUTE },
   },
-  { ago: 30, from: people.dev, text: 'Replica lag back under a second.', broadcast: true },
+  { ago: 30, from: people.dev, text: 'Replica lag back under a second.', broadcast: true, broadcastFrom: { id: 'C0ENG:1760000000.000100', preview: 'Postgres 16 migration plan is up for review. Thursday is the dry run.' } },
   {
     ago: 12,
     from: people.priya,

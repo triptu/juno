@@ -34,6 +34,7 @@ const one = (item: MessageListItem, extra: Partial<MessageProps> = {}, frame?: F
           tabbable
           hueOf={hueForId}
           onOpenThread={noop}
+          onOpenReply={noop}
           onChannel={noop}
           onLink={noop}
           {...extra}
@@ -51,6 +52,8 @@ const deleted = hostile[3]!
 const unloaded = hostile[4]!
 const edited = thread[9]!
 const broadcast = main[8]!
+// The same reply as its thread shows it: marked, with no link back.
+const { broadcastFrom: _from, ...broadcastInThread } = broadcast.message
 const longLine = longFirstLine[0]!
 const longLineContinuation = longFirstLine[1]!
 const pendingRow = sending[2]!
@@ -71,7 +74,9 @@ export default defineFixtures(
       continuation: one(grouped),
       'mentions-you': one(mention),
       edited: one(edited),
-      broadcast: one(broadcast, { startsGroup: true }),
+      broadcast: one({ ...broadcast, message: broadcastInThread }, { startsGroup: true }),
+      // In Main a broadcast reply links back to its thread.
+      'broadcast-main': one(broadcast, { startsGroup: true, main: true }),
       'thread-link': one(withThread, { main: true }),
       deleted: one(deleted),
       unloaded: one(unloaded),

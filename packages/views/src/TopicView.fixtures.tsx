@@ -59,7 +59,7 @@ function Topic({ detail, items, header, list, pill, scrollTop, floating }: Scene
       composer={<ComposerSlot placeholder={placeholder(detail)} />}
       floating={floating}
     >
-      <MessageList items={items} main={detail.kind === 'main'} now={NOW} scrollRef={scrollRef} onOpenThread={noop} onChannel={noop} onLink={noop} {...list} />
+      <MessageList items={items} main={detail.kind === 'main'} now={NOW} scrollRef={scrollRef} onOpenThread={noop} onOpenReply={noop} onChannel={noop} onLink={noop} {...list} />
     </TopicView>
   )
 }

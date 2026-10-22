@@ -25,6 +25,7 @@ import { Effect } from 'effect'
 import { pendingRowId, type FileView, type MessageView, type Person, type ReactionIssue, type ReactionView, type ThreadLink } from '@juno/contract'
 import {
   channelLabelBare,
+  compareTs,
   fileMediaKind,
   hashId,
   messageMentionsMe,
@@ -48,7 +49,7 @@ import { windowCovered } from './coverage'
 import { uploadsUrl } from '../staging'
 import type { ListRun } from '../protocol/live'
 import { personFrom, userName, type UserRow } from '../topicRows'
-import { actionsStatement, hiddenCopiesStatement, pendingStatement, reactionsStatement, rootStatement, firstRepliesStatement, windowStatements, type WindowMessage, type WindowTarget } from './window'
+import { actionsStatement, hiddenCopiesStatement, messagesByTsStatement, pendingStatement, reactionsStatement, rootStatement, firstRepliesStatement, windowStatements, type WindowMessage, type WindowTarget } from './window'
 
 export interface MessageRange {
   readonly anchor?: string | undefined
@@ -223,9 +224,15 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     const hidden = new Set(hiddenCopies.map((row) => row.ts))
     const listed = hidden.size === 0 ? withPending : withPending.filter((row) => !hidden.has(row.ts))
 
-    // Juno's own edits, deletes and reactions show over the stored message until Slack has them (architecture 5.7).
+    // Juno's own edits, deletes, reactions and broadcasts show over the stored message until Slack has them (architecture 5.7).
     const actions = listed.length === 0 ? emptyIntents : intentsOf(yield* sql.unsafe<ActionRow>(actionsStatement(target.channel).sql, actionsStatement(target.channel).params))
-    const rows = actions.size === 0 ? listed : withIntents(listed, actions, target)
+    // A reply the user also sent to the channel shows in Main at once, where it falls in the window.
+    const broadcasting = target.kind === 'main' ? actions.broadcasts.filter((ts) => !listed.some((row) => row.ts === ts)) : []
+    const sent = broadcasting.length === 0 ? [] : (yield* sql.unsafe<WindowMessage>(messagesByTsStatement(target.channel, broadcasting).sql, messagesByTsStatement(target.channel, broadcasting).params)).filter(
+      (row) => row.deleted === 0 && (beforeWindow === undefined || compareTs(row.ts, beforeWindow.ts) > 0) && (atNewest || (stored.length > 0 && compareTs(row.ts, stored.at(-1)!.ts) <= 0)),
+    )
+    const withSent = sent.length === 0 ? listed : [...listed.filter((row) => !row.ts.startsWith('pending:')), ...sent].toSorted((a, b) => compareTs(a.ts, b.ts)).concat(listed.filter((row) => row.ts.startsWith('pending:')))
+    const rows = actions.size === 0 ? withSent : withIntents(withSent, actions, target)
 
     if (cache.selfId !== selfId || cache.membership !== membership) {
       cache.membership = membership
@@ -237,7 +244,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     // Reactions, in Slack's order, with who reacted as far as Slack listed them.
     const reactions = new Map<string, Array<StoredReaction>>()
     if (rows.length > 0) {
-      const statement = reactionsStatement(target.channel, stored.map((row) => row.ts))
+      const statement = reactionsStatement(target.channel, [...stored, ...sent].map((row) => row.ts))
       for (const reaction of yield* sql.unsafe<{ ts: string; name: string; count: number; me: 0 | 1; user_ids_json: string | null }>(statement.sql, statement.params)) {
         let list = reactions.get(reaction.ts)
         if (list === undefined) reactions.set(reaction.ts, (list = []))
@@ -255,7 +262,16 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
         for (const reply of withIntents(replies, actions, target)) if (reply.thread_ts !== null && reply.deleted === 0) firstReplies.set(reply.thread_ts, reply)
       }
     }
-    const contentRows = [...rows, ...firstReplies.values()]
+    // Main's broadcast replies link back to their thread, with the start of its root.
+    const broadcastRoots = new Map<string, WindowMessage>()
+    if (target.kind === 'main') {
+      const wanted = [...new Set(rows.flatMap((row) => (row.subtype === 'thread_broadcast' && row.thread_ts !== null && row.thread_ts !== row.ts ? [row.thread_ts] : [])))]
+      const shown = new Map(rows.map((row) => [row.ts, row]))
+      const missing = wanted.filter((ts) => !shown.has(ts))
+      const read = missing.length === 0 ? [] : yield* sql.unsafe<WindowMessage>(messagesByTsStatement(target.channel, missing).sql, messagesByTsStatement(target.channel, missing).params)
+      for (const root of [...wanted.flatMap((ts) => (shown.has(ts) ? [shown.get(ts)!] : [])), ...read]) if (root.deleted === 0 && !STUB(root)) broadcastRoots.set(root.ts, root)
+    }
+    const contentRows = [...rows, ...firstReplies.values(), ...[...broadcastRoots.values()].filter((root) => !rows.includes(root))]
     const repliers = new Map<string, ReadonlyArray<string>>()
     if (target.kind === 'main') {
       for (const row of rows) {
@@ -365,7 +381,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     for (const row of rows) {
       const body = bodies.get(row.ts)!
       const isRoot = target.kind === 'thread' && row.ts === target.threadTs
-      const group: GroupMessage = { senderId: groupSender(row), body: body.body, isThreadRoot: isRoot }
+      const group: GroupMessage = { senderId: groupSender(row), body: body.body, isThreadRoot: isRoot, broadcast: row.subtype === 'thread_broadcast' }
       const groupStart = startsGroup(previous, group)
       previous = group
       const intent = intentOf(actions, row)
@@ -376,8 +392,14 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       const sender = reply?.bot_name ?? (reply?.user_id === null || reply?.user_id === undefined ? undefined : cache.users.get(reply.user_id))
       const name = typeof sender === 'string' ? sender : sender == null ? undefined : firstName(userName(sender.id, sender))
       const preview = replyText === '' ? undefined : name ? `${name}: ${replyText}` : replyText
+      const broadcastRoot = target.kind === 'main' && row.subtype === 'thread_broadcast' && row.thread_ts !== null && row.thread_ts !== row.ts ? row.thread_ts : undefined
+      const rootBody = broadcastRoot === undefined || !broadcastRoots.has(broadcastRoot) ? undefined : bodies.get(broadcastRoot)
+      const rootText = rootBody === undefined ? '' : readableText(rootBody.body).replace(/\s+/g, ' ').trim().slice(0, 240)
+      const broadcastFrom = broadcastRoot === undefined ? undefined : { id: threadTopicId(target.channel as ChannelId, broadcastRoot as Ts), ...(rootText === '' ? {} : { preview: rootText }) }
       const key = [
         row.version,
+        row.subtype,
+        rootText,
         body.epoch,
         groupStart ? 1 : 0,
         row.reply_count,
@@ -396,7 +418,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
         view = held.row
       } else {
         const thread = topicId === undefined ? undefined : threadLink(topicId, row, preview, repliers.get(row.ts) ?? [])
-        view = shapeRow(row, body, { groupStart, isRoot, selfId, reactions: own, reactionIssue: intent?.issue, actionIssue: intent?.actionIssue, thread, cache, pending: pending.get(row.ts), local })
+        view = shapeRow(row, body, { groupStart, isRoot, selfId, reactions: own, reactionIssue: intent?.issue, actionIssue: intent?.actionIssue, thread, broadcastFrom, cache, pending: pending.get(row.ts), local })
       }
       nextRows.set(row.ts, { key, row: view })
       out.push(view)
@@ -516,6 +538,7 @@ interface ShapeInput {
   readonly actionIssue: MessageView['actionIssue']
   readonly reactionIssue: ReactionIssue | undefined
   readonly thread: ThreadLink | undefined
+  readonly broadcastFrom: MessageView['broadcastFrom']
   readonly cache: MessageCache
   readonly pending: PendingRow | undefined
   readonly local: ReadonlyMap<string, LocalFile>
@@ -557,6 +580,7 @@ function shapeRow(row: WindowMessage, body: CachedBody, input: ShapeInput): Mess
     ...(kind === 'message' && input.reactionIssue !== undefined ? { reactionIssue: input.reactionIssue } : {}),
     files: kind !== 'message' ? [] : [...(input.pending === undefined ? filesOf(parseJson<ReadonlyArray<SlackFile>>(row.files_json), input.local) : pendingFiles(input.pending)), ...filesOf(sharedFiles(row), input.local)],
     ...(input.thread === undefined ? {} : { thread: input.thread }),
+    ...(input.broadcastFrom === undefined ? {} : { broadcastFrom: input.broadcastFrom }),
     ...(row.client_msg_id === null ? {} : { clientMsgId: row.client_msg_id }),
     ...(input.pending === undefined ? {} : { pending: input.pending.state === 'failed' ? ('failed' as const) : ('sending' as const) }),
     ...(kind === 'message' && body.editText !== undefined ? { editText: body.editText } : {}),
@@ -588,32 +612,34 @@ function contentVersion(text: string, blocksJson: string | null): number {
   return -1 - (hash >>> 0)
 }
 
-// Edits, deletes and reactions not yet in Slack
+// Edits, deletes, reactions and broadcasts not yet in Slack
 
 interface ActionRow {
   readonly created_at: string
   readonly id: number
-  readonly kind: 'edit' | 'delete' | 'react'
+  readonly kind: 'edit' | 'delete' | 'react' | 'broadcast'
   readonly payload_json: string
 }
 
-/** What the user has asked for one message: the text of an edit, a delete, reactions by name, and the newest reaction Slack has not taken. */
+/** What the user has asked for one message: the text of an edit, a delete, a broadcast, reactions by name, and the newest reaction Slack has not taken. */
 interface Intent {
   edit?: { readonly text: string; readonly blocksJson: string | null }
   deleted: boolean
+  broadcast?: boolean
   readonly reactions: Map<string, boolean>
   actionIssue?: NonNullable<MessageView['actionIssue']>
   issue?: ReactionIssue
 }
 
-/** Intents by the message's ts and by its `client_msg_id`, for posts Slack did not have when the user acted. */
-type Intents = { readonly size: number; readonly byTs: Map<string, Intent>; readonly byClientMsgId: Map<string, Intent> }
+/** Intents by the message's ts and by its `client_msg_id`, for posts Slack did not have when the user acted; `broadcasts` are the replies being sent to the channel. */
+type Intents = { readonly size: number; readonly byTs: Map<string, Intent>; readonly byClientMsgId: Map<string, Intent>; readonly broadcasts: ReadonlyArray<string> }
 
-const emptyIntents: Intents = { size: 0, byTs: new Map(), byClientMsgId: new Map() }
+const emptyIntents: Intents = { size: 0, byTs: new Map(), byClientMsgId: new Map(), broadcasts: [] }
 
 function intentsOf(rows: ReadonlyArray<ActionRow>): Intents {
   const byTs = new Map<string, Intent>()
   const byClientMsgId = new Map<string, Intent>()
+  const broadcasts: Array<string> = []
   for (const row of rows) {
     const payload = parseJson<{ ts: string | null; clientMsgId: string | null; text?: string; blocksJson?: string | null; name?: string; want?: boolean; failed?: string; stalled?: boolean }>(row.payload_json)
     if (payload === undefined) continue
@@ -623,13 +649,17 @@ function intentsOf(rows: ReadonlyArray<ActionRow>): Intents {
     if (row.kind !== 'react' && payload.failed !== undefined) intent.actionIssue = { id: row.id, kind: row.kind }
     else if (row.kind === 'delete') intent.deleted = true
     else if (row.kind === 'edit' && payload.text !== undefined) intent.edit = { text: payload.text, blocksJson: payload.blocksJson ?? null }
+    else if (row.kind === 'broadcast' && payload.ts !== null) {
+      intent.broadcast = true
+      broadcasts.push(payload.ts)
+    }
     else if (row.kind === 'react' && payload.name !== undefined) {
       // A refused reaction shows what Slack has; one that has waited long shows the change and says it is not sent yet.
       if (payload.failed === undefined) intent.reactions.set(payload.name, payload.want === true)
       if (payload.failed !== undefined || payload.stalled === true) intent.issue = { id: row.id, key: `${row.id}:${row.created_at}`, name: payload.name, on: payload.want === true, state: payload.failed === undefined ? 'waiting' : 'failed' }
     }
   }
-  return { size: rows.length, byTs, byClientMsgId }
+  return { size: rows.length, byTs, byClientMsgId, broadcasts }
 }
 
 const intentOf = (intents: Intents, row: Pick<WindowMessage, 'ts' | 'client_msg_id'>): Intent | undefined =>
@@ -638,7 +668,8 @@ const intentOf = (intents: Intents, row: Pick<WindowMessage, 'ts' | 'client_msg_
 /**
  * The window with the intents applied: an edited message shows its new
  * text and "edited"; a deleted one goes, except a root with replies, which
- * keeps its place as deleted, as Slack shows it.
+ * keeps its place as deleted, as Slack shows it; a reply being sent to the
+ * channel shows as one.
  */
 function withIntents(rows: ReadonlyArray<WindowMessage>, intents: Intents, target: WindowTarget): ReadonlyArray<WindowMessage> {
   const out: Array<WindowMessage> = []
@@ -649,11 +680,9 @@ function withIntents(rows: ReadonlyArray<WindowMessage>, intents: Intents, targe
     } else if (intent.deleted) {
       const keepsPlace = row.reply_count > 0 || (target.kind === 'thread' && row.ts === target.threadTs)
       if (keepsPlace) out.push({ ...row, deleted: 1, text: '', blocks_json: null, files_json: null, attachments_json: null, version: contentVersion('', 'deleted') })
-    } else if (intent.edit !== undefined) {
-      const { text, blocksJson } = intent.edit
-      out.push({ ...row, text, blocks_json: blocksJson, edited_ts: row.edited_ts ?? row.ts, version: contentVersion(text, blocksJson) })
     } else {
-      out.push(row)
+      const edited = intent.edit === undefined ? row : { ...row, text: intent.edit.text, blocks_json: intent.edit.blocksJson, edited_ts: row.edited_ts ?? row.ts, version: contentVersion(intent.edit.text, intent.edit.blocksJson) }
+      out.push(intent.broadcast === true && row.thread_ts !== null && row.thread_ts !== row.ts ? { ...edited, subtype: 'thread_broadcast' } : edited)
     }
   }
   return out

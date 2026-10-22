@@ -35,7 +35,7 @@ import { MessageList, type MessageListItem, type MessageListProps } from './Mess
 
 const noop = () => {}
 
-const base: Pick<MessageListProps, 'now' | 'onOpenThread' | 'onChannel' | 'onLink'> = { now: NOW, onOpenThread: noop, onChannel: noop, onLink: noop }
+const base: Pick<MessageListProps, 'now' | 'onOpenThread' | 'onOpenReply' | 'onChannel' | 'onLink'> = { now: NOW, onOpenThread: noop, onOpenReply: noop, onChannel: noop, onLink: noop }
 
 const state = (props: Partial<MessageListProps> & Pick<MessageListProps, 'items' | 'main'>, frame?: FixtureFrame) => fixture<MessageListProps>({ ...base, ...props }, frame)
 
