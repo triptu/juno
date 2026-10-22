@@ -60,10 +60,15 @@ export const HuddleCall = Schema.Struct({
    * session for another attendee and reports `ended` for it.
    */
   attendeeId: Schema.NullOr(Schema.String),
-  /** User ids in the call's huddle, in the order they joined, the user included. */
+  /**
+   * User ids in the call's huddle, in the order they joined, the user
+   * included once Slack has seen them join. Empty while Juno does not know.
+   */
   participants: Schema.Array(Schema.String),
-  /** When the huddle started (not when the user joined), in epoch milliseconds. */
+  /** When the huddle started (not when the user joined), in epoch milliseconds; null until Slack says. */
   startedAt: Schema.NullOr(Schema.Number),
+  /** When Slack answered the user's join, in epoch milliseconds: what the call counts from until `startedAt` is known. */
+  joinedAt: Schema.NullOr(Schema.Number),
   /** The media session's connection while the page holds this attendee's session, else null. */
   connection: Schema.NullOr(Schema.Literals(['connecting', 'connected', 'reconnecting'])),
   /** The mute state the page reports for this attendee's session. */

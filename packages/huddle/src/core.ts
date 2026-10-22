@@ -28,7 +28,7 @@ import type { HuddleSession } from './Huddle'
 import { failureOf } from './failure'
 import * as L from './lifecycle'
 import { noMedia, pageState, type MediaView, type Received } from './media'
-import { applyJoined, toRunningHuddles, type Running } from './running'
+import { applyJoined, secondsToMillis, toRunningHuddles, type Running } from './running'
 import { codeOf, joinedFrom, joinRequest, leaveRequest, toHuddleError } from './slack'
 import { keepStatus } from './status'
 
@@ -55,6 +55,21 @@ export interface Attached {
   readonly info: Info
   /** The workspace's stored leaves were read. Until then no join is sent and nothing stored is rewritten. */
   loaded: boolean
+}
+
+/**
+ * What Juno last knew of the room of the user's own call: who is in it and
+ * when it started, from the join answer, then from the running list while
+ * that lists the room. A read that does not list the room the user is
+ * talking in leaves the call as it was.
+ */
+export interface OwnRoom {
+  readonly attendeeId: string
+  readonly callId: string
+  readonly participants: ReadonlyArray<string>
+  readonly startedAt: number | null
+  /** When Slack answered the join. */
+  readonly joinedAt: number
 }
 
 /** Renderer page generations as main reports them (`media.ts`). */
@@ -101,14 +116,38 @@ export interface Core {
   status: { readonly attendeeId: string; readonly fiber: Fiber.Fiber<never> } | undefined
   /** The user alone in the live call, and the timer that leaves it (`alone.ts`). */
   alone: { readonly since: Alone; readonly fiber: Fiber.Fiber<void> } | undefined
+  own: OwnRoom | undefined
 }
 
 /** The pages' current state, for the rules. */
 export const view = (core: Core): MediaView => ({ pages: core.pages, reports: core.reports, handed: core.handed })
 
-const toCall = (s: L.Lifecycle, media: MediaView, running: Running): HuddleCall => {
+/**
+ * The room of the call: its running entry while that is about the call's
+ * room, else what Juno last knew of it. Before Slack answers the join, the
+ * huddle being joined.
+ */
+const callRoom = (s: L.Lifecycle, running: Running, own: OwnRoom | undefined): { readonly participants: ReadonlyArray<string>; readonly startedAt: number | null } | undefined => {
+  const channelId = L.callChannel(s)
+  const entry = channelId === undefined ? undefined : running.get(channelId)
+  const identity = s.current?.identity
+  if (identity === undefined || entry?.callId === identity.callId) return entry
+  return own?.attendeeId === identity.attendeeId ? own : undefined
+}
+
+/** Keeps `own` up to date with the running list, under the lock. */
+const followOwn = (core: Core) => {
+  const identity = core.s.current?.identity
+  const own = core.own
+  if (identity === undefined || own?.attendeeId !== identity.attendeeId) return
+  const entry = core.running.get(identity.channelId)
+  if (entry?.callId !== identity.callId || (entry.participants === own.participants && entry.startedAt === own.startedAt)) return
+  core.own = { ...own, participants: entry.participants, startedAt: entry.startedAt ?? own.startedAt }
+}
+
+const toCall = (s: L.Lifecycle, media: MediaView, running: Running, own: OwnRoom | undefined): HuddleCall => {
   const channelId = L.callChannel(s) ?? null
-  const entry = channelId === null ? undefined : running.get(channelId)
+  const room = callRoom(s, running, own)
   const identity = s.current?.identity
   const session = L.currentMedia(s, media)
   return {
@@ -116,8 +155,9 @@ const toCall = (s: L.Lifecycle, media: MediaView, running: Running): HuddleCall 
     channelId,
     callId: identity?.callId ?? null,
     attendeeId: identity?.attendeeId ?? null,
-    participants: entry?.participants ?? [],
-    startedAt: entry?.startedAt ?? null,
+    participants: room?.participants ?? [],
+    startedAt: room?.startedAt ?? null,
+    joinedAt: identity !== undefined && own?.attendeeId === identity.attendeeId ? own.joinedAt : null,
     connection: session?.connection ?? null,
     muted: session?.muted ?? false,
     ended: s.ended ?? null,
@@ -138,10 +178,11 @@ export const makeCore = Effect.gen(function* () {
     handed: new Map(),
     booting: undefined,
     attempts: new Map(),
-    callRef: yield* SubscriptionRef.make(toCall(L.initial, noMedia, new Map())),
+    callRef: yield* SubscriptionRef.make(toCall(L.initial, noMedia, new Map(), undefined)),
     runningRef: yield* SubscriptionRef.make<RunningHuddles>({}),
     status: undefined,
     alone: undefined,
+    own: undefined,
   }
   return core
 })
@@ -159,7 +200,7 @@ const followAlone = (core: Core, to: Attached | undefined) =>
     const next = aloneNow(core.alone?.since, {
       attendeeId: current?.attendeeId,
       live: connection === 'connected' || connection === 'reconnecting',
-      participants: current === undefined ? [] : core.running.get(current.channelId)?.participants ?? [],
+      participants: current === undefined ? [] : callRoom(core.s, core.running, core.own)?.participants ?? [],
     }, now)
     if (core.alone?.since === next) return
     const before = core.alone
@@ -176,8 +217,9 @@ const followAlone = (core: Core, to: Attached | undefined) =>
 
 /** Sends the call and the running huddles to subscribers. Under the lock. */
 export const publish = (core: Core) =>
-  followAlone(core, core.attached).pipe(
-    Effect.andThen(Effect.suspend(() => SubscriptionRef.set(core.callRef, toCall(core.s, view(core), core.running)))),
+  Effect.sync(() => followOwn(core)).pipe(
+    Effect.andThen(followAlone(core, core.attached)),
+    Effect.andThen(Effect.suspend(() => SubscriptionRef.set(core.callRef, toCall(core.s, view(core), core.running, core.own)))),
     Effect.andThen(Effect.suspend(() => SubscriptionRef.set(core.runningRef, toRunningHuddles(core.running)))),
   )
 
@@ -251,7 +293,12 @@ const answered = (core: Core, to: Attached, intent: L.Intent, answer: Result.Res
     if (delivered) waiter.state = 'delivered'
     core.s = L.answerJoin(core.s, delivered ? record : { ...record, generation: null }, workspace)
     if (delivered) core.handed.set(identity.attendeeId, waiter.connection)
-    if (Result.isSuccess(answer)) core.running = applyJoined(core.running, identity.channelId, identity.callId, answer.success.huddle)
+    const huddle = Result.isSuccess(answer) ? answer.success.huddle : undefined
+    core.running = applyJoined(core.running, identity.channelId, identity.callId, huddle)
+    if (delivered) {
+      const startedAt = secondsToMillis(huddle?.date_start)
+      core.own = { attendeeId: identity.attendeeId, callId: identity.callId, participants: huddle?.participants ?? [], startedAt, joinedAt: yield* Clock.currentTimeMillis }
+    }
     yield* markDue(to, identity.channelId)
     if (!delivered) return
     yield* Deferred.succeed(waiter.deferred, { _tag: 'joined', channelId: identity.channelId, callId: identity.callId, attendeeId: identity.attendeeId, credentials })
