@@ -237,11 +237,10 @@ describe('leaving after 10 minutes alone', () => {
     expect(leaveAt(again!)).toBe(22 * MINUTE)
   })
 
-  it('does not count before the media is up, or without a call', () => {
+  it('does not count before the media is up, without a call, or before Slack says who is in it', () => {
     expect(aloneNow(undefined, call(['U0ME'], { live: false }), 0)).toBeUndefined()
     expect(aloneNow(undefined, call([], { attendeeId: undefined }), 0)).toBeUndefined()
-    // Before Slack lists anyone, the user counts as alone.
-    expect(aloneNow(undefined, call([]), 0)).toEqual({ attendeeId: 'A1', since: 0 })
+    expect(aloneNow(undefined, call([]), 0)).toBeUndefined()
   })
 
   it('starts over for a new call', () => {
