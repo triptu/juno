@@ -25,6 +25,8 @@ test('a DM huddle shows both people and counts up while huddles/info lags the ro
   // Maya answers soon after, while Slack's edge still lists the huddle as it was before.
   fake.control('joinHuddle', { channel: 'D0MAYA', user: 'U0MAYA' })
   await addRemote(win, 'U0MAYA')
+  // Mount the tab between the bar's ticks: independently mounted clocks used to disagree.
+  await win.waitForTimeout(450)
   await bar.getByRole('button', { name: 'Open huddle in Maya' }).click()
   await juno.tabs.expectActive('Maya · Huddle')
 
@@ -41,4 +43,15 @@ test('a DM huddle shows both people and counts up while huddles/info lags the ro
   await expect(bar).toContainText(/0:(0[5-9]|[1-5]\d)/)
   await expect(bar).not.toContainText('0:00')
   await expect(row.root.locator('[data-huddle-indicator]')).toBeVisible()
+  const durations = await win.evaluate(async () => {
+    const samples: Array<ReadonlyArray<string | null>> = []
+    for (let i = 0; i < 100; i++) {
+      samples.push(['[data-huddle-bar]', '[data-huddle-page]'].map((selector) =>
+        document.querySelector(selector)?.textContent?.match(/\b\d+:\d{2}\b/)?.[0] ?? null))
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    }
+    return samples
+  })
+  expect(durations.every(([barTime, tabTime]) => barTime !== null && barTime === tabTime)).toBe(true)
+  expect(new Set(durations.map(([time]) => time)).size).toBeGreaterThan(1)
 })
