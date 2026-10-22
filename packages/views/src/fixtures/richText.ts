@@ -31,7 +31,7 @@ export const richText = window([
         tint: 'neutral',
         author: { name: 'Toru (@toruai)' },
         title: [link('https://x.com/toruai/status/2112593925114634603', 'Toru on X')],
-        blocks: [p('Your work, remembered. Toru keeps track of what you are doing and finishes it for you.'), { kind: 'image', url: picture(1200, 675, '#8A9BB0'), alt: 'Toru preview', width: 1200, height: 675 }],
+        blocks: [{ kind: 'paragraph', children: [t('Your work, remembered. Toru keeps track of what you are doing and finishes it for you.')] }, { kind: 'image', url: picture(1200, 675, '#8A9BB0'), alt: 'Toru preview', width: 1200, height: 675 }],
         footer: [t('X')],
       },
     ],
