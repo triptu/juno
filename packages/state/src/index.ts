@@ -1,5 +1,5 @@
 export { liveQuery, runCommand, type LiveListAtom, type LiveValueAtom } from './atoms'
-export { configureConnection, connectionStateAtom, makeRegistry, registry, restartEngine, type Registry } from './client'
+export { configureConnection, connectionStateAtom, makeRegistry, registry, restartEngine, type ConnectionState, type Registry } from './client'
 export { engineStatusAtom, pingCommand, syncFailureAtom, syncNoticeAtom, syncProgressAtom } from './engine'
 export { appStateAtom, copySyncLog, describeTabs, diagnosticDetails, showLogs, diagnosticsReport, formatCpu, readDiagnostics, reportAppStateAtom } from './diagnostics'
 export { importFromSlackAppCommand, junoSetupPendingAtom, sessionStatusAtom, sessionProfileAtom, sessionUnknownAtom, signedInAtom, signOutCommand } from './session'
@@ -37,12 +37,12 @@ export {
   sidebarFilterAtom,
   sidebarListAtom,
   sidebarRowAtom,
-  sidebarSectionsAtom,
   setSidebarEngaged,
   traceSidebarHold,
   topicSelectedAtom,
   type SidebarWindow,
 } from './sidebar'
+export { loadSidebarMoves, sidebarSectionsAtom } from './sidebarSections'
 export { applyListDelta, emptyWindow, type ListWindow } from './list'
 export { traceSend } from './sendTrace'
 export {
@@ -304,4 +304,4 @@ export {
 export { sendCheckPrefsAtom, aiAvailableAtom, setSendCheckPref } from './sendCheckPrefs'
 
 export { sentSuggestionsAtom, dismissSentSuggestion, type SentSuggestion } from './sentSuggestions'
-export { dismissHuddle, huddleCallValueAtom, huddleChannelAtom, huddleCountAtom, huddleIncomingValueAtom, huddleInChannelAtom, huddleLastRunAtom, huddlePeopleOf, type HuddleLastRun, leaveHuddle, reportHuddleMedia, startHuddle } from './huddle'
+export { dismissHuddle, huddleCallValueAtom, huddleNowAtom, huddleChannelAtom, huddleCountAtom, huddleIncomingValueAtom, huddleInChannelAtom, huddleLastRunAtom, huddlePeopleOf, type HuddleLastRun, leaveHuddle, reportHuddleMedia, startHuddle } from './huddle'

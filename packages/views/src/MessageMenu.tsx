@@ -13,8 +13,8 @@ import { Sparkle } from '@phosphor-icons/react/dist/icons/Sparkle'
 import { Trash } from '@phosphor-icons/react/dist/icons/Trash'
 import { useLayoutEffect, useState } from 'react'
 import type { PreparedEmojiPicker } from '@juno/contract'
-import { fonts, layout, menu, sizes } from '@juno/tokens/tokens.stylex'
-import { ContextMenu, Icon, SmileyPlus, type ContextMenuEntry, type MenuPoint, type PhosphorIcon } from '@juno/ui'
+import { layout, menu } from '@juno/tokens/tokens.stylex'
+import { ContextMenu, Emoji, Icon, SmileyPlus, type ContextMenuEntry, type MenuPoint, type PhosphorIcon } from '@juno/ui'
 import { EmojiPicker } from './EmojiPicker'
 import { GRID_REACTIONS, type GridReaction, type MessageMenuEntry, type MessageMenuIcon } from './messageMenuModel'
 
@@ -120,9 +120,7 @@ function ReactionGrid({ reactions, onReact, onMore, spaced }: ReactionGridProps)
           {...stylex.props(styles.cell, reaction.selected && styles.selected)}
         >
           {reaction.url === undefined ? (
-            <span aria-hidden {...stylex.props(styles.glyph)}>
-              {reaction.unicode}
-            </span>
+            <Emoji glyph={reaction.unicode} size={14} />
           ) : (
             <img src={reaction.url} alt="" draggable={false} decoding="async" {...stylex.props(styles.image)} />
           )}
@@ -177,6 +175,8 @@ const styles = stylex.create({
     borderRadius: menu['--menu-cell-radius'],
     outline: 'none',
     cursor: 'default',
+    // Opaque, for the emoji (`--menu-emoji`): Chromium draws a colour emoji with its text colour's alpha.
+    color: menu['--menu-emoji'],
     backgroundColor: 'transparent',
     backgroundImage: { default: 'none', ':focus': `linear-gradient(${menu['--menu-cell-hover']}, ${menu['--menu-cell-hover']})` },
   },
@@ -185,17 +185,6 @@ const styles = stylex.create({
   },
   more: {
     color: menu['--menu-icon'],
-  },
-  // In the emoji font in a square of its size, so the cell centres the square, not the menu font's line box; the
-  // shift puts Apple Color Emoji's ink on the square's centre (`--emoji-14-shift`).
-  glyph: {
-    width: menu['--menu-emoji-size'],
-    height: menu['--menu-emoji-size'],
-    color: menu['--menu-emoji'],
-    fontFamily: fonts['--font-emoji'],
-    fontSize: menu['--menu-emoji-size'],
-    lineHeight: 1,
-    transform: `translateY(${sizes['--emoji-14-shift']})`,
   },
   image: {
     width: menu['--menu-emoji-size'],

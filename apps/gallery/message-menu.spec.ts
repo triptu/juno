@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { measure, textEmoji } from './ink'
+import { measure, textEmoji } from './buttonInk'
 import { openState, type Route, type Theme } from './support'
 
 /**

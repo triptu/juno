@@ -24,25 +24,35 @@ it('reads running huddles after an overflow that dropped the reconnect', async (
   await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
     const huddle = yield* Huddle
     const listen = yield* huddle.attach({
-      workspace: 'T1',
+      workspace: 'T1', selfId: 'U0ME',
       slack: Context.make(SlackEdge, edge).pipe(Context.add(SlackApi, api)),
       leaves: { read: Effect.succeed([]), write: () => Effect.void },
       channels: Effect.succeed(['C1']),
+      infoSettleMillis: 1_000,
     })
     yield* listen({ _tag: 'Connected', fast: false })
     yield* readsAfter(1)
     expect(reads).toHaveLength(1)
 
+    // A frame is already due when the socket reconnects. Its old deadline
+    // must not bypass the new quiet window for the reconnect.
+    yield* listen({ _tag: 'Frame', receivedAt: 0, frame: { type: 'unknown', raw: { type: 'sh_room_update', huddle: { channel_id: 'C1' }, room: { id: 'R1', participants: ['U1'] } } } })
+    yield* Effect.sleep(700)
+    yield* listen({ _tag: 'Connected', fast: false })
+    yield* Effect.sleep(500)
+    expect(reads).toHaveLength(1)
+    yield* readsAfter(2)
+
     // The socket drops; Slack's frames meanwhile are lost, and so is the `Connected` after them.
     yield* listen({ _tag: 'Disconnected', reason: 'closed', retryInMillis: 1_000 })
     yield* listen({ _tag: 'Overflowed' })
-    yield* readsAfter(2)
-    expect(reads).toHaveLength(2)
+    yield* readsAfter(3)
+    expect(reads).toHaveLength(3)
 
     // A drop the service saw does stop reads.
     yield* listen({ _tag: 'Disconnected', reason: 'closed', retryInMillis: 1_000 })
     yield* listen({ _tag: 'Frame', receivedAt: 0, frame: { type: 'unknown', raw: { type: 'sh_room_update', huddle: { channel_id: 'C1' }, room: { id: 'R1', participants: ['U1'] } } } })
     yield* Effect.sleep(500)
-    expect(reads).toHaveLength(2)
+    expect(reads).toHaveLength(3)
   }).pipe(Effect.provide(Huddle.layer))))
-})
+}, 10_000)

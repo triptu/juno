@@ -4,8 +4,7 @@ import { createRequire, isBuiltin } from 'node:module'
 import { dependencies } from './package.json'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import type { Plugin } from 'vite'
-import react from '@vitejs/plugin-react'
-import stylex from '@stylexjs/unplugin'
+import { rendererPlugins } from './renderer.vite'
 
 /**
  * Injects the renderer's Content Security Policy (architecture section 14).
@@ -49,53 +48,6 @@ function contentSecurityPolicy(): Plugin {
   }
 }
 
-// The icon weights Juno draws: `IconWeight` in packages/ui/src/Icon.tsx. Keep the two lists the same.
-const ICON_WEIGHTS = new Set(['regular', 'bold', 'fill'])
-
-// The icons that draw duotone: the ones packages/ui/src/duotone.ts imports, the only way to draw it.
-const DUOTONE_ICONS = new Set(
-  Array.from(readFileSync(resolve(__dirname, '../../packages/ui/src/duotone.ts'), 'utf8').matchAll(/@phosphor-icons\/react\/dist\/icons\/([A-Za-z0-9]+)'/g), (match) => match[1]),
-)
-if (!DUOTONE_ICONS.has('Sparkle')) throw new Error('juno:phosphor-weights: found no duotone icons in packages/ui/src/duotone.ts')
-
-/**
- * Drops the icon weights Juno never draws from each Phosphor icon module:
- * thin and light everywhere, and duotone from every icon `duotone.ts` does
- * not import. Every icon ships all six weights as one `Map` built when the
- * module loads, so tree shaking cannot remove the unused ones. Thin and
- * light were about a third of the icons' share of the first bundle
- * (10-15), duotone about 40 KB more (10-17).
- */
-function phosphorWeights(): Plugin {
-  const defs = /@phosphor-icons\/react\/dist\/defs\/([A-Za-z0-9]+)\.es\.js$/
-  return {
-    name: 'juno:phosphor-weights',
-    enforce: 'pre',
-    transform(code, id) {
-      const icon = defs.exec(id)?.[1]
-      if (icon === undefined) return undefined
-      let out = code
-      for (const weight of ['thin', 'light', 'duotone']) {
-        if (ICON_WEIGHTS.has(weight) || (weight === 'duotone' && DUOTONE_ICONS.has(icon))) continue
-        const start = out.search(new RegExp(`\\[\\s*"${weight}",`))
-        if (start < 0) continue
-        // The entry ends at the bracket that closes it; path data holds no brackets or quotes.
-        let depth = 0
-        let end = start
-        for (; end < out.length; end++) {
-          const char = out[end]
-          if (char === '[' || char === '(' || char === '{') depth++
-          else if (char === ']' || char === ')' || char === '}') depth--
-          if (depth === 0) break
-        }
-        const comma = /^\s*,/.exec(out.slice(end + 1))
-        out = out.slice(0, start) + out.slice(end + 1 + (comma?.[0].length ?? 0))
-      }
-      return { code: out, map: null }
-    },
-  }
-}
-
 /**
  * Preloads the fonts the first screen uses (performance.md 2.3): Figtree for
  * the shell and the sidebar, Instrument Serif for Home's greeting. Without
@@ -118,9 +70,7 @@ function preloadFonts(patterns: ReadonlyArray<RegExp>): Plugin {
   }
 }
 
-// The monorepo root. StyleX hashes class names relative to this directory and
-// needs it to resolve the workspace token package, no matter which directory
-// the build is started from.
+// The monorepo root, for the renderer plugins (renderer.vite.ts).
 const repoRoot = resolve(__dirname, '../..')
 
 // Build-time dependencies are bundled. Only production dependencies in the desktop manifest
@@ -172,22 +122,6 @@ const minify = process.env['JUNO_UNMINIFIED'] === '1' ? false : ('esbuild' as co
 // source files (docs/development.md, "Affected tests").
 const sourcemap = process.env['JUNO_COVERAGE'] === '1' ? ('hidden' as const) : false
 
-// The React Compiler memoizes components and hooks at build time
-// (performance.md 5.4). It runs as a Babel plugin inside plugin-react 5, on
-// the workspace packages' source too. A component it cannot compile is left
-// as written; the build prints which one and why.
-const reactCompiler = [
-  'babel-plugin-react-compiler',
-  {
-    target: '19',
-    logger: {
-      logEvent(filename: string | null, event: { kind: string; detail?: { reason?: string } }) {
-        if (event.kind === 'CompileError' || event.kind === 'PipelineError') console.warn(`react-compiler: skipped a function in ${filename}: ${event.detail?.reason ?? event.kind}`)
-      },
-    },
-  },
-] as const
-
 export default defineConfig({
   main: {
     plugins: [externalize, runtimeImports(), codemodeFiles()],
@@ -227,17 +161,8 @@ export default defineConfig({
     },
     plugins: [
       contentSecurityPolicy(),
-      phosphorWeights(),
       preloadFonts([/figtree-latin-wght-normal-[^/]*\.woff2$/, /instrument-serif-latin-400-normal-[^/]*\.woff2$/]),
-      stylex.vite({
-        useCSSLayers: true,
-        // The plugin writes its sheet after Vite has minified the CSS, so it
-        // minifies the sheet itself: about 21 KB of the first stylesheet was
-        // line breaks and indents (10-21).
-        lightningcssOptions: { minify: minify !== false },
-        unstable_moduleResolution: { type: 'commonJS', rootDir: repoRoot },
-      }),
-      react({ babel: { plugins: [reactCompiler] } }),
+      ...rendererPlugins({ repoRoot, minify: minify !== false }),
     ],
   },
 })

@@ -567,8 +567,8 @@ export const fonts = stylex.defineVars({
   '--font-sans': "'Figtree Variable', 'Figtree', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
   '--font-serif': "'Instrument Serif', ui-serif, 'Iowan Old Style', Georgia, serif",
   '--font-mono': "'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace",
-  // An emoji drawn on its own (a cell of the message menu's grid), so its box
-  // takes the emoji font's metrics, not the text font's.
+  // A text emoji drawn on its own (`Emoji`), so its box takes the emoji
+  // font's metrics, not Figtree's.
   '--font-emoji': "'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif",
 })
 
@@ -673,10 +673,11 @@ export const text = stylex.defineVars({
   '--text-preview-weight': '400',
   '--text-preview-leading': '1.45',
   '--text-preview-tracking': '0',
-  // A read sidebar row's preview, half a pixel below the preview. The leading
-  // is the preview's line box (13.5px at 1.45), so the row keeps its height.
-  '--text-preview-read-size': '13px',
-  '--text-preview-read-leading': '19.575px',
+  // A sidebar row's preview, read or unread: half a pixel below the preview,
+  // in the preview's line box (13.5px at 1.45). One size in both states, so
+  // reading a row moves no letter.
+  '--text-row-preview-size': '13px',
+  '--text-row-preview-leading': '19.575px',
 
   // Card bodies, reply options, picker rows.
   '--text-body-small-family': fonts['--font-sans'],
@@ -790,7 +791,9 @@ export const text = stylex.defineVars({
  * it (a reaction landing, a toggle filling, a resolve check). Menus and
  * popovers enter in 80ms; other entrances are 240ms, exits 150ms, pops
  * 220ms; rows, tabs and typing never animate, except a tab being dragged,
- * whose neighbours slide aside over --duration-fast.
+ * whose neighbours slide aside over --duration-fast, and sidebar rows that
+ * news from elsewhere reorders at the top, which slide over
+ * --duration-reorder.
  *
  * Reduced motion collapses every duration, the scales and the distances
  * through the token itself, so components use these without a media query.
@@ -821,6 +824,12 @@ export const motion = stylex.defineVars({
     [REDUCED_MOTION]: '0.01ms',
   },
   '--ease-morph': 'cubic-bezier(0.22, 1, 0.36, 1)',
+  // Sidebar rows moving to their new places when activity from elsewhere
+  // reorders the list at the top (SPEC 5, "Holding the order").
+  '--duration-reorder': {
+    default: '220ms',
+    [REDUCED_MOTION]: '0.01ms',
+  },
   // One breath of the incoming huddle's pulse. Reduced motion stops the pulse instead.
   '--duration-pulse': '2400ms',
   // Entrances: the toast rises 8px, each part of an empty state rises 6px.
@@ -1107,6 +1116,12 @@ export const sizes = stylex.defineVars({
   // pixel low (the font puts its baseline there); this moves it back up, so
   // its centre is the box's centre.
   '--emoji-14-shift': '-0.5px',
+  // Measured at 2x from emoji-align.spec.ts; each size draws from a different bitmap.
+  '--emoji-16-shift': '-1px',
+  '--emoji-20-shift': '0.5px',
+  '--emoji-32-shift': '1px',
+  // Aligns Figtree's figures with the centre line of a reaction chip.
+  '--reaction-count-shift': '-0.5px',
 
   // Spot illustrations: 96 wide in lists, 120 in the workspace. The Juno
   // figure alone is 40.

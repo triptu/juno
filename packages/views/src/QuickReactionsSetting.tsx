@@ -5,7 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type DragEvent, type Keyb
 import { createPortal } from 'react-dom'
 import { DEFAULT_QUICK_REACTIONS, MAX_QUICK_REACTIONS, type QuickReaction } from '@juno/contract'
 import { accent, colors, motion, opacity, radii, sizes, spacing, z } from '@juno/tokens/tokens.stylex'
-import { Button, IconButton, Text } from '@juno/ui'
+import { Button, Emoji, IconButton, Text } from '@juno/ui'
 
 const HOVER = '@media (hover: hover)'
 
@@ -289,9 +289,7 @@ function Pill({ reaction, position, tabStop, removable, dragging, onFocus, onKey
       {...stylex.props(styles.pill, removable && styles.pillRemovable, dragging && styles.pillDragging)}
     >
       {reaction.url === undefined ? (
-        <span aria-hidden {...stylex.props(styles.glyph)}>
-          {reaction.unicode}
-        </span>
+        <Emoji glyph={reaction.unicode} size={16} />
       ) : (
         <img src={reaction.url} alt="" draggable={false} decoding="async" {...stylex.props(styles.image)} />
       )}
@@ -346,10 +344,6 @@ const styles = stylex.create({
   // The pill being dragged stays in the row at its drop place, faded.
   pillDragging: {
     opacity: opacity['--opacity-dim'],
-  },
-  glyph: {
-    fontSize: sizes['--icon-16'],
-    lineHeight: 1,
   },
   image: {
     width: sizes['--icon-16'],

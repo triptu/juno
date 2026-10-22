@@ -44,7 +44,7 @@
  */
 import { mainTopicId, threadTopicId, type ChannelId, type Ts } from '@juno/domain'
 import { Clock, Effect } from 'effect'
-import { Invalidation, StoreWriter, type MessageRow, type SqlError } from '@juno/store'
+import { CommandWrite, Invalidation, StoreWriter, type MessageRow, type SqlError } from '@juno/store'
 import { messageTopics } from './keys'
 import { dropAction, queueCopyDelete, type PendingAction } from './actions'
 
@@ -179,6 +179,8 @@ export const reconcileSent = (row: MessageRow): Effect.Effect<void, SqlError, St
     const sent = yield* sentPost(row.client_msg_id)
     if (sent !== undefined && sent.ts === null && sent.channel === row.channel && sent.user_id === row.user_id) {
       yield* sql`UPDATE sent_posts SET ts = ${row.ts} WHERE client_msg_id = ${row.client_msg_id}`
+      // The first acknowledgement is still the local send, even if its echo arrived long after the command returned.
+      yield* Invalidation.use((i) => i.invalidate({ topics: messageTopics(row) })).pipe(Effect.provideService(CommandWrite, true))
       return
     }
     const of = yield* copyOf(row)

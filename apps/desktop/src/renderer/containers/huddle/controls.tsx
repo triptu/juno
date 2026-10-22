@@ -2,7 +2,9 @@
  * What the bar and the tab share: the controls' state and actions, the
  * device menu and the ticking duration.
  */
-import { useEffect, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import { huddleNowAtom } from '@juno/state'
+import { useAtomValue } from '@juno/state/react'
 import type { MediaSnapshot, MicrophoneAccess } from '@juno/huddle-media'
 import { HuddleDeviceMenu, systemDevice, type HuddleControlsActions, type HuddleControlsState, type MicrophoneProblem } from '@juno/huddle-views'
 import { chooseMicrophone, chooseSpeaker, leaveCurrentHuddle, openMicrophoneSettings, refreshDevices, setNoiseSuppression, shareFull, toggleHuddleMuted, toggleSharing } from './media'
@@ -72,10 +74,6 @@ export function formatDuration(millis: number): string {
 
 /** A leaf that ticks once a second, so nothing else re-renders for the clock. */
 export function Duration({ startedAt }: { readonly startedAt: number | null }) {
-  const [now, setNow] = useState(Date.now)
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1_000)
-    return () => clearInterval(timer)
-  }, [])
+  const now = useAtomValue(huddleNowAtom)
   return <>{formatDuration(now - (startedAt ?? now))}</>
 }

@@ -879,6 +879,57 @@ test.describe('Topic header Follow', () => {
 })
 
 /**
+ * Reading a sidebar row (SPEC section 5, "Row anatomy"): the title's weight,
+ * the preview's colour and the tags at the line's end change, nothing else.
+ * The preview runs into the room the count and the people leave; every box
+ * keeps its place and size, and every letter of the preview its place.
+ */
+test.describe('Sidebar row read state', () => {
+  const step = (page: Page, name: string) => page.evaluate((control) => (window as unknown as { __fixtureControls?: Record<string, () => void> }).__fixtureControls?.[control]?.(), name)
+
+  /** Each preview letter's place in the frame, by row. Hidden letters past the ellipsis keep their places too. */
+  const letters = (page: Page) =>
+    page.locator('[data-row-part="preview"]').evaluateAll((nodes) => {
+      const frame = document.querySelector('[data-fixture-frame]')!.getBoundingClientRect()
+      return nodes.map((node) => {
+        const places: string[] = []
+        const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT)
+        const range = document.createRange()
+        for (let text = walker.nextNode(); text !== null; text = walker.nextNode()) {
+          for (let index = 0; index < (text.textContent ?? '').length; index++) {
+            range.setStart(text, index)
+            range.setEnd(text, index + 1)
+            const box = range.getBoundingClientRect()
+            places.push(`${(text.textContent ?? '')[index]} ${(box.x - frame.x).toFixed(2)},${(box.y - frame.y).toFixed(2)} ${box.height.toFixed(2)}`)
+          }
+        }
+        return places
+      })
+    })
+
+  for (const theme of ['light', 'dark'] as const) {
+    test(`reading rows and making them unread again moves nothing, short and long titles, DMs and group DMs, with and without an @ (${theme})`, async ({ page }) => {
+      await openState(page, { component: 'TopicRow', id: 'read/toggle', route: 'TopicRow/read/toggle', group: '', groupId: '', state: '', frame: {} }, theme)
+      const counts = page.locator('[data-row-part="counts"]')
+      await expect(counts).toHaveCount(8)
+      await expect(page.getByText('@', { exact: true })).toHaveCount(4)
+      for (const unread of [false, true]) {
+        const before = await letters(page)
+        await expectNoLayoutShift(
+          page,
+          async () => {
+            await step(page, 'read')
+            await expect(counts).toHaveCount(unread ? 8 : 0)
+          },
+          { motion: 'layout', grows: '[data-row-part="preview"]' },
+        )
+        expect(await letters(page), unread ? 'making the rows unread again' : 'reading the rows').toEqual(before)
+      }
+    })
+  }
+})
+
+/**
  * Attachments (SPEC section 8): a chip leaving the composer, the upload line
  * under a sending message and a card's Download button move nothing.
  */

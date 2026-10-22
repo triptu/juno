@@ -23,6 +23,7 @@ export { EmojiPicker } from './EmojiPicker'
 export { EngineNotice, EngineStatusView, SyncProgress } from './EngineStatusView'
 export { ProcessesView, type ProcessRow } from './ProcessesView'
 export { MediaViewer, type MediaViewerProps, type MediaViewing } from './MediaViewer'
+export { viewingOf } from './MediaGrid'
 
 export { type MessageActions, type MessageProps } from './Message'
 export { InlineEdit, type InlineEditProps } from './InlineEdit'

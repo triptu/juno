@@ -18,6 +18,7 @@ import {
   sidebarFilterAtom,
   sidebarRowAtom,
   sidebarSectionsAtom,
+  loadSidebarMoves,
   tabsAtom,
   tabTopic,
   topicListAtom,
@@ -32,7 +33,7 @@ import { markFilterChange, takeFilterMark } from './filterMark'
 import { openAllTopics, openTopicFromList, warmTopic } from './navigation'
 import { typeOnRow } from './pageFocus'
 import { useRowAccessory } from './rowAccessories'
-import { cancelRename, renameTopic, resolveTopic, showRowMenu } from './topicActions'
+import { cancelRename, loadTopicMenu, renameTopic, resolveTopic, showRowMenu } from './topicActions'
 import { editSelectedView } from './viewActions'
 
 /**
@@ -210,6 +211,20 @@ function useEmptyEntrance(shown: boolean): boolean {
   return enter
 }
 
+/** Marks when the first snapshot lands, before React renders it. */
+function useSnapshotMark(): void {
+  useLayoutEffect(() => {
+    if (registry.get(sidebarSectionsAtom).ready) return
+    let done = false
+    const off = registry.subscribe(sidebarSectionsAtom, (next) => {
+      if (done || !next.ready) return
+      done = true
+      mark('juno.sidebar-snapshot')
+    })
+    return off
+  }, [])
+}
+
 /**
  * The sidebar list. Subscribes to the shown window's order split into
  * sections only; each row subscribes to its own atom, so a delta that
@@ -233,16 +248,10 @@ export const TopicList = memo(function TopicList() {
   const full = fullFor === filter || count <= FIRST_ROWS
   const [pinned, recent] = full ? [sections.pinned, sections.recent] : firstIds(sections.pinned, sections.recent, FIRST_ROWS)
 
-  // Marks when the first snapshot lands, before React renders it.
-  useLayoutEffect(() => {
-    if (registry.get(sidebarSectionsAtom).ready) return
-    let done = false
-    const off = registry.subscribe(sidebarSectionsAtom, (next) => {
-      if (done || !next.ready) return
-      done = true
-      mark('juno.sidebar-snapshot')
-    })
-    return off
+  useSnapshotMark()
+  useEffect(() => {
+    const idle = requestIdleCallback(() => { void loadSidebarMoves(); void loadTopicMenu() }, { timeout: 2_000 })
+    return () => cancelIdleCallback(idle)
   }, [])
 
   // Runs once per new window: the first rows, and each filter change.
@@ -291,6 +300,7 @@ export const TopicList = memo(function TopicList() {
       {...(empty === undefined ? {} : { empty })}
       enterEmpty={enterEmpty}
       truncated={full && count >= SIDEBAR_WINDOW}
+      moves={sections.moves}
       onClearFilters={clearFilters}
       onViewAll={viewAllTopics}
       onEditView={editSelectedView}

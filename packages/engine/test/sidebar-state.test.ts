@@ -8,6 +8,12 @@ import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   activateTab,
+  loadSidebarMoves,
+  runCommand,
+  sendMessage,
+  releaseSidebarTopic,
+  openSidebarSheet,
+  closeSidebarSheet,
   openPlace,
   topicPlace,
   updateTabs,
@@ -20,7 +26,7 @@ import {
   sidebarSectionsAtom,
   type SidebarWindow,
 } from '@juno/state'
-import type { TopicRow } from '@juno/contract'
+import { topicsResolve, type TopicRow } from '@juno/contract'
 import { startTestEngine, waitFor, type RunningEngine } from './harness'
 import { apiCalls, bootedEngine, quiet } from './scenario'
 
@@ -213,4 +219,61 @@ describe('a store indexed by an older Juno', () => {
     expect(apiCalls(second, 'conversations.replies')).toEqual([])
     fake.release()
   })
+})
+
+it('marks command changes as instant without suppressing the next outside arrival', async () => {
+  const engine = await bootedEngine(engines)
+  const { registry, fake } = engine
+  await loadSidebarMoves()
+  const { shown } = watchList(engine)
+  await shown('all')
+  const first = fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: 'Review motion provenance' })
+  fake.followThread({ channel: 'C0ENG', threadTs: first.ts })
+  const id = `t:C0ENG:${first.ts}`
+  await waitFor(() => registry.get(sidebarSectionsAtom).recent.includes(id) || undefined)
+  expect(registry.get(sidebarSectionsAtom).moves).toBe('animate')
+
+  releaseSidebarTopic(registry, id)
+  const resolved = await runCommand(registry, topicsResolve, { id })
+  expect(resolved._tag).toBe('Success')
+  await waitFor(() => !registry.get(sidebarSectionsAtom).recent.includes(id) || undefined)
+  expect(registry.get(sidebarSectionsAtom).moves).toBe('instant')
+
+  // No 1.5-second pause: a real reply immediately after Resolve is a new outside change.
+  fake.injectMessage({ channel: 'C0ENG', threadTs: first.ts, user: 'U0LEO', text: 'An outside reply reopens it' })
+  await waitFor(() => registry.get(sidebarSectionsAtom).recent[0] === id || undefined)
+  expect(registry.get(sidebarSectionsAtom).moves).toBe('animate')
+
+  // A sheet that changed nothing must not consume the next outside reorder.
+  openSidebarSheet(registry)
+  closeSidebarSheet(registry)
+  const next = fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: 'The next independent topic' })
+  fake.followThread({ channel: 'C0ENG', threadTs: next.ts })
+  const nextId = `t:C0ENG:${next.ts}`
+  await waitFor(() => registry.get(sidebarSectionsAtom).recent.includes(nextId) || undefined)
+  expect(registry.get(sidebarSectionsAtom).moves).toBe('animate')
+})
+
+
+it('keeps a delayed own send instant while an unrelated reply can move during the wait', async () => {
+  const engine = await bootedEngine(engines)
+  const { registry, fake } = engine
+  await loadSidebarMoves()
+  const { shown } = watchList(engine)
+  const initial = await shown('all')
+  const id = initial.order.filter((key) => key.startsWith('t:')).at(-1)!
+  const [, channel, threadTs] = id.split(':')
+  fake.holdNext({ method: 'conversations.open', before: true })
+  const sending = sendMessage(registry, { kind: 'person', userId: 'U0JONAS' }, 'A delayed own send')
+  await waitFor(() => fake.heldCount({ method: 'conversations.open' }) > 0 || undefined)
+  fake.injectMessage({ channel: channel!, threadTs: threadTs!, user: 'U0LEO', text: 'An independent reply during the command' })
+  await waitFor(() => registry.get(sidebarSectionsAtom).recent[0] === id || undefined)
+  expect(registry.get(sidebarSectionsAtom).moves).toBe('animate')
+  await new Promise((done) => setTimeout(done, 1_600))
+  fake.release()
+  const exit = await sending
+  expect(exit._tag).toBe('Success')
+  if (exit._tag !== 'Success') return
+  await waitFor(() => registry.get(sidebarListAtom).rows.get(exit.value.topicId)?.preview.text === 'A delayed own send' || undefined)
+  expect(registry.get(sidebarSectionsAtom).moves).toBe('instant')
 })

@@ -1,6 +1,7 @@
 /**
  * Starts the engine on a transport. Electron calls this from the utility
- * process entry; tests call it from Node with a `memoryTransport`.
+ * process entry; tests call it from Node with a `memoryTransport`; the web
+ * shell calls it with a `socketTransport` of WebSockets.
  *
  * Startup order follows performance 2.1: the services and the RPC server come
  * up first, so the first live query is answered from local state before any
@@ -27,6 +28,7 @@ import { Outbox } from './outbox'
 import { SocketEvents } from './socketEvents'
 import { AgentHost, Handlers, Services } from './layer'
 import { protocolServer } from './protocol/server'
+import type { SocketTransport } from './protocol/socket'
 import type { Transport } from './protocol/transport'
 
 export interface EngineHandle {
@@ -60,7 +62,7 @@ export interface EngineHostOptions {
   readonly agentWrites?: HandlerOptions['writes']
 }
 
-export function startEngine(transport: Transport, config: Config, options: EngineHostOptions = {}): Promise<EngineHandle> {
+export function startEngine(transport: Transport | SocketTransport, config: Config, options: EngineHostOptions = {}): Promise<EngineHandle> {
   return Effect.runPromise(
     Effect.gen(function* () {
       const scope = yield* Scope.make()

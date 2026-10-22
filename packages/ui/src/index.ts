@@ -13,6 +13,7 @@ export { ContextMenu, type ContextMenuEntry, type MenuPoint } from './ContextMen
 export { ContextPill, type ContextTint } from './ContextPill'
 export { DayToggles } from './DayToggles'
 export { Divider, LabelledRule } from './Divider'
+export { Emoji } from './Emoji'
 export { EmptyState } from './EmptyState'
 export { HeaderBand } from './HeaderBand'
 export { Icon, type PhosphorIcon } from './Icon'
@@ -74,5 +75,6 @@ export { defineFixtures, fixture, scene, type Fixture, type FixtureFrame, type F
 export { FixtureAppearanceContext, useFixtureAppearance } from './fixtures/appearance'
 export { chunk } from './chunks'
 export { rootDuration } from './motion'
+export { ReorderMotion } from './ReorderMotion'
 
 export { menuTriggerHandlers } from './menuTrigger'

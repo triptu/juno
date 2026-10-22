@@ -71,7 +71,7 @@ test('start a huddle from the topic menu, mute from the bar, open the tab and le
   // The bar's first row opens the huddle tab.
   await bar.getByRole('button', { name: 'Open huddle in #eng' }).click()
   await juno.tabs.expectActive('eng · Huddle')
-  await expect(win.getByRole('group', { name: 'Huddle controls' })).toBeVisible()
+  await expect(win.locator('[data-huddle-page]').getByRole('group', { name: 'Huddle controls' })).toBeVisible()
 
   // Leave: the bar goes at once and the leave goes to Slack as the official client sends it.
   const attendeeId = await attendee(win)
@@ -282,7 +282,7 @@ test('while macOS blocks the microphone, Mute says so and opens System Settings;
   // The tab's Mute is the same.
   await bar.getByRole('button', { name: 'Open huddle in #eng' }).click()
   await juno.tabs.expectActive('eng · Huddle')
-  const controls = win.getByRole('group', { name: 'Huddle controls' })
+  const controls = win.locator('[data-huddle-page]').getByRole('group', { name: 'Huddle controls' })
   await controls.getByRole('button', { name: 'Allow the microphone in System Settings' }).click()
   await expect.poll(() => hooks(app, 'microphoneSettingsOpened')).toBe(2)
 

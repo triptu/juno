@@ -37,7 +37,7 @@ Stable: `Effect`, `Layer`, `Context`, `Stream`, `Schedule`, `Scope`, `Queue`, `R
 `TestClock`. Unstable (checked in the `.d.ts` headers):
 
 - Whole subpaths: `effect/rpc`, `effect/sql`, `effect/reactivity` (`Atom`, `Reactivity`, `AtomRpc`),
-  `effect/http`, `effect/http-api`, `effect/socket`, `effect/workers`, `effect/persistence`,
+  `effect/http`, `effect/http-api`, `effect/socket`, `effect/net`, `effect/workers`, `effect/persistence`,
   `effect/cli`, `effect/ai`, `effect/cluster`, `effect/workflow`, `effect/observability`,
   `effect/process`, `effect/devtools`, `effect/eventlog`.
 - Root modules: `FileSystem`, `Path`, `Terminal`, `Stdio`, `Newtype`, `LayerMap`, `Graph`,
@@ -52,8 +52,10 @@ Juno wrappers (`scripts/check-deps.mjs` fails `pnpm lint` on an import from anyw
 | `effect/reactivity` (`Atom`, `AtomRegistry`, `AtomRpc`, `AsyncResult`) | `liveQuery(route)` and `command(route)` in `@juno/state`; `packages/state/src` only |
 | `@effect/atom-react` | `@juno/state/react` (`useAtomValue`, `useAtom`, `useAtomSet`, `useAtomRefresh`, `RegistryContext`); containers import the hooks from there |
 | `effect/reactivity/Reactivity` | `Invalidation` in `packages/store/src/invalidation.ts` |
+| `effect/rpc/RpcMiddleware` | `packages/engine/src/protocol/server.ts` only: marks command writes for live-query motion provenance; no client middleware |
 | `effect/rpc` | route declarations in `packages/contract/src` and `packages/agent-contract/src/{rpc,host}` (the renderer groups and the AgentHost group), the servers in `packages/engine/src/protocol` (the renderer routes and the AgentHost group) and `packages/agent/src/serve` (the agent's renderer groups), the clients in `packages/state/src` (the engine and the agent) and `packages/agent/src/host`, and two tests that call raw routes: `packages/engine/test/agent-host.test.ts` (the AgentHost group) and `packages/agent/test/serve-harness.ts` (the agent's renderer groups, for `serve.test.ts` and `juno-pages.test.ts`) |
 | `effect/workers` | the port transports: `packages/state/src/transport.ts`, `packages/engine/src/protocol/runner.ts`, `packages/agent/src/host/port.ts` (the agent's client side of the AgentHost port, ADR 0012), `packages/agent/src/serve/runner.ts` (the agent's server side of the renderer ports) |
+| `effect/socket`, `effect/net` | the web shell's engine socket (`docs/development.md`, "Web shell"): the client in `packages/state/src/socket.ts` (`@juno/state/socket`, imported only by the web page) and the server in `packages/engine/src/protocol/socket.ts` (`socketTransport`; `effect/net` only for the server's address) |
 | `effect/sql`, `@effect/sql-sqlite-node` | `@juno/store` only. See below. |
 | everything else listed above | nowhere yet. Add a wrapper module and an entry in `check-deps.mjs` first. |
 

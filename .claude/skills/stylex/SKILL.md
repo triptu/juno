@@ -122,7 +122,7 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
 - **Static values only.** `stylex.create` cannot call functions or read runtime values. For a value
   that varies at runtime use a function style: `stylex.create({ w: (px: number) => ({ width: px }) })`.
 - **Workspace setup.** Packages ship TypeScript source and list `@stylexjs/stylex` as their own
-  dependency. The plugin sits before `react()` in `electron.vite.config.ts` and gets
+  dependency. The plugin sits before `react()` in `apps/desktop/renderer.vite.ts` and gets
   `unstable_moduleResolution: { type: 'commonJS', rootDir: repoRoot }` so builds work from any cwd.
   The plugin writes its sheet after Vite has minified the CSS, so its own lightningcss pass minifies
   it (`lightningcssOptions: { minify }`, in the app's and the gallery's config alike); without that the sheet

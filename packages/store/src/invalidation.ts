@@ -37,8 +37,14 @@ export interface LiveQueryOptions {
 
 export const DEFAULT_LIVE_QUERY_DEBOUNCE: Duration.Input = '30 millis'
 
+/** Writes made by a renderer command, rather than sync. */
+export class CommandWrite extends Context.Reference<boolean>('juno/store/CommandWrite', { defaultValue: () => false }) {}
+
+/** The cause of this query run, including writes received while it was reading. */
+export class QueryCause extends Context.Reference<{ own: boolean }>('juno/store/QueryCause', { defaultValue: () => ({ own: false }) }) {}
+
 /** Collects keys invalidated inside `withBatch` until the batch succeeds. */
-const PendingKeys = Context.Reference<Set<string> | undefined>('juno/store/Invalidation/PendingKeys', {
+const PendingKeys = Context.Reference<{ readonly keys: Set<string>; own: boolean } | undefined>('juno/store/Invalidation/PendingKeys', {
   defaultValue: () => undefined,
 })
 
@@ -122,8 +128,12 @@ export class Invalidation extends Context.Service<
     Effect.gen(function* () {
       const reactivity = yield* Reactivity.make
 
-      const fire = (keys: ReadonlyArray<string>) => {
-        if (keys.length > 0) reactivity.invalidateUnsafe(keys)
+      let ownWrite = false
+      const fire = (keys: ReadonlyArray<string>, own: boolean) => {
+        const previous = ownWrite
+        ownWrite = own
+        try { if (keys.length > 0) reactivity.invalidateUnsafe(keys) }
+        finally { ownWrite = previous }
       }
 
       const invalidate = (keys: InvalidationKeys) =>
@@ -131,21 +141,22 @@ export class Invalidation extends Context.Service<
           const pending = yield* PendingKeys
           const flat = invalidationKeys(keys)
           if (pending === undefined) {
-            fire(flat)
+            fire(flat, yield* CommandWrite)
           } else {
-            for (const key of flat) pending.add(key)
+            for (const key of flat) pending.keys.add(key)
+            pending.own ||= yield* CommandWrite
           }
         })
 
-      const invalidateAll = Effect.sync(() => fire([ALL_KEYS]))
+      const invalidateAll = Effect.gen(function* () { fire([ALL_KEYS], yield* CommandWrite) })
 
       const withBatch = <A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
         Effect.gen(function* () {
           const outer = yield* PendingKeys
           if (outer !== undefined) return yield* effect
-          const pending = new Set<string>()
+          const pending = { keys: new Set<string>(), own: false }
           const result = yield* effect.pipe(Effect.provideService(PendingKeys, pending))
-          fire([...pending])
+          fire([...pending.keys], pending.own)
           return result
         })
 
@@ -162,7 +173,11 @@ export class Invalidation extends Context.Service<
           Effect.gen(function* () {
             // One slot: invalidations that arrive while one is waiting collapse into it.
             const signal = yield* Queue.make<void>({ capacity: 1, strategy: 'dropping' })
+            let pendingOwn = false
+            let reading: { own: boolean } | undefined
             const cancel = subscribeUnsafe(keys, () => {
+              pendingOwn ||= ownWrite
+              if (reading !== undefined) reading.own ||= ownWrite
               Queue.offerUnsafe(signal, undefined)
             })
             yield* Effect.addFinalizer(() => Effect.sync(cancel))
@@ -170,7 +185,11 @@ export class Invalidation extends Context.Service<
             // Emits the run's outcome. An expected error is a value and the
             // loop goes on; a defect is a bug, so it fails the stream.
             const runOnce = Effect.gen(function* () {
-              const exit = yield* Effect.exit(query)
+              const cause = { own: pendingOwn }
+              pendingOwn = false
+              reading = cause
+              const exit = yield* Effect.exit(query.pipe(Effect.provideService(QueryCause, cause)))
+              reading = undefined
               if (Exit.isSuccess(exit)) {
                 yield* Queue.offer(out, Result.succeed(exit.value))
                 return true

@@ -1,10 +1,10 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { expectCentred, measure } from './ink'
+import { expectCentred, measure } from './buttonInk'
 import { openState, type Route, type Theme } from './support'
 
 /**
  * Quote and Ask Juno in the selection's bar are centred on the bar: the
- * painted part of each icon, read from a screenshot (`ink.ts`), has its
+ * painted part of each icon, read from a screenshot (`buttonInk.ts`), has its
  * centre within half a pixel of the bar's centre line and of its button's
  * centre, and the outer insets match.
  */

@@ -5,7 +5,7 @@ import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
 import { matchEmoji, type PickerItem as Item, type PreparedEmojiPicker } from '@juno/contract'
 import { itemKey, neighbour, normalize, type Section } from './emojiPickerModel'
 import { accent, colors, layout, menu, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
-import { ScrollArea, Surface, Text, TextField } from '@juno/ui'
+import { Emoji, ScrollArea, Surface, Text, TextField } from '@juno/ui'
 
 export interface EmojiPickerProps {
   readonly data: PreparedEmojiPicker
@@ -230,7 +230,7 @@ export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, on
                           title={chosen ? `:${item.name}: is added` : `:${item.name}:`}
                           {...stylex.props(styles.cell, inMenu && styles.cellInMenu, chosen && styles.chosen)}
                         >
-                          {item.unicode !== undefined ? item.unicode : item.url === undefined || failed.has(itemKey(item)) ? <span aria-hidden="true" {...stylex.props(styles.fallback)}><span data-emoji-placeholder="" {...stylex.props(styles.placeholder)} /></span> : (
+                          {item.unicode !== undefined ? <Emoji glyph={item.unicode} size={20} /> : item.url === undefined || failed.has(itemKey(item)) ? <span aria-hidden="true" {...stylex.props(styles.fallback)}><span data-emoji-placeholder="" {...stylex.props(styles.placeholder)} /></span> : (
                             <img src={item.url} alt="" draggable={false} loading="lazy" decoding="async" onError={() => setFailed((names) => new Set(names).add(itemKey(item)))} {...stylex.props(styles.image)} />
                           )}
                         </button>
@@ -258,8 +258,8 @@ export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, on
   )
 }
 
-// The emoji glyph and custom images in a 32px cell.
-const GLYPH = '20px' // tokens-allow: an emoji glyph in a 32px cell
+// Custom images in a 32px cell, the size of a text emoji's square there (`Emoji` 20).
+const GLYPH = sizes['--icon-20']
 // A section heading: tag text with its block padding. Sticky headers keep
 // this much of the scroller's top clear when focus moves up.
 const HEADING_HEIGHT = `calc(${spacing['--space-2']} + ${text['--text-tag-leading']} + ${spacing['--space-1']})`
@@ -332,8 +332,6 @@ const styles = stylex.create({
     padding: 0,
     borderWidth: 0,
     borderRadius: radii['--radius-lg'],
-    fontSize: GLYPH,
-    lineHeight: 1,
     color: 'inherit',
     userSelect: 'none',
     cursor: 'default',

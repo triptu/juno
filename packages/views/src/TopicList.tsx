@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { useRef, type FocusEvent, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
-import { Button, EmptyState, pointerMoved, ScrollArea, Text } from '@juno/ui'
+import { Button, EmptyState, pointerMoved, ReorderMotion, ScrollArea, Text } from '@juno/ui'
 
 export type TopicListSectionId = 'pinned' | 'recent'
 
@@ -29,6 +29,12 @@ export interface TopicListProps {
   readonly enterEmpty?: boolean
   /** The window is full: say where the rest is instead of paging. */
   readonly truncated?: boolean
+  /**
+   * How this change of the order shows. `animate`: the rows slide to their
+   * new places when the list is at its top (a change from elsewhere).
+   * `instant` (the default): they take them in one frame.
+   */
+  readonly moves?: 'animate' | 'instant'
   readonly onClearFilters?: () => void
   /** Opens All topics, offered by the quiet and filtered empty states. */
   readonly onViewAll?: () => void
@@ -71,6 +77,7 @@ export function TopicList({
   quietDays = 3,
   enterEmpty = true,
   truncated = false,
+  moves = 'instant',
   onClearFilters,
   onViewAll,
   onEditView,
@@ -83,6 +90,7 @@ export function TopicList({
   const isEmpty = shown.length === 0
   // Where the pointer and keyboard focus are. Not React state: nothing renders from it.
   const inside = useRef({ pointer: false, keyboard: false })
+  const scroller = useRef<HTMLElement>(null)
   const engage = (part: 'pointer' | 'keyboard', now: boolean) => {
     const was = inside.current.pointer || inside.current.keyboard
     inside.current[part] = now
@@ -114,25 +122,17 @@ export function TopicList({
         onTouch?.()
       }}
       sx={styles.scroller}
+      ref={scroller}
     >
       {isEmpty && empty !== undefined ? (
         <Empty kind={empty} quietDays={quietDays} enter={enterEmpty} onClearFilters={onClearFilters} onViewAll={onViewAll} onEditView={onEditView} />
       ) : (
-        shown.map((section) => (
-          <section key={section.id} aria-label={labels[section.id]} data-topic-section={section.id} {...stylex.props(styles.section)}>
-            {/* "Recent" is labelled only when a Pinned section sits above it. */}
-            {section.id === 'pinned' || shown.length > 1 ? (
-              <div {...stylex.props(styles.label)}>
-                <Text variant="sectionLabel" tone="muted" as="h2">
-                  {labels[section.id]}
-                </Text>
-              </div>
-            ) : null}
-            <div role="list" {...stylex.props(styles.rows)}>
-              {section.ids.map(renderRow)}
-            </div>
-          </section>
-        ))
+        <>
+          <ReorderMotion groups={shown.map((section) => section.ids)} animate={moves === 'animate'} scroller={scroller} row={ROW} rowKey="data-topic-id" />
+          {shown.map((section) => (
+            <Section key={section.id} section={section} labelled={section.id === 'pinned' || shown.length > 1} renderRow={renderRow} />
+          ))}
+        </>
       )}
       {!isEmpty && truncated ? (
         <Text variant="meta" tone="muted" as="p" sx={styles.footer}>
@@ -140,6 +140,24 @@ export function TopicList({
         </Text>
       ) : null}
     </ScrollArea>
+  )
+}
+
+/** One section of rows. "Recent" is labelled only when a Pinned section sits above it. */
+function Section({ section, labelled, renderRow }: { readonly section: TopicListSection; readonly labelled: boolean; readonly renderRow: (id: string) => ReactNode }) {
+  return (
+    <section aria-label={labels[section.id]} data-topic-section={section.id} {...stylex.props(styles.section)}>
+      {labelled ? (
+        <div {...stylex.props(styles.label)}>
+          <Text variant="sectionLabel" tone="muted" as="h2">
+            {labels[section.id]}
+          </Text>
+        </div>
+      ) : null}
+      <div role="list" {...stylex.props(styles.rows)}>
+        {section.ids.map(renderRow)}
+      </div>
+    </section>
   )
 }
 

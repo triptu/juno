@@ -263,6 +263,8 @@ export function openSidebarSheet(registry: Registry): void {
   traceSidebarHold(registry, 'sheet opened')
 }
 
+export const sidebarInstantAtom = Atom.make(0).pipe(Atom.keepAlive)
+
 /**
  * A sheet closed. When it was the last, what waited applies in one step,
  * the moves made in the sheet with the rest. Under the pointer the list
@@ -270,13 +272,17 @@ export function openSidebarSheet(registry: Registry): void {
  * explicit action.
  */
 export function closeSidebarSheet(registry: Registry): void {
-  const open = Math.max(0, registry.get(sidebarSheetsAtom) - 1)
-  registry.set(sidebarSheetsAtom, open)
-  if (open === 0) {
-    if (registry.get(sidebarEngagedAtom)) registry.set(sidebarPausedAtom, true)
-    else if (registry.get(sidebarReleasedAtom).length > 0) registry.set(sidebarReleasedAtom, [])
-  }
-  traceSidebarHold(registry, 'sheet closed')
+  Atom.batch(() => {
+    if (registry.get(sidebarSheetsAtom) === 0) return
+    registry.set(sidebarInstantAtom, registry.get(sidebarInstantAtom) + 1)
+    const open = Math.max(0, registry.get(sidebarSheetsAtom) - 1)
+    registry.set(sidebarSheetsAtom, open)
+    if (open === 0) {
+      if (registry.get(sidebarEngagedAtom)) registry.set(sidebarPausedAtom, true)
+      else if (registry.get(sidebarReleasedAtom).length > 0) registry.set(sidebarReleasedAtom, [])
+    }
+    traceSidebarHold(registry, 'sheet closed')
+  })
 }
 
 /** The pointer moved, or focus moved, in the list: a paused hold starts again from the order shown. */
@@ -288,18 +294,24 @@ export function resumeSidebarHold(registry: Registry): void {
 
 /** The user acted on this topic: its move, arrival or departure shows at once, even while the list holds, except behind a sheet. */
 export function releaseSidebarTopic(registry: Registry, id: string): void {
-  if (!registry.get(sidebarEngagedAtom) || registry.get(sidebarSheetsAtom) > 0) return
-  const released = registry.get(sidebarReleasedAtom)
-  if (released.includes(id)) return
-  registry.set(sidebarReleasedAtom, [...released, id])
-  traceSidebarHold(registry, 'released a topic')
+  Atom.batch(() => {
+    if (!registry.get(sidebarEngagedAtom) || registry.get(sidebarSheetsAtom) > 0) return
+    const released = registry.get(sidebarReleasedAtom)
+    if (released.includes(id)) return
+    registry.set(sidebarInstantAtom, registry.get(sidebarInstantAtom) + 1)
+    registry.set(sidebarReleasedAtom, [...released, id])
+    traceSidebarHold(registry, 'released a topic')
+  })
 }
 
 /** An explicit action elsewhere: show the live order now, and keep showing it until the list is touched again. Behind a sheet it waits for the sheet to close. */
 export function flushSidebar(registry: Registry): void {
-  if (!registry.get(sidebarEngagedAtom) || registry.get(sidebarSheetsAtom) > 0) return
-  registry.set(sidebarPausedAtom, true)
-  traceSidebarHold(registry, 'flushed')
+  Atom.batch(() => {
+    if (!registry.get(sidebarEngagedAtom) || registry.get(sidebarSheetsAtom) > 0) return
+    registry.set(sidebarInstantAtom, registry.get(sidebarInstantAtom) + 1)
+    registry.set(sidebarPausedAtom, true)
+    traceSidebarHold(registry, 'flushed')
+  })
 }
 
 /**
@@ -321,37 +333,6 @@ export const sidebarRowAtom = Atom.family((id: string) =>
   Atom.make((get): TopicRow | undefined => get(sidebarListAtom).rows.get(id)).pipe(Atom.withEquality((a, b) => a === b)),
 )
 
-export interface SidebarSections {
-  /** False until the first snapshot has arrived, so an empty list is not mistaken for an empty window. */
-  readonly ready: boolean
-  readonly pinned: ReadonlyArray<string>
-  readonly recent: ReadonlyArray<string>
-  /** The engine's count of rows in the whole list, when it knows it. */
-  readonly total: number | undefined
-  /** The filter of the rows shown, for the empty state. */
-  readonly filter: TopicListFilter
-}
-
-const sameSections = (a: SidebarSections, b: SidebarSections): boolean =>
-  a.ready === b.ready && a.total === b.total && a.filter === b.filter && sameOrder(a.pinned, b.pinned) && sameOrder(a.recent, b.recent)
-
-/**
- * The shown window's order split into Pinned and Recent, for the list
- * container. Equal splits do not notify, so a delta that only edits a row
- * (a new preview, a count) re-renders that row and nothing else.
- */
-export const sidebarSectionsAtom = Atom.make((get): SidebarSections => {
-  const window = get(sidebarListAtom)
-  const pinned: string[] = []
-  const recent: string[] = []
-  for (const id of window.order) {
-    const row = window.rows.get(id)
-    if (row === undefined) continue
-    if (row.section === 'pinned') pinned.push(id)
-    else recent.push(id)
-  }
-  return { ready: window.meta.seq > 0 && window.meta.windowCovered !== false, pinned, recent, total: window.meta.total, filter: window.filter }
-}).pipe(Atom.withEquality(sameSections))
 
 /**
  * The row that had focus last, by keyboard or pointer. Tab returns to it, so

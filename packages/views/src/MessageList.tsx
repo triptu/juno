@@ -117,6 +117,8 @@ export interface MessageListProps {
    * the sender's name or avatar (the person menu).
    */
   readonly onMessageMenu?: (ts: string, at: MenuAt, onSender: boolean) => void
+  /** Right-click on an image thumbnail: the image menu (SPEC 8, "Images and the media viewer"). */
+  readonly onImageMenu?: (ts: string, fileId: string, event: MouseEvent) => void
   /** Right-click on an @person chip: the person menu (inventory 15.6). */
   readonly onPersonMenu?: (person: { readonly id: string; readonly name: string }, event: MouseEvent) => void
   /** Right-click on a #channel chip: the channel menu (inventory 15.2). */
@@ -171,19 +173,27 @@ function onKeyDown(event: KeyboardEvent<HTMLDivElement>, onRowKey: MessageListPr
 }
 
 interface Menus {
-  readonly onMessageMenu: ((ts: string, at: MenuAt, onSender: boolean) => void) | undefined
-  readonly onPersonMenu: ((person: { readonly id: string; readonly name: string }, event: MouseEvent) => void) | undefined
-  readonly onChannelMenu: ((channel: { readonly id: string; readonly name: string }, event: MouseEvent) => void) | undefined
+  readonly onMessageMenu: MessageListProps['onMessageMenu']
+  readonly onImageMenu: MessageListProps['onImageMenu']
+  readonly onPersonMenu: MessageListProps['onPersonMenu']
+  readonly onChannelMenu: MessageListProps['onChannelMenu']
 }
 
 /**
- * One handler for every row: an @person or #channel chip under the pointer
- * gets its own menu at once, otherwise the row under the pointer, or the
- * focused row for the context-menu key. A field keeps the text menu (`inField`).
+ * One handler for every row: an image, @person or #channel chip under the
+ * pointer gets its own menu at once, otherwise the row under the pointer, or
+ * the focused row for the context-menu key. A field keeps the text menu (`inField`).
  */
-function messageMenu(event: MouseEvent<HTMLElement>, { onMessageMenu, onPersonMenu, onChannelMenu }: Menus) {
+function messageMenu(event: MouseEvent<HTMLElement>, { onMessageMenu, onImageMenu, onPersonMenu, onChannelMenu }: Menus) {
   const target = event.target
   if (!(target instanceof Element) || inField(event)) return
+  const ts = target.closest<HTMLElement>(ROW)?.dataset.messageRow
+  const image = target.closest<HTMLElement>('[data-thumbnail]')?.dataset.thumbnail
+  if (image !== undefined && ts !== undefined && onImageMenu !== undefined) {
+    event.preventDefault()
+    onImageMenu(ts, image, event)
+    return
+  }
   const person = onPersonMenu === undefined ? null : target.closest<HTMLElement>('[data-person]')
   if (person !== null && onPersonMenu !== undefined) {
     event.preventDefault()
@@ -196,9 +206,7 @@ function messageMenu(event: MouseEvent<HTMLElement>, { onMessageMenu, onPersonMe
     onChannelMenu({ id: channel.dataset.channel ?? '', name: channel.dataset.channelName ?? '' }, event)
     return
   }
-  if (onMessageMenu === undefined) return
-  const ts = target.closest<HTMLElement>(ROW)?.dataset.messageRow
-  if (ts === undefined) return
+  if (onMessageMenu === undefined || ts === undefined) return
   event.preventDefault()
   const onSender = target.closest('[data-sender]') !== null
   const list = event.currentTarget
@@ -251,6 +259,7 @@ export function MessageList({
   onQuickLook,
   uploadProgress,
   onMessageMenu,
+  onImageMenu,
   onPersonMenu,
   onChannelMenu,
 }: MessageListProps) {
@@ -288,7 +297,7 @@ export function MessageList({
               }
         }
         onContextMenu={
-          onMessageMenu === undefined && onPersonMenu === undefined && onChannelMenu === undefined ? undefined : (event) => messageMenu(event, { onMessageMenu, onPersonMenu, onChannelMenu })
+          onMessageMenu === undefined && onImageMenu === undefined && onPersonMenu === undefined && onChannelMenu === undefined ? undefined : (event) => messageMenu(event, { onMessageMenu, onImageMenu, onPersonMenu, onChannelMenu })
         }
         {...stylex.props(styles.column, popover && styles.popoverColumn)}
       >

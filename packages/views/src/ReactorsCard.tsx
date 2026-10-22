@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { Fragment, type PointerEvent } from 'react'
 import { colors, layout, radii, shadows, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { Text, type HueName } from '@juno/ui'
+import { Emoji, Text, type HueName } from '@juno/ui'
 import { TextButton } from './juno-chat/TextButton'
 
 export interface Reactor {
@@ -93,12 +93,14 @@ export function ReactorsCard({ name, emoji, url, reactors, count, id, onSeeAll, 
   }
   return (
     <div id={id} role="tooltip" data-reactors={name} onPointerEnter={onPointerEnter} onPointerLeave={onPointerLeave} {...stylex.props(styles.card)}>
-      {url === undefined ? (
-        <span aria-hidden {...stylex.props(styles.glyph)}>
+      {url !== undefined ? (
+        <img src={url} alt="" draggable={false} decoding="async" {...stylex.props(styles.image)} />
+      ) : emoji.startsWith(':') ? (
+        <span aria-hidden {...stylex.props(styles.shortcode)}>
           {emoji}
         </span>
       ) : (
-        <img src={url} alt="" draggable={false} decoding="async" {...stylex.props(styles.image)} />
+        <Emoji glyph={emoji} size={32} />
       )}
       <div {...stylex.props(styles.words)}>
         <Text variant="ui" tone="default" as="p" sx={styles.sentence} data-reactors-names="">
@@ -140,8 +142,8 @@ const styles = stylex.create({
     boxShadow: shadows['--pop-shadow'],
     userSelect: 'none',
   },
-  // The emoji large, as Slack's own card draws it.
-  glyph: {
+  // The emoji large, as Slack's own card draws it; an unknown one as its `:name:`, as large.
+  shortcode: {
     fontSize: sizes['--control-32'],
     lineHeight: 1,
   },

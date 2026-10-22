@@ -1,0 +1,1 @@
+- 10-22 15:12 · web shell · Keep the React Compiler on in the web shell so it renders the same compiled components as the app, though without it the host used about 75 MB less and the first load took half as long; cap the host's V8 old space at 384 MB in `pnpm web`, which cut its footprint after the first load from about 770 MB to about 370 MB with no slower reload.
