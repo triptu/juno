@@ -3,6 +3,8 @@ import { Effect, Schema } from 'effect'
 import * as Atom from 'effect/reactivity/Atom'
 import { AccentSchema, AppInfo, DEFAULT_ACCENT, DEFAULT_DENSITY, DEFAULT_SIDEBAR, DEFAULT_THEME, DensitySchema, NotificationPermission, unknownNotificationPermission, NotificationTarget, PrivacyState, SharingSetting, SIDEBAR_WIDTH, ThemeSchema, type Accent, type Density, type TopicTitleLines, type ResolvedTheme, type SidebarLayout, type SlackTarget, type Theme } from '@juno/contract'
 import type { ContextMenuAt, ContextMenuItem, JunoBridge, MenuCommand } from '@juno/contract/channels'
+import { registry } from './client'
+import { showToast } from './undo'
 
 export type { Accent, Density, TopicTitleLines, ResolvedTheme, Theme } from '@juno/contract'
 
@@ -187,9 +189,11 @@ export async function popupContextMenu(items: ReadonlyArray<ContextMenuItem>, at
   return typeof chosen === 'string' && ids.includes(chosen) ? chosen : undefined
 }
 
-/** Puts text on the clipboard. */
-export function copyText(text: string): void {
-  window.juno.clipboard.writeText(text).catch(() => {})
+/** Puts text on the clipboard and resolves whether it did. A failure shows "Could not copy"; main logs why. */
+export async function copyText(text: string): Promise<boolean> {
+  const copied = await window.juno.clipboard.writeText(text).then(() => true, () => false)
+  if (!copied) showToast(registry, { text: 'Could not copy' })
+  return copied
 }
 
 /** Opens a conversation in the Slack app. */

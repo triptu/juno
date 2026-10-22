@@ -204,7 +204,9 @@ async function showChatMenu(target: ChatMenuTarget, items: ReadonlyArray<ChatIte
     { id: 'remove', label: copy.remove, enabled: message !== null },
   ])
   switch (chosen) {
-    case 'copy': return copyText(span.text)
+    case 'copy':
+      await copyText(span.text)
+      return
     case 'remember':
       if (message !== null) await messages.pin(message, span.startByte, span.endByte)
       return
