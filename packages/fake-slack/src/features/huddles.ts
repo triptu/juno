@@ -35,6 +35,23 @@ interface Huddles {
   emptyDelayMs: number
   /** Self's `huddle_state_expiration_ts`, the one profile field the "In a huddle" status writes. */
   statusExpiresAt: number | undefined
+  /**
+   * How far `huddles/info` lags the room frames. Slack's edge answers from a
+   * little while ago: the spike saw it list the user as active after the
+   * room frame said they had left (research section 6).
+   */
+  infoLagMs: number
+  /** What `huddles/info` would have answered after each change, oldest first, while `infoLagMs` is set. */
+  readonly listed: Array<{ readonly at: number; readonly huddles: ReadonlyArray<Listed> }>
+}
+
+/** One running huddle as `huddles/info` lists it. */
+interface Listed {
+  readonly call_id: string
+  readonly channel_id: string
+  readonly active_members: ReadonlyArray<string>
+  readonly start_date: number
+  readonly created_by: string
 }
 
 /** Keyed by workspace so two fakes never share huddles. */
@@ -43,15 +60,33 @@ const state = new WeakMap<Workspace, Huddles>()
 function huddlesOf(ws: Workspace): Huddles {
   const existing = state.get(ws)
   if (existing !== undefined) return existing
-  const created: Huddles = { byChannel: new Map(), calls: 0, attendees: 0, arch: 'v2', leaveDelayMs: 1_000, emptyDelayMs: 3_000, statusExpiresAt: undefined }
+  const created: Huddles = { byChannel: new Map(), calls: 0, attendees: 0, arch: 'v2', leaveDelayMs: 1_000, emptyDelayMs: 3_000, statusExpiresAt: undefined, infoLagMs: 0, listed: [] }
   state.set(ws, created)
   return created
 }
 
 const encodeFrame = Schema.encodeSync(ShRoomFrame)
 
+const listedOf = (huddles: Huddles): ReadonlyArray<Listed> =>
+  [...huddles.byChannel.values()].map((huddle) => ({ call_id: huddle.callId, channel_id: huddle.channel, active_members: [...huddle.participants], start_date: huddle.dateStart, created_by: huddle.createdBy }))
+
+/** Keeps what `huddles/info` lists now, for a lagging answer later. */
+function remember(ws: Workspace): void {
+  const huddles = huddlesOf(ws)
+  if (huddles.infoLagMs > 0) huddles.listed.push({ at: Date.now(), huddles: listedOf(huddles) })
+}
+
+/** What `huddles/info` answers now: the list as it was `infoLagMs` ago. */
+function listedNow(ws: Workspace): ReadonlyArray<Listed> {
+  const huddles = huddlesOf(ws)
+  if (huddles.infoLagMs === 0) return listedOf(huddles)
+  const by = Date.now() - huddles.infoLagMs
+  return huddles.listed.findLast((entry) => entry.at <= by)?.huddles ?? []
+}
+
 /** Sends a room frame as Slack does: the whole room after the change. `RtmFrame` carries it as an unknown frame. */
 function emitRoom(ws: Workspace, type: ShRoomFrame['type'], huddle: FakeHuddle, user: string | undefined, ended = false): void {
+  remember(ws)
   const room = { id: huddle.callId, channels: [huddle.channel], participants: ended ? [] : [...huddle.participants],
     participant_history: [...huddle.history], date_start: huddle.dateStart,
     ...(ended ? { date_end: Math.floor(ws.clock.now() / 1000) } : {}),
@@ -103,6 +138,7 @@ function leave(ws: Workspace, huddle: FakeHuddle, user: string): void {
   // As the spike saw on v2: listed with nobody in it for a few seconds, then gone.
   const drop = () => {
     if (huddles.byChannel.get(huddle.channel) === huddle && huddle.participants.length === 0) huddles.byChannel.delete(huddle.channel)
+    remember(ws)
   }
   if (huddles.arch === 'v1') drop()
   else setTimeout(drop, huddles.emptyDelayMs).unref()
@@ -139,7 +175,8 @@ function running(fake: FakeSlack, channel: string): FakeHuddle {
  * `huddleStatus` (self's status expiry), `startHuddle` and `joinHuddle`
  * (another user starts or joins), `leaveHuddle` (another user leaves) and
  * `endHuddle` (the huddle ends for everyone, as a room update with
- * `has_ended`).
+ * `has_ended`). `setHuddleInfoLag` makes `huddles/info` answer from a
+ * while ago, as Slack's edge does.
  */
 export const huddlesFeature = {
   methods: {
@@ -192,11 +229,8 @@ export const huddlesFeature = {
   edge: {
     'huddles/info': (ctx, body) => {
       const args = Schema.decodeUnknownSync(EdgeHuddlesInfoArgs)(body)
-      const byChannel = huddlesOf(ctx.workspace).byChannel
-      const huddles = args.channel_ids.flatMap((channel) => {
-        const huddle = byChannel.get(channel)
-        return huddle === undefined ? [] : [{ call_id: huddle.callId, channel_id: channel, active_members: [...huddle.participants], start_date: huddle.dateStart, created_by: huddle.createdBy }]
-      })
+      const asked = new Set(args.channel_ids)
+      const huddles = listedNow(ctx.workspace).filter((huddle) => asked.has(huddle.channel_id))
       return Schema.encodeSync(EdgeHuddlesInfoOk)({ ok: true, huddles })
     },
   },
@@ -209,6 +243,12 @@ export const huddlesFeature = {
       huddles.arch = input.arch
       if (input.leaveDelayMs !== undefined) huddles.leaveDelayMs = input.leaveDelayMs
       if (input.emptyDelayMs !== undefined) huddles.emptyDelayMs = input.emptyDelayMs
+    },
+    /** `huddles/info` answers as Slack's edge did `ms` ago (see `Huddles.infoLagMs`); 0 answers now. */
+    setHuddleInfoLag: (fake, input: { ms: number }) => {
+      const huddles = huddlesOf(fake.workspace)
+      huddles.infoLagMs = input.ms
+      huddles.listed.splice(0, huddles.listed.length, { at: Date.now(), huddles: listedOf(huddles) })
     },
     /**
      * Chime drops self's attendee: the media session stopped (a leave, a
@@ -235,6 +275,7 @@ export const huddlesFeature = {
       emitRoom(fake.workspace, 'sh_room_update', huddle, undefined, true)
       huddle.participants.splice(0)
       huddle.attendees.clear()
+      remember(fake.workspace)
     },
   },
 } satisfies FakeFeature

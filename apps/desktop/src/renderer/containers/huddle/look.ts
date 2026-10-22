@@ -41,6 +41,26 @@ export function connectionOf(call: HuddleCall, media: MediaSnapshot | undefined)
 }
 
 /**
+ * Who is in the user's own call: the people Slack lists, the user, and
+ * anyone the media session hears whom Slack does not list yet. Slack's list
+ * can lag the call or be missing; the user and the people they hear are in
+ * it all the same.
+ */
+export function callPeopleIds(call: HuddleCall, selfId: string | undefined, media: MediaSnapshot | undefined): ReadonlyArray<string> {
+  const heard = media?.remotes.flatMap((remote) => (remote.userId === undefined ? [] : [remote.userId])) ?? []
+  return [...new Set([...(selfId === undefined ? [] : [selfId]), ...call.participants, ...heard])]
+}
+
+/** Slack says the user is the only one in their call, and the media session hears no one else. Not while Slack's list is unknown. */
+export function aloneInCall(call: HuddleCall, selfId: string | undefined, media: MediaSnapshot | undefined): boolean {
+  if (selfId === undefined || !call.participants.includes(selfId)) return false
+  return call.participants.every((id) => id === selfId) && !(media?.remotes.some((remote) => remote.userId !== selfId) ?? false)
+}
+
+/** When the call's duration counts from: the huddle's start once Slack says, else the user's join. */
+export const callStartOf = (call: HuddleCall): number | null => call.startedAt ?? call.joinedAt
+
+/**
  * The people in a huddle, the user first and then in join order. Speaking
  * and muted come from the media session while the user is in the call.
  */
