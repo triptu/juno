@@ -63,12 +63,12 @@ const pressProps = (action: () => void) => ({
 /** The floating toolbar over a text selection in a message (inventory 6.6): Quote, and Ask Juno while AI assist is on. */
 export function SelectionToolbar({ onQuote, onAskJuno }: SelectionToolbarProps) {
   return (
-    <Surface kind="toolbar" padding="xs" role="toolbar" aria-label="Selection" data-selection-toolbar="" sx={styles.toolbar}>
-      <Button variant="ghost" size="sm" tone="subtle" iconStart={Quotes} data-selection-quote="" {...pressProps(onQuote)}>
+    <Surface kind="toolbar" padding="none" radius="pill" role="toolbar" aria-label="Selection" data-selection-toolbar="" sx={styles.toolbar}>
+      <Button variant="ghost" size="xs" tone="subtle" iconStart={Quotes} data-selection-quote="" {...pressProps(onQuote)}>
         Quote
       </Button>
       {onAskJuno === undefined ? null : (
-        <Button variant="ghost" size="sm" tone="subtle" iconStart={SparkleDuotone} data-selection-ask-juno="" aria-keyshortcuts="Meta+J" {...tooltip(junoPanelCopy.askJunoTip, menuKeys('juno.toggle'))} {...pressProps(onAskJuno)}>
+        <Button variant="ghost" size="xs" tone="subtle" iconStart={SparkleDuotone} data-selection-ask-juno="" aria-keyshortcuts="Meta+J" {...tooltip(junoPanelCopy.askJunoTip, menuKeys('juno.toggle'))} {...pressProps(onAskJuno)}>
           {junoPanelCopy.askJuno}
         </Button>
       )}
@@ -77,10 +77,12 @@ export function SelectionToolbar({ onQuote, onAskJuno }: SelectionToolbarProps) 
 }
 
 const styles = stylex.create({
+  // The hover toolbar's height: 22px buttons, a 2px inset and the 1px border.
   toolbar: {
     display: 'inline-flex',
     alignItems: 'center',
     gap: spacing['--space-0-5'],
+    padding: spacing['--space-0-5'],
   },
   base: {
     position: 'absolute',
