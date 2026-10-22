@@ -11,7 +11,7 @@
  * publish the draft. The app only sees a release once it is published.
  *
  * Flags:
- *   --notes <file>   the changelog lines for this version, one per line (required)
+ *   --notes <file>   the highlights of this version, one per line, at most ten (required)
  *   --urgent         publish after typecheck, lint, unit tests and package smoke; start pnpm verify:main for it next
  *   --prerelease     publish as a pre-release: the app never offers it, and CHANGELOG.md is left alone
  *   --dry-run        check everything and print the plan; change nothing
@@ -23,8 +23,9 @@ import { closeSync, existsSync, mkdtempSync, openSync, readdirSync, readFileSync
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
-import { addChangelogEntry, compareVersions, isVersion, normalizeVersion, parseChangelog } from '../apps/desktop/src/main/releaseNotes.ts'
+import { addChangelogEntry, compareVersions, isVersion, normalizeVersion } from '../apps/desktop/src/main/releaseNotes.ts'
 import { releaseGate, printGate } from './release-gate.mjs'
+import { highlightLines } from './release-schedule.mjs'
 import { syncReleasedVersion } from './release-main.mjs'
 import { recordReleaseTiming } from './release-timings.mjs'
 
@@ -73,9 +74,13 @@ if (published && !values.prerelease) {
   console.log(`release:publish: ${tag} is already published; only the main version update was needed`)
   process.exit(0)
 }
-if (values.notes === undefined) fail('--notes <file> is required: the changelog lines for this version')
-const lines = parseChangelog(`## ${version}\n${readFileSync(values.notes, 'utf8')}`)[0]?.lines ?? []
-if (lines.length === 0) fail(`${values.notes} has no lines`)
+if (values.notes === undefined) fail('--notes <file> is required: the highlights of this version')
+let lines: readonly string[] = []
+try {
+  lines = highlightLines(readFileSync(values.notes, 'utf8'))
+} catch (error) {
+  fail(`${values.notes}: ${(error as Error).message}`)
+}
 
 // The build.
 if (!existsSync(join(dir, 'latest-mac.yml'))) fail(`no latest-mac.yml in ${dir}; run pnpm package first`)
