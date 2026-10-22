@@ -1,0 +1,1 @@
+- 10-22 19:01 · updates · Check for updates in Settings › About and Juno › Check for Updates… checks once even with automatic updates off, as Mac apps do, rather than asking to turn them on; it answers on one line under the version, and a found update follows the build's real path (DMG for unsigned, Restart to update for signed).
