@@ -35,4 +35,3 @@ export function neighbour(sections: ReadonlyArray<{ readonly items: ReadonlyArra
     default: return undefined
   }
 }
-

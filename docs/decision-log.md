@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-22 18:18 · verification · Reach Start thread with Tab and toolbar arrow keys in the existing background-tab check; mouse hover plus programmatic focus can hide the toolbar before the keyboard action. Keep all background-tab, scroll and focus assertions.
 - 10-22 18:00 · emoji search · Show name matches while the emoji search index warms after paint; append keyword matches to the current cold picker query so existing cells and Enter agree.
 - 10-22 18:00 · emoji search · Ship the CLDR Unicode License v3 notice with the desktop app and document the pinned, reproducible catalog generator.
 - 10-22 18:00 · emoji search · Rank curated chat terms above broad CLDR emoji associations; keep workspace names distinct from standard names and shared image URLs, and normalize skin tones in quick-reaction priors.

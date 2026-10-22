@@ -328,9 +328,11 @@ test('⌘-click Start thread opens the thread in a background tab; this tab, its
 
   // ⌘Enter on Start thread does the same from the keyboard; focus stays on the button.
   const other = topic.message('One more line under it')
-  await other.hover()
+  await other.press('Tab')
+  await juno.win.keyboard.press('End')
+  await juno.win.keyboard.press('ArrowLeft')
   const start = other.getByRole('button', { name: 'Start thread' })
-  await start.focus()
+  await expect(start).toBeFocused()
   await start.press('Meta+Enter')
   await tabs.expectCount(before.length + 2)
   await expect(active).toHaveAttribute('data-tooltip', mainTab!)

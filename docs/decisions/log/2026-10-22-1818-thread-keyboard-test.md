@@ -1,0 +1,1 @@
+- 10-22 18:18 · verification · Reach Start thread with Tab and toolbar arrow keys in the existing background-tab check; mouse hover plus programmatic focus can hide the toolbar before the keyboard action. Keep all background-tab, scroll and focus assertions.
