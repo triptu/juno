@@ -51,6 +51,12 @@
  * which mrkdwn markers the `text` puts around a styled run. Nothing is
  * written to disk.
  *
+ * `--only reactions` reads one history page of each of the 30 most recently
+ * active conversations and five of the general channel, and counts
+ * reactions whose `users` list is shorter than `count`. Then, for up to three messages (truncated ones first, else
+ * the largest counts), it calls `reactions.get` without and with `full` and
+ * compares `users.length` with `count` for each reaction. Counts only.
+ *
  * Output is counts, key censuses and milliseconds. No id, text, name, URL or
  * value is printed. `--out DIR` writes the redacted response shapes there
  * (default: a new temporary directory); copy the ones a fixture needs into
@@ -81,6 +87,7 @@ const READ_ONLY_METHODS = [
   'api.getFlannelHttpUrl',
   'users.list',
   'usergroups.list',
+  'reactions.get',
 ] as const
 /** Edge methods `--only users` and `--only emoji` may call, all reads. */
 const READ_ONLY_EDGE = ['users/info', 'users/list', 'emojis/list'] as const
@@ -226,6 +233,11 @@ async function main(): Promise<number> {
   if (flag('--only') === 'links') {
     console.log(JSON.stringify(await linksOnly(call), null, 2))
     return writeShapes(out)
+  }
+
+  if (flag('--only') === 'reactions') {
+    console.log(JSON.stringify(await reactionsOnly(call), null, 2))
+    return 0
   }
 
   if (flag('--only') === 'styles') {
@@ -610,6 +622,85 @@ async function linksOnly(call: Call): Promise<unknown> {
     relation: Object.fromEntries(relation),
     textForms: Object.fromEntries(textForms),
     urlLikeTextInTextElements: urlInTextElement,
+  }
+}
+
+/** `--only reactions`: whether a message lists fewer reactors than its count, and what `reactions.get` lists. Counts only. */
+async function reactionsOnly(call: Call): Promise<unknown> {
+  const counts = await call('client.counts', { thread_counts_by_channel: true }, 'reactions')
+  const recent = ['channels', 'mpims', 'ims'].flatMap((list) => (counts?.[list] as Array<{ id: string; latest?: string }> | undefined) ?? [])
+    .filter((e) => e.latest !== undefined)
+    .toSorted((a, b) => tsSeconds(b.latest!) - tsSeconds(a.latest!))
+    .slice(0, 30)
+    .map((e) => e.id)
+  type Seen = { count: number; users: number }
+  const reactionsOf = (message: Json | undefined): Array<Seen> =>
+    ((message?.['reactions'] as Array<{ count?: number; users?: Array<string> }> | undefined) ?? []).map((r) => ({ count: r.count ?? 0, users: r.users?.length ?? 0 }))
+  const bucket = (count: number) => (count <= 1 ? '1' : count <= 5 ? '2-5' : count <= 10 ? '6-10' : count <= 20 ? '11-20' : count <= 50 ? '21-50' : '51+')
+  const histogram: Record<string, { reactions: number; truncated: number; usersLengths: Record<string, number> }> = {}
+  const candidates: Array<{ channel: string; ts: string; max: number; truncated: boolean }> = []
+  let messages = 0
+  let withReactions = 0
+  let reactions = 0
+  let truncated = 0
+  let largest: Seen | undefined
+  // The workspace's general channel has the most members, so the largest counts: five pages of it too.
+  const boot = await call('client.userBoot', { version_all_channels: true, return_all_relevant_mpdms: true }, 'reactions')
+  const general = ((boot?.['channels'] as Array<Json> | undefined) ?? []).find((c) => c['is_general'] === true)?.['id']
+  const pages: Array<{ channel: string; cursor?: string }> = recent.map((channel) => ({ channel }))
+  if (typeof general === 'string') pages.push({ channel: general })
+  let generalPages = 0
+  while (pages.length > 0) {
+    const { channel, cursor } = pages.shift()!
+    const page = await call('conversations.history', { channel, limit: 100, no_user_profile: true, ...(cursor === undefined ? {} : { cursor }) }, 'reactions')
+    const next = (page?.['response_metadata'] as { next_cursor?: string } | undefined)?.next_cursor
+    if (channel === general && ++generalPages < 5 && next) pages.push({ channel, cursor: next })
+    for (const m of (page?.['messages'] as Array<Msg> | undefined) ?? []) {
+      messages++
+      const seen = reactionsOf(m)
+      if (seen.length === 0) continue
+      withReactions++
+      for (const r of seen) {
+        reactions++
+        const entry = (histogram[bucket(r.count)] ??= { reactions: 0, truncated: 0, usersLengths: {} })
+        entry.reactions++
+        if (r.users < r.count) {
+          truncated++
+          entry.truncated++
+          entry.usersLengths[String(r.users)] = (entry.usersLengths[String(r.users)] ?? 0) + 1
+        }
+        if (largest === undefined || r.count > largest.count) largest = r
+      }
+      candidates.push({ channel, ts: m.ts, max: Math.max(...seen.map((r) => r.count)), truncated: seen.some((r) => r.users < r.count) })
+    }
+  }
+  // Truncated messages first, then the largest counts.
+  const picked = candidates.toSorted((a, b) => Number(b.truncated) - Number(a.truncated) || b.max - a.max).slice(0, 3)
+  const gets = []
+  for (const target of picked) {
+    const plain = await call('reactions.get', { channel: target.channel, timestamp: target.ts }, 'reactions-get')
+    const full = await call('reactions.get', { channel: target.channel, timestamp: target.ts, full: true }, 'reactions-get-full')
+    const before = reactionsOf(plain?.['message'] as Json | undefined)
+    const after = reactionsOf(full?.['message'] as Json | undefined)
+    gets.push({
+      truncatedInHistory: target.truncated,
+      reactions: before.map((r, i) => ({ count: r.count, users: r.users, fullCount: after[i]?.count, fullUsers: after[i]?.users })),
+    })
+  }
+  return {
+    calls: summariseCalls(),
+    rateLimits,
+    conversations: recent.length,
+    generalChannelPages: generalPages,
+    messages,
+    withReactions,
+    reactions,
+    truncated,
+    usersAlwaysEqualCount: truncated === 0,
+    largestCount: largest?.count,
+    usersForLargest: largest?.users,
+    byCount: histogram,
+    reactionsGet: gets,
   }
 }
 
