@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { warmEmojiSearch, isEmojiSearchWarm } from '@juno/contract'
+import { useEmojiSearchReady } from './useEmojiSearchReady'
 /**
  * The emoji picker for Settings' quick reactions, loaded on its own like
  * `EmojiPickerPanel`, so the catalog is not in the first bundle.
@@ -9,6 +11,7 @@ import { frequentEmojiAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { EmojiPicker } from '@juno/views'
 
+const searchIndex = { warmEmojiSearch, isEmojiSearchWarm }
 warmWorkspaceEmoji(emojiCatalog)
 
 interface QuickReactionPickerProps {
@@ -27,10 +30,11 @@ export default function QuickReactionPicker({ selected, onPick, onClose }: Quick
   // Table changes take effect on the next open, so cells never move under a pending click.
   const answer = snapshot ?? current
   const data = answer?.data ?? standardEmojiPickerData
+  const searchReady = useEmojiSearchReady(data.all, searchIndex)
   const pick = (name: string, unicode?: string) => {
     if (unicode !== undefined) return onPick({ name, unicode })
     const own = data.byName.get(name)
     if (own?.url !== undefined) return onPick({ name, unicode: `:${name}:`, url: own.url })
   }
-  return <EmojiPicker data={data} recent={recent} selected={selected} onPick={pick} onClose={onClose} />
+  return <EmojiPicker data={data} searchReady={searchReady} recent={recent} selected={selected} onPick={pick} onClose={onClose} />
 }

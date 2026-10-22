@@ -1,4 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
+import { COLUMNS, neighbour } from './emojiPickerNavigation'
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
 import { useDeferredValue, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
@@ -8,6 +9,8 @@ import { Emoji, ScrollArea, Surface, Text, TextField } from '@juno/ui'
 
 export interface EmojiPickerProps {
   readonly data: PreparedEmojiPicker
+  /** The container warms the full index; until then search uses names only. */
+  readonly searchReady?: boolean
   /** Recently used names (Slack names), shown first as "Frequently used" when non-empty. */
   readonly recent?: ReadonlyArray<string>
   /** A Slack emoji name: "+1", "partying_face", a custom name. */
@@ -27,7 +30,6 @@ interface Section {
   readonly items: ReadonlyArray<Item>
 }
 
-const COLUMNS = 9
 // Grid geometry mirrors --control-32 and the tag heading's padding and line height.
 const ROW_HEIGHT = 32
 const HEADER_HEIGHT = 30
@@ -36,7 +38,7 @@ const EMPTY: ReadonlyArray<never> = []
 const NONE: ReadonlySet<string> = new Set()
 
 /** A windowed grid: only nearby rows mount, including in a large workspace or search. */
-export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, onClose, initialQuery = '' }: EmojiPickerProps) {
+export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, onClose, initialQuery = '', searchReady = true }: EmojiPickerProps) {
   const [query, setQuery] = useState(initialQuery)
   const [failed, setFailed] = useState<ReadonlySet<string>>(NONE)
   const [focused, setFocused] = useState<number | undefined>(undefined)
@@ -75,11 +77,20 @@ export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, on
 
   const results = useMemo((): ReadonlyArray<Section> | undefined => {
     if (search === '') return undefined
-    const matches = matchEmoji(all, search, recent, [], Infinity)
+    const matches = matchEmoji(all, search, recent, [], Infinity, searchReady)
     return [{ key: 'results', items: matches }]
-  }, [all, search, recent])
+  }, [all, search, recent, searchReady])
 
-  const sections = results ?? browse
+  const [cold, setCold] = useState<{ readonly search: string; readonly all: typeof all; readonly items: ReadonlyArray<Item> }>()
+  const items = results?.[0]?.items
+  if (!searchReady && items !== undefined && cold?.items !== items) setCold({ search, all, items })
+  const sections = useMemo(() => {
+    if (items === undefined) return browse
+    if (cold?.search !== search || cold.all !== all || !searchReady) return [{ key: 'results', items }]
+    // Refine this cold query by appending new matches, keeping the cells already under the pointer.
+    const seen = new Set(cold.items.map(itemKey))
+    return [{ key: 'results', items: [...cold.items, ...items.filter((item) => !seen.has(itemKey(item)))] }]
+  }, [items, browse, cold, search, all, searchReady])
   const grid = useMemo(() => {
     const rows: Array<{ key: string; heading: string } | { key: string; section: string; items: ReadonlyArray<Item>; start: number; first: number }> = []
     const groups: Array<{ section: Section; top: number; height: number; first: number; row: number }> = []
@@ -149,7 +160,8 @@ export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, on
     if (event.key === 'Enter') {
       // The live query, not the deferred one, so Enter right after typing picks what was typed.
       const typed = normalize(query)
-      const match = typed === '' ? undefined : matchEmoji(all, typed, recent, [], Infinity).find((item) => !isChosen(item))
+      const matches = typed === search ? sections.flatMap((section) => section.items) : matchEmoji(all, typed, recent, [], Infinity, searchReady)
+      const match = typed === '' ? undefined : matches.find((item) => !isChosen(item))
       if (match === undefined) return
       event.preventDefault()
       onPick(match.name, match.unicode)
@@ -251,44 +263,6 @@ const itemKey = (item: Item) => `${item.unicode === undefined ? 'workspace' : 's
 /** Search text as a name: lowercase, no colons, spaces as underscores (":Party face" finds partying_face). */
 function normalize(query: string): string {
   return query.trim().toLowerCase().replace(/:/g, '').replace(/\s+/g, '_')
-}
-
-/**
- * Where an arrow key moves focus from `from`: the next or previous emoji,
- * or the same column one row up or down, across section edges. `null` means
- * the search field; `undefined` means the key is not an arrow.
- * Uses the complete section order, including rows outside the viewport.
- */
-function neighbour(sections: ReadonlyArray<Section>, from: number, key: string): number | null | undefined {
-  const groups = sections.filter((section) => section.items.length > 0)
-  let start = 0
-  const s = groups.findIndex((section) => {
-    if (from < start + section.items.length) return true
-    start += section.items.length
-    return false
-  })
-  const cells = groups[s]?.items
-  if (cells === undefined) return undefined
-  const i = from - start
-  const column = i % COLUMNS
-  const previous = groups[s - 1]?.items
-  const next = groups[s + 1]?.items
-  switch (key) {
-    case 'ArrowLeft': return Math.max(0, from - 1)
-    case 'ArrowRight': return Math.min(groups.reduce((count, group) => count + group.items.length, 0) - 1, from + 1)
-    case 'ArrowUp': {
-      if (i >= COLUMNS) return from - COLUMNS
-      if (previous === undefined) return null
-      const lastRow = Math.floor((previous.length - 1) / COLUMNS) * COLUMNS
-      return start - previous.length + Math.min(lastRow + column, previous.length - 1)
-    }
-    case 'ArrowDown': {
-      if (i + COLUMNS < cells.length) return from + COLUMNS
-      if (Math.floor(i / COLUMNS) < Math.floor((cells.length - 1) / COLUMNS)) return start + cells.length - 1
-      return next === undefined ? from : start + cells.length + Math.min(column, next.length - 1)
-    }
-    default: return undefined
-  }
 }
 
 // Custom images in a 32px cell, the size of a text emoji's square there (`Emoji` 20).

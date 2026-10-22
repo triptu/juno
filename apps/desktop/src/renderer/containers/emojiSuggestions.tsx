@@ -3,6 +3,7 @@ import { EMOJI_QUERY_MIN, emojiQueryAt } from '@juno/contract'
 import { composerEmojiAtom, frequentEmojiAtom, noteRecentEmoji, quickReactionsAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { mentionRowId, type ComposerMention, type EmojiSuggestion } from '@juno/views'
+import { useEmojiSearchReady } from './useEmojiSearchReady'
 import { editField, listKey } from './suggestionKeys'
 import { SuggestionList, useSuggestionList } from './suggestionList'
 
@@ -27,7 +28,9 @@ function useEmojiRows(open: boolean) {
   }, [open, catalog])
   const standard = catalog?.standardEmoji ?? EMPTY_ROWS
   const workspace = useMemo(() => answer._tag !== 'Success' || catalog === undefined ? EMPTY_ROWS : catalog.workspaceChoices(answer.value), [answer, catalog])
-  return useMemo(() => ({ rows: catalog?.mergeEmoji(standard, workspace) ?? standard, match: catalog?.matchEmoji }), [catalog, standard, workspace])
+  const rows = useMemo(() => catalog?.mergeEmoji(standard, workspace) ?? standard, [catalog, standard, workspace])
+  const ready = useEmojiSearchReady(rows, catalog)
+  return { rows, match: catalog?.matchEmoji, ready }
 }
 
 /** Local colon suggestions share the mention list's anchor, rows, and keyboard handling. */
@@ -38,12 +41,12 @@ export function useEmojiSuggestions({ text, onChange, field }: Options) {
   const [chosen, setChosen] = useState<string | undefined>(undefined)
   const typed = emojiQueryAt(text, Math.min(caret, text.length))
   const loading = typed !== undefined && (/^[a-z]/.test(typed.text) || typed.text.length >= EMOJI_QUERY_MIN)
-  const { rows: catalog, match } = useEmojiRows(loading && typed.start !== dismissed)
+  const { rows: catalog, match, ready } = useEmojiRows(loading && typed.start !== dismissed)
   const listReady = useSuggestionList(loading)
   const query = typed === undefined || typed.start === dismissed || typed.text.length < EMOJI_QUERY_MIN ? undefined : typed
   const quick = useAtomValue(quickReactionsAtom)
   const frequent = useAtomValue(frequentEmojiAtom)
-  const rows = query === undefined || match === undefined ? [] : match(catalog, query.text, frequent, quick)
+  const rows = query === undefined || match === undefined ? [] : match(catalog, query.text, frequent, quick, undefined, ready)
   const ids = rows.map((row) => mentionRowId(listId, row.id))
   const activeId = chosen !== undefined && ids.includes(chosen) ? chosen : ids[0]
   const pick = (id: string) => {
