@@ -15,7 +15,7 @@ Conventions that apply everywhere (SPEC §16):
 - Focus ring: 2px, offset 2px, keyboard only.
 - Numbers use tabular figures.
 - Sentence case. Buttons start with a verb.
-- Context menus are native (spec). The prototype's DOM menus define the item order and labels; native menus cannot show the icons or the right-aligned hints ("⌘ click", "Stays unread"), so those are dropped or moved to the shortcut column.
+- Context menus are native (spec). The prototype's DOM menus define the item order and labels; native menus cannot show the icons or mouse gestures in the shortcut column. A short mouse hint can use a second line (`sublabel`) on macOS 14.4 and later, as the link menu does for “⌘ click”.
 
 ---
 
@@ -797,6 +797,10 @@ Right-click a text field (the composers, search, settings fields) or selected te
 - **Field:** Cut (⌘X) · Copy (⌘C) · Paste (⌘V) · Paste and Match Style (⌥⇧⌘V) · Select All (⌘A), each disabled when the field cannot do it. Read-only text has Copy alone.
 
 A password field offers no Look Up or Search. A right-click that opens a Juno menu calls `preventDefault`, and Chromium then reports nothing to main, so the two never open together. Row menus skip right-clicks inside a field (`inField` in `@juno/views`), which keep this menu.
+
+### 15.10 Link menu
+
+Right-click a link in message text or an unfurl title. A web link whose plain click opens Juno shows **Open link** · **Open in browser** (second line “⌘ click”) · — · **Copy link**. When the saved default is the browser and the panel can show it, the second item is **Open in Juno** without a hint; a browser-only link has no duplicate second item. A link to this Slack workspace shows **Open link** · **Open in background** (second line “⌘ click”) · — · **Copy link**. An email link shows **Copy email address** · **New email**. Copy uses the target, not the visible label. Right-clicking inside selected link text keeps the message menu; image, @person and #channel targets keep their own menus.
 
 ## 16. Toasts
 
