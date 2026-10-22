@@ -49,7 +49,7 @@ Visual and behaviour checks run in the gallery, not in the package: `pnpm galler
 
 Home's composer, Recent and destination chip stay in the startup bundle because Home is the launch tab. `DestinationLists` loads on idle, and the chip also warms it on hover and focus.
 
-Deferred views use `chunk` from `@juno/ui`, also re-exported here for desktop containers. Frequent rows reserve their final row heights while loading; picker popovers mount their frame and content together.
+Deferred views use `chunk` from `@juno/ui`, also re-exported here for desktop containers. Frequent rows reserve their final row heights while loading; picker popovers mount their frame and content together. Home’s Send to list and the message and selection toolbars warm on idle. `homeDestination.ts` keeps the composer’s labels and row ids eager; `PlacePicker.tsx` loads with All topics.
 
 Unfurl cards retain author and service icons, body text and source links. Their images load through the bounded main-process image route and collapse on failure. A shared Slack message's footer names its place, as a quiet link that opens the message (`SharedPlace`). The AttachmentCard gallery includes X, YouTube, generic, failed and shared-message previews.
 

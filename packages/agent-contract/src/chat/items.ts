@@ -167,24 +167,6 @@ export const JunoBlock = Schema.Union([
 ])
 export type JunoBlock = typeof JunoBlock.Type
 
-const inlineText = (inlines: ReadonlyArray<JunoInline>) => inlines.map((inline) => inline.text).join('')
-
-/** A bubble's body as plain text, for a quote's preview and Copy: blocks on their own lines, list items with "•" or their number. */
-export const junoText = (body: ReadonlyArray<JunoBlock>): string =>
-  body
-    .map((block) => {
-      switch (block._tag) {
-        case 'paragraph':
-        case 'heading':
-          return inlineText(block.inlines)
-        case 'list':
-          return block.items.map((item, n) => `${block.ordered ? `${(block.start ?? 1) + n}.` : '•'} ${inlineText(item)}`).join('\n')
-        case 'codeBlock':
-          return block.text
-      }
-    })
-    .join('\n')
-
 /**
  * How a run ended. `complete` is the normal case and shows nothing. Every
  * other variant is one fixed line from `chatCopy.ending` (an `ending`
