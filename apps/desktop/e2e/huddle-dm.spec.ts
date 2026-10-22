@@ -47,11 +47,11 @@ test('a DM huddle shows both people and counts up while huddles/info lags the ro
     const samples: Array<ReadonlyArray<string | null>> = []
     for (let i = 0; i < 100; i++) {
       samples.push(['[data-huddle-bar]', '[data-huddle-page]'].map((selector) =>
-        document.querySelector(selector)?.textContent?.match(/\b\d+:\d{2}\b/)?.[0] ?? null))
+        document.querySelector(selector)?.textContent?.match(/\d+:\d{2}/)?.[0] ?? null))
       await new Promise((resolve) => setTimeout(resolve, 20))
     }
     return samples
   })
-  expect(durations.every(([barTime, tabTime]) => barTime !== null && barTime === tabTime)).toBe(true)
+  expect(durations.filter(([barTime, tabTime]) => barTime === null || barTime !== tabTime)).toEqual([])
   expect(new Set(durations.map(([time]) => time)).size).toBeGreaterThan(1)
 })
