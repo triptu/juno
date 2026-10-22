@@ -265,7 +265,7 @@ export type { Picture } from '@juno/pictures'
 export { pictureYear } from '@juno/pictures'
 export { forgetPicture, homePicturesOnAtom, lastPictureId, pictureTitle, pictureUrl, preparePicture, setHomePicturesOn, takePicture } from './homePictures'
 export { withAsks } from './homeAsks'
-export { ensurePicture, loadPictures, pictureFilesAtom, readPictureFiles } from './pictureFiles'
+export { ensurePicture, loadedPictures, loadPictures, notePicture, pictureFilesAtom, readPictureFiles } from './pictureFiles'
 export { actOnSuggested } from './suggested'
 export {
   appendUnseen,
