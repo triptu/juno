@@ -21,14 +21,16 @@ test('cold picker paints Frequently used complete and keeps its first cell still
     await second.sidebar.row('#eng').open()
     const row = second.topic.list.locator('[data-message-row]').last()
     const menu = await second.messageMenu.openOnRow(row)
-    // Sampled once the menu has turned into the picker (its Web Animations, not the placeholders' CSS ones): during the morph every cell moves with it.
+    // Sampled once the menu has turned into the picker: during the morph every cell moves with it.
     const frames = again.win.evaluate(() => new Promise<Array<{ names: Array<string | null>; top: number }>>((resolve) => {
       const result: Array<{ names: Array<string | null>; top: number }> = []
-      let remaining = 180
+      let remaining = 600
       const tick = () => {
         const group = document.querySelector('[data-emoji-picker] [role="group"]')
         const cell = group?.querySelector('[data-emoji]')
-        const moving = document.querySelector('[data-context-menu]')?.getAnimations({ subtree: true }).some((animation) => !(animation instanceof CSSAnimation) && !(animation instanceof CSSTransition) && animation.playState === 'running') === true
+        // The material layer is scaled while the menu grows and has no transform once the picker is in place.
+        const surface = document.querySelector('[data-context-menu][data-morphed]')?.firstElementChild
+        const moving = surface == null || getComputedStyle(surface).transform !== 'none'
         if (cell !== undefined && cell !== null && !moving) result.push({ names: Array.from(group!.querySelectorAll('[data-emoji]'), (node) => node.getAttribute('data-emoji')), top: cell.getBoundingClientRect().top })
         if (--remaining === 0) resolve(result)
         else requestAnimationFrame(tick)
@@ -49,7 +51,8 @@ test('cold picker paints Frequently used complete and keeps its first cell still
     await expect.poll(() => resolved.locator('img').evaluate((node) => (node as HTMLImageElement).naturalWidth)).toBeGreaterThan(0)
     const seen = await frames
     expect(seen.length).toBeGreaterThan(0)
-    expect(seen[0]!.names).toContain('hello_juno')
+    // The custom emoji's cell is there from the first sampled frame, under its alias or its real name.
+    expect(seen[0]!.names.some((name) => name === 'hello_juno' || name === 'juno_wave')).toBe(true)
     expect(new Set(seen.map((frame) => frame.names.length)).size).toBe(1)
     expect(new Set(seen.map((frame) => frame.top)).size).toBe(1)
   } finally {

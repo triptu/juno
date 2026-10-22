@@ -84,7 +84,9 @@ test('a right-click opens the menu as it comes up, over the same message, with t
     const text = await boxOf(last.locator('[data-msg-text]').first())
     const box = await boxOf(menu.root)
     expect(Math.abs(box.left - (text.left + 1))).toBeLessThanOrEqual(1)
-    expect(box.top).toBeGreaterThan(text.top)
+    // Under the first line, or moved up only as far as the window's bottom edge needs.
+    const height = await juno.win.evaluate(() => window.innerHeight)
+    if (box.top <= text.top) expect(Math.round(box.bottom)).toBe(height - 6)
     // The keys: ↓ goes to the grid's first cell, → along it, ↓ to the rows.
     await juno.win.keyboard.press('ArrowDown')
     await expect(menu.cell('+1')).toBeFocused()
@@ -200,14 +202,19 @@ async function morphAt(juno: Juno, at: { readonly x: number; readonly y: number 
 
 /** A point on a row's text: near its start, or past where the picker would fit to the right of the window. */
 async function pointOn(win: Page, row: Locator, side: 'left' | 'right'): Promise<{ readonly x: number; readonly y: number }> {
-  const text = await boxOf(row)
+  // On the words, not the avatar or the name, which have the person's menu.
+  const text = await boxOf(row.locator('[data-msg-text]').first())
   const width = await win.evaluate(() => window.innerWidth)
-  const x = side === 'left' ? text.left + 24 : Math.min(text.right - 24, width - 120)
+  const x = side === 'left' ? text.left + 24 : text.right - 24
+  // The picker fits to the right of a point near the start, and not of one near the end.
+  expect(x + 1 + 314 + 6 <= width).toBe(side === 'left')
   return { x, y: text.top + 10 }
 }
 
 test('More reactions grows the picker from the corner of the menu that stays put, near every edge of the window', async ({ juno, fake }) => {
-  for (let i = 0; i < 12; i++) fake.injectMessage({ channel: 'C0ENG', user: i % 2 === 0 ? 'U0MAYA' : 'U0LEO', text: `Corner check ${i}` })
+  // A narrow window, so a message's words reach near its right edge.
+  await juno.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(900, 700))
+  for (let i = 0; i < 12; i++) fake.injectMessage({ channel: 'C0ENG', user: i % 2 === 0 ? 'U0MAYA' : 'U0LEO', text: `Corner check ${i}: a line long enough to run across the whole column of the list, to its far edge` })
   await juno.sidebar.expectTop('#eng')
   await juno.sidebar.row('#eng').open()
   await juno.topic.expectMessage('Corner check 11')

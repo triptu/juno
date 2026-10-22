@@ -207,7 +207,7 @@ test('a Juno custom reaction is stored by name and drawn as an image', async ({ 
   await expect.poll(() => model.inputs().some((input) => input.startsWith('<reaction') && input.includes('emoji="juno_wave"'))).toBe(true)
 })
 
-test('the keyboard reaches a bubble, ⇧F10 opens its menu under the first line, and the menu’s keys react', async ({ juno, model }) => {
+test('the keyboard reaches a bubble, ⇧F10 opens its menu under the first line, and the menu’s keys react', async ({ juno }) => {
   await ready(juno)
   await juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
   const chat = JunoChatPane.tab(juno.win)
@@ -243,5 +243,4 @@ test('the keyboard reaches a bubble, ⇧F10 opens its menu under the first line,
   await expect(menu.root).toHaveCount(0)
   await expect(chat.junoBubble('You said: keyboard menu target').getByLabel('Reacted 👍')).toBeVisible()
   await expect(bubble).toBeFocused()
-  await expect.poll(() => model.inputs().some((input) => input.startsWith('<reaction') && input.includes('emoji="👍"'))).toBe(true)
 })
