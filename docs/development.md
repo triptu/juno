@@ -110,7 +110,7 @@ What changes with it:
 - **The app under test gets neither.** pnpm passes that `NODE_PATH` and resolve hook to everything it runs, Electron included. The e2e fixture (`apps/desktop/e2e/fixtures.ts`) drops both, as the packaged app has neither; with them, a Home send to a DM did not arrive in one e2e test.
 - **Remote runs** install in their image the same way.
 
-Regenerate the standard emoji catalog and search keywords with `node scripts/emoji-catalog.mjs` (pinned sources; local input paths are documented at the top of the script); its CLDR notice ships in `apps/desktop/THIRD_PARTY_NOTICES.txt`.
+Regenerate the standard emoji catalog and search keywords with `node scripts/emoji-catalog.mjs` (pinned sources; local input paths are documented at the top of the script); its CLDR notice ships in `apps/desktop/THIRD_PARTY_NOTICES.txt`. The everyday phrases it adds come from `scripts/emoji-intent.json`; `node --import ./scripts/ts-resolve-hooks.mjs scripts/emoji-intent.ts` asks the model (OpenRouter, `OPENROUTER_API_KEY` from the environment or `.env`) for emoji the file lacks, `--all` for every emoji. Fix a bad phrase in `intentOverrides` in `emoji-catalog.mjs`, then rerun it.
 
 ## Decision log
 
@@ -1313,9 +1313,14 @@ Signed releases also carry the ZIP and its block map for in-place updates.
 - Fixed a crash on sign out.
 ```
 
-The app shows these lines as plain text under "What's new"
-(`apps/desktop/src/main/releaseNotes.ts` parses them). Write them for the person
-using Juno, in the style of SPEC section 17.
+A section is the version's highlights: 3 to 8 lines, each one plain sentence
+about what a person sees or can do now, in the style of SPEC section 17. It is
+not a list of commits. Leave out packages, tests, specs, refactors, budgets,
+CI, internal names and commit hashes, and anything a user would not notice.
+No group headings: the app shows every line as one bullet under "What's new"
+(`apps/desktop/src/main/releaseNotes.ts` parses them). The release agent writes
+the lines from the commits since the last release
+(`.claude/skills/do-release/SKILL.md`, "Write the highlights").
 
 ### Versions
 
@@ -1334,8 +1339,9 @@ offers a release only when it is newer than the installed version, and
 `pnpm release:publish --notes <file>` publishes the build in
 `apps/desktop/release/` to the releases repository, with your own `gh` login
 (`gh auth login`, with write access to the repository). No token is read or
-written by the script. `<file>` holds this version's changelog lines, one per
-line. The script:
+written by the script. `<file>` holds this version's highlights, one per line
+("The releases repository" above); the script refuses an empty file, more than
+ten lines, or a line with a commit hash. The script:
 
 1. checks `latest-mac.yml` is for the version in `apps/desktop/package.json`,
    that every file it names is there, and that the app contains `update.json`
@@ -1400,12 +1406,13 @@ records both the source and build commits; older releases use their
 A release gets a patch version newer than both the source and published version,
 a worktree on the scratch volume, a version commit, packaging through the heavy
 lock, and the packaged smoke with `JUNO_E2E_AI_JOBS=1`. Packaging uses release
-priority when the installed heavy lock supports it. Notes use commit subjects
-since the last release, omit test and merge maintenance, and group changes by
-area. Keep product commit subjects plain enough to read as release notes.
-Pass `--notes <file>` to use reviewed changelog lines instead; the dry run shows
-those same lines. This does not bypass the full-run gate or the check for
-user-facing changes.
+priority when the installed heavy lock supports it. A publish needs
+`--notes <file>` with the version's highlights, written by the release agent;
+without it the command lists the product commits since the last release, the
+input for those highlights, and stops. The dry run shows the same list, or with
+`--notes` the highlights as they will be published. Neither bypasses the
+full-run gate or the check for user-facing changes, which still reads the
+commits. Keep product commit subjects plain, so the list reads easily.
 
 The command uses the existing `gh` login and requires `JUNO_UPDATE_TOKEN` in its
 environment. Supply it through the existing secure release setup, never in a
