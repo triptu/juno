@@ -54,11 +54,11 @@ test('Ask Juno on highlighted text opens the panel with the selection quoted, an
 
   const root = juno.topic.message(POSTGRES)
   await highlight(juno, root, 'logical replication')
-  // The selection's toolbar: Quote, and Ask Juno with its shortcut.
+  // The selection's toolbar: Quote, and Ask Juno with its shortcut, icons named by their tooltips.
   const toolbar = juno.win.getByRole('toolbar', { name: 'Selection' })
   await expect(toolbar.getByRole('button', { name: 'Quote' })).toBeVisible()
   const ask = toolbar.getByRole('button', { name: 'Ask Juno' })
-  await expect(ask).toHaveAttribute('data-tooltip', 'Ask Juno about the selection')
+  await expect(ask).toHaveAttribute('data-tooltip', 'Ask Juno')
   await expect(ask).toHaveAttribute('data-tooltip-keys', '⌘J')
   await ask.click()
 

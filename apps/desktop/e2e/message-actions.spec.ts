@@ -187,7 +187,7 @@ async function quoteMessage({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Pr
     selection.addRange(range)
   })
   await text.dispatchEvent('pointerup', { bubbles: true, clientX: box.x + 20, clientY: box.y + 5 })
-  const quote = juno.win.locator('[data-selection-quote]')
+  const quote = juno.win.getByRole('toolbar', { name: 'Selection' }).getByRole('button', { name: 'Quote' })
   await expect(quote).toBeVisible()
   await quote.click()
   await expect(topic.composer).toHaveValue('> retry for 30 minutes\n')

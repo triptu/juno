@@ -21,7 +21,7 @@ Shared conventions for every primitive (details in `packages/ui/README.md`):
 
 ## 1. Icon
 
-Phosphor wrapper. Takes the icon component (`icon={Hash}`, imported from `@phosphor-icons/react/dist/icons/Hash`), not a name, so only used icons are bundled. `size` 12 | 13 | 14 | 15 | 16 | 18 | 20 (default 16); `weight` `regular` | `bold` | `fill`, defaulting to bold at 14 and below and regular at 15 and above, so call sites only name `fill`; duotone is not a weight but an icon from `duotone.ts` (`SparkleDuotone`), the only icons the desktop build keeps that weight for (`scripts/check-duotone.mjs` fails on it anywhere else); `active` is shorthand for `weight="fill"` (the outline/fill pair of a toggle); `dim` for the 0.75 tab icon; optional `label` (otherwise hidden from assistive technology). Drawn in `currentColor`. The Lucide name mapping is in `friendly-layer.md` §2.3.
+Phosphor wrapper. Takes the icon component (`icon={Hash}`, imported from `@phosphor-icons/react/dist/icons/Hash`), not a name, so only used icons are bundled. `size` 12 | 13 | 14 | 15 | 16 | 18 | 20 (default 16); `weight` `regular` | `bold` | `fill`, defaulting to bold at 14 and below and regular at 15 and above, so call sites only name `fill`; duotone is not a weight but an icon from `duotone.ts` (`SparkleDuotone`), the only icons the desktop build keeps that weight for (`scripts/check-duotone.mjs` fails on it anywhere else); `active` is shorthand for `weight="fill"` (the outline/fill pair of a toggle); `dim` for the 0.75 tab icon; optional `label` (otherwise hidden from assistive technology); `evenBox` `both` | `block` draws an odd size (13, 15) in a box 1px larger, with half a pixel of room each side, because the browser puts an SVG's box on whole pixels and an odd icon centred in an even box would draw half a pixel low and right. `IconButton` passes `both` and `Button` passes `block`, so their icons sit on the button's centre line. Drawn in `currentColor`. The Lucide name mapping is in `friendly-layer.md` §2.3.
 
 ## 2. Button
 
@@ -55,7 +55,7 @@ Button with only an icon. `label` is required and doubles as the tooltip (`noToo
 | `size` | 20, 22, 24, 26, 28, 30, 32, 36 |
 | `radius` | derived (4 for 20–22, round for 24 (the hover-toolbar button, with a 15px icon), 6 for 26, 12 for 28, 8 for 30+), or `sm` (5, dismiss), `full` (attach, send) |
 
-`EmojiButton`: the 24px round hover-toolbar button whose icon is a 14px emoji (`emoji` as text, or `src` for a custom emoji's image, with `emoji` as the alt), the same feedback as `IconButton`. Needs a `label` ("React 👍").
+`EmojiButton`: the 24px round hover-toolbar button whose icon is a 14px emoji (`emoji` as text, or `src` for a custom emoji's image, with `emoji` as the alt), the same feedback as `IconButton`. Needs a `label` ("React 👍"). The text emoji is set in `--font-emoji` in a 14px square with line-height 1, moved by `--emoji-14-shift`, so flex centres the emoji itself: in Figtree's line box it drew 1.5px high and, from its 18px advance, 2px left (`toolbar-align.spec.ts`).
 | `variant` | `ghost` (default), `secondary`, `primary` (send), `raised`, `island` (a page header island's control: hover and open `--secondary-default`, pressed toggle `--secondary-hover`) |
 | `tone` | `subtle` (default), `muted`, `default` for ghost |
 | `icon`, `iconSize`, `iconWeight`, `dimmed` | as Button. Icon 12 / 12 / 13 / 18 / 18 / 18 / 20 by size; the send arrow passes `iconWeight="bold"`, attach `iconSize={20}` |

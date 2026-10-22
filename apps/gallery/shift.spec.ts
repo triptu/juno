@@ -491,8 +491,8 @@ test.describe('Message actions', () => {
   test('the selection’s toolbar floats over the list, outside the rows, with Quote and Ask Juno', async ({ page }) => {
     await open(page, 'TopicView', 'interaction/selection-quote')
     const toolbar = page.locator('[data-selection-toolbar]')
-    await expect(toolbar.locator('[data-selection-quote]')).toBeVisible()
-    await expect(toolbar.locator('[data-selection-ask-juno]')).toBeVisible()
+    await expect(toolbar.getByRole('button', { name: 'Quote' })).toBeVisible()
+    await expect(toolbar.getByRole('button', { name: 'Ask Juno' })).toBeVisible()
     await expect(page.locator('[data-message-row] [data-selection-toolbar]')).toHaveCount(0)
     // Centred over the selection, above it.
     const selection = await page.evaluate(() => window.getSelection()!.getRangeAt(0).getBoundingClientRect().toJSON() as DOMRect)
