@@ -19,6 +19,7 @@ export interface EmojiProps {
  * assistive technology: the parent names it.
  */
 export function Emoji({ glyph, size = 14 }: EmojiProps) {
+  'use no memo' // A leaf in every reaction chip; the compiler's cache would only add bytes to the start bundle.
   return (
     <span aria-hidden {...stylex.props(styles.glyph, sizeStyles[size])}>
       {glyph}
@@ -36,14 +37,16 @@ const styles = stylex.create({
   glyph: {
     display: 'inline-block',
     flexShrink: 0,
+    width: '1em', // tokens-allow: the square is the font size
+    height: '1em', // tokens-allow: the square is the font size
     fontFamily: fonts['--font-emoji'],
     lineHeight: 1,
   },
 })
 
 const sizeStyles = stylex.create({
-  14: { width: sizes['--icon-14'], height: sizes['--icon-14'], fontSize: sizes['--icon-14'], transform: `translateY(${sizes['--emoji-14-shift']})` },
-  16: { width: sizes['--icon-16'], height: sizes['--icon-16'], fontSize: sizes['--icon-16'], transform: `translateY(${SHIFT_16})` },
-  20: { width: sizes['--icon-20'], height: sizes['--icon-20'], fontSize: sizes['--icon-20'], transform: `translateY(${SHIFT_20})` },
-  32: { width: sizes['--control-32'], height: sizes['--control-32'], fontSize: sizes['--control-32'], transform: `translateY(${SHIFT_32})` },
+  14: { fontSize: sizes['--icon-14'], transform: `translateY(${sizes['--emoji-14-shift']})` },
+  16: { fontSize: sizes['--icon-16'], transform: `translateY(${SHIFT_16})` },
+  20: { fontSize: sizes['--icon-20'], transform: `translateY(${SHIFT_20})` },
+  32: { fontSize: sizes['--control-32'], transform: `translateY(${SHIFT_32})` },
 })
