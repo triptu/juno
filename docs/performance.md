@@ -313,13 +313,13 @@ Menu and popover buttons use `menuTriggerHandlers` in `@juno/ui`: primary mouse 
 
 ### 5.4 Compiler and memo
 
-- The React Compiler (1.0, stable) is enabled through `@vitejs/plugin-react`'s Babel options ([react.dev/learn/react-compiler](https://react.dev/learn/react-compiler)) in both `apps/desktop/electron.vite.config.ts` and `apps/gallery/vite.config.ts`, and compiles the workspace packages' source too. It removes most hand-written `useMemo`/`useCallback`. Explicit `React.memo` stays on rows and messages so the rule is visible and survives a compiler bail-out. The build prints `react-compiler: skipped a function in …` for anything the compiler leaves as written; read those lines after touching a component. To confirm it ran, the built bundle contains `react.memo_cache_sentinel` once per compiled component. Still skipped (10-18): `TopicComposer` and `messageCommands` (deliberate `exhaustive-deps` disables), `chunks.ts` (a hook chosen at runtime), `emojiSuggestions` (dynamic `import()`), `AllTopics` (`useVirtualizer` is an incompatible library), and fixtures only (`new` in props, `??=`).
+- The React Compiler (1.0, stable) is enabled through `@vitejs/plugin-react`'s Babel options ([react.dev/learn/react-compiler](https://react.dev/learn/react-compiler)) in both `apps/desktop/renderer.vite.ts` (the app's renderer plugins, shared with the web shell) and `apps/gallery/vite.config.ts`, and compiles the workspace packages' source too. It removes most hand-written `useMemo`/`useCallback`. Explicit `React.memo` stays on rows and messages so the rule is visible and survives a compiler bail-out. The build prints `react-compiler: skipped a function in …` for anything the compiler leaves as written; read those lines after touching a component. To confirm it ran, the built bundle contains `react.memo_cache_sentinel` once per compiled component. Still skipped (10-18): `TopicComposer` and `messageCommands` (deliberate `exhaustive-deps` disables), `chunks.ts` (a hook chosen at runtime), `emojiSuggestions` (dynamic `import()`), `AllTopics` (`useVirtualizer` is an incompatible library), and fixtures only (`new` in props, `??=`).
 - Any component whose render exceeds 1 ms in the React profiler for a single row is split or memoized.
 
 ### 5.5 StyleX and CSS
 
 - StyleX has no runtime cost: `stylex.props` concatenates precomputed class names. Dynamic styles (`stylex.create` with a function) write inline CSS variables and are fine for a handful of values (avatar colour) but are not used for per-frame values.
-- CSS size is the only StyleX cost. The budget is 200 KB, minified (`lightningcssOptions: { minify: true }` in `apps/desktop/electron.vite.config.ts`); new variants are measured.
+- CSS size is the only StyleX cost. The budget is 200 KB, minified (`lightningcssOptions: { minify: true }` in `apps/desktop/renderer.vite.ts`); new variants are measured.
 - Hover, press, focus and selection states are CSS pseudo-classes, never React state.
 
 ## 6. Engine

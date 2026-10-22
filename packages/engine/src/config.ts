@@ -111,6 +111,8 @@ export interface EngineTimingConfig {
   readonly huddleStatusRenewMillis: number
   /** How long the user may be alone in a huddle before Juno leaves it (SPEC 20). */
   readonly huddleAloneMillis: number
+  /** How long a channel must be quiet before Juno reads its running huddle from Slack's edge, which lags the socket. */
+  readonly huddleInfoSettleMillis: number
 }
 
 export const productionTiming: EngineTimingConfig = {
@@ -156,6 +158,7 @@ export const productionTiming: EngineTimingConfig = {
   liveRetryCapMillis: 30_000,
   huddleStatusRenewMillis: 240_000,
   huddleAloneMillis: 600_000,
+  huddleInfoSettleMillis: 3_000,
 }
 
 export class EngineTiming extends Context.Reference<EngineTimingConfig>('juno/engine/EngineTiming', {

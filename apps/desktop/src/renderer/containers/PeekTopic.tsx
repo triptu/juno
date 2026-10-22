@@ -1,9 +1,11 @@
 import { useLayoutEffect } from 'react'
-import { topicAtom } from '@juno/state'
+import type { TopicDetail } from '@juno/contract'
+import { currentPlace, openViewerAtom, registry, tabsAtom, tabShowing, topicAtom, topicView } from '@juno/state'
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
-import { PeekView, TopicArt, type PeekPlacement } from '@juno/views'
-import { hasArt, TopicPreview } from './TopicView'
+import { PeekView, TopicArt, type MediaViewing, type PeekPlacement } from '@juno/views'
+import { hasArt, Topic } from './TopicView'
+import { afterNavigation, openTopic } from './navigation'
 
 /**
  * One peeked topic: its title over `TopicPreview`, the topic's list
@@ -28,8 +30,22 @@ export function PeekTopic({ id, at, placement }: { readonly id: string; readonly
       {...(hasArt(detail) ? { art: <TopicArt topicId={detail.id} recipe={detail.art} size={20} /> } : {})}
       placement={placement}
     >
-      <TopicPreview id={id} peek />
+      <TopicPreview id={id} detail={detail} />
     </PeekView>
   )
+}
+
+function TopicPreview({ id, detail }: { readonly id: string; readonly detail: TopicDetail }) {
+  return <Topic key={id} id={id} view={id} detail={detail} readOnly peek onOpenPreviewMedia={(viewing) => openTopicViewer(id, viewing)} />
+}
+
+function openTopicViewer(id: string, viewing: MediaViewing): void {
+  openTopic(id)
+  afterNavigation(() => {
+    const tab = tabShowing(registry.get(tabsAtom), id)
+    if (tab === undefined) return
+    const place = currentPlace(tab)
+    registry.set(openViewerAtom(topicView(place.kind === 'topic' ? place.viewId ?? id : id, tab.id)), { ...viewing, now: Date.now() })
+  })
 }
 

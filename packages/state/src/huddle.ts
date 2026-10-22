@@ -12,6 +12,13 @@ import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
 import { topicAtom } from './messages'
 
+/** One wall clock for every huddle duration, mounted only while a duration is visible. */
+export const huddleNowAtom = Atom.make<number>((get) => {
+  const timer = setInterval(() => get.setSelf(Date.now()), 1_000)
+  get.addFinalizer(() => clearInterval(timer))
+  return Date.now()
+})
+
 /** The current call, or how the last one ended. */
 export const huddleCallAtom = liveQuery(huddleCall)(undefined)
 

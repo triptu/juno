@@ -1,6 +1,6 @@
 # @juno/state
 
-The renderer's bridge to the engine: the port client and every atom. The only package that imports `effect/reactivity` Atom and `@effect/atom-react`, and the only place the renderer touches `effect/rpc` and `effect/workers`. See `docs/architecture.md` section 7.
+The renderer's bridge to the engine: its client and every atom. The only package that imports `effect/reactivity` Atom and `@effect/atom-react`, and the only place the renderer touches `effect/rpc` and `effect/workers`. See `docs/architecture.md` section 7.
 
 ## Public API
 
@@ -8,6 +8,7 @@ The renderer's bridge to the engine: the port client and every atom. The only pa
 - `applyListDelta`: rows with an unchanged `rev` keep their objects, across a `reset` too (a reconnect re-renders only what changed); `order` keeps its array when equal. The delta's `refs` (the people, channels and topic art rows name by id, architecture 7) go into `window.refs.people`, `window.refs.channels` and `window.refs.art` before the rows; a ref that arrives equal to the one held keeps its object, and a delta without refs keeps the maps.
 - `command(route)`: a writable atom that runs the command and exposes its `AsyncResult`. It runs one call at a time: a second write interrupts the first, so per-row actions use `runCommand(registry, route, payload)`, which gives each call its own atom.
 - `prefetch(registry, atoms)`: warms one or more queries as one entry (hover, focus, keyboard selection). One warm set per registry, at most three entries; it holds the subscriptions under the atoms, not the atoms, so an evicted prefetch that was never opened ends at once. An open topic reads the atoms themselves and is never evicted.
+- `@juno/state/socket`: `configureSocketConnection(registry, url)` selects the web shell’s WebSocket protocol. Only the web page imports it; Electron keeps the port protocol.
 - `registry`, `makeRegistry()`, `configureConnection(registry, { acquire })`, `connectionStateAtom`, `acquireRendererPort`: the client and its connection. Tests make their own registry. `restartEngine(registry)` asks main to start the engine again after its supervisor gave up (`failed`); the transport keeps asking for a port and connects once one comes.
 - Feature atoms, declared once at module level in `src/<feature>.ts`: `engineStatusAtom`, `pingCommand`, `appInfoAtom`, `themeAtom`, `persistTheme`, `sessionStatusAtom` and `signedInAtom` (the last ready session, held while the engine restarts so the shell stays up), `topicListAtom(filter)` (one filter's window, with each wire row's channel and people joined from the refs into the `TopicRow` the views take; a joined row keeps its object while its wire row and what it names keep theirs), `topicCountsAtom(scope)`.
 - Topic view atoms in `src/messages.ts`:

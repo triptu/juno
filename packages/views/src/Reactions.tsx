@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import type { Person, ReactionView } from '@juno/contract'
 import { sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { Chip } from '@juno/ui'
+import { Chip, Emoji } from '@juno/ui'
 import { useReactorsPopover } from './reactorsPopover'
 
 export interface ReactionsProps {
@@ -34,14 +34,16 @@ function ReactionChips({ reactions, onToggle, people, onSeeAll }: { readonly rea
         const emoji =
           reaction.url !== undefined ? (
             <img src={reaction.url} alt="" draggable={false} decoding="async" loading="lazy" {...stylex.props(styles.image)} />
+          ) : reaction.unicode !== undefined ? (
+            <Emoji glyph={reaction.unicode} />
           ) : (
-            <span aria-hidden>{reaction.unicode ?? `:${reaction.name}:`}</span>
+            <span aria-hidden>:{reaction.name}:</span>
           )
         const label = `${reaction.count} ${reaction.unicode ?? `:${reaction.name}:`}${reaction.me ? ', including you' : ''}`
         const content = (
           <span {...stylex.props(styles.content)}>
             {emoji}
-            <span>{reaction.count}</span>
+            <span {...stylex.props(styles.count)}>{reaction.count}</span>
           </span>
         )
         // The emoji is hidden and the title is not read reliably, so the item carries the words.
@@ -64,6 +66,8 @@ function ReactionChips({ reactions, onToggle, people, onSeeAll }: { readonly rea
   )
 }
 
+const COUNT_SHIFT = '-0.5px' // tokens-allow: measured at 2x (`emoji-align.spec.ts`)
+
 const styles = stylex.create({
   row: {
     display: 'flex',
@@ -71,11 +75,16 @@ const styles = stylex.create({
     gap: spacing['--space-1'],
     marginTop: spacing['--space-1-5'],
   },
-  // The emoji and its count, apart at the chip's gap (inventory 6.4).
+  // The emoji and its count, apart at the chip's gap (inventory 6.4). A block, not inline: in the label's line box the
+  // row sat a pixel above the chip's centre.
   content: {
-    display: 'inline-flex',
+    display: 'flex',
     alignItems: 'center',
     gap: spacing['--space-1'],
+  },
+  // Figtree's figures, centred in their line, draw half a pixel under the chip's centre line, where the emoji is.
+  count: {
+    transform: `translateY(${COUNT_SHIFT})`,
   },
   image: {
     width: sizes['--icon-14'],

@@ -77,7 +77,7 @@ for (const theme of ['light', 'dark'] as const) {
         const box = title?.getBoundingClientRect()
         const lineHeight = title === null ? 0 : parseFloat(getComputedStyle(title).lineHeight)
         // Icons and tags on the title line: each within the first line's box.
-        const beside = Array.from(time.parentElement!.children).filter((node) => node !== title && node !== time && node.tagName !== 'INPUT' && node.querySelector('input') === null)
+        const beside = Array.from(time.parentElement!.children).filter((node) => (title === null || !node.contains(title)) && node !== time && node.tagName !== 'INPUT' && node.querySelector('input') === null)
         return {
           lines: box === undefined ? 0 : Math.round(box.height / lineHeight),
           title: title === null ? null : baseline(title),

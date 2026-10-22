@@ -72,7 +72,7 @@ let seq = 0
 /** The page's whole media state, numbered as the page numbers its reports. */
 /** `via`: the registry it goes through, another engine connection of the page; else the engine's own. */
 export const report = async (engine: RunningEngine, state: Partial<HuddlePageReport> & { readonly generation?: number } = {}, via: Registry = engine.registry) =>
-  valueOf(await runCommand(via, huddleReport, { report: { generation: PAGE, seq: ++seq, holds: null, received: null, connection: 'connected', muted: false, ended: null, ...state } }))
+  valueOf(await runCommand(via, huddleReport, { report: { generation: PAGE, seq: ++seq, holds: null, received: null, connection: 'connected', muted: false, hasRemote: false, ended: null, ...state } }))
 
 /** The page started the session it was handed. */
 export const started = (engine: RunningEngine, attendeeId: string, generation: number = PAGE) => report(engine, { generation, holds: attendeeId, received: attendeeId })

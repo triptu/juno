@@ -58,6 +58,13 @@ export interface LayoutShiftOptions {
    * motion runs, as in the gallery's fixtures.
    */
   readonly motion?: 'all' | 'layout'
+  /**
+   * CSS selector of elements that may take room a neighbour left or need: their
+   * width may change while their left, top and height stay (a sidebar row's
+   * preview running to the line's end once its count goes). Anything else they
+   * push is still reported.
+   */
+  readonly grows?: string
 }
 
 interface Box {
@@ -128,6 +135,7 @@ export async function measureLayoutShift(page: Page, action: () => Promise<unkno
   const settleMs = options.settleMs ?? defaults.settleMs
   const tolerance = options.tolerance ?? defaults.tolerance
   const layoutOnly = (options.motion ?? defaults.motion) === 'layout'
+  const grows = options.grows ?? null
 
   await page.evaluate(
     ({ root: rootSelector, key }) => {
@@ -292,7 +300,7 @@ export async function measureLayoutShift(page: Page, action: () => Promise<unkno
   await action()
 
   return await page.evaluate(
-    async ({ key, settle, tolerance: epsilon, layoutOnly: onlyLayout }) => {
+    async ({ key, settle, tolerance: epsilon, layoutOnly: onlyLayout, grows: growsSelector }) => {
       const w = window as unknown as Record<string, PageState | undefined>
       const state = w[key]
       if (!state) throw new Error('Layout-shift guard was not started')
@@ -321,10 +329,11 @@ export async function measureLayoutShift(page: Page, action: () => Promise<unkno
       for (const before of state.before) {
         const now = nowByElement.get(before.el)
         if (!now || !before.rendered || !now.rendered) continue
+        const resized = Math.abs(before.box.width - now.box.width) > epsilon && (growsSelector === null || !before.el.matches(growsSelector))
         const differs =
           Math.abs(before.box.x - now.box.x) > epsilon ||
           Math.abs(before.box.y - now.box.y) > epsilon ||
-          Math.abs(before.box.width - now.box.width) > epsilon ||
+          resized ||
           Math.abs(before.box.height - now.box.height) > epsilon
         if (differs) moved.push({ element: state.describe(before.el), before: before.box, after: now.box })
       }
@@ -337,7 +346,7 @@ export async function measureLayoutShift(page: Page, action: () => Promise<unkno
         waitedMs: Math.round(performance.now() - started),
       } satisfies LayoutShiftReport
     },
-    { key: stateKey, settle: settleMs, tolerance, layoutOnly },
+    { key: stateKey, settle: settleMs, tolerance, layoutOnly, grows },
   )
 }
 

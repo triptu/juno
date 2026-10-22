@@ -1,0 +1,1 @@
+- 10-22 15:51 · web shell · Run the desktop browser smoke test against the actual CLI and the fake’s HTTP controls. An in-process host works alone but fails beside Electron specs because Playwright shares CommonJS and ES-module transforms; a separate Node host removes that dependency and exercises CLI shutdown.

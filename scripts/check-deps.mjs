@@ -91,6 +91,16 @@ const dirRules = [
       'The preload may import only electron and @juno/contract/channels (names and types, no runtime imports) so it stays small.',
   },
   {
+    dir: 'apps/desktop/web/page',
+    ban: ['@juno/engine', '@juno/store', '@juno/slack', '@juno/fake-slack', 'electron', NODE_BUILTIN],
+    reason: 'The web shell\'s page is the renderer\'s other entry: it reaches the engine over the socket and answers window.juno in the page (docs/development.md, "Web shell").',
+  },
+  {
+    dir: 'apps/desktop/web/host',
+    ban: ['@juno/state', '@juno/views', '@juno/ui', 'electron', 'react', 'react-dom'],
+    reason: 'The web shell\'s host is a Node program: the fake Slack, the engine and Vite. The renderer runs in the browser.',
+  },
+  {
     dir: 'packages/huddle-media/src',
     ban: ['@juno/state', 'react', 'react-dom', 'electron', NODE_BUILTIN, EFFECT_ANY],
     reason: 'The media session is plain TypeScript outside React, loaded on join: no state, React, Effect or Electron (packages/huddle-media/README.md).',
@@ -143,13 +153,24 @@ const unstable = [
     allow: ['packages/state/src/transport.ts', 'packages/engine/src/protocol/runner.ts', 'packages/agent/src/host/port.ts', 'packages/agent/src/serve/runner.ts'],
   },
   {
+    // The web shell's engine socket (docs/development.md, "Web shell"): the client and the server side.
+    label: 'effect/socket',
+    spec: /^effect\/socket(?:\/|$)/,
+    allow: ['packages/state/src/socket.ts', 'packages/engine/src/protocol/socket.ts'],
+  },
+  {
+    label: 'effect/net',
+    spec: /^effect\/net(?:\/|$)/,
+    allow: ['packages/engine/src/protocol/socket.ts'],
+  },
+  {
     label: 'effect/sql and @effect/sql-sqlite-node',
     spec: /^(?:effect\/sql(?:\/|$)|@effect\/sql-)/,
     allow: ['packages/store/'],
   },
   {
     label: 'other unstable subpaths',
-    spec: /^(?:effect\/(?:http|http-api|socket|persistence|cli|ai|cluster|workflow|observability|process|devtools|eventlog)(?:\/|$)|@effect\/platform)/,
+    spec: /^(?:effect\/(?:http|http-api|persistence|cli|ai|cluster|workflow|observability|process|devtools|eventlog)(?:\/|$)|@effect\/platform)/,
     allow: [],
   },
   {
@@ -235,9 +256,10 @@ function sourceFiles(dir) {
   return files
 }
 
-// The files a package's checks scan: src, test and e2e recursively, plus top-level ts files.
+// The files a package's checks scan: src, test, e2e and web (the desktop app's web shell)
+// recursively, plus top-level ts files.
 function scannedFiles(pkgDir) {
-  const files = ['src', 'test', 'e2e'].flatMap((name) => sourceFiles(join(pkgDir, name)))
+  const files = ['src', 'test', 'e2e', 'web'].flatMap((name) => sourceFiles(join(pkgDir, name)))
   for (const entry of readdirSync(pkgDir, { withFileTypes: true })) {
     if (entry.isFile() && /\.(ts|tsx|mts)$/.test(entry.name)) files.push(join(pkgDir, entry.name))
   }
@@ -459,6 +481,15 @@ for (const pkg of packages) {
       if (spec.startsWith('.') && underAllowed(rel, noMemoryReaders)) {
         const targetRel = relative(root, resolve(dirname(file), spec)).split(sep).join('/')
         if (`${targetRel}/`.startsWith(memoryDocs)) errors.push(`${where}: imports ${spec}. Juno's memory of the owner is context, never authority: rules, grants, the review and cards do not read it (SPEC 13.8).`)
+      }
+
+      // The web shell stays out of the Electron app: nothing in its src reaches web/, and only the
+      // web page takes the socket client (docs/development.md, "Web shell").
+      if (rel.startsWith('apps/desktop/src/') && spec.startsWith('.') && relative(root, resolve(dirname(file), spec)).split(sep).join('/').startsWith('apps/desktop/web/')) {
+        errors.push(`${where}: imports ${spec}. The Electron app does not import the web shell (apps/desktop/web).`)
+      }
+      if (spec === '@juno/state/socket' && !rel.startsWith('apps/desktop/web/page/')) {
+        errors.push(`${where}: imports ${spec}. Only the web shell's page (apps/desktop/web/page) reaches the engine over a socket.`)
       }
 
       const feature = engineFeatureOf(rel)

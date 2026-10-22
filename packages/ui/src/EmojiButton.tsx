@@ -1,7 +1,8 @@
 import { menuTriggerHandlers } from './menuTrigger'
 import * as stylex from '@stylexjs/stylex'
 import type { ButtonHTMLAttributes } from 'react'
-import { colors, fonts, radii, sizes } from '@juno/tokens/tokens.stylex'
+import { colors, radii, sizes } from '@juno/tokens/tokens.stylex'
+import { Emoji } from './Emoji'
 import { focusRing } from './focusRing'
 import { interactive } from './internal/interactive'
 import { tooltip } from './Tooltip'
@@ -24,11 +25,12 @@ export interface EmojiButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEl
  * a step under the toolbar's 15px icons, since a colour glyph reads larger
  * than a Phosphor outline. Same feedback as `IconButton`.
  *
- * The emoji is set in the emoji font in a 14px square, so flex centres the
- * square, not Figtree's line box: in Figtree's line the emoji drew 1.25px
- * high, and its 18px advance put it 2px left of centre.
+ * The text emoji is an `Emoji`, so flex centres the emoji itself: in
+ * Figtree's line box it drew 1.5px high, and its 18px advance put it 2px
+ * left of centre.
  */
 export function EmojiButton({ emoji, src, label, noTooltip = false, type = 'button', ...rest }: EmojiButtonProps) {
+  'use no memo' // Shown only in the one toolbar on screen; the compiler's cache would only add bytes to the start bundle.
   return (
     <button
       type={type}
@@ -39,9 +41,7 @@ export function EmojiButton({ emoji, src, label, noTooltip = false, type = 'butt
       {...stylex.props(interactive.reset, interactive.feedback, interactive.press, focusRing.outside, styles.base)}
     >
       {src === undefined ? (
-        <span aria-hidden {...stylex.props(styles.glyph)}>
-          {emoji}
-        </span>
+        <Emoji glyph={emoji} />
       ) : (
         <img src={src} alt="" draggable={false} decoding="async" {...stylex.props(styles.image)} />
       )}
@@ -63,15 +63,6 @@ const styles = stylex.create({
       default: 'transparent',
       ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
     },
-  },
-  // The emoji's advance is wider than its square; the extra runs out of the box to the right, unseen.
-  glyph: {
-    width: sizes['--icon-14'],
-    height: sizes['--icon-14'],
-    fontFamily: fonts['--font-emoji'],
-    fontSize: sizes['--icon-14'],
-    lineHeight: 1,
-    transform: `translateY(${sizes['--emoji-14-shift']})`,
   },
   image: {
     width: sizes['--icon-14'],

@@ -177,8 +177,8 @@ export const Peek = memo(function Peek() {
       scroller.scrollBy({ top: event.deltaY, behavior: 'instant' })
     }
     window.addEventListener('pointerover', onPointerOver, true)
-    // A press on a person in a thread peek opens their DM on its click (SPEC 7, "People"), so it leaves the peek open.
-    const onPress = (event: PointerEvent) => (event.target instanceof Element && event.target.closest(`${PEEK} [data-opens-person]`)) || close()
+    // A press on a person or picture in a thread peek lets its click or context menu act before navigation closes the peek.
+    const onPress = (event: PointerEvent) => (event.target instanceof Element && event.target.closest(`${PEEK} :is([data-opens-person], [data-thumbnail])`)) || close()
     window.addEventListener('pointerdown', onPress, true)
     window.addEventListener('wheel', onWheel, { capture: true, passive: false })
     return () => {

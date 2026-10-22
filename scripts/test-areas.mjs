@@ -81,7 +81,7 @@ export const PERF_INTERACTIONS = [
     interaction: 'launch',
     perf: 'launch warm start',
     feel: 'launch.feel.ts',
-    paths: ['apps/desktop/src/main/index.ts', 'apps/desktop/src/renderer/main.tsx', 'apps/desktop/src/renderer/App.tsx', 'apps/desktop/src/preload/', 'packages/state/src/transport.ts', 'packages/state/src/port.ts', 'packages/state/src/client.ts'],
+    paths: ['apps/desktop/src/main/index.ts', 'apps/desktop/src/renderer/main.tsx', 'apps/desktop/src/renderer/start.tsx', 'apps/desktop/src/renderer/App.tsx', 'apps/desktop/src/preload/', 'packages/state/src/transport.ts', 'packages/state/src/port.ts', 'packages/state/src/client.ts'],
   },
   {
     interaction: 'topic open, scroll and live updates',

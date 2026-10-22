@@ -30,6 +30,14 @@ export const isDocument = (file: FileView): boolean =>
 
 /** Every file of a message the viewer can show, in Slack's order: what its filmstrip and arrows move through. */
 export const viewableOf = (files: ReadonlyArray<FileView>): ReadonlyArray<FileView> => files.filter((file) => isMedia(file) || isDocument(file))
+
+/** The viewer's files and selected item for one message. */
+export function viewingOf(files: ReadonlyArray<FileView>, fileId: string, sender: string, at: number) {
+  const items = viewableOf(files)
+  const index = items.findIndex((file) => file.id === fileId)
+  return index < 0 ? undefined : { items, index, sender, at }
+}
+
 export interface MediaGridProps {
   readonly media: ReadonlyArray<MediaFile>
   readonly onOpen: ((file: FileView) => void) | undefined
@@ -126,6 +134,7 @@ function Thumbnail({ file, thumb, onOpen, tabIndex, tile = false, tall = false, 
   const broken = failed === thumb.src
   const sx = stylex.props(styles.thumb, tile ? styles.tile : styles.box(box.width, box.height, thumb.width, thumb.height), tall && styles.tall, onOpen !== undefined && styles.thumbButton, onOpen !== undefined && focusRing.outside)
   const label = more === undefined ? file.name : `${file.name}, and ${more} more`
+  const image = file.kind === 'image' ? file.id : ''
   // While a new src loads (the staged image giving way to Slack's), the one already shown stays under it.
   const previous = loaded !== undefined && loaded !== thumb.src ? loaded : undefined
   const content = broken ? (
@@ -159,13 +168,13 @@ function Thumbnail({ file, thumb, onOpen, tabIndex, tile = false, tall = false, 
   )
   if (onOpen !== undefined) {
     return (
-      <button type="button" aria-label={`Open ${label}`} title={file.name} tabIndex={tabIndex} data-thumbnail="" onClick={() => onOpen(file)} {...sx}>
+      <button type="button" aria-label={`Open ${label}`} title={file.name} tabIndex={tabIndex} data-thumbnail={image} onClick={() => onOpen(file)} {...sx}>
         {content}
       </button>
     )
   }
   return (
-    <figure role="img" aria-label={label} title={file.name} data-thumbnail="" {...sx}>
+    <figure role="img" aria-label={label} title={file.name} data-thumbnail={image} {...sx}>
       {content}
     </figure>
   )

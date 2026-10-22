@@ -47,6 +47,7 @@ Run these from the repo root.
 | `pnpm test:gallery` | Builds the gallery and runs only its behaviour tests (mouse-down activation, cursor rule, state switcher, layout-shift guard). |
 | `pnpm test:feel` | Builds, then records the feel suite against the fake Slack: slow-motion videos, filmstrips and frame checks in `apps/desktop/feel-report/`. See "The feel suite". |
 | `pnpm gallery` | Starts the fixture gallery at http://localhost:4174 (browser only, no Electron). |
+| `pnpm web` | Starts the web shell: the real app in a browser against a fake Slack, for UI-only work. No build, no Electron. `--host` listens on the LAN. See "Web shell". |
 | `pnpm gallery:shots` | Builds the gallery and screenshots every state in light and dark into `apps/gallery/shots/<Component>/<group>/<state>-<theme>.png`. |
 | `pnpm specs:check` | Checks every Quint spec in `specs/`, including the broken and corrected pairs for Juno Agent. Runs simulations three at a time, the Apalache checks on one shared server, and skips checks that passed before with the same inputs (see "Faster test runs"). `--memory`, `--actions` or `--recovery` selects one agent spec. See `specs/README.md`. |
 | `pnpm specs:conformance` | Generates Quint traces of `specs/outbox.qnt` and replays them against the engine and the fake Slack (`specs/README.md`, "Conformance"). About 30 s on a remote machine when its traces are cached. |
@@ -186,7 +187,7 @@ need the heavy-job lock. Tool errors fail both reporting and lint.
 
 `.juno-status/health.json` contains a timestamp, counts, duplication percentage, top offenders, and full Knip and size findings. `complete: false`, a null count, and an `errors` entry mean a tool failed, not that it found zero issues. Each external tool (`scripts/health-run.mjs`) gets 20 s on an idle machine, scaled by the one-minute load per core (at a load of 16 on 8 cores it gets 40 s) and capped at 120 s. A tool that runs out of time is tried once more with twice the limit. If it times out again, its `errors` entry has `timedOut: true` and lint says the tools timed out and no finding was checked: run `pnpm lint` again when the machine is less busy. It still fails, because nothing was checked. Raw reports are in `.juno-status/knip-report.json` and `.juno-status/jscpd-report.json`; all reports are gitignored.
 
-Knip exceptions are commented in `knip.config.mjs`. Fontsource dependencies are loaded by CSS `@import`, which Knip does not parse. Babel loads `babel-plugin-react-compiler` by a string in both Vite configs. The default exports of the Knip and electron-vite configs are tool entry points. The icon script resolves Playwright through desktop's manifest with `createRequire`, where it is declared. Exports used inside their own module are omitted because that code is live; unused barrel re-exports remain visible. Playwright's alternate configs, packaging hooks, agent evals and benchmarks, research spike scripts,
+Knip exceptions are commented in `knip.config.mjs`. Fontsource dependencies are loaded by CSS `@import`, which Knip does not parse. Babel loads `babel-plugin-react-compiler` by a string in the gallery's Vite config. The default exports of the Knip and electron-vite configs are tool entry points. The icon script resolves Playwright through desktop's manifest with `createRequire`, where it is declared. Exports used inside their own module are omitted because that code is live; unused barrel re-exports remain visible. Playwright's alternate configs, packaging hooks, agent evals and benchmarks, research spike scripts,
 and the engine's compile-time body compatibility check are explicit entries. The `tracking`
 token group is tagged `@public` because `global.css` reads its emitted CSS variables.
 No blanket source exclusion hides unused code.
@@ -229,7 +230,9 @@ apps/desktop            The Electron app. Thin wiring only.
   src/preload           contextBridge. Exposes window.juno and forwards the engine port.
   src/renderer          React root, global.css, containers (wire atoms to views).
   e2e                   Playwright tests and the Electron launch fixture.
+  web                   The web shell (pnpm web): host/ in Node, page/ in the browser. Never in the app.
   electron.vite.config.ts
+  renderer.vite.ts      The renderer's Vite plugins, shared by the app build and the web shell.
   electron-builder.yml
 packages/tokens         @juno/tokens. The only place design values live.
 packages/ui             @juno/ui. Primitives, StyleX only, each with *.fixtures.tsx. Owns applyTheme.
@@ -293,7 +296,7 @@ or Playwright's Chromium. The favicon is `src/renderer/public/favicon.svg` (and 
 3. Components import tokens through the subpath, never a barrel:
    `import { colors } from '@juno/tokens/tokens.stylex'`, then use
    `colors['--background']` inside `stylex.create`.
-4. `@stylexjs/unplugin` in `electron.vite.config.ts` compiles every `stylex.create`
+4. `@stylexjs/unplugin` in `renderer.vite.ts` compiles every `stylex.create`
    and `defineVars` call into one CSS file during the renderer build. In dev it
    injects a virtual stylesheet into `index.html` itself.
 5. Because the variable names are stable, plain CSS can use them too.
@@ -647,7 +650,7 @@ timeout. Global setup prevents this mismatch after a merge.
 
 ### The layout-shift guard
 
-Nothing may move when the pointer or the keyboard touches it. `expectNoLayoutShift(page, action)` from `@juno/testing/layout-shift` (`packages/testing`) runs `action` and fails with a report (the node, the old and new box, the delta) if anything shifted. It starts a `PerformanceObserver` for `layout-shift` entries just before the action, waits two frames and then until every transition or animation running under the frame has finished (one iteration of an endless one the action started; with `motion: 'layout'` only those of properties that can move a box, which the gallery uses), and counts every entry with a value above 0, including those Chromium marks `hadRecentInput`, except a `<video>`'s own controls (sources with no node inside a video's box, or an entry with no sources while a video with controls is under the frame). As a fallback it compares the layout box of every element in the frame (`offsetLeft`, `offsetTop`, `offsetWidth`, `offsetHeight`, relative to the frame) before and after. Those ignore transforms, so the press scale is not a shift but a change of size, border or position is, and nothing has to be excluded.
+Nothing may move when the pointer or the keyboard touches it. `expectNoLayoutShift(page, action)` from `@juno/testing/layout-shift` (`packages/testing`) runs `action` and fails with a report (the node, the old and new box, the delta) if anything shifted. It starts a `PerformanceObserver` for `layout-shift` entries just before the action, waits two frames and then until every transition or animation running under the frame has finished (one iteration of an endless one the action started; with `motion: 'layout'` only those of properties that can move a box, which the gallery uses), and counts every entry with a value above 0, including those Chromium marks `hadRecentInput`, except a `<video>`'s own controls (sources with no node inside a video's box, or an entry with no sources while a video with controls is under the frame). As a fallback it compares the layout box of every element in the frame (`offsetLeft`, `offsetTop`, `offsetWidth`, `offsetHeight`, relative to the frame) before and after. Those ignore transforms, so the press scale is not a shift but a change of size, border or position is, and nothing has to be excluded. The one allowance is `grows`, a selector of elements whose width may change while their left, top and height stay, for content that takes room a neighbour left (a sidebar row's preview once its count goes).
 
 `apps/gallery/shift.spec.ts` hovers, leaves, presses, releases, focuses from the keyboard and blurs every interactive element of every state, with motion on, and checks that an Avatar photo arriving late or failing moves nothing (the `photo/pending` state points at `/__fixture/pending.png`, which the gallery server never answers; the test answers it). The desktop e2e can import the same helper for sidebar hover, tab switches, live messages and image loads.
 
@@ -656,6 +659,30 @@ The guard and the focus-ring check walk many states on one page, and a state cha
 The 10-18 shift-walk hang looked like a close stuck in `pages.close()`, but a repeat of the RemoveCard states failed 20 of 20 walks at `remove/click-then-working`: pressing the last control makes the card working and disables that control, then the guard's keyboard-focus action on it waited until the test deadline. When Playwright aborted the test, context cleanup saw an already closed browser. Closing the page before the context did not fix that action. The guard now checks focus and blur before press and release, while the control is still interactive, and gives each state 30 s to finish. `walkPages()` closes the page with `runBeforeUnload: false` before closing its context, bounds each close at 5 s, and closes the worker browser with a clear failure if the context cannot close. This keeps a stuck context from silently retaining a renderer across rollovers.
 
 After the change, two full remote gallery runs in a row passed all 305 tests: 178 s with 13.0 GB peak used and 2.7 GB available, then 171 s with 12.8 GB peak used and 2.8 GB available. Both used the standard 8x16 machine and 24 gallery workers. The focused RemoveCard walk also passed three repeats at 24 workers after the interaction order changed.
+
+## Web shell
+
+`pnpm web` runs the real renderer in a browser, for UI-only work, with no build and no Electron. One Node process holds three things:
+
+- a fake Slack with the default seed the e2e and feel tests use;
+- the engine on a fresh temporary data folder, already signed in to the fake;
+- Vite in dev mode (HMR) serving the renderer.
+
+The page reaches the engine over a WebSocket that carries the same `effect/rpc` routes as the Electron port. It answers `window.juno` itself (`apps/desktop/web/page/bridge.ts`). The command prints one line with the app's address and the fake Slack's control API. Post to `<control>/<name>` to send messages, reactions and socket events while you look at the page; the controls are listed in `packages/fake-slack/README.md`.
+
+- **Ports.** Each worktree gets its own port, derived from its path like the gallery's, with a strict port check to catch collisions. `JUNO_WEB_PORT` overrides it. The shell listens on 127.0.0.1; `--host` listens on the LAN, and the fake Slack stays on this Mac.
+- **Stopping.** Ctrl-C stops everything and deletes the data folder. So does the end of the process that started it. A shell killed before it can clean up leaves its folder, and the next `pnpm web` deletes it. Each shell holds a few hundred MB, so stop it when you are done.
+- **Code.** `apps/desktop/web`: `host/` runs in Node, `page/` in the browser. The socket transport is `packages/state/src/socket.ts` and `packages/engine/src/protocol/socket.ts`. Nothing in `apps/desktop/src` imports the shell (`check-deps`), so it never reaches the Electron app.
+- **Test.** `apps/desktop/e2e/web/web-shell.spec.ts` runs in the desktop suite’s `web` Playwright project, starts the CLI and checks in Chrome that a channel's Main reads, a message sends, a reaction lands, a context menu item works and the page reconnects after the socket drops. `pnpm affected` runs it when the shell, the socket transport or the engine changes.
+
+What it cannot do:
+
+- Native menus and window chrome. Context menus are a plain HTML list. App-menu shortcuts work only where the browser does not keep the key for itself.
+- Huddles, the Juno Agent's providers and Codex, notifications, the web panel, Quick Look, folder pickers, Open in Slack and updates. These answer "unavailable" or do nothing.
+- Files from anywhere but the fake Slack. Other images show a grey placeholder.
+- Perf and feel numbers. It is a dev build with React in development mode and no Content Security Policy, so those come from Electron only (`pnpm perf`, `pnpm test:feel`).
+
+Desktop e2e on Electron stays the merge gate.
 
 ## The feel suite
 

@@ -10,7 +10,7 @@ import { huddleCallValueAtom, huddleInChannelAtom, huddleLastRunAtom, type Huddl
 import { useAtomValue } from '@juno/state/react'
 import { openTopic } from '../navigation'
 import { Duration, useHuddleControls } from './controls'
-import { connectionOf, placeOf, useHuddleChannel, useHuddlePeople, useHuddleShares, useMediaSnapshot, useSelfId } from './look'
+import { aloneInCall, callPeopleIds, callStartOf, connectionOf, placeOf, useHuddleChannel, useHuddlePeople, useHuddleShares, useMediaSnapshot, useSelfId } from './look'
 import { joinHuddle, showHuddleShare, showOwnShare } from './media'
 
 /** "24 minutes", "1 minute", "less than a minute". */
@@ -51,7 +51,7 @@ export function HuddleTab({ channelId, tabId }: { readonly channelId: string; re
   const selfId = useSelfId()
   const controls = useHuddleControls(media)
   const inThis = call !== undefined && call.channelId === channelId && (call.phase === 'joining' || call.phase === 'joined')
-  const people = useHuddlePeople(inThis ? call.participants : running?.participants ?? [], selfId, media, inThis)
+  const people = useHuddlePeople(inThis ? callPeopleIds(call, selfId, media) : running?.participants ?? [], selfId, media, inThis)
   const lastRun = useAtomValue(huddleLastRunAtom(channelId))
   const shares = useHuddleShares(inThis ? media : undefined)
   const [expandedShare, setExpandedShare] = useState<string | undefined>(undefined)
@@ -81,12 +81,19 @@ export function HuddleTab({ channelId, tabId }: { readonly channelId: string; re
     channel: string,
     times: HuddleLastRun | undefined,
   ): HuddlePageState {
-    const duration = <Duration startedAt={here?.startedAt ?? current?.startedAt ?? null} />
     if (joined && current !== undefined) {
       const { devices: _devices, ...rest } = actions
       const own = media?.localShare
-      return { kind: 'in', connection: connectionOf(current, media), duration, ...rest, ...(own === undefined ? {} : { sharingSource: { kind: own.kind, name: own.name } }) }
+      return {
+        kind: 'in',
+        connection: connectionOf(current, media),
+        duration: <Duration startedAt={callStartOf(current)} />,
+        ...(aloneInCall(current, selfId, media) ? { alone: true } : {}),
+        ...rest,
+        ...(own === undefined ? {} : { sharingSource: { kind: own.kind, name: own.name } }),
+      }
     }
+    const duration = <Duration startedAt={here?.startedAt ?? null} />
     const switching = current !== undefined && (current.phase === 'joining' || current.phase === 'joined')
     if (here !== undefined) return { kind: 'out', duration, ...(switching ? { switching: true } : {}), onJoin: () => void joinHuddle(channel) }
     const ended = current?.ended
