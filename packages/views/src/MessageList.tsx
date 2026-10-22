@@ -110,7 +110,7 @@ export interface MessageListProps {
   /** Upload progress of the messages being sent with files, by `clientMsgId`, 0 to 1. */
   readonly uploadProgress?: Readonly<Record<string, number>>
   /** Right-click or the context-menu key on a message: its menu, at the pointer. `onSender` on the sender's name or avatar (the person menu). */
-  readonly onMessageMenu?: (ts: string, event: MouseEvent, onSender: boolean) => void
+  readonly onMessageMenu?: (ts: string, event: MouseEvent, onSender: boolean, imageId?: string) => void
   /** Right-click on an @person chip: the person menu (inventory 15.6). */
   readonly onPersonMenu?: (person: { readonly id: string; readonly name: string }, event: MouseEvent) => void
   /** Right-click on a #channel chip: the channel menu (inventory 15.2). */
@@ -181,7 +181,7 @@ function onKeyDown(event: KeyboardEvent<HTMLDivElement>, onRowKey: MessageListPr
 }
 
 interface Menus {
-  readonly onMessageMenu: ((ts: string, event: MouseEvent, onSender: boolean) => void) | undefined
+  readonly onMessageMenu: MessageListProps['onMessageMenu']
   readonly onPersonMenu: ((person: { readonly id: string; readonly name: string }, event: MouseEvent) => void) | undefined
   readonly onChannelMenu: ((channel: { readonly id: string; readonly name: string }, event: MouseEvent) => void) | undefined
 }
@@ -194,6 +194,13 @@ interface Menus {
 function messageMenu(event: MouseEvent, { onMessageMenu, onPersonMenu, onChannelMenu }: Menus) {
   const target = event.target
   if (!(target instanceof Element) || inField(event)) return
+  const ts = target.closest<HTMLElement>(ROW)?.dataset.messageRow
+  const image = target.closest<HTMLElement>('[data-thumbnail]')?.dataset.thumbnail
+  if (image && ts !== undefined) {
+    event.preventDefault()
+    onMessageMenu?.(ts, event, false, image)
+    return
+  }
   const person = onPersonMenu === undefined ? null : target.closest<HTMLElement>('[data-person]')
   if (person !== null && onPersonMenu !== undefined) {
     event.preventDefault()
@@ -207,7 +214,6 @@ function messageMenu(event: MouseEvent, { onMessageMenu, onPersonMenu, onChannel
     return
   }
   if (onMessageMenu === undefined) return
-  const ts = target.closest<HTMLElement>(ROW)?.dataset.messageRow
   if (ts === undefined) return
   event.preventDefault()
   onMessageMenu(ts, event, target.closest('[data-sender]') !== null)

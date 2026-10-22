@@ -11,7 +11,7 @@ import { scopeToChannel, showChannelMenu } from './placeMenus'
 import { messageLinkInfo, openMessageLink, openPerson } from './slackLinks'
 import { attach } from './attachments'
 import { TopicComposer } from './TopicComposer'
-import { downloadMessageFile, quickLookMessageFile, useTopicFiles } from './topic/files'
+import { downloadMessageFile, openPreviewImage, quickLookMessageFile, showMessageImageMenu, useTopicFiles } from './topic/files'
 import { useTopicHeader } from './topic/header'
 import { useOlderPages } from './topic/older'
 import { listStatus, markRead, useDivider, useMarkRead, useTopicFetch, useWindowFocused, windowShown } from './topic/opening'
@@ -149,12 +149,10 @@ interface TopicProps {
 }
 
 /** What a tab's rows do beyond reading: open images, retry and discard sends, the message actions and the menus. */
-function rowActions(list: MessageWindow, messageActions: MessageActionsOutput, onOpenMedia: (viewing: MediaViewing) => void) {
+function rowActions(list: MessageWindow, messageActions: MessageActionsOutput) {
   return {
-    onOpenMedia,
     onRetry: retry,
     onDiscard: discard,
-    onMessageMenu: messageActions.onMessageMenu,
     actions: messageActions.actions,
     activeMessage: messageActions.activeMessage,
     confirmingDelete: messageActions.confirmingDelete,
@@ -184,6 +182,7 @@ function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps)
   const loading = useTopicFetch(detail.id, view)
   const showWindow = windowShown(position.positioned, list, readAtOpen, loading.fetchState)
   const files = useTopicFiles(view)
+  const openMedia = readOnly ? (viewing: MediaViewing) => openPreviewImage(id, viewing) : files.setViewing
   useOpenPosition(position, view, readOnly, list, showWindow)
   const flash = useMessageFlash(position, detail.id, readOnly, list)
   useHeldPosition(position, list)
@@ -230,8 +229,10 @@ function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps)
       onLink={openMessageLink}
       linkInfo={messageLinkInfo}
       {...FILE_ACTIONS}
+      onOpenMedia={openMedia}
+      onMessageMenu={(ts, event, onSender, imageId) => imageId === undefined ? (!readOnly && messageActions.onMessageMenu(ts, event, onSender)) : showMessageImageMenu(list, ts, imageId, event, openMedia)}
       {...(files.uploadProgress === undefined ? {} : { uploadProgress: files.uploadProgress })}
-      {...(readOnly ? {} : rowActions(list, messageActions, files.setViewing))}
+      {...(readOnly ? {} : rowActions(list, messageActions))}
     />
   )
   if (readOnly) return messages

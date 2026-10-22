@@ -1,6 +1,6 @@
-import { Suspense, useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useRef, useState, type MouseEvent } from 'react'
 import type { FileView } from '@juno/contract'
-import { copyImage, downloadFile, onMenuCommand, openFile, openViewerAtom, quickLookFile, readFileText, registry, uploadProgressAtom } from '@juno/state'
+import { copyImage, downloadFile, onMenuCommand, openFile, openViewerAtom, quickLookFile, readFileText, registry, uploadProgressAtom, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import type { MediaViewing } from '@juno/views'
 import { chunk } from '../chunks'
@@ -14,7 +14,9 @@ let viewerLoaded = false
 function preloadViewer(): void {
   if (viewerLoaded) return
   viewerLoaded = true
-  window.requestIdleCallback(() => void viewer.load())
+  window.requestIdleCallback(() => {
+    void viewer.load()
+  })
 }
 
 /**
@@ -44,8 +46,8 @@ export function quickLookMessageFile(file: FileView): void {
   if (file.download !== undefined) void quickLookFile({ url: file.download, name: file.name })
 }
 
-/** Open in browser for an HTML file in the viewer: main saves it into a temporary folder and opens it in the default app. */
-function openInBrowser(file: FileView): void {
+/** Open a temporary copy in the system's default app. */
+function openMessageFile(file: FileView): void {
   if (file.download !== undefined) void openFile({ url: file.download, name: file.name })
 }
 
@@ -53,6 +55,13 @@ function openInBrowser(file: FileView): void {
 function copyMessageImage(file: FileView): void {
   const src = file.full ?? file.thumb?.src
   if (src !== undefined) void copyImage(src)
+}
+
+const pointOf = (event: MouseEvent<Element>) => ({ x: event.clientX, y: event.clientY })
+
+const showViewerImageMenu = (file: FileView, event: MouseEvent<Element>) => {
+  event.preventDefault()
+  void viewer.load().then((menu) => menu.showImageMenu(file, pointOf(event)))
 }
 
 /** The viewer open in `view`, at the item it shows. */
@@ -70,8 +79,9 @@ function TopicViewer({ view, opener }: { readonly view: string; readonly opener:
         onShowItem={(index) => registry.set(openViewerAtom(view), { ...open, index })}
         onDownload={downloadMessageFile}
         onQuickLook={quickLookMessageFile}
-        onOpenInBrowser={openInBrowser}
+        onOpenInBrowser={openMessageFile}
         onCopyImage={copyMessageImage}
+        onImageMenu={showViewerImageMenu}
         loadText={readFileText}
         onLink={openMessageLink}
         linkInfo={messageLinkInfo}
@@ -86,6 +96,11 @@ function TopicViewer({ view, opener }: { readonly view: string; readonly opener:
  * view (`openViewerAtom`), so the tab shows it again when its topic mounts
  * again.
  */
+export const openPreviewImage = (topic: string, viewing: MediaViewing) => viewer.load().then((menu) => menu.openTopicViewer(topic, viewing))
+
+export const showMessageImageMenu = (list: MessageWindow, ts: string, fileId: string, event: MouseEvent<Element>, onOpen: (viewing: MediaViewing) => void) =>
+  viewer.load().then((menu) => menu.showMessageImageMenu(list, ts, fileId, pointOf(event), onOpen))
+
 export function useTopicFiles(view: string) {
   const [dropping, setDropping] = useState(false)
   // What had focus at the open, taken before the topic turns inert under the viewer; on a cold load its chunk mounts later.
