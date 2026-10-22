@@ -5,7 +5,7 @@ The engine side of huddles (`docs/plans/huddles.md`, SPEC 20). The `Huddle` serv
 - `lifecycle.ts`: the model's actions as pure functions, under the model's names.
 - `running.ts`: running huddles per channel, from room frames (decoded here from the socket's unknown frames) and the edge `huddles/info`.
 - `core.ts`: the state. It runs the rules under one lock and does the I/O they call for: `rooms.join`, `rooms.leave` and the stored leave. Leave stops the page's media and sends `rooms.leave` at once; the stored record is cleared only once the media is known stopped (and its request has gone out); the answer to `rooms.leave` is never awaited.
-- `attach.ts`: a sync's session and its end; `reads.ts`: room frames and `huddles/info` reads; `slack.ts`: the requests.
+- `attach.ts`: a sync's session and its end; `reads.ts`: room frames and `huddles/info` reads, each sent once its channel has been quiet for `INFO_SETTLE_MILLIS`, since Slack's edge lags its socket; `slack.ts`: the requests.
 - `Huddle.ts`: the service and its public types.
 
 The engine gives it a session per sync (`attach`) with the Slack client, where the pending leaves are stored and the channels to read; see `engine/src/huddle/`. The renderer runs the media session (`apps/desktop/src/renderer/containers/huddle/media.ts`) and reports to it through `huddle.report`.
