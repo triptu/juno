@@ -210,7 +210,13 @@ async function quoteMessage({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Pr
   })
   await text.dispatchEvent('pointerup', { bubbles: true, clientX: box.x + 20, clientY: box.y + 5 })
   await expect(quote).toBeVisible()
-  const menu = await juno.messageMenu.openOn(text)
+  // Right-clicked on the selected words, which keep their selection.
+  const words = await text.evaluate((node) => {
+    const rect = window.getSelection()!.getRangeAt(0).getBoundingClientRect()
+    const box = node.getBoundingClientRect()
+    return { x: rect.left - box.left + rect.width / 2, y: rect.top - box.top + rect.height / 2 }
+  })
+  const menu = await juno.messageMenu.openOn(text, words)
   await expect(quote).toHaveCount(0)
   expect(await menu.labels()).toContain('Copy')
   await menu.choose('quote')

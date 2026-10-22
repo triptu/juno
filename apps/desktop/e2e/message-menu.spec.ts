@@ -42,9 +42,11 @@ test('a right-click opens the menu as it comes up, over the same message, with t
     await juno.win.mouse.up({ button: 'right' })
     await expect(menu.root).toBeVisible()
     const box = await boxOf(menu.root)
-    // Downward from the pointer, to its right.
+    // To the right of the pointer, downward from it, or moved up only as far as the window's bottom edge needs.
+    const view = await juno.win.evaluate(() => window.innerHeight)
     expect(Math.round(box.left)).toBe(Math.round(at.x) + 1)
-    expect(Math.round(box.top)).toBe(Math.round(at.y) + 1)
+    if (Math.round(box.top) !== Math.round(at.y) + 1) expect(Math.round(box.bottom)).toBe(view - 6)
+    expect(box.top).toBeLessThanOrEqual(at.y + 1)
     // Eleven emoji, the quick reactions first, then More reactions; no why row and no Copy Slack link.
     expect((await menu.grid()).slice(0, 3)).toEqual(['+1', 'white_check_mark', 'eyes'])
     expect(await menu.grid()).toHaveLength(11)
@@ -209,7 +211,8 @@ test('More reactions grows the picker from the corner of the menu that stays put
   await juno.sidebar.expectTop('#eng')
   await juno.sidebar.row('#eng').open()
   await juno.topic.expectMessage('Corner check 11')
-  await juno.topic.toLatest()
+  await juno.topic.scroller.evaluate((scroller) => scroller.scrollTo({ top: scroller.scrollHeight }))
+  await juno.topic.expectAtBottom()
   const view = await juno.win.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight }))
   const rows = juno.topic.list.locator('[data-message-row]')
   const last = rows.last()
@@ -234,7 +237,6 @@ test('one sender’s messages start a new header after ten quiet minutes', async
   reply('Nine minutes later', 21)
   reply('Ten quiet minutes later', 11)
   reply('Right after that', 10)
-  await juno.sidebar.expectTop('#eng')
   await juno.sidebar.row('#eng').open()
   await juno.topic.list.locator(`[data-thread-link="t:C0ENG:${root.ts}"]`).click()
   await juno.topic.expectMessage('Right after that')

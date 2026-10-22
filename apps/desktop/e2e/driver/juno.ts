@@ -1199,10 +1199,16 @@ export class MessageMenuDriver {
   async openOn(target: Locator, position?: { readonly x: number; readonly y: number }, options: { readonly scroll?: boolean } = {}): Promise<MessageMenuDriver> {
     if (options.scroll !== false) await target.scrollIntoViewIfNeeded()
     const box = (await target.boundingBox())!
-    const at = position === undefined ? { x: box.x + box.width / 2, y: box.y + Math.min(box.height / 2, 12) } : { x: box.x + position.x, y: box.y + position.y }
-    await this.win.mouse.move(at.x, at.y)
-    await this.win.mouse.down({ button: 'right' })
-    await this.win.mouse.up({ button: 'right' })
+    const at = position ?? { x: box.width / 2, y: Math.min(box.height / 2, 12) }
+    if (options.scroll === false) {
+      // Down and up where it is, with no scroll on the way.
+      await this.win.mouse.move(box.x + at.x, box.y + at.y)
+      await this.win.mouse.down({ button: 'right' })
+      await this.win.mouse.up({ button: 'right' })
+    } else {
+      // A click, so Playwright waits until nothing covers the point (the composer over the list's end, a toast).
+      await target.click({ button: 'right', position: at })
+    }
     await expect(this.root).toBeVisible()
     return this
   }
