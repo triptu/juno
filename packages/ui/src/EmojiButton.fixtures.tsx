@@ -22,7 +22,7 @@ export default defineFixtures(EmojiButton, {
   },
   Overview: {
     'in-a-toolbar': scene(() => (
-      <Surface kind="toolbar" padding="xs" sx={styles.toolbar}>
+      <Surface kind="toolbar" padding="none" radius="pill" sx={styles.toolbar}>
         <EmojiButton emoji="👍" label="React 👍" />
         <EmojiButton emoji="✅" label="React ✅" />
         <EmojiButton emoji="👀" label="React 👀" />
@@ -34,6 +34,6 @@ export default defineFixtures(EmojiButton, {
 const styles = stylex.create({
   toolbar: {
     display: 'inline-flex',
-    gap: spacing['--space-0-5'],
+    padding: spacing['--space-pixel'],
   },
 })

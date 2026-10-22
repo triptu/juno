@@ -18,14 +18,11 @@ export interface EmojiButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEl
   readonly noTooltip?: boolean
 }
 
-// The emoji is drawn a step larger than the toolbar's 18px icons, since a
-// glyph fills less of its box than a Phosphor icon. The button is the 28px
-// hover-toolbar control (radius 12 inside the toolbar's 16).
-const EMOJI_SIZE = '16px' // tokens-allow: an emoji glyph's size, not a control
-
 /**
- * A 28px ghost button whose icon is an emoji: the quick reactions in the
- * hover toolbar and the picker's cells. Same feedback as `IconButton`.
+ * A 24px round ghost button whose icon is an emoji: the quick reactions in
+ * the hover toolbar, the same size as its icon buttons. The emoji is 14px,
+ * a step under the toolbar's 15px icons, since a colour glyph reads larger
+ * than a Phosphor outline. Same feedback as `IconButton`.
  */
 export function EmojiButton({ emoji, src, label, noTooltip = false, type = 'button', ...rest }: EmojiButtonProps) {
   return (
@@ -54,9 +51,9 @@ const styles = stylex.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-    width: sizes['--control-28'],
-    height: sizes['--control-28'],
-    borderRadius: radii['--radius-xl'],
+    width: sizes['--control-24'],
+    height: sizes['--control-24'],
+    borderRadius: radii['--radius-full'],
     verticalAlign: 'middle',
     backgroundColor: {
       default: 'transparent',
@@ -64,12 +61,12 @@ const styles = stylex.create({
     },
   },
   glyph: {
-    fontSize: EMOJI_SIZE,
+    fontSize: sizes['--icon-14'],
     lineHeight: 1,
   },
   image: {
-    width: EMOJI_SIZE,
-    height: EMOJI_SIZE,
+    width: sizes['--icon-14'],
+    height: sizes['--icon-14'],
     objectFit: 'contain',
   },
 })
