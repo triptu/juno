@@ -15,8 +15,9 @@ function warmSearch(data: PreparedEmojiPicker): void {
     warmEmojiSearch(data.all)
     measure('juno.emoji-search-index', started, { replace: true })
   }
-  if (typeof requestIdleCallback === 'function') requestIdleCallback(warm)
-  else setTimeout(warm, 0)
+  const idle = (globalThis as { readonly requestIdleCallback?: (task: () => void) => number }).requestIdleCallback
+  if (idle === undefined) setTimeout(warm, 0)
+  else idle.call(globalThis, warm)
 }
 warmSearch(standardEmojiPickerData)
 
