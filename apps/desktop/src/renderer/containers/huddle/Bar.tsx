@@ -6,13 +6,13 @@ import type { HuddleCall } from '@juno/contract'
 import { HuddleBar } from '@juno/huddle-views'
 import { openHuddle } from '../navigation'
 import { Duration, useHuddleControls } from './controls'
-import { connectionOf, placeOf, useHuddleChannel, useHuddlePeople, useHuddleShares, useMediaSnapshot, useSelfId } from './look'
+import { callPeopleIds, callStartOf, connectionOf, placeOf, useHuddleChannel, useHuddlePeople, useHuddleShares, useMediaSnapshot, useSelfId } from './look'
 
 export default function HuddleBarContainer({ call }: { readonly call: HuddleCall }) {
   const media = useMediaSnapshot()
   const detail = useHuddleChannel(call.channelId)
   const selfId = useSelfId()
-  const people = useHuddlePeople(call.participants, selfId, media, true)
+  const people = useHuddlePeople(callPeopleIds(call, selfId, media), selfId, media, true)
   const controls = useHuddleControls(media)
   const shares = useHuddleShares(media)
   const channelId = call.channelId
@@ -21,7 +21,7 @@ export default function HuddleBarContainer({ call }: { readonly call: HuddleCall
       {...controls}
       place={placeOf(detail)}
       connection={connectionOf(call, media)}
-      duration={<Duration startedAt={call.startedAt} />}
+      duration={<Duration startedAt={callStartOf(call)} />}
       people={people.filter((person) => person.you !== true)}
       sharers={shares.map((share) => share.ownerName)}
       {...(media?.localShare === undefined ? {} : { sharingSource: media.localShare.name })}

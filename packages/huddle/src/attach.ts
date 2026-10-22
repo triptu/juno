@@ -69,7 +69,7 @@ export const attach = Effect.fn('Huddle.attach')(function* (core: Core, session:
   const to: Attached = {
     session,
     work,
-    info: { connection: 'unknown', gap: 0, dirtyAll: true, dirty: new Set(), frameGen: new Map(), wake: yield* Queue.sliding<void>(1) },
+    info: { connection: 'unknown', gap: 0, dirtyAll: true, dirty: new Set(), frameGen: new Map(), quietAt: new Map(), allQuietAt: 0, wake: yield* Queue.sliding<void>(1) },
     loaded: false,
   }
   yield* step(core, Effect.sync(() => {

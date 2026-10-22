@@ -306,4 +306,4 @@ export {
 export { sendCheckPrefsAtom, aiAvailableAtom, setSendCheckPref } from './sendCheckPrefs'
 
 export { sentSuggestionsAtom, dismissSentSuggestion, type SentSuggestion } from './sentSuggestions'
-export { dismissHuddle, huddleCallValueAtom, huddleChannelAtom, huddleCountAtom, huddleIncomingValueAtom, huddleInChannelAtom, huddleLastRunAtom, huddlePeopleOf, type HuddleLastRun, leaveHuddle, reportHuddleMedia, startHuddle } from './huddle'
+export { dismissHuddle, huddleCallValueAtom, huddleNowAtom, huddleChannelAtom, huddleCountAtom, huddleIncomingValueAtom, huddleInChannelAtom, huddleLastRunAtom, huddlePeopleOf, type HuddleLastRun, leaveHuddle, reportHuddleMedia, startHuddle } from './huddle'
