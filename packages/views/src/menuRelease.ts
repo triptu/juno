@@ -19,7 +19,8 @@ export interface MenuAt {
  * focus opens nothing.
  */
 export function openOnRelease(event: MouseEvent, over: (element: Element) => boolean, open: (at: MenuAt) => void): void {
-  if (event.buttons === 0) return open(event)
+  // Not `=== 0`: an event a script sends has no buttons at all.
+  if (!(event.buttons > 0)) return open(event)
   const button = event.button
   const done = () => {
     window.removeEventListener('pointerup', up, true)
