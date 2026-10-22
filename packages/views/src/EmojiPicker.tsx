@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { COLUMNS, neighbour } from './emojiPickerNavigation'
+import { neighbour } from './emojiPickerNavigation'
 import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
 import { useDeferredValue, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual'
@@ -30,6 +30,7 @@ interface Section {
   readonly items: ReadonlyArray<Item>
 }
 
+const COLUMNS = 9
 // Grid geometry mirrors --control-32 and the tag heading's padding and line height.
 const ROW_HEIGHT = 32
 const HEADER_HEIGHT = 30
@@ -84,6 +85,7 @@ export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, on
   const [cold, setCold] = useState<{ readonly search: string; readonly all: typeof all; readonly items: ReadonlyArray<Item> }>()
   const items = results?.[0]?.items
   if (!searchReady && items !== undefined && cold?.items !== items) setCold({ search, all, items })
+  else if (cold !== undefined && (cold.search !== search || cold.all !== all)) setCold(undefined)
   const sections = useMemo(() => {
     if (items === undefined) return browse
     if (cold?.search !== search || cold.all !== all || !searchReady) return [{ key: 'results', items }]
@@ -176,7 +178,7 @@ export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, on
     const from = event.target
     if (!(from instanceof HTMLElement) || from.dataset['cell'] === undefined) return
     const index = pendingFocus.current ?? Number(from.dataset['cell'])
-    const target = neighbour(sections, index, event.key)
+    const target = neighbour(sections, index, event.key, COLUMNS)
     if (target === undefined) return
     event.preventDefault()
     if (target === null) scrollerRef.current?.closest('[data-emoji-picker]')?.querySelector('input')?.focus()
