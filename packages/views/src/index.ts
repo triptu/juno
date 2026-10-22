@@ -29,8 +29,8 @@ export { viewingOf } from './MediaGrid'
 
 export { type MessageActions, type MessageProps } from './Message'
 export { InlineEdit, type InlineEditProps } from './InlineEdit'
-export { Floating, SelectionToolbar } from './Floating'
-export { HoverToolbar } from './HoverToolbar'
+export { Floating } from './Floating'
+export { HoverToolbar, SelectionToolbar, loadMessageTools } from './HoverToolbar'
 
 export { MessageList, type MessageListItem, type MessageListStatus, type OlderStatus } from './MessageList'
 export type { LinkInfo } from './MessageLink'
