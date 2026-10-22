@@ -219,8 +219,13 @@ test('More reactions grows the picker from the corner of the menu that stays put
   await juno.sidebar.expectTop('#eng')
   await juno.sidebar.row('#eng').open()
   await juno.topic.expectMessage('Corner check 11')
-  await juno.topic.scroller.evaluate((scroller) => scroller.scrollTo({ top: scroller.scrollHeight }))
-  await juno.topic.expectAtBottom()
+  // Rows above lay out at their size estimate until seen, so the end may move: scroll until it holds.
+  await expect
+    .poll(() => juno.topic.scroller.evaluate((scroller) => {
+      scroller.scrollTo({ top: scroller.scrollHeight })
+      return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight
+    }))
+    .toBeLessThanOrEqual(2)
   const view = await juno.win.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight }))
   const rows = juno.topic.list.locator('[data-message-row]')
   const last = rows.last()
