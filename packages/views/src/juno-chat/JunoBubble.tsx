@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { memo } from 'react'
 import type { JunoBubbleItem } from '@juno/agent-contract'
 import { chat, colors, motion, spacing } from '@juno/tokens/tokens.stylex'
-import { Text, tooltip } from '@juno/ui'
+import { focusRing, Text, tooltip } from '@juno/ui'
 import type { ChatActions } from './commands'
 import { QuoteStub } from './QuoteStub'
 import { ReactionBadge } from './ReactionBadge'
@@ -44,9 +44,11 @@ export const JunoBubble = memo(function JunoBubble({ item, now, actions, enter =
       <div {...stylex.props(rowStyles.row, rowStyles.contained, eager && rowStyles.eager)}>
         <div
           data-chat-run={item.runId}
+          data-chat-row=""
+          tabIndex={-1}
           onContextMenu={menu === undefined ? undefined : (event) => menu({ kind: 'juno', id: item.id }, event)}
           {...(compact ? tooltip(fullTime(item.at)) : {})}
-          {...stylex.props(rowStyles.bubble, rowStyles.anchor, styles.bubble, end && rowStyles.tailStart)}
+          {...stylex.props(rowStyles.bubble, rowStyles.anchor, styles.bubble, end && rowStyles.tailStart, focusRing.inset)}
         >
           <Text variant="bodySmall" tone="default" selectable dir="auto" as="div" sx={[rowStyles.bubbleText, styles.blocks]}>
             <JunoRichText body={item.body} now={now} actions={actions} />

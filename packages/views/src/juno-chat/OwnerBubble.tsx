@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { memo, type MouseEvent } from 'react'
 import { aboutLabel, chatCopy, type About, type Delivery, type OwnerMessageItem } from '@juno/agent-contract'
 import { accent, chat, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { Text } from '@juno/ui'
+import { focusRing, Text } from '@juno/ui'
 import type { ChatActions } from './commands'
 import { OwnerFiles } from './OwnerFiles'
 import { QuoteStub } from './QuoteStub'
@@ -54,13 +54,13 @@ export const OwnerBubble = memo(function OwnerBubble({ item, now, actions, eager
         </Text>
         <div {...stylex.props(styles.content)}>
           {files !== undefined ? (
-            <div onContextMenu={wordless ? onMenu : undefined} {...stylex.props(wordless && rowStyles.anchor)}>
+            <div onContextMenu={wordless ? onMenu : undefined} {...(wordless ? { 'data-chat-row': '', tabIndex: -1 } : {})} {...stylex.props(wordless && rowStyles.anchor, wordless && focusRing.inset)}>
               <OwnerFiles opId={item.opId} files={files} renderImage={actions.renderOwnerImage} />
               {wordless ? (actions.renderReactions?.(item.reactions, 'start') ?? <ReactionBadge reactions={item.reactions} corner="start" />) : null}
             </div>
           ) : null}
           {wordless ? null : (
-            <div onContextMenu={onMenu} {...stylex.props(rowStyles.bubble, rowStyles.anchor, styles.bubble, styles.fill, end && rowStyles.tailEnd)}>
+            <div onContextMenu={onMenu} data-chat-row="" tabIndex={-1} {...stylex.props(rowStyles.bubble, rowStyles.anchor, styles.bubble, styles.fill, end && rowStyles.tailEnd, focusRing.inset)}>
               <Text variant="bodySmall" tone="inherit" selectable dir="auto" as="p" sx={rowStyles.bubbleText}>
                 {item.text}
               </Text>

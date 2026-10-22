@@ -8,7 +8,7 @@ import { junoFocusAtom, registry } from '@juno/state'
 import { junoThumbAtom, messageActions } from '@juno/state/agent'
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
-import { openOnRelease, OwnerImage, ReactionBadge, RemoveSheet, SheetLayer, type ActivateEvent, type ChatActions, type ChatMenuTarget, type OwnerImageFile, type ReactionTarget } from '@juno/views'
+import { openOnRelease, OwnerImage, type MenuAt, type MenuPoint, ReactionBadge, RemoveSheet, SheetLayer, type ActivateEvent, type ChatActions, type ChatMenuTarget, type OwnerImageFile, type ReactionTarget } from '@juno/views'
 import { openSlackMessage, openTopic } from '../navigation'
 import { chunk } from '../chunks'
 import { withMenus } from '../messageMenu'
@@ -159,13 +159,14 @@ export function useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote
         const span = selectedSpan(bubble)
         openOnRelease(event, (under) => bubble.contains(under), (at) =>
           withMenus((menus) =>
-            menus.openChatMenu(target, { x: at.clientX, y: at.clientY }, itemsRef.current, span, setRemoval, (reply) => {
+            menus.openChatMenu(target, anchorIn(bubble, at), itemsRef.current, span, setRemoval, (reply) => {
               setQuote(quoteOf(itemsRef.current, reply))
               inputRef.current?.focus()
             }),
           ),
         )
       },
+      onLeaveRows: () => inputRef.current?.focus(),
       renderOwnerImage,
       renderReactions,
     }),
@@ -177,6 +178,18 @@ function quoteOf(items: ReadonlyArray<ChatItem>, target: ReactionTarget): Quote 
   const item = items.find((i) => (target._tag === 'bubble' ? i._tag === 'juno' && i.id === target.id : i._tag === 'card' && i.card.id === target.id))
   const preview = item?._tag === 'juno' ? junoText(item.body).trim().split('\n', 1)[0] ?? '' : item?._tag === 'card' ? item.card._tag : ''
   return { target, preview }
+}
+
+/**
+ * Where a bubble's menu opens: at the pointer, or for the context-menu key
+ * and ⇧F10, whose point may be anywhere, under the bubble's first line.
+ */
+function anchorIn(bubble: HTMLElement, at: MenuAt): MenuPoint {
+  const box = bubble.getBoundingClientRect()
+  if (at.clientX > box.left && at.clientX < box.right && at.clientY > box.top && at.clientY < box.bottom) return { x: at.clientX, y: at.clientY }
+  const text = bubble.querySelector<HTMLElement>('p, [data-chat-run] > *') ?? bubble
+  const line = text.getBoundingClientRect()
+  return { x: line.left, y: Math.min(box.bottom, line.top + (Number.parseFloat(getComputedStyle(text).lineHeight) || 0)) }
 }
 
 /** The range selected in the message's words, read before the menu takes focus. */
