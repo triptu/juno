@@ -174,9 +174,7 @@ export function SettingsIgnored({ addRow, ignored, onStopIgnoring }: SettingsIgn
 }
 
 export interface SettingsAboutProps {
-  /** The build line: "Juno 0.1.0 on darwin, Electron 44.7.0". */
-  readonly build: ReactNode
-  /** The update setting (`UpdateSettings`). */
+  /** The build line with Check for updates, and the update setting (`UpdateSettings`). */
   readonly updates: ReactNode
   /** The engine's status line and Ping engine, then each process's CPU and memory and Copy diagnostics. */
   readonly diagnostics: ReactNode
@@ -185,16 +183,13 @@ export interface SettingsAboutProps {
 }
 
 /** About: the version, updates, the tour, and the diagnostics for when something looks wrong. */
-export function SettingsAbout({ build, updates, diagnostics, onShowTour }: SettingsAboutProps) {
+export function SettingsAbout({ updates, diagnostics, onShowTour }: SettingsAboutProps) {
   return (
     <Page width="settings">
       <PageHeader title="About" />
       <Section heading="Version">
         <Surface kind="group" padding="md" sx={styles.card}>
-          <div {...stylex.props(styles.stack)}>
-            {build}
-            {updates}
-          </div>
+          <div {...stylex.props(styles.stack)}>{updates}</div>
         </Surface>
       </Section>
       <Section heading="Tour">

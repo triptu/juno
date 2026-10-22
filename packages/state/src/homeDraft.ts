@@ -11,7 +11,7 @@
  */
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
-import { newChatConversations, type MentionPick, type PickConversation, type SendTarget } from '@juno/contract'
+import { newChatConversations, type LinkRange, type MentionPick, type PickConversation, type SendTarget } from '@juno/contract'
 import { liveQuery } from './atoms'
 import { channelTopicsAtom } from './messages'
 import type { Registry } from './client'
@@ -20,8 +20,10 @@ import { savedHomeDraftAtom } from './tabs'
 export interface HomeDraft {
   /** The text as the field shows it. */
   readonly draft: string
-  /** The people and channels picked from the @ and # suggestions; the send encodes them (`encodeMentions`). */
+  /** The people and channels picked from the @ and # suggestions; the send encodes them (`encodeDraft`). */
   readonly mentions: ReadonlyArray<MentionPick>
+  /** URLs attached to words in the field. Missing in drafts saved before rich paste. */
+  readonly links?: ReadonlyArray<LinkRange>
   /** Where Enter sends; none is Juno. */
   readonly conversation: PickConversation | undefined
   /** A thread in `conversation` the send replies in; none is Main. */
@@ -38,7 +40,7 @@ export interface HomeThread {
   readonly art?: string | undefined
 }
 
-export const emptyHomeDraft: HomeDraft = { draft: '', mentions: [], conversation: undefined }
+export const emptyHomeDraft: HomeDraft = { draft: '', mentions: [], links: [], conversation: undefined }
 
 /** Changed in this run of the app, by tab id. Until the first change, the saved one shows. */
 const changedHomeDraftAtom = Atom.family((_tabId: string) => Atom.make<HomeDraft | undefined>(undefined).pipe(Atom.keepAlive))

@@ -1,8 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
 import { useLayoutEffect, useRef, type KeyboardEvent, type RefObject } from 'react'
 import { layout, spacing } from '@juno/tokens/tokens.stylex'
-import { Button, Surface, Textarea, type TextareaFormat } from '@juno/ui'
-import { mentionProps, type ComposerMention } from './Composer'
+import { Button, Surface, Textarea, type TextareaFormat, type TextareaMark } from '@juno/ui'
+import { mentionProps, transfers, type ComposerMention, type ComposerPaste } from './Composer'
 
 export interface InlineEditProps {
   /** The text being edited: the owner's. */
@@ -23,6 +23,10 @@ export interface InlineEditProps {
   readonly onCaret?: (caret: number) => void
   /** Slack's markup in the text, drawn as it will look, as in the composer. */
   readonly format?: TextareaFormat
+  /** Linked words, drawn as in the composer. */
+  readonly marks?: ReadonlyArray<TextareaMark>
+  /** A rich or plain paste the owner may insert itself. */
+  readonly onPasteText?: (paste: ComposerPaste, field: HTMLTextAreaElement) => boolean
 }
 
 /**
@@ -34,10 +38,11 @@ export interface InlineEditProps {
  * it as in the composer, and take their keys first. Markup shows as it
  * will look, as in the composer.
  */
-export function InlineEdit({ value, onChange, onSave, onCancel, fieldRef, mention, onFieldKey, onCaret, format }: InlineEditProps) {
+export function InlineEdit({ value, onChange, onSave, onCancel, fieldRef, mention, onFieldKey, onCaret, format, marks, onPasteText }: InlineEditProps) {
   const own = useRef<HTMLTextAreaElement>(null)
   const field = fieldRef ?? own
   const root = useRef<HTMLDivElement>(null)
+  const { onPaste } = transfers(undefined, onPasteText)
   // Focus once, with the caret after the text, before the first paint. The field and its buttons are taller than the
   // body they replace, so a message near the bottom of the list is scrolled until it shows whole.
   useLayoutEffect(() => {
@@ -71,8 +76,9 @@ export function InlineEdit({ value, onChange, onSave, onCancel, fieldRef, mentio
           value={value}
           onChange={(event) => onChange(event.currentTarget.value, event.currentTarget.selectionStart)}
           onKeyDown={onKeyDown}
-          {...mentionProps(undefined, mention, onCaret)}
+          {...mentionProps(marks, mention, onCaret)}
           {...(format === undefined ? {} : { format })}
+          onPaste={onPasteText === undefined ? undefined : onPaste}
           dir="auto"
         />
       </Surface>

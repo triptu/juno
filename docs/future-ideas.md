@@ -24,6 +24,8 @@ Juno can connect to anything with an MCP server or anything that runs locally (c
 - **Tone, opt-in.** Flags only a clearly sharp message, never style, in the grammar check's 800 ms budget. A terse late reply to a report is the message a manager regrets.
 - **Forwardable summary.** "Explain this thread for Priya" puts a cited summary in the composer with Priya as the destination. Giving context to someone who was not in the thread is a large share of a manager's writing. It is organizing, and it sends only on your click.
 
+- **Suggested reactions.** The hover toolbar's quick reactions adapt to the message: on "we shipped it" it offers 🎉 🙌 🔥, on a question 👀 or ✅. A small model reads the message when the toolbar opens, falls back to your usual quick reactions when unsure, and never moves a reaction you are about to click. Builds on the intent phrases in emoji search and Juno's AI provider.
+
 ## Knowing the organization
 
 - **Person page.** Click a name: every open topic with them, what you owe them, what they owe you, the last decisions you made together, and your private notes. Per-person memory (in progress) gives it a home. Before a 1:1 it is the prep, without a feature called "1:1 prep".

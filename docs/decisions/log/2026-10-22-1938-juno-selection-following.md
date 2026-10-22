@@ -1,0 +1,1 @@
+- 10-22 19:38 · startup bundle room · Keep the one-shot topic selection read eager for ⌘J, and load selection following and held-range state with the idle-preloaded Juno panel.

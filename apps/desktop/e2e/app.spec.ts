@@ -85,7 +85,7 @@ async function onlyTheBridge(win: Page): Promise<void> {
     require: 'undefined',
     process: 'undefined',
     juno: ['updates', 'app', 'engine', 'agent', 'launch', 'window', 'sharing', 'huddle', 'contextMenu', 'shell', 'files', 'clipboard', 'menu', 'notifications', 'webPanel'],
-    updates: ['get', 'set', 'restart', 'download', 'notes', 'onChange'],
+    updates: ['get', 'set', 'restart', 'check', 'download', 'notes', 'onChange'],
     app: ['getInfo', 'diagnostics', 'logDiagnostics', 'copySyncLog', 'showLogs', 'reportStagingFailure', 'reportState'],
     engine: ['requestPort', 'restart'],
     agent: ['requestPort', 'setOpenRouterKey', 'provider', 'setProvider', 'codex', 'codexSignIn', 'onProvider', 'chooseFolder', 'recoveryPhrase', 'typeRecoveryPhrase'],

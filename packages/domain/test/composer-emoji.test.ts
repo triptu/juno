@@ -67,19 +67,19 @@ describe('matching', () => {
     expect(names(matchEmoji(catalog, 'smi', [], []))[0]).toBe('smile')
   })
 
-  it('offers a recently used workspace emoji for :part before standard matches', () => {
-    const catalog = [...Array.from({ length: 10 }, (_, i) => glyph(`part_${i}`, 'X')), custom('party_parrot')]
-    expect(names(matchEmoji(catalog, 'part', ['party_parrot'], []))[0]).toBe('party_parrot')
-    expect(names(matchEmoji(catalog, 'part_0', ['party_parrot'], []))[0]).toBe('part_0')
+  it('offers a frequently used workspace emoji for :part before standard names that start the same', () => {
+    const catalog = [glyph('partying_face', '🥳'), glyph('part_alternation_mark', '〽️'), custom('party_parrot')]
+    expect(names(matchEmoji(catalog, 'part', ['party_parrot'], []))).toEqual(['part_alternation_mark', 'party_parrot', 'partying_face'])
+    expect(names(matchEmoji(catalog, 'part', [], []))).toEqual(['part_alternation_mark', 'partying_face', 'party_parrot'])
   })
 
   it('offers the common emoji before name order, so thumbs offers 👍 first', () => {
     expect(names(matchEmoji(rows, 'thumbs', [], []))).toEqual(['thumbsup', 'thumbsdown'])
   })
 
-  it('ranks the recently used first, then the quick reactions in their order, aliases included', () => {
+  it('ranks the frequently used first among equal matches, then the quick reactions in their order, aliases included', () => {
     const quick = [{ name: 'smirk', unicode: '😏' }, { name: '+1', unicode: '👍' }]
-    expect(names(matchEmoji(rows, 'smi', ['sweat_smile'], quick))).toEqual(['sweat_smile', 'smirk', 'smile', 'smiley'])
+    expect(names(matchEmoji(rows, 'smi', ['smiley'], quick))).toEqual(['smiley', 'smirk', 'smile', 'sweat_smile'])
     expect(names(matchEmoji(rows, 'thumbs', [], [{ name: 'thumbsdown', unicode: '👎' }]))).toEqual(['thumbsdown', 'thumbsup'])
   })
 

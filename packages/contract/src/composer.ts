@@ -13,7 +13,6 @@ export {
   shownLinks,
   type LinkRange,
   defaultPersonColor,
-  encodeMentions,
   insertMention,
   mentionQueryAt,
   mentionTokens,
@@ -28,8 +27,10 @@ export {
   emojiQueryAt,
   matchEmoji,
   mergeEmoji,
+  warmEmojiSearch, isEmojiSearchWarm,
   markupLayout,
   toggleMarkup,
   type MarkupLayout,
   type MarkupStyle,
 } from '@juno/domain'
+export { clipboardHtml } from '@juno/domain'

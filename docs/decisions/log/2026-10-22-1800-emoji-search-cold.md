@@ -1,0 +1,1 @@
+- 10-22 18:00 · emoji search · Show name matches while the emoji search index warms after paint; append keyword matches to the current cold picker query so existing cells and Enter agree.

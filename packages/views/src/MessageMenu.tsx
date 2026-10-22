@@ -52,8 +52,8 @@ export interface MessageMenuProps {
   readonly noGrid?: boolean
   /** A grid cell or a picked emoji: its name, and its glyph or a custom emoji's image. */
   readonly onReact: (name: string, unicode: string | undefined, url: string | undefined) => void
-  /** Every emoji, and the frequently used ones that the picker shows first and ranks a search by. */
-  readonly emoji: { readonly data: PreparedEmojiPicker; readonly recent: ReadonlyArray<string> }
+  /** Every emoji, the frequently used ones that the picker shows first and ranks a search by, and whether the full search index is warm (`EmojiPicker` `searchReady`). */
+  readonly emoji: { readonly data: PreparedEmojiPicker; readonly recent: ReadonlyArray<string>; readonly searchReady?: boolean }
   /** A row was chosen; `metaKey` with ⌘ held (Start thread then opens it in a background tab). */
   readonly onSelect: (id: string, how: { readonly metaKey: boolean }) => void
   readonly onClose: () => void
@@ -89,7 +89,7 @@ export function MessageMenu({ anchor, reactions, items, noGrid = false, onReact,
       onSelect={onSelect}
       onClose={onClose}
       {...(noGrid ? {} : { panelWidth: layout['--emoji-picker-width'] })}
-      morph={picking ? <EmojiPicker data={emoji.data} recent={emoji.recent} material="menu" initialQuery={initialQuery} onPick={onReact} onClose={onClose} /> : undefined}
+      morph={picking ? <EmojiPicker data={emoji.data} recent={emoji.recent} searchReady={emoji.searchReady ?? true} material="menu" initialQuery={initialQuery} onPick={onReact} onClose={onClose} /> : undefined}
       inline={inline}
     />
   )

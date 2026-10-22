@@ -13,6 +13,7 @@ export { composeEdit } from './edit-outgoing'
 export { editMarkup } from './edit-markup'
 export { markupLayout, toggleMarkup, type MarkupEdit, type MarkupLayout, type MarkupStyle } from './markup'
 export { findLinks, linkOf } from './links'
+export { clipboardHtml } from './clipboard-html'
 export type { MentionTargets } from './outgoing'
 export {
   emojiCatalog,
@@ -24,6 +25,7 @@ export {
   unicodeFromHex,
   type EmojiCategory,
 } from './emoji'
+export { keywordData as emojiKeywordData } from './emoji-keywords'
 
 export { messageTitle } from './title'
 

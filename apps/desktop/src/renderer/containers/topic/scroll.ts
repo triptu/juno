@@ -6,6 +6,7 @@ import type { RefObject } from 'react'
 import type { MessageView, Person } from '@juno/contract'
 import type { MessageWindow, ScrollSnapshot } from '@juno/state'
 import type { MessageListItem } from '@juno/views'
+import { scrollingUp } from '../scrollInput'
 
 /** Within this of the end counts as at the bottom (performance 3.3). */
 export const BOTTOM_SLACK = 32
@@ -123,14 +124,16 @@ export function takeOwnEnd(scroller: HTMLElement): boolean {
 
 /**
  * Puts the pinned row or the bottom back, and remembers the scrollTop it set. A row that left the list ends the pin.
- * The bottom also ends when the list moved up from where it was last held and is away from the end: the user's
- * scroll is already in `scrollTop` when this runs, but its `scroll` event, which lets go, may come after it in the
- * frame, as when a row grows during a wheel gesture. Content that shrinks leaves the list at the end, so it holds.
+ * The bottom also ends when the user is scrolling up (`scrollingUp`) and the list moved up from where it was last
+ * held and is away from the end: the user's scroll is already in `scrollTop` when this runs, but its `scroll` event,
+ * which lets go, may come after it in the frame, as when a row grows during a wheel gesture. With no such input the
+ * list moved through scroll anchoring, as when a message arrives in a full window and its first row goes, and it
+ * holds. Content that shrinks leaves the list at the end, so it holds.
  */
 export function hold(scroller: HTMLElement, pin: RefObject<Pin | undefined>, pinnedTop: RefObject<number>): void {
   const held = pin.current
   if (held === undefined) return
-  if ((held.kind === 'row' && !held.element.isConnected) || (held.kind === 'bottom' && scroller.scrollTop < pinnedTop.current - 1 && distanceFromBottom(scroller) > 1)) {
+  if ((held.kind === 'row' && !held.element.isConnected) || (held.kind === 'bottom' && scroller.scrollTop < pinnedTop.current - 1 && distanceFromBottom(scroller) > 1 && scrollingUp(scroller))) {
     pin.current = undefined
     return
   }

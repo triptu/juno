@@ -9,6 +9,8 @@ import { Emoji, ScrollArea, Surface, Text, TextField } from '@juno/ui'
 
 export interface EmojiPickerProps {
   readonly data: PreparedEmojiPicker
+  /** The container warms the full index; until then search uses names only. */
+  readonly searchReady?: boolean
   /** Recently used names (Slack names), shown first as "Frequently used" when non-empty. */
   readonly recent?: ReadonlyArray<string>
   /** A Slack emoji name: "+1", "partying_face", a custom name; its glyph, or a custom emoji's image. */
@@ -35,7 +37,7 @@ const EMPTY: ReadonlyArray<never> = []
 const NONE: ReadonlySet<string> = new Set()
 
 /** A windowed grid: only nearby rows mount, including in a large workspace or search. */
-export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, onClose, initialQuery = '', material = 'popover' }: EmojiPickerProps) {
+export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, onClose, initialQuery = '', material = 'popover', searchReady = true }: EmojiPickerProps) {
   const [query, setQuery] = useState(initialQuery)
   const [failed, setFailed] = useState<ReadonlySet<string>>(NONE)
   const [focused, setFocused] = useState<number | undefined>(undefined)
@@ -74,11 +76,21 @@ export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, on
 
   const results = useMemo((): ReadonlyArray<Section> | undefined => {
     if (search === '') return undefined
-    const matches = matchEmoji(all, search, recent, [], Infinity)
+    const matches = matchEmoji(all, search, recent, [], Infinity, searchReady)
     return [{ key: 'results', items: matches }]
-  }, [all, search, recent])
+  }, [all, search, recent, searchReady])
 
-  const sections = results ?? browse
+  const [cold, setCold] = useState<{ readonly search: string; readonly all: typeof all; readonly items: ReadonlyArray<Item> }>()
+  const items = results?.[0]?.items
+  if (!searchReady && items !== undefined && cold?.items !== items) setCold({ search, all, items })
+  else if (cold !== undefined && (cold.search !== search || cold.all !== all)) setCold(undefined)
+  const sections = useMemo(() => {
+    if (items === undefined) return browse
+    if (cold?.search !== search || cold.all !== all || !searchReady) return [{ key: 'results', items }]
+    // Refine this cold query by appending new matches, keeping the cells already under the pointer.
+    const seen = new Set(cold.items.map(itemKey))
+    return [{ key: 'results', items: [...cold.items, ...items.filter((item) => !seen.has(itemKey(item)))] }]
+  }, [items, browse, cold, search, all, searchReady])
   const grid = useMemo(() => {
     const rows: Array<{ key: string; heading: string } | { key: string; section: string; items: ReadonlyArray<Item>; start: number; first: number }> = []
     const groups: Array<{ section: Section; top: number; height: number; first: number; row: number }> = []
@@ -151,7 +163,8 @@ export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, on
     if (event.key === 'Enter') {
       // The live query, not the deferred one, so Enter right after typing picks what was typed.
       const typed = normalize(query)
-      const match = typed === '' ? undefined : matchEmoji(all, typed, recent, [], Infinity).find((item) => !isChosen(item))
+      const matches = typed === search ? sections.flatMap((section) => section.items) : matchEmoji(all, typed, recent, [], Infinity, searchReady)
+      const match = typed === '' ? undefined : matches.find((item) => !isChosen(item))
       if (match === undefined) return
       event.preventDefault()
       pick(match)

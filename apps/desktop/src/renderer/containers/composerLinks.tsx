@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type RefObject } from 'react'
-import { linkAt, moveLinks, pastedLink, setLink, shownLinks, type LinkRange, type MentionPick } from '@juno/contract'
+import { clipboardHtml, linkAt, moveLinks, pastedLink, setLink, shownLinks, type LinkRange, type MentionPick } from '@juno/contract'
 import { openExternal } from '@juno/state'
-import type { ComposerPopover } from '@juno/views'
+import type { ComposerPaste, ComposerPopover } from '@juno/views'
 import { chunk, usePreloaded } from './chunks'
 import { editField } from './suggestionKeys'
 
@@ -56,17 +56,30 @@ export function useComposerLinks({ field, initialText, initial, onChange }: Comp
 
   /** Another tab's draft, or a sent one: the text and links start over. */
   const reset = (next: string, nextLinks: ReadonlyArray<LinkRange>) => {
+    if (text.current === next && links.current === nextLinks) return
     text.current = next
     keep(nextLinks)
   }
 
-  const onPasteText = (pasted: string, element: HTMLTextAreaElement): boolean => {
+  const onPasteText = (pasted: ComposerPaste, element: HTMLTextAreaElement): boolean => {
     const { selectionStart: start, selectionEnd: end, value } = element
-    const url = pastedLink(pasted)
+    if (pasted.html !== '') {
+      const rich = clipboardHtml(pasted.html)
+      if (rich.text === '') return false
+      editField(element, start, end, rich.text)
+      let next = links.current
+      for (const link of rich.links) next = setLink(next, start + link.start, start + link.end, link.url)
+      keep(next)
+      element.setSelectionRange(start + rich.text.length, start + rich.text.length)
+      // The input event saved the text; save once more with its new link ranges.
+      onChange(text.current)
+      return true
+    }
+    const url = pastedLink(pasted.plain)
     const words = value.slice(start, end)
     if (url === undefined || start === end || words.includes('\n') || words.trim() === '') return false
     // Two edits, so Undo first takes the words back to the plain paste.
-    const plain = pasted.trim()
+    const plain = pasted.plain.trim()
     editField(element, start, end, plain)
     editField(element, start, start + plain.length, words)
     keep(setLink(links.current, start, start + words.length, url))

@@ -2,16 +2,16 @@
 // at the end of a list longer than the view is fully in view on the first frame that draws it, and the list stays
 // at its end. Sitting there includes turning the wheel down at the end and clicking a message, which scroll
 // nothing. The last message growing at the bottom (a reaction, its edit box) stays whole above the composer, and an
-// edit box started just above the bottom shows whole too. Scrolled up, an arriving message or a reaction moves nothing.
-import type { Locator, Page } from '@playwright/test'
+// edit box started just above the bottom shows whole too. Back at the end by hand, with the wheel or with the
+// scrollbar thumb still held there, a list with more messages than its window follows new messages, though each
+// drops its first row. Scrolled up, an arriving message or a reaction moves nothing.
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
-import type { FakeSlack } from '@juno/fake-slack'
-import type { Juno } from './driver/juno'
-import type { Slack } from './driver/slack'
+import { TOPIC300_MAIN_CHANNEL } from '@juno/fake-slack'
 import { expect, test, type Fixtures } from './fixtures'
 import { answer, JunoChatPane, test as chatTest } from './juno-agent/chat'
 import { expectStableAnchor } from './shiftProbe'
 import { expectRestSurvivesGrowth, expectScrollEscapesGrowth } from './scrollGrowthProbe'
+import { distance, expectLastWhole, frames, holdThumbAtEnd, longerThanView, longTest, openLongMain, wheelDownAtEnd, wheelToEnd } from './stickBottomLists'
 import { watchArrival, watchEditVisibility, watchResize, type Frame } from './stickBottomProbe'
 
 test.describe.configure({ timeout: 90_000, mode: 'parallel' })
@@ -22,45 +22,8 @@ function expectHeldAtEnd(frames: Frame[]): void {
   expect(frames.filter((frame) => !frame.inView || frame.distance > 1)).toEqual([])
 }
 
-const frames = (page: Page, count: number) =>
-  page.evaluate(
-    (count) =>
-      new Promise<void>((resolve) => {
-        let left = count
-        const tick = () => (--left <= 0 ? resolve() : requestAnimationFrame(tick))
-        requestAnimationFrame(tick)
-      }),
-    count,
-  )
-
-const distance = (scroller: Locator) => scroller.evaluate((node) => node.scrollHeight - node.scrollTop - node.clientHeight)
-
-/** Turns the wheel down over a list already at its end, as a user sitting there does: nothing scrolls. */
-async function wheelDownAtEnd(page: Page, scroller: Locator): Promise<void> {
-  const box = await scroller.boundingBox()
-  if (box === null) throw new Error('No list to turn the wheel over')
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-  await page.mouse.wheel(0, 400)
-  await frames(page, 10)
-  expect(await distance(scroller)).toBeLessThanOrEqual(1)
-}
-
 const TOPIC_SCROLLER = '[data-topic-view] [data-scroll]'
 const PANEL_SCROLLER = 'aside[data-juno-panel] [data-scroll]'
-const longerThanView = (scroller: Locator) => scroller.evaluate((node) => node.scrollHeight > node.clientHeight * 1.5)
-
-/** #eng's Main with 30 more messages than the seed, open at its end. */
-async function openLongMain(juno: Juno, fake: FakeSlack, slack: Slack): Promise<string> {
-  const channel = slack.channel('eng')
-  for (let i = 0; i < 30; i++) fake.workspace.post({ channel, user: slack.as(i % 2 === 0 ? 'Maya' : 'Leo').id, text: `Earlier message ${i}`, silent: true })
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.sidebar.row('#eng').open()
-  await juno.topic.expectMessage('Earlier message 29')
-  await juno.topic.toLatest()
-  expect(await longerThanView(juno.topic.scroller)).toBe(true)
-  return channel
-}
 
 test('a thread at the bottom keeps a new reply fully in view', async ({ juno, win, slack, fake }) => {
   const channel = slack.channel('eng')
@@ -172,7 +135,8 @@ test('keeps the last message of Main whole as it grows at the bottom, and still 
     await topic.expectAtBottom()
     const watched = await watchArrival(win, TOPIC_SCROLLER, '[data-message-row]', text)
     fake.addReaction({ channel, ts: message.ts, name: 'eyes', user: slack.as('Leo').id })
-    await expect(topic.message(text).getByRole('button', { name: /👀/ })).toBeVisible()
+    // The reaction chip itself.
+    await expect(topic.message(text).getByRole('button', { name: '1 👀' })).toBeVisible()
     await frames(win, 5)
     expectWhole(await watched(), { atEnd: true })
   })
@@ -283,6 +247,56 @@ test('releases the bottom during an upward gesture and uses the resting threshol
     expect(await topic.scroller.evaluate((node) => node.scrollTop)).toBe(top)
   })
 })
+
+for (const place of ['Main', 'thread'] as const) {
+  longTest(`${place}: back at the end after scrolling up by hand, a full window follows new messages`, async ({ juno, win, slack, fake }) => {
+    const title = place === 'Main' ? '#perf-main' : 'Review the rollout checklist 1'
+    const post = (text: string) => (place === 'Main' ? void fake.injectMessage({ channel: TOPIC300_MAIN_CHANNEL, user: 'U0PERFLEO', text }) : slack.as('Leo').replyIn(title, text))
+    await juno.signIn()
+    await juno.waitForSync()
+    // The first open reads the topic. Opened again, it shows its newest 150 rows, so each message that arrives drops
+    // the first row, and scroll anchoring lowers scrollTop by that row's height.
+    const row = juno.sidebar.row(title)
+    await row.open()
+    await row.expectRead()
+    await juno.tabs.menu('close-tab')
+    await row.open()
+    await juno.topic.expectAtBottom()
+    const { topic } = juno
+
+    await test.step('the wheel up a few screens and back down to the end', async () => {
+      await topic.scrollUp(1_500)
+      expect(await distance(topic.scroller)).toBeGreaterThan(1_000)
+      await wheelToEnd(win, topic.scroller)
+      for (let i = 1; i <= 3; i++) {
+        post(`After the wheel ${i}`)
+        await topic.expectMessage(`After the wheel ${i}`)
+      }
+      await frames(win, 5)
+      await expectLastWhole(juno, 'After the wheel 3')
+    })
+
+    // The scroll has reached the end but has not ended: the thumb is still held, as fingers resting on the trackpad
+    // keep a gesture going. A message that arrives then is followed, and so is every one after the scroll ends.
+    await test.step('the scrollbar thumb held at the end while a message arrives', async () => {
+      await topic.scrollUp(1_500)
+      expect(await distance(topic.scroller)).toBeGreaterThan(1_000)
+      await holdThumbAtEnd(win, topic.scroller)
+      post('While the thumb is held')
+      await topic.expectMessage('While the thumb is held')
+      await frames(win, 5)
+      await expectLastWhole(juno, 'While the thumb is held')
+      await win.mouse.up()
+      await frames(win, 10)
+      for (let i = 1; i <= 3; i++) {
+        post(`After the thumb ${i}`)
+        await topic.expectMessage(`After the thumb ${i}`)
+      }
+      await frames(win, 5)
+      await expectLastWhole(juno, 'After the thumb 3')
+    })
+  })
+}
 
 test('an upward gesture escapes concurrent column growth from the first scroll frame', async ({ juno, win, slack, fake }) => {
   await openLongMain(juno, fake, slack)

@@ -1,12 +1,25 @@
 /** Loaded with the picker chunk, after the first list paint. One subscription per app. */
 import * as Atom from 'effect/reactivity/Atom'
-import { emojiCatalog, prepareEmojiPicker, workspaceEmoji, type PreparedEmojiPicker, type EmojiCategory } from '@juno/contract'
+import { emojiCatalog, prepareEmojiPicker, warmEmojiSearch, workspaceEmoji, type PreparedEmojiPicker, type EmojiCategory } from '@juno/contract'
 import { mark, measure } from './perf'
 import { registry } from './client'
 import { composerEmojiAtom } from './mentions'
 const catalogStarted = mark('juno.emoji-catalog')
 export const standardEmojiPickerData = prepareEmojiPicker(emojiCatalog, [])
 measure('juno.emoji-catalog', catalogStarted)
+
+/** Builds a picker's search index when the renderer is idle, so the first keystroke only compares. */
+function warmSearch(data: PreparedEmojiPicker): void {
+  const warm = () => {
+    const started = mark('juno.emoji-search-index')
+    warmEmojiSearch(data.all)
+    measure('juno.emoji-search-index', started, { replace: true })
+  }
+  const idle = (globalThis as { readonly requestIdleCallback?: (task: () => void) => number }).requestIdleCallback
+  if (idle === undefined) setTimeout(warm, 0)
+  else idle.call(globalThis, warm)
+}
+warmSearch(standardEmojiPickerData)
 
 export const workspaceEmojiDataAtom = Atom.make((get) => {
   const answer = get(composerEmojiAtom(true))
@@ -36,6 +49,7 @@ export function warmWorkspaceEmoji(catalog: ReadonlyArray<EmojiCategory>): void 
   let measured = false
   registry.subscribe(atom, (value) => {
     if (value === undefined) return
+    if (prepared !== value.data) warmSearch(value.data)
     prepared = value.data
     ready()
     if (!measured) { measure('juno.emoji-ready', started, { detail: { emojiCount: value.data.customItems.length } }); measured = true }

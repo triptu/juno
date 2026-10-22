@@ -18,6 +18,7 @@ import { useAtomValue } from '@juno/state/react'
 import { flashChatRow } from '@juno/views'
 import { onLeaveTab, takeOpenStart } from '../navigation'
 import { takeSendMark } from '../sendMark'
+import { watchUpwardInput } from '../scrollInput'
 import { scrollRest } from '../scrollRest'
 import { BOTTOM_SLACK, distanceFromBottom, dividerTop, hold, rowInView, rowSelector, snapshotOf, takeOwnEnd, type Pin } from './scroll'
 
@@ -221,22 +222,22 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
     const letGo = () => {
       if (pinRef.current?.kind === 'row') pinRef.current = undefined
     }
-    // The scrollTop last seen at the bottom. Holding the end and rows growing above only make it larger.
-    let bottomTop = scroller.scrollTop
+    const edge = watchBottom(scroller, pinRef, pinnedTopRef, atEndRef)
+    // The rows' height when a scroll last came to rest at the bottom; -1 until one has.
+    let bottomHeight = -1
     const rest = scrollRest(scroller, GESTURE_IDLE)
     const onScroll = () => {
       rest.onScroll()
-      if (pinRef.current?.kind !== 'bottom') return
-      const top = scroller.scrollTop
-      if (top < bottomTop - 1 && distanceFromBottom(scroller) > 1) pinRef.current = undefined
-      else bottomTop = top
+      edge.onScroll()
     }
     const onScrollEnd = () => {
       const own = takeOwnEnd(scroller)
       if (rest.pending()) return
       if (pinRef.current?.kind === 'row' && Math.abs(scroller.scrollTop - pinnedTopRef.current) > 1) pinRef.current = undefined
-      // Still held with the end away: the end moved under it (an edit box opening). `hold` lets go if the user scrolled up.
-      if (pinRef.current?.kind === 'bottom') hold(scroller, pinRef, pinnedTopRef)
+      // Still held with the end away and the rows grown since: the end moved under it (an edit box opening). With the
+      // rows as they were, the scroll was the user's, near the end, and the list stays where it stopped. `hold` lets
+      // go if the user scrolled up.
+      if (pinRef.current?.kind === 'bottom' && scroller.scrollHeight !== bottomHeight) hold(scroller, pinRef, pinnedTopRef)
       const distance = distanceFromBottom(scroller)
       const bottom = atEndRef.current && distance <= BOTTOM_SLACK
       // At the exact end hold now. Otherwise remember where the user stopped before growth can move the end.
@@ -253,7 +254,8 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
       }
       if (bottom) {
         pinRef.current = { kind: 'bottom' }
-        bottomTop = pinnedTopRef.current = scroller.scrollTop
+        edge.rested()
+        bottomHeight = scroller.scrollHeight
       } else if (pinRef.current?.kind === 'bottom') pinRef.current = undefined
       // Anywhere else, the list holds the row it came to rest on. A jump lands on rows still at their size estimate,
       // and Chromium does not anchor on those, so as they reach their real height a frame or two later the rows in view
@@ -274,12 +276,14 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
     scroller.addEventListener('scrollend', onScrollEnd)
     // After the listeners above, so it sees the bottom let go in the same scroll.
     const gesture = watchGesture(scroller, pinRef)
+    const stopInput = watchUpwardInput(scroller)
     const stopLeaving = readOnly ? () => {} : onLeaveTab(view, () => rememberPosition(scroller, view, pinRef, pinnedTopRef, gesture.going()))
     return () => {
       for (const type of inputs) scroller.removeEventListener(type, letGo)
       scroller.removeEventListener('scroll', onScroll)
       scroller.removeEventListener('scrollend', onScrollEnd)
       gesture.stop()
+      stopInput()
       stopLeaving()
       rest.cancel()
     }
@@ -307,6 +311,30 @@ function holdRestingRow(scroller: HTMLElement, pinRef: Position['pinRef'], pinne
     if (inView.element.firstElementChild?.checkVisibility({ contentVisibilityAuto: true }) === false) flushSync(() => setHeldAt(inView.anchorKey))
   }
   return inView
+}
+
+/**
+ * Takes and lets go of the bottom as the list scrolls, before the scroll ends. The user's own scroll that reaches the
+ * end (within 1 px) holds it at once: a scrollbar thumb held there, or fingers resting on the trackpad, end no
+ * scroll, and a message that arrived meanwhile was left below the fold. A scroll up and away from the end lets go.
+ */
+function watchBottom(scroller: HTMLElement, pinRef: Position['pinRef'], pinnedTopRef: Position['pinnedTopRef'], atEndRef: Position['atEndRef']) {
+  // The scrollTop last seen at the bottom. Holding the end and rows growing above only make it larger.
+  let bottomTop = scroller.scrollTop
+  return {
+    onScroll: () => {
+      const top = scroller.scrollTop
+      if (pinRef.current === undefined && atEndRef.current && distanceFromBottom(scroller) <= 1) {
+        pinRef.current = { kind: 'bottom' }
+        bottomTop = pinnedTopRef.current = top
+      } else if (pinRef.current?.kind === 'bottom') {
+        if (top < bottomTop - 1 && distanceFromBottom(scroller) > 1) pinRef.current = undefined
+        else bottomTop = top
+      }
+    },
+    /** A scroll came to rest at the bottom. */
+    rested: () => void (bottomTop = pinnedTopRef.current = scroller.scrollTop),
+  }
 }
 
 /**

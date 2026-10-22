@@ -506,6 +506,7 @@ export function parseTabs(value: unknown): Tabs {
 const HomeDraftJson = Schema.Struct({
   draft: Schema.String,
   mentions: Schema.Array(Schema.Struct({ kind: Schema.Literals(['person', 'channel']), id: Schema.String, name: Schema.String })),
+  links: Schema.optionalKey(Schema.Array(Schema.Struct({ start: Schema.Int, end: Schema.Int, url: Schema.String }))),
   conversation: Schema.optionalKey(PickConversation),
   thread: Schema.optionalKey(Schema.Struct({ id: Schema.String, rootTs: Schema.String, title: Schema.String, art: Schema.optionalKey(Schema.String) })),
 })
@@ -520,7 +521,7 @@ function parseHomeDrafts(value: unknown): ReadonlyMap<string, HomeDraft> {
       const json = tab.homeDraft ?? tab.newChat
       if (json === undefined) continue
       Option.map(decodeHomeDraft(json), (draft) =>
-        drafts.set(tab.id, { draft: draft.draft, mentions: draft.mentions, conversation: draft.conversation, ...(tab.homeDraft === undefined || draft.thread === undefined || draft.conversation === undefined ? {} : { thread: draft.thread }) }),
+        drafts.set(tab.id, { draft: draft.draft, mentions: draft.mentions, links: draft.links ?? [], conversation: draft.conversation, ...(tab.homeDraft === undefined || draft.thread === undefined || draft.conversation === undefined ? {} : { thread: draft.thread }) }),
       )
     }
   })
@@ -552,6 +553,7 @@ export function savedTabs(tabs: Tabs, draftOf: (tabId: string) => HomeDraft | un
 const savedHomeDraft = (draft: HomeDraft) => ({
   draft: draft.draft,
   mentions: draft.mentions,
+  ...((draft.links?.length ?? 0) === 0 ? {} : { links: draft.links }),
   ...(draft.conversation === undefined ? {} : { conversation: draft.conversation }),
   ...(draft.thread === undefined ? {} : { thread: draft.thread }),
 })

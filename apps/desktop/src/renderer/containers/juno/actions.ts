@@ -35,7 +35,7 @@ import {
 } from '@juno/state'
 import { chatActions, hasPersonFile, junoPageActions, memoryPersonAtom } from '@juno/state/agent'
 import { afterNavigation, openJuno, openJunoPage } from '../navigation'
-import { clearTopicSelection, topicSelection } from './topicContext'
+import { clearTopicSelection, topicSelection } from './topicSelection'
 
 export { openJunoPage } from '../navigation'
 

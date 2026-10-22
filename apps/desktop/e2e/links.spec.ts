@@ -25,6 +25,19 @@ async function pasteText(field: Locator, text: string): Promise<void> {
   }, text)
 }
 
+/** A rich paste, with the plain fallback another app puts beside its HTML. */
+async function pasteHtml(field: Locator, plain: string, html: string): Promise<void> {
+  await field.evaluate((element, pasted) => {
+    ;(element as HTMLTextAreaElement).focus()
+    const data = new DataTransfer()
+    data.setData('text/plain', pasted.plain)
+    data.setData('text/html', pasted.html)
+    const native = element.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
+    // A synthetic paste has no browser default. Reproduce the textarea's ordinary plain-text fallback.
+    if (native) document.execCommand('insertText', false, pasted.plain)
+  }, { plain, html })
+}
+
 /** Selects `words` in the composer, as a drag over them would. */
 async function select(field: Locator, words: string): Promise<void> {
   await field.evaluate((element, wanted) => {
@@ -56,6 +69,35 @@ test('sends plain links, pastes linked words and edits links with the keyboard',
   await test.step('URLs and domains sent from the composer show as links before and after the echo', () => sendPlainLinks(context))
   await test.step('a URL pasted over selected words links them, is sent as Slack sends it, and Undo gives the plain paste', () => pasteLinkedWords(context))
   await test.step('⌘K on selected words edits their link', () => editLinkedWords(context))
+})
+
+test('pastes a rich link from another app and sends its label with the URL', async ({ juno, fake }) => {
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.topic.expectTitle(POSTGRES)
+
+  await pasteHtml(
+    juno.topic.composer,
+    'Read the deployment guide before launch',
+    '<p>Read the <a href="https://example.com/deploy"><strong>deployment guide</strong></a> before launch</p>',
+  )
+  await expect(juno.topic.composer).toHaveValue('Read the *deployment guide* before launch')
+  await juno.topic.composer.press('Enter')
+  await juno.topic.expectSent('Read the deployment guide before launch')
+
+  expect(postedLinks(fake.calls)).toEqual([{ type: 'link', url: 'https://example.com/deploy', text: 'deployment guide', style: { bold: true } }])
+
+  await juno.topic.composer.press('ArrowUp')
+  await juno.topic.message('Read the deployment guide before launch').press('e')
+  const edit = juno.topic.list.getByRole('textbox', { name: 'Edit message' })
+  await edit.fill('')
+  await pasteHtml(edit, 'See release notes', '<div>See <a href="https://example.com/release"><em>release notes</em></a></div>')
+  await expect(edit).toHaveValue('See _release notes_')
+  await edit.press('Enter')
+  await expect.poll(() => fake.calls.filter((call) => call.method === 'chat.update').length).toBe(1)
+  const update = fake.calls.find((call) => call.method === 'chat.update')
+  expect(postedLinks(update === undefined ? [] : [{ method: 'chat.postMessage', args: update.args }])).toEqual([
+    { type: 'link', url: 'https://example.com/release', text: 'release notes', style: { italic: true } },
+  ])
 })
 
 async function sendPlainLinks({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {

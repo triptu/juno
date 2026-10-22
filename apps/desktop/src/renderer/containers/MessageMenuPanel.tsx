@@ -4,18 +4,21 @@
  * picker show, and what a topic's and the Juno chat's rows do.
  */
 import { useState } from 'react'
-import { emojiCatalog } from '@juno/contract'
+import { emojiCatalog, isEmojiSearchWarm, warmEmojiSearch } from '@juno/contract'
 import { frequentEmojiAtom, quickReactionsAtom } from '@juno/state'
 import { emojiPickerDataAtom, standardEmojiPickerData, warmWorkspaceEmoji } from '@juno/state/emoji'
 import { useAtomValue } from '@juno/state/react'
 import { MessageMenu } from '@juno/views'
 import { gridEmoji } from './gridEmoji'
 import type { OpenMessageMenu } from './messageMenu'
+import { useEmojiSearchReady } from './useEmojiSearchReady'
 
 export { openChatMenu } from './juno/chatMenu'
 export { topicMenu } from './topic/messageMenu'
 
 warmWorkspaceEmoji(emojiCatalog)
+
+const searchIndex = { warmEmojiSearch, isEmojiSearchWarm }
 
 interface MessageMenuPanelProps {
   readonly menu: OpenMessageMenu
@@ -35,5 +38,6 @@ export function MessageMenuPanel({ menu, onReact, onSelect, onClose }: MessageMe
   const data = (snapshot ?? current)?.data ?? standardEmojiPickerData
   const [grid] = useState(() => gridEmoji(quick, frequent, data).map((emoji) => ({ ...emoji, selected: menu.chosen?.(emoji) === true })))
   const [recent] = useState(frequent)
-  return <MessageMenu anchor={menu.anchor} reactions={grid} items={menu.items} noGrid={menu.noGrid === true} onReact={onReact} emoji={{ data, recent }} onSelect={onSelect} onClose={onClose} />
+  const searchReady = useEmojiSearchReady(data.all, searchIndex)
+  return <MessageMenu anchor={menu.anchor} reactions={grid} items={menu.items} noGrid={menu.noGrid === true} onReact={onReact} emoji={{ data, recent, searchReady }} onSelect={onSelect} onClose={onClose} />
 }

@@ -34,6 +34,7 @@ export type PerfName =
   | 'juno.emoji-ready'
   | 'juno.emoji-resolve'
   | 'juno.emoji-prepare'
+  | 'juno.emoji-search-index'
   | 'juno.emoji-decode'
   | 'juno.emoji-catalog'
   | 'juno.emoji-preload'
