@@ -390,7 +390,7 @@ if (!outboxOnly && !memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly)
     ['stale', 'noStaleLeave'], ['overflow', 'matchingState'], ['otherDevice', 'otherDevice'], ['refusedLeave', 'noGhost'],
     ['pageDuringJoin', 'drainBound'], ['earlyReport', 'drainBound'],
     ['lostStart', 'drainBound'], ['workspaceRestart', 'oneCall'], ['unlistedPage', 'drainBound'],
-    ['cancelDuringPersist', 'drainBound'],
+    ['cancelDuringPersist', 'drainBound'], ['laggingInfo', 'matchingState'],
   ]
   for (const [schedule, invariant] of pairs) {
     simulate('huddle', `${schedule}BugStep`, invariant, `huddle-${schedule}-bug.itf.json`, true)

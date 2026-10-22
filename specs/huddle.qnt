@@ -32,7 +32,7 @@ module huddle {
     pageDirty: bool, pageResend: bool, outbox: Set[Report], handOffs: Set[HandOff],
     connected: bool, dirty: bool, epoch: int, fetchEpoch: int,
     fetching: bool, snapshot: Set[int], snapshotVersion: int,
-    slack: Set[int], shown: Set[int], version: int,
+    slack: Set[int], served: Set[int], servedVersion: int, settling: bool, shown: Set[int], version: int,
     frames: Set[Frame], leaveReplies: Set[int], lastReply: str,
     sealed: bool, label: str
   }
@@ -57,7 +57,7 @@ module huddle {
     pageDirty: false, pageResend: false, outbox: Set(), handOffs: Set(),
     connected: true, dirty: true, epoch: 0,
     fetchEpoch: -1, fetching: false, snapshot: Set(), snapshotVersion: 0,
-    slack: Set(), shown: Set(), version: 0, frames: Set(), leaveReplies: Set(),
+    slack: Set(), served: Set(), servedVersion: 0, settling: false, shown: Set(), version: 0, frames: Set(), leaveReplies: Set(),
     lastReply: "", sealed: false, label: "init"
   }
   action init = all { s' = initial, before' = initial, turn' = 0, remaining' = 32 }
@@ -302,13 +302,15 @@ module huddle {
   // The stored leaves load later (`load`), after any number of reports.
   action restart = all {
     not(s.up),
-    s' = { ...s, up: true, quitting: false, connected: true, dirty: true, pageResend: true, conn: s.conn + 1,
+    s' = { ...s, up: true, quitting: false, connected: true, dirty: true, settling: true, pageResend: true, conn: s.conn + 1,
       epoch: s.epoch + 1, fetching: false, unsent: s.pending, phase: "leaving", label: "restart" }
   }
   action load(w: int): bool = all { s.up, not(s.loadedWs.contains(w)), s' = { ...s, loadedWs: s.loadedWs.union(Set(w)), label: "load" } }
 
   // Slack's running list includes other people. Its changes are independent of
   // media: arch v2 can retain an empty huddle after the local media has stopped.
+  // `huddles/info` answers `served`, Slack's list as of `servedVersion`, which
+  // lags `slack` until `catchUp`.
   action slackChange(c: int): bool = all {
     s' = { ...s, slack: if (s.slack.contains(c)) s.slack.exclude(Set(c)) else s.slack.union(Set(c)),
       version: s.version + 1,
@@ -321,9 +323,13 @@ module huddle {
     s.up, s.connected, s.frames.size() < 2,
     s' = { ...s, frames: s.frames.union(Set(f)), label: "queueFrame" }
   }
+  // Slack's edge catches up with its socket.
+  action catchUp = all { s.servedVersion != s.version, s' = { ...s, served: s.slack, servedVersion: s.version, label: "catchUp" } }
+  // Old rule (rule 14): a frame's channel was read at once, while the edge
+  // could still answer from before the frame.
   action roomFrame(f: Frame, bug: int): bool = all {
     s.up, s.connected, s.frames.contains(f),
-    s' = { ...s, dirty: true, epoch: s.epoch + 1,
+    s' = { ...s, dirty: true, epoch: s.epoch + 1, settling: if (bug == 14) s.settling else true,
       // Observed frames have a user id, not an attendee id. Even a same-room
       // self-leave cannot identify the current media session. Refetch only.
       current: if (bug == 4 and f.kind == "sh_room_leave") 0 else s.current,
@@ -335,17 +341,21 @@ module huddle {
   }
   action reconnect = all {
     s.up, not(s.connected),
-    s' = { ...s, connected: true, dirty: true, epoch: s.epoch + 1, label: "reconnect" }
+    s' = { ...s, connected: true, dirty: true, settling: true, epoch: s.epoch + 1, label: "reconnect" }
   }
   action overflow(bug: int): bool = all {
     s.up, s.connected,
-    s' = { ...s, frames: Set(), dirty: if (bug == 5) s.dirty else true,
+    s' = { ...s, frames: Set(), dirty: if (bug == 5) s.dirty else true, settling: true,
       epoch: s.epoch + 1, label: "overflow" }
   }
+  // The engine reads once the socket has been quiet for the settle time. The
+  // guard is the timing assumption: by then the edge has caught up with every
+  // change before the frame, connect or overflow that started the wait.
+  action settle = all { s.up, s.settling, s.servedVersion == s.version, s' = { ...s, settling: false, label: "settle" } }
   action fetchInfo = all {
-    s.up, s.connected, s.dirty, not(s.fetching),
-    s' = { ...s, fetching: true, fetchEpoch: s.epoch, snapshot: s.slack,
-      snapshotVersion: s.version, label: "fetchInfo" }
+    s.up, s.connected, s.dirty, not(s.fetching), not(s.settling),
+    s' = { ...s, fetching: true, fetchEpoch: s.epoch, snapshot: s.served,
+      snapshotVersion: s.servedVersion, label: "fetchInfo" }
   }
   action answerInfo = all {
     s.up, s.fetching,
@@ -410,6 +420,7 @@ module huddle {
     } else if (not(s.connected)) reconnect
     else if (s.frames.size() > 0) { nondet f = s.frames.oneOf() roomFrame(f, 0) }
     else if (s.fetching) answerInfo
+    else if (s.settling) (if (s.servedVersion != s.version) catchUp else settle)
     else if (s.dirty) fetchInfo
     else all { s' = { ...s, label: "idle" } }
 
@@ -423,7 +434,7 @@ module huddle {
     if (s.persisted != 0) any {
       handOff(0), cancelStart, receiveAny(true), receiveAny(false), pageReport, pageEnd, pageReconnect,
       pageStop(a, "left"), pageStop(a, "AudioJoinedFromAnotherDevice"), pageStop(a, "connectionLost"),
-      crash, engineCrash, slackChange(c)
+      crash, engineCrash, slackChange(c), catchUp
     } else any {
       cancelStart,
       choose(c), leave, requestJoin(0), answerJoin(a, r, 0), joinError, reconcile(0),
@@ -431,7 +442,7 @@ module huddle {
       leaveAnswer(a, "ok", 0), leaveAnswer(a, "feature_not_enabled", 0), leaveAnswer(a, "refused", 0),
       receiveAny(true), receiveAny(false), pageReport, deliverAny, pageEnd, mainReport, pageReconnect, seeClosed, switchWs,
       pageStop(a, "left"), pageStop(a, "AudioJoinedFromAnotherDevice"), pageStop(a, "connectionLost"),
-      quit, finishQuit, crash, engineCrash, restart, load(1), load(2), slackChange(c),
+      quit, finishQuit, crash, engineCrash, restart, load(1), load(2), slackChange(c), catchUp, settle,
       queueFrame({ kind: kind, channel: c, room: r, attendee: a }),
       roomFrame({ kind: kind, channel: c, room: r, attendee: a }, 0),
       disconnect, reconnect, overflow(0), fetchInfo, answerInfo, infoError, seal
@@ -468,7 +479,14 @@ module huddle {
   // disable the named rule; the default state machine always uses bug = 0.
   action scenario(which: int, bug: int): bool = tick(
     if (s.sealed) progress
-    else if (which == 5) (
+    else if (which == 22) (
+      // Slack changes and its frame arrives while its edge still answers from before.
+      if (turn == 0) slackChange(1)
+      else if (turn == 1) roomFrame({ kind: "sh_room_update", channel: 1, room: 1, attendee: 0 }, bug)
+      else if (bug == 14) (if (turn == 2) fetchInfo else if (turn == 3) answerInfo else seal)
+      else if (turn == 2) catchUp else if (turn == 3) settle
+      else if (turn == 4) fetchInfo else if (turn == 5) answerInfo else seal
+    ) else if (which == 5) (
       if (turn == 0) fetchInfo else if (turn == 1) answerInfo
       else if (turn == 2) slackChange(2) else if (turn == 3) overflow(bug)
       else seal
@@ -601,4 +619,6 @@ module huddle {
   action unlistedPageBugStep = scenario(20, 12)
   action cancelDuringPersistStep = scenario(21, 0)
   action cancelDuringPersistBugStep = scenario(21, 13)
+  action laggingInfoStep = scenario(22, 0)
+  action laggingInfoBugStep = scenario(22, 14)
 }
