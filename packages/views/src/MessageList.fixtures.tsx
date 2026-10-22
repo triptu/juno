@@ -9,7 +9,6 @@ import {
   failedSend,
   hostile,
   longCode,
-  longFirstLine,
   main as mainStream,
   mainDividerBefore,
   manyReactions,
@@ -29,7 +28,6 @@ import {
 import { albumOf, mediaAndPdf, mixedMedia, singleAudio, singleImage, singleVideo, withDocuments } from './fixtures/media'
 import { NOW, people } from './fixtures/topics'
 import { noopActions } from './fixtures/actions'
-import { sevenQuickReactions } from './fixtures/quickReactions'
 import { InlineEdit } from './InlineEdit'
 import { MessageList, type MessageListItem, type MessageListProps } from './MessageList'
 
@@ -40,9 +38,6 @@ const base: Pick<MessageListProps, 'now' | 'onOpenThread' | 'onOpenReply' | 'onC
 const state = (props: Partial<MessageListProps> & Pick<MessageListProps, 'items' | 'main'>, frame?: FixtureFrame) => fixture<MessageListProps>({ ...base, ...props }, frame)
 
 const ROW = '[data-message-row]'
-
-/** The toolbar with the most quick reactions it holds. */
-const sevenActions = { ...noopActions, quickReactions: sevenQuickReactions }
 
 /**
  * A send settles: the pending row is replaced by the message Slack stored,
@@ -78,8 +73,9 @@ const CHIPPED = 3
  */
 /**
  * The list opened scrolled so its first row's name line is under the header
- * band's place (`scroll-padding-top`) while its text shows: hovering that
- * text flips the toolbar below the row, since above it there is no room.
+ * band's place (`scroll-padding-top`) while its text shows, and that row asks
+ * to confirm a delete: the confirm flips below the row, since above it there
+ * is no room.
  */
 function ScrolledUnderBand() {
   const scrollRef = useRef<HTMLElement>(null)
@@ -90,7 +86,7 @@ function ScrolledUnderBand() {
     const listTop = scroller.getBoundingClientRect().top + Number.parseFloat(getComputedStyle(scroller).scrollPaddingTop)
     scroller.scrollTop += row.getBoundingClientRect().top - listTop + 16
   }, [])
-  return <MessageList {...base} items={thread} main={false} actions={noopActions} scrollRef={scrollRef} />
+  return <MessageList {...base} items={thread} main={false} actions={noopActions} confirmingDelete={thread[0]!.message.ts} scrollRef={scrollRef} />
 }
 
 /** A long report last, taller than its frame, as a feedback channel's newest message often is. */
@@ -102,8 +98,9 @@ const tallLast = messageWindow([
 
 /**
  * The list at its end, as a topic opens, with a last message taller than the
- * list: its top is under the band and its end on the composer, so the toolbar
- * has room neither above nor below it and goes inside, at the top in view.
+ * list asking to confirm a delete: its top is under the band and its end on
+ * the composer, so the confirm has room neither above nor below it and goes
+ * inside, at the top in view.
  */
 function TallLastRow() {
   const scrollRef = useRef<HTMLElement>(null)
@@ -111,7 +108,7 @@ function TallLastRow() {
     const scroller = scrollRef.current
     if (scroller != null) scroller.scrollTop = scroller.scrollHeight
   }, [])
-  return <MessageList {...base} items={tallLast} main={false} actions={noopActions} scrollRef={scrollRef} />
+  return <MessageList {...base} items={tallLast} main={false} actions={noopActions} confirmingDelete={tallLast[tallLast.length - 1]!.message.ts} scrollRef={scrollRef} />
 }
 
 function ReactionChanges() {
@@ -133,7 +130,7 @@ function ReactionChanges() {
   return <MessageList {...base} items={items} main={false} actions={noopActions} onToggleReaction={noop} />
 }
 
-/** The delete confirm takes the toolbar's place and the edit field the body's, on the owner's command. */
+/** The delete confirm shows at the row's top right and the edit field in the body's place, on the owner's command. */
 function OwnRowChanges() {
   const [mode, setMode] = useState<'none' | 'confirm' | 'edit'>('none')
   useFixtureControl('confirm', () => setMode('confirm'))
@@ -248,19 +245,17 @@ export default defineFixtures(
     Interaction: {
       hover: state({ items: thread, main: false }, { hover: `${ROW}:nth-of-type(4)` }),
       'hover-grouped': state({ items: thread, main: false }, { hover: `${ROW}:nth-of-type(6)` }),
-      'hover-toolbar': state({ items: thread, main: false, actions: noopActions }, { hover: `${ROW}:nth-of-type(4)` }),
-      'hover-toolbar-main': state({ items: mainStream, main: true, actions: noopActions }, { hover: `${ROW}:nth-of-type(5)` }),
-      // Seven quick reactions, all shown in a wide row.
-      'hover-toolbar-seven': state({ items: mainStream, main: true, actions: sevenActions }, { hover: `${ROW}:nth-of-type(5)` }),
-      // The toolbar straddles the row's top edge, above the first line: on a
-      // header row, on a grouped row, and on the first row at the list's top.
-      'hover-toolbar-grouped': state({ items: thread, main: false, actions: noopActions }, { hover: `${ROW}:nth-of-type(6)` }),
-      'hover-toolbar-first': state({ items: thread, main: false, actions: noopActions }, { hover: ROW }),
-      // A row whose top is under the band: the toolbar flips below it.
-      'hover-toolbar-under-band': scene(() => <ScrolledUnderBand />, { hover: `${ROW} [data-msg-text]` }),
-      // The last row is taller than the list and ends on the composer: the toolbar goes inside it, under the band.
-      'hover-toolbar-tall-last': scene(() => <TallLastRow />, { hover: `${ROW}:last-of-type [data-msg-text]` }),
-      'hover-toolbar-long-line': state({ items: longFirstLine, main: true, actions: noopActions }, { hover: ROW }),
+      // Its menu is open: the row keeps its hover fill.
+      'menu-open': state({ items: thread, main: false, actions: noopActions, activeMessage: thread[3]!.message.ts }),
+      // A delete waits for its confirm, which straddles the row's top edge above the first line: on a header row, on
+      // a grouped row, and inside the first row at the list's top.
+      'confirm-delete': state({ items: thread, main: false, actions: noopActions, confirmingDelete: thread[3]!.message.ts }),
+      'confirm-delete-grouped': state({ items: thread, main: false, actions: noopActions, confirmingDelete: thread.find((item, i) => i > 0 && !item.message.groupStart)!.message.ts }),
+      'confirm-delete-first': state({ items: thread, main: false, actions: noopActions, confirmingDelete: thread[0]!.message.ts }),
+      // A row whose top is under the band: the confirm flips below it.
+      'confirm-delete-under-band': scene(() => <ScrolledUnderBand />),
+      // The last row is taller than the list and ends on the composer: the confirm goes inside it, under the band.
+      'confirm-delete-tall-last': scene(() => <TallLastRow />),
       focus: state({ items: thread, main: false, actions: noopActions }, { focus: `${ROW}:last-of-type` }),
       'hover-thread-link': state({ items: mainStream, main: true }, { hover: '[data-thread-link]' }),
       // A sender's name, avatar and an @person chip open the DM: a quiet underline, a hairline ring, "Message Leo".
@@ -278,16 +273,11 @@ export default defineFixtures(
       // The tabbable row's link: the shot tabs back and forth, and only that row's link is in the Tab order.
       'focus-thread-link': state({ items: mainStream, main: true }, { focus: '[data-message-row][tabindex="0"] [data-thread-link]' }),
     },
-    // A 336px column, a topic in the 720px window: the toolbar straddles the
-    // row's top edge as in a wide one, and drops reactions that do not fit.
+    // A 336px column, a topic in the 720px window: the confirm straddles the row's top edge as in a wide one.
     Narrow: {
-      'hover-toolbar': state({ items: thread, main: false, actions: noopActions }, { width: 336, height: 600, padded: false, hover: `${ROW}:nth-of-type(4)` }),
-      'hover-toolbar-top': state({ items: thread, main: false, actions: noopActions }, { width: 336, height: 600, padded: false, hover: ROW }),
+      hover: state({ items: thread, main: false, actions: noopActions }, { width: 336, height: 600, padded: false, hover: `${ROW}:nth-of-type(4)` }),
+      'confirm-delete': state({ items: thread, main: false, actions: noopActions, confirmingDelete: thread[3]!.message.ts }, { width: 336, height: 600, padded: false }),
       'focus-top': state({ items: thread, main: false, actions: noopActions }, { width: 336, height: 600, padded: false, focus: ROW }),
-      // Seven quick reactions: the raised toolbar shows as many as fit, then More reactions.
-      'hover-toolbar-seven': state({ items: mainStream, main: true, actions: sevenActions }, { width: 336, height: 600, padded: false, hover: `${ROW}:nth-of-type(5)` }),
-      // A pane between narrow and wide: all seven fit.
-      'hover-toolbar-seven-mid': state({ items: mainStream, main: true, actions: sevenActions }, { width: 560, height: 600, padded: false, hover: `${ROW}:nth-of-type(5)` }),
     },
   },
   { width: 816, height: 600, padded: false },

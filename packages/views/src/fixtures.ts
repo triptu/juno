@@ -23,9 +23,10 @@ import SettledReview from './SettledReview.fixtures'
 import AutomatedReview from './AutomatedReview.fixtures'
 import ReviewCards from './ReviewCards.fixtures'
 import SuggestionReviews from './SuggestionReviews.fixtures'
-import HoverToolbar from './HoverToolbar.fixtures'
 import MediaViewer from './MediaViewer.fixtures'
+import DeleteConfirm from './DeleteConfirm.fixtures'
 import Message from './Message.fixtures'
+import MessageMenu from './MessageMenu.fixtures'
 import MessageList from './MessageList.fixtures'
 import CommandPalette from './CommandPalette.fixtures'
 import NewDivider from './NewDivider.fixtures'
@@ -58,7 +59,6 @@ import TopicRow from './TopicRow.fixtures'
 import TopicView from './TopicView.fixtures'
 import WelcomeCard from './WelcomeCard.fixtures'
 import Workspace from './Workspace.fixtures'
-import WhyPopover from './WhyPopover.fixtures'
 import AskCard from './juno-chat/AskCard.fixtures'
 import ChatCard, { budgetCard, changeCard, connectCard, proposedScheduleCard, proposedTaskCard, providerCard, questionCard, removeCard, resolveCard, scheduleCard, sendMessageCard, taskCard, topicsCardSet, unknownCardSet } from './juno-chat/cards/ChatCard.fixtures'
 import EmptyChat from './juno-chat/EmptyChat.fixtures'
@@ -121,7 +121,6 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   AutomatedReview,
   ReviewCards,
   SuggestionReviews,
-  HoverToolbar,
   JunoChatList,
   JunoComposer,
   JunoHeader,
@@ -130,7 +129,9 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   ProviderSection,
   MemoryPage,
   MemoryDocsPage,
+  DeleteConfirm,
   Message,
+  MessageMenu,
   MessageList,
   CommandPalette,
   MoveSheet: moveSheet,
@@ -183,7 +184,6 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   TopicRow,
   TopicView,
   UnknownCard: unknownCardSet,
-  WhyPopover,
   WelcomeCard,
   Workspace,
 }

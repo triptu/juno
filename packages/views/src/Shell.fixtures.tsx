@@ -26,7 +26,7 @@ const workspaceTabs = [
   { id: 'density', title: 'Thread list density', icon: 'hash', unread: true },
 ] as const
 
-/** A topic open in the window, with the hover toolbar's actions. */
+/** A topic open in the window, with its rows' actions. */
 const topicPage = (
   <TopicView header={<TopicHeader detail={details.postgres} onMenu={noop} onPill={noop} onResolve={noop} juno={{ open: false, onToggle: noop }} />} composer={<ComposerSlot placeholder="Reply" />}>
     <MessageList items={thread} main={false} now={NOW} actions={noopActions} onOpenThread={noop} onChannel={noop} onLink={noop} />
@@ -122,7 +122,7 @@ export default defineFixtures(
     },
     Interaction: {
       'hover-resize-edge': scene(() => <SignedIn />, { hover: '[role="separator"][aria-label="Resize sidebar"]' }),
-      // The pointer over one message in an open topic: the row's hover fill (--message-hover) and its toolbar.
+      // The pointer over one message in an open topic: the row's faint hover fill (--message-hover) and no controls.
       'hover-message': scene(() => <SignedIn page={topicPage} />, { width: 1200, height: 800, hover: '[data-message-row]:nth-of-type(4) [data-msg-text]' }),
     },
   },

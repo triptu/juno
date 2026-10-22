@@ -1,15 +1,14 @@
 import * as stylex from '@stylexjs/stylex'
-import { memo, type FocusEvent, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
-import type { FileView, MessageView, Person, QuickReaction, ReactionIssue } from '@juno/contract'
+import { memo, useLayoutEffect, useRef, type FocusEvent, type ReactNode } from 'react'
+import type { FileView, MessageView, Person, ReactionIssue } from '@juno/contract'
 import { colors, density, layout, motion, opacity, radii, sizes, spacing, text, tints, z } from '@juno/tokens/tokens.stylex'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
-import { Avatar, focusRing, Icon, pointerMoved, Text, type ActivateEvent, type HueName } from '@juno/ui'
+import { Avatar, focusRing, Icon, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { SharedFileLines, type FileBlock } from './AttachmentCard'
 import { Files } from './FileCard'
 import { viewableOf } from './MediaGrid'
 import type { MediaViewing } from './MediaViewer'
-import type { MenuAnchor } from './header/HeaderControls'
-import { HoverToolbar } from './HoverToolbar'
+import { DeleteConfirm } from './DeleteConfirm'
 import { hueFor, initials } from './look'
 import { MessageBody } from './MessageBody'
 import type { LinkInfo } from './MessageLink'
@@ -18,25 +17,17 @@ import { Reactions } from './Reactions'
 import { TextButton } from './juno-chat/TextButton'
 import { ThreadLink } from './ThreadLink'
 import { BroadcastSource } from './BroadcastSource'
-import { clockTime, fullTime } from './time'
+import { fullTime } from './time'
 
 /**
- * What the hover toolbar and the delete confirm do, for every row of a list.
- * Created once by the container and taking the message, so a row stays
- * memoized (performance 5.1).
+ * What a row's own controls do: Retry and Dismiss on an action Slack did not
+ * take, a reaction card's See all, and the delete confirm. Created once by
+ * the container and taking the message, so a row stays memoized
+ * (performance 5.1). Everything else a message does is in its menu, which
+ * the list opens (`MessageList`'s `onMessageMenu`).
  */
 export interface MessageActions {
   readonly onResolveAction?: (id: number, retry: boolean) => void
-  /** The toolbar's one-click reactions, in order; the default three when absent. */
-  readonly quickReactions?: ReadonlyArray<QuickReaction>
-  readonly onReact: (message: MessageView, name: string) => void
-  /** Opens the emoji picker at `at`. */
-  readonly onMoreReactions: (message: MessageView, at: MenuAnchor) => void
-  readonly onQuote: (message: MessageView) => void
-  /** Main only: opens the message's thread; with `newTab` (⌘-click or ⌘Enter) in a background tab. */
-  readonly onReply?: (message: MessageView, options?: { readonly newTab: boolean }) => void
-  /** The message menu at `at`. */
-  readonly onMore: (message: MessageView, at: MenuAnchor) => void
   /** Opens the reactions dialog on one emoji, under its chip (the card's See all). */
   readonly onSeeReactions?: (message: MessageView, name: string, chip: HTMLElement) => void
   readonly onConfirmDelete: (message: MessageView) => void
@@ -56,7 +47,7 @@ export interface MessageProps {
   readonly time: string
   /** Epoch milliseconds, for `date` inlines. */
   readonly now: number
-  /** Main: thread links under messages, Start thread or Open thread on the toolbar. */
+  /** Main: thread links under messages, and Start thread or Open thread in the menu. */
   readonly main: boolean
   /**
    * Show the name and avatar even when the message continues its sender's
@@ -72,10 +63,11 @@ export interface MessageProps {
   /** Roving tabindex: the one row that Tab reaches. */
   readonly tabbable?: boolean
   readonly hueOf: (id: string) => HueName
-  /** The hover toolbar's actions. With them the row has a toolbar and reserves its place, so nothing moves when it shows. */
+  /** What the row's own controls do. */
   readonly actions?: MessageActions
-  /** The toolbar asks to confirm a delete and stays shown. */
+  /** Its menu, the emoji picker it turned into or the reactions dialog is open: the row keeps its hover fill. */
   readonly active?: boolean
+  /** It asks to confirm a delete, at its top right. */
   readonly confirmingDelete?: boolean
   /**
    * The fix line after sending (SPEC section 8): "its → it's" or "2 small fixes", with `detail` (the fixes, or
@@ -112,82 +104,44 @@ const HOVER = '@media (hover: hover)'
 
 const NO_PEOPLE: ReadonlyMap<string, Person> = new Map()
 
-// How far the toolbar's bottom edge comes into the row: the row's top padding
-// less 2px (2px, or none in compact density). The name's text box starts
-// that far in, so the toolbar straddles the row's top edge, as Slack's does,
-// and never covers the name, the time or the first line of a grouped row.
+// How far the delete confirm's bottom edge comes into the row: the row's top
+// padding less 2px (2px, or none in compact density). The name's text box
+// starts that far in, so the confirm straddles the row's top edge and never
+// covers the name, the time or the first line of a grouped row.
 const STRADDLE = `(${density['--density-message-padding-block']} - ${spacing['--space-0-5']})`
 
-const TOOLBAR_MOVES = new Set(['ArrowLeft', 'ArrowRight', 'Home', 'End'])
-
 /**
- * Tab from a focused row into its toolbar, and the arrows inside it. The
- * toolbar shows only while something in the row has keyboard focus, so as
- * focus lets go of one element it would leave the layout before the next
- * button could take focus, and focus would fall to the page. For that key
- * press it stays laid out; the row lets go once focus is inside it again,
- * or has left the row. On the capture phase, before the toolbar's own keys.
+ * Where the delete confirm goes, decided as it shows and when the list
+ * stops scrolling (never per frame). It rises above
+ * the row's top edge unless that would put it under the header band at the
+ * list's top, where the band's fade washes it out and the list clips it. A
+ * row whose top is in view then takes it inside its top edge, over the right
+ * of its header line. A row whose top is under the band has it flip below,
+ * straddling the bottom edge the same way. A row taller than the list has
+ * room for neither: the confirm then goes inside the row, at the top of the
+ * part in view. The answer is a custom property on the row.
  */
-function holdToolbarForMove(event: KeyboardEvent<HTMLDivElement>): void {
-  const fromRow = event.key === 'Tab' && !event.shiftKey && event.target === event.currentTarget
-  const inToolbar = TOOLBAR_MOVES.has(event.key) && event.target instanceof Element && event.target.closest('[role="toolbar"]') !== null
-  if (fromRow || inToolbar) event.currentTarget.style.setProperty('--row-toolbar-display', 'block')
-}
-
-/**
- * Where the toolbar goes, decided as the pointer moves onto the row or it is focused, again
- * as the pointer moves over it, and when the list stops scrolling (never per
- * frame): a row can scroll or grow under a still pointer, and an answer kept
- * from before would leave the toolbar under the band. It rises above the
- * row's top edge unless that would put it under the header band at the
- * list's top, where the band's fade washes it out and the list clips it.
- * A row whose top is in view then takes it inside its top edge, over the
- * right of its header line, which keeps that room free: the first message at
- * scroll top, which starts right at the band. A row whose top is under the
- * band has it flip below, straddling the bottom edge the same way, so it
- * stays near what is in view. A row taller than the list has room for
- * neither, as the last message is when its end sits on the composer: the
- * toolbar then goes inside the row, at the top of the part in view, under
- * the band. The answer is a custom property
- * on the row, written only when it changes, so nothing re-renders.
- */
-export function placeToolbar(row: HTMLElement): void {
+function placeConfirm(row: HTMLElement): void {
   const scroller = row.closest('[data-scroll-area]')
   if (scroller === null) return
   const box = row.getBoundingClientRect()
   const list = scroller.getBoundingClientRect()
   const style = getComputedStyle(scroller)
   const listTop = list.top + (Number.parseFloat(style.scrollPaddingTop) || 0)
-  const toolbarHeight = Number.parseFloat(style.getPropertyValue('--toolbar-height')) || 0
+  const height = Number.parseFloat(style.getPropertyValue('--toolbar-height')) || 0
   const rowStyle = getComputedStyle(row)
   const gap = Number.parseFloat(rowStyle.getPropertyValue('--space-0-5')) || 0
   const straddle = (Number.parseFloat(rowStyle.paddingTop) || 0) - gap
   const top =
-    box.top + straddle - toolbarHeight >= listTop
+    box.top + straddle - height >= listTop
       ? ''
       : box.top >= listTop
         ? `${Math.round(gap)}px`
-        : box.bottom - straddle + toolbarHeight <= list.bottom
-        ? `${Math.round(box.height - straddle)}px`
-        : `${Math.round(Math.max(listTop - box.top, 0) + gap)}px`
-  if (row.style.getPropertyValue('--row-toolbar-top') === top) return
-  if (top === '') row.style.removeProperty('--row-toolbar-top')
-  else row.style.setProperty('--row-toolbar-top', top)
-}
-
-/** The pointer is over a row: it places its toolbar, except during a drag selection, which shows none (`MessageList`). */
-function pointedAt(event: PointerEvent<HTMLDivElement>): void {
-  if (event.currentTarget.closest('[data-selecting]') === null) placeToolbar(event.currentTarget)
-}
-
-/**
- * The pointer moved onto a row. A row that scrolled under a still pointer is
- * placed when the scroll ends (`MessageList`): read here, its rect laid the
- * page out inside every scroll frame that brought a new row under the pointer
- * (performance.md 8.14).
- */
-function pointerEntered(event: PointerEvent<HTMLDivElement>): void {
-  if (pointerMoved(event)) pointedAt(event)
+        : box.bottom - straddle + height <= list.bottom
+          ? `${Math.round(box.height - straddle)}px`
+          : `${Math.round(Math.max(listTop - box.top, 0) + gap)}px`
+  if (top === '') row.style.removeProperty('--row-confirm-top')
+  else row.style.setProperty('--row-confirm-top', top)
 }
 
 const dim = stylex.keyframes({
@@ -199,11 +153,10 @@ const dim = stylex.keyframes({
  * One flat message (inventory 6.1): the avatar column, then the name and
  * time on the first message of a run, the body, files, reactions and, in
  * Main, the thread link. A message that mentions you sits on the accent
- * tint. The hover toolbar sits at the top right of the row and shows by
- * opacity and display only, absolutely placed, so showing it never forces a layout. It
- * straddles the row's top edge, mostly above it, so it covers neither the
- * name and time nor the first line of a grouped row. The header is the same
- * height with or without a toolbar, so every list of messages has one rhythm.
+ * tint. Under the pointer the row takes a faint fill and shows no controls:
+ * its actions are in its menu (a right-click, the context-menu key or ⇧F10).
+ * A delete waiting for its confirm asks at the row's top right, straddling
+ * its top edge, so it covers neither the name and time nor the first line.
  *
  * A message Juno is still sending looks like the message it becomes, so the
  * swap moves nothing; a send that takes longer than `--delay-pending` dims
@@ -250,9 +203,7 @@ export const Message = memo(function Message({
   const opens = sender?.unreachable === true ? undefined : (sender?.user ?? sender?.id)
   const label = message.fromMe ? 'yourself' : name
   const focus = (event: FocusEvent<HTMLDivElement>) => {
-    if (actions !== undefined) placeToolbar(event.currentTarget)
     if (event.target === event.currentTarget) onFocus?.(message.ts)
-    else event.currentTarget.style.removeProperty('--row-toolbar-display')
   }
   const toggle = onToggleReaction === undefined ? undefined : (reaction: string) => onToggleReaction(message.ts, reaction)
   const seeReactions = actions?.onSeeReactions
@@ -282,22 +233,8 @@ export const Message = memo(function Message({
           )
         }
   const { pending, clientMsgId } = message
-  // A failed send has Retry and Delete draft instead; a deleted or unloaded message has nothing to act on.
-  const toolbar =
-    actions === undefined || message.kind !== 'message' || pending === 'failed' || editor !== undefined ? undefined : (
-      <HoverToolbar
-        main={main}
-        hasThread={message.thread !== undefined}
-        tabIndex={tabbable ? 0 : -1}
-        {...(actions.quickReactions === undefined ? {} : { reactions: actions.quickReactions })}
-        onReact={(reaction) => actions.onReact(message, reaction)}
-        onMoreReactions={(at) => actions.onMoreReactions(message, at)}
-        onQuote={() => actions.onQuote(message)}
-        {...(main && actions.onReply !== undefined ? { onReply: (options: { readonly newTab: boolean }) => actions.onReply?.(message, options) } : {})}
-        onMore={(at) => actions.onMore(message, at)}
-        {...(confirmingDelete ? { confirmDelete: { onConfirm: () => actions.onConfirmDelete(message), onCancel: actions.onCancelDelete } } : {})}
-      />
-    )
+  // A failed send has Retry and Delete draft instead; a deleted or unloaded message has nothing to delete.
+  const confirm = confirmingDelete && actions !== undefined && message.kind === 'message' && pending !== 'failed' && editor === undefined ? actions : undefined
 
   return (
     <div
@@ -308,10 +245,6 @@ export const Message = memo(function Message({
       data-pending={pending}
       data-popover-active={active ? '' : undefined}
       onFocus={focus}
-      onKeyDownCapture={actions === undefined ? undefined : holdToolbarForMove}
-      onBlur={actions === undefined ? undefined : (event) => event.currentTarget.contains(event.relatedTarget) || event.currentTarget.style.removeProperty('--row-toolbar-display')}
-      onPointerEnter={actions === undefined ? undefined : pointerEntered}
-      onPointerMove={actions === undefined ? undefined : pointedAt}
       data-editing={editor === undefined ? undefined : ''}
       {...stylex.props(
         styles.row,
@@ -328,11 +261,7 @@ export const Message = memo(function Message({
           <PersonLink id={opens} label={label} part="avatar">
             <Avatar label={sender === undefined ? '?' : initials(name)} name={name} size={32} hue={hue} {...(sender?.avatarUrl === undefined ? {} : { src: sender.avatarUrl })} />
           </PersonLink>
-        ) : (
-          <Text variant="tag" tone="muted" numeric as="time" title={fullTime(message.at)} sx={styles.gutterTime}>
-            {clockTime(message.at)}
-          </Text>
-        )}
+        ) : null}
       </span>
       <span {...stylex.props(styles.content, pending === 'sending' && styles.sending)}>
         {header ? (
@@ -423,15 +352,31 @@ export const Message = memo(function Message({
           </Text>
         ) : null}
       </span>
-      {toolbar !== undefined ? <span {...stylex.props(styles.toolbar)}><span {...stylex.props(styles.toolbarShown)}>{toolbar}</span></span> : null}
+      {confirm === undefined ? null : <ConfirmSlot onConfirm={() => confirm.onConfirmDelete(message)} onCancel={confirm.onCancelDelete} />}
     </div>
   )
 })
 
-/**
- * The user's reaction change Slack has not taken. Refused: what Slack has
- * is shown, with Retry and Remove. Waiting long: one quiet line.
- */
+/** The delete confirm in its slot at the row's top right, placed against the list's header band as it shows and when the list stops scrolling. */
+function ConfirmSlot({ onConfirm, onCancel }: { readonly onConfirm: () => void; readonly onCancel: () => void }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  useLayoutEffect(() => {
+    const row = ref.current?.closest<HTMLElement>('[data-message-row]')
+    const scroller = row?.closest('[data-scroll-area]')
+    if (row == null || scroller == null) return
+    placeConfirm(row)
+    // Placed again when the list stops scrolling under it, never per frame.
+    const place = () => placeConfirm(row)
+    scroller.addEventListener('scrollend', place)
+    return () => scroller.removeEventListener('scrollend', place)
+  }, [])
+  return (
+    <span ref={ref} {...stylex.props(styles.confirm)}>
+      <DeleteConfirm onConfirm={onConfirm} onCancel={onCancel} />
+    </span>
+  )
+}
+
 /** The ids of the files the message's shared cards draw, or undefined when it has none, which is nearly always. */
 function cardFileIds(message: MessageView): ReadonlySet<string> | undefined {
   let ids: Set<string> | undefined
@@ -442,6 +387,10 @@ function cardFileIds(message: MessageView): ReadonlySet<string> | undefined {
   return ids
 }
 
+/**
+ * The user's reaction change Slack has not taken. Refused: what Slack has
+ * is shown, with Retry and Remove. Waiting long: one quiet line.
+ */
 function ReactionIssueLine({ issue, onResolve }: { readonly issue: ReactionIssue; readonly onResolve: MessageActions['onResolveAction'] }) {
   if (issue.state === 'waiting') {
     return (
@@ -501,49 +450,16 @@ const styles = stylex.create({
     contain: 'content',
     contentVisibility: 'auto',
     containIntrinsicSize: `auto ${sizes['--row-message-estimate']}`,
-    // Paint containment clips at the row's edge; the toolbar above the row
-    // (or below it, when flipped) and its shadow paint this far out. A plain
-    // token: Chromium drops overflow-clip-margin given any calc().
+    // Paint containment clips at the row's edge; the delete confirm above the
+    // row (or below it, when flipped) and its shadow paint this far out. A
+    // plain token: Chromium drops overflow-clip-margin given any calc().
     overflowClipMargin: layout['--toolbar-clip-margin'],
-    containerName: 'message',
-    containerType: 'inline-size',
+    // A number at rest, never auto: a row raised over its neighbours while it
+    // asks to confirm a delete only changes its order (performance.md 8.14).
+    zIndex: z['--z-row'],
     backgroundColor: {
       default: 'transparent',
       ':hover': { default: null, [HOVER]: colors['--message-hover'] },
-    },
-    // The toolbar and the gutter time read these: hidden until the pointer is
-    // over the row, or keyboard focus is on the row or inside it. Only
-    // opacity and display change on an absolutely placed toolbar, so nothing
-    // moves, and a hidden toolbar never takes the pointer, which matters where
-    // it rises over the row before.
-    '--row-action-opacity': {
-      default: '0',
-      ':hover': { default: null, [HOVER]: '1' },
-      ':focus-visible': '1',
-      ':has(:focus-visible)': '1',
-    },
-    // The toolbar is out of the layout until then too: every row has one, and
-    // laid out but transparent it was most of the list's style and layout work
-    // when a topic opened or the pane changed width (performance.md 8). Its
-    // slot is absolutely placed and stays in layout, so showing it moves
-    // nothing and lays out only the slot, not the row (performance.md 8.14).
-    // The active row paints over its neighbours, which its toolbar overlaps.
-    // At rest it is --z-row, not auto: from auto to a number Chromium lays the
-    // whole row out again, on every row that slides under a still pointer
-    // while the list scrolls (performance.md 8.14).
-    zIndex: {
-      default: z['--z-row'],
-      ':hover': { default: null, [HOVER]: z['--z-toolbar'] },
-      ':focus-visible': z['--z-toolbar'],
-      ':has(:focus-visible)': z['--z-toolbar'],
-    },
-    // A drag selection sets --row-hover-toolbar to none on the list (MessageList), so the toolbar keeps out of
-    // the way while the owner selects, as native hover controls do; keyboard focus still shows it.
-    '--row-toolbar-display': {
-      default: 'none',
-      ':hover': { default: null, [HOVER]: 'var(--row-hover-toolbar, block)' },
-      ':focus-visible': 'block',
-      ':has(:focus-visible)': 'block',
     },
   },
   rowEager: {
@@ -555,12 +471,11 @@ const styles = stylex.create({
     contain: 'layout style',
     contentVisibility: 'visible',
   },
-  // Being edited, or asking to confirm a delete: the row keeps its hover look and its toolbar until that ends.
+  // Its menu or picker open, being edited, or asking to confirm a delete: the row keeps its hover fill until that ends,
+  // and paints over its neighbours, which the confirm overlaps.
   rowHeld: {
     zIndex: z['--z-toolbar'],
     backgroundColor: colors['--message-hover'],
-    '--row-action-opacity': '1',
-    '--row-toolbar-display': 'block',
   },
   rowGroupStart: {
     marginTop: density['--density-message-group-gap'],
@@ -582,19 +497,11 @@ const styles = stylex.create({
     marginTop: spacing['--space-0-5'],
     userSelect: 'none',
   },
-  // A continuation row is as tall as its body: the gutter is one body line,
-  // with the hover time centred on it, not the avatar's 32px box.
+  // A continuation row is as tall as its body: the gutter is one empty body line, not the avatar's 32px box.
   gutterContinuation: {
     minHeight: 0,
     height: `calc(${text['--text-body-size']} * ${text['--text-body-leading']})`,
     marginTop: 0,
-  },
-  gutterTime: {
-    opacity: 'var(--row-action-opacity)',
-    // Always its own stacking context, so the hover's opacity change from 0
-    // to 1 does not make it one and lay the row out again (performance.md 8.14).
-    isolation: 'isolate',
-    whiteSpace: 'nowrap',
   },
   // Whole pixels tall, whatever the text inside (performance 3.3): a row
   // laid out above the view for the first time grows from its estimate, and
@@ -652,28 +559,15 @@ const styles = stylex.create({
     userSelect: 'none',
   },
   // At the row's top right, mostly above the row: its bottom edge comes
-  // STRADDLE into the row, above the first line. placeToolbar flips it below
+  // STRADDLE into the row, above the first line. placeConfirm flips it below
   // a row whose top is under the header band, or inside a row too tall for
-  // either, under the band. Paint containment would clip it
-  // outside the row, so the row's overflow-clip-margin lets it paint.
-  // The slot is an empty anchor at the toolbar's top right corner. It never
-  // leaves the row's layout or changes size: either would lay the whole row
-  // out again when the toolbar shows (performance.md 8.14).
-  toolbar: {
+  // either, under the band. Paint containment would clip it outside the
+  // row, so the row's overflow-clip-margin lets it paint.
+  confirm: {
     position: 'absolute',
-    top: `var(--row-toolbar-top, calc(${STRADDLE} - ${layout['--toolbar-height']}))`,
+    top: `var(--row-confirm-top, calc(${STRADDLE} - ${layout['--toolbar-height']}))`,
     right: spacing['--space-2'],
-    width: 0,
-    height: 0,
     zIndex: z['--z-toolbar'],
-    opacity: 'var(--row-action-opacity)',
-  },
-  // The toolbar, shown and hidden inside the slot, hanging from its corner.
-  toolbarShown: {
-    display: 'var(--row-toolbar-display)',
-    position: 'absolute',
-    top: 0,
-    right: 0,
     width: 'max-content',
   },
 })

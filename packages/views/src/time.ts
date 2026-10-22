@@ -45,11 +45,6 @@ export function messageTime(at: number, now: number): string {
   return new Date(at).getFullYear() === new Date(now).getFullYear() ? monthDay.format(at) : monthDayYear.format(at)
 }
 
-/** The clock time alone, "22:26": a continuation's time in the avatar column, where the day separator above gives the day. */
-export function clockTime(at: number): string {
-  return clock.format(at)
-}
-
 /** The full date and time for a tooltip: "Saturday, October 3, 2026, 9:12". */
 export function fullTime(at: number): string {
   return full.format(at)
