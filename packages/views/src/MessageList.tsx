@@ -113,6 +113,8 @@ export interface MessageListProps {
   readonly onMessageMenu?: (ts: string, event: MouseEvent, onSender: boolean) => void
   /** Right-click on an image thumbnail: the image menu (SPEC 8, "Images and the media viewer"). */
   readonly onImageMenu?: (ts: string, fileId: string, event: MouseEvent) => void
+  /** Right-click on a link in message text or an unfurl: the link's own menu (SPEC 8, "Links"). */
+  readonly onLinkMenu?: (url: string, event: MouseEvent) => void
   /** Right-click on an @person chip: the person menu (inventory 15.6). */
   readonly onPersonMenu?: (person: { readonly id: string; readonly name: string }, event: MouseEvent) => void
   /** Right-click on a #channel chip: the channel menu (inventory 15.2). */
@@ -185,6 +187,7 @@ function onKeyDown(event: KeyboardEvent<HTMLDivElement>, onRowKey: MessageListPr
 interface Menus {
   readonly onMessageMenu: MessageListProps['onMessageMenu']
   readonly onImageMenu: MessageListProps['onImageMenu']
+  readonly onLinkMenu: MessageListProps['onLinkMenu']
   readonly onPersonMenu: MessageListProps['onPersonMenu']
   readonly onChannelMenu: MessageListProps['onChannelMenu']
 }
@@ -194,7 +197,13 @@ interface Menus {
  * pointer gets its own menu, otherwise the row under the pointer, or the
  * focused row for the context-menu key. A field keeps the text menu (`inField`).
  */
-function messageMenu(event: MouseEvent, { onMessageMenu, onImageMenu, onPersonMenu, onChannelMenu }: Menus) {
+function pointInSelection(event: MouseEvent): boolean {
+  const selection = globalThis.getSelection()
+  if (selection === null || selection.isCollapsed || selection.rangeCount === 0) return false
+  return [...selection.getRangeAt(0).getClientRects()].some((rect) => event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom)
+}
+
+function messageMenu(event: MouseEvent, { onMessageMenu, onImageMenu, onLinkMenu, onPersonMenu, onChannelMenu }: Menus) {
   const target = event.target
   if (!(target instanceof Element) || inField(event)) return
   const ts = target.closest<HTMLElement>(ROW)?.dataset.messageRow
@@ -215,6 +224,15 @@ function messageMenu(event: MouseEvent, { onMessageMenu, onImageMenu, onPersonMe
     event.preventDefault()
     onChannelMenu({ id: channel.dataset.channel ?? '', name: channel.dataset.channelName ?? '' }, event)
     return
+  }
+  const link = onLinkMenu === undefined || pointInSelection(event) ? null : target.closest<HTMLElement>('[data-message-link]')
+  if (link !== null && onLinkMenu !== undefined) {
+    const url = link.dataset.messageLink
+    if (url !== undefined) {
+      event.preventDefault()
+      onLinkMenu(url, event)
+      return
+    }
   }
   if (onMessageMenu === undefined || ts === undefined) return
   event.preventDefault()
@@ -266,6 +284,7 @@ export function MessageList({
   uploadProgress,
   onMessageMenu,
   onImageMenu,
+  onLinkMenu,
   onPersonMenu,
   onChannelMenu,
 }: MessageListProps) {
@@ -305,7 +324,7 @@ export function MessageList({
               }
         }
         onContextMenu={
-          onMessageMenu === undefined && onImageMenu === undefined && onPersonMenu === undefined && onChannelMenu === undefined ? undefined : (event) => messageMenu(event, { onMessageMenu, onImageMenu, onPersonMenu, onChannelMenu })
+          onMessageMenu === undefined && onImageMenu === undefined && onLinkMenu === undefined && onPersonMenu === undefined && onChannelMenu === undefined ? undefined : (event) => messageMenu(event, { onMessageMenu, onImageMenu, onLinkMenu, onPersonMenu, onChannelMenu })
         }
         {...stylex.props(styles.column, popover && styles.popoverColumn)}
       >

@@ -1,4 +1,4 @@
-import { memo, Suspense, useEffect, useRef } from 'react'
+import { memo, Suspense, useEffect, useRef, type MouseEvent } from 'react'
 import type { TopicDetail } from '@juno/contract'
 import { acknowledgeTopic, updateTabs, selectedTopicAtom, discardMessage, messageListAtom, nowAtom, retryMessage, registry, scrollSnapshotAtom, topicAtom, topicView, traceSend, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
@@ -60,6 +60,12 @@ const DeactivatedNote = chunk(() => import('./topic/deactivated')).component((mo
 
 const retry = (clientMsgId: string) => void retryMessage(registry, clientMsgId)
 const discard = (clientMsgId: string) => void discardMessage(registry, clientMsgId)
+
+/** Link-menu code is loaded only on the first right-click, keeping it out of the 1.1 MB startup bundle. */
+function showMessageLinkMenu(url: string, event: MouseEvent): void {
+  const at = { x: event.clientX, y: event.clientY }
+  void import('./linkMenu').then((menu) => menu.showLinkMenu(url, at))
+}
 
 /** Every topic draws its art (or the Tide placeholder) except a DM's Main, which keeps the person, as the sidebar tile does. */
 export function hasArt(detail: TopicDetail): boolean {
@@ -220,6 +226,7 @@ export function Topic({ id, view, detail, readOnly = false, peek = false, onOpen
       onPerson={openPersonDm}
       onLink={openMessageLink}
       linkInfo={messageLinkInfo}
+      onLinkMenu={showMessageLinkMenu}
       {...FILE_ACTIONS}
       onOpenMedia={openMedia}
       onImageMenu={(ts, fileId, event) => showMessageImageMenu(list, ts, fileId, event, openMedia)}

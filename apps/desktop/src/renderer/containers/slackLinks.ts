@@ -48,6 +48,12 @@ function read(url: string): SlackLinkMatch | undefined {
   return session === undefined ? undefined : parseSlackLink(url, { url: session.workspaceUrl, teamId: session.teamId })
 }
 
+/** Which navigation path a message link uses before modifier keys are applied. */
+export function messageLinkKind(url: string): 'juno' | 'web' | 'browser' {
+  const match = read(url)
+  return match?.ours === true ? 'juno' : match === undefined ? 'web' : 'browser'
+}
+
 const isMain = (topicId: string) => topicId.startsWith('m:')
 
 /**
