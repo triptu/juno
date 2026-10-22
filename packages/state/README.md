@@ -73,3 +73,5 @@ A thread started by a send keeps its pending `viewId` when `acknowledgeTopic` re
 The ⌘K Conversations tab's `newChat.ranked` live query ranks the same way over own sends and topic visits (`topic_visits`), uncapped before its 12 rows, then by activity; with text it ranks the conversation picker's matches, names that start with the text first among the unused. It re-runs on conversation, user, ignore and visit changes, not on messages, so a send re-ranks it on the next open. The renderer reads it as `paletteConversationsAtom`.
 
 `diagnosticDetails` reads the safe process log tails and engine outbox aggregates for Copy diagnostics. `showLogs` opens the logs through main.
+
+The agent client uses a scoped `Context.Service` and `Atom.runtime`. `agent/rpc.ts` loads the RPC schemas and creates the flattened client on demand; the workspace also preloads it on idle when Juno is available. All streams and commands share the same runtime and port.

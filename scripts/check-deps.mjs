@@ -140,6 +140,7 @@ const unstable = [
   { label: '@effect/atom-react', spec: /^@effect\/atom-react(?:\/|$)/, allow: ['packages/state/src/react.ts'] },
   { label: 'RpcMiddleware', spec: /^effect\/rpc\/RpcMiddleware$/, allow: ['packages/engine/src/protocol/server.ts'] },
   {
+    // state/src/agent/rpc.ts constructs the agent client in a deferred chunk.
     label: 'effect/rpc',
     spec: /^effect\/rpc(?:\/|$)/,
     allow: [

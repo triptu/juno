@@ -24,6 +24,7 @@ import {
   webPanelAtom,
 } from '@juno/state'
 import { JUNO_PANEL_WIDTH } from '@juno/contract'
+import { preloadAgentClient } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
 import { holdKeys, loadMessageTools, Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab } from '@juno/views'
 import { chunk, usePreloaded } from './chunks'
@@ -156,7 +157,10 @@ function useWorkspaceEffects(active: string | undefined): void {
         void loadChannelMenu()
         void loadSettingsTab()
         void loadAllTopicsPage()
-        if (registry.get(junoAvailableAtom)) void loadJuno()
+        if (registry.get(junoAvailableAtom)) {
+          void preloadAgentClient()
+          void loadJuno()
+        }
       },
       { timeout: 5_000 },
     )
