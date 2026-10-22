@@ -1,13 +1,15 @@
 // Picks and publishes a release on the release Mac. Nothing runs it on a
-// schedule. --dry-run reads GitHub and local
-// verification records without fetching, building, committing or publishing.
+// schedule. --dry-run reads GitHub and local verification records without
+// fetching, building, committing or publishing. Without --notes it lists the
+// changes since the last release, the input for the highlights the release
+// agent writes; a publish needs --notes <file> with those highlights.
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { compareVersions, normalizeVersion } from '../apps/desktop/src/main/releaseNotes.ts'
 import { git, isAncestor, printGate, readRecords, releaseGate, statusFolder } from './release-gate.mjs'
-import { releaseDue, releaseNotes, selectCommit } from './release-schedule.mjs'
+import { highlightLines, releaseDue, selectCommit, userFacingChanges } from './release-schedule.mjs'
 import { syncReleasedVersion } from './release-main.mjs'
 import { mainCheckout, worktreeFolder } from './worktree-folder.mjs'
 
@@ -56,11 +58,18 @@ async function scheduled() {
   const parts = base.split('.').map(Number)
   const version = `${parts[0]}.${parts[1]}.${parts[2] + 1}`
   const subjects = git(root, 'log', '--no-merges', '--reverse', '--format=%s', previous ? `${previous}..${candidate}` : candidate, '--', 'apps/desktop/src', 'assets', ':(glob)packages/*/src/**').split('\n')
-  const generated = releaseNotes(subjects)
-  if (!generated.trim()) { console.log('release:scheduled: no action: no user-facing changes since the last release'); return }
-  const notes = values.notes ? readFileSync(values.notes, 'utf8') : generated
-  if (!notes.trim()) throw new Error('release notes must not be empty')
-  console.log(`release:scheduled: would release ${version} from ${candidate}\n${notes}`)
+  const changes = userFacingChanges(subjects)
+  if (changes.length === 0) { console.log('release:scheduled: no action: no user-facing changes since the last release'); return }
+  console.log(`release:scheduled: would release ${version} from ${candidate}`)
+  if (values.notes === undefined) {
+    console.log(`release:scheduled: ${changes.length} change(s) since the last release, the input for the highlights (--notes <file>):`)
+    for (const change of changes) console.log(`  ${change}`)
+    if (values['dry-run']) return
+    throw new Error('--notes <file> is required: write this version\'s highlights first (.claude/skills/do-release/SKILL.md, "Write the highlights")')
+  }
+  const notes = readFileSync(values.notes, 'utf8')
+  const lines = highlightLines(notes)
+  console.log(`release:scheduled: ${lines.length} highlight(s):\n${lines.map((line) => `- ${line}`).join('\n')}`)
   if (values['dry-run']) return
   if (!process.env.JUNO_UPDATE_TOKEN) throw new Error('JUNO_UPDATE_TOKEN is required for the packaged updater')
   publish(candidate, version, notes)

@@ -4,7 +4,7 @@
  * - renderer <-> engine: `effect/rpc` route groups under `routes/` (ADR 0009),
  *   live-query helpers in `live.ts`, errors in `errors.ts`.
  * - renderer <-> main: `Channels` with input and output schemas in
- *   `ShellRoutes` (`shell.ts`).
+ *   `ShellRoutes` (`shellRoutes.ts`), payload schemas in `shell.ts`.
  * - engine <-> main and the port handoff: `protocol.ts`.
  */
 export {
@@ -37,6 +37,7 @@ export * from './body'
 export * from './refs'
 export { AllRoutes } from './routes/index'
 export * from './shell'
+export * from './shellRoutes'
 export * from './audience'
 export * from './composer'
 export * from './fileText'

@@ -104,7 +104,7 @@ export { type ReviewStatus } from './reviewModel'
 export { ViewSheet, type ViewSheetConversation } from './ViewSheet'
 export type { ViewIconName } from '@juno/ui'
 
-export { UpdateSettings, type UpdateOffer, type WhatsNew } from './UpdateSettings'
+export { UpdateSettings, type UpdateStatus, type WhatsNew } from './UpdateSettings'
 export { chunk } from '@juno/ui'
 export { WebPanel } from './WebPanel'
 

@@ -45,7 +45,7 @@ Every view has a `<View>.fixtures.tsx` next to it, registered in `src/fixtures.t
 
 Visual and behaviour checks run in the gallery, not in the package: `pnpm gallery` to look, `pnpm gallery:shots` for screenshots, `pnpm test:gallery` for behaviour (mouse-down activation, cursor rule, state switcher, no layout shift on hover, press or focus, and a message thumbnail that arrives late or fails). In the gallery a view is one state per address (`#/SignInView?__state=failure/keychain`), and `j` `k` `[` `]` move between states and components. A view's user flow is covered by an e2e spec against the built app.
 
-`UpdateSettings` is the dumb Settings › About update setting, the update line (Restart to update, or Download the new version for an unsigned build) and the "What's new" changelog. Its container supplies availability, enabled state, the offer, the notes and callbacks.
+`UpdateSettings` is the dumb Settings › About version block: the build line with Check for updates, the update line (checking, up to date, could not check with Copy details, downloading, Restart to update, or Download the new version for an unsigned build), the automatic update setting and the "What's new" changelog. Its container supplies the build line, availability, enabled state, the status, the notes and callbacks.
 
 Home's composer, Recent and destination chip stay in the startup bundle because Home is the launch tab. `DestinationLists` loads on idle, and the chip also warms it on hover and focus.
 

@@ -30,7 +30,7 @@ import { createProcessWatch } from './processWatch'
 import { createScreenWatch, loadScreenProbe, writeProbeForTests, type ScreenProbe } from './screenWatch'
 import { loadUpdateConfig } from './releaseFeed'
 import { createUpdates } from './updates'
-import { appWindow, createMainWindow, setMenuPrivacy, setSidebarHidden } from './window'
+import { appWindow, createMainWindow, setMenuCheckForUpdates, setMenuPrivacy, setSidebarHidden } from './window'
 
 app.enableSandbox()
 
@@ -288,6 +288,7 @@ app.whenReady().then(() => {
   activity.start()
   void providers.load()
   openWindow()
+  setMenuCheckForUpdates(() => void updates.check())
   updates.start()
 
   // The Dock icon, or a second launch: the app window comes back even while another window (sign-in) is open.

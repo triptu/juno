@@ -98,8 +98,7 @@ const refusedActivity: AiActivity = {
 
 const about = (
   <SettingsAbout
-    build={<AppInfoView line="Juno 0.1.0 on darwin, Electron 44.7.0" compact />}
-    updates={<UpdateSettings available enabled={false} offer={null} whatsNew={null} onChange={noop} onRestart={noop} onDownload={noop} onWhatsNew={noop} />}
+    updates={<UpdateSettings build={<AppInfoView line="Juno 0.1.0 on darwin, Electron 44.7.0" compact />} available enabled={false} status={null} whatsNew={null} onChange={noop} onCheck={noop} onRestart={noop} onDownload={noop} onCopyDetails={noop} onWhatsNew={noop} />}
     diagnostics={
       <>
         <EngineStatusView line="Engine catching up, 30 of 143" pong="Pong 2" onPing={noop} />

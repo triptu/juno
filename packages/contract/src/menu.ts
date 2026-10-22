@@ -7,7 +7,8 @@
  * The app-menu items main hands to the renderer (architecture, shortcuts):
  * the tab keys, Back and Forward (also the three-finger swipe), Hide
  * Sidebar, Hide Message Text (⌃⌘H), ⌘J for Juno, ⌘K for the palette, Edit › Undo, which undoes typing in a text field or else
- * Juno's last action, Settings (⌘,), which opens Settings, Help › Show
+ * Juno's last action, Settings (⌘,), which opens Settings, Check for
+ * Updates…, which main starts and the renderer shows in Settings › About, Help › Show
  * the Tour, which brings the welcome card back on Home (SPEC 4), and the
  * Huddle menu (SPEC 20).
  */
@@ -29,6 +30,8 @@ export type MenuCommand =
   | 'palette.toggle'
   | 'edit.undo'
   | 'settings.open'
+  /** Juno › Check for Updates…: main has started the check; the renderer opens Settings › About to show it. */
+  | 'settings.about'
   /** Esc, from main, which sees every key: a key pressed in a frame (the media viewer's PDF or HTML file) never reaches the page. No menu item. */
   | 'frame.escape'
   /** Help › Show the Tour. No shortcut. */

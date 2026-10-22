@@ -231,6 +231,13 @@ export function setMenuHuddle(huddle: HuddleMenu): void {
   updateAppMenu({ huddle })
 }
 
+/** The app menu's Check for Updates…, set by index.ts once the updater exists. */
+let checkForUpdates = () => {}
+
+export function setMenuCheckForUpdates(check: () => void): void {
+  checkForUpdates = check
+}
+
 /** A menu item that hands `command` to the focused app window. */
 const command = (id: string, label: string, accelerator: string | undefined, menuCommand: MenuCommand, hidden = false): MenuItemConstructorOptions => ({
   id,
@@ -336,6 +343,8 @@ function setAppMenu(state: MenuState, rebuild = false): void {
               label: app.name,
               submenu: [
                 { role: 'about' },
+                // Checks at once and opens Settings › About, where the result shows (SPEC 14).
+                { id: 'check-for-updates', label: 'Check for Updates…', click: (_item, window) => { checkForUpdates(); tabCommand(window, 'settings.about') } },
                 { type: 'separator' },
                 command('settings', 'Settings…', menuShortcuts['settings.open'], 'settings.open'),
                 { type: 'separator' },

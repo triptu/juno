@@ -14,7 +14,7 @@ const NOTES_FOR = 60 * 60 * 1000
 type Feed = ReturnType<typeof createReleaseFeed>
 
 /** electron-updater with the releases repository as a private GitHub feed. */
-async function loadSignedUpdater(settings: UpdateConfig, onDownloaded: (version: string) => void): Promise<AppUpdater> {
+async function loadSignedUpdater(settings: UpdateConfig, events: { readonly progress: (share: number) => void; readonly downloaded: (version: string) => void }): Promise<AppUpdater> {
   const module = await import('electron-updater')
   const { PrivateGitHubProvider } = await import('electron-updater/out/providers/PrivateGitHubProvider')
   const [owner, repo] = settings.repository.split('/')
@@ -29,31 +29,21 @@ async function loadSignedUpdater(settings: UpdateConfig, onDownloaded: (version:
   updater.autoDownload = false
   updater.autoInstallOnAppQuit = false
   updater.logger = null
-  updater.on('error', () => { /* Background failures stay quiet; check() falls back to the DMG. */ })
-  updater.on('update-downloaded', (info) => onDownloaded(info.version))
+  updater.on('error', () => { /* Failures reach check() through the promises; the DMG is the fallback. */ })
+  updater.on('download-progress', (info) => events.progress(info.percent / 100))
+  updater.on('update-downloaded', (info) => events.downloaded(info.version))
   return updater
 }
 
 /** Saves the DMG to Downloads (in tests, a folder of the test's own) and opens it in Finder. */
-async function saveDmg(feed: Feed, release: LatestRelease, e2e: boolean): Promise<void> {
+async function saveDmg(feed: Feed, release: LatestRelease, e2e: boolean, onProgress: (share: number) => void): Promise<void> {
   if (release.dmg === null) throw new Error('The release has no DMG')
   const folder = e2e ? join(app.getPath('userData'), 'Downloads') : app.getPath('downloads')
   await mkdir(folder, { recursive: true })
   const path = freePath(folder, release.dmg.name)
-  await feed.download(release.dmg, path)
+  await feed.download(release.dmg, path, onProgress)
   if (e2e) openedForTests.push(path)
   else await shell.openPath(path)
-}
-
-/** CHANGELOG.md, fetched when first asked for and kept for an hour. */
-function cachedChangelog(feed: Feed | null) {
-  let kept: { readonly text: string; readonly at: number } | undefined
-  return async (): Promise<string> => {
-    if (feed === null) throw new Error('Updates are unavailable')
-    if (kept !== undefined && Date.now() - kept.at < NOTES_FOR) return kept.text
-    kept = { text: await feed.changelog(), at: Date.now() }
-    return kept.text
-  }
 }
 
 /** The ten newest changelog sections, with the installed version identified for the view. */
@@ -64,9 +54,99 @@ function notesFor(text: string): ReleaseNotes {
   return { kind: 'notes', installedVersion: current, availableVersions: recent.filter((entry) => compareVersions(entry.version, current) > 0).map((entry) => entry.version), entries: recent }
 }
 
+/** "What's new": CHANGELOG.md, fetched when first asked for and kept for an hour. */
+function releaseNotes(feed: Feed | null) {
+  let kept: { readonly text: string; readonly at: number } | undefined
+  return async (scope: 'installed' | 'update'): Promise<ReleaseNotes> => {
+    void scope
+    try {
+      if (feed === null) throw new Error('Updates are unavailable')
+      if (kept === undefined || Date.now() - kept.at >= NOTES_FOR) kept = { text: await feed.changelog(), at: Date.now() }
+      return notesFor(kept.text)
+    } catch {
+      return { kind: 'failed' }
+    }
+  }
+}
+
+/** Copy details for a failed check: the version and the error, never the token. */
+function detailsOf(error: unknown, token: string): string {
+  const message = error instanceof Error ? error.message : String(error)
+  return `Juno ${app.getVersion()} could not check for updates: ${message.replaceAll(token, '[token]')}`.slice(0, 500)
+}
+
+/** What a look for a newer version reports, and only while its generation is current. */
+interface LookEvents {
+  readonly offer: (release: LatestRelease, download: 'none' | 'downloading') => void
+  readonly progress: (share: number) => void
+  readonly ready: (version: string) => void
+  readonly idle: () => void
+}
+
 /**
- * Shell-only updater. Nothing loads or contacts GitHub until the owner opts in,
- * except "What's new", which fetches the changelog when asked.
+ * Looks for a newer version, one look at a time: an unsigned build offers its
+ * DMG, a signed build downloads it in place. `reset` drops a look in progress,
+ * so it reports nothing more.
+ */
+function createLooker(config: UpdateConfig, feed: Feed, events: LookEvents) {
+  let generation = 0
+  let looking: Promise<'none' | 'found'> | undefined
+  let updater: AppUpdater | undefined
+  let cancel: (() => void) | undefined
+  const look = async (at: number): Promise<'none' | 'found'> => {
+    const latest = await feed.latest()
+    if (at !== generation || compareVersions(latest.version, app.getVersion()) <= 0) return 'none'
+    if (!config.signed) {
+      if (latest.dmg === null) throw new Error(`Release ${latest.version} has no DMG`)
+      events.offer(latest, 'none')
+      return 'found'
+    }
+    try {
+      updater ??= await loadSignedUpdater(config, {
+        progress: (share) => { if (at === generation) events.progress(share) },
+        downloaded: (version) => { if (at === generation) events.ready(version) },
+      })
+      const result = at === generation ? await updater.checkForUpdates() : null
+      if (at !== generation || result === null || !result.isUpdateAvailable) return 'none'
+      cancel = () => result.cancellationToken?.cancel()
+      events.offer(latest, 'downloading')
+      await updater.downloadUpdate(result.cancellationToken)
+      return 'found'
+    } catch (error) {
+      // Squirrel.Mac refused the update or the download failed: offer the DMG instead.
+      if (at !== generation) return 'none'
+      if (latest.dmg === null) {
+        events.idle()
+        throw error
+      }
+      events.offer(latest, 'none')
+      return 'found'
+    } finally {
+      cancel = undefined
+    }
+  }
+  return {
+    generation: () => generation,
+    /** The look in progress, or a new one. */
+    find: (): Promise<'none' | 'found'> => {
+      if (looking !== undefined) return looking
+      const run = look(generation).finally(() => { if (looking === run) looking = undefined })
+      looking = run
+      return run
+    },
+    reset: () => {
+      generation += 1
+      looking = undefined
+      cancel?.()
+    },
+    install: () => updater?.quitAndInstall(),
+  }
+}
+
+/**
+ * Shell-only updater. Nothing loads or contacts GitHub until the owner opts in
+ * or presses Check for updates, except "What's new", which fetches the
+ * changelog when asked.
  *
  * A Developer ID signed build downloads through electron-updater and installs on
  * Restart to update. Squirrel.Mac cannot install into an unsigned build, so an
@@ -75,83 +155,83 @@ function notesFor(text: string): ReleaseNotes {
  * in-place download fails.
  */
 export function createUpdates(initial: boolean, save: (enabled: boolean) => void, config: UpdateConfig | null, e2e: boolean) {
-  const available = config !== null
   const feed = config === null ? null : createReleaseFeed(config)
-  let enabled = available && initial
-  let state: UpdateState = available ? { kind: enabled ? 'idle' : 'disabled' } : { kind: 'unavailable' }
-  let updater: AppUpdater | undefined
+  let enabled = config !== null && initial
+  let state: UpdateState = config === null ? { kind: 'unavailable' } : { kind: 'idle', enabled }
   let found: LatestRelease | null = null
-  let checking = false
   let timer: ReturnType<typeof setTimeout> | undefined
-  let cancel: (() => void) | undefined
-  const changelog = cachedChangelog(feed)
   const publish = (next: UpdateState) => {
     state = next
     for (const window of BrowserWindow.getAllWindows()) window.webContents.send(Events.updatesChanged, state)
   }
-  const offer = (release: LatestRelease, download: 'none' | 'downloading' | 'failed') => {
+  const offer = (release: LatestRelease, download: 'none' | 'downloading' | 'failed', progress?: number) => {
     found = release
-    if (enabled) publish({ kind: 'available', version: release.version, download })
+    publish({ kind: 'available', enabled, version: release.version, download, ...(progress === undefined ? {} : { progress }) })
   }
-  const check = async () => {
-    if (!enabled || checking || feed === null || config === null || state.kind === 'ready') return
-    if (state.kind === 'available' && state.download === 'downloading') return
-    checking = true
-    try {
-      const latest = await feed.latest()
-      if (!enabled || compareVersions(latest.version, app.getVersion()) <= 0) return
-      if (!config.signed) return latest.dmg === null ? undefined : offer(latest, 'none')
-      try {
-        updater ??= await loadSignedUpdater(config, (version) => { if (enabled) publish({ kind: 'ready', version }) })
-        const result = enabled ? await updater.checkForUpdates() : null
-        cancel = () => result?.cancellationToken?.cancel()
-        if (enabled && result?.isUpdateAvailable) await updater.downloadUpdate(result.cancellationToken)
-      } catch {
-        // Squirrel.Mac refused the update or the download failed: offer the DMG instead.
-        if (latest.dmg !== null) offer(latest, 'none')
-      }
-    } catch {
-      // No dialogs or notifications for a background check.
-    } finally {
-      checking = false
-      cancel = undefined
-      clearTimeout(timer)
-      if (enabled) timer = setTimeout(() => void check(), CHECK_EVERY)
-    }
+  /** Download progress, published in whole percents. */
+  const progress = (release: LatestRelease | null, share: number) => {
+    const rounded = Math.floor(share * 100) / 100
+    if (release === null || found !== release || state.kind !== 'available' || state.download !== 'downloading' || state.progress === rounded) return
+    offer(release, 'downloading', rounded)
+  }
+  const looker = config === null || feed === null ? null : createLooker(config, feed, {
+    offer,
+    progress: (share) => progress(found, share),
+    ready: (version) => publish({ kind: 'ready', enabled, version }),
+    idle: () => publish({ kind: 'idle', enabled }),
+  })
+  const busy = () => state.kind === 'checking' || state.kind === 'ready' || (state.kind === 'available' && state.download === 'downloading')
+  const schedule = () => {
+    clearTimeout(timer)
+    timer = enabled ? setTimeout(background, CHECK_EVERY) : undefined
+  }
+  /** The automatic check: no dialogs or notifications, and a failure says nothing. */
+  const background = () => {
+    if (!enabled || looker === null) return
+    if (busy()) return schedule()
+    looker.find().catch(() => {}).finally(schedule)
   }
   return {
     get: () => state,
     set: (on: boolean) => {
-      if (!available) return state
+      if (looker === null) return state
       enabled = on
-      found = null
       save(on)
-      clearTimeout(timer)
-      if (!on) cancel?.()
-      publish({ kind: on ? 'idle' : 'disabled' })
-      if (on) void check()
+      // Turning updates on keeps an update already found; turning them off drops it.
+      if (on && (state.kind === 'ready' || state.kind === 'available')) publish({ ...state, enabled })
+      else {
+        looker.reset()
+        found = null
+        publish({ kind: 'idle', enabled })
+      }
+      schedule()
+      background()
       return state
     },
-    start: () => { if (enabled) timer = setTimeout(() => void check(), 30_000) },
-    stop: () => { enabled = false; clearTimeout(timer); cancel?.() },
-    restart: () => { if (enabled && state.kind === 'ready') updater?.quitAndInstall() },
+    /** Check for updates: at once, with automatic updates on or off. The result arrives through `updates.changed`. */
+    check: () => {
+      if (looker === null || config === null || busy()) return state
+      const at = looker.generation()
+      publish({ kind: 'checking', enabled })
+      looker.find().then(
+        (result) => { if (at === looker.generation() && result === 'none') publish({ kind: 'current', enabled }) },
+        (error: unknown) => { if (at === looker.generation()) publish({ kind: 'failed', enabled, details: detailsOf(error, config.token) }) },
+      ).finally(schedule)
+      return state
+    },
+    start: () => { if (enabled) timer = setTimeout(background, 30_000) },
+    stop: () => { enabled = false; clearTimeout(timer); looker?.reset() },
+    restart: () => { if (state.kind === 'ready') looker?.install() },
     /** "Download the new version". Answers at once; the state moves on through `updates.changed`. */
     download: () => {
       const release = found
       if (feed === null || release === null || state.kind !== 'available' || state.download === 'downloading') return state
       offer(release, 'downloading')
       const settle = (download: 'none' | 'failed') => () => { if (found === release) offer(release, download) }
-      void saveDmg(feed, release, e2e).then(settle('none'), settle('failed'))
+      void saveDmg(feed, release, e2e, (share) => progress(release, share)).then(settle('none'), settle('failed'))
       return state
     },
-    notes: async (scope: 'installed' | 'update'): Promise<ReleaseNotes> => {
-      try {
-        void scope
-        return notesFor(await changelog())
-      } catch {
-        return { kind: 'failed' }
-      }
-    },
+    notes: releaseNotes(feed),
   }
 }
 export type Updates = ReturnType<typeof createUpdates>

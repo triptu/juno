@@ -23,7 +23,7 @@ const POPULAR = [
   '😭', '😍', '🤣', '😊', '👏', '😅', '🤔', '😢', '💪', '😎', '🥳', '😁', '😆', '😄', '😀', '😃', '🙂', '😉',
   '👌', '🚀', '✨', '👎', '🙅‍♀️', '🚫', '⛔', '😮', '🤦', '🤷', '😬', '🙈', '💔', '😞', '😔', '🥲', '😡', '👋',
   '☕', '🤩', '🥰', '😘',
-  '😴', '😱', '🤯', '😳', '🙃', '😐', '🙄', '😤', '😩', '😕', '☹', '🙁', '😿', '💀', '👻', '💩', '🤖', '❌',
+  '😴', '😱', '🤯', '💀', '☠', '😵', '😳', '🙃', '😐', '🙄', '😤', '😩', '😕', '☹', '🙁', '😿', '👻', '💩', '🤖', '❌',
   '✔', '☑', '💰', '💸', '🤑', '🍕', '🍺', '🍻', '🐶', '🐱', '⭐', '🌟', '☀', '🌧', '🐛', '🚢', '🎊', '🤝', '🆘', '🛟',
 ]
 
@@ -40,8 +40,12 @@ interface Entry<E> {
   readonly nameWords: ReadonlyArray<ReadonlyArray<string>>
   /** Each name without separators, so `thumbs up` and `thumbsup` are the same. */
   readonly compact: ReadonlyArray<string>
+  /** The two-letter country code from a `flag-xx` name. */
+  readonly countryCode?: string
   readonly related: ReadonlyArray<string>
   readonly keywords: ReadonlyArray<string>
+  /** Words of the model-written everyday phrases: `ugh`, `so`, `done` for 😩. */
+  readonly intent: ReadonlyArray<string>
   /** Every name word and keyword after a space, to reject a row with one `includes`. */
   readonly words: string
 }
@@ -56,16 +60,17 @@ const plain = (glyph: string) => glyph.replaceAll('️', '')
 const wordsOf = (text: string): ReadonlyArray<string> => text.toLowerCase().replace(/(?!^)-/g, ' ').split(/[\s_:]+/).filter((word) => word !== '')
 
 /** Each standard glyph's search words and catalog position. Built on the first search. */
-let standard: ReadonlyMap<string, { readonly keywords: ReadonlyArray<string>; readonly related: ReadonlyArray<string>; readonly order: number }> | undefined
+let standard: ReadonlyMap<string, { readonly keywords: ReadonlyArray<string>; readonly related: ReadonlyArray<string>; readonly intent: ReadonlyArray<string>; readonly order: number }> | undefined
 function standardInfo() {
   if (standard !== undefined) return standard
   const lines = emojiKeywordData.split('\n')
-  const info = new Map<string, { keywords: ReadonlyArray<string>; related: ReadonlyArray<string>; order: number }>()
+  const info = new Map<string, { keywords: ReadonlyArray<string>; related: ReadonlyArray<string>; intent: ReadonlyArray<string>; order: number }>()
+  const split = (words: string) => (words === '' ? [] : words.split(' '))
   let order = 0
   for (const category of emojiCatalog) {
     for (const emoji of category.emoji) {
-      const [chat = '', related = ''] = (lines[order] ?? '').split('|')
-      info.set(plain(emoji.unicode), { keywords: chat === '' ? [] : chat.split(' '), related: related === '' ? [] : related.split(' '), order })
+      const [chat = '', related = '', intent = ''] = (lines[order] ?? '').split('|')
+      info.set(plain(emoji.unicode), { keywords: split(chat), related: split(related), intent: split(intent), order })
       order += 1
     }
   }
@@ -80,6 +85,7 @@ function entryOf<E extends Row>(row: E, withKeywords = true, order = Infinity): 
   const info = !withKeywords || glyph === undefined ? undefined : standardInfo().get(plain(glyph).replace(/[\u{1F3FB}-\u{1F3FF}]/gu, ''))
   const names = row.keys ?? [row.name, ...row.aliases ?? []].map((name) => name.toLowerCase())
   const nameWords = names.map(wordsOf)
+  const countryCode = info === undefined ? undefined : nameWords.find((words) => words.length === 2 && words[0] === 'flag' && words[1]?.length === 2)?.[1]
   const keywords = info?.keywords ?? []
   return {
     row,
@@ -89,9 +95,11 @@ function entryOf<E extends Row>(row: E, withKeywords = true, order = Infinity): 
     names,
     nameWords,
     compact: nameWords.map((words) => words.join('')),
+    ...(countryCode === undefined ? {} : { countryCode }),
     keywords,
     related: info?.related ?? [],
-    words: ` ${[...nameWords.flat(), ...keywords, ...info?.related ?? []].join(' ')}`,
+    intent: info?.intent ?? [],
+    words: ` ${[...nameWords.flat(), ...keywords, ...info?.related ?? [], ...info?.intent ?? []].join(' ')}`,
   }
 }
 
@@ -125,42 +133,52 @@ const NONE = 99
 /**
  * Match tiers, best first:
  * 0 a name or alias is the query; 1 every query word is a name word or keyword;
- * 2 a name starts with the query; 3 every query word starts a name word;
- * 4 every query word starts a name word or curated keyword; 5 a CLDR word;
- * 6 a CLDR word prefix; 7, only when nothing else matched, a typo away.
+ * for queries of three or more characters, 2 a whole CLDR word and 3 a whole phrase word;
+ * 4 a name starts with the query; 5 every query word starts a name word;
+ * 6 every query word starts a name word or curated keyword; 7 a CLDR word; 8 a word of an everyday phrase;
+ * 9 a two-letter flag code without `flag`; 10 a CLDR word prefix; 11 a phrase word prefix;
+ * 12, only when nothing else matched, a typo away.
  */
 function tierOf(entry: Entry<Row>, query: Query): { readonly tier: number; readonly byName: boolean } {
   let tier = NONE
   for (const compact of entry.compact) {
     if (compact === query.compact) return { tier: 0, byName: true }
-    if (compact.startsWith(query.compact)) tier = 2
+    if (compact.startsWith(query.compact)) tier = 4
   }
   let worst = 0
   let byName = tier !== NONE
   let named = true
+  const wholeRelatedTier = query.compact.length >= 3 ? 2 : 7
+  const wholeIntentTier = query.compact.length >= 3 ? 3 : 8
   for (const word of query.words) {
     let best = NONE
     let found = false
     for (const words of entry.nameWords) {
       for (const own of words) {
-        if (own === word) { best = 1; found = true } else if (own.startsWith(word)) { best = Math.min(best, 3); found = true }
+        if (own === word) { best = 1; found = true } else if (own.startsWith(word)) { best = Math.min(best, 5); found = true }
       }
     }
     if (best > 1) {
       for (const own of entry.keywords) {
         if (own === word) { best = 1; break }
-        if (best > 4 && own.startsWith(word)) best = 4
+        if (best > 6 && own.startsWith(word)) best = 6
       }
     }
-    if (best > 5) for (const own of entry.related) {
-      if (own === word) { best = 5; break }
-      if (own.startsWith(word)) best = 6
+    if (best > wholeRelatedTier) for (const own of entry.related) {
+      if (own === word) { best = wholeRelatedTier; break }
+      if (best > 10 && own.startsWith(word)) best = 10
+    }
+    if (best > wholeIntentTier) for (const own of entry.intent) {
+      if (own === word) { best = wholeIntentTier; break }
+      if (best > 11 && own.startsWith(word)) best = 11
     }
     worst = Math.max(worst, best)
     named &&= found
     if (worst === NONE) break
   }
-  return { tier: Math.min(tier, worst), byName: byName || named }
+  const best = Math.min(tier, worst)
+  const codeOnly = query.words.length === 1 && query.words[0] === entry.countryCode && best === 1
+  return { tier: codeOnly ? 9 : best, byName: byName || named }
 }
 
 /**
@@ -205,7 +223,7 @@ export function matchEmoji<E extends Row>(rows: ReadonlyArray<E>, search: string
   }
   if (ready && found.length === 0) {
     for (const entry of index) {
-      if (words.every((word) => entry.nameWords.some((own) => own.some((name) => nearly(word, name))) || [...entry.keywords, ...entry.related].some((own) => nearly(word, own)))) found.push({ entry, tier: 7, byName: false })
+      if (words.every((word) => entry.nameWords.some((own) => own.some((name) => nearly(word, name))) || [...entry.keywords, ...entry.related, ...entry.intent].some((own) => nearly(word, own)))) found.push({ entry, tier: 12, byName: false })
     }
   }
   const rank = priors(index, frequent, quick)

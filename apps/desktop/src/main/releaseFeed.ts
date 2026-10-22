@@ -108,12 +108,25 @@ export function createReleaseFeed(config: UpdateConfig) {
     },
     /** CHANGELOG.md from the repository's default branch. */
     changelog: async (): Promise<string> => text(await get(`${repo}/contents/CHANGELOG.md`, config.token, 'application/vnd.github.raw+json')),
-    /** Saves an asset to `path`, through a partial file so a failed download leaves nothing behind. */
-    download: async (asset: ReleaseAsset, path: string): Promise<void> => {
+    /**
+     * Saves an asset to `path`, through a partial file so a failed download leaves nothing behind.
+     * `onProgress` gets the share done, from 0 to 1, when the server sends the size.
+     */
+    download: async (asset: ReleaseAsset, path: string, onProgress?: (share: number) => void): Promise<void> => {
       const partial = `${path}.download`
       try {
         const response = await get(asset.url, config.token, 'application/octet-stream')
-        await pipeline(Readable.from(response as unknown as AsyncIterable<Buffer>), createWriteStream(partial))
+        const header = response.headers['content-length']
+        const size = Number(Array.isArray(header) ? header[0] : header)
+        let received = 0
+        const counted = async function* (chunks: AsyncIterable<Buffer>) {
+          for await (const chunk of chunks) {
+            received += chunk.length
+            if (size > 0) onProgress?.(Math.min(received / size, 1))
+            yield chunk
+          }
+        }
+        await pipeline(Readable.from(counted(response as unknown as AsyncIterable<Buffer>)), createWriteStream(partial))
         await rename(partial, path)
       } catch (error) {
         await rm(partial, { force: true })

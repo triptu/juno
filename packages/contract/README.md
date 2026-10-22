@@ -11,7 +11,8 @@ The wire between Juno's processes. Names, schemas and types only; no logic. See 
 | `src/body.ts` | `MessageBody` as a schema: the body `@juno/richtext` builds, checked against richtext's type at compile time in `engine/src/messages/body.ts`; and `tableText`, richtext's rows-to-tab-separated-lines rule through `@juno/domain`, for the view's copy of a table selection |
 | `src/routes/<feature>.ts` | One `RpcGroup` per feature (`EngineRoutes`, `SessionRoutes`, `TopicsRoutes`, `AllTopicsRoutes`, `MessagesRoutes`, `ArtRoutes` with `art.redraw` and its undo `art.restore`). `routes/index.ts` merges them into `AllRoutes` |
 | `src/errors.ts` | The errors a route may fail with: `NotSignedIn`, `Offline`, `Rejected`, `RateLimited`, `NotFound`, `AiUnavailable`, `Invalid`, `ProtocolError` |
-| `src/shell.ts` | `ShellRoutes`, `ShellInput`, `ShellOutput`: renderer to main requests (app info, the engine port, launch theme and accent, `contextMenu.popup`, `shell.openExternal`); `Theme`, `AppInfo` |
+| `src/shell.ts` | The schemas of renderer to main requests (app info, the engine port, launch theme and accent, `contextMenu.popup`, `shell.openExternal`, updates); `Theme`, `AppInfo` |
+| `src/shellRoutes.ts` | `ShellRoutes`, `ShellInput`, `ShellOutput`: each channel's input and output schema. Only main reads it; its own module keeps it out of the renderer's start bundle |
 | `src/channels.ts` | Channel names, the `window.juno` bridge type, `ContextMenuItem`, and the main-to-renderer `menu.command` event with its `MenuCommand` (`tab.close`, `tab.next`, `tab.previous`). No runtime imports, because the preload bundles it |
 | `src/fileText.ts` | `bodyFromMarkdown` and `csvRows`, `@juno/domain` rules the media viewer runs on a text file it read, re-exported because the renderer does not import domain |
 | `src/protocol.ts` | `parentPort` messages (`MainToEngine`, `EngineToMain`), `EngineConfig` and the port handoff |

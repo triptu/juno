@@ -1,0 +1,1 @@
+- 10-22 19:00 · Tushar · Each changelog section is a short list of highlights the release agent writes, not one line per commit. The scripts only publish `--notes` and list the commits as input.

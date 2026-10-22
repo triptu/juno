@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { releaseDue, releaseNotes, selectCommit } from './release-schedule.mjs'
-import { execFileSync } from 'node:child_process'
+import { MOST_HIGHLIGHTS, highlightLines, releaseDue, selectCommit, userFacingChanges } from './release-schedule.mjs'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { git, statusFolder } from './release-gate.mjs'
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -48,18 +48,33 @@ console.log(JSON.stringify(process.argv[3] === 'list' ? [{tagName:'v0.1.8',isDra
   writeFileSync(runner, code)
   const output = execFileSync(process.execPath, [runner, '--dry-run'], { cwd: root, env: { ...process.env, PATH: `${bin}:${process.env.PATH}` }, encoding: 'utf8' })
   assert.match(output, new RegExp(`would release 0\\.1\\.9 from ${candidate}`))
-  assert.match(output, /Messages: Fix message edits after reconnect/)
+  assert.match(output, /1 change\(s\) since the last release, the input for the highlights/)
+  assert.match(output, /\n  Fix message edits after reconnect\n/)
   const notes = join(root, 'notes.md')
   writeFileSync(notes, '- Keep your place after scrolling.\n')
   const reviewed = execFileSync(process.execPath, [runner, '--dry-run', '--notes', notes], { cwd: root, env: { ...process.env, PATH: `${bin}:${process.env.PATH}` }, encoding: 'utf8' })
-  assert.match(reviewed, /Keep your place after scrolling/)
-  assert.doesNotMatch(reviewed, /Messages: Fix message edits after reconnect/)
+  assert.match(reviewed, /1 highlight\(s\):\n- Keep your place after scrolling\./)
+  assert.doesNotMatch(reviewed, /Fix message edits after reconnect/)
+  // A publish needs written highlights; without them the command stops before the token check.
+  git(root, 'remote', 'add', 'origin', root)
+  const refused = spawnSync(process.execPath, [runner], { cwd: root, env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, JUNO_UPDATE_TOKEN: 'x' }, encoding: 'utf8' })
+  assert.equal(refused.status, 1)
+  assert.match(refused.stderr, /--notes <file> is required/)
+  assert.match(refused.stdout, /\n  Fix message edits after reconnect\n/)
 })
 
-test('notes group user changes and omit merge and test maintenance subjects', () => {
-  assert.equal(releaseNotes(['', '  ']).trim(), '')
-  const notes = releaseNotes(['Merge ci-fix', 'Release 0.1.7', 'Set version to 0.1.8 after release', 'Refresh the coverage map', 'Fix message edits after reconnect', 'Keep sidebar rows steady', 'Fix message edits after reconnect'])
-  assert.equal(notes, '- Messages: Fix message edits after reconnect.\n- Navigation: Keep sidebar rows steady.\n')
+test('user-facing changes keep product subjects in order and omit merge and test maintenance', () => {
+  assert.deepEqual(userFacingChanges(['', '  ']), [])
+  const changes = userFacingChanges(['Merge ci-fix', 'Release 0.1.7', 'Set version to 0.1.8 after release', 'Refresh the coverage map', 'fix: Fix message edits after reconnect', 'Keep sidebar rows steady', 'Fix message edits after reconnect'])
+  assert.deepEqual(changes, ['Fix message edits after reconnect', 'Keep sidebar rows steady'])
+})
+
+test('highlights are a short list of plain lines', () => {
+  assert.deepEqual(highlightLines('- Peek shows the last reply.\n- Long lines\n  wrap.\n'), ['Peek shows the last reply.', 'Long lines wrap.'])
+  assert.throws(() => highlightLines('\n'), /no lines/)
+  assert.throws(() => highlightLines(Array.from({ length: MOST_HIGHLIGHTS + 1 }, (_, i) => `- Line ${i}.`).join('\n')), /at most 10 highlights/)
+  assert.throws(() => highlightLines('- Fixed a crash (5162affc5).'), /commit hash/)
+  assert.deepEqual(highlightLines('- A defaced badge is drawn again.'), ['A defaced badge is drawn again.'])
 })
 
 test('selects the newest compatible main commit, leaving untested production changes behind', (t) => {
