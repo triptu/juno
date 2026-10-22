@@ -42,9 +42,13 @@ export function BroadcastSource({ from, onOpen, tabIndex }: BroadcastSourceProps
 }
 
 const styles = stylex.create({
+  // It takes what the name and time leave, never more than its text, so it is cut before the name is.
   link: {
     display: 'inline-flex',
+    flexGrow: 1,
     flexShrink: 1,
+    flexBasis: 0,
+    maxWidth: 'max-content',
     minWidth: 0,
     color: colors['--foreground-muted'],
     borderRadius: radii['--radius-xs'],
