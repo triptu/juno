@@ -22,7 +22,7 @@ Warm paper. HSL values are the source of truth; hex is the sRGB result for desig
 | `--background-subtle` | `hsla(48, 35%, 97%, 1)` | #FAF9F5 | css | Sidebar, tab strip |
 | `--surface-default` | `hsla(48, 30%, 98%, 1)` | #FBFBF8 | css | Popovers, cards, inputs, composer |
 | `--surface-hover` | `hsla(48, 30%, 94%, 1)` | #F4F2EB | css | Hover on rows, menu items, icon buttons, and an open ghost trigger (⋯, avatar); send-check bar; segmented control track |
-| `--message-hover` | `hsla(48, 30%, 95.5%, 1)` | #F7F6F0 | review 10-22 | A message under the pointer, and a message being edited or confirming a delete. 1.05:1 on the page, half the step of `--surface-hover` (1.08:1), so a list of messages stays calm and the hover toolbar's row still shows; muted text 4.72:1 on it |
+| `--message-hover` | `hsla(48, 43%, 96.7%, 1)` | #FAF9F3 | message actions 10-22 | A message under the pointer, and one with its menu open, being edited or confirming a delete. 1.02:1 on the page, about a third of the step to `--surface-hover` (1.08:1): with no controls on hover the fill only says which message the pointer is on, so a list stays calm (half the step, 10-22 morning, still drew the eye); muted text 4.82:1 on it |
 | `--surface-active` | `hsla(48, 30%, 92%, 1)` | #F1EEE4 | css | Reserved (unused in prototype) |
 | `--surface-raised` | `hsla(48, 30%, 98%, 1)` | #FBFBF8 | proposed | Selected segment of a segmented control; must read as raised over `--surface-hover` in both themes |
 | `--peek-surface` | `hsla(48, 22%, 96%, 1)` | #F7F6F3 | review 10-18 | Peek only: a neutral warm surface distinct from the page; paired with `--peek-shadow` |
@@ -61,7 +61,7 @@ Warm paper. HSL values are the source of truth; hex is the sRGB result for desig
 
 ### 1.2 Base palette, dark
 
-A warm-neutral near-black: the same paper seen at night, not a cool system grey. Built in OKLCH at hue 85 and chroma 0.006 (text at hue 90), so every step is one hue and only lightness moves. Three clear layers: the sidebar and tab strip sit lowest (L 0.19), the page above them (0.215), and cards, inputs and the composer on top (0.26); popovers and the hover toolbar go one step higher again (0.33, `--surface-raised`). Borders are two steps above what they sit on, so they still separate. Applied with the `dark` theme classes on `<html>`. Before and after renders of the friendly mock: `docs/design/dark-theme/before.png` (the cool palette the handoff CSS gave) and `after.png`.
+A warm-neutral near-black: the same paper seen at night, not a cool system grey. Built in OKLCH at hue 85 and chroma 0.006 (text at hue 90), so every step is one hue and only lightness moves. Three clear layers: the sidebar and tab strip sit lowest (L 0.19), the page above them (0.215), and cards, inputs and the composer on top (0.26); popovers and toolbars go one step higher again (0.33, `--surface-raised`). Borders are two steps above what they sit on, so they still separate. Applied with the `dark` theme classes on `<html>`. Before and after renders of the friendly mock: `docs/design/dark-theme/before.png` (the cool palette the handoff CSS gave) and `after.png`.
 
 | Token | Hex | OKLCH L | Measured | Source |
 | --- | --- | --- | --- | --- |
@@ -69,7 +69,7 @@ A warm-neutral near-black: the same paper seen at night, not a cool system grey.
 | `--background-subtle` | #151411 | 0.19 | 1.05:1 under the page | redesign |
 | `--surface-default` | #252421 | 0.26 | 1.13:1 over the page | redesign |
 | `--surface-hover` | #2D2B28 | 0.29 | 1.31:1 over the sidebar | redesign |
-| `--message-hover` | #23211E | 0.235 | 1.09:1 over the page (`--surface-hover` is 1.24:1); muted text 6.0:1 | review 10-22 |
+| `--message-hover` | #211F1C | 0.226 | 1.07:1 over the page, about a third of the step to `--surface-hover` (1.24:1); muted text 6.15:1 | message actions 10-22 |
 | `--surface-active` | #32302D | 0.31 | | redesign |
 | `--surface-raised` | #373532 | 0.33 | 1.43:1 over the page, 1.27:1 over a card | redesign |
 | `--peek-surface` | #373532 | 0.33 | Same as the existing raised popover; dark Peek is unchanged | review 10-18 |
@@ -339,7 +339,7 @@ The text's own colour (`--foreground-default`) is 15.6:1 in light and 14.7:1 in 
 | `--font-sans` | `'Figtree Variable', 'Figtree', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif` | decided (replaces Söhne; Inter until the friendly-layer options review) |
 | `--font-serif` | `'Instrument Serif', ui-serif, 'Iowan Old Style', Georgia, serif` | proposed (replaces Meraki) |
 | `--font-mono` | `'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace` | css (PP Neue Montreal Mono dropped) |
-| `--font-emoji` | `'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif` | An emoji drawn on its own (`EmojiButton`), so its box takes the emoji font's metrics, not Figtree's (10-22) |
+| `--font-emoji` | `'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif` | An emoji drawn on its own (a cell of the message menu's grid), so its box takes the emoji font's metrics, not the text font's (10-22) |
 
 Bundle Figtree (variable, `@fontsource-variable/figtree` 5.3.0, Latin subset 20 KB), Instrument Serif 400 regular + italic, JetBrains Mono 400/500 locally; no Google Fonts import.
 
@@ -423,7 +423,7 @@ Odd values the prototype uses once (3, 5, 9, 18) are component-local; keep them 
 
 ## 4. Radii
 
-[css] `--radius-sm 4`, `--radius-md 6`, `--radius-lg 8`, `--radius-xl 10`. The prototype also uses 5, 7, 9, 12, 13, 14, 16 and 999. The friendly layer (`friendly-layer.md` §3) makes every label a pill and gives containers one step more radius; the options review (`friendly-layer/options.html`, D1 "rounder") then took rows and tiles to 16, cards to 20, nav and filter buttons to 12, the composer and the 32px and taller buttons to pills, the hover toolbar to 16 with 12 buttons (since 10-22 a small pill with 24px round buttons), and replaced the card and popover rings with wide soft shadows. Full set:
+[css] `--radius-sm 4`, `--radius-md 6`, `--radius-lg 8`, `--radius-xl 10`. The prototype also uses 5, 7, 9, 12, 13, 14, 16 and 999. The friendly layer (`friendly-layer.md` §3) makes every label a pill and gives containers one step more radius; the options review (`friendly-layer/options.html`, D1 "rounder") then took rows and tiles to 16, cards to 20, nav and filter buttons to 12, the composer and the 32px and taller buttons to pills, the selection bar and the delete confirm to a small pill with 24px round buttons, and replaced the card and popover rings with wide soft shadows. Full set:
 
 | Token | px | Use |
 | --- | --- | --- |
@@ -449,7 +449,7 @@ Odd values the prototype uses once (3, 5, 9, 18) are component-local; keep them 
 
 A label is a pill; a control or a container is a rounded rectangle. Pills never nest in pills.
 
-**Nesting rule (SPEC §16):** outer radius = inner radius + padding. Pairs: palette 14 = item 8 + padding 6; Juno topics card 20 = item 12 + padding 8 (the items use `--radius-xl`); segmented control 7 = segment 5 + padding 2; menus 13 = item 6 + padding 6 + 1 border; hover toolbar: a pill around 24px round buttons; card 20 = inset block 8 + padding 12; settings group 20 = row 16 + 4; card row 16 = tile 16 only by eye (the tile is not inset evenly). When building a new container, compute it; do not pick from the table.
+**Nesting rule (SPEC §16):** outer radius = inner radius + padding. Pairs: palette 14 = item 8 + padding 6; Juno topics card 20 = item 12 + padding 8 (the items use `--radius-xl`); segmented control 7 = segment 5 + padding 2; menus 13 = item 6 + padding 6 + 1 border; the selection bar: a pill around 24px round buttons; the message menu 10 = row 6 + padding 5, rounded down a pixel as macOS draws it; card 20 = inset block 8 + padding 12; settings group 20 = row 16 + 4; card row 16 = tile 16 only by eye (the tile is not inset evenly). When building a new container, compute it; do not pick from the table.
 
 ## 5. Sizes
 
@@ -506,9 +506,9 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--search-field-width` | 260px filter search; `--keyword-field-width` 160px keyword rule input |
 | `--all-topics-columns` | All topics table grid: `minmax(200px, 1fr) minmax(0, 150px) 104px 44px 84px` |
 | `--code-block-max-height` | 150px, then the block scrolls inside; the wheel goes on to the page at its edges |
-| `--toolbar-clip-margin` | 36px: how far a message row may paint outside its box (the 28px toolbar and its shadow), so the toolbar can sit above the row, or below it when flipped. A plain length: Chromium ignores `calc()` in `overflow-clip-margin` |
-| `--emoji-14-shift` | -0.5px: a 14px Apple Color Emoji in a 14px box with line-height 1 draws half a pixel low at 2x (the font puts its baseline there); `EmojiButton` moves it up by this, so its centre is the box's centre. Measured, not derived: re-measure if the size changes (10-22) |
-| `--toolbar-height` | 28px. The message hover toolbar's height: 24px buttons, a 1px inset and the 1px border (10-22, down from 36). It straddles the row's top edge, its bottom 2px into the row (the row's top padding less 2px; none in compact), so no header keeps room for it (inventory 6.5). The Main toolbar measures 181px with three reactions and More |
+| `--toolbar-clip-margin` | 36px: how far a message row may paint outside its box (the 28px delete confirm and its shadow), so the confirm can sit above the row, or below it when flipped. A plain length: Chromium ignores `calc()` in `overflow-clip-margin` |
+| `--emoji-14-shift` | -0.5px: a 14px Apple Color Emoji in a 14px box with line-height 1 draws half a pixel low at 2x (the font puts its baseline there); the message menu's grid moves it up by this, so its centre is the box's centre (`apps/gallery/message-menu.spec.ts` checks it from pixels). Measured, not derived: re-measure if the size changes (10-22) |
+| `--toolbar-height` | 28px. The delete confirm's and the selection bar's height: 24px buttons (22 in the confirm, with a 2px inset), a 1px inset and the 1px border. The confirm straddles the row's top edge, its bottom 2px into the row (the row's top padding less 2px; none in compact), so no header keeps room for it (inventory 6.5) |
 | `--thumb-max-width` / `--thumb-max-height` | 360px / 240px. A lone image thumbnail in a message is scaled by its own aspect ratio inside this box, and the box is sized before the bytes arrive (performance.md 3.3). Several images in a message are one grid of this size, two columns, gap 6. File cards are `--thumb-max-width` wide |
 | `--thumb-tile-height` | 117px. A tile of that grid when it has two rows: two rows and the gap fill `--thumb-max-height`. |
 | `--filmstrip-thumb` | 56px. A square picture in the media viewer's filmstrip. |
@@ -553,7 +553,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 
 ### Icons
 
-Phosphor (`@phosphor-icons/react`, imported per icon). Weight by size: `bold` at 12–14, `regular` at 15–20. `fill` marks active and selected states. `duotone` only for the Juno nav item, the Juno mark and illustrations, as the icons in `packages/ui/src/duotone.ts`. Sizes (`--icon-12` … `--icon-20`): 12 (badges, chip close), 13 (row meta, tags, tab close), 14 (pills, cards, thread link, catch-up sparkle), 15 (tab icon, hover toolbar), 16 (nav, menu items, buttons, title sparkle), 18 (icon buttons, palette rows, send), 20 (attach, palette search). Tab icons sit at 0.75 opacity; a tab's art or photo dims to the same 0.75 on an inactive tab and comes up to full on hover and on the active tab. There is no stroke token; Phosphor is filled paths and the weight is the variant. The mapping from the Lucide names the prototype used is in `friendly-layer.md` §2.3.
+Phosphor (`@phosphor-icons/react`, imported per icon). Weight by size: `bold` at 12–14, `regular` at 15–20. `fill` marks active and selected states. `duotone` only for the Juno nav item, the Juno mark and illustrations, as the icons in `packages/ui/src/duotone.ts`. Sizes (`--icon-12` … `--icon-20`): 12 (badges, chip close), 13 (row meta, tags, tab close), 14 (pills, cards, thread link, catch-up sparkle), 15 (tab icon, the selection bar), 16 (nav, menu items, buttons, title sparkle), 18 (icon buttons, palette rows, send), 20 (attach, palette search). Tab icons sit at 0.75 opacity; a tab's art or photo dims to the same 0.75 on an inactive tab and comes up to full on hover and on the active tab. There is no stroke token; Phosphor is filled paths and the weight is the variant. The mapping from the Lucide names the prototype used is in `friendly-layer.md` §2.3.
 
 ### Juno chat
 
@@ -626,14 +626,31 @@ A field Textarea (a note or pin under edit on What Juno remembers) grows the sam
 
 Peek uses its own neutral `--peek-surface` and `--peek-shadow` in every accent. In light, the fill changes from #FBFBF8 to #F7F6F3 against the #FCFBF7 page (1.00:1 → 1.04:1). Muted #706E66 text on the new fill is 4.73:1. The 12% black hairline alone composites to #DEDDD9 on the page (1.31:1 against the page, 1.26:1 against Peek); the two blurred shadows add separation that varies with distance from the edge, so they have no single contrast ratio. The original border is transparent (no edge contrast). In the default-width Mac Chrome gallery shot at 2×, a straight left-edge pixel including the shadow measures 1.14:1 → 1.57:1 against the page and 1.14:1 → 1.50:1 against Peek. The same dark sample stays 1.06:1 against the page and 1.52:1 against Peek. These are representative samples, not minimum contrast along the whole edge. Its light shadow ring makes the complete edge visible over topic content; its dark values match the existing raised popover. Gallery checks cover both widths, every accent, text and icons at 4.5:1, and identical geometry before and after.
 
-Floating surfaces have `border: 1px solid transparent` plus the shadow, never a coloured border. Inputs keep a real 1px `--input-border`. The raised button (`Button variant="raised"`) is a control, not a floating surface: it keeps a 1px `--border-default` edge plus `--shadow-sm`. In dark the shadows alone do not separate a popover from the page, so popovers and the hover toolbar sit on `--surface-raised` (1.2). The header islands are the calm exception: `--surface-default` with `--card-ring` in both themes, because they are always on screen and sit on the page, not over another surface.
+Floating surfaces have `border: 1px solid transparent` plus the shadow, never a coloured border. Inputs keep a real 1px `--input-border`. The raised button (`Button variant="raised"`) is a control, not a floating surface: it keeps a 1px `--border-default` edge plus `--shadow-sm`. In dark the shadows alone do not separate a popover from the page, so popovers and toolbars sit on `--surface-raised` (1.2). The header islands are the calm exception: `--surface-default` with `--card-ring` in both themes, because they are always on screen and sit on the page, not over another surface.
+
+### The message menu
+
+The `menu` group (`tokens.stylex.ts`, dark in `themes.stylex.ts` as `darkMenu`) draws the menu over a message or a Juno bubble (`ContextMenu`, inventory 6.5) as close to a macOS menu as a page allows. Juno's accent fills the highlight; the material is a CSS blur, not the system's vibrancy.
+
+| Token | Light | Dark | Use |
+| --- | --- | --- | --- |
+| `--menu-font`, `--menu-font-size`, `--menu-line-height` | system font, 12px, 15px | same | The menu's labels, in the system font at menu size |
+| `--menu-fill`, `--menu-backdrop` | `hsla(0,0%,97%,.8)`, `blur(30px) saturate(1.8)` | `hsla(0,0%,16%,.78)` | The translucent, blurred material |
+| `--menu-shadow` | a 1px hairline at 10% black, a 6px and a 32px soft shadow | a 10% white edge inside, a 60% black edge outside, deeper shadows | The edge and lift; the morph scales it back each frame so it keeps its size |
+| `--menu-radius`, `--menu-padding` | 10px, 5px | same | Corners and inset |
+| `--menu-row-height`, `--menu-row-inset`, `--menu-row-radius`, `--menu-icon-gap`, `--menu-icon-size` | 22px, 9px, 6px, 7px, 14px | same | A row: the icon 9px in from the highlight's edge, 7px before the label; the highlight is the accent fill (`--hl`, `--hl-fg`) |
+| `--menu-text`, `--menu-text-disabled`, `--menu-icon`, `--menu-separator` | black at 85%, 26%, 62%, 10% | white at 88%, 26%, 66%, 12% | Labels, disabled rows, row icons, separators |
+| `--menu-separator-gap`, `--menu-min-width`, `--menu-edge` | 5px, 180px, 6px | same | Space around a separator and under the grid; the narrowest menu (about 190px with a message's rows); the gap kept from the window's edges |
+| `--menu-cell`, `--menu-cell-gap`, `--menu-cell-row-gap`, `--menu-cell-radius` | 24px, 5px, 6px, 6px | same | The emoji grid's cells, six a row, spread across the menu at least 5px apart, the first and last emoji in line with the rows' icons |
+| `--menu-emoji-size`, `--menu-emoji` | 14px, black | 14px, white | The grid's emoji, opaque: Chromium draws a colour emoji with its text colour's alpha |
+| `--menu-cell-hover`, `--menu-cell-selected` | black at 7%, the accent at 22% | white at 10%, the accent at 34% | A highlighted cell, and an emoji you already reacted with |
 
 ## 7. Z-index layers
 
 | Token | Value | Surface |
 | --- | --- | --- |
-| `--z-row` | 0 | A message row at rest; hover and focus raise it to `--z-toolbar`. A number, not `auto`: going from `auto` to a number lays the row out again (performance.md 8.14) |
-| `--z-toolbar` | 2 | Message hover toolbar (relative to message) |
+| `--z-row` | 0 | A message row at rest; one asking to confirm a delete, being edited or with its menu open is raised to `--z-toolbar`. A number, not `auto`: going from `auto` to a number lays the row out again (performance.md 8.14) |
+| `--z-toolbar` | 2 | The delete confirm's row, over the rows it overlaps |
 | `--z-header` | 3 | Page header band and islands, over the list that scrolls under them |
 | `--z-panel` | 4 | The Juno panel while it covers the topic, over the topic's header |
 | `--z-mention` | 5 | @/# suggestion popover above composer |
@@ -642,7 +659,7 @@ Floating surfaces have `border: 1px solid transparent` plus the shadow, never a 
 | `--z-palette` | 30 | ⌘K overlay and panel |
 | `--z-viewer` | 30 | Media viewer, over its tab's topic, inside the topic's own stacking context |
 | `--z-selection` | 35 | Floating Quote button |
-| `--z-context` | 40 | Context menus |
+| `--z-context` | 40 | Context menus: the message menu (`ContextMenu`) |
 | `--z-toast` | 45 | Toast |
 | `--z-tooltip` | 50 | Tooltip, over everything |
 
@@ -658,6 +675,7 @@ Buttons, toggles, menus and popovers answer at once. Buttons have no press motio
 | `--stagger` | 80ms | Between the parts of an empty state as they enter |
 | `--duration-pulse` | 2400ms | One breath of an incoming huddle's glow (huddles 10-20), read from the root by its Web Animation. Not shortened for reduced motion: the card does not start the pulse there |
 | `--ease-out` | `cubic-bezier(0.2, 0, 0, 1)` | Non-button entrances and exits |
+| `--duration-morph`, `--ease-morph` | 240ms, `cubic-bezier(0.22, 1, 0.36, 1)` | A message menu turning into the emoji picker (More reactions): the one surface that changes shape in motion. Quick off the mark, a long soft landing, no overshoot. Read by its Web Animations, which sample the curve into keyframes (performance.md, "The message menu's morph"); 0.01ms under reduced motion |
 | `--rise-toast`, `--rise-stagger` | 8px, 6px | How far a toast and an empty-state part rise as they enter |
 | `--duration-gather`, `--duration-settle` | 600ms, 900ms | The sign-in page's entrance, once: the mark's dots gather into the j; the pebbles fade in and settle |
 | `--rise-settle` | 6px | How far a sign-in pebble settles as it enters |
@@ -666,7 +684,7 @@ Buttons, toggles, menus and popovers answer at once. Buttons have no press motio
 | Button feedback | Instant colour and background changes; no transform or scale transition | |
 | Toggle to active | The filled icon replaces the outline at once, with no motion. Both icons stay in the DOM | |
 | Toast | Enter `translateY(--rise-toast)` → 0 with opacity over `--duration-appear`; it goes at once, and a replacement takes its place without rising again | |
-| Popovers and menus | Open on primary mouse-down and close at once, in their final place: no fade, no scale (Tushar, 10-21) | |
+| Popovers and menus | Open on primary mouse-down and close at once, in their final place: no fade, no scale (Tushar, 10-21). The message menu opens when its right-click completes, also with no motion of its own; only its turn into the emoji picker moves (`--duration-morph`) | |
 | Home | Never animates: every part is drawn in its final state in the frame it first shows (Tushar, 10-21) | |
 | Empty state | Illustration, title, body and action enter `--stagger` apart with opacity and `--rise-stagger`, once, when the state first appears | |
 | Theme switch | add `data-theme-switching` on the root; `* { transition: none !important }` while set; remove after two animation frames | |
@@ -675,7 +693,7 @@ Buttons, toggles, menus and popovers answer at once. Buttons have no press motio
 | Scroll to new | On open, scroll the "new" divider to 80px below the top, else to the bottom; `requestAnimationFrame` then a 150ms retry | |
 | Toast life | 5000ms for undoable, 4000ms for info | |
 
-Entrances take 240ms and pops 220ms; there are no exit animations. Never animated: Home, menus and popovers, row hover, selected row, tab switch, tab hover, typing, scrolling, list reorders, nav item hover and active. Only `transform` and `opacity` are animated anywhere.
+Entrances take 240ms and pops 220ms, and a message menu's turn into the emoji picker 240ms; there are no exit animations. Never animated: Home, menus and popovers (opening and closing), row hover, selected row, tab switch, tab hover, typing, scrolling, list reorders, nav item hover and active. Only `transform` and `opacity` are animated anywhere, except that the morph also keeps one box's corners and shadow their size (performance.md).
 
 ## 9. Opacity
 

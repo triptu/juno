@@ -8,7 +8,7 @@ The notification pipeline and scheduled presence for one signed-in workspace. It
 - `settingsChanged` re-runs today's rows at their original decision time, using stored judgements. It makes no model calls. A row without a judgement uses the AI-off rule. An already delivered or focused-topic-suppressed row cannot notify again.
 - `tick` applies a changed presence schedule. `wake` also reapplies scheduled presence. The engine calls it on launch and wake. A manual change holds until the next schedule switch or wake.
 - `observePresence` tracks Slack's manual-presence event. `setPresence` handles an explicit change from the owner through the same Slack callback. `presenceChanges` streams what Slack shows, for the avatar menu.
-- Every write to `notification_log` invalidates the `notification_log` key, so the Notifications page's Today and the why popover follow.
+- Every write to `notification_log` invalidates the `notification_log` key, so the Notifications page's Today follows.
 
 The removal migration drops `summary_due_at` and its index and converts old `summary` outcomes to `hold`. The older `digest_slot` column and the agent's `chat_summaries` table remain on disk for migration compatibility but is never read or written. Hours starts and launches do not deliver held messages.
 
