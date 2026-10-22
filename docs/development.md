@@ -185,7 +185,7 @@ need the heavy-job lock. Tool errors fail both reporting and lint.
 
 `.juno-status/health.json` contains a timestamp, counts, duplication percentage, top offenders, and full Knip and size findings. `complete: false`, a null count, and an `errors` entry mean a tool failed, not that it found zero issues. Each external tool (`scripts/health-run.mjs`) gets 20 s on an idle machine, scaled by the one-minute load per core (at a load of 16 on 8 cores it gets 40 s) and capped at 120 s. A tool that runs out of time is tried once more with twice the limit. If it times out again, its `errors` entry has `timedOut: true` and lint says the tools timed out and no finding was checked: run `pnpm lint` again when the machine is less busy. It still fails, because nothing was checked. Raw reports are in `.juno-status/knip-report.json` and `.juno-status/jscpd-report.json`; all reports are gitignored.
 
-Knip exceptions are commented in `knip.config.mjs`. Fontsource dependencies are loaded by CSS `@import`, which Knip does not parse. Babel loads `babel-plugin-react-compiler` by a string in both Vite configs. The default exports of the Knip and electron-vite configs are tool entry points. The icon script resolves Playwright through desktop's manifest with `createRequire`, where it is declared. Exports used inside their own module are omitted because that code is live; unused barrel re-exports remain visible. Playwright's alternate configs, packaging hooks, agent evals and benchmarks, research spike scripts,
+Knip exceptions are commented in `knip.config.mjs`. Fontsource dependencies are loaded by CSS `@import`, which Knip does not parse. Babel loads `babel-plugin-react-compiler` by a string in the gallery's Vite config. The default exports of the Knip and electron-vite configs are tool entry points. The icon script resolves Playwright through desktop's manifest with `createRequire`, where it is declared. Exports used inside their own module are omitted because that code is live; unused barrel re-exports remain visible. Playwright's alternate configs, packaging hooks, agent evals and benchmarks, research spike scripts,
 and the engine's compile-time body compatibility check are explicit entries. The `tracking`
 token group is tagged `@public` because `global.css` reads its emitted CSS variables.
 No blanket source exclusion hides unused code.
@@ -229,6 +229,7 @@ apps/desktop            The Electron app. Thin wiring only.
   src/renderer          React root, global.css, containers (wire atoms to views).
   e2e                   Playwright tests and the Electron launch fixture.
   electron.vite.config.ts
+  renderer.vite.ts      The renderer's Vite plugins, shared by the app build and the web shell.
   electron-builder.yml
 packages/tokens         @juno/tokens. The only place design values live.
 packages/ui             @juno/ui. Primitives, StyleX only, each with *.fixtures.tsx. Owns applyTheme.
@@ -292,7 +293,7 @@ or Playwright's Chromium. The favicon is `src/renderer/public/favicon.svg` (and 
 3. Components import tokens through the subpath, never a barrel:
    `import { colors } from '@juno/tokens/tokens.stylex'`, then use
    `colors['--background']` inside `stylex.create`.
-4. `@stylexjs/unplugin` in `electron.vite.config.ts` compiles every `stylex.create`
+4. `@stylexjs/unplugin` in `renderer.vite.ts` compiles every `stylex.create`
    and `defineVars` call into one CSS file during the renderer build. In dev it
    injects a virtual stylesheet into `index.html` itself.
 5. Because the variable names are stable, plain CSS can use them too.

@@ -42,11 +42,9 @@ export default {
         'src/preload/index.ts',
         'src/renderer/index.html',
       ],
-      project: ['src/**/*.{ts,tsx}', 'e2e/**/*.ts', 'packaging/**/*.ts', 'build/*.cjs', '*.config.ts'],
+      project: ['src/**/*.{ts,tsx}', 'e2e/**/*.ts', 'packaging/**/*.ts', 'build/*.cjs', '*.config.ts', '*.vite.ts'],
       playwright: { config: ['playwright*.config.ts'] },
       vite: { config: ['electron.vite.config.ts'] },
-      // Babel loads the shared reactCompiler tuple by its string name in the Vite config.
-      ignoreDependencies: ['babel-plugin-react-compiler'],
     },
     'apps/gallery': {
       entry: ['index.html'],
