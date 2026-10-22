@@ -170,6 +170,7 @@ function rowActions(list: MessageWindow, messageActions: MessageActionsOutput) {
 
 /** Download and Quick Look on a file card, one object for the app's life (performance 5.1). */
 const FILE_ACTIONS = { onDownload: downloadMessageFile, onQuickLook: quickLookMessageFile } as const
+const afterSend = (jump: () => void, topic: string) => () => { jump(); void markRead(topic) }
 
 function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps) {
   const list = useAtomValue(messageListAtom(view))
@@ -236,10 +237,7 @@ function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps)
     />
   )
   if (readOnly) return messages
-  const sent = () => {
-    jump()
-    void markRead(detail.id)
-  }
+  const sent = afterSend(jump, detail.id)
   return (
     <TopicViewFrame
       header={header}

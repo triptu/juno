@@ -8,11 +8,11 @@ import { copyImage, currentPlace, downloadFile, openFile, openViewerAtom, popupC
 import { MediaViewer, viewableOf, type MediaViewerProps, type MediaViewing } from '@juno/views'
 import { afterNavigation, openTopic } from './navigation'
 
-export default function MediaViewerPanel(props: MediaViewerProps) {
+function MediaViewerPanel(props: MediaViewerProps) {
   return <MediaViewer {...props} />
 }
 
-export function openTopicViewer(id: string, viewing: MediaViewing): void {
+function openTopicViewer(id: string, viewing: MediaViewing): void {
   openTopic(id)
   afterNavigation(() => {
     const tab = tabShowing(registry.get(tabsAtom), id)
@@ -22,7 +22,7 @@ export function openTopicViewer(id: string, viewing: MediaViewing): void {
   })
 }
 
-export function showMessageImageMenu(list: MessageWindow, ts: string, fileId: string, at: { readonly x: number; readonly y: number }, onOpen: (viewing: MediaViewing) => void): void {
+function showMessageImageMenu(list: MessageWindow, ts: string, fileId: string, at: { readonly x: number; readonly y: number }, onOpen: (viewing: MediaViewing) => void): void {
   const message = list.rows.get(ts)
   if (message === undefined) return
   const items = viewableOf(message.files)
@@ -32,7 +32,7 @@ export function showMessageImageMenu(list: MessageWindow, ts: string, fileId: st
   void showImageMenu(items[index]!, at, () => onOpen(viewing))
 }
 
-export async function showImageMenu(file: FileView, at: { readonly x: number; readonly y: number }, onOpen?: () => void): Promise<void> {
+async function showImageMenu(file: FileView, at: { readonly x: number; readonly y: number }, onOpen?: () => void): Promise<void> {
   const src = file.full ?? file.thumb?.src
   const canUseFile = file.download !== undefined
   const items = [
@@ -48,3 +48,5 @@ export async function showImageMenu(file: FileView, at: { readonly x: number; re
   else if (chosen === 'copy-image' && src !== undefined) void copyImage(src)
   else if (chosen === 'download' && file.download !== undefined) void downloadFile({ url: file.download, name: file.name })
 }
+
+export default Object.assign(MediaViewerPanel, { open: openTopicViewer, message: showMessageImageMenu, menu: showImageMenu })

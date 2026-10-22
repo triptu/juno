@@ -47,8 +47,7 @@ export interface MediaViewerProps extends DocumentLinks {
   readonly loadText?: LoadFileText | undefined
   /** With it, an image has Copy image. */
   readonly onCopyImage?: ((file: FileView) => void) | undefined
-  /** Right-click on the full image. The container owns the native menu. */
-  readonly onImageMenu?: ((file: FileView, event: MouseEvent<Element>) => void) | undefined
+  /** Right-click on the full image. The container owns the native menu. */ readonly onImageMenu?: ((file: FileView, event: MouseEvent<Element>) => void) | undefined
 }
 
 /**
@@ -239,17 +238,9 @@ function Item({ file, position, onImageMenu }: { readonly file: MediaFile; reado
   const full = file.kind === 'image' ? file.full : undefined
   const width = file.width ?? file.thumb.width
   const height = file.height ?? file.thumb.height
+  const imageMenu = file.kind === 'image' && onImageMenu !== undefined ? (event: MouseEvent<Element>) => onImageMenu(file, event) : undefined
   return (
-    <div
-      ref={frame}
-      data-viewer-item={position}
-      onContextMenu={
-        file.kind !== 'image' || onImageMenu === undefined
-          ? undefined
-          : (event) => onImageMenu(file, event)
-      }
-      {...stylex.props(styles.frame, styles.fitted(width, height), zoomed && styles.zoomed)}
-    >
+    <div ref={frame} data-viewer-item={position} onContextMenu={imageMenu} {...stylex.props(styles.frame, styles.fitted(width, height), zoomed && styles.zoomed)}>
       {/* One transform for both images, so the full image stays over the thumbnail. */}
       <div ref={content} data-viewer-zoom="" {...stylex.props(styles.zoom)}>
         <img src={file.thumb.src} alt="" draggable={false} decoding="async" {...stylex.props(styles.image)} />
@@ -263,7 +254,6 @@ function Item({ file, position, onImageMenu }: { readonly file: MediaFile; reado
     </div>
   )
 }
-
 /** A document's frame: a PDF and a CSV as wide as the stage, HTML and other text at reading width, audio a card of the bar's width. */
 function documentBox(file: FileView) {
   if (file.kind === 'audio') return [styles.audioCard]

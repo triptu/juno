@@ -61,7 +61,7 @@ const pointOf = (event: MouseEvent<Element>) => ({ x: event.clientX, y: event.cl
 
 const showViewerImageMenu = (file: FileView, event: MouseEvent<Element>) => {
   event.preventDefault()
-  void viewer.load().then((menu) => menu.showImageMenu(file, pointOf(event)))
+  void viewer.load().then((module) => module.default.menu(file, pointOf(event)))
 }
 
 /** The viewer open in `view`, at the item it shows. */
@@ -96,10 +96,10 @@ function TopicViewer({ view, opener }: { readonly view: string; readonly opener:
  * view (`openViewerAtom`), so the tab shows it again when its topic mounts
  * again.
  */
-export const openPreviewImage = (topic: string, viewing: MediaViewing) => viewer.load().then((menu) => menu.openTopicViewer(topic, viewing))
+export const openPreviewImage = (topic: string, viewing: MediaViewing) => viewer.load().then((module) => module.default.open(topic, viewing))
 
 export const showMessageImageMenu = (list: MessageWindow, ts: string, fileId: string, event: MouseEvent<Element>, onOpen: (viewing: MediaViewing) => void) =>
-  viewer.load().then((menu) => menu.showMessageImageMenu(list, ts, fileId, pointOf(event), onOpen))
+  viewer.load().then((module) => module.default.message(list, ts, fileId, pointOf(event), onOpen))
 
 export function useTopicFiles(view: string) {
   const [dropping, setDropping] = useState(false)
