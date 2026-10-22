@@ -225,8 +225,7 @@ export function Topic({ id, view, detail, readOnly = false, peek = false, onOpen
       onChannel={scopeToChannel}
       onPerson={openPersonDm}
       onLink={openMessageLink}
-      linkInfo={messageLinkInfo}
-      onLinkMenu={showMessageLinkMenu}
+      linkInfo={messageLinkInfo} onLinkMenu={showMessageLinkMenu}
       {...FILE_ACTIONS}
       onOpenMedia={openMedia}
       onImageMenu={(ts, fileId, event) => showMessageImageMenu(list, ts, fileId, event, openMedia)}
