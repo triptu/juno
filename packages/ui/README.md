@@ -11,7 +11,7 @@ Dumb, accessible primitives. StyleX plus `@juno/tokens` only; no app state, no d
 - Buttons have no transform transition or toggle pop. Toast and empty-state entrances use `--duration-appear`; menus and popovers open and close at once. Other motion uses only transform and opacity and collapses under reduced motion through the tokens.
 - `disabled` and `dimmed` share one look (`--opacity-disabled`); dimmed stays focusable and sets `aria-disabled`.
 - Chrome text is not selectable. `Text selectable`, `Textarea`, `TextField` and `CodeBlock` opt in.
-- Tooltips come from the one `TooltipLayer` the app mounts at its root; an element asks for one with `tooltip(label, keys?)`, and `IconButton`, `EmojiButton`, `AvatarButton` and `Swatch` do it from their `label` (an IconButton's `shortcut` adds keycaps). Do not use `title` on a control; it stays only for cut-off text and content.
+- Tooltips come from the one `TooltipLayer` the app mounts at its root; an element asks for one with `tooltip(label, keys?)`, and `IconButton`, `AvatarButton` and `Swatch` do it from their `label` (an IconButton's `shortcut` adds keycaps). Do not use `title` on a control; it stays only for cut-off text and content.
 - Icon-only controls take a required `label`. Icons are Phosphor components passed as props (`icon={Hash}`), never looked up by name, and imported one at a time from `@phosphor-icons/react/dist/icons/<Name>` (the root entry pulls the whole set into dev builds). `Icon` picks the weight from the size (bold at 14 and below, regular above); call sites name only `fill` (through `active`). A duotone icon comes from `src/duotone.ts` (`SparkleDuotone`): the desktop build keeps the duotone weight only for the icons it imports, and `scripts/check-duotone.mjs` fails on the weight's name anywhere else.
 - A person's colour comes from `hueForId(slackId)`; a channel's default colour from `hueForId(channelId)`. Both are stable across lists and machines.
 - Initials and channel letters take `firstGrapheme(name)`, never `charAt(0)`: a name that starts with an emoji or another character outside the Basic Multilingual Plane would otherwise draw half a glyph.
@@ -42,7 +42,11 @@ clamps to its pane when it mounts, including after a deferred load.
 
 ## Menu and popover triggers
 
-Every menu or popover button declares `aria-haspopup`. `Button`, `IconButton`, `AvatarButton`, `EmojiButton` and `SelectButton` share `menuTriggerHandlers`; custom view buttons use it too. `expanded` on Button and IconButton implies a dialog trigger unless `aria-haspopup` says otherwise. Primary mouse-down invokes the trigger; its later click is ignored. Preventing the mouse-down default preserves focus in the panel. Keyboard and touch still activate on click; ↓ also opens. Ctrl-click and right-click keep their context-menu behaviour. Custom popovers require a separate press to select an item; native menus keep system drag selection.
+Every menu or popover button declares `aria-haspopup`. `Button`, `IconButton`, `AvatarButton` and `SelectButton` share `menuTriggerHandlers`; custom view buttons use it too. `expanded` on Button and IconButton implies a dialog trigger unless `aria-haspopup` says otherwise. Primary mouse-down invokes the trigger; its later click is ignored. Preventing the mouse-down default preserves focus in the panel. Keyboard and touch still activate on click; ↓ also opens. Ctrl-click and right-click keep their context-menu behaviour. Custom popovers require a separate press to select an item; native menus keep system drag selection.
+
+## Context menu
+
+`ContextMenu` is the one menu Juno draws itself, for messages: rows with icons, a header (the emoji grid) and a morph into a larger panel. Its caller decides when it opens; the message menu opens when a right-click completes (`openOnRelease` in `@juno/views`). Rows choose on a click or Enter, not on a right press dragged onto them. The morph is the only motion a surface makes here: 240ms, on the compositor, and none under reduced motion (`docs/design/primitives.md`, `docs/performance.md`).
 
 ## Mouse-down activation
 
@@ -51,7 +55,7 @@ Things that navigate (`ListRow` with `onSelect`, `Tab`, `OptionRow`, `NavItem`) 
 - Primary button of the primary pointer only. The secondary button goes to `onContextMenu`; ctrl-click is left alone because on macOS it is the context menu.
 - ⌘, shift and alt are passed through in the `ActivateEvent` so the owner can open in a new tab.
 - Enter and Space activate from the keyboard, once per press: holding the key does not repeat. A click with `detail === 0` (assistive technology) activates too. Real clicks are ignored because the press already fired.
-- A press that starts inside a nested control (a Resolve button, a close button, a link, or anything marked `data-no-activate`) is ignored; the control handles itself.
+- A press that starts inside a nested control (a close button, a link, or anything marked `data-no-activate`) is ignored; the control handles itself.
 - Pressing and dragging away is harmless: the activation already happened on the press and nothing waits for the release.
 - Touch pointers wait for the click so a scroll gesture is not a navigation.
 

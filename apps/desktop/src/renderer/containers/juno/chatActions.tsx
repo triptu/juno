@@ -3,14 +3,16 @@
  * requests, the remove sheet and the row callbacks.
  */
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type MouseEvent, type RefObject, type SetStateAction } from 'react'
-import { chatCopy, junoText, type ChatItem, type ChatMention, type ChatPage, type JunoFileInput, type JunoPage, type MessageMenu, type OpId, type Reaction, type Quote, type SendContext } from '@juno/agent-contract'
-import { copyText, junoFocusAtom, popupContextMenu, registry } from '@juno/state'
+import { junoText, type ChatItem, type ChatMention, type ChatPage, type JunoFileInput, type JunoPage, type MessageMenu, type OpId, type Reaction, type Quote, type SendContext } from '@juno/agent-contract'
+import { junoFocusAtom, registry } from '@juno/state'
 import { junoThumbAtom, messageActions } from '@juno/state/agent'
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
-import { OwnerImage, ReactionBadge, RemoveSheet, SheetLayer, type ActivateEvent, type ChatActions, type ChatMenuTarget, type OwnerImageFile, type ReactionTarget } from '@juno/views'
+import { openOnRelease, OwnerImage, type MenuAt, type MenuPoint, ReactionBadge, RemoveSheet, SheetLayer, type ActivateEvent, type ChatActions, type ChatMenuTarget, type OwnerImageFile, type ReactionTarget } from '@juno/views'
 import { openSlackMessage, openTopic } from '../navigation'
 import { chunk } from '../chunks'
+import { withMenus } from '../messageMenu'
+import type { ChatSpan } from './chatMenu'
 import { openWebLink } from '../slackLinks'
 import { junoCommands } from './actions'
 import { scrollToRow, toEnd } from './chatScroll'
@@ -109,15 +111,13 @@ interface ActionsInput {
   readonly pinnedRef: RefObject<boolean>
   readonly inputRef: RefObject<HTMLTextAreaElement | null>
   readonly setQuote: Dispatch<SetStateAction<Quote | undefined>>
-  /** Opens the reactions of a bubble or card under (or over) this box (`useReactionPicker`). */
-  readonly openPicker: (target: ReactionTarget, box: DOMRect) => void
   readonly setRemoval: Dispatch<SetStateAction<Removal | undefined>>
   /** A link to a Juno page ("Show in Activity"): in the chat's own tab or panel. */
   readonly openPage: (page: JunoPage) => void
 }
 
 /** Callbacks every row gets, stable for the chat's life (performance 5.1); they read the latest state through refs. */
-export function useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote, openPicker, setRemoval, openPage }: ActionsInput): ChatActions {
+export function useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote, setRemoval, openPage }: ActionsInput): ChatActions {
   const itemsRef = useRef(items)
   const openPageRef = useRef(openPage)
   useLayoutEffect(() => {
@@ -143,7 +143,6 @@ export function useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote
         }
       },
       onRetry: (opId: OpId) => junoCommands.onRetry(opId),
-      onReactions: (target, event: MouseEvent<HTMLElement>) => openPicker(target, event.currentTarget.getBoundingClientRect()),
       onReply: (target) => {
         setQuote(quoteOf(itemsRef.current, target))
         inputRef.current?.focus()
@@ -153,18 +152,25 @@ export function useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote
       onUndoMemory: messages.undoMemory,
       onAsk: (id, choice) => void messages.ask(id, choice),
       onGroupLabel: () => {},
+      // The menu opens when the right-click completes over the same message (`openOnRelease`).
       onContextMenu: (target: ChatMenuTarget, event: MouseEvent<HTMLElement>) => {
         event.preventDefault()
-        const box = event.currentTarget.getBoundingClientRect()
-        void showChatMenu(target, itemsRef.current, selectedSpan(event.currentTarget), setRemoval, (reaction) => openPicker(reaction, box), (reply) => {
-          setQuote(quoteOf(itemsRef.current, reply))
-          inputRef.current?.focus()
-        })
+        const bubble = event.currentTarget
+        const span = selectedSpan(bubble)
+        openOnRelease(event, (under) => bubble.contains(under), (at) =>
+          withMenus((menus) =>
+            menus.openChatMenu(target, anchorIn(bubble, at), itemsRef.current, span, setRemoval, (reply) => {
+              setQuote(quoteOf(itemsRef.current, reply))
+              inputRef.current?.focus()
+            }),
+          ),
+        )
       },
+      onLeaveRows: () => inputRef.current?.focus(),
       renderOwnerImage,
       renderReactions,
     }),
-    [scrollRef, pinnedRef, inputRef, setQuote, openPicker, setRemoval],
+    [scrollRef, pinnedRef, inputRef, setQuote, setRemoval],
   )
 }
 
@@ -174,8 +180,20 @@ function quoteOf(items: ReadonlyArray<ChatItem>, target: ReactionTarget): Quote 
   return { target, preview }
 }
 
-/** Capture a range in the message's words before the native menu takes focus. */
-function selectedSpan(root: HTMLElement): { text: string; startByte: number; endByte: number } | undefined {
+/**
+ * Where a bubble's menu opens: at the pointer, or for the context-menu key
+ * and ⇧F10, whose point may be anywhere, under the bubble's first line.
+ */
+function anchorIn(bubble: HTMLElement, at: MenuAt): MenuPoint {
+  const box = bubble.getBoundingClientRect()
+  if (at.clientX > box.left && at.clientX < box.right && at.clientY > box.top && at.clientY < box.bottom) return { x: at.clientX, y: at.clientY }
+  const text = bubble.querySelector<HTMLElement>('p, [data-chat-run] > *') ?? bubble
+  const line = text.getBoundingClientRect()
+  return { x: line.left, y: Math.min(box.bottom, line.top + (Number.parseFloat(getComputedStyle(text).lineHeight) || 0)) }
+}
+
+/** The range selected in the message's words, read before the menu takes focus. */
+function selectedSpan(root: HTMLElement): ChatSpan | undefined {
   const selection = globalThis.getSelection()
   const words = root.querySelector('p')
   if (words === null || selection === null || selection.rangeCount === 0 || selection.isCollapsed) return undefined
@@ -187,35 +205,4 @@ function selectedSpan(root: HTMLElement): { text: string; startByte: number; end
   const text = range.toString()
   const startByte = new TextEncoder().encode(prefix.toString()).length
   return { text, startByte, endByte: startByte + new TextEncoder().encode(text).length }
-}
-
-async function showChatMenu(target: ChatMenuTarget, items: ReadonlyArray<ChatItem>, selection: ReturnType<typeof selectedSpan>, remove: (message: typeof MessageMenu.Type) => void, react: (target: ReactionTarget) => void, reply: (target: ReactionTarget) => void): Promise<void> {
-  const copy = chatCopy.contextMenu
-  const juno = target.kind !== 'owner'
-  const reaction: ReactionTarget | undefined = target.kind === 'juno' ? { _tag: 'bubble', id: target.id } : target.kind === 'card' ? { _tag: 'card', id: target.id } : undefined
-  const message = await messages.menu(target.kind === 'owner' ? { _tag: 'owner', opId: target.opId } : target.kind === 'juno' ? { _tag: 'bubble', id: target.id } : { _tag: 'card', id: target.id })
-  const item = items.find((i) => (target.kind === 'owner' ? i._tag === 'owner' && i.opId === target.opId : target.kind === 'juno' ? i._tag === 'juno' && i.id === target.id : false))
-  const text = item?._tag === 'owner' ? item.text : item?._tag === 'juno' ? junoText(item.body) : ''
-  const span = selection ?? { text, startByte: 0, endByte: new TextEncoder().encode(text).length }
-  const chosen = await popupContextMenu([
-    { id: 'copy', label: copy.copy },
-    ...(juno ? [{ id: 'react', label: chatCopy.react.react }, { id: 'reply', label: chatCopy.react.reply }] : [{ id: 'remember', label: copy.remember, enabled: message !== null && span.endByte - span.startByte > 0 && span.endByte - span.startByte <= 280 }]),
-    { separator: true },
-    { id: 'remove', label: copy.remove, enabled: message !== null },
-  ])
-  switch (chosen) {
-    case 'copy': return copyText(span.text)
-    case 'remember':
-      if (message !== null) await messages.pin(message, span.startByte, span.endByte)
-      return
-    case 'remove':
-      if (message !== null) remove(message)
-      return
-    case 'react':
-      if (reaction !== undefined) react(reaction)
-      return
-    case 'reply':
-      if (reaction !== undefined) reply(reaction)
-      return
-  }
 }

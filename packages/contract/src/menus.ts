@@ -16,7 +16,6 @@ export {
   topicMenuItems,
   viewMenuChoice,
   viewPillMenuItems,
-  whyLabel,
   type ChannelMenuAction,
   type HuddleMenuItem,
   type ViewChoice,

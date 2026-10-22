@@ -45,9 +45,19 @@ export function messageTime(at: number, now: number): string {
   return new Date(at).getFullYear() === new Date(now).getFullYear() ? monthDay.format(at) : monthDayYear.format(at)
 }
 
-/** The clock time alone, "22:26": a continuation's time in the avatar column, where the day separator above gives the day. */
-export function clockTime(at: number): string {
-  return clock.format(at)
+/**
+ * A message header's time, which always has the clock: "9:12" the same day,
+ * "Yesterday 9:12", "Oct 3, 9:12", and "Oct 3, 2025, 9:12" in another year.
+ * The same rule as `messageHeaderTime` in `@juno/domain`; keep the two in step.
+ */
+export function messageHeaderTime(at: number, now: number): string {
+  const today = startOfDay(now)
+  const day = startOfDay(at)
+  const time = clock.format(at)
+  if (day === today) return time
+  if (day === today - DAY) return `Yesterday ${time}`
+  const date = new Date(at).getFullYear() === new Date(now).getFullYear() ? monthDay.format(at) : monthDayYear.format(at)
+  return `${date}, ${time}`
 }
 
 /** The full date and time for a tooltip: "Saturday, October 3, 2026, 9:12". */

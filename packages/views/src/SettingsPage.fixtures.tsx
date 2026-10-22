@@ -20,7 +20,7 @@ import { SettingsAbout, SettingsGeneral, SettingsIgnored } from './SettingsSecti
 import { IgnoreChannelRow } from './IgnoreChannelRow'
 import { EmojiPicker } from './EmojiPicker'
 import { QuickReactionsSetting } from './QuickReactionsSetting'
-import { sevenQuickReactions } from './fixtures/quickReactions'
+import { elevenQuickReactions } from './fixtures/quickReactions'
 import { UpdateSettings } from './UpdateSettings'
 
 /** Today's spend from the agent's ledger, under the default $5 limit. */
@@ -143,7 +143,7 @@ export default defineFixtures(
       // Another app records the screen all the time, so Juno cannot tell when a share starts.
       'sharing-always-on': at('general', <SettingsGeneral hideWhileSharing sharingDetection="alwaysOn" onHideWhileSharingChange={noop} checks={checks} onCheckChange={noop} mirrorReads onMirrorReadsChange={noop} catchUp={{ available: 0, pending: 0 }} onCatchUp={noop} peekKey="option" onPeekKeyChange={noop} homePictures onHomePicturesChange={noop} onOpenGallery={noop} webPanel onWebPanelChange={noop} classifier onClassifierChange={noop} />),
       'read-mirroring-off': at('general', <SettingsGeneral hideWhileSharing sharingDetection="available" onHideWhileSharingChange={noop} checks={checks} onCheckChange={noop} mirrorReads={false} onMirrorReadsChange={noop} catchUp={{ available: 3, pending: 0 }} onCatchUp={noop} peekKey="option" onPeekKeyChange={noop} homePictures onHomePicturesChange={noop} onOpenGallery={noop} webPanel onWebPanelChange={noop} classifier onClassifierChange={noop} />),
-      'appearance-quick-reactions': at('appearance', <GallerySettingsAppearance theme="system" density="compact" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} quickReactions={<QuickReactionsSetting reactions={sevenQuickReactions} onChange={noop} onAdd={noop} />} />),
+      'appearance-quick-reactions': at('appearance', <GallerySettingsAppearance theme="system" density="compact" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} quickReactions={<QuickReactionsSetting reactions={elevenQuickReactions} onChange={noop} onAdd={noop} />} />),
       // Add's picker over the page, not clipped by the card.
       'appearance-quick-reactions-picker': at('appearance', <GallerySettingsAppearance theme="system" density="compact" onThemeChange={noop} onAccentChange={noop} onDensityChange={noop} quickReactions={<QuickReactionsSetting reactions={DEFAULT_QUICK_REACTIONS} onChange={noop} onAdd={noop} picker={<EmojiPicker data={prepareEmojiPicker(emojiCatalog, [])} recent={DEFAULT_QUICK_REACTIONS.map((reaction) => reaction.name)} selected={DEFAULT_QUICK_REACTIONS} onPick={noop} onClose={noop} />} />} />),
       // The minimum window with the sidebar hidden: the hours rows put their days and times under the label.

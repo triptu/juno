@@ -14,16 +14,6 @@ export function slackLink(workspaceUrl: string, topic: Pick<TopicDetail, 'channe
   return topic.rootTs === undefined ? base : `${base}/p${topic.rootTs.replace('.', '')}`
 }
 
-/** A message's Slack link. A reply carries its thread, as Slack's own links do. */
-export function messageLink(workspaceUrl: string, channel: string, ts: string, threadTs?: string): string {
-  const url = new URL(`archives/${channel}/p${ts.replace('.', '')}`, workspaceUrl.endsWith('/') ? workspaceUrl : `${workspaceUrl}/`)
-  if (threadTs !== undefined && threadTs !== ts) {
-    url.searchParams.set('thread_ts', threadTs)
-    url.searchParams.set('cid', channel)
-  }
-  return url.toString()
-}
-
 /** Where a Slack link points (research, slack-data-access "Permalinks"). */
 export type SlackLinkTarget =
   | { readonly kind: 'message'; readonly channel: string; readonly ts: string; readonly threadTs?: string }

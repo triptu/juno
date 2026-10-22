@@ -49,7 +49,7 @@ export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEle
 // StyleX cannot read constants from other modules.
 const HOVER = '@media (hover: hover)'
 
-// The 24px button is the hover-toolbar button: round, inside the toolbar's pill.
+// The 24px button is round, inside a toolbar pill (the selection bar).
 const radiusBySize: Record<IconButtonSize, IconButtonRadius> = {
   20: 'xs',
   22: 'xs',

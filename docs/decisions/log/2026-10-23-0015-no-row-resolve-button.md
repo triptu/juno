@@ -1,0 +1,1 @@
+- 10-23 00:15 · sidebar resolve · A sidebar row has no hover Resolve button. Resolve is in the row's menu, the topic header and ⌘K; rows keep their height and hovering adds only the fill (owner).

@@ -1,0 +1,1 @@
+- 10-23 00:50 · header times · A message header's time always has the clock ("Yesterday 15:42", "Oct 16, 15:42", "Oct 16, 2025, 15:42"), since headers repeat after ten quiet minutes and a date alone would not tell them apart. Juno chat bubble times follow. The app's 24-hour clock stays; it has no 12-hour setting (owner).

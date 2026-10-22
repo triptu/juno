@@ -1,5 +1,5 @@
 /**
- * Styles the bubble rows share: group spacing, the hover-revealed time,
+ * Styles the bubble rows share: group spacing, the time shown on hover,
  * and the fixed line under a group's last bubble where a delivery or an
  * ending line goes. The line's slot is always there, so a line arriving
  * or leaving never moves the bubbles.
@@ -26,7 +26,7 @@ export const rowStyles = stylex.create({
     alignItems: 'flex-end',
     gap: spacing['--space-2-5'],
     minWidth: 0,
-    // Hidden until the pointer is over the row or keyboard focus is inside it; only opacity changes.
+    // The time: hidden until the pointer is over the row or keyboard focus is inside it; only opacity changes.
     '--row-action-opacity': {
       default: '0',
       ':hover': { default: null, [HOVER]: '1' },

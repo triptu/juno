@@ -50,20 +50,40 @@ function dayNumber(d: CalendarDay): number {
 
 /** "9:12" the same day, "Yesterday", the weekday within a week ("Sat"), else "Oct 3" ("Oct 3, 2025" in another year). */
 export function messageTime(at: number, now: number, options: TimeOptions = {}): string {
-  const locale = options.locale ?? 'en-US'
   const then = calendarDay(at, options)
   const today = calendarDay(now, options)
   const diffDays = dayNumber(today) - dayNumber(then)
-  if (diffDays === 0) {
-    // "9:12", "13:45": 24-hour clock without a leading zero.
-    const parts = new Intl.DateTimeFormat(locale, { timeZone: options.timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(at))
-    const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '00'
-    return `${Number(get('hour'))}:${get('minute')}`
-  }
+  if (diffDays === 0) return shortClock(at, options)
   if (diffDays === 1) return 'Yesterday'
   if (diffDays > 1 && diffDays < 7) return then.weekday
-  const sameYear = then.year === today.year
-  return new Intl.DateTimeFormat(locale, { timeZone: options.timeZone, month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) }).format(new Date(at))
+  return shortDate(at, then.year === today.year, options)
+}
+
+/**
+ * A message header's time, which always has the clock: "9:12" the same day,
+ * "Yesterday 9:12", "Oct 3, 9:12", and "Oct 3, 2025, 9:12" in another year.
+ * Headers repeat after ten quiet minutes, so a date alone would not tell them apart.
+ */
+export function messageHeaderTime(at: number, now: number, options: TimeOptions = {}): string {
+  const then = calendarDay(at, options)
+  const today = calendarDay(now, options)
+  const diffDays = dayNumber(today) - dayNumber(then)
+  const clock = shortClock(at, options)
+  if (diffDays === 0) return clock
+  if (diffDays === 1) return `Yesterday ${clock}`
+  return `${shortDate(at, then.year === today.year, options)}, ${clock}`
+}
+
+/** "9:12", "13:45": 24-hour clock without a leading zero. */
+function shortClock(at: number, options: TimeOptions): string {
+  const parts = new Intl.DateTimeFormat(options.locale ?? 'en-US', { timeZone: options.timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(at))
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '00'
+  return `${Number(get('hour'))}:${get('minute')}`
+}
+
+/** "Oct 3", or "Oct 3, 2025" outside the current year. */
+function shortDate(at: number, sameYear: boolean, options: TimeOptions): string {
+  return new Intl.DateTimeFormat(options.locale ?? 'en-US', { timeZone: options.timeZone, month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) }).format(new Date(at))
 }
 
 /** "13:42" for the notification log. */

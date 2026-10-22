@@ -17,11 +17,9 @@ import {
   notificationsSetSlackSchedule,
   notificationsSettings,
   notificationsStatus,
-  notificationsWhy,
   type Hours,
   type NotificationSettingsView,
   type PresenceValue,
-  type Why,
 } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
@@ -41,17 +39,6 @@ export const notificationsPageAtom = liveQuery(notificationsPage)(undefined)
 
 /** Presence and "Paused until 9am", for the avatar menu. */
 export const notificationStatusAtom = liveQuery(notificationsStatus)(undefined)
-
-/** The why popover open on a message, or nothing. */
-export interface WhyPopover {
-  readonly topicId: string
-  readonly ts: string
-  readonly why: Why
-  /** Where the message menu opened, in window pixels. */
-  readonly at: { readonly x: number; readonly y: number }
-}
-
-export const whyPopoverAtom = Atom.make<WhyPopover | undefined>(undefined).pipe(Atom.keepAlive)
 
 /** The settings when the atom holds them, without waiting. The menus use them so they open in the same frame. */
 export function currentNotificationSettings(registry: Registry): NotificationSettingsView | undefined {
@@ -84,12 +71,6 @@ export function loadNotificationSettings(
     }
     release = registry.subscribe(notificationSettingsAtom, check, { immediate: true })
   })
-}
-
-/** Why a message did or did not notify. Undefined when the engine could not say. */
-export async function loadWhy(registry: Registry, topicId: string, ts: string): Promise<Why | undefined> {
-  const exit = await runCommand(registry, notificationsWhy, { topicId, ts })
-  return Exit.isSuccess(exit) ? exit.value : undefined
 }
 
 export function setHours(registry: Registry, which: 'notifications' | 'presence', hours: Partial<Hours>): void {

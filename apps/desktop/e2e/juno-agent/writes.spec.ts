@@ -128,8 +128,9 @@ test('selected words can be remembered, undone and removed without the optimisti
       selection.removeAllRanges()
       selection.addRange(range)
     })
-    await juno.chooseNextMenuItem('remember')
+    // The context-menu key: the menu opens at once, and Remember this takes the selected words.
     await chat.ownerBubble(text).locator('p').dispatchEvent('contextmenu')
+    await juno.messageMenu.choose('remember')
   }
   await remember()
   const note = chat.root.locator('[data-chat-note="remembered"]')
@@ -138,8 +139,7 @@ test('selected words can be remembered, undone and removed without the optimisti
   await expect(note).toHaveCount(0)
   await remember()
   await expect(note).toContainText('Remembered')
-  await juno.chooseNextMenuItem('remove')
-  await chat.ownerBubble(text).locator('p').dispatchEvent('contextmenu')
+  await (await chat.menu(text, { owner: true })).choose('remove')
   const sheet = juno.win.getByRole('dialog', { name: 'Remove from Juno' })
   await sheet.getByRole('button', { name: 'Remove', exact: true }).click()
   await expect(sheet).toHaveCount(0)

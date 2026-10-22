@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { useRef, type ReactNode, type Ref } from 'react'
+import { useRef, type KeyboardEvent, type ReactNode, type Ref } from 'react'
 import { chatCopy, type Banner, type ChatItem } from '@juno/agent-contract'
 import { chat, layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { ScrollArea, Text, useNarrowerThan } from '@juno/ui'
@@ -73,7 +73,7 @@ export function JunoChatList({ items, banner, moreAbove, moreBelow, now, actions
   const compact = useNarrowerThan(columnRef, COMPACT_BELOW)
   return (
     <ScrollArea scrollbar="hover" evenInset underHeader ref={scrollRef} data-scroll="" sx={styles.scroller}>
-      <div ref={columnRef} role="list" aria-label="Juno chat" data-chat-compact={compact || undefined} {...stylex.props(styles.column, column === 'panel' && styles.panel, column === 'page' && compact && styles.compact)}>
+      <div ref={columnRef} role="list" aria-label="Juno chat" onKeyDown={(event) => rowKey(event, actions)} data-chat-compact={compact || undefined} {...stylex.props(styles.column, column === 'panel' && styles.panel, column === 'page' && compact && styles.compact)}>
         <div ref={topEdgeRef} data-chat-edge={moreAbove ? 'more' : 'end'} aria-hidden {...stylex.props(styles.edge)} />
         {empty ? <EmptyChat onSuggest={onSuggest} enter={enterEmpty} /> : null}
         {rows.map((item, index) => (
@@ -90,6 +90,33 @@ export function JunoChatList({ items, banner, moreAbove, moreBelow, now, actions
       </div>
     </ScrollArea>
   )
+}
+
+const ROW = '[data-chat-row]'
+
+/**
+ * The keys of a bubble or card with keyboard focus (↑ in the empty composer
+ * gives the newest one focus): ↑ and ↓ move between them, Esc goes back to
+ * the composer, and ⇧F10 opens its menu, as the context-menu key does.
+ */
+function rowKey(event: KeyboardEvent<HTMLDivElement>, actions: ChatActions): void {
+  const target = event.target
+  if (!(target instanceof HTMLElement) || !target.matches(ROW)) return
+  if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+    const rows = [...event.currentTarget.querySelectorAll<HTMLElement>(ROW)]
+    const next = rows[rows.indexOf(target) + (event.key === 'ArrowUp' ? -1 : 1)]
+    if (next === undefined) return
+    event.preventDefault()
+    next.focus({ preventScroll: true })
+    next.scrollIntoView({ block: 'nearest', behavior: 'instant' })
+  } else if (event.key === 'Escape' && actions.onLeaveRows !== undefined) {
+    event.preventDefault()
+    actions.onLeaveRows()
+  } else if (event.key === 'F10' && event.shiftKey) {
+    event.preventDefault()
+    // As the context-menu key sends it: no button down, so the menu opens at once, under the first line.
+    target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))
+  }
 }
 
 /** The row key: the op for an owner bubble (it exists before the archive row), the id otherwise. */

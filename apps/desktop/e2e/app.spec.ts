@@ -202,10 +202,10 @@ async function surfacesOptOut(juno: Juno, fake: FakeSlack): Promise<void> {
   await win.keyboard.press('Escape')
 
   fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Drag region check' })
-  const row = topic.message('Drag region check')
-  await row.hover()
-  await row.getByRole('button', { name: 'More reactions' }).click()
-  await expectOptsOut(win.locator('[data-floating="picker"]'), 'emoji picker')
+  const menu = await topic.messageMenu('Drag region check')
+  await expectOptsOut(menu.root, 'message menu')
+  await menu.more.click()
+  await expectOptsOut(menu.root, 'emoji picker in the message menu')
   await win.keyboard.press('Escape')
 
   await tabs.newTabButton.click()

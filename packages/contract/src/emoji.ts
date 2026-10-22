@@ -18,7 +18,7 @@ export function recentEmojiFrom(value: unknown): ReadonlyArray<string> {
   return [...new Set(names)].slice(0, MAX_RECENT_EMOJI)
 }
 
-/** A one-click reaction in the message toolbar: a standard emoji (`unicode`) or a custom one (`url`). */
+/** A quick reaction, first in the message menu's emoji grid: a standard emoji (`unicode`) or a custom one (`url`). */
 export interface QuickReaction {
   /** Slack's name, for example `+1`. */
   readonly name: string
@@ -31,8 +31,8 @@ export interface QuickReaction {
 /** The workspace preference in user.db that holds the quick reactions, in order (SPEC 7, 14). */
 export const QUICK_REACTIONS_PREF = 'quickReactions'
 
-/** The toolbar holds up to seven. */
-export const MAX_QUICK_REACTIONS = 7
+/** Up to eleven: the message menu's grid holds eleven emoji and More reactions. */
+export const MAX_QUICK_REACTIONS = 11
 
 /** 👍 ✅ 👀, until the user chooses. */
 export const DEFAULT_QUICK_REACTIONS: ReadonlyArray<QuickReaction> = [
@@ -43,7 +43,7 @@ export const DEFAULT_QUICK_REACTIONS: ReadonlyArray<QuickReaction> = [
 
 /**
  * The quick reactions a saved preference holds: its well-formed entries,
- * without repeats, at most seven. A missing or unreadable value, or an empty
+ * without repeats, at most eleven. A missing or unreadable value, or an empty
  * list, gives the default three.
  */
 export function quickReactionsFrom(value: unknown): ReadonlyArray<QuickReaction> {

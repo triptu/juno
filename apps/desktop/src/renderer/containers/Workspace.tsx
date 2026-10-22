@@ -26,11 +26,11 @@ import {
 import { JUNO_PANEL_WIDTH } from '@juno/contract'
 import { preloadAgentClient } from '@juno/state/agent'
 import { useAtomValue } from '@juno/state/react'
-import { holdKeys, loadMessageTools, Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab } from '@juno/views'
+import { holdKeys, Workspace as WorkspaceView, type ActivateEvent, type WorkspaceTab } from '@juno/views'
 import { chunk, usePreloaded } from './chunks'
 import { runJunoShortcut } from './juno/actions'
 import { JunoPanel, loadJuno } from './juno/lazy'
-import { useNotificationBridge, WhyLayer } from './notificationBridge'
+import { useNotificationBridge } from './notificationBridge'
 import { closeTabById, loadAllTopicsPage, moveTabTo, openNewTab, runMenuCommand, showTabMenu, stepTabHistory, switchToTab } from './navigation'
 import { runUndoCommand } from './topicActions'
 import { focusPage, forcePageFocus, pageComposer, takeForcedPageFocus, takeTypedAhead } from './pageFocus'
@@ -165,7 +165,6 @@ function useWorkspaceEffects(active: string | undefined): void {
     return () => cancelIdleCallback(idle)
   }, [])
   useEffect(() => preloadAfterSidebar(() => {
-    void loadMessageTools()
     void loadChannelMenu()
     if (registry.get(junoAvailableAtom)) void preloadAgentClient()
   }), [])
@@ -255,7 +254,6 @@ export function Workspace() {
             </Activity>
           ))}
     </WorkspaceView>
-    <WhyLayer />
     </>
   )
 }

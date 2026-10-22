@@ -29,8 +29,6 @@ export interface ChatActions {
   readonly onOpen: (target: OpenTarget, event: ActivateEvent) => void
   /** "Try again" under an owner bubble or an ending line: resubmit the same op. */
   readonly onRetry: (opId: OpId) => void
-  /** React on a Juno bubble or card: the container opens the reaction picker at `event`'s target. */
-  readonly onReactions: (target: ReactionTarget, event: MouseEvent<HTMLElement>) => void
   /** Reply on a Juno bubble or card: the composer shows the quote. Not a click on the card. */
   readonly onReply: (target: ReactionTarget) => void
   /** A reply's quote was clicked: scroll to the original and flash it. */
@@ -42,7 +40,12 @@ export interface ChatActions {
   /** Start, Not now or Stop on a proactive ask. */
   readonly onAsk: (id: AskId, answer: AskAnswer) => void
   readonly onGroupLabel: (id: string, action: GroupLabelAction) => void
-  /** Right-click on a bubble: the container shows the native menu. */
+  /** Esc on a bubble or card that has keyboard focus: back to the composer. */
+  readonly onLeaveRows?: () => void
+  /**
+   * A right-click on a bubble or card: the container opens its menu when the click completes (`openOnRelease`). The
+   * context-menu key and ⇧F10 on a focused one open it at once.
+   */
   readonly onContextMenu?: (target: ChatMenuTarget, event: MouseEvent<HTMLElement>) => void
   /** An image the owner sent, with its thumbnail (`OwnerImage`): the container reads it from the agent. */
   readonly renderOwnerImage?: (opId: OpId, file: Extract<OwnerFile, { _tag: 'image' }>) => ReactNode
@@ -52,7 +55,6 @@ export const noopActions: ChatActions = {
   onCard: () => {},
   onOpen: () => {},
   onRetry: () => {},
-  onReactions: () => {},
   onReply: () => {},
   onQuote: () => {},
   onUndoNote: () => {},

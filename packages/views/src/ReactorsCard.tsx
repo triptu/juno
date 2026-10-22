@@ -112,7 +112,7 @@ export function ReactorsCard({ name, emoji, url, reactors, count, id, onSeeAll, 
           </Text>
           {cut && onSeeAll !== undefined ? (
             <Text variant="meta" tone="muted" sx={styles.action}>
-              {/* The pointer's way in, so it is not read with the card; the keyboard's is View reactions in the message menu. */}
+              {/* The pointer's way in, so it is not read with the card. */}
               <TextButton tone="default" tabIndex={-1} aria-hidden data-see-all="" onPointerDown={seeAll}>
                 See all
               </TextButton>

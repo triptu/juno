@@ -10,14 +10,14 @@ import { noopActions } from './fixtures/actions'
 import { InlineEdit } from './InlineEdit'
 import { Message, type MessageProps } from './Message'
 import type { MessageListItem } from './MessageList'
-import { messageTime } from './time'
+import { messageHeaderTime } from './time'
 
 const noop = () => {}
 
 // The frame sizes a lone component to its content; the list column sizes a
 // row to its width, so the row fills the frame as it would the column. The
-// toolbar and the delete confirm straddle the row's top edge, so the frame
-// keeps their height above the row, as the row before does in a list.
+// delete confirm straddles the row's top edge, so the frame keeps its height
+// above the row, as the row before does in a list.
 const column = stylex.create({ fill: { width: '100%', paddingTop: layout['--toolbar-height'] } })
 
 const one = (item: MessageListItem, extra: Partial<MessageProps> = {}, frame?: FixtureFrame): Fixture<MessageProps> =>
@@ -27,7 +27,7 @@ const one = (item: MessageListItem, extra: Partial<MessageProps> = {}, frame?: F
         <Message
           message={item.message}
           sender={item.sender}
-          time={messageTime(item.message.at, NOW)}
+          time={messageHeaderTime(item.message.at, NOW)}
           now={NOW}
           main={false}
           startsGroup={false}
@@ -100,7 +100,6 @@ export default defineFixtures(
       wide: one(tableMessages[1]!, { startsGroup: true }),
       tall: one(tableMessages[2]!, { startsGroup: true }),
       'table-only': one(tableMessages[3]!, { startsGroup: true }),
-      'hover-toolbar': one(tableMessages[0]!, { startsGroup: true, actions: noopActions }, { hover: '[data-message-row]' }),
       // A wrapped description at a narrow width: it wraps so the table fits, and the box does not scroll.
       wrapped: one(tableMessages[4]!, { startsGroup: true }, { width: 380 }),
       'copy-cell': one(tableMessages[5]!, { startsGroup: true }),
@@ -125,17 +124,18 @@ export default defineFixtures(
     Interaction: {
       hover: one(first, {}, { hover: '[data-message-row]' }),
       'hover-continuation': one(grouped, {}, { hover: '[data-message-row]' }),
-      'hover-toolbar': one(first, { actions: noopActions }, { hover: '[data-message-row]' }),
-      'hover-toolbar-main': one(withThread, { main: true, actions: noopActions }, { hover: '[data-message-row]' }),
-      // The header keeps the toolbar's footprint free, so the name and the first body line stay clear of it.
-      'hover-toolbar-long-line': one(longLine, { startsGroup: true, actions: noopActions }, { hover: '[data-message-row]' }),
-      'hover-toolbar-continuation': one(longLineContinuation, { actions: noopActions }, { hover: '[data-message-row]' }),
+      'hover-main': one(withThread, { main: true, actions: noopActions }, { hover: '[data-message-row]' }),
+      // Its menu is open: the row takes a faint fill.
+      'menu-open': one(first, { actions: noopActions, active: true }),
       focus: one(first, { actions: noopActions }, { focus: '[data-message-row]' }),
     },
-    // Your own message: the delete confirm in the toolbar's place, and the inline edit field in the body's.
+    // Your own message: the delete confirm at its top right, and the inline edit field in the body's place.
     Own: {
       'confirm-delete': one(ownMessage, { startsGroup: true, actions: noopActions, confirmingDelete: true }),
       'confirm-delete-continuation': one(ownMessage, { actions: noopActions, confirmingDelete: true }),
+      // The confirm straddles the row's top edge, so a long first line stays clear of it.
+      'confirm-delete-long-line': one(longLine, { startsGroup: true, actions: noopActions, confirmingDelete: true }),
+      'confirm-delete-long-continuation': one(longLineContinuation, { actions: noopActions, confirmingDelete: true }),
       editing: one(ownMessage, { startsGroup: true, actions: noopActions, editor: <InlineEdit value={ownText} onChange={noop} onSave={noop} onCancel={noop} /> }),
       'editing-long': one(ownMessage, {
         startsGroup: true,

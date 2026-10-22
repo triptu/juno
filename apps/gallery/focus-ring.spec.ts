@@ -32,7 +32,6 @@ const surfaces = [
   'AllTopics',
   'Home',
   'Composer',
-  'HoverToolbar',
   'Message',
   'SettingsPage',
   'AppearanceSettings',

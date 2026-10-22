@@ -14,7 +14,7 @@ const HANDOFF = 'Reminder: on-call handoff moves to Mondays'
 
 const sheet = (win: Page) => win.locator('[data-forward-sheet]')
 
-/** Forward… on `text` in the open topic, then `destination` from the list and `note`, and Enter. */
+/** Forward… on `text` in the open topic, then `destination` from the list and `note` (Shift-Enter between its lines), and Enter. */
 async function forward(juno: Juno, text: string, destination: string, note: string): Promise<void> {
   await juno.topic.chooseInMessageMenu(text, 'forward')
   const dialog = sheet(juno.win)
@@ -26,7 +26,16 @@ async function forward(juno: Juno, text: string, destination: string, note: stri
   await expect(dialog.getByRole('button', { name: `Send to: #${destination}` })).toBeVisible()
   const field = dialog.getByRole('textbox', { name: 'Note' })
   await expect(field).toBeFocused()
-  await field.fill(note)
+  const [first = '', ...more] = note.split('\n')
+  await field.fill(first)
+  const oneLine = (await field.boundingBox())!.height
+  for (const line of more) {
+    await field.press('Shift+Enter')
+    await field.pressSequentially(line)
+  }
+  await expect(field).toHaveValue(note)
+  // The note wraps and grows with its lines.
+  if (more.length > 0) expect((await field.boundingBox())!.height).toBeGreaterThan(oneLine)
   await field.press('Enter')
   await expect(dialog).toHaveCount(0)
 }
@@ -39,9 +48,10 @@ test('Forward… shares a message into a channel with a note', async ({ juno, fa
 
   const { labels } = await juno.topic.chooseInMessageMenu(HANDOFF, null)
   expect(labels.indexOf('Forward…')).toBeGreaterThan(-1)
-  expect(labels.indexOf('Forward…')).toBe(labels.indexOf('Copy Slack link') - 1)
+  expect(labels.indexOf('Forward…')).toBe(labels.indexOf('Open in Slack') - 1)
+  expect(labels).not.toContain('Copy Slack link')
 
-  await forward(juno, HANDOFF, 'product', 'For the roadmap review')
+  await forward(juno, HANDOFF, 'product', 'For the roadmap review\nThe second point matters most')
   await juno.expectToast('Forwarded to #product')
   await juno.win.getByRole('status').getByRole('button', { name: 'Open' }).click()
   await juno.topic.expectTitle('Main')
@@ -55,7 +65,7 @@ test('Forward… shares a message into a channel with a note', async ({ juno, fa
   expect(shares).toHaveLength(1)
   expect(shares[0]!.args).toMatchObject({ channel: 'C0ENG', share_channel: 'C0PRODUCT', text: '' })
   const stored = fake.messages('C0PRODUCT').at(-1)!
-  expect(stored.text).toBe('For the roadmap review')
+  expect(stored.text).toBe('For the roadmap review\nThe second point matters most')
   expect(stored.attachments?.[0]).toMatchObject({ is_msg_unfurl: true, text: expect.stringContaining(HANDOFF) })
 })
 

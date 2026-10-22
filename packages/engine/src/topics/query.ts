@@ -40,7 +40,6 @@
  * shapes one row. The SQL still runs in full every time.
  */
 import {
-  canResolveOnHover,
   channelLabel,
   hashId,
   isDm,
@@ -591,7 +590,6 @@ function shape(entry: CacheEntry, section: TopicListRow['section'], status: Topi
     tags: rowTags(topic),
     pinned: topic.overlay.pinnedAt !== undefined,
     resolved: isResolved(topic),
-    canResolveOnHover: canResolveOnHover(topic),
     subscribed: isFollowed(topic),
     newThreads: row.new_threads,
     lastActivityTs: topic.activity.lastActivityTs,

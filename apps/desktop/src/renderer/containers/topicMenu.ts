@@ -1,11 +1,11 @@
-import { junoNavAtom, watchReply, junoSettingsNow } from '@juno/state/agent'
+import { junoSettingsNow } from '@juno/state/agent'
 import { openSettings } from './navigation'
-import { whyLabel, type ContextMenuItem, type MessageView, topicMenuItems, type ContextMenuAt, type TopicMenuAction } from '@juno/contract'
-import { broadcastMessage, copyText, loadWhy, messageLink, signedInAtom, redrawTopic, showToast, type RedrawProblem, canRedraw, currentNotificationSettings, junoAvailableAtom, loadNotificationSettings, popupContextMenu, registry, type RenameTarget } from '@juno/state'
-import { choiceFor, nativeMenu, showPersonMenu, showWhy } from './notifyActions'
+import { topicMenuItems, type ContextMenuAt, type TopicMenuAction } from '@juno/contract'
+import { redrawTopic, showToast, type RedrawProblem, canRedraw, currentNotificationSettings, junoAvailableAtom, loadNotificationSettings, popupContextMenu, registry, type RenameTarget } from '@juno/state'
+import { choiceFor, nativeMenu } from './notifyActions'
 import { viewChoices } from './viewActions'
 import { huddleMenuItem } from './huddle/menuItem'
-import { openTopicInSlack, type MessageMenuChoice, labelOf, isLinkable, notifyTarget, runTopicAction, type ActionTopic } from './topicActions'
+import { labelOf, isLinkable, notifyTarget, runTopicAction, type ActionTopic } from './topicActions'
 
 const dmPartner = (topic: ActionTopic) => topic.channel.kind === 'im' ? topic.channel.partner : undefined
 
@@ -73,67 +73,3 @@ async function limitReached(): Promise<string> {
   }
   return `Today’s AI limit of ${dollars(page.limitTodayUsd)} is reached`
 }
-
-
-/**
- * "Also send to #eng" on your own thread reply, as Slack's "Send reply to
- * this channel"; "Also send to Main" in a DM or group DM, whose Main is the
- * conversation. Slack has threads in all four kinds.
- */
-function broadcastLabel(channel: Pick<ActionTopic['channel'], 'kind' | 'name'>): string {
-  return channel.kind === 'public' || channel.kind === 'private' ? `Also send to #${channel.name}` : 'Also send to Main'
-}
-
-/**
- * The message menu (SPEC 7 "More", inventory 15.4 and 15.6), from the
- * toolbar's More and from a right-click: Edit and Delete on your own
- * messages, and on your own reply in a thread Also send to #eng, unless it
- * already was; Start thread or Open thread in Main, View reactions, Forward…, Copy Slack link and Open in Slack,
- * and, on someone else's message, why it did or did not notify. A reply's
- * link carries its thread; a message Slack does not have yet has none. On
- * the sender's name or avatar it is the person menu.
- */
-export async function showMessageMenu(
-  topic: ActionTopic,
-  message: Pick<MessageView, 'ts' | 'pending' | 'thread' | 'kind' | 'root' | 'broadcast' | 'reactions'>,
-  editable: boolean,
-  at: ContextMenuAt,
-  sender: { readonly id: string; readonly name: string } | undefined,
-  onSender: boolean,
-): Promise<MessageMenuChoice | undefined> {
-  const session = registry.get(signedInAtom)
-  const own = sender !== undefined && sender.id === session?.userId
-  if (onSender && sender !== undefined && !own) {
-    await showPersonMenu(sender, at)
-    return undefined
-  }
-  const { ts } = message
-  const linkable = message.pending === undefined
-  const why = own || !linkable ? undefined : await loadWhy(registry, topic.id, ts)
-  // Only a reply Slack has, as Slack's own client offers it.
-  const broadcastable = own && topic.kind === 'thread' && linkable && message.kind === 'message' && !message.root && !message.broadcast
-  const items: ContextMenuItem[] = [
-    ...(editable ? [{ id: 'edit', label: 'Edit' }, { id: 'delete', label: 'Delete' }] : []),
-    ...(broadcastable ? [{ id: 'broadcast', label: broadcastLabel(topic.channel) }] : []),
-    ...(editable || broadcastable ? [{ separator: true } as const] : []),
-    ...(topic.kind === 'main' && linkable ? [{ id: 'reply', label: message.thread === undefined ? 'Start thread' : 'Open thread' }, { separator: true } as const] : []),
-    ...(own && linkable ? [{ id: 'watch-reply', label: 'Tell me if nobody replies', enabled: registry.get(junoNavAtom).mayAuthorize === true }] : []),
-    // The keyboard's way to the reactions dialog; the pointer also has the card's See all.
-    ...(message.reactions.length > 0 ? [{ id: 'reactions', label: 'View reactions' }] : []),
-    // Only a message Slack has can be shared, as only it has a link.
-    { id: 'forward', label: 'Forward…', ...(linkable && message.kind === 'message' ? {} : { enabled: false }) },
-    { id: 'copy-link', label: 'Copy Slack link', ...(linkable ? {} : { enabled: false }) },
-    { id: 'open-in-slack', label: 'Open in Slack' },
-    ...(why === undefined ? [] : [{ separator: true } as const, { id: 'why', label: whyLabel(why.notified) }]),
-  ]
-  const chosen = await popupContextMenu(items, at)
-  if (chosen === 'edit' || chosen === 'delete' || chosen === 'reply' || chosen === 'forward' || chosen === 'reactions') return chosen
-  // Main shows the reply at once and the thread marks it; the outbox sends it. The engine refuses a reply deleted meanwhile.
-  if (chosen === 'broadcast') void broadcastMessage(registry, { channelId: topic.channel.id, ts })
-  if (chosen === 'watch-reply') await watchReply(registry, { channelId: topic.channel.id, ts, ...(topic.kind === 'thread' && topic.rootTs ? { threadTs: topic.rootTs } : {}) })
-  else if (chosen === 'open-in-slack') openTopicInSlack(topic)
-  else if (chosen === 'why' && why !== undefined) showWhy(topic.id, ts, why, at)
-  else if (chosen === 'copy-link' && session !== undefined) copyText(messageLink(session.workspaceUrl, topic.channel.id, ts, topic.kind === 'thread' ? topic.rootTs : undefined))
-  return undefined
-}
-

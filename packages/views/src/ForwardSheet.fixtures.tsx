@@ -52,6 +52,13 @@ export default defineFixtures(
       // Tall enough for the open destination list under the chip.
       picking: sheet({ pickerOpen: true }, { width: 640, height: 480, padded: true, surface: 'subtle' }),
       'with-note': sheet({ destination: conversations.billing, note: 'FYI for the release notes' }),
+      // A note longer than a line wraps, and the field grows with it.
+      'long-note': sheet({
+        destination: conversations.billing,
+        note: 'FYI for the release notes. Leo checked the replica numbers twice, so this is the version to quote. If anything looks off, ask in the thread before Friday, since the window closes then and we will not get another one this month.',
+      }),
+      // In a DM with its sender the place is the sender's name, so it shows once.
+      'from-a-dm': sheet({ place: people.maya.name }),
       'to-a-person': sheet({ destination: conversations.sam }),
       'long-message': sheet({ message: long.message, sender: long.sender, place: 'Postgres 16 migration plan', destination: conversations.long }),
       forwarding: sheet({ destination: conversations.billing, note: 'FYI', busy: true }),

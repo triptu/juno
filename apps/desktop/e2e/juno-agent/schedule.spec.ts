@@ -287,6 +287,8 @@ test('a reply watch from the message menu: Undo deletes one, and a reply ends an
     await juno.sidebar.row(POSTGRES).open()
     await juno.topic.composer.fill('Please confirm the test window.')
     await juno.topic.composer.press('Enter')
+    // Only a message Slack has can be watched.
+    await juno.topic.expectSent('Please confirm the test window.')
     await juno.topic.chooseInMessageMenu('Please confirm the test window.', 'watch-reply')
     await expect(juno.win.getByRole('status')).toContainText('Watching for a reply until')
     await juno.undoFromToast()
@@ -300,6 +302,8 @@ test('a reply watch from the message menu: Undo deletes one, and a reply ends an
     await juno.sidebar.row(POSTGRES).open()
     await juno.topic.composer.fill('Can someone confirm the cutover?')
     await juno.topic.composer.press('Enter')
+    // Only a message Slack has can be watched.
+    await juno.topic.expectSent('Can someone confirm the cutover?')
     const menu = await juno.topic.chooseInMessageMenu('Can someone confirm the cutover?', 'watch-reply')
     expect(menu.labels).toContain('Tell me if nobody replies')
     await expect(juno.win.getByRole('status')).toContainText('Watching for a reply until')

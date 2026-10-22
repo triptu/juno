@@ -57,10 +57,12 @@ test('the web shell reads, sends and reacts through the engine socket', async ({
     await expect.poll(() => fakeMessages(shell.controlUrl)).toEqual(expect.arrayContaining([expect.objectContaining({ text })]))
   })
 
-  await test.step('a quick reaction reaches Slack', async () => {
+  await test.step('a quick reaction from the message menu reaches Slack', async () => {
     const row = message(text)
-    await row.hover()
-    await row.getByRole('button', { name: 'React 👍' }).click()
+    await row.locator('[data-msg-text]').first().click({ button: 'right' })
+    const menu = page.locator('[data-context-menu]')
+    await menu.getByRole('button', { name: 'React 👍' }).click()
+    await expect(menu).toHaveCount(0)
     await expect(row.getByRole('button', { name: '1 👍, including you' })).toBeVisible()
     await expect.poll(() => fakeMessages(shell.controlUrl)).toEqual(expect.arrayContaining([expect.objectContaining({ text, reactions: [expect.objectContaining({ name: '+1' })] })]))
   })

@@ -426,9 +426,8 @@ test.describe('Composer notices', () => {
 /**
  * Changes to one message (spec section 7): a reaction chip joining, its
  * count going up and the chip leaving move nothing; the first chip of a
- * message grows that message at its bottom only; the delete confirm takes
- * the toolbar's place and the edit field the body's without moving any row
- * above. Driven through `window.__fixtureControls`.
+ * message grows that message at its bottom only; the delete confirm at the
+ * row's top right and the edit field in the body's place move no row above. Driven through `window.__fixtureControls`.
  */
 test.describe('Message actions', () => {
   const open = (page: Page, component: string, id: string) => openState(page, { component, id, route: `${component}/${id}`, group: '', groupId: '', state: '', frame: {} })
@@ -464,7 +463,7 @@ test.describe('Message actions', () => {
     for (let index = 3; index < before.length; index++) expect(after[index]!.y - before[index]!.y).toBe(grown)
   })
 
-  test('the delete confirm takes the toolbar’s place and moves nothing', async ({ page }) => {
+  test('the delete confirm floats at the row’s top right and moves nothing', async ({ page }) => {
     await open(page, 'MessageList', 'shift/own-row-changes')
     const before = await boxes(page)
     await step(page, 'confirm')
@@ -488,7 +487,7 @@ test.describe('Message actions', () => {
     expect(await boxes(page)).toEqual(before)
   })
 
-  test('the selection’s toolbar floats over the list, outside the rows, with Quote and Ask Juno', async ({ page }) => {
+  test('the selection’s bar floats over the list, outside the rows, with Quote and Ask Juno', async ({ page }) => {
     await open(page, 'TopicView', 'interaction/selection-quote')
     const toolbar = page.locator('[data-selection-toolbar]')
     await expect(toolbar.getByRole('button', { name: 'Quote' })).toBeVisible()

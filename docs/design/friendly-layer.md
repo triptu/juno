@@ -54,7 +54,7 @@ Phosphor glyphs fill about 73% of their box; Lucide fills about 83%. To keep the
 | Lucide size | Phosphor size and weight | Where |
 | --- | --- | --- |
 | 11 | 12 bold | Badges, chip close |
-| 12 | 13 bold | Row meta (channel, count), tags, tab close, row Resolve check |
+| 12 | 13 bold | Row meta (channel, count), tags, tab close |
 | 13 | 14 bold | Context pill, cards, thread link, catch-up sparkle (duotone) |
 | 14 | 15 regular (tab icon), 16 regular (buttons), 16 duotone (AI sparkle beside a title) | |
 | 15 | 16 regular | Nav items, menu items, option rows |
@@ -81,7 +81,7 @@ Every Lucide import in `packages/ui`, `packages/views` and `apps` today, plus th
 | `Bell` | `Bell` | fill when subscribed |
 | `BellOff` (planned) | `BellSlash` | |
 | `Pin` | `PushPin` | fill when pinned |
-| `CircleCheck` | `CheckCircle` | regular on the Resolve button; fill in the resolve toast and on the Tidy up card (duotone) |
+| `CircleCheck` | `CheckCircle` | regular on the header Resolve button; fill in the resolve toast and on the Tidy up card (duotone) |
 | `Check` | `Check` | bold, row Resolve |
 | `X` | `X` | bold |
 | `Plus` | `Plus` | |
@@ -142,7 +142,7 @@ Keep the nesting rule (outer = inner + padding) and compute new containers from 
 | Tags, count badges, @ tag, status chips, decision chips, scope chip, digest chips, stealth pill, confidence badge | 6 | full | new `--radius-tag: 999px` |
 | Reaction chip | 6 | full | `--radius-tag` |
 | Context pill (header, To field, send card) | 6 | full | `--radius-pill: 999px` (new) |
-| Row Resolve button (22px) and the toast Undo button (26px) | 6 | full | `--radius-tag` |
+| The toast Undo button (26px) | 6 | full | `--radius-tag` |
 | Inline @person and #channel chips | 4 | full, padding 0 5 (was 0 3) | `--radius-tag` |
 | Channel tile (44 / 36), chat and card rows, cards, To field, composer | 10 / 10 / 10 / 10 / 12 | 12 / 12 / 12 / 12 / 14 | `--radius-xl` 10 → 12, `--radius-2xl` 12 → 14 |
 | Toast | 10 | 14 | `--radius-toast: 14px` (new) |

@@ -11,7 +11,7 @@
  * and the app can switch back to it.
  */
 import * as stylex from '@stylexjs/stylex'
-import { accent, accentSwatches, art, colors, density, hues, iconTints, shadows, syntax, tints } from './tokens.stylex'
+import { accent, accentSwatches, art, colors, density, hues, iconTints, menu, shadows, syntax, tints } from './tokens.stylex'
 
 export const darkColors = stylex.createTheme(colors, {
   // A warm-neutral near-black (OKLCH hue 85, chroma 0.006), so dark is the
@@ -24,7 +24,7 @@ export const darkColors = stylex.createTheme(colors, {
   '--background-subtle': '#151411',
   '--surface-default': '#252421',
   '--surface-hover': '#2D2B28',
-  '--message-hover': '#23211E',
+  '--message-menu-open': '#211F1C',
   '--surface-active': '#32302D',
   '--peek-surface': '#373532',
   '--surface-raised': '#373532',
@@ -260,7 +260,20 @@ export const darkArt = stylex.createTheme(art, {
 })
 
 /** Everything that changes in dark mode. Spread into stylex.props(). */
-export const dark = [darkColors, darkShadows, darkAccentSwatches, darkIconTints, darkTints, darkHues, darkArt, darkSyntax] as const
+// The menu material on ink: a darker translucent fill, an outer dark edge with a faint light one inside, as on macOS.
+export const darkMenu = stylex.createTheme(menu, {
+  '--menu-fill': 'hsla(0, 0%, 16%, 0.78)',
+  '--menu-shadow': 'inset 0 0 0 1px hsla(0, 0%, 100%, 0.1), 0 0 0 1px hsla(0, 0%, 0%, 0.6), 0 2px 6px 0 hsla(0, 0%, 0%, 0.3), 0 12px 32px -4px hsla(0, 0%, 0%, 0.5)',
+  '--menu-text': 'hsla(0, 0%, 100%, 0.88)',
+  '--menu-text-disabled': 'hsla(0, 0%, 100%, 0.26)',
+  '--menu-icon': 'hsla(0, 0%, 100%, 0.66)',
+  '--menu-emoji': 'hsl(0, 0%, 100%)',
+  '--menu-separator': 'hsla(0, 0%, 100%, 0.12)',
+  '--menu-cell-hover': 'hsla(0, 0%, 100%, 0.1)',
+  '--menu-cell-selected': 'color-mix(in oklch, var(--hl) 34%, transparent)',
+})
+
+export const dark = [darkColors, darkShadows, darkAccentSwatches, darkIconTints, darkTints, darkHues, darkArt, darkSyntax, darkMenu] as const
 
 /*
  * Accent themes. Each sets the fill, the text on it, the accent text, and

@@ -1,7 +1,7 @@
 import { DEFAULT_QUICK_REACTIONS, emojiCatalog, prepareEmojiPicker } from '@juno/contract'
 import { defineFixtures, fixture } from '@juno/ui'
 import { EmojiPicker } from './EmojiPicker'
-import { fiveQuickReactions, sevenQuickReactions } from './fixtures/quickReactions'
+import { elevenQuickReactions, fiveQuickReactions } from './fixtures/quickReactions'
 import { QuickReactionsSetting } from './QuickReactionsSetting'
 
 const noop = () => {}
@@ -12,8 +12,8 @@ export default defineFixtures(
     Reactions: {
       default: fixture({ reactions: DEFAULT_QUICK_REACTIONS, onChange: noop, onAdd: noop }),
       five: fixture({ reactions: fiveQuickReactions, onChange: noop, onAdd: noop }),
-      // Add is disabled at seven.
-      full: fixture({ reactions: sevenQuickReactions, onChange: noop, onAdd: noop }),
+      // Add is dimmed at eleven.
+      full: fixture({ reactions: elevenQuickReactions, onChange: noop, onAdd: noop }),
       // One left cannot be removed.
       one: fixture({ reactions: DEFAULT_QUICK_REACTIONS.slice(0, 1), onChange: noop, onAdd: noop }),
       // The picker floats under Add, out of the card; the five chosen show as chosen.
@@ -31,8 +31,8 @@ export default defineFixtures(
       'hover-pill': fixture({ reactions: fiveQuickReactions, onChange: noop, onAdd: noop }, { hover: '[data-quick-reaction]' }),
       'focus-pill': fixture({ reactions: fiveQuickReactions, onChange: noop, onAdd: noop }, { focus: '[data-quick-reaction="+1"]' }),
       'hover-add': fixture({ reactions: fiveQuickReactions, onChange: noop, onAdd: noop }, { hover: '[aria-label="Add reaction"]' }),
-      // At seven Add stays focusable, dimmed, and its tooltip says why.
-      'focus-add-full': fixture({ reactions: sevenQuickReactions, onChange: noop, onAdd: noop }, { focus: '[aria-label="Up to 7"]' }),
+      // At eleven Add stays focusable, dimmed, and its tooltip says why.
+      'focus-add-full': fixture({ reactions: elevenQuickReactions, onChange: noop, onAdd: noop }, { focus: '[aria-label="Up to 11"]' }),
     },
   },
   { width: 520 },

@@ -50,7 +50,9 @@ test('Also send to #eng sends your own reply to the channel, and Main shows it a
   // Slack holds its answer: everything below shows before it has the change.
   fake.holdNext({ method: 'chat.update', before: true })
   const { labels } = await topic.chooseInMessageMenu(MINE, 'broadcast')
-  expect(labels.indexOf('Also send to #eng')).toBe(labels.indexOf('Delete') + 1)
+  // With your own message's rows, after the shared ones and before Edit.
+  expect(labels.indexOf('Also send to #eng')).toBeGreaterThan(labels.indexOf('Open in Slack'))
+  expect(labels.indexOf('Also send to #eng')).toBeLessThan(labels.indexOf('Edit'))
   await expect(topic.message(MINE)).toContainText('also sent to the channel')
 
   await juno.sidebar.row(ENG_MAIN).open()

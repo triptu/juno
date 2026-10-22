@@ -44,13 +44,14 @@ export function InlineEdit({ value, onChange, onSave, onCancel, fieldRef, mentio
   const root = useRef<HTMLDivElement>(null)
   const { onPaste } = transfers(undefined, onPasteText)
   // Focus once, with the caret after the text, before the first paint. The field and its buttons are taller than the
-  // body they replace, so a message near the bottom of the list is scrolled until they show whole.
+  // body they replace, so a message near the bottom of the list is scrolled until it shows whole.
   useLayoutEffect(() => {
     const element = field.current
     if (element === null) return
     element.focus({ preventScroll: true })
     element.setSelectionRange(element.value.length, element.value.length)
-    root.current?.scrollIntoView({ block: 'nearest', behavior: 'instant' })
+    // The whole message, with the reactions and lines under its field.
+    ;(root.current?.closest('[data-message-row]') ?? root.current)?.scrollIntoView({ block: 'nearest', behavior: 'instant' })
   }, [field])
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     // The list's keys (arrows, E, Delete) never act on the row while its field has focus.

@@ -101,27 +101,29 @@ test('react to a Juno bubble in the Juno tab', async ({ juno, feel }) => {
   await juno.win.locator(`${TAB} [data-chat-juno]`).waitFor({ timeout: 15_000 })
 
   const bubble = juno.win.locator(`${TAB} [data-chat-juno]`).first()
-  await bubble.hover()
+  const box = (await bubble.locator('[data-chat-run]').boundingBox())!
+  await juno.win.mouse.move(box.x + 12, box.y + 10)
   await feel.run(
     {
       name: 'juno-react',
-      title: "React to Juno's bubble: the quick reactions open at the React button and stay, and the badge lands on the bubble without moving anything",
+      title: "React to Juno's bubble: its menu opens as the right-click comes up and stays, and the badge lands on the bubble without moving anything",
       probes: [
-        { kind: 'rect', name: 'reactions', selector: `${TAB} [data-juno-reactions]` },
+        { kind: 'rect', name: 'menu', selector: '[data-context-menu]' },
         { kind: 'count', name: 'badge', within: TAB, selector: '[data-reactions]' },
       ],
       regions: { chat: `${TAB} [data-scroll]` },
       checks: [
         happened('the reaction showed', (r) => r.frames.some((f) => f.values['badge'] === 1)),
-        landsAndStays('reactions', 'the quick reactions', { from: 'open' }),
+        landsAndStays('menu', 'the menu', { from: 'open' }),
         noFlicker('chat', 'the chat'),
         noLayoutShift({ from: 'open', region: 'chat', includeInput: true }),
       ],
     },
     async (rec) => {
       await rec.mark('open')
-      await bubble.getByRole('button', { name: 'React' }).click()
-      const thumbs = juno.win.locator(`${TAB} [data-juno-reactions]`).getByRole('button', { name: 'React 👍' })
+      await juno.win.mouse.down({ button: 'right' })
+      await juno.win.mouse.up({ button: 'right' })
+      const thumbs = juno.win.locator('[data-context-menu]').getByRole('button', { name: 'React 👍' })
       await thumbs.waitFor()
       await rec.mark('react')
       await thumbs.click()

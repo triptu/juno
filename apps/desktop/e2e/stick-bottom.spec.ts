@@ -94,7 +94,7 @@ for (const place of ['Main', 'topic', 'DM'] as const) {
         await expect(row.locator('[data-reaction]')).toHaveCount(0)
         await expect(topic.list.locator('[data-message-row]').last()).toContainText(firstLine)
 
-        for (const method of ['More', 'right click', 'Up then E'] as const) {
+        for (const method of ['right click', 'Up then E'] as const) {
           await test.step(`${name}: ${method}`, async () => {
             await topic.expectAtBottom()
             await expect(topic.composer).toHaveValue('')
@@ -104,11 +104,7 @@ for (const place of ['Main', 'topic', 'DM'] as const) {
               await expect(row).toBeFocused()
               await row.press('e')
             } else {
-              await row.hover()
-              await juno.chooseNextMenuItem('edit', { hold: true })
-              if (method === 'More') await row.getByRole('button', { name: 'More', exact: true }).click()
-              else await row.click({ button: 'right' })
-              await juno.releaseMenu()
+              await (await juno.messageMenu.openOnRow(row, { scroll: false })).choose('edit')
             }
             await expect(topic.list.getByRole('textbox', { name: 'Edit message' })).toBeFocused()
             await expect(topic.list.locator(EDITING).getByRole('button', { name: 'Cancel', exact: true })).toBeVisible()
@@ -139,7 +135,7 @@ test('keeps the last message of Main whole as it grows at the bottom, and still 
     await topic.expectAtBottom()
     const watched = await watchArrival(win, TOPIC_SCROLLER, '[data-message-row]', text)
     fake.addReaction({ channel, ts: message.ts, name: 'eyes', user: slack.as('Leo').id })
-    // The reaction itself, not the hover toolbar's React 👀 when the pointer rests on the last message.
+    // The reaction chip itself.
     await expect(topic.message(text).getByRole('button', { name: '1 👀' })).toBeVisible()
     await frames(win, 5)
     expectWhole(await watched(), { atEnd: true })
@@ -151,9 +147,9 @@ test('keeps the last message of Main whole as it grows at the bottom, and still 
     await topic.expectSent(own)
     await topic.expectAtBottom()
     const row = topic.message(own)
-    await row.hover()
+    const menu = await juno.messageMenu.openOnRow(row, { scroll: false })
     const watched = await watchArrival(win, TOPIC_SCROLLER, '[data-message-row]', own)
-    await row.getByRole('button', { name: 'React 👍' }).click()
+    await menu.react('+1')
     await expect(row.getByRole('button', { name: '1 👍, including you' })).toBeVisible()
     await frames(win, 5)
     expectWhole(await watched(), { atEnd: true })
@@ -178,11 +174,9 @@ test('keeps the last message of Main whole as it grows at the bottom, and still 
     await topic.scrollUp(40)
     expect(await distance(topic.scroller)).toBeGreaterThan(32)
     const row = topic.message(own)
-    await row.hover()
+    const menu = await juno.messageMenu.openOnRow(row, { scroll: false })
     const watched = await watchArrival(win, TOPIC_SCROLLER, EDITING, '')
-    await juno.chooseNextMenuItem('edit', { hold: true })
-    await row.getByRole('button', { name: 'More', exact: true }).click()
-    await juno.releaseMenu()
+    await menu.choose('edit')
     await expect(topic.list.getByRole('textbox', { name: 'Edit message' })).toBeFocused()
     await frames(win, 5)
     expectWhole(await watched(), { atEnd: false })

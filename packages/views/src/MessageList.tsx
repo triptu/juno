@@ -4,12 +4,13 @@ import type { FileView, MessageView, Person } from '@juno/contract'
 import { layout, sizes, spacing, z } from '@juno/tokens/tokens.stylex'
 import { EmptyState, hueForId, ScrollArea, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import type { MediaViewing } from './MediaViewer'
-import { Message, placeToolbar, type MessageActions, type MessageProps } from './Message'
+import { Message, type MessageActions, type MessageProps } from './Message'
 import type { LinkInfo } from './MessageLink'
 import { inField } from './fieldMenu'
+import { openOnRelease, type MenuAt } from './menuRelease'
 import { NewDivider } from './NewDivider'
 import { PersonLinks, press } from './personLink'
-import { messageTime } from './time'
+import { messageHeaderTime } from './time'
 
 /** One row as the container holds it: the message and its sender from the window's refs. */
 export interface MessageListItem {
@@ -66,10 +67,11 @@ export interface MessageListProps {
   readonly anchorRef?: Ref<HTMLDivElement>
   /** The person hue for @mention chips. Default: the id's hash. */
   readonly hueOf?: (id: string) => HueName
-  /** The hover toolbar's actions, created once. Without them rows have no toolbar (a preview). */
+  /** What rows' own controls do, created once. Without them rows have none (a preview). */
   readonly actions?: MessageActions
-  /** The row whose toolbar asks to confirm a delete. */
+  /** The row whose menu, or the emoji picker the menu turned into, is open: it takes a faint fill. */
   readonly activeMessage?: string | undefined
+  /** The row that asks to confirm a delete. */
   readonly confirmingDelete?: string | undefined
   /** The row being edited, and its inline edit field. */
   /** The fix lines after sending, by message `ts`. */
@@ -109,8 +111,12 @@ export interface MessageListProps {
   readonly onQuickLook?: (file: FileView) => void
   /** Upload progress of the messages being sent with files, by `clientMsgId`, 0 to 1. */
   readonly uploadProgress?: Readonly<Record<string, number>>
-  /** Right-click or the context-menu key on a message: its menu, at the pointer. `onSender` on the sender's name or avatar (the person menu). */
-  readonly onMessageMenu?: (ts: string, event: MouseEvent, onSender: boolean) => void
+  /**
+   * A right-click on a message, once the button comes up over the same
+   * message, or the context-menu key: its menu, at the pointer. `onSender` on
+   * the sender's name or avatar (the person menu).
+   */
+  readonly onMessageMenu?: (ts: string, at: MenuAt, onSender: boolean) => void
   /** Right-click on an image thumbnail: the image menu (SPEC 8, "Images and the media viewer"). */
   readonly onImageMenu?: (ts: string, fileId: string, event: MouseEvent) => void
   /** Right-click on a link in message text or an unfurl: the link's own menu (SPEC 8, "Links"). */
@@ -124,49 +130,33 @@ export interface MessageListProps {
 const ROW = '[data-message-row]'
 /** A Main message that has a thread; `data-thread` is the thread's topic id. */
 const THREAD_ROW = '[data-thread]'
-/** Rows whose toolbar can show: pointed at, or with focus in them. */
-const SHOWS_TOOLBAR = `${ROW}:is(:hover, :focus-within)`
 
-/** Arrow keys move focus between rows; the row that takes focus becomes the tabbable one. Other keys on a row go to `onRowKey`. */
 /** How far a press on the list moves before it is a drag selection, px. */
 const DRAG_SELECTION = 4
 
 /**
- * A press with the primary button that moves is a drag selection: until the
- * button is up the list carries `data-selecting` and `--row-hover-toolbar:
- * none`, so no row shows or places its hover toolbar, as native apps keep
- * hover controls out of the way of a selection. On release the row under
- * the pointer places its toolbar and shows it again. Nothing re-renders, and
- * focus and the keyboard are untouched: a focused row still shows its toolbar.
+ * A press with the primary button that moves is a drag selection: the
+ * person links under it then ignore the click that ends it
+ * (`personLink.tsx`). Nothing re-renders, and focus and the keyboard are untouched.
  */
 function watchSelectionDrag(event: PointerEvent<HTMLDivElement>): void {
   press.dragged = false
-  if (event.button !== 0 || event.pointerType !== 'mouse' || !(event.target instanceof Element) || event.target.closest('button, a, input, textarea, [role="toolbar"]') !== null) return
-  const list = event.currentTarget.closest<HTMLElement>('[data-scroll-area]')
-  if (list === null) return
+  if (event.button !== 0 || event.pointerType !== 'mouse' || !(event.target instanceof Element) || event.target.closest('button, a, input, textarea') !== null) return
   const from = { x: event.clientX, y: event.clientY }
-  let dragging = false
   const move = (next: globalThis.PointerEvent) => {
-    if (dragging || Math.hypot(next.clientX - from.x, next.clientY - from.y) < DRAG_SELECTION) return
-    dragging = press.dragged = true
-    list.toggleAttribute('data-selecting', true)
-    list.style.setProperty('--row-hover-toolbar', 'none')
+    if (Math.hypot(next.clientX - from.x, next.clientY - from.y) >= DRAG_SELECTION) press.dragged = true
   }
-  const end = (last: globalThis.PointerEvent) => {
+  const end = () => {
     window.removeEventListener('pointermove', move, true)
     window.removeEventListener('pointerup', end, true)
     window.removeEventListener('pointercancel', end, true)
-    if (!dragging) return
-    list.removeAttribute('data-selecting')
-    list.style.removeProperty('--row-hover-toolbar')
-    const row = document.elementFromPoint(last.clientX, last.clientY)?.closest<HTMLElement>(ROW)
-    if (row != null && list.contains(row)) placeToolbar(row)
   }
   window.addEventListener('pointermove', move, true)
   window.addEventListener('pointerup', end, true)
   window.addEventListener('pointercancel', end, true)
 }
 
+/** Arrow keys move focus between rows; the row that takes focus becomes the tabbable one. Other keys on a row go to `onRowKey`. */
 function onKeyDown(event: KeyboardEvent<HTMLDivElement>, onRowKey: MessageListProps['onRowKey']) {
   const target = event.target
   if (!(target instanceof HTMLElement) || !target.matches(ROW)) return
@@ -194,8 +184,8 @@ interface Menus {
 
 /**
  * One handler for every row: an image, @person or #channel chip under the
- * pointer gets its own menu, otherwise the row under the pointer, or the
- * focused row for the context-menu key. A field keeps the text menu (`inField`).
+ * pointer gets its own menu at once, otherwise the row under the pointer, or
+ * the focused row for the context-menu key. A field keeps the text menu (`inField`).
  */
 function pointInSelection(event: MouseEvent): boolean {
   const selection = globalThis.getSelection()
@@ -203,7 +193,7 @@ function pointInSelection(event: MouseEvent): boolean {
   return [...selection.getRangeAt(0).getClientRects()].some((rect) => event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom)
 }
 
-function messageMenu(event: MouseEvent, { onMessageMenu, onImageMenu, onLinkMenu, onPersonMenu, onChannelMenu }: Menus) {
+function messageMenu(event: MouseEvent<HTMLElement>, { onMessageMenu, onImageMenu, onLinkMenu, onPersonMenu, onChannelMenu }: Menus) {
   const target = event.target
   if (!(target instanceof Element) || inField(event)) return
   const ts = target.closest<HTMLElement>(ROW)?.dataset.messageRow
@@ -236,15 +226,19 @@ function messageMenu(event: MouseEvent, { onMessageMenu, onImageMenu, onLinkMenu
   }
   if (onMessageMenu === undefined || ts === undefined) return
   event.preventDefault()
-  onMessageMenu(ts, event, target.closest('[data-sender]') !== null)
+  const onSender = target.closest('[data-sender]') !== null
+  const list = event.currentTarget
+  openOnRelease(event, (under) => {
+    const row = under.closest<HTMLElement>(ROW)
+    return row !== null && list.contains(row) && row.dataset.messageRow === ts
+  }, (at) => onMessageMenu(ts, at, onSender))
 }
 
 /**
  * The messages of one topic, oldest first, in the centred 800px column
  * (inventory 6). Rows stay in flow with `content-visibility: auto`, so the
  * browser's scroll anchoring handles prepends and nothing runs per scroll
- * frame; when a scroll ends, the row under the pointer places its toolbar.
- * The list owns no scroll logic: the container reads and sets the position
+ * frame. The list owns no scroll logic: the container reads and sets the position
  * through `scrollRef` and `anchorRef`. One row is tabbable (the last, until
  * a row takes focus); arrow keys move between rows.
  */
@@ -303,8 +297,6 @@ export function MessageList({
       underHeader={underHeader}
       ref={scrollRef}
       data-scroll=""
-      // A row that scrolled under a still pointer, or under the band with focus, places its toolbar again once the list stops.
-      onScrollEnd={actions === undefined ? undefined : (event) => event.currentTarget.closest('[data-selecting]') === null && event.currentTarget.querySelectorAll<HTMLElement>(SHOWS_TOOLBAR).forEach(placeToolbar)}
       sx={styles.scroller}
     >
       <div
@@ -353,7 +345,7 @@ export function MessageList({
                 sender={item.sender}
                 {...(item.repliers === undefined ? {} : { repliers: item.repliers })}
                 {...(item.reactors === undefined ? {} : { reactors: item.reactors })}
-                time={messageTime(item.message.at, now)}
+                time={messageHeaderTime(item.message.at, now)}
                 now={now}
                 main={main}
                 startsGroup={atDivider}
@@ -436,7 +428,7 @@ const styles = stylex.create({
     // At scroll top the first row starts where the header band ends, 24px
     // under the islands; the last row ends 16 + the composer's 8 = 24px
     // above the field, so the two gaps match. With no room above it, the
-    // first row's hover toolbar sits inside its top edge (placeToolbar).
+    // first row's delete confirm sits inside its top edge (placeConfirm).
     position: 'relative',
     paddingTop: `calc(${layout['--header-band']} - ${layout['--header-inset']})`,
     paddingInline: spacing['--space-6'],

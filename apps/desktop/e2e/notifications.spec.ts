@@ -57,7 +57,7 @@ syncedTest('a group DM notifies under its people\'s names, not Slack\'s internal
   await expect.poll(() => juno.osNotifications(), { timeout: 15_000 }).toContainEqual({ title: 'Maya, Leo', body: 'Moved it to 1pm' })
 })
 
-syncedTest('a DM set to Every message notifies, the click opens it at the message, and the menu says why', async ({ juno, slack }) => {
+syncedTest('a DM set to Every message notifies, and the click opens it at the message', async ({ juno, slack }) => {
   // Maya's DM is on the page's Every message list once set from the person menu.
   slack.as('Maya').dm('Can you look at the hiring plan today?')
   await juno.sidebar.row('Maya', { exact: true }).open()
@@ -75,27 +75,9 @@ syncedTest('a DM set to Every message notifies, the click opens it at the messag
   await juno.tabs.expectActive('Maya')
   await juno.topic.expectMessage('The offer letter needs your signature')
 
-  // Why did this notify? The setting decided it, so the popover offers Change.
-  const menu = await juno.topic.chooseInMessageMenu('The offer letter needs your signature', 'why')
-  expect(menu.labels).toContain('Why did this notify?')
-  const why = juno.whyPopover(/^Notified you at \d\d:\d\d$/)
-  await expect(why).toContainText('Maya is set to Every message')
-  await juno.chooseNextMenuItem('notify-matters')
-  await why.getByRole('button', { name: 'Change' }).click()
-  await juno.expectToast('Maya: When it matters')
-  await expect(why).toHaveCount(0)
-
-  // A channel message without a mention never reaches the pipeline, and the menu says so.
-  await juno.sidebar.selectView('Automated')
-  await juno.sidebar.row(ALERTS_MAIN).open()
-  slack.as('Leo').postIn('alerts-prod', 'Weekly error report is up')
-  await juno.topic.expectMessage('Weekly error report is up')
-  const quiet = await juno.topic.chooseInMessageMenu('Weekly error report is up', 'why')
-  expect(quiet.labels).toContain('Why no notification?')
-  const none = juno.whyPopover("Didn't notify you")
-  await expect(none).toContainText('Juno checks DMs, mentions of you, and places set to Every message.')
-  await juno.win.keyboard.press('Escape')
-  await expect(none).toHaveCount(0)
+  // The message menu has no why row; how a message notified is on the Notifications page.
+  const menu = await juno.topic.chooseInMessageMenu('The offer letter needs your signature', null)
+  expect(menu.labels.some((label) => label.startsWith('Why'))).toBe(false)
 })
 
 syncedTest('a topic on screen in a focused window does not notify, and unread topics badge the dock', async ({ juno, slack }) => {

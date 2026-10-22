@@ -15,8 +15,8 @@ export const fiveQuickReactions: ReadonlyArray<QuickReaction> = [
   { name: 'pray', unicode: '🙏' },
 ]
 
-/** The most the toolbar holds. */
-export const sevenQuickReactions: ReadonlyArray<QuickReaction> = [
+/** The most the message menu's grid holds. */
+export const elevenQuickReactions: ReadonlyArray<QuickReaction> = [
   { name: '+1', unicode: '👍' },
   { name: 'white_check_mark', unicode: '✅' },
   { name: 'eyes', unicode: '👀' },
@@ -24,4 +24,8 @@ export const sevenQuickReactions: ReadonlyArray<QuickReaction> = [
   { name: 'tada', unicode: '🎉' },
   { name: 'heart', unicode: '❤️' },
   { name: 'ship-it', unicode: ':ship-it:', url: blob('#C86BD6') },
+  { name: 'joy', unicode: '😂' },
+  { name: 'fire', unicode: '🔥' },
+  { name: '100', unicode: '💯' },
+  { name: 'rocket', unicode: '🚀' },
 ]

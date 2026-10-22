@@ -19,7 +19,6 @@ import {
   topicsUnpin,
   type ContextMenuAt,
   type MenuCommand,
-  type MessageView,
   type NotifyTargetView,
   type TopicDetail,
   type TopicMenuAction,
@@ -184,23 +183,19 @@ export function showTableRowMenu(id: string): void {
   if (topic !== undefined) void showTopicMenu(topic, 'table')
 }
 
+/** Open in Slack: the topic's channel in the Slack app. */
 export function openTopicInSlack(topic: ActionTopic): void {
   const session = registry.get(signedInAtom)
   if (session !== undefined) openInSlack({ teamId: session.teamId, channelId: topic.channel.id })
 }
 
-/** What the message menu leaves to the topic: the edit field, the delete confirm, opening the thread, the Forward sheet, the reactions dialog. */
-export type MessageMenuChoice = 'edit' | 'delete' | 'reply' | 'forward' | 'reactions'
-
-export async function showMessageMenu(
-  topic: ActionTopic,
-  message: Pick<MessageView, 'ts' | 'pending' | 'thread' | 'kind' | 'root' | 'broadcast' | 'reactions'>,
-  editable: boolean,
-  at: ContextMenuAt,
-  sender: { readonly id: string; readonly name: string } | undefined,
-  onSender: boolean,
-): Promise<MessageMenuChoice | undefined> {
-  return (await loadTopicMenu()).showMessageMenu(topic, message, editable, at, sender, onSender)
+/**
+ * "Also send to #eng" on your own thread reply, as Slack's "Send reply to
+ * this channel"; "Also send to Main" in a DM or group DM, whose Main is the
+ * conversation. Slack has threads in all four kinds.
+ */
+export function broadcastLabel(channel: Pick<ActionTopic['channel'], 'kind' | 'name'>): string {
+  return channel.kind === 'public' || channel.kind === 'private' ? `Also send to #${channel.name}` : 'Also send to Main'
 }
 
 /** Whether focus is in a text field that has text, where ⌘Z undoes typing. */

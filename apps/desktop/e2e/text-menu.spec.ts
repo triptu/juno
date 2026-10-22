@@ -102,10 +102,10 @@ async function junoMenusWin(juno: Juno): Promise<void> {
   const selected = () => juno.win.evaluate(() => window.getSelection()?.toString() ?? '')
   const asked = await juno.menusAsked()
 
-  // The message menu, on its selected text.
+  // The message menu, on its selected text: Juno's own, not a native menu, and it copies the selection.
   await words.selectText()
   const message = await juno.topic.chooseInMessageMenu(text, null)
-  expect(message.labels).toContain('Copy Slack link')
+  expect(message.labels).toContain('Copy')
   expect(message.labels).not.toContain('Paste')
 
   // A tab's menu, and a sidebar row's, while the message text stays selected.
@@ -121,9 +121,9 @@ async function junoMenusWin(juno: Juno): Promise<void> {
   expect((await juno.lastMenu()).labels).toContain('Open in new tab')
 
   // Then the composer's text menu. Main takes right-clicks in order, so a text
-  // menu opened by any of the three above would be counted before this one.
+  // menu opened by any of the above would be counted before this one.
   await juno.chooseNextMenuItem(null)
   await juno.topic.composer.click({ button: 'right' })
   expect(names((await juno.lastMenu()).labels)).toEqual(EDIT_ITEMS)
-  expect((await juno.menusAsked()) - asked).toBe(4)
+  expect((await juno.menusAsked()) - asked).toBe(3)
 }

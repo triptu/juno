@@ -8,13 +8,19 @@ export interface GroupMessage {
   readonly startsAfterDivider?: boolean
   /** A thread reply also sent to the channel: its header says so, so it stands alone. */
   readonly broadcast?: boolean
+  /** When it was sent, in epoch milliseconds. */
+  readonly at: number
 }
 
-/** Quotes, roots, broadcast replies and the unread divider break consecutive messages from one sender. */
+/** One sender's messages share a header while each comes less than this long after the one before (SPEC 7, "Messages"). */
+const GROUP_GAP_MS = 10 * 60_000
+
+/** Quotes, roots, broadcast replies, the unread divider and ten quiet minutes break consecutive messages from one sender. */
 export function startsGroup(prev: GroupMessage | undefined, next: GroupMessage): boolean {
   return (
     prev === undefined ||
     prev.senderId !== next.senderId ||
+    next.at - prev.at >= GROUP_GAP_MS ||
     next.isThreadRoot ||
     next.startsAfterDivider === true ||
     next.broadcast === true ||

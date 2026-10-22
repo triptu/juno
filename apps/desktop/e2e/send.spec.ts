@@ -179,8 +179,7 @@ test('an edit whose answer is lost leaves one message with the new text', async 
   await topic.send('Edit me over a lost answer')
   await topic.expectSent('Edit me over a lost answer')
   const before = fake.messages('C0ENG').length
-  await juno.chooseNextMenuItem('edit')
-  await topic.message('Edit me over a lost answer').click({ button: 'right' })
+  await topic.chooseInMessageMenu('Edit me over a lost answer', 'edit')
   const field = topic.list.getByRole('textbox', { name: 'Edit message' })
   await field.fill('Edited over a lost answer')
   fake.loseResponse({ method: 'chat.update', times: 1 })
@@ -202,8 +201,7 @@ test('a reaction whose answer is lost is added once and taken away once', async 
   const reactionsOf = () => fake.messages('C0ENG').find((m) => m.ts === ts)?.reactions ?? []
 
   fake.loseResponse({ method: 'reactions.add', times: 1 })
-  await row.hover()
-  await row.getByRole('button', { name: 'React 👍' }).click()
+  await (await topic.messageMenu('React over a lost answer')).react('+1')
   const chip = row.getByRole('button', { name: '1 👍, including you' })
   await expect(chip).toBeVisible()
   await expect.poll(reactionsOf).toEqual([expect.objectContaining({ name: '+1', count: 1 })])

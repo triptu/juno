@@ -16,7 +16,7 @@
  * decides between the panel and the tab once a topic open asked for
  * before it has landed (`afterNavigation`).
  */
-import { personFileMissing, MemoryPersonId, type About, type Selection } from '@juno/agent-contract'
+import { personFileMissing, MemoryPersonId, type About } from '@juno/agent-contract'
 import {
   activeTab,
   currentPlace,
@@ -151,16 +151,6 @@ export async function showWhatJunoKnows(person: { readonly id: string; readonly 
 function aboutKey(): string {
   const active = registry.get(tabsAtom).active
   return topicTabActive() && active !== undefined ? active : JUNO_TAB_ABOUT
-}
-
-/** Tell Juno in the why popover (SPEC 14, inventory 15.4): the chat beside the topic, with the message quoted in its composer. */
-export function tellJunoAbout(topicId: string, quote: Selection | undefined): void {
-  afterNavigation(() => {
-    registry.set(junoAboutAtom(aboutKey()), undefined)
-    if (quote !== undefined) quoteInJuno(registry, topicId, quote)
-    if (topicTabActive()) openPanel()
-    else openJunoTab()
-  })
 }
 
 /** The paused chip's Resume: the same switch as Settings › Juno's Pause. */

@@ -70,7 +70,6 @@ export function row(input: RowInput): TopicRow {
     tags: [],
     pinned: false,
     resolved: false,
-    canResolveOnHover: true,
     subscribed: true,
     newThreads: 0,
     lastActivityTs: `${Math.floor(at / 1000)}.000100`,
@@ -196,7 +195,6 @@ export const rows = {
     messageCount: 2,
     pinned: true,
     resolved: true,
-    canResolveOnHover: false,
     ago: DAY / MINUTE + 60,
   }),
   /** A DM's Main: the tile is the person's photo, never art. */

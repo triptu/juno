@@ -1,0 +1,1 @@
+- 10-23 01:00 · forward note · The Forward sheet's note is a multi-line field that grows to eight lines (the shared field Textarea), with Enter forwarding and Shift-Enter adding a line as in the composer, since SPEC 7 says Enter forwards. The preview leaves out the place when it is the sender's own name (owner).

@@ -93,7 +93,6 @@ const renderRow = (id: string, selected?: string) => {
       tabbable={id === (selected ?? pinnedIds[0])}
       newThreads={newThreadsById.get(id)}
       onOpen={noop}
-      onResolve={noop}
     />
   )
 }
@@ -138,7 +137,7 @@ function ArtOffScreen() {
         sections={[{ id: 'recent', ids: waiting.map((row) => row.id) }]}
         renderRow={(id) => {
           const row = byId.get(id)!
-          return <TopicRow key={id} row={row} time={relativeTime(row.lastActivityAt, NOW)} selected={false} tabbable={id === waiting[0]!.id} onOpen={noop} onResolve={noop} />
+          return <TopicRow key={id} row={row} time={relativeTime(row.lastActivityAt, NOW)} selected={false} tabbable={id === waiting[0]!.id} onOpen={noop} />
         }}
         enterEmpty={false}
       />
@@ -154,7 +153,7 @@ const allArt = (overrides: Partial<SidebarProps> = {}) => (
       sections={[{ id: 'recent', ids: artRows.map((row) => row.id) }]}
       renderRow={(id) => {
         const row = artById.get(id)!
-        return <TopicRow key={id} row={row} time={relativeTime(row.lastActivityAt, NOW)} selected={id === artRows[1]!.id} tabbable={id === artRows[1]!.id} onOpen={noop} onResolve={noop} />
+        return <TopicRow key={id} row={row} time={relativeTime(row.lastActivityAt, NOW)} selected={id === artRows[1]!.id} tabbable={id === artRows[1]!.id} onOpen={noop} />
       }}
       enterEmpty={false}
     />

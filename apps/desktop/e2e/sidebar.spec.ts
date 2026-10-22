@@ -292,7 +292,7 @@ syncedTest("pressing a row selects it, the keyboard moves the selection, and Tab
   // Let go of the list, pointer and focus, so it no longer holds its order and the next row can move to the top.
   await win.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
   await sidebar.leave()
-  await test.step("after arrowing to a row, Tab reaches that row\\'s Resolve", async () => {
+  await test.step('arrowing to a row focuses it without selecting it', async () => {
     await postAbovePostgres(juno, fake)
     const titles = await sidebar.titles('Recent')
     const first = sidebar.row(titles[0]!)
@@ -307,12 +307,6 @@ syncedTest("pressing a row selects it, the keyboard moves the selection, and Tab
     for (let i = 0; i < steps; i++) await win.keyboard.press('ArrowDown')
     await postgres.expectFocused()
     await postgres.expectSelected(false)
-
-    await win.keyboard.press('Tab')
-    await expect(postgres.resolveButton).toBeFocused()
-    // And Shift-Tab goes back to its row.
-    await win.keyboard.press('Shift+Tab')
-    await postgres.expectFocused()
   })
 })
 

@@ -5,11 +5,9 @@ import { TopicSwitcher } from './TopicSwitcher'
 import { ComposerSlot } from './ComposerSlot'
 import { details, emojiOnly, me, message, engTopics, hostile, main, mainDividerBefore, mentions, rtl, thread, threadDividerBefore, withFiles } from './fixtures/messages'
 import { NOW } from './fixtures/topics'
-import { prepareEmojiPicker, type EmojiCategory } from '@juno/contract'
-import { EmojiPicker } from './EmojiPicker'
 import { noopActions } from './fixtures/actions'
 import { Floating } from './Floating'
-import { SelectionToolbar } from './HoverToolbar'
+import { SelectionToolbar } from './SelectionToolbar'
 import { MessageList, type MessageListProps } from './MessageList'
 import { NewMessagesPill } from './NewMessagesPill'
 import { TopicHeader, type TopicHeaderProps } from './TopicHeader'
@@ -101,28 +99,10 @@ const switcher = {
   content: <TopicSwitcher mainId="C0ENG:main" mainUnread={3} currentId="C0ENG:main" threads={engTopics} now={NOW} query="" onQuery={noop} onOpen={noop} />,
 }
 
-/** A few emoji, so the picker reads like the real one without the whole catalog. */
-const pickerCatalog: ReadonlyArray<EmojiCategory> = [
-  {
-    name: 'Smileys & emotion',
-    emoji: ['😀 grinning', '😃 smiley', '😄 smile', '😁 grin', '😆 laughing', '😅 sweat_smile', '🤣 rolling_on_the_floor_laughing', '😂 joy', '🙂 slightly_smiling_face', '😉 wink', '😊 blush', '😇 innocent'].map((pair) => {
-      const [unicode, name] = pair.split(' ') as [string, string]
-      return { name, unicode }
-    }),
-  },
-  {
-    name: 'People & body',
-    emoji: ['👍 +1', '👎 -1', '👏 clap', '🙌 raised_hands', '🙏 pray', '💪 muscle', '👀 eyes', '🧠 brain', '👋 wave'].map((pair) => {
-      const [unicode, name] = pair.split(' ') as [string, string]
-      return { name, unicode }
-    }),
-  },
-]
-
 /**
- * Text selected in a message shows the floating toolbar centred over the
+ * Text selected in a message shows the selection's bar centred over the
  * selection: Quote, and Ask Juno unless AI assist is off. The scene selects
- * a message's text the way a drag would and places the toolbar from the
+ * a message's text the way a drag would and places the bar from the
  * selection's box, as the container does.
  */
 function SelectionScene({ ai = true }: { readonly ai?: boolean }) {
@@ -159,7 +139,7 @@ function SelectionScene({ ai = true }: { readonly ai?: boolean }) {
       items={thread}
       list={{ actions: noopActions }}
       floating={at === undefined ? undefined : (
-        <Floating x={at.x} y={at.y} placement="above-center" layer="selection">
+        <Floating x={at.x} y={at.y}>
           <SelectionToolbar onQuote={noop} {...(ai ? { onAskJuno: noop } : {})} />
         </Floating>
       )}
@@ -211,17 +191,6 @@ export default defineFixtures(
       'selection-quote': scene(() => <SelectionScene />),
       // AI assist off: Quote alone.
       'selection-quote-ai-off': scene(() => <SelectionScene ai={false} />),
-      // More reactions opens the picker under the toolbar, floated over the list so the row's paint containment does not clip it.
-      'emoji-picker': topic({
-        detail: details.postgres,
-        items: thread,
-        list: { actions: noopActions },
-        floating: (
-          <Floating x={820} y={180} placement="below-end" layer="picker">
-            <EmojiPicker data={prepareEmojiPicker(pickerCatalog, [])} recent={['+1', 'white_check_mark', 'eyes']} onPick={noop} onClose={noop} />
-          </Floating>
-        ),
-      }),
       // After sending: the fix line under the sent message, until Review or Dismiss.
       'sent-suggestion': topic({ detail: details.postgres, items: sentSlip, list: { suggestions: slip } }),
       'sent-suggestions': topic({ detail: details.postgres, items: sentSlip, list: { suggestions: slips } }),

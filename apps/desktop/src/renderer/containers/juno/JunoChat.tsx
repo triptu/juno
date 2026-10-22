@@ -1,14 +1,14 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { chatCopy, type ChatPage, type JunoPage, type Quote, type SendContext } from '@juno/agent-contract'
 import { junoDraftAtom, junoPicksAtom, nowAtom, registry, type MentionPlace } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { JunoChatFrame, JunoChatList, JunoComposer, NewMessagesPill } from '@juno/views'
 import { useChatActions, useChatSend, useFocusRequest, useRemoval } from './chatActions'
-import { useReactionPicker } from './chatReactions'
 import { useBubbleMeasure, useChatPosition, useEdges, useReadMarks, useScrollRelease, useStickToBottom } from './chatScroll'
 import { useAgentState, useChatItems, useChatWindow } from './chatWindow'
 import { useChatFiles } from './chatFiles'
 import { useMentions } from '../mentions'
+import { preloadMessageMenu } from '../messageMenu'
 
 const NO_PLACE: MentionPlace = {}
 
@@ -87,8 +87,8 @@ export function JunoChat({ column, draftKey, header, contextOf, composerContext,
   const { toBottom, send } = useChatSend({ contextOf, onSent, quote, setQuote, sentAtRef, newestBubbleId, scrollRef, pinnedRef, pageRef, setAtBottom, setWindow })
   const files = useChatFiles(draftKey, draft, setDraft, send)
   const { setRemoval, sheet } = useRemoval(now)
-  const reactions = useReactionPicker(items, scrollRef)
-  const actions = useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote, openPicker: reactions.open, setRemoval, openPage: onOpenPage })
+  useEffect(preloadMessageMenu, [])
+  const actions = useChatActions({ items, scrollRef, pinnedRef, inputRef, setQuote, setRemoval, openPage: onOpenPage })
 
   return (
     <>
@@ -103,7 +103,7 @@ export function JunoChat({ column, draftKey, header, contextOf, composerContext,
           value={draft}
           onChange={mentions.onChange}
           onCaret={mentions.onCaret}
-          onFieldKey={mentions.onFieldKey}
+          onFieldKey={(event) => newestRow(event, draft, scrollRef.current) || mentions.onFieldKey(event)}
           marks={mentions.marks}
           {...(mentions.mention === undefined ? {} : { mention: mentions.mention })}
           onSend={files.send}
@@ -118,7 +118,6 @@ export function JunoChat({ column, draftKey, header, contextOf, composerContext,
           hasFiles={files.hasFiles}
         />
       }
-      floating={reactions.floating}
     >
       <JunoChatList
         column={column}
@@ -139,4 +138,16 @@ export function JunoChat({ column, draftKey, header, contextOf, composerContext,
     </JunoChatFrame>
     </>
   )
+}
+
+/** ↑ in an empty composer gives the newest bubble or card keyboard focus, as in a topic (its menu is then a key away). */
+function newestRow(event: KeyboardEvent<HTMLTextAreaElement>, draft: string, scroller: HTMLElement | null): boolean {
+  if (event.key !== 'ArrowUp' || draft !== '' || event.shiftKey || event.altKey || event.metaKey) return false
+  const rows = scroller?.querySelectorAll<HTMLElement>('[data-chat-row]')
+  const last = rows?.[rows.length - 1]
+  if (last === undefined) return false
+  event.preventDefault()
+  last.focus({ preventScroll: true })
+  last.scrollIntoView({ block: 'nearest', behavior: 'instant' })
+  return true
 }

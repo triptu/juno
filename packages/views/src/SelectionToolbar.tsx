@@ -27,10 +27,9 @@ const pressProps = (action: () => void) => ({
 })
 
 /**
- * The floating toolbar over a text selection in a message (inventory 6.6):
- * Quote, and Ask Juno while AI assist is on. Icon only, in the hover
- * toolbar's 24px round buttons; the tooltip names each. Ask Juno has the
- * header's outline sparkle.
+ * The bar over a text selection in a message (inventory 6.6): Quote, and
+ * Ask Juno while AI assist is on. Icon only, in 24px round buttons; the
+ * tooltip names each. Ask Juno has the header's outline sparkle.
  */
 export function SelectionToolbar({ onQuote, onAskJuno }: SelectionToolbarProps) {
   return (
@@ -44,7 +43,7 @@ export function SelectionToolbar({ onQuote, onAskJuno }: SelectionToolbarProps) 
 }
 
 const styles = stylex.create({
-  // The hover toolbar's shell: 24px buttons, a 1px inset and the 1px border.
+  // 24px buttons, a 1px inset and the 1px border: --toolbar-height.
   toolbar: {
     display: 'inline-flex',
     alignItems: 'center',

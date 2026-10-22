@@ -12,12 +12,6 @@ export interface JunoChatFrameProps {
   readonly pill?: ReactNode
   /** `JunoComposer`. */
   readonly composer: ReactNode
-  /**
-   * Over the list, outside its rows: the quick reactions and the emoji
-   * picker of a bubble or card (`Floating`). Positioned from the list
-   * area's top left, as in `TopicView`.
-   */
-  readonly floating?: ReactNode
   /** `panel`: drawn on the Juno panel's own material, with no page colour. Default `page`. */
   readonly column?: 'page' | 'panel'
 }
@@ -25,17 +19,15 @@ export interface JunoChatFrameProps {
 /**
  * The Juno chat as the Juno tab and the Juno panel show it: the header's
  * islands over the list, the pill over its bottom edge, the composer under
- * it. Neither the header nor the pill takes part in the list's layout. The
- * reactions float at the point the container gives them.
+ * it. Neither the header nor the pill takes part in the list's layout.
  */
-export function JunoChatFrame({ header, children, pill, composer, floating, column = 'page' }: JunoChatFrameProps) {
+export function JunoChatFrame({ header, children, pill, composer, column = 'page' }: JunoChatFrameProps) {
   return (
     <div data-juno-chat="" {...stylex.props(styles.root, column === 'panel' && styles.panel)}>
       <div data-juno-chat-middle="" {...stylex.props(styles.middle)}>
         {header}
         {children}
         {pill !== undefined ? <div {...stylex.props(styles.pill)}>{pill}</div> : null}
-        {floating}
       </div>
       {composer}
     </div>

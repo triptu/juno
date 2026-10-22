@@ -11,10 +11,7 @@ async function setup(juno: Juno, fake: FakeSlack) {
   const message = fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Reaction delivery target' })
   const row = juno.topic.message('Reaction delivery target')
   await expect(row).toBeVisible()
-  const react = async () => {
-    await row.hover()
-    await row.getByRole('button', { name: 'React 👀' }).click()
-  }
+  const react = async () => (await juno.messageMenu.openOnRow(row)).react('eyes')
   const sent = () => fake.messages('C0ENG').find((m) => m.ts === message.ts)?.reactions?.some((r) => r.name === 'eyes') === true
   return { row, react, sent, ts: message.ts }
 }
@@ -130,9 +127,9 @@ test('workspace emoji are searchable by name and alias, react by name and show t
   fake.addEmoji({ name: 'unavailable_image', url: `${fake.url}/no-such-emoji.png` })
   const target = await setup(juno, fake)
   const open = async () => {
-    await target.row.hover()
-    await target.row.getByRole('button', { name: 'More reactions' }).click()
-    return juno.win.getByRole('dialog', { name: 'Emoji' })
+    const menu = await juno.messageMenu.openOnRow(target.row)
+    await menu.more.click()
+    return menu.root.locator('[data-emoji-picker]')
   }
   let picker = await open()
   const workspace = picker.getByRole('group', { name: 'Workspace', exact: true })
@@ -159,7 +156,12 @@ test('workspace emoji are searchable by name and alias, react by name and show t
   const chip = target.row.getByRole('button', { name: /1.*juno_wave.*including you/ })
   await expect(chip.locator('img')).toBeVisible()
   await expect.poll(() => chip.locator('img').evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true)
-  picker = await open()
+  // Now frequently used: in the menu's grid as its image, and first in the picker it turns into.
+  const menu = await juno.messageMenu.openOnRow(target.row)
+  await expect(menu.cell('juno_wave').locator('img')).toBeVisible()
+  await expect(menu.cell('juno_wave')).toHaveAttribute('aria-pressed', 'true')
+  await menu.more.click()
+  picker = menu.root.locator('[data-emoji-picker]')
   await expect(picker.getByRole('heading', { name: 'Frequently used', exact: true })).toBeVisible()
   await expect(picker.locator('[data-emoji="juno_wave"]').first()).toBeVisible()
 })

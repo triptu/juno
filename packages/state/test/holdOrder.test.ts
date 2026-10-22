@@ -6,7 +6,7 @@ import { holdOrder } from '../src/holdOrder'
 const topicRow = (id: string, rev = 1, section: TopicRow['section'] = 'recent', at = 1000): TopicRow => ({
   id, rev, kind: 'thread', section, status: 'open', title: id, titleSource: 'fallback',
   preview: { sender: 'Dev', text: `Hello ${rev}` }, messageCount: 2, unreadCount: rev - 1, unreadExact: true,
-  mentionsMe: false, tags: [], pinned: section === 'pinned', resolved: false, canResolveOnHover: true,
+  mentionsMe: false, tags: [], pinned: section === 'pinned', resolved: false,
   subscribed: true, newThreads: 0, lastActivityTs: '1.000000', lastActivityAt: at,
   channel: { id: 'C1', kind: 'public', name: 'eng', label: '#eng', tint: 'public', icon: 'hash', color: 'cyan' },
   participants: [],

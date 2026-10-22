@@ -29,9 +29,9 @@ export const colors = stylex.defineVars({
   '--background-subtle': 'hsla(48, 35%, 97%, 1)',
   '--surface-default': 'hsla(48, 30%, 98%, 1)',
   '--surface-hover': 'hsla(48, 30%, 94%, 1)',
-  // A message under the pointer: half the step of --surface-hover, so a list
-  // of messages stays calm and the row the hover toolbar belongs to still shows.
-  '--message-hover': 'hsla(48, 30%, 95.5%, 1)',
+  // A message with its menu open, so it is clear which message the menu
+  // belongs to: a third of the step from the page to --surface-hover.
+  '--message-menu-open': 'hsla(48, 43%, 96.7%, 1)',
   '--surface-active': 'hsla(48, 30%, 92%, 1)',
   '--peek-surface': 'hsla(48, 22%, 96%, 1)',
   // A surface that sits on top of --surface-hover and must read as raised in
@@ -816,6 +816,14 @@ export const motion = stylex.defineVars({
     [REDUCED_MOTION]: '0ms',
   },
   '--ease-out': 'cubic-bezier(0.2, 0, 0, 1)',
+  // The message menu turning into the emoji picker (More reactions): the one
+  // surface that changes shape in motion. Quick off the mark, a long soft
+  // landing, no overshoot. Both are read by its Web Animations.
+  '--duration-morph': {
+    default: '240ms',
+    [REDUCED_MOTION]: '0.01ms',
+  },
+  '--ease-morph': 'cubic-bezier(0.22, 1, 0.36, 1)',
   // Sidebar rows moving to their new places when activity from elsewhere
   // reorders the list at the top (SPEC 5, "Holding the order").
   '--duration-reorder': {
@@ -1190,4 +1198,53 @@ export const opacity = stylex.defineVars({
   '--opacity-dim': '0.6',
   '--opacity-tab-icon': '0.75',
   '--opacity-kbd': '0.75',
+})
+
+/**
+ * The message menu (a right-click on a message or a Juno bubble), drawn as
+ * close to a macOS menu as a page allows: a translucent blurred material with
+ * a hairline edge and a soft shadow, the system font at menu size, 22px rows
+ * with a rounded accent highlight, inset separators, and a grid of small
+ * emoji on top spread across the menu's width. Dark values are in
+ * `themes.stylex.ts` (`darkMenu`).
+ */
+export const menu = stylex.defineVars({
+  '--menu-font': '-apple-system, BlinkMacSystemFont, system-ui, sans-serif',
+  '--menu-font-size': '12px',
+  '--menu-line-height': '15px',
+  '--menu-fill': 'hsla(0, 0%, 97%, 0.8)',
+  '--menu-backdrop': 'blur(30px) saturate(1.8)',
+  // A hairline edge and a soft two-step shadow, as a macOS menu lifts off the window.
+  '--menu-shadow': '0 0 0 1px hsla(0, 0%, 0%, 0.1), 0 2px 6px 0 hsla(0, 0%, 0%, 0.08), 0 12px 32px -4px hsla(0, 0%, 0%, 0.22)',
+  '--menu-radius': '10px',
+  '--menu-padding': '5px',
+  '--menu-row-height': '22px',
+  // From the highlight's edge to the row's icon.
+  '--menu-row-inset': '9px',
+  '--menu-row-radius': '6px',
+  '--menu-icon-gap': '7px',
+  // The rows' icons and the grid's emoji share this size.
+  '--menu-icon-size': '14px',
+  '--menu-text': 'hsla(0, 0%, 0%, 0.85)',
+  '--menu-text-disabled': 'hsla(0, 0%, 0%, 0.26)',
+  '--menu-icon': 'hsla(0, 0%, 0%, 0.62)',
+  '--menu-separator': 'hsla(0, 0%, 0%, 0.1)',
+  // The space above and below a separator's line, and under the grid.
+  '--menu-separator-gap': '5px',
+  // About 190px with the message rows; never narrower than this.
+  '--menu-min-width': '180px',
+  // The gap the menu keeps from the window's edges.
+  '--menu-edge': '6px',
+  // The emoji grid: six 24px cells a row, spread across the menu at least
+  // --menu-cell-gap apart, the first and last emoji in line with the rows' icons.
+  '--menu-cell': '24px',
+  '--menu-cell-gap': '5px',
+  '--menu-cell-row-gap': '6px',
+  '--menu-cell-radius': '6px',
+  '--menu-emoji-size': '14px',
+  // Opaque: Chromium draws a colour emoji with its text colour's alpha.
+  '--menu-emoji': 'hsl(0, 0%, 0%)',
+  '--menu-cell-hover': 'hsla(0, 0%, 0%, 0.07)',
+  // An emoji you already reacted with.
+  '--menu-cell-selected': 'color-mix(in oklch, var(--hl) 22%, transparent)',
 })

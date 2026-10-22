@@ -75,9 +75,8 @@ const TopicRowFields = {
   mentionsMe: Schema.Boolean,
   tags: Schema.Array(RowTag),
   pinned: Schema.Boolean,
-  /** Resolved and pinned: quieter, with a check, no hover Resolve. */
+  /** Resolved and pinned: quieter, with a check. */
   resolved: Schema.Boolean,
-  canResolveOnHover: Schema.Boolean,
   /**
    * Slack's follow flag for a thread (true means Slack lists it as followed),
    * which `topics.subscribe` and `topics.unsubscribe` change. Always false for

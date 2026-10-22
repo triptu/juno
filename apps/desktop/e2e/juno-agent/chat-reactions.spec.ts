@@ -155,12 +155,12 @@ test('a Juno bubble takes a quick reaction and any emoji from the picker, and it
     await panel.expectJuno(`You said: note ${n}`)
   }
 
-  // A quick reaction, from the toolbar a topic's messages use: the badge shows at once.
+  // A quick reaction, from the grid of the menu a topic's messages use: the badge shows at once.
   await panel.react('You said: note 6', '👍')
   await expect(panel.reactions).toHaveCount(0)
   await expect(panel.junoBubble('You said: note 6').getByLabel('Reacted 👍')).toBeVisible()
 
-  // Any emoji: More reactions opens the emoji picker; search, then pick. Juno hears it.
+  // Any emoji: More reactions turns the menu into the emoji picker; search, then pick. Juno hears it.
   await panel.reactWithPicker('You said: note 5', 'rocket', 'rocket')
   await expect(panel.root.locator('[data-emoji-picker]')).toHaveCount(0)
   await expect(panel.junoBubble('You said: note 5').getByLabel('Reacted 🚀')).toBeVisible()
@@ -205,4 +205,42 @@ test('a Juno custom reaction is stored by name and drawn as an image', async ({ 
   const badge = panel.junoBubble('You said: custom reaction target').getByLabel('Reacted juno_wave')
   await expect(badge.locator('img')).toBeVisible()
   await expect.poll(() => model.inputs().some((input) => input.startsWith('<reaction') && input.includes('emoji="juno_wave"'))).toBe(true)
+})
+
+test('the keyboard reaches a bubble, ⇧F10 opens its menu under the first line, and the menu’s keys react', async ({ juno }) => {
+  await ready(juno)
+  await juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
+  const chat = JunoChatPane.tab(juno.win)
+  await expect(chat.composer).toBeFocused()
+  await chat.send('keyboard menu target')
+  await chat.expectJuno('You said: keyboard menu target')
+
+  // ↑ in the empty composer: the newest bubble; ↑ again: your own before it; Esc: back to the composer.
+  await chat.composer.press('ArrowUp')
+  const bubble = chat.junoBubble('You said: keyboard menu target').locator('[data-chat-row]')
+  await expect(bubble).toBeFocused()
+  await juno.win.keyboard.press('ArrowUp')
+  await expect(chat.ownerBubble('keyboard menu target').locator('[data-chat-row]')).toBeFocused()
+  await juno.win.keyboard.press('Escape')
+  await expect(chat.composer).toBeFocused()
+
+  // ⇧F10 on the bubble: its menu, under the bubble's first line, at its text.
+  await chat.composer.press('ArrowUp')
+  await expect(bubble).toBeFocused()
+  await juno.win.keyboard.press('Shift+F10')
+  const menu = juno.messageMenu
+  await expect(menu.root).toBeVisible()
+  const text = (await bubble.boundingBox())!
+  const box = (await menu.root.boundingBox())!
+  expect(box.x).toBeGreaterThanOrEqual(text.x)
+  expect(box.x).toBeLessThan(text.x + 40)
+  expect(box.y).toBeGreaterThan(text.y)
+  expect(await menu.labels()).toEqual(['Reply', 'Copy', '-', 'Remove…'])
+  // ↓ to the grid's first cell, Enter reacts with it; focus goes back to the bubble.
+  await juno.win.keyboard.press('ArrowDown')
+  await expect(menu.cell('+1')).toBeFocused()
+  await juno.win.keyboard.press('Enter')
+  await expect(menu.root).toHaveCount(0)
+  await expect(chat.junoBubble('You said: keyboard menu target').getByLabel('Reacted 👍')).toBeVisible()
+  await expect(bubble).toBeFocused()
 })

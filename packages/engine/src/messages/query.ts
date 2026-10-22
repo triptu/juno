@@ -373,13 +373,18 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     const out: Array<MessageView> = []
     const nextRows = new Map<string, CachedRow>()
     const people = new Map<string, Person>()
-    // Grouping starts from the message before the window, so the first row's header does not depend on where the window begins.
+    // Grouping starts from the message before the window, so the first row's header does not depend on where the window
+    // begins: its sender, whether it is the root or a reply also sent to the channel, and when it was sent.
     let previous: GroupMessage | undefined =
-      beforeWindow === undefined ? undefined : { senderId: groupSender(beforeWindow), body: { blocks: [] }, isThreadRoot: target.kind === 'thread' && beforeWindow.ts === target.threadTs }
+      beforeWindow === undefined
+        ? undefined
+        : { senderId: groupSender(beforeWindow), body: { blocks: [] }, isThreadRoot: target.kind === 'thread' && beforeWindow.ts === target.threadTs, broadcast: beforeWindow.subtype === 'thread_broadcast', at: tsToMillis(beforeWindow.ts as Ts) }
     for (const row of rows) {
       const body = bodies.get(row.ts)!
       const isRoot = target.kind === 'thread' && row.ts === target.threadTs
-      const group: GroupMessage = { senderId: groupSender(row), body: body.body, isThreadRoot: isRoot, broadcast: row.subtype === 'thread_broadcast' }
+      const sent = pending.get(row.ts)
+      const at = sent === undefined ? tsToMillis(row.ts as Ts) : Number(sent.created_at)
+      const group: GroupMessage = { senderId: groupSender(row), body: body.body, isThreadRoot: isRoot, broadcast: row.subtype === 'thread_broadcast', at }
       const groupStart = startsGroup(previous, group)
       previous = group
       const intent = intentOf(actions, row)

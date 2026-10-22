@@ -169,8 +169,8 @@ describe('opening a topic', () => {
     const list = watchList(engine, messagesAtom(id))
     const before = await list.until((window) => window.order.length === 6, 'the six deploys')
     expect(rowsOf(before).every((row) => before.refs.people.get(row.senderId!)?.name === 'Deploy Bot')).toBe(true)
-    // Grouped under one header: one sender, no quotes.
-    expect(rowsOf(before).map((row) => row.groupStart)).toEqual([true, false, false, false, false, false])
+    // One sender, but more than ten minutes apart: each has its own header.
+    expect(rowsOf(before).map((row) => row.groupStart)).toEqual([true, true, true, true, true, true])
 
     // A message the socket never delivered.
     const missed = engine.fake.workspace.post({ channel: 'C0DEPLOYS', user: 'U0DEPLOYBOT', text: 'api@5d0e11 deployed to prod', silent: true })
@@ -240,17 +240,17 @@ describe('older messages', () => {
     const wider = await watchList(engine, messagesAtom(id, { anchor: first, before: 100, limit: 106 })).until((window) => window.order.length === 106, 'the wider window')
     expect(wider.order.slice(100)).toEqual(bottom.order)
     expect(textOf(wider.rows.get(wider.order[0]!)!)).toBe('old deploy 50')
-    // The old first row continues the bot's run, so it has no header, in this window and in the one that starts with it.
-    expect(wider.rows.get(first)!.groupStart).toBe(false)
+    // The old first row comes weeks after the bot's last old deploy, so it has a header, in this window and in the one that starts with it.
+    expect(wider.rows.get(first)!.groupStart).toBe(true)
     const recent = await watchList(engine, messagesAtom(id, { limit: 6 })).until((window) => window.order.length === 6, 'the recent deploys again')
-    expect(recent.rows.get(first)!.groupStart).toBe(false)
+    expect(recent.rows.get(first)!.groupStart).toBe(true)
 
     // Asking again for the same page needs no call; the last 50 make one more, which reaches the start.
     engine.fake.resetCalls()
     expect(valueOf(await loadOlderMessages(engine.registry, id, wider.order[0]!))).toEqual({ outcome: 'fetched', complete: true })
     expect(valueOf(await loadOlderMessages(engine.registry, id, wider.order[0]!))).toEqual({ outcome: 'cached', complete: true })
     expect(conversationCalls(engine)).toHaveLength(1)
-    // Now 'old deploy 49' is stored, just before the window: 'old deploy 50' continues its run and loses its header.
+    // Now 'old deploy 49' is stored, just before the window, a minute before 'old deploy 50', which continues its run and loses its header.
     await watchList(engine, messagesAtom(id, { anchor: first, before: 100, limit: 106 })).until((window) => window.rows.get(window.order[0]!)!.groupStart === false, 'the first row without a header')
   })
 })

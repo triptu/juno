@@ -28,9 +28,8 @@ async function resolveTopic({ juno, slack }: Pick<Fixtures, 'juno' | 'slack'>): 
   await roadmap.expectUnread(3)
   slack.resetCalls()
 
-  // The hover check.
-  await roadmap.hover()
-  await roadmap.resolveButton.click()
+  // From the row's menu.
+  await roadmap.chooseInMenu('resolve')
   await roadmap.expectAbsent()
   await juno.expectToast(`Resolved · ${ROADMAP}`)
   // Resolve marks read in Slack too; it never unfollows.
@@ -41,7 +40,7 @@ async function resolveTopic({ juno, slack }: Pick<Fixtures, 'juno' | 'slack'>): 
   await roadmap.expectVisible()
   await roadmap.expectUnread(3)
 
-  // Resolved again from the menu, then a reply from someone else brings it back, tagged.
+  // Resolved again, then a reply from someone else brings it back, tagged.
   await roadmap.chooseInMenu('resolve')
   await roadmap.expectAbsent()
   slack.as('Maya').replyIn(ROADMAP, 'One more thing on the proposal.')
@@ -156,7 +155,7 @@ test('Mark as read and unread, Ignore, and the Slack links, each from the menu',
     await alerts.expectVisible()
   })
 
-  await test.step('Copy Slack link and Open in Slack from a row and from a message', async () => {
+  await test.step('Copy Slack link and Open in Slack from a row, and Open in Slack from a message', async () => {
     // Back from the Automated view the step above chose.
     await juno.sidebar.filter('All')
     const postgres = juno.sidebar.row(POSTGRES)
@@ -166,15 +165,11 @@ test('Mark as read and unread, Ignore, and the Slack links, each from the menu',
     await postgres.chooseInMenu('open-in-slack')
     await expect.poll(() => juno.slackLinks()).toEqual([expect.stringMatching(/^slack:\/\/channel\?team=T0JUNO&id=C0ENG$/)])
 
-    // A reply's link carries its thread.
+    // A message's menu has Open in Slack, and no Copy Slack link: the topic's menus and ⌘K keep that.
     await postgres.open()
-    const reply = juno.topic.message('Booked 2–4pm')
     await juno.topic.expectMessage('Booked 2–4pm')
-    await juno.chooseNextMenuItem('copy-link')
-    await reply.click({ button: 'right' })
-    await expect.poll(() => juno.clipboard()).toMatch(/\/archives\/C0ENG\/p\d+\?thread_ts=\d+\.\d+&cid=C0ENG$/)
-    await juno.chooseNextMenuItem('open-in-slack')
-    await reply.click({ button: 'right' })
+    const { labels } = await juno.topic.chooseInMessageMenu('Booked 2–4pm', 'open-in-slack')
+    expect(labels).not.toContain('Copy Slack link')
     await expect.poll(async () => (await juno.slackLinks()).length).toBe(2)
   })
 })

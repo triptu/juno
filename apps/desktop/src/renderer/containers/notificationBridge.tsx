@@ -1,19 +1,13 @@
-import { preloadAfterSidebar } from './preloadAfterSidebar'
 /**
  * The renderer's side of OS notifications (architecture 11): it tells main
  * which topic is on screen while the window has focus, so the engine does
  * not notify about it, and opens what a clicked notification points at.
- * Also the why popover, which the message menu opens: Change for a
- * setting's call, Tell Juno for Juno's.
  */
 import { useEffect } from 'react'
 import type { NotificationTarget } from '@juno/contract'
-import { activeTab, currentPlace, notificationContentShown, notificationSettingsAtom, onNotificationOpen, setViewing, tabsAtom, tabTopic, whyPopoverAtom } from '@juno/state'
+import { activeTab, currentPlace, notificationContentShown, notificationSettingsAtom, onNotificationOpen, setViewing, tabsAtom, tabTopic } from '@juno/state'
 import { useAtomMount, useAtomValue } from '@juno/state/react'
-import { chunk, usePreloaded } from './chunks'
 import { openHuddle, openTopicAt } from './navigation'
-const whyPanel = chunk(() => import('./WhyPopoverPanel'))
-const WhyPopoverPanel = whyPanel.component((module) => module.WhyPopoverPanel)
 
 /**
  * A clicked notification: the topic at its message, which flashes, also in a
@@ -71,11 +65,4 @@ export function useNotificationBridge(): void {
       document.removeEventListener('visibilitychange', report)
     }
   }, [shown])
-}
-
-/** Warm the explanation on idle, before a message menu can open it. */
-export function WhyLayer() {
-  const wanted = useAtomValue(whyPopoverAtom) !== undefined
-  const ready = usePreloaded(whyPanel, wanted, preloadAfterSidebar)
-  return wanted && ready ? <WhyPopoverPanel /> : null
 }

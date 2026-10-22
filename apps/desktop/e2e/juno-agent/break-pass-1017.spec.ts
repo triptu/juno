@@ -83,9 +83,7 @@ test('two tabs on one topic with the panel open in one: send, react and edit sta
   await expect(juno.win.locator('aside[data-juno-panel]')).toHaveCount(0)
   await juno.topic.send('Sent from the plain tab')
   await juno.topic.expectSent('Sent from the plain tab')
-  const row = juno.topic.message('Sent from the plain tab')
-  await row.hover()
-  await row.getByRole('button', { name: 'React 👍' }).click()
+  await (await juno.topic.messageMenu('Sent from the plain tab')).react('+1')
   await expect.poll(() => fake.messages('C0ENG').find((m) => m.text === 'Sent from the plain tab')?.reactions?.length ?? 0).toBe(1)
 
   await juno.tabs.selectAt('eng', 0)

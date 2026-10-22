@@ -1,10 +1,30 @@
 /**
+ * The emoji picker's grid rules (`EmojiPicker.tsx`): its sections, the keys
+ * of its cells, how a search reads, and where the arrows move.
+ */
+import type { PickerItem as Item } from '@juno/contract'
+
+export interface Section {
+  readonly key: string
+  /** None for search results. */
+  readonly heading?: string
+  readonly items: ReadonlyArray<Item>
+}
+
+export const itemKey = (item: Item) => `${item.unicode === undefined ? 'workspace' : 'standard'}:${item.name}`
+
+/** Search text as a name: lowercase, no colons, spaces as underscores (":Party face" finds partying_face). */
+export function normalize(query: string): string {
+  return query.trim().toLowerCase().replace(/:/g, '').replace(/\s+/g, '_')
+}
+
+/**
  * Where an arrow key moves focus from `from`: the next or previous emoji,
- * or the same column one row up or down, across section edges. `null` means
+ * or the same column one row up or down, `columns` to a row, across section edges. `null` means
  * the search field; `undefined` means the key is not an arrow.
  * Uses the complete section order, including rows outside the viewport.
  */
-export function neighbour(sections: ReadonlyArray<{ readonly items: ReadonlyArray<unknown> }>, from: number, key: string, columns: number): number | null | undefined {
+export function neighbour(sections: ReadonlyArray<Section>, from: number, key: string, columns: number): number | null | undefined {
   const groups = sections.filter((section) => section.items.length > 0)
   let start = 0
   const s = groups.findIndex((section) => {

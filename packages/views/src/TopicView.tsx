@@ -11,7 +11,7 @@ export interface TopicViewProps {
   readonly pill?: ReactNode
   /** The `ComposerSlot` until the draft loads, then the composer. */
   readonly composer?: ReactNode
-  /** Over the list, outside its rows: the emoji picker, the selection's Quote button (`Floating`). Positioned from the list area's top left. */
+  /** Over the list, outside its rows: the selection's bar (`Floating`). Positioned from the list area's top left. */
   readonly floating?: ReactNode
   /** The media viewer, over the whole topic: header, list and composer. While it shows they are inert. */
   readonly viewer?: ReactNode
