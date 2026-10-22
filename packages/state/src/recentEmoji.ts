@@ -4,10 +4,9 @@
  */
 import * as Atom from 'effect/reactivity/Atom'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
-import { emojiRecent, emojiUse, MAX_RECENT_EMOJI } from '@juno/contract'
+import { emojiRecent, emojiFrequent, emojiUse, DEFAULT_QUICK_REACTIONS } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import { registry } from './client'
-import { quickReactionsAtom } from './quickReactions'
 
 const savedRecentEmojiAtom = liveQuery(emojiRecent)({})
 
@@ -17,10 +16,13 @@ export const recentEmojiAtom = Atom.make((get): ReadonlyArray<string> => {
   return AsyncResult.isSuccess(saved) ? saved.value : []
 }).pipe(Atom.keepAlive)
 
-/** The picker's Frequently used: the recent names, then the quick reactions. */
-export const frequentEmojiAtom = Atom.make((get) =>
-  [...new Set([...get(recentEmojiAtom), ...get(quickReactionsAtom).map((reaction) => reaction.name)])].slice(0, MAX_RECENT_EMOJI),
-).pipe(Atom.keepAlive)
+const savedFrequentEmojiAtom = liveQuery(emojiFrequent)({})
+
+/** The engine's final picker names. Defaults can paint before the first answer. */
+export const frequentEmojiAtom = Atom.make((get): ReadonlyArray<string> => {
+  const saved = get(savedFrequentEmojiAtom)
+  return AsyncResult.isSuccess(saved) ? saved.value : DEFAULT_QUICK_REACTIONS.map((reaction) => reaction.name)
+}).pipe(Atom.keepAlive)
 
 /** Records a pick. The engine saves it and every picker and composer sees the new order. */
 export function noteRecentEmoji(name: string): void {

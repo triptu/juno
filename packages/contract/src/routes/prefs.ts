@@ -16,7 +16,9 @@ export const emojiUse = Rpc.make('emoji.use', {
 })
 /** The open workspace's recent emoji names, newest first. */
 export const emojiRecent = liveValueRoute('emoji.recent', { payload: {}, value: Schema.Array(Schema.String) })
-export const PrefsRoutes = RpcGroup.make(prefsGet, prefsSet, aiAvailable, emojiUse, emojiRecent)
+/** The picker names: local recency, Slack usage, then quick reactions. */
+export const emojiFrequent = liveValueRoute('emoji.frequent', { payload: {}, value: Schema.Array(Schema.String) })
+export const PrefsRoutes = RpcGroup.make(prefsGet, prefsSet, aiAvailable, emojiUse, emojiRecent, emojiFrequent)
 
 export const sendCheckPrefKeys = ['wrongPlace', 'typos', 'capitalI', 'questionMarks', 'longSentences', 'grammar'] as const
 export type SendCheckPref = typeof sendCheckPrefKeys[number]
