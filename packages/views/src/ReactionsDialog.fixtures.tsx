@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { defineFixtures, fixture } from '@juno/ui'
 import { manyReactions } from './fixtures/reactions'
 import { ReactionsDialog, type ReactionsDialogEntry, type ReactionsDialogProps } from './ReactionsDialog'
@@ -7,10 +6,9 @@ const entries: ReadonlyArray<ReactionsDialogEntry> = manyReactions.map(({ people
 /** Slack listed ten of the forty; the rest are still being asked for, or Slack never gave them. */
 const listedTen = entries.map((entry) => (entry.name === 'tada' ? { ...entry, reactors: entry.reactors.slice(0, 10) } : entry))
 
-/** Choosing works in the gallery, so the strip and list can be tried by hand. */
+/** One state per fixture, as the container holds the choice: a press on another emoji changes nothing here. */
 function Dialog(props: Omit<ReactionsDialogProps, 'onSelect'>) {
-  const [selected, setSelected] = useState(props.selected)
-  return <ReactionsDialog {...props} selected={selected} onSelect={setSelected} />
+  return <ReactionsDialog {...props} onSelect={() => {}} />
 }
 
 const frame = { padded: true, surface: 'subtle' } as const
