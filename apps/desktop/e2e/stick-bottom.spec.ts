@@ -2,7 +2,7 @@
 // at the end of a list longer than the view is fully in view on the first frame that draws it, and the list stays
 // at its end. Sitting there includes turning the wheel down at the end and clicking a message, which scroll
 // nothing. The last message growing at the bottom (a reaction, its edit box) stays whole above the composer, and an
-// edit box started just above the bottom shows whole too. Scrolled up, an arriving message or a reaction moves nothing.
+// edit box started just above the bottom shows whole too. A scroll down that stops just short of the end stays there. Scrolled up, an arriving message or a reaction moves nothing.
 import type { Locator, Page } from '@playwright/test'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 import type { FakeSlack } from '@juno/fake-slack'
@@ -288,6 +288,26 @@ test('releases the bottom during an upward gesture and uses the resting threshol
     })
     expect(await topic.scroller.evaluate((node) => node.scrollTop)).toBe(top)
   })
+})
+
+test('a scroll down that stops just short of the end stays where it stopped', async ({ juno, win, slack, fake }) => {
+  await openLongMain(juno, fake, slack)
+  const { topic } = juno
+  await topic.scrollUp(24)
+  const before = await distance(topic.scroller)
+  expect(before).toBeGreaterThan(9)
+  expect(before).toBeLessThanOrEqual(32)
+  // Part of the way back down from a script, as scrolling a row into view does. Resting within 32px held the bottom,
+  // but no row grew, so the list stays where the scroll put it and the row under a still pointer stays there.
+  await topic.scroller.evaluate(
+    (scroller) =>
+      new Promise<void>((resolve) => {
+        scroller.addEventListener('scrollend', () => resolve(), { once: true })
+        scroller.scrollTop += 8
+      }),
+  )
+  await frames(win, 5)
+  expect(await distance(topic.scroller)).toBe(before - 8)
 })
 
 test('an upward gesture escapes concurrent column growth from the first scroll frame', async ({ juno, win, slack, fake }) => {
