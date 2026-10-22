@@ -1,7 +1,7 @@
 import '@juno/tokens/fonts.css'
 import './global.css'
 
-import { acquireRendererPort, configureConnection, frequentEmojiAtom, registry, sidebarSectionsAtom, type PortLike } from '@juno/state'
+import { acquireRendererPort, configureConnection, frequentEmojiAtom, recentEmojiAtom, registry, sidebarSectionsAtom, type PortLike } from '@juno/state'
 import { acquireAgentPort, configureAgentConnection } from '@juno/state/agent'
 import { afterPaint, mark, measure, observeFrames } from '@juno/state/perf'
 import { RegistryContext } from '@juno/state/react'
@@ -38,8 +38,8 @@ releaseSidebar = registry.subscribe(
   sidebarSectionsAtom,
   (sections) => {
     if (!sections.ready || releaseSidebar === undefined) return
-    // Warm durable frequents after the first sidebar paint, before a picker needs them.
-    afterPaint(() => { registry.mount(frequentEmojiAtom) })
+    // Warm picker ranking and composer recency after the first sidebar paint.
+    afterPaint(() => { registry.mount(frequentEmojiAtom); registry.mount(recentEmojiAtom) })
     const release = releaseSidebar
     releaseSidebar = undefined
     afterPaint(release)

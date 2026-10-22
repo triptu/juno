@@ -45,7 +45,7 @@ import {
   type Registry,
 } from '@juno/state'
 import { afterPaint, measure } from '@juno/state/perf'
-import { useAtomValue } from '@juno/state/react'
+import { useAtomMount, useAtomValue } from '@juno/state/react'
 import { CommandPalette, type PaletteIconName, type PaletteItem, type PaletteSection, type PaletteTab } from '@juno/views'
 import { junoCommands, openJunoTab } from './juno/actions'
 import { newMessage, openTopic, openTopicAt, warmTopic } from './navigation'
@@ -217,17 +217,14 @@ interface Query {
   readonly text: string
 }
 
-/**
- * The rows of the last text that has results, held until the next text's
- * arrive, so typing never flashes an empty list. `settled` when they
- * belong to the current text.
- */
-function useHeld<A>(request: Query, deferred: Query, result: { readonly _tag: string; readonly value?: A }): { readonly local: { readonly request: Query; readonly value: A } | undefined; readonly settled: boolean } {
-  const [held, setHeld] = useState<{ readonly request: Query; readonly value: A } | undefined>(undefined)
-  const current = deferred === request && result._tag === 'Success'
-  if (current && (held?.request !== request || held.value !== result.value)) setHeld({ request, value: result.value as A })
-  const local = current ? { request, value: result.value as A } : held
-  return { local, settled: local?.request === request }
+interface PaletteAnswer {
+  readonly request: Query
+  readonly local: ReadonlyArray<SearchResult> | ReadonlyArray<PickConversation> | undefined
+  readonly command: PaletteCommand | null | undefined
+  readonly slack: ReadonlyArray<SearchMessage> | undefined
+  readonly text: string
+  readonly sections: ReadonlyArray<PaletteSection>
+  readonly rows: ReadonlyArray<Row>
 }
 
 /** The text after a leading ">", or undefined when the text lists no commands. */
@@ -241,10 +238,14 @@ export function OpenPalette() {
   const tab = useAtomValue(paletteTabAtom)
   const [request, setRequest] = useState<Query>({ text: '' })
   const query = request.text
-  const deferred = useDeferredValue(request)
+  const deferredRequest = useDeferredValue(request)
+  // Clearing goes straight to the empty-query state, whose subscriptions stay warm while open.
+  const deferred = query.trim() === '' ? request : deferredRequest
+  useAtomMount(searchAtom(''))
+  useAtomMount(paletteConversationsAtom(''))
   const listing = commandListing(deferred.text)
-  const messages = useHeld(request, deferred, useAtomValue(searchAtom(deferred.text)))
-  const conversations = useHeld(request, deferred, useAtomValue(paletteConversationsAtom(listing === undefined ? deferred.text : '')))
+  const messages = useAtomValue(searchAtom(deferred.text))
+  const conversations = useAtomValue(paletteConversationsAtom(listing === undefined ? deferred.text : ''))
   const now = useAtomValue(nowAtom)
   // What the commands act on is read once, as the palette opens.
   const [commands] = useState(() => ({ global: globalCommands(), topic: topicCommands() }))
@@ -254,16 +255,9 @@ export function OpenPalette() {
 
   const conversationsTab = tab === 'conversations'
   const listingNow = commandListing(request.text)
-  const settled = conversationsTab ? listingNow !== undefined || conversations.settled : messages.settled
-  // Rows held from a ">" listing are the empty query's: they show as Frequent until the new text's arrive.
-  const heldConversations = conversations.local?.request.text ?? ''
-  const shownText = conversationsTab
-    ? listingNow !== undefined
-      ? request.text.trim()
-      : commandListing(heldConversations) === undefined
-        ? heldConversations.trim()
-        : ''
-    : (messages.local?.request.text.trim() ?? '')
+  const current = deferred === request
+  const settled = conversationsTab ? listingNow !== undefined || (current && conversations._tag === 'Success') : current && messages._tag === 'Success'
+  const shownText = conversationsTab && listingNow !== undefined ? request.text.trim() : deferred.text.trim()
   const shownCommand = settled ? (command ?? null) : null
 
   let sections: ReadonlyArray<PaletteSection>
@@ -276,12 +270,12 @@ export function OpenPalette() {
       sections = [...(topic === undefined ? [] : [{ key: 'topic', heading: topic.heading, items: topicRows }]), ...global]
       rows = [...topicRows, ...global.flatMap((section) => section.items)]
     } else if (shownText === '') {
-      const found = (conversations.local?.value ?? []).map(conversationRow)
+      const found = (conversations._tag === 'Success' ? conversations.value : []).map(conversationRow)
       sections = [{ heading: 'Frequent', items: found }]
       rows = found
     } else {
       const topicRows = topic === undefined ? [] : matchCommands(topic.rows, shownText, COMMANDS_WITH_TEXT)
-      const found = (conversations.local?.value ?? []).map(conversationRow)
+      const found = (conversations._tag === 'Success' ? conversations.value : []).map(conversationRow)
       const global = globalSections(commands.global, shownText, COMMANDS_WITH_TEXT)
       const juno = shownCommand === null ? [] : [commandRow(shownCommand)]
       sections = [
@@ -293,15 +287,27 @@ export function OpenPalette() {
       rows = [...topicRows, ...found, ...global.flatMap((section) => section.items), ...juno]
     }
   } else {
-    const results = messages.local?.value ?? []
+    const results = messages._tag === 'Success' ? messages.value : []
     const max = shownText === '' ? PALETTE_RECENT : shownCommand !== null ? RESULTS_UNDER_COMMAND : PALETTE_RESULTS
     const localRows = results.flatMap(rowsOf).slice(0, max)
-    const found = messages.settled && slack !== undefined && query.trim() !== '' ? appendUnseen(localRows, slack.map(messageRow), PALETTE_SLACK_RESULTS) : localRows
+    const found = settled && slack !== undefined && query.trim() !== '' ? appendUnseen(localRows, slack.map(messageRow), PALETTE_SLACK_RESULTS) : localRows
     const juno = shownCommand === null ? [] : [commandRow(shownCommand)]
     sections = [{ heading: 'Juno', items: juno }, { heading: shownText === '' ? 'Recent' : 'Results', items: found }]
     rows = [...juno, ...found]
   }
-  const byId = new Map<string, Row>(rows.map((row) => [row.id, row]))
+  // Hold the whole rendered answer, including empty, command and Slack states.
+  // A delayed answer for the new edit may arrive before its local query does.
+  const [answers, setAnswers] = useState<Partial<Record<PaletteTab, PaletteAnswer>>>({})
+  const previous = answers[tab]
+  const result = conversationsTab ? conversations : messages
+  const local = result._tag === 'Success' ? result.value : undefined
+  const fresh: PaletteAnswer = { request, local, command, slack, text: shownText, sections, rows }
+  if (settled && (previous?.request !== request || previous.local !== local || previous.command !== command || previous.slack !== slack)) {
+    setAnswers({ ...answers, [tab]: fresh })
+  }
+  const answer = settled ? fresh : (previous ?? fresh)
+  const resultsReady = settled || previous !== undefined
+  const byId = new Map<string, Row>(answer.rows.map((row) => [row.id, row]))
 
   // juno.palette-open: from ⌘K or the button to the first paint with rows. juno.palette-results: from a keystroke to its rows painted.
   const opened = useRef(false)
@@ -346,10 +352,11 @@ export function OpenPalette() {
       tab={tab}
       onTab={onTab}
       query={query}
-      resultsQuery={shownText}
+      resultsQuery={answer.text}
       onQuery={onQuery}
-      sections={sections}
+      sections={answer.sections}
       settled={settled}
+      resultsReady={resultsReady}
       now={now}
       onSelect={onSelect}
       onActiveChange={(id) => {

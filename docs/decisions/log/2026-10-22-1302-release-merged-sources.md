@@ -1,0 +1,1 @@
+- 10-22 13:02 · release · Search all of main's ancestors for verified release sources, including second parents; accept reviewed notes without bypassing either release gate.
