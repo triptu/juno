@@ -19,22 +19,13 @@ import { webShellPort } from './port'
 const lan = process.argv.includes('--host')
 const port = webShellPort()
 
-let shell: Awaited<ReturnType<typeof startWebShell>>
-try {
-  shell = await startWebShell({ port, host: lan ? '0.0.0.0' : '127.0.0.1' })
-} catch (cause) {
-  const inUse = cause instanceof Error && /port .* is already in use|EADDRINUSE/i.test(cause.message)
-  console.error(inUse ? `web shell: port ${port} is in use. Is pnpm web already running in this worktree? Stop it, or set JUNO_WEB_PORT.` : cause)
-  process.exit(1)
-}
-
 let stopping = false
 const stop = (code: number) => {
   if (stopping) return
   stopping = true
   // Stopping takes well under a second; one that hangs must not leave the process behind.
   setTimeout(() => process.exit(code), 5000).unref()
-  void shell.stop().finally(() => process.exit(code))
+  void starting.then((shell) => shell.stop()).finally(() => process.exit(code))
 }
 process.on('SIGINT', () => stop(0))
 process.on('SIGTERM', () => stop(0))
@@ -59,5 +50,17 @@ const alive = (pid: number) => {
 setInterval(() => {
   if (process.ppid !== starters[0] || !starters.every(alive)) stop(0)
 }, 1000).unref()
+
+const starting = startWebShell({ port, host: lan ? '0.0.0.0' : '127.0.0.1' })
+let shell: Awaited<ReturnType<typeof startWebShell>>
+try {
+  shell = await starting
+} catch (cause) {
+  const inUse = cause instanceof Error && /port .* is already in use|EADDRINUSE/i.test(cause.message)
+  console.error(inUse ? `web shell: port ${port} is in use. Is pnpm web already running in this worktree? Stop it, or set JUNO_WEB_PORT.` : cause)
+  process.exit(1)
+}
+
+if (stopping) await new Promise(() => {})
 
 console.log(`Juno web shell: ${shell.url}  control: ${shell.controlUrl}/<name>  (ready in ${Math.round(process.uptime() * 1000)} ms, pid ${process.pid})`)

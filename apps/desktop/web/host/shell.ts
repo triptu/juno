@@ -13,7 +13,7 @@
  *
  * `stop()` ends all of it and removes the data folder.
  */
-import { existsSync, mkdtempSync, readdirSync, realpathSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { Logger, LogLevel } from 'effect'
@@ -86,8 +86,8 @@ function running(pid: number): boolean {
  */
 function scratchFolder(): string {
   const volume = '/Volumes/AgentWork'
-  const wanted = existsSync(join(volume, '.fseventsd/no_log')) ? join(volume, 'tmp') : tmpdir()
-  const parent = existsSync(wanted) ? wanted : tmpdir()
+  const parent = existsSync(volume) ? join(volume, 'tmp') : tmpdir()
+  mkdirSync(parent, { recursive: true })
   for (const name of readdirSync(parent)) {
     if (!name.startsWith('juno-web-')) continue
     const owner = Number(/^juno-web-(\d+)-/.exec(name)?.[1])
@@ -130,7 +130,13 @@ function fakeMain(fake: FakeSlack, credentials: Credentials) {
   const cookie = () => (current === undefined ? '' : `d=${current.cookie}`)
   // The cookie Chromium would attach on the Slack session.
   const httpTransport = HttpTransport.nodeFetch({
-    fetch: (input, init) => fetch(input, { ...init, headers: { ...(init?.headers as Record<string, string>), cookie: cookie() } }),
+    fetch: async (input, init) => {
+      const url = new URL(input instanceof Request ? input.url : input)
+      if (url.origin !== new URL(fake.url).origin) throw new Error('The web shell only contacts its fake Slack')
+      const headers = new Headers(init?.headers)
+      headers.set('cookie', cookie())
+      return fetch(input, { ...init, headers, redirect: 'error' })
+    },
   })
   return { host, httpTransport, cookie }
 }
@@ -213,7 +219,7 @@ export async function startWebShell(options: WebShellOptions): Promise<WebShell>
         host,
         port: options.port,
         strictPort: true,
-        allowedHosts: host === '127.0.0.1' ? [] : true,
+
         fs: { allow: servedFolders() },
         // Transform the page's modules while nobody is looking yet, so the first load is quicker.
         warmup: { clientFiles: [pageEntry] },
@@ -221,6 +227,9 @@ export async function startWebShell(options: WebShellOptions): Promise<WebShell>
       optimizeDeps: { entries: [pageEntry], include: ['react/compiler-runtime'], holdUntilCrawlEnd: false },
     })
     cleanups.push(() => server.close())
+    cleanups.push(() => {
+      for (const socket of open) socket.terminate()
+    })
     await server.listen()
     const address = server.httpServer?.address()
     const port = typeof address === 'object' && address !== null ? address.port : options.port
