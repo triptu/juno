@@ -153,9 +153,14 @@ const unstable = [
   },
   {
     // The web shell's engine socket (docs/development.md, "Web shell"): the client and the server side.
-    label: 'effect/socket and effect/net',
-    spec: /^effect\/(?:socket|net)(?:\/|$)/,
+    label: 'effect/socket',
+    spec: /^effect\/socket(?:\/|$)/,
     allow: ['packages/state/src/socket.ts', 'packages/engine/src/protocol/socket.ts'],
+  },
+  {
+    label: 'effect/net',
+    spec: /^effect\/net(?:\/|$)/,
+    allow: ['packages/engine/src/protocol/socket.ts'],
   },
   {
     label: 'effect/sql and @effect/sql-sqlite-node',
