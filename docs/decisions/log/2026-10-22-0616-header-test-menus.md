@@ -1,0 +1,1 @@
+- 10-22 06:16 · Release agent · Capture native menus before pressing header controls in the feedback test. Menus open on press, so releasing elsewhere does not dismiss them and left Electron in the native menu loop during teardown; keep every hover and press assertion.

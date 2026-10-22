@@ -329,10 +329,12 @@ async function headerFeedback({ juno, win }: Pick<Fixtures, 'juno' | 'win'>): Pr
     const rest = await look(control)
     await control.hover()
     await expect.poll(async () => (await look(control)).background, { message: `hover on ${name}` }).not.toBe(rest.background)
+    // Menu triggers open on press; capture them instead of leaving a native menu open.
+    await juno.chooseNextMenuItem(null)
     await win.mouse.down()
     await expect.poll(async () => (await look(control)).background, { message: `press on ${name}` }).not.toBe(rest.background)
     expect((await look(control)).scale).toBe(rest.scale)
-    // Let go away from the control, so the press does nothing.
+    // Release away so buttons that act on click do not run.
     await away()
     await win.mouse.up()
   }
