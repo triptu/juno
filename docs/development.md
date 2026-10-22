@@ -587,6 +587,25 @@ Names are explained in `docs/architecture.md` sections 2.6 and 7.
 
 Tests that need the Effect test clock use `@effect/vitest`; see the effect skill.
 
+### Text-menu spelling checks
+
+Electron uses the native macOS spellchecker, which detects the language itself.
+`session.setSpellCheckerLanguages` has no effect there. Windows and Linux use
+Hunspell dictionaries. See [Electron's spellchecker guide](https://www.electronjs.org/docs/latest/tutorial/spellchecker).
+
+On macOS, right-clicking immediately after automated typing can select the word
+before the asynchronous checker marks it. Electron then sends an empty
+`misspelledWord` and `dictionarySuggestions`, even when the system checker knows
+the word. Reopening the menu alone can keep returning empty spelling data.
+This also occurs in a plain Electron textarea outside Juno.
+
+`e2e/text-menu.spec.ts` retries the real menu. After a macOS attempt without the
+expected guess, it moves the caret to the end and inserts then deletes a space
+to trigger another check before the next attempt. Moving the caret alone does
+not suffice. The test still requires the guess, Learn Spelling, menu order and
+replacement of the misspelled word on every platform. Keep these assertions;
+do not skip spelling on macOS or substitute a synthetic context-menu event.
+
 ### Single-instance check
 
 The second-launch test in `apps/desktop/e2e/app.spec.ts` starts a normal Electron

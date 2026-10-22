@@ -60,13 +60,21 @@ async function pickASpellingGuess(juno: Juno): Promise<void> {
   await composer.pressSequentially('recieve message is ready to send ')
   const word = await firstWord(composer)
 
-  // Chromium marks the word a moment after it is typed (on Linux once its dictionary has loaded).
+  // An early right-click can leave macOS's asynchronous check without a
+  // spelling marker. Make another edit outside the word between attempts
+  // so the checker runs again. Linux may still be loading its dictionary.
   await expect
     .poll(
       async () => {
         await juno.chooseNextMenuItem(null)
         await composer.click({ button: 'right', position: word })
-        return (await juno.lastMenu()).labels
+        const { labels } = await juno.lastMenu()
+        if (process.platform === 'darwin' && !labels.includes('receive')) {
+          await juno.topic.caretToEnd()
+          await composer.press('Space')
+          await composer.press('Backspace')
+        }
+        return labels
       },
       { timeout: 60_000, intervals: [500] },
     )

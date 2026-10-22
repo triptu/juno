@@ -48,7 +48,7 @@ No tests of its own. The routes are exercised by `packages/engine/test` (the rea
 
 The shell update routes (`updates.get`, `updates.set`, `updates.restart`, `updates.download`, `updates.notes`), `UpdateState` and `ReleaseNotes` keep release handling, and the releases repository's token, in main. `updates.changed` forwards changes to the renderer.
 
-- `mentions.emoji` serves cached workspace emoji and aliases once per workspace; composer keystrokes filter it locally. It never calls Slack.
+- `mentions.emoji` serves cached workspace emoji and aliases once per workspace; composer keystrokes filter it locally. `emoji.recent` streams the recent names from local preferences; `emoji.use { name }` records a choice durably in the open workspace. It never calls Slack.
 
 The ⌘K Conversations tab's `newChat.ranked` live query ranks conversations by own sends and topic visits (`topic_visits`) over 30 days, each use counting half as much per week, then by activity, before its 12 rows; archived and ignored channels are excluded and it never calls Slack; with text it ranks the conversation picker's matches, names that start with the text first among the unused. It re-runs on conversation, user, ignore and visit changes, not on messages, so a send re-ranks it on the next open. The renderer reads it as `paletteConversationsAtom`.
 
