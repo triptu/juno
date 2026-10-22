@@ -222,7 +222,6 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
     }
     // The scrollTop last seen at the bottom. Holding the end and rows growing above only make it larger.
     let bottomTop = scroller.scrollTop
-    // A resting place decided once nothing has scrolled for a moment (`onScrollEnd`).
     let settle: ReturnType<typeof setTimeout> | undefined
     const onScroll = () => {
       clearTimeout(settle)
@@ -245,17 +244,11 @@ export function useScrollRelease(position: Position, view: string, readOnly: boo
     const onScrollEnd = () => {
       const own = takeOwnEnd(scroller)
       if (pinRef.current?.kind === 'row' && Math.abs(scroller.scrollTop - pinnedTopRef.current) > 1) pinRef.current = undefined
-      // A scroll that ends with the bottom still held and the end away is the end moving under it: an edit box that
-      // scrolls itself into view as it opens grows its row, and this event comes before the resize observer in that
-      // frame. The bottom is held again; `hold` lets go instead if the user scrolled up.
+      // Still held with the end away: the end moved under it (an edit box opening). `hold` lets go if the user scrolled up.
       if (pinRef.current?.kind === 'bottom') hold(scroller, pinRef, pinnedTopRef)
-      // The end of the list's own scroll to the bottom, let go of since: the user is scrolling up while rows grow, and
-      // their scroll ends later. Taking the bottom here, within 32px of it, would pull them back down on the next
-      // growth. Where the list rests is decided once nothing has scrolled for a moment, in case both ended as this one event.
-      if (own && pinRef.current?.kind !== 'bottom') {
-        settle = setTimeout(onScrollEnd, GESTURE_IDLE)
-        return
-      }
+      // The list's own scroll to the bottom ended after the user let go of it: they are still scrolling up, so where the
+      // list rests is decided once nothing has scrolled for a moment, not here within 32px of the end.
+      if (own && pinRef.current?.kind !== 'bottom') return void (settle = setTimeout(onScrollEnd, GESTURE_IDLE))
       const distance = distanceFromBottom(scroller)
       const bottom = atEndRef.current && distance <= BOTTOM_SLACK
       if (bottom) {
