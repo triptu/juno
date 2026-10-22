@@ -92,7 +92,7 @@ export function UpdateSettings({ build, available, enabled, status, whatsNew, on
     <div {...stylex.props(styles.row)}>
       {build}
       {/* Dimmed rather than disabled, so a keyboard press keeps focus on it. */}
-      {available ? <Button variant="outline" size="sm" dimmed={busy} onClick={busy ? undefined : onCheck}>Check for updates</Button> : null}
+      {available ? <Button variant="secondary" size="sm" dimmed={busy} onClick={busy ? undefined : onCheck}>Check for updates</Button> : null}
     </div>
     {status === null ? null : <div {...stylex.props(styles.row, styles.status)}>
       <Text variant="meta" tone="muted" numeric as="p">{statusLine(status)}</Text>
