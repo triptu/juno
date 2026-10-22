@@ -165,14 +165,26 @@ export const ContextMenuItems = Schema.Array(
 export const ContextMenuAt = Schema.Struct({ x: Schema.Number, y: Schema.Number })
 
 /**
- * The updater as main sees it. `ready`: a signed build downloaded the update and
- * installs it on Restart to update. `available`: an unsigned build found a newer
- * version, which the owner downloads as a DMG (`download` tracks that).
+ * The updater as main sees it. `unavailable`: no releases repository (development,
+ * tests). Otherwise `enabled` is the "Download updates automatically" setting and
+ * `kind` is what About's update line shows: nothing (`idle`), a check the owner
+ * asked for (`checking`, then `current` or `failed` with `details` for Copy
+ * details), a signed build's downloaded update that installs on Restart to update
+ * (`ready`), or a newer version (`available`). An unsigned build downloads that as a DMG; `download`
+ * tracks it, and a signed build's download in place, with `progress` from 0 to 1 when known.
  */
 export const UpdateState = Schema.Union([
-  Schema.Struct({ kind: Schema.Literals(['unavailable', 'disabled', 'idle']) }),
-  Schema.Struct({ kind: Schema.Literal('ready'), version: Schema.String }),
-  Schema.Struct({ kind: Schema.Literal('available'), version: Schema.String, download: Schema.Literals(['none', 'downloading', 'failed']) }),
+  Schema.Struct({ kind: Schema.Literal('unavailable') }),
+  Schema.Struct({ kind: Schema.Literals(['idle', 'checking', 'current']), enabled: Schema.Boolean }),
+  Schema.Struct({ kind: Schema.Literal('failed'), enabled: Schema.Boolean, details: Schema.String }),
+  Schema.Struct({ kind: Schema.Literal('ready'), enabled: Schema.Boolean, version: Schema.String }),
+  Schema.Struct({
+    kind: Schema.Literal('available'),
+    enabled: Schema.Boolean,
+    version: Schema.String,
+    download: Schema.Literals(['none', 'downloading', 'failed']),
+    progress: Schema.optionalKey(Schema.Number),
+  }),
 ])
 export type UpdateState = typeof UpdateState.Type
 
@@ -312,6 +324,7 @@ export const ShellRoutes = {
   [Channels.updatesGet]: { input: Schema.Void, output: UpdateState },
   [Channels.updatesSet]: { input: Schema.Struct({ enabled: Schema.Boolean }), output: UpdateState },
   [Channels.updatesRestart]: { input: Schema.Void, output: Schema.Void },
+  [Channels.updatesCheck]: { input: Schema.Void, output: UpdateState },
   [Channels.updatesDownload]: { input: Schema.Void, output: UpdateState },
   [Channels.updatesNotes]: { input: Schema.Struct({ scope: Schema.Literals(['installed', 'update']) }), output: ReleaseNotes },
   [Channels.appGetInfo]: { input: Schema.Void, output: AppInfo },

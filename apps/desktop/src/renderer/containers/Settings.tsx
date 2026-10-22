@@ -54,7 +54,7 @@ function Section({ section }: { readonly section: SettingsSection }) {
     case 'backup':
       return <JunoBackup />
     case 'about':
-      return <SettingsAbout build={<AppInfo />} updates={<Updates />} diagnostics={<Diagnostics />} onShowTour={showTheTour} />
+      return <SettingsAbout updates={<Updates build={<AppInfo />} />} diagnostics={<Diagnostics />} onShowTour={showTheTour} />
   }
 }
 
