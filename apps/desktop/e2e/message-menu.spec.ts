@@ -229,10 +229,13 @@ test('More reactions grows the picker from the corner of the menu that stays put
   const view = await juno.win.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight }))
   const rows = juno.topic.list.locator('[data-message-row]')
   const last = rows.last()
-  // A row in the upper half of the list, with room for the picker below the menu.
-  const upper = juno.topic.message('Corner check 4')
-  await expect(upper).toBeInViewport()
-  expect((await boxOf(upper)).top).toBeLessThan(view.height - 360 - 40)
+  // The lowest row in view whose words leave room for the picker below a menu opened on them.
+  const index = await rows.evaluateAll((nodes, height) => nodes.findLastIndex((node) => {
+    const text = node.querySelector('[data-msg-text]')?.getBoundingClientRect()
+    return text !== undefined && text.top > 120 && text.top + 10 + 1 + 360 + 6 < height - 10
+  }), view.height)
+  expect(index).toBeGreaterThanOrEqual(0)
+  const upper = rows.nth(index)
   // The last row sits on the composer: the menu shifts up to fit, and the picker grows upward from its bottom.
   expect((await boxOf(last)).bottom).toBeGreaterThan(view.height - 360)
 
