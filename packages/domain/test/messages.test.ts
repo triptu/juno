@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { startsGroup, threadLinkLabel, type GroupMessage } from '../src/messages'
 
-const message: GroupMessage = { senderId: 'U0LEO', body: { blocks: [] }, isThreadRoot: false }
+const message: GroupMessage = { senderId: 'U0LEO', body: { blocks: [] }, isThreadRoot: false, at: 0 }
 
 describe('message headers', () => {
   it.each([
@@ -13,6 +13,8 @@ describe('message headers', () => {
     ['new divider', message, { ...message, startsAfterDivider: true }, true],
     ['reply also sent to the channel', message, { ...message, broadcast: true }, true],
     ['after a reply also sent to the channel', { ...message, broadcast: true }, message, true],
+    ['nine quiet minutes', message, { ...message, at: 9 * 60_000 }, false],
+    ['ten quiet minutes', message, { ...message, at: 10 * 60_000 }, true],
   ] satisfies ReadonlyArray<readonly [string, GroupMessage | undefined, GroupMessage, boolean]>)('%s', (_, prev, next, expected) => {
     expect(startsGroup(prev, next)).toBe(expected)
   })
