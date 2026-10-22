@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-22 12:27 · palette-stable-results · Both ⌘K tabs retain the last rendered answer, including "No matches." and delayed Slack or command rows, until the next local answer arrives. The displayed answer's readiness is separate from the current input's loading state. Clearing selects the warm empty-query state immediately; answers from older edits cannot replace newer results. The search divider appears only with a body.
 - 10-22 12:14 · Tushar · The message hover toolbar is smaller and quieter, so it never draws the eye from the messages: a 28px pill (was 38) of 24px round buttons with no gap (was 28px with a 2px gap), 14px emoji (was 16) and 15px icons (was 18). `--toolbar-height` is 28px and `--toolbar-clip-margin` 36px. The delete confirm and the selection toolbar keep the same 28px height with 22px buttons. Same actions in the same order.
 - 10-22 06:16 · Release agent · Capture native menus before pressing header controls in the feedback test. Menus open on press, so releasing elsewhere does not dismiss them and left Electron in the native menu loop during teardown; keep every hover and press assertion.
 - 10-22 06:15 · Release agent · Use an English sentence and the unambiguous misspelling `recieve` in the native spelling test. macOS detects `teh fix` as Indonesian, and Chromium rechecks the word alone; keep the correction, menu order and edit-item assertions.
