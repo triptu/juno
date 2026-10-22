@@ -22,6 +22,7 @@ export { openViewerAtom } from './mediaViewer'
 export { closeWelcome, showWelcome, tickWelcome, welcomeAtom } from './welcome'
 export { setTabExpiry, startTabExpiry, tabExpiryAtom } from './tabExpiry'
 export { quickReactionsAtom, setQuickReactions } from './quickReactions'
+export { recentEmojiAtom, frequentEmojiAtom, noteRecentEmoji } from './recentEmoji'
 export {
   closeSidebarSheet,
   currentRowAtom,

@@ -6,22 +6,26 @@ import { useState } from 'react'
  */
 import { emojiCatalog } from '@juno/contract'
 import { emojiPickerDataAtom, standardEmojiPickerData, warmWorkspaceEmoji } from '@juno/state/emoji'
+import { frequentEmojiAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { EmojiPicker } from '@juno/views'
 
 warmWorkspaceEmoji(emojiCatalog)
 
 export interface EmojiPickerPanelProps {
-  readonly recent: ReadonlyArray<string>
   readonly onPick: (name: string, unicode: string | undefined) => void
   readonly onClose: () => void
 }
 
-export default function EmojiPickerPanel({ recent, onPick, onClose }: EmojiPickerPanelProps) {
+export default function EmojiPickerPanel({ onPick, onClose }: EmojiPickerPanelProps) {
+  const recent = useAtomValue(frequentEmojiAtom)
+  const [recentSnapshot, setRecentSnapshot] = useState(recent)
+  if (recentSnapshot === undefined && recent !== undefined) setRecentSnapshot(recent)
   const current = useAtomValue(emojiPickerDataAtom(emojiCatalog))
   const [snapshot, setSnapshot] = useState(current)
   if (snapshot === undefined && current !== undefined) setSnapshot(current)
   // Table changes take effect on the next open, so cells never move under a pending click.
   const answer = snapshot ?? current
-  return <EmojiPicker data={answer?.data ?? standardEmojiPickerData} recent={recent} onPick={onPick} onClose={onClose} />
+  if (recentSnapshot === undefined) return null
+  return <EmojiPicker data={answer?.data ?? standardEmojiPickerData} recent={recentSnapshot} onPick={onPick} onClose={onClose} />
 }

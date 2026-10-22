@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-22 12:13 · Implementation · Keep emoji recency in the workspace's existing user.db preferences, matching quick reactions. The engine updates and ranks it; state preloads the local query after the sidebar paints, and pickers wait for its first value. This survives restarts, updates and cache resets without another store. The old list existed only in renderer memory, so no saved data can be migrated. Slack frequents have no documented or fetched payload in the current client, so seeding is deferred.
 - 10-22 06:16 · Release agent · Capture native menus before pressing header controls in the feedback test. Menus open on press, so releasing elsewhere does not dismiss them and left Electron in the native menu loop during teardown; keep every hover and press assertion.
 - 10-22 06:15 · Release agent · Use an English sentence and the unambiguous misspelling `recieve` in the native spelling test. macOS detects `teh fix` as Indonesian, and Chromium rechecks the word alone; keep the correction, menu order and edit-item assertions.
 - 10-22 06:08 · Release agent · Restore the surrounding eager rows when a scroll ends on skipped content. Laying out only the landing row let nearby row heights move it 201 px after scrollend on this Mac. Keep the synchronous commit and visibility guard.

@@ -9,7 +9,6 @@ import { quickReactionsAtom, registry, setQuickReactions } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { QuickReactionsSetting } from '@juno/views'
 import { chunk, usePreloaded } from './chunks'
-import { frequentEmoji } from './recentEmoji'
 import type { QuickReaction } from '@juno/contract'
 
 const pickerChunk = chunk(() => import('./QuickReactionPicker'))
@@ -42,7 +41,7 @@ export function QuickReactions() {
       onAdd={() => setOpen((was) => !was)}
       onClosePicker={() => setOpen(false)}
       picker={open && ready ? (
-        <QuickReactionPicker recent={frequentEmoji(reactions)} selected={reactions} onPick={add} onClose={() => setOpen(false)} />
+        <QuickReactionPicker selected={reactions} onPick={add} onClose={() => setOpen(false)} />
       ) : undefined}
     />
   )

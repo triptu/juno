@@ -4,12 +4,11 @@
  */
 import { useMemo, type Dispatch, type KeyboardEvent, type RefObject, type SetStateAction } from 'react'
 import type { MessageView, TopicDetail } from '@juno/contract'
-import { deleteMessage, forwardSheetAtom, reactToMessage, registry, type MessageWindow } from '@juno/state'
+import { deleteMessage, forwardSheetAtom, noteRecentEmoji, reactToMessage, registry, type MessageWindow } from '@juno/state'
 import type { MenuAnchor, MessageActions } from '@juno/views'
 import type { ComposerHandle } from '../messageActions'
 import { isOwnEditable, landedTs, refOf } from '../messageRows'
 import { openTopic, openTopicInBackground } from '../navigation'
-import { noteRecentEmoji } from '../recentEmoji'
 import { showMessageMenu } from '../topicActions'
 
 const ROW = '[data-message-row]'

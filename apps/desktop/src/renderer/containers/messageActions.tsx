@@ -169,6 +169,6 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
     activeMessage: picker?.ts ?? menuMessage,
     confirmingDelete: confirming?.ts,
     editing: editingRow,
-    floating: floatingOf(picker, setPicker, selection, setSelection, rowMessage, actions.react, scrollRef, composer, quick, juno),
+    floating: floatingOf(picker, setPicker, selection, setSelection, rowMessage, actions.react, scrollRef, composer, juno),
   }
 }

@@ -5,6 +5,9 @@
  */
 export { prepareEmojiPicker, type PreparedEmojiPicker, type PickerItem, workspaceEmoji, emojiCatalog, type EmojiCategory } from '@juno/domain'
 
+/** Recent emoji names in the open workspace's durable prefs. */
+export const RECENT_EMOJI_PREF = 'recentEmoji'
+
 /** A one-click reaction in the message toolbar: a standard emoji (`unicode`) or a custom one (`url`). */
 export interface QuickReaction {
   /** Slack's name, for example `+1`. */
