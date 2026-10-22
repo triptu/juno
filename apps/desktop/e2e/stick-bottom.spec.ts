@@ -139,7 +139,8 @@ test('keeps the last message of Main whole as it grows at the bottom, and still 
     await topic.expectAtBottom()
     const watched = await watchArrival(win, TOPIC_SCROLLER, '[data-message-row]', text)
     fake.addReaction({ channel, ts: message.ts, name: 'eyes', user: slack.as('Leo').id })
-    await expect(topic.message(text).getByRole('button', { name: /👀/ })).toBeVisible()
+    // The reaction itself, not the hover toolbar's React 👀 when the pointer rests on the last message.
+    await expect(topic.message(text).getByRole('button', { name: '1 👀' })).toBeVisible()
     await frames(win, 5)
     expectWhole(await watched(), { atEnd: true })
   })
