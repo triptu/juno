@@ -302,6 +302,8 @@ if (process.argv[2] === '--verify-agent') {
 }
 
 const regressions = [
+  ['reactors', 'raced', 'preservesConcurrentWrite', 'reactors-raced'],
+  ['reactors', 'sameCount', 'pageDropsUnprovenNames', 'reactors-same-count'],
   ['requestqueue', 'pauseWhileQueued', 'respectsPause', 'requestqueue-queued-pause'],
   ['requestqueue', 'methodSpacing', 'methodSpaced', 'requestqueue-method-spacing'],
   ['discovery', 'rootsFirst', 'noRedundantLookup', 'discovery-roots-first'],
@@ -347,7 +349,7 @@ for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith
 }
 
 if (!huddleOnly && !memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
-  for (const file of (outboxOnly ? ['outbox'] : ['follow', 'readstate', 'outbox', 'catchup', 'mutation-repair', 'requestqueue', 'discovery', 'metadata', 'quietwindow'])) {
+  for (const file of (outboxOnly ? ['outbox'] : ['follow', 'readstate', 'outbox', 'catchup', 'mutation-repair', 'requestqueue', 'discovery', 'metadata', 'quietwindow', 'reactors'])) {
     simulate(file, 'simulationStep', 'invariants', `${file}.itf.json`, false, true,
       drained.has(file) ? { witnesses: ['reachedAgreement'] } : {})
   }

@@ -8,10 +8,11 @@
  *
  * The first value is what the store holds. When a reaction lists fewer
  * people than its count, the subscription asks the running sync's fetcher
- * for everyone once (`TopicFetcher.reactors`, interactive lane), forked in
+ * for everyone once per incomplete snapshot (`TopicFetcher.reactors`), forked in
  * the subscription's scope so the value is not held back; closing the dialog
- * interrupts it. A failure is logged and leaves the stored list. People the
- * store lacks are asked for through `wantUsers`, once each per subscription.
+ * interrupts its wait (the last waiter cancels the shared fetch). A concurrent
+ * write supersedes the answer and triggers a retry. A failure is logged and
+ * leaves the stored list. People the store lacks are asked for through `wantUsers`, once each per subscription.
  */
 import { Effect, Scope, Stream } from 'effect'
 import { WhoReactedRoutes } from '@juno/contract'
@@ -22,6 +23,7 @@ import { retryFirstRun, serveLiveValue, timed } from '../protocol/live'
 import { SyncLink } from '../syncLink'
 import { Workspace } from '../workspace'
 import { whoReacted } from './reactors'
+import { outcomeOf } from './handlers'
 
 export const WhoReactedHandlers = WhoReactedRoutes.toLayer(
   Effect.gen(function* () {
@@ -43,7 +45,7 @@ export const WhoReactedHandlers = WhoReactedRoutes.toLayer(
               const rows = yield* sql<{ thread_ts: string | null }>`SELECT thread_ts FROM messages WHERE channel = ${channel} AND ts = ${ts}`.pipe(Effect.orElseSucceed(() => []))
               const thread = (rows[0]?.thread_ts ?? ts) as Ts
               const keys: InvalidationKeys = { messages: [mainTopicId(channel as ChannelId), threadTopicId(channel as ChannelId, thread), `channel:${channel}`], ...own, users: [], emoji: [], team: [] }
-              let fetched = false
+              let fetched: string | undefined
               let loading = false
               const asked = new Set<string>()
               const query = Effect.gen(function* () {
@@ -55,12 +57,17 @@ export const WhoReactedHandlers = WhoReactedRoutes.toLayer(
                   for (const id of unnamed) asked.add(id)
                   yield* fetcher.wantUsers(unnamed)
                 }
-                if (run.short && !fetched && fetcher !== undefined) {
-                  fetched = true
+                if (!run.short) fetched = undefined
+                if (run.short && !loading && fetched !== run.revision && fetcher !== undefined) {
+                  fetched = run.revision
                   loading = true
                   yield* Effect.forkIn(
                     fetcher.reactors(channel, ts).pipe(
-                      Effect.catchCause((cause) => Effect.logWarning('reactions.who: the full list was not fetched', { cause })),
+                      Effect.tap((revision) => Effect.sync(() => {
+                        // A response raced by a write needs a new read; a partial answer must not loop.
+                        fetched = revision
+                      })),
+                      Effect.catch((error) => outcomeOf(error).pipe(Effect.flatMap((outcome) => Effect.logWarning('reactions.who: the full list was not fetched', { outcome })))),
                       Effect.ensuring(
                         Effect.suspend(() => {
                           loading = false

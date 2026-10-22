@@ -7,7 +7,7 @@
  * - `channelThreadsAtom(channel)`: Main's active threads.
  * - `whoReactedAtom(channel, ts)`: everyone who reacted to a message, for
  *   the "who reacted" dialog. Mount it only while the dialog is open: the
- *   subscription may fetch the full list from Slack once.
+ *   subscription may fetch the full list from Slack when its stored snapshot is incomplete.
  *
  * What a topic tab reads, so the list never shows an empty frame when its
  * window moves (performance 5.3). Both are keyed by a view, `topicView(id,

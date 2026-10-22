@@ -34,6 +34,7 @@ export interface WhoReactedRun {
   /** `null` for a message the store does not have, or one deleted. */
   readonly value: Omit<WhoReacted, 'loading'> | null
   /** A stored reaction lists fewer people than its count. */
+  readonly revision: string
   readonly short: boolean
   /** Reactors the store has no user for. */
   readonly unknown: ReadonlyArray<string>
@@ -63,11 +64,12 @@ export const whoReacted = (channel: string, ts: string): Effect.Effect<WhoReacte
     const statements = whoReactedStatements(channel, ts)
     const messages = yield* sql.unsafe<{ client_msg_id: string | null; deleted: 0 | 1 }>(statements.message.sql, statements.message.params)
     const message = messages[0]
-    if (message === undefined || message.deleted === 1) return { value: null, short: false, unknown: [] }
+    if (message === undefined || message.deleted === 1) return { value: null, revision: '', short: false, unknown: [] }
     const team = yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`
     const selfId = team[0]?.self_user_id ?? undefined
     const stored: Array<StoredReaction> = []
-    for (const row of yield* sql.unsafe<{ name: string; count: number; me: 0 | 1; user_ids_json: string | null }>(statements.reactions.sql, statements.reactions.params)) {
+    const rows = yield* sql.unsafe<{ name: string; count: number; me: 0 | 1; user_ids_json: string | null }>(statements.reactions.sql, statements.reactions.params)
+    for (const row of rows) {
       stored.push({ name: row.name, count: row.count, me: row.me, users: parseUsers(row.user_ids_json) })
     }
     const short = stored.some((reaction) => reaction.users.length < reaction.count)
@@ -76,7 +78,7 @@ export const whoReacted = (channel: string, ts: string): Effect.Effect<WhoReacte
     const statement = actionsStatement(channel)
     const actions = yield* sql.unsafe<ActionRow>(statement.sql, statement.params)
     const intent = actions.length === 0 ? undefined : intentOf(intentsOf(actions), { ts, client_msg_id: message.client_msg_id })
-    if (intent?.deleted === true) return { value: null, short: false, unknown: [] }
+    if (intent?.deleted === true) return { value: null, revision: '', short: false, unknown: [] }
     const reactions = intent === undefined || intent.reactions.size === 0 ? stored : withReactionIntents(stored, intent.reactions, selfId)
 
     const ordered = reactions.map((reaction) => orderedReactors(reaction.users, reaction.me === 1, selfId))
@@ -109,6 +111,7 @@ export const whoReacted = (channel: string, ts: string): Effect.Effect<WhoReacte
         })),
         people,
       },
+      revision: JSON.stringify(rows.map(({ name, count, user_ids_json }) => ({ name, count, user_ids_json }))),
       short,
       unknown,
     }

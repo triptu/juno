@@ -1,7 +1,7 @@
 /**
  * The "who reacted" dialog's data (inventory 6.4): `reactions.who`, a live
  * value that reads the store and, unlike the topic view's live queries, may
- * call Slack once when the store lists fewer people than a reaction's count.
+ * call Slack when the store lists fewer people than a reaction's count.
  */
 import { Schema } from 'effect'
 import { RpcGroup } from 'effect/rpc'
@@ -39,9 +39,10 @@ export type WhoReacted = typeof WhoReacted.Type
  * Everyone who reacted to one message, for the "who reacted" dialog. `null`
  * for a message the store does not have, or one deleted. The first value is
  * what the store holds. When a reaction lists fewer people than its count,
- * the subscription fetches the full list once (`reactions.get` with `full`,
+ * the subscription fetches once per incomplete snapshot (`reactions.get` with `full`,
  * on the interactive lane) with `loading` set; the value updates when it is
- * stored. A failed fetch keeps what is stored and clears `loading`.
+ * stored. Concurrent subscriptions share the fetch; a concurrent write causes
+ * a fresh fetch instead of storing an older answer. A failed fetch keeps what is stored and clears `loading`.
  */
 export const reactionsWho = liveValueRoute('reactions.who', {
   payload: { channel: Schema.String, ts: Schema.String },

@@ -1,8 +1,7 @@
 // "Who reacted" (`reactions.who`): a page lists at most `REACTORS_LISTED`
 // people per reaction, as Slack may; the dialog's subscription shows what is
 // stored at once, fetches everyone once with `reactions.get` `full`, names
-// the people the store lacks, and keeps the full list when a later page cuts
-// it short again (an edit's event). The topic window still names at most ten per chip.
+// the people the store lacks, and refreshes after a later truncated snapshot. The topic window still names at most ten per chip.
 import { describe, expect, it } from 'vitest'
 import type { WhoReacted } from '@juno/contract'
 import { REACTORS_LISTED, type ManyReactionsSeed } from '@juno/fake-slack'
@@ -83,28 +82,84 @@ describe('who reacted: the full fetch', () => {
 })
 
 describe('who reacted: the stored full list', () => {
-  it('does not fetch again while the store lists everyone, and keeps the full list when a page cuts it short', async () => {
+  it('keeps a full list current through socket adds and removes without another fetch', async () => {
     const engine = await booted()
     const seed = await seeded(engine)
-    const first = who(engine, seed)
-    await first.until((value) => !value.loading && reaction(value, '+1')?.users.length === 40, 'everyone')
-    first.close()
-
-    // An edit's event carries the message as a page does, 25 people listed: the store keeps all 40.
+    const dialog = who(engine, seed)
+    await dialog.until((value) => !value.loading && reaction(value, '+1')?.users.length === 40, 'everyone')
     engine.fake.resetCalls()
-    engine.fake.editMessage({ channel: seed.channel, ts: seed.ts, text: 'Launch day, edited' })
-    const storedText = () => readDb(engine, 'cache.db', (db) => (db.prepare('SELECT text FROM messages WHERE channel = ? AND ts = ?').get(seed.channel, seed.ts) as { text: string }).text)
-    await waitFor(() => (storedText() === 'Launch day, edited' ? true : undefined), WAIT_MS, 'the edit stored')
-    expect(engine.fake.messages(seed.channel).find((m) => m.ts === seed.ts)?.reactions?.[0]?.users).toHaveLength(40)
-    expect(storedUsers(engine, seed.ts, '+1')).toHaveLength(40)
-
-    const again = who(engine, seed)
-    const value = await again.until(() => true, 'a value')
-    expect(value.loading).toBe(false)
-    expect(reaction(value, '+1')?.users).toHaveLength(40)
+    engine.fake.addReaction({ channel: seed.channel, ts: seed.ts, name: '+1', user: 'U0MAYA' })
+    const added = await dialog.until((value) => reaction(value, '+1')?.count === 41, 'new reactor')
+    expect(reaction(added, '+1')?.users).toContain('U0MAYA')
+    const removed = seed.reactions[0]!.users.at(-1)!
+    engine.fake.removeReaction({ channel: seed.channel, ts: seed.ts, name: '+1', user: removed })
+    const current = await dialog.until((value) => reaction(value, '+1')?.count === 40, 'reactor removed')
+    expect(reaction(current, '+1')?.users).not.toContain(removed)
+    expect(reaction(current, '+1')?.users).toContain('U0MAYA')
     await quiet(engine)
     expect(apiCalls(engine, 'reactions.get')).toHaveLength(0)
+    dialog.close()
+  })
+
+  it('refetches after a truncated snapshot even when the count and listed users are unchanged', async () => {
+    const engine = await booted()
+    const seed = await seeded(engine)
+    const dialog = who(engine, seed)
+    await dialog.until((value) => !value.loading && reaction(value, '+1')?.users.length === 40, 'everyone')
+    engine.fake.resetCalls()
+    // A missed remove/add beyond the first 25 keeps both count and truncated list unchanged.
+    const removed = seed.reactions[0]!.users.at(-1)!
+    engine.fake.holdFrames({ types: ['reaction_added', 'reaction_removed'] })
+    engine.fake.removeReaction({ channel: seed.channel, ts: seed.ts, name: '+1', user: removed })
+    engine.fake.addReaction({ channel: seed.channel, ts: seed.ts, name: '+1', user: 'U0MAYA' })
+    engine.fake.releaseFrames({ drop: true })
+    engine.fake.editMessage({ channel: seed.channel, ts: seed.ts, text: 'Launch day, edited' })
+    const fresh = await dialog.until((value) => !value.loading && reaction(value, '+1')?.users.includes('U0MAYA') === true, 'fresh full list')
+    expect(reaction(fresh, '+1')?.users).toHaveLength(40)
+    expect(reaction(fresh, '+1')?.users).not.toContain(removed)
+    expect(apiCalls(engine, 'reactions.get')).toHaveLength(1)
+    dialog.close()
+    const again = who({ ...engine, registry: engine.openWindow() }, seed)
+    await again.until((value) => !value.loading && reaction(value, '+1')?.users.length === 40, 'cached full list')
+    await quiet(engine)
+    expect(apiCalls(engine, 'reactions.get')).toHaveLength(1)
     again.close()
+  })
+
+})
+
+describe('who reacted: concurrent fetches', () => {
+  it('shares a held full fetch across renderer subscriptions', async () => {
+    const engine = await booted()
+    const seed = await seeded(engine)
+    engine.fake.holdNext({ method: 'reactions.get' })
+    const first = who(engine, seed)
+    await first.until((value) => value.loading, 'first loading')
+    await waitFor(() => engine.fake.heldCount() === 1 ? true : undefined, WAIT_MS, 'held full fetch')
+    const second = who({ ...engine, registry: engine.openWindow() }, seed)
+    await second.until((value) => value.loading, 'second loading')
+    engine.fake.release()
+    await first.until((value) => !value.loading && reaction(value, '+1')?.users.length === 40, 'first complete')
+    await second.until((value) => !value.loading && reaction(value, '+1')?.users.length === 40, 'second complete')
+    expect(apiCalls(engine, 'reactions.get')).toHaveLength(1)
+    first.close()
+    second.close()
+  })
+
+  it('retries a full response superseded by a socket event without undoing the event', async () => {
+    const engine = await booted()
+    const seed = await seeded(engine)
+    engine.fake.holdNext({ method: 'reactions.get' })
+    const dialog = who(engine, seed)
+    await waitFor(() => engine.fake.heldCount() === 1 ? true : undefined, WAIT_MS, 'old snapshot held')
+    engine.fake.addReaction({ channel: seed.channel, ts: seed.ts, name: '+1', user: 'U0MAYA' })
+    await dialog.until((value) => reaction(value, '+1')?.count === 41, 'event stored during fetch')
+    engine.fake.release()
+    const fresh = await dialog.until((value) => !value.loading && reaction(value, '+1')?.users.length === 41, 'fresh response')
+    expect(reaction(fresh, '+1')?.users).toContain('U0MAYA')
+    expect(apiCalls(engine, 'reactions.get')).toHaveLength(2)
+    expect(dialog.seen.filter((value) => value !== null && reaction(value, '+1')?.users.length === 40)).toHaveLength(0)
+    dialog.close()
   })
 
   it('keeps what is stored and stops loading when Slack refuses', async () => {

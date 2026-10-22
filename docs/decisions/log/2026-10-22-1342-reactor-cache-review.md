@@ -1,0 +1,1 @@
+- 10-22 13:42 · Correctness · Full reactor reads share pending work and compare the stored snapshot across the request; a raced write triggers a retry. Truncated pages replace old membership even at the same count, since unseen remove/add pairs can change who reacted. Hover-card names stay together while the sentence wraps between people.

@@ -10,7 +10,6 @@ import { Effect } from 'effect'
 import { syncKeys } from '../keys'
 import { acknowledgeStartedThread } from '../startedThreads'
 import { reconcilePost } from '../posts'
-import { reactorsToStore } from '../merge'
 import { reconcileSent } from '../sent'
 
 import { invalidate, type Writer } from './shared'
@@ -50,30 +49,22 @@ export function topicOfMessage(row: Pick<MessageRow, 'channel' | 'ts' | 'thread_
 
 type ReactionTarget = Pick<MessageRow, 'channel' | 'ts' | 'thread_ts' | 'subtype' | 'reply_count'>
 
-/**
- * A message's reactions as a page, an event or `reactions.get` states them.
- * A longer list of who reacted that the store already holds is kept when
- * the incoming one is cut short (`reactorsToStore`). Fires the message's
- * topics, whose rows show the reactions.
- */
+/** A message's reactions as a page states them. Fires the message's topics, whose rows show the reactions. */
 export const replaceReactions = (message: ReactionTarget, reactions: ReadonlyArray<Reaction>, selfId: string): Writer =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     const { channel, ts } = message
-    const stored = yield* sql<{ name: string; count: number; user_ids_json: string | null; me: number }>`
-      SELECT name, count, user_ids_json, me FROM reactions WHERE channel = ${channel} AND ts = ${ts} ORDER BY rowid`
-    const storedByName = new Map(stored.map((row) => [row.name, { count: row.count, users: JSON.parse(row.user_ids_json ?? '[]') as Array<string> }]))
     const next = reactions.map((reaction) => {
-      const listed = reaction.users ?? []
-      const count = reaction.count ?? listed.length
-      const users = reactorsToStore({ count, users: listed }, storedByName.get(reaction.name))
+      const users = reaction.users ?? []
       return {
         name: reaction.name,
-        count,
+        count: reaction.count ?? users.length,
         user_ids_json: JSON.stringify(users),
         me: users.includes(selfId) ? 1 : 0,
       }
     })
+    const stored = yield* sql<{ name: string; count: number; user_ids_json: string; me: number }>`
+      SELECT name, count, user_ids_json, me FROM reactions WHERE channel = ${channel} AND ts = ${ts} ORDER BY rowid`
     if (stored.length === next.length && stored.every((row, index) => {
       const expected = next[index]
       return expected !== undefined && row.name === expected.name && row.count === expected.count && row.user_ids_json === expected.user_ids_json && row.me === expected.me

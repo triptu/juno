@@ -9,7 +9,7 @@ export { type FetchReport } from './open'
 export { syncConfigLayer, type SyncConfigShape } from './config'
 export { followFenceLayer } from './followFence'
 
-export { mergeMessage, mergeRootCounters, mergeTombstone, reactorsToStore, stubRoot, toMessageRow } from './merge'
+export { mergeMessage, mergeRootCounters, mergeTombstone, stubRoot, toMessageRow } from './merge'
 export { imagesWithoutThumbs } from './files'
 export { reindexAll, reindexTopics, type StoredPreview } from './reindex'
 export { BOOT_KEY, HOME_READY_KEY, QUICK_START_KEY, storedMe } from './boot'

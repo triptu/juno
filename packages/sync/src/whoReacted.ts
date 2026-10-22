@@ -1,34 +1,40 @@
 /**
- * Everyone who reacted to one message, for the "who reacted" dialog.
- * A page may list fewer people than a reaction's count; `reactions.get` with
- * `full` lists them all (research section 10, "Who reacted"). The answer is
- * stored as a page's reactions are (architecture 5.4): only when no event
- * touched the message after the request started, so a reaction added or
- * removed meanwhile is not undone.
+ * Fetch everyone who reacted to one message. Compare the stored snapshot
+ * before and after the request so a socket event or page cannot be undone
+ * by an older answer. A superseded answer asks the open dialog to try again.
  */
-import { compareTs, millisToTs, type Ts } from '@juno/domain'
+import type { Ts } from '@juno/domain'
 import { SlackApi } from '@juno/slack'
-import { transaction } from '@juno/store'
-import { Clock, Effect } from 'effect'
+import { StoreWriter, transaction } from '@juno/store'
+import { Effect } from 'effect'
 import type { SyncContext } from './context'
 import type { OpenError, OpenServices } from './open'
 import { readMessage, replaceReactions } from './write'
 
-/** Fetches and stores every reactor of a stored message on the interactive lane. True when the store took the answer. */
-export const fetchFullReactions = (ctx: SyncContext, channel: string, ts: string): Effect.Effect<boolean, OpenError, OpenServices> =>
+/** The stored reaction snapshot after a settled read; undefined when a concurrent write superseded it. */
+export const fetchFullReactions = (ctx: SyncContext, channel: string, ts: string): Effect.Effect<string | undefined, OpenError, OpenServices> =>
   Effect.gen(function* () {
     const api = yield* SlackApi
-    const requestedAt = millisToTs(yield* Clock.currentTimeMillis)
+    const sql = yield* StoreWriter
+    const snapshot = transaction(Effect.gen(function* () {
+      const message = yield* readMessage(channel, ts)
+      const reactions = yield* sql<{ name: string; count: number; user_ids_json: string | null }>`
+        SELECT name, count, user_ids_json FROM reactions WHERE channel = ${channel} AND ts = ${ts} ORDER BY rowid`
+      return { message, reactions, revision: JSON.stringify([message?.version, reactions]) }
+    }))
+    const before = yield* snapshot
+    if (before.message === undefined || before.message.deleted === 1) return JSON.stringify(before.reactions)
+    if (before.reactions.every((reaction) => JSON.parse(reaction.user_ids_json ?? '[]').length >= reaction.count)) return JSON.stringify(before.reactions)
     const answer = yield* api.call('reactions.get', { channel, timestamp: ts as Ts, full: true }, { lane: 'interactive', reason: 'reactors' })
-    if (answer.message === undefined) return false
+    if (answer.message === undefined) return JSON.stringify(before.reactions)
     const reactions = answer.message.reactions ?? []
     return yield* transaction(
       Effect.gen(function* () {
-        const existing = yield* readMessage(channel, ts)
-        if (existing === undefined || existing.deleted === 1) return false
-        if (existing.last_event_ts !== null && compareTs(existing.last_event_ts, requestedAt) >= 0) return false
-        yield* replaceReactions(existing, reactions, ctx.me.userId)
-        return true
+        const current = yield* snapshot
+        if (current.message === undefined || current.message.deleted === 1) return JSON.stringify(current.reactions)
+        if (current.revision !== before.revision) return undefined
+        yield* replaceReactions(current.message, reactions, ctx.me.userId)
+        return JSON.stringify((yield* snapshot).reactions)
       }),
     )
   })
