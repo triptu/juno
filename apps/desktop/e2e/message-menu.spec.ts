@@ -214,6 +214,9 @@ async function pointOn(win: Page, row: Locator, side: 'left' | 'right'): Promise
 test('More reactions grows the picker from the corner of the menu that stays put, near every edge of the window', async ({ juno, fake }) => {
   // A narrow window, so a message's words reach near its right edge.
   await juno.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(900, 700))
+  // A resize closes an open menu, so let it land first.
+  await expect.poll(() => juno.win.evaluate(() => window.innerWidth)).toBeLessThanOrEqual(900)
+  await juno.win.waitForTimeout(300)
   for (let i = 0; i < 12; i++) fake.injectMessage({ channel: 'C0ENG', user: i % 2 === 0 ? 'U0MAYA' : 'U0LEO', text: `Corner check ${i}: a line long enough to run across the whole column of the list, to its far edge` })
   await juno.sidebar.expectTop('#eng')
   await juno.sidebar.row('#eng').open()
