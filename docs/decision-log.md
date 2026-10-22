@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-22 12:16 · pin-bottom agent · At the bottom, a message list and the Juno chat also hold the end when their column of rows changes size, not only their own box: the edit box opening, a delete asking to confirm or a card laying out changes no rows, so no layout effect held the bottom and the new part sat under the composer. The writing `ResizeObserver` now watches the column too and still writes only while the bottom is held. An edit box scrolls itself into view whole as it opens, and a `scrollend` that finds the bottom still held puts it back rather than letting it go, since that scroll ends before the observer runs.
 - 10-22 06:16 · Release agent · Capture native menus before pressing header controls in the feedback test. Menus open on press, so releasing elsewhere does not dismiss them and left Electron in the native menu loop during teardown; keep every hover and press assertion.
 - 10-22 06:15 · Release agent · Use an English sentence and the unambiguous misspelling `recieve` in the native spelling test. macOS detects `teh fix` as Indonesian, and Chromium rechecks the word alone; keep the correction, menu order and edit-item assertions.
 - 10-22 06:08 · Release agent · Restore the surrounding eager rows when a scroll ends on skipped content. Laying out only the landing row let nearby row heights move it 201 px after scrollend on this Mac. Keep the synchronous commit and visibility guard.
