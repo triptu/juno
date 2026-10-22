@@ -149,7 +149,6 @@ export {
   aiAssistOnAtom,
   currentNotificationSettings,
   loadNotificationSettings,
-  loadWhy,
   notificationSettingsAtom,
   notificationsPageAtom,
   notificationStatusAtom,
@@ -160,7 +159,6 @@ export {
   setMatters,
   setPresence,
   setSlackSchedule,
-  whyPopoverAtom,
 } from './notifications'
 export { ignorableChannelsAtom, ignoreChannel, ignoredChannelsAtom, stopIgnoring } from './ignored'
 export { acquireRendererPort } from './port'
@@ -209,7 +207,7 @@ export type { PortLike } from './transport'
 export { canRedraw, redrawTopic, type RedrawProblem } from './art'
 export { aiActivityAtom } from './aiActivity'
 export { DEV_LOG_PAGE, devLogDetailAtom, devLogFilterAtom, devLogLimitAtom, devLogListAtom } from './devLog'
-export { messageLink, parseSlackLink, slackLink, threadRootTs, type SlackLinkMatch, type SlackLinkTarget } from './links'
+export { parseSlackLink, slackLink, threadRootTs, type SlackLinkMatch, type SlackLinkTarget } from './links'
 export { headerRenamingAtom, renamingAtom, rowRenamingAtom, tableRenamingAtom, type RenameTarget } from './rename'
 export {
   dismissToast,

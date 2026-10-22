@@ -40,14 +40,6 @@ function selectionOf(text: string, rows: readonly [HTMLElement, ...HTMLElement[]
   }
 }
 
-/** The whole of one message in the visible topic, with its sender, as a quote: Tell Juno in the why popover (SPEC 14). */
-export function messageQuote(ts: string): Selection | undefined {
-  const row = visibleTopicView()?.querySelector<HTMLElement>(`${ROW}[data-message-row="${CSS.escape(ts)}"]`)
-  const text = row?.querySelector('[data-msg-text]')?.textContent?.trim()
-  if (row === null || row === undefined || text === undefined || text === '') return undefined
-  return selectionOf(text, [row])
-}
-
 const rowOf = (node: Node): HTMLElement | null => (node instanceof Element ? node : node.parentElement)?.closest<HTMLElement>(ROW) ?? null
 
 /** Whether the topic view holding `row` is on screen. A layout read, so it is asked once per row a selection starts in. */

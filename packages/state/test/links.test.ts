@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { messageLink, parseSlackLink, slackLink } from '../src/links'
+import { parseSlackLink, slackLink } from '../src/links'
 
 const channel = { id: 'C024BE91L' } as never
 const workspace = { url: 'https://acme.slack.com/', teamId: 'T0ACME' }
@@ -36,8 +36,8 @@ describe('reading a Slack link', () => {
     })
   })
 
-  it('reads the round trip of the links Juno copies', () => {
-    const link = messageLink(workspace.url, 'C024BE91L', '1712345690.000300', '1712345678.000200')
+  it('reads a reply permalink with its thread', () => {
+    const link = 'https://acme.slack.com/archives/C024BE91L/p1712345690000300?thread_ts=1712345678.000200&cid=C024BE91L'
     expect(parseSlackLink(link, workspace)).toEqual({ ours: true, target: { kind: 'message', channel: 'C024BE91L', ts: '1712345690.000300', threadTs: '1712345678.000200' } })
   })
 

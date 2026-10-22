@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { channelMenuItems, followsThread, notifyChoiceOf, personMenuItems, tabMenuItems, threadNotifyChoice, topicMenuItems, whyLabel, type MenuItem, type TopicMenuState } from '../src/index'
+import { channelMenuItems, followsThread, notifyChoiceOf, personMenuItems, tabMenuItems, threadNotifyChoice, topicMenuItems, type MenuItem, type TopicMenuState } from '../src/index'
 import { eng, group, maya } from './fixtures'
 
 const labels = (items: ReadonlyArray<MenuItem<string>>) => items.map((i) => (i.type === 'separator' ? '—' : i.label))
@@ -109,16 +109,11 @@ describe('Notify me on a thread', () => {
   })
 })
 
-describe('person and message menus', () => {
+describe('person menu', () => {
   it('names the person by first name and checks their level', () => {
     const [notify] = personMenuItems({ name: 'Maya Chen', notify: 'every' })
     expect(notify?.type === 'submenu' && notify.label).toBe('Notify me about Maya')
     expect(notify?.type === 'submenu' && notify.items.map((item) => item.type === 'item' && item.checked)).toEqual([true, false, false])
-  })
-
-  it('asks why by what happened', () => {
-    expect(whyLabel(true)).toBe('Why did this notify?')
-    expect(whyLabel(false)).toBe('Why no notification?')
   })
 })
 

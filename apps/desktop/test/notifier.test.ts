@@ -4,7 +4,7 @@
  * fake Electron notification and dock.
  */
 import { afterEach, expect, it } from 'vitest'
-import { notificationsSetLevel, notificationsWhy, readsMarkRead, type MainToEngine, type NotificationTarget } from '@juno/contract'
+import { notificationsSetLevel, readsMarkRead, type MainToEngine, type NotificationTarget } from '@juno/contract'
 import { runCommand } from '@juno/state'
 import { Exit } from 'effect'
 import { bootedEngine, readDb } from '../../../packages/engine/test/scenario'
@@ -70,9 +70,6 @@ it('shows what the engine decides, opens the message on click, hides the topic o
   expect(main.shown[0]).toMatchObject({ title: 'Maya', body: 'Can you look at the draft?' })
   main.shown[0]?.click()
   expect(main.opened).toEqual([{ _tag: 'message', source: { channelId: 'D0MAYA', ts: first.ts, topicId: 'm:D0MAYA' } }])
-
-  const why = await runCommand(engine.registry, notificationsWhy, { topicId: 'm:D0MAYA', ts: first.ts })
-  expect(Exit.isSuccess(why) && why.value).toMatchObject({ notified: true, reason: 'Maya is set to Every message', action: { kind: 'change', target: { kind: 'channel', id: 'D0MAYA' } } })
 
   // The DM is on screen in a focused window: decided, logged, not shown.
   main.notifier.setViewing('m:D0MAYA')

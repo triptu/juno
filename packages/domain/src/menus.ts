@@ -211,11 +211,6 @@ export function personMenuItems(person: PersonMenuState): ReadonlyArray<MenuItem
   return person.askJuno === true ? [notify, separator, item('ask-juno', 'Ask Juno'), item('juno-knows', knowsAbout(person.name))] : [notify]
 }
 
-/** The message menu's why item (inventory 15.4), by what happened to the message. */
-export function whyLabel(notified: boolean): string {
-  return notified ? 'Why did this notify?' : 'Why no notification?'
-}
-
 export type TabKind = 'topic' | 'all-topics' | 'juno' | 'settings'
 
 /** Topic tabs get the topic menu; page tabs have none. */

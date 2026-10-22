@@ -2,18 +2,12 @@
  * The renderer's side of OS notifications (architecture 11): it tells main
  * which topic is on screen while the window has focus, so the engine does
  * not notify about it, and opens what a clicked notification points at.
- * Also the why popover, which the message menu opens: Change for a
- * setting's call, Tell Juno for Juno's.
  */
 import { useEffect } from 'react'
 import type { NotificationTarget } from '@juno/contract'
-import { activeTab, currentPlace, notificationContentShown, junoAvailableAtom, notificationSettingsAtom, onNotificationOpen, setViewing, tabsAtom, tabTopic, whyPopoverAtom } from '@juno/state'
+import { activeTab, currentPlace, notificationContentShown, notificationSettingsAtom, onNotificationOpen, setViewing, tabsAtom, tabTopic } from '@juno/state'
 import { useAtomMount, useAtomValue } from '@juno/state/react'
-import { WhyPopover } from '@juno/views'
 import { openHuddle, openTopicAt } from './navigation'
-import { tellJunoAbout } from './juno/actions'
-import { messageQuote } from './juno/topicContext'
-import { changeFromWhy, closeWhy } from './notifyActions'
 
 /**
  * A clicked notification: the topic at its message, which flashes, also in a
@@ -72,26 +66,3 @@ export function useNotificationBridge(): void {
     }
   }, [shown])
 }
-
-/** Tell Juno: the Juno chat beside the topic with the message quoted, read before the popover closes. */
-function tellJuno(topicId: string, ts: string): void {
-  const quote = messageQuote(ts)
-  closeWhy()
-  tellJunoAbout(topicId, quote)
-}
-
-/** The why popover, over everything, where the message menu opened. Tell Juno shows only while AI assist is on. */
-export function WhyLayer() {
-  const popover = useAtomValue(whyPopoverAtom)
-  const junoAvailable = useAtomValue(junoAvailableAtom)
-  if (popover === undefined) return null
-  const { why, at, topicId, ts } = popover
-  const action =
-    why.action.kind === 'change' || why.action.kind === 'hours'
-      ? { label: 'Change' as const, onAction: () => void changeFromWhy(why, at) }
-      : why.action.kind === 'juno' && junoAvailable
-        ? { label: 'Tell Juno' as const, onAction: () => tellJuno(topicId, ts) }
-        : undefined
-  return <WhyPopover at={at} title={why.title} reason={why.reason} {...(action === undefined ? {} : { action })} onClose={closeWhy} />
-}
-

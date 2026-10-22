@@ -29,7 +29,7 @@ import { holdKeys, Workspace as WorkspaceView, type ActivateEvent, type Workspac
 import { chunk, usePreloaded } from './chunks'
 import { runJunoShortcut } from './juno/actions'
 import { JunoPanel, loadJuno } from './juno/lazy'
-import { useNotificationBridge, WhyLayer } from './notificationBridge'
+import { useNotificationBridge } from './notificationBridge'
 import { closeTabById, loadAllTopicsPage, moveTabTo, openNewTab, runMenuCommand, showTabMenu, stepTabHistory, switchToTab } from './navigation'
 import { runUndoCommand } from './topicActions'
 import { focusPage, forcePageFocus, pageComposer, takeForcedPageFocus, takeTypedAhead } from './pageFocus'
@@ -245,7 +245,6 @@ export function Workspace() {
             </Activity>
           ))}
     </WorkspaceView>
-    <WhyLayer />
     </>
   )
 }

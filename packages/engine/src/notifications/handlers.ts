@@ -26,11 +26,9 @@ import {
   type NotifyTag,
   type NotifyTargetView,
   type TodayRow,
-  type Why,
 } from '@juno/contract'
 import {
   channelLabel,
-  decideWithCause,
   localTime,
   notifyChoice,
   parseTopicId,
@@ -42,10 +40,9 @@ import {
   type NotificationSettings,
   type NotifyChoice,
 } from '@juno/domain'
-import { Candidate, Judgement, NotificationSettingsSchema, readSettings } from '@juno/notifications'
+import { Candidate, NotificationSettingsSchema, readSettings } from '@juno/notifications'
 import { liveQuery, prefs, StoreReader, transaction, type InvalidationKeys, type SqlError } from '@juno/store'
 import { NotificationControl } from '../notificationRuntime'
-import { conversationLabel } from '../placeLabel'
 import { Outbox } from '../outbox'
 import { SlackSchedule, slackScheduleView } from '../slackSchedule'
 import { retryFirstRun, serveLiveValue, timed, type Run } from '../protocol/live'
@@ -129,77 +126,6 @@ const today = (now: number) =>
       }
     })
     return { interrupted: counts[0]?.interrupted ?? 0, held: counts[0]?.held ?? 0, today: list }
-  })
-
-const clock = (iso: string) => {
-  const date = new Date(iso)
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-}
-
-/** The why for a message the pipeline decided: the stored outcome and reason, and what decided it. */
-const whyOfRow = (row: LogRow, settings: NotificationSettings, aiAssist: boolean): Why => {
-  const reason = row.reason ?? ''
-  const notified = row.outcome === 'now' && row.delivered_at !== null
-  const title = notified
-    ? `Notified you at ${clock(row.delivered_at ?? row.at)}`
-    : "Didn't notify you"
-  const candidate = decodeCandidate(row.candidate_json)
-  if (candidate === undefined) return { notified, title, reason, action: { kind: 'none' } }
-  const judgement = row.judgement_json === null ? undefined : Schema.decodeUnknownOption(Judgement)(JSON.parse(row.judgement_json))
-  const at = localTime(new Date(row.at).getTime())
-  const decided = decideWithCause({ ...candidate, at }, settings, { aiAssist: aiAssist && judgement?._tag === 'Some', userName: () => candidate.senderName }, judgement?._tag === 'Some' ? judgement.value : undefined)
-  // Settings changed since, in a way today's re-run did not reach: say what happened, offer nothing.
-  if ('needsJudgement' in decided || !reason.startsWith(decided.decision.reason)) return { notified, title, reason, action: { kind: 'none' } }
-  const { cause } = decided
-  switch (cause.kind) {
-    case 'level': {
-      const target = cause.target
-      const name = target.kind === 'thread' ? 'This thread' : target.kind === 'channel' ? channelLabel(candidate.channel) : candidate.senderName ?? target.id
-      return { notified, title, reason, action: { kind: 'change', target, name } }
-    }
-    case 'hours':
-      return { notified, title, reason, action: { kind: 'hours' } }
-    case 'juno':
-      return { notified, title, reason, action: { kind: 'juno' } }
-    default:
-      return { notified, title, reason, action: { kind: 'none' } }
-  }
-}
-
-/** The why for a message the pipeline never saw: a Never level, an ignored channel, or Juno only checks some messages. */
-const whyUnseen = (topicId: string, channel: string, ts: string, settings: NotificationSettings) =>
-  Effect.gen(function* () {
-    const sql = yield* StoreReader
-    const parsed = parseTopicId(topicId)
-    const threadTs = parsed?.kind === 'thread' ? parsed.threadTs : ''
-    const rows = yield* sql<{ kind: ConversationKind; name: string | null; person: string | null; ignored: number; sender: string | null; sender_name: string | null; subscribed: number | null }>`
-      SELECT c.kind, c.name, COALESCE(u.display_name, u.real_name, u.name) AS person, ig.channel IS NOT NULL AS ignored,
-        m.user_id AS sender, COALESCE(sender.display_name, sender.real_name, sender.name) AS sender_name,
-        (SELECT subscribed FROM thread_subs s WHERE s.channel = c.id AND s.thread_ts = ${threadTs}) AS subscribed
-      FROM conversations c LEFT JOIN users u ON u.id = c.user_id LEFT JOIN ignored_channels ig ON ig.channel = c.id
-      LEFT JOIN messages m ON m.channel = c.id AND m.ts = ${ts} LEFT JOIN users sender ON sender.id = m.user_id
-      WHERE c.id = ${channel}`
-    const row = rows[0]
-    const title = "Didn't notify you"
-    if (row === undefined) return { notified: false, title, reason: 'Juno does not know this conversation yet.', action: { kind: 'none' } } satisfies Why
-    const where = row.kind === 'mpim' ? (yield* conversationLabel(channel))?.label ?? channel : channelLabel({ kind: row.kind, name: row.person ?? row.name ?? (row.kind === 'im' ? UNKNOWN_PERSON : channel) })
-    if (row.ignored === 1) return { notified: false, title, reason: `${where} is ignored`, action: { kind: 'none' } } satisfies Why
-    if (parsed?.kind === 'thread' && row.subscribed === 0) {
-      return { notified: false, title, reason: 'This thread is set to Never', action: { kind: 'change', target: { kind: 'thread', id: topicId }, name: 'This thread' } } satisfies Why
-    }
-    if (settings.channels[channel] === 'never') {
-      return { notified: false, title, reason: `${where} is set to Never`, action: { kind: 'change', target: { kind: 'channel', id: channel }, name: where } } satisfies Why
-    }
-    if (row.sender !== null && settings.people[row.sender] === 'never') {
-      const name = row.sender_name ?? UNKNOWN_PERSON
-      return { notified: false, title, reason: `${name} is set to Never`, action: { kind: 'change', target: { kind: 'person', id: row.sender }, name } } satisfies Why
-    }
-    return {
-      notified: false,
-      title,
-      reason: 'Juno checks DMs, mentions of you, and places set to Every message. This was none of them.',
-      action: { kind: 'change', target: { kind: 'channel', id: channel }, name: where },
-    } satisfies Why
   })
 
 /** A thread topic id's channel and root, or undefined for anything else. */
@@ -340,18 +266,6 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
           // run read (the two start together), so it is not dropped: it costs one more run.
           runs(SETTINGS_KEYS, status, Stream.merge(control.presence, Stream.tick('1 minute').pipe(Stream.drop(1)))),
         ).pipe(retryFirstRun('notifications.status'), Stream.orDie),
-      'notifications.why': ({ topicId, ts }) =>
-        inWorkspace(
-          Effect.gen(function* () {
-            const parsed = parseTopicId(topicId)
-            const channel = parsed?.channel ?? ''
-            const sql = yield* StoreReader
-            const { settings, aiAssist } = yield* readSettings
-            const rows = yield* sql<LogRow>`SELECT * FROM notification_log WHERE channel = ${channel} AND ts = ${ts}`
-            const row = rows[0]
-            return row === undefined ? yield* whyUnseen(topicId, channel, ts, settings) : whyOfRow(row, settings, aiAssist)
-          }).pipe(Effect.orDie),
-        ),
       'notifications.setHours': ({ which, hours }) => changeHours(which, (saved) => ({ ...saved, ...hours })),
       'notifications.setDay': ({ which, day, enabled }) => changeHours(which, (saved) => ({
         ...saved,

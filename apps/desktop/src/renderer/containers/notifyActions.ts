@@ -1,6 +1,5 @@
 /**
- * Notify me and the why popover (SPEC 5 and 14, inventory 15.3, 15.4 and
- * 15.6). The engine stores the choice and, on a thread, follows or
+ * Notify me (SPEC 5 and 14, inventory 15.3 and 15.6). The engine stores the choice and, on a thread, follows or
  * unfollows it; each change shows a toast with Undo.
  */
 import {
@@ -18,11 +17,9 @@ import {
   type NotifyAction,
   type NotifyChoice,
   type NotifyTargetView,
-  type Why,
 } from '@juno/contract'
-import { currentNotificationSettings, junoAvailableAtom, loadNotificationSettings, popupContextMenu, registry, releaseSidebarTopic, runAction, whyPopoverAtom } from '@juno/state'
+import { currentNotificationSettings, junoAvailableAtom, loadNotificationSettings, popupContextMenu, registry, releaseSidebarTopic, runAction } from '@juno/state'
 import { askJunoAbout, showWhatJunoKnows } from './juno/actions'
-import { openSettings } from './navigation'
 
 /** Sets a Notify me choice: "#design-review: Never", with Undo. */
 export function setNotifyLevel(target: NotifyTargetView, choice: NotifyChoice, label: string): void {
@@ -84,28 +81,4 @@ export async function showPersonMenu(person: { readonly id: string; readonly nam
  */
 export function followThread(thread: { readonly id: string; readonly title: string }): void {
   setNotifyLevel({ kind: 'thread', id: thread.id }, 'matters', thread.title)
-}
-
-/** Opens the why popover for a message, under where its menu opened. */
-export function showWhy(topicId: string, ts: string, why: Why, at: ContextMenuAt): void {
-  registry.set(whyPopoverAtom, { topicId, ts, why, at })
-}
-
-export function closeWhy(): void {
-  registry.set(whyPopoverAtom, undefined)
-}
-
-/** The popover's Change: Notify me for the setting that decided it, or the Notifications page for the hours. */
-export async function changeFromWhy(why: Why, at: ContextMenuAt): Promise<void> {
-  closeWhy()
-  if (why.action.kind === 'hours') return openSettings('notifications')
-  if (why.action.kind !== 'change') return
-  const { target, name } = why.action
-  const settings = await loadNotificationSettings(registry)
-  // A level decided it, so a thread is either stored as Every message or unfollowed (Never).
-  const current = target.kind === 'thread' ? (settings?.threads[target.id] === 'every' ? 'every' : 'never') : choiceFor(settings, target)
-  // The three choices themselves, not a Notify me submenu.
-  const choices = personMenuItems({ name, notify: current }).flatMap((item) => (item.type === 'submenu' ? item.items : []))
-  const chosen = (await popupContextMenu(nativeMenu(choices), at)) as NotifyAction | undefined
-  if (chosen !== undefined) setNotifyLevel(target, notifyChoiceOf(chosen), name)
 }

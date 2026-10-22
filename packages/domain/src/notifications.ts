@@ -95,7 +95,7 @@ export type NotificationOutcome = 'now' | 'hold'
 
 export interface NotificationDecision {
   readonly outcome: NotificationOutcome
-  /** For "Why did this notify?": "#incidents is set to Every message", "Juno: asks you to decide". */
+  /** What decided it, as the Notifications page shows it: "#incidents is set to Every message", "Juno: asks you to decide". */
   readonly reason: string
 }
 

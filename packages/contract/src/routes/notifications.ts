@@ -7,7 +7,6 @@
  *   settings: the Every message and Never lists with their names, and today.
  * - `notifications.status` is the avatar menu's line and hint: presence
  *   with until when, and "Paused until 9am" outside notification hours.
- * - `notifications.why` answers the message menu's why item.
  * - The setters write the settings. `notifications.setLevel` returns an
  *   undo (ADR 0010); on a thread it also follows or unfollows it (SPEC 5).
  * - `notifications.setHuddleRing` is Ring for huddles (SPEC 20).
@@ -112,31 +111,6 @@ export type NotificationStatus = typeof NotificationStatus.Type
 
 export const notificationsStatus = liveValueRoute('notifications.status', { value: NotificationStatus })
 
-/**
- * Why a message did or did not notify. `change` is the thread, channel or
- * person whose Notify me level decided it; `hours` opens the page; `juno`
- * offers Tell Juno.
- */
-export const Why = Schema.Struct({
-  notified: Schema.Boolean,
-  /** "Notified you at 13:42", "Didn't notify you". */
-  title: Schema.String,
-  reason: Schema.String,
-  action: Schema.Union([
-    Schema.Struct({ kind: Schema.Literal('change'), target: NotifyTargetSchema, name: Schema.String }),
-    Schema.Struct({ kind: Schema.Literal('hours') }),
-    Schema.Struct({ kind: Schema.Literal('juno') }),
-    Schema.Struct({ kind: Schema.Literal('none') }),
-  ]),
-})
-export type Why = typeof Why.Type
-
-export const notificationsWhy = Rpc.make('notifications.why', {
-  payload: { topicId: Schema.String, ts: Schema.String },
-  success: Why,
-  error: NotSignedIn,
-})
-
 export const notificationsSetHours = Rpc.make('notifications.setHours', {
   payload: { which: Schema.Literals(['notifications', 'presence']), hours: Hours.mapFields(({ days, from, to }) => ({ days: Schema.optionalKey(days), from: Schema.optionalKey(from), to: Schema.optionalKey(to) })) },
   success: Schema.Void,
@@ -194,7 +168,6 @@ export const NotificationsRoutes = RpcGroup.make(
   notificationsSettings,
   notificationsPage,
   notificationsStatus,
-  notificationsWhy,
   notificationsSetHours,
   notificationsSetDay,
   notificationsSetMatters,
