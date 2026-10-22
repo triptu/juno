@@ -339,7 +339,7 @@ The text's own colour (`--foreground-default`) is 15.6:1 in light and 14.7:1 in 
 | `--font-sans` | `'Figtree Variable', 'Figtree', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif` | decided (replaces Söhne; Inter until the friendly-layer options review) |
 | `--font-serif` | `'Instrument Serif', ui-serif, 'Iowan Old Style', Georgia, serif` | proposed (replaces Meraki) |
 | `--font-mono` | `'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace` | css (PP Neue Montreal Mono dropped) |
-| `--font-emoji` | `'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif` | An emoji drawn on its own (`EmojiButton`), so its box takes the emoji font's metrics, not Figtree's (10-22) |
+| `--font-emoji` | `'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif` | A text emoji drawn on its own (`Emoji`), so its box takes the emoji font's metrics, not Figtree's (10-22) |
 
 Bundle Figtree (variable, `@fontsource-variable/figtree` 5.3.0, Latin subset 20 KB), Instrument Serif 400 regular + italic, JetBrains Mono 400/500 locally; no Google Fonts import.
 
@@ -507,7 +507,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--all-topics-columns` | All topics table grid: `minmax(200px, 1fr) minmax(0, 150px) 104px 44px 84px` |
 | `--code-block-max-height` | 150px, then the block scrolls inside; the wheel goes on to the page at its edges |
 | `--toolbar-clip-margin` | 36px: how far a message row may paint outside its box (the 28px toolbar and its shadow), so the toolbar can sit above the row, or below it when flipped. A plain length: Chromium ignores `calc()` in `overflow-clip-margin` |
-| `--emoji-14-shift` | -0.5px: a 14px Apple Color Emoji in a 14px box with line-height 1 draws half a pixel low at 2x (the font puts its baseline there); `EmojiButton` moves it up by this, so its centre is the box's centre. Measured, not derived: re-measure if the size changes (10-22) |
+| `--emoji-14-shift` | -0.5px: a 14px Apple Color Emoji in a 14px box with line-height 1 draws half a pixel low at 2x (the font puts its baseline there); `Emoji` moves it up by this, so its centre is the box's centre. Measured, not derived: re-measure if the size changes (10-22). The amounts for 16, 20 and 32 are constants in `Emoji.tsx`, its only user (primitives 1a) |
 | `--toolbar-height` | 28px. The message hover toolbar's height: 24px buttons, a 1px inset and the 1px border (10-22, down from 36). It straddles the row's top edge, its bottom 2px into the row (the row's top padding less 2px; none in compact), so no header keeps room for it (inventory 6.5). The Main toolbar measures 181px with three reactions and More |
 | `--thumb-max-width` / `--thumb-max-height` | 360px / 240px. A lone image thumbnail in a message is scaled by its own aspect ratio inside this box, and the box is sized before the bytes arrive (performance.md 3.3). Several images in a message are one grid of this size, two columns, gap 6. File cards are `--thumb-max-width` wide |
 | `--thumb-tile-height` | 117px. A tile of that grid when it has two rows: two rows and the gap fill `--thumb-max-height`. |

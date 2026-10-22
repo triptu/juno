@@ -567,7 +567,7 @@ export const fonts = stylex.defineVars({
   '--font-sans': "'Figtree Variable', 'Figtree', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
   '--font-serif': "'Instrument Serif', ui-serif, 'Iowan Old Style', Georgia, serif",
   '--font-mono': "'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace",
-  // An emoji drawn on its own (a quick reaction), so its box takes the emoji
+  // A text emoji drawn on its own (`Emoji`), so its box takes the emoji
   // font's metrics, not Figtree's.
   '--font-emoji': "'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif",
 })
