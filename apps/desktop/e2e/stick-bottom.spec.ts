@@ -11,7 +11,7 @@ import type { Slack } from './driver/slack'
 import { expect, test, type Fixtures } from './fixtures'
 import { answer, JunoChatPane, test as chatTest } from './juno-agent/chat'
 import { expectStableAnchor } from './shiftProbe'
-import { expectScrollEscapesGrowth } from './scrollGrowthProbe'
+import { expectRestSurvivesGrowth, expectScrollEscapesGrowth } from './scrollGrowthProbe'
 
 test.describe.configure({ timeout: 90_000, mode: 'parallel' })
 
@@ -395,5 +395,6 @@ heldTest('the Juno panel at the bottom keeps a new answer fully in view', async 
   await panel.expectJuno(`You said: ${ask}`)
   await frames(win, 5)
   expectHeldAtEnd(await watched())
+  await expectRestSurvivesGrowth(scroller, '[data-chat-juno]')
   await expectScrollEscapesGrowth(win, scroller, scroller.locator('[data-chat-juno]').last())
 })
