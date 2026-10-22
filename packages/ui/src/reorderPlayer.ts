@@ -29,10 +29,14 @@ export type Snapshot = { readonly drawn: ReadonlyMap<string, Drawn> | undefined 
 const BELOW = 320
 /** How far (in its own heights) a row from outside the view may slide; from further it comes in as new. */
 const SLIDE_LIMIT = 2
+/** How far the rows below a new row have moved aside (in eased progress) when it starts to show in its place. */
+const SHOW_FROM = 0.8
 
 /** One list's rows in motion. */
 export class Player {
   private readonly running = new Map<HTMLElement, Animation>()
+  /** When each animation was made, on the document timeline. */
+  private readonly made = new WeakMap<Animation, number>()
   private readonly raised = new Set<HTMLElement>()
   private readonly arriving = new Set<HTMLElement>()
 
@@ -47,6 +51,13 @@ export class Player {
   capture(before: ReorderMotionProps, { groups, animate, scroller: { current: scroller }, row, rowKey }: ReorderMotionProps): Snapshot | null {
     if (appendedOnly(before.groups, groups)) return null
     if (!animate || scroller === null || scroller.scrollTop > 0.5 || rootDuration('--duration-reorder') < 1) return { drawn: undefined }
+    // The compositor runs an animation from the frame after it was made, while this
+    // thread holds it at its start until it hears back. Put such an animation at the
+    // time the compositor drew, so the rows are read where they are on screen.
+    const now = Number(document.timeline.currentTime ?? 0)
+    for (const animation of this.running.values()) {
+      if (animation.startTime === null) animation.currentTime = Math.max(0, now - (this.made.get(animation) ?? now))
+    }
     const view = scroller.getBoundingClientRect()
     const drawn = new Map<string, Drawn>()
     for (const el of scroller.querySelectorAll<HTMLElement>(row)) {
@@ -92,8 +103,14 @@ export class Player {
         this.start(el, [{ transform: `translateY(${dy}px)`, ...fade[0] }, { transform: 'none', ...fade[1] }], timing, rises)
         continue
       }
-      // New in view, or still coming in: it rides down on top of the row below as that moves aside, so the two never overlap.
       const opacity = from?.arriving === true ? from.opacity : 0
+      // New in view under a row that stays: it shows in its place once the rows below have moved aside, so it never passes over the row above.
+      const above = rows[i - 1]
+      if (above !== undefined && above.from !== undefined && !above.from.arriving) {
+        this.start(el, [{ opacity }, { opacity, offset: SHOW_FROM }, { opacity: 1 }], timing, false, true)
+        continue
+      }
+      // New at the top, or under another new row: it rides down on top of the row below as that moves aside, so the two never overlap.
       const below = rows.slice(i + 1).find((other) => other.from !== undefined)
       const dy = below?.from === undefined ? -height : Math.min(0, below.from.top - below.top)
       this.start(el, [{ transform: `translateY(${dy}px)`, opacity }, { transform: 'none', opacity: 1 }], timing, false, true)
@@ -117,6 +134,7 @@ export class Player {
       this.raised.add(el)
     }
     const animation = el.animate(keyframes, timing)
+    this.made.set(animation, Number(document.timeline.currentTime ?? 0))
     this.running.set(el, animation)
     // A cancelled animation was stopped by `stop`, which lowers its row there and then.
     animation.addEventListener('finish', () => {
