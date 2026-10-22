@@ -6,7 +6,7 @@
 import type { Page } from '@playwright/test'
 import type { FakeSlack } from '@juno/fake-slack'
 import type { Juno } from '../driver/juno'
-import { happened, noFlicker, shotOfFrame, type Check } from './checks'
+import { happened, noFlicker, noLongFrames, shotOfFrame, type Check } from './checks'
 import { expect, test } from './feel'
 import type { ProbeFrame } from './recorder'
 
@@ -99,7 +99,7 @@ for (const theme of themes) {
         checks: [happened('the thread moved up', (r) => {
             const y = (frame: ProbeFrame | undefined) => boxes(frame?.values ?? {}).find((box) => box.key === mover)?.y ?? Number.NaN
             return y(r.frames.at(-1)) < y(r.frames[0])
-          }), slidesIntoPlace('reply'), noFlicker('sidebar', 'the sidebar')],
+          }), slidesIntoPlace('reply'), noFlicker('sidebar', 'the sidebar'), noLongFrames()],
       },
       async (rec) => {
         await rec.mark('reply')
@@ -122,7 +122,7 @@ for (const theme of themes) {
         probes,
         regions,
         settleMs: 700,
-        checks: [happened('the thread came in', (r) => boxes(r.frames.at(-1)?.values ?? {}).some((box) => box.key === id)), slidesIntoPlace('follow'), noFlicker('sidebar', 'the sidebar')],
+        checks: [happened('the thread came in', (r) => boxes(r.frames.at(-1)?.values ?? {}).some((box) => box.key === id)), slidesIntoPlace('follow'), noFlicker('sidebar', 'the sidebar'), noLongFrames()],
       },
       async (rec) => {
         await rec.mark('follow')
@@ -145,7 +145,7 @@ for (const theme of themes) {
         probes,
         regions,
         settleMs: 800,
-        checks: [slidesIntoPlace('burst'), noFlicker('sidebar', 'the sidebar')],
+        checks: [slidesIntoPlace('burst'), noFlicker('sidebar', 'the sidebar'), noLongFrames()],
       },
       async (rec) => {
         await rec.mark('burst')
