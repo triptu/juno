@@ -14,6 +14,7 @@
  * `stop()` ends all of it and removes the data folder.
  */
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync } from 'node:fs'
+import { createServer as createHttpServer, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { Logger, LogLevel } from 'effect'
@@ -148,7 +149,7 @@ function sameOrigin(origin: string | undefined, host: string | undefined): boole
 }
 
 /** Serves the page entry in place of the renderer's, the engine socket and the files, on Vite's server. */
-function webShellPlugin(onSocket: (socket: WebSocket) => void, files: FileSource): Plugin {
+function webShellPlugin(httpServer: Server, onSocket: (socket: WebSocket) => void, files: FileSource): Plugin {
   const sockets = new WebSocketServer({ noServer: true })
   return {
     name: 'juno:web-shell',
@@ -162,7 +163,7 @@ function webShellPlugin(onSocket: (socket: WebSocket) => void, files: FileSource
           if (!served) next()
         }, next)
       })
-      server.httpServer?.on('upgrade', (request, socket, head) => {
+      httpServer.on('upgrade', (request, socket, head) => {
         if (new URL(request.url ?? '/', 'http://web-shell').pathname !== ENGINE_SOCKET_PATH) return
         // Only the page itself: another site open in the browser must not reach the engine.
         if (!sameOrigin(request.headers.origin, request.headers.host)) {
@@ -198,6 +199,9 @@ export async function startWebShell(options: WebShellOptions): Promise<WebShell>
     )
     cleanups.push(() => engine.stop())
     const open = new Set<WebSocket>()
+    // The host owns signals and shutdown. Vite's standalone server exits on SIGTERM
+    // before the engine and scratch folder can be cleaned up.
+    const httpServer = createHttpServer()
     const server: ViteDevServer = await createServer({
       configFile: false,
       root: rendererDir,
@@ -207,6 +211,7 @@ export async function startWebShell(options: WebShellOptions): Promise<WebShell>
       plugins: [
         ...rendererPlugins({ repoRoot, minify: false, reportSkipped: false }),
         webShellPlugin(
+          httpServer,
           (socket) => {
             open.add(socket)
             socket.on('close', () => open.delete(socket))
@@ -218,7 +223,8 @@ export async function startWebShell(options: WebShellOptions): Promise<WebShell>
       server: {
         host,
         port: options.port,
-        strictPort: true,
+        middlewareMode: true,
+        hmr: { server: httpServer },
 
         fs: { allow: servedFolders() },
         // Transform the page's modules while nobody is looking yet, so the first load is quicker.
@@ -226,12 +232,24 @@ export async function startWebShell(options: WebShellOptions): Promise<WebShell>
       },
       optimizeDeps: { entries: [pageEntry], include: ['react/compiler-runtime'], holdUntilCrawlEnd: false },
     })
+    cleanups.push(() => new Promise<void>((resolve, reject) => {
+      if (!httpServer.listening) return resolve()
+      httpServer.close((error) => error === undefined ? resolve() : reject(error))
+      httpServer.closeAllConnections()
+    }))
     cleanups.push(() => server.close())
     cleanups.push(() => {
       for (const socket of open) socket.terminate()
     })
-    await server.listen()
-    const address = server.httpServer?.address()
+    httpServer.on('request', server.middlewares)
+    await new Promise<void>((resolve, reject) => {
+      httpServer.once('error', reject)
+      httpServer.listen(options.port, host, () => {
+        httpServer.removeListener('error', reject)
+        resolve()
+      })
+    })
+    const address = httpServer.address()
     const port = typeof address === 'object' && address !== null ? address.port : options.port
     return {
       url: `http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${port}/`,

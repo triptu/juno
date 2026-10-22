@@ -1,7 +1,7 @@
 /**
  * The web shell's port: one per worktree, derived from this file's path the
- * way the gallery derives its own (apps/gallery/playwright.config.ts), so two
- * worktrees never meet on one port. The gallery's ports start at 4174 and
+ * way the gallery derives its own (apps/gallery/playwright.config.ts). A
+ * collision fails at listen; JUNO_WEB_PORT can select another port. The gallery's ports start at 4174 and
  * these at 5174; each range is 997 ports wide, so they never overlap.
  * JUNO_WEB_PORT overrides it.
  */
