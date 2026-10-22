@@ -1,9 +1,10 @@
 import { Suspense, useEffect, useRef, useState, type MouseEvent } from 'react'
-import type { FileView } from '@juno/contract'
-import { copyImage, downloadFile, onMenuCommand, openFile, openViewerAtom, quickLookFile, readFileText, registry, uploadProgressAtom, type MessageWindow } from '@juno/state'
+import type { ContextMenuItem, FileView } from '@juno/contract'
+import { copyImage, currentPlace, downloadFile, onMenuCommand, openFile, openViewerAtom, popupContextMenu, quickLookFile, readFileText, registry, tabsAtom, tabShowing, topicView, uploadProgressAtom, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import type { MediaViewing } from '@juno/views'
+import { viewableOf, type MediaViewing } from '@juno/views'
 import { chunk } from '../chunks'
+import { afterNavigation, openTopic } from '../navigation'
 import { messageLinkInfo, openMessageLink } from '../slackLinks'
 
 const viewer = chunk(() => import('../MediaViewerPanel'))
@@ -14,9 +15,7 @@ let viewerLoaded = false
 function preloadViewer(): void {
   if (viewerLoaded) return
   viewerLoaded = true
-  window.requestIdleCallback(() => {
-    void viewer.load()
-  })
+  window.requestIdleCallback(() => void viewer.load())
 }
 
 /**
@@ -61,7 +60,7 @@ const pointOf = (event: MouseEvent<Element>) => ({ x: event.clientX, y: event.cl
 
 const showViewerImageMenu = (file: FileView, event: MouseEvent<Element>) => {
   event.preventDefault()
-  void viewer.load().then((module) => module.default.menu(file, pointOf(event)))
+  void showImageMenu(file, pointOf(event))
 }
 
 /** The viewer open in `view`, at the item it shows. */
@@ -96,10 +95,46 @@ function TopicViewer({ view, opener }: { readonly view: string; readonly opener:
  * view (`openViewerAtom`), so the tab shows it again when its topic mounts
  * again.
  */
-export const openPreviewImage = (topic: string, viewing: MediaViewing) => viewer.load().then((module) => module.default.open(topic, viewing))
+function openTopicViewer(id: string, viewing: MediaViewing): void {
+  openTopic(id)
+  afterNavigation(() => {
+    const tab = tabShowing(registry.get(tabsAtom), id)
+    if (tab === undefined) return
+    const place = currentPlace(tab)
+    registry.set(openViewerAtom(topicView(place.kind === 'topic' ? place.viewId ?? id : id, tab.id)), { ...viewing, now: Date.now() })
+  })
+}
 
-export const showMessageImageMenu = (list: MessageWindow, ts: string, fileId: string, event: MouseEvent<Element>, onOpen: (viewing: MediaViewing) => void) =>
-  viewer.load().then((module) => module.default.message(list, ts, fileId, pointOf(event), onOpen))
+export function openPreviewImage(topic: string, viewing: MediaViewing): void {
+  openTopicViewer(topic, viewing)
+}
+
+export function showMessageImageMenu(list: MessageWindow, ts: string, fileId: string, event: MouseEvent<Element>, onOpen: (viewing: MediaViewing) => void): void {
+  const message = list.rows.get(ts)
+  if (message === undefined) return
+  const items = viewableOf(message.files)
+  const index = items.findIndex((file) => file.id === fileId)
+  if (index < 0) return
+  const viewing = { items, index, sender: list.refs.people.get(message.senderId ?? '')?.name ?? message.senderId ?? 'Unknown', at: message.at }
+  void showImageMenu(items[index]!, pointOf(event), () => onOpen(viewing))
+}
+
+export async function showImageMenu(file: FileView, at: { readonly x: number; readonly y: number }, onOpen?: () => void): Promise<void> {
+  const src = file.full ?? file.thumb?.src
+  const canUseFile = file.download !== undefined
+  const items = [
+    ...(onOpen === undefined ? [] : [{ id: 'open', label: 'Open' }]),
+    { id: 'open-in-preview', label: 'Open in Preview', enabled: canUseFile },
+    { separator: true },
+    { id: 'copy-image', label: 'Copy image', enabled: src !== undefined },
+    { id: 'download', label: 'Download', enabled: canUseFile },
+  ] satisfies ReadonlyArray<ContextMenuItem>
+  const chosen = await popupContextMenu(items, at)
+  if (chosen === 'open') onOpen?.()
+  else if (chosen === 'open-in-preview') openMessageFile(file)
+  else if (chosen === 'copy-image') copyMessageImage(file)
+  else if (chosen === 'download') downloadMessageFile(file)
+}
 
 export function useTopicFiles(view: string) {
   const [dropping, setDropping] = useState(false)

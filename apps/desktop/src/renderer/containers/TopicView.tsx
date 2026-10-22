@@ -153,6 +153,7 @@ function rowActions(list: MessageWindow, messageActions: MessageActionsOutput) {
   return {
     onRetry: retry,
     onDiscard: discard,
+    onMessageMenu: messageActions.onMessageMenu,
     actions: messageActions.actions,
     activeMessage: messageActions.activeMessage,
     confirmingDelete: messageActions.confirmingDelete,
@@ -170,7 +171,6 @@ function rowActions(list: MessageWindow, messageActions: MessageActionsOutput) {
 
 /** Download and Quick Look on a file card, one object for the app's life (performance 5.1). */
 const FILE_ACTIONS = { onDownload: downloadMessageFile, onQuickLook: quickLookMessageFile } as const
-const afterSend = (jump: () => void, topic: string) => () => { jump(); void markRead(topic) }
 
 function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps) {
   const list = useAtomValue(messageListAtom(view))
@@ -231,13 +231,13 @@ function Topic({ id, view, detail, readOnly = false, peek = false }: TopicProps)
       linkInfo={messageLinkInfo}
       {...FILE_ACTIONS}
       onOpenMedia={openMedia}
-      onMessageMenu={(ts, event, onSender, imageId) => imageId === undefined ? (!readOnly && messageActions.onMessageMenu(ts, event, onSender)) : showMessageImageMenu(list, ts, imageId, event, openMedia)}
+      onImageMenu={(ts, fileId, event) => showMessageImageMenu(list, ts, fileId, event, openMedia)}
       {...(files.uploadProgress === undefined ? {} : { uploadProgress: files.uploadProgress })}
       {...(readOnly ? {} : rowActions(list, messageActions))}
     />
   )
   if (readOnly) return messages
-  const sent = afterSend(jump, detail.id)
+  const sent = () => { jump(); void markRead(detail.id) }
   return (
     <TopicViewFrame
       header={header}
