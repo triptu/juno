@@ -35,6 +35,8 @@ export function reactorsOf(reaction: ReactionView, people: ReadonlyMap<string, P
 interface Open {
   readonly name: string
   readonly chip: HTMLElement
+  /** Shown for keyboard focus: See all, a pointer's control, stays out. */
+  readonly focus: boolean
 }
 
 /**
@@ -58,9 +60,9 @@ export function useReactorsPopover(reactions: ReadonlyArray<ReactionView>, peopl
     timer.current = setTimeout(run, ms)
   }
   // From one chip to the next while a card shows, the next one's shows at once. None shows while the reactions dialog is open.
-  const show = (name: string, chip: HTMLElement) => {
+  const show = (name: string, chip: HTMLElement, focus = false) => {
     void reactorsCard.load()
-    if (people !== undefined && chip !== muted.current) later(() => document.querySelector(DIALOG) === null && setOpen({ name, chip }), open === undefined ? DELAY_MS : 0)
+    if (people !== undefined && chip !== muted.current) later(() => document.querySelector(DIALOG) === null && setOpen({ name, chip, focus }), open === undefined ? DELAY_MS : 0)
   }
   const hideSoon = () => hide(true)
   const hide = (wait: boolean) => (wait ? later(() => setOpen(undefined), GRACE_MS) : (clearTimeout(timer.current), setOpen(undefined)))
@@ -89,7 +91,7 @@ export function useReactorsPopover(reactions: ReadonlyArray<ReactionView>, peopl
       hide(false)
     },
     onFocus: (event: FocusEvent<HTMLElement>) => {
-      if (event.currentTarget.matches(':focus-visible')) show(name, event.currentTarget)
+      if (event.currentTarget.matches(':focus-visible')) show(name, event.currentTarget, true)
     },
     onBlur: (event: FocusEvent<HTMLElement>) => {
       if (!event.currentTarget.matches(':hover')) hide(false)
@@ -99,7 +101,7 @@ export function useReactorsPopover(reactions: ReadonlyArray<ReactionView>, peopl
   const reaction = open === undefined || !open.chip.isConnected ? undefined : reactions.find((each) => each.name === open.name)
   // See all hands over to the dialog: the card goes, and stays away until the pointer leaves the chip.
   const seeAll =
-    onSeeAll === undefined || open === undefined
+    onSeeAll === undefined || open === undefined || open.focus
       ? undefined
       : () => {
           muted.current = open.chip

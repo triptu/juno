@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import type { PointerEvent } from 'react'
+import { Fragment, type PointerEvent } from 'react'
 import { colors, layout, radii, shadows, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Text, type HueName } from '@juno/ui'
 import { TextButton } from './juno-chat/TextButton'
@@ -26,7 +26,7 @@ export interface ReactorsCardProps {
   readonly count: number
   /** The chip points at the card with `aria-describedby` while it shows. */
   readonly id?: string
-  /** Opens the reactions dialog on this emoji. Without it, the card names as many as it can and stops there. */
+  /** Opens the reactions dialog on this emoji. Without it (a peek, or a card shown for keyboard focus, which reaches the dialog through the message menu), the card names as many as it can and stops there. */
   readonly onSeeAll?: () => void
   readonly onPointerEnter?: () => void
   readonly onPointerLeave?: () => void
@@ -54,11 +54,25 @@ export function reactorsLine(reactors: ReadonlyArray<Reactor>, count: number): {
   return { names, others: Math.max(0, count - names.length) }
 }
 
-/** "You, Maya Chen and 3 others"; "Maya Chen and Leo Park"; "3 people" when nobody is known. */
-export function reactorsSentence({ names, others }: ReturnType<typeof reactorsLine>): string {
-  if (names.length === 0) return others === 1 ? '1 person' : `${others} people`
-  if (others > 0) return `${names.join(', ')} and ${others === 1 ? '1 other' : `${others} others`}`
-  return names.length === 1 ? names[0]! : `${names.slice(0, -1).join(', ')} and ${names.at(-1)!}`
+/**
+ * "You, Maya Chen and 3 others"; "Maya Chen and Leo Park"; "3 people" when
+ * nobody is known. Each name is isolated, so names written right to left
+ * keep their order in the sentence.
+ */
+function Sentence({ names, others }: ReturnType<typeof reactorsLine>) {
+  if (names.length === 0) return <>{others === 1 ? '1 person' : `${others} people`}</>
+  const last = names.length - 1
+  return (
+    <>
+      {names.map((name, index) => (
+        <Fragment key={index}>
+          {index === 0 ? '' : index === last && others === 0 ? ' and ' : ', '}
+          <bdi>{name}</bdi>
+        </Fragment>
+      ))}
+      {others === 0 ? '' : ` and ${others === 1 ? '1 other' : `${others} others`}`}
+    </>
+  )
 }
 
 /**
@@ -88,10 +102,10 @@ export function ReactorsCard({ name, emoji, url, reactors, count, id, onSeeAll, 
       )}
       <div {...stylex.props(styles.words)}>
         <Text variant="ui" tone="default" as="p" sx={styles.sentence} data-reactors-names="">
-          {reactorsSentence(line)}
+          <Sentence {...line} />
         </Text>
         <div {...stylex.props(styles.foot)}>
-          <Text variant="meta" tone="muted" truncate>
+          <Text variant="meta" tone="muted" sx={styles.with}>
             reacted with :{name}:
           </Text>
           {cut && onSeeAll !== undefined ? (
@@ -147,14 +161,20 @@ const styles = stylex.create({
     overflowWrap: 'anywhere',
     textWrap: 'pretty',
   },
+  // A long emoji name wraps rather than being cut, and See all keeps to the line's end.
   foot: {
     display: 'flex',
+    flexWrap: 'wrap',
     alignItems: 'baseline',
-    justifyContent: 'space-between',
-    gap: spacing['--space-3'],
+    columnGap: spacing['--space-3'],
     minWidth: 0,
+  },
+  with: {
+    minWidth: 0,
+    overflowWrap: 'anywhere',
   },
   action: {
     flexShrink: 0,
+    marginInlineStart: 'auto',
   },
 })

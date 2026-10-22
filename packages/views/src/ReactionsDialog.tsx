@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useId, useLayoutEffect, useRef, type KeyboardEvent, type PointerEvent, type WheelEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { colors, layout, radii, shadows, sizes, spacing, weights, z } from '@juno/tokens/tokens.stylex'
+import { colors, layout, radii, shadows, sizes, spacing, text, z } from '@juno/tokens/tokens.stylex'
 import { Avatar, Surface, Text, focusRing, moveFocus } from '@juno/ui'
 import { initials } from './look'
 import type { Reactor } from './ReactorsCard'
@@ -81,7 +81,7 @@ export function ReactionsDialog({ reactions, selected, onSelect, loading = false
         <div
           ref={strip}
           role="tablist"
-          aria-label="Reactions"
+          aria-label="Emoji"
           data-reactions-strip=""
           onKeyDown={(event: KeyboardEvent<HTMLElement>) => moveFocus(event, '[role="tab"]', { select: true })}
           onWheel={wheel}
@@ -98,7 +98,7 @@ export function ReactionsDialog({ reactions, selected, onSelect, loading = false
                 id={`${id}-${reaction.name}`}
                 aria-selected={on}
                 aria-controls={`${id}-people`}
-                aria-label={`${reaction.count} ${reaction.url === undefined ? reaction.emoji : `:${reaction.name}:`}`}
+                aria-label={`${reaction.count} ${reaction.url === undefined ? reaction.emoji : `:${reaction.name}:`}${reaction.reactors[0]?.you === true ? ', including you' : ''}`}
                 tabIndex={on ? 0 : -1}
                 data-reaction-tab={reaction.name}
                 onPointerDown={press(reaction.name)}
@@ -114,37 +114,40 @@ export function ReactionsDialog({ reactions, selected, onSelect, loading = false
         </div>
       </div>
       <div {...stylex.props(styles.caption)}>
-        <Text variant="meta" tone="muted" truncate>
+        <Text variant="meta" tone="muted" truncate tooltipWhenTruncated>
           :{chosen.name}:
         </Text>
         <Text variant="meta" tone="muted" numeric sx={styles.count}>
           {chosen.count === 1 ? '1 person' : `${chosen.count} people`}
         </Text>
       </div>
-      <ul id={`${id}-people`} role="tabpanel" aria-labelledby={`${id}-${chosen.name}`} data-reactions-people="" {...stylex.props(styles.list, styles.height(rows))}>
-        {chosen.reactors.map((reactor) => (
-          <li key={reactor.id} {...stylex.props(styles.person)}>
-            <Avatar label={initials(reactor.name)} size={20} hue={reactor.hue} {...(reactor.avatarUrl === undefined ? {} : { src: reactor.avatarUrl })} />
-            <Text variant="ui" tone="default" truncate tooltipWhenTruncated dir="auto">
-              {reactor.you ? 'You' : reactor.name}
-            </Text>
-          </li>
-        ))}
-        {missing === 0 ? null : loading ? (
-          Array.from({ length: missing }, (_, index) => (
-            <li key={`waiting-${index}`} aria-hidden {...stylex.props(styles.person)}>
-              <span {...stylex.props(styles.waitingAvatar)} />
-              <span {...stylex.props(styles.waitingName, index % 3 === 1 && styles.waitingShort, index % 3 === 2 && styles.waitingLong)} />
+      {/* The panel scrolls, so it is a Tab stop of its own: the keyboard scrolls it, with the inset ring. */}
+      <div id={`${id}-people`} role="tabpanel" tabIndex={0} aria-labelledby={`${id}-${chosen.name}`} data-reactions-people="" {...stylex.props(styles.list, styles.height(rows), focusRing.inset)}>
+        <ul {...stylex.props(styles.people)}>
+          {chosen.reactors.map((reactor) => (
+            <li key={reactor.id} {...stylex.props(styles.person)}>
+              <Avatar label={initials(reactor.name)} size={20} hue={reactor.hue} {...(reactor.avatarUrl === undefined ? {} : { src: reactor.avatarUrl })} />
+              <Text variant="ui" tone="default" truncate tooltipWhenTruncated dir="auto">
+                {reactor.you ? 'You' : reactor.name}
+              </Text>
             </li>
-          ))
-        ) : (
-          <li {...stylex.props(styles.person)}>
-            <Text variant="meta" tone="muted">
-              {chosen.reactors.length === 0 ? (missing === 1 ? '1 person' : `${missing} people`) : `and ${missing === 1 ? '1 other' : `${missing} others`}`}
-            </Text>
-          </li>
-        )}
-      </ul>
+          ))}
+          {missing === 0 ? null : loading ? (
+            Array.from({ length: missing }, (_, index) => (
+              <li key={`waiting-${index}`} aria-hidden {...stylex.props(styles.person)}>
+                <span {...stylex.props(styles.waitingAvatar)} />
+                <span {...stylex.props(styles.waitingName, index % 3 === 1 && styles.waitingShort, index % 3 === 2 && styles.waitingLong)} />
+              </li>
+            ))
+          ) : (
+            <li {...stylex.props(styles.person)}>
+              <Text variant="meta" tone="muted">
+                {chosen.reactors.length === 0 ? (missing === 1 ? '1 person' : `${missing} people`) : `and ${missing === 1 ? '1 other' : `${missing} others`}`}
+              </Text>
+            </li>
+          )}
+        </ul>
+      </div>
     </Surface>
   )
 }
@@ -246,7 +249,7 @@ const styles = stylex.create({
   track: {
     margin: spacing['--space-1-5'],
     padding: spacing['--space-0-5'],
-    borderRadius: radii['--radius-xl'],
+    borderRadius: radii['--radius-md-plus'],
     backgroundColor: colors['--surface-hover'],
   },
   strip: {
@@ -256,7 +259,7 @@ const styles = stylex.create({
     overscrollBehavior: 'contain',
     scrollbarWidth: 'none',
     containerType: 'scroll-state',
-    borderRadius: radii['--radius-lg'],
+    borderRadius: radii['--radius-sm'],
   },
   // While the strip can scroll on, its edge shades the emoji under it. A
   // container query shows it, so no script watches the scroll; it sticks to
@@ -290,15 +293,15 @@ const styles = stylex.create({
     margin: 0,
     paddingInline: spacing['--space-2'],
     borderWidth: 0,
-    borderRadius: radii['--radius-lg'],
+    borderRadius: radii['--radius-sm'],
     backgroundColor: 'transparent',
     color: {
       default: colors['--foreground-muted'],
       ':hover': { default: null, '@media (hover: hover)': colors['--foreground-default'] },
     },
-    fontFamily: 'inherit',
-    fontSize: sizes['--icon-12'],
-    fontWeight: weights['--weight-medium'],
+    fontFamily: text['--text-tag-small-family'],
+    fontSize: text['--text-tag-small-size'],
+    fontWeight: text['--text-tag-small-weight'],
     fontVariantNumeric: 'tabular-nums',
     lineHeight: 1,
     whiteSpace: 'nowrap',
@@ -333,16 +336,21 @@ const styles = stylex.create({
     flexShrink: 0,
   },
   list: {
-    display: 'flex',
-    flexDirection: 'column',
     boxSizing: 'content-box',
-    margin: 0,
     paddingTop: 0,
     paddingInline: spacing['--space-1-5'],
     paddingBottom: spacing['--space-1-5'],
-    listStyle: 'none',
     overflowY: 'auto',
     overscrollBehavior: 'contain',
+    borderBottomLeftRadius: radii['--radius-menu'],
+    borderBottomRightRadius: radii['--radius-menu'],
+  },
+  people: {
+    display: 'flex',
+    flexDirection: 'column',
+    margin: 0,
+    padding: 0,
+    listStyle: 'none',
   },
   // As tall as the message's largest reaction needs, so choosing another emoji moves nothing.
   height: (rows: number) => ({
