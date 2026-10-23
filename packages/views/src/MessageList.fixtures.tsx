@@ -85,7 +85,7 @@ const menuItems: ReadonlyArray<MessageMenuEntry> = [
   { id: 'ask-juno', label: 'Ask Juno', icon: 'juno' },
   { separator: true },
   { id: 'copy', label: 'Copy text', icon: 'copy' },
-  { id: 'forward', label: 'Forward…', icon: 'forward' },
+  { id: 'forward', label: 'Forward…', icon: 'forward', shortcut: 'F' },
   { id: 'open-in-slack', label: 'Open in Slack', icon: 'open' },
 ]
 

@@ -36,7 +36,7 @@ const others: ReadonlyArray<MessageMenuEntry> = [
   { id: 'ask-juno', label: 'Ask Juno', icon: 'juno' },
   S,
   { id: 'copy', label: 'Copy text', icon: 'copy' },
-  { id: 'forward', label: 'Forward…', icon: 'forward' },
+  { id: 'forward', label: 'Forward…', icon: 'forward', shortcut: 'F' },
   { id: 'open-in-slack', label: 'Open in Slack', icon: 'open' },
 ]
 /** Someone else's message in Main, with text selected in it. */
@@ -46,7 +46,7 @@ const mainSelection: ReadonlyArray<MessageMenuEntry> = [
   { id: 'ask-juno', label: 'Ask Juno', icon: 'juno' },
   S,
   { id: 'copy', label: 'Copy', icon: 'copy' },
-  { id: 'forward', label: 'Forward…', icon: 'forward' },
+  { id: 'forward', label: 'Forward…', icon: 'forward', shortcut: 'F' },
   { id: 'open-in-slack', label: 'Open in Slack', icon: 'open' },
 ]
 /** Your own reply in a thread. */
@@ -55,7 +55,7 @@ const own: ReadonlyArray<MessageMenuEntry> = [
   { id: 'ask-juno', label: 'Ask Juno', icon: 'juno' },
   S,
   { id: 'copy', label: 'Copy text', icon: 'copy' },
-  { id: 'forward', label: 'Forward…', icon: 'forward' },
+  { id: 'forward', label: 'Forward…', icon: 'forward', shortcut: 'F' },
   { id: 'open-in-slack', label: 'Open in Slack', icon: 'open' },
   S,
   { id: 'broadcast', label: 'Also send to #eng', icon: 'broadcast' },
@@ -71,7 +71,7 @@ const ownMain: ReadonlyArray<MessageMenuEntry> = [
   { id: 'ask-juno', label: 'Ask Juno', icon: 'juno' },
   S,
   { id: 'copy', label: 'Copy text', icon: 'copy' },
-  { id: 'forward', label: 'Forward…', icon: 'forward' },
+  { id: 'forward', label: 'Forward…', icon: 'forward', shortcut: 'F' },
   { id: 'open-in-slack', label: 'Open in Slack', icon: 'open' },
   S,
   { id: 'watch-reply', label: 'Tell me if nobody replies', icon: 'bell', disabled: true },

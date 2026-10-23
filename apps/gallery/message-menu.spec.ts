@@ -143,9 +143,9 @@ for (const theme of ['light', 'dark'] as const) {
       )
     await open(page, 'look/own-main', theme)
     const rows = await read()
-    expect([rows['reply']!.key, rows['edit']!.key, rows['delete']!.key]).toEqual(['T', 'E', '⌫'])
-    expect(rows['quote']!.key).toBeUndefined()
-    for (const id of ['reply', 'edit', 'delete']) {
+    expect(['reply', 'quote', 'forward', 'edit', 'delete'].map((id) => rows[id]!.key)).toEqual(['T', 'Q', 'F', 'E', '⌫'])
+    expect(rows['copy']!.key).toBeUndefined()
+    for (const id of ['reply', 'quote', 'forward', 'edit', 'delete']) {
       const row = rows[id]!
       expect(row.keyInset, id).toBe(row.iconInset)
       expect(row.keyInset, id).toBe(9)
