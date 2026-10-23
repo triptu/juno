@@ -16,3 +16,7 @@ The engine gives it a session per sync (`attach`) with the Slack client, where t
 `incoming.ts` is the rule for incoming huddles (SPEC 20, "Incoming huddles"): which running huddles someone else just started where the user is, and when each card goes. The engine decides how each may interrupt and posts its notification (`engine/src/huddle/incoming.ts`).
 
 `status.ts` keeps the "In a huddle" status as the official client does: `users.profile.set` with `huddle_state_expiration_ts` while the call is live, renewed every 240 s or so, and no clearing write on leave.
+
+## Testing
+
+`bun run --cwd packages/huddle test`. The service tests drive `Huddle.layer` with a fake Slack client and store, and wait on signals, never on time: `cancel.test.ts` (a Cancel during the durable write), `overflow.test.ts` (reads after `Overflowed`, on the `TestClock` with the app's settle window) and `workspace-barrier.test.ts` (a join in the next workspace waits for the last one's attendee to stop). `rules.test.ts` holds the room frame and alone rules as tables, `incoming.test.ts` and `own.test.ts` the card and retained-room rules. The other lifecycle schedules of `specs/huddle.qnt` (a switch, a cancelled join, a refused leave, a restart) run against the fake Slack in `engine/test/huddle*.test.ts`.

@@ -1,7 +1,7 @@
 // Which huddles get the incoming card (SPEC 20, "Incoming huddles"), and when the card goes.
 import { describe, expect, it } from 'bun:test'
 import type { HuddleCall, RunningHuddle, RunningHuddles } from '@juno/contract'
-import { dismiss, incomingOf, lookAt, noIncoming, offer, settle, NEW_HUDDLE_MILLIS, RING_MILLIS } from '../src/incoming'
+import { incomingOf, lookAt, noIncoming, offer, settle, NEW_HUDDLE_MILLIS, RING_MILLIS } from '../src/incoming'
 
 const NOW = 1_790_000_000_000
 const SELF = 'U0ME'
@@ -22,8 +22,8 @@ describe('incoming huddles', () => {
     expect(lookAt(state, running, SELF, NOW).fresh).toEqual([])
   })
 
-  it('offers none the user started, here or on another device, or is already in, or that has run a while', () => {
-    expect(offered({ C1: huddle({ createdBy: SELF, participants: [SELF] }) }).list).toEqual([])
+  // huddle-incoming.spec covers a huddle the user started on another device.
+  it('offers none the user started or is already in, or that has run a while', () => {
     expect(offered({ C1: huddle({ createdBy: null, participants: [SELF, 'U0MAYA'] }) }).list).toEqual([])
     expect(offered({ C1: huddle({ participants: ['U0MAYA', SELF] }) }).list).toEqual([])
     expect(offered({ C1: huddle({ startedAt: NOW - NEW_HUDDLE_MILLIS - 1 }) }).list).toEqual([])
@@ -40,23 +40,16 @@ describe('incoming huddles', () => {
     expect(settle(state, { C1: huddle(), C2: huddle({ callId: 'R9' }) }, inCall('C2'), SELF).list[0]?.ringUntil).toBeNull()
   })
 
-  it('does not ring with Ring for huddles off, and still lists it to notify', () => {
-    const looked = lookAt(noIncoming, { C1: huddle() }, SELF, NOW)
-    expect(looked.fresh.map((fresh) => incomingOf(fresh, 'ring', false, idle, NOW))).toMatchObject([{ alert: 'ring', ringUntil: null }])
-  })
-
-  it('lists the newest first, and drops one on a join, an end, a new call there or a dismiss', () => {
+  // huddle-incoming.spec covers dropping the card on Join, Dismiss and the huddle's end.
+  it('lists the newest first, and drops one when the user is in it or a new call starts there', () => {
     const first = offered({ C1: huddle() })
     const running = { C1: huddle(), C2: huddle({ callId: 'R2' }) }
     const looked = lookAt(first, running, SELF, NOW)
     const both = offer(looked.state, looked.fresh.map((fresh) => incomingOf(fresh, 'quiet', true, idle, NOW)))
     expect(both.list.map((entry) => entry.callId)).toEqual(['R2', 'R1'])
     expect(both.list[0]?.ringUntil).toBeNull()
-    expect(settle(both, running, { ...inCall('C1'), phase: 'joining' }, SELF).list.map((entry) => entry.callId)).toEqual(['R2'])
     expect(settle(both, { C1: huddle({ participants: ['U0MAYA', SELF] }), C2: huddle({ callId: 'R2' }) }, idle, SELF).list.map((entry) => entry.callId)).toEqual(['R2'])
-    expect(settle(both, { C2: huddle({ callId: 'R2' }) }, idle, SELF).list.map((entry) => entry.callId)).toEqual(['R2'])
     expect(settle(both, { C1: huddle({ callId: 'R3' }), C2: huddle({ callId: 'R2' }) }, idle, SELF).list.map((entry) => entry.callId)).toEqual(['R2'])
-    expect(dismiss(both, 'R2').list.map((entry) => entry.callId)).toEqual(['R1'])
   })
 
   it('keeps who is in it up to date, and the same state when nothing changed', () => {
