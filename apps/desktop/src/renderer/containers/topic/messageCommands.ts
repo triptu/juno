@@ -9,7 +9,7 @@ import { deleteMessage, noteRecentEmoji, reactToMessage, registry, type MessageW
 import type { MenuAt, MenuPoint, MessageActions } from '@juno/views'
 import type { ComposerHandle } from '../messageActions'
 import { withMenus } from '../messageMenu'
-import { isOwnEditable, refOf } from '../messageRows'
+import { isOwnEditable, opensThread, refOf } from '../messageRows'
 import { openTopic, openTopicInBackground } from '../navigation'
 import type { MenuInput } from './messageMenu'
 
@@ -112,10 +112,12 @@ export function useMessageCommands({ channel, scrollRef, composer, latest, setEd
       readonly react: typeof react
       readonly startEdit: typeof startEdit
       readonly askDelete: typeof askDelete
+      readonly reply: typeof reply
     } = {
       react,
       startEdit,
       askDelete,
+      reply,
       onSeeReactions: (message, name, chip) => setReactions({ ts: message.ts, name, anchor: chip }),
       onConfirmDelete: confirmDelete,
       onCancelDelete: () => {
@@ -135,7 +137,7 @@ export function useMessageCommands({ channel, scrollRef, composer, latest, setEd
 
 type MessageCommands = ReturnType<typeof useMessageCommands>
 
-/** The row keys, the reaction toggle, the row menu and ↑ in an empty composer. */
+/** The row keys (the menu shows T, E and ⌫ beside their rows), the reaction toggle, the row menu and ↑ in an empty composer. */
 export function rowHandlers(actions: MessageCommands, rowMessage: (ts: string) => MessageView | undefined, latest: Latest, scrollRef: RefObject<HTMLElement | null>, composer: RefObject<ComposerHandle | null>) {
   const onRowKey = (ts: string, event: KeyboardEvent<HTMLElement>) => {
     const message = rowMessage(ts)
@@ -152,6 +154,13 @@ export function rowHandlers(actions: MessageCommands, rowMessage: (ts: string) =
       return
     }
     switch (event.key) {
+      // T starts or opens the message's thread, as the menu's row does, where it has that row.
+      case 't':
+      case 'T':
+        if (!opensThread(latest.current.detail.kind, message)) return
+        event.preventDefault()
+        actions.reply(message)
+        return
       case 'e':
       case 'E':
         if (!isOwnEditable(message)) return

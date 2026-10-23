@@ -638,6 +638,7 @@ The `menu` group (`tokens.stylex.ts`, dark in `themes.stylex.ts` as `darkMenu`) 
 | `--menu-shadow` | a 1px hairline at 10% black, a 6px and a 32px soft shadow | a 10% white edge inside, a 60% black edge outside, deeper shadows | The edge and lift; the morph scales it back each frame so it keeps its size |
 | `--menu-radius`, `--menu-padding` | 10px, 5px | same | Corners and inset |
 | `--menu-row-height`, `--menu-row-inset`, `--menu-row-radius`, `--menu-icon-gap`, `--menu-icon-size` | 22px, 9px, 6px, 7px, 14px | same | A row: the icon 9px in from the highlight's edge, 7px before the label; the highlight is the accent fill (`--hl`, `--hl-fg`) |
+| `--menu-shortcut-gap` | 20px | same | At least this from a row's label to its key equivalent, which ends 9px in from the highlight's other edge, in `--menu-icon` (`--hl-fg` highlighted) |
 | `--menu-text`, `--menu-text-disabled`, `--menu-icon`, `--menu-separator` | black at 85%, 26%, 62%, 10% | white at 88%, 26%, 66%, 12% | Labels, disabled rows, row icons, separators |
 | `--menu-separator-gap`, `--menu-min-width`, `--menu-edge` | 5px, 180px, 6px | same | Space around a separator and under the grid; the narrowest menu (about 190px with a message's rows); the gap kept from the window's edges |
 | `--menu-cell`, `--menu-cell-gap`, `--menu-cell-row-gap`, `--menu-cell-radius` | 24px, 5px, 6px, 6px | same | The emoji grid's cells, six a row, spread across the menu at least 5px apart, the first and last emoji in line with the rows' icons |

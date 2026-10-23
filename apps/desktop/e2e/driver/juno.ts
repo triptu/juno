@@ -1232,12 +1232,20 @@ export class MessageMenuDriver {
     return this.root.getByRole('textbox', { name: 'Search emoji' })
   }
 
-  /** The rows' labels in order: "-" for a separator, "(label)" for a disabled row. */
+  /** The rows' labels in order, without their keys: "-" for a separator, "(label)" for a disabled row. */
   labels(): Promise<string[]> {
     return this.root.evaluate((root) =>
-      [...root.querySelectorAll('[role="menuitem"], [role="separator"]')].filter((node) => node.closest('[inert]') === null).map((node) =>
-        node.getAttribute('role') === 'separator' ? '-' : node.getAttribute('aria-disabled') === 'true' ? `(${node.textContent ?? ''})` : (node.textContent ?? ''),
-      ),
+      [...root.querySelectorAll('[role="menuitem"], [role="separator"]')].filter((node) => node.closest('[inert]') === null).map((node) => {
+        const label = [...node.childNodes].filter((child) => !(child instanceof Element && child.getAttribute('aria-hidden') === 'true')).map((child) => child.textContent ?? '').join('')
+        return node.getAttribute('role') === 'separator' ? '-' : node.getAttribute('aria-disabled') === 'true' ? `(${label})` : label
+      }),
+    )
+  }
+
+  /** The keys the rows show, by row id. */
+  shortcuts(): Promise<Record<string, string>> {
+    return this.root.evaluate((root) =>
+      Object.fromEntries([...root.querySelectorAll<HTMLElement>('[role="menuitem"][data-menu-shortcut]')].filter((node) => node.closest('[inert]') === null).map((node) => [node.dataset['menuItem'] ?? '', node.dataset['menuShortcut'] ?? ''])),
     )
   }
 

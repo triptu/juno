@@ -39,7 +39,11 @@ const ICONS: Record<MessageMenuIcon, PhosphorIcon> = {
 }
 
 const withIcons = (items: ReadonlyArray<MessageMenuEntry>): ReadonlyArray<ContextMenuEntry> =>
-  items.map((entry) => ('separator' in entry ? entry : { id: entry.id, label: entry.label, icon: ICONS[entry.icon], ...(entry.disabled === true ? { disabled: true } : {}) }))
+  items.map((entry) =>
+    'separator' in entry
+      ? entry
+      : { id: entry.id, label: entry.label, icon: ICONS[entry.icon], ...(entry.disabled === true ? { disabled: true } : {}), ...(entry.shortcut === undefined ? {} : { shortcut: entry.shortcut }) },
+  )
 
 export interface MessageMenuProps {
   /** The pointer, or under the focused message's first line. */

@@ -41,7 +41,7 @@ const others: ReadonlyArray<MessageMenuEntry> = [
 ]
 /** Someone else's message in Main, with text selected in it. */
 const mainSelection: ReadonlyArray<MessageMenuEntry> = [
-  { id: 'reply', label: 'Start thread', icon: 'thread' },
+  { id: 'reply', label: 'Start thread', icon: 'thread', shortcut: 'T' },
   { id: 'quote', label: 'Quote', icon: 'quote' },
   { id: 'ask-juno', label: 'Ask Juno', icon: 'juno' },
   S,
@@ -61,8 +61,23 @@ const own: ReadonlyArray<MessageMenuEntry> = [
   { id: 'broadcast', label: 'Also send to #eng', icon: 'broadcast' },
   { id: 'watch-reply', label: 'Tell me if nobody replies', icon: 'bell' },
   S,
-  { id: 'edit', label: 'Edit', icon: 'edit' },
-  { id: 'delete', label: 'Delete…', icon: 'delete' },
+  { id: 'edit', label: 'Edit', icon: 'edit', shortcut: 'E' },
+  { id: 'delete', label: 'Delete…', icon: 'delete', shortcut: '⌫' },
+]
+/** Your own message in Main. */
+const ownMain: ReadonlyArray<MessageMenuEntry> = [
+  { id: 'reply', label: 'Open thread', icon: 'thread', shortcut: 'T' },
+  { id: 'quote', label: 'Quote', icon: 'quote' },
+  { id: 'ask-juno', label: 'Ask Juno', icon: 'juno' },
+  S,
+  { id: 'copy', label: 'Copy text', icon: 'copy' },
+  { id: 'forward', label: 'Forward…', icon: 'forward' },
+  { id: 'open-in-slack', label: 'Open in Slack', icon: 'open' },
+  S,
+  { id: 'watch-reply', label: 'Tell me if nobody replies', icon: 'bell', disabled: true },
+  S,
+  { id: 'edit', label: 'Edit', icon: 'edit', shortcut: 'E' },
+  { id: 'delete', label: 'Delete…', icon: 'delete', shortcut: '⌫' },
 ]
 /** A Juno bubble or card. */
 const junoBubble: ReadonlyArray<MessageMenuEntry> = [
@@ -120,6 +135,8 @@ export default defineFixtures(MessageMenu, {
     others: menu({}),
     'main-selection': menu({ items: mainSelection, reactions: grid(['+1']) }),
     own: menu({ items: own }),
+    // Your own in Main: Open thread, Edit and Delete… show their keys at the row's end.
+    'own-main': menu({ items: ownMain }),
     // Emoji you already reacted with show chosen; choosing one again takes it back.
     reacted: menu({ reactions: grid(['+1', 'eyes']) }),
     // A quick reaction can be a workspace's custom emoji.
@@ -151,6 +168,8 @@ export default defineFixtures(MessageMenu, {
   },
   Interaction: {
     'hover-row': menu({}, undefined, { hover: '[data-menu-item="forward"]' }),
+    // A highlighted row's key takes the highlight's text colour.
+    'hover-shortcut': menu({ items: ownMain }, undefined, { hover: '[data-menu-item="edit"]' }),
     'hover-cell': menu({ reactions: grid(['eyes']) }, undefined, { hover: '[data-grid-reaction="eyes"]' }),
     'hover-more': menu({}, undefined, { hover: '[data-grid-more]' }),
   },

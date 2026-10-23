@@ -114,3 +114,55 @@ test('in a window too short for the picker above or below the menu, the picker i
   expect(box.top).toBe(EDGE)
   expect(box.left).toBe(41)
 })
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`a row's key sits at its end, as far in as the icon on the other side, in the icons' colour; highlighted, in the highlight's (${theme})`, async ({ page }) => {
+    const read = () =>
+      menu(page).evaluate((root) =>
+        Object.fromEntries(
+          [...root.querySelectorAll<HTMLElement>('[role="menuitem"]')].map((row) => {
+            const box = row.getBoundingClientRect()
+            const [icon, label, key] = [...row.children] as HTMLElement[]
+            const svg = icon!.querySelector('svg')!.getBoundingClientRect()
+            const keyBox = key?.getBoundingClientRect()
+            return [
+              row.dataset['menuItem'],
+              {
+                iconInset: svg.left - box.left,
+                keyInset: keyBox === undefined ? undefined : box.right - keyBox.right,
+                gap: keyBox === undefined ? undefined : keyBox.left - label!.getBoundingClientRect().right,
+                key: key?.textContent,
+                keyColour: key === undefined ? undefined : getComputedStyle(key).color,
+                keyFont: key === undefined ? undefined : getComputedStyle(key).fontSize,
+                iconColour: getComputedStyle(icon!).color,
+                labelColour: getComputedStyle(row).color,
+              },
+            ]
+          }),
+        ),
+      )
+    await open(page, 'look/own-main', theme)
+    const rows = await read()
+    expect([rows['reply']!.key, rows['edit']!.key, rows['delete']!.key]).toEqual(['T', 'E', '⌫'])
+    expect(rows['quote']!.key).toBeUndefined()
+    for (const id of ['reply', 'edit', 'delete']) {
+      const row = rows[id]!
+      expect(row.keyInset, id).toBe(row.iconInset)
+      expect(row.keyInset, id).toBe(9)
+      expect(row.gap!, id).toBeGreaterThanOrEqual(20)
+      expect(row.keyColour, id).toBe(row.iconColour)
+      expect(row.keyFont, id).toBe('12px')
+    }
+    // The rows with keys need no more room than the widest label: the menu keeps its width.
+    const width = (await menu(page).boundingBox())!.width
+    expect(width).toBeLessThanOrEqual(200)
+
+    await open(page, 'interaction/hover-shortcut', theme)
+    await menu(page).locator('[data-menu-item="edit"]').hover()
+    await expect(menu(page).locator('[data-menu-item="edit"]')).toBeFocused()
+    const hovered = await read()
+    expect(hovered['edit']!.keyColour).toBe(hovered['edit']!.labelColour)
+    expect(hovered['delete']!.keyColour).toBe(hovered['delete']!.iconColour)
+    expect(hovered['delete']!.keyColour).not.toBe(hovered['edit']!.keyColour)
+  })
+}

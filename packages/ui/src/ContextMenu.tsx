@@ -15,6 +15,12 @@ export interface ContextMenuItem {
   readonly label: string
   readonly icon?: PhosphorIcon
   readonly disabled?: boolean
+  /**
+   * Its key equivalent, shown at the row's end as a macOS menu shows one: a
+   * letter ("E"), or ⌫ for Delete and Backspace. Pressing it while the menu
+   * is open chooses the row. Only for a key that does the same outside the menu.
+   */
+  readonly shortcut?: string
 }
 
 export type ContextMenuEntry = ContextMenuItem | { readonly separator: true }
@@ -57,6 +63,9 @@ const CELL = '[data-menu-cell]'
 const OWN_KEYS = '[data-menu-own-keys]'
 /** How long typed letters add up before they start a new search, as in a macOS menu. */
 const TYPE_AHEAD_MS = 1000
+/** The keys a shown key equivalent stands for, beyond its own letter. */
+const SHORTCUT_KEYS: Readonly<Record<string, ReadonlyArray<string>>> = { '⌫': ['Backspace', 'Delete'] }
+const pressed = (shortcut: string, key: string) => (SHORTCUT_KEYS[shortcut] ?? [shortcut.toLowerCase()]).includes(key.length === 1 ? key.toLowerCase() : key)
 
 const isItem = (entry: ContextMenuEntry): entry is ContextMenuItem => !('separator' in entry)
 
@@ -180,6 +189,8 @@ function Row({ item, onSelect }: { readonly item: ContextMenuItem; readonly onSe
       tabIndex={-1}
       aria-disabled={item.disabled === true ? true : undefined}
       data-menu-item={item.id}
+      data-menu-shortcut={item.shortcut}
+      aria-keyshortcuts={item.shortcut === undefined ? undefined : (SHORTCUT_KEYS[item.shortcut] ?? [item.shortcut]).join(' ')}
       onClick={(event) => {
         if (item.disabled !== true) onSelect(item.id, { metaKey: event.metaKey })
       }}
@@ -187,6 +198,11 @@ function Row({ item, onSelect }: { readonly item: ContextMenuItem; readonly onSe
     >
       <span {...stylex.props(styles.icon)}>{item.icon === undefined ? null : <Icon icon={item.icon} size={14} />}</span>
       <span {...stylex.props(styles.label)}>{item.label}</span>
+      {item.shortcut === undefined ? null : (
+        <span aria-hidden {...stylex.props(styles.shortcut)}>
+          {item.shortcut}
+        </span>
+      )}
     </div>
   )
 }
@@ -194,9 +210,9 @@ function Row({ item, onSelect }: { readonly item: ContextMenuItem; readonly onSe
 /**
  * The menu's keys. ↓ from the menu goes to the grid's first cell, ↑ to the
  * last row; ↑ ↓ then move through the grid's rows and the menu's rows, and
- * ← → along the grid. Enter or Space chooses, Esc closes, Tab stays, and
- * letters typed within a second of each other jump to the first row whose
- * label starts with them.
+ * ← → along the grid. Enter or Space chooses, Esc closes, Tab stays, a
+ * row's key equivalent chooses it, and letters typed within a second of each
+ * other jump to the first row whose label starts with them.
  */
 function menuKey(event: KeyboardEvent<HTMLDivElement>, onClose: () => void, typed: { text: string; at: number }): void {
   const root = event.currentTarget
@@ -244,9 +260,19 @@ function menuKey(event: KeyboardEvent<HTMLDivElement>, onClose: () => void, type
       // ⌘Enter reads as ⌘-click.
       return void at?.dispatchEvent(new MouseEvent('click', { bubbles: true, metaKey: event.metaKey }))
   }
-  if (event.key.length !== 1 || event.metaKey || event.ctrlKey || event.altKey) return
+  if (event.metaKey || event.ctrlKey || event.altKey) return
   const now = performance.now()
-  typed.text = (now - typed.at > TYPE_AHEAD_MS ? '' : typed.text) + event.key.toLowerCase()
+  const fresh = now - typed.at > TYPE_AHEAD_MS || typed.text === ''
+  // ⌫ always; a letter only as the first key, so typing on into a label still works.
+  const equivalent = fresh || event.key.length !== 1 ? rows.find((node) => node.dataset['menuShortcut'] !== undefined && pressed(node.dataset['menuShortcut'], event.key)) : undefined
+  if (equivalent !== undefined) {
+    event.preventDefault()
+    event.stopPropagation()
+    typed.text = ''
+    return void equivalent.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+  }
+  if (event.key.length !== 1) return
+  typed.text = (fresh ? '' : typed.text) + event.key.toLowerCase()
   typed.at = now
   focus(rows.find((node) => (node.textContent ?? '').trim().toLowerCase().startsWith(typed.text)))
 }
@@ -337,6 +363,12 @@ const styles = stylex.create({
   },
   label: {
     flexGrow: 1,
+  },
+  // A key equivalent: the icons' colour, at the row's end, as far from the highlight's edge as the icon is on the other side.
+  shortcut: {
+    flexShrink: 0,
+    marginInlineStart: `calc(${menu['--menu-shortcut-gap']} - ${menu['--menu-icon-gap']})`,
+    color: 'var(--menu-row-icon)',
   },
   separator: {
     flexShrink: 0,
