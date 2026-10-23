@@ -108,7 +108,8 @@ separately on the Mac.
 - Turn timing remains a normal correctness scenario in `turn-timing.test.ts`; its two 100 ms p95
   assertions run only under the perf configuration. The separate normal timing project is gone.
 - Engine `idle.perf.ts` holds the pure idle CPU test. CPU assertions in `actions.test.ts` and
-  `outbox-idle.test.ts`, and the elapsed-time assertion in AI `pi.test.ts`, run only under perf.
+  `outbox-idle.test.ts` run only under perf. AI `pi.test.ts` runs its task timeout on the test
+  clock and has no elapsed-time assertion (10-24).
   Queue state, deadline outcomes and query-count assertions remain in normal runs.
 - Desktop cached topic opening keeps its 250 ms bound in `topic.perf.spec.ts`. First-sync 30 s and
   preview 10 s ceilings move intact to `quick-start.perf.spec.ts`; normal checks wait for readiness.
