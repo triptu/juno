@@ -49,7 +49,7 @@ const NONE = 'none'
  */
 export const notificationReading = defineStructuredTask<NotificationReadingInput, typeof NotificationReadingOutput>({
   name: 'notificationReading',
-  version: 1,
+  version: 2,
   tier: 'decision',
   timeoutMillis: 2000,
   prompt,
