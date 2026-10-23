@@ -9,7 +9,7 @@ The catalog (`packages/pictures`) is bundled in the app. Only the image files ar
 
 ```sh
 brew install webp            # cwebp; sips comes with macOS
-pnpm pictures:build
+bun run pictures:build
 ```
 
 It downloads each original from `sources.json` into `<out>/originals` (once), writes the two WebP files to `<out>` (`/Volumes/AgentWork/pictures-juno-art` when that volume is mounted, else `scripts/pictures/.out`), prints each picture's sizes and width over height, and fails when the catalog's `ratio` is off. `--only id1,id2` builds a few.
@@ -19,8 +19,8 @@ A picture photographed with a black border around the canvas, or scanned on a gr
 ## Uploading
 
 ```sh
-pnpm dlx wrangler login      # once, in the browser
-pnpm pictures:upload
+bunx wrangler login      # once, in the browser
+bun run pictures:upload
 ```
 
 It creates the bucket `juno-art` if it is missing, turns on its public r2.dev URL (read-only: anyone can GET a file, only the account can write), uploads the files the bucket lacks or that changed (`<out>/uploaded.json` keeps their hashes) with `content-type: image/webp` and a year's `cache-control`, and prints the public URL. It touches no other bucket or Cloudflare resource. `--dry-run` prints the wrangler commands instead.

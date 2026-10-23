@@ -27,7 +27,7 @@ Unknown inline elements (`file`, `canvas`, `message_mention`, future ones) decod
 
 ## Testing
 
-`pnpm --filter @juno/richtext test`. Table-driven tests with real payload shapes: `decode.test.ts` (a payload decoded with `Schema.decodeUnknownSync(Message)`, including an unknown element, then rendered), `rendering.test.ts`, `tables.test.ts` (table blocks and their text views), `outgoing.test.ts` (the markup rules and the edit round trip too), `edit-roundtrip.test.ts` (Slack-origin and generated edit preservation), `markup.test.ts` (the formatting keys and the field's look), `links.test.ts`, `emoji.test.ts`, and `content.test.ts` (dates, files, attachment text and workspace emoji). Use redacted or invented text, never real message content.
+`bun run --cwd packages/richtext test`. Table-driven tests with real payload shapes: `decode.test.ts` (a payload decoded with `Schema.decodeUnknownSync(Message)`, including an unknown element, then rendered), `rendering.test.ts`, `tables.test.ts` (table blocks and their text views), `outgoing.test.ts` (the markup rules and the edit round trip too), `edit-roundtrip.test.ts` (Slack-origin and generated edit preservation), `markup.test.ts` (the formatting keys and the field's look), `links.test.ts`, `emoji.test.ts`, and `content.test.ts` (dates, files, attachment text and workspace emoji). Use redacted or invented text, never real message content.
 
 Integration attachments retain titles and links, mrkdwn bodies, two-column fields,
 context, images, footer dates and URL actions. A shared Slack message (`is_share`

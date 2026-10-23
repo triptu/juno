@@ -50,7 +50,7 @@ comparisons.
 - Gemini 3.1 Flash-Lite (`google/gemini-3.1-flash-lite`)
 - GPT-4.1 Nano (`openai/gpt-4.1-nano`)
 
-Run `pnpm --filter @juno/ai grammar:bench` with the same environment key the engine receives.
+Run `bun run --cwd packages/ai grammar:bench` with the same environment key the engine receives.
 The script never prints the key or provider error bodies. It uses the production
 provider, prompt, protected-text masking, output schema and edit filter. Requests
 have one attempt and at most 256 output tokens. The measurement deadline is ten
@@ -81,6 +81,6 @@ of zero production errors. If none qualifies, report that rather than naming an
 unmeasured winner. Jev is not benchmarked for span edits because its classifier
 output cannot produce replacement words; existing local rules need no model.
 
-`pnpm --filter @juno/ai grammar:bench --fake` passed 40/40, with all 20 clean examples unchanged
+`bun run --cwd packages/ai grammar:bench --fake` passed 40/40, with all 20 clean examples unchanged
 and all 20 corrections exact. This checks fixtures and validation only. Fake
 latency is not a model result and is excluded from the table.

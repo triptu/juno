@@ -27,4 +27,4 @@ Import from `@juno/domain`; everything is exported from `src/index.ts`.
 
 ## Testing
 
-`pnpm --filter @juno/domain test` (vitest, `test/*.test.ts`). Tests build topics with `test/fixtures.ts` and assert behaviour: a resolved topic with later activity shows the reopen tag, an ambiguous command scores below an unambiguous one. Prefer table-driven cases from the spec's examples.
+`bun run --cwd packages/domain test` (vitest, `test/*.test.ts`). Tests build topics with `test/fixtures.ts` and assert behaviour: a resolved topic with later activity shows the reopen tag, an ambiguous command scores below an unambiguous one. Prefer table-driven cases from the spec's examples.

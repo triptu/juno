@@ -62,7 +62,7 @@ Things that navigate (`ListRow` with `onSelect`, `Tab`, `OptionRow`, `NavItem`) 
 
 These elements have **no transition on their background**. Selected and active states change in the same frame as the press; hover is instant too (the design allows up to 150ms, instant is better). Hover changes only colour and background, never size, border width or shadow, so nothing forces layout.
 
-The gallery's `behaviour` project (`pnpm --filter @juno/gallery test:e2e`) drives the `ListRow/activation` fixture in a real browser to check each of these.
+The gallery's `behaviour` project (`bun run --cwd apps/gallery test:e2e`) drives the `ListRow/activation` fixture in a real browser to check each of these.
 
 ## Fixtures and the gallery
 

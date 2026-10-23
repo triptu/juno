@@ -3,7 +3,7 @@
 The tests run the real engine and state client over a MessageChannel against the fake Slack server. Run them through the root machine lock:
 
 ```sh
-node scripts/heavy.mjs pnpm --filter @juno/engine exec vitest run test/sync.test.ts
+node scripts/heavy.mjs bun run --cwd packages/engine vitest run test/sync.test.ts
 ```
 
 `startTestEngine()` uses `fastTiming`: the scheduling fields from `src/config.ts` divided by 20. Retry ratios, attempt limits and timer order stay the same. Pass `timing: { ... }` for a scenario override. Periodic sweeps remain disabled (`sweepIntervalMillis: 0`) and `followPassMillis: 0` checks follows at every catch-up. Boot, reconnect and `force_reload` run normally. Data ages, server Retry-After values and network request timeouts keep their real meaning. The app retains its existing defaults.
@@ -35,14 +35,14 @@ The engine runs the fake AI, but its background AI jobs (titles, topic art, Home
 `stress-flakes.mjs` starts eight CPU-burning Node processes, runs the command serially, saves each run under `.juno-status/flake-check/<label>/`, and stops the load processes even when tests fail. Retries stay off.
 
 ```sh
-node scripts/heavy.mjs node scripts/stress-flakes.mjs engine 20 pnpm --filter @juno/engine exec vitest run test/sync.test.ts test/reconnect.test.ts -t 'warm boot reads every page|reads followed threads past the first getView page|Unsubscribe|rejected unsubscribe'
+node scripts/heavy.mjs node scripts/stress-flakes.mjs engine 20 bun run --cwd packages/engine vitest run test/sync.test.ts test/reconnect.test.ts -t 'warm boot reads every page|reads followed threads past the first getView page|Unsubscribe|rejected unsubscribe'
 ```
 
 Build before repeating desktop tests:
 
 ```sh
-pnpm build
-node scripts/heavy.mjs node scripts/stress-flakes.mjs desktop 20 pnpm --filter @juno/desktop exec playwright test e2e/sidebar.spec.ts e2e/session.spec.ts --grep 'hovering a row shows|signs out:|comes back signed in' --retries=0
+bun run build
+node scripts/heavy.mjs node scripts/stress-flakes.mjs desktop 20 bun run --cwd apps/desktop playwright test e2e/sidebar.spec.ts e2e/session.spec.ts --grep 'hovering a row shows|signs out:|comes back signed in' --retries=0
 ```
 
 ## Conformance
@@ -50,14 +50,14 @@ node scripts/heavy.mjs node scripts/stress-flakes.mjs desktop 20 pnpm --filter @
 `test/conformance` replays Quint traces of `specs/outbox.qnt` against the engine and the fake Slack, and compares the two after every round (`specs/README.md`, "Conformance"). Run it with the root script, which generates the traces first:
 
 ```sh
-pnpm specs:conformance                                  # here, behind the machine lock
-pnpm remote specs:conformance                           # on a machine of its own
-CONFORMANCE_ONLY=copy-7 pnpm specs:conformance          # only the traces whose file name contains this
+bun run specs:conformance                                  # here, behind the machine lock
+bun run remote specs:conformance                           # on a machine of its own
+CONFORMANCE_ONLY=copy-7 bun run specs:conformance          # only the traces whose file name contains this
 ```
 
 - `itf.ts` reads ITF. `replay.ts` is the loop for any spec: it cuts a trace into rounds (a step the harness drives, then the steps Juno takes on its own), drives the first step, waits until the projections agree, and reports the first round where they do not, with the fields that differ, the gated calls and the outbox.
 - `outbox.ts` is the outbox mapping: how each step is driven through the fake (`gate`, `decide`, `holdFramesWhere`, `releaseFramesWhere`) and the commands, and the projection both sides are compared on. A new spec adds a file like it and a `*.conformance.ts` entry. The outbox suite is in `outbox-suite.ts`; `outbox.conformance.ts` and `outbox-2` to `outbox-4` each take a share of the traces, slowest first, so vitest runs them in four workers.
-- The files are not `*.test.ts`, so `pnpm test` does not run them: they need the generated traces. `vitest.conformance.config.ts` runs up to `JUNO_CONFORMANCE_CONCURRENCY` traces at once (default 6); each boots its own engine and fake.
+- The files are not `*.test.ts`, so `bun run test` does not run them: they need the generated traces. `vitest.conformance.config.ts` runs up to `JUNO_CONFORMANCE_CONCURRENCY` traces at once (default 6); each boots its own engine and fake.
 - A divergence is a finding. Fix the code or the spec, or record why the trace cannot be replayed. Do not loosen the projection to make a trace pass.
 
 Replays use the same fast timing profile. Their projection is checked again after the socket barrier and sync completion, instead of waiting 300 ms per round. Deliberately broken traces get a 2.5 s divergence bound. No trace step depends on a wall-clock duration: retry refusals are stutters and the trace gates the successful operation. The projections, traces and pre-existing skips are unchanged.
@@ -70,7 +70,7 @@ utilization, so exclude the production idle checks from diagnostic runs; keep
 profiling off for validation and before/after suite timings.
 
 ```sh
-pnpm remote --machine linux/amd64:4x8 --env JUNO_TEST_PACKAGE_JOBS=1 --env JUNO_VITEST_WORKERS=1 --env JUNO_UNIT_PROFILE=1 test --passWithNoTests test/mutation-activity.test.ts test/mutation-repair-large.test.ts test/sync.test.ts test/send.test.ts test/actions.test.ts -t '^(?!.*production timing)'
+bun run remote --machine linux/amd64:4x8 --env JUNO_TEST_PACKAGE_JOBS=1 --env JUNO_VITEST_WORKERS=1 --env JUNO_UNIT_PROFILE=1 test --passWithNoTests test/mutation-activity.test.ts test/mutation-repair-large.test.ts test/sync.test.ts test/send.test.ts test/actions.test.ts -t '^(?!.*production timing)'
 ```
 
 The profile's wall and CPU figures include asynchronous engine work; phases can

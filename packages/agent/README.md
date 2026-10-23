@@ -66,11 +66,11 @@ Versions are pinned exactly: pi 1.2.0 and the Codex SDK 0.162.1.
 
 ## Testing
 
-`pnpm test:agent` from the root, behind the machine-wide lock. `test/recovery.test.ts` runs the core as a process (`test/fixtures/program.ts`) under the crash harness: it kills it at each named point or restores files from an earlier commit boundary, restarts it and checks the spec's post-condition. `bench/commit-cost.ts` measures the cost of a commit. `pnpm perf --unit` runs Activity's read budget (`test/activity.perf.ts`), cached chat-window budgets (`test/serve/chat-cache.perf.ts`) and turn latency (`test/turn-timing.test.ts`) on the Mac under the exclusive heavy lock. Normal tests keep turn correctness and cached-window content/payload checks, without timing assertions.
+`bun run test:agent` from the root, behind the machine-wide lock. `test/recovery.test.ts` runs the core as a process (`test/fixtures/program.ts`) under the crash harness: it kills it at each named point or restores files from an earlier commit boundary, restarts it and checks the spec's post-condition. `bench/commit-cost.ts` measures the cost of a commit. `bun run perf --unit` runs Activity's read budget (`test/activity.perf.ts`), cached chat-window budgets (`test/serve/chat-cache.perf.ts`) and turn latency (`test/turn-timing.test.ts`) on the Mac under the exclusive heavy lock. Normal tests keep turn correctness and cached-window content/payload checks, without timing assertions.
 
 Set `JUNO_UNIT_PROFILE=1` on a focused remote run to print per-test wall and worker CPU time, including setup and cleanup. Child-process work is outside the worker's CPU count: a crash test waiting on a child is not necessarily idle CPU on the machine. `node packages/agent/test/runner-matrix.mjs` runs five alternating samples of the Agent pool/isolation settings and Store file parallelism, after one warmup per setting. Measurements are in [Unit suite timing](../../docs/unit-suite-timing.md).
 
-**Evals** (WP23) are in `eval/`: behaviour cases on the real turn engine, graded by code checks and a model judge. `eval/eval.test.ts` runs them on the scripted model in `pnpm test`; `pnpm agent:eval --live` runs them on OpenRouter. See `eval/README.md`.
+**Evals** (WP23) are in `eval/`: behaviour cases on the real turn engine, graded by code checks and a model judge. `eval/eval.test.ts` runs them on the scripted model in `bun run test`; `bun run agent:eval --live` runs them on OpenRouter. See `eval/README.md`.
 
 ## Must not
 

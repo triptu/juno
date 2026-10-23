@@ -13,7 +13,7 @@ Sorts a model provider's error into a kind, from the text pi-ai gives: the HTTP 
 
 ## Tests
 
-`pnpm --filter @juno/ai-failure test`: OpenRouter-shaped error bodies (none real) to kinds, and what each kind means for the next try.
+`bun run --cwd packages/ai-failure test`: OpenRouter-shaped error bodies (none real) to kinds, and what each kind means for the next try.
 
 ## Must not
 

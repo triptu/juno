@@ -45,7 +45,7 @@ Stable: `Effect`, `Layer`, `Context`, `Stream`, `Schedule`, `Scope`, `Queue`, `R
 - A few members of stable modules: `Effect.withExecutionPlan`, `Effect.withErrorReporting`,
   `Stream.withExecutionPlan`, `Stream.limitBytes`, the `ByteSize`/`MacAddress` schemas.
 
-Juno wrappers (`scripts/check-deps.mjs` fails `pnpm lint` on an import from anywhere else):
+Juno wrappers (`scripts/check-deps.mjs` fails `bun run lint` on an import from anywhere else):
 
 | Unstable module | Wrapper, and the only files that import it |
 | --- | --- |

@@ -20,7 +20,7 @@ The unused `topic_overlay.tracked` column remains from the initial migration. Re
 
 `usergroups` in cache.db holds the workspace's user groups (`id`, `handle`, `name`, `deleted`), so a group mention shows its handle.
 
-To change a schema, add a timestamped migration file in `src/migrations/<db>/` and list it in that folder's `index.ts`. Its id must be later than every shipped id in that folder: the Migrator skips ids at or below the newest one it has recorded. `scripts/check-migration-order.mjs` (run by `pnpm lint`) checks both folders against `origin/main` (or `main`): an id main does not have must be above main's largest, and no id may repeat. It names the id to renumber and the smallest safe one. Without git it checks only that ids are unique.
+To change a schema, add a timestamped migration file in `src/migrations/<db>/` and list it in that folder's `index.ts`. Its id must be later than every shipped id in that folder: the Migrator skips ids at or below the newest one it has recorded. `scripts/check-migration-order.mjs` (run by `bun run lint`) checks both folders against `origin/main` (or `main`): an id main does not have must be above main's largest, and no id may repeat. It names the id to renumber and the smallest safe one. Without git it checks only that ids are unique.
 
 ### Cache migrations
 
@@ -31,7 +31,7 @@ To change a schema, add a timestamped migration file in `src/migrations/<db>/` a
 - Leaves data that only Slack has to be fetched lazily: the sync asks for the items that need it, on the background lane. It never blocks the first paint and never starts a cold boot.
 - Runs once: the Migrator records it in the same transaction, so a crash leaves the migration either applied and recorded or not applied at all.
 
-A change that cannot be migrated changes `CACHE_RESET_EPOCH` in `src/migrations/cache/index.ts`. That deletes every user's cache and syncs everything again, so it needs a decision fragment that says "cache reset epoch N" and why; `scripts/check-cache-epoch.mjs` (run by `pnpm lint`) fails without one. Tests can open a store with the migrations of a later build through `Store.layer(paths, { cacheMigrations })`; the desktop e2e test of an update uses `cacheMigrationsWithProbe`.
+A change that cannot be migrated changes `CACHE_RESET_EPOCH` in `src/migrations/cache/index.ts`. That deletes every user's cache and syncs everything again, so it needs a decision fragment that says "cache reset epoch N" and why; `scripts/check-cache-epoch.mjs` (run by `bun run lint`) fails without one. Tests can open a store with the migrations of a later build through `Store.layer(paths, { cacheMigrations })`; the desktop e2e test of an update uses `cacheMigrationsWithProbe`.
 
 The topic view's Main window reads the partial index `messages_main (channel, ts)` over roots and broadcast replies; a query uses it only when its WHERE clause repeats the index's condition. Invalidation keys in the record form may give a table an empty id list (`{ messages: [topicId], users: [] }`), which subscribes to the whole table.
 
@@ -45,7 +45,7 @@ Indexes the sidebar relies on (`docs/performance.md` section 6): `topic_index (l
 
 ## Testing
 
-`pnpm --filter @juno/store test`. Tests open a real store on a private temporary directory (`test/helpers.ts`) and use `@effect/vitest`. Remote runs set `JUNO_TEST_FILE_PARALLEL=1` to overlap files in separate workers; synchronous SQLite handles and files are never shared. `it.effect` runs on a `TestClock`, so tests advance the debounce with `TestClock.adjust(DEFAULT_LIVE_QUERY_DEBOUNCE)`. SQLite is `node:sqlite`; Electron 44 runs Node 24, so see `docs/development.md` for running the suite under Electron's Node.
+`bun run --cwd packages/store test`. Tests open a real store on a private temporary directory (`test/helpers.ts`) and use `@effect/vitest`. Remote runs set `JUNO_TEST_FILE_PARALLEL=1` to overlap files in separate workers; synchronous SQLite handles and files are never shared. `it.effect` runs on a `TestClock`, so tests advance the debounce with `TestClock.adjust(DEFAULT_LIVE_QUERY_DEBOUNCE)`. SQLite is `node:sqlite`; Electron 44 runs Node 24, so see `docs/development.md` for running the suite under Electron's Node.
 
 ⌘K's Conversations ranking reads recent own sends through the partial `messages_sender_ts (user_id, ts, channel) WHERE deleted = 0` index.
 

@@ -32,6 +32,6 @@ The compatibility bound includes fixed compaction task space, raw context, both 
 
 ## Testing
 
-From the root, run `pnpm --filter @juno/agent-memory test`. Its script takes the machine-wide heavy-job lock, including when called through `pnpm test`.
+From the root, run `bun run --cwd packages/agent-memory test`. Its script takes the machine-wide heavy-job lock, including when called through `bun run test`.
 
 The tests use the public API: six safety properties (exact closure, local taint, cutoff, node size, parent input, and request partition/budget), due order against independent rollback push at every t from 0 through 20,000, and three compaction task examples. fast-check and Vitest are development dependencies; `juno.testDeps` applies only to workspace package edges.

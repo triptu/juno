@@ -39,4 +39,4 @@ A 429 retains Retry-After and doubles that method's background interval once per
 
 ## Testing
 
-`pnpm --filter @juno/slack test`. Tests start a real `@juno/fake-slack` per test and point the client layer at it (`test/helpers.ts`): the request lanes, the 429 handling, the auth failures and the socket lifecycle are all checked against the fake's HTTP and websocket server. Under `it.effect` the `TestClock` stops the per-method background lane spacing; set `backgroundMinIntervalMillis: 0` or use `it.live` for tests that make several background calls.
+`bun run --cwd packages/slack test`. Tests start a real `@juno/fake-slack` per test and point the client layer at it (`test/helpers.ts`): the request lanes, the 429 handling, the auth failures and the socket lifecycle are all checked against the fake's HTTP and websocket server. Under `it.effect` the `TestClock` stops the per-method background lane spacing; set `backgroundMinIntervalMillis: 0` or use `it.live` for tests that make several background calls.

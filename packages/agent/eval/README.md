@@ -6,15 +6,15 @@ Behaviour cases for the Juno Agent: short conversations against an invented Slac
 
 | Command | What |
 | --- | --- |
-| `pnpm test` (or `pnpm affected`) | `eval.test.ts`: every case on the scripted model, plus negative scripts that each grader must fail. No network |
-| `pnpm agent:eval` | The same cases on the scripted model, with the report printed. `--save` writes it |
-| `pnpm agent:eval --live` | OpenRouter, with the default chat model (the newest Sonnet). Saves the report |
-| `pnpm agent:eval --live --model sonnet --model haiku` | Several chat models in one run, one report each |
-| `pnpm agent:eval --live --case remember --case thanks` | Only these cases |
-| `pnpm agent:eval --live --judge sol` | Another judge family (default `opus`) |
-| `pnpm agent:eval --live --case reaction-question --repeat 3` | The cases 3 times per model, to tell noise from a real change |
+| `bun run test` (or `bun run affected`) | `eval.test.ts`: every case on the scripted model, plus negative scripts that each grader must fail. No network |
+| `bun run agent:eval` | The same cases on the scripted model, with the report printed. `--save` writes it |
+| `bun run agent:eval --live` | OpenRouter, with the default chat model (the newest Sonnet). Saves the report |
+| `bun run agent:eval --live --model sonnet --model haiku` | Several chat models in one run, one report each |
+| `bun run agent:eval --live --case remember --case thanks` | Only these cases |
+| `bun run agent:eval --live --judge sol` | Another judge family (default `opus`) |
+| `bun run agent:eval --live --case reaction-question --repeat 3` | The cases 3 times per model, to tell noise from a real change |
 
-A live run needs `OPENROUTER_API_KEY` in the environment or in the repo's `.env`; without it, it says so and runs nothing. When the app's keychain bridge can be reached outside Electron, `run.ts` should read the key from it. A live run costs money: about 20 chat runs per model plus one judge request per case. It never runs in `pnpm test`.
+A live run needs `OPENROUTER_API_KEY` in the environment or in the repo's `.env`; without it, it says so and runs nothing. When the app's keychain bridge can be reached outside Electron, `run.ts` should read the key from it. A live run costs money: about 20 chat runs per model plus one judge request per case. It never runs in `bun run test`.
 
 Run it before changing the prompt (`src/request/prompt.ts`), the tools or the default chat model, and after each WP that changes what Juno can do.
 

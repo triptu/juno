@@ -11,7 +11,7 @@ Home's pictures and their words (SPEC 12, "A picture" and "Pictures and the gall
 
 1. Record the image's licence as its source page states it (`public-domain`, `cc0`, `cc-by-2.0`, `cc-by-3.0`, `cc-by-4.0`, `cc-by-sa-3.0`, `cc-by-sa-4.0`; add a value when a new one is needed). The licence does not rule a picture out in this personal app, but every picture keeps a `credit` line, shown on its page, naming the photographer and licence where there is one (ESA/Hubble and ESA/Webb images show the credit ESA asks for). A photograph of a replica says so in its title, place and credit.
 2. Give the picture its `kind` (`objects` for sculpture, reliefs, vessels, seals and masks) and, for a date before the common era or in "years ago", a `year`, negative for BCE. Write a caption (one sentence, at most 160 characters; it is the image's alt text), a line (a verbatim quote with `by`, or one dated fact, at most about 140 characters, with its source and an optional `context` clause for the picture page), an about (two to four plain sentences), a `learnMore` link (the museum's object page or the release, labelled with the institution) and, where it says something, a `scale` (the museum's size in cm, or the distance in light-years or km). Plain English, no hype, no metaphors; leave it out when in doubt, and keep popular myths out (`docs/design/home-art/README.md`, "Writing the words").
-3. Add the original's download URL to `scripts/pictures/sources.json`, run `pnpm pictures:build --only <id>` for its two files and its `ratio`, then `pnpm pictures:upload` (`scripts/pictures/README.md`).
+3. Add the original's download URL to `scripts/pictures/sources.json`, run `bun run pictures:build --only <id>` for its two files and its `ratio`, then `bun run pictures:upload` (`scripts/pictures/README.md`).
 
 ## Links to check by hand
 
@@ -27,7 +27,7 @@ The ancient and early works added on 2026-10-22 had their links resolved from a 
 
 ## Tests
 
-`pnpm --filter @juno/pictures test`: every entry has a licence, a credit, a source page, its shape, a year (its own, below 1 for a BCE or "years ago" date and in its date's century otherwise, or the one its date gives) and a caption within length; a sourced line within length, an about, and a link labelled with a name, not an address; scale numbers are positive and distances belong to space images. No entry is pinned.
+`bun run --cwd packages/pictures test`: every entry has a licence, a credit, a source page, its shape, a year (its own, below 1 for a BCE or "years ago" date and in its date's century otherwise, or the one its date gives) and a caption within length; a sourced line within length, an about, and a link labelled with a name, not an address; scale numbers are positive and distances belong to space images. No entry is pinned.
 
 ## Must not
 

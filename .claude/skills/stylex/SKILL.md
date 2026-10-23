@@ -12,7 +12,7 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
 ## Rules
 
 1. **Every design value comes from `@juno/tokens`.** Colours, spacing, radii, type sizes, line
-   heights, fonts, shadows, durations, easing and layout sizes. `pnpm lint` runs `scripts/check-tokens.mjs` on UI, views and renderer StyleX calls.
+   heights, fonts, shadows, durations, easing and layout sizes. `bun run lint` runs `scripts/check-tokens.mjs` on UI, views and renderer StyleX calls.
    It rejects literal colours and lengths, including nested conditions and templates.
    Zero, percentages and 1px border/outline hairlines pass. For geometry exceptions,
    add a trailing `// tokens-allow: reason` on the declaration line. A module constant used in
@@ -28,7 +28,7 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
    `import { colors, spacing } from '@juno/tokens/tokens.stylex'`. Each group is a named export;
    read a token as `colors['--foreground-default']`. `packages/tokens/README.md` lists the groups
    and the naming scheme, and `tokens.stylex.ts` is the source of truth.
-3. **Never `cursor: pointer`, except on links in message content that open outside the app.** Interactive elements use `cursor: 'default'`. The exception is marked `// external-link-cursor` in `MessageBody.tsx`. `pnpm lint` runs
+3. **Never `cursor: pointer`, except on links in message content that open outside the app.** Interactive elements use `cursor: 'default'`. The exception is marked `// external-link-cursor` in `MessageBody.tsx`. `bun run lint` runs
    `scripts/check-no-pointer-cursor.mjs`, which fails on it in any other ts, tsx, css or html file.
 4. **Hover only for hover-capable pointers**, and nested so that it falls back to nothing:
    ```ts
@@ -89,8 +89,8 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
 3. A new group needs its own `createTheme` and, if it changes in dark, an entry in `dark`.
 4. Add the row to `docs/design/tokens.md`. Renaming a key breaks `global.css` and the e2e colour
    checks, so search for the name first.
-5. Use it in components as `group['--key']`. Run `pnpm build`: StyleX errors show up at build
-   time, not in `pnpm typecheck`.
+5. Use it in components as `group['--key']`. Run `bun run build`: StyleX errors show up at build
+   time, not in `bun run typecheck`.
 
 ## Pitfalls
 
@@ -134,5 +134,5 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
 - **Main process** cannot use StyleX. The one raw colour there (`BrowserWindow.backgroundColor` in
   `main/window.ts`) must match `--background`; update both together.
 - **Verify** as CLAUDE.md says (typecheck, lint, your own tests), plus
-  `GALLERY_SHIFT_ONLY=<components> pnpm remote test:gallery` for anything that
+  `GALLERY_SHIFT_ONLY=<components> bun run remote test:gallery` for anything that
   changes computed colours or states.

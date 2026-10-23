@@ -69,7 +69,7 @@ All five are settled in plan v3 (§0 rows W9 to W13):
 - W11 (Stop's line) no longer applies: the chat has no Stop (decision log, 10-14 11:50).
 - Approval identities and edit revisions travel in RPC metadata, not in `src/chat/**` (W13).
 
-Run `pnpm test:agent-contracts` from the root for the property tests and request/response JSON codec round trips for every RPC group. `pnpm typecheck` checks the test sources too.
+Run `bun run test:agent-contracts` from the root for the property tests and request/response JSON codec round trips for every RPC group. `bun run typecheck` checks the test sources too.
 
 WP19 adds `agent.schedule.watchReply { opId, channelId, ts, threadTs? }` to
 `ScheduledRpcs`. It returns `{ opId, id, at }` after the menu watch is persisted.

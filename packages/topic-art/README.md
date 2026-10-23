@@ -25,4 +25,4 @@ Topic art as a vocabulary. The model does not send a picture; it sends a short r
 
 ## Testing
 
-`pnpm --filter @juno/topic-art test`. Behaviour through `parseRecipe`, `serialiseRecipe`, `renderArt` and `renderPebble`: a valid drawing, the round trip, every kind of hostile reply (scripts, text, `href`, event handlers, style, hex and `url()` colours, path data outside the grammar, off-grid numbers, deep groups), the detail and stroke rules below 20px, and that rendered markup names only whitelisted tags and attributes.
+`bun run --cwd packages/topic-art test`. Behaviour through `parseRecipe`, `serialiseRecipe`, `renderArt` and `renderPebble`: a valid drawing, the round trip, every kind of hostile reply (scripts, text, `href`, event handlers, style, hex and `url()` colours, path data outside the grammar, off-grid numbers, deep groups), the detail and stroke rules below 20px, and that rendered markup names only whitelisted tags and attributes.

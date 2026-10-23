@@ -17,6 +17,6 @@ The dispatcher (WP15) still owns current revision/schema/account/precondition ch
 
 ## Tests
 
-From the repository root: `pnpm test:agent-contracts`. It uses the shared heavy-job queue.
+From the repository root: `bun run test:agent-contracts`. It uses the shared heavy-job queue.
 
-The public-API properties cover canonical round trips and key order, every payload leaf's digest contribution, frozen JCS vectors, independent SHA-256 and fresh-process stability, immutable child expansion, retry selection, evidence preservation and derived status. The contract package checks RPC codecs and WP7 projection compatibility. `pnpm typecheck` includes these tests.
+The public-API properties cover canonical round trips and key order, every payload leaf's digest contribution, frozen JCS vectors, independent SHA-256 and fresh-process stability, immutable child expansion, retry selection, evidence preservation and derived status. The contract package checks RPC codecs and WP7 projection compatibility. `bun run typecheck` includes these tests.

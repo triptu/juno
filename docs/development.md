@@ -5,7 +5,7 @@ How to build and run Juno, and how the repo is put together.
 ## Prerequisites
 
 - Node 24 or newer (Node 26 is what this was built with).
-- pnpm 12. Node 25+ has no Corepack, so install it directly: `npm i -g pnpm@12`.
+- Bun 1.4.4, the version `packageManager` in `package.json` names: `curl -fsSL https://bun.sh/install | bash -s bun-v1.4.4`, or `bun upgrade` on an older Bun. The root `preinstall` script (`scripts/check-bun.mjs`) stops an install with any other version.
 - macOS for the window chrome and e2e tests. Nothing else is platform-specific yet.
 - Google Chrome, for the gallery tests and screenshots.
 - Git LFS (`brew install git-lfs`, then `git lfs install` once), for the images and videos under `docs/`.
@@ -19,7 +19,7 @@ gallery projects use the installed Google Chrome (`channel: 'chrome'`); set
 Images and videos under `docs/` (`.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`, `.mp4`, `.webm`, `.mov`) are stored in Git LFS, as `.gitattributes` lists. They were about 240 MB of the 265 MB checkout on 10-18, and they made most of the repo's growth. Nothing the app, the tests or CI reads is under `docs/`, so a checkout without LFS gets pointer files there and still builds and tests. The app icon in `apps/desktop/build` stays a normal file.
 
 - `git lfs install` adds the `pre-push` hook that uploads new images. Without it, a push leaves pointers on GitHub with nothing behind them. Worktrees share their clone's hooks, so once per clone is enough.
-- `pnpm lint` runs `scripts/check-lfs.mjs`, which fails when a file under `docs/` that should be in LFS is stored as the file itself. It also warns when the clone has no LFS `pre-push` hook.
+- `bun run lint` runs `scripts/check-lfs.mjs`, which fails when a file under `docs/` that should be in LFS is stored as the file itself. It also warns when the clone has no LFS `pre-push` hook.
 - To clone without the images: `GIT_LFS_SKIP_SMUDGE=1 git clone ...`, then `git lfs pull --include="docs/design/home/**"` for the ones you need.
 
 **A branch from before the move.** A branch that added or changed images before docs moved to LFS (10-18) stores them as normal files. After it merges or rebases onto main, `git status` lists those images as modified and `check-lfs` fails. Run `git add --renormalize docs` and commit; nothing in the images changes. A conflict on an image means both sides changed it: keep the branch's version with `git checkout --theirs <path>` during a merge (`--ours` during a rebase), then renormalize.
@@ -32,52 +32,52 @@ Run these from the repo root.
 
 | Command | What it does |
 | --- | --- |
-| `pnpm install` | Installs everything, linking packages from pnpm's global virtual store (see "Worktrees and installs"). |
-| `pnpm dev` | Starts electron-vite with HMR for the renderer and reload for main and preload. |
-| `pnpm build` | Builds main, preload and renderer into `apps/desktop/out/`, then checks the renderer bundle size. |
-| `pnpm typecheck` | Fast local check of all Bun-compatible projects with the pinned Bun; see "Typecheck". |
-| `pnpm typecheck:tsc` | Manual TypeScript check of every project. |
-| `pnpm typecheck:parity` | Manual comparison of Bun and TypeScript diagnostics across projects; bypasses result caches. |
-| `pnpm lint` | Runs oxlint, cursor and token checks, dependency and fixture checks, and the health ratchet, all at once (`scripts/lint.mjs`; see "Typecheck"). |
-| `pnpm check-deps` | The package graph and the import rules in `docs/architecture.md` section 3. Part of `pnpm lint`; run it alone for a quicker loop. |
-| `pnpm health` | Reports unused code and dependencies, duplication, and large files and functions. Writes `.juno-status/health.json`. |
-| `pnpm test` | Runs every package's vitest suite (`packages/*/test` and `apps/desktop/test`). |
-| `pnpm test:e2e` | Builds, runs the Playwright tests against the built app, then the gallery behaviour tests. |
-| `pnpm perf` | Builds and runs the perf scenarios (`apps/desktop/e2e/perf.spec.ts`, config `playwright.perf.config.ts`), which fail over the budgets in `docs/performance.md`. A scenario that did not run, because its group's setup or an earlier scenario failed, fails the run too (`e2e/no-skips.ts`). `-g "<name>"` runs some of them; `JUNO_PERF_TRACE=<dir>` also writes traces for `scripts/perf-trace.mjs`. Passing `--reporter` replaces that check, so do not. |
-| `pnpm test:gallery` | Builds the gallery and runs only its behaviour tests (mouse-down activation, cursor rule, state switcher, layout-shift guard). |
-| `pnpm test:feel` | Builds, then records the feel suite against the fake Slack: slow-motion videos, filmstrips and frame checks in `apps/desktop/feel-report/`. See "The feel suite". |
-| `pnpm gallery` | Starts the fixture gallery at http://localhost:4174 (browser only, no Electron). |
-| `pnpm web` | Starts the web shell: the real app in a browser against a fake Slack, for UI-only work. No build, no Electron. `--host` listens on the LAN. See "Web shell". |
-| `pnpm gallery:shots` | Builds the gallery and screenshots every state in light and dark into `apps/gallery/shots/<Component>/<group>/<state>-<theme>.png`. |
-| `pnpm specs:check` | Checks every Quint spec in `specs/`, including the broken and corrected pairs for Juno Agent. Runs simulations three at a time, the Apalache checks on one shared server, and skips checks that passed before with the same inputs (see "Faster test runs"). `--memory`, `--actions` or `--recovery` selects one agent spec. See `specs/README.md`. |
-| `pnpm specs:conformance` | Generates Quint traces of `specs/outbox.qnt` and replays them against the engine and the fake Slack (`specs/README.md`, "Conformance"). About 30 s on a remote machine when its traces are cached. |
-| `pnpm remote <script>` | Runs a Linux-safe root script (`test`, `specs:check`, `specs:conformance`, `test:agent*`, `test:gallery`, `test:e2e`) on the shared SSH runner and streams the output. `--dry-run` shows what would be sent and run. See ADR 0013. |
-| `pnpm flake <spec>` | Repeats desktop e2e, gallery or package tests many times on remote machines (`-g <title>`, `--repeat 40`, `--machines 1\|2`, `--workers n`) and reports how many runs failed, with traces of the failures. See "Hunting a flaky test". |
-| `pnpm test:agent-contracts` | Runs the `agent-cards` and `agent-contract` property tests: card identities, digests, retries, the RPC codecs and the chat projection. |
-| `pnpm --filter @juno/agent-memory test` | Runs the pure memory rules' property tests. Its script takes the heavy-job lock itself. |
-| `pnpm --filter @juno/engine test` | Runs one package's suite (here the engine's: the port protocol over an in-memory MessageChannel, live query serving). |
-| `pnpm pictures:build`, `pnpm pictures:upload` | Make the two WebP files of each of Home's pictures from their open-licence originals, and upload them to the R2 bucket `juno-art` (`scripts/pictures/README.md`). |
+| `bun install` | Installs everything, linking packages from Bun's global store (see "Worktrees and installs"). |
+| `bun run dev` | Starts electron-vite with HMR for the renderer and reload for main and preload. |
+| `bun run build` | Builds main, preload and renderer into `apps/desktop/out/`, then checks the renderer bundle size. |
+| `bun run typecheck` | Fast local check of all Bun-compatible projects with the pinned Bun; see "Typecheck". |
+| `bun run typecheck:tsc` | Manual TypeScript check of every project. |
+| `bun run typecheck:parity` | Manual comparison of Bun and TypeScript diagnostics across projects; bypasses result caches. |
+| `bun run lint` | Runs oxlint, cursor and token checks, dependency and fixture checks, and the health ratchet, all at once (`scripts/lint.mjs`; see "Typecheck"). |
+| `bun run check-deps` | The package graph and the import rules in `docs/architecture.md` section 3. Part of `bun run lint`; run it alone for a quicker loop. |
+| `bun run health` | Reports unused code and dependencies, duplication, and large files and functions. Writes `.juno-status/health.json`. |
+| `bun run test` | Runs every package's vitest suite (`packages/*/test` and `apps/desktop/test`). |
+| `bun run test:e2e` | Builds, runs the Playwright tests against the built app, then the gallery behaviour tests. |
+| `bun run perf` | Builds and runs the perf scenarios (`apps/desktop/e2e/perf.spec.ts`, config `playwright.perf.config.ts`), which fail over the budgets in `docs/performance.md`. A scenario that did not run, because its group's setup or an earlier scenario failed, fails the run too (`e2e/no-skips.ts`). `-g "<name>"` runs some of them; `JUNO_PERF_TRACE=<dir>` also writes traces for `scripts/perf-trace.mjs`. Passing `--reporter` replaces that check, so do not. |
+| `bun run test:gallery` | Builds the gallery and runs only its behaviour tests (mouse-down activation, cursor rule, state switcher, layout-shift guard). |
+| `bun run test:feel` | Builds, then records the feel suite against the fake Slack: slow-motion videos, filmstrips and frame checks in `apps/desktop/feel-report/`. See "The feel suite". |
+| `bun run gallery` | Starts the fixture gallery at http://localhost:4174 (browser only, no Electron). |
+| `bun run web` | Starts the web shell: the real app in a browser against a fake Slack, for UI-only work. No build, no Electron. `--host` listens on the LAN. See "Web shell". |
+| `bun run gallery:shots` | Builds the gallery and screenshots every state in light and dark into `apps/gallery/shots/<Component>/<group>/<state>-<theme>.png`. |
+| `bun run specs:check` | Checks every Quint spec in `specs/`, including the broken and corrected pairs for Juno Agent. Runs simulations three at a time, the Apalache checks on one shared server, and skips checks that passed before with the same inputs (see "Faster test runs"). `--memory`, `--actions` or `--recovery` selects one agent spec. See `specs/README.md`. |
+| `bun run specs:conformance` | Generates Quint traces of `specs/outbox.qnt` and replays them against the engine and the fake Slack (`specs/README.md`, "Conformance"). About 30 s on a remote machine when its traces are cached. |
+| `bun run remote <script>` | Runs a Linux-safe root script (`test`, `specs:check`, `specs:conformance`, `test:agent*`, `test:gallery`, `test:e2e`) on the shared SSH runner and streams the output. `--dry-run` shows what would be sent and run. See ADR 0013. |
+| `bun run flake <spec>` | Repeats desktop e2e, gallery or package tests many times on remote machines (`-g <title>`, `--repeat 40`, `--machines 1\|2`, `--workers n`) and reports how many runs failed, with traces of the failures. See "Hunting a flaky test". |
+| `bun run test:agent-contracts` | Runs the `agent-cards` and `agent-contract` property tests: card identities, digests, retries, the RPC codecs and the chat projection. |
+| `bun run --cwd packages/agent-memory test` | Runs the pure memory rules' property tests. Its script takes the heavy-job lock itself. |
+| `bun run --cwd packages/engine test` | Runs one package's suite (here the engine's: the port protocol over an in-memory MessageChannel, live query serving). |
+| `bun run pictures:build`, `bun run pictures:upload` | Make the two WebP files of each of Home's pictures from their open-licence originals, and upload them to the R2 bucket `juno-art` (`scripts/pictures/README.md`). |
 | `node scripts/build-icons.mjs` | Rebuilds `apps/desktop/build/icon.icns` and `icon.png` from `assets/icon.svg`. See "App icon". |
-| `pnpm package` | Builds an unsigned DMG with electron-builder into `apps/desktop/release/`; signed builds also make a ZIP for in-place updates. The tag workflow builds these too; see "Releasing". |
-| `JUNO_LIVE=1 pnpm smoke:live` | The read-only live smoke against your real workspace (see "Sign-in and the live smoke"). `pnpm smoke:live -- --fake` runs the same script against an in-process fake. |
-| `JUNO_LIVE=1 pnpm presence:live` | The live presence check (`scripts/presence-live.ts`): polls `users.getPresence` for you while Juno's socket is closed, open, tickling every 19 s, then idle, and prints presence values and seconds. Sends only `ping` and `tickle`. Research section 3, Presence. |
-| `JUNO_LIVE=1 pnpm sync:live` | The read-only sync dry run: the real `@juno/sync` cold boot against your workspace into a temporary directory, numbers only (see "The live sync dry run"). `pnpm sync:live -- --fake` runs it against an in-process fake. |
+| `bun run package` | Builds an unsigned DMG with electron-builder into `apps/desktop/release/`; signed builds also make a ZIP for in-place updates. The tag workflow builds these too; see "Releasing". |
+| `JUNO_LIVE=1 bun run smoke:live` | The read-only live smoke against your real workspace (see "Sign-in and the live smoke"). `bun run smoke:live --fake` runs the same script against an in-process fake. |
+| `JUNO_LIVE=1 bun run presence:live` | The live presence check (`scripts/presence-live.ts`): polls `users.getPresence` for you while Juno's socket is closed, open, tickling every 19 s, then idle, and prints presence values and seconds. Sends only `ping` and `tickle`. Research section 3, Presence. |
+| `JUNO_LIVE=1 bun run sync:live` | The read-only sync dry run: the real `@juno/sync` cold boot against your workspace into a temporary directory, numbers only (see "The live sync dry run"). `bun run sync:live --fake` runs it against an in-process fake. |
 | `JUNO_LIVE=1 node --import ./scripts/ts-resolve-hooks.mjs scripts/idle-live.ts` | The live idle check: the whole engine on the cached session, read-only as the timeline below, synced into `--dir` (kept, so a second run is a relaunch on the same cache) or a temporary folder, then left alone. Once no call has been made for 30 s it prints the share of one core every 10 s over `--idle` seconds (180 by default), the calls and the SQL statements run meanwhile (Juno's SQL text, never a value); `--profile DIR` writes a CPU profile of that window, `--fake-ai` runs the AI jobs on the engine's fake model, `--fake` uses the large fake seed. See performance.md 8.12. |
-| `JUNO_LIVE=1 pnpm sync:timeline` | The first sync timeline (`scripts/first-sync-live.ts`): the whole engine signed in from an empty data folder on the cached session, read-only (every write refused before it leaves, no AI key). Prints when the sidebar, Home and every conversation first show, when unread counts settle (all, and those of unread DMs and mentions), where each kind of conversation fell in the history order, history ends and the sync ends; Slack calls by method with retries, 429s and `Retry-After`; CPU and SQLite time. `--out FILE` writes the timeline as JSON (method names, counts and times only). `-- --fake` runs it on the large fake seed with the app's pacing, `--fake --small` on 16 conversations. See performance.md, "First sync timeline". |
-| `JUNO_LIVE=1 pnpm react:live` | The live reaction check: the whole engine on the cached session, reacting in your self-DM through the outbox, then removing and cleaning up. Writes only reactions and two test posts in the self-DM. `-- --probe-get` instead asks `reactions.get` (read-only) for stored messages of every kind. Shapes and codes only (research section 10, "Live reactions"). |
-| `JUNO_LIVE=1 pnpm forward:live` | The live forward check: in your self-DM only, posts a message and a reply, forwards them with `chat.shareMessage` with and without a note, tries a user id as the destination and a missing message, reads the history and deletes everything it made. Field names and codes only (research `slack-forward.md`). |
-| `JUNO_LIVE=1 pnpm broadcast:live` | The live check of sending an existing reply to the channel: in your self-DM only, posts a message and two replies, sends one to the channel with `chat.update` and `reply_broadcast`, tries it again, on the root and with text, reads Main and the thread, records the socket frames, and deletes everything it made. Field names and codes only (research `slack-data-access.md`, "Send an existing reply to the channel"). |
-| `JUNO_LIVE=1 pnpm huddle:live` | The huddle spike (`docs/plans/huddles.md`, phase 2): joins a huddle in the private test channel `juno-huddle-test` on the cached session with `rooms.join`, runs the answer through the Chime SDK in a local Chromium page with a fake microphone, prints a status line every 10 s for `--minutes N` (default 5), and always sends `rooms.leave`. `--create-only` finds or creates the channel and exits; `--socket` also prints room frames from the socket; `--headed` shows the window so you can hear the huddle. Writes only that channel's create, join and leave. Field names, codes and counts only. `-- --fake` stops after `rooms.join`. |
+| `JUNO_LIVE=1 bun run sync:timeline` | The first sync timeline (`scripts/first-sync-live.ts`): the whole engine signed in from an empty data folder on the cached session, read-only (every write refused before it leaves, no AI key). Prints when the sidebar, Home and every conversation first show, when unread counts settle (all, and those of unread DMs and mentions), where each kind of conversation fell in the history order, history ends and the sync ends; Slack calls by method with retries, 429s and `Retry-After`; CPU and SQLite time. `--out FILE` writes the timeline as JSON (method names, counts and times only). `-- --fake` runs it on the large fake seed with the app's pacing, `--fake --small` on 16 conversations. See performance.md, "First sync timeline". |
+| `JUNO_LIVE=1 bun run react:live` | The live reaction check: the whole engine on the cached session, reacting in your self-DM through the outbox, then removing and cleaning up. Writes only reactions and two test posts in the self-DM. `-- --probe-get` instead asks `reactions.get` (read-only) for stored messages of every kind. Shapes and codes only (research section 10, "Live reactions"). |
+| `JUNO_LIVE=1 bun run forward:live` | The live forward check: in your self-DM only, posts a message and a reply, forwards them with `chat.shareMessage` with and without a note, tries a user id as the destination and a missing message, reads the history and deletes everything it made. Field names and codes only (research `slack-forward.md`). |
+| `JUNO_LIVE=1 bun run broadcast:live` | The live check of sending an existing reply to the channel: in your self-DM only, posts a message and two replies, sends one to the channel with `chat.update` and `reply_broadcast`, tries it again, on the root and with text, reads Main and the thread, records the socket frames, and deletes everything it made. Field names and codes only (research `slack-data-access.md`, "Send an existing reply to the channel"). |
+| `JUNO_LIVE=1 bun run huddle:live` | The huddle spike (`docs/plans/huddles.md`, phase 2): joins a huddle in the private test channel `juno-huddle-test` on the cached session with `rooms.join`, runs the answer through the Chime SDK in a local Chromium page with a fake microphone, prints a status line every 10 s for `--minutes N` (default 5), and always sends `rooms.leave`. `--create-only` finds or creates the channel and exits; `--socket` also prints room frames from the socket; `--headed` shows the window so you can hear the huddle. Writes only that channel's create, join and leave. Field names, codes and counts only. `-- --fake` stops after `rooms.join`. |
 | `JUNO_LIVE=1 node --import ./scripts/ts-resolve-hooks.mjs scripts/dnd-live.ts` | Reads Slack's notification schedule (the `dnd_*` prefs) on the cached session and prints it. `--apply` writes Juno's notification hours into it once (`--days 1,2,3,4,5 --from 540 --to 1140`, defaults otherwise) and reads them back; `--restore '<json>'` writes a printed schedule back. Calls only `users.prefs.get` and `users.prefs.set`, and writes only schedule prefs. Your own account only (research section 7, "Live write"). |
-| `pnpm ai:eval` | Runs every AI task on invented examples with the fake provider and prints the outputs. `JUNO_AI=live pnpm ai:eval` uses OpenRouter through pi-ai with `OPENROUTER_API_KEY` (environment or `.env`) and prints outputs, latency and cost; without a key it says so and exits. `pnpm ai:eval routeCheck` runs one task. See `packages/ai/README.md`. |
-| `pnpm notif:replay run\|sample\|label\|report` | Measures the notification decision against your own messages: replays the last N days from a copy of the app's store through the real classifier, samples about 300 for you to label on a local page, and reports agreement and a sweep of each notification constant. Real content stays under `/Volumes/AgentWork/scratch/`. See `scripts/notif-replay/README.md`. |
-| `pnpm agent:eval` | Runs the Juno Agent eval cases on the real turn engine with the scripted model and prints the report (CI runs the same through `pnpm test`). `pnpm agent:eval --live` uses OpenRouter with `OPENROUTER_API_KEY` (environment or `.env`), costs money, and saves the report under `packages/agent/eval/reports/`; `--model haiku` picks another family, `--case <id>` one case. See `packages/agent/eval/README.md`. |
+| `bun run ai:eval` | Runs every AI task on invented examples with the fake provider and prints the outputs. `JUNO_AI=live bun run ai:eval` uses OpenRouter through pi-ai with `OPENROUTER_API_KEY` (environment or `.env`) and prints outputs, latency and cost; without a key it says so and exits. `bun run ai:eval routeCheck` runs one task. See `packages/ai/README.md`. |
+| `bun run notif:replay run\|sample\|label\|report` | Measures the notification decision against your own messages: replays the last N days from a copy of the app's store through the real classifier, samples about 300 for you to label on a local page, and reports agreement and a sweep of each notification constant. Real content stays under `/Volumes/AgentWork/scratch/`. See `scripts/notif-replay/README.md`. |
+| `bun run agent:eval` | Runs the Juno Agent eval cases on the real turn engine with the scripted model and prints the report (CI runs the same through `bun run test`). `bun run agent:eval --live` uses OpenRouter with `OPENROUTER_API_KEY` (environment or `.env`), costs money, and saves the report under `packages/agent/eval/reports/`; `--model haiku` picks another family, `--case <id>` one case. See `packages/agent/eval/README.md`. |
 
-`GALLERY_SHOTS_ONLY=Sidebar,Workspace pnpm gallery:shots` refreshes only those components and leaves other shots untouched. Add `GALLERY_SHOTS_ACCENT=teal` to shoot them in another accent as `<state>-<theme>-teal.png`, beside the default accent's shots.
+`GALLERY_SHOTS_ONLY=Sidebar,Workspace bun run gallery:shots` refreshes only those components and leaves other shots untouched. Add `GALLERY_SHOTS_ACCENT=teal` to shoot them in another accent as `<state>-<theme>-teal.png`, beside the default accent's shots.
 
 The switcher, key and index tests use `GalleryTestComponent`, declared in `apps/gallery/src/testFixtures.tsx`. It is registered only when the page is opened as `/?test-fixtures#/...`, so it never shows in the normal gallery or the screenshots. The tests serve the built gallery on a port derived from the worktree's path, so two worktrees never share a server; a run reuses a server only if one is already up on its own port. Set `GALLERY_PORT` to choose the port.
 
-Before calling work done: `pnpm affected`, which covers typecheck, lint and the tests the change reaches (see "Affected tests").
+Before calling work done: `bun run affected`, which covers typecheck, lint and the tests the change reaches (see "Affected tests").
 
 Copy `.env.example` to `.env` for local secrets. `.env` is ignored by git.
 
@@ -90,26 +90,19 @@ node scripts/worktree.mjs add <name> [--base <ref>] [--branch <branch>] [--detac
 node scripts/worktree.mjs remove <name-or-path> [--force] [--delete-branch]
 ```
 
-`add` checks out `<branch>` (default `<name>`; an existing branch is reused, a new one starts at `--base`, default `origin/main`; `--detach <ref>` checks out a commit with no branch, as for a DMG build), runs `pnpm install --frozen-lockfile` and prints the path. Worktrees go in `/Volumes/AgentWork/worktrees/juno/` when that volume is mounted (file event logging and Spotlight are off there), else in `.claude/worktrees/`. `scripts/worktree-folder.mjs` decides the folder (the volume counts as mounted when `/Volumes/AgentWork/.fseventsd/no_log` exists) and is shared by the helper, `batch-merge.mjs` and packaging. It names the folder after the main checkout, also when run from a linked worktree such as `t3-1234`; `JUNO_WORKTREE_DIR` overrides it. Older worktrees under `.claude/worktrees/` stay until their branches merge. The helper writes `.metadata_never_index` into that folder so Spotlight skips it, and waits to install while the load average is above 8. `remove` removes the worktree and, with `--delete-branch`, deletes its branch if it is merged.
+`add` checks out `<branch>` (default `<name>`; an existing branch is reused, a new one starts at `--base`, default `origin/main`; `--detach <ref>` checks out a commit with no branch, as for a DMG build), runs `bun install --frozen-lockfile` and prints the path. Worktrees go in `/Volumes/AgentWork/worktrees/juno/` when that volume is mounted (file event logging and Spotlight are off there), else in `.claude/worktrees/`. `scripts/worktree-folder.mjs` decides the folder (the volume counts as mounted when `/Volumes/AgentWork/.fseventsd/no_log` exists) and is shared by the helper, `batch-merge.mjs` and packaging. It names the folder after the main checkout, also when run from a linked worktree such as `t3-1234`; `JUNO_WORKTREE_DIR` overrides it. Older worktrees under `.claude/worktrees/` stay until their branches merge. The helper writes `.metadata_never_index` into that folder so Spotlight skips it, and waits to install while the load average is above 8. `remove` removes the worktree and, with `--delete-branch`, deletes its branch if it is merged.
 
-**The global virtual store.** `pnpm-workspace.yaml` sets `virtualStoreType: global`. Each package is written once into the store's `links` folder (`pnpm store path`, then `links/`), keyed by its version and its dependencies, and a project's `node_modules` holds only symlinks into it. Before, every worktree had its own `node_modules/.pnpm` with about 50,000 entries; creating and deleting those flooded macOS's `fseventsd` (about 260% CPU on 10-17) and froze the Mac. Measured on 10-17 (warm store, one install at a time):
-
-| Setup | Entries in the worktree's `node_modules` | Install | Remove worktree |
-| --- | --- | --- | --- |
-| Per-worktree `.pnpm`, main disk | 49,515–50,100 | 3.0–4.2 s | 4.2–7.7 s |
-| Per-worktree `.pnpm`, AgentWork volume | 49,514 | 2.6–3.0 s | 3.3 s |
-| Global virtual store, main disk | 1,045 | 0.5–0.9 s | 0.5 s |
-| Global virtual store, AgentWork volume | 1,045 | 0.3 s (34 s with an empty store) | 0.4 s |
-
-Removing a worktree with no install takes 0.4 s. A worktree on the AgentWork volume uses a store on that volume (`/Volumes/AgentWork/.pnpm-store`), because pnpm keeps the store on the same volume as the project; the main checkout keeps using `~/Library/pnpm/store`. An existing worktree switches to the shared store on its next `pnpm install`, which removes its old `.pnpm` folder.
+**The global store.** `bunfig.toml` sets the isolated linker with `globalStore = true`. Each package is written once into `~/.bun/install/cache/links/`, keyed by its version and its dependencies, and a project's `node_modules` holds only symlinks into it: about 1,100 entries per worktree. Many entries per worktree flood macOS's `fseventsd` when worktrees are created and deleted (about 260% CPU on 10-17, with pnpm's old per-worktree store of about 50,000 entries), so keep this setting. Measured on 10-24 with a warm store: `bun install` took 0.4 s into an empty `node_modules` and 0.05 s with nothing to change. Worktrees on the AgentWork volume link into the same store on the main disk.
 
 What changes with it:
 
-- **A package resolves only what it declares.** Inside the store, a package sees its own dependencies and peers, not the workspace's hoisted packages. Three packages broke: `@phosphor-icons/react` imports React's types without depending on `@types/react`, Playwright's Electron API imports `electron`, and Quint's Apalache client requires `protobufjs` and `semver`. `packageExtensions` in `pnpm-workspace.yaml` declares them. Scripts run through `pnpm` get `NODE_PATH` and a resolve hook from pnpm that hide such gaps, but plain `node` (the remote image's Quint warm-up, for one) does not, so add a line there when something fails only because a dependency cannot see a package it does not declare.
-- **Electron's binary is shared.** Electron 44 has no install script: the first `require('electron')` downloads and unpacks it (about 600 files, 300 MB) next to the package. With the shared store that happens once per Electron version, not once per worktree. Two versions live in separate store folders.
-- **Packaging uses `pnpm deploy`.** electron-builder cannot find the dependencies of dependencies in the shared store (`pnpm list` reports paths that do not exist). `apps/desktop/build/package.cjs` first deploys the app's production dependencies as real files into a temporary folder and packages from there. That folder is under `/Volumes/AgentWork/tmp` when the volume is mounted, else in the system temp folder. electron-builder's native rebuild then writes only into that copy, never into the shared store. `files` in `apps/desktop/package.json` limits the deploy to `out/`.
-- **The app under test gets neither.** pnpm passes that `NODE_PATH` and resolve hook to everything it runs, Electron included. The e2e fixture (`apps/desktop/e2e/fixtures.ts`) drops both, as the packaged app has neither; with them, a Home send to a DM did not arrive in one e2e test.
-- **Remote runs** install in their image the same way.
+- **A package resolves only what it declares.** Inside the store, a package sees its own dependencies and peers, not the workspace's packages. Three packages need help: `@phosphor-icons/react` imports React's types without depending on `@types/react`, Playwright's Electron API imports `electron`, and Quint's Apalache client requires `protobufjs` and `semver`. `packageExtensions` in the root `package.json` declares them. Add an entry there when something fails only because a dependency cannot see a package it does not declare.
+- **Install scripts are blocked.** Bun runs dependencies' install scripts only for packages in `trustedDependencies`, which is empty. None is needed: esbuild and Bun pick their platform binary from optional dependencies, koffi's prebuilt binary comes from `@koromix/koffi-<platform>`, and the Google and gRPC SDKs pulled in by pi-ai are not used. A trusted package also stays out of the global store, so trust one only when it cannot work otherwise.
+- **Electron's binary is shared.** Electron 44 has no install script: the first `require('electron')` downloads and unpacks it (about 600 files, 300 MB) next to the package. With the global store that happens once per Electron version, not once per worktree.
+- **Packaging copies its dependencies.** electron-builder cannot find the dependencies of dependencies in the shared store. `apps/desktop/build/package.cjs` first copies the app's `files` and its installed production dependencies, with theirs, as real files into a temporary folder (`deploy`), and packages from there. That folder is under `/Volumes/AgentWork/tmp` when the volume is mounted, else in the system temp folder. electron-builder's native rebuild then writes only into that copy, never into the shared store.
+- **The app under test gets no `NODE_PATH` or `NODE_OPTIONS`.** The e2e fixture (`apps/desktop/e2e/fixtures.ts`) drops both, as the packaged app has neither; with a resolve hook left in, a Home send to a DM did not arrive in one e2e test.
+- **New releases wait a day.** `minimumReleaseAge` in `bunfig.toml` holds back versions published less than a day ago. To take one sooner, add it to `minimumReleaseAgeExcludes` there.
+- **Remote runs** install in their image the same way, against the runner's persistent Bun cache.
 
 Regenerate the standard emoji catalog and search keywords with `node scripts/emoji-catalog.mjs` (pinned sources; local input paths are documented at the top of the script); its CLDR notice ships in `apps/desktop/THIRD_PARTY_NOTICES.txt`. The everyday phrases it adds come from `scripts/emoji-intent.json`; `node --import ./scripts/ts-resolve-hooks.mjs scripts/emoji-intent.ts` asks the model (OpenRouter, `OPENROUTER_API_KEY` from the environment or `.env`) for emoji the file lacks, `--all` for every emoji. Fix a bad phrase in `intentOverrides` in `emoji-catalog.mjs`, then rerun it.
 
@@ -132,7 +125,7 @@ their original order when timestamps match.
 
 ## Batch merges
 
-Run `pnpm test:repo-tools` for the CLI checks using temporary Git repositories (batch merges and the migration order check).
+Run `bun run test:repo-tools` for the CLI checks using temporary Git repositories (batch merges and the migration order check).
 
 Fetch `origin/main`, then run from the repository root:
 
@@ -152,11 +145,11 @@ continuing. Progress and command output stay in `.juno-status/batches/` in the
 original worktree; read `batch-N.log` while checks run.
 
 Generated-file conflicts use a temporary copy of the batch's version. After all
-merges, the script installs with `pnpm install --frozen-lockfile`, rebuilds the
-decision log, runs `pnpm health:baseline`, and commits generated changes. Review
+merges, the script installs with `bun install --frozen-lockfile`, rebuilds the
+decision log, runs `bun run health:baseline`, and commits generated changes. Review
 the baseline diff: regeneration records the merged tree's current health,
-including any increases. Then it runs `pnpm typecheck`, `pnpm lint` and
-`pnpm affected --batch --base <batch base>`: the unit test files the merged
+including any increases. Then it runs `bun run typecheck`, `bun run lint` and
+`bun run affected --batch --base <batch base>`: the unit test files the merged
 change reaches, plus `specs:check` and `specs:conformance` when the code the
 specs model changed ("Affected tests"), on one machine. Files that passed with
 the same inputs, in an agent's run or an earlier batch, are skipped through the
@@ -179,16 +172,16 @@ batch branch with `git branch -D batch-N`. If a process was killed, remove its
 
 ## Codebase health
 
-Run `pnpm health` for a summary and the largest clone pairs, files, and functions.
-`pnpm lint` runs the same scan with `--check` against `health-baseline.json`.
+Run `bun run health` for a summary and the largest clone pairs, files, and functions.
+`bun run lint` runs the same scan with `--check` against `health-baseline.json`.
 Knip and jscpd run concurrently; neither uses a cached result. Health scans do not
 need the heavy-job lock. Tool errors fail both reporting and lint.
 
-- **Knip** checks unused files, value exports, type exports, dependencies, and unlisted dependencies across all workspaces, scripts, and test entries. `pnpm health:knip` prints every finding. Private package exports are included, so a barrel export with no consumers is a finding even if its implementation is used internally.
-- **jscpd** checks `packages/*/src` and `apps/*/src`, including fixtures and CSS. Clones need at least 100 tokens and eight lines. Comments and whitespace do not count as matching tokens. The percentage is duplicated lines divided by scanned source lines. `pnpm health:clones` writes the full clone report.
-- **Size** checks tracked and new code files in apps, packages, scripts, and specs, including tests and configs. It reports files over 400 physical lines and functions over 80 lines using the TypeScript parser. Functions include methods, generators, and callbacks, with comments and blank lines inside their span. Nested functions can overlap. `pnpm health:size` prints every result.
+- **Knip** checks unused files, value exports, type exports, dependencies, and unlisted dependencies across all workspaces, scripts, and test entries. `bun run health:knip` prints every finding. Private package exports are included, so a barrel export with no consumers is a finding even if its implementation is used internally.
+- **jscpd** checks `packages/*/src` and `apps/*/src`, including fixtures and CSS. Clones need at least 100 tokens and eight lines. Comments and whitespace do not count as matching tokens. The percentage is duplicated lines divided by scanned source lines. `bun run health:clones` writes the full clone report.
+- **Size** checks tracked and new code files in apps, packages, scripts, and specs, including tests and configs. It reports files over 400 physical lines and functions over 80 lines using the TypeScript parser. Functions include methods, generators, and callbacks, with comments and blank lines inside their span. Nested functions can overlap. `bun run health:size` prints every result.
 
-`.juno-status/health.json` contains a timestamp, counts, duplication percentage, top offenders, and full Knip and size findings. `complete: false`, a null count, and an `errors` entry mean a tool failed, not that it found zero issues. Each external tool (`scripts/health-run.mjs`) gets 20 s on an idle machine, scaled by the one-minute load per core (at a load of 16 on 8 cores it gets 40 s) and capped at 120 s. A tool that runs out of time is tried once more with twice the limit. If it times out again, its `errors` entry has `timedOut: true` and lint says the tools timed out and no finding was checked: run `pnpm lint` again when the machine is less busy. It still fails, because nothing was checked. Raw reports are in `.juno-status/knip-report.json` and `.juno-status/jscpd-report.json`; all reports are gitignored.
+`.juno-status/health.json` contains a timestamp, counts, duplication percentage, top offenders, and full Knip and size findings. `complete: false`, a null count, and an `errors` entry mean a tool failed, not that it found zero issues. Each external tool (`scripts/health-run.mjs`) gets 20 s on an idle machine, scaled by the one-minute load per core (at a load of 16 on 8 cores it gets 40 s) and capped at 120 s. A tool that runs out of time is tried once more with twice the limit. If it times out again, its `errors` entry has `timedOut: true` and lint says the tools timed out and no finding was checked: run `bun run lint` again when the machine is less busy. It still fails, because nothing was checked. Raw reports are in `.juno-status/knip-report.json` and `.juno-status/jscpd-report.json`; all reports are gitignored.
 
 Knip exceptions are commented in `knip.config.mjs`. Fontsource dependencies are loaded by CSS `@import`, which Knip does not parse. Babel loads `babel-plugin-react-compiler` by a string in the gallery's Vite config. The default exports of the Knip and electron-vite configs are tool entry points. The icon script resolves Playwright through desktop's manifest with `createRequire`, where it is declared. Exports used inside their own module are omitted because that code is live; unused barrel re-exports remain visible. Playwright's alternate configs, packaging hooks, agent evals and benchmarks, research spike scripts,
 and the engine's compile-time body compatibility check are explicit entries. The `tracking`
@@ -209,12 +202,12 @@ On 2026-10-15, five alternating warm runs on the same cleaned Mac worktree took
 Knip and jscpd scanned the source each time. This measures local scan overhead,
 not app performance; timings vary with machine load.
 
-To change the baseline deliberately, first run `pnpm health` and inspect the full
+To change the baseline deliberately, first run `bun run health` and inspect the full
 reports. Fix false positives with a narrow, explained Knip entry or annotation.
-Then run `pnpm health:baseline`, review `git diff -- health-baseline.json`, and commit
+Then run `bun run health:baseline`, review `git diff -- health-baseline.json`, and commit
 it with the change and its reason. This command records current counts and lists,
 including improvements. It refuses to record a failed scan. Do not hand-edit counts
-to hide a tool failure. `pnpm test:health` checks regression detection and stable
+to hide a tool failure. `bun run test:health` checks regression detection and stable
 function identities through the shared heavy-job queue.
 
 The engine/agent runner clone remains: neither package may import the other, and
@@ -233,7 +226,7 @@ apps/desktop            The Electron app. Thin wiring only.
   src/preload           contextBridge. Exposes window.juno and forwards the engine port.
   src/renderer          React root, global.css, containers (wire atoms to views).
   e2e                   Playwright tests and the Electron launch fixture.
-  web                   The web shell (pnpm web): host/ in Node, page/ in the browser. Never in the app.
+  web                   The web shell (bun run web): host/ in Node, page/ in the browser. Never in the app.
   electron.vite.config.ts
   renderer.vite.ts      The renderer's Vite plugins, shared by the app build and the web shell.
   electron-builder.yml
@@ -278,7 +271,7 @@ writes two files that are committed:
 
 - `apps/desktop/build/icon.icns`, used by electron-builder (`mac.icon` in `electron-builder.yml`).
 - `apps/desktop/build/icon.png` (1024px), set as the Dock icon in development
-  (`app.dock.setIcon` in `src/main/index.ts`), so `pnpm dev` does not show Electron's icon.
+  (`app.dock.setIcon` in `src/main/index.ts`), so `bun run dev` does not show Electron's icon.
 
 Rerun the script after editing `assets/icon.svg`. It needs macOS (`iconutil`) and Google Chrome
 or Playwright's Chromium. The favicon is `src/renderer/public/favicon.svg` (and the same file in
@@ -313,7 +306,7 @@ or Playwright's Chromium. The favicon is `src/renderer/public/favicon.svg` (and 
 
 Rules that come from the design spec and are enforced in `@juno/ui`:
 
-- Default arrow cursor, never `cursor: pointer`. `pnpm lint` fails on it.
+- Default arrow cursor, never `cursor: pointer`. `bun run lint` fails on it.
 - Buttons scale to 0.96 on press, never when disabled.
 - Hover styles only inside `@media (hover: hover)`.
 - 2px focus ring in `--focus-ring` on `:focus-visible` only.
@@ -357,7 +350,7 @@ endpoint (for example Ollama at `http://localhost:11434/v1`), with its optional 
 as `juno-custom-provider-key` and its base URL and the active provider in
 `<userData>/juno-provider.json` (`src/main/providers.ts`). `OPENROUTER_API_KEY` in
 the environment sets OpenRouter up for development (for example
-`OPENROUTER_API_KEY=… pnpm dev`). To start again with no provider, delete both items
+`OPENROUTER_API_KEY=… bun run dev`). To start again with no provider, delete both items
 (`security delete-generic-password -s juno-openrouter-key`, and the same for
 `juno-custom-provider-key`) and the file. Under `JUNO_E2E` the keys are kept in
 memory, `JUNO_E2E_OPENROUTER_KEY` sets OpenRouter up at launch (the fixtures'
@@ -391,7 +384,7 @@ allow-list point at), `JUNO_SLACK_APP_DIR` (a fixture Slack-app directory) and
 in `apps/desktop/e2e/fixtures.ts` set all three; `juno.signIn()` and
 `juno.importFromSlackApp()` in `apps/desktop/e2e/driver/juno.ts` are the verbs.
 
-`JUNO_LIVE=1 pnpm smoke:live` (`scripts/smoke-live.ts`) is the manual, read-only
+`JUNO_LIVE=1 bun run smoke:live` (`scripts/smoke-live.ts`) is the manual, read-only
 check against your real workspace. It imports the session the same way (keychain
 prompt), prints its call list, calls `auth.test`, `client.userBoot`,
 `client.counts`, `subscriptions.thread.getView` and one `conversations.history`
@@ -400,22 +393,22 @@ on a channel you are a member of, connects the socket and reads 30 s of events
 reports failures by path only. Redacted shapes land in
 `packages/slack-schema/test/fixtures/recorded/` (one file per method, one per
 socket frame type), `packages/slack-schema/test/recorded.test.ts` decodes them,
-and `pnpm lint` runs `scripts/check-fixtures-redacted.mjs` over them so no id,
+and `bun run lint` runs `scripts/check-fixtures-redacted.mjs` over them so no id,
 URL, email, timestamp or free text can be committed. The smoke refuses any
-method outside its allow-list. `pnpm smoke:live -- --fake` runs it against an
+method outside its allow-list. `bun run smoke:live --fake` runs it against an
 in-process fake, which is how it is checked in development.
 
-Skipping the keychain prompt on later runs: `JUNO_LIVE=1 pnpm smoke:live --
+Skipping the keychain prompt on later runs: `JUNO_LIVE=1 bun run smoke:live --
 --cache-session` imports the session once (the Slack prompt appears) and keeps
 the token, `d` cookie and team URL in a generic password of your login keychain
 named `juno-dev-slack-session` (`security add-generic-password`, value passed on
 stdin). Every later run finds it with `security find-generic-password` without a
-prompt, because `security` itself created the item. `pnpm smoke:live --
+prompt, because `security` itself created the item. `bun run smoke:live --
 --forget-session` deletes it. Delete it when the session stops working
 (`auth.test: SlackAuthRequired`) and cache again, or before handing the machine
 to someone else. The desktop app never reads this item.
 
-`JUNO_LIVE=1 pnpm probe:live` (`scripts/probe-live.ts`) answers questions the smoke does not:
+`JUNO_LIVE=1 bun run probe:live` (`scripts/probe-live.ts`) answers questions the smoke does not:
 the cost of the M7 recheck, what `conversations.history` and `conversations.replies` return
 around threads, the search response, file objects and thumbnail auth, and the notification
 prefs. It reuses the cached session, refuses methods outside its own read-only allow-list, starts
@@ -509,7 +502,7 @@ not change it; it appears once per run that imports.
 
 ## The live sync dry run
 
-`JUNO_LIVE=1 pnpm sync:live` (`scripts/sync-live-dry-run.ts`) runs the real `@juno/sync`
+`JUNO_LIVE=1 bun run sync:live` (`scripts/sync-live-dry-run.ts`) runs the real `@juno/sync`
 cold boot (`runSync`, with the default `SyncConfig`) against your real workspace into a
 temporary data directory, waits until boot and discovery finish (`live`) or `--seconds N`
 (default 900) pass, prints aggregate numbers and deletes the directory. It reuses the
@@ -527,12 +520,12 @@ sidebar shows under the quiet rule, unread and mention counts, decode issues by 
 hits, the `topics.list` query time and snapshot size. Titles, names, message text and ids are
 never printed; the Effect logger is replaced by one that prints messages and enum-like fields
 only. `-- --until-quiet` keeps it running after `live` until no call has been made for 30 s, so the
-background pass over the followed threads of the window is counted too (raise `--seconds` for it). `pnpm sync:live -- --fake` runs the same script against an in-process fake, which is how
+background pass over the followed threads of the window is counted too (raise `--seconds` for it). `bun run sync:live --fake` runs the same script against an in-process fake, which is how
 it is checked in development.
 
 Both live scripts run under plain Node (type stripping). `@juno/sync`, `@juno/store` and
 `@juno/engine` use bundler-style relative imports (`./sync` for `./sync.ts`), which Node does
-not resolve on its own, so `pnpm sync:live` starts Node with
+not resolve on its own, so `bun run sync:live` starts Node with
 `--import ./scripts/ts-resolve-hooks.mjs`, a small `module.registerHooks` resolver that tries
 `.ts`, `.tsx` and `/index.ts`.
 
@@ -573,7 +566,7 @@ Names are explained in `docs/architecture.md` sections 2.6 and 7.
 4. **Container.** `apps/desktop/src/renderer/containers/<Feature>.tsx`: reads atoms with `useAtomValue`
    and `useAtomSet` from `@juno/state/react`, maps results to view props, binds callbacks to commands.
 5. **View.** `packages/views/src/<Feature>View.tsx` with `<Feature>View.fixtures.tsx`, registered in
-   `src/fixtures.ts` and exported from `index.ts`. Check it in `pnpm gallery`, one state at a time. Props in, callbacks out;
+   `src/fixtures.ts` and exported from `index.ts`. Check it in `bun run gallery`, one state at a time. Props in, callbacks out;
    no state, Effect or `window.juno`.
 6. **Test.** `apps/desktop/e2e/<feature>.spec.ts` follows the user flow against the built app (and the
    fake Slack server once sign-in exists). Add engine or domain unit tests only for pure rules.
@@ -582,17 +575,17 @@ Names are explained in `docs/architecture.md` sections 2.6 and 7.
 
 | Kind | Where | Run |
 | --- | --- | --- |
-| Pure rules, store, Slack client, Slack-app import, merge rules, engine protocol, session, sync and the AI provider (fake, and pi-ai's scripted faux provider) | `packages/<name>/test/` (vitest) | `pnpm test` |
-| The sidebar query and boot on the large seed (report only) | `packages/engine/test/bench/` | `JUNO_BENCH=1 pnpm --filter @juno/engine exec vitest run test/bench` |
-| User flows in the built app | `apps/desktop/e2e/` (Playwright, one worker) | `pnpm test:e2e` |
-| Mouse-down activation, state switcher, in a real browser | `apps/gallery/activation.spec.ts`, `apps/gallery/behaviour.spec.ts` | `pnpm test:gallery` |
-| Sidebar row text contrast, each level in both themes and every accent | `apps/gallery/contrast.spec.ts` | `pnpm test:gallery` |
-| No layout shift on hover, press or focus, and the cursor rule, in every state | `apps/gallery/shift.spec.ts` (helper: `packages/testing`) | `pnpm test:gallery` |
-| Topic art: fades on screen, whole when an off-screen row scrolls in | `apps/gallery/topic-art.spec.ts` | `pnpm test:gallery` |
-| Sidebar rows as views: a DM's preview, the group DM tile, the row's description, the title tooltip, the Resolve slot, the list scrollbar | `apps/gallery/sidebar-rows.spec.ts` | `pnpm test:gallery` |
-| No focus ring cut off by a scroller or paint containment, tabbing through the main surfaces in light, in four parts (`GALLERY_RING_ONLY=Sidebar` for one, `*` for every component; dark changes only colours) | `apps/gallery/focus-ring.spec.ts` | `pnpm test:gallery` |
-| Screenshots of every state | `apps/gallery/shots.spec.ts` | `pnpm gallery:shots` |
-| Feel: no shift, jump, flicker, empty frame or late feedback, frame by frame, in the built app | `apps/desktop/e2e/feel/*.feel.ts` | `pnpm test:feel` |
+| Pure rules, store, Slack client, Slack-app import, merge rules, engine protocol, session, sync and the AI provider (fake, and pi-ai's scripted faux provider) | `packages/<name>/test/` (vitest) | `bun run test` |
+| The sidebar query and boot on the large seed (report only) | `packages/engine/test/bench/` | `JUNO_BENCH=1 bun run --cwd packages/engine vitest run test/bench` |
+| User flows in the built app | `apps/desktop/e2e/` (Playwright, one worker) | `bun run test:e2e` |
+| Mouse-down activation, state switcher, in a real browser | `apps/gallery/activation.spec.ts`, `apps/gallery/behaviour.spec.ts` | `bun run test:gallery` |
+| Sidebar row text contrast, each level in both themes and every accent | `apps/gallery/contrast.spec.ts` | `bun run test:gallery` |
+| No layout shift on hover, press or focus, and the cursor rule, in every state | `apps/gallery/shift.spec.ts` (helper: `packages/testing`) | `bun run test:gallery` |
+| Topic art: fades on screen, whole when an off-screen row scrolls in | `apps/gallery/topic-art.spec.ts` | `bun run test:gallery` |
+| Sidebar rows as views: a DM's preview, the group DM tile, the row's description, the title tooltip, the Resolve slot, the list scrollbar | `apps/gallery/sidebar-rows.spec.ts` | `bun run test:gallery` |
+| No focus ring cut off by a scroller or paint containment, tabbing through the main surfaces in light, in four parts (`GALLERY_RING_ONLY=Sidebar` for one, `*` for every component; dark changes only colours) | `apps/gallery/focus-ring.spec.ts` | `bun run test:gallery` |
+| Screenshots of every state | `apps/gallery/shots.spec.ts` | `bun run gallery:shots` |
+| Feel: no shift, jump, flicker, empty frame or late feedback, frame by frame, in the built app | `apps/desktop/e2e/feel/*.feel.ts` | `bun run test:feel` |
 
 Tests that need the Effect test clock use `@effect/vitest`; see the effect skill.
 
@@ -629,8 +622,8 @@ opening one. Any launch error would satisfy that assertion, even a crash.
 Playwright global setup runs `build-cached` before the desktop tests, including
 direct `playwright test` calls and the perf config. Unchanged inputs and output
 skip the build. The package scripts do not build a second time. Repeat locally with
-`node scripts/heavy.mjs pnpm --filter @juno/desktop exec playwright test e2e/app.spec.ts -g "second launch" --repeat-each=10 --retries=0`.
-`pnpm flake` runs remotely. Set `DEBUG=pw:browser` to capture the first app's
+`node scripts/heavy.mjs bun run --cwd apps/desktop playwright test e2e/app.spec.ts -g "second launch" --repeat-each=10 --retries=0`.
+`bun run flake` runs remotely. Set `DEBUG=pw:browser` to capture the first app's
 process logs. The test attaches the second process's output as `second-launch.log`.
 The test allows 90 seconds overall and 30 seconds for the second process to exit.
 This checks the development executable, not an installed DMG or Finder launch.
@@ -644,13 +637,13 @@ timeout. Global setup prevents this mismatch after a merge.
 
 ## The gallery
 
-`pnpm gallery` serves every primitive and view at http://localhost:4174. A component page shows one state at a time, with the states listed beside it under group headings (a select above the frame in a narrow window). The list is plain system styling on purpose, so it is never mistaken for product UI.
+`bun run gallery` serves every primitive and view at http://localhost:4174. A component page shows one state at a time, with the states listed beside it under group headings (a select above the frame in a narrow window). The list is plain system styling on purpose, so it is never mistaken for product UI.
 
 - **Addresses.** `#/Button?__state=variant/primary&theme=dark&accent=claret`. `__state` is `<group>/<state>` (just `<state>` for a state declared without a group); no `__state` opens the first state. `theme` and `accent` are left out when they are the defaults. States draw in Compact density, the app's default; a state declares `frame.density: 'comfortable'` to draw in Comfortable, and `density=comfortable` or `density=compact` in the address overrides both. `#/` is the index, which lists each component with its groups and states. The old `#/Button/primary` still opens the first state with that key.
 - **Keys.** `j` / `k` or the down / up arrows move between states; `[` and `]` switch components (wrapping). Keys are ignored while typing in a field, and the arrows are left to the component while focus is inside the frame.
 - **Declaring states.** Group them under headings in product words (`Data`, `Session`, `Failure`, `Interaction`, `Overview`). See `packages/ui/README.md`. List only states the component's code can reach, add no branch to a component to make a state possible, and keep pending states still: nothing resolves on a timer. An unreachable fixture is removed, not kept for show.
-- **Screenshots.** `pnpm gallery:shots` writes `apps/gallery/shots/<Component>/<group>/<state>-<theme>.png`.
-- **Behaviour specs.** The `behaviour` project in `apps/gallery/playwright.config.ts` runs every `*.spec.ts` in `apps/gallery/` except `shots.spec.ts`, so a new spec file runs without editing the config. `pnpm affected` passes a changed spec as `/<name>.spec.ts`; the slash keeps `geometry.spec.ts` from also matching `list-geometry.spec.ts`.
+- **Screenshots.** `bun run gallery:shots` writes `apps/gallery/shots/<Component>/<group>/<state>-<theme>.png`.
+- **Behaviour specs.** The `behaviour` project in `apps/gallery/playwright.config.ts` runs every `*.spec.ts` in `apps/gallery/` except `shots.spec.ts`, so a new spec file runs without editing the config. `bun run affected` passes a changed spec as `/<name>.spec.ts`; the slash keeps `geometry.spec.ts` from also matching `list-geometry.spec.ts`.
 
 
 ### The layout-shift guard
@@ -667,7 +660,7 @@ After the change, two full remote gallery runs in a row passed all 305 tests: 17
 
 ## Web shell
 
-`pnpm web` runs the real renderer in a browser, for UI-only work, with no build and no Electron. One Node process holds three things:
+`bun run web` runs the real renderer in a browser, for UI-only work, with no build and no Electron. One Node process holds three things:
 
 - a fake Slack with the default seed the e2e and feel tests use;
 - the engine on a fresh temporary data folder, already signed in to the fake;
@@ -676,22 +669,22 @@ After the change, two full remote gallery runs in a row passed all 305 tests: 17
 The page reaches the engine over a WebSocket that carries the same `effect/rpc` routes as the Electron port. It answers `window.juno` itself (`apps/desktop/web/page/bridge.ts`). The command prints one line with the app's address and the fake Slack's control API. Post to `<control>/<name>` to send messages, reactions and socket events while you look at the page; the controls are listed in `packages/fake-slack/README.md`.
 
 - **Ports.** Each worktree gets its own port, derived from its path like the gallery's, with a strict port check to catch collisions. `JUNO_WEB_PORT` overrides it. The shell listens on 127.0.0.1; `--host` listens on the LAN, and the fake Slack stays on this Mac.
-- **Stopping.** Ctrl-C stops everything and deletes the data folder. So does the end of the process that started it. A shell killed before it can clean up leaves its folder, and the next `pnpm web` deletes it. Each shell holds a few hundred MB, so stop it when you are done.
+- **Stopping.** Ctrl-C stops everything and deletes the data folder. So does the end of the process that started it. A shell killed before it can clean up leaves its folder, and the next `bun run web` deletes it. Each shell holds a few hundred MB, so stop it when you are done.
 - **Code.** `apps/desktop/web`: `host/` runs in Node, `page/` in the browser. The socket transport is `packages/state/src/socket.ts` and `packages/engine/src/protocol/socket.ts`. Nothing in `apps/desktop/src` imports the shell (`check-deps`), so it never reaches the Electron app.
-- **Test.** `apps/desktop/e2e/web/web-shell.spec.ts` runs in the desktop suite’s `web` Playwright project, starts the CLI and checks in Chrome that a channel's Main reads, a message sends, a reaction lands, a context menu item works and the page reconnects after the socket drops. `pnpm affected` runs it when the shell, the socket transport or the engine changes.
+- **Test.** `apps/desktop/e2e/web/web-shell.spec.ts` runs in the desktop suite’s `web` Playwright project, starts the CLI and checks in Chrome that a channel's Main reads, a message sends, a reaction lands, a context menu item works and the page reconnects after the socket drops. `bun run affected` runs it when the shell, the socket transport or the engine changes.
 
 What it cannot do:
 
 - Native menus and window chrome. Context menus are a plain HTML list. App-menu shortcuts work only where the browser does not keep the key for itself.
 - Huddles, the Juno Agent's providers and Codex, notifications, the web panel, Quick Look, folder pickers, Open in Slack and updates. These answer "unavailable" or do nothing.
 - Files from anywhere but the fake Slack. Other images show a grey placeholder.
-- Perf and feel numbers. It is a dev build with React in development mode and no Content Security Policy, so those come from Electron only (`pnpm perf`, `pnpm test:feel`).
+- Perf and feel numbers. It is a dev build with React in development mode and no Content Security Policy, so those come from Electron only (`bun run perf`, `bun run test:feel`).
 
 Desktop e2e on Electron stays the merge gate.
 
 ## The feel suite
 
-`pnpm test:feel` records scripted interactions in the built app against the fake Slack and checks them frame by frame. It is separate from `test:e2e` (its own config, `apps/desktop/playwright.feel.config.ts`) because it records video and takes a few minutes.
+`bun run test:feel` records scripted interactions in the built app against the fake Slack and checks them frame by frame. It is separate from `test:e2e` (its own config, `apps/desktop/playwright.feel.config.ts`) because it records video and takes a few minutes.
 
 - **Recording.** `e2e/feel/recorder.ts` takes every compositor frame through the CDP screencast, and on every animation frame reads a few DOM probes (a rectangle, the scroll position, the rows at the top and bottom edges of the view, header text, an element's computed look), plus `layout-shift` and `long-animation-frame` entries and the input events.
 - **When probes read.** Once per frame, in a ResizeObserver created in that frame's `requestAnimationFrame`, so it is delivered after layout and after the app's own observers, just before paint. Reading in `requestAnimationFrame` itself sees states the app corrects before painting (the topic view pins its scroll position in a ResizeObserver), and reported jumps that never reached the screen. When a check and the images disagree, trust the images and fix the probe.
@@ -706,7 +699,7 @@ At the end of each UI milestone, run these reviews in parallel and turn the find
 
 1. **Design review.** The `interfaces:better-interface` skill on the built app and the gallery shots, as in `docs/reviews/m3/design-review.md`.
 2. **Code and performance review.** The performance skill's review questions and `docs/performance.md` 7.4, with measured numbers against every budget, as in `docs/reviews/m3/code-perf-review.md`.
-3. **Feel review.** The `feel-review` skill (`.claude/skills/feel-review/`): run `pnpm test:feel`, read the contact sheet and the filmstrips, and report what shifts, jumps, flickers, flashes empty or answers late, with frame numbers.
+3. **Feel review.** The `feel-review` skill (`.claude/skills/feel-review/`): run `bun run test:feel`, read the contact sheet and the filmstrips, and report what shifts, jumps, flickers, flashes empty or answers late, with frame numbers.
 
 ## Pitfalls met while setting this up
 
@@ -714,25 +707,20 @@ At the end of each UI milestone, run these reviews in parallel and turn the find
   child shells. With it set, Electron starts as plain Node and never opens a window.
   `scripts/without-run-as-node.mjs` strips it for `dev`, `start` and `test:e2e`, and
   `playwright.config.ts` deletes it again.
-- **pnpm 12 blocks install scripts.** `pnpm-workspace.yaml` must list `esbuild` and
-  `bun` under `allowBuilds` (the old `onlyBuiltDependencies` key is ignored).
-  Electron 44 has no install script: `apps/desktop/node_modules/electron/dist` appears
-  the first time something requires `electron` (`node -e "require('electron')"` in
-  `apps/desktop` fetches it).
+- **Electron's binary appears on first use.** Electron 44 has no install script:
+  `apps/desktop/node_modules/electron/dist` appears the first time something requires
+  `electron` (`node -e "require('electron')"` in `apps/desktop` fetches it).
 - **`ws` in the bundled engine.** `ws` loads the optional native `bufferutil` inside a
   try. In the main build that require became an empty stub, so `ws` called a missing
   `mask` and died on every outgoing socket frame of 48 bytes or more (a `tickle` is 47,
   so only `presence_sub` showed it, 10-21). `electron.vite.config.ts` defines
   `process.env.WS_NO_BUFFER_UTIL` for the main build, which keeps `ws` on its own
   JavaScript masking. Engine tests under plain Node never saw it.
-- **pnpm 12 minimum release age.** It refused `effect@4.0.3` as too new and wrote an
-  exclusion into `pnpm-workspace.yaml`. Expect the same for other day-old releases
-  (it did it again for `vitest@5.0.4`).
 - **`node:sqlite` and Node versions.** Electron 44 runs Node 24.21; the system Node is
   26. `@effect/sql-sqlite-node` uses `isTransaction`, `columns()`, `setReturnArrays`
   and `backup`, and the store uses FTS5; all were checked in Electron's own Node. To
   run a package's tests under that Node:
-  `ELECTRON_RUN_AS_NODE=1 apps/desktop/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron node_modules/.pnpm/node_modules/vitest/vitest.mjs run`
+  `ELECTRON_RUN_AS_NODE=1 apps/desktop/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron node_modules/vitest/vitest.mjs run`
   from the package directory. Node 24 prints an ExperimentalWarning for `node:sqlite`;
   it is harmless.
 - **Workspace packages and `effect` in main and preload.** `externalizeDepsPlugin`
@@ -755,7 +743,7 @@ At the end of each UI milestone, run these reviews in parallel and turn the find
 - **Node and DOM `MessagePort`s** have the same `addEventListener` surface at runtime
   but different typings; tests cast Node ports to `PortLike` / `MessagePortLike`.
 - **Renderer bundle size.** The budget is 1.1 MB of initial JS and 200 KB of CSS
-  (`docs/performance.md`); `pnpm build` runs `scripts/check-bundle-size.mjs` and fails
+  (`docs/performance.md`); `bun run build` runs `scripts/check-bundle-size.mjs` and fails
   over it. The M1 shell is 426.1 KB of JS (138.6 KB gzip) and 68.7 KB of CSS, minified.
   electron-vite does not minify by default, so the config sets `minify: 'esbuild'` for
   all three targets; without it the same code was 1,097 KB. Vite's CSS minifier does not
@@ -768,51 +756,51 @@ Effect and StyleX pitfalls are in their skills: `.claude/skills/effect/SKILL.md`
 
 ## Faster test runs
 
-- **Spec cache.** `pnpm specs:check` stores each passing Quint run in the system temp folder (`juno-cache/specs`), keyed by its arguments, what is checked on its output, the spec file and what it imports, and the Quint and Apalache versions. Every worktree shares it. A run whose key matches is not repeated: its saved output goes through the same checks and its trace is written back to `specs/traces/`. A changed spec reruns only its own checks. `SPECS_CACHE=off pnpm specs:check` or `--no-cache` runs everything; `SPECS_JOBS=<n>` sets how many typechecks and simulations run at once (default 3). The Apalache checks run after them, one at a time, on one Apalache server started for the run, so a check no longer pays for starting a JVM. Bump `cacheVersion` in `specs/check.mjs` when you change how a result is checked.
-- **Build skip.** `test:e2e`, `perf`, `test:feel`, `test:gallery` and `gallery:shots` build through `scripts/build-cached.mjs`. It hashes the app, packages, scripts, root configuration and lockfile, build command, Node version, platform, architecture and build flags (including Vite variables and local `.env` files). Desktop e2e files, app-level specs, Playwright configs, package/app `test/` and `tests/` directories, and `scripts/*.test.mjs` do not affect the build key. Seed definitions and other helpers under `src/` still do. It verifies output bytes before reuse. Remote runs also restore matching output from a persistent cache; a changed input, missing output or failed checksum rebuilds. `JUNO_REBUILD=1` forces a build. `pnpm build` and `pnpm dev` always build.
-- **Shift guard.** The gallery's guard waits only for running transitions and animations that can move a box, touches once a state that draws the same DOM as one already checked, and its twelve parts take components from one queue in the temp folder, so they finish together. The parts also check the cursor rule on each state they open. `GALLERY_SHIFT_ONLY=Button,Chip pnpm test:gallery` checks a few components while you iterate.
-- **Changed tests only.** `pnpm test --changed main` runs only the vitest files affected by changes since `main` (vitest follows imports across packages).
-- **Remote runs.** `pnpm remote <script>` takes no local slot. See "Remote runs" below.
+- **Spec cache.** `bun run specs:check` stores each passing Quint run in the system temp folder (`juno-cache/specs`), keyed by its arguments, what is checked on its output, the spec file and what it imports, and the Quint and Apalache versions. Every worktree shares it. A run whose key matches is not repeated: its saved output goes through the same checks and its trace is written back to `specs/traces/`. A changed spec reruns only its own checks. `SPECS_CACHE=off bun run specs:check` or `--no-cache` runs everything; `SPECS_JOBS=<n>` sets how many typechecks and simulations run at once (default 3). The Apalache checks run after them, one at a time, on one Apalache server started for the run, so a check no longer pays for starting a JVM. Bump `cacheVersion` in `specs/check.mjs` when you change how a result is checked.
+- **Build skip.** `test:e2e`, `perf`, `test:feel`, `test:gallery` and `gallery:shots` build through `scripts/build-cached.mjs`. It hashes the app, packages, scripts, root configuration and lockfile, build command, Node version, platform, architecture and build flags (including Vite variables and local `.env` files). Desktop e2e files, app-level specs, Playwright configs, package/app `test/` and `tests/` directories, and `scripts/*.test.mjs` do not affect the build key. Seed definitions and other helpers under `src/` still do. It verifies output bytes before reuse. Remote runs also restore matching output from a persistent cache; a changed input, missing output or failed checksum rebuilds. `JUNO_REBUILD=1` forces a build. `bun run build` and `bun run dev` always build.
+- **Shift guard.** The gallery's guard waits only for running transitions and animations that can move a box, touches once a state that draws the same DOM as one already checked, and its twelve parts take components from one queue in the temp folder, so they finish together. The parts also check the cursor rule on each state they open. `GALLERY_SHIFT_ONLY=Button,Chip bun run test:gallery` checks a few components while you iterate.
+- **Changed tests only.** `bun run test --changed main` runs only the vitest files affected by changes since `main` (vitest follows imports across packages).
+- **Remote runs.** `bun run remote <script>` takes no local slot. See "Remote runs" below.
 
 ## Typecheck
 
-TypeScript 7.0.2 remains installed for the manual `pnpm typecheck:tsc` path and parity comparison. Routine checks use Bun 1.4.4, installed as an exact root devDependency. `pnpm exec bun` resolves the pinned binary; the global Bun install is not used.
+TypeScript 7.0.2 remains installed for the manual `bun run typecheck:tsc` path and parity comparison. Routine checks use the Bun that runs the scripts, pinned to 1.4.4 by `packageManager` in `package.json`.
 
-`pnpm typecheck` runs `bun check -b` over every project that Bun supports, locally. The checker reads the project inventory and dependency hashes from `scripts/typecheck.mjs`, builds a temporary solution config, and stores passing results separately in the shared system temp folder (`juno-cache/typecheck-bun`). `--no-cache` checks every supported project. Bun has no incremental build cache. Projects with unsupported compiler settings produce one warning naming the project and are skipped; there is no TypeScript fallback. Today all 35 project configs support Bun.
+`bun run typecheck` runs `bun check -b` over every project that Bun supports, locally. The checker reads the project inventory and dependency hashes from `scripts/typecheck.mjs`, builds a temporary solution config, and stores passing results separately in the shared system temp folder (`juno-cache/typecheck-bun`). `--no-cache` checks every supported project. Bun has no incremental build cache. Projects with unsupported compiler settings produce one warning naming the project and are skipped; there is no TypeScript fallback. Today all 35 project configs support Bun.
 
-`pnpm typecheck:tsc` is the manual TypeScript-only check. No automatic check, hook, or scheduled run invokes it. `pnpm typecheck:parity` is also manual; it compares Bun and `tsc -b --force`, bypasses result caches, and fails if any project cannot be compared. Neither command is part of routine verification.
+`bun run typecheck:tsc` is the manual TypeScript-only check. No automatic check, hook, or scheduled run invokes it. `bun run typecheck:parity` is also manual; it compares Bun and `tsc -b --force`, bypasses result caches, and fails if any project cannot be compared. Neither command is part of routine verification.
 
-**Type stripping.** Node runs some TypeScript from source by stripping types: the agent's crash and recovery fixtures, `pnpm agent:eval`, the AI evals, `fake-slack start`, and the live scripts in `scripts/`, which reach the engine and most packages under it. Node cannot strip syntax that emits code, such as parameter properties (`constructor(private readonly x)`), enums or namespaces, and fails at load time. So every package such code reaches sets `erasableSyntaxOnly` in its `tsconfig.json`, and `pnpm typecheck` reports that syntax: all of `packages/` except `ui`, `views`, `tokens` and `testing`, and `scripts/tsconfig.json`. The desktop app, `ui` and `views` are bundled by Vite and may use it. A package that Node starts to run from source needs the flag too; the flag applies to every file in a project's program, so a bundled package it imports must follow the rule as well.
+**Type stripping.** Node runs some TypeScript from source by stripping types: the agent's crash and recovery fixtures, `bun run agent:eval`, the AI evals, `fake-slack start`, and the live scripts in `scripts/`, which reach the engine and most packages under it. Node cannot strip syntax that emits code, such as parameter properties (`constructor(private readonly x)`), enums or namespaces, and fails at load time. So every package such code reaches sets `erasableSyntaxOnly` in its `tsconfig.json`, and `bun run typecheck` reports that syntax: all of `packages/` except `ui`, `views`, `tokens` and `testing`, and `scripts/tsconfig.json`. The desktop app, `ui` and `views` are bundled by Vite and may use it. A package that Node starts to run from source needs the flag too; the flag applies to every file in a project's program, so a bundled package it imports must follow the rule as well.
 
-`pnpm lint` runs its ten checks at once through `scripts/lint.mjs`: oxlint, the decision log, the cache epoch, the migration order, the cursor rule, the duotone icons (`check-duotone.mjs`), tokens, `check-deps`, the fixture check and the health ratchet. None depends on another. Each check's output is printed as one group, under a line with its name, result and time, when it finishes. Lint fails if any check fails, and its last line names the ones that did.
+`bun run lint` runs its ten checks at once through `scripts/lint.mjs`: oxlint, the decision log, the cache epoch, the migration order, the cursor rule, the duotone icons (`check-duotone.mjs`), tokens, `check-deps`, the fixture check and the health ratchet. None depends on another. Each check's output is printed as one group, under a line with its name, result and time, when it finishes. Lint fails if any check fails, and its last line names the ones that did.
 
 Measured on 10-17 on this Mac, eight alternating runs of each while other agents kept the load at 5.5 to 7.3 on 8 cores, so the numbers vary a lot. The checks one after another with `&&` took 5.5 s median (fastest 3.0 s). At once they took 4.8 s median (fastest 2.2 s). In the parallel run every check except health finishes within 0.7 s. Health takes 2.6 s, and knip alone takes 1.9 to 2.0 s, so knip sets the floor. Making lint faster than that means making knip faster.
 
-`pnpm lint` stays whole: oxlint, the cursor rule, `check-deps` and the fixture check take about 3 s together even on the loaded Mac, and `check-deps` needs the whole package graph to see a bad edge.
+`bun run lint` stays whole: oxlint, the cursor rule, `check-deps` and the fixture check take about 3 s together even on the loaded Mac, and `check-deps` needs the whole package graph to see a bad edge.
 
 ## Local Bun checks
 
-`pnpm affected` uses the same local Bun check before starting remote test suites. It checks pending projects with `bun check -b --no-pretty --all`; a type error stops the run before remote suites start. Unsupported configs are warned about and skipped. It never runs TypeScript.
+`bun run affected` uses the same local Bun check before starting remote test suites. It checks pending projects with `bun check -b --no-pretty --all`; a type error stops the run before remote suites start. Unsupported configs are warned about and skipped. It never runs TypeScript.
 
 ## Testing
 
-Agents run selective checks before reporting. A scheduled task runs the full suites on main once a day with `pnpm verify:main` ("Full runs"). The agent that runs it commits the refreshed coverage map and merges it. A release follows `.claude/skills/do-release/SKILL.md`. Remote jobs share the laptop through tstack, including jobs from other projects.
+Agents run selective checks before reporting. A scheduled task runs the full suites on main once a day with `bun run verify:main` ("Full runs"). The agent that runs it commits the refreshed coverage map and merges it. A release follows `.claude/skills/do-release/SKILL.md`. Remote jobs share the laptop through tstack, including jobs from other projects.
 
-**Agents.** Before reporting, an agent runs `pnpm affected`: the local Bun check and lint, then, as one remote plan with separate SSH jobs, the unit files its change reaches, the specs it added or changed, the specs it names with `--spec`, and at most 10 more desktop specs that cover the change most directly ("Affected tests"). Heavy tests run only when the change is in their area, and the Quint checks only when the code the specs model changed. `pnpm affected --plan` first shows what it would run and why. `--wide` runs every spec the change can reach, for the rare change that needs it. One remote run at a time per agent. To run a few unit test files by hand, use `pnpm remote test --passWithNoTests <files>` (paths relative to their package); one spec, `pnpm remote test:desktop <files>`.
+**Agents.** Before reporting, an agent runs `bun run affected`: the local Bun check and lint, then, as one remote plan with separate SSH jobs, the unit files its change reaches, the specs it added or changed, the specs it names with `--spec`, and at most 10 more desktop specs that cover the change most directly ("Affected tests"). Heavy tests run only when the change is in their area, and the Quint checks only when the code the specs model changed. `bun run affected --plan` first shows what it would run and why. `--wide` runs every spec the change can reach, for the rare change that needs it. One remote run at a time per agent. To run a few unit test files by hand, use `bun run remote test --passWithNoTests <files>` (paths relative to their package); one spec, `bun run remote test:desktop <files>`.
 
 **Signed-in desktop tests.** Use `syncedTest` or `test.use({ synced: true })` for a default-seed flow whose first sync is only setup. Each test boots a fresh Electron process from a worker's verified snapshot and starts a matching fresh fake. Sign-in, first-sync, convergence, boot, AI-job and custom-seed scenarios keep a real sign-in. Snapshot keys, guards and the remaining exceptions are described in [Desktop e2e](../apps/desktop/e2e/README.md#synced-start). Timings and the rejected app-reuse experiment are in [Test speed round 4](test-speed-4.md).
 
 **Merging.** Finished branches merge into main in batches (`scripts/batch-merge.mjs`, "Batch merges") after typecheck, lint and the unit tests pass on the merged tree. The full suites do not gate a merge.
 
-**Full runs.** `pnpm verify:main --ref origin/main` runs every suite on main, including heavy sync tests; `--nightly` adds uncached Quint and the Mac suites ("Full runs" below). Run Quint uncached when its specs or checker change too. Conformance is in the full plan. Do not repeat `test:agent` separately; the unit suite already includes it.
+**Full runs.** `bun run verify:main --ref origin/main` runs every suite on main, including heavy sync tests; `--nightly` adds uncached Quint and the Mac suites ("Full runs" below). Run Quint uncached when its specs or checker change too. Conformance is in the full plan. Do not repeat `test:agent` separately; the unit suite already includes it.
 
-**Flakes.** Remote Playwright runs retry once. Tests that pass only on retry remain listed as flaky in the console and full-run summary. A failed test fails the gate. Fix intermittent failures without weakening assertions or running retry loops to obtain green results. Use `pnpm flake` to investigate them ("Hunting a flaky test" below).
+**Flakes.** Remote Playwright runs retry once. Tests that pass only on retry remain listed as flaky in the console and full-run summary. A failed test fails the gate. Fix intermittent failures without weakening assertions or running retry loops to obtain green results. Use `bun run flake` to investigate them ("Hunting a flaky test" below).
 
-**Remote plan shape**: `pnpm affected` and `pnpm verify:main` use separate unit, app and specs jobs when running on the SSH runner. The app job builds the desktop app once and does not shard desktop e2e. See "Remote runs" and "Machine shapes".
+**Remote plan shape**: `bun run affected` and `bun run verify:main` use separate unit, app and specs jobs when running on the SSH runner. The app job builds the desktop app once and does not shard desktop e2e. See "Remote runs" and "Machine shapes".
 
-**Test selection by coverage** (landed 10-17): `pnpm affected` picks desktop e2e specs by a coverage map that `pnpm verify:main` refreshes, and gallery behaviour specs by the components they open. See "Desktop specs by coverage".
+**Test selection by coverage** (landed 10-17): `bun run affected` picks desktop e2e specs by a coverage map that `bun run verify:main` refreshes, and gallery behaviour specs by the components they open. See "Desktop specs by coverage".
 
-**Narrow plans** (10-18): every spec boots the whole app, so the coverage map linked the median source file to 64 of 103 specs, and 125 of the 181 merges of 10-16 to 10-18 would have run 100 or more desktop specs. `pnpm affected` now ranks the specs and runs at most 10 besides the changed and named ones, skips heavy tests outside the change's area, and runs conformance only for the code the specs model. A full run covers the rest. Replayed over the 30 branch merges up to `993f2375` (`pnpm affected --plan --json --range`, old planner against new, both without the results cache): 2,503 desktop specs became 296, plans that ran 100 or more desktop specs went from 22 to none, shift-guard components from 1,326 to 546, conformance from 18 plans to 9, and the remote time, estimated from the per-spec times of the 10-17 and 10-18 full runs, from 13,873 s to 6,071 s (median plan 512 s to 189 s). `--wide` planned the same steps as the old planner for all 30. See "Affected tests".
+**Narrow plans** (10-18): every spec boots the whole app, so the coverage map linked the median source file to 64 of 103 specs, and 125 of the 181 merges of 10-16 to 10-18 would have run 100 or more desktop specs. `bun run affected` now ranks the specs and runs at most 10 besides the changed and named ones, skips heavy tests outside the change's area, and runs conformance only for the code the specs model. A full run covers the rest. Replayed over the 30 branch merges up to `993f2375` (`bun run affected --plan --json --range`, old planner against new, both without the results cache): 2,503 desktop specs became 296, plans that ran 100 or more desktop specs went from 22 to none, shift-guard components from 1,326 to 546, conformance from 18 plans to 9, and the remote time, estimated from the per-spec times of the 10-17 and 10-18 full runs, from 13,873 s to 6,071 s (median plan 512 s to 189 s). `--wide` planned the same steps as the old planner for all 30. See "Affected tests".
 
 **A leaner suite** (10-17). Slow, duplicated and misplaced tests were merged, moved or removed, and fixed waits replaced with waits on a condition. Each suite on one remote machine of its usual shape, main at `0d93f4e9` before and the `test-slim` branch after:
 
@@ -828,7 +816,7 @@ Where it came from: a 31 s idle-time sleep and an 11 s poll sleep in unit tests,
 
 The T3 watcher (`packages/agent/src/t3/watch.ts`) no longer reads on a fixed 10 s poll: it reads 1 s after a change and backs off to 10 s while nothing changes, and wakes at once when `t3_thread_wait` reports the run ended or Juno sends an answer, so the T3 Code e2e tests no longer wait out a poll for those steps. Still slow, left as they are: `ai-key.spec.ts` waits about 22 s for the title job's 30 s tick after the daily cap is raised; several tests sleep a few seconds to show that nothing happens, where no signal marks the end of a pass.
 
-**Round 2** (10-17). The follow-ups above, measured the same way but with every suite on the standard 8x16 machine, one after another in one plan (`pnpm remote --env JUNO_PLAN_SERIAL=1 test:plan test + test:gallery + test:desktop`), main at `0e8669fe` before and the `test-slim-2` branch after. Summed test time is the sum of the per-test (desktop, gallery) or per-file (unit) durations the run log prints; script time depends mostly on the slowest worker.
+**Round 2** (10-17). The follow-ups above, measured the same way but with every suite on the standard 8x16 machine, one after another in one plan (`bun run remote --env JUNO_PLAN_SERIAL=1 test:plan test + test:gallery + test:desktop`), main at `0e8669fe` before and the `test-slim-2` branch after. Summed test time is the sum of the per-test (desktop, gallery) or per-file (unit) durations the run log prints; script time depends mostly on the slowest worker.
 
 | Suite | Before: script time, summed, tests | After: script time, summed, tests |
 | --- | --- | --- |
@@ -846,7 +834,7 @@ The desktop specs changed went from 246 s to 152 s summed: `presence.spec.ts` 10
 
 Looked at and left: the ten slowest unit files (the engine's `sync`, `send`, `reads`, `art`, `automated`, `actions`, `reconnect`, `reactions`, `messages`, `send-copies`) spend their time booting an engine per test, with sleeps under 3 s that show nothing happens; `juno-agent/crash.spec.ts` relaunches by design; the 429 storm in `realtime.spec.ts` needs a Retry-After longer than the interactive lane's 5 s wait; `idle-cpu.spec.ts` measures over the 20 s window performance.md sets; `automated.spec.ts` waits 4 s three times for the Automated job's 3 s window, which has no signal for a finished pass.
 
-**Round 3** (10-17). Main at `c57723fc`, `pnpm remote test:desktop` on one 8x16 machine: 409 passed, 1,414 s summed, 291 s script time. Round 2 had already moved the send-check limits, emoji matching and five sidebar view states, and mention parsing was unit tested, so what was left was launches:
+**Round 3** (10-17). Main at `c57723fc`, `bun run remote test:desktop` on one 8x16 machine: 409 passed, 1,414 s summed, 291 s script time. Round 2 had already moved the send-check limits, emoji matching and five sidebar view states, and mention parsing was unit tested, so what was left was launches:
 
 - A test that needs a launch setting gets it from a fixture option: `test.use({ fakeAiDelayMillis })` in `grammar-pause.spec.ts` and the three slow-model tests in `send-checks.spec.ts`, `test.use({ screenShared: true })` for the capture that never stops in `privacy-sharing.spec.ts`. Each used to sign in, quit and relaunch. A relaunch stays where a test checks what survives one.
 - `quick-start.spec.ts`: the flow test runs on the same fifth of the large seed as the preview test (13 s on the large seed). The budget stays on the large seed in `perf.spec.ts`.
@@ -857,11 +845,11 @@ Looked at and left: the 429 storm in `realtime.spec.ts` (33 s) and `idle-cpu.spe
 
 **Round 4** (10-18): the audit in `docs/testing-audit.md` measured what each suite costs and what it caught in a week, removed a gallery hang that cost every full run on main 13 minutes, merged desktop tests that shared their setup (474 to 408 launches), and removed or rewrote tests of internals. Its rules follow.
 
-**Unit setup and parallel files** (10-19). The engine harness builds an empty migrated database template once per test file, closes it, then copies it into each fresh engine's private directory. It does not copy synced workspace data or share engines. Store migration tests still run from scratch. Related engine checks can share one named flow; tests of different starting states and failure cases remain independent. Large-seed repair and socket-liveness cases are separate files so existing remote file parallelism can overlap them. `pnpm remote test` already sets `JUNO_TEST_FILE_PARALLEL=1` and bounds workers to the runner; the local serial default is unchanged. Measurements and the assertion inventory are in [Unit suite timing](unit-suite-timing.md).
+**Unit setup and parallel files** (10-19). The engine harness builds an empty migrated database template once per test file, closes it, then copies it into each fresh engine's private directory. It does not copy synced workspace data or share engines. Store migration tests still run from scratch. Related engine checks can share one named flow; tests of different starting states and failure cases remain independent. Large-seed repair and socket-liveness cases are separate files so existing remote file parallelism can overlap them. `bun run remote test` already sets `JUNO_TEST_FILE_PARALLEL=1` and bounds workers to the runner; the local serial default is unchanged. Measurements and the assertion inventory are in [Unit suite timing](unit-suite-timing.md).
 
-**Further unit tuning** (10-19). Store now overlaps files on remote workers because every test owns a private temporary directory and database handles. The mutation scenarios use a smaller 20,000-message fixture while keeping 300 conversations, all 150 activity targets and the exact repair budgets; the 100,000-message performance fixture stays intact. The send flush check advances retry deadlines with TestClock. Home's AI-off setup now precedes its job startup, and quick-start's Automated hold is advanced explicitly, so both work under load. Five paired Agent pool/isolation samples found no consistent improvement, so its defaults stay unchanged. Wall-clock and CPU budgets are excluded from normal unit runs and `affected`: `pnpm perf --unit` runs the Agent, Engine and AI performance configurations on the Mac. Mixed tests keep their correctness assertions in the normal suite; query-count and payload limits remain normal checks. The Agent no longer has a separate timing project in `pnpm test`. Profiling commands and measurements are in [Unit suite timing](unit-suite-timing.md#round-3-smaller-repair-fixtures-and-independent-store-workers).
+**Further unit tuning** (10-19). Store now overlaps files on remote workers because every test owns a private temporary directory and database handles. The mutation scenarios use a smaller 20,000-message fixture while keeping 300 conversations, all 150 activity targets and the exact repair budgets; the 100,000-message performance fixture stays intact. The send flush check advances retry deadlines with TestClock. Home's AI-off setup now precedes its job startup, and quick-start's Automated hold is advanced explicitly, so both work under load. Five paired Agent pool/isolation samples found no consistent improvement, so its defaults stay unchanged. Wall-clock and CPU budgets are excluded from normal unit runs and `affected`: `bun run perf --unit` runs the Agent, Engine and AI performance configurations on the Mac. Mixed tests keep their correctness assertions in the normal suite; query-count and payload limits remain normal checks. The Agent no longer has a separate timing project in `bun run test`. Profiling commands and measurements are in [Unit suite timing](unit-suite-timing.md#round-3-smaller-repair-fixtures-and-independent-store-workers).
 
-**Desktop scheduling and persistent builds** (10-19). The desktop fixture now selects the engine unit harness's fast scheduling for ordinary fake-Slack launches. Both e2e mode and a fake URL are required. Thumbnail recovery keeps four attempts at the same ratios; production still waits 1, 3, 10 and 30 seconds. The fast profile disables periodic discovery, uses explicit catch-ups, and preserves real socket hello/pong safety deadlines. Tests of real timing opt out with `test.use({ timing: 'production' })` or `launchApp(dir, { timing: 'production' })`; presence spacing and reaction-versus-edit backoff do so. Paced sync, idle, perf, feel and `@mac` launches retain production timing automatically. `juno.workPass(name)` waits for an engine job pass started after its request, so negative AI and Automated assertions no longer sleep for several seconds. `JUNO_E2E_TIMINGS=1` reports separate fake-start, Electron-launch, sign-in, sync-wait and close times. Related checks with the same starting state share one launch and use labelled `test.step` calls. Each flow owns its fake and user data. Cold starts, different initial fixtures and destructive failure cases stay separate. Timing budgets run on the Mac through `pnpm perf`; normal e2e waits only establish readiness or fail a hung step.
+**Desktop scheduling and persistent builds** (10-19). The desktop fixture now selects the engine unit harness's fast scheduling for ordinary fake-Slack launches. Both e2e mode and a fake URL are required. Thumbnail recovery keeps four attempts at the same ratios; production still waits 1, 3, 10 and 30 seconds. The fast profile disables periodic discovery, uses explicit catch-ups, and preserves real socket hello/pong safety deadlines. Tests of real timing opt out with `test.use({ timing: 'production' })` or `launchApp(dir, { timing: 'production' })`; presence spacing and reaction-versus-edit backoff do so. Paced sync, idle, perf, feel and `@mac` launches retain production timing automatically. `juno.workPass(name)` waits for an engine job pass started after its request, so negative AI and Automated assertions no longer sleep for several seconds. `JUNO_E2E_TIMINGS=1` reports separate fake-start, Electron-launch, sign-in, sync-wait and close times. Related checks with the same starting state share one launch and use labelled `test.step` calls. Each flow owns its fake and user data. Cold starts, different initial fixtures and destructive failure cases stay separate. Timing budgets run on the Mac through `bun run perf`; normal e2e waits only establish readiness or fail a hung step.
 
 The subsequent flow pass combines 50 checks into 17 labelled flows across 17 specs, saving 33 launches. The portable idle walk replaces three launches with one. The [round 4 report](test-speed-4.md) records the assertion inventory, timings, injected CPU/leak failures and unresolved flakes. No exact duplicate test was removed.
 
@@ -884,16 +872,16 @@ Removing production waits is visible per file despite that contention: media che
 
 Cold candidate builds took 32.69 s for desktop and 22.70 s for gallery. The following fresh remote workspaces restored the same outputs in 0.03 s and 0.01 s. Cache tests cover fresh archives and Git checkouts, changed and deleted inputs, build flags, damaged output, damaged cache entries and failed builds. The gallery sweep also keeps exact markup comparisons in the browser and reads each shared offset parent once per synchronous snapshot; it still measures every selected element and all six touches.
 
-The final `pnpm affected` invocation initially failed the health limits on the added test hooks. Extracting the main/engine test helpers fixed that: Bun, desktop TypeScript, all 11 lint checks and 17 local AI/Automated/Home/review checks then passed. Its unit lane stopped at the unchanged `packages/agent/test/serve/chat-cache.bench.test.ts:43`: event-to-window p95 was 62.1 ms against a 50 ms budget, while the query budget passed. That left planned unit files unrun; the benchmark and its limit were left for the separate unit/plan work. The protocol checks passed, conformance passed 80 cases with 12 existing skips, and all 62 repository-tool tests passed. The same plan passed all 297 gallery checks in 1,149 s and 17 selected desktop checks in 56 s, without retries. Its three sweep parts took 16.2–16.3 minutes, so they needed the increased batch limit. With the root script registration changed, this plan selected the ten smallest desktop specs; the changed job/review flows were checked separately in the 17-test local batch above. The overall affected result remains failed because of the recorded initial health failure and the unit benchmark; the health checks were subsequently rerun successfully.
+The final `bun run affected` invocation initially failed the health limits on the added test hooks. Extracting the main/engine test helpers fixed that: Bun, desktop TypeScript, all 11 lint checks and 17 local AI/Automated/Home/review checks then passed. Its unit lane stopped at the unchanged `packages/agent/test/serve/chat-cache.bench.test.ts:43`: event-to-window p95 was 62.1 ms against a 50 ms budget, while the query budget passed. That left planned unit files unrun; the benchmark and its limit were left for the separate unit/plan work. The protocol checks passed, conformance passed 80 cases with 12 existing skips, and all 62 repository-tool tests passed. The same plan passed all 297 gallery checks in 1,149 s and 17 selected desktop checks in 56 s, without retries. Its three sweep parts took 16.2–16.3 minutes, so they needed the increased batch limit. With the root script registration changed, this plan selected the ten smallest desktop specs; the changed job/review flows were checked separately in the 17-test local batch above. The overall affected result remains failed because of the recorded initial health failure and the unit benchmark; the health checks were subsequently rerun successfully.
 
 Reproduce the samples with:
 
 ```sh
-pnpm remote test:desktop app.spec.ts topic.spec.ts send.spec.ts actions.spec.ts automated.spec.ts ai-key.spec.ts art.spec.ts home.spec.ts mirror-reads.spec.ts presence.spec.ts
-pnpm remote --env GALLERY_SHIFT_ONLY=Button,Chip,TopicHeader test:gallery shift.spec.ts behaviour.spec.ts topic-art.spec.ts
+bun run remote test:desktop app.spec.ts topic.spec.ts send.spec.ts actions.spec.ts automated.spec.ts ai-key.spec.ts art.spec.ts home.spec.ts mirror-reads.spec.ts presence.spec.ts
+bun run remote --env GALLERY_SHIFT_ONLY=Button,Chip,TopicHeader test:gallery shift.spec.ts behaviour.spec.ts topic-art.spec.ts
 ```
 
-The full commands are `pnpm remote --env JUNO_E2E_TIMINGS=1 test:desktop` and `pnpm remote test:gallery`.
+The full commands are `bun run remote --env JUNO_E2E_TIMINGS=1 test:desktop` and `bun run remote test:gallery`.
 
 ### Rules for tests
 
@@ -910,50 +898,50 @@ These apply to every new or changed test. The audit has the measurements behind 
 
 ## Affected tests
 
-`pnpm affected` works out which tests the change can reach and runs only those. After local Bun checking passes, the remote suites run as one plan: separate SSH jobs through tstack (`pnpm remote test:plan`, see "Remote runs"), and the local steps (lint, the Node checks) run on the Mac beside it. Each step's result comes back separately, so the results cache records the steps that passed (`--local` runs every step one after another through the local root scripts; `--plan` only prints the plan, and `--plan --json` prints it as JSON; `--files a,b` plans for given files; `--spec <spec>` also runs that desktop or gallery spec, repeated or comma-separated; `--max-specs <n>` allows more coverage-picked desktop specs than 10; `--wide` plans every spec the change can reach, heavy tests included, as before 10-18; `--batch` is the batch gate's plan, below). The change is every file that differs from the merge base with `origin/main` (or `main` when there is no remote), committed or not, plus new files. Agents use it while iterating and for their report; a scheduled task runs the full suites on `main` once a day.
+`bun run affected` works out which tests the change can reach and runs only those. After local Bun checking passes, the remote suites run as one plan: separate SSH jobs through tstack (`bun run remote test:plan`, see "Remote runs"), and the local steps (lint, the Node checks) run on the Mac beside it. Each step's result comes back separately, so the results cache records the steps that passed (`--local` runs every step one after another through the local root scripts; `--plan` only prints the plan, and `--plan --json` prints it as JSON; `--files a,b` plans for given files; `--spec <spec>` also runs that desktop or gallery spec, repeated or comma-separated; `--max-specs <n>` allows more coverage-picked desktop specs than 10; `--wide` plans every spec the change can reach, heavy tests included, as before 10-18; `--batch` is the batch gate's plan, below). The change is every file that differs from the merge base with `origin/main` (or `main` when there is no remote), committed or not, plus new files. Agents use it while iterating and for their report; a scheduled task runs the full suites on `main` once a day.
 
 An import graph over `apps/` and `packages/` decides what each change reaches, and for desktop e2e specs a coverage map narrows it ("Desktop specs by coverage" below). The graph follows relative imports, `@juno/*` through each package's `exports`, and named imports followed through barrel files (`export * from` and `export { } from`) to the module that declares the name. The rules:
 
 | Changed | Runs |
 | --- | --- |
-| `pnpm-lock.yaml`, `pnpm-workspace.yaml`, the root `package.json`, `tsconfig.base.json` | every unit test, `specs:check`, conformance, and a sample of each e2e suite: the 10 smallest desktop specs and 10 gallery components (no spec can be told apart) |
+| `bun.lock`, `bunfig.toml`, the root `package.json`, `tsconfig.base.json` | every unit test, `specs:check`, conformance, and a sample of each e2e suite: the 10 smallest desktop specs and 10 gallery components (no spec can be told apart) |
 | `scripts/affected.mjs`, `scripts/affected-select.mjs`, `scripts/affected-run.mjs`, `scripts/affected-tests.mjs`, `scripts/test-areas.mjs`, `scripts/import-graph.mjs`, `scripts/coverage-map.mjs`, `scripts/remote*`, `scripts/heavy.mjs`, `scripts/build-cached.mjs`, `scripts/without-run-as-node.mjs` | the tool tests (`test:health`, `test:repo-tools`, `test:runner`) and `e2e/app.spec.ts`, as a check that a run still works |
-| A vitest file, a file one reaches, or a package's `package.json`, `vitest.config.ts` or `tsconfig.json` | those vitest files (`pnpm test --files <repository paths>`). A vitest file is any file a package's or app's `vitest.config.ts` includes (every project's `include`, `test/**/*.test.ts` by default), in `packages/` and `apps/` alike: `apps/desktop/test/`, `packages/agent/eval/` |
+| A vitest file, a file one reaches, or a package's `package.json`, `vitest.config.ts` or `tsconfig.json` | those vitest files (`bun run test --files <repository paths>`). A vitest file is any file a package's or app's `vitest.config.ts` includes (every project's `include`, `test/**/*.test.ts` by default), in `packages/` and `apps/` alike: `apps/desktop/test/`, `packages/agent/eval/` |
 | A script under `scripts/` that a Node test imports, or the test itself | the root script that runs that test with `node --test` (`test:repo-tools`, `test:health`, `test:runner`); every `scripts/**/*.test.mjs` belongs to one (`scripts/affected.test.mjs` checks) |
-| `specs/` (not Markdown) | `pnpm specs:check`, narrowed to `--memory`, `--actions` or `--recovery` when only that agent spec changed; its cache skips checks whose inputs passed before |
-| The code the specs model (`PROTOCOL_PATHS` in `scripts/test-areas.mjs`): `specs/`, `packages/sync/`, the engine's `outbox.ts` and `send/`, the conformance harness | `pnpm specs:conformance` |
-| A file a component's fixtures reach | `pnpm test:gallery` with `GALLERY_SHIFT_ONLY` set to at most 10 of those components, ranked as desktop specs are (below), and the other behaviour specs that open one of them |
+| `specs/` (not Markdown) | `bun run specs:check`, narrowed to `--memory`, `--actions` or `--recovery` when only that agent spec changed; its cache skips checks whose inputs passed before |
+| The code the specs model (`PROTOCOL_PATHS` in `scripts/test-areas.mjs`): `specs/`, `packages/sync/`, the engine's `outbox.ts` and `send/`, the conformance harness | `bun run specs:conformance` |
+| A file a component's fixtures reach | `bun run test:gallery` with `GALLERY_SHIFT_ONLY` set to at most 10 of those components, ranked as desktop specs are (below), and the other behaviour specs that open one of them |
 | A gallery behaviour spec other than `shift.spec.ts` | that spec |
-| The gallery harness: `apps/gallery/` (except its spec files and `shots.spec.ts`), `shift.spec.ts`, `packages/testing/` | `pnpm test:gallery` for every component and spec, the heavy shift guard over every component included |
-| A file the desktop app runs (`apps/desktop/src` and the packages it bundles) | `pnpm test:desktop` with at most 10 of the specs the coverage map says ran it, the most direct first (below) |
-| The shared e2e support: `e2e/fixtures.ts`, `e2e/driver/`, `e2e/build.ts`, `e2e/coverage.ts`, `e2e/no-skips.ts`, the Playwright and electron-vite configs, `apps/desktop/package.json`, the renderer's `index.html`, `src/coverage.ts`, and what they reach outside the app (the fake Slack, the fake OpenRouter) | `pnpm test:desktop` with at most 10 of the specs that use what changed, the nearest first (below) |
+| The gallery harness: `apps/gallery/` (except its spec files and `shots.spec.ts`), `shift.spec.ts`, `packages/testing/` | `bun run test:gallery` for every component and spec, the heavy shift guard over every component included |
+| A file the desktop app runs (`apps/desktop/src` and the packages it bundles) | `bun run test:desktop` with at most 10 of the specs the coverage map says ran it, the most direct first (below) |
+| The shared e2e support: `e2e/fixtures.ts`, `e2e/driver/`, `e2e/build.ts`, `e2e/coverage.ts`, `e2e/no-skips.ts`, the Playwright and electron-vite configs, `apps/desktop/package.json`, the renderer's `index.html`, `src/coverage.ts`, and what they reach outside the app (the fake Slack, the fake OpenRouter) | `bun run test:desktop` with at most 10 of the specs that use what changed, the nearest first (below) |
 | An e2e spec file | that spec, always |
 | A helper some specs import | those specs, ranked above coverage picks |
-| Any `.ts`, `.tsx` or config a typecheck project reads | `pnpm typecheck` locally with pinned Bun; unsupported projects are warned about and skipped |
-| Anything but Markdown | `pnpm lint`, on the Mac (about 3 s, less than a remote machine's overhead) |
+| Any `.ts`, `.tsx` or config a typecheck project reads | `bun run typecheck` locally with pinned Bun; unsupported projects are warned about and skipped |
+| Anything but Markdown | `bun run lint`, on the Mac (about 3 s, less than a remote machine's overhead) |
 | Documentation only | nothing |
 
-**Unit file selection.** Each test runs only when its import closure contains a changed file, or its package configuration changed. Engine tests often import the whole engine through their shared harness, so an engine edit can legitimately select most engine tests. The runner keeps each selected path's package, starts only those packages, and excludes nested namesakes that Vitest's substring filters would also match. A package config change still runs that package's tests; root config and lockfile changes still run every unit file. In desktop selection, they keep changed specs and specs importing a changed private helper mandatory, then add the usual sample of other specs. Full `pnpm test` and the older package-relative filters keep their existing behaviour.
+**Unit file selection.** Each test runs only when its import closure contains a changed file, or its package configuration changed. Engine tests often import the whole engine through their shared harness, so an engine edit can legitimately select most engine tests. The runner keeps each selected path's package, starts only those packages, and excludes nested namesakes that Vitest's substring filters would also match. A package config change still runs that package's tests; root config and lockfile changes still run every unit file. In desktop selection, they keep changed specs and specs importing a changed private helper mandatory, then add the usual sample of other specs. Full `bun run test` and the older package-relative filters keep their existing behaviour.
 
 Replaying the 15 first-parent merges ending at `f601148d2` with `--plan --json --no-cache --range <merge>^1..<merge>` selected 1,113 unit files before and after. The old package-relative filters matched 1,196 files; the new commands run the selected 1,113. Examples: `home-muted-levels` matched 74 files for 62 selected, `newchat-toasts` 25 for 19, and `sync-sweep-cheaper` 73 for 57. These are file-match counts against the same checkout, not historical test executions. The JSON output is written synchronously so a large replay remains complete when piped.
 
 `--wide` keeps the rules from before 10-18: everything runs for the files in the first two rows, every spec the coverage map picks runs, shared e2e support and style sheets run every desktop spec, `packages/tokens/` runs the whole gallery, conformance runs for any of the 425 files its replay reaches, and heavy tests always run.
 
-**Heavy tests.** Some tests are slow because of what they check, and their code rarely changes: the small idle CPU and memory smoke check (about 53 seconds on the pinned runner), the first-sync cases in `layout-shift.spec.ts`, every test in `quick-start.spec.ts`, the 429 storm in `realtime.spec.ts`, and the gallery's shift guard over every component. Each is tagged `@heavy` and its area's tag (`{ tag: ['@heavy', '@heavy-sync'] }`). `HEAVY_AREAS` in `scripts/test-areas.mjs` is the one place that says which code each area covers: sync (`packages/sync/`, the engine's session and start, the Slack client's pacing, the large seed and the three specs), idle (the process monitor, the engine's workers, the agent's schedulers, `idle-cpu.spec.ts`) and the gallery harness. The idle spec's portable gate uses a 2,000-message seed, four states, 2 s settling and 10 s samples: every process stays below 25% of one core, below 96 MB peak/end memory growth, and below 32 MB growth if every interval grows by more than 2 MB. A focused run uses `--machine linux/amd64:2x4` (one physical core, two threads, 3 GB); full app runs retain their normal two-core allocation. Its fine per-process budgets and long large-seed walk stay in the Mac run (`pnpm verify:main --with-mac`). App diagnostics remain the primary way to find field spins; this smoke check does not cover slow leaks or every deferred worker path. A plan runs an area's heavy tests only when a changed file, or a spec named with `--spec`, is in that area. Otherwise it sets `JUNO_SKIP_TAGS` (for example `@heavy-sync,@heavy-idle`), which each suite's Playwright config adds to its `grepInvert`, and leaves out a spec whose every test is heavy. The remote full run includes the coarse idle check. Fine idle budgets run in the `--with-mac` lane and on demand on the Mac; they do not run in remote plans or remote full runs.
+**Heavy tests.** Some tests are slow because of what they check, and their code rarely changes: the small idle CPU and memory smoke check (about 53 seconds on the pinned runner), the first-sync cases in `layout-shift.spec.ts`, every test in `quick-start.spec.ts`, the 429 storm in `realtime.spec.ts`, and the gallery's shift guard over every component. Each is tagged `@heavy` and its area's tag (`{ tag: ['@heavy', '@heavy-sync'] }`). `HEAVY_AREAS` in `scripts/test-areas.mjs` is the one place that says which code each area covers: sync (`packages/sync/`, the engine's session and start, the Slack client's pacing, the large seed and the three specs), idle (the process monitor, the engine's workers, the agent's schedulers, `idle-cpu.spec.ts`) and the gallery harness. The idle spec's portable gate uses a 2,000-message seed, four states, 2 s settling and 10 s samples: every process stays below 25% of one core, below 96 MB peak/end memory growth, and below 32 MB growth if every interval grows by more than 2 MB. A focused run uses `--machine linux/amd64:2x4` (one physical core, two threads, 3 GB); full app runs retain their normal two-core allocation. Its fine per-process budgets and long large-seed walk stay in the Mac run (`bun run verify:main --with-mac`). App diagnostics remain the primary way to find field spins; this smoke check does not cover slow leaks or every deferred worker path. A plan runs an area's heavy tests only when a changed file, or a spec named with `--spec`, is in that area. Otherwise it sets `JUNO_SKIP_TAGS` (for example `@heavy-sync,@heavy-idle`), which each suite's Playwright config adds to its `grepInvert`, and leaves out a spec whose every test is heavy. The remote full run includes the coarse idle check. Fine idle budgets run in the `--with-mac` lane and on demand on the Mac; they do not run in remote plans or remote full runs.
 
-**Batch gate.** `pnpm affected --batch --base <ref>` (what `scripts/batch-merge.mjs` runs after its own typecheck and lint) plans only the unit files and script tests the batch reaches, `specs:check` when `specs/` changed, and conformance when the code the specs model changed. It does not run the gallery or desktop e2e.
+**Batch gate.** `bun run affected --batch --base <ref>` (what `scripts/batch-merge.mjs` runs after its own typecheck and lint) plans only the unit files and script tests the batch reaches, `specs:check` when `specs/` changed, and conformance when the code the specs model changed. It does not run the gallery or desktop e2e.
 
 **Results cache.** Each unit test file, gallery component, gallery behaviour spec file and desktop e2e spec file is an item with a key: a hash of every file it reaches, its package and suite configs, and the lockfile. After a step passes, its items' keys are recorded in the system temp folder (`juno-cache/results`), shared by every worktree, whether the step ran here or remotely. An item whose key passed before is skipped and counted in the plan; `--no-cache` runs everything. `specs:check` keeps its own cache per Quint run. A failing step records nothing.
 
-`perf` and `test:feel` never run here, but `pnpm verify:main --with-mac` (or `--nightly`) runs both on the Mac after the other suites. Run a matching perf scenario for new per-row, per-frame or startup work, and a matching feel scenario for a change to that interaction. Use the last `--with-mac` result as the baseline. The plan names matching perf and feel scenarios from `PERF_INTERACTIONS` in `scripts/test-areas.mjs` when their files change. The graph errs towards running more: a module imported whole (`import x from`, `import * as`) brings everything it imports. A test whose behaviour depends on a file it does not import (a fixture read from disk, an environment variable) is not seen; a full run on `main` catches that.
+`perf` and `test:feel` never run here, but `bun run verify:main --with-mac` (or `--nightly`) runs both on the Mac after the other suites. Run a matching perf scenario for new per-row, per-frame or startup work, and a matching feel scenario for a change to that interaction. Use the last `--with-mac` result as the baseline. The plan names matching perf and feel scenarios from `PERF_INTERACTIONS` in `scripts/test-areas.mjs` when their files change. The graph errs towards running more: a module imported whole (`import x from`, `import * as`) brings everything it imports. A test whose behaviour depends on a file it does not import (a fixture read from disk, an environment variable) is not seen; a full run on `main` catches that.
 
 ### Desktop specs by coverage
 
-Nearly every file reaches the whole desktop app through the import graph, so the graph alone would run every desktop spec for any app change. Instead, `pnpm affected` reads `apps/desktop/e2e/coverage-map.json`, which records, for each spec file, the source files under `apps/` and `packages/` whose functions ran while one of its tests had the app open.
+Nearly every file reaches the whole desktop app through the import graph, so the graph alone would run every desktop spec for any app change. Instead, `bun run affected` reads `apps/desktop/e2e/coverage-map.json`, which records, for each spec file, the source files under `apps/` and `packages/` whose functions ran while one of its tests had the app open.
 
-**Recording.** `JUNO_COVERAGE=1` turns it on for a desktop run. The build then writes hidden source maps (`electron.vite.config.ts`; `build-cached` rebuilds when the variable changes). `apps/desktop/src/coverage.ts` is the first import of main, the engine and the agent: with `JUNO_E2E_COVERAGE` set to a directory, each process starts precise function coverage on its own inspector and writes the start offsets of the functions that ran. Main also attaches to each renderer over the DevTools protocol before its page loads. The fixtures give each launch its own directory under the spec it belongs to, and ask main and the renderers to write before they close the app. The engine and the agent write every two seconds and on SIGTERM. The run's teardown (`e2e/coverage.ts`) runs `node scripts/coverage-map.mjs reduce`, which maps the offsets to source files with the source maps and writes `apps/desktop/coverage/map/partial-<shard>.json`; `pnpm remote` brings it back with the reports. A module's top level does not count: in a bundle it runs at load in every test, so it says nothing about a spec.
+**Recording.** `JUNO_COVERAGE=1` turns it on for a desktop run. The build then writes hidden source maps (`electron.vite.config.ts`; `build-cached` rebuilds when the variable changes). `apps/desktop/src/coverage.ts` is the first import of main, the engine and the agent: with `JUNO_E2E_COVERAGE` set to a directory, each process starts precise function coverage on its own inspector and writes the start offsets of the functions that ran. Main also attaches to each renderer over the DevTools protocol before its page loads. The fixtures give each launch its own directory under the spec it belongs to, and ask main and the renderers to write before they close the app. The engine and the agent write every two seconds and on SIGTERM. The run's teardown (`e2e/coverage.ts`) runs `node scripts/coverage-map.mjs reduce`, which maps the offsets to source files with the source maps and writes `apps/desktop/coverage/map/partial-<shard>.json`; `bun run remote` brings it back with the reports. A module's top level does not count: in a bundle it runs at load in every test, so it says nothing about a spec.
 
-**Refreshing.** `pnpm verify:main` runs the desktop suite with `JUNO_COVERAGE=1` and writes the joined map (`node scripts/coverage-map.mjs merge <partials> --commit <sha>`) to `apps/desktop/e2e/coverage-map.json` in the checkout it ran from. A failed test still ran its code, so failures do not stop the refresh. A scheduled task runs a full run on main once a day; the agent that runs it commits the refreshed map and merges it, as "Refresh the e2e coverage map". The map is a few hundred kilobytes, one source file per line, so a refresh reads as a diff.
+**Refreshing.** `bun run verify:main` runs the desktop suite with `JUNO_COVERAGE=1` and writes the joined map (`node scripts/coverage-map.mjs merge <partials> --commit <sha>`) to `apps/desktop/e2e/coverage-map.json` in the checkout it ran from. A failed test still ran its code, so failures do not stop the refresh. A scheduled task runs a full run on main once a day; the agent that runs it commits the refreshed map and merges it, as "Refresh the e2e coverage map". The map is a few hundred kilobytes, one source file per line, so a refresh reads as a diff.
 
 **Selecting.** `scripts/affected-select.mjs` picks the candidates, and the plan prints each spec's strongest reason:
 
@@ -969,15 +957,15 @@ A changed app file that was in no bundle when the map was recorded (types only, 
 
 **Ranking.** The plan runs every changed spec and every spec named with `--spec`, then at most 10 candidates (`--max-specs`), the highest score first (`rankSpecs`). A spec scores, for each changed file it ran, the log of how many specs there are over how many ran that file: a file every spec runs (app boot, the shared harness, `Palette.tsx`, which the shell mounts) adds almost nothing, and one three specs run adds a lot. A support change adds more the nearer the spec is to what changed. A helper adds more the fewer specs import it. A spec named like a changed file (`palette.spec.ts` for `Palette.tsx`) adds a little. A tie goes to the spec that ran fewer files, which is usually the quicker one. The plan says how many more specs ran a changed file; a full run covers them. Gallery components for the shift guard are ranked the same way, by how few components a changed file reaches and a component named like a changed file.
 
-**Measured** (10-17, map from `d15f27ee`, replaying merges with `pnpm affected --plan --range <merge>^1..<merge>`). Of the 20 merges on main up to `25e9b5f7`, 17 touched the app, and for each the import graph picked every desktop spec. The coverage map picked 6 of 69 for palette-pages, 44 for thread-root and 1 for a batch fix; the other 14 still ran everything, because of the lockfile or root `package.json` (4), the fake Slack, the fake OpenRouter or the fixtures (5), or core files every spec runs (5: navigation, the send worker, sync boot). 123 files are run by every spec and the median file by 40. File by file it is narrower: palette files pick 5 specs, the message window 44. It picked the failing spec for all six real desktop failures of 10-16 (mirror-reads, tabs, both break-pass specs, avatars-unfurls, stick-bottom), whether given the whole merge or only the files that caused the failure. Gallery behaviour specs: 3 of 14 for palette-pages, slack-import-paths and automated-reason, 8 for send-checks-c, 13 for broad UI merges.
+**Measured** (10-17, map from `d15f27ee`, replaying merges with `bun run affected --plan --range <merge>^1..<merge>`). Of the 20 merges on main up to `25e9b5f7`, 17 touched the app, and for each the import graph picked every desktop spec. The coverage map picked 6 of 69 for palette-pages, 44 for thread-root and 1 for a batch fix; the other 14 still ran everything, because of the lockfile or root `package.json` (4), the fake Slack, the fake OpenRouter or the fixtures (5), or core files every spec runs (5: navigation, the send worker, sync boot). 123 files are run by every spec and the median file by 40. File by file it is narrower: palette files pick 5 specs, the message window 44. It picked the failing spec for all six real desktop failures of 10-16 (mirror-reads, tabs, both break-pass specs, avatars-unfurls, stick-bottom), whether given the whole merge or only the files that caused the failure. Gallery behaviour specs: 3 of 14 for palette-pages, slack-import-paths and automated-reason, 8 for send-checks-c, 13 for broad UI merges.
 
-**Staleness.** The map lags main by the time since the last full run whose map was committed. The rules above cover the two ways it goes stale: new files, and importers edited since the map. What they miss is a call that became reachable through a file that did not change, which is rare; a full run on main catches it. A map more than three days old, from a commit this repository does not have, or missing, is not used: every spec runs when the app changed, as before. `pnpm affected --graph` ignores the map.
+**Staleness.** The map lags main by the time since the last full run whose map was committed. The rules above cover the two ways it goes stale: new files, and importers edited since the map. What they miss is a call that became reachable through a file that did not change, which is rare; a full run on main catches it. A map more than three days old, from a commit this repository does not have, or missing, is not used: every spec runs when the app changed, as before. `bun run affected --graph` ignores the map.
 
 **Limits.** Code that runs only in the test process (the fake Slack, the driver) is not recorded; that is why changes there are picked by the names specs use, not by the map. The renderer writes its coverage when the test closes the app, so a renderer that crashed or a window that closed before that is not counted. Tests tagged `@mac` do not run remotely and are not recorded. The gallery is not recorded: its behaviour specs are narrowed by the component names they open (`galleryComponents`), and a spec that reads every route without filtering them runs for any component.
 
 ## Remote runs
 
-`pnpm remote <script> [args...]` runs on the SSH laptop through tstack's shared
+`bun run remote <script> [args...]` runs on the SSH laptop through tstack's shared
 host allocator. Install tstack with `/tstack:setup`; its checkout is
 `$TSTACK_HOME` (default `~/Documents/code/tstack`). Juno owns the test plan,
 workload sizes, workers, toolchain image, workspace install and result parsing.
@@ -987,9 +975,9 @@ for machine setup, lessons and troubleshooting.
 
 Jobs wait up to 60 seconds for capacity (`--wait <seconds>` or
 `JUNO_RUNNER_WAIT` changes this). An unavailable or full runner fails. Use
-`pnpm remote --local <script>` or `pnpm affected --local` to run the steps on
+`bun run remote --local <script>` or `bun run affected --local` to run the steps on
 this Mac through the heavy lock. These commands have no automatic local fallback.
-`pnpm verify:main` falls back locally when its runner health check reports an
+`bun run verify:main` falls back locally when its runner health check reports an
 unreachable host (see "Full runs").
 Namespace, if needed again, is available only through `/tstack:runner`.
 
@@ -1000,10 +988,10 @@ finishes. `JUNO_RUNNER_PLAN=single` keeps one job; `JUNO_PLAN_SERIAL=1` also
 runs every step in order. `KEY=VALUE` before a step overrides its environment.
 
 ```sh
-pnpm runner:check
-pnpm remote test --passWithNoTests test/messages.test.ts
-pnpm remote test:plan test --passWithNoTests test/messages.test.ts + test:desktop e2e/app.spec.ts
-pnpm remote --cores 2 --wait 120 test:gallery shift.spec.ts
+bun run runner:check
+bun run remote test --passWithNoTests test/messages.test.ts
+bun run remote test:plan test --passWithNoTests test/messages.test.ts + test:desktop e2e/app.spec.ts
+bun run remote --cores 2 --wait 120 test:gallery shift.spec.ts
 ```
 
 The worktree snapshot includes tracked and unignored files, with non-Markdown
@@ -1012,31 +1000,32 @@ or contain real Slack tokens or cookies. Ignored dependencies and build output
 stay on the client. Never put secrets in the workspace.
 
 Juno's toolchain image is built on the runner through tstack's shared build
-lock. Dependencies install per run against `/cache/pnpm-store` with
-`--frozen-lockfile --prefer-offline`; lockfile changes do not rebuild the image.
+lock. Dependencies install per run against the Bun cache and store in `/cache/bun` with
+`--frozen-lockfile --prefer-offline`; lockfile changes do not rebuild the image, but
+a new Bun pin does.
 Electron downloads and verified app builds persist under `/cache`. Spec cache
 entries travel with the job and return with its results. Reports and logs land
 in `.remote/`, with `plan.log` for the coordinator and `run.log` for each child.
-`pnpm remote:usage` summarizes the retained logs across worktrees.
+`bun run remote:usage` summarizes the retained logs across worktrees.
 
 The Mac client stays awake with `caffeinate -i -w <pid>` for the remote run.
 Heartbeat loss or a closed connection makes tstack stop the job and free its
 cores. A killed coordinator closes its children's pipes so their jobs stop too.
 
 `perf`, `test:feel` and `gallery:shots` stay on the Mac. Tests tagged `@mac`
-are skipped on Linux and included in `pnpm verify:main --with-mac` runs. For idle CPU changes,
+are skipped on Linux and included in `bun run verify:main --with-mac` runs. For idle CPU changes,
 run the fine budgets through the heavy lock with
-`pnpm test:desktop idle-cpu.spec.ts --grep @mac`.
+`bun run test:desktop idle-cpu.spec.ts --grep @mac`.
 
 ## Hunting a flaky test
 
-`pnpm flake <spec...> [-g <title>] [--repeat 40] [--machines 2] [--workers n]` runs the specs (all under `apps/desktop/e2e` or all under `apps/gallery`) through `pnpm remote` with Playwright's `--repeat-each`, no retries and traces kept on failure. The repeats are split across the machines (at most two, so other agents keep theirs), and each machine runs its usual number of workers, so the tests run under the load of a normal remote run; `--workers` raises it. It ends with one line, `flake: 2 of 160 failed`, and the names of the failing tests. Traces are in `.remote/<run>/`; `pnpm exec playwright show-trace <trace.zip>` opens one. For the gallery's shift and focus-ring walks, each repeat walks every state again, and `GALLERY_SHIFT_ONLY=MediaViewer pnpm flake apps/gallery/shift.spec.ts --repeat 20 --machines 1` limits the walk to those components.
+`bun run flake <spec...> [-g <title>] [--repeat 40] [--machines 2] [--workers n]` runs the specs (all under `apps/desktop/e2e` or all under `apps/gallery`) through `bun run remote` with Playwright's `--repeat-each`, no retries and traces kept on failure. The repeats are split across the machines (at most two, so other agents keep theirs), and each machine runs its usual number of workers, so the tests run under the load of a normal remote run; `--workers` raises it. It ends with one line, `flake: 2 of 160 failed`, and the names of the failing tests. Traces are in `.remote/<run>/`; `bun run playwright show-trace <trace.zip>` opens one. For the gallery's shift and focus-ring walks, each repeat walks every state again, and `GALLERY_SHIFT_ONLY=MediaViewer bun run flake apps/gallery/shift.spec.ts --repeat 20 --machines 1` limits the walk to those components.
 
-Package tests under `packages/` use Vitest's `--repeats` with retries off. Their summary counts test cases, each failed if any repetition failed, and states the number of executions per case. For example, `pnpm flake packages/engine/test/sidebar-state.test.ts -g "four people" --repeat 200 --machines 1` runs that case 200 times on one small machine. Every repetition runs its setup and teardown.
+Package tests under `packages/` use Vitest's `--repeats` with retries off. Their summary counts test cases, each failed if any repetition failed, and states the number of executions per case. For example, `bun run flake packages/engine/test/sidebar-state.test.ts -g "four people" --repeat 200 --machines 1` runs that case 200 times on one small machine. Every repetition runs its setup and teardown.
 
 ```sh
-pnpm flake apps/desktop/e2e/sidebar.spec.ts -g "list scrollbar" --repeat 120
-pnpm flake apps/gallery/behaviour.spec.ts -g "rewritten Home" --repeat 400 --workers 32
+bun run flake apps/desktop/e2e/sidebar.spec.ts -g "list scrollbar" --repeat 120
+bun run flake apps/gallery/behaviour.spec.ts -g "rewritten Home" --repeat 400 --workers 32
 ```
 
 Measure the failure rate before a fix and prove the fix with the same count and load. A test that fails a few times in a hundred needs a hundred or more runs to show it. To see what the app was doing when a test failed, add a temporary `console.log` of what the test cannot see in its assertion (what `:hover` matches, which Slack calls arrived) and repeat; the line reporter prints it.
@@ -1098,7 +1087,7 @@ Causes found so far (2026-10-15):
 
 - **A speed budget asserted inside a loaded plan.** `quick-start.spec.ts` failed its 5 s sign-in-to-rows budget in a plan at 96% busy. On a quiet remote machine it takes about 2.7 s, the same before and after the tour (10 runs each: 2,687 to 2,738 ms at `480da939^1`, 2,681 to 2,782 ms at `480da939`). Budgets belong to `perf.spec.ts` on the Mac; the e2e test keeps the flow with a ceiling and records the time.
 
-- **A style change read before the next frame under reduced motion.** The gallery runs with `reducedMotion: 'reduce'`, and `global.css` then gives every element `transition-duration: 0.01ms`. Their `transition-property` is `all`, so any change to a box that is already drawn becomes a transition that ends only on the next animation frame. `placeToolbar` reads the row's styles as the row turns `:hover`, so the toolbar's slot is already shown when the flip below the row is written; a read before the next frame found the toolbar still above the row, at 42 px (`toolbar-geometry.spec.ts`: 6 of 250 runs with `pnpm remote test:gallery toolbar-geometry.spec.ts --repeat-each=50`, then 0 of 250 and 0 of 1,000 with `transition-property: none` on the slot). `pnpm flake` did not show it in 1,300 runs: it records a trace, and the trace's snapshots wait for frames. To hunt a flake that depends on frames, run `pnpm remote test:gallery <spec> --repeat-each=<n> --retries=0` without a trace. The same hunt found a real bug: the toolbar's place was decided only on `pointerenter`, so a row that scrolled under a still pointer kept it; the row now decides again on `pointermove` and the list's `scrollend`.
+- **A style change read before the next frame under reduced motion.** The gallery runs with `reducedMotion: 'reduce'`, and `global.css` then gives every element `transition-duration: 0.01ms`. Their `transition-property` is `all`, so any change to a box that is already drawn becomes a transition that ends only on the next animation frame. `placeToolbar` reads the row's styles as the row turns `:hover`, so the toolbar's slot is already shown when the flip below the row is written; a read before the next frame found the toolbar still above the row, at 42 px (`toolbar-geometry.spec.ts`: 6 of 250 runs with `bun run remote test:gallery toolbar-geometry.spec.ts --repeat-each=50`, then 0 of 250 and 0 of 1,000 with `transition-property: none` on the slot). `bun run flake` did not show it in 1,300 runs: it records a trace, and the trace's snapshots wait for frames. To hunt a flake that depends on frames, run `bun run remote test:gallery <spec> --repeat-each=<n> --retries=0` without a trace. The same hunt found a real bug: the toolbar's place was decided only on `pointerenter`, so a row that scrolled under a still pointer kept it; the row now decides again on `pointermove` and the list's `scrollend`.
 
 - **A sidebar row moved between the read of its box and the press.** Rows sort by latest activity. A test that injects a message and then opens that row read the row's box before the engine moved it to the top, so the press landed on the row that took its place: `partial thread waits for history at bottom` opened another topic (1 in a plan run at 85% busy; 0 of 20 at 16 workers, where the move came 34 to 161 ms after the inject and the pointer reached the row 107 to 406 ms after the move). `SidebarRow.select` now waits until the row's box is the same on two frames and points again if it moved under the pointer, and a test that has just moved a row waits for it (`sidebar.expectTop`). The tests that measure the first sync must also let the list settle: the quick start paints #alerts-prod and #deploys, which leave for Automated as their history lands (in 20 of 20 tour runs, 110 to 690 ms after the first paint; in 2 of 20 runs of the cold sidebar test), and the sync card leaving at the end makes the list 77 px taller. The tour waits for the sync to end before its layout check, and the cold sidebar test starts its probe once the bot channels have left.
 
@@ -1116,7 +1105,7 @@ Causes found so far (2026-10-15):
 
 - **A card button pressed while Juno still answered.** The remove card shows with the status bubble (40 px) under it, and Juno's "Done." (56 px) takes that bubble's place about 70 to 100 ms later, so the chat, held at the bottom, scrolls 15 px. `click()` had measured the button before the scroll and pressed its old centre after it, 0.06 px below the button's new bottom edge: `pointerdown` went to the card's inner `div`, and `onCard` never ran (`memory.spec.ts`, 1 of 20, then 2, 5 and 3 of 40 at 16 workers; a log in the page showed the event's target was the `div` while `elementFromPoint` at the same point still named the button). This is a chat taking a reply under the pointer, as SPEC 13.2 asks, not a lost click. The test now waits for the second "Done." and for the status bubble to go before it presses Remove (0 of 40). To press a button in the chat, wait until the run that drew it has ended. A target that `pointerdown` names and `elementFromPoint` does not means the point was measured before a move.
 
-- **A retry that walked no states.** The shift and focus-ring walks share their states through a claim queue (`claimQueue` in `apps/gallery/support.ts`) keyed by run and repeat, not by retry. A retried part found every state already claimed, walked none and passed, so a failure that happened on every walk showed as flaky: `AttachmentCard/shared-video` and `shared-files-quiet` gave the text cursor to their video box, video and file names without making them selectable (80 of 120 at `GALLERY_SHIFT_ONLY=AttachmentCard pnpm flake apps/gallery/shift.spec.ts --repeat 40 --machines 1`, every repeat; a retry logged 0 states walked). A retry now walks again the states its test took on the first attempt. The files in a shared card keep the arrow and its file lines are selectable text (0 of 120 at the same command).
+- **A retry that walked no states.** The shift and focus-ring walks share their states through a claim queue (`claimQueue` in `apps/gallery/support.ts`) keyed by run and repeat, not by retry. A retried part found every state already claimed, walked none and passed, so a failure that happened on every walk showed as flaky: `AttachmentCard/shared-video` and `shared-files-quiet` gave the text cursor to their video box, video and file names without making them selectable (80 of 120 at `GALLERY_SHIFT_ONLY=AttachmentCard bun run flake apps/gallery/shift.spec.ts --repeat 40 --machines 1`, every repeat; a retry logged 0 states walked). A retry now walks again the states its test took on the first attempt. The files in a shared card keep the arrow and its file lines are selectable text (0 of 120 at the same command).
 
 ## Machine shapes
 
@@ -1149,15 +1138,15 @@ Use `runner list` to see their combined usage.
 
 ## Heavy jobs share one queue
 
-Tests, e2e runs, gallery shots, benchmarks and spec checks spawn many processes. Several agents often work in separate worktrees on the same machine, so the root scripts (`pnpm test`, `pnpm test:e2e`, `pnpm test:feel`, `pnpm test:gallery`, `pnpm gallery:shots`, `pnpm specs:check`, `pnpm test:agent-contracts`, `pnpm test:agent-testing`) run through `scripts/heavy.mjs`. It takes a machine-wide lock in the system temp folder, shared by every worktree, and waits for a free slot. There are two slots by default (`JUNO_HEAVY_SLOTS` changes it). On the Mac, `--electron` also takes a single shared app-launch slot. `test:desktop`, `test:e2e`, `test:gallery` and `gallery:shots` use it, so only one of these jobs runs at once. Ordinary jobs can still use both slots, or run beside one app job. An app job waiting for the app-launch slot holds no general slot. Timing runs (`pnpm perf`, `pnpm test:feel`) pass `--exclusive`, which takes every slot and stops new jobs from starting while it waits, so their numbers are not skewed by another run. Release packaging passes `--priority release` with `--exclusive`: it moves ahead of all queued jobs while it waits for active jobs to finish, without interrupting them. Use `node scripts/heavy.mjs --status` to see holders and queued commands, PIDs and wait times. The wrapper sets `JUNO_HEAVY_HELD` for its child; nested heavy commands run within the parent's reservation and cannot deadlock waiting for a slot the parent holds. Running a package's tests directly bypasses the queue, so prefer the root scripts. `pnpm test:health` and `pnpm test:runner` skip the queue: they are small Node tests that should not wait behind perf or package runs.
+Tests, e2e runs, gallery shots, benchmarks and spec checks spawn many processes. Several agents often work in separate worktrees on the same machine, so the root scripts (`bun run test`, `bun run test:e2e`, `bun run test:feel`, `bun run test:gallery`, `bun run gallery:shots`, `bun run specs:check`, `bun run test:agent-contracts`, `bun run test:agent-testing`) run through `scripts/heavy.mjs`. It takes a machine-wide lock in the system temp folder, shared by every worktree, and waits for a free slot. There are two slots by default (`JUNO_HEAVY_SLOTS` changes it). On the Mac, `--electron` also takes a single shared app-launch slot. `test:desktop`, `test:e2e`, `test:gallery` and `gallery:shots` use it, so only one of these jobs runs at once. Ordinary jobs can still use both slots, or run beside one app job. An app job waiting for the app-launch slot holds no general slot. Timing runs (`bun run perf`, `bun run test:feel`) pass `--exclusive`, which takes every slot and stops new jobs from starting while it waits, so their numbers are not skewed by another run. Release packaging passes `--priority release` with `--exclusive`: it moves ahead of all queued jobs while it waits for active jobs to finish, without interrupting them. Use `node scripts/heavy.mjs --status` to see holders and queued commands, PIDs and wait times. The wrapper sets `JUNO_HEAVY_HELD` for its child; nested heavy commands run within the parent's reservation and cannot deadlock waiting for a slot the parent holds. Running a package's tests directly bypasses the queue, so prefer the root scripts. `bun run test:health` and `bun run test:runner` skip the queue: they are small Node tests that should not wait behind perf or package runs.
 
 
 ## Releasing
 
-The release target is macOS Apple Silicon. `pnpm package` builds the app, rebuilds
+The release target is macOS Apple Silicon. `bun run package` builds the app, rebuilds
 native dependencies for Electron, and writes the DMG, its block map and
 update metadata (`latest-mac.yml`) to `apps/desktop/release/`. It never
-publishes; `pnpm release:publish` does (below). Developer ID signing and notarization require the explicit `JUNO_RELEASE=1` switch; without it,
+publishes; `bun run release:publish` does (below). Developer ID signing and notarization require the explicit `JUNO_RELEASE=1` switch; without it,
 the build prints one unsigned-build line and disables identity discovery.
 The package runs through the machine-wide heavy lock. A signed build also makes
 a ZIP and its block map: electron-updater's Mac installer requires the ZIP.
@@ -1179,8 +1168,8 @@ The engine and agent use Electron's built-in `node:sqlite`, so there is no SQLit
 addon to rebuild. `npmRebuild` is enabled for future native dependencies; `.node`
 files and koffi are explicitly unpacked. koffi (main's screen watch, ADR 0015) is
 a Node-API module, so it needs no rebuild per Electron version; its prebuilt
-binary comes from `@koromix/koffi-darwin-arm64`, its install script is denied in
-`pnpm-workspace.yaml`, and its C++ sources and docs are left out of the app.
+binary comes from `@koromix/koffi-darwin-arm64`, its install script is blocked
+(it is not in `trustedDependencies`), and its C++ sources and docs are left out of the app.
 Only `electron-updater`, koffi and their runtime dependencies ship as node_modules; application dependencies are bundled by Vite.
 Source maps are excluded. Codex uses the separately installed `codex` executable;
 its unused vendor binaries do not ship.
@@ -1259,14 +1248,14 @@ ReactiveObjC, which the updater needs. Juno's own code is about 8 MB
 
 Keep all credentials in the environment or repository Actions secrets. Never
 commit certificates, keys, passwords or tokens. No secrets are needed for PR
-lint/typecheck. Heavy checks run through `pnpm affected` on the SSH runner.
+lint/typecheck. Heavy checks run through `bun run affected` on the SSH runner.
 
 ### Steps
 
-1. Install Node 26, pnpm 12.11.2 and Xcode (including its command-line tools).
-   Run `pnpm install --frozen-lockfile` and `pnpm affected`.
-2. Set the version with `pnpm release:version` ("Versions" below). Build and smoke the
-   local package with `pnpm package` and `pnpm test:package`. The smoke launches
+1. Install Node 26, Bun 1.4.4 and Xcode (including its command-line tools).
+   Run `bun install --frozen-lockfile` and `bun run affected`.
+2. Set the version with `bun run release:version` ("Versions" below). Build and smoke the
+   local package with `bun run package` and `bun run test:package`. The smoke launches
    the executable directly, signs in to fake Slack, waits for sidebar rows,
    starts the agent against fake OpenRouter, and relaunches the cached account.
    It uses temporary data and never reads a real Slack session. Without a Developer
@@ -1275,15 +1264,15 @@ lint/typecheck. Heavy checks run through `pnpm affected` on the SSH runner.
    first sidebar-row paint marker, reporting median and range. These are warm
    filesystem-cache runs with CDP attached, not a cold-disk benchmark.
 3. For a local signed release, provide the variables above, then run
-   `JUNO_RELEASE=1 JUNO_UPDATE_TOKEN=… pnpm package` (read the token from your
+   `JUNO_RELEASE=1 JUNO_UPDATE_TOKEN=… bun run package` (read the token from your
    password manager into the variable; do not type it into a file). electron-builder
    uses `notarytool` and staples the ticket. Partial release credentials fail the
    build. Verify with
    `codesign --verify --deep --strict apps/desktop/release/mac-arm64/Juno.app`
    and `xcrun stapler validate apps/desktop/release/mac-arm64/Juno.app`, then
-   run `pnpm test:package` again. An unsigned release is the same without
+   run `bun run test:package` again. An unsigned release is the same without
    `JUNO_RELEASE=1`.
-4. Publish with `pnpm release:publish --notes <file>` (below).
+4. Publish with `bun run release:publish --notes <file>` (below).
 5. For CI, configure those repository secrets, commit the version, and create
    and push the matching `v<version>` tag. `.github/workflows/release.yml` runs
    on `macos-26`. Complete credentials enable signing and notarization;
@@ -1327,7 +1316,7 @@ the lines from the commits since the last release
 
 Versions are semver, kept in `apps/desktop/package.json` and tagged `v<version>`
 in the releases repository. Set the next one with
-`pnpm release:version patch|minor|major` (or an exact `x.y.z`) and commit it.
+`bun run release:version patch|minor|major` (or an exact `x.y.z`) and commit it.
 Before 1.0: **patch** for fixes only, **minor** for anything new or changed
 that a user would notice. From 1.0, **major** for changes that drop data or
 settings, or need a newer macOS. A pre-release (`0.3.0-beta.1`) is for testing
@@ -1337,7 +1326,7 @@ offers a release only when it is newer than the installed version, and
 
 ### Publishing
 
-`pnpm release:publish --notes <file>` publishes the build in
+`bun run release:publish --notes <file>` publishes the build in
 `apps/desktop/release/` to the releases repository, with your own `gh` login
 (`gh auth login`, with write access to the repository). No token is read or
 written by the script. `<file>` holds this version's highlights, one per line
@@ -1378,25 +1367,25 @@ A failed test fails the release gate. Never infer a green record from a log.
 
 Use `--urgent` only for a fix to a problem hurting the
 owner now, such as a CPU spin, data loss or a crash on launch. It runs local
-typecheck and lint, remote unit tests, and `pnpm test:package` against the
+typecheck and lint, remote unit tests, and `bun run test:package` against the
 packaged app before publishing. It adds an `urgent` marker to the GitHub release
 notes metadata. No full run covers an urgent release yet, so run
-`pnpm verify:main --ref <commit>` for it next; the command prints the commit. An urgent publish is still a normal visible release.
+`bun run verify:main --ref <commit>` for it next; the command prints the commit. An urgent publish is still a normal visible release.
 It records the commit it built from as the release source, so merge that
 `Release x.y.z` commit into main afterwards; the next `release:scheduled` refuses
 any commit that does not descend from the last release source.
 
-`pnpm release:version`, `pnpm package` and `pnpm release:publish` print their
+`bun run release:version`, `bun run package` and `bun run release:publish` print their
 step durations and append them to `.juno-status/release-timings.json` (local,
 gitignored): version bump, JS build, deploy, electron-builder, DMG, notarize
 or skip, and upload. The electron-builder total includes the DMG phase.
 
 ### Scheduled releases
 
-`pnpm release:scheduled` picks and publishes a release on the release Mac.
+`bun run release:scheduled` picks and publishes a release on the release Mac.
 Nothing runs it on a schedule. An agent runs it when Tushar asks for a release,
 following `.claude/skills/do-release/SKILL.md`, which also covers the update token. Use
-`pnpm release:scheduled --dry-run` to inspect the current refs, records and
+`bun run release:scheduled --dry-run` to inspect the current refs, records and
 GitHub release without fetching, building, committing or publishing.
 
 The command fetches `origin/main` and searches its full ancestry, newest descendants
@@ -1500,11 +1489,11 @@ the hardened package; the packaged smoke instead uses Chromium CDP. The
 
 ### Engine and sync benchmarks
 
-`pnpm bench:engine` runs `packages/engine/test/bench` with one worker and serial files, through the exclusive machine lock. `pnpm bench:sync` runs the read-only sync harness against the large fake seed with production pacing; it never opens a real session and fails if it cannot reach `live` within an hour. Both can run through `pnpm remote` on a dedicated 4x8 Linux machine. Compare runs on the same shape; renderer performance budgets still run on the Mac. The fake's normal engine tests disable pacing, so their boot time does not measure the request budget.
+`bun run bench:engine` runs `packages/engine/test/bench` with one worker and serial files, through the exclusive machine lock. `bun run bench:sync` runs the read-only sync harness against the large fake seed with production pacing; it never opens a real session and fails if it cannot reach `live` within an hour. Both can run through `bun run remote` on a dedicated 4x8 Linux machine. Compare runs on the same shape; renderer performance budgets still run on the Mac. The fake's normal engine tests disable pacing, so their boot time does not measure the request budget.
 
 ## StyleX token check
 
-`pnpm lint` runs `node scripts/check-tokens.mjs` over `packages/ui`,
+`bun run lint` runs `node scripts/check-tokens.mjs` over `packages/ui`,
 `packages/views` and the desktop renderer. It parses StyleX `create` calls,
 including aliased imports and nested conditions. Raw CSS colours, px/rem/em
 lengths (also inside templates and calc), and numeric length properties fail.
@@ -1526,26 +1515,26 @@ for parsing the StyleX source files, not a lint speedup.
 
 ## Delayed-load layout checks
 
-At `d0876483`, all 18 cases passed in 38.5 seconds on one `linux/amd64:4x8` remote runner with two workers. This is test time, excluding allocation, image pull and build. Use `pnpm remote --machine linux/amd64:4x8 test:desktop layout-shift.spec.ts` for the same runner size.
+At `d0876483`, all 18 cases passed in 38.5 seconds on one `linux/amd64:4x8` remote runner with two workers. This is test time, excluding allocation, image pull and build. Use `bun run remote --machine linux/amd64:4x8 test:desktop layout-shift.spec.ts` for the same runner size.
 
-`pnpm remote test:desktop layout-shift.spec.ts` runs the desktop shift checks against fake Slack. They are ordinary desktop e2e tests, so `pnpm affected` picks them when they cover a change directly; the first-sync cases are `@heavy` and run when sync code changes, and always in a full run. No Mac timing or filmstrip recording is required.
+`bun run remote test:desktop layout-shift.spec.ts` runs the desktop shift checks against fake Slack. They are ordinary desktop e2e tests, so `bun run affected` picks them when they cover a change directly; the first-sync cases are `@heavy` and run when sync code changes, and always in a full run. No Mac timing or filmstrip recording is required.
 
 `expectStableAnchor` in `apps/desktop/e2e/shiftProbe.ts` samples a retained DOM anchor's screen coordinates every animation frame and asserts exactly zero movement. It also requires Chromium's Layout Shift observer and rejects entries without recent input. The anchor check includes the recent-input interval, which otherwise hides jumps for 500 ms. Start it before releasing delayed data, and wait for the resulting UI inside its action. A missing anchor fails.
 
 Home's first sync uses `expectHomeSyncFrames` instead: SPEC 12 leaves no space for rows that have not arrived, so adding rows recentres the column. Every sampled frame keeps the composer fixed, retains painted rows in order with their greeting offsets, and shows the scene, greeting and rows without fading. Progress and readiness changes alone must not move the column.
 
-Use `fake.holdNext({ method, reason: 'open' })`, assert the call is held, then `fake.release({ method })` to exercise partial caches. Use silent fake posts followed by one socket message to reproduce history missing above the latest message. Do not substitute a settled gallery fixture for this case. Repeat with `pnpm flake apps/desktop/e2e/layout-shift.spec.ts --repeat 20 --machines 1`. Keep one remote run at a time; all jobs share the laptop’s configured cores.
+Use `fake.holdNext({ method, reason: 'open' })`, assert the call is held, then `fake.release({ method })` to exercise partial caches. Use silent fake posts followed by one socket message to reproduce history missing above the latest message. Do not substitute a settled gallery fixture for this case. Repeat with `bun run flake apps/desktop/e2e/layout-shift.spec.ts --repeat 20 --machines 1`. Keep one remote run at a time; all jobs share the laptop’s configured cores.
 
 ## Full runs
 
-`pnpm verify:main --ref origin/main` runs every suite on main; fetch main first.
+`bun run verify:main --ref origin/main` runs every suite on main; fetch main first.
 The scheduled task runs it once a day on main. It checks out that commit in a temporary worktree on the scratch volume and
 runs unit tests, Quint checks, conformance, gallery and desktop tests as
 one plan of separate SSH jobs on the laptop when it is reachable. Heavy sync tests stay in
 this run. Random Quint simulations run each time; deterministic Apalache and
 typecheck results use the cache. Changes to sync or outbox code also trigger selective protocol checks.
 
-`pnpm verify:main --ref origin/main --local` runs the same plan on this Mac.
+`bun run verify:main --ref origin/main --local` runs the same plan on this Mac.
 Without `--local`, an unreachable runner triggers a clear message and local
 execution after the health check, without retrying the run. SSH authentication,
 configuration and runner setup errors still fail. A failing remote suite never
@@ -1560,7 +1549,7 @@ step skips `@mac`, matching the remote plan; `--with-mac` runs those tests once
 on this Mac after the local plan. `--dry-run --local` prints the plan without
 installing, running suites or writing a full-run record.
 
-`pnpm verify:main --ref origin/main --nightly` implies
+`bun run verify:main --ref origin/main --nightly` implies
 `--no-cache` for Quint and `--with-mac` for the Mac-only e2e tests, perf and feel,
 including the fine idle-CPU budgets. A run without them checks
 only the coarse idle runaway ceiling.

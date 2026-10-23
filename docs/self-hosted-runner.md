@@ -1,6 +1,6 @@
 # Juno on the shared runner
 
-`pnpm remote` uses the SSH laptop by default. Install tstack with `/tstack:setup`.
+`bun run remote` uses the SSH laptop by default. Install tstack with `/tstack:setup`.
 Juno sends `$TSTACK_HOME/scripts/runner/host.sh` on every host call; `TSTACK_HOME`
 defaults to `~/Documents/code/tstack`. A missing script fails before starting work.
 
@@ -27,16 +27,16 @@ For `.local` hosts Juno probes IPv4 first, then dual stack on transport failure.
 Authentication errors and connected-host failures stop the run.
 
 ```sh
-pnpm runner:check
-pnpm remote test --passWithNoTests test/messages.test.ts
-pnpm remote test:plan test --passWithNoTests test/messages.test.ts + test:desktop e2e/app.spec.ts
+bun run runner:check
+bun run remote test --passWithNoTests test/messages.test.ts
+bun run remote test:plan test --passWithNoTests test/messages.test.ts + test:desktop e2e/app.spec.ts
 ```
 
 Standalone jobs wait up to 60 seconds for capacity; split plans default to one hour so queued jobs can wait for capacity released by their siblings. `--wait <seconds>` or
 `JUNO_RUNNER_WAIT` changes the wait, including for each job in a split plan.
 An unreachable or full runner fails with a message explaining that `--local`
 runs the steps on this Mac through the heavy lock. There is no automatic local
-fallback. Use `pnpm remote --local <script>` or `pnpm affected --local`.
+fallback. Use `bun run remote --local <script>` or `bun run affected --local`.
 Namespace, if needed again, is available only through `/tstack:runner`.
 
 ## Job sizes and workers
@@ -75,21 +75,21 @@ split into n jobs on the same shared allocator.
 ## Toolchain, caches and results
 
 Juno builds `scripts/remote/Dockerfile` through tstack's shared image-build lock.
-Its tag hashes the Dockerfile and Quint pin; the build context contains just
+Its tag hashes the Dockerfile and the Quint and Bun pins; the build context contains just
 that Dockerfile and `toolchain.json`. It includes Playwright's Ubuntu libraries,
-Node, pnpm, Java and Quint. `JUNO_RUNNER_IMAGE` selects an existing compatible
+Node, Bun, Java and Quint. `JUNO_RUNNER_IMAGE` selects an existing compatible
 toolchain image; every run installs the uploaded workspace, including with an
 override. Images must not depend on a baked `/work`, which tstack mounts as tmpfs.
 
-Each job runs `pnpm install --frozen-lockfile --prefer-offline`, checks the Bun
+Each job runs `bun install --frozen-lockfile --prefer-offline`, checks the Bun
 version and starts tests under xvfb. tstack mounts `~/.cache/tstack-runner` at
-`/cache`; Juno keeps the pnpm store, metadata, Electron downloads and app build
+`/cache`; Juno keeps the bun run store, metadata, Electron downloads and app build
 cache there. Missing packages are downloaded. The former Juno cache is not
 removed or migrated while other clients might use it.
 
 Passing spec results travel with the workspace and return with new results.
 Logs, test reports and coverage arrive in `.remote/<job>/`; split plans have a
-`plan.log` plus child `run.log` files. `pnpm remote:usage` summarizes retained
+`plan.log` plus child `run.log` files. `bun run remote:usage` summarizes retained
 logs across worktrees, including failed and incomplete runs.
 
 ## Cancellation and sleep

@@ -20,4 +20,4 @@ Decoding is tolerant. Unknown keys are dropped. Unknown block elements and socke
 
 ## Testing
 
-`pnpm --filter @juno/slack-schema test`. The tests decode and encode representative payloads and check the `Ts` helpers. Real payloads recorded by the live smoke are redacted before they become fixtures; never commit tokens, cookies or message content.
+`bun run --cwd packages/slack-schema test`. The tests decode and encode representative payloads and check the `Ts` helpers. Real payloads recorded by the live smoke are redacted before they become fixtures; never commit tokens, cookies or message content.

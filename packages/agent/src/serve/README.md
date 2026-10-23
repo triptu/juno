@@ -38,7 +38,7 @@ another connection's writes require this hook.
 
 ## Verification and measurement
 
-`pnpm remote test:agent test/serve` runs the cache tests, benchmark and existing
+`bun run remote test:agent test/serve` runs the cache tests, benchmark and existing
 chat RPC tests. The randomized test compares every complete projection and five
 window kinds with the frozen WP13b implementation in
 `test/serve/full-rebuild.ts` (commit `b94ec99bd3`). It covers archive edits and
@@ -47,7 +47,7 @@ aliases, replies and rolled-back transactions. That reference is deliberately
 independent of the cache implementation.
 
 The benchmark seeds 5,000 synthetic messages in the real SQLite schema and keeps
-a live run and a task card. `pnpm perf --unit` runs `test/serve/chat-cache.perf.ts`
+a live run and a task card. `bun run perf --unit` runs `test/serve/chat-cache.perf.ts`
 on the Mac under the exclusive heavy lock, with one Vitest worker and no file
 parallelism. Normal tests retain one cached correctness/payload scenario and
 the randomized comparisons, without latency gates.
@@ -88,7 +88,7 @@ same arrays so memos compare them by identity, records a memo key's last pass
 instead of adding it to a set, checks each entry against the current day's
 range, and makes a bubble's text once with its blocks.
 
-`pnpm flake packages/agent/test/serve/chat-cache.bench.test.ts --repeat 10
+`bun run flake packages/agent/test/serve/chat-cache.bench.test.ts --repeat 10
 --machines 1`, 50 single-run p95s:
 
 - Event through encoded window, p95: **10.5 to 21.2 ms, median 14.3**
@@ -123,7 +123,7 @@ statement preparation and reads. The remaining cached cost is the history walk
 and memo lookups when an append or read mark changes layout. Profiled timings
 were excluded from the numbers above.
 
-Verification: the merged branch passed `pnpm affected` (typechecks, lint, affected
-unit tests and desktop e2e) and `pnpm remote test:agent` (184 tests). The benchmark's
+Verification: the merged branch passed `bun run affected` (typechecks, lint, affected
+unit tests and desktop e2e) and `bun run remote test:agent` (184 tests). The benchmark's
 runner is a type dependency of its test, so `affected` follows changes to the
 child script, fixture and full-rebuild reference as well as the cache.

@@ -10,7 +10,7 @@ Research for Juno's Forward… (SPEC section 7, "Forward"). Analysed 2026-10-19.
   - `shared` = `gantry-v2-shared.3b03bc2a28796cb1.min.js`
 - **Public code** that calls the method: emacs-slack (`slack-message-editor.el`), jollyroger182/ooc (`src/slack/operations.ts`), 3kh0/super-platinum (`crates/super-platinum-core/src/slack/api/forward.rs`, `forwarding/scheduled.rs`), ImShyMike/slack-undoc-client (`src/types.ts`). cgrossde/slackcli's `docs/forward.md` says the method does not exist; the client code shows it does.
 - **Event fixtures** from the Haskell `slack-web` package (`forwarded_message.json`, `share_with_message.json`, `share_without_message.json`).
-- **The live check** of 2026-10-19, `scripts/forward-live.ts` (`JUNO_LIVE=1 pnpm forward:live`): in the self-DM only, it posts a message and a reply, forwards them with and without a note, uploads a 1×1 image and forwards that file-only message, tries two refusals, reads the history and deletes everything it made, the file too. It prints field names and true or false, never values.
+- **The live check** of 2026-10-19, `scripts/forward-live.ts` (`JUNO_LIVE=1 bun run forward:live`): in the self-DM only, it posts a message and a reply, forwards them with and without a note, uploads a 1×1 image and forwards that file-only message, tries two refusals, reads the history and deletes everything it made, the file too. It prints field names and true or false, never values.
 
 ## The call
 

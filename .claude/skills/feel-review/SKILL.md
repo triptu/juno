@@ -1,6 +1,6 @@
 ---
 name: feel-review
-description: The feel review for Juno. Use at each UI milestone review, or when asked whether the app feels stable, to run the feel suite (`pnpm test:feel`), read its contact sheet, filmstrips and videos, and report what shifts, jumps, flickers, flashes empty or answers late, with frame numbers.
+description: The feel review for Juno. Use at each UI milestone review, or when asked whether the app feels stable, to run the feel suite (`bun run test:feel`), read its contact sheet, filmstrips and videos, and report what shifts, jumps, flickers, flashes empty or answers late, with frame numbers.
 ---
 
 # Feel review
@@ -9,7 +9,7 @@ Juno should feel as stable as a native macOS app: nothing moves unless the user 
 
 ## Run it
 
-1. `pnpm test:feel` from the repository root. It builds the app, then queues behind the machine-wide lock (`scripts/heavy.mjs`), so it may wait for other agents' runs before it starts. Do not run it twice at once and do not start other heavy jobs alongside it.
+1. `bun run test:feel` from the repository root. It builds the app, then queues behind the machine-wide lock (`scripts/heavy.mjs`), so it may wait for other agents' runs before it starts. Do not run it twice at once and do not start other heavy jobs alongside it.
 2. It writes `apps/desktop/feel-report/`. A failed check fails the run, but every scenario still records.
 3. Note the load average printed per scenario. A long frame under heavy load is weak evidence; the geometry and pixel checks count frames, not time, so load does not change them.
 

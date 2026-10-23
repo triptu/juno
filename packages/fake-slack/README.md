@@ -2,7 +2,7 @@
 
 A fake Slack for tests and development: an HTTP and websocket server that speaks the web client's protocol (`docs/research/slack-data-access.md`), with a control API to make things happen from "another client". See `docs/architecture.md` sections 2.2 and 13.
 
-Live Slack wins. Each behaviour the fake copies should name the live check it comes from and its date, as the `files.info` and `client.counts` notes below do. The fake has been kinder than live Slack before, which hid bugs. Before a fix, a performance claim or a "live bug" report depends on behaviour the fake has not been checked against, run one read-only live probe (`pnpm probe:live`). When the fake and live disagree, change the fake to match live, and keep the old behaviour behind a test control if a test needs it.
+Live Slack wins. Each behaviour the fake copies should name the live check it comes from and its date, as the `files.info` and `client.counts` notes below do. The fake has been kinder than live Slack before, which hid bugs. Before a fix, a performance claim or a "live bug" report depends on behaviour the fake has not been checked against, run one read-only live probe (`bun run probe:live`). When the fake and live disagree, change the fake to match live, and keep the old behaviour behind a test control if a test needs it.
 
 ## Public API
 
@@ -34,7 +34,7 @@ await fake.close()
 - Eight distinct custom emoji images at public `/emoji/<name>.svg` URLs, plus `hello_juno`, an alias of `juno_wave`.
 - A default seeded workspace (`PEOPLE`, `CONVERSATIONS`); replace it with the `seed` option. It includes public channels the self user is not a member of (`members` without `SELF_ID`), because the real `client.userBoot` lists every channel of the workspace.
 - Boot shapes follow what the live smoke recorded (`packages/slack-schema/test/fixtures/recorded/`): `client.userBoot.channels` is metadata only for every channel, member or not (no `is_member`, `last_read`, `latest`, `unread_count`); `client.counts` lists the user's own conversations with their read state, except closed group DMs, which it leaves out as it did live (27 of 200 group DMs, research section 10). A message in a closed DM or group DM opens it again with no `im_open` or `mpim_open`: on 10-22 a group DM reopened by someone else's message did not reach Juno's sidebar until the next counts call, so no membership event arrived. Which events Slack does send then is not known. `conversations.*` and the `channel_joined` family return the fuller channel object with `is_member`. The socket sends `hello` with `start: true`, then a complete `reconnect_url` after 200 ms and every 30 s.
-- `pnpm --filter @juno/fake-slack start` runs it on its own.
+- `bun run --cwd packages/fake-slack start` runs it on its own.
 
 ## Features
 
@@ -50,7 +50,7 @@ Startup merges both maps before opening a port and throws on a duplicate method 
 
 ## Testing
 
-`pnpm --filter @juno/fake-slack test`. The tests call the fake over real HTTP and websockets: auth failures, pagination, posting and echoes, the upload flow, and each control. Any behaviour the client tests rely on is checked here first.
+`bun run --cwd packages/fake-slack test`. The tests call the fake over real HTTP and websockets: auth failures, pagination, posting and echoes, the upload flow, and each control. Any behaviour the client tests rely on is checked here first.
 
 `holdNext`, `heldCount` and `release` also cover edge methods using the `edge:` prefix, for example `edge:users/info`. This lets desktop tests delay sender resolution independently of history. Use `file:bytes` to hold thumbnail or download bytes until the test explicitly releases them, and `picture:small`, `picture:large` or `picture:<file name>` to hold Juno's picture files.
 

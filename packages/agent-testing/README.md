@@ -4,7 +4,7 @@ Test doubles for Juno Agent (plan v3 §16). Imported only by tests (declare it i
 
 pi packages and the Codex SDK may be imported anywhere in this package (`check-deps`), because the fakes stand in for them.
 
-`pnpm test:agent-testing` runs this package's tests behind the machine-wide lock.
+`bun run test:agent-testing` runs this package's tests behind the machine-wide lock.
 
 ## Which fake to use
 

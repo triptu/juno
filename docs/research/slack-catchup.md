@@ -353,7 +353,7 @@ This is a recommendation for later work, not an approved protocol replacement.
 8. If investigating `historyChanges` further, obtain a current nonempty client
    call and its exact argument names. Current empty probes are not enough.
    Update architecture and the relevant Quint specs with any eventual sync
-   behavior change, and run `pnpm specs:check` then.
+   behavior change, and run `bun run specs:check` then.
 
 The immediate engineering follow-up is the partial-count schema mismatch.
 The broader improvement is to spend the existing repair budget on ranges
@@ -361,7 +361,7 @@ whose mutation markers changed, then use conditional versions to reduce bytes.
 
 ## Validation of this research change
 
-`pnpm affected` completed successfully and reported four documentation files
+`bun run affected` completed successfully and reported four documentation files
 changed, with nothing to run. `git diff --check` and the generated decision-log
 check passed. Live probes established the results above; no product test suite
 or sync-protocol verification is claimed for this documentation-only branch.
