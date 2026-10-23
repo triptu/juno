@@ -1,16 +1,29 @@
 // Settings › Juno, the Juno menu's pages and the message menu as the renderer reads them (SPEC 13.10,
 // plan v3 §13.3): RPCs over a port to the real turn engine, with the scripted fake provider and the fake
 // OpenRouter catalogue. The clock is the test's, so "today" never crosses a midnight.
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, expect, it } from 'bun:test'
 import { fakeActionHost, rejectedKey, reply, TEST_CHANNEL } from '@juno/agent-testing'
 import { Revision } from '@juno/agent-cards'
 import { OpId, type ChatItem, type ChatPage, type JunoSettingsPage } from '@juno/agent-contract'
 import { providerTurns } from '../src/index'
 import { fallbackSlug } from '../src/settings/store'
+import { fakeKeychain } from './fixtures/keychain'
 import { closeServed, run, served } from './serve-harness'
 import { say } from './turns-harness'
 
 afterEach(closeServed)
+const dirs: string[] = []
+afterEach(() => {
+  for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
+})
+const tempDir = () => {
+  const dir = mkdtempSync(join(tmpdir(), 'juno-settings-'))
+  dirs.push(dir)
+  return dir
+}
 
 /** Noon, local time: a day's spend stays in that day. */
 const NOON = new Date(2026, 9, 14, 12).getTime()
@@ -122,6 +135,32 @@ it('shows when OpenRouter rejected its key, until main sends a new one', async (
 
   connection.set({ _tag: 'openRouter', key: 'sk-or-v1-other' })
   await settings.where((p) => p.openRouterKey === 'set', 'a new key')
+})
+
+it('a backup folder Juno cannot use is refused with the reason, and the backup stays where it was', async () => {
+  const mac = (name: string) => served({ now: () => NOON, backup: { keychain: fakeKeychain(), deviceName: name, intervalMs: 0 } })
+  const { client, follow } = await mac('Studio')
+  const settings = follow(client['agent.settings.page']())
+  const before = await settings.where((p) => p.ownership._tag === 'active', 'the page')
+  const folder = (opId: string, path: string) => run(client['agent.settings.change'](change(opId, { _tag: 'backupFolder', path })))
+
+  // A path under a file: the folder can never be made.
+  const file = join(tempDir(), 'notes.txt')
+  writeFileSync(file, 'not a folder')
+  const underFile = await folder('op-1', join(file, 'Juno'))
+  // Another Mac's backup: writing there would delete it.
+  const theirs = tempDir()
+  const other = await mac('Laptop')
+  await run(other.client['agent.settings.change'](change('op-1', { _tag: 'backupFolder', path: theirs })))
+  const foreign = await folder('op-2', theirs)
+  expect([underFile, foreign]).toMatchObject([
+    { _tag: 'Failure', failure: { reason: 'invalid' } },
+    { _tag: 'Failure', failure: { reason: 'invalid' } },
+  ])
+  // Each says its own reason.
+  const message = (result: typeof foreign) => (result._tag === 'Failure' ? result.failure.message : '')
+  expect(message(underFile)).not.toBe(message(foreign))
+  expect((await settings.where((p) => p.ownership._tag === 'active', 'the page')).backupFolder).toBe(before.backupFolder)
 })
 
 it('Rules: the owner sets them in Settings, the page lists them, and the next request carries them', async () => {

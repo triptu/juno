@@ -373,6 +373,8 @@ it('a new Mac that already backed up restores with the phrase, takes the backup 
   b.h.turns.ownership.activate({ backupAt: staged.backupAt })
   await converse(b, 'and the demo on Monday', 'Noted.')
   await b.h.turns.backup!.flush()
+  // The backup carries on in the folder it came from, not the one the new Mac had before.
+  expect(b.h.turns.backup!.folder()).toBe(folder)
   expect(generations(folder)).toEqual([2])
   // The old Mac reads the new owner's manifest, and a third Mac opens it with the phrase the owner has.
   await a.h.turns.backup!.flush()

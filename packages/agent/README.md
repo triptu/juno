@@ -377,7 +377,7 @@ view routes at startup. See [the tool README](src/view-tools/README.md).
 
 **In the app** (`apps/desktop/src/agent/index.ts`): `turns.backup` gets main's keychain through `keychainBridge` (`secret`, `secretReply`), this Mac's computer name, and `restart`, which tells main and exits so the renderer's streams reconnect to the new process. A folder change answers once the first backup is in the new folder, and it checks the folder can be made and written before the setting changes. A failed folder change, export, move or restore answers with one plain line from `backupFailure` (a folder Juno can't write, one that is not available, a full disk, another Mac's backup, the keychain); `onReport` logs the error's code and message. Settings › Juno shows the line under its row or in its sheet.
 
-Tests: `test/backup.test.ts` (Macs in-process: round trips, segments, a move, a voided click, a stale owner, WP16's removal and the regeneration, a record ahead, the key and record after a restore, the folder rules), `test/ownership-serve.test.ts` (the RPCs, banners and Review page) and `test/backup-crash.test.ts` (kills at `backup.segmentWritten`, `backup.manifestRenamed`, `ownership.released`, `restore.staged`, `restore.swapped`).
+Tests: `test/backup.test.ts` (Macs in-process: round trips, segments, a move, a voided click, a stale owner, WP16's removal and the regeneration, a record ahead, the key and record after a restore, the folder rules), `test/settings.test.ts` (a backup folder refused through the RPC) and `test/backup-crash.test.ts` (kills at `backup.segmentWritten`, `backup.manifestRenamed`, `ownership.released`, `restore.staged`, `restore.swapped`).
 
 ## Message menu and network admission
 
