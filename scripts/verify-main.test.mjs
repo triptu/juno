@@ -22,7 +22,7 @@ test('explicit local skips probing; unreachable falls back once; reachable stays
   assert.throws(() => verifyExecution(false, { ...deps, probe: () => { throw new Error('SSH configuration failed') } }), /SSH configuration failed/)
 })
 
-test('local and fallback runs archive eligible records, refresh coverage, and preserve failed suites', { timeout: 120_000 }, (t) => {
+function verificationFixture(t) {
   mkdirSync(scratchFolder(), { recursive: true })
   const root = mkdtempSync(join(scratchFolder(), 'verify-main-test-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
@@ -64,6 +64,11 @@ console.error('Connection refused'); process.exit(255);
   const commit = git(root, 'rev-parse', 'HEAD')
   const env = { ...process.env, PATH: `${join(root, 'bin')}:${process.env.PATH}`, TSTACK_HOME: join(root, 'tstack'), JUNO_RUNNER_HOST: 'runner.test', TEST_CALLS: join(root, 'calls'), TEST_PROBES: join(root, 'probes') }
   const invoke = (args, extra = {}) => spawnSync(process.execPath, ['scripts/verify-main.mjs', '--ref', 'HEAD', ...args], { cwd: root, env: { ...env, ...extra }, encoding: 'utf8', timeout: 60_000 })
+  return { root, commit, env, invoke }
+}
+
+test('local and fallback runs archive eligible records, refresh coverage, and preserve failed suites', { timeout: 120_000 }, (t) => {
+  const { root, commit, env, invoke } = verificationFixture(t)
   const dry = invoke(['--local', '--dry-run', '--nightly'])
   assert.equal(dry.status, 0, dry.stderr)
   assert.match(dry.stdout, /SPECS_SEED=\d+ specs:check/)
