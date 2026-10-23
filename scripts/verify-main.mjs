@@ -222,7 +222,7 @@ if (withMac && !cancelled) {
   if (existsSync(sheet)) cpSync(sheet, join(logDir, 'feel-report'), { recursive: true, force: true })
 }
 
-/** The failing tests a log names: Playwright's numbered failures, vitest's FAIL lines, a failed spec job. */
+/** The failing tests a log names: Playwright's numbered failures, bun test's `(fail)` lines, a failed spec job. */
 function failures(log) {
   let text = ''
   try {
@@ -234,7 +234,7 @@ function failures(log) {
   const found = [
     ...lines.filter((line) => /^\s+\d+\) /.test(line)).map((line) => line.trim().replace(/\s*─+$/, '')),
     ...lines.filter((line) => /^did not run: |against a budget of/.test(line)).map((line) => line.trim()),
-    ...lines.filter((line) => /\bFAIL\b/.test(line) && /\.test\.ts/.test(line)).map((line) => line.replace(/^.*?FAIL\s+/, 'FAIL ').trim()),
+    ...lines.filter((line) => line.startsWith('(fail) ')).map((line) => line.replace(/ \[[\d.]+m?s\]$/, '').trim()),
     ...lines.filter((line) => /^Error: (Quint|Spec check|Missing|A corrected|Agent schedule|No usable)/.test(line)),
     ...lines.filter((line) => /^remote: (?!.*exited with)/.test(line) && /failed|lost the connection|not reach|unreachable|Gave up/.test(line)),
   ]
