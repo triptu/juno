@@ -3,7 +3,6 @@ export { CommandWrite, QueryCause, DEFAULT_LIVE_QUERY_DEBOUNCE, Invalidation, ty
 export { MIGRATIONS_TABLE, migrate } from './migrate'
 export { CACHE_RESET_EPOCH, cacheMigrations } from './migrations/cache'
 export { cacheMigrationsWithProbe } from './migrations/cache/probe'
-export { userMigrations } from './migrations/user'
 export { StorePaths, type WorkspacePaths, workspacePaths, workspacePathsFromDir } from './paths'
 export { ftsQuery, keys, prefs, searchMessages, syncState, syncedRanges } from './queries'
 export type { ConversationRow, Flag, MessageRow, TopicArtRow, TopicIndexRow, UsergroupRow, UserRow } from './rows'

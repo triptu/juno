@@ -214,10 +214,6 @@ export type Message = typeof Message.Type
 /** Subtypes that change another message instead of being one. They arrive only on the socket. */
 export const StructuralSubtypes = ['message_changed', 'message_deleted', 'message_replied'] as const
 
-export function isThreadRoot(message: Pick<Message, 'ts' | 'thread_ts' | 'reply_count'>): boolean {
-  return (message.thread_ts === undefined || message.thread_ts === message.ts) && (message.reply_count ?? 0) > 0
-}
-
 export function isReply(message: Pick<Message, 'ts' | 'thread_ts'>): boolean {
   return message.thread_ts !== undefined && message.thread_ts !== message.ts
 }

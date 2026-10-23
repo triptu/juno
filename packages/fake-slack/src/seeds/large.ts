@@ -23,7 +23,7 @@ export interface LargeSeedOptions {
   readonly days?: number
 }
 
-export const LARGE_SEED_DEFAULTS = {
+const LARGE_SEED_DEFAULTS = {
   seed: 1,
   users: 2_000,
   channels: { public: 180, private: 60, dms: 40, mpims: 20 },
