@@ -1,6 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
+import type { Ref } from 'react'
 import type { Hours, NotificationPermission } from '@juno/contract'
-import { colors, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { colors, layout, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Button, DayToggles, ListRow, Section, Select, Surface, Text } from '@juno/ui'
 import { hourLabel } from './time'
 
@@ -38,17 +39,15 @@ const times = Array.from({ length: (24 * 60) / HALF_HOUR }, (_, index) => {
 })
 
 /** Notification hours, then Active in Slack, each its own section. */
-export function HoursSections({ notificationHours, presenceHours, onHoursChange, onDayChange, slackSchedule, onUseJunoHours, hoursRef }: HoursProps & { readonly hoursRef: (element: HTMLDivElement | null) => void }) {
+export function HoursSections({ notificationHours, presenceHours, onHoursChange, onDayChange, slackSchedule, onUseJunoHours, hoursRef }: HoursProps & { readonly hoursRef: Ref<HTMLElement> }) {
   return (
     <>
-      <div ref={hoursRef} {...stylex.props(styles.anchor)}>
-        <Section heading="Notification hours" sub="Outside these hours your Mac doesn't notify. Slack pauses at the same times, so your phone stays quiet too.">
+      <Section headingRef={hoursRef} heading="Notification hours" sub="Outside these hours your Mac doesn't notify. Slack pauses at the same times, so your phone stays quiet too.">
           <Surface kind="group">
             <HoursRow which="notifications" title="Notification hours" hours={notificationHours} onChange={onHoursChange} onDayChange={onDayChange} />
             <SlackLine schedule={slackSchedule} onUseJunoHours={onUseJunoHours} />
           </Surface>
         </Section>
-      </div>
       <Section heading="Active in Slack" sub="Outside these hours you show as away.">
         <Surface kind="group">
           <HoursRow which="presence" title="Active in Slack" hours={presenceHours} onChange={onHoursChange} onDayChange={onDayChange} />
@@ -120,19 +119,20 @@ function Check({ title, words }: { readonly title: string; readonly words: strin
   )
 }
 
-/** How Auto decides: the three checks in plain words. How Auto decides… and Notification settings open the page here. */
-export function HowAutoDecides() {
+/** How Auto decides: the four checks in plain words. How Auto decides… and Notification settings open the page here. */
+export function HowAutoDecides({ headingRef }: { readonly headingRef: Ref<HTMLElement> }) {
   return (
-    <Section heading="How Auto decides">
+    <Section headingRef={headingRef} heading="How Auto decides">
       <div {...stylex.props(styles.howAuto)}>
         <Text variant="ui" tone="subtle" as="div">
           <p {...stylex.props(styles.howLead)}>For everything on Auto, Juno checks in this order:</p>
           <ol {...stylex.props(styles.howList)}>
             <Check title="Closers." words={'"thanks", "ok" and the like don\'t notify.'} />
+            <Check title="Messages to someone else." words="A message that names someone else and not you doesn't notify." />
             <Check title="Conversations you're in." words="If you wrote in the last 10 minutes, replies notify." />
             <Check
               title="Juno reads it."
-              words="If it clearly falls under your instructions, Juno does what they say. Otherwise, asks, answers to your questions, follow-ups you haven't answered, decisions you should weigh in on and serious problems notify. Greetings, updates and chatter stay in Juno."
+              words="If it clearly falls under your instructions, Juno does what they say. Otherwise, questions to you, answers to your questions, follow-ups you haven't answered, decisions in threads you started and serious problems notify. Greetings, updates and chatter stay in Juno."
             />
           </ol>
         </Text>
@@ -155,13 +155,7 @@ export function TodaySection({ notifiedToday, stayedToday, detailsOpen, onDetail
     <Section heading="Today">
       <div {...stylex.props(styles.todayLine)}>
         <Text variant="body" tone="subtle">
-          {notifiedToday === 0 ? (
-            'Nothing has notified you today.'
-          ) : (
-            <>
-              Today: {count(notifiedToday)} notified you, {count(stayedToday)} stayed in Juno.
-            </>
-          )}
+          {count(notifiedToday)} notified you, {count(stayedToday)} stayed in Juno.
         </Text>
         {notifiedToday + stayedToday === 0 ? null : (
           <Button variant="ghost" size="sm" tone="subtle" aria-haspopup="dialog" expanded={detailsOpen} onClick={onDetails}>
@@ -208,15 +202,13 @@ export function TestSection({ permission, onSendTest, onOpenSettings }: { readon
   )
 }
 
-/** The label column of a row: 260px (inventory 13). */
-const LABEL_WIDTH = 260 // tokens-allow: the row's label column
 
 const styles = stylex.create({
   label: {
     display: 'flex',
     flexDirection: 'column',
     gap: spacing['--space-0-5'],
-    width: LABEL_WIDTH,
+    width: layout['--settings-label-width'],
     maxWidth: '100%',
     minWidth: 0,
   },
@@ -260,10 +252,6 @@ const styles = stylex.create({
     minHeight: sizes['--control-28'],
     paddingInline: spacing['--space-3-5'],
     paddingBottom: spacing['--space-2'],
-  },
-  // Scrolled to the top of the page's scroller with the section's own room above it.
-  anchor: {
-    scrollMarginTop: spacing['--space-6'],
   },
   howAuto: {
     paddingBlock: spacing['--space-3'],

@@ -4,9 +4,9 @@ import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { User } from '@phosphor-icons/react/dist/icons/User'
 import { Users } from '@phosphor-icons/react/dist/icons/Users'
-import { useState, type ReactNode } from 'react'
+import { useState, type ReactNode, type Ref } from 'react'
 import type { PickConversation, PickConversations } from '@juno/contract'
-import { colors, spacing } from '@juno/tokens/tokens.stylex'
+import { colors, layout, spacing } from '@juno/tokens/tokens.stylex'
 import { Avatar, Button, Chip, Popover, Section, Surface, Text, type PhosphorIcon } from '@juno/ui'
 import { ConversationList } from './DestinationLists'
 import { hueFor, initials } from './look'
@@ -35,6 +35,8 @@ export interface NotifyLevelsSectionProps {
   readonly onPick: (level: ListedLevel, conversation: PickConversation) => void
   /** Settings › Ignored. */
   readonly onOpenIgnored: () => void
+  /** The heading, for the page to scroll to. */
+  readonly headingRef?: Ref<HTMLElement>
 }
 
 const channelIcons: Record<Extract<LevelTag, { kind: 'channel' }>['channelKind'], PhosphorIcon> = { public: Hash, private: Lock, im: User, mpim: Users }
@@ -45,7 +47,7 @@ const channelIcons: Record<Extract<LevelTag, { kind: 'channel' }>['channelKind']
  * and Add… on each row, which searches people and channels. Everything
  * else is on Auto.
  */
-export function NotifyLevelsSection({ always, never, onRemove, picker, onPick, onOpenIgnored }: NotifyLevelsSectionProps) {
+export function NotifyLevelsSection({ always, never, onRemove, picker, onPick, onOpenIgnored, headingRef }: NotifyLevelsSectionProps) {
   const [open, setOpen] = useState<ListedLevel | undefined>(undefined)
   const show = (level: ListedLevel | undefined) => {
     setOpen(level)
@@ -102,7 +104,7 @@ export function NotifyLevelsSection({ always, never, onRemove, picker, onPick, o
     </div>
   )
   return (
-    <Section heading="People, channels and threads" sub="Set from any conversation's menu: Notify me › Always, Auto or Never. Everything else is on Auto.">
+    <Section headingRef={headingRef} heading="People, channels and threads" sub="Set from any conversation's menu: Notify me › Always, Auto or Never. Everything else is on Auto.">
       {/* Add…'s list hangs below the card, so the card does not clip. */}
       <Surface kind="group" sx={styles.card}>
         {row('always', 'Always', 'Notifies for every message, inside your hours.', always, true)}
@@ -146,8 +148,6 @@ function Tag({ tag, onRemove }: { readonly tag: LevelTag; readonly onRemove: () 
   )
 }
 
-/** The label column of a row: 260px (inventory 13). */
-const LABEL_WIDTH = 260 // tokens-allow: the row's label column
 
 const styles = stylex.create({
   card: {
@@ -178,15 +178,16 @@ const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     gap: spacing['--space-0-5'],
-    width: LABEL_WIDTH,
+    width: layout['--settings-label-width'],
     maxWidth: '100%',
     minWidth: 0,
   },
+  // Left-aligned after the label, Add… last in the flow, so Always and Never line up and Add… only moves when a tag is added.
   tags: {
     display: 'flex',
     flexWrap: 'wrap',
     alignItems: 'center',
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
     gap: spacing['--space-1-5'],
     flexGrow: 1,
     flexBasis: 0,
