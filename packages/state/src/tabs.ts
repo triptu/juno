@@ -105,6 +105,8 @@ export interface Tabs {
   readonly recent: ReadonlyArray<string>
   /** Closed tabs, the last closed at the end. */
   readonly closed: ReadonlyArray<ClosedTab>
+  /** The number of the last tab id given out, so an id that fell off the reopen stack is not given out again: a tab's Home draft and Juno panel view are kept by its id. */
+  readonly lastId?: number
 }
 
 export const noTabs: Tabs = { tabs: [], active: undefined, recent: [], closed: [] }
@@ -160,14 +162,14 @@ export const tabShowing = (tabs: Tabs, topicId: string): Tab | undefined => tabS
 export const allTopicsTab = (tabs: Tabs): Tab | undefined => tabShowingPlace(tabs, allTopicsPlace)
 const pinnedCount = (tabs: ReadonlyArray<Tab>) => tabs.filter((tab) => tab.pinned).length
 
-/** A tab id no open or closed tab has. Ids are `tab-<n>`, so the next is one past the highest. */
-function nextTabId(tabs: Tabs): string {
-  let highest = 0
+/** A tab id no tab has had. Ids are `tab-<n>`, so the next is one past the highest given out or held. */
+function nextTabId(tabs: Tabs): { readonly id: string; readonly lastId: number } {
+  let highest = tabs.lastId ?? 0
   for (const tab of [...tabs.tabs, ...tabs.closed.map((closed) => closed.tab)]) {
     const n = Number(tab.id.slice(4))
     if (tab.id.startsWith('tab-') && Number.isInteger(n)) highest = Math.max(highest, n)
   }
-  return `tab-${highest + 1}`
+  return { id: `tab-${highest + 1}`, lastId: highest + 1 }
 }
 
 const touch = (recent: ReadonlyArray<string>, id: string): ReadonlyArray<string> => (recent[0] === id ? recent : [id, ...recent.filter((other) => other !== id)])
@@ -192,14 +194,15 @@ export function openPlace(tabs: Tabs, place: Place, { newTab = false, background
   if (showing !== undefined) return activateTab(tabs, showing.id)
   const at = tabs.tabs.findIndex((tab) => tab.id === tabs.active)
   if (at < 0 || newTab) {
-    const tab = freshTab(nextTabId(tabs), place)
+    const { id, lastId } = nextTabId(tabs)
+    const tab = freshTab(id, place)
     const anchor = after === undefined ? -1 : tabs.tabs.findIndex((tab) => tab.id === after)
     const from = anchor >= 0 ? anchor : at
     // A new tab never lands among the pinned ones.
     const index = from < 0 ? tabs.tabs.length : Math.max(from + 1, pinnedCount(tabs.tabs))
     // A background tab is not viewed yet, so it is not among the recent ones either.
-    if (background && at >= 0) return { ...tabs, tabs: tabs.tabs.toSpliced(index, 0, tab) }
-    return { ...tabs, tabs: tabs.tabs.toSpliced(index, 0, tab), active: tab.id, recent: touch(tabs.recent, tab.id) }
+    if (background && at >= 0) return { ...tabs, tabs: tabs.tabs.toSpliced(index, 0, tab), lastId }
+    return { ...tabs, tabs: tabs.tabs.toSpliced(index, 0, tab), active: tab.id, recent: touch(tabs.recent, tab.id), lastId }
   }
   const current = tabs.tabs[at]!
   if (samePlace(currentPlace(current), place)) return tabs
@@ -223,8 +226,9 @@ export function showInActiveTab(tabs: Tabs, place: Place): Tabs {
 /** With no tab left, one tab that shows `place`, active. Otherwise the tabs as they are. */
 export function ensureTab(tabs: Tabs, place: Place): Tabs {
   if (tabs.tabs.length > 0) return tabs
-  const tab = freshTab(nextTabId(tabs), place)
-  return { ...tabs, tabs: [tab], active: tab.id, recent: [tab.id] }
+  const { id, lastId } = nextTabId(tabs)
+  const tab = freshTab(id, place)
+  return { ...tabs, tabs: [tab], active: tab.id, recent: [tab.id], lastId }
 }
 
 /**
@@ -292,7 +296,7 @@ export function closeTab(tabs: Tabs, id: string): Tabs {
   const closed = [...tabs.closed, { tab: tabs.tabs[at]!, index: at }].slice(-CLOSED_LIMIT)
   if (tabs.active !== id) return { ...tabs, tabs: rest, recent, closed }
   const neighbour = rest[Math.min(at, rest.length - 1)]
-  return { tabs: rest, active: neighbour?.id, recent: neighbour === undefined ? recent : touch(recent, neighbour.id), closed }
+  return { ...tabs, tabs: rest, active: neighbour?.id, recent: neighbour === undefined ? recent : touch(recent, neighbour.id), closed }
 }
 
 /** Closes `ids` from the right, so ⌘⇧T brings them back left to right, each at its old place. */
@@ -329,7 +333,7 @@ export function reopenClosedTab(tabs: Tabs, id?: string): Tabs {
   if (last === undefined) return tabs
   const pinned = pinnedCount(tabs.tabs)
   const index = last.tab.pinned ? Math.min(last.index, pinned) : Math.min(Math.max(last.index, pinned), tabs.tabs.length)
-  return { tabs: tabs.tabs.toSpliced(index, 0, last.tab), active: last.tab.id, recent: touch(tabs.recent, last.tab.id), closed: tabs.closed.toSpliced(at, 1) }
+  return { ...tabs, tabs: tabs.tabs.toSpliced(index, 0, last.tab), active: last.tab.id, recent: touch(tabs.recent, last.tab.id), closed: tabs.closed.toSpliced(at, 1) }
 }
 
 /** Pins a tab after the pinned ones, or unpins it to the first unpinned place. */
