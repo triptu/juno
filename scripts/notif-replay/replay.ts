@@ -104,22 +104,174 @@ interface Cached {
   readonly costUsd: number
 }
 
+interface Pending {
+  readonly candidate: Candidate
+  readonly at: number
+  readonly item: Omit<ReplayItem, 'decision' | 'reading' | 'early'>
+  readonly early?: Step
+  readonly input?: NotificationReadingInput
+}
+
+type Sql = StoreWriter['Service']
+
+/** Who the owner is, names for mentions, the old check's decisions and the settings, from the copy. */
+const openCopy = (sql: Sql, instructions: ReadonlyArray<Instruction> | undefined) =>
+  Effect.gen(function* () {
+    const self = (yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`)[0]?.self_user_id
+    if (self == null) return yield* Effect.die(new Error('The copied store has no signed-in user.'))
+    const me: Me = parse<Me>((yield* sql<{ value_json: string }>`SELECT value_json FROM sync_state WHERE key = 'me'`)[0]?.value_json ?? null) ?? { userId: UserId.make(self) }
+    const users = new Map((yield* sql<{ id: string; name: string | null }>`SELECT id, COALESCE(NULLIF(display_name, ''), NULLIF(real_name, ''), name) AS name FROM users`).map((row) => [row.id, row.name ?? row.id]))
+    const groups = new Map((yield* sql<{ id: string; handle: string }>`SELECT id, handle FROM usergroups`).map((row) => [row.id, { handle: row.handle }]))
+    // The old check's decisions, then a clean log: the burst rule is played from the replay's own banners.
+    const old = new Map((yield* sql<{ channel: string; ts: string; outcome: string; reason: string | null }>`SELECT channel, ts, outcome, reason FROM notification_log`)
+      .map((row) => [`${row.channel}:${row.ts}`, { outcome: row.outcome === 'notify' || row.outcome === 'now' ? 'notify' as const : 'stay' as const, reason: row.reason ?? '' }]))
+    yield* sql`DELETE FROM notification_log`
+    const stored = yield* readSettings
+    const settings: NotificationSettings = instructions === undefined ? stored.settings : { ...stored.settings, instructions }
+    return { self, me, users, lookups: { user: (id: string) => users.get(id), usergroup: (id: string) => groups.get(id) }, old, settings, aiAssist: stored.aiAssist }
+  })
+type Copy = Effect.Success<ReturnType<typeof openCopy>>
+
+const candidateRows = (sql: Sql, self: string, from: number) =>
+  sql<MessageRow>`SELECT m.channel, m.ts, m.thread_ts, m.user_id, m.subtype, m.text, m.blocks_json, m.attachments_json, m.files_json, m.bot_name,
+      c.kind, c.name, c.user_id AS dm_user, c.member_ids_json, ig.channel IS NOT NULL AS ignored,
+      COALESCE(NULLIF(u.display_name, ''), NULLIF(u.real_name, ''), u.name) AS sender_name, s.subscribed
+    FROM messages m JOIN conversations c ON c.id = m.channel
+    LEFT JOIN ignored_channels ig ON ig.channel = m.channel
+    LEFT JOIN users u ON u.id = m.user_id
+    LEFT JOIN thread_subs s ON s.channel = m.channel AND s.thread_ts = m.thread_ts
+    WHERE m.ts >= ${millisToTs(from)} AND m.deleted = 0 AND (m.user_id IS NULL OR m.user_id <> ${self})
+    ORDER BY m.ts`
+
+/** The candidate a message makes, as the engine's frame handler builds it, or undefined when it is not one. */
+function toCandidate(copy: Copy, row: MessageRow): Candidate | undefined {
+  const { self, me, users, lookups, settings } = copy
+  if (!WRITTEN.has(row.subtype) || (row.kind === 'im' && row.dm_user === self)) return undefined
+  const body = messageBody({
+    text: row.text,
+    ...(parse(row.blocks_json) === undefined ? {} : { blocks: parse(row.blocks_json) }),
+    ...(parse(row.attachments_json) === undefined ? {} : { attachments: parse(row.attachments_json) }),
+    ...(parse(row.files_json) === undefined ? {} : { files: parse(row.files_json) }),
+  } as never, lookups)
+  const mentionsMe = messageMentionsMe(body, me)
+  const reply = row.thread_ts !== null && row.thread_ts !== row.ts
+  const topicId = reply ? `t:${row.channel}:${row.thread_ts}` : `m:${row.channel}`
+  const sender = row.user_id ?? ''
+  const always = settings.channels[row.channel] === 'always' || settings.people[sender] === 'always' || settings.threads?.[topicId] === 'always'
+  // The candidates: DMs and group DMs, mentions, replies in threads the owner follows (Slack's desktop_notification), and Always.
+  if (!isDm(row.kind) && !mentionsMe && !(reply && row.subscribed === 1) && !always) return undefined
+  const memberNames = row.kind === 'mpim' ? (parse<string[]>(row.member_ids_json) ?? []).filter((id) => id !== self).map((id) => users.get(id) ?? id) : []
+  const name = row.kind === 'im' ? users.get(row.dm_user ?? '') ?? row.name ?? row.channel
+    : row.kind === 'mpim' ? channelLabel({ kind: 'mpim', name: row.name ?? row.channel, memberNames }) : row.name ?? row.channel
+  const senderName = row.sender_name ?? row.bot_name ?? undefined
+  return {
+    channel: { id: ChannelId.make(row.channel), kind: row.kind, name, ignored: row.ignored === 1 },
+    senderId: UserId.make(sender),
+    ...(senderName === undefined ? {} : { senderName }),
+    mentionsMe, mentionsMeDirectly: mentionsMe && messageMentionsMeDirectly(body, me),
+    ts: row.ts, topicId, text: readableText(body),
+  }
+}
+
+/** The facts as of the message's own time, the decision before the reading, and the reading's input when it gets that far. */
+const prepare = (sql: Sql, copy: Copy, candidate: Candidate) =>
+  Effect.gen(function* () {
+    const at = tsToMillis(candidate.ts as never)
+    const conversation = yield* readConversation(sql, copy.self, candidate, at)
+    const facts = conversation.facts
+    const first = decideNotification({ ...candidate, facts, at: localTime(at) }, copy.settings, { aiAssist: copy.aiAssist, userName: () => candidate.senderName })
+    // The reading is asked whenever the message gets past the closer, so the report can sweep the live window too.
+    const reaches = 'needsReading' in first || first.decidedBy === 'live'
+    const exchanges = reaches ? (yield* sql<{ n: number }>`SELECT COUNT(*) AS n FROM messages m JOIN conversations c ON c.id = m.channel
+        WHERE c.kind = 'im' AND c.user_id = ${candidate.senderId} AND m.ts >= ${millisToTs(at - 30 * DAY)} AND m.ts < ${candidate.ts} AND m.deleted = 0`)[0]?.n ?? 0 : 0
+    const readable = (text: string) => readableText(messageBody({ text }, copy.lookups))
+    const shown = (message: { sender: string; text: string; at: string; fromMe?: boolean }): ShownMessage =>
+      ({ sender: message.fromMe === true ? 'You' : message.sender, text: readable(message.text), at: Date.parse(message.at), fromMe: message.fromMe === true })
+    const { kind: channelKind, id: channel } = candidate.channel
+    const kind: Kind = channelKind === 'im' ? 'dm' : channelKind === 'mpim' ? 'group DM' : candidate.topicId.startsWith('t:') ? 'thread' : 'channel'
+    const old = copy.old.get(`${channel}:${candidate.ts}`)
+    return {
+      candidate, at,
+      item: {
+        id: `${channel}:${candidate.ts}`, at, topicId: candidate.topicId, kind, where: channelLabel(candidate.channel), sender: candidate.senderName ?? 'Someone',
+        text: candidate.text, mentionsMe: candidate.mentionsMe, mentionsMeDirectly: candidate.mentionsMeDirectly === true, facts,
+        ...(conversation.threadRoot === undefined ? {} : { threadRoot: shown(conversation.threadRoot) }),
+        before: conversation.before.map(shown),
+        ...(old === undefined ? {} : { old }),
+      },
+      ...(reaches ? {} : { early: { outcome: first.outcome, decidedBy: first.decidedBy, reason: first.reason } }),
+      ...(reaches ? { input: readingInput({ ...candidate, facts }, conversation, copy.settings.instructions ?? [], exchanges, at) } : {}),
+    } satisfies Pending
+  })
+
+interface Reader {
+  readonly ai: AiProviderShape
+  readonly model: string
+  readonly cacheDir: string
+  readonly concurrency: number
+}
+
+/** The readings, by item id, cached on disk by their input. A failure is not cached, so a rerun asks again. */
+const readAll = (pending: ReadonlyArray<Pending>, { ai, model, cacheDir, concurrency }: Reader) =>
+  Effect.gen(function* () {
+    const task = { ...notificationReading, timeoutMillis: REPLAY_TIMEOUT_MILLIS }
+    const counts = { calls: 0, cached: 0, cost: 0 }
+    const toRead = pending.filter((entry) => entry.input !== undefined)
+    const readings = yield* Effect.forEach(toRead, (entry) => Effect.gen(function* () {
+      const key = createHash('sha256').update(JSON.stringify({ model, task: task.name, version: task.version, input: entry.input })).digest('hex')
+      const file = join(cacheDir, `${key}.json`)
+      if (existsSync(file)) {
+        counts.cached++
+        return [entry.item.id, readJson<Cached>(file)] as const
+      }
+      const answer = yield* ai.decide(task, entry.input!)
+      counts.cost += answer.meta.costUsd ?? 0
+      const value: Cached = answer._tag === 'Decided'
+        ? { reading: { ...answer.value, instruction: answer.value.instruction ?? undefined } as never, latencyMillis: answer.meta.latencyMillis, costUsd: answer.meta.costUsd ?? 0 }
+        : { reading: null, latencyMillis: answer.meta.latencyMillis, costUsd: answer.meta.costUsd ?? 0 }
+      if (value.reading !== null) writeFileSync(file, JSON.stringify(value))
+      if (++counts.calls % 50 === 0) console.log(`  ${counts.calls} asked`)
+      return [entry.item.id, value] as const
+    }), { concurrency })
+    return { byId: new Map(readings), ...counts }
+  })
+
+/** The real decision for each message in time order, with the burst rule played from the replay's own banners. */
+function decideInOrder(pending: ReadonlyArray<Pending>, byId: ReadonlyMap<string, Cached>, copy: Copy): ReplayItem[] {
+  const lastBanner = new Map<string, number>()
+  return pending.map((entry) => {
+    const got = byId.get(entry.item.id)
+    const reading: ReplayReading | 'failed' | undefined = got === undefined ? undefined
+      : got.reading === null ? 'failed' : { ...stripUndefined(got.reading), latencyMillis: got.latencyMillis }
+    const last = lastBanner.get(entry.candidate.topicId)
+    const facts = { ...entry.item.facts, ...(last === undefined ? {} : { bannerSecondsAgo: (entry.at - last) / 1000 }) }
+    const decided = decideNotification({ ...entry.candidate, facts, at: localTime(entry.at) }, copy.settings,
+      { aiAssist: copy.aiAssist, userName: () => entry.candidate.senderName }, reading as Reading | 'failed' | undefined)
+    if ('needsReading' in decided) throw new Error(`No reading for ${entry.item.id}`)
+    if (decided.outcome === 'notify') lastBanner.set(entry.candidate.topicId, entry.at)
+    return {
+      ...entry.item,
+      ...(entry.early === undefined ? {} : { early: entry.early }),
+      ...(reading === undefined ? {} : { reading }),
+      decision: { outcome: decided.outcome, decidedBy: decided.decidedBy, reason: decided.reason },
+    }
+  })
+}
+
 export async function run(argv: ReadonlyArray<string>) {
   const options = flags(argv)
   const out = resolve(required(options, 'out'))
   const days = Number(options.days ?? 21)
-  const concurrency = Number(options.concurrency ?? 4)
   const data = resolve(options.data ?? defaultWorkspace())
   if (out.startsWith(data)) throw new Error('--out must be outside the app data folder.')
-  const instructionsOverride = options.instructions === undefined ? undefined : readJson<ReadonlyArray<Instruction>>(resolve(options.instructions))
-  const apiKey = loadKey(options.env)
+  const instructions = options.instructions === undefined ? undefined : readJson<ReadonlyArray<Instruction>>(resolve(options.instructions))
   const model = defaultModelPrefs.classifier
-  const ai: AiProviderShape = makePiAiProvider(Effect.succeed({ apiKey, models: { classifier: model } }), openRouterModels())
-  const task = { ...notificationReading, timeoutMillis: REPLAY_TIMEOUT_MILLIS }
-
+  const reader: Reader = {
+    ai: makePiAiProvider(Effect.succeed({ apiKey: loadKey(options.env), models: { classifier: model } }), openRouterModels()),
+    model, cacheDir: join(out, 'readings'), concurrency: Number(options.concurrency ?? 4),
+  }
   const storeDir = join(out, 'store')
-  const cacheDir = join(out, 'readings')
-  mkdirSync(cacheDir, { recursive: true })
+  mkdirSync(reader.cacheDir, { recursive: true })
   copyStore(data, storeDir)
   const started = Date.now()
   const to = Date.now()
@@ -127,143 +279,16 @@ export async function run(argv: ReadonlyArray<string>) {
 
   const program = Effect.gen(function* () {
     const sql = yield* StoreWriter
-    const self = (yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`)[0]?.self_user_id
-    if (self == null) return yield* Effect.die(new Error('The copied store has no signed-in user.'))
-    const me: Me = parse<Me>((yield* sql<{ value_json: string }>`SELECT value_json FROM sync_state WHERE key = 'me'`)[0]?.value_json ?? null) ?? { userId: UserId.make(self) }
-    const users = new Map((yield* sql<{ id: string; name: string | null }>`SELECT id, COALESCE(NULLIF(display_name, ''), NULLIF(real_name, ''), name) AS name FROM users`).map((row) => [row.id, row.name ?? row.id]))
-    const groups = new Map((yield* sql<{ id: string; handle: string }>`SELECT id, handle FROM usergroups`).map((row) => [row.id, { handle: row.handle }]))
-    const lookups = { user: (id: string) => users.get(id), usergroup: (id: string) => groups.get(id) }
-    const readable = (text: string) => readableText(messageBody({ text }, lookups))
-
-    // The old check's decisions, then a clean log: the burst rule is played below, from the replay's own banners.
-    const old = new Map((yield* sql<{ channel: string; ts: string; outcome: string; reason: string | null }>`SELECT channel, ts, outcome, reason FROM notification_log`)
-      .map((row) => [`${row.channel}:${row.ts}`, { outcome: row.outcome === 'notify' || row.outcome === 'now' ? 'notify' as const : 'stay' as const, reason: row.reason ?? '' }]))
-    yield* sql`DELETE FROM notification_log`
-
-    const stored = yield* readSettings
-    const settings: NotificationSettings = instructionsOverride === undefined ? stored.settings : { ...stored.settings, instructions: instructionsOverride }
-    const { aiAssist } = stored
-
-    const rows = yield* sql<MessageRow>`SELECT m.channel, m.ts, m.thread_ts, m.user_id, m.subtype, m.text, m.blocks_json, m.attachments_json, m.files_json, m.bot_name,
-        c.kind, c.name, c.user_id AS dm_user, c.member_ids_json, ig.channel IS NOT NULL AS ignored,
-        COALESCE(NULLIF(u.display_name, ''), NULLIF(u.real_name, ''), u.name) AS sender_name, s.subscribed
-      FROM messages m JOIN conversations c ON c.id = m.channel
-      LEFT JOIN ignored_channels ig ON ig.channel = m.channel
-      LEFT JOIN users u ON u.id = m.user_id
-      LEFT JOIN thread_subs s ON s.channel = m.channel AND s.thread_ts = m.thread_ts
-      WHERE m.ts >= ${millisToTs(from)} AND m.deleted = 0 AND (m.user_id IS NULL OR m.user_id <> ${self})
-      ORDER BY m.ts`
-
-    interface Pending {
-      readonly candidate: Candidate
-      readonly at: number
-      readonly kind: Kind
-      readonly item: Omit<ReplayItem, 'decision' | 'reading' | 'early'>
-      readonly early?: Step
-      readonly input?: NotificationReadingInput
-    }
+    const copy = yield* openCopy(sql, instructions)
     const pending: Pending[] = []
-    for (const row of rows) {
-      if (!WRITTEN.has(row.subtype) || (row.kind === 'im' && row.dm_user === self)) continue
-      const body = messageBody({
-        text: row.text,
-        ...(parse(row.blocks_json) === undefined ? {} : { blocks: parse(row.blocks_json) }),
-        ...(parse(row.attachments_json) === undefined ? {} : { attachments: parse(row.attachments_json) }),
-        ...(parse(row.files_json) === undefined ? {} : { files: parse(row.files_json) }),
-      } as never, lookups)
-      const mentionsMe = messageMentionsMe(body, me)
-      const reply = row.thread_ts !== null && row.thread_ts !== row.ts
-      const topicId = reply ? `t:${row.channel}:${row.thread_ts}` : `m:${row.channel}`
-      const sender = row.user_id ?? ''
-      const always = settings.channels[row.channel] === 'always' || settings.people[sender] === 'always' || settings.threads?.[topicId] === 'always'
-      // The candidates: DMs and group DMs, mentions, replies in threads the owner follows (Slack's desktop_notification), and Always.
-      if (!isDm(row.kind) && !mentionsMe && !(reply && row.subscribed === 1) && !always) continue
-      const memberNames = row.kind === 'mpim' ? (parse<string[]>(row.member_ids_json) ?? []).filter((id) => id !== self).map((id) => users.get(id) ?? id) : []
-      const name = row.kind === 'im' ? users.get(row.dm_user ?? '') ?? row.name ?? row.channel
-        : row.kind === 'mpim' ? channelLabel({ kind: 'mpim', name: row.name ?? row.channel, memberNames }) : row.name ?? row.channel
-      const senderName = row.sender_name ?? row.bot_name ?? undefined
-      const candidate: Candidate = {
-        channel: { id: ChannelId.make(row.channel), kind: row.kind, name, ignored: row.ignored === 1 },
-        senderId: UserId.make(sender),
-        ...(senderName === undefined ? {} : { senderName }),
-        mentionsMe, mentionsMeDirectly: mentionsMe && messageMentionsMeDirectly(body, me),
-        ts: row.ts, topicId, text: readableText(body),
-      }
-      const at = tsToMillis(row.ts as never)
-      const conversation = yield* readConversation(sql, self, candidate, at)
-      const facts = conversation.facts
-      const decideAt = (reading?: Reading | 'failed') =>
-        decideNotification({ ...candidate, facts, at: localTime(at) }, settings, { aiAssist, userName: () => senderName }, reading)
-      const first = decideAt()
-      // The reading is asked whenever the message gets past the closer, so the report can sweep the live window too.
-      const reaches = 'needsReading' in first || first.decidedBy === 'live'
-      const exchanges = reaches ? (yield* sql<{ n: number }>`SELECT COUNT(*) AS n FROM messages m JOIN conversations c ON c.id = m.channel
-          WHERE c.kind = 'im' AND c.user_id = ${sender} AND m.ts >= ${millisToTs(at - 30 * DAY)} AND m.ts < ${row.ts} AND m.deleted = 0`)[0]?.n ?? 0 : 0
-      const shown = (message: { sender: string; text: string; at: string; fromMe?: boolean }): ShownMessage =>
-        ({ sender: message.fromMe === true ? 'You' : message.sender, text: readable(message.text), at: Date.parse(message.at), fromMe: message.fromMe === true })
-      const kind: Kind = row.kind === 'im' ? 'dm' : row.kind === 'mpim' ? 'group DM' : reply ? 'thread' : 'channel'
-      pending.push({
-        candidate, at, kind,
-        item: {
-          id: `${row.channel}:${row.ts}`, at, topicId, kind, where: channelLabel(candidate.channel), sender: senderName ?? 'Someone', text: candidate.text,
-          mentionsMe, mentionsMeDirectly: candidate.mentionsMeDirectly === true, facts,
-          ...(conversation.threadRoot === undefined ? {} : { threadRoot: shown(conversation.threadRoot) }),
-          before: conversation.before.map(shown),
-          ...(old.has(`${row.channel}:${row.ts}`) ? { old: old.get(`${row.channel}:${row.ts}`)! } : {}),
-        },
-        ...('needsReading' in first || first.decidedBy === 'live' ? {} : { early: { outcome: first.outcome, decidedBy: first.decidedBy, reason: first.reason } }),
-        ...(reaches ? { input: readingInput({ ...candidate, facts }, conversation, settings.instructions ?? [], exchanges, at) } : {}),
-      })
+    for (const row of yield* candidateRows(sql, copy.self, from)) {
+      const candidate = toCandidate(copy, row)
+      if (candidate !== undefined) pending.push(yield* prepare(sql, copy, candidate))
     }
     console.log(`${pending.length} candidates in ${days} days, ${pending.filter((entry) => entry.input !== undefined).length} reach the reading.`)
-
-    // The readings, cached by their input.
-    let calls = 0
-    let cached = 0
-    let cost = 0
-    let done = 0
-    const toRead = pending.filter((entry) => entry.input !== undefined)
-    const readings = yield* Effect.forEach(toRead, (entry) => Effect.gen(function* () {
-      const key = createHash('sha256').update(JSON.stringify({ model, task: task.name, version: task.version, input: entry.input })).digest('hex')
-      const file = join(cacheDir, `${key}.json`)
-      if (existsSync(file)) {
-        cached++
-        return [entry.item.id, readJson<Cached>(file)] as const
-      }
-      calls++
-      const answer = yield* ai.decide(task, entry.input!)
-      cost += answer.meta.costUsd ?? 0
-      const value: Cached = answer._tag === 'Decided'
-        ? { reading: { ...answer.value, instruction: answer.value.instruction ?? undefined } as never, latencyMillis: answer.meta.latencyMillis, costUsd: answer.meta.costUsd ?? 0 }
-        : { reading: null, latencyMillis: answer.meta.latencyMillis, costUsd: answer.meta.costUsd ?? 0 }
-      // A failure is not cached, so a rerun asks again.
-      if (value.reading !== null) writeFileSync(file, JSON.stringify(value))
-      if (++done % 50 === 0) console.log(`  ${done} of ${toRead.length - cached} asked`)
-      return [entry.item.id, value] as const
-    }), { concurrency })
-    const byId = new Map(readings)
-
-    // Decide in time order with the real decision, playing the burst rule.
-    const lastBanner = new Map<string, number>()
-    const items: ReplayItem[] = []
-    for (const entry of pending) {
-      const got = byId.get(entry.item.id)
-      const reading: ReplayReading | 'failed' | undefined = got === undefined ? undefined
-        : got.reading === null ? 'failed' : { ...stripUndefined(got.reading), latencyMillis: got.latencyMillis }
-      const last = lastBanner.get(entry.candidate.topicId)
-      const facts = { ...entry.item.facts, ...(last === undefined ? {} : { bannerSecondsAgo: (entry.at - last) / 1000 }) }
-      const decided = decideNotification({ ...entry.candidate, facts, at: localTime(entry.at) }, settings, { aiAssist, userName: () => entry.candidate.senderName },
-        reading === undefined ? undefined : reading === 'failed' ? 'failed' : reading)
-      if ('needsReading' in decided) return yield* Effect.die(new Error(`No reading for ${entry.item.id}`))
-      if (decided.outcome === 'notify') lastBanner.set(entry.candidate.topicId, entry.at)
-      items.push({
-        ...entry.item,
-        ...(entry.early === undefined ? {} : { early: entry.early }),
-        ...(reading === undefined ? {} : { reading }),
-        decision: { outcome: decided.outcome, decidedBy: decided.decidedBy, reason: decided.reason },
-      })
-    }
-    const replay: Replay = { createdAt: new Date().toISOString(), days, from, to, instructions: settings.instructions ?? [], model, items }
+    const { byId, calls, cached, cost } = yield* readAll(pending, reader)
+    const items = decideInOrder(pending, byId, copy)
+    const replay: Replay = { createdAt: new Date().toISOString(), days, from, to, instructions: copy.settings.instructions ?? [], model, items }
     writeJson(join(out, 'replay.json'), replay)
     const slow = items.filter((item) => typeof item.reading === 'object' && item.reading.latencyMillis > READING_MILLIS).length
     const failed = items.filter((item) => item.reading === 'failed').length

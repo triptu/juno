@@ -17,17 +17,7 @@ export interface PageItem {
   readonly before: ReadonlyArray<ShownMessage>
 }
 
-export function page(items: ReadonlyArray<PageItem>, commands: { readonly serve: string; readonly report: string }): string {
-  const data = JSON.stringify({ items, commands }).replaceAll('<', '\\u003c')
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light dark">
-<title>Label notifications</title>
-<style>
-:root {
+const STYLE = `:root {
   --bg: #f5f5f3; --surface: #ffffff; --sunken: #f0f0ee; --text: #1d1d1f; --muted: #6b6b70; --faint: #8e8e93;
   --line: rgba(0, 0, 0, 0.09); --press: rgba(0, 0, 0, 0.06); --hover: rgba(0, 0, 0, 0.035); --accent: #4a6f9c; --error: #b3261e;
   --mine: #eef2f7;
@@ -83,22 +73,10 @@ footer { display: flex; justify-content: space-between; align-items: center; col
 .status.error { color: var(--error); }
 .done { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 24px; }
 .done code { font: 12px ui-monospace, "SF Mono", monospace; background: var(--sunken); padding: 8px 10px; border-radius: 6px; overflow-wrap: anywhere; user-select: all; }
-</style>
-</head>
-<body>
-<main>
-  <header><h1>Should this have notified you?</h1><span class="progress" id="progress"></span></header>
-  <div class="bar"><div id="bar"></div></div>
-  <section class="card" id="card"></section>
-  <div class="choices">
-    <button class="choice" id="notify">Notify <kbd>N</kbd></button>
-    <button class="choice" id="stay">Don't notify <kbd>D</kbd></button>
-  </div>
-  <footer><span class="status" id="status"></span><button class="undo" id="undo">Undo <kbd>U</kbd></button></footer>
-</main>
-<script type="application/json" id="data">${data}</script>
-<script>
-const { items, commands } = JSON.parse(document.getElementById('data').textContent)
+`
+
+/** The page's behaviour: one unlabelled message at a time, N, D and U, saved through the label server. */
+const SCRIPT = `const { items, commands } = JSON.parse(document.getElementById('data').textContent)
 const served = location.protocol.startsWith('http')
 const storeKey = 'notif-labels:' + items.length + ':' + (items[0] ? items[0].id : '')
 let labels = JSON.parse(localStorage.getItem(storeKey) || '{}')
@@ -235,7 +213,34 @@ async function start() {
   render()
 }
 start()
-</script>
+`
+
+export function page(items: ReadonlyArray<PageItem>, commands: { readonly serve: string; readonly report: string }): string {
+  const data = JSON.stringify({ items, commands }).replaceAll('<', '\\u003c')
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Label notifications</title>
+<style>
+${STYLE}</style>
+</head>
+<body>
+<main>
+  <header><h1>Should this have notified you?</h1><span class="progress" id="progress"></span></header>
+  <div class="bar"><div id="bar"></div></div>
+  <section class="card" id="card"></section>
+  <div class="choices">
+    <button class="choice" id="notify">Notify <kbd>N</kbd></button>
+    <button class="choice" id="stay">Don't notify <kbd>D</kbd></button>
+  </div>
+  <footer><span class="status" id="status"></span><button class="undo" id="undo">Undo <kbd>U</kbd></button></footer>
+</main>
+<script type="application/json" id="data">${data}</script>
+<script>
+${SCRIPT}</script>
 </body>
 </html>
 `
