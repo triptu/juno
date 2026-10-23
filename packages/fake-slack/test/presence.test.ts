@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, expect, it } from 'vitest'
-import { startFakeSlack, type FakeSlack } from '../src/index.ts'
+import { AUTO_AWAY_MILLIS, SELF_ID, startFakeSlack, type FakeSlack } from '../src/index.ts'
+import type { RtmFrame } from '@juno/slack-schema'
 import { isType, TestClient } from './helpers.ts'
 
 let fake: FakeSlack
@@ -53,5 +54,24 @@ it("answers presence_sub with each person's presence, sends their changes, and a
   // The pong comes next: no presence_change went out before it.
   expect(await socket.next((frame) => frame.type === 'pong' || frame.type === 'presence_change')).toMatchObject({ type: 'pong' })
   fake.setPresence({ users: ['U0LEO', 'U0PRIYA'], presence: 'away' })
+  socket.close()
+})
+
+it('tells a socket subscribed to the self user when what colleagues see for them changes', async () => {
+  expect(await setPresenceRaw('active')).toEqual({ ok: true })
+  const socket = await client.connect()
+  await socket.next(isType('hello'))
+  const self = (frame: RtmFrame) => frame.type === 'presence_change' && frame.users?.includes(SELF_ID) === true
+  socket.send({ type: 'presence_sub', ids: [SELF_ID] })
+  // No tickle yet: away, even though manual presence is active.
+  expect(await socket.next(self)).toMatchObject({ presence: 'away', users: [SELF_ID] })
+  socket.send({ type: 'tickle', reason: 'polling' })
+  expect(await socket.next(self)).toMatchObject({ presence: 'active' })
+  fake.advanceClock({ millis: AUTO_AWAY_MILLIS + 1_000 })
+  expect(await socket.next(self)).toMatchObject({ presence: 'away' })
+  socket.send({ type: 'tickle', reason: 'polling' })
+  expect(await socket.next(self)).toMatchObject({ presence: 'active' })
+  expect(await setPresenceRaw('away')).toEqual({ ok: true })
+  expect(await socket.next(self)).toMatchObject({ presence: 'away' })
   socket.close()
 })

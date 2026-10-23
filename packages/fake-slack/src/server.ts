@@ -125,6 +125,8 @@ export class FakeServer {
   /** Each socket's `presence_sub` ids. Each `presence_sub` replaces the socket's list. */
   readonly #presenceSubs = new Map<WebSocket, ReadonlySet<string>>()
   #lastTickleAt: number | undefined
+  /** The self user's presence as last told to subscribed sockets (`checkSelfPresence`). */
+  #selfShown: 'active' | 'away' = 'away'
   readonly #rateLimits = new Map<string, RateLimitRule>()
   readonly #failures = new Map<string, FailureRule>()
   readonly #holds = new Map<string, HoldRule>()
@@ -166,6 +168,7 @@ export class FakeServer {
     workspace.onEvent((frame) => {
       if (this.#frameHold?.has(frame.type) === true || this.#frameWhere?.(frame) === true) this.#heldFrames.push(frame)
       else this.broadcast(frame)
+      if (frame.type === 'manual_presence_change') this.checkSelfPresence()
     })
   }
 
@@ -487,7 +490,10 @@ export class FakeServer {
   #connected(ws: WebSocket, session: Session): void {
     this.sockets.add(ws)
     const self = session.userId === this.workspace.selfId
-    if (self) this.#selfSockets.add(ws)
+    if (self) {
+      this.#selfSockets.add(ws)
+      this.checkSelfPresence()
+    }
     const reconnectUrl = () => {
       if (ws.readyState !== ws.OPEN) return
       const url = new URL(this.socketUrl())
@@ -502,6 +508,7 @@ export class FakeServer {
       this.sockets.delete(ws)
       this.#selfSockets.delete(ws)
       this.#presenceSubs.delete(ws)
+      this.checkSelfPresence()
     })
     ws.on('message', (raw) => {
       let frame: Record<string, unknown>
@@ -518,7 +525,10 @@ export class FakeServer {
           ...(Array.isArray(frame['ids']) ? { ids: frame['ids'].filter((id): id is string => typeof id === 'string') } : {}),
         })
       }
-      if (frame['type'] === 'tickle' && self) this.#lastTickleAt = this.workspace.clock.now()
+      if (frame['type'] === 'tickle' && self) {
+        this.#lastTickleAt = this.workspace.clock.now()
+        this.checkSelfPresence()
+      }
       if (frame['type'] === 'ping' && typeof frame['id'] === 'number') {
         const pong = { type: 'pong', reply_to: frame['id'] } as const
         if (this.#frameHold?.has('pong') === true || this.#frameWhere?.(pong) === true) this.#heldFrames.push(pong)
@@ -547,6 +557,18 @@ export class FakeServer {
   /** The ids the open sockets subscribed to with their last `presence_sub`, merged. */
   presenceSubscriptions(): ReadonlyArray<string> {
     return [...new Set([...this.#presenceSubs.values()].flatMap((ids) => [...ids]))]
+  }
+
+  /**
+   * Tells subscribed sockets when what colleagues see for the self user changed. Checked on each
+   * `tickle`, socket open and close, `manual_presence_change` and clock change, so the auto-away after
+   * `AUTO_AWAY_MILLIS` shows when a test moves the clock past it, not as real time passes.
+   */
+  checkSelfPresence(): void {
+    const now = this.selfPresence()
+    if (now === this.#selfShown) return
+    this.#selfShown = now
+    this.presenceChanged([this.workspace.selfId], now)
   }
 
   #presenceOf(id: string): 'active' | 'away' {

@@ -546,11 +546,13 @@ export class FakeSlack {
 
   advanceClock(input: { millis: number }): number {
     this.workspace.clock.advance(input.millis)
+    this.server.checkSelfPresence()
     return this.now()
   }
 
   setNow(input: { millis: number }): number {
     this.workspace.clock.set(input.millis)
+    this.server.checkSelfPresence()
     return this.now()
   }
 
