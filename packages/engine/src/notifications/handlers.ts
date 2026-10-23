@@ -22,6 +22,7 @@ import {
   NotifyTargetSchema,
   NotificationsRoutes,
   NotSignedIn,
+  TODAY_DECISIONS_LIMIT,
   type CommandResult,
   type Hours, type InstructionRule, type NotificationSettingsView,
   type NotificationsPage,
@@ -33,6 +34,7 @@ import {
 import {
   alwaysNotifyOf,
   channelLabel,
+  firstWords,
   localTime,
   notifyChoice,
   parseTopicId,
@@ -40,6 +42,7 @@ import {
   presenceLabel,
   scheduledPresence,
   seenNote,
+  slackLine,
   threadNotifyChoice,
   type ConversationKind,
   type NotificationSettings,
@@ -58,9 +61,8 @@ import { Workspace, type StoreServices } from '../workspace'
 import { UNKNOWN_PERSON } from '@juno/richtext'
 
 const SETTINGS_KEYS: InvalidationKeys = ['prefs']
-const PAGE_KEYS: InvalidationKeys = ['prefs', 'notification_log', 'conversations', 'users', 'team']
+const PAGE_KEYS: InvalidationKeys = ['prefs', 'notification_log', 'conversations', 'users', 'team', 'topic_overlay']
 const DECISION_KEYS: InvalidationKeys = ['notification_log']
-const DECISIONS_LIMIT = 500
 /** People and channels an instruction names that the rule check is shown, at most. */
 const NAMED_LIMIT = 5
 
@@ -76,7 +78,7 @@ const viewOf = (settings: NotificationSettings, aiAssist: boolean): Notification
   huddleRing: settings.huddleRing !== false,
 })
 
-/** Every channel and person on a list, with their names. Unknown ids show as they are. */
+/** Every channel, person and thread on a list, with their names; a thread by its topic title. Unknown ids show as they are. */
 const tagsFor = (settings: NotificationSettings, level: NotifyLevel) =>
   Effect.gen(function* () {
     const sql = yield* StoreReader
@@ -89,6 +91,12 @@ const tagsFor = (settings: NotificationSettings, level: NotifyLevel) =>
       SELECT id, COALESCE(display_name, real_name, name) AS name, avatar_url FROM users WHERE id IN ${sql.in(personIds)}`
     const channelById = new Map(channels.map((row) => [row.id, row]))
     const personById = new Map(people.map((row) => [row.id, row]))
+    const threadIds = Object.keys(settings.threads ?? {}).filter((id) => settings.threads?.[id] === level)
+    const threads = threadIds.length === 0 ? [] : yield* sql<{ topic_id: string; manual_title: string | null; ai_title: string | null; root_text: string | null }>`
+      SELECT i.topic_id, o.manual_title, o.ai_title, m.text AS root_text FROM topic_index i
+      LEFT JOIN topic_overlay o ON o.topic_id = i.topic_id LEFT JOIN messages m ON m.channel = i.channel AND m.ts = i.root_ts
+      WHERE i.topic_id IN ${sql.in(threadIds)}`
+    const threadById = new Map(threads.map((row) => [row.topic_id, row]))
     const tags: NotifyTag[] = []
     for (const id of channelIds) {
       const row = channelById.get(id)
@@ -98,6 +106,10 @@ const tagsFor = (settings: NotificationSettings, level: NotifyLevel) =>
     for (const id of personIds) {
       const row = personById.get(id)
       tags.push({ kind: 'person', id, name: row?.name ?? UNKNOWN_PERSON, ...(row?.avatar_url == null ? {} : { avatarUrl: row.avatar_url }) })
+    }
+    for (const id of threadIds) {
+      const row = threadById.get(id)
+      tags.push({ kind: 'thread', id, name: row?.manual_title?.trim() || row?.ai_title?.trim() || firstWords(slackLine(row?.root_text ?? '')) || 'Thread' })
     }
     return tags.toSorted((a, b) => a.name.localeCompare(b.name))
   })
@@ -113,6 +125,7 @@ interface LogRow {
   readonly reason: string | null
   readonly preview: string | null
   readonly candidate_json: string | null
+  readonly suppressed_at: string | null
 }
 
 const decodeCandidate = (json: string | null): Candidate | undefined => {
@@ -140,12 +153,12 @@ const sinceMidnight = (now: number) => {
   return midnight.toISOString()
 }
 
-/** Today's counts for the page: what notified (a banner was shown) and what stayed. */
+/** Today's counts for the page: what notified (a banner was shown) and what stayed, a banner held because the conversation was open included. */
 const todayCounts = (now: number) =>
   Effect.gen(function* () {
     const sql = yield* StoreReader
     const counts = yield* sql<{ notified: number; stayed: number }>`
-      SELECT COALESCE(SUM(delivered_at IS NOT NULL AND outcome = 'notify'), 0) AS notified, COALESCE(SUM(outcome = 'stay'), 0) AS stayed
+      SELECT COALESCE(SUM(delivered_at IS NOT NULL AND outcome = 'notify'), 0) AS notified, COALESCE(SUM(outcome = 'stay' OR suppressed_at IS NOT NULL), 0) AS stayed
       FROM notification_log WHERE at >= ${sinceMidnight(now)}`
     return { notified: counts[0]?.notified ?? 0, stayed: counts[0]?.stayed ?? 0 }
   })
@@ -154,10 +167,12 @@ const todayCounts = (now: number) =>
 const todayDecisions = (now: number) =>
   Effect.gen(function* () {
     const sql = yield* StoreReader
-    const rows = yield* sql<LogRow>`SELECT id, at, channel, topic_id, outcome, decided_by, decision_json, reason, preview, candidate_json
-      FROM notification_log WHERE at >= ${sinceMidnight(now)} ORDER BY at DESC, id DESC LIMIT ${DECISIONS_LIMIT}`
+    const rows = yield* sql<LogRow>`SELECT id, at, channel, topic_id, outcome, decided_by, decision_json, reason, preview, candidate_json, suppressed_at
+      FROM notification_log WHERE at >= ${sinceMidnight(now)} ORDER BY at DESC, id DESC LIMIT ${TODAY_DECISIONS_LIMIT}`
     return rows.map((row): TodayRow => {
       const candidate = decodeCandidate(row.candidate_json)
+      // A banner held because the conversation was open in a focused window stayed, as Today counts it.
+      const held = row.outcome === 'notify' && row.suppressed_at !== null
       return {
         id: row.id,
         at: new Date(row.at).getTime(),
@@ -167,9 +182,9 @@ const todayDecisions = (now: number) =>
         channelId: row.channel,
         topicId: row.topic_id ?? '',
         text: row.preview ?? '',
-        outcome: row.outcome === 'notify' ? 'notify' : 'stay',
+        outcome: row.outcome === 'notify' && !held ? 'notify' : 'stay',
         decidedBy: row.decided_by ?? 'reading',
-        reason: row.reason ?? '',
+        reason: held ? 'You had the conversation open.' : (row.reason ?? ''),
         ...decodeExtra(row.decision_json),
       }
     })
@@ -368,7 +383,7 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
         }),
       'notifications.removeInstruction': ({ id }) =>
         updateSettings((settings) => ({ ...settings, instructions: (settings.instructions ?? []).filter((item) => item.id !== id) })).pipe(Effect.asVoid),
-      'notifications.checkInstruction': ({ text }) =>
+      'notifications.checkInstruction': ({ text, direction }) =>
         inWorkspace(
           Effect.gen(function* () {
             const { aiAssist } = yield* readSettings
@@ -379,7 +394,8 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
             if (rule === null) return null
             const name = rule.kind === 'person' ? named.people.find((p) => p.id === rule.id)?.name : named.channels.find((c) => c.id === rule.id)?.name
             if (name === undefined) return null
-            return { kind: rule.kind, id: rule.id, name: rule.kind === 'channel' ? `#${name}` : name, level: rule.level } satisfies InstructionRule
+            // The owner's direction decides the level, so Make it a setting never applies the opposite one.
+            return { kind: rule.kind, id: rule.id, name: rule.kind === 'channel' ? `#${name}` : name, level: direction === 'notify' ? 'always' : 'never' } satisfies InstructionRule
           }).pipe(Effect.orDie),
         ),
       'notifications.setHuddleRing': ({ enabled }) => updateSettings((settings) => ({ ...settings, huddleRing: enabled })).pipe(Effect.asVoid),

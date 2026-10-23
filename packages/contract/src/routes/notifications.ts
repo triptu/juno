@@ -84,10 +84,11 @@ export type NotificationSettingsView = typeof NotificationSettingsView.Type
 
 export const notificationsSettings = liveValueRoute('notifications.settings', { value: NotificationSettingsView })
 
-/** A channel, DM or person on the page's Always or Never list. */
+/** A channel, DM, person or thread on the page's Always or Never list. A thread is named by its topic title. */
 export const NotifyTag = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('channel'), id: Schema.String, name: Schema.String, channelKind: ConversationKind }),
   Schema.Struct({ kind: Schema.Literal('person'), id: Schema.String, name: Schema.String, avatarUrl: Schema.optionalKey(Schema.String) }),
+  Schema.Struct({ kind: Schema.Literal('thread'), id: Schema.String, name: Schema.String }),
 ])
 export type NotifyTag = typeof NotifyTag.Type
 
@@ -127,8 +128,11 @@ export const TodayRow = Schema.Struct({
 })
 export type TodayRow = typeof TodayRow.Type
 
+/** Details lists at most this many of today's decisions, the latest. */
+export const TODAY_DECISIONS_LIMIT = 500
+
 export const NotificationDecisions = Schema.Struct({
-  /** Today's decisions, newest first, at most 500. */
+  /** Today's decisions, newest first, at most `TODAY_DECISIONS_LIMIT`. */
   decisions: Schema.Array(TodayRow),
 })
 export type NotificationDecisions = typeof NotificationDecisions.Type
@@ -221,7 +225,8 @@ export type InstructionRule = typeof InstructionRule.Type
 
 /** Whether an added instruction is really a rule about one person or channel. Null when it is not, or when Juno could not tell. */
 export const notificationsCheckInstruction = Rpc.make('notifications.checkInstruction', {
-  payload: { text: InstructionText },
+  /** The direction the owner chose sets the level: Notify me is Always, Don't notify is Never. */
+  payload: { text: InstructionText, direction: InstructionDirection },
   success: Schema.NullOr(InstructionRule),
   error: NotSignedIn,
 })

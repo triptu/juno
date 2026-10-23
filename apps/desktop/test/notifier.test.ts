@@ -4,8 +4,8 @@
  * fake Electron notification and dock.
  */
 import { afterEach, expect, it } from 'vitest'
-import { notificationsSetLevel, prefsSet, readsMarkRead, type MainToEngine, type NotificationTarget } from '@juno/contract'
-import { runCommand } from '@juno/state'
+import { notificationsDecisions, notificationsPage, notificationsSetLevel, prefsSet, readsMarkRead, type MainToEngine, type NotificationDecisions, type NotificationsPage, type NotificationTarget } from '@juno/contract'
+import { liveQuery, runCommand } from '@juno/state'
 import { Exit, Schema } from 'effect'
 import { bootedEngine, readDb } from '../../../packages/engine/test/scenario'
 import { waitFor, type RunningEngine } from '../../../packages/engine/test/harness'
@@ -84,6 +84,18 @@ it('shows what the engine decides, opens the message on click, hides the topic o
   await waitFor(() => readDb(engine, 'user.db', (db) => db.prepare('SELECT suppressed_at FROM notification_log WHERE ts = ?').get(second.ts))?.suppressed_at ?? undefined, 15_000, 'the suppressed row')
   expect(main.shown).toHaveLength(1)
   main.notifier.setViewing(null)
+  // Details shows the held banner as stayed, with why, and Today counts it the same way.
+  const decisionsAtom = liveQuery(notificationsDecisions)(undefined)
+  const pageAtom = liveQuery(notificationsPage)(undefined)
+  const unmount = [engine.registry.mount(decisionsAtom), engine.registry.mount(pageAtom)]
+  const held = await waitFor(() => {
+    const result = engine.registry.get(decisionsAtom) as { _tag: string; value?: NotificationDecisions }
+    return result.value?.decisions.find((row) => row.text === 'Never mind, found it')
+  }, 15_000, 'the held decision')
+  expect(held).toMatchObject({ outcome: 'stay', reason: 'You had the conversation open.' })
+  const page = await waitFor(() => (engine.registry.get(pageAtom) as { value?: NotificationsPage }).value, 15_000, 'the page')
+  expect(page.notified).toBe(main.shown.length)
+  for (const release of unmount) release()
 
   // Privacy mode: the notification still says who it is from, never what they wrote.
   main.setPrivacy(true)
