@@ -77,6 +77,44 @@ test('Set yourself away from the avatar menu sets Slack presence and stays away 
   await expect.poll(() => slack.tickles(), { timeout: 15_000 }).toBeGreaterThan(0)
 })
 
+test('the avatar shows what Slack shows colleagues, while the setting stays active', async ({ juno, slack }) => {
+  test.setTimeout(90_000)
+  await juno.signIn()
+  await juno.waitForSync()
+  await setActive(juno)
+  await slack.expectSeenAs('active')
+  await juno.sidebar.expectOwnPresence('active')
+
+  await test.step("Slack's timeout shows you away; the setting stays active", async () => {
+    await juno.setSystemIdle(5 * 60)
+    await pollAndWait(juno, 5 * 60)
+    slack.advanceClock(AUTO_AWAY_MILLIS + 1_000)
+    await slack.expectSeenAs('away')
+    expect(slack.fake.workspace.manualPresence).toBe('active')
+    await juno.sidebar.expectOwnPresence('away')
+    await juno.accountMenu.open()
+    await expect(juno.accountMenu.item('Set yourself away')).toBeVisible()
+    await juno.accountMenu.expectPresence(/^Active.*\. Slack shows you away$/)
+    await juno.accountMenu.close()
+  })
+
+  await test.step('back at the Mac, Slack says active and the dot turns green', async () => {
+    await juno.setSystemIdle(0)
+    await slack.expectSeenAs('active')
+    await juno.sidebar.expectOwnPresence('active')
+  })
+
+  await test.step('while the socket is down, the avatar does not claim active', async () => {
+    slack.fake.goOffline()
+    await juno.sidebar.expectOwnPresence('away')
+    await juno.accountMenu.open()
+    await juno.accountMenu.expectPresence(/^Active.*\. Connecting to Slack$/)
+    await juno.accountMenu.close()
+    slack.fake.goOnline()
+    await juno.sidebar.expectOwnPresence('active')
+  })
+})
+
 // The first step reads every tickle since launch, so it runs before any idle change.
 test('opening Juno shows you active, an idle Mac stops keeping you active, and coming back starts it again', async ({ juno, slack }) => {
   test.setTimeout(120_000)

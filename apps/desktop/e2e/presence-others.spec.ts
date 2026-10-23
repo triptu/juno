@@ -2,12 +2,13 @@
  * Other people's presence (SPEC 7, "Presence in a DM"; SPEC 14, "Show who
  * is active in the sidebar"). An open 1:1 DM always shows whether its
  * person is active or away, in the header's context pill: Juno subscribes
- * to the open DMs' partners over the socket with `presence_sub`. The
+ * to you and the open DMs' partners over the socket with `presence_sub`. The
  * sidebar's dots are off by default; turned on, Juno also subscribes to the
  * recent DMs' partners and a DM row shows the dot on the person's photo
  * while Slack shows them active. The fake says each subscribed person's
  * presence at once and then each change (`slack.as(name).setPresence`).
  */
+import { SELF_ID } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 
 test('an open DM shows its person active or away, and the sidebar dots follow their own setting, off by default', async ({ juno, slack }) => {
@@ -16,12 +17,12 @@ test('an open DM shows its person active or away, and the sidebar dots follow th
   const maya = slack.as('Maya')
   const dm = juno.sidebar.row('Maya', { exact: true })
 
-  await test.step('by default the sidebar shows no dot and Juno asks Slack about no one', async () => {
+  await test.step('by default the sidebar shows no dot and Juno asks Slack only about you', async () => {
     maya.setPresence('active')
     await dm.expectVisible()
     await expect(dm.presenceDot).toHaveCount(0)
     await slack.expectPresenceSubscribed('Maya', false)
-    expect(slack.presenceSubs()).toEqual([])
+    expect(slack.presenceSubs().every((ids) => ids.length === 1 && ids[0] === SELF_ID)).toBe(true)
   })
 
   await test.step('opening Maya’s DM shows her active in the header, then away', async () => {
@@ -34,8 +35,8 @@ test('an open DM shows its person active or away, and the sidebar dots follow th
     maya.setPresence('active')
     await juno.topic.expectPresence('active')
     await expect(dm.presenceDot).toHaveCount(0)
-    // Only the open DM's person is asked about.
-    expect(slack.presenceSubs().at(-1)).toEqual([maya.id])
+    // Only you and the open DM's person are asked about, in one sorted list.
+    expect(slack.presenceSubs().at(-1)).toEqual([maya.id, SELF_ID].toSorted())
   })
 
   await test.step('turning on Show who is active in the sidebar shows her dot', async () => {
@@ -58,7 +59,7 @@ test('an open DM shows its person active or away, and the sidebar dots follow th
     await expect(dm.presenceDot).toHaveCount(0)
     await dm.select()
     await juno.topic.expectPresence('active')
-    await expect.poll(() => slack.presenceSubs().at(-1)).toEqual([maya.id])
+    await expect.poll(() => slack.presenceSubs().at(-1)).toEqual([maya.id, SELF_ID].toSorted())
     maya.setPresence('away')
     await juno.topic.expectPresence('away')
     await expect(dm.presenceDot).toHaveCount(0)

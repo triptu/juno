@@ -489,6 +489,13 @@ export class Sidebar {
   get accountButton() {
     return this.root.getByRole('button', { name: 'Account and settings' })
   }
+
+  /** Your presence on the avatar as Slack shows colleagues: the button's description, and its dot unless the snooze badge takes the dot's place. */
+  async expectOwnPresence(presence: 'active' | 'away'): Promise<void> {
+    const word = presence === 'active' ? 'Active' : 'Away'
+    await expect(this.accountButton).toHaveAccessibleDescription(new RegExp(`^${word}(\\. Notifications paused until .+)?$`), { timeout: 10_000 })
+    if ((await this.accountButton.locator('[data-paused]').count()) === 0) await expect(this.accountButton.locator('[data-presence]')).toHaveAttribute('data-presence', presence)
+  }
 }
 
 /** The popover behind the avatar button: presence, privacy, Notifications, Settings and the session. */
