@@ -147,3 +147,26 @@ test('runtime and platform changes invalidate recorded results; reports survive 
   assert.equal(kept.length, 1)
   assert.equal(JSON.parse(readFileSync(kept[0], 'utf8')).stats.duration, 12)
 })
+
+test('a repair installs its planner, reruns the failed suite, and retains passing suites at the fix commit', (t) => {
+  const { root, env, invoke } = verificationFixture(t)
+  writeFileSync(join(root, 'scripts/affected.mjs'), `import { existsSync } from 'node:fs';
+if (!existsSync('installed')) throw new Error('Planner dependencies were not installed');
+console.log(JSON.stringify({changed:['app.ts'],steps:[{script:'test:desktop',args:[],items:[]}]}));\n`)
+  git(root, 'add', 'scripts/affected.mjs')
+  git(root, 'commit', '-qm', 'Fixture planner')
+  const failed = invoke(['--local'], { TEST_FAIL_SUITE: 'test:desktop' })
+  assert.equal(failed.status, 1, failed.stderr + failed.stdout)
+  const baseline = join(root, '.juno-status/verify-main.json')
+  writeFileSync(join(root, 'app.ts'), 'fixed')
+  git(root, 'add', 'app.ts')
+  git(root, 'commit', '-qm', 'Fix')
+  writeFileSync(env.TEST_CALLS, '')
+  const repaired = invoke(['--local', '--repair', baseline])
+  assert.equal(repaired.status, 0, repaired.stderr + repaired.stdout)
+  const record = JSON.parse(readFileSync(baseline, 'utf8'))
+  assert.equal(record.commit, git(root, 'rev-parse', 'HEAD'))
+  assert.equal(record.suites.filter((suite) => suite.reusedFrom).length, 4)
+  assert.deepEqual(readFileSync(env.TEST_CALLS, 'utf8').trim().split('\n').map(JSON.parse).map((call) => call.suite), ['install', 'test:desktop'])
+  assert.ok(releaseGate(root, record.commit))
+})

@@ -154,6 +154,15 @@ function splitPlan(planned) {
   })
 }
 
+console.log(`verify:main: ${commit.slice(0, 10)} ${subject}; ${execution.mode} on ${execution.host}`)
+const heavy = join(checkout, 'scripts/heavy.mjs')
+const planStarted = Date.now()
+let installed = true
+if (local || baseline) {
+  installed = (await run('install', process.execPath, [heavy, '--exclusive', 'bun', 'install', '--frozen-lockfile', '--silent'], checkout)).code === 0
+}
+if (baseline && !installed) throw new Error(`Repair dependencies did not install; see ${join(logDir, 'install.log')}`)
+
 const checkoutFiles = tracked.filter((file) => /^(apps|packages)\//.test(file))
 const graph = new ImportGraph(checkout, new Set(checkoutFiles))
 const protocols = protocolInputs(tracked, (file) => graph.closure(file))
@@ -169,13 +178,6 @@ if (baseline) {
   words = suites.flatMap((suite, index) => [...(index ? ['+'] : []), ...suite.words])
 }
 
-console.log(`verify:main: ${commit.slice(0, 10)} ${subject}; ${execution.mode} on ${execution.host}`)
-const heavy = join(checkout, 'scripts/heavy.mjs')
-const planStarted = Date.now()
-let installed = true
-if (local) {
-  installed = (await run('install', process.execPath, [heavy, '--exclusive', 'bun', 'install', '--frozen-lockfile', '--silent'], checkout)).code === 0
-}
 const runs = [cancelled || !installed ? Promise.resolve(suites.map(({ name }) => ({ suite: name, code: cancelled ? 130 : 1, seconds: 0, log: join(logDir, 'install.log') })))
   : suites.length === 0 ? Promise.resolve([]) : run('plan', process.execPath, local
     ? [heavy, '--exclusive', 'node', join(checkout, 'scripts/plan.mjs'), ...words]
