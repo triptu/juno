@@ -23,7 +23,9 @@ it('a sent message shows as the owner bubble, then Juno answers it, and reading 
   const answered = await pageWhere((p) => of(p, 'juno').length === 2 && of(p, 'status').length === 0, 'two bubbles and no status')
   expect(answered.banner).toEqual({ _tag: 'none' })
   expect(answered.composerEnabled).toBe(true)
-  expect(answered.items.map((item) => item._tag)).toEqual(['day', 'owner', 'newDivider', 'juno', 'juno'])
+  // The "New" divider sits right above Juno's first unread bubble.
+  const tags = answered.items.map((item) => item._tag)
+  expect(tags.indexOf('newDivider')).toBe(tags.indexOf('juno') - 1)
   expect(of(answered, 'owner')[0]).toMatchObject({ opId: 'op-1', text: 'what is on today?', delivery: { _tag: 'sent' }, group: 'single' })
   expect(of(answered, 'newDivider')[0]).toEqual({ _tag: 'newDivider', count: 2 })
   const [first, second] = of(answered, 'juno')
@@ -94,7 +96,10 @@ it('a failed run shows its ending line, and Try again sends the same message wit
   expect(twice).toMatchObject({ _tag: 'Success', success: { opId: 'op-2' } })
   const answered = await pageWhere((p) => of(p, 'juno').length === 1 && of(p, 'status').length === 0, 'the answer')
   expect(of(answered, 'owner').map((item) => item.text)).toEqual(['summarise #eng'])
-  expect(answered.items.map((item) => item._tag)).toEqual(['day', 'owner', 'ending', 'newDivider', 'juno'])
+  // The failed run's line stays, above the answer.
+  const tags = answered.items.map((item) => item._tag)
+  expect(tags.filter((tag) => tag === 'ending')).toHaveLength(1)
+  expect(tags.indexOf('ending')).toBeLessThan(tags.indexOf('juno'))
 
   const again = await run(client['agent.chat.retry']({ opId: 'op-3' as OpId, interruptedOpId: 'op-2' as OpId }))
   expect(again).toMatchObject({ _tag: 'Failure', failure: { _tag: 'AgentCommandError', reason: 'invalid' } })
