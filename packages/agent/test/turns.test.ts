@@ -2,6 +2,7 @@
 // that join a run at its next step, every ending, the budget, compaction beside a run, and pins. In-process, through the
 // engine's public API, with the scripted fake provider behind the provider guard.
 import { afterEach, expect, it } from 'bun:test'
+import { eventually } from '@juno/testing/eventually'
 import { fakeCatalogue, lostStream, rateLimited, rejectedKey, reply, serverError } from '@juno/agent-testing'
 import type { BubbleId } from '@juno/agent-contract'
 import { dollars, type HostReads } from '../src/index'
@@ -436,7 +437,7 @@ it('compacts in the background without holding up the next turn', async () => {
   h.fake.script([reply('Noted.'), reply('Yes, the sidebar ships first.')])
   const first = h.send(long)
   await h.ended(first)
-  await waitUntil(() => held > 0)
+  await eventually(() => expect(held).toBeGreaterThan(0))
   expect(h.turns.compaction.state()).toBe('running')
 
   const second = h.send('what ships first?')
@@ -493,14 +494,6 @@ it('remembers words from this turn only, pins an owner message, checks pin versi
   const memory = textOf(h.chatRequests().at(-1)!.context.messages.find((m) => m.role !== 'system'))
   expect(memory).toContain('<remembered>\nI prefer short answers.\nMy sister is Ada Lovelace.\n</remembered>')
 })
-
-async function waitUntil(test: () => boolean, timeoutMs = 10_000) {
-  const deadline = Date.now() + timeoutMs
-  while (!test()) {
-    if (Date.now() > deadline) throw new Error('timed out')
-    await new Promise((resolve) => setTimeout(resolve, 5))
-  }
-}
 
 it('lowering the cap leaves the current reply running and blocks the next one', async () => {
   h = await turnsHarness({ compaction: false })
