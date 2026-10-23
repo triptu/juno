@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-23 13:45 · emoji picker headings in the menu · In the message menu's emoji picker the section headings scroll with their emoji, and the emoji fade out over 16px under the search field. A sticky heading on the translucent menu could only blur the emoji under it (a coloured band) or carry the menu's fill (a visible box); the popover picker keeps its opaque sticky headings.
 - 10-23 13:30 · sidebar time on hover · A sidebar row shows its time only while hovered or keyboard-focused, at once. It is drawn over the end of line one on a fade of the row's fill, so the title has the whole line at rest and nothing moves. No hover controls share that corner; a tag at the line's end (thread count, huddle mark) is covered while the time shows (owner).
 - 10-23 13:25 · mention tint · A message that mentions you has no fill of its own; the @you chip marks it. The `--tint-mention-bg` token and the per-message `mentionsMe` field went with it (owner).
 - 10-23 01:00 · forward note · The Forward sheet's note is a multi-line field that grows to eight lines (the shared field Textarea), with Enter forwarding and Shift-Enter adding a line as in the composer, since SPEC 7 says Enter forwards. The preview leaves out the place when it is the sender's own name (owner).

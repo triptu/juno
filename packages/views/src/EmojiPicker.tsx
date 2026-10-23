@@ -210,7 +210,7 @@ export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, on
           onKeyDown={onFieldKeyDown}
         />
       </div>
-      <ScrollArea ref={scrollerRef} scrollbar="hover" sx={styles.scroller} onClick={onGridClick} onKeyDown={onGridKeyDown} onFocusCapture={(event) => {
+      <ScrollArea ref={scrollerRef} scrollbar="hover" sx={[styles.scroller, inMenu && styles.scrollerInMenu]} onClick={onGridClick} onKeyDown={onGridKeyDown} onFocusCapture={(event) => {
         const cell = (event.target as HTMLElement).dataset['cell']
         if (cell !== undefined) setFocused(Number(cell))
       }} onBlurCapture={(event) => {
@@ -273,10 +273,12 @@ export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, on
 
 // Custom images in a 32px cell, the size of a text emoji's square there (`Emoji` 20).
 const GLYPH = sizes['--icon-20']
-// A section heading: tag text with its block padding. Sticky headers keep
-// this much of the scroller's top clear when focus moves up.
+// A section heading: tag text with its block padding. Focus moving up keeps
+// this much of the scroller's top clear: under the sticky heading, or in the
+// menu under the fade and with the section's heading in view.
 const HEADING_HEIGHT = `calc(${spacing['--space-2']} + ${text['--text-tag-leading']} + ${spacing['--space-1']})`
 const HOVER = '@media (hover: hover)'
+const FADE = spacing['--space-4']
 
 const styles = stylex.create({
   panel: {
@@ -315,10 +317,16 @@ const styles = stylex.create({
     paddingInline: spacing['--space-1-5'],
     backgroundColor: colors['--surface-raised'],
   },
-  // On the menu's material the headings have no fill of their own: they blur the emoji scrolling under them into it.
+  // On the menu's material the headings scroll away with their emoji. A sticky
+  // heading there could only blur the emoji under it, which tints it their colour.
   headingInMenu: {
+    position: 'relative',
     backgroundColor: 'transparent',
-    backdropFilter: menu['--menu-backdrop'],
+  },
+  // Emoji fade out under the search field instead of being cut off. The fade
+  // fits in the first heading's top padding, so at rest nothing is faded.
+  scrollerInMenu: {
+    maskImage: `linear-gradient(to bottom, transparent, black ${FADE})`, // tokens-allow: a mask's alpha, not a colour that shows.
   },
   // Opaque: the menu's text colour is translucent, and Chromium draws a colour emoji with its text colour's alpha.
   cellInMenu: {
