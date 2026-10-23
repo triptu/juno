@@ -1,6 +1,6 @@
 export { createMcpManager, type McpManagerApi } from './manager'
 export { MCP_MIGRATIONS } from './schema'
-export { mcpExecutors, changeCard } from './actions'
+export { mcpExecutors } from './actions'
 export { mcpTools } from './tools'
 
 export { serveMcp } from './serve'
