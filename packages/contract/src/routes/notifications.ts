@@ -6,7 +6,9 @@
  * - `notifications.page` is what the Notifications page shows beyond the
  *   settings: the Every message and Never lists with their names, and today.
  * - `notifications.status` is the avatar menu's line and hint: presence
- *   with until when, and "Paused until 9am" outside notification hours.
+ *   with until when, what Slack shows colleagues when it differs, and
+ *   "Paused until 9am" outside notification hours. `seen` drives the
+ *   avatar's dot.
  * - The setters write the settings. `notifications.setLevel` returns an
  *   undo (ADR 0010); on a thread it also follows or unfollows it (SPEC 5).
  * - `notifications.setHuddleRing` is Ring for huddles (SPEC 20).
@@ -100,9 +102,11 @@ export const PresenceValue = Schema.Literals(['active', 'away'])
 export type PresenceValue = typeof PresenceValue.Type
 
 export const NotificationStatus = Schema.Struct({
-  /** What Slack shows now, once known. */
+  /** The presence setting (Slack's `manual_presence`), once known: what Set yourself away or active and the active hours change. */
   presence: Schema.NullOr(PresenceValue),
-  /** "Active", "Away until 9am", "Active until 8pm". */
+  /** What Slack shows colleagues, from `presence_change` for the user; null until Slack answers and while the socket is down. */
+  seen: Schema.NullOr(PresenceValue),
+  /** "Active", "Away until 9am", "Active until 8pm", then "Slack shows you away" or "Connecting to Slack" when `seen` differs. */
   presenceLabel: Schema.String,
   /** "Paused until 9am" outside notification hours. */
   paused: Schema.optionalKey(Schema.String),

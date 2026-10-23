@@ -189,6 +189,17 @@ export function presenceLabel(at: LocalTime, presence: Presence, presenceHours: 
   return next === undefined ? name : `${name} ${until(at, next.inMinutes, next.at)}`
 }
 
+/**
+ * The avatar menu's second sentence when your presence setting and what
+ * Slack shows colleagues differ (SPEC 14, "Your own dot"): "Slack shows
+ * you away", or "Connecting to Slack" while Slack has not said, which the
+ * dot shows as away. Nothing when they agree.
+ */
+export function seenNote(setting: Presence, seen: Presence | undefined): string | undefined {
+  if (seen === undefined) return setting === 'active' ? 'Connecting to Slack' : undefined
+  return seen === setting ? undefined : `Slack shows you ${seen}`
+}
+
 /** The avatar menu's hint on Notifications: "Paused until 9am" outside notification hours, nothing inside. */
 export function pausedLabel(at: LocalTime, notificationHours: Hours): string | undefined {
   if (inHours(at, notificationHours)) return undefined

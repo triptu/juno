@@ -13,6 +13,7 @@ import {
   decideWithCause,
   pausedLabel,
   presenceLabel,
+  seenNote,
   type DecisionContext,
   type Hours,
   type LocalTime,
@@ -162,6 +163,16 @@ describe('presence', () => {
     expect(presenceLabel(at(MON, 12), 'away', { days: [], from: 540, to: 1140 })).toBe('Away')
     expect(pausedLabel(at(MON, 12), settings.notificationHours)).toBeUndefined()
     expect(pausedLabel(at(5, 20), settings.notificationHours)).toBe('Paused until Mon 9am')
+  })
+
+  it('says what Slack shows colleagues only when it differs from the setting', () => {
+    expect(seenNote('active', 'active')).toBeUndefined()
+    expect(seenNote('away', 'away')).toBeUndefined()
+    expect(seenNote('active', 'away')).toBe('Slack shows you away')
+    expect(seenNote('away', 'active')).toBe('Slack shows you active')
+    // Until Slack answers, the dot shows away; only an active setting differs from that.
+    expect(seenNote('active', undefined)).toBe('Connecting to Slack')
+    expect(seenNote('away', undefined)).toBeUndefined()
   })
 
   it('uses the same hours for both by default', () => {

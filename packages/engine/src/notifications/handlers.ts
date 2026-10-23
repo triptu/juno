@@ -35,6 +35,7 @@ import {
   pausedLabel,
   presenceLabel,
   scheduledPresence,
+  seenNote,
   threadNotifyChoice,
   type ConversationKind,
   type NotificationSettings,
@@ -43,6 +44,7 @@ import {
 import { Candidate, NotificationSettingsSchema, readSettings } from '@juno/notifications'
 import { liveQuery, prefs, StoreReader, transaction, type InvalidationKeys, type SqlError } from '@juno/store'
 import { NotificationControl } from '../notificationRuntime'
+import { OthersPresence } from '../presence/service'
 import { Outbox } from '../outbox'
 import { SlackSchedule, slackScheduleView } from '../slackSchedule'
 import { retryFirstRun, serveLiveValue, timed, type Run } from '../protocol/live'
@@ -166,6 +168,7 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
     const workspace = yield* Workspace
     const outbox = yield* Outbox
     const control = yield* NotificationControl
+    const othersPresence = yield* OthersPresence
     const slackSchedule = yield* SlackSchedule
     // Read-modify-write of one pref: one writer at a time, so two quick changes never lose one.
     const writes = yield* Semaphore.make(1)
@@ -213,9 +216,12 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
       const now = localTime(yield* Clock.currentTimeMillis)
       const { settings } = yield* readSettings
       const presence = (yield* control.currentPresence) ?? null
+      const seen = yield* othersPresence.self
       const shown = presence ?? scheduledPresence(now, settings.presenceHours)
+      const label = presenceLabel(now, shown, settings.presenceHours)
+      const note = presence === null ? undefined : seenNote(presence, seen)
       const paused = pausedLabel(now, settings.notificationHours)
-      return { presence, presenceLabel: presenceLabel(now, shown, settings.presenceHours), ...(paused === undefined ? {} : { paused }) } satisfies NotificationStatus
+      return { presence, seen: seen ?? null, presenceLabel: note === undefined ? label : `${label}. ${note}`, ...(paused === undefined ? {} : { paused }) } satisfies NotificationStatus
     })
 
     const setLevel = (target: NotifyTargetView, choice: NotifyChoice) =>
@@ -264,7 +270,7 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
         serveLiveValue(
           // The presence stream starts with the current value, which can be newer than what the first
           // run read (the two start together), so it is not dropped: it costs one more run.
-          runs(SETTINGS_KEYS, status, Stream.merge(control.presence, Stream.tick('1 minute').pipe(Stream.drop(1)))),
+          runs(SETTINGS_KEYS, status, Stream.merge(Stream.merge(control.presence, othersPresence.selfChanges), Stream.tick('1 minute').pipe(Stream.drop(1)))),
         ).pipe(retryFirstRun('notifications.status'), Stream.orDie),
       'notifications.setHours': ({ which, hours }) => changeHours(which, (saved) => ({ ...saved, ...hours })),
       'notifications.setDay': ({ which, day, enabled }) => changeHours(which, (saved) => ({

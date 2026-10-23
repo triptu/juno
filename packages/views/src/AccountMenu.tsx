@@ -23,8 +23,12 @@ export interface AccountMenuProps {
   readonly avatarUrl?: string
   /** "acme.slack.com", or the team name. Shown until presence is known. */
   readonly workspace: string
-  /** What Slack shows, and the line under the name: "Active", "Away until 9am". */
-  readonly presence?: { readonly active: boolean; readonly label: string }
+  /**
+   * The presence setting (`active`, which the toggle reads), whether Slack shows colleagues you as
+   * active (`seen`, the dot), and the line under the name: "Active", "Away until 9am", "Active.
+   * Slack shows you away".
+   */
+  readonly presence?: { readonly active: boolean; readonly seen: boolean; readonly label: string }
   /** "Paused until 9am" outside notification hours, beside Notifications. */
   readonly paused?: string
   /** Privacy mode is on: the item offers Show message text instead of Hide (SPEC section 5). */
@@ -72,7 +76,7 @@ export function AccountMenu({ name, initials, hue, avatarUrl, workspace, presenc
           ) : (
             <span {...stylex.props(styles.avatar)}>
               {avatar}
-              <PresenceDot active={presence.active} surface="raised" paused={paused !== undefined} />
+              <PresenceDot active={presence.seen} surface="raised" paused={paused !== undefined} />
             </span>
           )
         }

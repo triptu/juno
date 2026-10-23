@@ -121,7 +121,8 @@ export function Sidebar() {
   const name = person?.name ?? user?.userName ?? ''
   const account = { ...(person?.avatarUrl ? { avatarUrl: person.avatarUrl } : {}), name, initials: initials(name) || '?', hue: hueFor('', user?.userId ?? '') }
 
-  const presence = status._tag === 'Success' && status.value.presence !== null ? { active: status.value.presence === 'active', label: status.value.presenceLabel } : undefined
+  // The setting drives the menu's toggle; the dot shows what Slack shows colleagues, away until Slack says.
+  const presence = status._tag === 'Success' && status.value.presence !== null ? { active: status.value.presence === 'active', seen: status.value.seen === 'active', label: status.value.presenceLabel } : undefined
   const paused = status._tag === 'Success' ? status.value.paused : undefined
   const accountAction = (action: AccountMenuAction) => {
     setMenuOpen(false)
@@ -148,7 +149,7 @@ export function Sidebar() {
       titlebarLeading={<TitlebarNav />}
       fullScreen={fullScreen}
       top={sidebarTop}
-      account={{ ...account, ...(presence === undefined ? {} : { presence: presence.active ? 'active' : 'away' }), ...(paused === undefined ? {} : { paused }) }}
+      account={{ ...account, ...(presence === undefined ? {} : { presence: presence.seen ? 'active' : 'away' }), ...(paused === undefined ? {} : { paused }) }}
       filter={{ kind: filter.kind, unreadOnly: filter.unreadOnly, view: filter.view }}
       dots={dots}
       {...(filter.scope === undefined ? {} : { scope: { name: scopeChannel?.name ?? filter.scope, kind: scopeChannel?.kind ?? 'public' } })}
