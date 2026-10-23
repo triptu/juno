@@ -49,6 +49,8 @@ export interface ContextMenuProps {
    * (`internal/menuMorph.ts`). Its keys are its own (`data-menu-own-keys`), Esc aside.
    */
   readonly morph?: ReactNode
+  /** The panel shows in its place at once, with no motion: a menu opened as the panel (R on a message). */
+  readonly morphAtOnce?: boolean
   /**
    * Drawn inside its parent, which stands in for the window, with no focus
    * move and nothing outside closing it: the gallery's fixtures. The parent
@@ -79,7 +81,7 @@ const isItem = (entry: ContextMenuEntry): entry is ContextMenuItem => !('separat
  * a wheel turn outside, the window losing focus or resizing close it. One
  * instance for the window, rendered on demand in a portal on `body`.
  */
-export function ContextMenu({ anchor, items, header, label, onSelect, onClose, panelWidth, morph, inline = false }: ContextMenuProps) {
+export function ContextMenu({ anchor, items, header, label, onSelect, onClose, panelWidth, morph, morphAtOnce = false, inline = false }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null)
   const closeRef = useRef(onClose)
   const typed = useRef({ text: '', at: 0 })
@@ -148,7 +150,7 @@ export function ContextMenu({ anchor, items, header, label, onSelect, onClose, p
       )}
     >
       {morphing ? (
-        <MorphLayers root={ref} menu={state} view={view} from={content} material={styles.material} body={styles.body}>
+        <MorphLayers root={ref} menu={state} view={view} from={content} material={styles.material} body={styles.body} atOnce={morphAtOnce}>
           {morph}
         </MorphLayers>
       ) : (
@@ -263,8 +265,8 @@ function menuKey(event: KeyboardEvent<HTMLDivElement>, onClose: () => void, type
   if (event.metaKey || event.ctrlKey || event.altKey) return
   const now = performance.now()
   const fresh = now - typed.at > TYPE_AHEAD_MS || typed.text === ''
-  // ⌫ always; a letter only as the first key, so typing on into a label still works.
-  const equivalent = fresh || event.key.length !== 1 ? rows.find((node) => node.dataset['menuShortcut'] !== undefined && pressed(node.dataset['menuShortcut'], event.key)) : undefined
+  // ⌫ always; a letter only as the first key, so typing on into a label still works. A cell can have a key too.
+  const equivalent = fresh || event.key.length !== 1 ? [...rows, ...cells].find((node) => node.dataset['menuShortcut'] !== undefined && pressed(node.dataset['menuShortcut'], event.key)) : undefined
   if (equivalent !== undefined) {
     event.preventDefault()
     event.stopPropagation()

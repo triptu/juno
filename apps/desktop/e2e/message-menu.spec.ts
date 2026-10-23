@@ -3,7 +3,8 @@
 // context-menu key and ⇧F10 open it at once. More reactions turns it into the
 // emoji picker in one motion, growing from the corner of the menu that stays
 // put, near every edge of the window. Rows show the keys that work on a
-// focused message (T, Q, E, ⌫), which also choose them while the menu is open.
+// focused message (T, Q, F, E, ⌫, and R on More reactions), which also choose
+// them while the menu is open.
 // One sender's messages start a new header after ten quiet minutes.
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from './fixtures'
@@ -116,7 +117,7 @@ test('a key the menu shows runs its row; T on a focused message in Main starts i
 
   await test.step('E in the open menu edits, and types nothing', async () => {
     await menu.openOnRow(row)
-    expect(await menu.shortcuts()).toEqual({ reply: 'T', quote: 'Q', edit: 'E', delete: '⌫' })
+    expect(await menu.shortcuts()).toEqual({ reply: 'T', quote: 'Q', forward: 'F', edit: 'E', delete: '⌫' })
     await juno.win.keyboard.press('e')
     await expect(menu.root).toHaveCount(0)
     const field = topic.list.getByRole('textbox', { name: 'Edit message' })
@@ -174,7 +175,7 @@ test('a key the menu shows runs its row; T on a focused message in Main starts i
     await expect(root).toBeFocused()
     await topic.expectTitle(/Keys in the menu/)
     await menu.openOnRow(root)
-    expect(await menu.shortcuts()).toEqual({ quote: 'Q', edit: 'E', delete: '⌫' })
+    expect(await menu.shortcuts()).toEqual({ quote: 'Q', forward: 'F', edit: 'E', delete: '⌫' })
     // T is no key here: it only jumps to a row by its name, and the menu stays open.
     await juno.win.keyboard.press('t')
     await expect(menu.root).toBeVisible()
@@ -183,7 +184,7 @@ test('a key the menu shows runs its row; T on a focused message in Main starts i
   })
 })
 
-test('the grid reacts and takes a reaction back, and More reactions picks any emoji', async ({ juno, fake }) => {
+test('the grid reacts and takes a reaction back, More reactions picks any emoji, and R opens the picker', async ({ juno, fake }) => {
   const message = fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'React to me from the menu' })
   await juno.sidebar.expectTop('#eng')
   await juno.sidebar.row('#eng').open()
@@ -223,6 +224,28 @@ test('the grid reacts and takes a reaction back, and More reactions picks any em
   await juno.win.keyboard.press('Escape')
   await expect(closing.root).toHaveCount(0)
   expect(reactions()).toEqual(['rocket'])
+
+  // R on a focused message opens its menu as the picker, at once and under its first line, the search focused.
+  await juno.topic.composer.focus()
+  await juno.topic.composer.press('ArrowUp')
+  await expect(row).toBeFocused()
+  await row.press('r')
+  const picker = juno.messageMenu
+  await expect(picker.search).toBeFocused()
+  expect(await picker.root.evaluate((node) => node.getAnimations({ subtree: true }).length)).toBe(0)
+  expect([(await boxOf(picker.root)).width, (await boxOf(picker.root)).height]).toEqual([314, 360])
+  await juno.win.keyboard.type('tada')
+  await picker.search.press('Enter')
+  await expect(picker.root).toHaveCount(0)
+  await expect.poll(reactions).toEqual(['rocket', 'tada'])
+
+  // R in the open menu chooses More reactions, as its tooltip says.
+  const keyed = await juno.messageMenu.openOnRow(row)
+  await expect(keyed.more).toHaveAttribute('aria-keyshortcuts', 'r')
+  await juno.win.keyboard.press('r')
+  await expect(keyed.search).toBeFocused()
+  await juno.win.keyboard.press('Escape')
+  await expect(keyed.root).toHaveCount(0)
 })
 
 type Corner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'

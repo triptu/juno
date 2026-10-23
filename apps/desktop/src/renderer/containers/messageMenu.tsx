@@ -58,6 +58,8 @@ export interface OpenMessageMenu {
   /** The pointer, or under the focused message's first line. */
   readonly anchor: MenuPoint
   readonly items: ReadonlyArray<MessageMenuEntry>
+  /** Opens as the full emoji picker, at once, with its search focused (R on a focused message). */
+  readonly picking?: boolean
   /** No grid: a message nobody can react to. */
   readonly noGrid?: boolean
   /** You already reacted with this emoji: its cell shows chosen. */

@@ -2,7 +2,8 @@
 // the sheet, a channel is picked and a note added, and the message lands in
 // the channel as a shared message under the note, sent once with
 // `chat.shareMessage`. A forward Slack refuses shows the usual "Not sent."
-// in the destination, and Retry sends it.
+// in the destination, and Retry sends it. F on a focused message opens the
+// sheet too, and chooses Forward… in the open menu.
 import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
@@ -87,4 +88,28 @@ test('a forward Slack refuses shows Not sent. in the destination, and Retry send
   await failed.retry()
   await juno.topic.expectSent('This one is refused first')
   expect(fake.messages('C0PRODUCT').filter((message) => message.text === 'This one is refused first')).toHaveLength(1)
+})
+
+test('F forwards a focused message, and chooses Forward… in its open menu', async ({ juno }) => {
+  await juno.signIn()
+  await juno.waitForSync()
+  await juno.sidebar.row(ENG_MAIN).open()
+  await juno.topic.expectTitle('Main')
+  const dialog = sheet(juno.win)
+  const row = juno.topic.message(HANDOFF)
+
+  await row.locator('[data-msg-text]').first().click()
+  await expect(row).toBeFocused()
+  await row.press('f')
+  await expect(dialog).toBeVisible()
+  await expect(dialog.locator('[data-forward-preview]')).toContainText(HANDOFF)
+  await juno.win.keyboard.press('Escape')
+  await juno.win.keyboard.press('Escape')
+  await expect(dialog).toHaveCount(0)
+
+  const menu = await juno.messageMenu.openOnRow(row)
+  expect((await menu.shortcuts())['forward']).toBe('F')
+  await juno.win.keyboard.press('f')
+  await expect(menu.root).toHaveCount(0)
+  await expect(dialog).toBeVisible()
 })

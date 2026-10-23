@@ -14,7 +14,7 @@ import type { OpenMessageMenu } from './messageMenu'
 import { useEmojiSearchReady } from './useEmojiSearchReady'
 
 export { openChatMenu } from './juno/chatMenu'
-export { topicMenu } from './topic/messageMenu'
+export { topicForward, topicMenu } from './topic/messageMenu'
 
 warmWorkspaceEmoji(emojiCatalog)
 
@@ -39,5 +39,5 @@ export function MessageMenuPanel({ menu, onReact, onSelect, onClose }: MessageMe
   const [grid] = useState(() => gridEmoji(quick, frequent, data).map((emoji) => ({ ...emoji, selected: menu.chosen?.(emoji) === true })))
   const [recent] = useState(frequent)
   const searchReady = useEmojiSearchReady(data.all, searchIndex)
-  return <MessageMenu anchor={menu.anchor} reactions={grid} items={menu.items} noGrid={menu.noGrid === true} onReact={onReact} emoji={{ data, recent, searchReady }} onSelect={onSelect} onClose={onClose} />
+  return <MessageMenu anchor={menu.anchor} reactions={grid} items={menu.items} noGrid={menu.noGrid === true} onReact={onReact} emoji={{ data, recent, searchReady }} onSelect={onSelect} onClose={onClose} initialPicking={menu.picking === true} />
 }

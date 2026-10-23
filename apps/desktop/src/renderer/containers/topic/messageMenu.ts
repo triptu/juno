@@ -37,7 +37,8 @@ export interface MenuFacts {
  * The rows, in groups: Start thread or Open thread (Main), Quote, Ask Juno;
  * Copy text, Forward…, Open in Slack; on your own, Also send
  * to #eng (a thread reply) and Tell me if nobody replies; then Edit and Delete….
- * Rows whose key works on a focused message show it (`rowHandlers`): T, Q, E and ⌫.
+ * Rows whose key works on a focused message show it (`rowKeyAction`): T, Q, F, E and ⌫; R, More reactions,
+ * names its key in its tooltip.
  */
 export function topicMenuItems({ topic, message, editable, own, selection, juno, mayWatch }: MenuFacts): ReadonlyArray<MessageMenuEntry> {
   // Only a message Slack has can be shared or linked to.
@@ -50,7 +51,7 @@ export function topicMenuItems({ topic, message, editable, own, selection, juno,
     ...(juno ? [item('ask-juno', 'Ask Juno', 'juno')] : []),
     SEPARATOR,
     item('copy', selection === undefined ? 'Copy text' : 'Copy', 'copy'),
-    item('forward', 'Forward…', 'forward', !linkable || message.kind !== 'message'),
+    item('forward', 'Forward…', 'forward', !forwardable(message), 'F'),
     item('open-in-slack', 'Open in Slack', 'open'),
     ...(broadcastable || (own && linkable) ? [SEPARATOR] : []),
     ...(broadcastable ? [item('broadcast', broadcastLabel(topic.channel), 'broadcast')] : []),
@@ -80,6 +81,9 @@ function selectWords(scroller: HTMLElement | null, ts: string): void {
   selection.removeAllRanges()
   selection.addRange(range)
 }
+
+/** Only a message Slack has, with words or files, can be forwarded. */
+export const forwardable = (message: MessageView) => message.pending === undefined && message.kind === 'message'
 
 /** Forward… opens the sheet with the message as the list shows it, its sender and where it was posted (SPEC 7, "Forward"). */
 function openForward(channel: string, message: MessageView, { list, detail }: NonNullable<Latest['current']>): void {
@@ -123,7 +127,7 @@ function choose(id: string, now: MessageView, input: MenuInput, selection: strin
     case 'copy':
       return void copyText(text())
     case 'forward':
-      return now.pending === undefined && now.kind === 'message' ? openForward(channel, now, latest.current) : undefined
+      return forwardable(now) ? openForward(channel, now, latest.current) : undefined
     case 'open-in-slack':
       return openTopicInSlack(detail)
     case 'broadcast':
@@ -138,8 +142,16 @@ function choose(id: string, now: MessageView, input: MenuInput, selection: strin
   }
 }
 
-/** A message's menu at `anchor`; on the sender's name or avatar, someone else's person menu. */
-export function topicMenu(input: MenuInput, message: MessageView, anchor: MenuPoint, onSender: boolean): void {
+/** F on a focused message: Forward…, as the menu's row does. */
+export function topicForward(input: MenuInput, message: MessageView): void {
+  if (forwardable(message)) openForward(input.channel, message, input.latest.current)
+}
+
+/**
+ * A message's menu at `anchor`; on the sender's name or avatar, someone else's person menu. `picking` opens it as
+ * the full emoji picker, at once (R on a focused message).
+ */
+export function topicMenu(input: MenuInput, message: MessageView, anchor: MenuPoint, onSender: boolean, picking = false): void {
   const { scrollRef, latest, setMenuMessage, react } = input
   const { detail, list } = latest.current
   const own = message.senderId !== undefined && message.senderId === registry.get(signedInAtom)?.userId
@@ -165,6 +177,7 @@ export function topicMenu(input: MenuInput, message: MessageView, anchor: MenuPo
   setMenuMessage(message.ts)
   openMessageMenu({
     anchor,
+    ...(picking ? { picking } : {}),
     items: topicMenuItems(facts),
     chosen: (emoji) => message.reactions.some((reaction) => reaction.me && reaction.name === emoji.name),
     onReact: (name) => {

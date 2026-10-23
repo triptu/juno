@@ -130,8 +130,9 @@ export function useMessageCommands({ channel, scrollRef, composer, latest, setEd
     }
     // The menu and what its rows do load when idle (`../messageMenu.tsx`).
     const input: MenuInput = { channel, scrollRef, composer, latest, setMenuMessage, react, startEdit, askDelete, reply }
-    const menu = (message: MessageView, anchor: MenuPoint, onSender = false) => withMenus((menus) => menus.topicMenu(input, message, anchor, onSender))
-    return { ...handlers, menu }
+    const menu = (message: MessageView, anchor: MenuPoint, onSender = false, picking = false) => withMenus((menus) => menus.topicMenu(input, message, anchor, onSender, picking))
+    const forward = (message: MessageView) => withMenus((menus) => menus.topicForward(input, message))
+    return { ...handlers, menu, forward }
     // `channel` is fixed for a topic tab; the rest is read through refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel])
@@ -147,8 +148,8 @@ interface RowKeyInput {
 }
 
 /**
- * What a key does on a focused message, or undefined when it does nothing there. The menu shows the letters and ⌫
- * beside their rows (`topicMenuItems`). A letter held with ⌘, ⌃ or ⌥ is the app's or the system's (⌘Q quits).
+ * What a key does on a focused message, or undefined when it does nothing there, with Slack's keys where Juno has
+ * the action. The menu shows the letters and ⌫ beside their rows (`topicMenuItems`); R is More reactions' key. A letter held with ⌘, ⌃ or ⌥ is the app's or the system's (⌘Q quits).
  */
 function rowKeyAction(event: KeyboardEvent<HTMLElement>, message: MessageView, { actions, latest, scrollRef, composer }: RowKeyInput): (() => void) | undefined {
   const key = event.key.length === 1 ? event.key.toLowerCase() : event.key
@@ -159,6 +160,14 @@ function rowKeyAction(event: KeyboardEvent<HTMLElement>, message: MessageView, {
     case 'q': {
       const text = textOf(scrollRef.current, message.ts)
       return text === '' ? undefined : () => composer.current?.quote(text)
+    }
+    // F forwards it, as the menu's Forward… does, when Slack has it.
+    case 'f':
+      return message.pending === undefined && message.kind === 'message' ? () => actions.forward(message) : undefined
+    // R opens its menu as the full emoji picker, where ⇧F10 opens the menu, with the search focused.
+    case 'r': {
+      const row = rowOf(scrollRef.current, message.ts)
+      return row !== null && message.kind === 'message' ? () => actions.menu(message, anchorFor(row, undefined), false, true) : undefined
     }
     // T starts or opens the message's thread, as the menu's row does, where it has that row.
     case 't':

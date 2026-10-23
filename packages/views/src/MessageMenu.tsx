@@ -14,7 +14,7 @@ import { Trash } from '@phosphor-icons/react/dist/icons/Trash'
 import { useLayoutEffect, useState } from 'react'
 import type { PreparedEmojiPicker } from '@juno/contract'
 import { layout, menu } from '@juno/tokens/tokens.stylex'
-import { ContextMenu, Emoji, Icon, SmileyPlus, type ContextMenuEntry, type MenuPoint, type PhosphorIcon } from '@juno/ui'
+import { ContextMenu, Emoji, Icon, SmileyPlus, tooltip, type ContextMenuEntry, type MenuPoint, type PhosphorIcon } from '@juno/ui'
 import { EmojiPicker } from './EmojiPicker'
 import { GRID_REACTIONS, type GridReaction, type MessageMenuEntry, type MessageMenuIcon } from './messageMenuModel'
 
@@ -63,7 +63,7 @@ export interface MessageMenuProps {
   readonly onClose: () => void
   /** Drawn inside its parent, which stands in for the window: the gallery. */
   readonly inline?: boolean
-  /** Turns into the emoji picker as soon as it is placed, with this search. For fixtures; the app opens the menu. */
+  /** Opens as the emoji picker, in its place at once with no motion, and this search: R on a message, and fixtures. */
   readonly initialPicking?: boolean
   readonly initialQuery?: string
 }
@@ -93,6 +93,7 @@ export function MessageMenu({ anchor, reactions, items, noGrid = false, onReact,
       onSelect={onSelect}
       onClose={onClose}
       {...(noGrid ? {} : { panelWidth: layout['--emoji-picker-width'] })}
+      morphAtOnce={initialPicking}
       morph={picking ? <EmojiPicker data={emoji.data} recent={emoji.recent} searchReady={emoji.searchReady ?? true} material="menu" initialQuery={initialQuery} onPick={onReact} onClose={onClose} /> : undefined}
       inline={inline}
     />
@@ -135,6 +136,10 @@ function ReactionGrid({ reactions, onReact, onMore, spaced }: ReactionGridProps)
         tabIndex={-1}
         data-menu-cell=""
         data-grid-more=""
+        // R chooses it while the menu is open, as it opens the picker on a focused message.
+        data-menu-shortcut="R"
+        aria-keyshortcuts="r"
+        {...tooltip('More reactions', 'R')}
         aria-label="More reactions"
         aria-haspopup="dialog"
         // A popover trigger: it opens as the primary button goes down, as every menu and popover does; Enter opens it from the keys.
