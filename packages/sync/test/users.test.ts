@@ -72,6 +72,7 @@ const context = (): Effect.Effect<SyncContext> =>
       config: { ...defaultSyncConfig, quietDays: 30 },
       rootFetches: yield* Queue.unbounded(),
       readLookups: yield* Queue.unbounded(),
+      conversationLookups: yield* Queue.unbounded(),
       fileFetches: yield* Queue.unbounded(),
       missingUsers: new Map(),
       usersWanted: yield* Queue.sliding<void>(1),

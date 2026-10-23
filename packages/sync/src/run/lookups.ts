@@ -2,10 +2,11 @@ import { mainTopicId, millisToTs, type ChannelId, type Ts } from '@juno/domain'
 import { SlackApi } from '@juno/slack'
 import { transaction } from '@juno/store'
 import { Clock, Effect, Queue } from 'effect'
-import { reindexOptions, trackFetch, type SyncContext } from '../context'
-import { applyPage } from '../pages'
+import { reindexOptions, trackFetch, wantMembers, type SyncContext } from '../context'
+import { patchMetadata, readMetadata, storeMetadata } from '../metadata'
+import { applyPage, mainTopicOf } from '../pages'
 import { reindexTopics } from '../reindex'
-import { observeRead } from '../write'
+import { observeRead, toConversationRow } from '../write'
 
 
 export const fetchRoots = (ctx: SyncContext) => Effect.gen(function* () {
@@ -58,5 +59,35 @@ export const lookUpReads = (ctx: SyncContext) => Effect.gen(function* () {
         if (outcome === 'lookup') yield* Queue.offer(ctx.readLookups, channel)
       }),
     ).pipe(Effect.catchCause((cause) => Effect.logError('sync: read lookup not applied', { cause })))
+  }
+})
+
+/**
+ * A conversation a live message arrived in that the store has never seen:
+ * its metadata from `conversations.info`, and membership when it is a DM or
+ * group DM (`noteMember` in `events.ts`) unless an event said otherwise
+ * meanwhile. A failure is dropped: the next counts call brings it.
+ */
+export const lookUpConversations = (ctx: SyncContext) => Effect.gen(function* () {
+  const api = yield* SlackApi
+  while (true) {
+    const channel = yield* Queue.take(ctx.conversationLookups)
+    yield* readMetadata(ctx.metadata, (observed) => Effect.gen(function* () {
+      const result = yield* Effect.result(api.call('conversations.info', { channel }, { lane: 'background', reason: 'conversation' }))
+      if (result._tag === 'Failure') {
+        if (result.failure._tag === 'SlackAuthRequired') return yield* result.failure
+        return yield* Effect.logDebug('sync: conversation lookup failed', { cause: result.failure })
+      }
+      const row = toConversationRow(result.success.channel)
+      yield* transaction(
+        Effect.gen(function* () {
+          yield* storeMetadata(observed, [row])
+          const member = row.kind === 'im' || row.kind === 'mpim' || result.success.channel.is_member === true
+          if (member && observed.get(channel)?.is_member === undefined) yield* patchMetadata(ctx.metadata, channel, { is_member: 1 })
+          wantMembers(ctx, row)
+          yield* reindexTopics([mainTopicOf(channel)], reindexOptions(ctx))
+        }),
+      ).pipe(Effect.catchCause((cause) => Effect.logError('sync: conversation lookup not applied', { cause })))
+    }))
   }
 })
