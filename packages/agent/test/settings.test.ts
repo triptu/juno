@@ -137,8 +137,10 @@ it('shows when OpenRouter rejected its key, until main sends a new one', async (
   await settings.where((p) => p.openRouterKey === 'set', 'a new key')
 })
 
+/** A Mac with a backup, served to the renderer. */
+const mac = (name: string) => served({ now: () => NOON, backup: { keychain: fakeKeychain(), deviceName: name, intervalMs: 0 } })
+
 it('a backup folder Juno cannot use is refused with the reason, and the backup stays where it was', async () => {
-  const mac = (name: string) => served({ now: () => NOON, backup: { keychain: fakeKeychain(), deviceName: name, intervalMs: 0 } })
   const { client, follow } = await mac('Studio')
   const settings = follow(client['agent.settings.page']())
   const before = await settings.where((p) => p.ownership._tag === 'active', 'the page')
@@ -180,11 +182,13 @@ it('Rules: the owner sets them in Settings, the page lists them, and the next re
   expect(request).toContain('Never message Sam on weekends.')
 })
 
+/** A model step that proposes one Send message. */
+const send = (id: string) => reply({ type: 'toolCall', id, name: 'send_message', arguments: { messages: [{ topic: `m:${TEST_CHANNEL}`, text: `Text ${id}` }] } })
+
 it('Activity lists each finished run newest first, how it ended, and its actions with the decision and outcome', async () => {
   const slack = fakeActionHost()
   let now = NOON
   const { h, client, follow } = await served({ actions: { host: slack.host }, now: () => now })
-  const send = (id: string) => reply({ type: 'toolCall', id, name: 'send_message', arguments: { messages: [{ topic: `m:${TEST_CHANNEL}`, text: `Text ${id}` }] } })
   h.fake.script([send('call-a'), send('call-b'), reply(say('Two drafts.'))])
   h.send('draft two messages', { opId: 'op-1' })
   await h.ended('op-1')

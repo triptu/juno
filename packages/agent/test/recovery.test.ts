@@ -13,7 +13,6 @@ import { agentDatabaseFiles, crashAt, journalFiles, runAgent, snapshotFiles, typ
 
 // Each test starts the agent as a process several times, about a second each on an idle Mac.
 setDefaultTimeout(60_000)
-
 const program = fileURLToPath(new URL('./fixtures/program.ts', import.meta.url))
 let dir: string
 beforeEach(() => {
