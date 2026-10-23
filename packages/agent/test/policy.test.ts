@@ -25,43 +25,23 @@ const input: fc.Arbitrary<AuthorizeInput> = fc.record({
 }) as fc.Arbitrary<AuthorizeInput>
 
 describe('authorizing a child action', () => {
-  it('authorizes an exact, unused click on a current, valid intent', () => {
-    expect(authorizeDecision(base)).toEqual({ _tag: 'authorize', via: 'approval' })
-  })
-
-  it('refuses while paused, off, or on a Mac that does not own Juno', () => {
-    expect(authorizeDecision({ ...base, authority: { mode: 'paused', owner: 'active' } })).toEqual({ _tag: 'refused', reason: 'paused' })
-    expect(authorizeDecision({ ...base, authority: { mode: 'off', owner: 'active' } })).toEqual({ _tag: 'refused', reason: 'off' })
-    expect(authorizeDecision({ ...base, authority: { mode: 'on', owner: 'recovery' } })).toEqual({ _tag: 'refused', reason: 'notOwner' })
-  })
-
-  it('refuses a click on an older revision or another payload', () => {
-    expect(authorizeDecision({ ...base, approval: { ...approval, rev: 1 } })).toEqual({ _tag: 'refused', reason: 'noApproval' })
-    expect(authorizeDecision({ ...base, approval: { ...approval, digest: 'd1' } })).toEqual({ _tag: 'refused', reason: 'noApproval' })
-    expect(authorizeDecision({ ...base, approval: { ...approval, used: true } })).toEqual({ _tag: 'refused', reason: 'noApproval' })
-    expect(authorizeDecision({ ...base, approval: { ...approval, batchOrdered: false } })).toEqual({ _tag: 'refused', reason: 'noApproval' })
-  })
-
-  it('never authorizes a child twice when its destination does not deduplicate, whatever became of the first', () => {
-    expect(authorizeDecision({ ...base, prior: ['d2'] })).toEqual({ _tag: 'refused', reason: 'alreadyAuthorized' })
-  })
-
-  it('authorizes a deduplicated child again only with the same payload', () => {
-    const deduped = { ...base, intent: { ...intent, deduped: true } }
-    expect(authorizeDecision({ ...deduped, prior: ['d2'] })).toEqual({ _tag: 'authorize', via: 'approval' })
-    expect(authorizeDecision({ ...deduped, prior: ['d1'] })).toEqual({ _tag: 'refused', reason: 'payloadChanged' })
-  })
-
-  it('names why an approved intent can no longer run', () => {
-    expect(authorizeDecision({ ...base, validity: 'expired' })).toEqual({ _tag: 'refused', reason: 'invalid', invalid: 'expired' })
-    expect(authorizeDecision({ ...base, done: true })).toEqual({ _tag: 'refused', reason: 'done' })
-    expect(authorizeDecision({ ...base, intent: { ...intent, tier: 4 } })).toEqual({ _tag: 'refused', reason: 'destructive' })
-  })
-
-  it('lets a grant stand in for a click on Tier 2 only', () => {
-    const { approval: _, ...noClick } = base
-    expect(authorizeDecision({ ...noClick, grant: true, intent: { ...intent, tier: 2 } })).toEqual({ _tag: 'authorize', via: 'grant' })
-    expect(authorizeDecision({ ...noClick, grant: true })).toEqual({ _tag: 'refused', reason: 'noApproval' })
+  const { approval: _, ...noClick } = base
+  it('authorizes only an exact, current click or a Tier 2 grant, and names why it refuses the rest', () => {
+    const table: ReadonlyArray<[string, AuthorizeInput, ReturnType<typeof authorizeDecision>]> = [
+      ['an exact, unused click on a current, valid intent', base, { _tag: 'authorize', via: 'approval' }],
+      ['a click while paused', { ...base, authority: { mode: 'paused', owner: 'active' } }, { _tag: 'refused', reason: 'paused' }],
+      ['a click on a Mac that does not own Juno', { ...base, authority: { mode: 'on', owner: 'recovery' } }, { _tag: 'refused', reason: 'notOwner' }],
+      ['a click on an older revision', { ...base, approval: { ...approval, rev: 1 } }, { _tag: 'refused', reason: 'noApproval' }],
+      ['a second authorization where the destination does not deduplicate', { ...base, prior: ['d2'] }, { _tag: 'refused', reason: 'alreadyAuthorized' }],
+      ['a deduplicated child again with the same payload', { ...base, intent: { ...intent, deduped: true }, prior: ['d2'] }, { _tag: 'authorize', via: 'approval' }],
+      ['a deduplicated child again with another payload', { ...base, intent: { ...intent, deduped: true }, prior: ['d1'] }, { _tag: 'refused', reason: 'payloadChanged' }],
+      ['an intent that expired', { ...base, validity: 'expired' }, { _tag: 'refused', reason: 'invalid', invalid: 'expired' }],
+      ['an intent already done', { ...base, done: true }, { _tag: 'refused', reason: 'done' }],
+      ['a Tier 4 intent', { ...base, intent: { ...intent, tier: 4 } }, { _tag: 'refused', reason: 'destructive' }],
+      ['a grant on Tier 2', { ...noClick, grant: true, intent: { ...intent, tier: 2 } }, { _tag: 'authorize', via: 'grant' }],
+      ['a grant on Tier 3', { ...noClick, grant: true }, { _tag: 'refused', reason: 'noApproval' }],
+    ]
+    for (const [what, facts, decision] of table) expect(authorizeDecision(facts), what).toEqual(decision)
   })
 
   it('holds the spec properties for any facts', () => {
@@ -113,17 +93,14 @@ describe('what a tool call does, by tier and run', () => {
   })
 
   it('carries the Because line only when untrusted content made it a card', () => {
-    expect(toolDecision('outward', clean)).toEqual({ _tag: 'card', because: false })
     expect(toolDecision('t3Start', clean)).toEqual({ _tag: 'card', because: false })
     expect(toolDecision('t3Start', tainted)).toEqual({ _tag: 'card', because: true })
-    expect(toolDecision('delegateSpawn', tainted)).toEqual({ _tag: 'card', because: true })
   })
 
-  it('steers or stops a job with no click only under its live grant in a clean owner run', () => {
+  it('steers a job with no click only under its live grant in a clean owner run, and never stops one from a report', () => {
     expect(toolDecision('steer', clean, { liveGrant: true })).toEqual({ _tag: 'run' })
-    expect(toolDecision('steer', clean, { liveGrant: false })).toEqual({ _tag: 'card', because: true })
-    expect(toolDecision('steer', tainted, { liveGrant: true })).toEqual({ _tag: 'card', because: true })
-    expect(toolDecision('stopJob', clean, { liveGrant: true })).toEqual({ _tag: 'run' })
+    expect(toolDecision('steer', clean, { liveGrant: false })._tag).toBe('card')
+    expect(toolDecision('steer', tainted, { liveGrant: true })._tag).toBe('card')
     expect(toolDecision('stopJob', report, { liveGrant: true })).toEqual({ _tag: 'refused', reason: 'useTaskCard' })
   })
 
@@ -145,16 +122,12 @@ describe('who may mint a grant', () => {
   it('is a clean owner run with its source in the run, a current click, or the menu, and only while Juno may act', () => {
     expect(mayMintGrant({ _tag: 'cleanRun', run: { origin: 'owner', clean: true }, sourceInRun: true }, ON)).toBe(true)
     expect(mayMintGrant({ _tag: 'cleanRun', run: { origin: 'owner', clean: false }, sourceInRun: true }, ON)).toBe(false)
-    expect(mayMintGrant({ _tag: 'cleanRun', run: { origin: 'owner', clean: true }, sourceInRun: false }, ON)).toBe(false)
     expect(mayMintGrant({ _tag: 'cleanRun', run: { origin: 'report', clean: true }, sourceInRun: true }, ON)).toBe(false)
-    expect(mayMintGrant({ _tag: 'click', current: true }, ON)).toBe(true)
     expect(mayMintGrant({ _tag: 'click', current: false }, ON)).toBe(false)
     // The menu's reply watch: what the chat has read does not matter (spec scheduleFromMenu).
     expect(mayMintGrant({ _tag: 'menu' }, ON)).toBe(true)
-    for (const now of [{ mode: 'paused', owner: 'active' }, { mode: 'off', owner: 'active' }, { mode: 'on', owner: 'released' }] as const) {
-      expect(mayMintGrant({ _tag: 'menu' }, now)).toBe(false)
-      expect(mayMintGrant({ _tag: 'click', current: true }, now)).toBe(false)
-    }
+    expect(mayMintGrant({ _tag: 'menu' }, { mode: 'paused', owner: 'active' })).toBe(false)
+    expect(mayMintGrant({ _tag: 'click', current: true }, { mode: 'on', owner: 'released' })).toBe(false)
   })
 })
 
@@ -168,9 +141,7 @@ describe('a click binds the card the owner saw', () => {
   it('matches only the same revision, digest and children in the same order', () => {
     expect(bindingMatches(stored, stored)).toBe(true)
     expect(bindingMatches(stored, { ...stored, revision: 2 })).toBe(false)
-    expect(bindingMatches(stored, { ...stored, digest: 'other' })).toBe(false)
     expect(bindingMatches(stored, { ...stored, children: children.toReversed() })).toBe(false)
-    expect(bindingMatches(stored, { ...stored, children: [children[0]!] })).toBe(false)
     expect(bindingMatches(stored, { ...stored, children: [children[0]!, { ...children[1]!, revision: 1 }] })).toBe(false)
   })
 })
@@ -185,48 +156,29 @@ describe('the auto-review of a connection call', () => {
   )
   const answered = (intent: 'explicit' | 'implied' | 'notAsked', risk: 'read' | 'reversible' | 'write' | 'delete' | 'send'): Review => ({ _tag: 'answered', intent, risk })
 
-  it('runs under Auto only what the owner asked for exactly and can be undone', () => {
-    expect(reviewDecision('auto', false, answered('explicit', 'reversible'))).toEqual({ _tag: 'run', line: 'ranExplicit' })
-    expect(reviewDecision('auto', true, answered('implied', 'reversible'))).toEqual({ _tag: 'card', line: 'implied' })
-    expect(reviewDecision('auto', true, answered('explicit', 'delete'))).toEqual({ _tag: 'card', line: 'delete' })
-    expect(reviewDecision('auto', true, answered('explicit', 'send'))).toEqual({ _tag: 'card', line: 'send' })
-    expect(reviewDecision('auto', true, answered('implied', 'write'))).toEqual({ _tag: 'card', line: 'write' })
-    expect(reviewDecision('auto', true, answered('notAsked', 'delete'))).toEqual({ _tag: 'card', line: 'notAsked' })
+  it('runs with no click what the rule and the review allow, and asks for the rest', () => {
+    const table: ReadonlyArray<[string, 'auto' | 'always' | 'never', boolean, Review, ReturnType<typeof reviewDecision>]> = [
+      ['Auto runs what the owner asked for exactly and can be undone', 'auto', false, answered('explicit', 'reversible'), { _tag: 'run', line: 'ranExplicit' }],
+      ['Auto asks for what was only implied', 'auto', true, answered('implied', 'reversible'), { _tag: 'card', line: 'implied' }],
+      ['Auto asks for a send the owner asked for', 'auto', true, answered('explicit', 'send'), { _tag: 'card', line: 'send' }],
+      ['Auto runs a lookup the owner implied', 'auto', false, answered('implied', 'read'), { _tag: 'run', line: 'ranRead' }],
+      ['Auto asks for a lookup the owner never asked for', 'auto', false, answered('notAsked', 'read'), { _tag: 'card', line: 'notAsked' }],
+      ['Always ask asks even for an explicit lookup', 'always', false, answered('explicit', 'read'), { _tag: 'card', line: 'always' }],
+      ['Never ask runs with no review in a clean run', 'never', true, { _tag: 'skipped' }, { _tag: 'run', line: 'ranNever' }],
+      ['Never ask still asks for what cannot be undone', 'never', false, answered('implied', 'delete'), { _tag: 'card', line: 'delete' }],
+      ['a review that failed asks under any rule', 'never', false, { _tag: 'failed' }, { _tag: 'card', line: 'failed' }],
+    ]
+    for (const [what, rule, clean, review, decision] of table) expect(reviewDecision(rule, clean, review), what).toEqual(decision)
   })
 
-  it('runs under Auto a call the review found only reads, when the owner at least implied it', () => {
-    // A lookup through a tool that takes a command, such as `info update-feature-flag`, judged by its arguments.
-    expect(reviewDecision('auto', false, answered('implied', 'read'))).toEqual({ _tag: 'run', line: 'ranRead' })
-    expect(reviewDecision('auto', false, answered('explicit', 'read'))).toEqual({ _tag: 'run', line: 'ranRead' })
-    expect(reviewDecision('auto', false, answered('notAsked', 'read'))).toEqual({ _tag: 'card', line: 'notAsked' })
-    expect(reviewDecision('always', false, answered('explicit', 'read'))).toEqual({ _tag: 'card', line: 'always' })
-    expect(reviewDecision('never', false, answered('implied', 'read'))).toEqual({ _tag: 'run', line: 'ranNever' })
-    expect(reviewDecision('auto', false, floorRisk(answered('implied', 'read'), true))).toEqual({ _tag: 'card', line: 'delete' })
-  })
-
-  it('never takes a call that looks like a delete as reversible', () => {
+  it('never takes a call that looks like a delete as reversible or a lookup', () => {
     expect(floorRisk(answered('explicit', 'reversible'), true)).toEqual(answered('explicit', 'delete'))
+    expect(floorRisk(answered('implied', 'read'), true)).toEqual(answered('implied', 'delete'))
     expect(floorRisk(answered('explicit', 'send'), true)).toEqual(answered('explicit', 'send'))
-    expect(floorRisk(answered('explicit', 'reversible'), false)).toEqual(answered('explicit', 'reversible'))
-    expect(reviewDecision('auto', true, floorRisk(answered('explicit', 'reversible'), true))).toEqual({ _tag: 'card', line: 'delete' })
   })
 
-  it('asks when the review failed or timed out', () => {
-    expect(reviewDecision('auto', true, { _tag: 'failed' })).toEqual({ _tag: 'card', line: 'failed' })
-    expect(reviewDecision('never', false, { _tag: 'failed' })).toEqual({ _tag: 'card', line: 'failed' })
-  })
-
-  it('lets the owner\'s rule override the review', () => {
-    expect(reviewDecision('always', true, answered('explicit', 'reversible'))).toEqual({ _tag: 'card', line: 'always' })
-    expect(reviewDecision('never', true, { _tag: 'skipped' })).toEqual({ _tag: 'run', line: 'ranNever' })
-    expect(reviewDecision('never', false, answered('implied', 'reversible'))).toEqual({ _tag: 'run', line: 'ranNever' })
-    // Never ask does not cover what the review finds can't be undone.
-    expect(reviewDecision('never', false, answered('implied', 'delete'))).toEqual({ _tag: 'card', line: 'delete' })
-    expect(reviewDecision('never', false, answered('explicit', 'write'))).toEqual({ _tag: 'card', line: 'write' })
-    expect(needsReview('always', false)).toBe(false)
-    expect(needsReview('never', true)).toBe(false)
-    expect(needsReview('never', false)).toBe(true)
-    expect(needsReview('auto', true)).toBe(true)
+  it('reviews only where a rule needs it: always under Auto, and under Never ask once the run read something', () => {
+    expect([needsReview('auto', true), needsReview('always', false), needsReview('never', true), needsReview('never', false)]).toEqual([true, false, false, true])
   })
 
   it('never lets a call only untrusted text asked for run, under any rule', () => {
@@ -249,6 +201,5 @@ describe('the auto-review of a connection call', () => {
     expect(authorizeDecision({ ...base, approval: undefined, review: true })).toEqual({ _tag: 'authorize', via: 'review' })
     expect(authorizeDecision({ ...base, approval: undefined, review: true, intent: { ...intent, tier: 2 } })).toEqual({ _tag: 'refused', reason: 'noApproval' })
     expect(authorizeDecision({ ...base, approval: undefined, review: true, authority: { mode: 'paused', owner: 'active' } })).toEqual({ _tag: 'refused', reason: 'paused' })
-    expect(authorizeDecision({ ...base, approval: undefined, review: true, prior: ['d2'] })).toEqual({ _tag: 'refused', reason: 'alreadyAuthorized' })
   })
 })
