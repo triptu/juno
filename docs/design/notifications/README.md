@@ -18,11 +18,11 @@ The first step that applies decides:
 3. **Never**, or an ignored channel, stays. A direct mention of the owner by name, or of a group they are in, still notifies. @here and @channel do not.
 4. **Always notify** switches: Direct messages, Group DMs, Mentions (on by default), Threads you started and Threads you follow.
 5. **AI assist off:** DMs and mentions notify, as in Slack.
-6. **Auto:** a closer ("thanks", "ok") after the owner's own message stays; a reply within 10 minutes of the owner writing in the conversation notifies; otherwise Juno reads it.
+6. **Auto:** a closer ("thanks", "ok") after the owner's own message stays; a message in a group DM, thread or channel that names someone else and not the owner stays ("Asks Dev, not you."); a reply within 10 minutes of the owner writing in the conversation notifies; otherwise Juno reads it.
 
-Then, after a banner, the same conversation does not notify again for one minute.
+Then, messages that arrive within 10 seconds of a banner for the same conversation do not notify again. A later message is decided on its own.
 
-**Juno's reading** is one decision-classifier call. It asks which of the owner's instructions the message is mainly about, and whether it needs the owner: an ask, an answer to the owner's question, a follow-up, a decision, something serious, or else a greeting, an update or chatter. A clear instruction decides. Otherwise the first five kinds notify and the rest stay. With no answer within 2 seconds, DMs and mentions notify.
+**Juno's reading** is one decision-classifier call. It asks which of the owner's instructions the message is mainly about, and whether it needs the owner: an ask, an answer to the owner's question, a follow-up, a decision, something serious, or else a greeting, an update or chatter. A clear instruction decides. Otherwise answers, follow-ups and serious matters notify. An ask notifies in a DM or group DM, or in a thread the owner started, wrote last in or is named in. A decision notifies only in the owner's own thread. The rest stay. With no answer within 2 seconds, DMs and mentions notify.
 
 **Your instructions** replace the What matters to you text. Each is one line with a direction the owner picks, Notify me or Don't notify. An instruction that is really about one person or channel is offered as a setting instead, since a setting is exact.
 

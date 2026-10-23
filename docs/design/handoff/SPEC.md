@@ -677,12 +677,13 @@ Everything is always visible when you open Juno. Notification settings only deci
 3. **Never** on the thread, channel or person, or an ignored channel: it stays. A direct mention of you by name, or of a group you are in, still notifies. @here and @channel do not get through Never or an ignored channel.
 4. **Always notify:** a switch that is on and matches the message: it notifies.
 5. **AI assist off:** DMs and mentions notify, as in Slack. Everything else stays.
-6. **Auto**, in three steps:
-   1. **Closer.** The message is only a closer, and you wrote the message before it in the conversation: it stays. A closer is emoji only, or one of these, at most three words, ignoring case and trailing punctuation: thanks, thank you, ty, thx, got it, ok, okay, k, cool, great, perfect, sounds good, will do, np, no worries. "thanks, can you approve?" is not a closer.
-   2. **Live conversation.** You wrote in this conversation in the last 10 minutes, and the message is from someone else: it notifies. A conversation is one topic: a thread, or a channel's or DM's Main.
-   3. **Juno's reading** (below).
+6. **Auto**, in four steps:
+   1. **Closer.** The message is only a closer, and you wrote the message before it in the conversation: it stays. A closer is emoji only, or one of these, at most three words, ignoring case and trailing punctuation: thanks, thank you, ty, thx, got it, ok, okay, k, sure, yep, cool, great, nice, perfect, sounds good, will do, np, no worries. "thanks, can you approve?" is not a closer.
+   2. **Addressed to someone else.** In a group DM, thread or channel, the message mentions another person by name and mentions neither you nor a group you are in: it stays. The reason says "Asks Dev, not you."
+   3. **Live conversation.** You wrote in this conversation in the last 10 minutes, and the message is from someone else: it notifies. A conversation is one topic: a thread, or a channel's or DM's Main.
+   4. **Juno's reading** (below).
 
-**Bursts.** After a banner for a conversation, more messages in that conversation do not notify for one minute. A banner already shown is never updated or replaced.
+**Bursts.** Messages in a conversation that arrive within 10 seconds of a banner for it do not notify again. A later message is decided on its own, so a new question still notifies. A banner already shown is never updated or replaced.
 
 **Juno's reading** is one call to the decision classifier (section 15). It reads:
 
@@ -701,16 +702,17 @@ It answers two questions:
 How the answers apply:
 
 - A Notify me instruction chosen with a confidence of at least 0.7: it notifies. A Don't notify instruction chosen with a confidence of at least 0.85: it stays. Don't notify needs more confidence because missing a message that needed you costs more than one extra banner.
-- Otherwise it notifies when the first five answers to Does it need you (asks, answers, follows up, decision, serious) have a total probability of at least 0.5. Else it stays.
+- Otherwise it notifies when the answers that count have a total probability of at least 0.5. Else it stays. Answers, follow-ups and serious matters always count. An ask counts in a DM or group DM, and in a thread or channel only when you started the thread, wrote the message before it, or are named in it, so a question to the whole room in someone else's thread stays. A decision counts only in a thread you started, so a discussion or proposal elsewhere stays.
 - These three numbers are named constants, set from labelled replays of real decisions.
 - When the classifier gives no answer within 2 seconds, or fails, DMs and mentions notify and the rest stays.
 
-- **Why.** Juno keeps each decision with what decided it (hours, Always, Never, ignored, direct mention, Always notify, AI assist off, closer, live conversation, instruction, reading, timeout or burst) and a one-line reason. The reason is built from facts and the chosen answer, never from generated text:
+- **Why.** Juno keeps each decision with what decided it (hours, Always, Never, ignored, direct mention, Always notify, AI assist off, closer, addressed to someone else, live conversation, instruction, reading, timeout or burst) and a one-line reason. The reason is built from facts and the chosen answer, never from generated text:
   - "Outside your notification hours."
   - "#design is set to Always." or "#random is set to Never."
   - "Mentions you by name. That gets through Never." or "Mentions you by name. That gets through ignored channels."
   - "Direct messages always notify.", "Mentions always notify.", "A reply in a thread you started." or "A reply in a thread you follow."
   - "Maya thanked you. Nothing to do."
+  - "Asks Dev, not you."
   - "You were talking with Priya 2 minutes ago."
   - "Your instructions: Don't notify: social plans", quoting the instruction with its direction.
   - From the reading: "Sam asks you something.", "Lena answered your question.", "Dev is following up, and you haven't replied.", "A decision is being made in #launch.", "Something serious in #incidents, and you're part of it.", "Sam said hello. Nothing asked yet.", "An update with nothing asked of you." or "Talk you're not part of."
@@ -746,7 +748,7 @@ A huddle someone starts where you are follows the notification hours and the lev
 4. **Always notify**, sub "These notify inside your hours, whatever they say. Turn them all on to be notified the way Slack does by default.", with the five switches.
 5. **Your instructions**, sub "For each instruction, choose Notify me or Don't notify, then describe it in your own words. Juno follows them when it reads messages on Auto. If one is about a single person or channel, Juno offers to make it a setting instead." Each instruction is a row: a Notify me or Don't notify segmented control, its text (edited in place) and Remove. Under the rows is an add row with the same control, a text field and **Add**. The field and Add stay disabled until a direction is chosen. The found-rule line shows under the instruction it is about. With AI assist off, a line under the sub says "AI assist is off. DMs and mentions notify you." and the list stays editable.
 6. **People, channels and threads**, sub "Set from any conversation's menu: Notify me › Always, Auto or Never. Everything else is on Auto." Two rows: **Always**, "Notifies for every message, inside your hours.", and **Never**, "No notifications. A direct mention of you or a group you're in still notifies. Ignored channels work the same way.", where "Ignored channels" links to Settings › Ignored. Each row holds its people, channels and threads as tags with Remove, and **Add…**, which opens a searchable list of people and channels.
-7. **How Auto decides**, a short box: "For everything on Auto, Juno checks in this order:" then three numbered lines. "**Closers.** "thanks", "ok" and the like don't notify." "**Conversations you're in.** If you wrote in the last 10 minutes, replies notify." "**Juno reads it.** If it clearly falls under your instructions, Juno does what they say. Otherwise, asks, answers to your questions, follow-ups you haven't answered, decisions you should weigh in on and serious problems notify. Greetings, updates and chatter stay in Juno."
+7. **How Auto decides**, a short box: "For everything on Auto, Juno checks in this order:" then four numbered lines. "**Closers.** "thanks", "ok" and the like don't notify." "**Messages to someone else.** A message that names someone else and not you doesn't notify." "**Conversations you're in.** If you wrote in the last 10 minutes, replies notify." "**Juno reads it.** If it clearly falls under your instructions, Juno does what they say. Otherwise, questions to you, answers to your questions, follow-ups you haven't answered, decisions in threads you started and serious problems notify. Greetings, updates and chatter stay in Juno."
 8. **Today**, the line and Details (above).
 9. **Huddles**, with Ring for huddles, then **Test notification**.
 

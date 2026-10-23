@@ -679,8 +679,9 @@ The Backup folder path is measured in its rendered font and cut in the middle to
 
 - A box: radius 10, bg `--surface-hover`, padding `12 14`, 13 lh 1.55. "For everything on Auto, Juno checks in this order:" then a numbered list:
   1. "**Closers.** "thanks", "ok" and the like don't notify."
-  2. "**Conversations you're in.** If you wrote in the last 10 minutes, replies notify."
-  3. "**Juno reads it.** If it clearly falls under your instructions, Juno does what they say. Otherwise, asks, answers to your questions, follow-ups you haven't answered, decisions you should weigh in on and serious problems notify. Greetings, updates and chatter stay in Juno."
+  2. "**Messages to someone else.** A message that names someone else and not you doesn't notify."
+  3. "**Conversations you're in.** If you wrote in the last 10 minutes, replies notify."
+  4. "**Juno reads it.** If it clearly falls under your instructions, Juno does what they say. Otherwise, questions to you, answers to your questions, follow-ups you haven't answered, decisions in threads you started and serious problems notify. Greetings, updates and chatter stay in Juno."
 
 **Today** (no sub)
 
@@ -700,7 +701,7 @@ The Backup folder path is measured in its rendered font and cut in the middle to
 
 [built M10] `NotificationsPage` in `@juno/views`, Settings › Notifications (§14), opened from the avatar menu's Notifications or the section list. Hours selects are named "Notifications from", "Active in Slack to" and so on, and the day toggles are `DayToggles` in `@juno/ui` (Monday first). A change to the hours saves at once. The macOS permission line is `PermissionLine` in `@juno/views`. [not built, v2 10-23] Notification hours and Active in Slack as two sections, Always notify, Your instructions, the Always and Never labels, How Auto decides, the Today line with Details, the why under a row, the Slack line under the hours row in place of the Slack on your phone card, and the Notify me menu's How Auto decides….
 
-**Decision** (`@juno/domain` `decideNotification`), SPEC 14, "The order": outside notification hours → Always (thread, channel or person; beats Never) → Never or ignored, unless the message mentions the user by name or a group they are in (`mentionsMeDirectly`) → Always notify switches → AI assist off (DMs and mentions) → Auto: closer → live conversation → Juno's reading; then the one-minute burst rule. Each decision is stored with its `decidedBy` and a reason from SPEC 14, "Why" ("#incidents is set to Always.", "Maya thanked you. Nothing to do.", "Sam asks you something.").
+**Decision** (`@juno/domain` `decideNotification`), SPEC 14, "The order": outside notification hours → Always (thread, channel or person; beats Never) → Never or ignored, unless the message mentions the user by name or a group they are in (`mentionsMeDirectly`) → Always notify switches → AI assist off (DMs and mentions) → Auto: closer → addressed to someone else → live conversation → Juno's reading; then the 10-second burst rule. Each decision is stored with its `decidedBy` and a reason from SPEC 14, "Why" ("#incidents is set to Always.", "Maya thanked you. Nothing to do.", "Sam asks you something.").
 
 ## 14. Settings
 
