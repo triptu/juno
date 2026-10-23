@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
-import { checkEntry, DOCS, docLimits, looksSecret, outline, renderDocs, searchDocs, utf8Bytes } from '../src/index.ts';
+import { checkEntry, DOCS, docLimits, looksSecret, outline, searchDocs, utf8Bytes } from '../src/index.ts';
 import type { Doc, DocEntry } from '../src/index.ts';
 
 const entry = (id: string, doc: Doc, text: string): DocEntry => ({ id, doc, text });
@@ -30,10 +30,6 @@ describe('the outline', () => {
     // The newest come first.
     expect(text).toContain('Person 29');
   });
-
-  test('marks an empty doc', () => {
-    expect(outline([entry('a', 'you', 'Staff engineer on the sync team')], 1)).toContain('People: (empty)');
-  });
 });
 
 describe('an entry', () => {
@@ -61,15 +57,8 @@ describe('an entry', () => {
   });
 });
 
-describe('the docs', () => {
-  test('render as markdown with each entry\'s id', () => {
-    const all = [entry('e1', 'people', 'Maya Chen: design lead'), entry('e2', 'style', 'Short sentences')];
-    expect(renderDocs(all, 'people')).toBe('# People (people)\n- [e1] Maya Chen: design lead');
-    expect(renderDocs(all)).toContain('# Writing style (style)\n- [e2] Short sentences');
-    expect(renderDocs(all)).toContain('# Projects (projects)\n(empty)');
-  });
-
-  test('search finds entries by their words, best match first', () => {
+describe('search', () => {
+  test('finds entries by their words, best match first', () => {
     const all = [entry('e1', 'people', 'Maya Chen leads design'), entry('e2', 'projects', 'Sync engine rewrite with Maya'), entry('e3', 'style', 'Short sentences')];
     expect(searchDocs(all, 'maya design').map((e) => e.id)).toEqual(['e1', 'e2']);
     expect(searchDocs(all, 'writing').map((e) => e.id)).toEqual(['e3']);

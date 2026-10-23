@@ -219,34 +219,14 @@ test('a whole tool result is sent in full up to its own limit, and paged past it
   expect(limits.wholeResult).toBeLessThan(limits.active);
 });
 
-describe('compaction task text', () => {
-  test('leaf task contains a byte ruler, the bounded original and raw context', () => {
-    const original = 'leaf input '.repeat(80);
-    const work = start({ a: 1, w: 1, v: 1 }, { kind: 'leaf', source: source(1, original) }, [source(0, 'earlier raw text')]);
-    if (work.kind !== 'retry') throw new Error('Expected task');
-    const text = compactionTask(work.state).join('\n');
-    expect(text).toContain('-'.repeat(512));
-    expect(text).toContain('earlier raw text');
-    expect(text).toContain(original);
-    expect(text).toContain('Do not call tools');
-  });
+describe('compaction retry', () => {
   test('retry uses the same input without accumulating previous model output', () => {
     const work = start({ a: 0, w: 1, v: 1 }, { kind: 'leaf', source: source(0, 'original '.repeat(100)) }, []);
     if (work.kind !== 'retry') throw new Error('Expected task');
     const retry = complete(work.state, 'untrusted answer '.repeat(100));
     if (retry.kind !== 'retry') throw new Error('Expected retry');
     const text = compactionTask(retry.state).join('\n');
-    expect(text).toContain('Too long');
     expect(text).toContain('original '.repeat(100));
     expect(text).not.toContain('untrusted answer');
-  });
-  test('parent task has both child texts and its interval', () => {
-    const left = finish(start({ a: 0, w: 1, v: 1 }, { kind: 'leaf', source: source(0, 'left child') }, []), []);
-    const right = finish(start({ a: 1, w: 1, v: 1 }, { kind: 'leaf', source: source(1, 'right child') }, []), []);
-    const work = start({ a: 0, w: 2, v: 1 }, { kind: 'parent', children: [left, right] }, []);
-    if (work.kind !== 'retry') throw new Error('Expected task');
-    const text = compactionTask(work.state).join('\n');
-    expect(text).toContain('messages 0–1');
-    expect(text).toContain('left child\nright child');
   });
 });

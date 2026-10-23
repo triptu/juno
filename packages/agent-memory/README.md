@@ -32,6 +32,6 @@ The compatibility bound includes fixed compaction task space, raw context, both 
 
 ## Testing
 
-From the root, run `bun run --cwd packages/agent-memory test`. Its script takes the machine-wide heavy-job lock, including when called through `bun run test`.
+Run `bun test` here, or `bun run --cwd packages/agent-memory test` from the root.
 
-The tests use the public API: six safety properties (exact closure, local taint, cutoff, node size, parent input, and request partition/budget), due order against independent rollback push at every t from 0 through 20,000, and three compaction task examples. fast-check and Vitest are development dependencies; `juno.testDeps` applies only to workspace package edges.
+The tests use the public API: six safety properties (exact closure, local taint, cutoff, node size, parent input, and request partition/budget), due order against independent rollback push at every t from 0 through 20,000, and a retry that never feeds model output back. For the docs and people files they cover the outline byte budget and its determinism, refusing keys and passwords, refusing sensitive details Juno did not hear from the owner, which people a run names, and splitting the People doc. fast-check is a development dependency; `juno.testDeps` applies only to workspace package edges.
