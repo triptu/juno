@@ -1,0 +1,1 @@
+- 10-23 23:35 · slack-schedule-always · The Pause Slack switch and Restore are removed: Juno always writes its hours to Slack's schedule under the existing rules, and Use Juno's hours is its own route. Stored enabled and saved values are left unread (owner).
