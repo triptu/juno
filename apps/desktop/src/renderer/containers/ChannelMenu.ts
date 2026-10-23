@@ -12,6 +12,7 @@ import { scopeToChannel, type MenuChannel } from './placeMenus'
 import { huddleMenuItem, joinHuddleFromMenu } from './huddle/menuItem'
 import { askJunoAbout } from './juno/actions'
 import { openTopic } from './navigation'
+import { openNotificationsAt } from './notificationsAnchor'
 import { choiceFor, nativeMenu, setNotifyLevel } from './notifyActions'
 import { runViewMenuAction, viewChoices } from './viewActions'
 
@@ -39,6 +40,7 @@ export async function showChannelMenu(channel: MenuChannel, at?: ContextMenuAt):
 
 async function runChannelAction(chosen: ChannelMenuAction, channel: MenuChannel, target: NotifyTargetView): Promise<void> {
   if (isNotify(chosen)) return setNotifyLevel(target, notifyChoiceOf(chosen), channel.label)
+  if (chosen === 'how-auto') return openNotificationsAt('how-auto')
   if (isViewMenuAction(chosen)) return runViewMenuAction(chosen, channel)
   switch (chosen) {
     case 'show-topics':

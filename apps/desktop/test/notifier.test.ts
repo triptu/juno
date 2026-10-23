@@ -4,9 +4,9 @@
  * fake Electron notification and dock.
  */
 import { afterEach, expect, it } from 'vitest'
-import { notificationsSetLevel, readsMarkRead, type MainToEngine, type NotificationTarget } from '@juno/contract'
-import { runCommand } from '@juno/state'
-import { Exit } from 'effect'
+import { notificationsDecisions, notificationsPage, notificationsSetLevel, prefsSet, readsMarkRead, type MainToEngine, type NotificationDecisions, type NotificationsPage, type NotificationTarget } from '@juno/contract'
+import { liveQuery, runCommand } from '@juno/state'
+import { Exit, Schema } from 'effect'
 import { bootedEngine, readDb } from '../../../packages/engine/test/scenario'
 import { waitFor, type RunningEngine } from '../../../packages/engine/test/harness'
 import { HIDDEN_BODY, Notifier } from '../src/main/notifier'
@@ -62,8 +62,15 @@ it('shows what the engine decides, opens the message on click, hides the topic o
   const engine = await bootedEngine(engines)
   const main = connect(engine)
 
-  const set = await runCommand(engine.registry, notificationsSetLevel, { target: { kind: 'channel', id: 'D0MAYA' }, choice: 'every' })
-  expect(Exit.isSuccess(set) && set.value).toEqual({ undo: { _tag: 'notifications.setLevel', target: { kind: 'channel', id: 'D0MAYA' }, choice: 'matters' } })
+  // Hours around now: nothing notifies outside them, not even Always.
+  const minute = new Date().getHours() * 60 + new Date().getMinutes()
+  const hours = { days: [0, 1, 2, 3, 4, 5, 6], from: (minute + 1380) % 1440, to: (minute + 60) % 1440 }
+  await runCommand(engine.registry, prefsSet, { key: 'notifications', value: Schema.decodeUnknownSync(Schema.Json)({
+    notificationHours: hours, presenceHours: hours, channels: {}, people: {},
+  }) })
+  await runCommand(engine.registry, notificationsSetLevel, { target: { kind: 'channel', id: 'D0SAM' }, choice: 'always' })
+  const set = await runCommand(engine.registry, notificationsSetLevel, { target: { kind: 'channel', id: 'D0MAYA' }, choice: 'always' })
+  expect(Exit.isSuccess(set) && set.value).toEqual({ undo: { _tag: 'notifications.setLevel', target: { kind: 'channel', id: 'D0MAYA' }, choice: 'auto' } })
 
   const first = engine.fake.injectMessage({ channel: 'D0MAYA', user: 'U0MAYA', text: 'Can you look at the draft?' })
   await waitFor(() => (main.shown.length === 1 ? true : undefined), 15_000, 'the first notification')
@@ -71,18 +78,30 @@ it('shows what the engine decides, opens the message on click, hides the topic o
   main.shown[0]?.click()
   expect(main.opened).toEqual([{ _tag: 'message', source: { channelId: 'D0MAYA', ts: first.ts, topicId: 'm:D0MAYA' } }])
 
-  // The DM is on screen in a focused window: decided, logged, not shown.
-  main.notifier.setViewing('m:D0MAYA')
-  const second = engine.fake.injectMessage({ channel: 'D0MAYA', user: 'U0MAYA', text: 'Never mind, found it' })
+  // Sam's DM is on screen in a focused window: decided, logged, not shown. (Maya's DM stays quiet for a minute after its banner.)
+  main.notifier.setViewing('m:D0SAM')
+  const second = engine.fake.injectMessage({ channel: 'D0SAM', user: 'U0SAM', text: 'Never mind, found it' })
   await waitFor(() => readDb(engine, 'user.db', (db) => db.prepare('SELECT suppressed_at FROM notification_log WHERE ts = ?').get(second.ts))?.suppressed_at ?? undefined, 15_000, 'the suppressed row')
   expect(main.shown).toHaveLength(1)
   main.notifier.setViewing(null)
+  // Details shows the held banner as stayed, with why, and Today counts it the same way.
+  const decisionsAtom = liveQuery(notificationsDecisions)(undefined)
+  const pageAtom = liveQuery(notificationsPage)(undefined)
+  const unmount = [engine.registry.mount(decisionsAtom), engine.registry.mount(pageAtom)]
+  const held = await waitFor(() => {
+    const result = engine.registry.get(decisionsAtom) as { _tag: string; value?: NotificationDecisions }
+    return result.value?.decisions.find((row) => row.text === 'Never mind, found it')
+  }, 15_000, 'the held decision')
+  expect(held).toMatchObject({ outcome: 'stay', reason: 'You had the conversation open.' })
+  const page = await waitFor(() => (engine.registry.get(pageAtom) as { value?: NotificationsPage }).value, 15_000, 'the page')
+  expect(page.notified).toBe(main.shown.length)
+  for (const release of unmount) release()
 
   // Privacy mode: the notification still says who it is from, never what they wrote.
   main.setPrivacy(true)
-  engine.fake.injectMessage({ channel: 'D0MAYA', user: 'U0MAYA', text: 'The salary sheet is attached' })
+  engine.fake.injectMessage({ channel: 'D0SAM', user: 'U0SAM', text: 'The salary sheet is attached' })
   await waitFor(() => (main.shown.length === 2 ? true : undefined), 15_000, 'the notification in privacy mode')
-  expect(main.shown[1]).toMatchObject({ title: 'Maya', body: HIDDEN_BODY })
+  expect(main.shown[1]).toMatchObject({ title: expect.stringMatching(/^Sam/), body: HIDDEN_BODY })
   main.setPrivacy(false)
 
   // Reading all unread topics clears the badge; a new mention brings it back.
@@ -91,7 +110,7 @@ it('shows what the engine decides, opens the message on click, hides the topic o
   expect(main.badge()).toBe('•')
   for (const { topic_id } of mentioned) await runCommand(engine.registry, readsMarkRead, { id: topic_id })
   await waitFor(() => (main.badge() === '' ? true : undefined), 15_000, 'the badge to clear')
-  await runCommand(engine.registry, notificationsSetLevel, { target: { kind: 'channel', id: 'C0ENG' }, choice: 'every' })
+  await runCommand(engine.registry, notificationsSetLevel, { target: { kind: 'channel', id: 'C0ENG' }, choice: 'always' })
   engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: '<@U0TUSHAR> can you review the plan?' })
   await waitFor(() => (main.badge() === '•' ? true : undefined), 15_000, 'the dock badge')
 })

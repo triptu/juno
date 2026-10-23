@@ -39,8 +39,8 @@ it.effect('removes retired cards, summary scheduling and the AI title version wh
     assert.notInclude(columns.map((column) => column.name), 'summary_due_at')
     const overlay = yield* sql<{ name: string }>`PRAGMA table_info(topic_overlay)`
     assert.notInclude(overlay.map((column) => column.name), 'ai_title_version')
-    const held = yield* sql<{ outcome: string }>`SELECT outcome FROM notification_log WHERE channel = 'C1'`
-    assert.deepStrictEqual(held, [{ outcome: 'hold' }])
+    const stayed = yield* sql<{ outcome: string }>`SELECT outcome FROM notification_log WHERE channel = 'C1'`
+    assert.deepStrictEqual(stayed, [{ outcome: 'stay' }])
     const rows = yield* sql<{ value_json: string }>`SELECT value_json FROM prefs WHERE key = 'theme'`
     assert.strictEqual(rows[0]?.value_json, '"dark"')
   }).pipe(Effect.provide(freshStore)),

@@ -124,13 +124,18 @@ const frameHandler = (userId: string, sql: StoreReader['Service'], notifications
   const topicId = threadTs === undefined || threadTs === ts ? `m:${channel.id}` : `t:${channel.id}:${threadTs}`
   if (frame.type === 'message' && !mentionsMe && !isDm(channel.kind)) {
     const { settings } = yield* readSettings
-    if (settings.channels[channel.id] !== 'every' && settings.people[user ?? ''] !== 'every' && settings.threads?.[topicId] !== 'every') return
+    const always = settings.channels[channel.id] === 'always' || settings.people[user ?? ''] === 'always' || settings.threads?.[topicId] === 'always'
+    // A reply in a thread the owner follows or started is decided too, whether or not Slack also sends desktop_notification; (channel, ts) keeps one row.
+    const owned = !always && topicId.startsWith('t:') && (yield* sql`SELECT 1 FROM thread_subs WHERE channel = ${channel.id} AND thread_ts = ${threadTs ?? ''} AND subscribed = 1
+      UNION ALL SELECT 1 FROM started_threads WHERE channel = ${channel.id} AND root_ts = ${threadTs ?? ''} LIMIT 1`).length > 0
+    if (!always && !owned) return
   }
   // A group DM is named by its people, as the sidebar names it, not by Slack's "mpdm-…" name.
   const groupName = channel.kind === 'mpim' ? (yield* conversationLabel(channel.id))?.label : undefined
   yield* notifications.receive({ channel: { id: ChannelId.make(channel.id), kind: channel.kind,
     name: groupName ?? channel.person_name ?? channel.name ?? (channel.kind === 'im' ? UNKNOWN_PERSON : channel.id), ignored: channel.ignored === 1 },
-    senderId: UserId.make(user ?? ''), ...(channel.sender_name === null ? {} : { senderName: channel.sender_name }), mentionsMe, mentionsMeDirectly, ts, text: readableText(body),
+    senderId: UserId.make(user ?? ''), ...(channel.sender_name === null ? {} : { senderName: channel.sender_name }), mentionsMe, mentionsMeDirectly,
+    mentionsOthers: [...mentioned].filter((id) => id !== userId && id !== user).flatMap((id) => names.get(id) ?? []), ts, text: readableText(body),
     topicId })
 })
 
@@ -145,7 +150,7 @@ const sessionNotifications = (control: NotificationControl['Service'], host: Not
   }
   const notifications = yield* makeNotifications(notifier, (presence) => api.call('presence.set', { presence }, { lane: 'send' }).pipe(
     Effect.as(true), Effect.catch(() => Effect.succeed(false)),
-  ))
+  ), session.userId)
   yield* Effect.acquireRelease(control.attach(notifications), () => control.attach(undefined))
   const handle = frameHandler(session.userId, sql, notifications)
   // Re-read persisted preferences only when they change. The initial pass also catches missed starts.

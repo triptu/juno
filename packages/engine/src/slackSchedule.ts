@@ -1,15 +1,15 @@
 /**
  * Slack's own notification schedule from the notification hours (SPEC 14,
- * "Slack's notification schedule"; research section 7). On by default.
+ * "Slack's notification schedule"; research section 7). Always on.
  *
- * The state is the `slackSchedule` pref: whether Juno writes the schedule,
- * the schedule Slack held before Juno's first write (`saved`, for Restore),
- * and the hours and prefs Juno last applied. A pass runs, after a debounce,
+ * The state is the `slackSchedule` pref: whether the owner chose the hours,
+ * and the hours and prefs Juno last applied. Values stored before
+ * 2026-10-23 (`enabled`, `saved`) are left and not read. A pass runs, after a debounce,
  * when a pref or Slack's cached prefs change and when a catch-up ends, but
  * not before this session's first catch-up, so it reads Slack's prefs as
  * the boot left them. Nothing is written until the hours are the owner's
- * own on this install: set on the page (`hoursSet`) or confirmed by turning
- * the switch on, which sits under them (`hoursChosen`). Default hours never
+ * own on this install: set on the page (`hoursSet`) or confirmed with Use
+ * Juno's hours (`hoursChosen`). Default hours never
  * reach Slack, so a fresh or dev install leaves the schedule alone.
  * After that, it writes only when the notification hours differ
  * from the hours it last applied, and only when Slack does not hold the
@@ -19,7 +19,7 @@
  * page says it no longer matches.
  *
  * A top-level module like `notificationRuntime.ts`: the notifications
- * feature serves the switch and Restore through it.
+ * feature serves Use Juno's hours through it.
  */
 import { observeWork, workWakes } from './workControl'
 import { Context, Duration, Effect, Layer, Ref, Schema, Semaphore, Stream } from 'effect'
@@ -28,7 +28,7 @@ import { slackScheduleFor, slackScheduleKeys, slackScheduleMatches, slackSchedul
 import { NotificationSettingsSchema, readSettings } from '@juno/notifications'
 import { invalidate, liveQuery, prefs, StoreReader, StoreWriter, transaction, type SqlError } from '@juno/store'
 import { EngineTiming } from './config'
-import { Outbox, type MirrorError } from './outbox'
+import { Outbox } from './outbox'
 import { SyncLink } from './syncLink'
 import { Workspace, type StoreServices } from './workspace'
 
@@ -36,11 +36,8 @@ const PREF = 'slackSchedule'
 
 const SchedulePrefs = Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Boolean]))
 const State = Schema.Struct({
-  enabled: Schema.Boolean,
-  /** The owner set the notification hours on this install, or turned the switch on. Until then nothing is written. */
+  /** The owner set the notification hours on this install, or chose Use Juno's hours. Until then nothing is written. */
   hoursChosen: Schema.optionalKey(Schema.Boolean),
-  /** Slack's schedule before Juno's first write. */
-  saved: Schema.optionalKey(SchedulePrefs),
   /** The notification hours Juno last applied. */
   appliedFor: Schema.optionalKey(NotificationSettingsSchema.fields.notificationHours),
   /** The prefs Juno last applied. */
@@ -50,7 +47,7 @@ type State = typeof State.Type
 
 const readState = Effect.gen(function* () {
   const raw = yield* prefs.get(PREF)
-  return yield* Schema.decodeUnknownEffect(State)(raw ?? { enabled: true }).pipe(Effect.catch(() => Effect.succeed<State>({ enabled: true })))
+  return yield* Schema.decodeUnknownEffect(State)(raw ?? {}).pipe(Effect.catch(() => Effect.succeed<State>({})))
 })
 
 const writeState = (state: State) => transaction(prefs.set(PREF, state))
@@ -81,19 +78,17 @@ const sameHours = (a: Hours, b: Hours) => a.from === b.from && a.to === b.to && 
 export const slackScheduleView: Effect.Effect<SlackScheduleView, SqlError, StoreServices> = Effect.gen(function* () {
   const state = yield* readState
   const cached = yield* cachedPrefs
-  const changedInSlack = state.enabled && state.applied !== undefined && cached !== undefined && !slackScheduleMatches(cached, state.applied)
-  return { enabled: state.enabled, canRestore: state.saved !== undefined, changedInSlack, waitingForHours: state.enabled && state.hoursChosen !== true }
+  const changedInSlack = state.applied !== undefined && cached !== undefined && !slackScheduleMatches(cached, state.applied)
+  return { changedInSlack, waitingForHours: state.hoursChosen !== true }
 })
 
 export class SlackSchedule extends Context.Service<
   SlackSchedule,
   {
-    /** On: apply the notification hours once now, and on every change. Off: leave Slack's schedule as it is. */
-    readonly setEnabled: (enabled: boolean) => Effect.Effect<void, SqlError, StoreServices>
+    /** Use Juno's hours: apply the notification hours once now, even unchanged, over a schedule changed in Slack. */
+    readonly useJunoHours: Effect.Effect<void, SqlError, StoreServices>
     /** The owner set the notification hours: from now on they may reach Slack. */
     readonly hoursSet: Effect.Effect<void, SqlError, StoreServices>
-    /** Writes the saved schedule back to Slack and turns the switch off. Nothing to do without a saved one. */
-    readonly restore: Effect.Effect<void, SqlError | MirrorError, StoreServices>
   }
 >()('juno/engine/SlackSchedule') {
   static readonly layer: Layer.Layer<SlackSchedule, never, Workspace | Outbox | SyncLink> = Layer.effect(
@@ -103,7 +98,7 @@ export class SlackSchedule extends Context.Service<
       const workspace = yield* Workspace
       const outbox = yield* Outbox
       const link = yield* SyncLink
-      // Passes, the switch and Restore run one at a time, so Restore never races a write.
+      // Passes and Use Juno's hours run one at a time.
       const lock = yield* Semaphore.make(1)
       const caughtUp = yield* Ref.make(false)
 
@@ -113,21 +108,20 @@ export class SlackSchedule extends Context.Service<
       const pass = Effect.gen(function* () {
         if (!(yield* Ref.get(caughtUp))) return
         const state = yield* readState
-        if (!state.enabled || state.hoursChosen !== true) return
+        if (state.hoursChosen !== true) return
         const hours = (yield* readSettings).settings.notificationHours
         if (state.appliedFor !== undefined && sameHours(state.appliedFor, hours)) return
         const cached = yield* cachedPrefs
         if (cached === undefined) return
         const target = slackScheduleFor(hours)
-        // The cache can be behind Slack: read the schedule itself before saving it or writing over it.
+        // The cache can be behind Slack: read the schedule itself before writing over it.
         // When it already matches, nothing is written, and after this session's boot it is Slack's.
         const current = slackScheduleMatches(cached, target)
           ? cached
           : (yield* outbox.lookup((api) => api.call('users.prefs.get', { prefs: slackScheduleKeys.join(',') }))).prefs
-        const saved = state.saved ?? slackScheduleSnapshot(current)
         if (!slackScheduleMatches(current, target)) yield* write(target)
         else if (current !== cached) yield* storePrefs(slackScheduleSnapshot(current))
-        yield* writeState({ ...state, saved, appliedFor: hours, applied: target })
+        yield* writeState({ ...state, appliedFor: hours, applied: target })
       }).pipe(
         Effect.catch((error) =>
           error._tag === 'Rejected'
@@ -157,20 +151,12 @@ export class SlackSchedule extends Context.Service<
       yield* Effect.forkScoped(Stream.runForEach(workspace.changes, () => Ref.set(caughtUp, false)))
 
       return SlackSchedule.of({
-        setEnabled: (enabled) =>
-          Effect.gen(function* () {
-            const state = yield* readState
-            // Turning it on applies the hours once, even when they did not change.
-            const { appliedFor: _, ...rest } = state
-            yield* writeState(enabled ? { ...rest, enabled, hoursChosen: true } : { ...state, enabled })
-          }).pipe(lock.withPermit),
-        hoursSet: readState.pipe(Effect.flatMap((state) => state.hoursChosen === true ? Effect.void : writeState({ ...state, hoursChosen: true })), lock.withPermit),
-        restore: Effect.gen(function* () {
-          const state = yield* readState
-          if (state.saved === undefined) return
-          yield* write(state.saved)
-          yield* writeState({ enabled: false })
+        useJunoHours: Effect.gen(function* () {
+          // Forgetting what was applied makes the next pass write the hours, even unchanged.
+          const { appliedFor: _, ...rest } = yield* readState
+          yield* writeState({ ...rest, hoursChosen: true })
         }).pipe(lock.withPermit),
+        hoursSet: readState.pipe(Effect.flatMap((state) => state.hoursChosen === true ? Effect.void : writeState({ ...state, hoursChosen: true })), lock.withPermit),
       })
     }),
   )

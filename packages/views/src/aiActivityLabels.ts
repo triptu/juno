@@ -12,6 +12,9 @@ const FEATURES: Record<string, string> = {
   automatedChannel: 'Automated channel check',
   parseCommand: 'Search command',
   routeCheck: 'Wrong-place check',
+  notificationReading: 'Notification check',
+  instructionRule: 'Instruction check',
+  // Calls from before the notification reading, still in the last 500.
   urgencyGate: 'Notification check',
   chat: 'Juno chat turn',
   subagent: 'Juno background job',

@@ -37,7 +37,7 @@ it.effect('holds an early DM until its read state is known, and shares All exclu
     yield* reindex
     assert.isTrue(yield* badge, 'a mention breaks through the exclusion')
     const never = badgeStatement(badgePolicy({ ...defaultNotificationSettings, people: { U0OTHER: 'never' } }, { aiAssist: false, at: { weekday: 1, minutes: 600 } }), 'U0SELF')
-    const denied = yield* reader.unsafe<{ active: number }>(never.sql, never.params)
-    assert.strictEqual(denied[0]?.active, 0, 'a Never sender stays silent')
+    const through = yield* reader.unsafe<{ active: number }>(never.sql, never.params)
+    assert.strictEqual(through[0]?.active, 1, 'a direct mention gets through a Never sender')
   }).pipe(Effect.provide(freshStore)),
 )

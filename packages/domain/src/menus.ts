@@ -23,9 +23,10 @@ export type TopicMenuAction =
   | ViewMenuAction
   | 'ignore-channel'
   | 'juno-knows'
+  | 'how-auto'
 
-export type ChannelMenuAction = 'show-topics' | 'open-main' | 'huddle' | 'mark-channel-read' | 'mark-channel-unread' | NotifyAction | ViewMenuAction | 'ignore-channel' | 'ask-juno'
-export type PersonMenuAction = 'ask-juno' | 'juno-knows'
+export type ChannelMenuAction = 'show-topics' | 'open-main' | 'huddle' | 'mark-channel-read' | 'mark-channel-unread' | NotifyAction | 'how-auto' | ViewMenuAction | 'ignore-channel' | 'ask-juno'
+export type PersonMenuAction = 'ask-juno' | 'juno-knows' | 'how-auto'
 
 /** Add to view (inventory 15.8): add to or remove from a view by id, or a new view with the conversation in it. */
 export type ViewMenuAction = `view-add:${string}` | `view-remove:${string}` | 'view-new'
@@ -37,30 +38,30 @@ export type MenuItem<A extends string> =
 
 /**
  * Notify me (spec sections 5 and 14, inventory 15.3). On a thread the
- * choice is also how you follow it: Every message and When it matters
- * follow it in Slack, Never unfollows it.
+ * choice is also how you follow it: Always and Auto follow it in Slack,
+ * Never unfollows it.
  */
-export type NotifyChoice = NotifyLevel | 'matters'
-export type NotifyAction = 'notify-every' | 'notify-matters' | 'notify-never'
+export type NotifyChoice = NotifyLevel | 'auto'
+export type NotifyAction = 'notify-always' | 'notify-auto' | 'notify-never'
 
-const notifyLabels: Record<NotifyChoice, string> = { every: 'Every message', matters: 'When it matters', never: 'Never' }
+const notifyLabels: Record<NotifyChoice, string> = { always: 'Always', auto: 'Auto', never: 'Never' }
 
 /**
- * A thread's Notify me choice: Never when you do not follow it in Slack,
- * else Every message when its level says so, else When it matters.
+ * A thread's Notify me choice: Never when its level is Never or you do not
+ * follow it in Slack, else Always when its level says so, else Auto.
  */
 export function threadNotifyChoice(subscribed: boolean, level?: NotifyLevel): NotifyChoice {
-  return !subscribed ? 'never' : level === 'every' ? 'every' : 'matters'
+  return !subscribed || level === 'never' ? 'never' : level === 'always' ? 'always' : 'auto'
 }
 
-/** A channel's, DM's or person's Notify me choice: When it matters unless a level is stored. */
+/** A channel's, DM's or person's Notify me choice: Auto unless a level is stored. */
 export function notifyChoice(level: NotifyLevel | undefined): NotifyChoice {
-  return level ?? 'matters'
+  return level ?? 'auto'
 }
 
 /** The Notify me choice an action picks. */
 export function notifyChoiceOf(action: NotifyAction): NotifyChoice {
-  return action === 'notify-every' ? 'every' : action === 'notify-matters' ? 'matters' : 'never'
+  return action === 'notify-always' ? 'always' : action === 'notify-auto' ? 'auto' : 'never'
 }
 
 /** Whether a thread with this choice is followed in Slack. */
@@ -140,9 +141,10 @@ function item<A extends string>(id: A, label: string, hint?: string): MenuItem<A
   return hint === undefined ? { type: 'item', id, label } : { type: 'item', id, label, hint }
 }
 
-function notifyMenu(current: NotifyChoice, label = 'Notify me'): MenuItem<NotifyAction> {
+/** The three levels, then How Auto decides…, which opens Settings › Notifications at its box. */
+function notifyMenu(current: NotifyChoice, label = 'Notify me'): MenuItem<NotifyAction | 'how-auto'> {
   const choice = (level: NotifyChoice): MenuItem<NotifyAction> => ({ type: 'item', id: `notify-${level}`, label: notifyLabels[level], checked: level === current })
-  return { type: 'submenu', label, hint: notifyLabels[current], items: [choice('every'), choice('matters'), choice('never')] }
+  return { type: 'submenu', label, hint: notifyLabels[current], items: [choice('always'), choice('auto'), choice('never'), separator, item('how-auto', 'How Auto decides…')] }
 }
 
 /** How a toast names a choice: "#design-review: Never". */

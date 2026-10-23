@@ -26,12 +26,12 @@ const badgeTest = test.extend({
 badgeTest('dock dot follows unread DMs, group DMs and mentions through reads, wake and engine restart', async ({ juno, slack, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await notificationHoursNow(juno)
+  await juno.notificationHoursNow()
   const badge = (text: string) => expect.poll(() => juno.dockBadge(), { timeout: 15_000 }).toBe(text)
   await badge('•')
   await juno.sidebar.row('Maya', { exact: true }).chooseInMenu('notify-never')
   await badge('')
-  await juno.sidebar.row('Maya', { exact: true }).chooseInMenu('notify-every')
+  await juno.sidebar.row('Maya', { exact: true }).chooseInMenu('notify-always')
   await badge('•')
   // More unread items keep the same dot, including a mention in the DM.
   const dm = slack.as('Maya').dm('<@U0TUSHAR> Another DM')
@@ -78,23 +78,23 @@ badgeTest('the first Home view asks for authorization before any notification is
 badgeTest('badge regression: a kept-out DM is quiet, but its mention counts', async ({ juno, slack }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await notificationHoursNow(juno)
+  await juno.notificationHoursNow()
   await juno.sidebar.createView({ name: 'Apps', conversations: ['Maya'], keepOutOfAll: true })
   await expect.poll(() => juno.dockBadge()).toBe('')
   slack.as('Maya').dm('<@U0TUSHAR> Please approve')
   await expect.poll(() => juno.dockBadge()).toBe('•')
 })
 
-badgeTest('badge regression: a muted channel mention counts, but a Never sender does not', async ({ juno, slack, fake }) => {
+badgeTest('badge regression: a muted channel mention counts, but @here from a Never sender does not', async ({ juno, slack, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await notificationHoursNow(juno)
+  await juno.notificationHoursNow()
   await juno.sidebar.row('Maya', { exact: true }).open()
   await juno.topic.chooseInMessageMenu('A DM before launch', 'notify-never', { onSender: true })
   await juno.openNotifications()
   await expect.poll(() => juno.dockBadge()).toBe('')
-  slack.as('Maya').postIn('eng', '<@U0TUSHAR> A muted sender')
-  await juno.sidebar.row('#eng', { exact: true }).expectPreview('Maya: @Tushar A muted sender')
+  slack.as('Maya').postIn('eng', '<!here> A muted sender')
+  await juno.sidebar.row('#eng', { exact: true }).expectPreview('Maya: @here A muted sender')
   await expect.poll(() => juno.dockBadge()).toBe('')
   fake.emitFrame({ type: 'pref_change', name: 'muted_channels', value: 'C0ENG' })
   slack.as('Leo').postIn('eng', '<@U0TUSHAR> Can you approve this now?')
@@ -164,7 +164,7 @@ const appDmTest = test.extend({
 appDmTest('an unread app DM in Automated sets no dot until it mentions the owner', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await notificationHoursNow(juno)
+  await juno.notificationHoursNow()
   await juno.sidebar.selectView('Automated')
   await juno.sidebar.row('GitHub', { exact: true }).expectVisible()
   await expect.poll(() => juno.dockBadge()).toBe('')
@@ -172,15 +172,3 @@ appDmTest('an unread app DM in Automated sets no dot until it mentions the owner
   await expect.poll(() => juno.dockBadge()).toBe('•')
 })
 
-/** Exercise alert rules inside notification hours, independent of the runner's timezone or weekday. */
-async function notificationHoursNow(juno: Juno): Promise<void> {
-  await juno.openNotifications()
-  const minutes = await juno.win.evaluate(() => new Date().getHours() * 60 + new Date().getMinutes())
-  const from = (Math.floor(minutes / 30) * 30 + 1380) % 1440
-  await juno.notifications.root.getByRole('combobox', { name: 'Notifications from' }).selectOption(String(from))
-  await juno.notifications.root.getByRole('combobox', { name: 'Notifications to' }).selectOption(String((from + 120) % 1440))
-  for (const day of ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']) {
-    const button = juno.notifications.day('Notifications', day)
-    if (await button.getAttribute('aria-pressed') === 'false') await button.click()
-  }
-}

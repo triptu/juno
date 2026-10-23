@@ -8,14 +8,16 @@ import { routeCheck } from './routeCheck'
 import { settledScore } from './settledScore'
 import { titleTopic } from './titleTopic'
 import { topicArt } from './topicArt'
-import { urgencyGate } from './urgencyGate'
+import { instructionRule } from './instructionRule'
+import { notificationReading } from './notificationReading'
 
 export const tasks = {
   titleTopic,
   routeCheck,
   grammarCheck,
   settledScore,
-  urgencyGate,
+  notificationReading,
+  instructionRule,
   parseCommand,
   topicArt,
   followUps,
@@ -24,13 +26,14 @@ export const tasks = {
 } as const
 
 /** The structured tasks, for the eval and for schema tests. */
-export const decisionTasks = [grammarCheck, routeCheck, settledScore, urgencyGate, parseCommand, followUps, automatedChannel] as const
+export const decisionTasks = [grammarCheck, routeCheck, settledScore, notificationReading, instructionRule, parseCommand, followUps, automatedChannel] as const
 
 export * from './shared'
 export * from './titleTopic'
 export * from './routeCheck'
 export * from './settledScore'
-export * from './urgencyGate'
+export * from './notificationReading'
+export * from './instructionRule'
 export * from './parseCommand'
 export * from './topicArt'
 export * from './followUps'

@@ -10,7 +10,9 @@ import type { RouteCheckInput } from '../tasks/routeCheck'
 import type { SettledScoreInput } from '../tasks/settledScore'
 import type { TitleTopicInput } from '../tasks/titleTopic'
 import type { TopicArtInput } from '../tasks/topicArt'
-import type { UrgencyGateInput } from '../tasks/urgencyGate'
+import type { InstructionRuleInput } from '../tasks/instructionRule'
+import type { NotificationReadingInput } from '../tasks/notificationReading'
+import { needsYouOptions, type NeedsYou } from '@juno/domain'
 import { CHATTER, CLOSING, URGENT, contentWords, firstName, firstSentence, firstWords, overlap, sentenceCase } from './text'
 
 export function fakeRouteCheck(input: RouteCheckInput): unknown {
@@ -32,10 +34,39 @@ export function fakeSettledScore(input: SettledScoreInput): unknown {
   return { score: 0.4, reason: 'no closing message' }
 }
 
-export function fakeUrgencyGate(input: UrgencyGateInput): unknown {
-  if (CHATTER.test(input.text)) return { notify: false, reason: 'Social chatter' }
-  const notify = URGENT.test(input.text) || (input.mentionsMe && /\?/.test(input.text)) || input.channelKind === 'im'
-  return { notify, reason: notify ? 'Needs your attention' : 'An update with no action needed' }
+const ASKS = /\?|\b(can|could|would) you\b|\bplease\b|\b(approve|review|sign off|decide|let me know)\b/i
+const GREETING = /^\s*(hi|hey|hello|morning|good morning|yo)\b/i
+const GREETING_WORDS = /\b(greeting|greetings|hello|hellos|hi)\b/i
+const SOCIAL_WORDS = /\b(social|lunch|plans|chatter)\b/i
+const stems = (text: string) => new Set([...contentWords(text)].map((word) => word.replace(/s$/, '')))
+
+/** What the message needs, then the instruction its main point matches: word overlap, or a greeting instruction for a bare greeting. */
+export function fakeNotificationReading(input: NotificationReadingInput): unknown {
+  const answered = input.before.at(-1)?.fromMe === true && /\?/.test(input.before.at(-1)?.text ?? '')
+  const needsYou: NeedsYou = URGENT.test(input.text) ? 'serious'
+    : ASKS.test(input.text) ? 'ask'
+    : answered ? 'answer'
+    : GREETING.test(input.text) ? 'greeting'
+    : CHATTER.test(input.text) ? 'chatter'
+    : input.kind === 'channel' && !input.mentionsMe ? 'chatter'
+    : 'fyi'
+  const probabilities = Object.fromEntries(needsYouOptions.map((option) => [option, option === needsYou ? 0.8 : 0.2 / (needsYouOptions.length - 1)]))
+  const words = stems(input.text)
+  const match = input.instructions.find((item) =>
+    GREETING_WORDS.test(item.text) ? needsYou === 'greeting' : SOCIAL_WORDS.test(item.text) ? CHATTER.test(input.text) : overlap(stems(item.text), words) > 0)
+  return { needsYou, probabilities, instruction: match === undefined ? null : { id: match.id, confidence: 0.9 } }
+}
+
+const RULE_ALWAYS = /\b(always|every message|anything from|whenever)\b/i
+const RULE_NEVER = /\b(never|don'?t|do not|mute|stop)\b/i
+
+/** A rule when the text names exactly one of the people or channels given and says always or never, with no other subject. */
+export function fakeInstructionRule(input: InstructionRuleInput): unknown {
+  const named = [...input.people.map((p) => ({ id: p.id, kind: 'person' })), ...input.channels.map((c) => ({ id: c.id, kind: 'channel' }))]
+  const level = RULE_NEVER.test(input.text) ? 'never' : RULE_ALWAYS.test(input.text) ? 'always' : undefined
+  const only = named.length === 1 ? named[0] : undefined
+  if (only === undefined || level === undefined || /\bwhen\b.*\b(asks|says|mentions|about)\b/i.test(input.text)) return { rule: null }
+  return { rule: { kind: only.kind, id: only.id, level } }
 }
 
 const LET_KNOW = /^(?:let|tell|remind)\s+(\w+)\s+(?:know\s+)?(?:that\s+)?(.+)$/i

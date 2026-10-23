@@ -1,0 +1,1 @@
+- 10-23 23:36 · huddle-follows-hours · An incoming huddle rings only inside notification hours; inside them Always rings and Never keeps it quiet. The switches and the reading do not apply, and an ignored channel does not hold it (owner, via the spec rewrite).

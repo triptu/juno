@@ -18,7 +18,7 @@ import { cleanText, validateOutput, type StructuredTask, type TextTask } from '.
 import type { TitleTopicInput } from '../tasks/titleTopic'
 import type { TopicArtInput } from '../tasks/topicArt'
 import { fakeGrammarCheck } from './grammar'
-import { fakeAutomatedChannel, fakeFollowUps, fakeHomeTitle, fakeParseCommand, fakeRouteCheck, fakeSettledScore, fakeTitle, fakeTopicArt, fakeUrgencyGate } from './rules'
+import { fakeAutomatedChannel, fakeFollowUps, fakeHomeTitle, fakeParseCommand, fakeRouteCheck, fakeSettledScore, fakeTitle, fakeTopicArt, fakeNotificationReading, fakeInstructionRule } from './rules'
 
 export const FAKE_MODEL = 'fake'
 /** In a task's input, the fake's main model refuses it under its policy. */
@@ -44,7 +44,8 @@ const structuredRules: Record<string, (input: never) => unknown> = {
   routeCheck: fakeRouteCheck,
   grammarCheck: fakeGrammarCheck,
   settledScore: fakeSettledScore,
-  urgencyGate: fakeUrgencyGate,
+  notificationReading: fakeNotificationReading,
+  instructionRule: fakeInstructionRule,
   parseCommand: fakeParseCommand,
   followUps: fakeFollowUps,
   homeTitle: fakeHomeTitle,

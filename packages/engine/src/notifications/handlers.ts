@@ -5,30 +5,30 @@
  * a time, and the running pipeline re-decides today's messages when the
  * pref changes (`notificationRuntime.ts`).
  *
- * Notify me on a thread is also its follow (SPEC 5): Every message and
- * When it matters follow it in Slack through `topics.subscribe`, Never
- * unfollows it. Only Every message is stored as a thread level.
+ * Notify me on a thread is also its follow (SPEC 5): Always and Auto
+ * follow it in Slack through `topics.subscribe`, Never unfollows it. Always
+ * and Never are also stored as the thread's level, which the decision reads.
  *
  * Slack's own schedule (the `dnd_*` user prefs) follows the notification
  * hours through `SlackSchedule` (`../slackSchedule.ts`), which watches the
  * hours itself, so every way of changing them reaches it. The page carries
- * its state; the switch and Restore are served here.
+ * its state; Use Juno's hours is served here.
  */
+import { randomUUID } from 'node:crypto'
 import { Clock, Effect, Schema, Semaphore, Stream } from 'effect'
+import { AiProvider, tasks } from '@juno/ai'
 import {
   NotFound,
   NotificationsRoutes,
   NotSignedIn,
   type CommandResult,
-  type Hours, type NotificationSettingsView,
+  type Hours, type InstructionRule, type NotificationSettingsView,
   type NotificationsPage,
   type NotificationStatus,
-  type NotifyTag,
   type NotifyTargetView,
-  type TodayRow,
 } from '@juno/contract'
 import {
-  channelLabel,
+  alwaysNotifyOf,
   localTime,
   notifyChoice,
   parseTopicId,
@@ -37,11 +37,11 @@ import {
   scheduledPresence,
   seenNote,
   threadNotifyChoice,
-  type ConversationKind,
   type NotificationSettings,
   type NotifyChoice,
+  type NotifyLevel,
 } from '@juno/domain'
-import { Candidate, NotificationSettingsSchema, readSettings } from '@juno/notifications'
+import { NotificationSettingsSchema, readSettings } from '@juno/notifications'
 import { liveQuery, prefs, StoreReader, transaction, type InvalidationKeys, type SqlError } from '@juno/store'
 import { NotificationControl } from '../notificationRuntime'
 import { SelfPresence } from '../selfPresence'
@@ -50,84 +50,42 @@ import { SlackSchedule, slackScheduleView } from '../slackSchedule'
 import { retryFirstRun, serveLiveValue, timed, type Run } from '../protocol/live'
 import { setSubscribed } from '../follow'
 import { Workspace, type StoreServices } from '../workspace'
-import { UNKNOWN_PERSON } from '@juno/richtext'
+import { tagsFor, todayCounts, todayDecisions } from './pageQueries'
 
 const SETTINGS_KEYS: InvalidationKeys = ['prefs']
-const PAGE_KEYS: InvalidationKeys = ['prefs', 'notification_log', 'conversations', 'users', 'team']
-const TODAY_LIMIT = 50
+const PAGE_KEYS: InvalidationKeys = ['prefs', 'notification_log', 'conversations', 'users', 'team', 'topic_overlay']
+const DECISION_KEYS: InvalidationKeys = ['notification_log']
+/** People and channels an instruction names that the rule check is shown, at most. */
+const NAMED_LIMIT = 5
 
-const levelsOf = (settings: NotificationSettings) => ({ ...settings, threads: settings.threads ?? {}, huddleRing: settings.huddleRing !== false })
+const viewOf = (settings: NotificationSettings, aiAssist: boolean): NotificationSettingsView => ({
+  notificationHours: settings.notificationHours,
+  presenceHours: settings.presenceHours,
+  channels: settings.channels,
+  people: settings.people,
+  threads: settings.threads ?? {},
+  alwaysNotify: alwaysNotifyOf(settings),
+  instructions: settings.instructions ?? [],
+  aiAssist,
+  huddleRing: settings.huddleRing !== false,
+})
 
-/** Every channel and person on a list, with their names. Unknown ids show as they are. */
-const tagsFor = (settings: NotificationSettings, level: 'every' | 'never') =>
+/** The people and channels an instruction names: a person's full or first name or handle, a channel's name, as whole words. */
+const namedIn = (text: string) =>
   Effect.gen(function* () {
     const sql = yield* StoreReader
-    const channelIds = Object.keys(settings.channels).filter((id) => settings.channels[id] === level)
-    const personIds = Object.keys(settings.people).filter((id) => settings.people[id] === level)
-    const channels = channelIds.length === 0 ? [] : yield* sql<{ id: string; kind: ConversationKind; name: string | null; person: string | null }>`
-      SELECT c.id, c.kind, c.name, COALESCE(u.display_name, u.real_name, u.name) AS person FROM conversations c
-      LEFT JOIN users u ON u.id = c.user_id WHERE c.id IN ${sql.in(channelIds)}`
-    const people = personIds.length === 0 ? [] : yield* sql<{ id: string; name: string | null; avatar_url: string | null }>`
-      SELECT id, COALESCE(display_name, real_name, name) AS name, avatar_url FROM users WHERE id IN ${sql.in(personIds)}`
-    const channelById = new Map(channels.map((row) => [row.id, row]))
-    const personById = new Map(people.map((row) => [row.id, row]))
-    const tags: NotifyTag[] = []
-    for (const id of channelIds) {
-      const row = channelById.get(id)
-      const kind = row?.kind ?? 'public'
-      tags.push({ kind: 'channel', id, name: row?.person ?? row?.name ?? id, channelKind: kind })
+    const words = new Set(text.toLowerCase().split(/[^\p{L}\p{N}_-]+/u).filter((word) => word.length > 1))
+    const lower = ` ${text.toLowerCase().replace(/\s+/g, ' ')} `
+    const people = yield* sql<{ id: string; name: string | null; display_name: string | null; real_name: string | null }>`
+      SELECT id, name, display_name, real_name FROM users WHERE deleted = 0 AND is_bot = 0`
+    const channels = yield* sql<{ id: string; name: string }>`
+      SELECT id, name FROM conversations WHERE kind IN ('public', 'private') AND is_member = 1 AND is_archived = 0 AND name IS NOT NULL`
+    const named = (full: string | null) => full !== null && full.trim() !== '' && (lower.includes(` ${full.toLowerCase()} `) || words.has(full.trim().split(/\s+/)[0]!.toLowerCase()))
+    return {
+      people: people.filter((p) => named(p.real_name) || named(p.display_name) || (p.name !== null && words.has(p.name.toLowerCase())))
+        .slice(0, NAMED_LIMIT).map((p) => ({ id: p.id, name: p.real_name ?? p.display_name ?? p.name ?? p.id })),
+      channels: channels.filter((c) => words.has(c.name.toLowerCase())).slice(0, NAMED_LIMIT).map((c) => ({ id: c.id, name: c.name })),
     }
-    for (const id of personIds) {
-      const row = personById.get(id)
-      tags.push({ kind: 'person', id, name: row?.name ?? UNKNOWN_PERSON, ...(row?.avatar_url == null ? {} : { avatarUrl: row.avatar_url }) })
-    }
-    return tags.toSorted((a, b) => a.name.localeCompare(b.name))
-  })
-
-interface LogRow {
-  readonly id: number
-  readonly at: string
-  readonly outcome: 'now' | 'hold'
-  readonly reason: string | null
-  readonly preview: string | null
-  readonly candidate_json: string | null
-  readonly judgement_json: string | null
-  readonly delivered_at: string | null
-  readonly suppressed_at: string | null
-}
-
-const decodeCandidate = (json: string | null): Candidate | undefined => {
-  if (json === null) return undefined
-  try {
-    return Schema.decodeUnknownSync(Candidate)(JSON.parse(json))
-  } catch {
-    return undefined
-  }
-}
-
-const today = (now: number) =>
-  Effect.gen(function* () {
-    const sql = yield* StoreReader
-    const midnight = new Date(now)
-    midnight.setHours(0, 0, 0, 0)
-    const since = midnight.toISOString()
-    const counts = yield* sql<{ interrupted: number; held: number }>`
-      SELECT COALESCE(SUM(delivered_at IS NOT NULL AND outcome = 'now'), 0) AS interrupted, COALESCE(SUM(outcome = 'hold'), 0) AS held
-      FROM notification_log WHERE at >= ${since}`
-    const rows = yield* sql<LogRow>`SELECT * FROM notification_log WHERE at >= ${since} AND outcome = 'now' AND delivered_at IS NOT NULL
-      ORDER BY at DESC, id DESC LIMIT ${TODAY_LIMIT}`
-    const list: TodayRow[] = rows.map((row) => {
-      const candidate = decodeCandidate(row.candidate_json)
-      return {
-        id: row.id,
-        at: new Date(row.at).getTime(),
-        place: candidate === undefined ? '' : channelLabel(candidate.channel),
-        sender: candidate?.senderName ?? '',
-        text: row.preview ?? '',
-        reason: row.reason ?? '',
-      }
-    })
-    return { interrupted: counts[0]?.interrupted ?? 0, held: counts[0]?.held ?? 0, today: list }
   })
 
 /** A thread topic id's channel and root, or undefined for anything else. */
@@ -136,20 +94,19 @@ const thread = (id: string) => {
   return parsed?.kind === 'thread' ? parsed : undefined
 }
 
-/** The settings with one Notify me choice applied. When it matters is no entry; a thread's Never is its follow flag, not an entry. */
+/** The settings with one Notify me choice applied. Auto is no entry; Always and Never are stored for a thread, channel or person alike. */
 const withLevel = (settings: NotificationSettings, target: NotifyTargetView, choice: NotifyChoice): NotificationSettings => {
-  const set = (map: Readonly<Record<string, 'every' | 'never'>> | undefined, allowNever: boolean) => {
+  const set = (map: Readonly<Record<string, NotifyLevel>> | undefined) => {
     const { [target.id]: _, ...rest } = map ?? {}
-    return choice === 'every' || (choice === 'never' && allowNever) ? { ...rest, [target.id]: choice } : rest
+    return choice === 'auto' ? rest : { ...rest, [target.id]: choice }
   }
   switch (target.kind) {
     case 'channel':
-      return { ...settings, channels: set(settings.channels, true) }
+      return { ...settings, channels: set(settings.channels) }
     case 'person':
-      return { ...settings, people: set(settings.people, true) }
+      return { ...settings, people: set(settings.people) }
     case 'thread':
-      // A thread's Never is its follow flag, not a stored level.
-      return { ...settings, threads: set(settings.threads, false) }
+      return { ...settings, threads: set(settings.threads) }
   }
 }
 
@@ -170,6 +127,7 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
     const control = yield* NotificationControl
     const selfPresence = yield* SelfPresence
     const slackSchedule = yield* SlackSchedule
+    const ai = yield* AiProvider
     // Read-modify-write of one pref: one writer at a time, so two quick changes never lose one.
     const writes = yield* Semaphore.make(1)
 
@@ -210,7 +168,7 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
         if (which === 'notifications') yield* inWorkspace(slackSchedule.hoursSet.pipe(Effect.orDie))
       })
 
-    const settingsView = Effect.map(readSettings, ({ settings, aiAssist }): NotificationSettingsView => ({ ...levelsOf(settings), aiAssist }))
+    const settingsView = Effect.map(readSettings, ({ settings, aiAssist }) => viewOf(settings, aiAssist))
 
     const status = Effect.gen(function* () {
       const now = localTime(yield* Clock.currentTimeMillis)
@@ -234,9 +192,15 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
           }).pipe(Effect.orDie),
         )
         if (target.kind === 'thread') {
-          if (thread(target.id) === undefined) return yield* new NotFound({ kind: 'topic', id: target.id })
+          const parsed = thread(target.id)
+          if (parsed === undefined) return yield* new NotFound({ kind: 'topic', id: target.id })
           const follow = choice !== 'never'
-          if (follow !== (before !== 'never')) {
+          // The follow flag as Slack last said, not the stored level: Slack may have followed the thread again since.
+          const followed = yield* inWorkspace(
+            Effect.map(StoreReader.use((sql) => sql<{ subscribed: number }>`SELECT subscribed FROM thread_subs WHERE channel = ${parsed.channel} AND thread_ts = ${parsed.threadTs}`),
+              (rows) => rows[0]?.subscribed === 1).pipe(Effect.orDie),
+          )
+          if (follow !== followed) {
             yield* setSubscribed(target.id, follow).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(Outbox, outbox))
           }
         }
@@ -256,9 +220,9 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
               const { settings } = yield* readSettings
               const now = yield* Clock.currentTimeMillis
               return {
-                every: yield* tagsFor(settings, 'every'),
+                always: yield* tagsFor(settings, 'always'),
                 never: yield* tagsFor(settings, 'never'),
-                ...(yield* today(now)),
+                ...(yield* todayCounts(now)),
                 slackSchedule: yield* slackScheduleView,
               } satisfies NotificationsPage
             }),
@@ -266,6 +230,10 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
             Stream.tick('1 minute').pipe(Stream.drop(1)),
           ),
         ).pipe(retryFirstRun('notifications.page'), Stream.orDie),
+      'notifications.decisions': () =>
+        serveLiveValue(
+          runs(DECISION_KEYS, Effect.flatMap(Clock.currentTimeMillis, (now) => Effect.map(todayDecisions(now), (decisions) => ({ decisions }))), Stream.tick('1 minute').pipe(Stream.drop(1))),
+        ).pipe(retryFirstRun('notifications.decisions'), Stream.orDie),
       'notifications.status': () =>
         serveLiveValue(
           // The presence stream starts with the current value, which can be newer than what the first
@@ -277,7 +245,39 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
         ...saved,
         days: enabled ? [...saved.days.filter((other) => other !== day), day].toSorted((a, b) => a - b) : saved.days.filter((other) => other !== day),
       })),
-      'notifications.setMatters': ({ text }) => updateSettings((settings) => ({ ...settings, matters: text.trim() })).pipe(Effect.asVoid),
+      'notifications.setAlwaysNotify': ({ which, enabled }) =>
+        updateSettings((settings) => ({ ...settings, alwaysNotify: { ...settings.alwaysNotify, [which]: enabled } })).pipe(Effect.asVoid),
+      'notifications.saveInstruction': ({ id, direction, text }) =>
+        Effect.gen(function* () {
+          const fresh = `i${randomUUID().replaceAll('-', '').slice(0, 12)}`
+          let saved = fresh
+          yield* updateSettings((settings) => {
+            const list = settings.instructions ?? []
+            const old = list.find((other) => other.id === id)
+            // A changed instruction gets a new id, so a reading made against the old one names an id that is gone and is ignored.
+            saved = old !== undefined && old.text === text.trim() && old.direction === direction ? old.id : fresh
+            const item = { id: saved, direction, text: text.trim() }
+            return { ...settings, instructions: old === undefined ? [...list, item] : list.map((other) => (other.id === id ? item : other)) }
+          })
+          return { id: saved }
+        }),
+      'notifications.removeInstruction': ({ id }) =>
+        updateSettings((settings) => ({ ...settings, instructions: (settings.instructions ?? []).filter((item) => item.id !== id) })).pipe(Effect.asVoid),
+      'notifications.checkInstruction': ({ text, direction }) =>
+        inWorkspace(
+          Effect.gen(function* () {
+            const { aiAssist } = yield* readSettings
+            const named = yield* namedIn(text)
+            if (!aiAssist || named.people.length + named.channels.length === 0) return null
+            const decision = yield* ai.decide(tasks.instructionRule, { text, ...named })
+            const rule = decision._tag === 'Decided' ? decision.value.rule : null
+            if (rule === null) return null
+            const name = rule.kind === 'person' ? named.people.find((p) => p.id === rule.id)?.name : named.channels.find((c) => c.id === rule.id)?.name
+            if (name === undefined) return null
+            // The owner's direction decides the level, so Make it a setting never applies the opposite one.
+            return { kind: rule.kind, id: rule.id, name: rule.kind === 'channel' ? `#${name}` : name, level: direction === 'notify' ? 'always' : 'never' } satisfies InstructionRule
+          }).pipe(Effect.orDie),
+        ),
       'notifications.setHuddleRing': ({ enabled }) => updateSettings((settings) => ({ ...settings, huddleRing: enabled })).pipe(Effect.asVoid),
       'notifications.setLevel': ({ target, choice }) => setLevel(target, choice),
       'notifications.setPresence': ({ presence }) =>
@@ -285,8 +285,7 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
           if ((yield* workspace.current) === undefined) return yield* new NotSignedIn()
           yield* control.setPresence(presence)
         }),
-      'notifications.setSlackSchedule': ({ enabled }) => inWorkspace(slackSchedule.setEnabled(enabled).pipe(Effect.orDie)),
-      'notifications.restoreSlackSchedule': () => inWorkspace(slackSchedule.restore.pipe(Effect.catchTag('SqlError', Effect.die))),
+      'notifications.useJunoHours': () => inWorkspace(slackSchedule.useJunoHours.pipe(Effect.orDie)),
     }
   }),
 )

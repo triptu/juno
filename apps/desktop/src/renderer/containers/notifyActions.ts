@@ -20,6 +20,7 @@ import {
 } from '@juno/contract'
 import { currentNotificationSettings, junoAvailableAtom, loadNotificationSettings, popupContextMenu, registry, releaseSidebarTopic, runAction } from '@juno/state'
 import { askJunoAbout, showWhatJunoKnows } from './juno/actions'
+import { openNotificationsAt } from './notificationsAnchor'
 
 /** Sets a Notify me choice: "#design-review: Never", with Undo. */
 export function setNotifyLevel(target: NotifyTargetView, choice: NotifyChoice, label: string): void {
@@ -67,18 +68,19 @@ export async function showPersonMenu(person: { readonly id: string; readonly nam
   const settings = currentNotificationSettings(registry) ?? (await loadNotificationSettings(registry))
   const target: NotifyTargetView = { kind: 'person', id: person.id }
   const items = personMenuItems({ name: person.name, notify: choiceFor(settings, target), askJuno: registry.get(junoAvailableAtom) })
-  const chosen = (await popupContextMenu(nativeMenu(items), at)) as NotifyAction | 'ask-juno' | 'juno-knows' | undefined
-  if (chosen === 'ask-juno') askJunoAbout({ _tag: 'person', userId: person.id, name: person.name })
+  const chosen = (await popupContextMenu(nativeMenu(items), at)) as NotifyAction | 'ask-juno' | 'juno-knows' | 'how-auto' | undefined
+  if (chosen === 'how-auto') openNotificationsAt('how-auto')
+  else if (chosen === 'ask-juno') askJunoAbout({ _tag: 'person', userId: person.id, name: person.name })
   else if (chosen === 'juno-knows') void showWhatJunoKnows(person)
   else if (chosen !== undefined) setNotifyLevel(target, notifyChoiceOf(chosen), person.name)
 }
 
 /**
  * The header's Follow on a thread you do not follow (SPEC 5 and 7): it
- * follows at once with When it matters, set as Notify me sets it, so the
+ * follows at once with Auto, set as Notify me sets it, so the
  * thread follows in Slack, joins the sidebar, and ⌘Z undoes it. Notify me
  * in ⋯ changes the level afterwards.
  */
 export function followThread(thread: { readonly id: string; readonly title: string }): void {
-  setNotifyLevel({ kind: 'thread', id: thread.id }, 'matters', thread.title)
+  setNotifyLevel({ kind: 'thread', id: thread.id }, 'auto', thread.title)
 }

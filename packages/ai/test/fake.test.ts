@@ -37,12 +37,13 @@ describe('FakeAiProvider decisions', () => {
   })
 
 
-  it('gates an outage as urgent and a joke as chatter', async () => {
-    const base = { channel: '#incidents', channelKind: 'public' as const, mentionsMe: false, now: NOW }
-    const outage = decided(await run((p) => p.decide(tasks.urgencyGate, { ...base, messageTs: '1', sender: 'Jonas Weber', text: 'Checkout is down for 20% of requests, production incident.' })))
-    expect(outage.notify).toBe(true)
-    const joke = decided(await run((p) => p.decide(tasks.urgencyGate, { ...base, messageTs: '2', sender: 'Priya Raman', text: 'haha the cake was great' })))
-    expect(joke.notify).toBe(false)
+  it('reads a mixed greeting and ask as an ask, past a greetings instruction', async () => {
+    const base = { where: 'Sam Okafor', kind: 'dm' as const, sender: 'Sam Okafor', mentionsMe: false, now: NOW, before: [],
+      facts: { ownerWroteLast: false, ownerStartedThread: false, senderWroteSinceOwner: false, exchangesLast30Days: 0 }, instructions: [{ id: 'i1', direction: 'stay' as const, text: 'greetings' }] }
+    const mixed = decided(await run((p) => p.decide(tasks.notificationReading, { ...base, messageTs: '1', text: 'hey! can you approve the contract by 3?' })))
+    expect(mixed).toMatchObject({ needsYou: 'ask', instruction: null })
+    const hello = decided(await run((p) => p.decide(tasks.notificationReading, { ...base, messageTs: '2', text: 'hey, morning!' })))
+    expect(hello).toMatchObject({ needsYou: 'greeting', instruction: { id: 'i1' } })
   })
 
   it('parses "let maya know …" as a send and a bare search word as no command', async () => {

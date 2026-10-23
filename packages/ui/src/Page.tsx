@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { createContext, useContext, type ReactNode } from 'react'
+import { createContext, useContext, type ReactNode, type Ref } from 'react'
 import { layout, spacing } from '@juno/tokens/tokens.stylex'
 import { revealFocus } from './internal/revealFocus'
 import { Text } from './Text'
@@ -66,21 +66,23 @@ export interface SectionProps {
   readonly sub?: string
   /** A quiet control at the end of the heading's line (a ghost `xs` button such as Add). It never makes the line taller. */
   readonly action?: ReactNode
+  /** The heading's element, for a page that scrolls to the section and focuses it. */
+  readonly headingRef?: Ref<HTMLElement>
   readonly children?: ReactNode
 }
 
 /** A settings section: heading, one-line explanation, then a group card. */
-export function Section({ heading, sub, action, children }: SectionProps) {
+export function Section({ heading, sub, action, headingRef, children }: SectionProps) {
   return (
     <section {...stylex.props(styles.section)}>
       <div {...stylex.props(styles.sectionHead)}>
         {action === undefined ? (
-          <Text variant="heading" tone="default">
+          <Text variant="heading" tone="default" ref={headingRef}>
             {heading}
           </Text>
         ) : (
           <div {...stylex.props(styles.headingLine)}>
-            <Text variant="heading" tone="default">
+            <Text variant="heading" tone="default" ref={headingRef}>
               {heading}
             </Text>
             <div {...stylex.props(styles.action)}>{action}</div>

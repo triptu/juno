@@ -1,0 +1,1 @@
+- 10-24 00:10 · thread-never-level · Never on a thread is stored as its level, as on a channel or person, and still unfollows it in Slack, so @here, mentions and DM-thread replies in it stay quiet A thread with no stored level that is not followed counts as Never, as the menu shows it, since Never before this was only an unfollow; no data migration (Astra review).

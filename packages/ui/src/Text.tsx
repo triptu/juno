@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import type { ElementType, HTMLAttributes, PointerEvent, ReactNode } from 'react'
+import type { ElementType, HTMLAttributes, PointerEvent, ReactNode, Ref } from 'react'
 import { accent, colors, text } from '@juno/tokens/tokens.stylex'
 import { pointerMoved } from './internal/pointer'
 import type { LayoutStyles } from './internal/sx'
@@ -37,6 +37,8 @@ export interface TextProps extends Omit<HTMLAttributes<HTMLElement>, 'style' | '
   readonly as?: ElementType
   /** Extra StyleX styles from the owner (layout only). */
   readonly sx?: LayoutStyles
+  /** The rendered element: a heading another place scrolls to and focuses. */
+  readonly ref?: Ref<HTMLElement>
   readonly children?: ReactNode
 }
 

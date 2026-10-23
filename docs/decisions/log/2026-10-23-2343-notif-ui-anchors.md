@@ -1,0 +1,1 @@
+- 10-23 23:43 · notif-ui-anchors · How Auto decides…, Notification settings, Edit instructions and Change open Settings › Notifications scrolled to their part with its heading focused (no ring), once per ask; opening the page again later starts at the top. Change on an ignored channel opens Settings › Ignored.

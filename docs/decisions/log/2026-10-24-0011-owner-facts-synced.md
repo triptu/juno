@@ -1,0 +1,1 @@
+- 10-24 00:11 · owner-facts-synced · The owner's facts for a notification (wrote last, wrote recently, sender wrote since) come from synced messages in the same topic strictly before the message, not from sent_posts, which hold attempts without a thread (Astra review).

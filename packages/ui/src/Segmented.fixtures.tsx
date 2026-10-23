@@ -12,6 +12,8 @@ export default defineFixtures(Segmented, {
     now: fixture({ options, value: 'now', onChange: () => {}, label: 'Decision' }),
     digest: fixture({ options, value: 'digest', onChange: () => {}, label: 'Decision' }),
     silent: fixture({ options, value: 'silent', onChange: () => {}, label: 'Decision' }),
+    // Nothing chosen yet: no segment is raised.
+    none: fixture({ options, value: null, onChange: () => {}, label: 'Decision' }),
   },
   Interaction: {
     hover: fixture({ options, value: 'now', onChange: () => {}, label: 'Decision' }, { hover: '[role="radio"]:nth-of-type(2)' }),

@@ -10,7 +10,7 @@ import {
   localTime,
   scheduledPresence,
   untilLabel,
-  decideWithCause,
+  readLevel,
   pausedLabel,
   presenceLabel,
   seenNote,
@@ -19,8 +19,9 @@ import {
   type LocalTime,
   type NotificationCandidate,
   type NotificationSettings,
+  type Reading,
 } from '../src/index'
-import { alerts, eng, hiring, leoId, maya, mayaId } from './fixtures'
+import { alerts, eng, group, hiring, leoId, maya, mayaId } from './fixtures'
 
 const at = (weekday: LocalTime['weekday'], hour: number, minute = 0): LocalTime => ({ weekday, minutes: hour * 60 + minute })
 const MON = 1
@@ -31,86 +32,118 @@ const settings: NotificationSettings = {
   ...defaultNotificationSettings,
   notificationHours: { days: [1, 2, 3, 4, 5], from: 9 * 60, to: 18 * 60 },
   presenceHours: { days: [1, 2, 3, 4, 5], from: 9 * 60, to: 20 * 60 },
-  channels: { C0INCIDENTS: 'every', [eng.id]: 'never' },
-  people: { [mayaId]: 'every', U0SAM: 'never' },
+  channels: { C0INCIDENTS: 'always', [eng.id]: 'never' },
+  people: { [mayaId]: 'always', U0SAM: 'never' },
+  instructions: [
+    { id: 'greet', direction: 'stay', text: 'greetings' },
+    { id: 'contracts', direction: 'notify', text: 'contracts' },
+  ],
 }
 const incidents = { id: 'C0INCIDENTS', kind: 'public', name: 'incidents' } as const
-const ai: DecisionContext = { aiAssist: true, userName: (id) => ({ U0MAYA: 'Maya Chen', U0SAM: 'Sam Okafor' })[id] }
+const sam = 'U0SAM' as never
+const ai: DecisionContext = { aiAssist: true, userName: (id) => ({ U0MAYA: 'Maya Chen', U0SAM: 'Sam Okafor', U0LEO: 'Leo Park' })[id] }
 const aiOff: DecisionContext = { ...ai, aiAssist: false }
 
 describe('effective notification level for Home', () => {
-  it('mutes on Never unless an applicable Every message level overrides it', () => {
+  it('mutes on Never unless an applicable Always level overrides it', () => {
     expect(notificationIsMuted('never')).toBe(true)
     expect(notificationIsMuted(undefined, 'never', undefined)).toBe(true)
-    expect(notificationIsMuted('every', 'never')).toBe(false)
-    expect(notificationIsMuted('never', undefined, 'every')).toBe(false)
+    expect(notificationIsMuted('always', 'never')).toBe(false)
     expect(notificationIsMuted(undefined, undefined, undefined)).toBe(false)
+  })
+
+  it('reads levels stored before Always and Auto', () => {
+    expect([readLevel('always'), readLevel('always'), readLevel('never'), readLevel('matters'), readLevel(undefined)]).toEqual(['always', 'always', 'never', undefined, undefined])
   })
 })
 
 function candidate(overrides: Partial<NotificationCandidate> = {}): NotificationCandidate {
-  return { channel: hiring, senderId: leoId, mentionsMe: false, at: at(MON, 12), ...overrides }
+  return { channel: hiring, senderId: leoId, mentionsMe: false, text: 'the build is green', at: at(MON, 12), ...overrides }
 }
 
-describe('notification decision', () => {
-  const urgent = { notify: true, reason: 'asks you to approve the release before 2pm' }
-  const routine = { notify: false, reason: 'an update with nothing for you to do' }
+const read = (needsYou: Reading['needsYou'], probabilities: Reading['probabilities'], instruction?: Reading['instruction']): Reading =>
+  ({ needsYou, probabilities, ...(instruction === undefined ? {} : { instruction }) })
+const asks = read('ask', { ask: 0.8, fyi: 0.2 })
+const fyi = read('fyi', { ask: 0.2, fyi: 0.8 })
+const thread = 't:C0HIRING:1.000001'
+const started = { ...settings, alwaysNotify: { startedThreads: true } }
+const followed = { ...settings, alwaysNotify: { followedThreads: true } }
+const live = { ownerWroteMinutesAgo: 2, ownerWroteLast: true }
 
+describe('the decision order', () => {
   it.each([
-    ['an ignored channel holds before anything else', candidate({ channel: alerts, senderId: mayaId }), ai, undefined, { outcome: 'hold', reason: '#alerts-prod is ignored' }],
-    ['a channel set to Every message notifies', candidate({ channel: incidents as never }), ai, undefined, { outcome: 'now', reason: '#incidents is set to Every message' }],
-    ['a person set to Every message notifies', candidate({ senderId: mayaId }), ai, undefined, { outcome: 'now', reason: 'Maya Chen is set to Every message' }],
-    ['Every message on the person wins over Never on the channel', candidate({ channel: eng, senderId: mayaId }), ai, undefined, { outcome: 'now', reason: 'Maya Chen is set to Every message' }],
-    ['Every message on the channel wins over Never on the person', candidate({ channel: incidents as never, senderId: 'U0SAM' as never }), ai, undefined, { outcome: 'now', reason: '#incidents is set to Every message' }],
-    ['a channel set to Never holds', candidate({ channel: eng }), ai, urgent, { outcome: 'hold', reason: '#eng is set to Never' }],
-    ['a person set to Never holds', candidate({ senderId: 'U0SAM' as never }), ai, urgent, { outcome: 'hold', reason: 'Sam Okafor is set to Never' }],
-    ['Every message comes through outside notification hours', candidate({ senderId: mayaId, at: at(MON, 22) }), ai, undefined, { outcome: 'now', reason: 'Maya Chen is set to Every message' }],
-    ['inside hours, Juno says it needs you', candidate(), ai, urgent, { outcome: 'now', reason: 'Juno: asks you to approve the release before 2pm' }],
-    ['inside hours, Juno says it can wait', candidate(), ai, routine, { outcome: 'hold', reason: 'Juno: an update with nothing for you to do' }],
-    ['outside hours, what would have notified is held', candidate({ at: at(MON, 19) }), ai, urgent, { outcome: 'hold', reason: 'Outside your notification hours. Juno: asks you to approve the release before 2pm' }],
-    ['outside hours, what can wait is held', candidate({ at: at(SAT, 12) }), ai, routine, { outcome: 'hold', reason: 'Juno: an update with nothing for you to do' }],
-    ['AI assist off: a DM notifies', candidate({ channel: maya }), aiOff, undefined, { outcome: 'now', reason: 'AI assist is off, and DMs and mentions notify you' }],
-    ['AI assist off: a mention notifies', candidate({ mentionsMe: true }), aiOff, undefined, { outcome: 'now', reason: 'AI assist is off, and DMs and mentions notify you' }],
-    ['AI assist off: anything else holds', candidate(), aiOff, undefined, { outcome: 'hold', reason: 'AI assist is off, so only DMs and mentions notify you' }],
-    ['AI assist off: a DM outside hours is held', candidate({ channel: maya, at: at(MON, 7) }), aiOff, undefined, { outcome: 'hold', reason: 'Outside your notification hours. AI assist is off, and DMs and mentions notify you' }],
-  ] as const)('%s', (_name, message, context, judgement, expected) => {
-    expect(decideNotification(message, settings, context, judgement)).toEqual(expected)
-  })
-
-  it('lets a direct mention through an ignored channel, then decides it by the usual settings', () => {
-    const named = candidate({ channel: alerts, mentionsMe: true, mentionsMeDirectly: true })
-    expect(decideNotification(named, settings, aiOff)).toEqual({ outcome: 'now', reason: 'AI assist is off, and DMs and mentions notify you' })
-    expect(decideNotification({ ...named, at: at(SAT, 12) }, settings, aiOff)).toMatchObject({ outcome: 'hold', reason: 'Outside your notification hours. AI assist is off, and DMs and mentions notify you' })
-    expect(decideNotification({ ...named, senderId: 'U0SAM' as never }, settings, ai)).toEqual({ outcome: 'hold', reason: 'Sam Okafor is set to Never' })
-    // @here and @channel mention everyone, so they stay held.
-    expect(decideNotification(candidate({ channel: alerts, mentionsMe: true }), settings, aiOff)).toEqual({ outcome: 'hold', reason: '#alerts-prod is ignored' })
-    expect(decideWithCause(candidate({ channel: alerts, mentionsMe: true, mentionsMeDirectly: false }), settings, ai)).toMatchObject({ cause: { kind: 'ignored' } })
-  })
-
-  it('applies thread overrides, with Every message winning over Never anywhere', () => {
-    const topicId = 't:C0HIRING:1.000001'
-    const message = candidate({ topicId })
-    expect(decideNotification(message, { ...settings, threads: { [topicId]: 'every' }, channels: { [message.channel.id]: 'never' } }, ai)).toMatchObject({ outcome: 'now' })
-    expect(decideNotification(message, { ...settings, threads: { [topicId]: 'never' } }, ai)).toMatchObject({ outcome: 'hold' })
-    expect(decideNotification({ ...message, senderId: mayaId }, { ...settings, threads: { [topicId]: 'never' } }, ai)).toMatchObject({ outcome: 'now' })
-  })
-
-  it('asks for Juno only when the settings did not decide', () => {
-    expect(decideNotification(candidate(), settings, ai)).toEqual({ needsJudgement: true })
-    expect(decideNotification(candidate({ at: at(SAT, 12) }), settings, ai)).toEqual({ needsJudgement: true })
-    expect(decideNotification(candidate({ channel: eng }), settings, ai)).not.toEqual({ needsJudgement: true })
-  })
-})
-
-describe('what decided a message', () => {
-  it('names the level that decided, or the hours, or Juno', () => {
-    const thread = candidate({ topicId: 't:C0HIRING:1.0' })
-    const threads = { ...settings, threads: { 't:C0HIRING:1.0': 'never' as const } }
-    expect(decideWithCause(thread, threads, ai)).toMatchObject({ cause: { kind: 'level', target: { kind: 'thread', id: 't:C0HIRING:1.0' } } })
-    expect(decideWithCause(candidate({ senderId: mayaId }), settings, ai)).toMatchObject({ cause: { kind: 'level', target: { kind: 'person', id: mayaId } } })
-    expect(decideWithCause(candidate({ channel: eng }), settings, ai)).toMatchObject({ cause: { kind: 'level', target: { kind: 'channel', id: eng.id } } })
-    expect(decideWithCause(candidate({ at: at(SAT, 12) }), settings, ai, { notify: true, reason: 'asks you' })).toMatchObject({ decision: { outcome: 'hold' }, cause: { kind: 'hours' } })
-    expect(decideWithCause(candidate(), settings, ai, { notify: false, reason: 'chatter' })).toEqual({ decision: { outcome: 'hold', reason: 'Juno: chatter' }, cause: { kind: 'juno' } })
+    // 1. Hours: nothing gets through, not even Always.
+    ['outside hours, Always stays', candidate({ senderId: mayaId, at: at(MON, 22) }), settings, ai, undefined, { outcome: 'stay', decidedBy: 'hours', reason: 'Outside your notification hours.' }],
+    ['outside hours, a direct mention stays', candidate({ mentionsMe: true, mentionsMeDirectly: true, at: at(SAT, 12) }), settings, ai, asks, { outcome: 'stay', decidedBy: 'hours' }],
+    // 2. Always, which beats Never.
+    ['a channel on Always notifies', candidate({ channel: incidents as never }), settings, ai, undefined, { outcome: 'notify', decidedBy: 'always', reason: '#incidents is set to Always.', target: { kind: 'channel', id: 'C0INCIDENTS' } }],
+    ['Always on the person beats Never on the channel', candidate({ channel: eng, senderId: mayaId }), settings, ai, undefined, { outcome: 'notify', decidedBy: 'always', reason: 'Maya Chen is set to Always.' }],
+    ['Always on the thread beats Never on the channel', candidate({ topicId: thread }), { ...settings, threads: { [thread]: 'always' }, channels: { C0HIRING: 'never' } }, ai, undefined, { outcome: 'notify', decidedBy: 'always', reason: 'This thread is set to Always.' }],
+    ['Always beats an ignored channel', candidate({ channel: alerts, senderId: mayaId }), settings, ai, undefined, { outcome: 'notify', decidedBy: 'always' }],
+    // 3. Never and ignored, with the direct-mention exception.
+    ['a channel on Never stays', candidate({ channel: eng }), settings, ai, asks, { outcome: 'stay', decidedBy: 'never', reason: '#eng is set to Never.', target: { kind: 'channel', id: 'C0ENG' } }],
+    ['a person on Never stays', candidate({ senderId: sam }), settings, ai, asks, { outcome: 'stay', decidedBy: 'never', reason: 'Sam Okafor is set to Never.' }],
+    ['a thread on Never stays', candidate({ topicId: thread }), { ...settings, threads: { [thread]: 'never' } }, ai, asks, { outcome: 'stay', decidedBy: 'never', reason: 'This thread is set to Never.' }],
+    ['an unfollowed thread with no level is Never', candidate({ topicId: thread, mentionsMe: true, mentionsMeDirectly: false, facts: { followed: false } }), settings, ai, undefined, { outcome: 'stay', decidedBy: 'never' }],
+    ['a direct mention gets through an unfollowed thread', candidate({ topicId: thread, mentionsMe: true, mentionsMeDirectly: true, facts: { followed: false } }), settings, ai, undefined, { outcome: 'notify', decidedBy: 'directMention' }],
+    ['a stored level wins over the follow state', candidate({ topicId: thread, facts: { followed: false } }), { ...settings, threads: { [thread]: 'always' } }, ai, undefined, { outcome: 'notify', decidedBy: 'always' }],
+    ['@here in a thread on Never stays, though Mentions is on', candidate({ topicId: thread, mentionsMe: true, mentionsMeDirectly: false }), { ...settings, threads: { [thread]: 'never' } }, ai, undefined, { outcome: 'stay', decidedBy: 'never' }],
+    ['an ignored channel stays', candidate({ channel: alerts }), settings, ai, asks, { outcome: 'stay', decidedBy: 'ignored', reason: '#alerts-prod is ignored.' }],
+    ['a direct mention gets through Never', candidate({ channel: eng, mentionsMe: true, mentionsMeDirectly: true }), settings, ai, undefined, { outcome: 'notify', decidedBy: 'directMention', reason: 'Mentions you by name. That gets through Never.' }],
+    ['a direct mention gets through an ignored channel', candidate({ channel: alerts, mentionsMe: true, mentionsMeDirectly: true }), settings, ai, undefined, { outcome: 'notify', decidedBy: 'directMention', reason: 'Mentions you by name. That gets through ignored channels.' }],
+    ['@here does not get through Never', candidate({ channel: eng, mentionsMe: true, mentionsMeDirectly: false }), settings, ai, undefined, { outcome: 'stay', decidedBy: 'never' }],
+    // 4. The Always notify switches.
+    ['mentions notify by default', candidate({ mentionsMe: true }), settings, ai, undefined, { outcome: 'notify', decidedBy: 'alwaysNotify', reason: 'Mentions always notify.' }],
+    ['DMs are read by default', candidate({ channel: maya }), settings, ai, undefined, { needsReading: true }],
+    ['the DMs switch notifies', candidate({ channel: maya }), { ...settings, alwaysNotify: { dms: true } }, ai, undefined, { outcome: 'notify', decidedBy: 'alwaysNotify', reason: 'Direct messages always notify.' }],
+    ['the group DMs switch notifies', candidate({ channel: group }), { ...settings, alwaysNotify: { groupDms: true } }, ai, undefined, { outcome: 'notify', decidedBy: 'alwaysNotify', reason: 'Group DMs always notify.' }],
+    ['threads you started', candidate({ topicId: thread, facts: { ownerStartedThread: true } }), started, ai, undefined, { outcome: 'notify', decidedBy: 'alwaysNotify', reason: 'A reply in a thread you started.' }],
+    ['threads you follow', candidate({ topicId: thread, facts: { followed: true } }), followed, ai, undefined, { outcome: 'notify', decidedBy: 'alwaysNotify', reason: 'A reply in a thread you follow.' }],
+    ['threads you follow include threads you started', candidate({ topicId: thread, facts: { ownerStartedThread: true } }), followed, ai, undefined, { outcome: 'notify', decidedBy: 'alwaysNotify', reason: 'A reply in a thread you started.' }],
+    ['threads you started do not include threads you follow', candidate({ topicId: thread, facts: { followed: true } }), started, ai, fyi, { outcome: 'stay', decidedBy: 'reading' }],
+    // 5. AI assist off.
+    ['AI assist off: a DM notifies', candidate({ channel: maya }), settings, aiOff, undefined, { outcome: 'notify', decidedBy: 'aiOff' }],
+    ['AI assist off: the rest stays', candidate(), settings, aiOff, undefined, { outcome: 'stay', decidedBy: 'aiOff' }],
+    // 6.1 Closers, only after the owner wrote last.
+    ['a thanks after the owner wrote stays', candidate({ channel: maya, senderId: mayaId, text: 'Thanks!', facts: live }), { ...settings, people: {} }, ai, undefined, { outcome: 'stay', decidedBy: 'closer', reason: 'Maya thanked you. Nothing to do.' }],
+    ['an emoji closer stays', candidate({ channel: maya, text: '👍', facts: live }), settings, ai, undefined, { outcome: 'stay', decidedBy: 'closer' }],
+    ['"Yep!" is a closer', candidate({ channel: maya, text: 'Yep!', facts: live }), settings, ai, undefined, { outcome: 'stay', decidedBy: 'closer' }],
+    ['"nice" is a closer', candidate({ channel: group, text: 'nice', facts: live }), settings, ai, undefined, { outcome: 'stay', decidedBy: 'closer' }],
+    ['"sure?" is a closer', candidate({ channel: maya, text: 'sure?', facts: live }), settings, ai, undefined, { outcome: 'stay', decidedBy: 'closer' }],
+    ['"nice…" is a closer', candidate({ channel: maya, text: 'nice…', facts: live }), settings, ai, undefined, { outcome: 'stay', decidedBy: 'closer' }],
+    ['a question to someone else in a channel stays', candidate({ mentionsOthers: ['Dev Patel'], facts: { ownerWroteMinutesAgo: 2 } }), settings, ai, asks, { outcome: 'stay', decidedBy: 'addressedElsewhere', reason: 'Asks Dev, not you.' }],
+    ['a question to someone else that also names the owner is read', candidate({ mentionsOthers: ['Dev Patel'], mentionsMe: true, mentionsMeDirectly: true }), { ...settings, alwaysNotify: { mentions: false } }, ai, undefined, { needsReading: true }],
+    ['a question to someone else in a group DM stays', candidate({ channel: group, mentionsOthers: ['Maya Chen'] }), settings, ai, undefined, { outcome: 'stay', decidedBy: 'addressedElsewhere', reason: 'Asks Maya, not you.' }],
+    ['a name in a one-to-one DM is not addressed elsewhere', candidate({ channel: maya, mentionsOthers: ['Dev Patel'] }), settings, ai, undefined, { needsReading: true }],
+    ['"sounds good." is a closer', candidate({ channel: maya, text: 'Sounds good.', facts: live }), settings, ai, undefined, { outcome: 'stay', decidedBy: 'closer' }],
+    ['a closer with a question is not one', candidate({ channel: maya, text: 'thanks, can you approve?', facts: live }), settings, ai, undefined, { outcome: 'notify', decidedBy: 'live' }],
+    ['a closer when the owner did not write last is read', candidate({ channel: maya, text: 'thanks', facts: { ownerWroteLast: false } }), settings, ai, undefined, { needsReading: true }],
+    // 6.2 A live conversation.
+    ['the owner wrote 2 minutes ago', candidate({ channel: maya, text: 'yes, Thursday', facts: { ownerWroteMinutesAgo: 2 } }), settings, ai, undefined, { outcome: 'notify', decidedBy: 'live', reason: 'You were talking with Leo 2 minutes ago.' }],
+    ['the owner wrote 30 minutes ago', candidate({ channel: maya, text: 'yes, Thursday', facts: { ownerWroteMinutesAgo: 30 } }), settings, ai, undefined, { needsReading: true }],
+    // 6.3 The reading: instructions, then the needs-you sum.
+    ['the reading says it asks in a DM', candidate({ senderId: sam, channel: maya }), { ...settings, people: {} }, ai, asks, { outcome: 'notify', decidedBy: 'reading', reason: 'Sam asks you something.' }],
+    ['a room question in someone else\'s followed thread stays', candidate({ topicId: thread, facts: { followed: true } }), settings, ai, asks, { outcome: 'stay', decidedBy: 'reading', reason: 'Leo asks everyone, not you.' }],
+    ['a room question in the owner\'s own thread notifies', candidate({ topicId: thread, facts: { followed: true, ownerStartedThread: true } }), settings, ai, asks, { outcome: 'notify', decidedBy: 'reading', reason: 'Leo asks you something.' }],
+    ['an ask counts in a channel after the owner wrote last', candidate({ facts: { ownerWroteLast: true, ownerWroteMinutesAgo: 30 } }), settings, ai, asks, { outcome: 'notify', decidedBy: 'reading' }],
+    ['an ask counts in a channel when the owner is named', candidate({ mentionsMe: true, mentionsMeDirectly: true }), { ...settings, alwaysNotify: { mentions: false } }, ai, asks, { outcome: 'notify', decidedBy: 'reading' }],
+    ['an answer always counts', candidate(), settings, ai, read('answer', { answer: 0.6, fyi: 0.4 }), { outcome: 'notify', decidedBy: 'reading', reason: 'Leo answered your question.' }],
+    ['the reading says it is an update', candidate(), settings, ai, fyi, { outcome: 'stay', decidedBy: 'reading', reason: 'An update with nothing asked of you.' }],
+    ['the options that count add up', candidate({ topicId: thread, facts: { ownerStartedThread: true } }), settings, ai, read('fyi', { ask: 0.2, decision: 0.2, serious: 0.1, fyi: 0.5 }), { outcome: 'notify', decidedBy: 'reading', reason: 'Leo asks you something.' }],
+    ['a decision in a thread the owner started notifies', candidate({ topicId: thread, facts: { ownerStartedThread: true } }), settings, ai, read('decision', { decision: 0.9 }), { outcome: 'notify', reason: 'A decision is being made in #hiring.' }],
+    ['a decision elsewhere stays', candidate(), settings, ai, read('decision', { decision: 0.9 }), { outcome: 'stay', decidedBy: 'reading', reason: 'A discussion in #hiring, with nothing asked of you.' }],
+    ['a Notify me instruction at 0.7', candidate(), settings, ai, read('fyi', { fyi: 1 }, { id: 'contracts', confidence: 0.7 }), { outcome: 'notify', decidedBy: 'instruction', reason: 'Your instructions: Notify me: contracts', instructionId: 'contracts' }],
+    ['a Notify me instruction below 0.7 falls to the sum', candidate(), settings, ai, read('fyi', { fyi: 1 }, { id: 'contracts', confidence: 0.69 }), { outcome: 'stay', decidedBy: 'reading' }],
+    ["a Don't notify instruction at 0.85", candidate(), settings, ai, read('greeting', { ask: 0.6, greeting: 0.4 }, { id: 'greet', confidence: 0.85 }), { outcome: 'stay', decidedBy: 'instruction', reason: "Your instructions: Don't notify: greetings" }],
+    ["a Don't notify instruction below 0.85 falls to the sum", candidate({ channel: maya }), settings, ai, read('ask', { ask: 0.6, greeting: 0.4 }, { id: 'greet', confidence: 0.8 }), { outcome: 'notify', decidedBy: 'reading' }],
+    ['a removed instruction is ignored', candidate(), settings, ai, read('fyi', { fyi: 1 }, { id: 'gone', confidence: 1 }), { outcome: 'stay', decidedBy: 'reading' }],
+    ['no reading in time: a DM notifies', candidate({ channel: maya }), settings, ai, 'failed', { outcome: 'notify', decidedBy: 'timeout', reason: "Juno couldn't read this in time." }],
+    ['no reading in time: a channel message stays', candidate(), settings, ai, 'failed', { outcome: 'stay', decidedBy: 'timeout' }],
+    // 7. A banner holds the conversation for a minute.
+    ['a second message within 10 seconds of a banner stays', candidate({ channel: incidents as never, facts: { bannerSecondsAgo: 9 } }), settings, ai, undefined, { outcome: 'stay', decidedBy: 'burst' }],
+    ['10 seconds after a banner a message is decided on its own', candidate({ channel: incidents as never, facts: { bannerSecondsAgo: 10 } }), settings, ai, undefined, { outcome: 'notify', decidedBy: 'always' }],
+  ] as const)('%s', (_name, message, config, context, reading, expected) => {
+    expect(decideNotification(message, config, context, reading)).toMatchObject(expected)
   })
 })
 
@@ -205,9 +238,10 @@ describe('incoming huddle', () => {
     expect(huddle('C0PRODUCT', 'U0LEO', at(SAT, 10))).toBe('quiet')
   })
 
-  it('follows Every message and Never on the conversation or the person who started it, Every message first', () => {
-    expect(huddle('C0INCIDENTS', 'U0LEO', at(SAT, 23))).toBe('ring')
-    expect(huddle('C0PRODUCT', mayaId, at(SAT, 23))).toBe('ring')
+  it('follows Always and Never on the conversation or the person who started it, Always first', () => {
+    expect(huddle('C0INCIDENTS', 'U0LEO', at(MON, 10))).toBe('ring')
+    expect(huddle('C0INCIDENTS', 'U0LEO', at(SAT, 23))).toBe('quiet')
+    expect(huddle('C0PRODUCT', mayaId, at(MON, 10))).toBe('ring')
     expect(huddle(eng.id, 'U0LEO', at(MON, 10))).toBe('quiet')
     expect(huddle('C0PRODUCT', 'U0SAM', at(MON, 10))).toBe('quiet')
     expect(huddle(eng.id, mayaId, at(MON, 10))).toBe('ring')

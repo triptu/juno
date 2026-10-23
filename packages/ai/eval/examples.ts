@@ -10,6 +10,7 @@
 import type { ChannelId, TopicId, UserId } from '@juno/domain'
 import type { AiMessage, Static, StructuredTask, Task, TextTask, TSchema } from '../src/index'
 import { tasks } from '../src/index'
+import { INSTRUCTION_NOTIFY_CONFIDENCE, INSTRUCTION_STAY_CONFIDENCE, NEEDS_YOU_THRESHOLD, type Instruction } from '@juno/domain'
 
 const T = (id: string) => id as TopicId
 const C = (id: string) => id as ChannelId
@@ -167,54 +168,11 @@ export const examples: ReadonlyArray<Example> = [
   ),
 
 
-  ex(
-    tasks.urgencyGate,
-    'incident in a channel',
-    { messageTs: '1728812000.000100', channel: '#incidents', channelKind: 'public', sender: 'Jonas Weber', text: 'Checkout is returning 500s for about 20% of requests since 09:05. Looking now, could use a second pair of eyes.', mentionsMe: false, now: NOW },
-    (o) => o.notify,
-  ),
-  ex(
-    tasks.urgencyGate,
-    'question to me in a DM with a deadline',
-    { messageTs: '1728812100.000100', channel: 'Maya Chen', channelKind: 'im', sender: 'Maya Chen', text: 'Can you review the pricing page copy before the 2pm call?', mentionsMe: false, now: NOW },
-    (o) => o.notify,
-  ),
-  ex(
-    tasks.urgencyGate,
-    'chatter with a mention',
-    { messageTs: '1728812200.000100', channel: '#social', channelKind: 'public', sender: 'Priya Raman', text: 'haha thanks @tushar, the cake was great', mentionsMe: true, now: NOW },
-    (o) => !o.notify,
-  ),
-  ex(
-    tasks.urgencyGate,
-    'status update',
-    { messageTs: '1728812300.000100', channel: '#platform', channelKind: 'public', sender: 'Dev Patel', text: 'FYI the nightly backup job moved to 02:00 UTC. No action needed.', mentionsMe: false, now: NOW },
-    (o) => !o.notify,
-  ),
-  ex(
-    tasks.urgencyGate,
-    'blocked person waiting on me',
-    { messageTs: '1728812400.000100', channel: '#eng', channelKind: 'public', sender: 'Sam Okafor', text: '@tushar I cannot merge the schema PR until you approve it, and the release cut is at 15:00.', mentionsMe: true, now: NOW },
-    (o) => o.notify,
-  ),
-  ex(
-    tasks.urgencyGate,
-    'bot deploy notice',
-    { messageTs: '1728812500.000100', channel: '#deploys', channelKind: 'public', sender: 'Deploy Bot', text: 'web v3.12.0 deployed to production (no changes to migrations)', mentionsMe: false, now: NOW },
-    (o) => !o.notify,
-  ),
-  ex(
-    tasks.urgencyGate,
-    'meeting starting now',
-    { messageTs: '1728812600.000100', channel: '#design', channelKind: 'public', sender: 'Elena Ruiz', text: '@tushar design review is starting now in room 4, we are waiting for you', mentionsMe: true, now: NOW },
-    (o) => o.notify,
-  ),
-  ex(
-    tasks.urgencyGate,
-    'lunch plans in a DM',
-    { messageTs: '1728812700.000100', channel: 'Leo Park', channelKind: 'im', sender: 'Leo Park', text: 'ramen place at 1?', mentionsMe: false, now: NOW },
-    (o) => !o.notify,
-  ),
+  ...readingExamples(),
+  ex(tasks.instructionRule, 'always for one person', { text: 'Always notify me when Maya messages me', people: [people[0]!], channels: [] }, (o) => o.rule?.kind === 'person' && o.rule.id === 'U0MAYA' && o.rule.level === 'always'),
+  ex(tasks.instructionRule, 'never for one channel', { text: "Don't notify me about #eng", people: [], channels: [channels[0]!] }, (o) => o.rule?.kind === 'channel' && o.rule.id === 'C0ENG' && o.rule.level === 'never'),
+  ex(tasks.instructionRule, 'a subject from one person is not a rule', { text: 'Notify me when Maya asks about the budget', people: [people[0]!], channels: [] }, (o) => o.rule === null),
+  ex(tasks.instructionRule, 'a subject is not a rule', { text: 'social plans', people: [], channels: [] }, (o) => o.rule === null),
 
   ex(
     tasks.parseCommand,
@@ -381,3 +339,45 @@ export const examples: ReadonlyArray<Example> = [
 export const decisionExamples: ReadonlyArray<Example & { readonly expect: (output: never) => boolean }> = examples.filter(
   (e): e is Example & { readonly expect: (output: never) => boolean } => e.expect !== undefined,
 )
+
+type ReadingInput = Parameters<typeof tasks.notificationReading.render>[0]
+type ReadingOutput = Static<typeof tasks.notificationReading.output>
+
+/** Whether a reading notifies, with the thresholds `decideNotification` applies. */
+function notifies(o: ReadingOutput, input: ReadingInput): boolean {
+  const chosen = input.instructions.find((item) => item.id === o.instruction?.id)
+  if (chosen !== undefined && o.instruction !== null) {
+    if (chosen.direction === 'notify' && o.instruction.confidence >= INSTRUCTION_NOTIFY_CONFIDENCE) return true
+    if (chosen.direction === 'stay' && o.instruction.confidence >= INSTRUCTION_STAY_CONFIDENCE) return false
+  }
+  const p = o.probabilities
+  // As `decideNotification` counts them: an ask only where it is put to the owner, a decision only in a thread the owner started.
+  const asked = input.kind === 'dm' || input.kind === 'group DM' || input.facts.ownerStartedThread || input.facts.ownerWroteLast || input.mentionsMe
+  return (p['answer'] ?? 0) + (p['follow_up'] ?? 0) + (p['serious'] ?? 0) + (asked ? p['ask'] ?? 0 : 0) + (input.facts.ownerStartedThread ? p['decision'] ?? 0 : 0) >= NEEDS_YOU_THRESHOLD
+}
+
+function readingExamples(): ReadonlyArray<Example> {
+  const noFacts = { ownerWroteLast: false, ownerStartedThread: false, senderWroteSinceOwner: false, exchangesLast30Days: 0 }
+  const greetings: Instruction = { id: 'i1', direction: 'stay', text: 'greetings' }
+  const social: Instruction = { id: 'i2', direction: 'stay', text: 'social plans' }
+  const contracts: Instruction = { id: 'i3', direction: 'notify', text: 'anything about the contract renewal' }
+  let n = 0
+  const reading = (label: string, input: Partial<ReadingInput> & Pick<ReadingInput, 'sender' | 'text'>, notify: boolean): Example => {
+    const full: ReadingInput = { messageTs: `1728812${String(n++).padStart(3, '0')}.000100`, where: input.sender, kind: 'dm', mentionsMe: false, now: NOW, before: [], facts: noFacts, instructions: [], ...input }
+    return ex(tasks.notificationReading, label, full, (o) => notifies(o, full) === notify)
+  }
+  return [
+    reading('incident in a channel', { where: '#incidents', kind: 'channel', sender: 'Jonas Weber', text: 'Checkout is returning 500s for about 20% of requests since 09:05. @tushar could use a second pair of eyes.', mentionsMe: true }, true),
+    reading('question in a DM with a deadline', { sender: 'Maya Chen', text: 'Can you review the pricing page copy before the 2pm call?' }, true),
+    reading('a mixed greeting and ask, with a greetings instruction', { sender: 'Sam Okafor', text: 'hey! can you approve the contract by 3?', instructions: [greetings] }, true),
+    reading('a bare greeting, with a greetings instruction', { sender: 'Sam Okafor', text: 'hey, morning!', instructions: [greetings] }, false),
+    reading('a cold greeting', { sender: 'Priya Raman', text: 'hi Tushar 👋' }, false),
+    reading('lunch plans, with a social plans instruction', { sender: 'Leo Park', text: 'lunch at the ramen place at 1? Elena is in too', instructions: [social, greetings] }, false),
+    reading('an answer to my question', { sender: 'Elena Ruiz', text: 'Yes, the Figma file has the final version.', before: [m('Tushar', 'Is the Figma file final?', 20, true)] }, true),
+    reading('a follow-up I did not answer', { sender: 'Dev Patel', text: 'Any thoughts on the migration window? Need to book it today.', before: [m('Dev Patel', 'Can you pick a migration window?', 120)], facts: { ...noFacts, senderWroteSinceOwner: true } }, true),
+    reading('status update in a channel', { where: '#platform', kind: 'channel', sender: 'Dev Patel', text: 'FYI the nightly backup job moved to 02:00 UTC. No action needed.', mentionsMe: true }, false),
+    reading('chatter in a thread', { where: '#social', kind: 'thread', sender: 'Priya Raman', text: 'haha the cake was great', threadRoot: m('Elena Ruiz', 'Cake in the kitchen!', 30) }, false),
+    reading('a contract update, with a contract instruction', { where: '#legal', kind: 'channel', sender: 'Maya Chen', text: 'Contract renewal draft from Acme just came in, redlines attached.', instructions: [contracts, greetings] }, true),
+    reading('a blocked person in a thread I started', { where: '#eng', kind: 'thread', sender: 'Sam Okafor', text: 'I cannot merge the schema PR until you approve it, and the release cut is at 15:00.', threadRoot: m('Tushar', 'Schema PR for the billing tables', 60, true), facts: { ...noFacts, ownerStartedThread: true } }, true),
+  ]
+}

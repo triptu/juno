@@ -196,7 +196,7 @@ const restorePayload = {
 /** What a Notify me choice applies to: a thread topic id, a channel or DM id, or a user id. */
 export const NotifyTargetSchema = Schema.Struct({ kind: Schema.Literals(['thread', 'channel', 'person']), id: Schema.String })
 export type NotifyTargetView = typeof NotifyTargetSchema.Type
-export const NotifyChoiceSchema = Schema.Literals(['every', 'matters', 'never'])
+export const NotifyChoiceSchema = Schema.Literals(['always', 'auto', 'never'])
 
 /**
  * A topic's stored drawing as `art.restore` writes it back: the `topic_art`

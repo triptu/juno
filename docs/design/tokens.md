@@ -482,6 +482,7 @@ All [proto] measured at 1280×800 with Inter unless marked.
 | `--sign-in-art-width` | 330px: each side of the sign-in page's pebble art, the box its pebbles are placed in |
 | `--page-width` | 720px (Juno) |
 | `--page-width-settings` | 760px: every section of Settings, so the sections share one column and one title edge |
+| `--settings-label-width` | 260px: the label column of a Settings row with controls beside it (Notifications' Always and Never, Test notification) |
 | `--settings-nav-width` | 200px: Settings' list of sections, with the sidebar's 10px inset on both sides; fits "Backup & This Mac" |
 | `--list-row-wrap-min` | 200px: the narrowest a wrapping ListRow's text gets before its controls move under it |
 | `--all-topics-columns` | All topics grid: `minmax(200px, 1fr) minmax(72px, 150px) 104px 44px 84px`; `--all-topics-columns-narrow` drops Where under a 648px table, `--all-topics-columns-narrowest` drops Msgs under 576px; `--all-topics-columns-compact` (`minmax(0, 1fr) 84px`) drops Status under 516px, so the table never scrolls sideways |
