@@ -1,11 +1,12 @@
 // Shared by the outbox action tests (`actions.test.ts`, `reactions.test.ts`):
-// one booted engine per test on the fake, #eng's Main window, and readers of
-// Slack's and the store's state.
+// one engine per test, warm on a copy of the synced default workspace, #eng's
+// Main window, and readers of Slack's and the store's state.
 import { afterEach } from 'bun:test'
 import type { MessageRef, MessageView } from '@juno/contract'
 import { messagesAtom, sendMessage, type ListWindow } from '@juno/state'
 import { waitFor, WAIT_MS, type RunningEngine } from './harness'
 import { bootedEngine, quiet, readDb, restart, valueOf } from './scenario'
+import { syncedEngine, type SyncedOptions } from './synced'
 
 const engines: Array<RunningEngine> = []
 const unmounts: Array<() => void> = []
@@ -25,8 +26,9 @@ export const restarted = (first: RunningEngine, whileStopped: Parameters<typeof 
 export const MAIN = 'm:C0ENG'
 export const eng = { kind: 'channel', channelId: 'C0ENG' } as const
 
-export const booted = async (options: Parameters<typeof bootedEngine>[1] = {}) => {
-  const engine = await bootedEngine(engines, options)
+/** An engine live on the default seed, warm on the synced workspace; `firstSync` cold-boots instead, for a test of state only the first sync leaves. */
+export const booted = async ({ firstSync = false, ...options }: SyncedOptions & { readonly firstSync?: boolean } = {}) => {
+  const engine = firstSync ? await bootedEngine(engines, options) : await syncedEngine(engines, options)
   await quiet(engine)
   engine.fake.resetCalls()
   return engine

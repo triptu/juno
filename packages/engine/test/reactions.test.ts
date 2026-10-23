@@ -195,7 +195,7 @@ describe('reactions: refused or waiting', () => {
 
 describe('reactions from pages', () => {
   it('stores the reactions of a thread reply discovery found by search, when the thread opens', async () => {
-    const engine = await booted()
+    const engine = await booted({ firstSync: true })
     await quiet(engine)
     const reply = engine.fake.messages('C0ENG').find((m) => m.text?.startsWith('We keep the old primary warm'))!
     const stored = () => readDb(engine, 'cache.db', (db) => db.prepare('SELECT name, count, me FROM reactions WHERE channel = ? AND ts = ?').all('C0ENG', reply.ts))
