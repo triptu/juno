@@ -35,6 +35,7 @@ test('local and fallback runs archive eligible records, refresh coverage, and pr
   writeFileSync(join(root, 'bin/bun'), `#!/usr/bin/env node
 const fs = require('node:fs');
 const argv = process.argv.slice(2);
+if (argv[0] === '--version') { console.log('1.4.4'); process.exit(0); }
 const [suite, ...args] = argv[0] === 'run' ? argv.slice(1) : argv;
 fs.appendFileSync(process.env.TEST_CALLS, JSON.stringify({suite,args,held:process.env.JUNO_HEAVY_HELD,skip:process.env.JUNO_SKIP_TAGS,coverage:process.env.JUNO_COVERAGE,workers:process.env.JUNO_E2E_WORKERS})+'\\n');
 if (suite === 'install') { fs.writeFileSync('installed', 'yes'); process.exit(0); }
@@ -61,11 +62,11 @@ console.error('Connection refused'); process.exit(255);
   const invoke = (args, extra = {}) => spawnSync(process.execPath, ['scripts/verify-main.mjs', '--ref', 'HEAD', ...args], { cwd: root, env: { ...env, ...extra }, encoding: 'utf8', timeout: 60_000 })
   const dry = invoke(['--local', '--dry-run', '--nightly'])
   assert.equal(dry.status, 0, dry.stderr)
-  assert.match(dry.stdout, /SPECS_CACHE=off.*specs:check --no-cache/)
+  assert.match(dry.stdout, /SPECS_SEED=\d+ specs:check/)
   assert.match(dry.stdout, /test:desktop --grep @mac, then perf, then test:feel/)
   assert.equal(existsSync(join(root, '.juno-status')), false)
   assert.equal(existsSync(env.TEST_CALLS), false)
-  for (const [args, failing] of [[['--local'], false], [[], false], [['--local', '--with-mac'], true]]) {
+  for (const [args, failing] of [[['--local'], false], [['--nightly'], false], [['--local', '--with-mac', '--no-cache'], true]]) {
     writeFileSync(env.TEST_CALLS, '')
     const result = invoke(args, { TEST_FAIL_SUITE: failing ? 'specs:conformance' : '' })
     assert.equal(result.status, failing ? 1 : 0, result.stderr + result.stdout)
@@ -73,19 +74,23 @@ console.error('Connection refused'); process.exit(255);
     assert.deepEqual(summary.execution, { mode: 'local', host: hostname() })
     assert.equal(assessRecord(summary), !failing)
     assert.equal(summary.passed, !failing)
-    assert.deepEqual(summary.suites.slice(0, 5).map((s) => s.suite), ['test', 'specs:check', 'specs:conformance', 'test:gallery', 'test:desktop'])
+    assert.deepEqual(summary.suites.filter((s) => summary.required.includes(s.suite)).map((s) => s.suite).toSorted(), ['test', 'specs:check', 'specs:conformance', 'test:gallery', 'test:desktop'].toSorted())
     assert.ok(summary.suites.every((s) => s.host === hostname()))
-    const map = JSON.parse(readFileSync(join(root, 'apps/desktop/e2e/coverage-map.json'), 'utf8'))
-    assert.equal(map.commit, commit)
-    assert.deepEqual(map.files, { 'apps/desktop/src/main.ts': [0] })
     const calls = readFileSync(env.TEST_CALLS, 'utf8').trim().split('\n').map(JSON.parse)
-    assert.deepEqual(calls.slice(0, 6).map((c) => c.suite), ['install', 'test', 'specs:check', 'specs:conformance', 'test:gallery', 'test:desktop'])
-    assert.ok(calls.slice(0, 6).every((c) => c.held === '1'))
-    assert.equal(calls[5].coverage, '1')
-    assert.equal(calls[5].skip, '@mac')
-    assert.equal(calls[5].workers, '1')
+    const desktop = calls.find((c) => c.suite === 'test:desktop')
+    assert.equal(desktop.coverage, args.includes('--nightly') ? '1' : undefined)
+    assert.equal(desktop.skip, '@mac')
+    assert.equal(desktop.workers, '1')
+    if (args.includes('--nightly')) {
+      const map = JSON.parse(readFileSync(join(root, 'apps/desktop/e2e/coverage-map.json'), 'utf8'))
+      assert.equal(map.commit, commit)
+      assert.deepEqual(map.files, { 'apps/desktop/src/main.ts': [0] })
+      assert.ok(summary.suites.find((s) => s.suite === 'specs:conformance').reusedFrom)
+      assert.ok(!calls.some((c) => c.suite === 'specs:conformance'))
+    }
     if (failing) {
-      assert.equal(summary.suites[2].code, 7)
+      assert.equal(summary.suites.find((s) => s.suite === 'specs:conformance').code, 7)
+      assert.equal(summary.suites.find((s) => s.suite === 'specs:conformance').cause.category, 'test')
       assert.deepEqual(calls.slice(6).map((c) => c.suite), ['test:desktop', 'perf', 'test:feel'])
       assert.deepEqual(calls[6].args, ['--grep', '@mac'])
       assert.equal(calls[6].skip, undefined)
@@ -94,4 +99,42 @@ console.error('Connection refused'); process.exit(255);
   assert.equal(readFileSync(env.TEST_PROBES, 'utf8'), 'probe\n')
   assert.equal(readRecords(join(root, '.juno-status')).filter((r) => r.execution).length, 3)
   assert.equal(releaseGate(root, commit).record.passed, true)
+})
+
+test('repair selects failed and unfinished files plus every reached spec, and refuses another runtime', async () => {
+  const { repairPlan, mergeRepairTests } = await import('./verify-repair.mjs')
+  const identity = { bun: '1.4.4', platform: 'linux', arch: 'x64', electron: '44.7.0' }
+  const item = (file, outcome, attempts = [{ status: 'passed' }]) => ({ file: `apps/desktop/e2e/${file}.spec.ts`, project: 'electron', outcome, attempts })
+  const previous = { status: 'failed', errors: 0, incomplete: 1, failures: [], cases: [item('good', 'expected'), item('bad', 'unexpected', [{ status: 'failed' }]), item('unfinished', 'skipped', [])] }
+  const baseline = { commit: 'a', finishedAt: 'then', identity, suites: [{ suite: 'test:desktop', code: 1, tests: previous }, { suite: 'test:gallery', code: 0 }] }
+  const suites = ['test:desktop', 'test:gallery', 'test'].map((name) => ({ name, words: [name] }))
+  const affected = [{ script: 'test:desktop', args: ['e2e/reached.spec.ts'], items: [] }]
+  const result = repairPlan({ baseline, identity, suites, affected })
+  assert.deepEqual(result.planned[0].words, ['test:desktop', 'e2e/bad.spec.ts', 'e2e/unfinished.spec.ts', 'e2e/reached.spec.ts'])
+  assert.equal(result.reused[0].suite, 'test:gallery')
+  assert.deepEqual(result.planned[1].words, ['test'])
+  assert.throws(() => repairPlan({ baseline, identity: { ...identity, platform: 'darwin' }, suites, affected }), /runtime/)
+  const repaired = mergeRepairTests(previous, { status: 'passed', errors: 0, incomplete: 0, failures: [], cases: [item('bad', 'expected'), item('unfinished', 'expected'), item('reached', 'expected')] })
+  assert.equal(repaired.cases.length, 4)
+  assert.equal(repaired.failures.length, 0)
+  assert.equal(repaired.incomplete, 0)
+  assert.equal(repairPlan({ baseline, identity, suites, affected: [{ script: 'test:desktop', args: [] }] }).planned[0].words.length, 1)
+})
+
+test('runtime and platform changes invalidate recorded results; reports survive checkout removal', async (t) => {
+  const { inputKey } = await import('./verify-inputs.mjs')
+  const { keepReports } = await import('./verify-reports.mjs')
+  const root = mkdtempSync(join(scratchFolder(), 'verify-input-test-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const checkout = join(root, 'checkout')
+  const report = 'apps/desktop/test-results/results.json'
+  mkdirSync(join(checkout, 'apps/desktop/test-results'), { recursive: true })
+  writeFileSync(join(checkout, report), '{"suites":[],"stats":{"duration":12}}')
+  const identity = { bun: '1', platform: 'linux', arch: 'x64', electron: '44' }
+  const key = inputKey(checkout, [report], identity)
+  for (const field of ['bun', 'platform', 'arch', 'electron']) assert.notEqual(inputKey(checkout, [report], { ...identity, [field]: 'different' }), key)
+  const kept = keepReports(checkout, join(root, 'status'), 0)
+  rmSync(checkout, { recursive: true, force: true })
+  assert.equal(kept.length, 1)
+  assert.equal(JSON.parse(readFileSync(kept[0], 'utf8')).stats.duration, 12)
 })

@@ -1,0 +1,1 @@
+- 10-24 03:14 · affected-time-budget · Replace the ten-spec branch cap with 300 estimated test seconds for optional coverage picks; changed and named specs remain mandatory, and every reachable candidate runs when its timings fit. Run every reached gallery component and rely on its content cache (owner).

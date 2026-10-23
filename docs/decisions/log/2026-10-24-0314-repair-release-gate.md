@@ -1,0 +1,1 @@
+- 10-24 03:14 · repair-release-gate · Let a repair pass the release gate after rerunning failed and unfinished files plus all work the fix reaches through the import graph, without count or time caps. Keep baseline provenance and require the same runtime/platform; missing structured inventories rerun whole suites (owner).

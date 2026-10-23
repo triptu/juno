@@ -100,9 +100,27 @@ test('tool changes keep the desktop smoke spec through the final input filter', 
 })
 
 test('a root config change keeps changed desktop specs and their private helpers mandatory', () => {
-  const steps = plan('--max-specs', '0', '--files', 'package.json,apps/desktop/e2e/mentions.spec.ts,apps/desktop/e2e/idleJourney.ts').steps
+  const steps = plan('--budget-seconds', '0', '--files', 'package.json,apps/desktop/e2e/mentions.spec.ts,apps/desktop/e2e/idleJourney.ts').steps
   const desktop = steps.find((step) => step.script === 'test:desktop')?.items ?? []
   assert.ok(desktop.includes('apps/desktop/e2e/mentions.spec.ts'))
   assert.ok(desktop.includes('apps/desktop/e2e/idle-cpu.spec.ts'))
   assert.ok(!desktop.some((file) => file.endsWith('.perf.spec.ts')))
+})
+
+test('protocol checks follow their own inputs, not unrelated sync or UI edits', () => {
+  const scripts = (file) => plan('--batch', '--files', file).steps.map((step) => step.script)
+  assert.ok(scripts('specs/readstate.qnt').includes('specs:check'))
+  assert.ok(!scripts('specs/readstate.qnt').includes('specs:conformance'))
+  assert.ok(scripts('packages/engine/src/send/worker.ts').includes('specs:conformance'))
+  assert.ok(!scripts('packages/engine/src/send/worker.ts').includes('specs:check'))
+  for (const file of ['packages/sync/src/follow.ts', 'packages/views/src/Topic.tsx']) {
+    assert.ok(!scripts(file).includes('specs:check'))
+    assert.ok(!scripts(file).includes('specs:conformance'))
+  }
+})
+
+test('a repair conservatively reruns app suites when a deleted source cannot be followed in the current graph', () => {
+  const result = plan('--wide', '--graph', '--files', 'packages/domain/src/deleted-rule.ts')
+  assert.ok(result.steps.some((step) => step.script === 'test' && step.args.length === 0))
+  assert.ok(result.steps.some((step) => step.script === 'test:desktop' && step.args.length === 0))
 })

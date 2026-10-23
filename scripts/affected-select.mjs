@@ -9,8 +9,8 @@ export const MAX_MAP_AGE_DAYS = 3
 const SOURCE = /\.(ts|tsx|mts|js|mjs|cjs)$/
 const DRIVER = /^apps\/desktop\/e2e\/driver\//
 
-/** At most this many desktop specs come from coverage in a narrow plan; changed and named specs come on top. */
-export const MAX_COVERAGE_SPECS = 10
+/** Estimated test seconds for optional coverage picks; required specs always run. */
+export const COVERAGE_BUDGET_SECONDS = 300
 
 /**
  * Returns `{ all }` with a reason when every spec must run, or `{ specs }`, a
@@ -196,21 +196,30 @@ function words(name) {
 }
 
 /**
- * The specs a narrow plan runs: every required spec, then at most `max` of the
- * others, the highest score first. A tie goes to the spec that ran fewer files
+ * The specs a narrow plan runs: every required spec, then optional candidates
+ * within the test-seconds budget, the highest score first. A tie goes to the spec that ran fewer files
  * (`size`), which is usually the quicker one, then by path. Returns the kept
  * reasons and the specs left out.
  */
-export function rankSpecs({ specs, scores, required, max = MAX_COVERAGE_SPECS, size = () => 0 }) {
+export function rankSpecs({ specs, scores, required, budget = COVERAGE_BUDGET_SECONDS, seconds = () => 60, size = () => 0 }) {
+  if (!(budget >= 0)) throw new Error('The spec time budget must be non-negative')
   const order = [...specs.keys()].filter((spec) => !required.has(spec)).toSorted((a, b) => (scores.get(b) ?? 0) - (scores.get(a) ?? 0) || size(a) - size(b) || a.localeCompare(b))
-  const kept = [...[...required].filter((spec) => specs.has(spec)), ...order.slice(0, max)]
-  return { specs: new Map(kept.map((spec) => [spec, specs.get(spec)])), dropped: order.slice(max) }
+  const kept = [...required].filter((spec) => specs.has(spec))
+  const dropped = []
+  let estimatedSeconds = 0
+  for (const spec of order) {
+    const cost = seconds(spec)
+    if (estimatedSeconds + cost <= budget) { kept.push(spec); estimatedSeconds += cost }
+    else dropped.push(spec)
+  }
+  return { specs: new Map(kept.map((spec) => [spec, specs.get(spec)])), dropped, estimatedSeconds }
 }
 
 /** Why the map cannot be used, or undefined when it can. */
-export function mapProblem(map, { now = Date.now(), commitKnown }) {
+export function mapProblem(map, { now = Date.now(), commitKnown, identity }) {
   if (map === undefined) return 'there is no coverage map'
   if (map.version !== 1) return `the coverage map has version ${map.version}`
+  if (identity && JSON.stringify(map.identity) !== JSON.stringify(identity)) return 'the coverage map has a different or unknown runtime/platform'
   if (!commitKnown) return `the coverage map's commit ${String(map.commit).slice(0, 10)} is not in this repository`
   const days = (now - Date.parse(map.recordedAt)) / 86_400_000
   if (!(days <= MAX_MAP_AGE_DAYS)) return `the coverage map is ${Number.isFinite(days) ? `${Math.floor(days)} days` : 'of unknown age and'} old (at most ${MAX_MAP_AGE_DAYS})`

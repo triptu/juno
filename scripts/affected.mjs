@@ -7,7 +7,7 @@
 //   bun run affected --plan --range a..b   plan for what changed between two commits
 //   bun run affected --plan --json   the plan as JSON
 //   bun run affected --spec e2e/tabs.spec.ts   also run that spec (desktop or gallery; repeat or comma-separate)
-//   bun run affected --max-specs 20  allow more coverage-picked desktop specs (default 10)
+//   bun run affected --budget-seconds 300  estimated test time for optional coverage picks
 //   bun run affected --wide          the wide plan: every spec the change can reach, heavy tests included
 //   bun run affected --batch --base <ref>   the batch gate: unit tests, specs:check and conformance only
 //
@@ -16,7 +16,7 @@
 // @juno/* through each package's exports, named imports followed through
 // barrel re-exports) decides what each change reaches; for desktop e2e specs
 // the coverage map narrows it, and the plan runs the changed and named specs
-// and at most 10 more, the most direct first (scripts/affected-select.mjs).
+// and coverage picks within a time budget, the most direct first (scripts/affected-select.mjs).
 // Heavy tests, the Quint checks and the perf suggestion follow the areas in
 // scripts/test-areas.mjs. The rules are in docs/development.md ("Affected
 // tests"); --wide plans as before 10-18. scripts/affected-run.mjs runs the plan.
@@ -29,10 +29,13 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { MAP_PATH } from './coverage-map.mjs'
 import { ImportGraph } from './import-graph.mjs'
-import { driverSpecs, galleryComponents, mapProblem, MAX_COVERAGE_SPECS, rankSpecs, reachSpecs, selectSpecs } from './affected-select.mjs'
-import { HEAVY_AREAS, heavyAreasChanged, inPaths, perfInteractionsChanged, PROTOCOL_PATHS } from './test-areas.mjs'
+import { driverSpecs, galleryComponents, mapProblem, COVERAGE_BUDGET_SECONDS, rankSpecs, reachSpecs, selectSpecs } from './affected-select.mjs'
+import { HEAVY_AREAS, heavyAreasChanged, perfInteractionsChanged } from './test-areas.mjs'
 import { runPlan } from './affected-run.mjs'
 import { nodeTestScripts, unitTestItems } from './affected-tests.mjs'
+import { protocolInputs, runtimeIdentity, sameIdentity } from './verify-inputs.mjs'
+import { readRecords, statusFolder } from './release-gate.mjs'
+import { specDurations } from './verify-records.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
@@ -40,9 +43,10 @@ const flag = (name) => argv.includes(name)
 const values = (name) => argv.flatMap((arg, at) => (arg === name && at + 1 < argv.length ? argv[at + 1].split(',') : []))
 const wide = flag('--wide')
 const batch = flag('--batch')
-const maxSpecs = argv.includes('--max-specs') ? Number(argv[argv.indexOf('--max-specs') + 1]) : MAX_COVERAGE_SPECS
-/** At most this many gallery components go through the shift guard, unless the gallery harness changed. */
-const MAX_SHIFT_COMPONENTS = 10
+const budget = argv.includes('--budget-seconds') ? Number(argv[argv.indexOf('--budget-seconds') + 1]) : COVERAGE_BUDGET_SECONDS
+if (!Number.isFinite(budget) || budget < 0) throw new Error('--budget-seconds must be a non-negative number')
+const identity = runtimeIdentity(root, !flag('--local'))
+const durations = specDurations(readRecords(statusFolder(root)), identity)
 // Branches are cut from origin/main and the local main is often behind it, so the merge base is taken with origin/main when it exists.
 const mergeBase = (ref) => spawnSync('git', ['merge-base', 'HEAD', ref], { cwd: root, encoding: 'utf8' }).stdout.trim()
 const base = argv.includes('--base') ? argv[argv.indexOf('--base') + 1] : mergeBase('origin/main') || mergeBase('main')
@@ -68,7 +72,8 @@ const dependencies = ['bun.lock', 'bunfig.toml', 'package.json', 'tsconfig.base.
 /** The tools that plan and run the suites: a change runs the tool tests and one spec end to end (--wide: everything). */
 const tools = ['scripts/affected.mjs', 'scripts/affected-select.mjs', 'scripts/affected-run.mjs', 'scripts/affected-tests.mjs', 'scripts/unit.mjs', 'scripts/plan.mjs', 'scripts/test-areas.mjs', 'scripts/import-graph.mjs', 'scripts/coverage-map.mjs', 'scripts/remote.mjs', 'scripts/heavy.mjs', 'scripts/build-cached.mjs', 'scripts/without-run-as-node.mjs']
 const toolChanged = changed.filter((file) => tools.includes(file) || file.startsWith('scripts/remote/'))
-const everythingChanged = [...changed.filter((file) => dependencies.includes(file)), ...(wide ? toolChanged : [])]
+const deletedSources = wide ? changed.filter((file) => /^(apps|packages)\//.test(file) && !file.endsWith('.md') && !files.has(file)) : []
+const everythingChanged = [...changed.filter((file) => dependencies.includes(file)), ...(wide ? toolChanged : []), ...deletedSources]
 
 const graph = new ImportGraph(root, files)
 const closure = (file) => graph.closure(file)
@@ -105,7 +110,7 @@ const hashOf = (file) => {
 }
 const shared = ['bun.lock', 'bunfig.toml', 'package.json', 'tsconfig.base.json']
 const keyOf = (suite, id, inputs) => {
-  const hash = createHash('sha256').update(`${suite}\0${id}\0`)
+  const hash = createHash('sha256').update(`${JSON.stringify(identity)}\0${suite}\0${id}\0${JSON.stringify({ wide, heavy: heavyAreasChanged(changed) })}\0`)
   for (const file of [...new Set([...shared, ...inputs])].toSorted()) hash.update(`${file}\0${hashOf(file)}\0`)
   return hash.digest('hex')
 }
@@ -128,28 +133,19 @@ const unit = pending(unitItems)
 // namesakes in unrelated packages and start every package's test process.
 if (unit.length > 0) plan.push({ script: 'test', args: unit.length === unitItems.length ? [] : ['--files', ...unit.map((item) => item.id)], items: unit, why: `${unit.length} vitest file(s)` })
 
-// Specs. specs:check keeps its own cache of passing Quint runs. A narrow plan
-// adds it when the specs themselves changed, or what they run on (the lockfile
-// carries the Quint version), not for the tools (the wide plan does).
-const specChanges = changed.filter((file) => file.startsWith('specs/') && !file.endsWith('.md'))
-if (everythingChanged.length > 0 || specChanges.length > 0) {
+// Protocol checks follow their inputs, independently of the breadth of e2e selection.
+const protocols = protocolInputs(git('ls-files', '--cached', '--others', '--exclude-standard'), closure)
+const specChanges = changed.filter((file) => protocols['specs:check'].includes(file))
+if (specChanges.length > 0) {
   const only = { 'specs/agent-memory.qnt': '--memory', 'specs/agent-actions.qnt': '--actions', 'specs/agent-recovery.qnt': '--recovery', 'specs/agent-recovery-replay.qnt': '--recovery' }
   const modes = new Set(specChanges.map((file) => only[file] ?? 'all'))
-  const args = everythingChanged.length === 0 && modes.size === 1 && !modes.has('all') ? [...modes] : []
-  plan.push({ script: 'specs:check', args, items: [], why: `${specChanges.length || 'shared'} spec input(s) changed${args.length ? `, ${args[0].slice(2)} only` : ''}` })
+  const args = modes.size === 1 && !modes.has('all') ? [...modes] : []
+  plan.push({ script: 'specs:check', args, items: [], why: `${specChanges.length} spec input(s) changed${args.length ? `, ${args[0].slice(2)} only` : ''}` })
 }
-
-// Conformance: the outbox traces replayed against the engine (specs/README.md,
-// "Conformance"). A narrow plan runs it when the code the specs model changed
-// (PROTOCOL_PATHS: specs/, packages/sync/, the engine's outbox and send code);
-// the wide plan when any file the replay reaches (425 of them) changed. The
-// result is cached under every file the replay reaches either way.
-const conformanceSpecs = ['specs/outbox.qnt', 'specs/outbox-conformance.qnt', 'specs/outbox-checks.mjs', 'specs/conformance.mjs', 'packages/engine/vitest.conformance.config.ts']
-const protocolChanges = changed.filter((file) => inPaths(PROTOCOL_PATHS, file))
-const conformanceItem = { suite: 'conformance', id: 'outbox', inputs: new Set([...closure('packages/engine/test/conformance/outbox.conformance.ts'), ...conformanceSpecs]) }
-const conformanceDue = wide || everythingChanged.length > 0 || protocolChanges.length > 0
-if (conformanceDue && pending([conformanceItem]).length > 0)
-  plan.push({ script: 'specs:conformance', args: [], items: [conformanceItem], why: wide ? 'the outbox spec or the code its replay reaches changed' : `the code the specs model changed: ${protocolChanges.slice(0, 3).join(', ') || everythingChanged[0]}${protocolChanges.length > 3 ? ` and ${protocolChanges.length - 3} more` : ''}` })
+const protocolChanges = changed.filter((file) => protocols['specs:conformance'].includes(file))
+const conformanceItem = { suite: 'conformance', id: 'outbox', inputs: new Set(protocols['specs:conformance']) }
+if (protocolChanges.length > 0 && pending([conformanceItem]).length > 0)
+  plan.push({ script: 'specs:conformance', args: [], items: [conformanceItem], why: `outbox inputs changed: ${protocolChanges.slice(0, 3).join(', ')}` })
 
 // Specs named with --spec run whatever changed: e2e/tabs.spec.ts, apps/desktop/e2e/tabs.spec.ts or geometry.spec.ts (the gallery).
 const named = values('--spec').map((spec) => {
@@ -193,20 +189,8 @@ const gallerySpecItems = [...files]
     return { suite: 'gallery', id: file, opens, inputs: new Set([...closure(file), ...galleryBase, ...reached.flatMap((inputs) => [...inputs])]) }
   })
 for (const item of gallerySpecItems) if (named.includes(item.id)) item.force = true
-let components = batch ? [] : pending(componentItems)
+const components = batch ? [] : pending(componentItems)
 const gallerySpecs = batch ? [] : pending(gallerySpecItems)
-// The shift guard over every component is heavy: a narrow plan walks at most
-// MAX_SHIFT_COMPONENTS, ranked as desktop specs are (a changed file few
-// components reach counts most, a component named like a changed file more).
-let shiftDropped = 0
-if (!wide && !heavyActive.has('gallery') && components.length > MAX_SHIFT_COMPONENTS) {
-  const reach = (file) => componentItems.filter((item) => item.inputs.has(file)).length
-  const changedWords = new Set(changed.map((file) => file.split('/').at(-1).replace(/(\.fixtures)?\.[a-z]+$/, '')))
-  const score = (item) => changed.filter((file) => item.inputs.has(file)).reduce((sum, file) => sum + Math.log(componentItems.length / Math.max(reach(file), 1)), 0) + (changedWords.has(item.id) ? Math.log(componentItems.length) : 0)
-  const ranked = components.map((item) => [item, score(item)]).toSorted((a, b) => b[1] - a[1] || a[0].inputs.size - b[0].inputs.size || a[0].id.localeCompare(b[0].id))
-  shiftDropped = ranked.length - MAX_SHIFT_COMPONENTS
-  components = ranked.slice(0, MAX_SHIFT_COMPONENTS).map(([item]) => item)
-}
 const touchedComponents = new Set(componentItems.filter((item) => touches(item.inputs)).map((item) => item.id))
 const galleryReason = (item) => {
   if (changed.includes(item.id)) return 'the spec changed'
@@ -227,7 +211,7 @@ if (components.length > 0 || gallerySpecs.length > 0) {
     items: [...components, ...gallerySpecs],
     why: all
       ? 'every component and behaviour spec'
-      : `${components.length} component(s) in the shift guard${components.length ? `: ${components.map((item) => item.id).join(', ')}` : ''}${shiftDropped ? ` (${shiftDropped} more reached; the full walk is @heavy)` : ''}; ${gallerySpecs.length} of ${gallerySpecItems.length} behaviour spec file(s)`,
+      : `${components.length} component(s) in the shift guard${components.length ? `: ${components.map((item) => item.id).join(', ')}` : ''}; ${gallerySpecs.length} of ${gallerySpecItems.length} behaviour spec file(s)`,
     reasons: all ? undefined : gallerySpecs.map((item) => [item.id.replace('apps/gallery/', ''), [galleryReason(item)]]),
   })
 }
@@ -284,7 +268,7 @@ function desktopSelection() {
   if (flag('--graph')) return { all: 'asked for by --graph; the import graph decides' }
   const map = existsSync(join(root, MAP_PATH)) ? JSON.parse(readFileSync(join(root, MAP_PATH), 'utf8')) : undefined
   const commitKnown = map !== undefined && spawnSync('git', ['cat-file', '-e', `${map.commit}^{commit}`], { cwd: root }).status === 0
-  const problem = mapProblem(map, { commitKnown })
+  const problem = mapProblem(map, { commitKnown, identity })
   if (problem) return { all: `${problem}; the import graph decides`, graph: true }
   const existed = new Set(git('ls-tree', '-r', '--name-only', map.commit, '--', 'apps', 'packages'))
   const drift = new Set([...changed, ...git('diff', '--name-only', map.commit), ...git('ls-files', '--others', '--exclude-standard')])
@@ -322,12 +306,6 @@ if (!wide && selection.specs) {
     selection.specs.set(smoke, [`${toolChanged[0]} changed; one spec checks that a run still works (--wide runs everything)`])
     selection.required.add(smoke)
   }
-  if (!batch && toolChanged.length > 0 && files.has(smoke)) {
-    const item = specItems.find((candidate) => candidate.id === smoke)
-    item.own = true
-    // A smoke run verifies the tools too; their contents must invalidate its cache.
-    for (const file of git('ls-files', '--cached', '--others', '--exclude-standard', '--', 'scripts')) item.inputs.add(file)
-  }
   // A spec whose every test is heavy runs only when its area changed.
   for (const area of HEAVY_AREAS.filter((entry) => !heavyActive.has(entry.area)))
     for (const spec of area.whole)
@@ -335,9 +313,16 @@ if (!wide && selection.specs) {
   const sizes = new Map()
   const map = existsSync(join(root, MAP_PATH)) ? JSON.parse(readFileSync(join(root, MAP_PATH), 'utf8')) : { specs: [], files: {} }
   for (const at of Object.values(map.files).flat()) sizes.set(map.specs[at], (sizes.get(map.specs[at]) ?? 0) + 1)
-  const ranked = rankSpecs({ specs: selection.specs, scores: selection.scores, required: selection.required, max: maxSpecs, size: (spec) => sizes.get(spec) ?? Infinity })
+  const ranked = rankSpecs({ specs: selection.specs, scores: selection.scores, required: selection.required, budget, seconds: (spec) => durations.get(spec) ?? 60, size: (spec) => sizes.get(spec) ?? Infinity })
   selection.specs = ranked.specs
   desktopDropped = ranked.dropped
+}
+const smoke = 'apps/desktop/e2e/app.spec.ts'
+if (!batch && toolChanged.length > 0 && files.has(smoke)) {
+  const item = specItems.find((candidate) => candidate.id === smoke)
+  item.own = true
+  // A smoke run verifies the tools too; their contents must invalidate its cache.
+  for (const file of git('ls-files', '--cached', '--others', '--exclude-standard', '--', 'scripts')) item.inputs.add(file)
 }
 for (const item of specItems) if (named.includes(item.id)) item.force = true
 // A narrow plan keeps the order picked: changed and named specs, then the most direct first.
@@ -353,7 +338,7 @@ if (specs.length > 0) {
     env: Object.keys(skipEnv).length > 0 ? skipEnv : undefined,
     items: specs,
     why: selection.specs
-      ? `${specs.length} of ${specItems.length} e2e spec file(s)${wide ? ', by the coverage map' : `: the changed and named specs, and the ${maxSpecs} that cover the change most directly`}`
+      ? `${specs.length} of ${specItems.length} e2e spec file(s)${wide ? ', by the coverage map' : `: the changed and named specs, and coverage picks within ${budget} estimated test seconds`}`
       : `every desktop e2e spec: ${selection.all}`,
     reasons: selection.specs ? specs.map((item) => [item.id.replace('apps/desktop/', ''), selection.specs.get(item.id)]) : undefined,
   })
@@ -381,7 +366,7 @@ for (const step of plan) {
   for (const [id, why] of step.reasons ?? []) console.log(`      ${id}: ${why[0]}${why.length > 1 ? ` (and ${why.length - 1} more)` : ''}`)
 }
 if (skipped > 0) console.log(`  (${skipped} item(s) skipped: they passed before with the same inputs; --no-cache runs them)`)
-if (desktopDropped.length > 0) console.log(`  (${desktopDropped.length} more desktop spec(s) ran a changed file less directly; a full run (bun run verify:main) covers them, --wide or --max-specs runs them)`)
+if (desktopDropped.length > 0) console.log(`  (${desktopDropped.length} more desktop spec(s) ran a changed file less directly; a full run (bun run verify:main) covers them, --wide or --budget-seconds runs them)`)
 for (const note of desktopNotes) console.log(`  (${note})`)
 if (!batch && skipTags.length > 0 && plan.some((step) => step.script === 'test:desktop')) console.log(`  (@heavy tests skipped: ${HEAVY_AREAS.filter((area) => area.suite === 'desktop' && !heavyActive.has(area.area)).map((area) => area.area).join(', ')}; no changed file is in their area. A full run (bun run verify:main) and --wide run them)`)
 if (plan.length === 0) console.log('  nothing to run')
@@ -391,7 +376,7 @@ if (flag('--plan') || plan.length === 0) process.exit(0)
 
 const results = await runPlan(plan, { root, local: flag('--local') })
 mkdirSync(resultsDir, { recursive: true })
-for (const { step, code } of results) if (code === 0) for (const item of step.items) writeFileSync(join(resultsDir, item.key), `${item.suite} ${item.id}\n`)
+for (const { step, code, identity: actual } of results) if (code === 0 && sameIdentity(actual, identity)) for (const item of step.items) writeFileSync(join(resultsDir, item.key), `${item.suite} ${item.id}\n`)
 console.log('affected: results')
 for (const { step, code } of results) console.log(`  ${code === 0 ? 'passed' : `failed (${code})`}  bun run ${step.script}`)
 process.exit(results.every(({ code }) => code === 0) ? 0 : 1)

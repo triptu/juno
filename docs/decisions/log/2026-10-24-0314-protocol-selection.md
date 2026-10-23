@@ -1,0 +1,1 @@
+- 10-24 03:14 · protocol-selection · Run Quint when its spec inputs change, reusing matching successful protocol results across full runs; nightly runs choose and record a varied seed while deterministic checks remain cached. Run outbox conformance only for outbox inputs and their dependencies, or when matching evidence is absent (owner).

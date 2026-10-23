@@ -287,15 +287,26 @@ test('a changed spec is required; specs importing a changed helper are ranked, n
   assert.equal(result.scores.get(AGENT) > 1, true)
 })
 
-test('the ranked plan keeps required specs, then at most max others by score, then the smaller spec', () => {
+test('the ranked plan keeps required specs, then others within the time budget by score, then the smaller spec', () => {
   const specs = new Map([['a', ['x']], ['b', ['x']], ['c', ['x']], ['d', ['x']]])
   const scores = new Map([['a', 0], ['b', 2], ['c', 0], ['d', 1]])
   const sizes = { a: 50, c: 10 }
-  const ranked = rankSpecs({ specs, scores, required: new Set(['a']), max: 2, size: (spec) => sizes[spec] ?? 0 })
+  const ranked = rankSpecs({ specs, scores, required: new Set(['a']), budget: 120, size: (spec) => sizes[spec] ?? 0 })
   assert.deepEqual([...ranked.specs.keys()], ['a', 'b', 'd'])
   assert.deepEqual(ranked.dropped, ['c'])
   // A tie goes to the spec that ran fewer files.
-  assert.deepEqual([...rankSpecs({ specs, scores: new Map(), required: new Set(), max: 1, size: (spec) => sizes[spec] ?? 99 }).specs.keys()], ['c'])
+  assert.deepEqual([...rankSpecs({ specs, scores: new Map(), required: new Set(), budget: 60, size: (spec) => sizes[spec] ?? 99 }).specs.keys()], ['c'])
+})
+
+test('a cheap browser lane runs every reachable spec; an expensive optional spec cannot consume the required set', () => {
+  const specs = new Map(Array.from({ length: 30 }, (_, index) => [`spec-${index}`, ['reached']]))
+  const required = new Set(['spec-0'])
+  const options = { specs, required, scores: new Map(), budget: 60 }
+  assert.equal(rankSpecs({ ...options, seconds: () => 1 }).specs.size, 30)
+  const bounded = rankSpecs({ ...options, seconds: (spec) => spec === 'spec-1' ? 90 : 10 })
+  assert.ok(bounded.specs.has('spec-0'))
+  assert.ok(!bounded.specs.has('spec-1'))
+  assert.equal(bounded.specs.size, 7)
 })
 
 const FAKE_SERVER = `export class FakeServer {

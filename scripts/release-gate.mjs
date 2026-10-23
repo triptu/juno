@@ -1,6 +1,8 @@
 import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { sameIdentity } from './verify-inputs.mjs'
+import { suitePassed } from './verify-repair.mjs'
 
 export const git = (root, ...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim()
 export const statusFolder = (root) => resolve(root, git(root, 'rev-parse', '--git-common-dir'), '../.juno-status')
@@ -18,10 +20,12 @@ export function readRecords(status) {
 
 /** A full run passes only when every required suite ran and every suite passed. */
 export function assessRecord(record) {
-  const required = ['test', 'specs:check', 'test:gallery', 'test:desktop']
+  const required = record.version === 2 ? ['test', 'specs:check', 'specs:conformance', 'test:gallery',
+    ...(record.required?.includes('test:browser') ? ['test:browser', 'test:electron'] : ['test:desktop'])] : ['test', 'specs:check', 'test:gallery', 'test:desktop']
   return record.passed === true
     && required.every((name) => record.suites.some((suite) => suite.suite === name))
-    && record.suites.every((suite) => suite.code === 0)
+    && record.suites.every(suitePassed)
+    && (record.version !== 2 || (record.identity && record.required?.every((name) => record.suites.some((suite) => suite.suite === name))))
 }
 
 export function docsOrTests(file) {
@@ -41,8 +45,19 @@ export function compatible(root, green, commit) {
 }
 
 export function releaseGate(root, commit, records = readRecords(statusFolder(root))) {
+  const provenance = (record, seen = new Set()) => {
+    if (!record.repair) return true
+    const key = `${record.commit}:${record.finishedAt}`
+    if (seen.has(key) || record.repair.selection !== 'graph-uncapped') return false
+    seen.add(key)
+    const previous = records.find((candidate) => candidate.commit === record.repair.commit && candidate.finishedAt === record.repair.finishedAt)
+    return previous?.version === 2 && sameIdentity(previous.identity, record.identity)
+      && isAncestor(root, previous.commit, record.commit)
+      && previous.required?.every((name) => record.suites.some((suite) => suite.suite === name))
+      && provenance(previous, seen)
+  }
   for (const record of records) {
-    if (assessRecord(record) && compatible(root, record.commit, commit)) return { commit, record }
+    if (assessRecord(record) && provenance(record) && compatible(root, record.commit, commit)) return { commit, record }
   }
   return null
 }

@@ -201,6 +201,7 @@ export function formatMap(map) {
     `  "version": ${map.version},`,
     `  "commit": ${JSON.stringify(map.commit)},`,
     `  "recordedAt": ${JSON.stringify(map.recordedAt)},`,
+    ...(map.identity ? [`  "identity": ${JSON.stringify(map.identity)},`] : []),
     '  "specs": [',
     map.specs.map((spec) => `    ${JSON.stringify(spec)}`).join(',\n'),
     '  ],',

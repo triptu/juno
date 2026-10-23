@@ -22,6 +22,7 @@ import { availableParallelism, loadavg } from 'node:os'
 import { createInterface } from 'node:readline'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { forwardSignals } from './remote/children.mjs'
+import { runtimeIdentity } from './verify-inputs.mjs'
 
 export function parsePlan(argv) {
   const steps = []
@@ -42,7 +43,7 @@ export function parsePlan(argv) {
   return steps
 }
 
-export const appSuites = ['test:desktop', 'test:gallery', 'test:e2e']
+export const appSuites = ['test:desktop', 'test:browser', 'test:electron', 'test:gallery', 'test:e2e']
 /** The steps in lanes that run at the same time; each lane runs its steps in order. */
 export function lanes(steps, serial) {
   if (serial) return [steps]
@@ -78,6 +79,7 @@ if (import.meta.main) {
     process.exit(2)
   }
   const children = new Set()
+  console.log(`juno-runtime: ${JSON.stringify(runtimeIdentity(process.cwd()))}`)
   forwardSignals(children)
   const serial = process.env.JUNO_PLAN_SERIAL === '1'
   const planned = lanes(steps, serial)

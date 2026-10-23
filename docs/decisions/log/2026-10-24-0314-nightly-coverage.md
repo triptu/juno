@@ -1,0 +1,1 @@
+- 10-24 03:14 · nightly-coverage · Record and merge desktop coverage only in nightly verification. Ordinary full and repair runs retain per-test timings and structured reports without inspector coverage overhead (owner).

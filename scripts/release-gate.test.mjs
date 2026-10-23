@@ -59,3 +59,48 @@ test('reads archived results as well as the latest result', (t) => {
   assert.equal(readRecords(root).length, 3)
 
 })
+
+test('a repair can pass only with its recorded ancestor and complete successful outcomes', (t) => {
+  const root = mkdtempSync(join(scratchFolder(), 'release-repair-test-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  git(root, 'init', '-q')
+  git(root, 'config', 'user.name', 'Test')
+  git(root, 'config', 'user.email', 'test@example.com')
+  writeFileSync(join(root, 'app.ts'), 'before')
+  git(root, 'add', '.')
+  git(root, 'commit', '-qm', 'Before')
+  const before = git(root, 'rev-parse', 'HEAD')
+  writeFileSync(join(root, 'app.ts'), 'fixed')
+  git(root, 'commit', '-qam', 'Fix')
+  const commit = git(root, 'rev-parse', 'HEAD')
+  const identity = { bun: '1.4.4', platform: 'linux', arch: 'x64', electron: '44' }
+  const required = ['test', 'specs:check', 'specs:conformance', 'test:gallery', 'test:desktop']
+  const baseline = { version: 2, commit: before, finishedAt: 'before', passed: false, identity, required, suites: required.map((suite) => ({ suite, code: 1 })) }
+  const repaired = { ...baseline, commit, finishedAt: 'after', passed: true, suites: required.map((suite) => ({ suite, code: 0 })), repair: { commit: before, finishedAt: 'before', selection: 'graph-uncapped' } }
+  assert.ok(releaseGate(root, commit, [repaired, baseline]))
+  assert.equal(releaseGate(root, commit, [repaired]), null)
+  assert.equal(releaseGate(root, commit, [{ ...repaired, identity: { ...identity, bun: 'other' } }, baseline]), null)
+  const incomplete = { ...repaired, suites: repaired.suites.map((suite) => suite.suite === 'test:desktop' ? { ...suite, tests: { status: 'passed', errors: 0, incomplete: 1, failures: [] } } : suite) }
+  assert.equal(releaseGate(root, commit, [incomplete, baseline]), null)
+})
+
+test('release timings from a disposable checkout remain in the shared main status directory', async (t) => {
+  const { cpSync, readFileSync } = await import('node:fs')
+  const { execFileSync } = await import('node:child_process')
+  const root = mkdtempSync(join(scratchFolder(), 'release-timings-test-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const main = join(root, 'main')
+  mkdirSync(join(main, 'scripts'), { recursive: true })
+  writeFileSync(join(main, 'package.json'), '{"type":"module"}')
+  for (const name of ['release-timings.mjs', 'release-gate.mjs', 'verify-inputs.mjs', 'verify-repair.mjs']) cpSync(join(import.meta.dirname, name), join(main, 'scripts', name))
+  git(main, 'init', '-q')
+  git(main, 'config', 'user.name', 'Test')
+  git(main, 'config', 'user.email', 'test@example.com')
+  git(main, 'add', '.')
+  git(main, 'commit', '-qm', 'Fixture')
+  const checkout = join(root, 'release')
+  git(main, 'worktree', 'add', '--detach', checkout, 'HEAD')
+  execFileSync(process.execPath, ['--input-type=module', '-e', "import { recordReleaseTiming } from './scripts/release-timings.mjs'; recordReleaseTiming('package', Date.now(), {status:'passed'})"], { cwd: checkout })
+  git(main, 'worktree', 'remove', checkout)
+  assert.equal(JSON.parse(readFileSync(join(main, '.juno-status/release-timings.json'), 'utf8')).steps[0].step, 'package')
+})

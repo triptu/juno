@@ -8,6 +8,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { actionCases, recoveryCases, replayCases } from './agent-checks.mjs'
 import { outboxPairs, outboxSchedules } from './outbox-checks.mjs'
+import { runtimeIdentity } from '../scripts/verify-inputs.mjs'
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
 const require = createRequire(import.meta.url)
@@ -21,7 +22,8 @@ const boundedOnly = process.argv.includes('--bounded')
 const huddleOnly = process.argv.includes('--huddle')
 const outboxOnly = process.argv.includes('--outbox')
 const backend = process.env.QUINT_SIMULATOR ?? 'rust'
-const seed = '20261013'
+const seed = process.env.SPECS_SEED ?? '20261013'
+if (!/^\d+$/.test(seed)) throw new Error('SPECS_SEED must be an unsigned integer')
 const samples = tracesOnly ? 100 : 10000
 const steps = 160
 const startedAt = Date.now()
@@ -49,7 +51,7 @@ const sha = (...parts) => {
   return hash.digest('hex')
 }
 const cacheVersion = 1
-const runnerHash = sha(cacheVersion, require('@informalsystems/quint/package.json').version, apalacheVersion, backend, seed)
+const runnerHash = sha(cacheVersion, require('@informalsystems/quint/package.json').version, apalacheVersion, backend, JSON.stringify(runtimeIdentity(root)), readFileSync(fileURLToPath(import.meta.url)))
 function specHash(file, seen = new Set()) {
   if (seen.has(file)) return ''
   seen.add(file)
