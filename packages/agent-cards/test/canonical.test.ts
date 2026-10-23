@@ -1,5 +1,3 @@
-import { execFileSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'bun:test'
 import fc from 'fast-check'
@@ -37,17 +35,6 @@ describe('canonical payloads and digests', () => {
     }), { numRuns: 130 })
   })
 
-  it('keeps the public digest across fresh processes', () => {
-    const loader = fileURLToPath(new URL('../../../scripts/ts-resolve-hooks.mjs', import.meta.url))
-    fc.assert(fc.property(fc.constantFrom(...payloads), fc.string(), (sample, because) => {
-      const payload = { ...sample, because }
-      const digest = execFileSync(process.execPath, ['--import', loader, '--input-type=module', '-e',
-        'import { decodePayload, payloadDigest } from "@juno/agent-cards"; process.stdout.write(payloadDigest(decodePayload(process.argv[1])))',
-        canonicalPayload(payload)], { encoding: 'utf8' })
-      expect(digest).toBe(payloadDigest(payload))
-    }), { numRuns: 5 })
-  }, 120_000)
-
   it('binds every executable identity field and preserves operation order', () => {
     fc.assert(fc.property(fc.jsonValue(), (args) => {
       const payload = Schema.decodeUnknownSync(ExecutableIdentity)({ ...identity, args })
@@ -60,6 +47,8 @@ describe('canonical payloads and digests', () => {
     const value = { '2': 2, '10': 10, z: -0, a: '€\n', numbers: [1e30, 0.002, 1e-27] }
     expect(canonicalJson(value)).toBe('{"10":10,"2":2,"a":"€\\n","numbers":[1e+30,0.002,1e-27],"z":0}')
     expect(digestJson({})).toBe('44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a')
+    // Frozen digest of one card payload. Stored cards carry it, so a change makes their clicks stale.
+    expect(payloadDigest(payloads.find((p) => p._tag === 'resolve')!)).toBe('5115f585deebf3664cfc12e4ed158cf1a9c86dfeb168edeeff4fd164d4a8d7bf')
     expect(() => canonicalJson('\ud800')).toThrow()
     expect(() => canonicalJson(Infinity)).toThrow()
   })
