@@ -18,14 +18,16 @@ export const InstructionRuleOutput = Type.Object({
 
 /**
  * Decision, once per added instruction (SPEC 14, "Your instructions"):
- * whether it is really a person or channel level. A chat model answers;
- * the owner waits for the offer, but can add the instruction meanwhile.
+ * whether it is really a person or channel level. A chat model answers.
+ * Nothing waits on it: the instruction is saved at once and the offer
+ * shows when the answer comes. Luna took 2.8 to 3.9 s on 2026-10-23, so
+ * 10 s leaves room for a slow call and its retry.
  */
 export const instructionRule = defineStructuredTask<InstructionRuleInput, typeof InstructionRuleOutput>({
   name: 'instructionRule',
   version: 1,
   tier: 'decision',
-  timeoutMillis: 4000,
+  timeoutMillis: 10_000,
   prompt,
   tool: { name: 'rule', description: 'Report the person or channel level the instruction means, or null.' },
   output: InstructionRuleOutput,

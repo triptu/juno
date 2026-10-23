@@ -627,6 +627,7 @@ Every model call's deadline is listed here; the code keeps it on the task (`pack
 | `topicArt` from the art job | nobody | 60 s | one | Live check 4.2 to 14.0 s per call (2026-10-14). |
 | `topicArt` from Redraw | the owner, on the topic | 15 s | one | Asked for and watched (`ART_REDRAW_TIMEOUT_MILLIS`). |
 | `notificationReading` | a notification | 2 s | one | Past it DMs and mentions notify and the rest stays ("Juno couldn't read this in time."). A notification should not be late. |
+| `instructionRule` | an added instruction | 10 s | one | Nothing waits on it: the instruction is saved at once and the offer shows when the answer comes. Luna took 5.8 to 7.8 s on 2026-10-23. |
 | `parseCommand` | the owner, in ⌘K | 4 s | one | Search results show meanwhile. Luna p50 1.5 s, p95 2.3 s. |
 | Agent action review | the Juno chat turn | 3 s | none | `REVIEW_TIMEOUT_MS` in `packages/agent/src/review/review.ts`; past it the action asks instead. |
 | Juno chat turn | the owner, in the chat | the agent's own | the agent's own | Set in `packages/agent`, not by `@juno/ai`; a code-mode script stops after 60 s (`SCRIPT_LIMITS`). |
