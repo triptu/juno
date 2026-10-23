@@ -26,12 +26,12 @@ export default class TestResultsReporter {
 }
 
 /** A test failure is provisional until triage distinguishes product from test. */
-export function failureCause({ code, signal, tests, log = '', cause, note }) {
+export function failureCause({ code, signal, tests, unfinished = false, log = '', cause, note }) {
   if (code === 0) return undefined
   if (cause && !['product', 'test', 'infrastructure', 'cancellation'].includes(cause)) throw new Error(`Unknown failure cause: ${cause}`)
   if (cause) return { category: cause, provisional: false, evidence: note || 'Classified by the run owner' }
   if (signal || code === 130 || code === 143 || tests?.status === 'interrupted') return { category: 'cancellation', provisional: false, evidence: signal || 'Interrupted run' }
-  if (code === 255 || /lost the connection|Connection (?:refused|reset)|No space left|ENOMEM|out of memory|worker.*(?:crash|exited)/i.test(log) || tests?.errors > 0 || tests?.incomplete > 0)
+  if (unfinished || code === 255 || /lost the connection|Connection (?:refused|reset)|No space left|ENOMEM|out of memory|worker.*(?:crash|exited)/i.test(log) || tests?.errors > 0 || tests?.incomplete > 0)
     return { category: 'infrastructure', provisional: true, evidence: 'Runner, worker or incomplete-test failure; inspect the log' }
   return { category: 'test', provisional: true, evidence: 'Check failed; triage must confirm a test or product defect' }
 }

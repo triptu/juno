@@ -257,7 +257,7 @@ const measured = results.map((result) => {
     host: suites.some(({ name }) => name === result.suite) || result.suite === 'plan' ? execution.host : hostname(),
     log: result.log ? join('.juno-status', relative(statusDir, result.log)) : '',
     failures: code === 0 ? [] : mismatch ? ['The job runtime differs from the planned runtime; reuse was refused'] : failures(result.log), tests,
-    cause: failureCause({ code, signal: cancelled ?? result.signal, tests, log, cause: override }),
+    cause: failureCause({ code, signal: cancelled ?? result.signal, tests, unfinished: result.unfinished, log, cause: override ?? (mismatch ? 'infrastructure' : undefined), note: mismatch ? 'The job did not report the expected runtime identity' : undefined }),
   }
 })
 const outcomes = [...measured, ...reused]
