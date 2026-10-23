@@ -739,7 +739,7 @@ Other literal lengths and colours require tokens, or a trailing
 
 | Token | Value | Used for |
 | --- | --- | --- |
-| `--topic-time-width` | 48px | Stable relative-time slot in topic rows: at least this wide, the time aligned to its end, so every time ends at the row's trailing inset. |
+| `--topic-time-width` | 48px | Stable relative-time column in All topics and the dev log. Sidebar rows keep no slot: their time shows on hover over the title's end. |
 
 ### Topic title line limit
 

@@ -930,6 +930,43 @@ test.describe('Sidebar row read state', () => {
 })
 
 /**
+ * A sidebar row's time (SPEC section 5, "Row anatomy") shows only while the
+ * row is hovered or has keyboard focus, over the end of line one. Every kind
+ * of row, with a short title and with a long one cut off at the line's end:
+ * the time appearing and going moves no box, and the title keeps its width.
+ */
+test.describe('Sidebar row time on hover', () => {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`hovering or focusing a row shows its time and moves nothing, short and long titles (${theme})`, async ({ page }) => {
+      await openState(page, { component: 'TopicRow', id: 'interaction/each-kind', route: 'TopicRow/interaction/each-kind', group: '', groupId: '', state: '', frame: {} }, theme)
+      const rows = page.locator('[data-topic-row]')
+      const count = await rows.count()
+      expect(count).toBeGreaterThan(8)
+      const titles = () => page.locator('[data-row-part="title"]').evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()))
+      const before = await titles()
+      for (let index = 0; index < count; index++) {
+        const row = rows.nth(index)
+        const time = row.locator('[data-row-part="time"]')
+        await expect(time).toHaveCSS('opacity', '0')
+        const box = (await row.boundingBox())!
+        await expectNoLayoutShift(page, () => page.mouse.move(box.x + box.width / 2, box.y + box.height / 2))
+        await expect(time).toHaveCSS('opacity', '1')
+        await expectNoLayoutShift(page, () => page.mouse.move(2, 2))
+        await expect(time).toHaveCSS('opacity', '0')
+        await expectNoLayoutShift(page, async () => {
+          await page.keyboard.press('Shift')
+          await row.focus()
+        })
+        await expect(time).toHaveCSS('opacity', '1')
+        await expectNoLayoutShift(page, () => row.blur())
+        await expect(time).toHaveCSS('opacity', '0')
+      }
+      expect(await titles()).toEqual(before)
+    })
+  }
+})
+
+/**
  * Attachments (SPEC section 8): a chip leaving the composer, the upload line
  * under a sending message and a card's Download button move nothing.
  */

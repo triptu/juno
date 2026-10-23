@@ -1,0 +1,1 @@
+- 10-23 13:30 · sidebar time on hover · A sidebar row shows its time only while hovered or keyboard-focused, at once. It is drawn over the end of line one on a fade of the row's fill, so the title has the whole line at rest and nothing moves. No hover controls share that corner; a tag at the line's end (thread count, huddle mark) is covered while the time shows (owner).

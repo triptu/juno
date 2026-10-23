@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-23 13:30 · sidebar time on hover · A sidebar row shows its time only while hovered or keyboard-focused, at once. It is drawn over the end of line one on a fade of the row's fill, so the title has the whole line at rest and nothing moves. No hover controls share that corner; a tag at the line's end (thread count, huddle mark) is covered while the time shows (owner).
 - 10-23 13:25 · mention tint · A message that mentions you has no fill of its own; the @you chip marks it. The `--tint-mention-bg` token and the per-message `mentionsMe` field went with it (owner).
 - 10-23 01:00 · forward note · The Forward sheet's note is a multi-line field that grows to eight lines (the shared field Textarea), with Enter forwarding and Shift-Enter adding a line as in the composer, since SPEC 7 says Enter forwards. The preview leaves out the place when it is the sender's own name (owner).
 - 10-23 00:50 · header times · A message header's time always has the clock ("Yesterday 15:42", "Oct 16, 15:42", "Oct 16, 2025, 15:42"), since headers repeat after ten quiet minutes and a date alone would not tell them apart. Juno chat bubble times follow. The app's 24-hour clock stays; it has no 12-hour setting (owner).
