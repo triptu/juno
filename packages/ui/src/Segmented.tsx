@@ -19,7 +19,8 @@ export interface SegmentedOption<T extends string> {
 
 export interface SegmentedProps<T extends string> {
   readonly options: ReadonlyArray<SegmentedOption<T>>
-  readonly value: T
+  /** Null: nothing chosen yet. No segment is raised and the first one is the Tab stop. */
+  readonly value: T | null
   readonly onChange: (value: T) => void
   readonly label: string
   readonly disabled?: boolean
@@ -48,15 +49,16 @@ export function Segmented<T extends string>({ options, value, onChange, label, d
       onKeyDown={onKeyDown}
       {...stylex.props(styles.track, disabled && interactive.dimmed)}
     >
-      {options.map((option) => {
+      {options.map((option, index) => {
         const selected = option.value === value
+        const tabStop = selected || (value === null && index === 0)
         return (
           <button
             key={option.value}
             type="button"
             role="radio"
             aria-checked={selected}
-            tabIndex={selected ? 0 : -1}
+            tabIndex={tabStop ? 0 : -1}
             disabled={disabled}
             aria-label={option.count === undefined ? undefined : `${option.label} ${option.count}`}
             {...activateHandlers<HTMLButtonElement>(() => onChange(option.value), { disabled })}
