@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type Ref } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode, type Ref } from 'react'
 import type { FileView, MessageView, Person } from '@juno/contract'
 import { layout, sizes, spacing, z } from '@juno/tokens/tokens.stylex'
 import { EmptyState, hueForId, ScrollArea, Text, type ActivateEvent, type HueName } from '@juno/ui'
@@ -117,6 +117,8 @@ export interface MessageListProps {
    * the sender's name or avatar (the person menu).
    */
   readonly onMessageMenu?: (ts: string, at: MenuAt, onSender: boolean) => void
+  /** Closes the message menu: a second press on a row's menu button. */
+  readonly onCloseMessageMenu?: () => void
   /** Right-click on an image thumbnail: the image menu (SPEC 8, "Images and the media viewer"). */
   readonly onImageMenu?: (ts: string, fileId: string, event: MouseEvent) => void
   /** Right-click on a link in message text or an unfurl: the link's own menu (SPEC 8, "Links"). */
@@ -277,11 +279,22 @@ export function MessageList({
   onQuickLook,
   uploadProgress,
   onMessageMenu,
+  onCloseMessageMenu,
   onImageMenu,
   onLinkMenu,
   onPersonMenu,
   onChannelMenu,
 }: MessageListProps) {
+  // The rows' menu button, one handler for the list's life, so rows stay memoized; it reads the latest callbacks.
+  const menus = useRef({ onMessageMenu, onCloseMessageMenu })
+  useLayoutEffect(() => {
+    menus.current = { onMessageMenu, onCloseMessageMenu }
+  })
+  const onMenuButton = useCallback((ts: string, button: HTMLElement, open: boolean) => {
+    if (open) return menus.current.onCloseMessageMenu?.()
+    const box = button.getBoundingClientRect()
+    menus.current.onMessageMenu?.(ts, { clientX: box.left, clientY: box.bottom, trigger: { width: box.width, height: box.height } }, false)
+  }, [])
   const [focusedTs, setFocusedTs] = useState<string | undefined>(undefined)
   // The thread last warmed, so moving within one message warms it once.
   const warmed = useRef<string | undefined>(undefined)
@@ -371,6 +384,7 @@ export function MessageList({
                 onQuickLook={onQuickLook}
                 progress={item.message.clientMsgId === undefined ? undefined : uploadProgress?.[item.message.clientMsgId]}
                 onFocus={setFocusedTs}
+                onMenuButton={onMessageMenu === undefined ? undefined : onMenuButton}
               />
             </Row>
           )

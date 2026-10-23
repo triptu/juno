@@ -16,6 +16,8 @@ interface MorphLayersProps {
   readonly body: stylex.StyleXStyles
   /** The panel's content, fading in. */
   readonly children: ReactNode
+  /** No motion: the panel shows in its place at once. */
+  readonly atOnce?: boolean
 }
 
 /**
@@ -23,12 +25,12 @@ interface MorphLayersProps {
  * under everything, and a window that clips the old content and the new to
  * the material's box while it grows.
  */
-export function MorphLayers({ root, menu, view, from, material, body, children }: MorphLayersProps) {
+export function MorphLayers({ root, menu, view, from, material, body, children, atOnce = false }: MorphLayersProps) {
   const surface = useRef<HTMLDivElement>(null)
   const clip = useRef<HTMLDivElement>(null)
   const fromRef = useRef<HTMLDivElement>(null)
   const to = useRef<HTMLDivElement>(null)
-  useMorph(root, menu, view, { surface, window: clip, from: fromRef, to })
+  useMorph(root, menu, view, { surface, window: clip, from: fromRef, to }, atOnce)
   return (
     <>
       <div ref={surface} aria-hidden {...stylex.props(material, styles.surface)} />

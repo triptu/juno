@@ -32,30 +32,30 @@ const withCustom: ReadonlyArray<GridReaction> = [{ name: 'ship-it', unicode: ':s
 const S: MessageMenuEntry = { separator: true }
 /** Someone else's message in a thread. */
 const others: ReadonlyArray<MessageMenuEntry> = [
-  { id: 'quote', label: 'Quote', icon: 'quote' },
+  { id: 'quote', label: 'Quote', icon: 'quote', shortcut: 'Q' },
   { id: 'ask-juno', label: 'Ask Juno', icon: 'juno' },
   S,
   { id: 'copy', label: 'Copy text', icon: 'copy' },
-  { id: 'forward', label: 'Forward…', icon: 'forward' },
+  { id: 'forward', label: 'Forward…', icon: 'forward', shortcut: 'F' },
   { id: 'open-in-slack', label: 'Open in Slack', icon: 'open' },
 ]
 /** Someone else's message in Main, with text selected in it. */
 const mainSelection: ReadonlyArray<MessageMenuEntry> = [
   { id: 'reply', label: 'Start thread', icon: 'thread', shortcut: 'T' },
-  { id: 'quote', label: 'Quote', icon: 'quote' },
+  { id: 'quote', label: 'Quote', icon: 'quote', shortcut: 'Q' },
   { id: 'ask-juno', label: 'Ask Juno', icon: 'juno' },
   S,
   { id: 'copy', label: 'Copy', icon: 'copy' },
-  { id: 'forward', label: 'Forward…', icon: 'forward' },
+  { id: 'forward', label: 'Forward…', icon: 'forward', shortcut: 'F' },
   { id: 'open-in-slack', label: 'Open in Slack', icon: 'open' },
 ]
 /** Your own reply in a thread. */
 const own: ReadonlyArray<MessageMenuEntry> = [
-  { id: 'quote', label: 'Quote', icon: 'quote' },
+  { id: 'quote', label: 'Quote', icon: 'quote', shortcut: 'Q' },
   { id: 'ask-juno', label: 'Ask Juno', icon: 'juno' },
   S,
   { id: 'copy', label: 'Copy text', icon: 'copy' },
-  { id: 'forward', label: 'Forward…', icon: 'forward' },
+  { id: 'forward', label: 'Forward…', icon: 'forward', shortcut: 'F' },
   { id: 'open-in-slack', label: 'Open in Slack', icon: 'open' },
   S,
   { id: 'broadcast', label: 'Also send to #eng', icon: 'broadcast' },
@@ -67,11 +67,11 @@ const own: ReadonlyArray<MessageMenuEntry> = [
 /** Your own message in Main. */
 const ownMain: ReadonlyArray<MessageMenuEntry> = [
   { id: 'reply', label: 'Open thread', icon: 'thread', shortcut: 'T' },
-  { id: 'quote', label: 'Quote', icon: 'quote' },
+  { id: 'quote', label: 'Quote', icon: 'quote', shortcut: 'Q' },
   { id: 'ask-juno', label: 'Ask Juno', icon: 'juno' },
   S,
   { id: 'copy', label: 'Copy text', icon: 'copy' },
-  { id: 'forward', label: 'Forward…', icon: 'forward' },
+  { id: 'forward', label: 'Forward…', icon: 'forward', shortcut: 'F' },
   { id: 'open-in-slack', label: 'Open in Slack', icon: 'open' },
   S,
   { id: 'watch-reply', label: 'Tell me if nobody replies', icon: 'bell', disabled: true },

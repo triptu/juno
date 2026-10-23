@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { emojiCatalog, prepareEmojiPicker } from '@juno/contract'
 import type { MessageView } from '@juno/contract'
-import { defineFixtures, fixture, scene, TooltipLayer, type FixtureFrame } from '@juno/ui'
+import { defineFixtures, fixture, scene, TooltipLayer, type FixtureFrame, type MenuPoint } from '@juno/ui'
 import { useFixtureControl } from './juno-chat/fixtures/control'
 import { conversation } from './fixtures/conversation'
 import {
@@ -25,11 +26,14 @@ import {
   p,
   withFiles,
 } from './fixtures/messages'
+import { longLines } from './fixtures/longLines'
 import { albumOf, mediaAndPdf, mixedMedia, singleAudio, singleImage, singleVideo, withDocuments } from './fixtures/media'
 import { NOW, people } from './fixtures/topics'
 import { noopActions } from './fixtures/actions'
 import { InlineEdit } from './InlineEdit'
 import { MessageList, type MessageListItem, type MessageListProps } from './MessageList'
+import { MessageMenu } from './MessageMenu'
+import type { MessageMenuEntry } from './messageMenuModel'
 
 const noop = () => {}
 
@@ -56,6 +60,71 @@ const settledMessage: MessageView = (() => {
   const ts = `${Math.floor(NOW / 1000)}.000999`
   return { ...rest, id: ts, ts }
 })()
+
+/** Rows with a menu: each shows its menu button on hover and keyboard focus. */
+const withMenu = (props: Partial<MessageListProps> & Pick<MessageListProps, 'items' | 'main'>, frame?: FixtureFrame) => state({ actions: noopActions, onMessageMenu: noop, ...props }, frame)
+
+const MORE = '[data-message-more] button'
+
+const menuEmoji = { data: prepareEmojiPicker(emojiCatalog, []), recent: [] }
+const menuGrid = [
+  { name: '+1', unicode: '👍' },
+  { name: 'white_check_mark', unicode: '✅' },
+  { name: 'eyes', unicode: '👀' },
+  { name: 'pray', unicode: '🙏' },
+  { name: 'tada', unicode: '🎉' },
+  { name: 'heart', unicode: '❤️' },
+  { name: 'joy', unicode: '😂' },
+  { name: 'fire', unicode: '🔥' },
+  { name: '100', unicode: '💯' },
+  { name: 'raised_hands', unicode: '🙌' },
+  { name: 'slightly_smiling_face', unicode: '🙂' },
+].map((emoji) => ({ ...emoji, selected: false }))
+const menuItems: ReadonlyArray<MessageMenuEntry> = [
+  { id: 'quote', label: 'Quote', icon: 'quote', shortcut: 'Q' },
+  { id: 'ask-juno', label: 'Ask Juno', icon: 'juno' },
+  { separator: true },
+  { id: 'copy', label: 'Copy text', icon: 'copy' },
+  { id: 'forward', label: 'Forward…', icon: 'forward', shortcut: 'F' },
+  { id: 'open-in-slack', label: 'Open in Slack', icon: 'open' },
+]
+
+/**
+ * A row's menu opened from its button, as the app does: under the button, from the press. The scene opens it once
+ * the rows have laid out; the button stays shown and held, and the row takes the open fill.
+ */
+function MenuFromButton({ items, row }: { readonly items: ReadonlyArray<MessageListItem>; readonly row: number }) {
+  const frameRef = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState<{ readonly ts: string; readonly anchor: MenuPoint } | undefined>(undefined)
+  const ts = items[row]!.message.ts
+  // Once the fonts and the list have laid the rows out, as a press would find them.
+  useEffect(() => {
+    let live = true
+    const place = () => {
+      const frame = frameRef.current
+      const button = frame?.querySelector<HTMLElement>(`[data-message-row="${CSS.escape(ts)}"] ${MORE}`)
+      if (!live || frame == null || button == null) return
+      const box = button.getBoundingClientRect()
+      const origin = frame.getBoundingClientRect()
+      setOpen({ ts, anchor: { x: box.left - origin.left, y: box.bottom - origin.top, trigger: { width: box.width, height: box.height } } })
+    }
+    void document.fonts.ready.then(() => requestAnimationFrame(() => requestAnimationFrame(place)))
+    return () => {
+      live = false
+    }
+  }, [ts])
+  return (
+    <div ref={frameRef} style={{ position: 'absolute', inset: 0, display: 'flex' }}>
+      <MessageList {...base} items={items} main={false} actions={noopActions} onMessageMenu={noop} activeMessage={open?.ts} />
+      {/* Above the rows, as the app's portal on the body is; the open row is raised over its neighbours. */}
+      {open === undefined ? null : (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 1000 }}>
+          <MessageMenu anchor={open.anchor} reactions={menuGrid} items={menuItems} onReact={noop} emoji={menuEmoji} onSelect={noop} onClose={noop} inline />
+        </div>
+      )}
+    </div>
+  )
+}
 
 /** `items` with the reactions of row `index` replaced. */
 const withReactions = (items: ReadonlyArray<MessageListItem>, index: number, reactions: MessageView['reactions']): ReadonlyArray<MessageListItem> =>
@@ -296,6 +365,21 @@ export default defineFixtures(
       'hover-person-chip': state({ items: thread, main: false, onPerson: noop }, { hover: `${ROW} [data-msg-text] [data-opens-person]` }),
       // The tabbable row's link: the shot tabs back and forth, and only that row's link is in the Tab order.
       'focus-thread-link': state({ items: mainStream, main: true }, { focus: '[data-message-row][tabindex="0"] [data-thread-link]' }),
+    },
+    // The menu button over the end of a hovered or focused row's first line (inventory 6.5): on a header row, on a
+    // grouped row, under the pointer itself, open with its menu, and over lines that run to the column's edge.
+    'Menu button': {
+      hover: withMenu({ items: thread, main: false }, { hover: `${ROW}:nth-of-type(4)` }),
+      'hover-grouped': withMenu({ items: thread, main: false }, { hover: `${ROW}:nth-of-type(5)` }),
+      focus: withMenu({ items: thread, main: false }, { focus: `${ROW}:nth-of-type(4)` }),
+      'menu-open': scene(() => <MenuFromButton items={thread} row={1} />),
+      'long-hover': withMenu({ items: longLines, main: false }, { hover: `${ROW}:nth-of-type(1)` }),
+      'long-hover-grouped': withMenu({ items: longLines, main: false }, { hover: `${ROW}:nth-of-type(2)` }),
+      'long-hover-code': withMenu({ items: longLines, main: false }, { hover: `${ROW}:nth-of-type(3)` }),
+      'long-hover-image': withMenu({ items: longLines, main: false }, { hover: `${ROW}:nth-of-type(4)` }),
+      'long-hover-reactions': withMenu({ items: longLines, main: false }, { hover: `${ROW}:nth-of-type(5)` }),
+      'long-menu-open': scene(() => <MenuFromButton items={longLines} row={1} />),
+      narrow: withMenu({ items: longLines, main: false }, { width: 336, height: 600, padded: false, hover: `${ROW}:nth-of-type(2)` }),
     },
     // A 336px column, a topic in the 720px window: the confirm straddles the row's top edge as in a wide one.
     Narrow: {

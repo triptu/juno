@@ -6,6 +6,7 @@ import { chunk, hueFor, MessageList, NewMessagesPill, TopicView as TopicViewFram
 import { closeTabById, openTopic, openTopicAt, openTopicAtInBackground, warmTopic } from './navigation'
 import { useMessageActions, type ComposerHandle, type MessageActionsOutput } from './messageActions'
 import { showPersonMenu } from './notifyActions'
+import { closeMessageMenu } from './messageMenu'
 import { takeComposerFocus } from './pageFocus'
 import { scopeToChannel, showChannelMenu } from './placeMenus'
 import { messageLinkInfo, openMessageLink, openPerson } from './slackLinks'
@@ -151,6 +152,7 @@ function rowActions(list: MessageWindow, messageActions: MessageActionsOutput) {
     onRetry: retry,
     onDiscard: discard,
     onMessageMenu: messageActions.onMessageMenu,
+    onCloseMessageMenu: closeMessageMenu,
     actions: messageActions.actions,
     activeMessage: messageActions.activeMessage,
     confirmingDelete: messageActions.confirmingDelete,

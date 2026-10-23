@@ -54,9 +54,10 @@ const originOf = (pin: Pin) => `${pin.x === 'left' ? '0' : '100%'} ${pin.y === '
 /**
  * When the panel mounts, places it before it paints, from the menu's last
  * box, and plays the morph from that box. `view` is the box the menu lives
- * in: the window, or the gallery's frame.
+ * in: the window, or the gallery's frame. `atOnce` shows the panel in its
+ * place with no motion, as reduced motion does: a menu opened as the panel.
  */
-export function useMorph(root: RefObject<HTMLDivElement | null>, menu: RefObject<MenuState | undefined>, view: () => { readonly width: number; readonly height: number }, parts: MorphParts): void {
+export function useMorph(root: RefObject<HTMLDivElement | null>, menu: RefObject<MenuState | undefined>, view: () => { readonly width: number; readonly height: number }, parts: MorphParts, atOnce = false): void {
   const { surface: surfaceRef, window: windowRef, from: fromRef, to: toRef } = parts
   useLayoutEffect(() => {
     const [node, surface, clip, from, to, start] = [root.current, surfaceRef.current, windowRef.current, fromRef.current, toRef.current, menu.current]
@@ -79,8 +80,8 @@ export function useMorph(root: RefObject<HTMLDivElement | null>, menu: RefObject
     for (const layer of [surface, clip, from, to]) layer.style.transformOrigin = origin
 
     const duration = rootDuration('--duration-morph')
-    // Reduced motion: the panel shows at once.
-    if (duration < 1) return
+    // Reduced motion, or a menu opened as the panel: it shows at once.
+    if (duration < 1 || atOnce) return
     const ease = cubicBezier(getComputedStyle(document.documentElement).getPropertyValue('--ease-morph'))
     // How far the pinned corner is from where it was: nothing, unless the view was too small for the panel.
     const dx = pin.x === 'left' ? start.box.x - x : start.box.x + start.box.width - (x + width)

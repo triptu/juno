@@ -251,7 +251,7 @@ async function menuActions({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Pro
     const labels = (await menu.labels()).filter((label) => label !== 'Ask Juno').map((label) => label.replace(/^\((.*)\)$/, '$1'))
     expect(labels).toEqual(['Start thread', 'Quote', '-', 'Copy text', 'Forward…', 'Open in Slack', '-', 'Tell me if nobody replies', '-', 'Edit', 'Delete…'])
     // The keys that work on a focused message show at their rows' ends.
-    expect(await menu.shortcuts()).toEqual({ reply: 'T', edit: 'E', delete: '⌫' })
+    expect(await menu.shortcuts()).toEqual({ reply: 'T', quote: 'Q', forward: 'F', edit: 'E', delete: '⌫' })
     await menu.choose('edit')
     const editing = topic.list.locator('[data-editing]')
     const field = editing.getByRole('textbox', { name: 'Edit message' })

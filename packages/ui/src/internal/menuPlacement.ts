@@ -9,6 +9,14 @@ import { useEffect, type RefObject } from 'react'
 export interface MenuPoint {
   readonly x: number
   readonly y: number
+  /**
+   * Set when the menu opens from a button rather than the pointer: its size,
+   * with `x` the button's left edge and `y` its bottom. Opening to the right,
+   * the menu lines up with the button's left edge; to the left, with its
+   * right edge. Where there is no room under the button, it opens above it,
+   * so it never covers the button that closes it.
+   */
+  readonly trigger?: { readonly width: number; readonly height: number }
 }
 
 export interface Size {
@@ -32,12 +40,17 @@ export interface Pin {
  * under it; near the bottom it moves up only as far as it must, never above
  * the pointer. To the right of the pointer when `room` fits there (the menu,
  * or the larger panel it may turn into), else to the left of it, its right
- * edge at the pointer. Then held `edge` inside the view.
+ * edge at the pointer. From a button (`at.trigger`), under it, lined up with
+ * its left edge or, opening to the left, its right edge, and above it when
+ * only that fits. Then held `edge` inside the view.
  */
 export function placeMenu(at: MenuPoint, size: Size, room: Size, view: Size, edge: number): MenuPoint & { readonly side: MenuSide } {
-  const side: MenuSide = at.x + 1 + Math.max(size.width, room.width) + edge <= view.width ? 'right' : 'left'
-  const x = side === 'right' ? at.x + 1 : at.x - size.width
-  const y = at.y + 1
+  const { trigger } = at
+  const nudge = trigger === undefined ? 1 : 0
+  const side: MenuSide = at.x + nudge + Math.max(size.width, room.width) + edge <= view.width ? 'right' : 'left'
+  const x = side === 'right' ? at.x + nudge : at.x + (trigger?.width ?? 0) - size.width
+  const above = trigger === undefined ? undefined : at.y - trigger.height - 1 - size.height
+  const y = above !== undefined && at.y + 1 + size.height + edge > view.height && above >= edge ? above : at.y + 1
   return {
     side,
     x: Math.round(clamp(x, edge, view.width - edge - size.width)),
@@ -80,7 +93,10 @@ export function useDismiss(ref: RefObject<HTMLDivElement | null>, closeRef: RefO
     if (inline) return
     const close = () => closeRef.current()
     // A wheel inside the menu (its emoji picker) is the menu's own.
+    // A press on a button that toggles a menu (`data-menu-toggle`) is left to the button: it closes its own menu
+    // or opens another in its place, so a second press on it does not close and reopen the menu.
     const outside = (event: Event) => {
+      if (event.type === 'pointerdown' && event.target instanceof Element && event.target.closest('[data-menu-toggle]') !== null) return
       if (!(event.target instanceof Node) || ref.current?.contains(event.target) !== true) close()
     }
     window.addEventListener('pointerdown', outside, true)

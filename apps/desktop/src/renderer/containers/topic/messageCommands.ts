@@ -69,8 +69,10 @@ interface CommandsInput {
  * Where a message's menu opens: at the pointer for a right-click, and from
  * the keyboard under the row's first line, at its text. A context-menu key
  * press reports a point that may be anywhere; inside the row it is kept.
+ * From the row's menu button, under the button.
  */
 export function anchorFor(row: HTMLElement, at: MenuAt | undefined): MenuPoint {
+  if (at?.trigger !== undefined) return { x: at.clientX, y: at.clientY, trigger: at.trigger }
   const box = row.getBoundingClientRect()
   if (at !== undefined && at.clientX > box.left && at.clientX < box.right && at.clientY > box.top && at.clientY < box.bottom) return { x: at.clientX, y: at.clientY }
   const text = row.querySelector<HTMLElement>('[data-msg-text]')
@@ -128,8 +130,9 @@ export function useMessageCommands({ channel, scrollRef, composer, latest, setEd
     }
     // The menu and what its rows do load when idle (`../messageMenu.tsx`).
     const input: MenuInput = { channel, scrollRef, composer, latest, setMenuMessage, react, startEdit, askDelete, reply }
-    const menu = (message: MessageView, anchor: MenuPoint, onSender = false) => withMenus((menus) => menus.topicMenu(input, message, anchor, onSender))
-    return { ...handlers, menu }
+    const menu = (message: MessageView, anchor: MenuPoint, onSender = false, picking = false) => withMenus((menus) => menus.topicMenu(input, message, anchor, onSender, picking))
+    const forward = (message: MessageView) => withMenus((menus) => menus.topicForward(input, message))
+    return { ...handlers, menu, forward }
     // `channel` is fixed for a topic tab; the rest is read through refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel])
@@ -137,7 +140,55 @@ export function useMessageCommands({ channel, scrollRef, composer, latest, setEd
 
 type MessageCommands = ReturnType<typeof useMessageCommands>
 
-/** The row keys (the menu shows T, E and ⌫ beside their rows), the reaction toggle, the row menu and ↑ in an empty composer. */
+interface RowKeyInput {
+  readonly actions: MessageCommands
+  readonly latest: Latest
+  readonly scrollRef: RefObject<HTMLElement | null>
+  readonly composer: RefObject<ComposerHandle | null>
+}
+
+/**
+ * What a key does on a focused message, or undefined when it does nothing there, with Slack's keys where Juno has
+ * the action. The menu shows the letters and ⌫ beside their rows (`topicMenuItems`); R is More reactions' key. A letter held with ⌘, ⌃ or ⌥ is the app's or the system's (⌘Q quits).
+ */
+function rowKeyAction(event: KeyboardEvent<HTMLElement>, message: MessageView, { actions, latest, scrollRef, composer }: RowKeyInput): (() => void) | undefined {
+  const key = event.key.length === 1 ? event.key.toLowerCase() : event.key
+  if (event.key.length === 1 && (event.metaKey || event.ctrlKey || event.altKey)) return undefined
+  const own = isOwnEditable(message)
+  switch (key) {
+    // Q quotes the whole message in the composer, as the menu's Quote row does.
+    case 'q': {
+      const text = textOf(scrollRef.current, message.ts)
+      return text === '' ? undefined : () => composer.current?.quote(text)
+    }
+    // F forwards it, as the menu's Forward… does, when Slack has it.
+    case 'f':
+      return message.pending === undefined && message.kind === 'message' ? () => actions.forward(message) : undefined
+    // R opens its menu as the full emoji picker, where ⇧F10 opens the menu, with the search focused.
+    case 'r': {
+      const row = rowOf(scrollRef.current, message.ts)
+      return row !== null && message.kind === 'message' ? () => actions.menu(message, anchorFor(row, undefined), false, true) : undefined
+    }
+    // T starts or opens the message's thread, as the menu's row does, where it has that row.
+    case 't':
+      return opensThread(latest.current.detail.kind, message) ? () => actions.reply(message) : undefined
+    case 'e':
+      return own ? () => actions.startEdit(message) : undefined
+    case 'Delete':
+    case 'Backspace':
+      return own ? () => actions.askDelete(message) : undefined
+    case 'Escape':
+      return () => composer.current?.focus()
+    // ⇧F10 opens the selected message's menu, as the context-menu key does.
+    case 'F10': {
+      const row = rowOf(scrollRef.current, message.ts)
+      return event.shiftKey && row !== null ? () => actions.menu(message, anchorFor(row, undefined)) : undefined
+    }
+  }
+  return undefined
+}
+
+/** The row keys (`rowKeyAction`), the reaction toggle, the row menu and ↑ in an empty composer. */
 export function rowHandlers(actions: MessageCommands, rowMessage: (ts: string) => MessageView | undefined, latest: Latest, scrollRef: RefObject<HTMLElement | null>, composer: RefObject<ComposerHandle | null>) {
   const onRowKey = (ts: string, event: KeyboardEvent<HTMLElement>) => {
     const message = rowMessage(ts)
@@ -153,39 +204,10 @@ export function rowHandlers(actions: MessageCommands, rowMessage: (ts: string) =
       }
       return
     }
-    switch (event.key) {
-      // T starts or opens the message's thread, as the menu's row does, where it has that row.
-      case 't':
-      case 'T':
-        if (!opensThread(latest.current.detail.kind, message)) return
-        event.preventDefault()
-        actions.reply(message)
-        return
-      case 'e':
-      case 'E':
-        if (!isOwnEditable(message)) return
-        event.preventDefault()
-        actions.startEdit(message)
-        return
-      case 'Delete':
-      case 'Backspace':
-        if (!isOwnEditable(message)) return
-        event.preventDefault()
-        actions.askDelete(message)
-        return
-      case 'Escape':
-        event.preventDefault()
-        composer.current?.focus()
-        return
-      // ⇧F10 opens the selected message's menu, as the context-menu key does.
-      case 'F10': {
-        const row = rowOf(scrollRef.current, ts)
-        if (!event.shiftKey || row === null) return
-        event.preventDefault()
-        actions.menu(message, anchorFor(row, undefined))
-        return
-      }
-    }
+    const run = rowKeyAction(event, message, { actions, latest, scrollRef, composer })
+    if (run === undefined) return
+    event.preventDefault()
+    run()
   }
 
   const selectNewest = () => {
