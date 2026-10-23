@@ -1,30 +1,14 @@
 import { AiProvider, notificationReading } from '@juno/ai'
 import { channelLabel, decideNotification, localTime, scheduledPresence, type NotificationDecision, type NotificationSettings, type Presence, type Reading } from '@juno/domain'
 import { Invalidation, StoreWriter, type StoreReader } from '@juno/store'
-import { Clock, Effect, Schema, Semaphore, SubscriptionRef } from 'effect'
+import { Clock, Effect, Semaphore, SubscriptionRef } from 'effect'
 import { exchangesWith, readConversation, type Conversation } from './conversation'
 import { Candidate, StoredReading, type Notifier } from './model'
 import { readSettings } from './settings'
 
-interface Row {
-  readonly id: number
-  readonly at: string
-  readonly candidate_json: string
-  readonly judgement_json: string | null
-}
-
 /** The reading waits this long; then the decision goes on without it. */
 const READING_MILLIS = 2000
 const FOCUSED = '. Topic is visible in a focused window'
-
-const decodeReading = (json: string | null): StoredReading | undefined => {
-  if (json === null) return undefined
-  try {
-    return Schema.decodeUnknownSync(StoredReading)(JSON.parse(json))
-  } catch {
-    return undefined
-  }
-}
 
 const kindOf = (candidate: Candidate) =>
   candidate.channel.kind === 'im' ? 'dm' as const : candidate.channel.kind === 'mpim' ? 'group DM' as const : candidate.topicId.startsWith('t:') ? 'thread' as const : 'channel' as const
@@ -48,13 +32,13 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
   let scheduled: Presence | undefined
   const current = yield* SubscriptionRef.make<Presence | undefined>(undefined)
 
-  /** Stores the decision; on arrival (`deliver`), claims and shows the banner. A re-run never shows one: a message that stayed does not notify later. */
-  const storeDecision = (id: number, candidate: Candidate, at: number, decision: NotificationDecision, deliver: boolean) =>
+  /** Stores the decision and, for a banner, claims and shows it. */
+  const storeDecision = (id: number, candidate: Candidate, at: number, decision: NotificationDecision) =>
     Effect.gen(function* () {
       const { outcome, decidedBy, reason, ...rest } = decision
       yield* sql`UPDATE notification_log SET outcome = ${outcome}, decided_by = ${decidedBy}, decision_json = ${JSON.stringify(rest)},
         reason = CASE WHEN suppressed_at IS NULL THEN ${reason} ELSE ${reason + FOCUSED} END WHERE id = ${id}`
-      if (outcome !== 'notify' || !deliver) return
+      if (outcome !== 'notify') return
       // Claim before the external effect. A repeated event or settings pass cannot ring twice.
       const focused = yield* notifier.viewing(candidate.topicId)
       const claimed = yield* sql<{ id: number }>`UPDATE notification_log
@@ -100,9 +84,10 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
     let reading: StoredReading | undefined
     if ('needsReading' in decision) {
       reading = yield* read(candidate, conversation, settings, now)
-      // The hours are checked again after the wait, so it cannot notify past their end.
+      // Settings and hours are read again after the wait: a change made meanwhile, such as Never or the hours ending, wins.
       now = yield* Clock.currentTimeMillis
-      decision = decide(candidate, now, settings, aiAssist, reading)
+      const after = yield* configuration
+      decision = decide(candidate, now, after.settings, after.aiAssist, reading)
     }
     if ('needsReading' in decision) return
     const rows = yield* sql<{ id: number }>`INSERT INTO notification_log
@@ -111,25 +96,7 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
         ${decision.outcome}, ${decision.reason}, ${JSON.stringify(candidate)}, ${reading === undefined ? null : JSON.stringify(reading)})
       ON CONFLICT(channel, ts) DO NOTHING RETURNING id`
     const row = rows[0]
-    if (row !== undefined) yield* storeDecision(row.id, candidate, now, decision, true)
-    yield* logChanged
-  })
-
-  /**
-   * Today's rows again, at their own times, with their stored facts and readings, so Today and Details
-   * say what the settings decide now. A row that would need a reading it does not have keeps its decision.
-   */
-  const rerun = Effect.gen(function* () {
-    const now = yield* Clock.currentTimeMillis
-    const midnight = new Date(now)
-    midnight.setHours(0, 0, 0, 0)
-    const { settings, aiAssist } = yield* configuration
-    const rows = yield* sql<Row>`SELECT id, at, candidate_json, judgement_json FROM notification_log WHERE at >= ${midnight.toISOString()} AND candidate_json IS NOT NULL`
-    for (const row of rows) {
-      const candidate = Schema.decodeUnknownSync(Candidate)(JSON.parse(row.candidate_json))
-      const decision = decide(candidate, new Date(row.at).getTime(), settings, aiAssist, decodeReading(row.judgement_json))
-      if (!('needsReading' in decision)) yield* storeDecision(row.id, candidate, now, decision, false)
-    }
+    if (row !== undefined) yield* storeDecision(row.id, candidate, now, decision)
     yield* logChanged
   })
 
@@ -146,7 +113,8 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
 
   return {
     receive: (candidate: Candidate) => receive(candidate).pipe(lock.withPermit),
-    settingsChanged: rerun.pipe(Effect.andThen(tick(false)), lock.withPermit),
+    /** The log is history: a settings change re-decides nothing already logged. It can move the presence schedule. */
+    settingsChanged: tick(false).pipe(lock.withPermit),
     tick: tick(false).pipe(lock.withPermit),
     wake: tick(true).pipe(lock.withPermit),
     currentPresence: SubscriptionRef.get(current),

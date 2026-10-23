@@ -47,11 +47,11 @@ export type NotifyAction = 'notify-always' | 'notify-auto' | 'notify-never'
 const notifyLabels: Record<NotifyChoice, string> = { always: 'Always', auto: 'Auto', never: 'Never' }
 
 /**
- * A thread's Notify me choice: Never when you do not follow it in Slack,
- * else Always when its level says so, else Auto.
+ * A thread's Notify me choice: Never when its level is Never or you do not
+ * follow it in Slack, else Always when its level says so, else Auto.
  */
 export function threadNotifyChoice(subscribed: boolean, level?: NotifyLevel): NotifyChoice {
-  return !subscribed ? 'never' : level === 'always' ? 'always' : 'auto'
+  return !subscribed || level === 'never' ? 'never' : level === 'always' ? 'always' : 'auto'
 }
 
 /** A channel's, DM's or person's Notify me choice: Auto unless a level is stored. */

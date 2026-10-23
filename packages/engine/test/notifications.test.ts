@@ -93,36 +93,21 @@ describe('notifications service', () => {
     expect(record.shown).toHaveLength(0)
   }).pipe(Effect.provide(Layer.merge(freshStore, aiLayer)), Effect.scoped))
 
-  effectIt.effect('re-runs today\'s rows with their stored readings, without reading again or showing a banner later', () => Effect.gen(function* () {
+  effectIt.effect('decides with settings read after the reading, and leaves logged decisions alone when settings change', () => Effect.gen(function* () {
     yield* TestClock.setTime(monday(12))
     yield* setSettings()
-    let calls = 0
-    const inputs: unknown[] = []
-    const observed = { ...fakeProvider, decide: (...args: Parameters<typeof fakeProvider.decide>) => {
-      calls++
-      inputs.push(args[1])
-      return fakeProvider.decide(...args)
-    } }
+    // The owner sets #eng to Never while Juno is reading the message.
+    const inFlight = { ...fakeProvider, decide: (...args: Parameters<typeof fakeProvider.decide>) =>
+      setSettings({ ...settings, channels: { C0ENG: 'never' } }).pipe(Effect.orDie, Effect.andThen(fakeProvider.decide(...args))) }
     const record = recorder()
-    const service = yield* makeNotifications(record.notifier, () => Effect.succeed(true)).pipe(Effect.provideService(AiProvider, observed))
-    record.focus(true)
-    yield* service.receive(candidate('1.000001'))
-    expect(calls).toBe(1)
-    expect(inputs[0]).toMatchObject({ instructions: settings.instructions, kind: 'channel' })
+    const service = yield* makeNotifications(record.notifier, () => Effect.succeed(true)).pipe(Effect.provideService(AiProvider, inFlight))
+    yield* service.receive(candidate('1.000001', false))
     const sql = yield* StoreWriter
-    const suppressed = yield* sql<{ outcome: string; decided_by: string; suppressed_at: string | null; reason: string }>`SELECT outcome, decided_by, suppressed_at, reason FROM notification_log`
-    expect(suppressed[0]).toMatchObject({ outcome: 'notify', decided_by: 'instruction' })
-    expect(suppressed[0]?.suppressed_at).not.toBeNull()
-    expect(suppressed[0]?.reason).toContain('focused window')
-    record.focus(false)
-    yield* setSettings({ ...settings, channels: { C0ENG: 'never' } })
+    expect(yield* sql`SELECT outcome, decided_by FROM notification_log`).toEqual([{ outcome: 'stay', decided_by: 'never' }])
+    yield* setSettings()
     yield* service.settingsChanged
     expect(yield* sql`SELECT outcome, decided_by FROM notification_log`).toEqual([{ outcome: 'stay', decided_by: 'never' }])
-    yield* setSettings(settings)
-    yield* service.settingsChanged
-    expect(yield* sql`SELECT outcome, decided_by FROM notification_log`).toEqual([{ outcome: 'notify', decided_by: 'instruction' }])
     expect(record.shown).toHaveLength(0)
-    expect(calls).toBe(1)
   }).pipe(Effect.provide(Layer.merge(freshStore, aiLayer)), Effect.scoped))
 
   effectIt.effect('keeps messages held with AI off and sends presence switches through Slack', () => Effect.gen(function* () {
@@ -175,9 +160,6 @@ it('consumes both socket inputs, observes manual presence and responds to prefs 
   const rows = readDb(engine, 'user.db', (db) => db.prepare('SELECT * FROM notification_log WHERE channel = ? AND ts = ?').all('C0ENG', message.ts))
   expect(rows).toHaveLength(1)
   engine.fake.emitFrame({ type: 'desktop_notification', channel: 'C0ENG', msg: message.ts, user: 'U0MAYA', title: 'eng', content: '<@U0TUSHAR> Can you approve this?' })
-  // Re-decided under Never, the direct mention gets through; the re-run shows no second banner.
-  await configure({ ...live, channels: { C0ENG: 'never' } })
-  await waitFor(() => readDb(engine, 'user.db', (db) => db.prepare('SELECT decided_by FROM notification_log WHERE ts = ?').get(message.ts))?.decided_by === 'directMention' ? true : undefined)
   expect(record.shown).toHaveLength(1)
   // Another conversation: C0ENG just had a banner, so it stays quiet for a minute.
   await configure({ ...live, channels: { C0PRODUCT: 'always' } })

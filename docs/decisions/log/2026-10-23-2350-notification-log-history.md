@@ -1,0 +1,1 @@
+- 10-23 23:50 · notification-log-history · The notification log is history: a settings change re-decides nothing already logged, so Today counts what happened and a message that stayed never notifies later. Settings are read again after the reading, so a change made while it is in flight (Never, the hours ending) decides (Astra review).
