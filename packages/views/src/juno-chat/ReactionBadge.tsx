@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { chatCopy, isEmoji, type Reaction } from '@juno/agent-contract'
 import { chat, colors, radii, shadows, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { Text } from '@juno/ui'
+import { Emoji, Text } from '@juno/ui'
 
 export interface ReactionBadgeProps {
   readonly images?: ReadonlyMap<string, string>
@@ -23,7 +23,7 @@ export function ReactionBadge({ reactions, corner, images }: ReactionBadgeProps)
         const url = images?.get(reaction.emoji)
         return (
           <Text key={reaction.by} variant="meta" tone="default" as="span" role="img" aria-label={chatCopy.react.reacted(reaction.emoji)}>
-            {url === undefined ? (isEmoji(reaction.emoji) ? reaction.emoji : '▫') : <img src={url} alt="" draggable={false} {...stylex.props(styles.image)} />}
+            {url === undefined ? (isEmoji(reaction.emoji) ? <Emoji glyph={reaction.emoji} size={16} /> : '▫') : <Emoji url={url} size={16} />}
           </Text>
         )
       })}
@@ -32,7 +32,6 @@ export function ReactionBadge({ reactions, corner, images }: ReactionBadgeProps)
 }
 
 const styles = stylex.create({
-  image: { width: sizes['--icon-16'], height: sizes['--icon-16'], objectFit: 'contain', verticalAlign: 'middle' },
   badge: {
     position: 'absolute',
     top: `calc(-1 * ${chat['--reaction-offset']})`,

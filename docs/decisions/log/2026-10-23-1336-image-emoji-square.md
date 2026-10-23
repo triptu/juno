@@ -1,0 +1,1 @@
+- 10-23 13:36 · image emoji square · Text and image emoji use the shared `Emoji` square at the same nominal size on every mixed surface; the measured font shift moves only the text glyph inside that square, and inline message images follow the surrounding one-em text height.

@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import type { ReactNode } from 'react'
 import type { BodyBlock, BodyInline, MessageBody as MessageBodyModel } from '@juno/contract'
 import { colors, radii, spacing, text, weights, sizes } from '@juno/tokens/tokens.stylex'
-import { Chip, Divider, focusRing, Text, type ActivateEvent, type HueName } from '@juno/ui'
+import { Chip, Divider, Emoji, focusRing, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { HighlightedCodeBlock } from './CodeHighlight'
 import { AttachmentCard, AttachmentFields, AttachmentImage, SharedFileLines, SharedPlace, type FileBlock } from './AttachmentCard'
 import { MessageLink as Link, type LinkInfo } from './MessageLink'
@@ -38,8 +38,6 @@ export interface MessageBodyProps {
 // An emoji-only message (one to three emoji and nothing else) is drawn
 // larger, as Slack does. A ratio of the body size, used nowhere else.
 const EMOJI_ONLY_SCALE = '1.75em' // tokens-allow: a ratio of the body size
-// Custom emoji images sit on the text line at a little over its size.
-const INLINE_EMOJI_SIZE = '1.25em' // tokens-allow: a ratio of the line's text
 const MAX_EMOJI_ONLY = 3
 
 const isSpace = (inline: BodyInline) => inline.kind === 'text' && inline.text.trim() === ''
@@ -230,7 +228,7 @@ function Inline({ inline, now, hueOf, onChannel, onLink, linkInfo, tabIndex, qui
       )
     case 'emoji':
       if (inline.url !== undefined) {
-        return <img src={inline.url} alt={`:${inline.name}:`} title={`:${inline.name}:`} draggable={false} decoding="async" loading="lazy" {...stylex.props(styles.customEmoji)} />
+        return <Emoji url={inline.url} size="inline" label={`:${inline.name}:`} title={`:${inline.name}:`} loading="lazy" />
       }
       return inline.unicode ?? `:${inline.name}:`
     case 'break':
@@ -365,13 +363,6 @@ const styles = stylex.create({
     paddingInline: spacing['--space-1'],
     borderRadius: radii['--radius-xs'],
     backgroundColor: colors['--secondary-default'],
-  },
-  customEmoji: {
-    display: 'inline-block',
-    width: INLINE_EMOJI_SIZE,
-    height: INLINE_EMOJI_SIZE,
-    objectFit: 'contain',
-    verticalAlign: 'text-bottom',
   },
   // A #channel chip is a control inside selectable text: it resets the
   // button and keeps the chip's own look.

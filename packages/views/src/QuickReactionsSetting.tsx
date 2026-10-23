@@ -291,7 +291,7 @@ function Pill({ reaction, position, tabStop, removable, dragging, onFocus, onKey
       {reaction.url === undefined ? (
         <Emoji glyph={reaction.unicode} size={16} />
       ) : (
-        <img src={reaction.url} alt="" draggable={false} decoding="async" {...stylex.props(styles.image)} />
+        <Emoji url={reaction.url} size={16} />
       )}
       {removable ? <IconButton icon={X} label={`Remove ${reaction.name}`} size={20} iconSize={12} tone="muted" tabIndex={-1} noTooltip onClick={onRemove} /> : null}
     </div>
@@ -344,11 +344,6 @@ const styles = stylex.create({
   // The pill being dragged stays in the row at its drop place, faded.
   pillDragging: {
     opacity: opacity['--opacity-dim'],
-  },
-  image: {
-    width: sizes['--icon-16'],
-    height: sizes['--icon-16'],
-    objectFit: 'contain',
   },
   add: {
     display: 'inline-flex',

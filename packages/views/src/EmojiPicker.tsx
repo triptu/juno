@@ -244,7 +244,7 @@ export function EmojiPicker({ data, recent = EMPTY, selected = EMPTY, onPick, on
                           {...stylex.props(styles.cell, inMenu && styles.cellInMenu, chosen && styles.chosen)}
                         >
                           {item.unicode !== undefined ? <Emoji glyph={item.unicode} size={20} /> : item.url === undefined || failed.has(itemKey(item)) ? <span aria-hidden="true" {...stylex.props(styles.fallback)}><span data-emoji-placeholder="" {...stylex.props(styles.placeholder)} /></span> : (
-                            <img src={item.url} alt="" draggable={false} loading="lazy" decoding="async" onError={() => setFailed((names) => new Set(names).add(itemKey(item)))} {...stylex.props(styles.image)} />
+                            <Emoji url={item.url} size={20} loading="lazy" onError={() => setFailed((names) => new Set(names).add(itemKey(item)))} />
                           )}
                         </button>
                       )
@@ -369,11 +369,6 @@ const styles = stylex.create({
       ':focus-visible': accent['--hl-soft'],
     },
     boxShadow: `inset 0 0 0 1px ${accent['--hl-ring']}`, // tokens-allow: 1px hairline ring, as the reaction chip's border
-  },
-  image: {
-    width: GLYPH,
-    height: GLYPH,
-    objectFit: 'contain',
   },
   fallback: { width: GLYPH, height: GLYPH, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   placeholder: { width: sizes['--icon-12'], height: sizes['--icon-12'], boxSizing: 'border-box', border: `1px solid ${colors['--foreground-muted']}`, borderRadius: radii['--radius-inline'] },

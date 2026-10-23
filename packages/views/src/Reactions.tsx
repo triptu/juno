@@ -33,7 +33,7 @@ function ReactionChips({ reactions, onToggle, people, onSeeAll }: { readonly rea
       {reactions.map((reaction) => {
         const emoji =
           reaction.url !== undefined ? (
-            <img src={reaction.url} alt="" draggable={false} decoding="async" loading="lazy" {...stylex.props(styles.image)} />
+            <Emoji url={reaction.url} loading="lazy" />
           ) : reaction.unicode !== undefined ? (
             <Emoji glyph={reaction.unicode} />
           ) : (
@@ -83,10 +83,5 @@ const styles = stylex.create({
   // Figtree's figures, centred in their line, draw half a pixel under the chip's centre line, where the emoji is.
   count: {
     transform: `translateY(${sizes['--reaction-count-shift']})`,
-  },
-  image: {
-    width: sizes['--icon-14'],
-    height: sizes['--icon-14'],
-    objectFit: 'contain',
   },
 })

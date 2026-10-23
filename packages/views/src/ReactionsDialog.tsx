@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { useEffect, useId, useLayoutEffect, useRef, type KeyboardEvent, type PointerEvent, type WheelEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { colors, layout, radii, shadows, sizes, spacing, text, z } from '@juno/tokens/tokens.stylex'
-import { Avatar, Surface, Text, focusRing, moveFocus } from '@juno/ui'
+import { Avatar, Emoji, Surface, Text, focusRing, moveFocus } from '@juno/ui'
 import { initials } from './look'
 import type { Reactor } from './ReactorsCard'
 import { placeNear } from './reactorsPlace'
@@ -118,7 +118,7 @@ function Strip({ id, reactions, chosen, onSelect }: { readonly id: string; reado
               onClick={() => choose(reaction.name)}
               {...stylex.props(styles.tab, focusRing.inset, on && styles.tabOn)}
             >
-              <Emoji reaction={reaction} />
+              <ReactionEmoji reaction={reaction} />
               <span>{reaction.count}</span>
             </button>
           )
@@ -163,14 +163,10 @@ function People({ id, chosen, rows, loading }: { readonly id: string; readonly c
   )
 }
 
-function Emoji({ reaction }: { readonly reaction: ReactionsDialogEntry }) {
-  return reaction.url === undefined ? (
-    <span aria-hidden {...stylex.props(styles.glyph)}>
-      {reaction.emoji}
-    </span>
-  ) : (
-    <img src={reaction.url} alt="" draggable={false} decoding="async" {...stylex.props(styles.glyph)} />
-  )
+function ReactionEmoji({ reaction }: { readonly reaction: ReactionsDialogEntry }) {
+  if (reaction.url !== undefined) return <Emoji url={reaction.url} size={16} />
+  if (!reaction.emoji.startsWith(':')) return <Emoji glyph={reaction.emoji} size={16} />
+  return <span aria-hidden {...stylex.props(styles.shortcode)}>{reaction.emoji}</span>
 }
 
 export interface ReactionsPopoverProps extends ReactionsDialogProps {
@@ -324,15 +320,13 @@ const styles = stylex.create({
     boxShadow: shadows['--shadow-sm'],
     color: colors['--foreground-default'],
   },
-  glyph: {
+  shortcode: {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
     width: sizes['--icon-16'],
     height: sizes['--icon-16'],
-    fontSize: sizes['--icon-15'],
     lineHeight: 1,
-    objectFit: 'contain',
   },
   caption: {
     display: 'flex',

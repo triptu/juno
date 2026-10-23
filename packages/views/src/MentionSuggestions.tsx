@@ -4,7 +4,7 @@ import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { UsersThree } from '@phosphor-icons/react/dist/icons/UsersThree'
 import type { MentionChannel, MentionGroup, MentionPerson } from '@juno/contract'
 import { colors, layout, radii, sizes, spacing, z } from '@juno/tokens/tokens.stylex'
-import { Avatar, Icon, Text, OptionGroupLabel, OptionList, OptionRow, Surface } from '@juno/ui'
+import { Avatar, Emoji, Icon, OptionGroupLabel, OptionList, OptionRow, Surface } from '@juno/ui'
 import { hueFor, initials } from './look'
 import { mentionRowId } from './mentionRowId'
 
@@ -87,7 +87,7 @@ export function MentionSuggestions(props: MentionSuggestionsProps) {
           : props.kind === 'emoji' ? props.rows.map((emoji) => {
               const rowId = mentionRowId(id, emoji.id)
               return <OptionRow key={emoji.id} id={rowId} size={32} active={rowId === activeId}
-                leading={emoji.url === undefined ? <Text aria-hidden>{emoji.insert}</Text> : <img src={emoji.url} alt="" {...stylex.props(styles.emoji)} />}
+                leading={emoji.url === undefined ? <Emoji glyph={emoji.insert} size={20} /> : <Emoji url={emoji.url} size={20} />}
                 label={`:${emoji.name}:`} onSelect={() => onPick(rowId)} onActivate={() => onActivate(rowId)} />
             }) : props.rows.map((channel) => {
               const rowId = mentionRowId(id, channel.id)
@@ -132,7 +132,6 @@ export function MentionSuggestions(props: MentionSuggestionsProps) {
 const CHANNEL_ICON = '15px' // tokens-allow: the channel icon's size
 
 const styles = stylex.create({
-  emoji: { width: sizes['--avatar-20'], height: sizes['--avatar-20'], objectFit: 'contain' },
   // A group's tile: an avatar's size and shape, so its handle lines up with the people's names.
   groupTile: {
     display: 'inline-flex',

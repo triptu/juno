@@ -94,7 +94,7 @@ export function ReactorsCard({ name, emoji, url, reactors, count, id, onSeeAll, 
   return (
     <div id={id} role="tooltip" data-reactors={name} onPointerEnter={onPointerEnter} onPointerLeave={onPointerLeave} {...stylex.props(styles.card)}>
       {url !== undefined ? (
-        <img src={url} alt="" draggable={false} decoding="async" {...stylex.props(styles.image)} />
+        <Emoji url={url} size={32} />
       ) : emoji.startsWith(':') ? (
         <span aria-hidden {...stylex.props(styles.shortcode)}>
           {emoji}
@@ -146,11 +146,6 @@ const styles = stylex.create({
   shortcode: {
     fontSize: sizes['--control-32'],
     lineHeight: 1,
-  },
-  image: {
-    width: sizes['--control-32'],
-    height: sizes['--control-32'],
-    objectFit: 'contain',
   },
   words: {
     display: 'flex',

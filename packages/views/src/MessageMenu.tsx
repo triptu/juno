@@ -122,7 +122,7 @@ function ReactionGrid({ reactions, onReact, onMore, spaced }: ReactionGridProps)
           {reaction.url === undefined ? (
             <Emoji glyph={reaction.unicode} size={14} />
           ) : (
-            <img src={reaction.url} alt="" draggable={false} decoding="async" {...stylex.props(styles.image)} />
+            <Emoji url={reaction.url} size={14} />
           )}
         </button>
       ))}
@@ -185,10 +185,5 @@ const styles = stylex.create({
   },
   more: {
     color: menu['--menu-icon'],
-  },
-  image: {
-    width: menu['--menu-emoji-size'],
-    height: menu['--menu-emoji-size'],
-    objectFit: 'contain',
   },
 })
