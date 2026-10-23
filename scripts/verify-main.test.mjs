@@ -32,6 +32,7 @@ function verificationFixture(t) {
   writeFileSync(fixtureExecution, readFileSync(fixtureExecution, 'utf8') + "\nlocalVerifyEnv.JUNO_PLAN_MAX_LOAD = 'Infinity'\n")
   mkdirSync(join(root, 'apps/desktop/e2e'), { recursive: true })
   mkdirSync(join(root, 'bin'))
+  mkdirSync(join(root, 'tmp'))
   writeFileSync(join(root, 'bin/package.json'), '{"type":"commonjs"}')
   mkdirSync(join(root, 'tstack/scripts/runner'), { recursive: true })
   writeFileSync(join(root, 'tstack/scripts/runner/host.sh'), '# fixture\n')
@@ -62,7 +63,8 @@ console.error('Connection refused'); process.exit(255);
   git(root, 'add', '.')
   git(root, 'commit', '-qm', 'Fixture')
   const commit = git(root, 'rev-parse', 'HEAD')
-  const env = { ...process.env, PATH: `${join(root, 'bin')}:${process.env.PATH}`, TSTACK_HOME: join(root, 'tstack'), JUNO_RUNNER_HOST: 'runner.test', TEST_CALLS: join(root, 'calls'), TEST_PROBES: join(root, 'probes') }
+  // TMPDIR keeps the heavy lock inside the fixture, so other jobs on the machine cannot hold it.
+  const env = { ...process.env, TMPDIR: join(root, 'tmp'), PATH: `${join(root, 'bin')}:${process.env.PATH}`, TSTACK_HOME: join(root, 'tstack'), JUNO_RUNNER_HOST: 'runner.test', TEST_CALLS: join(root, 'calls'), TEST_PROBES: join(root, 'probes') }
   const invoke = (args, extra = {}) => spawnSync(process.execPath, ['scripts/verify-main.mjs', '--ref', 'HEAD', ...args], { cwd: root, env: { ...env, ...extra }, encoding: 'utf8', timeout: 60_000 })
   return { root, commit, env, invoke }
 }
