@@ -2,7 +2,7 @@
 // from timeouts or worker crashes. Playwright's list reporter still shows retries.
 export default class TestResultsReporter {
   errors = 0
-  onBegin(config, suite) { this.config = config; this.suite = suite }
+  onBegin(_config, suite) { this.suite = suite }
   onError() { this.errors += 1 }
   onEnd(result) {
     const tests = this.suite.allTests()

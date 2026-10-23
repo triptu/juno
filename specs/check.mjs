@@ -51,7 +51,7 @@ const sha = (...parts) => {
   return hash.digest('hex')
 }
 const cacheVersion = 1
-const runnerHash = sha(cacheVersion, require('@informalsystems/quint/package.json').version, apalacheVersion, backend, JSON.stringify(runtimeIdentity(root)), readFileSync(fileURLToPath(import.meta.url)))
+const runnerHash = sha(cacheVersion, require('@informalsystems/quint/package.json').version, apalacheVersion, backend, JSON.stringify(runtimeIdentity(root)), ...['check.mjs', 'agent-checks.mjs', 'outbox-checks.mjs'].map((file) => readFileSync(join(root, 'specs', file))))
 function specHash(file, seen = new Set()) {
   if (seen.has(file)) return ''
   seen.add(file)

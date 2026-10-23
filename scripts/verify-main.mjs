@@ -90,7 +90,7 @@ let suites = required.filter((suite) => {
   if (baseline || !protocolRoots[suite.name] || noCache || (seed !== undefined && suite.name === 'specs:check')) return true
   for (const record of records) {
     const previous = record.suites.find((item) => item.suite === suite.name)
-    if (!previous || !suitePassed(previous) || !sameIdentity(previous.identity ?? record.identity, identity) || !previous.inputs || !isAncestor(root, record.commit, commit)) continue
+    if (!previous || !suitePassed(previous) || !sameIdentity(previous.identity, identity) || !previous.inputs || !isAncestor(root, record.commit, commit)) continue
     if (!protocolRoots[suite.name].every((file) => previous.inputs.includes(file))) continue
     if (previous.inputKey !== committedInputKey(root, commit, previous.inputs, identity)) continue
     reused.push({ ...previous, reusedFrom: { commit: record.commit, finishedAt: record.finishedAt } })
@@ -122,6 +122,7 @@ for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => {
 /** Runs one suite, writing its log; resolves with the outcome. */
 function run(suite, command, args, cwd, env = {}) {
   return new Promise((resolvePromise) => {
+    if (cancelled) { resolvePromise({ suite, code: 130, signal: cancelled, seconds: 0, log: '' }); return }
     const started = Date.now()
     const log = join(logDir, `${suite.replace(/[^\w-]/g, '_')}.log`)
     const out = createWriteStream(log)
@@ -185,6 +186,7 @@ if (withMac) {
     (async () => {
       // Local Electron suites share the checkout and must not overlap.
       if (local) await runs[0]
+      if (cancelled) return [{ suite: 'test:desktop @mac', code: 130, seconds: 0, log: '' }]
       const install = local ? { status: installed ? 0 : 1 } : spawnSync('bun', ['install', '--frozen-lockfile', '--silent'], { cwd: checkout, stdio: 'ignore' })
       if (install.status !== 0) return [{ suite: 'test:desktop @mac', code: 1, seconds: 0, log: '' }]
       return [await run('test:desktop @mac', 'bun', ['run', 'test:desktop', '--grep', '@mac'], checkout, local ? localVerifyEnv : {})]
@@ -241,15 +243,15 @@ const measured = results.map((result) => {
   const log = result.log && existsSync(result.log) ? readFileSync(result.log, 'utf8') : ''
   const reported = [...log.matchAll(/^juno-runtime: (.+)$/gm)].map((match) => JSON.parse(match[1]))
   const expected = suites.some(({ name }) => name === result.suite) || result.suite === 'plan' ? identity : runtimeIdentity(root)
-  const actual = reported[0] ?? expected
-  const mismatch = reported.some((value) => !sameIdentity(value, expected))
+  const actual = reported[0] ?? (local || expected !== identity ? expected : undefined)
+  const mismatch = actual === undefined || reported.some((value) => !sameIdentity(value, expected))
   let code = cancelled ? 130 : mismatch ? 1 : result.code
   let tests = testResults(log)
   if (baseline && tests) tests = mergeRepairTests(baseline.suites.find((suite) => suite.suite === result.suite)?.tests, tests)
   if (!suitePassed({ ...result, code, tests })) code ||= 1
   const inputs = protocols[result.suite]
   const override = argv.filter((word, index) => argv[index - 1] === '--cause').map((word) => word.split('=')).find(([suite]) => suite === result.suite)?.[1]
-  return { ...result, code, identity: actual, inputs, inputKey: inputs ? committedInputKey(root, commit, inputs, actual) : undefined,
+  return { ...result, code, command: suites.find(({ name }) => name === result.suite)?.words, identity: actual, inputs, inputKey: inputs ? committedInputKey(root, commit, inputs, actual) : undefined,
     host: suites.some(({ name }) => name === result.suite) || result.suite === 'plan' ? execution.host : hostname(),
     log: result.log ? join('.juno-status', relative(statusDir, result.log)) : '',
     failures: code === 0 ? [] : mismatch ? ['The job runtime differs from the planned runtime; reuse was refused'] : failures(result.log), tests,

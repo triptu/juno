@@ -1,6 +1,30 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { sameIdentity } from './verify-inputs.mjs'
+import { failureCause } from './test-results-reporter.mjs'
+import { statusFolder } from './release-gate.mjs'
+
+/** Confirm triage on a full-run or affected record without changing its outcome. */
+export function classifyRecord(file, suite, category, evidence, status) {
+  if (!evidence?.trim()) throw new Error('Classification needs evidence')
+  const record = JSON.parse(readFileSync(file, 'utf8'))
+  const failed = record.suites.find((item) => item.suite === suite)
+  if (!failed || failed.code === 0) throw new Error(`No failed ${suite} suite in this record`)
+  failed.cause = failureCause({ code: failed.code, cause: category, note: evidence })
+  const targets = new Set([file])
+  if (record.commit && status) {
+    const folder = join(status, 'verify-main', 'commits', record.commit)
+    if (existsSync(folder)) for (const name of readdirSync(folder).filter((name) => name.endsWith('.json'))) targets.add(join(folder, name))
+    if (existsSync(join(status, 'verify-main.json'))) targets.add(join(status, 'verify-main.json'))
+  }
+  for (const target of targets) {
+    const saved = JSON.parse(readFileSync(target, 'utf8'))
+    if (saved.finishedAt !== record.finishedAt || saved.commit !== record.commit) continue
+    const temporary = `${target}.${process.pid}.tmp`
+    writeFileSync(temporary, JSON.stringify(record, null, 2) + '\n')
+    renameSync(temporary, target)
+  }
+}
 
 /** Newest matching successful per-file measurements, in test seconds (not wall time). */
 export function specDurations(records, identity) {
@@ -36,4 +60,10 @@ export function writeRecord(status, runId, summary) {
   const temporary = `${latest}.${process.pid}.tmp`
   writeFileSync(temporary, `${JSON.stringify(summary, null, 2)}\n`)
   renameSync(temporary, latest)
+}
+
+if (import.meta.main) {
+  const [file, suite, category, ...evidence] = process.argv.slice(2)
+  if (!file || !suite || !category || evidence.length === 0) throw new Error('usage: bun scripts/verify-records.mjs <record.json> <suite> <product|test|infrastructure|cancellation> <evidence>')
+  classifyRecord(resolve(file), suite, category, evidence.join(' '), statusFolder(resolve(import.meta.dirname, '..')))
 }

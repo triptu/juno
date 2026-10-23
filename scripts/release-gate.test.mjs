@@ -104,3 +104,19 @@ test('release timings from a disposable checkout remain in the shared main statu
   git(main, 'worktree', 'remove', checkout)
   assert.equal(JSON.parse(readFileSync(join(main, '.juno-status/release-timings.json'), 'utf8')).steps[0].step, 'package')
 })
+
+test('triage updates matching archived and latest records without turning a failure green', async (t) => {
+  const { classifyRecord } = await import('./verify-records.mjs')
+  const { readFileSync } = await import('node:fs')
+  const root = mkdtempSync(join(scratchFolder(), 'failure-cause-test-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const record = { ...green('a'.repeat(40)), passed: false, suites: [{ suite: 'test:desktop', code: 1 }] }
+  writeRecord(root, 'failed', record)
+  const file = join(root, 'verify-main/commits', record.commit, 'failed.json')
+  classifyRecord(file, 'test:desktop', 'product', 'Fixed a dropped socket event', root)
+  const latest = JSON.parse(readFileSync(join(root, 'verify-main.json'), 'utf8'))
+  assert.equal(latest.suites[0].cause.category, 'product')
+  assert.equal(latest.suites[0].cause.provisional, false)
+  assert.equal(latest.passed, false)
+  assert.equal(latest.suites[0].code, 1)
+})

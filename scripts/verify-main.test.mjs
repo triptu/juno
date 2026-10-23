@@ -4,11 +4,12 @@ import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rm
 import { hostname } from 'node:os'
 import { join, resolve } from 'node:path'
 import { test } from 'node:test'
-import { verifyExecution } from './verify-execution.mjs'
+import { localVerifyEnv, verifyExecution } from './verify-execution.mjs'
 import { assessRecord, git, readRecords, releaseGate } from './release-gate.mjs'
 import { scratchFolder } from './worktree-folder.mjs'
 
 test('explicit local skips probing; unreachable falls back once; reachable stays remote; configuration errors fail', () => {
+  assert.equal(localVerifyEnv.JUNO_PLAN_MAX_LOAD, '8')
   let calls = 0
   const messages = []
   const deps = { config: () => ({ host: 'runner' }), probe: () => { calls++; return { reachable: false, reason: 'offline' } }, log: (line) => messages.push(line) }
@@ -26,6 +27,9 @@ test('local and fallback runs archive eligible records, refresh coverage, and pr
   const root = mkdtempSync(join(scratchFolder(), 'verify-main-test-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
   cpSync(resolve(import.meta.dirname), join(root, 'scripts'), { recursive: true })
+  // This checkout only runs fake commands. Its capacity is independent of the host's load.
+  const fixtureExecution = join(root, 'scripts/verify-execution.mjs')
+  writeFileSync(fixtureExecution, readFileSync(fixtureExecution, 'utf8') + "\nlocalVerifyEnv.JUNO_PLAN_MAX_LOAD = 'Infinity'\n")
   mkdirSync(join(root, 'apps/desktop/e2e'), { recursive: true })
   mkdirSync(join(root, 'bin'))
   writeFileSync(join(root, 'bin/package.json'), '{"type":"commonjs"}')

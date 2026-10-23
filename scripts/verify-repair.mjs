@@ -9,10 +9,13 @@ export function repairPlan({ baseline, identity, suites, affected }) {
   if (!sameIdentity(baseline.identity, identity)) throw new Error('Repair runtime/platform differs from the baseline; start a full run')
   if (baseline.suites.some((suite) => ['perf', 'test:feel', 'test:desktop @mac'].includes(suite.suite)))
     throw new Error('Repair of a Mac timing/nightly run needs a fresh --with-mac full run')
+  const coordinatorFailed = baseline.suites.some((suite) => ['plan', 'setup'].includes(suite.suite) && !suitePassed(suite))
+  const all = [...suites, ...baseline.suites.filter((previous) => !['plan', 'setup'].includes(previous.suite) && !suites.some((suite) => suite.name === previous.suite))
+    .map((previous) => ({ name: previous.suite, words: [previous.suite] }))]
   const planned = []
   const reused = []
-  for (const suite of suites) {
-    const previous = baseline.suites.find((item) => item.suite === suite.name)
+  for (const suite of all) {
+    const previous = coordinatorFailed ? undefined : baseline.suites.find((item) => item.suite === suite.name)
     const reached = affected.find((item) => item.script === suite.name)
     if (previous && suitePassed(previous) && !reached) {
       reused.push({ ...previous, reusedFrom: { commit: baseline.commit, finishedAt: baseline.finishedAt } })
@@ -35,7 +38,7 @@ export function repairPlan({ baseline, identity, suites, affected }) {
       planned.push({ ...suite, words: [...Object.entries(reached.env ?? {}).map(([key, value]) => `${key}=${value}`), suite.name, ...reached.args] })
     } else planned.push(suite)
   }
-  for (const step of affected.filter((item) => !suites.some((suite) => suite.name === item.script)))
+  for (const step of affected.filter((item) => !all.some((suite) => suite.name === item.script)))
     planned.push({ name: step.script, words: [...Object.entries(step.env ?? {}).map(([key, value]) => `${key}=${value}`), step.script, ...step.args] })
   return { planned, reused }
 }
