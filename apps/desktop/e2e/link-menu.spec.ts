@@ -41,15 +41,12 @@ test('web and email links have link menus; message text keeps the message menu',
   await expect(email).toBeVisible()
   await expect(slack).toBeVisible()
 
-  await juno.app.evaluate(({ clipboard }) => clipboard.clear())
   expect(await choose(juno, web, 'copy-link')).toEqual(['Open link', 'Open in browser · ⌘ click', '-', 'Copy link'])
   await expect.poll(() => juno.clipboard()).toBe(WEB_URL)
 
-  await juno.app.evaluate(({ clipboard }) => clipboard.clear())
   expect(await choose(juno, email, 'copy-email')).toEqual(['Copy email address', 'New email'])
   await expect.poll(() => juno.clipboard()).toBe(EMAIL)
 
-  await juno.app.evaluate(({ clipboard }) => clipboard.clear())
   expect(await choose(juno, slack, 'copy-link')).toEqual(['Open link', 'Open in background · ⌘ click', '-', 'Copy link'])
   await expect.poll(() => juno.clipboard()).toBe(slackUrl)
 

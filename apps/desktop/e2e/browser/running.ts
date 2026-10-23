@@ -19,7 +19,7 @@ export async function startWebApp(
   fake: FakeSlack,
   userData: string,
   snapshot: WebSnapshot | undefined,
-  options: { readonly sidebarTrace: boolean; readonly sendTrace: boolean; readonly engine: EngineOptions },
+  options: { readonly sidebarTrace: boolean; readonly sendTrace: boolean; readonly tour?: boolean; readonly engine: EngineOptions },
 ): Promise<RunningApp> {
   const timings = process.env.JUNO_E2E_TIMINGS === '1'
   let at = performance.now()
@@ -32,7 +32,7 @@ export async function startWebApp(
   try {
     if (options.sidebarTrace) await page.addInitScript(startSidebarTrace)
     if (options.sendTrace) await page.addInitScript(startSendTrace)
-    await page.goto(`${host.url}?e2e=1`)
+    await page.goto(`${host.url}?e2e=1${options.tour ? "&tour=auto" : ""}`)
     lap('page')
     if (snapshot !== undefined) {
       await new Juno(webSurface(page, host), page).waitForSync()

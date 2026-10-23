@@ -6,8 +6,8 @@
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { SELF_ID } from '@juno/fake-slack'
-import { expect, launchApp, syncedTest, test } from './fixtures'
-import { Juno } from './driver/juno'
+import { expect, syncedTest, test } from './fixtures'
+import type { Juno } from './driver/juno'
 
 test.describe.configure({ timeout: 150_000 })
 
@@ -88,63 +88,59 @@ test.describe('follow-ups that look done', () => {
 })
 
 test.describe('old drafts', () => {
-  syncedTest('a draft untouched for two weeks is proposed with its age and first line; Delete, Undo and Keep work per row', async ({ fake, slackApp, userData, running }) => {
-    await running.close()
+  syncedTest('a draft untouched for two weeks is proposed with its age and first line; Delete, Undo and Keep work per row', async ({ fake, userData, relaunch }) => {
+    const app = await relaunch({
+      whileClosed: () => {
+        // Two drafts written 15 days ago, in topics that moved on since.
+        const root = fake.workspace.main('C0ENG').find((message) => message.text?.startsWith(POSTGRES) === true)!
+        const old = String(Date.now() - 15 * 24 * 3_600_000)
+        const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
+        const insert = db.prepare('INSERT INTO drafts (topic_id, text, updated_at) VALUES (?, ?, ?)')
+        insert.run('m:C0ENG', 'Before the window we should\nsecond line', old)
+        insert.run(`t:C0ENG:${root.ts}`, 'Can we move the cutover to', old)
+        db.close()
+      },
+    })
+    const { home } = app
+    await expect(home.navItem).toBeVisible({ timeout: 30_000 })
+    await expect.poll(() => freshHome(app), { timeout: 30_000 }).toContain('oldDrafts')
+    await expect(home.title('oldDrafts')).toHaveText('2 old drafts')
+    await expect(home.meta('oldDrafts')).toHaveText('eng')
 
-    // Two drafts written 15 days ago, in topics that moved on since.
-    const root = fake.workspace.main('C0ENG').find((message) => message.text?.startsWith(POSTGRES) === true)!
-    const old = String(Date.now() - 15 * 24 * 3_600_000)
-    const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
-    const insert = db.prepare('INSERT INTO drafts (topic_id, text, updated_at) VALUES (?, ?, ?)')
-    insert.run('m:C0ENG', 'Before the window we should\nsecond line', old)
-    insert.run(`t:C0ENG:${root.ts}`, 'Can we move the cutover to', old)
-    db.close()
+    const sheet = await home.reviewOf('oldDrafts', 'oldDrafts')
+    await expect(sheet.title).toHaveText('2 old drafts')
+    await expect(sheet.reason(ENG_MAIN)).toHaveText(/^Untouched for 2 weeks · \d+\+? messages? since$/)
+    await expect(sheet.quote(ENG_MAIN)).toHaveText('Before the window we should')
+    await expect(sheet.quote(POSTGRES)).toHaveText('Can we move the cutover to')
+    await sheet.about.click()
+    await expect(sheet.explainer).toContainText('nothing changes in Slack')
+    // The info covers the top of the list; the button closes it again.
+    await sheet.about.click()
 
-    const relaunched = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
-    try {
-      const app = new Juno(relaunched.app, relaunched.win)
-      const { home } = app
-      await expect(home.navItem).toBeVisible({ timeout: 30_000 })
-      await expect.poll(() => freshHome(app), { timeout: 30_000 }).toContain('oldDrafts')
-      await expect(home.title('oldDrafts')).toHaveText('2 old drafts')
-      await expect(home.meta('oldDrafts')).toHaveText('eng')
+    // Delete, then the row's Undo puts the draft back.
+    await sheet.act(ENG_MAIN).click()
+    await expect(sheet.row(ENG_MAIN)).toHaveAttribute('data-review-status', 'done')
+    await app.expectToast('Draft deleted · #eng')
+    await sheet.undo(ENG_MAIN).click()
+    await expect(sheet.row(ENG_MAIN)).toHaveAttribute('data-review-status', 'open')
 
-      const sheet = await home.reviewOf('oldDrafts', 'oldDrafts')
-      await expect(sheet.title).toHaveText('2 old drafts')
-      await expect(sheet.reason(ENG_MAIN)).toHaveText(/^Untouched for 2 weeks · \d+\+? messages? since$/)
-      await expect(sheet.quote(ENG_MAIN)).toHaveText('Before the window we should')
-      await expect(sheet.quote(POSTGRES)).toHaveText('Can we move the cutover to')
-      await sheet.about.click()
-      await expect(sheet.explainer).toContainText('nothing changes in Slack')
-      // The info covers the top of the list; the button closes it again.
-      await sheet.about.click()
+    // Keep the thread's draft; delete the Main's with D.
+    await sheet.decline(POSTGRES).click()
+    await expect(sheet.row(POSTGRES)).toHaveAttribute('data-review-status', 'declined')
+    await app.expectToast('Keeping draft · ')
+    await sheet.row(ENG_MAIN).getByRole('link').focus()
+    await app.win.keyboard.press('d')
+    await expect(sheet.row(ENG_MAIN)).toHaveAttribute('data-review-status', 'done')
+    await app.win.keyboard.press('Escape')
+    await expect(sheet.root).toHaveCount(0)
 
-      // Delete, then the row's Undo puts the draft back.
-      await sheet.act(ENG_MAIN).click()
-      await expect(sheet.row(ENG_MAIN)).toHaveAttribute('data-review-status', 'done')
-      await app.expectToast('Draft deleted · #eng')
-      await sheet.undo(ENG_MAIN).click()
-      await expect(sheet.row(ENG_MAIN)).toHaveAttribute('data-review-status', 'open')
+    // The kept draft is not proposed again, and the deleted one is gone.
+    expect(await freshHome(app)).not.toContain('oldDrafts')
+    await app.sidebar.row(POSTGRES).open()
+    await expect(app.topic.composer).toHaveValue('Can we move the cutover to')
+    await app.sidebar.row(ENG_MAIN).open()
+    await app.topic.expectTitle('Main')
+    await expect(app.topic.composer).toHaveValue('')
 
-      // Keep the thread's draft; delete the Main's with D.
-      await sheet.decline(POSTGRES).click()
-      await expect(sheet.row(POSTGRES)).toHaveAttribute('data-review-status', 'declined')
-      await app.expectToast('Keeping draft · ')
-      await sheet.row(ENG_MAIN).getByRole('link').focus()
-      await relaunched.win.keyboard.press('d')
-      await expect(sheet.row(ENG_MAIN)).toHaveAttribute('data-review-status', 'done')
-      await relaunched.win.keyboard.press('Escape')
-      await expect(sheet.root).toHaveCount(0)
-
-      // The kept draft is not proposed again, and the deleted one is gone.
-      expect(await freshHome(app)).not.toContain('oldDrafts')
-      await app.sidebar.row(POSTGRES).open()
-      await expect(app.topic.composer).toHaveValue('Can we move the cutover to')
-      await app.sidebar.row(ENG_MAIN).open()
-      await app.topic.expectTitle('Main')
-      await expect(app.topic.composer).toHaveValue('')
-    } finally {
-      await relaunched.close()
-    }
   })
 })

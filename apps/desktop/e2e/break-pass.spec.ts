@@ -58,7 +58,7 @@ syncedTest('long RTL and zero-width text leaves the composer usable', async ({ j
   expect(await juno.win.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })
 
-test('a malformed launch.json still opens a usable window', async ({ running, userData }) => {
+test('a malformed launch.json still opens a usable window', { tag: '@electron' }, async ({ running, userData }) => {
   await running.close()
   await writeFile(join(userData, 'launch.json'), '{"theme":')
   const again = await launchApp(userData)
@@ -89,7 +89,7 @@ test('a deleted sender and a live rename keep their messages readable', async ({
   await juno.topic.expectSent('Reply to the old message')
 })
 
-syncedTest('repeated window minimize and restore keeps the draft', async ({ juno, app }) => {
+syncedTest('repeated window minimize and restore keeps the draft', { tag: '@electron' }, async ({ juno, app }) => {
   await juno.sidebar.row('#eng').open()
   await juno.topic.composer.fill('Draft through window changes')
   await app.evaluate(({ BrowserWindow }) => {

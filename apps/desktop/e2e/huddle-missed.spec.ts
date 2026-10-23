@@ -1,6 +1,6 @@
 import { SELF_ID } from '@juno/fake-slack'
-import { expect, launchApp, test } from './fixtures'
-import { Juno } from './driver/juno'
+import { expect, test } from './fixtures'
+import type { Juno } from './driver/juno'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -9,7 +9,7 @@ async function revisit(juno: Juno) {
   await juno.home.open()
 }
 
-test('a dismissed huddle appears after it ends; opening it clears it across a relaunch', async ({ juno, fake, win, running, userData, slackApp }) => {
+test('a dismissed huddle appears after it ends; opening it clears it across a relaunch', async ({ juno, fake, win, relaunch }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.sidebar.row('#eng').open()
@@ -27,14 +27,10 @@ test('a dismissed huddle appears after it ends; opening it clears it across a re
   await juno.topic.expectTitle('Maya')
   await revisit(juno)
   await expect(juno.home.item('missedHuddle')).toHaveCount(0)
-  await running.close()
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
-  try {
-    const next = new Juno(again.app, again.win)
-    await next.waitForSync()
-    await next.home.open()
-    await expect(next.home.item('missedHuddle')).toHaveCount(0)
-  } finally { await again.close() }
+  const next = await relaunch()
+  await next.waitForSync()
+  await next.home.open()
+  await expect(next.home.item('missedHuddle')).toHaveCount(0)
 })
 
 test('history recovers an offline miss and a later join on another device clears it', async ({ juno, fake, win }) => {

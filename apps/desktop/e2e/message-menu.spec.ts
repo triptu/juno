@@ -6,6 +6,7 @@
 // focused message (T, Q, F, E, ⌫, and R on More reactions), which also choose
 // them while the menu is open.
 // One sender's messages start a new header after ten quiet minutes.
+import { checkMessageMenuButton } from './messageMenuButton'
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from './fixtures'
 import type { Juno, MessageMenuDriver } from './driver/juno'
@@ -39,7 +40,6 @@ test('a right-click opens the menu as it comes up, over the same message, with t
     const at = { x: text.left + 20, y: text.top + 6 }
     await juno.win.mouse.move(at.x, at.y)
     await juno.win.mouse.down({ button: 'right' })
-    await juno.win.waitForTimeout(150)
     await expect(menu.root).toHaveCount(0)
     await juno.win.mouse.up({ button: 'right' })
     await expect(menu.root).toBeVisible()
@@ -69,7 +69,6 @@ test('a right-click opens the menu as it comes up, over the same message, with t
     await juno.win.mouse.down({ button: 'right' })
     await juno.win.mouse.move(to.left + 20, to.top + 6, { steps: 4 })
     await juno.win.mouse.up({ button: 'right' })
-    await juno.win.waitForTimeout(150)
     await expect(menu.root).toHaveCount(0)
   })
 
@@ -103,6 +102,8 @@ test('a right-click opens the menu as it comes up, over the same message, with t
     await juno.win.mouse.click(5, 300)
     await expect(menu.root).toHaveCount(0)
   })
+
+  await checkMessageMenuButton(juno, target, neighbour)
 })
 
 test('a key the menu shows runs its row; T on a focused message in Main starts its thread, and does nothing in the thread', async ({ juno, fake }) => {
@@ -317,7 +318,7 @@ test('More reactions grows the picker from the corner of the menu that stays put
   await juno.setWindowSize(900, 700)
   // A resize closes an open menu, so let it land first.
   await expect.poll(() => juno.win.evaluate(() => window.innerWidth)).toBeLessThanOrEqual(900)
-  await juno.win.waitForTimeout(300)
+  await juno.win.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
   for (let i = 0; i < 12; i++) fake.injectMessage({ channel: 'C0ENG', user: i % 2 === 0 ? 'U0MAYA' : 'U0LEO', text: `Corner check ${i}: a line long enough to run across the whole column of the list, to its far edge` })
   await juno.sidebar.expectTop('#eng')
   await juno.sidebar.row('#eng').open()

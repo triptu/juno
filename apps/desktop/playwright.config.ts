@@ -55,6 +55,7 @@ export default defineConfig<object, { lane: Lane }>({
       use: {
         lane: 'web' satisfies Lane,
         browserName: 'chromium',
+        launchOptions: { ignoreDefaultArgs: ['--hide-scrollbars'] },
         // The Electron window's content size (src/main/window.ts).
         viewport: { width: 1200, height: 800 },
         permissions: ['clipboard-read', 'clipboard-write'],

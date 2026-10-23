@@ -20,6 +20,8 @@ export * from './launch'
 export interface Fixtures {
   readonly timing: 'fast' | 'production' | undefined
   /** Run the engine's background AI jobs in the `running` app (`LaunchOptions.aiJobs`); `test.use({ aiJobs: true })` opts a file in. */
+  readonly paced: boolean
+  readonly tour: boolean
   readonly aiJobs: boolean
   /** How long the `running` app's fake AI takes to answer (`LaunchOptions.fakeAiDelayMillis`); undefined answers at once. */
   readonly fakeAiDelayMillis: number | undefined
@@ -76,7 +78,7 @@ export interface WorkerFixtures {
 
 type SyncOptions = Pick<LaunchOptions, 'timing' | 'fakeAiDelayMillis'>
 
-export interface RelaunchOptions extends Pick<LaunchOptions, 'aiJobs' | 'cacheMigration'> {
+export interface RelaunchOptions extends Pick<LaunchOptions, 'aiJobs' | 'cacheMigration' | 'tour'> {
   /** Runs while the app is closed: edit `user.db` or a launch preference here. */
   readonly whileClosed?: () => unknown
 }
@@ -200,6 +202,8 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   },
   timing: [undefined, { option: true }],
   aiJobs: [false, { option: true }],
+  paced: [false, { option: true }],
+  tour: [false, { option: true }],
   fakeAiDelayMillis: [undefined, { option: true }],
   screenShared: [false, { option: true }],
   updateServer: [undefined, { option: true }],
@@ -209,14 +213,14 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   cpu: async ({}, use) => {
     await use(process.env.JUNO_E2E_CPU === '1' ? cpuMeter() : undefined)
   },
-  running: async ({ lane, fake, slackApp, userData, syncedStart, aiJobs, fakeAiDelayMillis, screenShared, updateServer, sidebarTrace, sendTrace, timing, hostPool, page, cpu }, use, testInfo) => {
+  running: async ({ lane, fake, slackApp, userData, syncedStart, aiJobs, paced, tour, fakeAiDelayMillis, screenShared, updateServer, sidebarTrace, sendTrace, timing, hostPool, page, cpu }, use, testInfo) => {
     const printCpu = () => {
       for (const [kind, millis] of Object.entries(cpu?.stop() ?? {})) console.log(`e2e timing: cpu-${kind} ${Math.round(millis)} ms`)
     }
     if (lane === 'web') {
       if (screenShared || updateServer !== undefined) throw new Error('screenShared and updateServer are Electron launch options; tag the test @electron.')
       const running = await startWebApp(hostPool, page, fake, userData, syncedStart?.snapshot, {
-        sidebarTrace, sendTrace, engine: { timing: timing ?? 'fast', aiJobs, ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }) },
+        sidebarTrace, sendTrace, tour, engine: { timing: launchTiming({ paced, ...(timing === undefined ? {} : { timing }) }), aiJobs, paced, ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }) },
       })
       await use(running)
       if (sidebarTrace && testInfo.status !== testInfo.expectedStatus) await attachSidebarTrace(page, testInfo)
@@ -228,7 +232,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     const running = await launchApp(userData, {
       fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword,
       ...(timing === undefined ? {} : { timing }),
-      aiJobs, screenShared, sidebarTrace, sendTrace, ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }),
+      aiJobs, paced, tour, screenShared, sidebarTrace, sendTrace, ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }),
       ...(updateServer === undefined ? {} : { updateServer }),
     })
     if (syncedStart !== undefined) {
@@ -247,7 +251,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     printCpu()
     await running.close()
   },
-  relaunch: async ({ lane, running, fake, slackApp, userData, aiJobs, fakeAiDelayMillis, timing, page }, use) => {
+  relaunch: async ({ lane, running, fake, slackApp, userData, aiJobs, paced, tour, fakeAiDelayMillis, timing, page }, use) => {
     let latest: RunningApp = running
     await use(async ({ whileClosed, ...options } = {}) => {
       if (lane === 'web') {
@@ -256,14 +260,14 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
         await host.quitEngine()
         await whileClosed?.()
         await host.startEngine({ ...(options.aiJobs === undefined ? {} : { aiJobs: options.aiJobs }), ...(options.cacheMigration === undefined ? {} : { cacheMigration: options.cacheMigration }) })
-        await page.goto(`${host.url}?e2e=1`)
+        await page.goto(`${host.url}?e2e=1${(options.tour ?? tour) ? "&tour=auto" : ""}`)
         return new Juno(webSurface(page, host), page)
       }
       await latest.close()
       await whileClosed?.()
       latest = await launchApp(userData, {
         fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword,
-        ...(timing === undefined ? {} : { timing }), aiJobs, ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }),
+        ...(timing === undefined ? {} : { timing }), aiJobs, paced, tour, ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }),
         ...options,
       })
       return new Juno(latest.app, latest.win)

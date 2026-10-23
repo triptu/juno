@@ -19,11 +19,10 @@ function expectStill(landing: Landing): void {
 }
 
 const THREAD = 'Review the rollout checklist 1'
-let threadTs = ''
 const longTest = test.extend({
   // oxlint-disable-next-line no-empty-pattern
   fake: async ({}, use) => {
-    const fake = await startFakeSlack({ seed: (workspace, avatars) => void (threadTs = topic300Seed()(workspace, avatars).threadTs) })
+    const fake = await startFakeSlack({ seed: topic300Seed() })
     await use(fake)
     await fake.close()
   },
@@ -53,6 +52,7 @@ async function hideWhileRepliesArrive(juno: Juno, fake: FakeSlack, row: { readon
   await tabs.selectAt(THREAD, 0)
   await tabs.expectActiveAt(THREAD, 0)
   await meanwhile?.()
+  const threadTs = fake.workspace.main(TOPIC300_THREAD_CHANNEL).find((message) => message.text?.startsWith(THREAD))!.ts
   for (const n of [1, 2, 3]) fake.injectMessage({ channel: TOPIC300_THREAD_CHANNEL, user: 'U0PERFLEO', threadTs, text: `A reply while the other tab is hidden ${n}` })
   await topic.expectMessage('A reply while the other tab is hidden 3')
   await topic.expectAtBottom()
@@ -121,7 +121,7 @@ test.describe('one topic in two tabs', () => {
     await hideWhileRepliesArrive(juno, fake, gap)
   })
 
-  longTest('a click that scrolls nothing keeps the tab where it is for the next switch', async ({ juno, fake, app }) => {
+  longTest('a click that scrolls nothing keeps the tab where it is for the next switch', async ({ juno, fake }) => {
     await openTwice(juno)
     const { topic, win } = juno
     expectStill(await topic.scrollUp(5000, FRAMES))
@@ -130,6 +130,6 @@ test.describe('one topic in two tabs', () => {
     await win.mouse.click(at.x, at.y)
     const row = await topic.firstVisibleRow()
     // The window narrows while the tab is hidden, so the rows around the view wrap again before it is laid out.
-    await hideWhileRepliesArrive(juno, fake, row, () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(760, 700)))
+    await hideWhileRepliesArrive(juno, fake, row, () => juno.setWindowSize(760, 700))
   })
 })

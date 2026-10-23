@@ -40,10 +40,6 @@ syncedTest('Back and Forward move through the topics one tab showed', async ({ j
   await nav.expectCanGo(true, false)
   await nav.mouseButton(3)
   await topic.expectTitle(RINA)
-  await nav.swipe('right')
-  await topic.expectTitle(ROADMAP)
-  await nav.swipe('left')
-  await topic.expectTitle(RINA)
   await nav.menu('forward')
   await topic.expectTitle(ROADMAP)
   await tabs.expectCount(1)
@@ -67,6 +63,15 @@ syncedTest('Back and Forward move through the topics one tab showed', async ({ j
   await nav.expectCanGo(true, false)
   await tabs.select(RINA)
   await nav.expectCanGo(true, true)
+})
+
+syncedTest('window swipe events move back and forward', { tag: '@electron' }, async ({ juno }) => {
+  await juno.sidebar.row(RINA).open()
+  await juno.sidebar.row(ROADMAP).open()
+  await juno.nav.swipe('left')
+  await juno.topic.expectTitle(RINA)
+  await juno.nav.swipe('right')
+  await juno.topic.expectTitle(ROADMAP)
 })
 
 syncedTest('⌘⇧T reopens closed tabs, the last closed first, each with its history', async ({ juno }) => {
@@ -100,7 +105,7 @@ syncedTest('⌘⇧T reopens closed tabs, the last closed first, each with its hi
   await tabs.expectCount(3)
 })
 
-syncedTest('the tab menu pins, unpins and closes, and pins survive a restart', async ({ juno, running, userData, fake, slackApp, slack }) => {
+syncedTest('the tab menu pins, unpins and closes, and pins survive a restart', async ({ juno, relaunch, userData, fake, slack }) => {
   const { sidebar, tabs } = juno
 
   await sidebar.row(POSTGRES).open()
@@ -131,27 +136,22 @@ syncedTest('the tab menu pins, unpins and closes, and pins survive a restart', a
 
   // Copy Slack link and Open in Slack.
   await tabs.contextMenu(POSTGRES, 'copy-link')
-  await expect.poll(() => juno.app.evaluate(({ clipboard }) => clipboard.readText())).toMatch(/\/archives\/C[A-Z0-9]+\/p\d+$/)
+  await expect.poll(() => juno.clipboard()).toMatch(/\/archives\/C[A-Z0-9]+\/p\d+$/)
   await tabs.contextMenu(POSTGRES, 'open-in-slack')
-  const opened = await juno.app.evaluate(() => [...(globalThis as unknown as { junoTest: { slackLinks: string[] } }).junoTest.slackLinks])
+  const opened = await juno.slackLinks()
   expect(opened).toEqual([expect.stringMatching(/^slack:\/\/channel\?team=T0JUNO&id=C[A-Z0-9]+$/)])
 
   // The pin and the closes have reached the engine.
   await expect.poll(() => savedTabs(userData, fake.teamId)?.tabs).toEqual([{ place: threadId(slack, ROADMAP), pinned: true }, { place: threadId(slack, POSTGRES), pinned: false }])
-  await running.close()
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
-  try {
-    const restarted = new Juno(again.app, again.win)
-    await restarted.tabs.expectCount(2)
-    await restarted.tabs.expectPinned(ROADMAP)
-    await restarted.tabs.expectPinned(POSTGRES, false)
-    expect(await restarted.tabs.contextMenu(ROADMAP, 'pin')).toContain('Unpin tab')
-    await restarted.tabs.expectPinned(ROADMAP, false)
-    expect(await restarted.tabs.titles()).toEqual([expect.stringMatching(/^Proposal/), expect.stringMatching(/^Draft plan/)])
-    await expect(restarted.tabs.closeButton(ROADMAP)).toHaveCount(1)
-  } finally {
-    await again.close()
-  }
+  const restarted = await relaunch()
+  await restarted.tabs.expectCount(2)
+  await restarted.tabs.expectPinned(ROADMAP)
+  await restarted.tabs.expectPinned(POSTGRES, false)
+  expect(await restarted.tabs.contextMenu(ROADMAP, 'pin')).toContain('Unpin tab')
+  await restarted.tabs.expectPinned(ROADMAP, false)
+  expect(await restarted.tabs.titles()).toEqual([expect.stringMatching(/^Proposal/), expect.stringMatching(/^Draft plan/)])
+  await expect(restarted.tabs.closeButton(ROADMAP)).toHaveCount(1)
+
 })
 
 syncedTest('an inactive tab shows the unread dot until its topic is read', async ({ juno, slack }) => {
@@ -176,7 +176,7 @@ syncedTest('an inactive tab shows the unread dot until its topic is read', async
 })
 
 // @mac: on Linux the width is not restored after the relaunch at the end (macOS quit and menu path); the Mac runs it.
-syncedTest('the sidebar resizes by its edge, resets on double-click, and hides', { tag: '@mac' }, async ({ juno, running, userData, fake, slackApp }) => {
+syncedTest('the sidebar resizes by its edge, resets on double-click, and hides', { tag: ['@mac', '@electron'] }, async ({ juno, running, userData, fake, slackApp }) => {
   const { frame, nav, sidebar } = juno
 
   await frame.expectWidth(384)
@@ -231,7 +231,7 @@ syncedTest('the sidebar resizes by its edge, resets on double-click, and hides',
   }
 })
 
-test('in full screen the title bars drop the traffic lights’ room, and keep it again after', async ({ juno, app }) => {
+test('in full screen the title bars drop the traffic lights’ room, and keep it again after', { tag: '@electron' }, async ({ juno, app }) => {
   await juno.signIn()
   const fullScreen = (on: boolean) => app.evaluate(({ BrowserWindow }, on) => BrowserWindow.getAllWindows()[0]!.setFullScreen(on), on)
   // A button's left edge from the left of the pane it sits in.

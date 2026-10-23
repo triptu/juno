@@ -63,17 +63,15 @@ async function redrawTopicArt({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   await expect.poll(() => row.artMarkup()).toBe(first)
 }
 
-test('with AI assist off, the topic menu has no Redraw art and a selection offers Quote alone', async ({ juno, fake, slackApp, userData, running }) => {
+test('with AI assist off, the topic menu has no Redraw art and a selection offers Quote alone', async ({ juno, fake, userData, relaunch }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await running.close()
-  const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
-  db.prepare(`INSERT INTO prefs (key, value_json) VALUES ('aiAssist', 'false') ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json`).run()
-  db.close()
-
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, aiJobs: true })
-  try {
-    const { sidebar, topic } = new Juno(again.app, again.win)
+  const again = await relaunch({ whileClosed: () => {
+    const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
+    db.prepare(`INSERT INTO prefs (key, value_json) VALUES ('aiAssist', 'false') ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json`).run()
+    db.close()
+  } })
+  const { sidebar, topic } = again
     const row = sidebar.row(POSTGRES)
     await row.expectVisible()
     await expect(row.art).toHaveAttribute('data-topic-art', 'placeholder')
@@ -97,12 +95,9 @@ test('with AI assist off, the topic menu has no Redraw art and a selection offer
     const { labels } = await row.chooseInMenu('pin')
     expect(labels).toContain('Pin')
     expect(labels).not.toContain('Redraw art')
-  } finally {
-    await again.close()
-  }
 })
 
-test('Redraw art needs an OpenRouter key; at the daily limit it says so, and a raised limit draws without a restart', async ({ fake, slackApp, userData }) => {
+test('Redraw art needs an OpenRouter key; at the daily limit it says so, and a raised limit draws without a restart', { tag: '@electron' }, async ({ fake, slackApp, userData }) => {
   const KEY = 'fake-engine-test-key'
   const model = await startFakeOpenRouter({ key: KEY })
   const running = await launchApp(userData, {

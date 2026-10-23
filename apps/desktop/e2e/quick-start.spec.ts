@@ -6,11 +6,8 @@
 // asserted by `quick start` in perf.spec.ts on the Mac, on the large seed;
 // here, inside a loaded plan, the time is recorded without a timing gate. The flows need busy channels and history still being read when
 // they look, not the budget's size, so they use a fifth of the large seed.
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { largeSeed, SELF_ID, startFakeSlack } from '@juno/fake-slack'
-import { expect, launchApp, test, writeSlackApp } from './fixtures'
+import { expect, test } from './fixtures'
 
 const LATENCY_MS = 300
 
@@ -22,16 +19,7 @@ const signInOn = (seed: Parameters<typeof largeSeed>[0], options: { readonly lat
     await use(fake)
     await fake.close()
   },
-  slackApp: async ({ fake }, use) => {
-    const dir = await mkdtemp(join(tmpdir(), 'juno-slack-app-'))
-    await use(await writeSlackApp(fake, dir))
-    await rm(dir, { recursive: true, force: true })
-  },
-  running: async ({ fake, slackApp, userData }, use) => {
-    const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, paced: options.paced ?? true })
-    await use(running)
-    await running.close()
-  },
+  paced: options.paced ?? true,
 })
 
 /** A fifth of the large seed (as in perf.spec.ts): plenty of busy channels, and quicker to make and read. */

@@ -16,7 +16,7 @@ async function openLongMain(juno: Juno, fake: FakeSlack, slack: Slack): Promise<
   return channel
 }
 
-test('the bottom survives shrinking content and fractional offsets at 2x', async ({ juno, win, slack, fake }) => {
+test('the bottom survives shrinking content and fractional offsets at 2x', { tag: '@electron' }, async ({ juno, win, slack, fake }) => {
   await openLongMain(juno, fake, slack)
   const zoom = 2 / await win.evaluate(() => devicePixelRatio)
   await juno.app.evaluate(({ BrowserWindow }, zoom) => BrowserWindow.getAllWindows()[0]!.webContents.setZoomFactor(zoom), zoom)

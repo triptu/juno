@@ -16,6 +16,12 @@ export async function holdWorkspaceEmoji(win: Page): Promise<void> {
       if (waiting && text?.includes('mentions.emoji')) held.push(send)
       else send()
     }
+    const socketSend = WebSocket.prototype.send
+    WebSocket.prototype.send = function (data) {
+      const send = () => socketSend.call(this, data)
+      if (waiting && typeof data === 'string' && data.includes('mentions.emoji')) held.push(send)
+      else send()
+    }
     window.emojiGate = { count: () => held.length, release: () => { waiting = false; held.splice(0).forEach((send) => send()) } }
   })
 }

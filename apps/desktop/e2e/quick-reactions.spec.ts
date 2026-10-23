@@ -6,8 +6,8 @@ import type { Fixtures } from './fixtures'
  * click reacts, and the choice survives a relaunch. Add opens the emoji
  * picker as a popover over the page, with the chosen emoji marked.
  */
-import { expect, launchApp, test } from './fixtures'
-import { Juno } from './driver/juno'
+import { expect, test } from './fixtures'
+import type { Juno } from './driver/juno'
 import { readUserDb } from './driver/userDb'
 
 // Starts signed in and synced (README, "Synced start").
@@ -48,7 +48,7 @@ async function gridStart(juno: Juno, text: string, count: number): Promise<strin
   return names
 }
 
-test('five quick reactions set in Settings start the menu’s emoji grid in order, react in one click, and survive a relaunch', async ({ juno, fake, slackApp, userData, running }) => {
+test('five quick reactions set in Settings start the menu’s emoji grid in order, react in one click, and survive a relaunch', async ({ juno, fake, relaunch }) => {
   await juno.openSettings('Appearance')
   await expect.poll(() => pillNames(juno)).toEqual(['+1', 'white_check_mark', 'eyes'])
 
@@ -82,17 +82,11 @@ test('five quick reactions set in Settings start the menu’s emoji grid in orde
   await expect(row.getByRole('button', { name: '1 🚀, including you' })).toBeVisible()
   await expect.poll(() => fake.messages('C0ENG').find((m) => m.ts === ts)?.reactions?.map((r) => r.name)).toEqual(['rocket'])
 
-  await running.close()
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
-  try {
-    const second = new Juno(again.app, again.win)
-    await second.waitForSync()
-    await expect.poll(() => gridStart(second, 'Release notes are ready for review', 5)).toEqual(CHOSEN)
-    await second.openSettings('Appearance')
-    await expect.poll(() => pillNames(second)).toEqual(CHOSEN)
-  } finally {
-    await again.close()
-  }
+  const second = await relaunch()
+  await second.waitForSync()
+  await expect.poll(() => gridStart(second, 'Release notes are ready for review', 5)).toEqual(CHOSEN)
+  await second.openSettings('Appearance')
+  await expect.poll(() => pillNames(second)).toEqual(CHOSEN)
 })
 
 test('adds, removes and resets quick reactions, then enforces the eleven-reaction limit', async ({ juno, fake }) => {

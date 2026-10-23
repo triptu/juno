@@ -7,8 +7,8 @@
 // bring it back. Nothing around it moves when it appears, ticks or goes.
 import { expectNoLayoutShift } from '@juno/testing/layout-shift'
 import type { Locator } from '@playwright/test'
-import { Juno } from './driver/juno'
-import { expect, launchApp, test, type RunningApp } from './fixtures'
+import type { Juno } from './driver/juno'
+import { expect, test } from './fixtures'
 
 test.describe.configure({ timeout: 150_000 })
 
@@ -16,17 +16,11 @@ const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
 
 /** Apps that show the card by themselves, as outside tests. */
-const showsItself = test.extend({
-  running: async ({ fake, slackApp, userData }, use) => {
-    const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, tour: true })
-    await use(running)
-    await running.close()
-  },
-})
+const showsItself = test.extend({ tour: true })
 
 const boxes = (locators: ReadonlyArray<Locator>) => Promise.all(locators.map((locator) => locator.boundingBox()))
 
-showsItself('shows on Home after the first sign-in once the sidebar has rows, ticks each hint where it is done, keeps the ticks over a relaunch, and Done puts it away', async ({ juno, running, fake, slackApp, userData }) => {
+showsItself('shows on Home after the first sign-in once the sidebar has rows, ticks each hint where it is done, keeps the ticks over a relaunch, and Done puts it away', async ({ juno, fake, relaunch }) => {
   const { welcome, sidebar, write, tabs } = juno
   // The first sync has nothing to show yet: the card keeps its room, empty.
   fake.holdNext({ method: 'client.userBoot', before: true })
@@ -66,10 +60,7 @@ showsItself('shows on Home after the first sign-in once the sidebar has rows, ti
   await welcome.expectTicked('peek', 'tab')
 
   // The ticks survive a relaunch.
-  await running.close()
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, tour: true })
-  try {
-    const after = new Juno(again.app, again.win)
+  const after = await relaunch()
     await after.sidebar.expectRows()
     await after.tabs.select('Home')
     await after.welcome.expectShown()
@@ -89,33 +80,24 @@ showsItself('shows on Home after the first sign-in once the sidebar has rows, ti
       await after.welcome.close.click()
       await after.welcome.expectGone()
     })
-  } finally {
-    await again.close()
-  }
 
   // Never again by itself.
-  await expectNoCardAfterLaunch(await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, tour: true }))
+  await expectNoCardAfterLaunch(await relaunch({ tour: true }))
 })
 
-test('an install from before the welcome card shows it once, on its next launch', async ({ juno, running, fake, slackApp, userData }) => {
+test('an install from before the welcome card shows it once, on its next launch', async ({ juno, relaunch }) => {
   // This app does not show the card by itself: the workspace never sees it, as on a build from before it.
   await juno.signIn()
   await juno.waitForSync()
   await juno.welcome.expectGone()
-  await running.close()
 
-  const updated = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, tour: true })
-  try {
-    const after = new Juno(updated.app, updated.win)
+  const after = await relaunch({ tour: true })
     await after.sidebar.expectRows()
     await after.welcome.expectShown()
     await after.welcome.close.click()
     await after.welcome.expectGone()
-  } finally {
-    await updated.close()
-  }
 
-  await expectNoCardAfterLaunch(await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, tour: true }))
+  await expectNoCardAfterLaunch(await relaunch({ tour: true }))
 })
 
 test('Hide puts it away without moving Home, and ⌘K, Help and Settings › About bring it back on Home', async ({ juno }) => {
@@ -155,14 +137,9 @@ test('Hide puts it away without moving Home, and ⌘K, Help and Settings › Abo
 })
 
 /** Launches the app on a workspace that has seen the card: signed in, synced, and no card on Home. */
-async function expectNoCardAfterLaunch(app: RunningApp): Promise<void> {
-  try {
-    const juno = new Juno(app.app, app.win)
-    await juno.expectSignedIn('Juno Fake')
-    await juno.waitForSync()
-    await juno.home.expectShown()
-    await juno.welcome.expectGone()
-  } finally {
-    await app.close()
-  }
+async function expectNoCardAfterLaunch(juno: Juno): Promise<void> {
+  await juno.expectSignedIn('Juno Fake')
+  await juno.waitForSync()
+  await juno.home.expectShown()
+  await juno.welcome.expectGone()
 }

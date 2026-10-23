@@ -6,8 +6,8 @@
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { SELF_ID, startFakeSlack, TEAM } from '@juno/fake-slack'
-import { expect, launchApp, test } from './fixtures'
-import { Juno } from './driver/juno'
+import { expect, test } from './fixtures'
+import type { Juno } from './driver/juno'
 
 test.describe.configure({ timeout: 150_000 })
 // Home's AI items and title rewrites come from the background AI jobs.
@@ -212,36 +212,33 @@ test('Mark done clears a follow-up, and Resolve all resolves the settled topics 
   expect(await freshHome(juno, POSTGRES)).not.toContain('followUp')
 })
 
-test('with AI assist off, Home shows the rules alone, with their plain titles and no Juno to write to, and the Juno tab says Juno is off', async ({ juno, fake, slackApp, userData, running }) => {
+test('with AI assist off, Home shows the rules alone, with their plain titles and no Juno to write to, and the Juno tab says Juno is off', async ({ juno, fake, userData, relaunch }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await running.close()
-  const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
-  db.prepare(`INSERT INTO prefs (key, value_json) VALUES ('aiAssist', 'false') ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json`).run()
-  db.close()
+  const relaunched = await relaunch({
+    whileClosed: () => {
+      const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
+      db.prepare(`INSERT INTO prefs (key, value_json) VALUES ('aiAssist', 'false') ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json`).run()
+      db.close()
+    },
+  })
+  const { home, write } = relaunched
+  // The relaunch restores the session first.
+  await expect(home.navItem).toBeVisible({ timeout: 30_000 })
+  await home.open()
+  await expect(home.title('waiting')).toHaveText('Elena asked you something')
+  expect(await home.kinds()).toEqual(['waiting'])
+  // A completed background pass still contributes no AI items.
+  await relaunched.workPass('home')
+  await expect(home.title('waiting')).toHaveText('Elena asked you something')
+  // Juno is an AI surface: Home's composer has no Juno to send to, and the Juno tab says Juno is off rather than asking for a model.
+  await expect(write.chip).toHaveAccessibleName('Send to: Pick a conversation')
+  await relaunched.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
+  await expect(relaunched.win.locator('main').getByText('Juno is off. Turn on AI assist in Settings.')).toBeVisible()
+  await expect(relaunched.win.locator('main [data-juno-no-provider]')).toHaveCount(0)
+  await expect(relaunched.win.locator('main').getByText('What do you need?')).toHaveCount(0)
+  await expect(relaunched.win.locator('main').getByRole('textbox', { name: /^Ask Juno/ })).toBeDisabled()
 
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, aiJobs: true })
-  try {
-    const relaunched = new Juno(again.app, again.win)
-    const { home, write } = relaunched
-    // The relaunch restores the session first.
-    await expect(home.navItem).toBeVisible({ timeout: 30_000 })
-    await home.open()
-    await expect(home.title('waiting')).toHaveText('Elena asked you something')
-    expect(await home.kinds()).toEqual(['waiting'])
-    // A completed background pass still contributes no AI items.
-    await relaunched.workPass('home')
-    await expect(home.title('waiting')).toHaveText('Elena asked you something')
-    // Juno is an AI surface: Home's composer has no Juno to send to, and the Juno tab says Juno is off rather than asking for a model.
-    await expect(write.chip).toHaveAccessibleName('Send to: Pick a conversation')
-    await again.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
-    await expect(again.win.locator('main').getByText('Juno is off. Turn on AI assist in Settings.')).toBeVisible()
-    await expect(again.win.locator('main [data-juno-no-provider]')).toHaveCount(0)
-    await expect(again.win.locator('main').getByText('What do you need?')).toHaveCount(0)
-    await expect(again.win.locator('main').getByRole('textbox', { name: /^Ask Juno/ })).toBeDisabled()
-  } finally {
-    await again.close()
-  }
 })
 
 /** A workspace where everything is read and nobody waits: Home is caught up. */

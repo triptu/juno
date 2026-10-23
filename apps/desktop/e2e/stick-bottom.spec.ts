@@ -359,7 +359,7 @@ const heldTest = chatTest.extend<{ readonly gate: { readonly wait: Promise<void>
   },
 })
 
-heldTest('the Juno panel at the bottom keeps a new answer fully in view', async ({ juno, win, gate }) => {
+heldTest('the Juno panel at the bottom keeps a new answer fully in view', { tag: '@electron' }, async ({ juno, win, gate }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.app.evaluate(({ BrowserWindow }) => {

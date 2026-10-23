@@ -13,7 +13,7 @@ test.describe.configure({ timeout: 120_000 })
 const POSTGRES = 'Draft plan is in the doc'
 
 async function setWindowSize(juno: Juno, width: number, height: number): Promise<void> {
-  await juno.app.evaluate(({ BrowserWindow }, [w, h]) => BrowserWindow.getAllWindows()[0]!.setSize(w!, h!), [width, height] as const)
+  await juno.setWindowSize(width, height)
 }
 
 test('a first @ and a name typed fast with Enter picks the person typed, not a row from before', async ({ juno }) => {

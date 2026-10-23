@@ -1,6 +1,5 @@
 import { largeSeed, startFakeSlack } from '@juno/fake-slack'
-import { test as base, expect, launchApp } from './fixtures'
-import { Juno } from './driver/juno'
+import { test as base, expect } from './fixtures'
 import { expectStableAnchor } from './shiftProbe'
 
 const test = base.extend({
@@ -12,7 +11,7 @@ const test = base.extend({
   },
 })
 
-test('topic title lines apply immediately, keep the scrolled row anchored, and survive relaunch', async ({ juno, win, running, fake, slackApp, userData }) => {
+test('topic title lines apply immediately, keep the scrolled row anchored, and survive relaunch', async ({ juno, win, relaunch }) => {
   test.setTimeout(180_000)
   await juno.signIn()
   await juno.waitForSync()
@@ -69,15 +68,9 @@ test('topic title lines apply immediately, keep the scrolled row anchored, and s
   await expect.poll(async () => (await held.boundingBox())!.y).toBe(anchor.top)
   await expectStableAnchor(win, `[data-topic-id="${anchor.id}"]`, () => two.click())
   await expect.poll(async () => (await held.boundingBox())!.y).toBe(anchor.top)
-  await running.close()
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
-  try {
-    const second = new Juno(again.app, again.win)
-    await second.sidebar.expectRows()
-    await expect(again.win.locator('html')).toHaveAttribute('data-topic-title-lines', 'two')
-    await second.openSettings('Appearance')
-    await expect(again.win.getByRole('radio', { name: 'Two lines', exact: true })).toHaveAttribute('aria-checked', 'true')
-  } finally {
-    await again.close()
-  }
+  const second = await relaunch()
+  await second.sidebar.expectRows()
+  await expect(second.win.locator('html')).toHaveAttribute('data-topic-title-lines', 'two')
+  await second.openSettings('Appearance')
+  await expect(second.win.getByRole('radio', { name: 'Two lines', exact: true })).toHaveAttribute('aria-checked', 'true')
 })

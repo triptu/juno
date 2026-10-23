@@ -1,7 +1,6 @@
-import { expect, launchApp, test } from './fixtures'
-import { Juno } from './driver/juno'
+import { expect, test } from './fixtures'
 
-test('frequently used emoji survive a restart and an update from their first picker paint', async ({ juno, fake, running, userData, slackApp }) => {
+test('frequently used emoji survive a restart and an update from their first picker paint', async ({ juno, fake, relaunch }) => {
   test.setTimeout(120_000)
   fake.workspace.prefs = { ...fake.workspace.prefs, emoji_use: JSON.stringify({
     eyes: 5, tada: 20, hello_juno: 30, '+1::skin-tone-3': 12, thumbsup: 10,
@@ -29,30 +28,24 @@ test('frequently used emoji survive a restart and an update from their first pic
     'rocket', 'tada', 'eyes', '+1', 'white_check_mark',
   ])
   await search.press('Escape')
-  await running.close()
 
   for (const cacheMigration of [false, true]) {
-    const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, cacheMigration })
-    try {
-      const second = new Juno(again.app, again.win)
-      await second.waitForSync()
-      await second.sidebar.row('#eng').open()
-      const message = second.topic.list.locator('[data-message-row]').last()
-      const menu = await second.messageMenu.openOnRow(message)
-      const firstPaint = again.win.evaluate(() => new Promise<string | null>((resolve) => {
-        const sample = () => {
-          const picker = document.querySelector('[data-emoji-picker]')
-          if (picker !== null) resolve(picker.querySelector('[role="group"] [data-emoji]')?.getAttribute('data-emoji') ?? null)
-          else requestAnimationFrame(sample)
-        }
-        requestAnimationFrame(sample)
-      }))
-      await menu.more.click()
-      const frequent = again.win.getByRole('group', { name: 'Frequently used' }).locator('[data-emoji]').first()
-      await expect(frequent).toHaveAttribute('data-emoji', 'rocket')
-      expect(await firstPaint).toBe('rocket')
-    } finally {
-      await again.close()
-    }
+    const second = await relaunch({ cacheMigration })
+    await second.waitForSync()
+    await second.sidebar.row('#eng').open()
+    const message = second.topic.list.locator('[data-message-row]').last()
+    const menu = await second.messageMenu.openOnRow(message)
+    const firstPaint = second.win.evaluate(() => new Promise<string | null>((resolve) => {
+      const sample = () => {
+        const picker = document.querySelector('[data-emoji-picker]')
+        if (picker !== null) resolve(picker.querySelector('[role="group"] [data-emoji]')?.getAttribute('data-emoji') ?? null)
+        else requestAnimationFrame(sample)
+      }
+      requestAnimationFrame(sample)
+    }))
+    await menu.more.click()
+    const frequent = second.win.getByRole('group', { name: 'Frequently used' }).locator('[data-emoji]').first()
+    await expect(frequent).toHaveAttribute('data-emoji', 'rocket')
+    expect(await firstPaint).toBe('rocket')
   }
 })

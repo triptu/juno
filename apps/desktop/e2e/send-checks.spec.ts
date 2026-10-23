@@ -1,8 +1,8 @@
 import type { Fixtures } from './fixtures'
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
-import { expect, launchApp, test } from './fixtures'
-import { Juno } from './driver/juno'
+import { expect, test } from './fixtures'
+import type { Juno } from './driver/juno'
 
 // Starts signed in and synced (README, "Synced start").
 test.use({ synced: true })
@@ -200,37 +200,34 @@ test.describe('with a model slower than the typing pause', () => {
   })
 })
 
-test('with AI assist off, local checks still work and models stay off', async ({ fake, slackApp, userData, running }) => {
-  await running.close()
-  const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
-  db.prepare(`INSERT INTO prefs (key, value_json) VALUES ('aiAssist', 'false') ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json`).run()
+test('with AI assist off, local checks still work and models stay off', async ({ fake, userData, relaunch }) => {
+  const restarted = await relaunch({
+    whileClosed: () => {
+      const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
+      db.prepare(`INSERT INTO prefs (key, value_json) VALUES ('aiAssist', 'false') ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json`).run()
+      db.close()
+    },
+  })
+  const { topic } = restarted
+  await restarted.sidebar.row(ENG_MAIN).open()
+  await topic.expectTitle('Main')
+  await topic.composer.fill('The offer for the new backend hire goes out Friday')
+  await restarted.win.waitForTimeout(800)
+  await expect(topic.audienceWarning).toHaveCount(0)
+  await topic.send(BILL_REPLY)
+  await topic.expectSent(BILL_REPLY)
+  await topic.send(TYPOS)
+  await expect(restarted.win.locator('[data-send-suggestion]')).toContainText('recieve → receive')
+  await topic.expectSent(TYPOS)
+  await expect(topic.checkBar.bar).toHaveCount(0)
+  const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'), { readOnly: true })
+  expect(db.prepare(`SELECT count(*) AS n FROM ai_cache WHERE task = 'routeCheck'`).get()).toEqual({ n: 0 })
   db.close()
+  expect(posts(fake).map((call) => [call.args['text'], call.args['thread_ts']])).toEqual([
+    [BILL_REPLY, undefined],
+    [TYPOS, undefined],
+  ])
 
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
-  try {
-    const restarted = new Juno(again.app, again.win)
-    const { topic } = restarted
-    await restarted.sidebar.row(ENG_MAIN).open()
-    await topic.expectTitle('Main')
-    await topic.composer.fill('The offer for the new backend hire goes out Friday')
-    await restarted.win.waitForTimeout(800)
-    await expect(topic.audienceWarning).toHaveCount(0)
-    await topic.send(BILL_REPLY)
-    await topic.expectSent(BILL_REPLY)
-    await topic.send(TYPOS)
-    await expect(restarted.win.locator('[data-send-suggestion]')).toContainText('recieve → receive')
-    await topic.expectSent(TYPOS)
-    await expect(topic.checkBar.bar).toHaveCount(0)
-    const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'cache.db'), { readOnly: true })
-    expect(db.prepare(`SELECT count(*) AS n FROM ai_cache WHERE task = 'routeCheck'`).get()).toEqual({ n: 0 })
-    db.close()
-    expect(posts(fake).map((call) => [call.args['text'], call.args['thread_ts']])).toEqual([
-      [BILL_REPLY, undefined],
-      [TYPOS, undefined],
-    ])
-  } finally {
-    await again.close()
-  }
 })
 
 // The thread suggestion goes first, for the same reason: the audience step's drafts start wrong-place checks.

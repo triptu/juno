@@ -94,7 +94,7 @@ test('a message written offline shows at once, waits, and is posted once when Sl
   expect(fake.messages('C0ENG').filter((m) => m.text === 'Written on the train')).toHaveLength(1)
 })
 
-test('an engine restart mid-session keeps the open topic, the unsent text and the sidebar, and live updates go on', async ({ juno, app, fake }) => {
+test('an engine restart mid-session keeps the open topic, the unsent text and the sidebar, and live updates go on', { tag: '@electron' }, async ({ juno, app, fake }) => {
   await openMain(juno)
   const { topic, sidebar } = juno
   await topic.composer.fill('Half a thought')

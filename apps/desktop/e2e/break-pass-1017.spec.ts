@@ -3,8 +3,9 @@
 // docs/reviews/2026-10-17-break-pass.md.
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
-import { expect, launchApp, syncedTest, test } from './fixtures'
-import { Juno } from './driver/juno'
+import { expect, syncedTest, test } from './fixtures'
+import type { Juno } from './driver/juno'
+import type { AppMenuItem } from './driver/surface'
 
 test.describe.configure({ timeout: 120_000 })
 // A failing test attaches the send's path through the app and the fake's post calls (README, "Send trace").
@@ -34,20 +35,8 @@ function saved(userData: string, teamId: string): { readonly tabs: ReadonlyArray
   }
 }
 
-async function menu(juno: Juno, id: string): Promise<void> {
-  await juno.app.evaluate(({ Menu, BrowserWindow }, itemId) => {
-    const item = Menu.getApplicationMenu()?.getMenuItemById(itemId)
-    if (!item) throw new Error(`No menu item ${itemId}`)
-    item.click(undefined, BrowserWindow.getAllWindows()[0])
-  }, id)
-}
-
-async function setWindowSize(juno: Juno, width: number, height?: number): Promise<void> {
-  await juno.app.evaluate(({ BrowserWindow }, [w, h]) => {
-    const window = BrowserWindow.getAllWindows()[0]!
-    window.setSize(w!, h ?? window.getSize()[1]!)
-  }, [width, height] as const)
-}
+const menu = (juno: Juno, id: AppMenuItem) => juno.surface.appMenu(id)
+const setWindowSize = (juno: Juno, width: number, height?: number) => juno.setWindowSize(width, height)
 
 syncedTest('two tabs on one topic share its draft, and a send from one clears it in both', async ({ juno, fake }) => {
   await juno.sidebar.row(POSTGRES).open()
@@ -82,7 +71,6 @@ syncedTest('closing the last tab while its message sends posts it once and opens
   await juno.tabs.menu('reopen-tab')
   await juno.topic.expectSent('Sent as the tab closed')
   await expect(juno.topic.composer).toHaveValue('')
-  await juno.win.waitForTimeout(500)
   expect(fake.messages('C0ENG').filter((m) => m.text === 'Sent as the tab closed')).toHaveLength(1)
 })
 
@@ -147,7 +135,7 @@ test('a picked destination and its draft survive switching tabs before sending',
   await expect.poll(() => fake.messages('C0ENG').filter((m) => m.text === 'Picked then switched').length).toBe(1)
 })
 
-syncedTest('a relaunch keeps many tabs and their drafts', async ({ juno, running, userData, fake, slackApp }) => {
+syncedTest('a relaunch keeps many tabs and their drafts', async ({ juno, relaunch, userData, fake }) => {
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.composer.fill('Draft one')
   await juno.sidebar.row(RINA).openInNewTab()
@@ -168,11 +156,7 @@ syncedTest('a relaunch keeps many tabs and their drafts', async ({ juno, running
       return state.tabs.length === 6 && rina !== undefined && state.active?.place?.topicId === rina && state.drafts.has('Draft one') && state.drafts.has('Draft in Main')
     })
     .toBe(true)
-  await running.close()
-
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
-  try {
-    const restarted = new Juno(again.app, again.win)
+  const restarted = await relaunch()
     await restarted.tabs.expectCount(6)
     await expect.poll(() => restarted.tabs.titles()).toEqual(before)
     await restarted.tabs.expectActive('Rina')
@@ -183,9 +167,6 @@ syncedTest('a relaunch keeps many tabs and their drafts', async ({ juno, running
     await expect(restarted.topic.composer).toHaveValue('Draft in Main')
     await restarted.tabs.selectAt(POSTGRES, 1)
     await expect(restarted.topic.composer).toHaveValue('Draft one')
-  } finally {
-    await again.close()
-  }
 })
 
 test('the topic switcher with many threads keeps the selected row in view and fits the window', async ({ juno, fake }) => {
@@ -222,7 +203,7 @@ syncedTest('a send while the socket and network drop goes once when they are bac
   await juno.sidebar.expectSyncStatus("You're offline")
   fake.goOnline()
   await juno.topic.expectSent('Sent offline')
-  await juno.win.waitForTimeout(3000)
+  await juno.waitForSync()
   expect(fake.messages('C0ENG').filter((m) => m.text === 'Sent offline')).toHaveLength(1)
   await expect(juno.topic.message('Sent offline')).toHaveCount(1)
 })
@@ -273,7 +254,7 @@ syncedTest('a mouse press on a tab gives its page focus; the keyboard keeps focu
   await juno.tabs.expectFocused('Rina')
 })
 
-syncedTest('⌘T twice gives two Home tabs with their own drafts and destinations, and both survive a relaunch', async ({ juno, running, userData, fake, slackApp }) => {
+syncedTest('⌘T twice gives two Home tabs with their own drafts and destinations, and both survive a relaunch', async ({ juno, relaunch, userData, fake }) => {
   await juno.sidebar.row(POSTGRES).open()
   await juno.tabs.menu('new-tab')
   await juno.write.write('First note for Juno')
@@ -294,11 +275,7 @@ syncedTest('⌘T twice gives two Home tabs with their own drafts and destination
       return state.tabs.length === 3 && state.active?.homeDraft?.draft === 'First note for Juno' && second?.homeDraft?.conversation !== undefined
     })
     .toBe(true)
-  await running.close()
-
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
-  try {
-    const restarted = new Juno(again.app, again.win)
+  const restarted = await relaunch()
     await restarted.tabs.expectCount(3)
     await expect.poll(() => restarted.tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), 'Home', 'Home'])
     await restarted.tabs.expectActiveAt('Home', 0)
@@ -306,9 +283,6 @@ syncedTest('⌘T twice gives two Home tabs with their own drafts and destination
     await restarted.tabs.selectAt('Home', 1)
     await restarted.write.expectDestination('#product')
     await expect(restarted.write.composer).toHaveValue('Second, for product')
-  } finally {
-    await again.close()
-  }
 })
 
 syncedTest('a send from Home to a channel, a thread’s channel or a DM another tab shows leaves every tab where it was', async ({ juno, fake }) => {

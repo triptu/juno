@@ -48,7 +48,7 @@ test('workspace emoji and aliases show images and send shortcodes', async ({ jun
   await expect.poll(() => postedText(fake).at(-1)).toBe(':juno_wave:')
 })
 
-agentTest('the Juno panel composer suggests emoji too', async ({ juno }) => {
+agentTest('the Juno panel composer suggests emoji too', { tag: '@electron' }, async ({ juno }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.sidebar.row(POSTGRES).open()
