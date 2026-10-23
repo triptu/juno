@@ -99,7 +99,8 @@ export async function served(options: HarnessOptions & { readonly custom?: { rea
 
   /**
    * Follows `stream` for the whole test. `where(test)` resolves with the first value, already seen or
-   * still to come, that passes `test`.
+   * still to come, that passes `test`. It gives up after `ms` (4 s by default, inside bun test's 5 s), naming
+   * what it waited for and the last value it saw.
    */
   const follow = <A>(stream: Stream.Stream<A, unknown>) => {
     let latest: A | undefined
@@ -117,9 +118,9 @@ export async function served(options: HarnessOptions & { readonly custom?: { rea
       ),
     )
     return {
-      where: (test: (value: A) => boolean, what: string) =>
+      where: (test: (value: A) => boolean, what: string, ms = 4_000) =>
         new Promise<A>((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error(`nothing with ${what}; last: ${JSON.stringify(latest)}`)), 15_000)
+          const timer = setTimeout(() => reject(new Error(`nothing with ${what}; last: ${JSON.stringify(latest)}`)), ms)
           const check = () => {
             if (latest === undefined || !test(latest)) return
             clearTimeout(timer)

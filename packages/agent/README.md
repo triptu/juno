@@ -329,7 +329,7 @@ The same op again is the same removal; a removal of messages already gone change
 - **What a message is about.** A message's `context` (a topic from the Juno panel, or a person or channel from Ask Juno) is stored with the op, reaches the model as an `<about>` element inside `<message>` (`router/input.ts`), and shows as the owner bubble's `about` line. A topic context is Slack content, so the run starts tainted, or is tainted when the message steers it.
 - **Cost**: each change rebuilds the whole list with a few queries, and parses finished runs' text again. That is fine for M2; a 5,000-message chat will want finished runs cached, against the budget in `docs/performance.md`.
 
-`test/serve.test.ts` and `test/juno-pages.test.ts` run the server on the real engine with the scripted model, through an RPC client on a Node `MessageChannel` (`test/serve-harness.ts`). `packages/state/test/agent-chat.test.ts` runs the renderer's atoms against it.
+`test/serve.test.ts` and `test/settings.test.ts` (Settings › Juno, the menu pages and the message menu) run the server on the real engine with the scripted model, through an RPC client on a Node `MessageChannel` (`test/serve-harness.ts`). `packages/state/test/agent-chat.test.ts` runs the renderer's atoms against it.
 
 ## MCP connections (WP17)
 
