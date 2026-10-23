@@ -29,7 +29,7 @@ Run these from a Juno checkout with dependencies installed (not the main checkou
 5. **Check.** `gh release view v<version> --repo triptu/juno-releases` shows the DMG, its block map and `latest-mac.yml`, marked latest. `git log origin/main -1` shows the version commit.
 6. **Report** the version, the source commit, the highlights and whether it was urgent.
 
-If a step fails after the upload, rerun the same command: it finishes only the main update and never uploads a published version again. A failed release leaves its worktree (`scheduled-release-<version>`) for inspection; remove it with `node scripts/worktree.mjs remove <name>` once done.
+If a step fails after the upload, rerun the same command: it finishes only the main update and never uploads a published version again. A failed release leaves its worktree (`scheduled-release-<version>`) for inspection; remove it with `bun scripts/worktree.mjs remove <name>` once done.
 
 ## Urgent releases
 

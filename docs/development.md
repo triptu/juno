@@ -4,8 +4,8 @@ How to build and run Juno, and how the repo is put together.
 
 ## Prerequisites
 
-- Node 24 or newer (Node 26 is what this was built with).
-- Bun 1.4.4, the version `packageManager` in `package.json` names: `curl -fsSL https://bun.sh/install | bash -s bun-v1.4.4`, or `bun upgrade` on an older Bun. The root `preinstall` script (`scripts/check-bun.mjs`) stops an install with any other version.
+- Node 24 or newer (Node 26 is what this was built with), for the few tools that stay on Node (see "Runtimes").
+- The Bun canary build that `packageManager` in `package.json` names: `1.4.4-canary.20261023.1`, commit `5c6d4e24c`. Canary builds have `bun lint`. Every canary of a release prints the same `bun --version`, so check the build with `bun --revision`, which prints `1.4.4-canary.1+5c6d4e24c`. `bun upgrade --canary` installs the newest canary, which may be another build, so install this one from npm: `npm pack @oven/bun-darwin-aarch64@1.4.4-canary.20261023.1`, `tar -xzf oven-bun-darwin-aarch64-1.4.4-canary.20261023.1.tgz package/bin/bun`, then move `package/bin/bun` to `~/.bun/bin/bun`. The root `preinstall` script (`scripts/check-bun.mjs`) stops an install with any other build. The remote image and CI install the same build with `npm install -g bun@<version>`.
 - macOS for the window chrome and e2e tests. Nothing else is platform-specific yet.
 - Google Chrome, for the gallery tests and screenshots.
 - Git LFS (`brew install git-lfs`, then `git lfs install` once), for the images and videos under `docs/`.
@@ -26,6 +26,18 @@ Images and videos under `docs/` (`.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`, `.mp4
 
 **History is not rewritten yet.** History from before 10-18 still holds the images as normal files, so a full clone still downloads them once (about 220 MB). A shallow clone (`--depth 1`) does not. A rewrite (`git lfs migrate import --everything` over the same patterns, then a force-push of main) is planned for a time when no other work is happening, because it changes every commit hash: every clone, worktree and open branch has to move to the new history. Before it runs, merge or close every open branch and stop every agent. Afterwards, re-clone, or `git fetch` and `git reset --hard origin/main` in each checkout, then delete the old worktrees.
 
+## Runtimes
+
+The repo's scripts, its tool tests, the evals and most live scripts run on Bun. The root and package scripts call `bun`, and a script that starts another uses the running Bun (`process.execPath`). Bun runs TypeScript directly and resolves `./sync` to `./sync.ts`, so these need no resolve hook. These stay on Node:
+
+- **Scripts that open the store:** `bun run web`, `sync:live`, `sync:timeline`, `bench:sync`, `react:live`, `notif:replay`, `scripts/idle-live.ts` and the agent benchmarks in `packages/agent/bench`. `@effect/sql-sqlite-node` opens every database with `allowExtension: true`. Bun's `node:sqlite` on macOS uses the system SQLite, which is built without extension loading, so the open fails. These scripts start Node with `--import ./scripts/ts-resolve-hooks.mjs`, a small `module.registerHooks` resolver that tries `.ts`, `.tsx` and `/index.ts`.
+- **Knip**, in `bun run health` and lint. It asks the runtime which imports are built in, and Bun's `module.isBuiltin` counts `ws` and `undici`, so knip under Bun reported `ws` and `@types/ws` as unused in three packages. Knip takes the same 1.6 s on either runtime.
+- **electron-builder**, which supports only Node: `bun run package` runs `apps/desktop/build/package.cjs` with Node.
+- **Playwright's test runner.** `bun run` starts `playwright test` through the CLI's own `node` shebang. Playwright's library works under Bun (`huddle:live` and `build-icons.mjs` use it).
+- **Electron**, which runs its own Node 24 for main and the engine, and the unit tests' child scripts that use the resolve hook (the agent's crash and recovery fixtures).
+
+The tool tests (`test:repo-tools`, `test:runner`, `test:health`) run under `bun test`. Their files still import `node:test` and `node:assert`; Bun runs them, including `t.after`, `t.mock.method`, `timeout` and `skip`.
+
 ## Commands
 
 Run these from the repo root.
@@ -38,7 +50,7 @@ Run these from the repo root.
 | `bun run typecheck` | Fast local check of all Bun-compatible projects with the pinned Bun; see "Typecheck". |
 | `bun run typecheck:tsc` | Manual TypeScript check of every project. |
 | `bun run typecheck:parity` | Manual comparison of Bun and TypeScript diagnostics across projects; bypasses result caches. |
-| `bun run lint` | Runs oxlint, cursor and token checks, dependency and fixture checks, and the health ratchet, all at once (`scripts/lint.mjs`; see "Typecheck"). |
+| `bun run lint` | Runs `bun lint` with the rules in `.oxlintrc.json`, cursor and token checks, dependency and fixture checks, and the health ratchet, all at once (`scripts/lint.mjs`; see "Typecheck"). |
 | `bun run check-deps` | The package graph and the import rules in `docs/architecture.md` section 3. Part of `bun run lint`; run it alone for a quicker loop. |
 | `bun run health` | Reports unused code and dependencies, duplication, and large files and functions. Writes `.juno-status/health.json`. |
 | `bun run test` | Runs every package's vitest suite (`packages/*/test` and `apps/desktop/test`). |
@@ -57,7 +69,7 @@ Run these from the repo root.
 | `bun run --cwd packages/agent-memory test` | Runs the pure memory rules' property tests. Its script takes the heavy-job lock itself. |
 | `bun run --cwd packages/engine test` | Runs one package's suite (here the engine's: the port protocol over an in-memory MessageChannel, live query serving). |
 | `bun run pictures:build`, `bun run pictures:upload` | Make the two WebP files of each of Home's pictures from their open-licence originals, and upload them to the R2 bucket `juno-art` (`scripts/pictures/README.md`). |
-| `node scripts/build-icons.mjs` | Rebuilds `apps/desktop/build/icon.icns` and `icon.png` from `assets/icon.svg`. See "App icon". |
+| `bun scripts/build-icons.mjs` | Rebuilds `apps/desktop/build/icon.icns` and `icon.png` from `assets/icon.svg`. See "App icon". |
 | `bun run package` | Builds an unsigned DMG with electron-builder into `apps/desktop/release/`; signed builds also make a ZIP for in-place updates. The tag workflow builds these too; see "Releasing". |
 | `JUNO_LIVE=1 bun run smoke:live` | The read-only live smoke against your real workspace (see "Sign-in and the live smoke"). `bun run smoke:live --fake` runs the same script against an in-process fake. |
 | `JUNO_LIVE=1 bun run presence:live` | The live presence check (`scripts/presence-live.ts`): polls `users.getPresence` for you while Juno's socket is closed, open, tickling every 19 s, then idle, and prints presence values and seconds. Sends only `ping` and `tickle`. Research section 3, Presence. |
@@ -68,7 +80,7 @@ Run these from the repo root.
 | `JUNO_LIVE=1 bun run forward:live` | The live forward check: in your self-DM only, posts a message and a reply, forwards them with `chat.shareMessage` with and without a note, tries a user id as the destination and a missing message, reads the history and deletes everything it made. Field names and codes only (research `slack-forward.md`). |
 | `JUNO_LIVE=1 bun run broadcast:live` | The live check of sending an existing reply to the channel: in your self-DM only, posts a message and two replies, sends one to the channel with `chat.update` and `reply_broadcast`, tries it again, on the root and with text, reads Main and the thread, records the socket frames, and deletes everything it made. Field names and codes only (research `slack-data-access.md`, "Send an existing reply to the channel"). |
 | `JUNO_LIVE=1 bun run huddle:live` | The huddle spike (`docs/plans/huddles.md`, phase 2): joins a huddle in the private test channel `juno-huddle-test` on the cached session with `rooms.join`, runs the answer through the Chime SDK in a local Chromium page with a fake microphone, prints a status line every 10 s for `--minutes N` (default 5), and always sends `rooms.leave`. `--create-only` finds or creates the channel and exits; `--socket` also prints room frames from the socket; `--headed` shows the window so you can hear the huddle. Writes only that channel's create, join and leave. Field names, codes and counts only. `-- --fake` stops after `rooms.join`. |
-| `JUNO_LIVE=1 node --import ./scripts/ts-resolve-hooks.mjs scripts/dnd-live.ts` | Reads Slack's notification schedule (the `dnd_*` prefs) on the cached session and prints it. `--apply` writes Juno's notification hours into it once (`--days 1,2,3,4,5 --from 540 --to 1140`, defaults otherwise) and reads them back; `--restore '<json>'` writes a printed schedule back. Calls only `users.prefs.get` and `users.prefs.set`, and writes only schedule prefs. Your own account only (research section 7, "Live write"). |
+| `JUNO_LIVE=1 bun scripts/dnd-live.ts` | Reads Slack's notification schedule (the `dnd_*` prefs) on the cached session and prints it. `--apply` writes Juno's notification hours into it once (`--days 1,2,3,4,5 --from 540 --to 1140`, defaults otherwise) and reads them back; `--restore '<json>'` writes a printed schedule back. Calls only `users.prefs.get` and `users.prefs.set`, and writes only schedule prefs. Your own account only (research section 7, "Live write"). |
 | `bun run ai:eval` | Runs every AI task on invented examples with the fake provider and prints the outputs. `JUNO_AI=live bun run ai:eval` uses OpenRouter through pi-ai with `OPENROUTER_API_KEY` (environment or `.env`) and prints outputs, latency and cost; without a key it says so and exits. `bun run ai:eval routeCheck` runs one task. See `packages/ai/README.md`. |
 | `bun run notif:replay run\|sample\|label\|report` | Measures the notification decision against your own messages: replays the last N days from a copy of the app's store through the real classifier, samples about 300 for you to label on a local page, and reports agreement and a sweep of each notification constant. Real content stays under `/Volumes/AgentWork/scratch/`. See `scripts/notif-replay/README.md`. |
 | `bun run agent:eval` | Runs the Juno Agent eval cases on the real turn engine with the scripted model and prints the report (CI runs the same through `bun run test`). `bun run agent:eval --live` uses OpenRouter with `OPENROUTER_API_KEY` (environment or `.env`), costs money, and saves the report under `packages/agent/eval/reports/`; `--model haiku` picks another family, `--case <id>` one case. See `packages/agent/eval/README.md`. |
@@ -86,8 +98,8 @@ Copy `.env.example` to `.env` for local secrets. `.env` is ignored by git.
 Agents work in their own git worktrees. Create and remove them with the helper:
 
 ```sh
-node scripts/worktree.mjs add <name> [--base <ref>] [--branch <branch>] [--detach <ref>] [--no-install]
-node scripts/worktree.mjs remove <name-or-path> [--force] [--delete-branch]
+bun scripts/worktree.mjs add <name> [--base <ref>] [--branch <branch>] [--detach <ref>] [--no-install]
+bun scripts/worktree.mjs remove <name-or-path> [--force] [--delete-branch]
 ```
 
 `add` checks out `<branch>` (default `<name>`; an existing branch is reused, a new one starts at `--base`, default `origin/main`; `--detach <ref>` checks out a commit with no branch, as for a DMG build), runs `bun install --frozen-lockfile` and prints the path. Worktrees go in `/Volumes/AgentWork/worktrees/juno/` when that volume is mounted (file event logging and Spotlight are off there), else in `.claude/worktrees/`. `scripts/worktree-folder.mjs` decides the folder (the volume counts as mounted when `/Volumes/AgentWork/.fseventsd/no_log` exists) and is shared by the helper, `batch-merge.mjs` and packaging. It names the folder after the main checkout, also when run from a linked worktree such as `t3-1234`; `JUNO_WORKTREE_DIR` overrides it. Older worktrees under `.claude/worktrees/` stay until their branches merge. The helper writes `.metadata_never_index` into that folder so Spotlight skips it, and waits to install while the load average is above 8. `remove` removes the worktree and, with `--delete-branch`, deletes its branch if it is merged.
@@ -104,7 +116,7 @@ What changes with it:
 - **New releases wait a day.** `minimumReleaseAge` in `bunfig.toml` holds back versions published less than a day ago. To take one sooner, add it to `minimumReleaseAgeExcludes` there.
 - **Remote runs** install in their image the same way, against the runner's persistent Bun cache.
 
-Regenerate the standard emoji catalog and search keywords with `node scripts/emoji-catalog.mjs` (pinned sources; local input paths are documented at the top of the script); its CLDR notice ships in `apps/desktop/THIRD_PARTY_NOTICES.txt`. The everyday phrases it adds come from `scripts/emoji-intent.json`; `node --import ./scripts/ts-resolve-hooks.mjs scripts/emoji-intent.ts` asks the model (OpenRouter, `OPENROUTER_API_KEY` from the environment or `.env`) for emoji the file lacks, `--all` for every emoji. Fix a bad phrase in `intentOverrides` in `emoji-catalog.mjs`, then rerun it.
+Regenerate the standard emoji catalog and search keywords with `bun scripts/emoji-catalog.mjs` (pinned sources; local input paths are documented at the top of the script); its CLDR notice ships in `apps/desktop/THIRD_PARTY_NOTICES.txt`. The everyday phrases it adds come from `scripts/emoji-intent.json`; `bun scripts/emoji-intent.ts` asks the model (OpenRouter, `OPENROUTER_API_KEY` from the environment or `.env`) for emoji the file lacks, `--all` for every emoji. Fix a bad phrase in `intentOverrides` in `emoji-catalog.mjs`, then rerun it.
 
 ## Decision log
 
@@ -116,7 +128,7 @@ Keep the existing one-line format, for example:
 - 10-17 00:55 · orchestrator · Record decisions in separate fragments to avoid merge conflicts.
 ```
 
-Run `node scripts/decision-log.mjs` and commit both the fragment and generated
+Run `bun scripts/decision-log.mjs` and commit both the fragment and generated
 `docs/decision-log.md`. Never edit the generated log by hand. Lint checks that it
 matches the fragments. The builder sorts newest first, then by filename for ties;
 `~` in a reconstructed entry's time stays in its text. The status page reads the
@@ -130,9 +142,9 @@ Run `bun run test:repo-tools` for the CLI checks using temporary Git repositorie
 Fetch `origin/main`, then run from the repository root:
 
 ```sh
-node scripts/batch-merge.mjs branch-one branch-two
-node scripts/batch-merge.mjs --continue batch-1
-node scripts/batch-merge.mjs --continue batch-1 --push
+bun scripts/batch-merge.mjs branch-one branch-two
+bun scripts/batch-merge.mjs --continue batch-1
+bun scripts/batch-merge.mjs --continue batch-1 --push
 ```
 
 The script creates `batch-N` from the current `origin/main` in the worktree
@@ -174,8 +186,9 @@ batch branch with `git branch -D batch-N`. If a process was killed, remove its
 
 Run `bun run health` for a summary and the largest clone pairs, files, and functions.
 `bun run lint` runs the same scan with `--check` against `health-baseline.json`.
-Knip and jscpd run concurrently; neither uses a cached result. Health scans do not
-need the heavy-job lock. Tool errors fail both reporting and lint.
+Knip and jscpd run concurrently; neither uses a cached result. Knip runs on Node
+(see "Runtimes"), jscpd and the size scan on Bun. Health scans do not need the
+heavy-job lock. Tool errors fail both reporting and lint.
 
 - **Knip** checks unused files, value exports, type exports, dependencies, and unlisted dependencies across all workspaces, scripts, and test entries. `bun run health:knip` prints every finding. Private package exports are included, so a barrel export with no consumers is a finding even if its implementation is used internally.
 - **jscpd** checks `packages/*/src` and `apps/*/src`, including fixtures and CSS. Clones need at least 100 tokens and eight lines. Comments and whitespace do not count as matching tokens. The percentage is duplicated lines divided by scanned source lines. `bun run health:clones` writes the full clone report.
@@ -184,7 +197,10 @@ need the heavy-job lock. Tool errors fail both reporting and lint.
 `.juno-status/health.json` contains a timestamp, counts, duplication percentage, top offenders, and full Knip and size findings. `complete: false`, a null count, and an `errors` entry mean a tool failed, not that it found zero issues. Each external tool (`scripts/health-run.mjs`) gets 20 s on an idle machine, scaled by the one-minute load per core (at a load of 16 on 8 cores it gets 40 s) and capped at 120 s. A tool that runs out of time is tried once more with twice the limit. If it times out again, its `errors` entry has `timedOut: true` and lint says the tools timed out and no finding was checked: run `bun run lint` again when the machine is less busy. It still fails, because nothing was checked. Raw reports are in `.juno-status/knip-report.json` and `.juno-status/jscpd-report.json`; all reports are gitignored.
 
 Knip exceptions are commented in `knip.config.mjs`. Fontsource dependencies are loaded by CSS `@import`, which Knip does not parse. Babel loads `babel-plugin-react-compiler` by a string in the gallery's Vite config. The default exports of the Knip and electron-vite configs are tool entry points. The icon script resolves Playwright through desktop's manifest with `createRequire`, where it is declared. Exports used inside their own module are omitted because that code is live; unused barrel re-exports remain visible. Playwright's alternate configs, packaging hooks, agent evals and benchmarks, research spike scripts,
-and the engine's compile-time body compatibility check are explicit entries. The `tracking`
+the agent's opt-in profiling setup file (`JUNO_UNIT_PROFILE=1`) and the engine's compile-time body compatibility check are explicit entries.
+Knip finds the tool tests through its Bun plugin (`bun test` in the root scripts), which takes only
+`*.test.*` and `*.spec.*` files as test entries, so any other file under a `test/` folder counts only
+if something imports it. The `tracking`
 token group is tagged `@public` because `global.css` reads its emitted CSS variables.
 No blanket source exclusion hides unused code.
 
@@ -265,7 +281,7 @@ Each package has its own `tsconfig.json` that extends `tsconfig.base.json` (stri
 ## App icon
 
 The source is `assets/icon.svg` (the laptop-two app icon; `assets/icon-dark.svg` and
-`assets/mark.svg` sit next to it). `node scripts/build-icons.mjs` renders every iconset size
+`assets/mark.svg` sit next to it). `bun scripts/build-icons.mjs` renders every iconset size
 (16 to 1024, with @2x pairs) from the SVG in Chrome through Playwright, runs `iconutil`, and
 writes two files that are committed:
 
@@ -414,7 +430,7 @@ around threads, the search response, file objects and thumbnail auth, and the no
 prefs. It reuses the cached session, refuses methods outside its own read-only allow-list, starts
 calls 1.5 s apart, and honours `Retry-After` once. It prints counts, key censuses and
 milliseconds only, and writes redacted shapes to `--out DIR` (a temporary directory by default);
-copy a shape into the recorded fixtures by hand and run `node scripts/check-fixtures-redacted.mjs`.
+copy a shape into the recorded fixtures by hand and run `bun scripts/check-fixtures-redacted.mjs`.
 `-- --only files` checks the newest self-DM image via an exact history re-read, probes `files.info`, and compares thumbnail GETs with and without the cookie. It prints booleans and statuses and writes no shapes. `-- --only search` runs the search part alone (four calls). `-- --only users` asks the edge
 `users/info` about every person the newest conversations reference and reads one page of each
 users list (about 14 calls). `-- --only emoji` reads every edge `emojis/list` page and prints its key census (about 5 calls). `-- --only reactions` reads one history page of the 30 most recently active conversations and five of the general channel, counts reactions that list fewer people than their count, and asks `reactions.get` without and with `full` about three messages (about 43 calls). A full run is about 34 calls. The
@@ -523,11 +539,10 @@ only. `-- --until-quiet` keeps it running after `live` until no call has been ma
 background pass over the followed threads of the window is counted too (raise `--seconds` for it). `bun run sync:live --fake` runs the same script against an in-process fake, which is how
 it is checked in development.
 
-Both live scripts run under plain Node (type stripping). `@juno/sync`, `@juno/store` and
-`@juno/engine` use bundler-style relative imports (`./sync` for `./sync.ts`), which Node does
-not resolve on its own, so `bun run sync:live` starts Node with
-`--import ./scripts/ts-resolve-hooks.mjs`, a small `module.registerHooks` resolver that tries
-`.ts`, `.tsx` and `/index.ts`.
+Both live scripts open the store, so they run under plain Node (see "Runtimes").
+`@juno/sync`, `@juno/store` and `@juno/engine` use bundler-style relative imports (`./sync`
+for `./sync.ts`), which Node does not resolve on its own, so `bun run sync:live` starts Node
+with `--import ./scripts/ts-resolve-hooks.mjs`.
 
 ## IPC with main
 
@@ -622,7 +637,7 @@ opening one. Any launch error would satisfy that assertion, even a crash.
 Playwright global setup runs `build-cached` before the desktop tests, including
 direct `playwright test` calls and the perf config. Unchanged inputs and output
 skip the build. The package scripts do not build a second time. Repeat locally with
-`node scripts/heavy.mjs bun run --cwd apps/desktop playwright test e2e/app.spec.ts -g "second launch" --repeat-each=10 --retries=0`.
+`bun scripts/heavy.mjs bun run --cwd apps/desktop playwright test e2e/app.spec.ts -g "second launch" --repeat-each=10 --retries=0`.
 `bun run flake` runs remotely. Set `DEBUG=pw:browser` to capture the first app's
 process logs. The test attaches the second process's output as `second-launch.log`.
 The test allows 90 seconds overall and 30 seconds for the second process to exit.
@@ -764,19 +779,21 @@ Effect and StyleX pitfalls are in their skills: `.claude/skills/effect/SKILL.md`
 
 ## Typecheck
 
-TypeScript 7.0.2 remains installed for the manual `bun run typecheck:tsc` path and parity comparison. Routine checks use the Bun that runs the scripts, pinned to 1.4.4 by `packageManager` in `package.json`.
+TypeScript 7.0.2 remains installed for the manual `bun run typecheck:tsc` path and parity comparison. Routine checks use the Bun that runs the scripts, the canary build `packageManager` in `package.json` pins (see "Prerequisites").
 
-`bun run typecheck` runs `bun check -b` over every project that Bun supports, locally. The checker reads the project inventory and dependency hashes from `scripts/typecheck.mjs`, builds a temporary solution config, and stores passing results separately in the shared system temp folder (`juno-cache/typecheck-bun`). `--no-cache` checks every supported project. Bun has no incremental build cache. Projects with unsupported compiler settings produce one warning naming the project and are skipped; there is no TypeScript fallback. Today all 35 project configs support Bun.
+`bun run typecheck` runs `bun check -b` over every project that Bun supports, locally. The checker reads the project inventory and dependency hashes from `scripts/typecheck.mjs`, builds a temporary solution config, and stores passing results separately in the shared system temp folder (`juno-cache/typecheck-bun`), keyed by `bun --revision`, so another Bun build checks everything again. `--no-cache` checks every supported project. Bun has no incremental build cache. Projects with unsupported compiler settings produce one warning naming the project and are skipped; there is no TypeScript fallback. Today all 35 project configs support Bun.
 
 `bun run typecheck:tsc` is the manual TypeScript-only check. No automatic check, hook, or scheduled run invokes it. `bun run typecheck:parity` is also manual; it compares Bun and `tsc -b --force`, bypasses result caches, and fails if any project cannot be compared. Neither command is part of routine verification.
 
-**Type stripping.** Node runs some TypeScript from source by stripping types: the agent's crash and recovery fixtures, `bun run agent:eval`, the AI evals, `fake-slack start`, and the live scripts in `scripts/`, which reach the engine and most packages under it. Node cannot strip syntax that emits code, such as parameter properties (`constructor(private readonly x)`), enums or namespaces, and fails at load time. So every package such code reaches sets `erasableSyntaxOnly` in its `tsconfig.json`, and `bun run typecheck` reports that syntax: all of `packages/` except `ui`, `views`, `tokens` and `testing`, and `scripts/tsconfig.json`. The desktop app, `ui` and `views` are bundled by Vite and may use it. A package that Node starts to run from source needs the flag too; the flag applies to every file in a project's program, so a bundled package it imports must follow the rule as well.
+**Type stripping.** Node runs some TypeScript from source by stripping types: the scripts that open the store (see "Runtimes") and the agent's crash and recovery fixtures, which reach the engine and most packages under it. Node cannot strip syntax that emits code, such as parameter properties (`constructor(private readonly x)`), enums or namespaces, and fails at load time. So every package such code reaches sets `erasableSyntaxOnly` in its `tsconfig.json`, and `bun run typecheck` reports that syntax: all of `packages/` except `ui`, `views`, `tokens` and `testing`, and `scripts/tsconfig.json`. The desktop app, `ui` and `views` are bundled by Vite and may use it. A package that Node starts to run from source needs the flag too; the flag applies to every file in a project's program, so a bundled package it imports must follow the rule as well.
 
-`bun run lint` runs its ten checks at once through `scripts/lint.mjs`: oxlint, the decision log, the cache epoch, the migration order, the cursor rule, the duotone icons (`check-duotone.mjs`), tokens, `check-deps`, the fixture check and the health ratchet. None depends on another. Each check's output is printed as one group, under a line with its name, result and time, when it finishes. Lint fails if any check fails, and its last line names the ones that did.
+`bun run lint` runs its eleven checks at once through `scripts/lint.mjs`: `bun lint`, the decision log, the cache epoch, the migration order, the cursor rule, the duotone icons (`check-duotone.mjs`), tokens, `check-deps`, the fixture check, the LFS check and the health ratchet. None depends on another. Each check's output is printed as one group, under a line with its name, result and time, when it finishes. Lint fails if any check fails, and its last line names the ones that did.
 
 Measured on 10-17 on this Mac, eight alternating runs of each while other agents kept the load at 5.5 to 7.3 on 8 cores, so the numbers vary a lot. The checks one after another with `&&` took 5.5 s median (fastest 3.0 s). At once they took 4.8 s median (fastest 2.2 s). In the parallel run every check except health finishes within 0.7 s. Health takes 2.6 s, and knip alone takes 1.9 to 2.0 s, so knip sets the floor. Making lint faster than that means making knip faster.
 
-`bun run lint` stays whole: oxlint, the cursor rule, `check-deps` and the fixture check take about 3 s together even on the loaded Mac, and `check-deps` needs the whole package graph to see a bad edge.
+`bun lint` reads `.oxlintrc.json` (the oxlint format) and honours `oxlint-disable` comments. It runs with `--no-script`, since without it `bun lint` runs the root `lint` script. On 10-24 it reported the same 419 warnings as oxlint 1.87.0 over the same 2,238 files and 148 rules, in 0.08 s against oxlint's 0.21 s (medians of five alternating runs). `--type-aware` stays off: it took 1.4 s and reported 266 errors and about 2,500 more warnings from 25 rules that need types, mostly `no-unsafe-type-assertion`, `no-floating-promises` and `unbound-method`. Moving the rules into `bunfig.toml` dropped 22 React rules, because Bun enables React rules only when the root `package.json` lists React, so the rules stay in `.oxlintrc.json`.
+
+`bun run lint` stays whole: `bun lint`, the cursor rule, `check-deps` and the fixture check take about 3 s together even on the loaded Mac, and `check-deps` needs the whole package graph to see a bad edge.
 
 ## Local Bun checks
 
@@ -907,7 +924,7 @@ An import graph over `apps/` and `packages/` decides what each change reaches, a
 | `bun.lock`, `bunfig.toml`, the root `package.json`, `tsconfig.base.json` | every unit test, `specs:check`, conformance, gallery and desktop picks within their time budgets (no spec can be told apart) |
 | `scripts/affected.mjs`, `scripts/affected-select.mjs`, `scripts/affected-run.mjs`, `scripts/affected-tests.mjs`, `scripts/test-areas.mjs`, `scripts/import-graph.mjs`, `scripts/coverage-map.mjs`, `scripts/remote*`, `scripts/heavy.mjs`, `scripts/build-cached.mjs`, `scripts/without-run-as-node.mjs` | the tool tests (`test:health`, `test:repo-tools`, `test:runner`) and `e2e/app.spec.ts`, as a check that a run still works |
 | A unit file, a file one reaches, or a package's `package.json`, `vitest.config.ts`, `bunfig.toml` or `tsconfig.json` | those vitest files (`bun run test --files <repository paths>`). Selection reads `vitest.config.ts` includes while present. A Bun package without that config selects `.test.ts`, `.test.tsx`, `.test.js` and `.test.mjs` files, including `eval/`; performance-only files stay excluded. This covers `packages/` and `apps/` alike |
-| A script under `scripts/` that a Node test imports, or the test itself | the root script that runs that test with `node --test` or `bun test` (`test:repo-tools`, `test:health`, `test:runner`); every `scripts/**/*.test.mjs` belongs to one (`scripts/affected.test.mjs` checks) |
+| A script under `scripts/` that a tool test imports, or the test itself | the root script that runs that test with `bun test` (`test:repo-tools`, `test:health`, `test:runner`); every `scripts/**/*.test.mjs` belongs to one (`scripts/affected.test.mjs` checks) |
 | `specs/` (not Markdown) | `bun run specs:check`, narrowed to `--memory`, `--actions` or `--recovery` when only that agent spec changed; its cache skips checks whose inputs passed before |
 | Outbox inputs (`protocolInputs` in `scripts/verify-inputs.mjs`): the engine's `outbox.ts` and `send/` and their imports, outbox specs and the conformance harness | `bun run specs:conformance` |
 | A file a component's fixtures reach | `bun run test:gallery` with `GALLERY_SHIFT_ONLY` set to ranked reached components within the time budget; a component whose own source or fixture changed is required, and the other behaviour specs that open one of them |
@@ -939,9 +956,9 @@ Replaying the 15 first-parent merges ending at `f601148d2` with `--plan --json -
 
 Nearly every file reaches the whole desktop app through the import graph, so the graph alone would run every desktop spec for any app change. Instead, `bun run affected` reads `apps/desktop/e2e/coverage-map.json`, which records, for each spec file, the source files under `apps/` and `packages/` whose functions ran while one of its tests had the app open.
 
-**Recording.** `JUNO_COVERAGE=1` turns it on for a desktop run. The build then writes hidden source maps (`electron.vite.config.ts`; `build-cached` rebuilds when the variable changes). `apps/desktop/src/coverage.ts` is the first import of main, the engine and the agent: with `JUNO_E2E_COVERAGE` set to a directory, each process starts precise function coverage on its own inspector and writes the start offsets of the functions that ran. Main also attaches to each renderer over the DevTools protocol before its page loads. The fixtures give each launch its own directory under the spec it belongs to, and ask main and the renderers to write before they close the app. The engine and the agent write every two seconds and on SIGTERM. The run's teardown (`e2e/coverage.ts`) runs `node scripts/coverage-map.mjs reduce`, which maps the offsets to source files with the source maps and writes `apps/desktop/coverage/map/partial-<shard>.json`; `bun run remote` brings it back with the reports. A module's top level does not count: in a bundle it runs at load in every test, so it says nothing about a spec.
+**Recording.** `JUNO_COVERAGE=1` turns it on for a desktop run. The build then writes hidden source maps (`electron.vite.config.ts`; `build-cached` rebuilds when the variable changes). `apps/desktop/src/coverage.ts` is the first import of main, the engine and the agent: with `JUNO_E2E_COVERAGE` set to a directory, each process starts precise function coverage on its own inspector and writes the start offsets of the functions that ran. Main also attaches to each renderer over the DevTools protocol before its page loads. The fixtures give each launch its own directory under the spec it belongs to, and ask main and the renderers to write before they close the app. The engine and the agent write every two seconds and on SIGTERM. The run's teardown (`e2e/coverage.ts`) runs `bun scripts/coverage-map.mjs reduce`, which maps the offsets to source files with the source maps and writes `apps/desktop/coverage/map/partial-<shard>.json`; `bun run remote` brings it back with the reports. A module's top level does not count: in a bundle it runs at load in every test, so it says nothing about a spec.
 
-**Refreshing.** `bun run verify:main --nightly` runs the desktop suite with `JUNO_COVERAGE=1` and writes the joined map (`node scripts/coverage-map.mjs merge <partials> --commit <sha>`) to `apps/desktop/e2e/coverage-map.json` in the checkout it ran from. The map records runtime/platform identity; another identity falls back to import-graph candidates within the time budget. A failed test still ran its code, so failures do not stop the refresh. A scheduled task runs a full run on main once a day; the agent that runs it commits the refreshed map and merges it, as "Refresh the e2e coverage map". The map is a few hundred kilobytes, one source file per line, so a refresh reads as a diff.
+**Refreshing.** `bun run verify:main --nightly` runs the desktop suite with `JUNO_COVERAGE=1` and writes the joined map (`bun scripts/coverage-map.mjs merge <partials> --commit <sha>`) to `apps/desktop/e2e/coverage-map.json` in the checkout it ran from. The map records runtime/platform identity; another identity falls back to import-graph candidates within the time budget. A failed test still ran its code, so failures do not stop the refresh. A scheduled task runs a full run on main once a day; the agent that runs it commits the refreshed map and merges it, as "Refresh the e2e coverage map". The map is a few hundred kilobytes, one source file per line, so a refresh reads as a diff.
 
 **Selecting.** `scripts/affected-select.mjs` picks the candidates, and the plan prints each spec's strongest reason:
 
@@ -1137,7 +1154,7 @@ Use `runner list` to see their combined usage.
 
 ## Heavy jobs share one queue
 
-Tests, e2e runs, gallery shots, benchmarks and spec checks spawn many processes. Several agents often work in separate worktrees on the same machine, so the root scripts (`bun run test`, `bun run test:e2e`, `bun run test:feel`, `bun run test:gallery`, `bun run gallery:shots`, `bun run specs:check`, `bun run test:agent-contracts`, `bun run test:agent-testing`) run through `scripts/heavy.mjs`. It takes a machine-wide lock in the system temp folder, shared by every worktree, and waits for a free slot. There are two slots by default (`JUNO_HEAVY_SLOTS` changes it). On the Mac, `--electron` also takes a single shared app-launch slot. `test:desktop`, `test:e2e`, `test:gallery` and `gallery:shots` use it, so only one of these jobs runs at once. Ordinary jobs can still use both slots, or run beside one app job. An app job waiting for the app-launch slot holds no general slot. Timing runs (`bun run perf`, `bun run test:feel`) pass `--exclusive`, which takes every slot and stops new jobs from starting while it waits, so their numbers are not skewed by another run. Release packaging passes `--priority release` with `--exclusive`: it moves ahead of all queued jobs while it waits for active jobs to finish, without interrupting them. Use `node scripts/heavy.mjs --status` to see holders and queued commands, PIDs and wait times. The wrapper sets `JUNO_HEAVY_HELD` for its child; nested heavy commands run within the parent's reservation and cannot deadlock waiting for a slot the parent holds. Running a package's tests directly bypasses the queue, so prefer the root scripts. `bun run test:health` and `bun run test:runner` skip the queue: they are small Node tests that should not wait behind perf or package runs.
+Tests, e2e runs, gallery shots, benchmarks and spec checks spawn many processes. Several agents often work in separate worktrees on the same machine, so the root scripts (`bun run test`, `bun run test:e2e`, `bun run test:feel`, `bun run test:gallery`, `bun run gallery:shots`, `bun run specs:check`, `bun run test:agent-contracts`, `bun run test:agent-testing`) run through `scripts/heavy.mjs`. It takes a machine-wide lock in the system temp folder, shared by every worktree, and waits for a free slot. There are two slots by default (`JUNO_HEAVY_SLOTS` changes it). On the Mac, `--electron` also takes a single shared app-launch slot. `test:desktop`, `test:e2e`, `test:gallery` and `gallery:shots` use it, so only one of these jobs runs at once. Ordinary jobs can still use both slots, or run beside one app job. An app job waiting for the app-launch slot holds no general slot. Timing runs (`bun run perf`, `bun run test:feel`) pass `--exclusive`, which takes every slot and stops new jobs from starting while it waits, so their numbers are not skewed by another run. Release packaging passes `--priority release` with `--exclusive`: it moves ahead of all queued jobs while it waits for active jobs to finish, without interrupting them. Use `bun scripts/heavy.mjs --status` to see holders and queued commands, PIDs and wait times. The wrapper sets `JUNO_HEAVY_HELD` for its child; nested heavy commands run within the parent's reservation and cannot deadlock waiting for a slot the parent holds. Running a package's tests directly bypasses the queue, so prefer the root scripts. `bun run test:health` and `bun run test:runner` skip the queue: they are small Node tests that should not wait behind perf or package runs.
 
 
 ## Releasing
@@ -1251,7 +1268,7 @@ lint/typecheck. Heavy checks run through `bun run affected` on the SSH runner.
 
 ### Steps
 
-1. Install Node 26, Bun 1.4.4 and Xcode (including its command-line tools).
+1. Install Node 26, the pinned Bun canary ("Prerequisites") and Xcode (including its command-line tools).
    Run `bun install --frozen-lockfile` and `bun run affected`.
 2. Set the version with `bun run release:version` ("Versions" below). Build and smoke the
    local package with `bun run package` and `bun run test:package`. The smoke launches
@@ -1360,7 +1377,7 @@ ancestor. Records live under the shared `.juno-status/verify-main/commits/`;
 `verify-main.json` remains the latest summary for existing readers. A newer red
 run does not erase an older green record. Only docs, tests and the app version
 may change after the verified commit. The publish checkout must be clean.
-`node scripts/release-gate.mjs <commit>` checks this without a build or upload.
+`bun scripts/release-gate.mjs <commit>` checks this without a build or upload.
 
 A failed test fails the release gate. Never infer a green record from a log.
 
@@ -1494,7 +1511,7 @@ the hardened package; the packaged smoke instead uses Chromium CDP. The
 
 ## StyleX token check
 
-`bun run lint` runs `node scripts/check-tokens.mjs` over `packages/ui`,
+`bun run lint` runs `bun scripts/check-tokens.mjs` over `packages/ui`,
 `packages/views` and the desktop renderer. It parses StyleX `create` calls,
 including aliased imports and nested conditions. Raw CSS colours, px/rem/em
 lengths (also inside templates and calc), and numeric length properties fail.
@@ -1505,7 +1522,7 @@ value (a number used as a factor inside a template is not a length). Runtime
 style parameters are not evaluated. For a real geometry exception, put
 `// tokens-allow: reason` after the declaration on the same line (for a
 constant, after the constant); an empty reason does not pass.
-Run the rule tests with `node --test scripts/check-tokens.test.mjs`.
+Run the rule tests with `bun test scripts/check-tokens.test.mjs`.
 
 Measured on the shared Mac (2026-10-15), the token check alone took 0.36 s
 median (0.35–0.50 s, five successful runs including Node startup). Five

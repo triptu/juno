@@ -3,7 +3,7 @@
 The tests run the real engine and state client over a MessageChannel against the fake Slack server. Run them through the root machine lock:
 
 ```sh
-node scripts/heavy.mjs bun run --cwd packages/engine vitest run test/sync.test.ts
+bun scripts/heavy.mjs bun run --cwd packages/engine vitest run test/sync.test.ts
 ```
 
 `startTestEngine()` uses `fastTiming`: the scheduling fields from `src/config.ts` divided by 20. Retry ratios, attempt limits and timer order stay the same. Pass `timing: { ... }` for a scenario override. Periodic sweeps remain disabled (`sweepIntervalMillis: 0`) and `followPassMillis: 0` checks follows at every catch-up. Boot, reconnect and `force_reload` run normally. Data ages, server Retry-After values and network request timeouts keep their real meaning. The app retains its existing defaults.
@@ -35,14 +35,14 @@ The engine runs the fake AI, but its background AI jobs (titles, topic art, Home
 `stress-flakes.mjs` starts eight CPU-burning Node processes, runs the command serially, saves each run under `.juno-status/flake-check/<label>/`, and stops the load processes even when tests fail. Retries stay off.
 
 ```sh
-node scripts/heavy.mjs node scripts/stress-flakes.mjs engine 20 bun run --cwd packages/engine vitest run test/sync.test.ts test/reconnect.test.ts -t 'warm boot reads every page|reads followed threads past the first getView page|Unsubscribe|rejected unsubscribe'
+bun scripts/heavy.mjs bun scripts/stress-flakes.mjs engine 20 bun run --cwd packages/engine vitest run test/sync.test.ts test/reconnect.test.ts -t 'warm boot reads every page|reads followed threads past the first getView page|Unsubscribe|rejected unsubscribe'
 ```
 
 Build before repeating desktop tests:
 
 ```sh
 bun run build
-node scripts/heavy.mjs node scripts/stress-flakes.mjs desktop 20 bun run --cwd apps/desktop playwright test e2e/sidebar.spec.ts e2e/session.spec.ts --grep 'hovering a row shows|signs out:|comes back signed in' --retries=0
+bun scripts/heavy.mjs bun scripts/stress-flakes.mjs desktop 20 bun run --cwd apps/desktop playwright test e2e/sidebar.spec.ts e2e/session.spec.ts --grep 'hovering a row shows|signs out:|comes back signed in' --retries=0
 ```
 
 ## Conformance

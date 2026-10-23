@@ -25,9 +25,11 @@ Read the parts relevant to your task, and the package's README, before changing 
 
 ## Working rules
 
-- Add each decision as one dated line in its own `docs/decisions/log/YYYY-MM-DD-HHMM-slug.md` fragment (IST; choose a distinct slug). Run `node scripts/decision-log.mjs` and commit the generated result. Never edit `docs/decision-log.md` by hand; lint checks it against the fragments.
+- Add each decision as one dated line in its own `docs/decisions/log/YYYY-MM-DD-HHMM-slug.md` fragment (IST; choose a distinct slug). Run `bun scripts/decision-log.mjs` and commit the generated result. Never edit `docs/decision-log.md` by hand; lint checks it against the fragments.
 
-- Create a worktree with `node scripts/worktree.mjs add <name>` and remove it with `node scripts/worktree.mjs remove <name>` (`docs/development.md`, "Worktrees and installs"). New worktrees go in `/Volumes/AgentWork/worktrees/juno/<name>` when that volume is mounted, else in `.claude/worktrees/`; the helper, `batch-merge.mjs` and packaging pick the folder the same way. Installs link from Bun's global store, so a worktree's `node_modules` stays small. Remove worktrees a few at a time, never in bulk.
+- Create a worktree with `bun scripts/worktree.mjs add <name>` and remove it with `bun scripts/worktree.mjs remove <name>` (`docs/development.md`, "Worktrees and installs"). New worktrees go in `/Volumes/AgentWork/worktrees/juno/<name>` when that volume is mounted, else in `.claude/worktrees/`; the helper, `batch-merge.mjs` and packaging pick the folder the same way. Installs link from Bun's global store, so a worktree's `node_modules` stays small. Remove worktrees a few at a time, never in bulk.
+
+- Repo scripts run on Bun (`bun scripts/<name>.mjs`, `bun <file>.ts`). Only the tools `docs/development.md`, "Runtimes", lists stay on Node; a new one needs a real reason there and a one-line comment where it starts.
 
 - Use the project skills in `.claude/skills/` when touching the tool they cover (Effect, StyleX, performance, and others as they are added).
 - Tests: prefer end-to-end tests that follow a user flow against the fake Slack server. Write unit tests only for pure domain rules, and test behaviour, not implementation details.
