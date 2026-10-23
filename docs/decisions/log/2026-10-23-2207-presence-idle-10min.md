@@ -1,0 +1,1 @@
+- 10-23 22:07 · presence-idle-10min · Juno keeps the owner active while the Mac was used (any app) in the last 10 minutes, not the official app's 20 s, so a short break from the keyboard does not show them away. The 19 s tickle spacing, the 10 s poll, the screen-lock gate and never tickling while away are unchanged (owner).
