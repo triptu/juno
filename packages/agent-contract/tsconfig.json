@@ -2,15 +2,8 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "erasableSyntaxOnly": true,
-    "lib": [
-      "ES2023"
-    ],
-    "types": [
-      "bun"
-    ]
+    "lib": ["ES2023"],
+    "types": ["node", "bun-types/test"]
   },
-  "include": [
-    "src",
-    "test"
-  ]
+  "include": ["src", "test"]
 }
