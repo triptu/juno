@@ -20,12 +20,11 @@ import { join, resolve } from 'node:path'
 import { Logger, LogLevel } from 'effect'
 import { createServer, type Plugin, type ViteDevServer } from 'vite'
 import { WebSocketServer, type WebSocket } from 'ws'
-import type { SessionSecrets } from '@juno/contract'
 import { memoryHost, socketTransport, startEngine, type EngineHandle } from '@juno/engine'
-import { startFakeSlack, type Credentials, type FakeSlack } from '@juno/fake-slack'
-import { HttpTransport } from '@juno/slack'
+import { startFakeSlack } from '@juno/fake-slack'
 import { rendererPlugins } from '../../renderer.vite'
 import { ENGINE_SOCKET_PATH } from '../paths'
+import { fakeMain, memorySessionStore, storedSession } from './fakeMain'
 import { serveFile, type FileSource } from './files'
 
 const desktopDir = resolve(import.meta.dirname, '../..')
@@ -94,51 +93,6 @@ function scratchFolder(): string {
   return mkdtempSync(join(parent, `juno-web-${process.pid}-`))
 }
 
-/** What main does for the engine, for a session main already holds: the fake's credentials. */
-function fakeMain(fake: FakeSlack, credentials: Credentials) {
-  const host = memoryHost()
-  let current: Credentials | undefined = credentials
-  const secrets = (c: Credentials): SessionSecrets => ({ teamId: c.teamId, userId: c.userId, workspaceUrl: c.url, token: c.token, teamName: 'Juno Fake' })
-  let stored: SessionSecrets | null = secrets(credentials)
-  host.onEngine((message) => {
-    switch (message._tag) {
-      case 'requestSecrets':
-        host.deliver({ _tag: 'secrets', secrets: stored })
-        return
-      case 'importFromSlackApp':
-        current = fake.signIn()
-        host.deliver({ _tag: 'secrets', secrets: secrets(current) })
-        return
-      case 'storeSecrets':
-        stored = message.secrets
-        host.deliver({ _tag: 'secretsStored' })
-        return
-      case 'signOut':
-        stored = null
-        current = undefined
-        host.deliver({ _tag: 'signedOut' })
-        return
-      case 'handshake':
-        host.deliver({ _tag: 'handshake', id: message.id, cookie: current === undefined ? '' : `d=${current.cookie}`, origin: 'https://app.slack.com', userAgent: 'Juno web shell', proxy: 'DIRECT' })
-        return
-      default:
-        return
-    }
-  })
-  const cookie = () => (current === undefined ? '' : `d=${current.cookie}`)
-  // The cookie Chromium would attach on the Slack session.
-  const httpTransport = HttpTransport.nodeFetch({
-    fetch: async (input, init) => {
-      const url = new URL(input instanceof Request ? input.url : input)
-      if (url.origin !== new URL(fake.url).origin) throw new Error('The web shell only contacts its fake Slack')
-      const headers = new Headers(init?.headers)
-      headers.set('cookie', cookie())
-      return fetch(input, { ...init, headers, redirect: 'error' })
-    },
-  })
-  return { host, httpTransport, cookie }
-}
-
 /** Whether an upgrade's `Origin` names the host it was sent to. A missing or malformed one does not. */
 function sameOrigin(origin: string | undefined, host: string | undefined): boolean {
   if (origin === undefined || !URL.canParse(origin)) return false
@@ -205,12 +159,13 @@ export async function startWebShell(options: WebShellOptions): Promise<WebShell>
   try {
     const fake = await startFakeSlack({ seedTime: Date.now() })
     cleanups.push(() => fake.close())
-    const main = fakeMain(fake, fake.signIn())
+    const engineHost = memoryHost()
+    const main = fakeMain(engineHost, { fakeUrl: fake.url, store: memorySessionStore(storedSession(fake.signIn())), signIn: () => Promise.resolve(fake.signIn()) })
     const transport = socketTransport({ host, port: options.port })
     const engine: EngineHandle = await startEngine(
       transport,
       { userData, e2e: true, dev: true, fakeSlackUrl: fake.url, ai: 'fake', aiJobs: false },
-      { host: main.host, httpTransport: main.httpTransport, logger: engineLogger },
+      { host: engineHost, httpTransport: main.httpTransport, logger: engineLogger },
     )
     cleanups.push(() => engine.stop())
     const open = new Set<WebSocket>()

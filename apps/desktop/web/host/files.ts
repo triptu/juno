@@ -16,6 +16,7 @@ import { readdir, readFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { join } from 'node:path'
 import { DOWNLOAD_PATH, SCHEME_PREFIX } from '../paths'
+import { fakeAddress } from './fakeMain'
 
 const PLACEHOLDER = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16" fill="#8884"/></svg>'
 const UPLOAD_NAME = /^[\w-]+\.(png|jpe?g|gif|webp)$/
@@ -25,6 +26,8 @@ const STREAMED = new Set(['video', 'audio', 'content'])
 export interface FileSource {
   /** The fake Slack's origin, the only place file bytes come from. */
   readonly origin: string
+  /** Other origins that mean the fake (`fakeMain.ts`, `aliases`). */
+  readonly aliases?: ReadonlyArray<string>
   /** The session cookie the fake checks. */
   readonly cookie: () => string
   /** The engine's data folder. */
@@ -37,13 +40,14 @@ function send(response: ServerResponse, status: number, type: string, body: stri
 }
 
 async function fromFake(request: IncomingMessage, response: ServerResponse, source: FileSource, raw: string | null, extra: Record<string, string> = {}): Promise<boolean> {
-  let url: URL
+  let asked: URL
   try {
-    url = new URL(raw ?? '')
+    asked = new URL(raw ?? '')
   } catch {
     return false
   }
-  if (url.origin !== source.origin) return false
+  const url = fakeAddress(asked, source.origin, source.aliases)
+  if (url === undefined) return false
   const range = request.headers.range
   const answer = await fetch(url, { headers: { cookie: source.cookie(), ...(range === undefined ? {} : { range }) }, redirect: 'manual' })
   if (answer.status >= 300 && answer.status < 400) return false
