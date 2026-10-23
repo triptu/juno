@@ -21,7 +21,8 @@ export default {
     // Knip reads every package.json exports map and discovers test/config entries
     // through its Vitest plugin. Package scripts also cover the AI eval entries.
     'packages/*': { project: ['**/*.{ts,tsx}'] },
-    'packages/engine': { entry: ['src/messages/body.ts'], project: ['**/*.{ts,tsx}'], vitest: { config: ['vitest.config.ts', 'vitest.conformance.config.ts', 'vitest.perf.config.ts'] } },
+    // Bun's test runner finds *.test.ts; the perf and conformance files are run by path (scripts/perf.mjs, specs/conformance.mjs).
+    'packages/engine': { entry: ['src/messages/body.ts', 'test/**/*.test.ts', 'test/perf/*.perf.ts', 'test/conformance/*.conformance.ts'], project: ['**/*.{ts,tsx}'] },
     // scripts/perf.mjs runs the agent's *.perf.ts files, which bun test's default pattern skips.
     'packages/agent': { entry: ['eval/run.ts', 'bench/*.ts', 'test/**/*.perf.ts'], project: ['**/*.{ts,tsx}'] },
     'docs/juno-agent/spikes': { entry: ['*.ts'], project: ['*.ts'] },

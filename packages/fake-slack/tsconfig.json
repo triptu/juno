@@ -4,9 +4,7 @@
     "lib": [
       "ES2023"
     ],
-    "types": [
-      "node"
-    ],
+    "types": ["node", "bun-types/test"],
     "allowImportingTsExtensions": true,
     "erasableSyntaxOnly": true
   },

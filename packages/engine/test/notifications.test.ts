@@ -1,5 +1,5 @@
-import { it as effectIt } from '@effect/vitest'
-import { afterEach, describe, expect, it } from 'vitest'
+import { itEffect } from '@juno/testing/effect'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { AiProvider, makeFakeAiProvider } from '@juno/ai'
 import { ChannelId, UserId, defaultNotificationSettings, localTime, millisToTs, type NotificationSettings } from '@juno/domain'
 import { makeNotifications, type Candidate, type Notification, type Notifier } from '@juno/notifications'
@@ -39,7 +39,7 @@ const aiLayer = Layer.succeed(AiProvider, fakeProvider)
 
 // These tests run the engine service on a real SQLite store and the real client against fake Slack.
 describe('notifications service', () => {
-  effectIt.effect('times out at two seconds, falls back for mentions and DMs, and never duplicates a row', () => Effect.gen(function* () {
+  itEffect('times out at two seconds, falls back for mentions and DMs, and never duplicates a row', () => Effect.gen(function* () {
     yield* TestClock.setTime(monday(12))
     yield* setSettings()
     const record = recorder()
@@ -69,7 +69,7 @@ describe('notifications service', () => {
     expect(yield* sql`SELECT outcome FROM notification_log WHERE ts = '4.000001'`).toEqual([{ outcome: 'stay' }])
   }).pipe(Effect.provide(Layer.merge(freshStore, Layer.succeed(AiProvider, { ...fakeProvider, decide: () => Effect.never }))), Effect.scoped))
 
-  effectIt.effect('keeps messages held at hours start and after a missed start on relaunch', () => Effect.gen(function* () {
+  itEffect('keeps messages held at hours start and after a missed start on relaunch', () => Effect.gen(function* () {
     yield* TestClock.setTime(monday(8))
     yield* setSettings()
     const record = recorder()
@@ -93,7 +93,7 @@ describe('notifications service', () => {
     expect(record.shown).toHaveLength(0)
   }).pipe(Effect.provide(Layer.merge(freshStore, aiLayer)), Effect.scoped))
 
-  effectIt.effect('decides with settings read after the reading, and leaves logged decisions alone when settings change', () => Effect.gen(function* () {
+  itEffect('decides with settings read after the reading, and leaves logged decisions alone when settings change', () => Effect.gen(function* () {
     yield* TestClock.setTime(monday(12))
     yield* setSettings()
     // The owner sets #eng to Never while Juno is reading the message.
@@ -110,7 +110,7 @@ describe('notifications service', () => {
     expect(record.shown).toHaveLength(0)
   }).pipe(Effect.provide(Layer.merge(freshStore, aiLayer)), Effect.scoped))
 
-  effectIt.effect('keeps messages held with AI off and sends presence switches through Slack', () => Effect.gen(function* () {
+  itEffect('keeps messages held with AI off and sends presence switches through Slack', () => Effect.gen(function* () {
     const fake = yield* fakeSlack
     yield* Effect.gen(function* () {
       yield* TestClock.setTime(monday(8))

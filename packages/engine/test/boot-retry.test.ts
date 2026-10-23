@@ -1,5 +1,5 @@
-import { it } from '@effect/vitest'
-import { expect } from 'vitest'
+import { itEffect } from '@juno/testing/effect'
+import { expect } from 'bun:test'
 import { Clock, Effect, Fiber, Layer } from 'effect'
 import { TestClock } from 'effect/testing'
 import { runSync, syncConfigLayer } from '@juno/sync'
@@ -7,7 +7,7 @@ import { SlackSession } from '@juno/slack'
 import { clientLayer, eventually, fakeSlack } from '../../slack/test/helpers'
 import { freshStore } from '../../store/test/helpers'
 
-it.effect('force_reload wakes a failed boot immediately and the next failure still backs off', () => Effect.gen(function* () {
+itEffect('force_reload wakes a failed boot immediately and the next failure still backs off', () => Effect.gen(function* () {
   yield* TestClock.setTime(Date.UTC(2026, 9, 15))
   const fake = yield* fakeSlack
   fake.forceError({ method: 'client.userBoot', error: 'not_allowed', times: 2 })

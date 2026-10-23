@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { prefsSet, searchCommand, searchQuery, searchSlack, type SearchResult } from '@juno/contract'
 import { liveQuery, runCommand } from '@juno/state'
 import { Store, StoreWriter, transaction, workspacePaths } from '@juno/store'

@@ -1,4 +1,5 @@
-import { assert, it } from '@effect/vitest'
+import { expect } from 'bun:test'
+import { itEffect } from '@juno/testing/effect'
 import { Effect } from 'effect'
 import { TestClock } from 'effect/testing'
 import { copyFile, writeFile } from 'node:fs/promises'
@@ -27,28 +28,28 @@ const seed = Effect.gen(function* () {
   yield* sql`INSERT INTO messages (channel, ts, text) VALUES ('C1', '1.000001', 'mirror')`
 })
 
-it.effect('recreates cache.db, keeps user.db, and re-runs live queries', () =>
+itEffect('recreates cache.db, keeps user.db, and re-runs live queries', () =>
   Effect.gen(function* () {
     const store = yield* Store
     yield* transaction(seed)
     const live = yield* collect(liveQuery(['messages'], countMessages))
-    assert.strictEqual(yield* takeValue(live), 1)
+    expect(yield* takeValue(live)).toBe(1)
     yield* TestClock.adjust(DEFAULT_LIVE_QUERY_DEBOUNCE)
 
     yield* store.resetCache
 
-    assert.strictEqual(yield* takeValue(live), 0)
-    assert.strictEqual(yield* countMessages, 0)
-    assert.strictEqual(yield* prefs.get<string>('theme'), 'dark')
+    expect(yield* takeValue(live)).toBe(0)
+    expect(yield* countMessages).toBe(0)
+    expect(yield* prefs.get<string>('theme')).toBe('dark')
 
     // Both connections still work on the new file.
     const sql = yield* StoreWriter
     yield* transaction(sql`INSERT INTO messages (channel, ts, text) VALUES ('C1', '2.000001', 'after')`)
-    assert.strictEqual(yield* countMessages, 1)
+    expect(yield* countMessages).toBe(1)
   }).pipe(Effect.provide(freshStore)),
 )
 
-it.effect('a cache.db with another schema version is recreated on open', () =>
+itEffect('a cache.db with another schema version is recreated on open', () =>
   Effect.gen(function* () {
     const dir = yield* tempWorkspaceDir
     const paths = workspacePathsFromDir(dir)
@@ -62,13 +63,13 @@ it.effect('a cache.db with another schema version is recreated on open', () =>
     })
 
     yield* Effect.gen(function* () {
-      assert.strictEqual(yield* countMessages, 0)
-      assert.strictEqual(yield* prefs.get<string>('theme'), 'dark')
+      expect(yield* countMessages).toBe(0)
+      expect(yield* prefs.get<string>('theme')).toBe('dark')
     }).pipe(Effect.provide(Store.layer(paths)), Effect.scoped)
   }),
 )
 
-it.effect('a damaged cache.db is recreated on open, and user.db is kept', () =>
+itEffect('a damaged cache.db is recreated on open, and user.db is kept', () =>
   Effect.gen(function* () {
     const dir = yield* tempWorkspaceDir
     const paths = workspacePathsFromDir(dir)
@@ -77,13 +78,13 @@ it.effect('a damaged cache.db is recreated on open, and user.db is kept', () =>
     yield* Effect.promise(() => writeFile(paths.cacheDb, 'not a database '.repeat(200)))
 
     yield* Effect.gen(function* () {
-      assert.strictEqual(yield* countMessages, 0)
-      assert.strictEqual(yield* prefs.get<string>('theme'), 'dark')
+      expect(yield* countMessages).toBe(0)
+      expect(yield* prefs.get<string>('theme')).toBe('dark')
     }).pipe(Effect.provide(Store.layer(paths)), Effect.scoped)
   }),
 )
 
-it.effect('a damaged cache.db next to a WAL that still holds its first page is recreated on open', () =>
+itEffect('a damaged cache.db next to a WAL that still holds its first page is recreated on open', () =>
   Effect.gen(function* () {
     const dir = yield* tempWorkspaceDir
     const paths = workspacePathsFromDir(dir)
@@ -103,8 +104,8 @@ it.effect('a damaged cache.db next to a WAL that still holds its first page is r
     })
 
     yield* Effect.gen(function* () {
-      assert.strictEqual(yield* countMessages, 0)
-      assert.strictEqual(yield* prefs.get<string>('theme'), 'dark')
+      expect(yield* countMessages).toBe(0)
+      expect(yield* prefs.get<string>('theme')).toBe('dark')
     }).pipe(Effect.provide(Store.layer(paths)), Effect.scoped)
   }),
 )

@@ -2,7 +2,8 @@
 // so the users fiber sleeps once the names are in (the owner's idle-CPU
 // report of 2026-10-16: a stored person mentioned in an older unread
 // message re-indexed the topic every 50 ms, without end).
-import { assert, describe, it } from '@effect/vitest'
+import { describe, expect } from 'bun:test'
+import { itEffect } from '@juno/testing/effect'
 import { Effect, Fiber, Layer, Queue } from 'effect'
 import { TestClock } from 'effect/testing'
 import * as fs from 'node:fs/promises'
@@ -91,20 +92,20 @@ const context = (): Effect.Effect<SyncContext> =>
   })
 
 describe('naming people', () => {
-  it.effect('a re-index reports only the people the store lacks, wherever the rule names them', () =>
+  itEffect('a re-index reports only the people the store lacks, wherever the rule names them', () =>
     Effect.gen(function* () {
       yield* seed
       const asked: Array<string> = []
       yield* transaction(reindexTopics([TOPIC], { me: { userId: ME as UserId }, onMissingUser: (id) => asked.push(id) }))
-      assert.deepStrictEqual(asked, [])
+      expect(asked).toStrictEqual([])
 
       // Someone the store has never seen, in an older unread message, is asked for.
       yield* insert('1700000000.000100', `<@${NOBODY}> joined`)
       yield* transaction(reindexTopics([TOPIC], { me: { userId: ME as UserId }, onMissingUser: (id) => asked.push(id) }))
-      assert.deepStrictEqual(asked, [NOBODY])
+      expect(asked).toStrictEqual([NOBODY])
     }).pipe(Effect.provide(store)))
 
-  it.effect('the users fiber sleeps once a stored person has been asked about', () =>
+  itEffect('the users fiber sleeps once a stored person has been asked about', () =>
     Effect.gen(function* () {
       yield* seed
       const ctx = yield* context()
@@ -114,12 +115,12 @@ describe('naming people', () => {
       wantUsers(ctx, [LEO], false, TOPIC)
       yield* TestClock.adjust('1 second')
       // Leo is stored, so nothing is fetched and nothing asks again.
-      assert.strictEqual(calls.n, 0)
-      assert.strictEqual(ctx.missingUsers.size, 0)
-      assert.strictEqual(yield* Queue.size(ctx.usersWanted), 0)
+      expect(calls.n).toBe(0)
+      expect(ctx.missingUsers.size).toBe(0)
+      expect(yield* Queue.size(ctx.usersWanted)).toBe(0)
       yield* TestClock.adjust('1 minute')
-      assert.strictEqual(ctx.missingUsers.size, 0)
-      assert.strictEqual(yield* Queue.size(ctx.usersWanted), 0)
+      expect(ctx.missingUsers.size).toBe(0)
+      expect(yield* Queue.size(ctx.usersWanted)).toBe(0)
       yield* Fiber.interrupt(fiber)
     }).pipe(Effect.provide(store)))
 })

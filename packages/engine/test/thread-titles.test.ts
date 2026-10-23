@@ -1,6 +1,6 @@
 // The channel's Threads list reads the root's Slack text with entities decoded and the
 // people it mentions named, never `<@U…>`.
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { channelThreadsAtom, messagesAtom, type ListWindow, type LiveListAtom } from '@juno/state'
 import { waitFor, WAIT_MS, type RunningEngine } from './harness'
 import { bootedEngine, quiet } from './scenario'

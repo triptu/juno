@@ -4,7 +4,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { writeSlackAppFixture } from '@juno/fake-slack'
 import { slackAppCandidates } from '@juno/slack/import'
 import { NEXT_KEYCHAIN, NO_KEYCHAIN, NOT_INSTALLED, readSlackApp, securityKeychain, SIGNED_OUT, UNREADABLE, WRONG_KEYCHAIN, type SlackKeychain } from '../src/main/slackAppData'

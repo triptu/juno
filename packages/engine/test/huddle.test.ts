@@ -1,7 +1,7 @@
 // Huddles (SPEC 20, specs/huddle.qnt) through the engine's routes against
 // the fake Slack on arch v2, as the owner's workspace runs: the call, its
 // leaves and who is in it. Recovery is in huddle-recovery.test.ts.
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import { huddleLeave } from '@juno/contract'
 import { runCommand } from '@juno/state'
 import { sleep, waitFor, WAIT_MS } from './harness'

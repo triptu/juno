@@ -23,7 +23,7 @@
     "health:clones": "jscpd --config .jscpd.json --workers 2 --absolute packages/*/src apps/*/src",
     "health:size": "bun scripts/health-size.mjs",
     "bench:sync": "bun scripts/heavy.mjs node --import ./scripts/ts-resolve-hooks.mjs scripts/sync-live-dry-run.ts --fake --large --paced --seconds 3600",
-    "bench:engine": "env JUNO_BENCH=1 JUNO_TEST_FILE_PARALLEL=0 JUNO_VITEST_WORKERS=1 bun scripts/heavy.mjs --exclusive bun run --cwd packages/engine vitest run test/bench --silent=false",
+    "bench:engine": "bun scripts/heavy.mjs --exclusive sh -c \"cd packages/engine && bun test ./test/perf/*-large.perf.ts\"",
     "test": "bun scripts/heavy.mjs bun scripts/unit.mjs",
     "test:e2e": "bun scripts/heavy.mjs --electron sh -c \"bun run --cwd apps/desktop test:e2e && bun run --cwd apps/gallery test:e2e\"",
     "test:desktop": "bun scripts/heavy.mjs --electron bun run --cwd apps/desktop test:e2e",

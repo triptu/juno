@@ -4,7 +4,7 @@
 import { copyFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import { huddleStart } from '@juno/contract'
 import { runCommand } from '@juno/state'
 import { sleep, waitFor, WAIT_MS } from './harness'

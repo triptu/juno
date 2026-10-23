@@ -2,9 +2,9 @@
 // the real state atoms, an in-process fake Slack, and a scripted "main" that
 // answers the engine's parentPort requests the way apps/desktop does
 // (`harness.ts`).
-import { access } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { Cause, Exit } from 'effect'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { sessionImportFromSlackApp, sessionSignOut } from '@juno/contract'
 import { runCommand } from '@juno/state'
 import { workspacePaths } from '@juno/store'
@@ -71,7 +71,7 @@ describe('session', () => {
 
     const expired = await e.status('authRequired')
     // Whichever notices first: the socket's `user_session_expiration` frame or a sync call answered `invalid_auth`.
-    expect(['user_session_expiration', 'invalid_auth']).toContain(expired._tag === 'authRequired' && expired.reason)
+    expect<unknown>(['user_session_expiration', 'invalid_auth']).toContain(expired._tag === 'authRequired' && expired.reason)
     expect(sentTags(e)).toContain('authRequired')
     // The session's client is gone with it: no socket comes back on its own.
     await waitFor(() => e.fake.socketCount() === 0 ? true : undefined, undefined, 'expired session socket closed')
@@ -87,16 +87,16 @@ describe('session', () => {
     await e.phase('live')
     const paths = workspacePaths(e.userData, e.fake.teamId)
     // The open workspace has written both files by now.
-    await expect(access(paths.cacheDb)).resolves.toBeUndefined()
-    await expect(access(paths.userDb)).resolves.toBeUndefined()
+    expect(existsSync(paths.cacheDb)).toBe(true)
+    expect(existsSync(paths.userDb)).toBe(true)
 
     expect(Exit.isSuccess(await runCommand(e.registry, sessionSignOut, undefined))).toBe(true)
 
     await e.status('signedOut')
     expect(sentTags(e)).toContain('signOut')
     expect(e.main.stored).toBeNull()
-    await expect(access(paths.cacheDb)).rejects.toThrow()
-    await expect(access(paths.userDb)).resolves.toBeUndefined()
+    expect(existsSync(paths.cacheDb)).toBe(false)
+    expect(existsSync(paths.userDb)).toBe(true)
     await waitFor(() => (e.fake.socketCount() === 0 ? true : undefined), undefined, 'the socket to close')
   })
 

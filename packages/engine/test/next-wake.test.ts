@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import { wakeSchedule } from '../src/send/nextWake'
 
 it('counts only channel heads and the timers that can unblock work', () => {

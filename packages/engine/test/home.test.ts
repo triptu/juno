@@ -1,6 +1,6 @@
 // Home (SPEC section 12): what wants the user, from the local cache, against
 // the fake Slack and the fake AI provider.
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { homeMarkDone, homeView, homeVisit, prefsSet, type HomeView } from '@juno/contract'
 import { SELF_ID } from '@juno/fake-slack'
 import { liveQuery, runCommand, type Registry } from '@juno/state'

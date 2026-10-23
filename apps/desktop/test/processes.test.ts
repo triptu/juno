@@ -3,7 +3,7 @@
  * a core for 2 minutes while the app is idle is logged once, with Juno's
  * name for it; one busy while the owner works or a sync runs is not.
  */
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import { createProcessMonitor, SAMPLE_MS, type Metric } from '../src/main/processes'
 
 /** Main, the window and the engine; the engine has used `engineSeconds` of CPU so far. */

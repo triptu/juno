@@ -5,16 +5,15 @@
 // as refs. It also times opening a 300-message thread the store does not
 // have (`topics.open` to the rows in the window) and a cached open (a new
 // subscription to its first snapshot). Like the sidebar benchmark it boots
-// against 100 000 messages, so it runs only with JUNO_BENCH=1:
-//
-//   JUNO_BENCH=1 bun run --cwd packages/engine vitest run test/bench/messages-large.test.ts --silent=false
+// against 100 000 messages, so it runs only on the Mac with
+// `bun run perf --unit`.
 //
 // The thread mirrors the M4 gate's fixture (performance 3.4): 300 messages,
 // 20 % with an image (dimensions included), 10 % with a code block, a few
 // reactions, several senders.
 import { loadavg } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { largeSeed } from '@juno/fake-slack'
 import { Effect, Schema } from 'effect'
 import { ChannelRef, MessageView, Person, TopicListRow } from '@juno/contract'
@@ -44,7 +43,7 @@ const timeEach = (runs: number, f: () => void) => {
   return samples
 }
 
-describe.skipIf(process.env['JUNO_BENCH'] !== '1')('messages.list on the large seed', () => {
+describe('messages.list on the large seed', () => {
   it('opens a 300-message thread and serves its window within budget', async () => {
     const engine = await startTestEngine({ initial: (fake) => fake.signIn(), fakeOptions: { seed: largeSeed() } })
     try {
@@ -212,12 +211,10 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('messages.list on the large s
       expect(budgets.snapshot).toBe(true)
       expect(budgets.delta).toBe(true)
       expect(budgets.topicsSnapshot).toBe(true)
-      if (process.env['JUNO_BENCH_STRICT'] === '1') {
-        expect(budgets.rerunP95).toBe(true)
-        expect(budgets.mainRerunP95).toBe(true)
-        expect(budgets.liveQueryP95).toBe(true)
-        expect(budgets.codec).toBe(true)
-      }
+      expect(budgets.rerunP95).toBe(true)
+      expect(budgets.mainRerunP95).toBe(true)
+      expect(budgets.liveQueryP95).toBe(true)
+      expect(budgets.codec).toBe(true)
     } finally {
       await engine.stop()
     }

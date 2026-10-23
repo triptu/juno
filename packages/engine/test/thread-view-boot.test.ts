@@ -1,4 +1,4 @@
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { type FakeSlack } from '@juno/fake-slack'
 import { bootedEngine, apiCalls, seedThread, storedFollow, type SeededThread } from './scenario'
 import { type RunningEngine } from './harness'

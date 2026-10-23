@@ -1,5 +1,5 @@
 // Call metadata through real routes and the fake Slack, including an edge that never lists it.
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import { huddleLeave } from '@juno/contract'
 import { runCommand } from '@juno/state'
 import { sleep, waitFor, WAIT_MS } from './harness'

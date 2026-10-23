@@ -1,5 +1,5 @@
 import { Effect, Schema } from 'effect'
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import { Methods, ThreadView } from '@juno/slack-schema'
 import { decodeIssueDetails } from '../src/client/decodeIssue.ts'
 import { decodeResponse } from '../src/client/api.ts'

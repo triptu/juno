@@ -1,4 +1,4 @@
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { mutationSeed } from './mutationSeed'
 import { millisToTs } from '@juno/domain'
 import { bootedEngine, readDb, restart, DAY } from './scenario'

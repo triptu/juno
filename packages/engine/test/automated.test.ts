@@ -3,7 +3,7 @@
 // sync reports live, later moves in and back out are recorded for Home, an
 // ambiguous channel is asked about on Home, answers stick, a hand-placed
 // channel is never moved, and a deleted view stays deleted.
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { homeMovesSeen, homeMovesShown, homeView, prefsSet, viewsDelete, viewsList, viewsRemoveChannel, viewsSortChannel, type HomeView, type SidebarView } from '@juno/contract'
 import type { FakeSlack } from '@juno/fake-slack'
 import { liveQuery, runCommand } from '@juno/state'

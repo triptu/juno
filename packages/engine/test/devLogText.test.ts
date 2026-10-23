@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { makeDevLog } from '../src/devLog'
 import { capLines, clean, cleanLine, ENTRY_CHARS, MAX_LINES, summarise, VALUE_CHARS } from '../src/devLogText'
 

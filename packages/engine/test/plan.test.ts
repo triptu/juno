@@ -6,7 +6,8 @@
 import { countsStatement } from '../src/sidebarUnread'
 import { badgeStatement, badgePolicy } from '../src/dockBadge'
 import { defaultNotificationSettings } from '@juno/domain'
-import { assert, describe, it } from '@effect/vitest'
+import { describe, expect } from 'bun:test'
+import { itEffect } from '@juno/testing/effect'
 import { Effect, Layer } from 'effect'
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
@@ -67,47 +68,47 @@ const filters: ReadonlyArray<ListFilter> = [
 ]
 
 describe('query plans', () => {
-  it.effect('topics.list never scans the guarded tables, for every filter', () =>
+  itEffect('topics.list never scans the guarded tables, for every filter', () =>
     Effect.gen(function* () {
       for (const filter of filters) {
         for (const statement of listStatements(filter, '1700000000.000000', 300)) {
           const lines = yield* plan(statement.sql, statement.params)
-          assert.deepStrictEqual(scans(lines), [], `${JSON.stringify(filter)}\n${lines.join('\n')}`)
-          assert.isTrue(lines.some((line) => line.includes('topic_index')), 'the window comes from a topic_index index')
+          expect(scans(lines), name).toStrictEqual([])
+          expect(lines.some((line) => line.includes('topic_index'))).toBe(true)
         }
         // Unscoped (a view included), Pinned and older unread rows come through their own partial indexes, never every topic of a channel.
         if (filter.scope === undefined) {
           const [, pinned, unread] = listStatements(filter, '1700000000.000000', 300)
           const pinnedLines = yield* plan(pinned!.sql, pinned!.params)
-          assert.isTrue(pinnedLines.some((line) => line.includes('topic_overlay_pinned')), `${JSON.stringify(filter)} pinned\n${pinnedLines.join('\n')}`)
+          expect(pinnedLines.some((line) => line.includes('topic_overlay_pinned'))).toBe(true)
           const unreadLines = yield* plan(unread!.sql, unread!.params)
-          assert.isTrue(unreadLines.some((line) => line.includes('topic_index_unread')), `${JSON.stringify(filter)} unread\n${unreadLines.join('\n')}`)
+          expect(unreadLines.some((line) => line.includes('topic_index_unread'))).toBe(true)
         }
       }
     }).pipe(Effect.provide(freshStore)),
   )
 
-  it.effect('topics.counts never scans the guarded tables', () =>
+  itEffect('topics.counts never scans the guarded tables', () =>
     Effect.gen(function* () {
       for (const scope of [undefined, 'C0ENG']) {
         const statement = countsStatement(scope)
         const lines = yield* plan(statement.sql, statement.params)
-        assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
+        expect(scans(lines), name).toStrictEqual([])
       }
     }).pipe(Effect.provide(freshStore)),
   )
 
-  it.effect('dock badge uses EXISTS and indexed unread message probes', () =>
+  itEffect('dock badge uses EXISTS and indexed unread message probes', () =>
     Effect.gen(function* () {
       const statement = badgeStatement(badgePolicy(defaultNotificationSettings, { aiAssist: false, at: { weekday: 1, minutes: 600 } }), 'U0SELF')
       const lines = yield* plan(statement.sql, statement.params)
-      assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
-      assert.isTrue(lines.some((line) => line.includes('topic_index_unread')), lines.join('\n'))
-      assert.isTrue(statement.sql.includes('EXISTS'), 'the badge returns one boolean')
+      expect(scans(lines)).toStrictEqual([])
+      expect(lines.some((line) => line.includes('topic_index_unread'))).toBe(true)
+      expect(statement.sql.includes('EXISTS')).toBe(true)
     }).pipe(Effect.provide(freshStore)),
   )
 
-  it.effect('allTopics.list and allTopics.summary never scan the guarded tables, for every chip, narrowing, sort and a text filter', () =>
+  itEffect('allTopics.list and allTopics.summary never scan the guarded tables, for every chip, narrowing, sort and a text filter', () =>
     Effect.gen(function* () {
       const cutoff = '1700000000.000000'
       const narrowings = [{ kind: 'all' }, { kind: 'channels' }, { kind: 'dms', scope: 'D0MAYA' }, { kind: 'all', query: 'postgres plan' }] as const
@@ -116,21 +117,21 @@ describe('query plans', () => {
           for (const sort of ['recent', 'oldest', 'messages'] as const) {
             const statement = orderStatement({ ...narrowing, status, sort }, cutoff, 200, 200)
             const lines = yield* plan(statement.sql, statement.params)
-            assert.deepStrictEqual(scans(lines), [], `${JSON.stringify({ ...narrowing, status, sort })}\n${lines.join('\n')}`)
-            assert.isTrue(lines.some((line) => /SEARCH i USING (COVERING )?INDEX topic_index_channel/.test(line)), `each conversation reads its topics through the channel index\n${lines.join('\n')}`)
+            expect(scans(lines), name).toStrictEqual([])
+            expect(lines.some((line) => /SEARCH i USING (COVERING )?INDEX topic_index_channel/.test(line))).toBe(true)
           }
         }
         const counts = allTopicsCountsStatement(narrowing, cutoff)
         const countLines = yield* plan(counts.sql, counts.params)
-        assert.deepStrictEqual(scans(countLines), [], countLines.join('\n'))
+        expect(scans(countLines)).toStrictEqual([])
         const places = placesStatement(narrowing.kind)
         const placeLines = yield* plan(places.sql, places.params)
-        assert.deepStrictEqual(scans(placeLines), [], placeLines.join('\n'))
+        expect(scans(placeLines)).toStrictEqual([])
       }
     }).pipe(Effect.provide(freshStore)),
   )
 
-  it.effect('messages.list reads the Main and thread windows through their indexes', () =>
+  itEffect('messages.list reads the Main and thread windows through their indexes', () =>
     Effect.gen(function* () {
       const targets: ReadonlyArray<WindowTarget> = [
         { kind: 'main', channel: 'C0ENG' },
@@ -140,71 +141,71 @@ describe('query plans', () => {
         for (const anchor of [undefined, '1700000000.000200']) {
           for (const statement of windowStatements(target, { anchor, before: 50, limit: 300 })) {
             const lines = yield* plan(statement.sql, statement.params)
-            assert.deepStrictEqual(scans(lines), [], `${target.kind} ${anchor ?? 'bottom'}\n${lines.join('\n')}`)
+            expect(scans(lines), name).toStrictEqual([])
             const index = target.kind === 'main' ? 'messages_main' : 'messages_thread'
-            assert.isTrue(lines.some((line) => line.includes(index)), `${target.kind} uses ${index}\n${lines.join('\n')}`)
+            expect(lines.some((line) => line.includes(index))).toBe(true)
           }
         }
       }
       for (const statement of [broadcastTitlesStatement(['t:C0ENG:1700000000.000100']), rootStatement({ kind: 'thread', channel: 'C0ENG', threadTs: '1700000000.000100' }), reactionsStatement('C0ENG', ['1700000000.000100', '1700000000.000200']), firstRepliesStatement('C0ENG', ['1700000000.000100']), messagesByTsStatement('C0ENG', ['1700000000.000100', '1700000000.000200'])]) {
         const lines = yield* plan(statement.sql, statement.params)
-        assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
+        expect(scans(lines), name).toStrictEqual([])
       }
     }).pipe(Effect.provide(freshStore)),
   )
 
-  it.effect("messages.list finds an app's or a deactivated person's DM through the DM index", () =>
+  itEffect("messages.list finds an app's or a deactivated person's DM through the DM index", () =>
     Effect.gen(function* () {
       const statement = messageUsersStatement(['U0GRAFANA', 'U0MAYA'])
       const lines = yield* plan(statement.sql, statement.params)
-      assert.isFalse(lines.some((line) => /^SCAN (d|conversations)\b/.test(line)), lines.join('\n'))
-      assert.isTrue(lines.some((line) => line.includes('conversations_im_user')), lines.join('\n'))
+      expect(lines.some((line) => /^SCAN (d|conversations)\b/.test(line))).toBe(false)
+      expect(lines.some((line) => line.includes('conversations_im_user'))).toBe(true)
     }).pipe(Effect.provide(freshStore)),
   )
 
-  it.effect('reactions.who reads the message and its reactions by key', () =>
+  itEffect('reactions.who reads the message and its reactions by key', () =>
     Effect.gen(function* () {
       const statements = whoReactedStatements('C0ENG', '1700000000.000100')
       for (const statement of [statements.message, statements.reactions]) {
         const lines = yield* plan(statement.sql, statement.params)
-        assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
+        expect(scans(lines), name).toStrictEqual([])
       }
     }).pipe(Effect.provide(freshStore)),
   )
 
-  it.effect("channel.threads reads a channel's threads through the channel index", () =>
+  itEffect("channel.threads reads a channel's threads through the channel index", () =>
     Effect.gen(function* () {
       const recent = threadsStatements('C0ENG', '1700000000.000000', 100)
       const all = threadsStatements('C0ENG', undefined, 100)
       for (const statement of [recent.list, recent.count, all.list, all.count]) {
         const lines = yield* plan(statement.sql, statement.params)
-        assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
-        assert.isTrue(lines.some((line) => line.includes('topic_index_channel_activity')), lines.join('\n'))
+        expect(scans(lines), name).toStrictEqual([])
+        expect(lines.some((line) => line.includes('topic_index_channel_activity'))).toBe(true)
       }
     }).pipe(Effect.provide(freshStore)),
   )
 
-  it.effect('the New chat pickers read topic_index through an index', () =>
+  itEffect('the New chat pickers read topic_index through an index', () =>
     Effect.gen(function* () {
-      assert.deepStrictEqual(scans(yield* plan(frequentConversationsStatement, [])), [])
+      expect(scans(yield* plan(frequentConversationsStatement, []))).toStrictEqual([])
       const sends = frequentSendsStatement('U0SELF', 1_800_000_000_000)
-      assert.deepStrictEqual(scans(yield* plan(sends.sql, sends.params)), [])
+      expect(scans(yield* plan(sends.sql, sends.params))).toStrictEqual([])
       const activity = activityStatement(['C0ENG', 'D0MAYA'])
-      assert.deepStrictEqual(scans(yield* plan(activity.sql, activity.params)), [])
+      expect(scans(yield* plan(activity.sql, activity.params))).toStrictEqual([])
       const { recent } = pickerStatements('1700000000.000000')
       const lines = yield* plan(recent.sql, recent.params)
-      assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
+      expect(scans(lines)).toStrictEqual([])
     }).pipe(Effect.provide(freshStore)),
   )
 
-  it.effect('the ignore list\'s add row reads no message or topic table', () =>
+  itEffect('the ignore list\'s add row reads no message or topic table', () =>
     Effect.gen(function* () {
       const lines = yield* plan(ignorableStatement, [])
-      assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
+      expect(scans(lines)).toStrictEqual([])
     }).pipe(Effect.provide(freshStore)),
   )
 
-  it.effect('the @ and # suggestions read messages and topic_index through their indexes', () =>
+  itEffect('the @ and # suggestions read messages and topic_index through their indexes', () =>
     Effect.gen(function* () {
       const statements = [
         mentionStatements.threadPosters('C0ENG', '1700000000.000100'),
@@ -214,12 +215,12 @@ describe('query plans', () => {
       ]
       for (const statement of statements) {
         const lines = yield* plan(statement.sql, statement.params)
-        assert.deepStrictEqual(scans(lines), [], lines.join('\n'))
+        expect(scans(lines), name).toStrictEqual([])
       }
     }).pipe(Effect.provide(freshStore)),
   )
 
-  it.effect('Home reads topic_index and messages through their indexes', () =>
+  itEffect('Home reads topic_index and messages through their indexes', () =>
     Effect.gen(function* () {
       const statements = [
         homeStatements.unread('1700000000.000000'),
@@ -243,18 +244,18 @@ describe('query plans', () => {
       ]
       for (const statement of statements) {
         const lines = yield* plan(statement.sql, statement.params)
-        assert.deepStrictEqual(scans(lines), [], `${statement.sql}\n${lines.join('\n')}`)
+        expect(scans(lines), name).toStrictEqual([])
       }
     }).pipe(Effect.provide(freshStore)),
   )
 
-  it.effect('⌘K search reads every table through FTS or an index', () =>
+  itEffect('⌘K search reads every table through FTS or an index', () =>
     Effect.gen(function* () {
       const reader = yield* StoreReader
       for (const [name, statement] of Object.entries(searchStatements(reader, '"roll"*', 50))) {
         const [sql, params] = statement.compile()
         const lines = yield* plan(sql, params)
-        assert.deepStrictEqual(scans(lines), [], `${name}\n${lines.join('\n')}`)
+        expect(scans(lines), name).toStrictEqual([])
       }
     }).pipe(Effect.provide(freshStore)),
   )

@@ -3,9 +3,7 @@
 // they name travel once as refs and are reported on their own), a delta
 // within 32 KB, encode and decode within 5 ms each. It boots the engine against 300 channels,
 // 5 000 threads and 100 000 messages, which takes a while, so it runs only
-// with JUNO_BENCH=1:
-//
-//   JUNO_BENCH=1 bun run --cwd packages/engine vitest run test/bench --silent=false
+// on the Mac with `bun run perf --unit`.
 //
 // The machine is often shared, so the report carries the load average. The
 // query is timed twice: alone on its own connection ("isolated", with and
@@ -13,7 +11,7 @@
 // engine while events land, where other fibers share the event loop.
 import { loadavg } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { largeSeed } from '@juno/fake-slack'
 import { Effect, Exit, Schema } from 'effect'
 import { ALL_TOPICS_WINDOW, ChannelRef, Person, TopicListRow, viewsSave } from '@juno/contract'
@@ -43,7 +41,7 @@ const timeEach = (runs: number, f: () => void) => {
   return samples
 }
 
-describe.skipIf(process.env['JUNO_BENCH'] !== '1')('topics.list on the large seed', () => {
+describe('topics.list on the large seed', () => {
   it('boots, then runs the sidebar window within budget', async () => {
     const started = Date.now()
     const engine = await startTestEngine({ initial: (fake) => fake.signIn(), fakeOptions: { seed: largeSeed() } })
@@ -182,18 +180,15 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('topics.list on the large see
       console.log(`topics.list plans with views: ${JSON.stringify(isolated.plans, null, 1)}`)
       expect(rows.length).toBe(300)
       expect(budgets.deltaBytesMax).toBe(true)
-      // The query and snapshot budgets are reported; JUNO_BENCH_STRICT=1 makes them fail the run.
-      if (process.env['JUNO_BENCH_STRICT'] === '1') {
-        expect(budgets.queryMsP95).toBe(true)
-        expect(budgets.snapshotBytes).toBe(true)
-      }
+      expect(budgets.queryMsP95).toBe(true)
+      expect(budgets.snapshotBytes).toBe(true)
     } finally {
       await engine.stop()
     }
   }, 900_000)
 })
 
-describe.skipIf(process.env['JUNO_BENCH'] !== '1')('allTopics.list on the large seed', () => {
+describe('allTopics.list on the large seed', () => {
   it('runs a window, the counts and a text filter over every topic within budget', async () => {
     const engine = await startTestEngine({ initial: (fake) => fake.signIn(), fakeOptions: { seed: largeSeed() } })
     try {
@@ -247,13 +242,11 @@ describe.skipIf(process.env['JUNO_BENCH'] !== '1')('allTopics.list on the large 
       }
       console.log(`allTopics.list large seed: ${JSON.stringify(result)}`)
       expect(report.top.rows.length).toBe(ALL_TOPICS_WINDOW)
-      if (process.env['JUNO_BENCH_STRICT'] === '1') {
-        // All topics' first window may take 8 ms: it orders every topic, and it is a page open, not a sidebar update.
-        expect(result.firstMsP95).toBeLessThan(8)
-        expect(result.countsMsP95).toBeLessThan(5)
-        expect(result.textMsP95).toBeLessThan(20)
-        expect(snapshotBytes).toBeLessThan(200 * 1024)
-      }
+      // All topics' first window may take 8 ms: it orders every topic, and it is a page open, not a sidebar update.
+      expect(result.firstMsP95).toBeLessThan(8)
+      expect(result.countsMsP95).toBeLessThan(5)
+      expect(result.textMsP95).toBeLessThan(20)
+      expect(snapshotBytes).toBeLessThan(200 * 1024)
     } finally {
       await engine.stop()
     }

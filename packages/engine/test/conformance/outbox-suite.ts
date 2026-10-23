@@ -3,10 +3,10 @@
 //
 // The engine runs in the test's own thread, so one file's replays share one
 // core. The traces are dealt to `SHARDS` files (`outbox*.conformance.ts`),
-// which vitest runs in separate workers; within a file they run concurrently.
+// which `bun test --parallel` runs in separate processes; within a file they run concurrently.
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { readTrace, type Trace } from './itf'
 import { outboxSpec } from './outbox'
 import { explain, json, replay } from './replay'

@@ -4,7 +4,7 @@
 // exactly one copy of each message.
 import { controlledClock } from './controlledClock'
 import { step } from './step'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import type { MessageView } from '@juno/contract'
 import { discardMessage, draftAtom, messagesAtom, retryMessage, saveDraft, sendMessage, type ListWindow } from '@juno/state'
 import { waitFor, WAIT_MS, type RunningEngine, type EngineOptions } from './harness'
@@ -156,7 +156,7 @@ describe('send', () => {
     await waitFor(() => (inSlack(engine, id) === 1 ? true : undefined), WAIT_MS, 'the copy deleted')
     await quiet(engine)
     expect((await rows(settled('Sent over a closed connection'), 'one row')).filter((row) => textOf(row) === 'Sent over a closed connection')).toHaveLength(1)
-    expect(engine.fake.messages('C0ENG').find((m) => m.client_msg_id === id)!.ts).toBe(kept)
+    expect<unknown>(engine.fake.messages('C0ENG').find((m) => m.client_msg_id === id)!.ts).toBe(kept)
     expect(apiCalls(engine, 'chat.delete')).toHaveLength(1)
   })
 

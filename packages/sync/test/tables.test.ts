@@ -4,7 +4,8 @@
  * upgrade on start re-reads those messages, so the row's preview names the
  * table without a resync.
  */
-import { assert, describe, it } from '@effect/vitest'
+import { describe, expect } from 'bun:test'
+import { itEffect } from '@juno/testing/effect'
 import { Effect, Layer, Queue } from 'effect'
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
@@ -49,19 +50,19 @@ const preview = Effect.gen(function* () {
 })
 
 describe('tables in the cache', () => {
-  it.effect('an index from before tables is rebuilt on start, and its preview names the table', () =>
+  itEffect('an index from before tables is rebuilt on start, and its preview names the table', () =>
     Effect.gen(function* () {
       const sql = yield* StoreWriter
       yield* sql`INSERT INTO messages ${sql.insert(toMessageRow(C, cachedTable) as unknown as Record<string, unknown>)}`
       yield* transaction(reindexTopics([TOPIC], { me: { userId: ME } }))
-      assert.strictEqual(yield* preview, 'Table: Service, Status')
+      expect(yield* preview).toBe('Table: Service, Status')
 
       // The index as the version before tables left it: the row stored Slack's fallback text.
       yield* sql`UPDATE topic_index SET preview_json = ${JSON.stringify({ sender: '', text: 'Release status' })} WHERE topic_id = ${TOPIC}`
       yield* setSyncState(INDEX_VERSION_KEY, 5)
       const ctx = { me: { userId: ME }, usergroupTopics: new Set(), missingUsers: new Map(), usersWanted: yield* Queue.sliding<void>(1) } as unknown as SyncContext
-      assert.strictEqual(yield* upgradeIndex(ctx), 1)
-      assert.strictEqual(yield* preview, 'Table: Service, Status')
-      assert.strictEqual(yield* getSyncState<number>(INDEX_VERSION_KEY), INDEX_VERSION)
+      expect(yield* upgradeIndex(ctx)).toBe(1)
+      expect(yield* preview).toBe('Table: Service, Status')
+      expect(yield* getSyncState<number>(INDEX_VERSION_KEY)).toBe(INDEX_VERSION)
     }).pipe(Effect.provide(store)))
 })

@@ -1,4 +1,5 @@
-import { assert, describe, it } from '@effect/vitest'
+import { describe, expect } from 'bun:test'
+import { itLive } from '@juno/testing/effect'
 import { Cause, Effect, Fiber, Queue, Stream } from 'effect'
 import { isMessagePosted } from '@juno/slack-schema'
 import { SlackSocket, type SocketEvent } from '../src/index.ts'
@@ -10,7 +11,7 @@ const isPostedMessage = (event: SocketEvent): event is Extract<SocketEvent, { _t
   event._tag === 'Frame' && isMessagePosted(event.frame)
 
 describe('SlackSocket', () => {
-  it.live('receives hello and an injected message event', () =>
+  itLive('receives hello and an injected message event', () =>
     Effect.gen(function* () {
       const fake = yield* fakeSlack
       const program = Effect.gen(function* () {
@@ -18,14 +19,14 @@ describe('SlackSocket', () => {
         const { queue } = yield* collect(yield* socket.events)
 
         const hello = yield* takeUntil(queue, (event: SocketEvent) => event._tag === 'Frame' && event.frame.type === 'hello')
-        assert.strictEqual(hello._tag, 'Frame')
+        expect(hello._tag).toBe('Frame')
         yield* takeUntil(queue, isConnected)
 
         fake.injectMessage({ channel: CHANNEL, text: 'hello from the fake' })
         const posted = yield* takeUntil(queue, isPostedMessage)
         if (isMessagePosted(posted.frame)) {
-          assert.strictEqual(posted.frame.channel, CHANNEL)
-          assert.strictEqual(posted.frame.text, 'hello from the fake')
+          expect(posted.frame.channel).toBe(CHANNEL)
+          expect(posted.frame.text).toBe('hello from the fake')
         }
 
         // Pings go out and pongs come back as frames.
@@ -36,7 +37,7 @@ describe('SlackSocket', () => {
     }),
   )
 
-  it.live('reconnects after the fake drops the socket and keeps receiving', () =>
+  itLive('reconnects after the fake drops the socket and keeps receiving', () =>
     Effect.gen(function* () {
       const fake = yield* fakeSlack
       const program = Effect.gen(function* () {
@@ -48,21 +49,21 @@ describe('SlackSocket', () => {
 
         fake.dropSocket()
         const down = yield* takeUntil(queue, isDisconnected)
-        assert.isAtMost(down.retryInMillis, 200)
+        expect(down.retryInMillis).toBeLessThanOrEqual(200)
         const back = yield* takeUntil(queue, isConnected)
-        assert.isTrue(back.fast)
+        expect(back.fast).toBe(true)
 
         fake.injectMessage({ channel: CHANNEL, text: 'after reconnect' })
         const posted = yield* takeUntil(queue, isPostedMessage)
-        if (isMessagePosted(posted.frame)) assert.strictEqual(posted.frame.text, 'after reconnect')
+        if (isMessagePosted(posted.frame)) expect(posted.frame.text).toBe('after reconnect')
       })
       yield* program.pipe(Effect.provide(clientLayer(fake)), Effect.scoped)
       // One URL from the API; the reconnect used the reconnect_url.
-      assert.strictEqual(fake.callCount('client.getWebSocketURL'), 1)
+      expect(fake.callCount('client.getWebSocketURL')).toBe(1)
     }),
   )
 
-  it.live('sends at most one tickle per spacing, across reconnects', () =>
+  itLive('sends at most one tickle per spacing, across reconnects', () =>
     Effect.gen(function* () {
       const fake = yield* fakeSlack
       const tickles = () => fake.received.filter((frame) => frame.type === 'tickle')
@@ -70,19 +71,19 @@ describe('SlackSocket', () => {
         const socket = yield* SlackSocket
         const { queue } = yield* collect(yield* socket.events)
         yield* takeUntil(queue, isConnected)
-        assert.isTrue(yield* socket.tickle('polling'))
-        assert.isFalse(yield* socket.tickle('polling'))
+        expect(yield* socket.tickle('polling')).toBe(true)
+        expect(yield* socket.tickle('polling')).toBe(false)
         yield* eventually(() => tickles().length === 1)
-        assert.strictEqual(tickles()[0]?.reason, 'polling')
+        expect(tickles()[0]?.reason).toBe('polling')
 
         // A new connection does not reset the spacing.
         fake.dropSocket()
         yield* takeUntil(queue, isConnected)
-        assert.isFalse(yield* socket.tickle('polling'))
+        expect(yield* socket.tickle('polling')).toBe(false)
         yield* Effect.sleep(1_500)
-        assert.isTrue(yield* socket.tickle('polling'))
+        expect(yield* socket.tickle('polling')).toBe(true)
         yield* eventually(() => tickles().length === 2)
-        assert.strictEqual(fake.selfPresence(), 'active')
+        expect(fake.selfPresence()).toBe('active')
       })
       yield* program.pipe(Effect.provide(clientLayer(fake, { socket: { tickleSpacingMillis: 1_500 } })), Effect.scoped)
       // The socket closed: Slack shows the user away.
@@ -90,7 +91,7 @@ describe('SlackSocket', () => {
     }),
   )
 
-  it.live('passes unknown frames through and skips known types with a bad shape', () =>
+  itLive('passes unknown frames through and skips known types with a bad shape', () =>
     Effect.gen(function* () {
       const fake = yield* fakeSlack
       const program = Effect.gen(function* () {
@@ -100,13 +101,13 @@ describe('SlackSocket', () => {
         fake.emitFrame({ type: 'reaction_added', user: 'U0MAYA' })
         fake.emitFrame({ type: 'canvas_updated', canvas: 'F1' })
         const unknown = yield* takeUntil(queue, (event: SocketEvent) => event._tag === 'Frame' && event.frame.type === 'unknown')
-        if (unknown._tag === 'Frame' && unknown.frame.type === 'unknown') assert.deepStrictEqual(unknown.frame.raw, { type: 'canvas_updated', canvas: 'F1' })
+        if (unknown._tag === 'Frame' && unknown.frame.type === 'unknown') expect(unknown.frame.raw).toStrictEqual({ type: 'canvas_updated', canvas: 'F1' })
       })
       yield* program.pipe(Effect.provide(clientLayer(fake)), Effect.scoped)
     }),
   )
 
-  it.live('session expiry ends the stream with SlackAuthRequired', () =>
+  itLive('session expiry ends the stream with SlackAuthRequired', () =>
     Effect.gen(function* () {
       const fake = yield* fakeSlack
       const program = Effect.gen(function* () {
@@ -116,19 +117,19 @@ describe('SlackSocket', () => {
 
         fake.expireSession()
         const exit = yield* Fiber.await(fiber)
-        assert.strictEqual(exit._tag, 'Failure')
+        expect(exit._tag).toBe('Failure')
         if (exit._tag === 'Failure') {
           const error = Cause.findErrorOption(exit.cause)
-          assert.strictEqual(error._tag === 'Some' ? error.value._tag : undefined, 'SlackAuthRequired')
+          expect(error._tag === 'Some' ? error.value._tag : undefined).toBe('SlackAuthRequired')
         }
         const frames = yield* Queue.takeAll(queue)
-        assert.isTrue(frames.some((event) => event._tag === 'Frame' && event.frame.type === 'user_session_expiration'))
+        expect(frames.some((event) => event._tag === 'Frame' && event.frame.type === 'user_session_expiration')).toBe(true)
       })
       yield* program.pipe(Effect.provide(clientLayer(fake)), Effect.scoped)
     }),
   )
 
-  it.live('an expired session at connect time fails the stream without a socket', () =>
+  itLive('an expired session at connect time fails the stream without a socket', () =>
     Effect.gen(function* () {
       const fake = yield* fakeSlack
       const credentials = fake.signIn()
@@ -138,8 +139,8 @@ describe('SlackSocket', () => {
         Effect.scoped,
         Effect.flip,
       )
-      assert.strictEqual(result._tag, 'SlackAuthRequired')
-      assert.strictEqual(fake.socketCount(), 0)
+      expect(result._tag).toBe('SlackAuthRequired')
+      expect(fake.socketCount()).toBe(0)
     }),
   )
 })

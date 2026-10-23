@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { newChatConversations, type PickConversations } from '@juno/contract'
 import { liveQuery } from '@juno/state'
 import { waitFor, WAIT_MS, type RunningEngine } from './harness'

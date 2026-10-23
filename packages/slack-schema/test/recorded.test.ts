@@ -7,7 +7,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Schema } from 'effect'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { decodeRtmFrame, isMethodName, Methods, ThreadView, type TableBlock } from '@juno/slack-schema'
 
 const dir = join(import.meta.dirname, 'fixtures', 'recorded')
@@ -105,7 +105,7 @@ describe('recorded socket frames', () => {
       const frame = decodeRtmFrame(read(join(dir, 'rtm', file)))
       expect(frame.type).not.toBe('unknown')
       if (type.startsWith('message')) expect(frame.type).toBe('message')
-      else expect(frame.type).toBe(type)
+      else expect<unknown>(frame.type).toBe(type)
     })
   }
 })
@@ -116,12 +116,12 @@ it('decodes an incremental counts row without manufacturing unread fields', () =
   const counts = Schema.decodeUnknownSync(Methods['client.counts'].ok)({
     ...full, channels: [{ id: 'CINVENTED', last_read: '1700000000.000001' }],
   })
-  expect(counts.channels).toEqual([{ id: 'CINVENTED', last_read: '1700000000.000001' }])
+  expect<unknown>(counts.channels).toEqual([{ id: 'CINVENTED', last_read: '1700000000.000001' }])
 })
 
 it('ignores an unexpected message version without rejecting its history page', () => {
   const page = Schema.decodeUnknownSync(Methods['conversations.history'].ok)({
     ok: true, has_more: false, messages: [{ ts: '1700000000.000001', text: 'Invented message.', version: { unexpected: true } }],
   })
-  expect(page.messages).toEqual([{ ts: '1700000000.000001', text: 'Invented message.' }])
+  expect<unknown>(page.messages).toEqual([{ ts: '1700000000.000001', text: 'Invented message.' }])
 })

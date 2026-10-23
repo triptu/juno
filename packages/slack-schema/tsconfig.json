@@ -2,8 +2,9 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2023"],
+    "types": ["node", "bun-types/test"],
     "allowImportingTsExtensions": true,
     "erasableSyntaxOnly": true
   },
-  "include": ["src", "test", "vitest.config.ts"]
+  "include": ["src", "test"]
 }

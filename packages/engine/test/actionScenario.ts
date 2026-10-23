@@ -1,7 +1,7 @@
 // Shared by the outbox action tests (`actions.test.ts`, `reactions.test.ts`):
 // one booted engine per test on the fake, #eng's Main window, and readers of
 // Slack's and the store's state.
-import { afterEach } from 'vitest'
+import { afterEach } from 'bun:test'
 import type { MessageRef, MessageView } from '@juno/contract'
 import { messagesAtom, sendMessage, type ListWindow } from '@juno/state'
 import { waitFor, WAIT_MS, type RunningEngine } from './harness'

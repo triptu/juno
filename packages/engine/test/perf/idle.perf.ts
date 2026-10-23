@@ -1,12 +1,12 @@
-import { productionTiming } from '../src/config'
+import { productionTiming } from '../../src/config'
 // The engine sleeps when nothing happens (performance.md section 1, "Idle
 // CPU after sync"). On 10-16 it spun at 103 % on a large workspace: an
 // unread message mentioned someone the store knew, a newer one named nobody,
 // and the topic's re-index asked for that person again every 50 ms. A large
 // channel makes each re-index cost what it did there.
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import type { FakeSlack } from '@juno/fake-slack'
-import { sleep, startTestEngine, type RunningEngine } from './harness'
+import { sleep, startTestEngine, type RunningEngine } from '../harness'
 
 /** performance.md section 1: under 3 % of one core while idle. The spin above cost about 7 % here. */
 const IDLE_CPU_BUDGET_PERCENT = 2

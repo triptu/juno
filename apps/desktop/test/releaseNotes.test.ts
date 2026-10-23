@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { addChangelogEntry, compareVersions, normalizeVersion, notesBetween, parseChangelog } from '../src/main/releaseNotes'
 
 describe('compareVersions', () => {

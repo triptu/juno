@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { millisToTs, Ts } from '@juno/domain'
 import { bootedEngine, readDb, restart, seedThread, DAY } from './scenario'
 import { waitFor, type RunningEngine } from './harness'

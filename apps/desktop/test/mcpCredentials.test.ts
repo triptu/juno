@@ -1,6 +1,6 @@
 // Main's MCP keychain bridge: an MCP connection's OAuth state lives only in keychain items, in
 // chunks `security -i` accepts, and only checked sign-in pages open. A fake `security` stands in.
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import type { CredentialRequest } from '@juno/agent-contract'
 import { macKeychain, type SecurityRunner } from '../src/main/keychain'
 import { mcpCredentials } from '../src/main/mcpCredentials'

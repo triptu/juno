@@ -2,7 +2,7 @@
 // gathers its conversations, Keep these out of All takes them out of the
 // other filters, and delete, add and remove undo through the commands they
 // return. Views are local: nothing reaches Slack.
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { topicsCounts, viewsAddChannel, viewsDelete, viewsList, viewsRemoveChannel, viewsReorder, viewsSave, type SidebarView, type TopicCounts } from '@juno/contract'
 import { liveQuery, runCommand, undoStackAtom, undoLast } from '@juno/state'
 import { waitFor, WAIT_MS, type RunningEngine } from './harness'

@@ -4,7 +4,7 @@
 // first over a table of every status a topic can have, straight against a
 // store, then end to end for the two mention branches.
 import { Effect } from 'effect'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { byLatestActivity, isDm, matchesSidebarFilter, sidebarPlacement, type ChannelId, type SidebarFilter, type Topic } from '@juno/domain'
 import type { TopicCounts } from '@juno/contract'
 import { SELF_ID } from '@juno/fake-slack'
@@ -108,10 +108,10 @@ describe('the sidebar rule, query against domain', () => {
     const all = expected({ kind: 'all', unreadOnly: false })
     const mentionOnly = cases.filter((c) => c.kind === 'thread' && c.subscribed === null && c.mention && c.unread > 0 && c.overlay === 'none')
     expect(mentionOnly.length).toBeGreaterThan(0)
-    for (const c of mentionOnly) expect(all.recent).toContain(c.id)
+    for (const c of mentionOnly) expect<unknown>(all.recent).toContain(c.id)
     const unfollowedMention = cases.filter((c) => c.kind === 'thread' && c.subscribed === 0 && c.mention && c.unread > 0 && c.overlay === 'none')
     for (const c of unfollowedMention) expect([...all.pinned, ...all.recent]).not.toContain(c.id)
-    expect(all.recent).toContain(`m:C0ALIVE`)
+    expect<unknown>(all.recent).toContain(`m:C0ALIVE`)
   })
 
   it('a view shows only its conversations, and Keep these out of All takes them out of All, Channels, DMs and their dots', async () => {

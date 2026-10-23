@@ -1,7 +1,7 @@
 // The catch-up after a socket drop (architecture 5.8): what changed while
 // Juno was offline reaches the sidebar with a fixed call budget, and pages in
 // flight while events land never undo the events.
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { SELF_ID } from '@juno/fake-slack'
 import { startTestEngine, waitFor, type RunningEngine } from './harness'
 import { apiCalls, bootedEngine, callMap, DAY, notRecheck, quiet, readDb, restart, seedThread, storedFollow, threadId, tsOf, type SeededThread } from './scenario'

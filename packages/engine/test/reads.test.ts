@@ -6,7 +6,7 @@ import { productionTiming } from '../src/config'
 import { step } from './step'
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { prefsSet, readsCatchUp, readsMarkRead, readsMarkUnread, type TopicRow, type UndoCommand } from '@juno/contract'
 import { mirrorReadsAtom, readCatchUpAtom, runCommand, type TopicListFilter } from '@juno/state'
 import { waitFor, type RunningEngine } from './harness'
@@ -312,8 +312,8 @@ describe('read catch-up', () => {
       const state = engine.registry.get(readCatchUpAtom)
       return state._tag === 'Success' && state.value.pending === 0 && state.value.available === 0 ? true : undefined
     }, 10_000, 'catch-up finished')
-    expect(engine.fake.workspace.reads.get(ALERTS)).toBe(storedPointer(engine, ALERTS_MAIN))
-    expect(engine.fake.workspace.subscription('C0PRODUCT', tsOf(roadmap))?.lastRead).toBe(storedPointer(engine, roadmap))
+    expect<unknown>(engine.fake.workspace.reads.get(ALERTS)).toBe(storedPointer(engine, ALERTS_MAIN))
+    expect<unknown>(engine.fake.workspace.subscription('C0PRODUCT', tsOf(roadmap))?.lastRead).toBe(storedPointer(engine, roadmap))
     valueOf(await runCommand(engine.registry, readsCatchUp, undefined))
     await quiet(engine)
     expect(marks(engine)).toHaveLength(2)

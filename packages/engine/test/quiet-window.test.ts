@@ -2,7 +2,7 @@ import { mkdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Effect } from 'effect'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { prefsSet } from '@juno/contract'
 import { CONVERSATIONS, SELF_ID, startFakeSlack, type FakeSlack } from '@juno/fake-slack'
 import { prefs, Store, workspacePaths } from '@juno/store'
@@ -64,7 +64,8 @@ it('lowering hides an old read topic without calls or deletion; raising backfill
   valueOf(await runCommand(engine.registry, prefsSet, { key: 'quietDays', value: 3 }))
   await engine.rowsUntil((rows) => rows.every((r) => r.id !== oldId), 'old topic hidden')
   await quiet(engine)
-  expect(engine.fake.calls).toEqual([])
+  // Background reads (huddles, presence) may run meanwhile; lowering itself reads no history.
+  expect(apiCalls(engine).filter((c) => /^(conversations|search)\./.test(c.method))).toEqual([])
   expect(readDb(engine, 'cache.db', (db) => db.prepare('SELECT count(*) AS n FROM messages').get())).toEqual(stored)
   const painted = await waitFor(() => {
     const window = engine.registry.get(sidebarListAtom)
@@ -72,7 +73,7 @@ it('lowering hides an old read topic without calls or deletion; raising backfill
   }, 30_000, 'painted rows at three days')
   valueOf(await runCommand(engine.registry, prefsSet, { key: 'quietDays', value: 14 }))
   await waitFor(() => engine.registry.get(sidebarListAtom).rows.has(oldId) ? true : undefined, 30_000, 'cached topic returns')
-  expect(engine.registry.get(sidebarListAtom).order.slice(0, painted.length)).toEqual(painted)
+  expect<unknown>(engine.registry.get(sidebarListAtom).order.slice(0, painted.length)).toEqual(painted)
   await waitFor(() => readDb(engine, 'cache.db', (db) => {
     const row = db.prepare("SELECT value_json FROM sync_state WHERE key = 'boot'").get() as { value_json: string }
     return JSON.parse(row.value_json).quietDays === 14 ? true : undefined

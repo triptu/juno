@@ -15,7 +15,7 @@
     "build:web": "rm -rf dist && vite build -c vite.web.config.ts && bun build web/host/testHost.ts --target=node --format=esm --outfile dist/host/testHost.mjs",
     "start": "bun ../../scripts/without-run-as-node.mjs electron-vite preview",
     "typecheck": "tsc -p tsconfig.node.json && tsc -p tsconfig.web.json && tsc -p tsconfig.e2e.json",
-    "test": "vitest run",
+    "test": "bun test",
     "test:e2e": "bun ../../scripts/without-run-as-node.mjs playwright test",
     "test:browser": "bun ../../scripts/without-run-as-node.mjs playwright test --project=browser",
     "test:electron": "bun ../../scripts/without-run-as-node.mjs playwright test --project=electron",
@@ -53,6 +53,7 @@
     "@types/ws": "8.18.2",
     "@vitejs/plugin-react": "5.2.0",
     "babel-plugin-react-compiler": "1.0.0",
+    "bun-types": "1.4.3",
     "effect": "4.0.3",
     "electron": "44.7.0",
     "electron-builder": "26.15.3",
@@ -62,7 +63,6 @@
     "typescript": "7.0.2",
     "unplugin": "2.3.11",
     "vite": "7.3.7",
-    "vitest": "5.0.4",
     "ws": "8.22.0"
   },
   "juno": {

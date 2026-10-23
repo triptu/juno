@@ -1,4 +1,5 @@
-import { assert, describe, it } from '@effect/vitest'
+import { describe, expect } from 'bun:test'
+import { itEffect } from '@juno/testing/effect'
 import { Effect } from 'effect'
 import { searchMessages, StoreWriter, transaction } from '../src/index'
 import { freshStore } from './helpers'
@@ -10,7 +11,7 @@ const insert = (channel: string, ts: string, text: string) =>
   })
 
 describe('message search', () => {
-  it.effect('finds an inserted message by a word in its text', () =>
+  itEffect('finds an inserted message by a word in its text', () =>
     Effect.gen(function* () {
       yield* transaction(
         Effect.gen(function* () {
@@ -20,34 +21,31 @@ describe('message search', () => {
       )
 
       const hits = yield* searchMessages('staging deploy')
-      assert.deepStrictEqual(
-        hits.map((h) => h.ts),
-        ['1.000001'],
-      )
-      assert.strictEqual(hits[0]?.text, 'The deploy to staging finished')
-      assert.deepStrictEqual(yield* searchMessages('breakfast'), [])
-      assert.deepStrictEqual(yield* searchMessages('   '), [])
+      expect(hits.map((h) => h.ts)).toStrictEqual(['1.000001'])
+      expect(hits[0]?.text).toBe('The deploy to staging finished')
+      expect(yield* searchMessages('breakfast')).toStrictEqual([])
+      expect(yield* searchMessages('   ')).toStrictEqual([])
     }).pipe(Effect.provide(freshStore)),
   )
 
-  it.effect('follows edits and ignores tombstones', () =>
+  itEffect('follows edits and ignores tombstones', () =>
     Effect.gen(function* () {
       const sql = yield* StoreWriter
       yield* transaction(insert('C1', '1.000001', 'first wording'))
       yield* transaction(sql`UPDATE messages SET text = 'second wording' WHERE ts = '1.000001'`)
-      assert.deepStrictEqual(yield* searchMessages('first'), [])
-      assert.strictEqual((yield* searchMessages('second')).length, 1)
+      expect(yield* searchMessages('first')).toStrictEqual([])
+      expect((yield* searchMessages('second')).length).toBe(1)
 
       yield* transaction(sql`UPDATE messages SET deleted = 1 WHERE ts = '1.000001'`)
-      assert.deepStrictEqual(yield* searchMessages('second'), [])
+      expect(yield* searchMessages('second')).toStrictEqual([])
     }).pipe(Effect.provide(freshStore)),
   )
 
-  it.effect('never raises a syntax error on user input', () =>
+  itEffect('never raises a syntax error on user input', () =>
     Effect.gen(function* () {
       yield* transaction(insert('C1', '1.000001', 'what about "quotes" AND OR NOT (parens)*'))
-      assert.strictEqual((yield* searchMessages('"quotes" AND (parens)*')).length, 1)
-      assert.strictEqual((yield* searchMessages('OR NOT')).length, 1)
+      expect((yield* searchMessages('"quotes" AND (parens)*')).length).toBe(1)
+      expect((yield* searchMessages('OR NOT')).length).toBe(1)
     }).pipe(Effect.provide(freshStore)),
   )
 })

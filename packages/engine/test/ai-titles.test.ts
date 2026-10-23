@@ -1,7 +1,7 @@
 import { step } from './step'
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { SELF_ID } from '@juno/fake-slack'
 import { bootedEngine } from './scenario'
 import type { RunningEngine } from './harness'

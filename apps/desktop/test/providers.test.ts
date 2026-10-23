@@ -4,7 +4,7 @@
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, expect, it, vi } from 'bun:test'
 import type { AgentProvider } from '@juno/agent-contract'
 import type { ProviderState } from '@juno/contract'
 import { macKeychain, memoryKeychain, OPENROUTER_ITEM, type Keychain, type SecurityRunner } from '../src/main/keychain'

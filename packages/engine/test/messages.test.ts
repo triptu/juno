@@ -3,7 +3,7 @@
 // the port, `topics.open` and `messages.loadOlder` fetch what the store
 // lacks, and socket events change exactly the rows they touch.
 import { Schema } from 'effect'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { MessageView, type ThreadSummary, type TopicDetail } from '@juno/contract'
 import {
   channelThreadsAtom,
@@ -238,7 +238,7 @@ describe('older messages', () => {
 
     // The container widens the window: 100 rows before the old first row, which keeps its place after them.
     const wider = await watchList(engine, messagesAtom(id, { anchor: first, before: 100, limit: 106 })).until((window) => window.order.length === 106, 'the wider window')
-    expect(wider.order.slice(100)).toEqual(bottom.order)
+    expect<unknown>(wider.order.slice(100)).toEqual(bottom.order)
     expect(textOf(wider.rows.get(wider.order[0]!)!)).toBe('old deploy 50')
     // The old first row comes weeks after the bot's last old deploy, so it has a header, in this window and in the one that starts with it.
     expect(wider.rows.get(first)!.groupStart).toBe(true)
@@ -286,13 +286,13 @@ describe('live messages', () => {
     let before = list.current()
     engine.fake.editMessage({ channel: 'C0ENG', ts: second!, text: 'Four minutes is fine for us.' })
     let after = await list.until((window) => window.rows.get(second!)?.edited === true, 'the edit')
-    expect(changedRows(before, after)).toEqual([second])
+    expect<unknown>(changedRows(before, after)).toEqual([second])
     expect(textOf(after.rows.get(second!)!)).toBe('Four minutes is fine for us.')
 
     before = after
     engine.fake.addReaction({ channel: 'C0ENG', ts: third!, name: 'eyes', user: 'U0SAM' })
     after = await list.until((window) => window.rows.get(third!)?.reactions.some((r) => r.name === 'eyes') === true, 'the reaction')
-    expect(changedRows(before, after)).toEqual([third])
+    expect<unknown>(changedRows(before, after)).toEqual([third])
     expect(after.rows.get(third!)!.reactions.find((r) => r.name === 'eyes')).toEqual({ name: 'eyes', count: 1, me: false, unicode: '👀', users: ['U0SAM'] })
 
     before = after
@@ -332,8 +332,8 @@ describe('live messages', () => {
     // Rows that show Leo (the stack or a group DM's tile) get the new photo with the same rev; the others keep their object.
     const shown = await engine.rowsUntil((rows) => rows.some((row) => row.participants.some((p) => p.id === 'U0LEO' && p.avatarUrl === photo)), 'the new photo in the sidebar')
     for (const row of shown) {
-      expect(row.rev).toBe(sidebarBefore.get(row.id)?.rev)
-      if (![...row.participants, ...(row.channel.members ?? [])].some((p) => p.id === 'U0LEO')) expect(row).toBe(sidebarBefore.get(row.id))
+      expect<unknown>(row.rev).toBe(sidebarBefore.get(row.id)?.rev)
+      if (![...row.participants, ...(row.channel.members ?? [])].some((p) => p.id === 'U0LEO')) expect<unknown>(row).toBe(sidebarBefore.get(row.id))
     }
   })
 })

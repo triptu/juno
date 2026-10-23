@@ -2,10 +2,13 @@
 // engine (startEngine + memoryTransport) and the real state helpers
 // (liveQuery, command) with a Node port in place of the renderer's. Each test
 // gets its own registry, so nothing leaks between them.
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { MessageChannel } from 'node:worker_threads'
 import { Exit } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import {
   configureConnection,
   connectionStateAtom,
@@ -25,12 +28,14 @@ afterEach(async () => {
   for (const stop of stops.splice(0)) await stop()
 })
 
-const config = { userData: '/tmp/juno-test', e2e: true, dev: false }
-
 async function engineWithPorts() {
   const transport = memoryTransport()
-  const engine = await startEngine(transport, config)
-  stops.push(engine.stop)
+  const userData = await mkdtemp(join(tmpdir(), 'juno-protocol-test-'))
+  const engine = await startEngine(transport, { userData, e2e: true, dev: false })
+  stops.push(async () => {
+    await engine.stop()
+    await rm(userData, { recursive: true, force: true })
+  })
   const registry = makeRegistry()
   let current: MessageChannel | undefined
   configureConnection(registry, {

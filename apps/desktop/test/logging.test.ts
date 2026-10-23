@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Effect, Logger } from 'effect'
 import { SlackAuthRequired, SlackDecodeError, SlackRejected } from '@juno/slack'
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import { createLog, LOG_LIMIT, safeDetails, warningLines } from '../src/logging'
 
 it('keeps only checked schema paths and issue kinds on SlackDecodeError', () => {

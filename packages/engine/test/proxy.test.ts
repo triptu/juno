@@ -2,7 +2,7 @@
 // handshake with Chromium's proxy list and `ws` connects through it.
 import { createServer, type Server } from 'node:http'
 import { connect } from 'node:net'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { proxyFor } from '../src/session/handshake'
 import type { RunningEngine } from './harness'
 import { bootedEngine } from './scenario'

@@ -1,6 +1,6 @@
 // Slack's own notification schedule from the notification hours (SPEC 14),
 // against the fake: what reaches Slack and when.
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { notificationsSetHours, notificationsUseJunoHours, type Hours, type SlackScheduleView } from '@juno/contract'
 import { notificationsPageAtom, runCommand } from '@juno/state'
 import { waitFor, type RunningEngine } from './harness'

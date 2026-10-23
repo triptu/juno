@@ -3,9 +3,8 @@
 // event reconcile it in either order, a message still being sent is waited
 // for (`depends_on`), and a refusal puts back what Slack has. Reactions are
 // in `reactions.test.ts`.
-import { productionTiming } from '../src/config'
 import { step } from './step'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { SELF_ID } from '@juno/fake-slack'
 import { deleteMessage, editMessage, sendMessage } from '@juno/state'
 import { waitFor, WAIT_MS } from './harness'
@@ -190,24 +189,6 @@ describe('edit', () => {
     await watch(engine, MAIN)((list) => rowWith(list, 'After a restart')?.edited === true, 'the edit after the restart')
     await waitFor(() => (actionRows(engine).length === 0 ? true : undefined), WAIT_MS, 'the row ended')
     expect(inSlack(engine, message.ts)?.text).toBe('After a restart')
-  })
-
-  it('stays idle while the channel’s first edit waits to retry and a second waits behind it [production timing]', async () => {
-    const engine = await booted({ timing: { retryBaseMillis: productionTiming.retryBaseMillis, retryCapMillis: productionTiming.retryCapMillis, actionDeadlineMillis: productionTiming.actionDeadlineMillis } })
-    const rows = watch(engine, MAIN)
-    const first = await sent(engine, 'First draft', rows)
-    const second = await sent(engine, 'Second draft', rows)
-    engine.fake.forceError({ method: 'chat.update', times: 1000 })
-    valueOf(await editMessage(engine.registry, refOf(first), 'First edit'))
-    valueOf(await editMessage(engine.registry, refOf(second), 'Second edit'))
-    const attempts = () => readDb(engine, 'user.db', (db) => db.prepare(`SELECT max(attempts) AS n FROM outbox WHERE kind = 'edit'`).get() as { n: number })
-    // The second failure puts the first row off for two seconds.
-    await waitFor(() => (attempts().n >= 2 ? true : undefined), 30_000, 'two tries')
-    // The engine shares this thread: a pass that keeps finding the row behind due fills the event loop.
-    const before = performance.eventLoopUtilization()
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    if (process.env.JUNO_PERF === '1') expect(performance.eventLoopUtilization(before).utilization).toBeLessThan(0.5)
-    expect(actionRows(engine)).toHaveLength(2)
   })
 })
 

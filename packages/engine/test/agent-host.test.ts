@@ -7,7 +7,7 @@
  */
 import { rm } from 'node:fs/promises'
 import { MessageChannel, type MessagePort } from 'node:worker_threads'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { Effect, Exit, Layer, Schema, Scope, Stream } from 'effect'
 import { RpcClient, type RpcClientError, type RpcGroup } from 'effect/rpc'
 import { actionDigest, AgentHostRpcs, HostDispatch, HostPresence, HostTopicId, type HostSendState } from '@juno/agent-contract'
@@ -199,7 +199,7 @@ describe('the AgentHost port', () => {
 
     expect(await ok(client['host.hello']({ protocol: 2 }))).toEqual({ host: 'juno', protocol: 2 })
     expect(await ok(client['host.hello']({ protocol: 1 }))).toEqual({ host: 'juno', protocol: 2 })
-    expect(account).toBe(`${engine.fake.teamId}:U0TUSHAR`)
+    expect<unknown>(account).toBe(`${engine.fake.teamId}:U0TUSHAR`)
 
     const injection = hostileMessages.find((f) => f.name === 'ignoreInstructions')!.message.text
     const history = await waitFor(async () => {
@@ -215,7 +215,7 @@ describe('the AgentHost port', () => {
 
     const older = await ok(client['host.slack.history']({ accountId: account, channelId: CHANNEL, limit: 2 } as never))
     expect(older.messages).toHaveLength(2)
-    expect(older.next).toBe(older.messages[0]!.ts)
+    expect<unknown>(older.next).toBe(older.messages[0]!.ts)
 
     const found = await ok(client['host.slack.search']({ accountId: account, query: 'maintenance mode', limit: 10 } as never))
     expect(found.messages.map((m) => m.text)).toEqual([injection])
@@ -228,7 +228,7 @@ describe('the AgentHost port', () => {
     expect(fromMe.messages.length).toBeGreaterThan(0)
     expect(fromMe.messages.every((m) => m.senderId === SELF_ID)).toBe(true)
 
-    expect(await ok(client['host.slack.person']({ accountId: account, userId: 'U0MAYA' } as never))).toEqual({ id: 'U0MAYA', name: 'Maya Chen', displayName: 'Maya' })
+    expect<unknown>(await ok(client['host.slack.person']({ accountId: account, userId: 'U0MAYA' } as never))).toEqual({ id: 'U0MAYA', name: 'Maya Chen', displayName: 'Maya' })
     expect((await failure(client['host.slack.person']({ accountId: account, userId: 'U0NOBODY' } as never)))).toMatchObject({ reason: 'notFound' })
 
     // Who the owner exchanges messages with (SPEC 13.8): counts and names, most first, never a bot or the owner.
@@ -242,7 +242,7 @@ describe('the AgentHost port', () => {
     expect(people.map((p) => p.owner + p.them)).toEqual(people.map((p) => p.owner + p.them).toSorted((a, b) => b - a))
     expect(Object.keys(maya!).sort()).toEqual(['dm', 'id', 'lastAt', 'name', 'owner', 'them'])
     const { members } = await ok(client['host.slack.members']({ accountId: account, names: ['Maya', 'maya chen', 'Nobody'] } as never))
-    expect(members.map((m) => m.ids.map((id) => id.id))).toEqual([['U0MAYA'], ['U0MAYA'], []])
+    expect<unknown>(members.map((m) => m.ids.map((id) => id.id))).toEqual([['U0MAYA'], ['U0MAYA'], []])
 
     const { topics } = await ok(client['host.topics.list']({ limit: 200 } as never))
     expect(topics).toContainEqual({ topicId: `m:${CHANNEL}`, title: '#eng · Main', where: '#eng', tint: 'public' })
@@ -273,7 +273,7 @@ describe('the AgentHost port', () => {
     expect(history.messages.find((m) => m.text === 'Deploy is green')).toMatchObject({ channelId: CHANNEL, senderId: 'U0MAYA' })
     expect((await agent.reads.search('green')).messages.map((m) => m.text)).toEqual(['Deploy is green'])
     expect(await agent.reads.person('U0MAYA')).toEqual({ id: 'U0MAYA', name: 'Maya Chen', displayName: 'Maya' })
-    await expect(agent.reads.person('U0NOBODY')).rejects.toMatchObject({ reason: 'notFound' })
+    expect(await agent.reads.person('U0NOBODY').catch((error: unknown) => error)).toMatchObject({ reason: 'notFound' })
   })
 
   it('reads notification and active hours from the notifications settings', async () => {
@@ -299,7 +299,7 @@ describe('the AgentHost port', () => {
 
     const unmount = engine.registry.mount(topicAtom(`m:${CHANNEL}`))
     const viewing = await presence(agent.client, (p) => p.thisTopic !== null)
-    expect(viewing?.thisTopic).toEqual({ topicId: `m:${CHANNEL}`, place: { channelId: CHANNEL, name: 'eng', kindLabel: 'Public channel', tint: 'public' } })
+    expect<unknown>(viewing?.thisTopic).toEqual({ topicId: `m:${CHANNEL}`, place: { channelId: CHANNEL, name: 'eng', kindLabel: 'Public channel', tint: 'public' } })
     unmount()
 
     await runCommand(engine.registry, prefsSet, { key: 'aiAssist', value: false })

@@ -13,8 +13,10 @@ if (args.length === 0 || unitsOnly) {
   const agentPerf = readdirSync(fileURLToPath(new URL('../packages/agent/test', import.meta.url)), { recursive: true })
     .filter((file) => file.endsWith('.perf.ts')).toSorted().map((file) => `./test/${file}`)
   commands.push({ cwd: 'packages/agent', args: ['test', '--timeout', '600000', ...agentPerf] })
-  commands.push({ args: ['run', '--cwd', 'packages/engine', 'vitest', 'run', '-c', 'vitest.perf.config.ts'] })
-  commands.push({ args: ['run', '--cwd', 'packages/engine', 'vitest', 'run', 'test/bench', '--silent=false'] })
+  // The engine's budgets, one file after another: the idle checks and the large-seed benchmarks.
+  const enginePerf = readdirSync(fileURLToPath(new URL('../packages/engine/test/perf', import.meta.url)))
+    .filter((file) => file.endsWith('.perf.ts')).toSorted().map((file) => `./test/perf/${file}`)
+  commands.push({ cwd: 'packages/engine', args: ['test', '--timeout', '600000', ...enginePerf] })
 }
 if (!unitsOnly) commands.push({ args: ['run', '--cwd', 'apps/desktop', 'perf', ...args] })
 let failed = 0

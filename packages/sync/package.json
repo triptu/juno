@@ -10,7 +10,7 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "test": "bun test"
   },
   "dependencies": {
     "@juno/domain": "workspace:*",
@@ -20,10 +20,10 @@
     "effect": "4.0.3"
   },
   "devDependencies": {
-    "@effect/vitest": "4.0.3",
+    "@juno/testing": "workspace:*",
     "@types/node": "24.19.2",
-    "typescript": "7.0.2",
-    "vitest": "5.0.4"
+    "bun-types": "1.4.3",
+    "typescript": "7.0.2"
   },
   "juno": {
     "allowedDeps": [
@@ -31,6 +31,9 @@
       "@juno/slack",
       "@juno/slack-schema",
       "@juno/store"
+    ],
+    "testDeps": [
+      "@juno/testing"
     ]
   }
 }

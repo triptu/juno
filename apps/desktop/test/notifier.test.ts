@@ -3,7 +3,7 @@
  * against the fake Slack, over the host link main uses in the app, with a
  * fake Electron notification and dock.
  */
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { notificationsDecisions, notificationsPage, notificationsSetLevel, prefsSet, readsMarkRead, type MainToEngine, type NotificationDecisions, type NotificationsPage, type NotificationTarget } from '@juno/contract'
 import { liveQuery, runCommand } from '@juno/state'
 import { Exit, Schema } from 'effect'

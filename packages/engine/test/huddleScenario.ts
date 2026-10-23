@@ -7,7 +7,7 @@
  */
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
-import { afterEach } from 'vitest'
+import { afterEach } from 'bun:test'
 import { huddleCall, huddleReport, huddleRunning, huddleStart, type HuddleCall, type HuddleMediaEnd, type HuddlePageReport, type HuddleStartResult, type RunningHuddles } from '@juno/contract'
 import { liveQuery, runCommand, type Registry } from '@juno/state'
 import { waitFor, WAIT_MS, type EngineOptions, type RunningEngine } from './harness'

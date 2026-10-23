@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { filesToFetch, imagesWithoutThumbs, isReady, keepFuller } from '../src/files'
 
 const fresh = { id: 'F1', name: 'shot.png', title: 'shot.png', mimetype: '', filetype: '', pretty_type: '', size: 43_000, mode: 'hosted', url_private: 'https://files.example/F1' }

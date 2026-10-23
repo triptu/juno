@@ -15,7 +15,7 @@
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { Effect } from 'effect'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { Store, workspacePathsFromDir } from '@juno/store'
 import { reindexAll } from '@juno/sync'
 import { UserId } from '@juno/domain'

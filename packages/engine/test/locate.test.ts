@@ -1,7 +1,7 @@
 // Where a Slack link in a message goes (spec section 8, "Links"): the topic
 // `messages.locate` names for a message, with the conversation's label for
 // the link's hover text, and the DM `people.locate` finds for a person.
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { locateMessage, locatePerson } from '@juno/state'
 import type { RunningEngine } from './harness'
 import { bootedEngine as boot, quiet, valueOf } from './scenario'

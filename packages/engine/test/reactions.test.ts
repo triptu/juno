@@ -3,7 +3,7 @@
 // repeats (`already_reacted`, `no_reaction`): the chip changes at once, the
 // call names the emoji as Slack does, a refusal puts back what Slack has
 // with Retry and Dismiss, and a reaction that waits long says so.
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { editMessage, openTopic, reactToMessage, sendMessage } from '@juno/state'
 import { waitFor, WAIT_MS } from './harness'
 import { apiCalls, quiet, readDb, valueOf } from './scenario'
@@ -127,7 +127,7 @@ describe('reactions: adding and removing', () => {
     engine.fake.release()
     await waitFor(() => (actionRows(engine).length === 0 ? true : undefined), WAIT_MS, 'the reaction sent')
     const posted = engine.fake.messages('C0ENG').find((m) => m.client_msg_id === pending.clientMsgId)!
-    expect(posted.reactions?.find((r) => r.name === 'rocket')?.users).toEqual([posted.user])
+    expect<unknown>(posted.reactions?.find((r) => r.name === 'rocket')?.users).toEqual([posted.user])
     expect(apiCalls(engine, 'reactions.add')[0]!.args['timestamp']).toBe(posted.ts)
     await rows((list) => chip(rowWith(list, 'Fresh off the press'), 'rocket')?.count === 1, 'one chip, stored')
   })

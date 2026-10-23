@@ -2,7 +2,7 @@
 // people per reaction, as Slack may; the dialog's subscription shows what is
 // stored at once, fetches everyone once with `reactions.get` `full`, names
 // the people the store lacks, and refreshes after a later truncated snapshot. The topic window still names at most ten per chip.
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import type { WhoReacted } from '@juno/contract'
 import { REACTORS_LISTED, type ManyReactionsSeed } from '@juno/fake-slack'
 import { openTopic, reactToMessage, whoReactedAtom } from '@juno/state'

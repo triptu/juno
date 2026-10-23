@@ -1,4 +1,5 @@
-import { assert, describe, it } from '@effect/vitest'
+import { describe, expect } from 'bun:test'
+import { itEffect } from '@juno/testing/effect'
 import { Effect } from 'effect'
 import { prefs, StoreReader, StoreWriter, syncedRanges, syncState, transaction } from '../src/index'
 import { freshStore } from './helpers'
@@ -10,32 +11,32 @@ const readCount = Effect.gen(function* () {
 })
 
 describe('reader connection', () => {
-  it.effect('sees rows the writer committed, and not rows of an open transaction', () =>
+  itEffect('sees rows the writer committed, and not rows of an open transaction', () =>
     Effect.gen(function* () {
       const writer = yield* StoreWriter
-      assert.strictEqual(yield* readCount, 0)
+      expect(yield* readCount).toBe(0)
 
       yield* transaction(
         Effect.gen(function* () {
           yield* writer`INSERT INTO messages (channel, ts, text) VALUES ('C1', '1.000001', 'one')`
           // WAL: the reader keeps its snapshot while the writer's transaction is open.
-          assert.strictEqual(yield* readCount, 0)
+          expect(yield* readCount).toBe(0)
         }),
       )
 
-      assert.strictEqual(yield* readCount, 1)
+      expect(yield* readCount).toBe(1)
     }).pipe(Effect.provide(freshStore)),
   )
 
-  it.effect('refuses writes', () =>
+  itEffect('refuses writes', () =>
     Effect.gen(function* () {
       const reader = yield* StoreReader
       const result = yield* reader`INSERT INTO prefs (key, value_json) VALUES ('k', '1')`.pipe(Effect.result)
-      assert.isTrue(result._tag === 'Failure')
+      expect(result._tag === 'Failure').toBe(true)
     }).pipe(Effect.provide(freshStore)),
   )
 
-  it.effect('one transaction writes to both databases, or to neither', () =>
+  itEffect('one transaction writes to both databases, or to neither', () =>
     Effect.gen(function* () {
       const failed = yield* transaction(
         Effect.gen(function* () {
@@ -44,9 +45,9 @@ describe('reader connection', () => {
           return yield* Effect.fail('after both writes')
         }),
       ).pipe(Effect.result)
-      assert.isTrue(failed._tag === 'Failure')
-      assert.isUndefined(yield* prefs.get('theme'))
-      assert.isUndefined(yield* syncState.get('cursor'))
+      expect(failed._tag === 'Failure').toBe(true)
+      expect(yield* prefs.get('theme')).toBeUndefined()
+      expect(yield* syncState.get('cursor')).toBeUndefined()
 
       yield* transaction(
         Effect.gen(function* () {
@@ -54,12 +55,12 @@ describe('reader connection', () => {
           yield* syncState.set('cursor', { C1: '1.000001' })
         }),
       )
-      assert.strictEqual(yield* prefs.get<string>('theme'), 'dark')
-      assert.deepStrictEqual(yield* syncState.get('cursor'), { C1: '1.000001' })
+      expect(yield* prefs.get<string>('theme')).toBe('dark')
+      expect(yield* syncState.get('cursor')).toStrictEqual({ C1: '1.000001' })
     }).pipe(Effect.provide(freshStore)),
   )
 
-  it.effect('synced ranges merge when they touch', () =>
+  itEffect('synced ranges merge when they touch', () =>
     Effect.gen(function* () {
       yield* transaction(syncedRanges.add({ channel: 'C1', from_ts: '1.000000', to_ts: '2.000000' }))
       yield* transaction(syncedRanges.add({ channel: 'C1', from_ts: '5.000000', to_ts: '6.000000' }))
@@ -67,7 +68,7 @@ describe('reader connection', () => {
       yield* transaction(syncedRanges.add({ channel: 'C2', from_ts: '1.000000', to_ts: '1.000000' }))
 
       const ranges = yield* syncedRanges.list('C1')
-      assert.deepStrictEqual(ranges, [{ channel: 'C1', from_ts: '1.000000', to_ts: '6.000000' }])
+      expect(ranges).toStrictEqual([{ channel: 'C1', from_ts: '1.000000', to_ts: '6.000000' }])
     }).pipe(Effect.provide(freshStore)),
   )
 })

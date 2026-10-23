@@ -1,8 +1,8 @@
-import { it } from '@effect/vitest'
+import { itEffect } from '@juno/testing/effect'
 import { UserId } from '@juno/domain'
 import type { SocketEvent } from '@juno/slack'
 import { Context, Deferred, Effect, Exit, Queue, Scope } from 'effect'
-import { expect } from 'vitest'
+import { expect } from 'bun:test'
 import { CAPACITY, SocketEvents, type SessionServices, type SessionStart, type SocketInput } from '../src/socketEvents'
 
 const me = { userId: UserId.make('U0ME') }
@@ -30,7 +30,7 @@ const sync = Effect.gen(function* () {
   return { publish: (n: number) => publish(event(n), me), end: Scope.close(scope, Exit.void) }
 })
 
-it.effect('subscribers hear each sync\'s events in order, from the sync they started in, until they leave', () => Effect.gen(function* () {
+itEffect('subscribers hear each sync\'s events in order, from the sync they started in, until they leave', () => Effect.gen(function* () {
   const events = yield* SocketEvents
   const early = yield* recorder()
   const late = yield* recorder()
@@ -61,7 +61,7 @@ it.effect('subscribers hear each sync\'s events in order, from the sync they sta
   yield* second.end
 }).pipe(Effect.provide(SocketEvents.layer), Effect.scoped))
 
-it.effect('a stuck subscriber never holds up the sync or the others, and hears Overflowed before newer events', () => Effect.gen(function* () {
+itEffect('a stuck subscriber never holds up the sync or the others, and hears Overflowed before newer events', () => Effect.gen(function* () {
   const events = yield* SocketEvents
   const busy = yield* Deferred.make<void>()
   const release = yield* Deferred.make<void>()
@@ -80,7 +80,7 @@ it.effect('a stuck subscriber never holds up the sync or the others, and hears O
   yield* running.end
 }).pipe(Effect.provide(SocketEvents.layer), Effect.scoped))
 
-it.effect('a listener that throws or dies on one event still hears the later ones', () => Effect.gen(function* () {
+itEffect('a listener that throws or dies on one event still hears the later ones', () => Effect.gen(function* () {
   const events = yield* SocketEvents
   const heard = yield* Queue.unbounded<string>()
   yield* events.subscribe('fragile', Effect.succeed((input) => {
@@ -94,7 +94,7 @@ it.effect('a listener that throws or dies on one event still hears the later one
   yield* running.end
 }).pipe(Effect.provide(SocketEvents.layer), Effect.scoped))
 
-it.effect('events published while a subscriber starts reach it once it has started, and a stuck start holds up nothing', () => Effect.gen(function* () {
+itEffect('events published while a subscriber starts reach it once it has started, and a stuck start holds up nothing', () => Effect.gen(function* () {
   const events = yield* SocketEvents
   const ready = yield* Deferred.make<void>()
   const slow = yield* recorder()
@@ -113,7 +113,7 @@ it.effect('events published while a subscriber starts reach it once it has start
   yield* running.end
 }).pipe(Effect.provide(SocketEvents.layer), Effect.scoped))
 
-it.effect('nothing is delivered once the sync\'s scope closes, queued or in flight', () => Effect.gen(function* () {
+itEffect('nothing is delivered once the sync\'s scope closes, queued or in flight', () => Effect.gen(function* () {
   const events = yield* SocketEvents
   const busy = yield* Deferred.make<void>()
   const release = yield* Deferred.make<void>()

@@ -1,14 +1,13 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { Session } from 'node:inspector/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { loadavg, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Effect, Fiber, Queue } from 'effect'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { largeSeed, startFakeSlack } from '@juno/fake-slack'
 import { inBatches, Store, StoreReader, StoreWriter, transaction, workspacePathsFromDir } from '@juno/store'
-import { querySearch, searchStatements } from '../../src/search/query'
+import { querySearch } from '../../src/search/query'
 
-describe.skipIf(process.env['JUNO_SEARCH_BENCH'] !== '1' && process.env['JUNO_BENCH'] !== '1')('local FTS on 100 k messages', () => {
+describe('local FTS on 100 k messages', () => {
   it('stays within 20 ms while a backfill writes', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'juno-search-bench-'))
     const fake = await startFakeSlack({ seed: largeSeed() })
@@ -26,25 +25,6 @@ describe.skipIf(process.env['JUNO_SEARCH_BENCH'] !== '1' && process.env['JUNO_BE
         expect(topics.length).toBeGreaterThan(4_000)
         const count = yield* reader<{ count: number }>`SELECT count(*) AS count FROM messages`
         expect(count[0]?.count).toBe(100_000)
-
-        if (process.env['JUNO_SEARCH_PROFILE'] === '1') {
-          for (const [name, statement] of Object.entries(searchStatements(reader, '"deploy"*', 50))) {
-            const [query, params] = statement.compile()
-            const plan = yield* reader.unsafe<{ detail: string }>(`EXPLAIN QUERY PLAN ${query}`, params)
-            const started = performance.now()
-            yield* statement
-            console.log(`search profile ${name}: ${performance.now() - started} ms, ${JSON.stringify(plan.map((row) => row.detail))}`)
-          }
-          const profiler = new Session()
-          profiler.connect()
-          try {
-            yield* Effect.promise(() => profiler.post('Profiler.enable'))
-            yield* Effect.promise(() => profiler.post('Profiler.start'))
-            for (let run = 0; run < 10; run++) yield* querySearch('deploy')
-            const { profile } = yield* Effect.promise(() => profiler.post('Profiler.stop'))
-            yield* Effect.promise(() => writeFile(join(tmpdir(), 'juno-wp2-search.cpuprofile'), JSON.stringify(profile)))
-          } finally { profiler.disconnect() }
-        }
 
         const committed = yield* Queue.unbounded<number>()
         const resume = yield* Queue.unbounded<void>()

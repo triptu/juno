@@ -3,7 +3,7 @@
 // beside it: thread previews read replies while history reads channels, and user groups and emoji load beside
 // the boot rather than after it. A 429 on history in the middle of it delays history only by its Retry-After.
 import { largeSeed } from '@juno/fake-slack'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { startTestEngine, waitFor, type RunningEngine } from './harness'
 import { apiCalls, bootedEngine } from './scenario'
 

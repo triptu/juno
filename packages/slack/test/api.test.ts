@@ -1,41 +1,42 @@
-import { assert, describe, it } from '@effect/vitest'
+import { describe, expect } from 'bun:test'
+import { itEffect, itLive } from '@juno/testing/effect'
 import { Effect, Fiber } from 'effect'
 import { RequestQueue, SlackApi, SlackEdge } from '../src/index.ts'
 import { CHANNEL, clientLayer, eventually, fakeSlack, SELF } from './helpers.ts'
 
 describe('SlackApi.call', () => {
-  it.effect('round-trips a call as multipart with the token first and decodes the answer', () =>
+  itEffect('round-trips a call as multipart with the token first and decodes the answer', () =>
     Effect.gen(function* () {
       const fake = yield* fakeSlack
       const boot = yield* SlackApi.use((api) => api.call('client.userBoot', { return_all_relevant_mpdms: true }, { reason: 'test' })).pipe(
         Effect.provide(clientLayer(fake)),
       )
-      assert.strictEqual(boot.self.id, SELF)
-      assert.isTrue(boot.channels.some((channel) => channel.id === CHANNEL))
+      expect(boot.self.id).toBe(SELF)
+      expect(boot.channels.some((channel) => channel.id === CHANNEL)).toBe(true)
 
       const [call] = fake.calls
-      assert.strictEqual(call?.method, 'client.userBoot')
-      assert.strictEqual(call?.args['return_all_relevant_mpdms'], 'true')
-      assert.strictEqual(call?.args['_x_reason'], 'test')
-      assert.strictEqual(call?.args['_x_mode'], 'online')
-      assert.strictEqual(Object.keys(call?.args ?? {})[0], 'token')
+      expect(call?.method).toBe('client.userBoot')
+      expect(call?.args['return_all_relevant_mpdms']).toBe('true')
+      expect(call?.args['_x_reason']).toBe('test')
+      expect(call?.args['_x_mode']).toBe('online')
+      expect(Object.keys(call?.args ?? {})[0]).toBe('token')
     }),
   )
 
-  it.effect('an ok:false answer with a plain error is a SlackRejected', () =>
+  itEffect('an ok:false answer with a plain error is a SlackRejected', () =>
     Effect.gen(function* () {
       const fake = yield* fakeSlack
       const result = yield* SlackApi.use((api) => api.call('conversations.history', { channel: 'C0NOPE' })).pipe(
         Effect.provide(clientLayer(fake)),
         Effect.flip,
       )
-      assert.strictEqual(result._tag, 'SlackRejected')
-      if (result._tag === 'SlackRejected') assert.strictEqual(result.error, 'channel_not_found')
-      assert.strictEqual(fake.callCount(), 1)
+      expect(result._tag).toBe('SlackRejected')
+      if (result._tag === 'SlackRejected') expect(result.error).toBe('channel_not_found')
+      expect(fake.callCount()).toBe(1)
     }),
   )
 
-  it.effect('a fatal auth error surfaces as SlackAuthRequired and is not retried', () =>
+  itEffect('a fatal auth error surfaces as SlackAuthRequired and is not retried', () =>
     Effect.gen(function* () {
       const fake = yield* fakeSlack
       const credentials = fake.signIn()
@@ -44,13 +45,13 @@ describe('SlackApi.call', () => {
         Effect.provide(clientLayer(fake, {}, credentials)),
         Effect.flip,
       )
-      assert.strictEqual(result._tag, 'SlackAuthRequired')
-      if (result._tag === 'SlackAuthRequired') assert.strictEqual(result.error, 'invalid_auth')
-      assert.strictEqual(fake.callCount(), 1)
+      expect(result._tag).toBe('SlackAuthRequired')
+      if (result._tag === 'SlackAuthRequired') expect(result.error).toBe('invalid_auth')
+      expect(fake.callCount()).toBe(1)
     }),
   )
 
-  it.live('a 429 is retried after Retry-After and then succeeds', () =>
+  itLive('a 429 is retried after Retry-After and then succeeds', () =>
     Effect.gen(function* () {
       const fake = yield* fakeSlack
       fake.force429({ method: 'conversations.history', retryAfter: 1, times: 1 })
@@ -58,16 +59,16 @@ describe('SlackApi.call', () => {
       const history = yield* SlackApi.use((api) => api.call('conversations.history', { channel: CHANNEL, limit: 2 })).pipe(
         Effect.provide(clientLayer(fake)),
       )
-      assert.isAtLeast(history.messages.length, 1)
-      assert.isAtLeast(Date.now() - started, 900)
+      expect(history.messages.length).toBeGreaterThanOrEqual(1)
+      expect(Date.now() - started).toBeGreaterThanOrEqual(900)
       const [first, second] = fake.calls
-      assert.strictEqual(first?.status, 429)
-      assert.strictEqual(second?.status, 200)
-      assert.strictEqual(fake.callCount('conversations.history'), 2)
+      expect(first?.status).toBe(429)
+      expect(second?.status).toBe(200)
+      expect(fake.callCount('conversations.history')).toBe(2)
     }),
   )
 
-  it.live('a lost answer is retried, so a post can land twice; a single attempt posts once', () =>
+  itLive('a lost answer is retried, so a post can land twice; a single attempt posts once', () =>
     Effect.gen(function* () {
       const fake = yield* fakeSlack
       const layer = clientLayer(fake)
@@ -79,16 +80,16 @@ describe('SlackApi.call', () => {
 
       fake.loseResponse({ method: 'chat.postMessage' })
       yield* post('3f0c8a51-0000-4000-8000-000000000001', false)
-      assert.strictEqual(posted('3f0c8a51-0000-4000-8000-000000000001'), 2)
+      expect(posted('3f0c8a51-0000-4000-8000-000000000001')).toBe(2)
 
       fake.loseResponse({ method: 'chat.postMessage' })
       const once = yield* post('3f0c8a51-0000-4000-8000-000000000002', true)
-      assert.isTrue(once._tag === 'Failure' && once.failure._tag === 'SlackTransportError')
-      assert.strictEqual(posted('3f0c8a51-0000-4000-8000-000000000002'), 1)
+      expect(once._tag === 'Failure' && once.failure._tag === 'SlackTransportError').toBe(true)
+      expect(posted('3f0c8a51-0000-4000-8000-000000000002')).toBe(1)
     }),
   )
 
-  it.live('a paused method does not hold the interactive lane: it fails fast with SlackRateLimited', () =>
+  itLive('a paused method does not hold the interactive lane: it fails fast with SlackRateLimited', () =>
     Effect.gen(function* () {
       const fake = yield* fakeSlack
       fake.force429({ method: 'conversations.history', retryAfter: 30, times: 1 })
@@ -98,14 +99,14 @@ describe('SlackApi.call', () => {
         Effect.provide(layer),
         Effect.flip,
       )
-      assert.strictEqual(result._tag, 'SlackRateLimited')
-      if (result._tag === 'SlackRateLimited') assert.isAtLeast(result.retryAfterMillis, 25_000)
-      assert.isBelow(Date.now() - started, 2_000)
-      assert.strictEqual(fake.callCount('conversations.history'), 1)
+      expect(result._tag).toBe('SlackRateLimited')
+      if (result._tag === 'SlackRateLimited') expect(result.retryAfterMillis).toBeGreaterThanOrEqual(25_000)
+      expect(Date.now() - started).toBeLessThan(2_000)
+      expect(fake.callCount('conversations.history')).toBe(1)
     }),
   )
 
-  it.live('a 429 on one method pauses only that method', () =>
+  itLive('a 429 on one method pauses only that method', () =>
     Effect.gen(function* () {
       const fake = yield* fakeSlack
       fake.force429({ method: 'conversations.history', retryAfter: 30, times: 1 })
@@ -113,16 +114,16 @@ describe('SlackApi.call', () => {
         const api = yield* SlackApi
         yield* api.call('conversations.history', { channel: CHANNEL }).pipe(Effect.ignore)
         const counts = yield* api.call('client.counts', {})
-        assert.isTrue(counts.ok)
+        expect(counts.ok).toBe(true)
         const again = yield* api.call('conversations.history', { channel: CHANNEL }).pipe(Effect.flip)
-        assert.strictEqual(again._tag, 'SlackRateLimited')
-        assert.strictEqual(fake.callCount('conversations.history'), 1)
+        expect(again._tag).toBe('SlackRateLimited')
+        expect(fake.callCount('conversations.history')).toBe(1)
       })
       yield* program.pipe(Effect.provide(clientLayer(fake)))
     }),
   )
 
-  it.live('queued calls respect a new Retry-After after waiting for a permit', () =>
+  itLive('queued calls respect a new Retry-After after waiting for a permit', () =>
     Effect.gen(function* () {
       const fake = yield* fakeSlack
       const program = Effect.gen(function* () {
@@ -138,13 +139,13 @@ describe('SlackApi.call', () => {
         yield* Fiber.join(waiting)
         yield* history
         const calls = fake.calls.filter((call) => call.method === 'conversations.history')
-        assert.lengthOf(calls, 3)
-        assert.isAtLeast(calls[1]!.at - pausedAt, 950)
+        expect(calls).toHaveLength(3)
+        expect(calls[1]!.at - pausedAt).toBeGreaterThanOrEqual(950)
         // A 429 doubles the method interval (1 s here) until the quiet period.
-        assert.isAtLeast(calls[2]!.at - calls[1]!.at, 1_900)
+        expect(calls[2]!.at - calls[1]!.at).toBeGreaterThanOrEqual(1_900)
         const counts = fake.calls.find((call) => call.method === 'client.counts')!
-        assert.isBelow(counts.at, calls[1]!.at)
-        assert.isTrue(fake.calls.every((call) => call.status === 200))
+        expect(counts.at).toBeLessThan(calls[1]!.at)
+        expect(fake.calls.every((call) => call.status === 200)).toBe(true)
       })
       // History is spaced 1 s apart, not 1.5 s, to keep the waits short.
       yield* program.pipe(Effect.provide(clientLayer(fake, { lanes: { backgroundConcurrency: 1, backgroundMinIntervalMillis: 1_000 } })))
@@ -152,7 +153,7 @@ describe('SlackApi.call', () => {
     10_000,
   )
 
-  it.effect('a flood of background calls does not starve the interactive lane', () =>
+  itEffect('a flood of background calls does not starve the interactive lane', () =>
     Effect.gen(function* () {
       const fake = yield* fakeSlack
       const program = Effect.gen(function* () {
@@ -166,8 +167,8 @@ describe('SlackApi.call', () => {
         )
         yield* eventually(() => fake.callCount('conversations.history') >= 1)
         const counts = yield* api.call('client.counts', {}, { lane: 'interactive' })
-        assert.isTrue(counts.ok)
-        assert.isAtMost(fake.callCount('conversations.history'), 2)
+        expect(counts.ok).toBe(true)
+        expect(fake.callCount('conversations.history')).toBeLessThanOrEqual(2)
         yield* Fiber.interrupt(flood)
       })
       yield* program.pipe(Effect.provide(clientLayer(fake)))
@@ -176,21 +177,21 @@ describe('SlackApi.call', () => {
 })
 
 describe('SlackEdge', () => {
-  it.effect('fetches the edge URL once and queries users/info with JSON', () =>
+  itEffect('fetches the edge URL once and queries users/info with JSON', () =>
     Effect.gen(function* () {
       const fake = yield* fakeSlack
       const program = Effect.gen(function* () {
         const edge = yield* SlackEdge
         const first = yield* edge.usersInfo([SELF, 'U0MAYA', 'U0NOPE'])
-        assert.deepStrictEqual(first.results.map((user) => user.id).toSorted(), [SELF, 'U0MAYA'].toSorted())
-        assert.deepStrictEqual(first.failed_ids, ['U0NOPE'])
+        expect(first.results.map((user) => user.id).toSorted()).toStrictEqual([SELF, 'U0MAYA'].toSorted())
+        expect(first.failed_ids).toStrictEqual(['U0NOPE'])
         const second = yield* edge.usersInfo(['U0MAYA'])
-        assert.strictEqual(second.results.length, 1)
+        expect(second.results.length).toBe(1)
       })
       // Three background calls in a row; no spacing so the virtual clock need not move.
       yield* program.pipe(Effect.provide(clientLayer(fake, { lanes: { backgroundMinIntervalMillis: 0 } })))
-      assert.strictEqual(fake.callCount('api.getFlannelHttpUrl'), 1)
-      assert.strictEqual(fake.calls.filter((call) => call.kind === 'edge').length, 2)
+      expect(fake.callCount('api.getFlannelHttpUrl')).toBe(1)
+      expect(fake.calls.filter((call) => call.kind === 'edge').length).toBe(2)
     }),
   )
 })

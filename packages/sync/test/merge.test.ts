@@ -1,6 +1,6 @@
 // The merge rules of ADR 0011 as a table: what wins when a page, an event
 // and an edit arrive in any order.
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { Ts, type Message } from '@juno/slack-schema'
 import { mergeMessage, mergeRootCounters, mergeTombstone, stubRoot, toMessageRow } from '../src/index'
 

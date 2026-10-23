@@ -2,7 +2,7 @@
 // `messages.list` subscription listens on `{ synced_ranges: [channel] }` for
 // that, so a history page that adds a range but no new or changed message
 // must still move the window to covered, without the renderer asking again.
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import type { MessageView } from '@juno/contract'
 import { messagesAtom, openTopic, type ListWindow } from '@juno/state'
 import { waitFor, WAIT_MS, type RunningEngine } from './harness'

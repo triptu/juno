@@ -2,7 +2,7 @@
 // copy's delete is checked again just before it goes out, and after a gap
 // only once the recheck has read the copy's topic. Slack must always hold
 // at least one copy of the post.
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import type { MessageView } from '@juno/contract'
 import { deleteMessage, messagesAtom, sendMessage, type ListWindow } from '@juno/state'
 import { waitFor, WAIT_MS, type RunningEngine } from './harness'

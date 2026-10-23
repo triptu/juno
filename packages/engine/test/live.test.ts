@@ -4,7 +4,7 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { Cause, Effect, Exit, Layer, Queue, Schedule, Schema, Stream } from 'effect'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { invalidate, liveQuery, Store, StoreReader, StoreWriter, workspacePathsFromDir } from '@juno/store'
 import { retryFirstRun, serveLiveList, serveLiveValue, timed, type ListRun } from '../src/protocol/live'
 

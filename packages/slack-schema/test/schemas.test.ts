@@ -1,5 +1,5 @@
 import { Schema } from 'effect'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import {
   Block,
   ChatPostMessageArgs,
@@ -29,7 +29,7 @@ describe('tolerant decoding', () => {
       text: 'hi',
       brand_new_field: { nested: true },
     })
-    expect(message.ts).toBe('1760000000.000100')
+    expect<unknown>(message.ts).toBe('1760000000.000100')
     expect('brand_new_field' in message).toBe(false)
   })
 
@@ -189,7 +189,7 @@ describe('ts helpers', () => {
 
   it('has one shape: seconds, a dot, six digits', () => {
     const decode = Schema.decodeUnknownSync(Ts)
-    expect(decode('1760000000.000100')).toBe('1760000000.000100')
+    expect<unknown>(decode('1760000000.000100')).toBe('1760000000.000100')
     expect(() => decode('1760000000.5')).toThrow()
     expect(() => decode('1760000000')).toThrow()
     expect(() => decode('abc')).toThrow()
@@ -197,7 +197,7 @@ describe('ts helpers', () => {
   })
 
   it('round trips through milliseconds', () => {
-    expect(millisToTs(1760000000123, 7)).toBe('1760000000.123007')
+    expect<unknown>(millisToTs(1760000000123, 7)).toBe('1760000000.123007')
     expect(tsToMillis('1760000000.123007')).toBe(1760000000123)
   })
 

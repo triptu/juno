@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import { editMessage, reactToMessage, resolveMessageAction, sendMessage } from '@juno/state'
 import { apiCalls, readDb, valueOf } from './scenario'
 import { waitFor, WAIT_MS, type RunningEngine } from './harness'
@@ -29,7 +29,7 @@ it('settles the partial chat.update response without an echo, including a thread
   await waitFor(() => failures(engine).length === 0 ? true : undefined, WAIT_MS, 'partial response settled')
   await rows((list) => rowWith(list, 'Reply **changed**')?.edited === true, 'edited reply stays in its thread')
   expect(apiCalls(engine, 'chat.update')).toHaveLength(1)
-  expect(inSlack(engine, reply.ts)?.thread_ts).toBe(root.ts)
+  expect<unknown>(inSlack(engine, reply.ts)?.thread_ts).toBe(root.ts)
 })
 
 it('ends a defect once, keeps the edit for dismissal, and releases the next reaction', async () => {

@@ -4,7 +4,7 @@
 // the status table, for every chip, kind, place and sort, reading the list
 // in windows the way the page does.
 import { Effect } from 'effect'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { allTopicsList, type AllTopicsFilter as DomainFilter, type ChannelId } from '@juno/domain'
 import type { AllTopicsFilter, TopicListRow } from '@juno/contract'
 import { listAllTopics, summarizeAllTopics } from '../src/topics/allTopics'

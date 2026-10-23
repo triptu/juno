@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { DEFAULT_QUICK_REACTIONS } from '@juno/contract'
 import { frequentEmojiNames, slackEmojiUseFrom } from '../src/prefs/emojiRules'
 

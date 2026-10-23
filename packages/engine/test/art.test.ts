@@ -6,7 +6,7 @@
 // placeholder.
 import { step } from './step'
 import { controlledSleep } from './controlledClock'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { artRedraw, prefsSet, type TopicRow } from '@juno/contract'
 import { redrawTopic, runAction, runCommand, topicAtom, undoLast } from '@juno/state'
 import { parseRecipe } from '@juno/topic-art'

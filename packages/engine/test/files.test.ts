@@ -3,7 +3,7 @@
 // (files.getUploadURL, the bytes, files.completeUpload, then files.share),
 // show in the pending row at the size the stored message will have, and a
 // failed upload waits for Retry without losing the text or the files.
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import type { FileView, MessageView } from '@juno/contract'
 import { samplePng } from '@juno/fake-slack'
 import { attachFiles, attachmentsAtom, messagesAtom, openTopic, readyFiles, retryMessage, sendMessage, uploadProgressAtom, type ListWindow } from '@juno/state'

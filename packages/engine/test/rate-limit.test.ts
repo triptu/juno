@@ -1,7 +1,7 @@
 // Slack's rate limits (architecture 5.1): a 429 pauses only its method until
 // Retry-After, the engine says it was slowed down while a long pause holds,
 // and the catch-up still converges once the pause ends.
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import type { RunningEngine } from './harness'
 import { apiCalls, bootedEngine, quiet } from './scenario'
 
@@ -33,7 +33,7 @@ describe('rate limits', () => {
     for (const method of ['conversations.history', 'client.counts']) {
       const calls = apiCalls(engine, method)
       const limitedCalls = calls.filter((call) => call.status === 429)
-      expect(limitedCalls.length, method).toBe(times[method])
+      expect<unknown>(limitedCalls.length, method).toBe(times[method])
       // Every call after a 429 of the same method waited out its Retry-After.
       for (const call of limitedCalls) {
         const next = calls.find((later) => later.at > call.at)

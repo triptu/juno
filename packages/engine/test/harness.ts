@@ -32,10 +32,10 @@ import { memoryTransport, type MessagePortLike, type Transport } from '../src/pr
 
 /**
  * How long a harness wait allows by default: half the test timeout
- * (`vitest.config.ts`), so a slow step on a loaded machine still fails with
- * the step's label before the test itself times out.
+ * (`setDefaultTimeout` in packages/testing/src/preload.ts), so a slow step on a
+ * loaded machine still fails with the step's label before the test times out.
  */
-export const WAIT_MS = 45_000
+export const WAIT_MS = 15_000
 
 /** Polls a condition, awaiting async predicates before deciding whether to poll again. */
 export async function waitFor<A>(f: () => A | undefined | Promise<A | undefined>, timeoutMs = WAIT_MS, label = 'condition'): Promise<Exclude<A, undefined>> {

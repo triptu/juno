@@ -1,6 +1,6 @@
 import { loadavg } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { largeSeed } from '@juno/fake-slack'
 import { Effect } from 'effect'
 import { Store, workspacePathsFromDir } from '@juno/store'
@@ -10,7 +10,7 @@ import { startTestEngine } from '../harness'
 /** Each keystroke of a name, as ⌘K's Conversations tab and the New chat picker ask for it. */
 const KEYSTROKES = ['d', 'de', 'dev', 'dev ', 'dev o', 'dev op', 'a', 'al', 'ali', 'alic', 'alice', 'alice w']
 
-describe.skipIf(process.env['JUNO_BENCH'] !== '1')('conversation search on the large seed', () => {
+describe('conversation search on the large seed', () => {
   it('answers each keystroke within the palette budget once the words are indexed', async () => {
     const engine = await startTestEngine({ initial: (fake) => fake.signIn(), fakeOptions: { seed: largeSeed() } })
     try {

@@ -1,5 +1,5 @@
 import { sendMessage } from '@juno/state'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { startTestEngine, waitFor, type RunningEngine } from './harness'
 import { bootedEngine, readDb, valueOf } from './scenario'
 

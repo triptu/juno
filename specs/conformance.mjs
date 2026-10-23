@@ -145,7 +145,12 @@ console.log(`Generated ${replayed} outbox traces (${manifest.length - replayed} 
 
 if (!process.argv.includes('--generate')) {
   const status = await new Promise((resolve) => {
-    const child = spawn('bun', ['run', '--cwd', 'packages/engine', 'vitest', 'run', '--config', 'vitest.conformance.config.ts'], { cwd: root, stdio: 'inherit' })
+    // Each file holds one shard of the replays (outbox-suite.ts) and gets its own process; a file's
+    // replays run concurrently, at most JUNO_CONFORMANCE_CONCURRENCY at once.
+    const files = readdirSync(join(root, 'packages/engine/test/conformance')).filter((name) => name.endsWith('.conformance.ts')).map((name) => `./test/conformance/${name}`)
+    const workers = Number(process.env.JUNO_TEST_WORKERS ?? process.env.JUNO_VITEST_WORKERS ?? 2)
+    const concurrency = Number(process.env.JUNO_CONFORMANCE_CONCURRENCY ?? 6)
+    const child = spawn('bun', ['test', `--parallel=${Math.min(workers, files.length)}`, `--max-concurrency=${concurrency}`, '--timeout=600000', ...files], { cwd: join(root, 'packages/engine'), stdio: 'inherit' })
     child.on('close', resolve)
   })
   console.log(`Conformance runtime: ${((Date.now() - startedAt) / 1000).toFixed(1)} seconds (excludes machine-lock wait).`)

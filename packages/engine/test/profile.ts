@@ -1,6 +1,6 @@
 /** Opt-in diagnostics, excluded from reported suite timings. */
 import { Session } from 'node:inspector/promises'
-import { afterAll, beforeAll } from 'vitest'
+import { afterAll, beforeAll } from 'bun:test'
 
 const enabled = process.env.JUNO_UNIT_PROFILE === '1'
 const phases = new Map<string, { calls: number; wall: number; cpu: number }>()

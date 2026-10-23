@@ -4,7 +4,7 @@
 // engine's are in huddle-pages.test.ts.
 import { copyFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import { sleep, waitFor, WAIT_MS } from './harness'
 import { readDb, restart, valueOf } from './scenario'
 import {
