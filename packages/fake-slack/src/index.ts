@@ -262,6 +262,26 @@ export class FakeSlack {
     if (last !== undefined) this.workspace.reads.set(input.id, last.ts)
   }
 
+  /**
+   * A group DM self shares with `users`, with no messages. Closed (`open:
+   * false`), counts leaves it out, as it does live for a group DM no one has
+   * used for a while. Sends no events: add it before the app signs in.
+   */
+  addGroupDm(input: { id: string; users: ReadonlyArray<string>; open?: boolean }): void {
+    const others = input.users.map((id) => this.workspace.users.get(id)?.name ?? id)
+    this.workspace.addConversation({
+      id: input.id,
+      name: `mpdm-${[this.workspace.users.get(this.selfId)?.name ?? this.selfId, ...others].join('--')}-1`,
+      kind: 'mpim',
+      members: new Set([this.selfId, ...input.users]),
+      created: this.workspace.clock.now() - 30 * 24 * 60 * 60_000,
+      topic: '',
+      purpose: '',
+      isOpen: input.open ?? true,
+      archived: false,
+    })
+  }
+
   /** `user` (self by default) joins a channel. Emits `channel_joined`/`group_joined` to self and `member_joined_channel`. */
   joinChannel(input: { channel: string; user?: string }): void {
     this.workspace.join(input.channel, input.user ?? this.selfId)

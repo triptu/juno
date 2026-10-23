@@ -10,6 +10,7 @@ export const coreFeature = {
     markRead: (fake, i) => fake.markRead(i),
     markThreadRead: (fake, i) => fake.markThreadRead(i),
     addChannel: (fake, i) => fake.addChannel(i),
+    addGroupDm: (fake, i) => fake.addGroupDm(i),
     joinChannel: (fake, i) => fake.joinChannel(i),
     leaveChannel: (fake, i) => fake.leaveChannel(i),
     renameChannel: (fake, i) => fake.renameChannel(i),
