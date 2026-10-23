@@ -21,6 +21,14 @@ export const planWords = (steps) => steps.flatMap((step, index) => [
   ...(index ? ['+'] : []), ...Object.entries(step.env).map(([key, value]) => `${key}=${value}`), step.script, ...step.args,
 ])
 
+export function planCores(kind, options, env = process.env) {
+  const key = `JUNO_RUNNER_${kind.toUpperCase()}_CORES`
+  const value = options.env.findLast((pair) => pair.startsWith(`${key}=`))?.slice(key.length + 1) ?? env[key]
+  const cores = value === undefined ? options.cores : Number(value)
+  if (cores !== undefined && (!Number.isInteger(cores) || cores < 1)) throw new Error(`${key} must be a positive whole number`)
+  return cores
+}
+
 export async function runRunnerPlan(jobs, { self, root, options, log }) {
   const children = new Set()
   forwardSignals(children)
@@ -28,8 +36,9 @@ export async function runRunnerPlan(jobs, { self, root, options, log }) {
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => { cancelled = true })
   log(`remote: SSH plan in ${jobs.length} jobs: ${jobs.map((job) => job.kind).join(', ')}; each waits for runner capacity`)
   const codes = await Promise.all(jobs.map(({ kind, steps }) => new Promise((done) => {
+    const cores = planCores(kind, options)
     const flags = [
-      ...(options.cores !== undefined ? ['--cores', String(options.cores)] : []),
+      ...(cores !== undefined ? ['--cores', String(cores)] : []),
       '--wait', String(options.wait ?? 60),
       ...options.env.flatMap((pair) => ['--env', pair]),
       '--env', 'JUNO_RUNNER_PLAN=single', '--env', 'JUNO_PLAN_SERIAL=1',

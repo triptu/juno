@@ -19,7 +19,7 @@ export function runnerJobSize({ script, args, cores, specsCached = false }, capa
     const files = step.args.filter((arg) => !arg.startsWith('-') && /\.[cm]?[jt]sx?$/.test(arg))
     return files.length === 0 || files.length > 20
   })
-  const requested = steps.some((step) => !['test:desktop', 'test:e2e', 'test:gallery', 'test', 'specs:check'].includes(step.script) && !step.script.startsWith('test:agent')) ? 4
+  const requested = steps.some((step) => !['test:desktop', 'test:browser', 'test:electron', 'test:e2e', 'test:gallery', 'test', 'specs:check'].includes(step.script) && !step.script.startsWith('test:agent')) ? 4
     : unitOnly ? wide ? 2 : 1 : 2
   const reserved = cores ?? Math.min(requested, capacity)
   if (!Number.isSafeInteger(reserved) || reserved < 1 || reserved > capacity) throw new Error(`job needs ${reserved} cores; runner lends ${capacity}`)

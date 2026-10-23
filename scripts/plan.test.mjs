@@ -107,3 +107,12 @@ test('a report download or coordinator failure after successful steps fails the 
   assert.equal(results.every((result) => result.code === 0), false)
   assert.deepEqual(results[2], { ...planned, suite: 'plan', code: 255 })
 })
+
+test('desktop and gallery allocations vary independently and reject invalid core counts', async () => {
+  const { planCores } = await import('./remote/plan.mjs')
+  const options = { env: ['JUNO_RUNNER_DESKTOP_CORES=5', 'JUNO_RUNNER_GALLERY_CORES=3'] }
+  assert.equal(planCores('desktop', options, {}), 5)
+  assert.equal(planCores('gallery', options, {}), 3)
+  assert.equal(planCores('unit', options, {}), undefined)
+  assert.throws(() => planCores('gallery', { env: ['JUNO_RUNNER_GALLERY_CORES=0'] }, {}), /positive whole number/)
+})

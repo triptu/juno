@@ -1,0 +1,1 @@
+- 10-24 03:16 · runner-split-benchmark · Keep the current runner allocation until five same-commit laptop runs compare desktop and gallery together at 2/2, 3/3, 4/4, 5/3 and 4/4 cores. Run them sequentially only after the browser lane lands; retain total time, waits, memory, pressure, outcomes and per-test timings (owner).
