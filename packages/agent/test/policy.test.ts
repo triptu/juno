@@ -168,7 +168,7 @@ describe('the auto-review of a connection call', () => {
       ['Never ask still asks for what cannot be undone', 'never', false, answered('implied', 'delete'), { _tag: 'card', line: 'delete' }],
       ['a review that failed asks under any rule', 'never', false, { _tag: 'failed' }, { _tag: 'card', line: 'failed' }],
     ]
-    for (const [what, rule, clean, review, decision] of table) expect(reviewDecision(rule, clean, review), what).toEqual(decision)
+    for (const [what, owner, clean, answer, decision] of table) expect(reviewDecision(owner, clean, answer), what).toEqual(decision)
   })
 
   it('never takes a call that looks like a delete as reversible or a lookup', () => {

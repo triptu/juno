@@ -314,8 +314,8 @@ test('after a removal, stops watching the session and leaves its interrupt to an
 })
 
 test('shows a session T3 Code started while the account changed, and stops watching it', async () => {
-  let changeAccount = () => {}
-  const { c, start, steer, sends } = await t3([{ ...launch, call: () => { changeAccount(); return json({ threadId: 'thread-test' }) } }, ...TOOLS.slice(1)])
+  let changeAccount: (() => void) | undefined
+  const { c, start, steer, sends } = await t3([{ ...launch, call: () => { changeAccount?.(); return json({ threadId: 'thread-test' }) } }, ...TOOLS.slice(1)])
   // A new sign-in during the launch gives the connection a new account epoch.
   changeAccount = () => { c.turns.store.db.prepare("UPDATE mcp_connections SET epoch = 'account-test' WHERE id = 't3'").run() }
   await start()
@@ -330,21 +330,19 @@ test('shows a session T3 Code started while the account changed, and stops watch
 
 test('sees a session end as soon as t3_thread_wait returns, without another timed read', async () => {
   let state = 'running'
-  let end = () => {}
-  const ended = new Promise<void>((resolve) => { end = resolve })
-  let waiting = () => {}
-  const called = new Promise<void>((resolve) => { waiting = resolve })
+  const ended = Promise.withResolvers<void>()
+  const called = Promise.withResolvers<void>()
   const { c, start, job } = await t3([launch, read(() => ({ status: state, branch: 'fix-test' })), status,
     { name: 't3_thread_wait', inputSchema: { type: 'object', properties: { threadId: str, timeoutMs: { type: 'number' } }, required: ['threadId'] }, call: async () => {
-      waiting()
-      await ended
+      called.resolve()
+      await ended.promise
       return json({ threadId: 'thread-test', status: state, timedOut: false })
     } }])
   await start()
   await c.click()
-  await called
+  await called.promise
   state = 'completed'
-  end()
+  ended.resolve()
   await c.turns.jobs.idle()
   expect(job().phase).toBe('done')
   expect(c.clock.waits).toHaveLength(1)

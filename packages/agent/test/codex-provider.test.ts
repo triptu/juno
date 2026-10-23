@@ -16,9 +16,9 @@ let called: Promise<void>
 beforeEach(async () => {
   h = await providerHarness()
   fake = startFakeCodex()
-  let reached = () => {}
-  called = new Promise((resolve) => { reached = resolve })
-  server = await startFakeMcpServer({ tools: [{ name: 'echo', call: args => { reached(); return String(args.text) } }], bearer: 'test-turn-token' })
+  const reached = Promise.withResolvers<void>()
+  called = reached.promise
+  server = await startFakeMcpServer({ tools: [{ name: 'echo', call: args => { reached.resolve(); return String(args.text) } }], bearer: 'test-turn-token' })
 })
 afterEach(async () => { await server.close(); fake.close(); await h.close() })
 

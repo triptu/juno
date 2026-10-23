@@ -84,17 +84,16 @@ it('asks the fallback model once when the model refuses under its policy, and lo
   const fallback = h.fake.model('google/gemini-3.8-flash')
   const guard = createProviderGuard({ store: h.core.store, transport: h.fake.models, fallback: () => fallback })
   const calls: GuardCall[] = []
-  let logged = () => {}
-  const both = new Promise<void>((resolve) => { logged = resolve })
+  const both = Promise.withResolvers<void>()
   guard.onCall((call) => {
     calls.push(call)
-    if (calls.length === 2) logged()
+    if (calls.length === 2) both.resolve()
   })
   const { revision, context } = request()
   const result = await guard.models.completeSimple(h.model, guard.stamp(revision, h.model, context))
   expect(result).toMatchObject({ stopReason: 'stop', model: 'google/gemini-3.8-flash' })
   expect(h.fake.requests.map((sent) => sent.model)).toEqual(['anthropic/claude-sonnet-5.5', 'google/gemini-3.8-flash'])
-  await both
+  await both.promise
   expect(calls.map((call) => [call.model, call.outcome, call.kind, call.message])).toEqual([
     ['anthropic/claude-sonnet-5.5', 'error', 'policy.fallback', 'HTTP 403'],
     ['google/gemini-3.8-flash', 'ok', '', ''],
