@@ -17,10 +17,12 @@ export function unitTestMatcher(root) {
   const patternsOf = (dir) => {
     if (!patterns.has(dir)) {
       const manifest = join(root, dir, 'package.json')
-      const runsVitest = existsSync(manifest) && /\bvitest\b/.test(JSON.parse(readFileSync(manifest, 'utf8')).scripts?.test ?? '')
+      const command = existsSync(manifest) ? JSON.parse(readFileSync(manifest, 'utf8')).scripts?.test ?? '' : ''
+      const runsBun = /\bbun\b/.test(command)
+      const runsTests = runsBun || /\bvitest\b/.test(command)
       const config = join(root, dir, 'vitest.config.ts')
-      const globs = runsVitest && existsSync(config) ? [...readFileSync(config, 'utf8').matchAll(/include:\s*\[([^\]]*)\]/g)].flatMap((match) => [...match[1].matchAll(/'([^']+)'/g)].map((glob) => glob[1])) : []
-      patterns.set(dir, runsVitest ? (globs.length > 0 ? globs : ['test/**/*.test.ts']).map(globPattern) : [])
+      const globs = runsTests && existsSync(config) ? [...readFileSync(config, 'utf8').matchAll(/include:\s*\[([^\]]*)\]/g)].flatMap((match) => [...match[1].matchAll(/'([^']+)'/g)].map((glob) => glob[1])) : []
+      patterns.set(dir, runsTests ? (globs.length > 0 ? globs : runsBun ? ['**/*.test.ts', '**/*.test.tsx', '**/*.test.js', '**/*.test.mjs'] : ['test/**/*.test.ts']).map(globPattern) : [])
     }
     return patterns.get(dir)
   }
@@ -46,7 +48,7 @@ function scriptImports(root, file, seen = new Set()) {
 export function nodeTestScripts(root, changed) {
   const scripts = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts
   return Object.entries(scripts)
-    .filter(([, command]) => /\bnode --test\b/.test(command))
+    .filter(([, command]) => /\b(?:node --test|bun test)\b/.test(command))
     .map(([script, command]) => {
       const tests = command.split(/\s+/).filter((word) => /\.test\.[cm]?js$/.test(word))
       return { script, reached: tests.flatMap((test) => [...scriptImports(root, test)].filter((file) => changed.includes(file)).map((file) => ({ test, file }))) }
@@ -59,7 +61,7 @@ export function unitTestItems(root, files, changed, closure) {
     .filter(unitTestMatcher(root))
     .map((file) => {
       const dir = file.split('/').slice(0, 2).join('/')
-      const config = [`${dir}/package.json`, `${dir}/vitest.config.ts`, `${dir}/tsconfig.json`]
+      const config = [`${dir}/package.json`, `${dir}/vitest.config.ts`, `${dir}/bunfig.toml`, `${dir}/tsconfig.json`]
       return { suite: 'test', id: file, inputs: new Set([...closure(file), ...config]), own: changed.some((path) => config.includes(path)) }
     })
 }

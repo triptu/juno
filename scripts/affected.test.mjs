@@ -33,7 +33,7 @@ test('a script change runs the root Node test scripts whose tests import it, and
   assert.ok(steps('scripts/check-tokens.mjs').includes('test:repo-tools'))
   assert.ok(steps('scripts/remote/usage.mjs').includes('test:runner'))
   assert.ok(!steps('scripts/check-tokens.mjs').includes('test:runner'))
-  const scripts = Object.values(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts).filter((command) => /\bnode --test\b/.test(command)).join(' ')
+  const scripts = Object.values(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts).filter((command) => /\b(?:node --test|bun test)\b/.test(command)).join(' ')
   for (const file of tracked('scripts/**/*.test.mjs', 'scripts/*.test.mjs')) assert.ok(scripts.includes(file), `${file} is in no root node --test script`)
 })
 
@@ -123,4 +123,17 @@ test('a repair conservatively reruns app suites when a deleted source cannot be 
   const result = plan('--wide', '--graph', '--files', 'packages/domain/src/deleted-rule.ts')
   assert.ok(result.steps.some((step) => step.script === 'test' && step.args.length === 0))
   assert.ok(result.steps.some((step) => step.script === 'test:desktop' && step.args.length === 0))
+})
+
+test('Bun packages keep test and eval file selection after their Vitest config is removed', async (t) => {
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs')
+  const { scratchFolder } = await import('./worktree-folder.mjs')
+  const fixture = mkdtempSync(join(scratchFolder(), 'affected-bun-'))
+  t.after(() => rmSync(fixture, { recursive: true, force: true }))
+  mkdirSync(join(fixture, 'packages/example'), { recursive: true })
+  writeFileSync(join(fixture, 'packages/example/package.json'), '{"scripts":{"test":"bun test"}}')
+  const matches = unitTestMatcher(fixture)
+  assert.ok(matches('packages/example/test/domain.test.ts'))
+  assert.ok(matches('packages/example/eval/behavior.test.ts'))
+  assert.ok(!matches('packages/example/test/domain.perf.ts'))
 })
