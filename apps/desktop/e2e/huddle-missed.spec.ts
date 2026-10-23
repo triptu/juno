@@ -74,7 +74,7 @@ test('old huddles expire and incomplete participation history is not called miss
   await expect(juno.home.item('missedHuddle')).toHaveCount(0)
 })
 
-test('Never hides a missed huddle, Every message restores it, and ignoring the channel does not hide it', async ({ juno, fake }) => {
+test('Never hides a missed huddle, Always restores it, and ignoring the channel does not hide it', async ({ juno, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.sidebar.row('#product').chooseInMenu('notify-never')
@@ -82,7 +82,7 @@ test('Never hides a missed huddle, Every message restores it, and ignoring the c
   fake.control('endHuddle', { channel: 'C0PRODUCT' })
   await revisit(juno)
   await expect(juno.home.item('missedHuddle')).toHaveCount(0)
-  await juno.sidebar.row('#product').chooseInMenu('notify-every')
+  await juno.sidebar.row('#product').chooseInMenu('notify-always')
   await juno.sidebar.row('#product').chooseInMenu('ignore-channel')
   await expect.poll(async () => { await revisit(juno); return juno.home.title('missedHuddle').allTextContents() }).toEqual(['Missed huddle in #product'])
   await juno.home.openItem('missedHuddle')

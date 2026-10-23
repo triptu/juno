@@ -9,7 +9,7 @@
  * (`window.__junoHuddleRing`), and main counts the dock's bounces.
  *
  * Notification hours depend on the clock, so the channels that ring are set
- * to Every message, which rings at any hour; #product is set to Never, which
+ * to Always, which rings at any hour; #product is set to Never, which
  * keeps its card quiet.
  */
 import type { Page } from '@playwright/test'
@@ -27,10 +27,10 @@ const rings = (win: Page) => win.evaluate(() => (window as unknown as RingWindow
 test('someone starts a huddle: the card rings, Join joins, Dismiss hides it, and it goes when the huddle ends', async ({ juno, fake, win }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await juno.sidebar.row('#eng').chooseInMenu('notify-every')
-  await juno.expectToast('#eng: Every message')
-  await juno.sidebar.row('Maya', { exact: true }).chooseInMenu('notify-every')
-  await juno.expectToast('Maya: Every message')
+  await juno.sidebar.row('#eng').chooseInMenu('notify-always')
+  await juno.expectToast('#eng: Always')
+  await juno.sidebar.row('Maya', { exact: true }).chooseInMenu('notify-always')
+  await juno.expectToast('Maya: Always')
   await juno.sidebar.row('#product').chooseInMenu('notify-never')
   await juno.expectToast('#product: Never')
 
@@ -98,10 +98,10 @@ test('someone starts a huddle: the card rings, Join joins, Dismiss hides it, and
 test('a huddle the user started on another device shows no card', async ({ juno, fake, win }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await juno.sidebar.row('#eng').chooseInMenu('notify-every')
-  await juno.expectToast('#eng: Every message')
-  await juno.sidebar.row('#product').chooseInMenu('notify-every')
-  await juno.expectToast('#product: Every message')
+  await juno.sidebar.row('#eng').chooseInMenu('notify-always')
+  await juno.expectToast('#eng: Always')
+  await juno.sidebar.row('#product').chooseInMenu('notify-always')
+  await juno.expectToast('#product: Always')
 
   // The user starts one from their phone; then Maya starts one. Only Maya's has a card.
   fake.control('startHuddle', { channel: 'C0ENG', user: 'U0TUSHAR' })
@@ -117,11 +117,11 @@ test('a huddle the user started on another device shows no card', async ({ juno,
 test('an ignored channel rings like any other, the dock bounces while Juno is behind, and Ring for huddles off keeps it silent', async ({ juno, fake, win }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await juno.sidebar.row('#eng').chooseInMenu('notify-every')
-  await juno.expectToast('#eng: Every message')
+  await juno.sidebar.row('#eng').chooseInMenu('notify-always')
+  await juno.expectToast('#eng: Always')
   await juno.sidebar.selectView('Automated')
-  await juno.sidebar.row('#alerts-prod').chooseInMenu('notify-every')
-  await juno.expectToast('#alerts-prod: Every message')
+  await juno.sidebar.row('#alerts-prod').chooseInMenu('notify-always')
+  await juno.expectToast('#alerts-prod: Always')
   await juno.sidebar.row('#alerts-prod').chooseInMenu('ignore-channel')
   await juno.expectToast('Ignoring #alerts-prod')
 

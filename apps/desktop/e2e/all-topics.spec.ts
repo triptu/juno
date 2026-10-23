@@ -184,12 +184,12 @@ async function actOnTopicRows({ juno, slack }: Pick<Fixtures, 'juno' | 'slack'>)
   await juno.undo()
   await expect(postgres.root.getByTitle('Pinned')).toHaveCount(0)
 
-  // Notify me: Never unfollows: Unfollowed here, gone from the sidebar. Every message follows again; undo unfollows.
+  // Notify me: Never unfollows: Unfollowed here, gone from the sidebar. Always follows again; undo unfollows.
   await postgres.chooseInMenu('notify-never')
   await postgres.expectStatus('Unfollowed')
   await sidebar.row(POSTGRES).expectAbsent()
   await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.remove'), { timeout: 10_000 }).toBe(true)
-  await postgres.chooseInMenu('notify-every')
+  await postgres.chooseInMenu('notify-always')
   await postgres.expectStatus('Open')
   await sidebar.row(POSTGRES).expectVisible()
   await juno.undo()
@@ -198,7 +198,7 @@ async function actOnTopicRows({ juno, slack }: Pick<Fixtures, 'juno' | 'slack'>)
   await postgres.expectStatus('Open')
 
   // A never-followed thread followed from here gets a sidebar row.
-  await allTopics.row(FLAGS).chooseInMenu('notify-matters')
+  await allTopics.row(FLAGS).chooseInMenu('notify-auto')
   await sidebar.row(FLAGS).expectVisible()
 
   // Rename edits the row in place; undo puts the old title back.

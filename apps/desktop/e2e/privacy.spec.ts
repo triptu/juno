@@ -41,8 +41,8 @@ test('privacy mode blurs previews from the account menu, hides notification text
 
   // A notification says where it came from, not what was written. #alerts-prod is a bot channel, in Automated.
   await sidebar.selectView('Automated')
-  await sidebar.row(ALERTS_MAIN).chooseInMenu('notify-every')
-  await juno.expectToast('#alerts-prod: Every message')
+  await sidebar.row(ALERTS_MAIN).chooseInMenu('notify-always')
+  await juno.expectToast('#alerts-prod: Always')
   await sidebar.filter('All')
   slack.as('Leo').postIn('alerts-prod', 'Payroll export failed for 3 people')
   await expect.poll(async () => (await juno.osNotifications()).map((shown) => shown.body), { timeout: 15_000 }).toContain('Message hidden')

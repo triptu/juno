@@ -626,9 +626,9 @@ export class NotificationsPage {
     this.root = win.getByRole('main')
   }
 
-  /** The Notifications or Active in Slack row. */
+  /** The Notification hours or Active in Slack row. */
   hoursRow(which: 'Notifications' | 'Active in Slack'): Locator {
-    return this.root.getByLabel(which, { exact: true })
+    return this.root.getByLabel(which === 'Notifications' ? 'Notification hours' : which, { exact: true })
   }
 
   async setFrom(which: 'Notifications' | 'Active in Slack', label: string): Promise<void> {
@@ -643,18 +643,33 @@ export class NotificationsPage {
     return this.root.getByRole('group', { name: `${which} days` }).getByRole('button', { name: day })
   }
 
-  get matters(): Locator {
-    return this.root.getByRole('textbox', { name: 'What matters to you' })
+  /** The add row's field, disabled until a direction is chosen. */
+  get newInstruction(): Locator {
+    return this.root.getByRole('textbox', { name: 'New instruction', exact: true })
   }
 
-  /** Types into What matters to you and leaves the field, which saves it. */
-  async writeMatters(text: string): Promise<void> {
-    await this.matters.fill(text)
-    await this.matters.blur()
+  get addInstructionButton(): Locator {
+    return this.root.locator('[data-instruction-add]').getByRole('button', { name: 'Add', exact: true })
   }
 
-  /** The Every message or Never row. */
-  level(name: 'Every message' | 'Never'): Locator {
+  /** Chooses the direction in the add row, types the words and presses Add. */
+  async addInstruction(direction: 'Notify me' | "Don't notify", text: string): Promise<void> {
+    await this.root.getByRole('radiogroup', { name: "New instruction: Notify me or Don't notify" }).getByRole('radio', { name: direction }).click()
+    await this.newInstruction.fill(text)
+    await this.addInstructionButton.click()
+  }
+
+  /** The row of the instruction with these words. */
+  instruction(text: string): Locator {
+    return this.root.locator('[data-instruction]').filter({ has: this.win.locator(`input[value="${text.replaceAll('"', '\\"')}"]`) })
+  }
+
+  async removeInstruction(text: string): Promise<void> {
+    await this.instruction(text).getByRole('button', { name: 'Remove instruction' }).click()
+  }
+
+  /** The Always or Never row. */
+  level(name: 'Always' | 'Never'): Locator {
     return this.root.getByLabel(name, { exact: true })
   }
 
@@ -662,12 +677,9 @@ export class NotificationsPage {
     await this.root.getByRole('button', { name: `Remove ${name}` }).click()
   }
 
-  get showWhy(): Locator {
-    return this.root.getByRole('button', { name: 'Show why' })
-  }
-
-  get interrupted(): Locator {
-    return this.root.getByRole('list', { name: 'Messages that interrupted you' })
+  /** Today's Details, which opens the sheet of today's decisions. */
+  get details(): Locator {
+    return this.root.getByRole('button', { name: 'Details', exact: true })
   }
 }
 
@@ -1166,9 +1178,11 @@ export type TopicMenuItem =
   | 'reopen'
   | 'copy-link'
   | 'open-in-slack'
-  | 'notify-every'
-  | 'notify-matters'
+  | 'notify-always'
+  | 'notify-auto'
   | 'notify-never'
+  // Settings › Notifications at How Auto decides.
+  | 'how-auto'
   | 'ignore-channel'
   // What Juno knows about a DM's other person (SPEC 13.8).
   | 'juno-knows'

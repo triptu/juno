@@ -75,9 +75,11 @@ syncedTest('Rina’s thread opens at the "N new" divider, and its ⋯ menu unfol
       'Copy Slack link',
       'Open in Slack',
       'Notify me',
-      '> Every message',
-      '> When it matters ✓',
+      '> Always',
+      '> Auto ✓',
       '> Never',
+      '> -',
+      '> How Auto decides…',
       'Ignore #hiring',
     ])
     // At ⋯'s left edge, 6px under the right island.
@@ -89,8 +91,8 @@ syncedTest('Rina’s thread opens at the "N new" divider, and its ⋯ menu unfol
     await rina.expectAbsent()
     await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.remove'), { timeout: 10_000 }).toBe(true)
 
-    // Every message follows it again, and it comes back; a right-click on the title shows the same menu, under the left island at the title's left edge.
-    const every = await juno.topic.chooseInTitleMenu('notify-every')
+    // Always follows it again, and it comes back; a right-click on the title shows the same menu, under the left island at the title's left edge.
+    const every = await juno.topic.chooseInTitleMenu('notify-always')
     expect(every.labels.slice(0, 8)).toEqual(never.labels.slice(0, 8))
     const title = (await juno.topic.titleButton.boundingBox())!
     expect(Math.round(every.at!.x)).toBe(Math.round(title.x))
@@ -150,7 +152,7 @@ syncedTest('Main’s thread links, its title switcher, its Notify me and its hea
     await juno.topic.expectTitle('Main')
     const { labels } = await juno.topic.chooseInMenu('copy-link')
     expect(labels).toContain('Notify me')
-    expect(labels).toContain('> When it matters ✓')
+    expect(labels).toContain('> Auto ✓')
     expect(labels).not.toContain('Rename')
 
     await juno.topic.contextPill.focus()
@@ -169,7 +171,7 @@ syncedTest('Main’s thread links, its title switcher, its Notify me and its hea
 
 // The Follow step ends with ⌘Z, so the thread is unfollowed again for the Notify me step.
 syncedTest('Follow on an unfollowed thread from Main, then Notify me after it', async ({ juno, slack }) => {
-  await test.step('an unfollowed thread opened from Main shows Follow in Resolve’s place; a click follows it with When it matters, no menu, and ⌘Z undoes it', async () => {
+  await test.step('an unfollowed thread opened from Main shows Follow in Resolve’s place; a click follows it with Auto, no menu, and ⌘Z undoes it', async () => {
     await juno.sidebar.row(ENG_MAIN).open()
     await juno.topic.threadLinkUnder(CHECKOUT).open()
     await juno.topic.expectTitle(CHECKOUT)
@@ -183,11 +185,11 @@ syncedTest('Follow on an unfollowed thread from Main, then Notify me after it', 
     const follow = (await juno.topic.followButton.boundingBox())!
     const title = (await juno.topic.titleButton.boundingBox())!
 
-    // One click follows it, with no menu: When it matters, as Notify me sets it.
+    // One click follows it, with no menu: Auto, as Notify me sets it.
     const { menuOpened } = await juno.topic.follow()
     expect(menuOpened).toBe(false)
     await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.add' && call.args['channel'] === 'C0ENG'), { timeout: 10_000 }).toBe(true)
-    await juno.expectToast('When it matters')
+    await juno.expectToast('Auto')
     await checkout.expectVisible()
     await expect(resolve).toBeVisible()
     // Resolve took Follow's place at Follow's width; the title did not move.
@@ -204,19 +206,19 @@ syncedTest('Follow on an unfollowed thread from Main, then Notify me after it', 
     await expect(resolve).toHaveCount(0)
   })
 
-  await test.step('after Follow, Notify me in ⋯ shows When it matters and changes it', async () => {
+  await test.step('after Follow, Notify me in ⋯ shows Auto and changes it', async () => {
     await juno.sidebar.row(ENG_MAIN).open()
     await juno.topic.threadLinkUnder(CHECKOUT).open()
     await juno.topic.expectTitle(CHECKOUT)
     expect((await juno.topic.follow()).menuOpened).toBe(false)
-    await juno.expectToast('When it matters')
+    await juno.expectToast('Auto')
 
-    // ⋯ › Notify me has When it matters checked; Every message replaces it, and the thread stays followed.
-    const every = await juno.topic.chooseInMenu('notify-every')
-    expect(every.labels).toContain('> When it matters ✓')
-    await juno.expectToast('Every message')
+    // ⋯ › Notify me has Auto checked; Always replaces it, and the thread stays followed.
+    const every = await juno.topic.chooseInMenu('notify-always')
+    expect(every.labels).toContain('> Auto ✓')
+    await juno.expectToast('Always')
     const after = await juno.topic.chooseInMenu('copy-link')
-    expect(after.labels).toContain('> Every message ✓')
+    expect(after.labels).toContain('> Always ✓')
     await juno.sidebar.row(CHECKOUT).expectVisible()
     await expect(juno.topic.header.getByRole('button', { name: 'Resolve', exact: true })).toBeVisible()
   })

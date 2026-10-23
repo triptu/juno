@@ -31,7 +31,7 @@ badgeTest('dock dot follows unread DMs, group DMs and mentions through reads, wa
   await badge('•')
   await juno.sidebar.row('Maya', { exact: true }).chooseInMenu('notify-never')
   await badge('')
-  await juno.sidebar.row('Maya', { exact: true }).chooseInMenu('notify-every')
+  await juno.sidebar.row('Maya', { exact: true }).chooseInMenu('notify-always')
   await badge('•')
   // More unread items keep the same dot, including a mention in the DM.
   const dm = slack.as('Maya').dm('<@U0TUSHAR> Another DM')
