@@ -124,7 +124,11 @@ const frameHandler = (userId: string, sql: StoreReader['Service'], notifications
   const topicId = threadTs === undefined || threadTs === ts ? `m:${channel.id}` : `t:${channel.id}:${threadTs}`
   if (frame.type === 'message' && !mentionsMe && !isDm(channel.kind)) {
     const { settings } = yield* readSettings
-    if (settings.channels[channel.id] !== 'always' && settings.people[user ?? ''] !== 'always' && settings.threads?.[topicId] !== 'always') return
+    const always = settings.channels[channel.id] === 'always' || settings.people[user ?? ''] === 'always' || settings.threads?.[topicId] === 'always'
+    // A reply in a thread the owner follows or started is decided too, whether or not Slack also sends desktop_notification; (channel, ts) keeps one row.
+    const owned = !always && topicId.startsWith('t:') && (yield* sql`SELECT 1 FROM thread_subs WHERE channel = ${channel.id} AND thread_ts = ${threadTs ?? ''} AND subscribed = 1
+      UNION ALL SELECT 1 FROM started_threads WHERE channel = ${channel.id} AND root_ts = ${threadTs ?? ''} LIMIT 1`).length > 0
+    if (!always && !owned) return
   }
   // A group DM is named by its people, as the sidebar names it, not by Slack's "mpdm-…" name.
   const groupName = channel.kind === 'mpim' ? (yield* conversationLabel(channel.id))?.label : undefined

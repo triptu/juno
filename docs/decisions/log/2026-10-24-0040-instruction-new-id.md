@@ -1,0 +1,1 @@
+- 10-24 00:40 · instruction-new-id · An instruction gets a new id whenever its text or direction changes, so a reading made against the old one names an id that is gone and the decision falls through to needs-you (Astra review).

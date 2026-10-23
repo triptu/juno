@@ -194,3 +194,19 @@ it('notifies for your user group but not another group', async () => {
   await waitFor(() => record.shown.some((item) => item.target.kind === 'message' && item.target.source.ts === own.ts) ? true : undefined)
   expect(record.shown.some((item) => item.target.kind === 'message' && item.target.source.ts === other.ts)).toBe(false)
 })
+
+it('decides a plain reply in a followed channel thread from its message frame alone', async () => {
+  const record = recorder()
+  const engine = await bootedEngine(engines, { notifications: { notifier: record.notifier } })
+  const minute = localTime(Date.now()).minutes
+  await runCommand(engine.registry, prefsSet, { key: 'notifications', value: Schema.decodeUnknownSync(Schema.Json)({
+    ...defaultNotificationSettings, alwaysNotify: { followedThreads: true },
+    notificationHours: { days: [0, 1, 2, 3, 4, 5, 6], from: (minute + 1380) % 1440, to: (minute + 60) % 1440 },
+  }) })
+  const followed = readDb(engine, 'cache.db', (db) => db.prepare(`SELECT s.channel, s.thread_ts FROM thread_subs s JOIN conversations c ON c.id = s.channel
+    WHERE s.subscribed = 1 AND c.kind IN ('public', 'private') LIMIT 1`).get()) as { channel: string; thread_ts: string }
+  // Only the message frame: no desktop_notification comes with it.
+  const ts = millisToTs(Date.now() + 1000)
+  engine.fake.emitFrame({ type: 'message', channel: followed.channel, user: 'U0LEO', ts, thread_ts: followed.thread_ts, text: 'Pushed the fix to staging' })
+  await waitFor(() => readDb(engine, 'user.db', (db) => db.prepare('SELECT decided_by FROM notification_log WHERE ts = ?').get(ts))?.decided_by === 'alwaysNotify' ? true : undefined)
+})

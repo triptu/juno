@@ -196,7 +196,7 @@ export const notificationsSetAlwaysNotify = Rpc.make('notifications.setAlwaysNot
 
 const InstructionText = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(500))
 
-/** Adds an instruction (no id) or changes one. Answers with its id. */
+/** Adds an instruction (no id) or changes one. Answers with its id, which is new whenever the text or direction changed. */
 export const notificationsSaveInstruction = Rpc.make('notifications.saveInstruction', {
   payload: { id: Schema.optionalKey(Schema.String), direction: InstructionDirection, text: InstructionText },
   success: Schema.Struct({ id: Schema.String }),

@@ -155,6 +155,10 @@ function decideOnce(candidate: NotificationCandidate, settings: NotificationSett
     ?? (context.aiAssist ? auto(candidate, settings, names, reading) : byAiOff)
 }
 
+/** A thread's level: the stored one, else Never when it is known not to be followed, as Notify me shows it (threads set to Never before 2026-10-23 were only unfollowed). */
+const threadLevel = (candidate: NotificationCandidate, settings: NotificationSettings, thread: string): NotifyLevel | undefined =>
+  settings.threads?.[thread] ?? (candidate.facts?.followed === false ? 'never' : undefined)
+
 const threadOf = (candidate: NotificationCandidate) => (candidate.topicId?.startsWith('t:') ? candidate.topicId : undefined)
 
 /** Always, then Never or an ignored channel, which a direct mention gets through. */
@@ -162,7 +166,7 @@ function byLevels(candidate: NotificationCandidate, settings: NotificationSettin
   const { channel, senderId } = candidate
   const thread = threadOf(candidate)
   const levels: ReadonlyArray<{ readonly target: NotifyTarget; readonly level: NotifyLevel | undefined; readonly name: string }> = [
-    ...(thread === undefined ? [] : [{ target: { kind: 'thread', id: thread } as const, level: settings.threads?.[thread], name: 'This thread' }]),
+    ...(thread === undefined ? [] : [{ target: { kind: 'thread', id: thread } as const, level: threadLevel(candidate, settings, thread), name: 'This thread' }]),
     { target: { kind: 'channel', id: channel.id }, level: settings.channels[channel.id], name: names.where },
     { target: { kind: 'person', id: senderId }, level: settings.people[senderId], name: names.sender },
   ]
