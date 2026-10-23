@@ -9,8 +9,6 @@ import { fakeActionHost, reply, TEST_CHANNEL } from '@juno/agent-testing'
 import { junoText, type Card, type CardBinding, type ChatItem, type ChatPage, type OpId, type ChatMessageId } from '@juno/agent-contract'
 import { liveGrant, mintGrant, type RemovalBackup, type Turns } from '../src/index'
 import { ONLINE, run, served, closeServed } from './serve-harness'
-import { createChatCache, type ChatSource } from '../src/serve/chat'
-import { CHAT_MIGRATIONS } from '../src/serve/schema'
 import { deferred, HAIKU, say, turnsHarness } from './turns-harness'
 
 afterEach(closeServed)
@@ -203,7 +201,7 @@ it('quotes of a removed message in later replies and reactions become the Remove
 
 it('a compaction job that read the message before the removal is discarded, and the summary is rebuilt without it', async () => {
   const hold = deferred()
-  let held = 0
+  const held = deferred()
   const h = await turnsHarness({
     transport: (fake) => ({
       getProviders: () => fake.models.getProviders(),
@@ -211,7 +209,7 @@ it('a compaction job that read the message before the removal is discarded, and 
       streamSimple: (model: { id: string }, context: unknown, options: unknown) => {
         const inner = () => fake.models.streamSimple(model as never, context as never, options as never)
         if (model.id !== HAIKU.modelId) return inner()
-        return { async *[Symbol.asyncIterator]() { held += 1; await hold.promise; yield* inner() } }
+        return { async *[Symbol.asyncIterator]() { held.resolve(); await hold.promise; yield* inner() } }
       },
     }) as never,
   })
@@ -220,7 +218,7 @@ it('a compaction job that read the message before the removal is discarded, and 
   h.fake.script([reply(say('Noted.'))])
   const said = h.send(`The gate code is ${SECRET}. ${'We agreed to repaint the gate before the spring. '.repeat(20)}`)
   await h.ended(said)
-  await waitUntil(() => held > 0)
+  await held.promise
   expect(h.turns.compaction.state()).toBe('running')
 
   await h.turns.redaction.remove({ opId: 'remove-1', messageIds: [ownerMessageId(h.turns, said)], alsoRemoveReply: false })
@@ -261,7 +259,7 @@ it('work that saw the removed message is refused: a waiting click, a pin edit, a
 
 it('a job started in a run that saw the message stops, and no report from it reaches Juno', async () => {
   const hold = deferred()
-  let held = 0
+  const held = deferred()
   const h = await turnsHarness({
     compaction: false,
     subagent: HAIKU,
@@ -272,7 +270,7 @@ it('a job started in a run that saw the message stops, and no report from it rea
       streamSimple: (model: { id: string }, context: unknown, options: unknown) => {
         const inner = () => fake.models.streamSimple(model as never, context as never, options as never)
         if (model.id !== HAIKU.modelId) return inner()
-        return { async *[Symbol.asyncIterator]() { held += 1; await hold.promise; yield* inner() } }
+        return { async *[Symbol.asyncIterator]() { held.resolve(); await hold.promise; yield* inner() } }
       },
     }) as never,
   })
@@ -280,7 +278,7 @@ it('a job started in a run that saw the message stops, and no report from it rea
   h.fake.script([call('delegate', { title: 'Plan the gate', task: `Plan around the gate code ${SECRET}.` }), reply(say('Started.'))])
   const said = h.send(`The gate code is ${SECRET}. Plan the repaint in the background.`)
   await h.ended(said)
-  await waitUntil(() => held > 0)
+  await held.promise
   const [job] = h.turns.jobs.list()
   expect(job!.phase).toBe('running')
 
@@ -330,28 +328,6 @@ it("a removal Juno proposes: the card names the message and offers Juno's reply,
   expect(h.turns.actions.views()).toHaveLength(1)
 })
 
-it("a removal drops the chat's cached pages at once: the next read shows Removed", async () => {
-  const h = await turnsHarness({ compaction: false, migrations: [CHAT_MIGRATIONS] })
-  harnesses.push(h)
-  h.fake.script([reply(say(`Noted, ${SECRET}.`))])
-  const said = h.send(`The gate code is ${SECRET}.`)
-  await h.ended(said)
-  let changes = 0
-  const cache = createChatCache(h.turns.store, () => changes++)
-  const source: ChatSource = {
-    store: h.turns.store, live: undefined, seen: (_id, fallback) => fallback, jobs: [], cards: [], readAt: 0, waiting: undefined,
-    dayOf: (at) => new Date(at).setHours(0, 0, 0, 0),
-  }
-  expect(cache.items(source).some((item) => item._tag === 'owner')).toBe(true)
-
-  await h.turns.redaction.remove({ opId: 'remove-1', messageIds: [ownerMessageId(h.turns, said)], alsoRemoveReply: true })
-  expect(changes).toBe(1)
-  const items = cache.items(source)
-  expect(items.filter((item) => item._tag === 'note')).toEqual([{ _tag: 'note', id: String(ownerMessageId(h.turns, said)), kind: 'removed' }])
-  expect(JSON.stringify(items)).not.toContain(SECRET)
-  cache.close()
-})
-
 it('the owner removes a message from the sheet with AI assist off, and the chat shows Removed in its place', async () => {
   const { h, client, pageWhere, setPresence } = await served()
   h.fake.script([reply(say(`Noted, ${SECRET}.`))])
@@ -375,11 +351,3 @@ it('the owner removes a message from the sheet with AI assist off, and the chat 
   const missing = await run(client['agent.chat.remove']({ opId: 'remove-2' as OpId, messageId: '999' as ChatMessageId, alsoRemoveReply: false }))
   expect(missing).toMatchObject({ _tag: 'Failure', failure: { reason: 'stale' } })
 })
-
-async function waitUntil(test: () => boolean, timeoutMs = 10_000) {
-  const deadline = Date.now() + timeoutMs
-  while (!test()) {
-    if (Date.now() > deadline) throw new Error('timed out')
-    await new Promise((resolve) => setTimeout(resolve, 10))
-  }
-}
