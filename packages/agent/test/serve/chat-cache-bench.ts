@@ -1,13 +1,10 @@
-/** Run by the benchmark test in an isolated process with GC available on both sides. */
+/** Run by the benchmark (chat-cache.perf.ts) in its own process, under Bun so GC can be forced. */
 import assert from 'node:assert/strict'
 import { Session } from 'node:inspector/promises'
 import { writeFileSync } from 'node:fs'
 import { CardId, JobId } from '@juno/agent-contract'
 import { createChatCache, windowOf } from '../../src/serve/chat'
-import { chatItems } from './full-rebuild'
 import { chatFixture } from './cache-fixture'
-
-export type BenchmarkMode = 'full' | 'cached'
 
 const percentile = (values: number[], p: number) => values.toSorted((a, b) => a - b)[Math.floor(values.length * p)]!
 
@@ -17,13 +14,11 @@ source.store.db.prepare("INSERT INTO runs (id, op_id, origin, h, clean, started_
 source = { ...source, live: { runId: 'live', opId: 'live', origin: 'owner', bubbles: [], status: {} },
   cards: [{ runId: 'live', at: source.store.now() + 3_000_000, card: { _tag: 'task', id: CardId.make('bench-card'), jobId: JobId.make('bench-job'), kind: 'subagent', title: 'Task', where: 'Juno', phase: 'running' } }] }
 
-const cached = process.argv[2] === 'cached'
-const gc = globalThis.gc
-assert(gc, 'start this benchmark with --expose-gc')
+const gc = () => Bun.gc(true)
 gc()
 const initialHeap = process.memoryUsage().heapUsed
-const cache = cached ? createChatCache(source.store) : undefined
-const build = () => windowOf(cache?.items(source) ?? chatItems(source), { _tag: 'latest', limit: 40 })
+const cache = createChatCache(source.store)
+const build = () => windowOf(cache.items(source), { _tag: 'latest', limit: 40 })
 const write = source.store.db.prepare("INSERT INTO reactions (op_id, target_kind, target_id, by, emoji, at) VALUES (?, 'bubble', 'run-2499:0', 'owner', ?, 0)")
 let page = build()
 gc()
@@ -80,7 +75,7 @@ try {
   }
   if (session) {
     const result = await session.post('Profiler.stop')
-    writeFileSync(`${profile}/${cached ? 'cached' : 'full'}-${process.pid}.cpuprofile`, JSON.stringify(result.profile))
+    writeFileSync(`${profile}/cached-${process.pid}.cpuprofile`, JSON.stringify(result.profile))
     session.disconnect()
   }
   gc()
@@ -90,4 +85,4 @@ try {
     warmHeap: warmHeap - initialHeap, retainedHeap, rss: process.memoryUsage().rss, peakRss: process.resourceUsage().maxRSS * 1024,
     bytes, events: eventMs.length, eventMs, queryMs,
   }))
-} finally { cache?.close(); fixture.close() }
+} finally { cache.close(); fixture.close() }

@@ -38,21 +38,20 @@ another connection's writes require this hook.
 
 ## Verification and measurement
 
-`bun run remote test:agent test/serve` runs the cache tests, benchmark and existing
-chat RPC tests. The randomized test compares every complete projection and five
-window kinds with the frozen WP13b implementation in
-`test/serve/full-rebuild.ts` (commit `b94ec99bd3`). It covers archive edits and
-removal, redaction, read marks, source changes, live bubbles, card changes, retry
-aliases, replies and rolled-back transactions. That reference is deliberately
-independent of the cache implementation.
+`bun test test/serve` (from `packages/agent`) runs the cache tests. The randomized
+test applies archive edits and removal, redaction, read marks, source changes, live
+bubbles, card changes, retry aliases, replies and rolled-back transactions, and
+after each one compares the warm cache's rows with a cache built cold on the same
+store, so every in-place update must give what a full build gives. The same file
+checks that untouched rows keep their identity, that a redaction clears every
+cache on the database, the "New" divider inside a group, and that the latest
+40-row window of a 5,000-message chat is under 200 KB.
 
 The benchmark seeds 5,000 synthetic messages in the real SQLite schema and keeps
 a live run and a task card. `bun run perf --unit` runs `test/serve/chat-cache.perf.ts`
-on the Mac under the exclusive heavy lock, with one Vitest worker and no file
-parallelism. Normal tests retain one cached correctness/payload scenario and
-the randomized comparisons, without latency gates.
-The 5 ms and 50 ms p95 limits apply to the events of all five cached runs together, as every budget in `docs/performance.md` is a p95 over the runs of its scenario; each run's own p95 is still reported. Five fresh Node processes measure the cached projection; setting
-`JUNO_CHAT_BENCH_REPORT` also measures the original projection for comparison. Each process warms up for ten events, then
+on the Mac under the exclusive heavy lock. The normal tests have no latency gates.
+The 5 ms and 50 ms p95 limits apply to the events of all five runs together, as every budget in `docs/performance.md` is a p95 over the runs of its scenario; each run's own p95 is still reported. Five fresh Bun processes
+(`test/serve/chat-cache-bench.ts`) measure the cached projection. Each process warms up for ten events, then
 measures 100 alternating reaction writes, status changes, card updates, live bubble appends
 and read marks through
 the encoded 40-row window. It checks the changed value on every iteration. No
@@ -62,10 +61,10 @@ agent's page preparation, not write-to-pixels latency.
 The check fails above 5 ms p95 for queries after an in-place update, 50 ms p95 from
 any event through
 encoding (both over the five runs' events together), or 200 KB for the snapshot (`docs/performance.md`). It also caps retained
-cache heap at 32 MiB. Memory is measured after explicit GC, relative to the seeded
+cache heap at 32 MiB. Memory is measured after `Bun.gc(true)`, relative to the seeded
 process before creating its projection; RSS and peak RSS are reported separately.
 Set `JUNO_CHAT_BENCH_REPORT` to save the JSON results. Set `JUNO_CHAT_PROFILE` to an
-existing directory to capture one profiling pair instead of five timing pairs;
+existing directory to capture one profiled run instead of five timed runs;
 profiled timings are not comparison results.
 
 ## Results, 2026-10-17
@@ -124,6 +123,4 @@ and memo lookups when an append or read mark changes layout. Profiled timings
 were excluded from the numbers above.
 
 Verification: the merged branch passed `bun run affected` (typechecks, lint, affected
-unit tests and desktop e2e) and `bun run remote test:agent` (184 tests). The benchmark's
-runner is a type dependency of its test, so `affected` follows changes to the
-child script, fixture and full-rebuild reference as well as the cache.
+unit tests and desktop e2e) and `bun run remote test:agent` (184 tests).
