@@ -48,7 +48,10 @@ export function writeRecord(status, runId, summary) {
   const archive = (id, record) => {
     const folder = join(status, 'verify-main', 'commits', record.commit)
     mkdirSync(folder, { recursive: true })
-    writeFileSync(join(folder, `${id}.json`), `${JSON.stringify(record, null, 2)}\n`)
+    const target = join(folder, `${id}.json`)
+    const temporary = `${target}.${process.pid}.tmp`
+    writeFileSync(temporary, `${JSON.stringify(record, null, 2)}\n`)
+    renameSync(temporary, target)
   }
   if (existsSync(latest)) {
     const previous = JSON.parse(readFileSync(latest, 'utf8'))
