@@ -5,8 +5,7 @@
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { measureLayoutShift } from '@juno/testing/layout-shift'
-import { expect, launchApp, test } from './fixtures'
-import { Juno } from './driver/juno'
+import { expect, test } from './fixtures'
 
 // Starts signed in and synced (README, "Synced start").
 test.use({ synced: true })
@@ -45,6 +44,7 @@ test('a reply in a thread shows at once and settles in place, posted once', asyn
 
   // The answer waits, so the pending row is on screen until it is released.
   fake.holdNext({ method: 'chat.postMessage', before: true })
+  await expect(topic.composerField).toBeVisible()
   const field = await topic.composerField.boundingBox()
   await topic.send('Thursday works for the freeze')
   await expect(topic.message('Thursday works for the freeze')).toHaveAttribute('data-pending', 'sending')
@@ -106,7 +106,7 @@ test('a refused send stays in the row with Retry and Delete draft', async ({ jun
   expect(fake.messages('C0ENG').filter((m) => m.text === 'Please drop this one')).toHaveLength(0)
 })
 
-test('a draft is kept per topic across tab switches and a restart', async ({ juno, running, userData, fake, slackApp }) => {
+test('a draft is kept per topic across tab switches and a restart', async ({ juno, relaunch, userData, fake }) => {
   const { topic, sidebar } = juno
   await sidebar.row(POSTGRES).open()
   await topic.composer.fill('Half a thought about the freeze')
@@ -124,17 +124,10 @@ test('a draft is kept per topic across tab switches and a restart', async ({ jun
       return topic !== undefined && state.active?.place?.topicId === topic && state.tabs.length === 2
     })
     .toBe(true)
-  await running.close()
-
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
-  try {
-    const restarted = new Juno(again.app, again.win)
-    await restarted.tabs.menu('previous-tab')
-    await restarted.topic.expectTitle(POSTGRES)
-    await expect(restarted.topic.composer).toHaveValue('Half a thought about the freeze')
-  } finally {
-    await again.close()
-  }
+  const restarted = await relaunch()
+  await restarted.tabs.menu('previous-tab')
+  await restarted.topic.expectTitle(POSTGRES)
+  await expect(restarted.topic.composer).toHaveValue('Half a thought about the freeze')
 })
 
 test('the composer grows to about eight lines, then scrolls inside', async ({ juno }) => {

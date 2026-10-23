@@ -6,8 +6,8 @@
 // each tab shows its topic's art or the DM person's photo, and a tab not
 // viewed for a day closes by itself.
 import { expectNoLayoutShift } from '@juno/testing/layout-shift'
-import { expect, launchApp, syncedTest, test } from './fixtures'
-import { Juno } from './driver/juno'
+import { expect, syncedTest, test } from './fixtures'
+import { schemeUrl, type Juno } from './driver/juno'
 import { readUserDb, savedTabs, threadId } from './driver/userDb'
 
 test.describe.configure({ timeout: 120_000 })
@@ -140,7 +140,7 @@ async function appMenuMovesBetweenTabs(juno: Juno): Promise<void> {
   await tabs.expectActive(ROADMAP)
 }
 
-syncedTest('⌘W held down closes a tab per press, even when the tabs it lands on were put away', async ({ juno, running, userData, fake, slackApp, slack }) => {
+syncedTest('⌘W held down closes a tab per press, even when the tabs it lands on were put away', async ({ juno, relaunch, userData, fake, slack }) => {
   const { sidebar, tabs } = juno
   const topics = [POSTGRES, RINA, ROADMAP, OFFSITE, 'Unrelated: has anyone looked at the', 'p95 on /v2/search jumped to 1.8s', 'Two options for the thread list', 'Final copy for pricing is in']
   await sidebar.row(topics[0]!).open()
@@ -149,29 +149,19 @@ syncedTest('⌘W held down closes a tab per press, even when the tabs it lands o
   await tabs.expectActive(POSTGRES)
   // The save has reached the engine.
   await expect.poll(() => savedTabs(userData, fake.teamId)).toEqual({ tabs: topics.map((title) => ({ place: threadId(slack, title), pinned: false })), active: 0 })
-  await running.close()
-
   // After a relaunch only the active tab has its topic loaded, so showing any other one waits for the engine.
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
-  try {
-    const restarted = new Juno(again.app, again.win)
-    await restarted.tabs.expectCount(topics.length)
-    await restarted.tabs.expectActive(POSTGRES)
-    // Three presses in one go, as the key repeats.
-    await again.app.evaluate(({ Menu, BrowserWindow }) => {
-      const close = Menu.getApplicationMenu()!.getMenuItemById('close-tab')!
-      for (let press = 0; press < 3; press++) close.click(undefined, BrowserWindow.getAllWindows()[0])
-    })
-    await restarted.tabs.expectCount(topics.length - 3)
-    await restarted.win.waitForTimeout(500)
-    await restarted.tabs.expectCount(topics.length - 3)
-    expect(await restarted.tabs.titles()).not.toContain(expect.stringMatching(/^Draft plan/))
-  } finally {
-    await again.close()
-  }
+  const restarted = await relaunch()
+  await restarted.tabs.expectCount(topics.length)
+  await restarted.tabs.expectActive(POSTGRES)
+  // Three presses in one go, as the key repeats.
+  await restarted.surface.appMenu('close-tab', 3)
+  await restarted.tabs.expectCount(topics.length - 3)
+  await restarted.win.waitForTimeout(500)
+  await restarted.tabs.expectCount(topics.length - 3)
+  expect(await restarted.tabs.titles()).not.toContain(expect.stringMatching(/^Draft plan/))
 })
 
-syncedTest('tabs survive a restart', async ({ juno, running, userData, fake, slackApp, slack }) => {
+syncedTest('tabs survive a restart', async ({ juno, relaunch, userData, fake, slack }) => {
   const { sidebar, tabs } = juno
   await sidebar.row(POSTGRES).open()
   await sidebar.row(RINA).openInNewTab()
@@ -180,21 +170,14 @@ syncedTest('tabs survive a restart', async ({ juno, running, userData, fake, sla
   await tabs.expectActive(OFFSITE)
   // The save has reached the engine.
   await expect.poll(() => savedTabs(userData, fake.teamId)).toEqual({ tabs: [POSTGRES, RINA, ROADMAP, OFFSITE].map((title) => ({ place: threadId(slack, title), pinned: false })), active: 3 })
-  await running.close()
-
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
-  try {
-    const restarted = new Juno(again.app, again.win)
-    await restarted.tabs.expectCount(4)
-    await expect.poll(() => restarted.tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/), expect.stringMatching(/^Proposal/), expect.stringMatching(/^Can eng/)])
-    await restarted.tabs.expectActive(OFFSITE)
-    await restarted.sidebar.row(OFFSITE).expectVisible()
-  } finally {
-    await again.close()
-  }
+  const restarted = await relaunch()
+  await restarted.tabs.expectCount(4)
+  await expect.poll(() => restarted.tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/), expect.stringMatching(/^Proposal/), expect.stringMatching(/^Can eng/)])
+  await restarted.tabs.expectActive(OFFSITE)
+  await restarted.sidebar.row(OFFSITE).expectVisible()
 })
 
-syncedTest('tabs drag to a new place, move with ⌃⇧← and ⌃⇧→, and keep their order after a restart', async ({ juno, running, userData, fake, slackApp, slack }) => {
+syncedTest('tabs drag to a new place, move with ⌃⇧← and ⌃⇧→, and keep their order after a restart', async ({ juno, relaunch, userData, fake, slack }) => {
   const { sidebar, tabs } = juno
   await sidebar.row(POSTGRES).open()
   await sidebar.row(RINA).openInNewTab()
@@ -232,15 +215,9 @@ syncedTest('tabs drag to a new place, move with ⌃⇧← and ⌃⇧→, and kee
 
   // The order has reached the engine.
   await expect.poll(() => savedTabs(userData, fake.teamId)?.tabs.map((tab) => tab.place)).toEqual([ROADMAP, POSTGRES, RINA].map((title) => threadId(slack, title)))
-  await running.close()
-  const again = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
-  try {
-    const restarted = new Juno(again.app, again.win)
-    await restarted.tabs.expectCount(3)
-    await expect.poll(() => restarted.tabs.titles()).toEqual([expect.stringMatching(/^Proposal/), expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/)])
-  } finally {
-    await again.close()
-  }
+  const restarted = await relaunch()
+  await restarted.tabs.expectCount(3)
+  await expect.poll(() => restarted.tabs.titles()).toEqual([expect.stringMatching(/^Proposal/), expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/)])
 })
 
 syncedTest('a topic tab shows its art and a DM tab the person\'s photo', async ({ juno }) => {
@@ -254,7 +231,7 @@ syncedTest('a topic tab shows its art and a DM tab the person\'s photo', async (
   await expect(tabs.tile(POSTGRES)).toHaveAttribute('data-topic-art', /^(art|placeholder)$/)
   for (const title of [OFFSITE, 'Maya']) {
     const photo = tabs.tile(title)
-    await expect(photo).toHaveAttribute('src', /^juno:\/\/files\/avatar/)
+    await expect(photo).toHaveAttribute('src', new RegExp(`${schemeUrl('files').source}avatar`))
     await expect.poll(() => photo.evaluate((img) => img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0)).toBe(true)
   }
   // The DM photo is the URL the sidebar row shows, so it was loaded already.
@@ -286,7 +263,7 @@ test('a tab not viewed for a day closes by itself, ⌘⇧T brings it back, and a
   await tabs.expectActive(POSTGRES)
 })
 
-syncedTest('"+" sits one tab gap after the last tab, level with the tabs, and stays at the end of the strip when the tabs scroll', async ({ juno, app }) => {
+syncedTest('"+" sits one tab gap after the last tab, level with the tabs, and stays at the end of the strip when the tabs scroll', async ({ juno }) => {
   const { sidebar, tabs } = juno
 
   // `strip` is the tablist, the scroller the tabs sit in.
@@ -313,7 +290,7 @@ syncedTest('"+" sits one tab gap after the last tab, level with the tabs, and st
   await expectAfterLastTab()
 
   // A narrow window: the tabs overflow and scroll, and "+" stays in view at the strip's end.
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(760, 600))
+  await juno.setWindowSize(760, 600)
   await sidebar.row(ROADMAP).openInNewTab()
   await sidebar.row(OFFSITE).openInNewTab()
   await expect.poll(() => tabs.root.evaluate((list) => list.scrollWidth > list.clientWidth)).toBe(true)

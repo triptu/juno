@@ -55,7 +55,7 @@ export class TestHost implements EngineHooks {
     child.on('message', (message: HostMessage) => {
       if (message.type === 'ask') {
         const reply: WorkerMessage = { type: 'reply', id: message.id, value: fake.signIn() }
-        child.send(reply)
+        if (child.connected) child.send(reply, () => undefined)
       } else if (message.type === 'answer') {
         const waiting = this.#answers.get(message.id)
         this.#answers.delete(message.id)
@@ -71,12 +71,16 @@ export class TestHost implements EngineHooks {
   }
 
   #command<T>(command: HostCommand): Promise<T> {
-    if (this.#exited) return Promise.reject(new Error('The test host has exited'))
+    if (this.#exited || !this.#child.connected) return Promise.reject(new Error('The test host has exited'))
     const id = ++this.#next
     return new Promise<T>((resolve, reject) => {
       this.#answers.set(id, { resolve: resolve as (value: unknown) => void, reject })
       const message: WorkerMessage = { type: 'command', id, command }
-      this.#child.send(message)
+      this.#child.send(message, (error) => {
+        if (error === null) return
+        this.#answers.delete(id)
+        reject(error)
+      })
     })
   }
 

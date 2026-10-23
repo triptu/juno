@@ -66,7 +66,10 @@ export type WorkerMessage =
   | { readonly type: 'command'; readonly id: number; readonly command: HostCommand }
   | { readonly type: 'reply'; readonly id: number; readonly value: Credentials }
 
-const send = (message: HostMessage) => process.send?.(message)
+// The worker may be gone already (a test that timed out); nothing is left to tell.
+const send = (message: HostMessage) => {
+  if (process.connected) process.send?.(message, undefined, undefined, () => undefined)
+}
 
 const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',

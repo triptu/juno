@@ -326,7 +326,8 @@ syncedTest("pressing a row selects it, the keyboard moves the selection, and Tab
   })
 })
 
-syncedTest('zooming in from the View menu keeps the whole sidebar inside the window', async ({ juno, app, win }) => {
+// Zoom is main's: the View menu's items and the window's minimum size.
+syncedTest('zooming in from the View menu keeps the whole sidebar inside the window', { tag: '@electron' }, async ({ juno, app, win }) => {
   await juno.sidebar.row(POSTGRES).expectVisible()
 
   // The smallest window, then View > Zoom In eight times (about 200%).

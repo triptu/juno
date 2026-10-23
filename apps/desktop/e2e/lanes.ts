@@ -5,5 +5,14 @@
  * Every other file runs only in the electron project.
  */
 export const BROWSER_SPECS: ReadonlyArray<string> = [
+  'actions.spec.ts',
+  'all-topics.spec.ts',
+  'home-write.spec.ts',
+  'message-menu.spec.ts',
+  'palette.spec.ts',
+  'send.spec.ts',
+  'sidebar.spec.ts',
+  'tabs.spec.ts',
   'topic.spec.ts',
+  'views.spec.ts',
 ]

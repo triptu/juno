@@ -20,7 +20,8 @@ export interface AppSurface {
   /** Disarms the next choice; answers whether a menu took it first. */
   disarmMenu(expected: string): Promise<boolean>
   releaseMenu(): Promise<void>
-  appMenu(id: AppMenuItem): Promise<void>
+  /** Clicks an app menu item `presses` times in one go, as a held key repeats it. */
+  appMenu(id: AppMenuItem, presses?: number): Promise<void>
   /** An app menu item's label, which names what it will do. */
   menuLabel(id: 'toggle-sidebar' | 'toggle-privacy'): Promise<string | undefined>
   clipboard(): Promise<string>
@@ -30,8 +31,8 @@ export interface AppSurface {
   aiCalls(): Promise<Record<string, number>>
   /** The three-finger swipe. */
   swipe(direction: 'left' | 'right'): Promise<void>
-  /** The window's content size. */
-  setWindowSize(width: number, height: number): Promise<void>
+  /** The window's size; the height stays when it is left out. The browser has no frame, so its page takes the size. */
+  setWindowSize(width: number, height?: number): Promise<void>
 }
 
 export type WorkPassName = 'title' | 'art' | 'home' | 'automated'
@@ -121,12 +122,12 @@ export function electronSurface(app: ElectronApplication): AppSurface {
         return taken
       }, expected),
     releaseMenu: () => app.evaluate(() => (globalThis as unknown as MainHooks).junoTest.contextMenu.release?.()),
-    appMenu: (id) =>
-      app.evaluate(({ Menu, BrowserWindow }, itemId) => {
+    appMenu: (id, presses = 1) =>
+      app.evaluate(({ Menu, BrowserWindow }, { itemId, times }) => {
         const item = Menu.getApplicationMenu()?.getMenuItemById(itemId)
         if (!item) throw new Error(`No menu item ${itemId}`)
-        item.click(undefined, BrowserWindow.getAllWindows()[0])
-      }, id),
+        for (let press = 0; press < times; press++) item.click(undefined, BrowserWindow.getAllWindows()[0])
+      }, { itemId: id, times: presses }),
     menuLabel: (id) => app.evaluate(({ Menu }, itemId) => Menu.getApplicationMenu()?.getMenuItemById(itemId)?.label, id),
     clipboard: () => app.evaluate(({ clipboard }) => clipboard.readText()),
     browserLinks: () => app.evaluate(() => [...(globalThis as unknown as MainHooks).junoTest.browserLinks]),
@@ -139,7 +140,8 @@ export function electronSurface(app: ElectronApplication): AppSurface {
       }, direction),
     setWindowSize: (width, height) =>
       app.evaluate(({ BrowserWindow }, size) => {
-        BrowserWindow.getAllWindows()[0]?.setContentSize(size.width, size.height)
+        const window = BrowserWindow.getAllWindows()[0]!
+        window.setSize(size.width, size.height ?? window.getSize()[1]!)
       }, { width, height }),
   }
 }
@@ -177,7 +179,10 @@ export function webSurface(page: Page, engine: EngineHooks): AppSurface {
         return taken
       }, expected),
     releaseMenu: () => page.evaluate(() => (window as unknown as PageSeam).__junoWebTest.contextMenu.release?.()),
-    appMenu: (id) => page.evaluate((command) => (window as unknown as PageSeam).__junoWebTest.menu(command), COMMANDS[id]),
+    appMenu: (id, presses = 1) =>
+      page.evaluate(({ command, times }) => {
+        for (let press = 0; press < times; press++) (window as unknown as PageSeam).__junoWebTest.menu(command)
+      }, { command: COMMANDS[id], times: presses }),
     // As main names them from what the page reported (`setAppMenu`).
     menuLabel: async (id) => {
       const params = await page.evaluate(() => Object.fromEntries(new URL(location.href).searchParams))
@@ -192,7 +197,7 @@ export function webSurface(page: Page, engine: EngineHooks): AppSurface {
     swipe: async () => {
       throw new Error('The swipe is an Electron window event. Tag the test @electron.')
     },
-    setWindowSize: (width, height) => page.setViewportSize({ width, height }),
+    setWindowSize: (width, height) => page.setViewportSize({ width, height: height ?? page.viewportSize()?.height ?? 800 }),
   }
 }
 

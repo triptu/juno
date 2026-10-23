@@ -21,13 +21,22 @@ export async function startWebApp(
   snapshot: WebSnapshot | undefined,
   options: { readonly sidebarTrace: boolean; readonly sendTrace: boolean; readonly engine: EngineOptions },
 ): Promise<RunningApp> {
+  const timings = process.env.JUNO_E2E_TIMINGS === '1'
+  let at = performance.now()
+  const lap = (name: string) => {
+    if (timings) console.log(`e2e timing: ${name} ${Math.round(performance.now() - at)} ms`)
+    at = performance.now()
+  }
   const host = await pool.start(fake, { userData, aliases: snapshot === undefined ? [] : [snapshot.origin], engine: options.engine })
+  lap('host')
   try {
     if (options.sidebarTrace) await page.addInitScript(startSidebarTrace)
     if (options.sendTrace) await page.addInitScript(startSendTrace)
     await page.goto(`${host.url}?e2e=1`)
+    lap('page')
     if (snapshot !== undefined) {
       await new Juno(webSurface(page, host), page).waitForSync()
+      lap('warm-sync')
       if (snapshotState(fake) !== snapshot.fakeState || fake.server.sockets.size !== 1) throw new Error('The fake no longer matches the synced snapshot this test started from. Something in the test setup or the warm boot changed the fake; sign in instead (synced: false), or remove the difference.')
     }
   } catch (error) {

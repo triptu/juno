@@ -44,6 +44,14 @@ export interface Fixtures {
   readonly slackApp: SlackAppFixture
   readonly userData: string
   readonly running: RunningApp
+  /**
+   * Quits the app and opens it again on the same data folder, against the same
+   * fake, and answers the driver for it: what a test needs to show that state
+   * survives a relaunch. The browser project restarts the host's engine and
+   * reloads the page; what main alone keeps (launch.json, the window) is
+   * Electron's to test.
+   */
+  readonly relaunch: (options?: Pick<LaunchOptions, 'aiJobs' | 'cacheMigration'>) => Promise<Juno>
   readonly app: ElectronApplication
   readonly win: Page
   readonly juno: Juno
@@ -188,7 +196,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   updateServer: [undefined, { option: true }],
   sidebarTrace: [false, { option: true }],
   sendTrace: [false, { option: true }],
-  running: async ({ lane, fake, userData, syncedStart, aiJobs, fakeAiDelayMillis, screenShared, updateServer, sidebarTrace, sendTrace, timing, hostPool, page }, use, testInfo) => {
+  running: async ({ lane, fake, slackApp, userData, syncedStart, aiJobs, fakeAiDelayMillis, screenShared, updateServer, sidebarTrace, sendTrace, timing, hostPool, page }, use, testInfo) => {
     if (lane === 'web') {
       if (screenShared || updateServer !== undefined) throw new Error('screenShared and updateServer are Electron launch options; tag the test @electron.')
       const running = await startWebApp(hostPool, page, fake, userData, syncedStart?.snapshot, {
@@ -200,7 +208,6 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
       await running.close()
       return
     }
-    const slackApp = await slackAppFor(fake)
     const running = await launchApp(userData, {
       fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword,
       ...(timing === undefined ? {} : { timing }),
@@ -221,7 +228,25 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     if (sidebarTrace && testInfo.status !== testInfo.expectedStatus) await attachSidebarTrace(running.win, testInfo)
     if (sendTrace && testInfo.status !== testInfo.expectedStatus) await attachSendTrace(running.win, fake, testInfo)
     await running.close()
-    await slackApp.remove()
+  },
+  relaunch: async ({ lane, running, fake, slackApp, userData, aiJobs, fakeAiDelayMillis, timing, page }, use) => {
+    let latest: RunningApp = running
+    await use(async (options = {}) => {
+      if (lane === 'web') {
+        const host = running.host!
+        await host.restart({ ...(options.aiJobs === undefined ? {} : { aiJobs: options.aiJobs }), ...(options.cacheMigration === undefined ? {} : { cacheMigration: options.cacheMigration }) })
+        await page.reload()
+        return new Juno(webSurface(page, host), page)
+      }
+      await latest.close()
+      latest = await launchApp(userData, {
+        fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword,
+        ...(timing === undefined ? {} : { timing }), aiJobs, ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }),
+        ...options,
+      })
+      return new Juno(latest.app, latest.win)
+    })
+    if (latest !== running) await latest.close()
   },
   app: async ({ running }, use) => {
     await use(running.app)

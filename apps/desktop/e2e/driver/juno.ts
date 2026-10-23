@@ -101,6 +101,9 @@ export type SidebarFilterName = 'All' | 'Channels' | 'DMs'
  */
 export const schemeSrc = (host: string, attribute = 'src'): string => `:is([${attribute}^="juno://${host}/"], [${attribute}^="/__juno/${host}/"])`
 
+/** An address on main's `juno://<host>/` scheme, or the browser lane's `/__juno/<host>/` for it. */
+export const schemeUrl = (host: string): RegExp => new RegExp(`^(?:juno://|/__juno/)${host}/`)
+
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 /** One row in the sidebar, found by the start of its title. */
@@ -353,6 +356,8 @@ export class Sidebar {
     const was = (await this.unreadToggle.getAttribute('aria-pressed')) === 'true'
     await this.unreadToggle.click()
     await expect(this.unreadToggle).toHaveAttribute('aria-pressed', String(!was))
+    // Rows the filter takes away leave with their titles gone; wait until only the filtered rows remain.
+    await expect.poll(() => this.titles()).not.toContain('')
   }
 
   /** The unread dot after a filter, which a screen reader hears as part of the filter's name. */
@@ -956,8 +961,8 @@ export class Juno {
     return this.surface.aiCalls()
   }
 
-  /** The window's content size, as a user drags it to. */
-  async setWindowSize(width: number, height: number): Promise<void> {
+  /** The window's size, as a user drags it to; the height stays when it is left out. */
+  async setWindowSize(width: number, height?: number): Promise<void> {
     await this.surface.setWindowSize(width, height)
   }
 
