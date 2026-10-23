@@ -39,7 +39,7 @@ function beforeBurst(item: ReplayItem, knobs: Knobs, instructions: ReadonlyArray
     const enough = chosen.direction === 'notify' ? knobs.instructionNotify : knobs.instructionStay
     if (reading.instruction.confidence >= enough) return { outcome: chosen.direction, decidedBy: 'instruction' }
   }
-  return { outcome: needsSum(reading) >= knobs.needsYou ? 'notify' : 'stay', decidedBy: 'reading' }
+  return { outcome: needsSum(item, reading) >= knobs.needsYou ? 'notify' : 'stay', decidedBy: 'reading' }
 }
 
 /** Every item's outcome, by id. Items must be in time order: a banner holds its topic quiet for `BURST_SECONDS`. */

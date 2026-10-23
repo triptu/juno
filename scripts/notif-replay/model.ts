@@ -1,5 +1,5 @@
 /** The files the replay commands share. They hold real Slack content: keep them under /Volumes/AgentWork/scratch, never in the repo. */
-import type { DecidedBy, Instruction, NeedsYou, NotificationOutcome, ConversationFacts } from '@juno/domain'
+import { needsYouOptions, type DecidedBy, type Instruction, type NeedsYou, type NotificationOutcome, type ConversationFacts } from '@juno/domain'
 import { readFileSync, writeFileSync } from 'node:fs'
 
 export type Kind = 'dm' | 'group DM' | 'thread' | 'channel'
@@ -93,6 +93,16 @@ export function required(options: Record<string, string>, name: string): string 
   return value
 }
 
-/** The probability the reading puts on the options that need the owner. */
-export const needsSum = (reading: ReplayReading) =>
-  (['ask', 'answer', 'follow_up', 'decision', 'serious'] as const).reduce((sum, option) => sum + (reading.probabilities[option] ?? 0), 0)
+/**
+ * The probability the reading puts on the options that count here, as `counts` in
+ * `packages/domain/src/notificationDecision.ts` decides: answer, follow-up and
+ * serious always; ask in a DM or group DM, or when the owner started the thread,
+ * wrote the previous message or is named; decision only in the owner's own thread.
+ */
+export function needsSum(item: ReplayItem, reading: ReplayReading): number {
+  const direct = item.kind === 'dm' || item.kind === 'group DM'
+  const ask = direct || item.facts.ownerStartedThread === true || item.facts.ownerWroteLast === true || item.mentionsMeDirectly
+  const counts = (option: NeedsYou) => option === 'answer' || option === 'follow_up' || option === 'serious'
+    || (option === 'ask' && ask) || (option === 'decision' && item.facts.ownerStartedThread === true)
+  return needsYouOptions.filter(counts).reduce((sum, option) => sum + (reading.probabilities[option] ?? 0), 0)
+}

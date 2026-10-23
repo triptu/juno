@@ -166,11 +166,14 @@ function toCandidate(copy: Copy, row: MessageRow): Candidate | undefined {
   const name = row.kind === 'im' ? users.get(row.dm_user ?? '') ?? row.name ?? row.channel
     : row.kind === 'mpim' ? channelLabel({ kind: 'mpim', name: row.name ?? row.channel, memberNames }) : row.name ?? row.channel
   const senderName = row.sender_name ?? row.bot_name ?? undefined
+  // The other people it names, found as the engine's frame handler finds them.
+  const mentioned = new Set([...`${row.text} ${row.blocks_json ?? ''}`.matchAll(/<@([UW][A-Z0-9]+)|"user_id":"([UW][A-Z0-9]+)"/g)].map((m) => (m[1] ?? m[2])!))
+  const mentionsOthers = [...mentioned].filter((id) => id !== self && id !== sender).flatMap((id) => users.get(id) ?? [])
   return {
     channel: { id: ChannelId.make(row.channel), kind: row.kind, name, ignored: row.ignored === 1 },
     senderId: UserId.make(sender),
     ...(senderName === undefined ? {} : { senderName }),
-    mentionsMe, mentionsMeDirectly: mentionsMe && messageMentionsMeDirectly(body, me),
+    mentionsMe, mentionsMeDirectly: mentionsMe && messageMentionsMeDirectly(body, me), mentionsOthers,
     ts: row.ts, topicId, text: readableText(body),
   }
 }

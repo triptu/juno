@@ -83,7 +83,7 @@ function listWrong(title: string, wrong: ReadonlyArray<Scored>, showText: boolea
   for (const [key, group] of [...groups].sort((a, b) => b[1].length - a[1].length)) {
     console.log(`  ${key} (${group.length})`)
     for (const { item } of group) {
-      const reading = typeof item.reading === 'object' ? ` needs ${needsSum(item.reading).toFixed(2)}` : ''
+      const reading = typeof item.reading === 'object' ? ` needs ${needsSum(item, item.reading).toFixed(2)}` : ''
       const live = item.facts.ownerWroteMinutesAgo === undefined ? '' : ` you wrote ${Math.round(item.facts.ownerWroteMinutesAgo)} min before`
       console.log(`    ${new Date(item.at).toLocaleString()}  ${item.kind}${reading}${live}  ${item.id}`)
       if (showText) console.log(`      ${item.where} · ${item.sender}: ${item.text.replace(/\s+/g, ' ').slice(0, 140)}\n      ${item.decision.reason}`)

@@ -20,7 +20,7 @@ function borderline(item: ReplayItem): boolean {
   const minutes = item.facts.ownerWroteMinutesAgo
   if (minutes !== undefined && minutes >= 3 && minutes <= 30) return true
   if (typeof item.reading !== 'object') return false
-  const sum = needsSum(item.reading)
+  const sum = needsSum(item, item.reading)
   return (sum >= 0.25 && sum <= 0.75) || (item.reading.instruction !== undefined && item.reading.instruction.confidence >= 0.5)
 }
 
