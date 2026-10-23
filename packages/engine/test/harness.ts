@@ -7,6 +7,7 @@ import type { WorkName } from '../src/workControl'
  * answers the engine's parentPort requests the way apps/desktop does.
  */
 import { productionTiming, type EngineTimingConfig } from '../src/config'
+import { appendFileSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -205,6 +206,8 @@ export const fastTiming: EngineTimingConfig = {
 
 /** Starts a fake (unless reused) and the engine on it, with the atoms a test reads. */
 export async function startTestEngine(options: EngineOptions = {}): Promise<RunningEngine> {
+  // JUNO_BOOT_LOG=<file> counts boots: one line per engine, `cold` on an empty store, `warm` on a used one.
+  if (process.env.JUNO_BOOT_LOG) appendFileSync(process.env.JUNO_BOOT_LOG, options.reuse === undefined ? 'cold\n' : 'warm\n')
   const fake =
     options.reuse?.fake ??
     (await timed('fake and seed', () => startFakeSlack({
