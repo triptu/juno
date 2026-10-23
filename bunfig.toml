@@ -6,3 +6,11 @@ linker = "isolated"
 globalStore = true
 # Hold back versions published less than a day ago.
 minimumReleaseAge = 86400
+
+[test]
+# The unit tests of every package that runs `bun test` (scripts/unit.mjs runs
+# them together with --parallel). The same preload as each package's own
+# bunfig.toml: Node-compatible SQLite and the default test timeout.
+preload = ["./packages/testing/src/preload.ts"]
+# Playwright specs, repository scripts' node:test files and docs are not unit tests.
+pathIgnorePatterns = ["apps/desktop/e2e/**", "apps/desktop/packaging/**", "apps/gallery/**", "scripts/**", "docs/**", "specs/**", "**/node_modules/**"]

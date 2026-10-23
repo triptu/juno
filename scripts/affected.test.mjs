@@ -37,15 +37,36 @@ test('a script change runs the root Bun test scripts whose tests import it, and 
   for (const file of tracked('scripts/**/*.test.mjs', 'scripts/*.test.mjs')) assert.ok(scripts.includes(file), `${file} is in no root bun test script`)
 })
 
-test('unit execution keeps package identity and starts no unrelated packages', async () => {
+test('unit execution runs bun packages together and other packages in their own folder, starting no unrelated packages', async () => {
+  const { existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
   const { unitCommands } = await import('./unit.mjs')
   const file = 'packages/domain/test/notifications.test.ts'
   const selected = plan('--batch', '--files', file).steps.find((step) => step.script === 'test')
   assert.deepEqual(selected.items, [file])
   assert.deepEqual(selected.args, ['--files', file])
-  assert.deepEqual(unitCommands(selected.args, root), [['run', '--cwd', 'packages/domain', 'test', join(root, file)]])
-  const other = 'packages/engine/test/notifications.test.ts'
-  assert.deepEqual(unitCommands(['--files', file, other], root).map((args) => args[2]), ['packages/domain', 'packages/engine'])
+  const dir = mkdtempSync(join(existsSync('/Volumes/AgentWork') ? '/Volumes/AgentWork' : tmpdir(), 'juno-unit-commands-'))
+  try {
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ workspaces: ['packages/*', 'apps/*'] }))
+    const make = (pkg, test, files) => {
+      mkdirSync(join(dir, pkg, 'test'), { recursive: true })
+      writeFileSync(join(dir, pkg, 'package.json'), JSON.stringify({ scripts: { test } }))
+      for (const name of files) writeFileSync(join(dir, pkg, name), '')
+    }
+    make('packages/fast', 'bun test', ['test/one.test.ts', 'test/two.test.ts', 'test/load.perf.ts'])
+    make('apps/app', 'bun test', ['test/three.test.ts'])
+    writeFileSync(join(dir, 'apps/app/bunfig.toml'), '[test]\nroot = "test"\n')
+    make('packages/old', 'vitest run', ['test/four.test.ts'])
+    make('packages/none', '', [])
+    const timings = join(dir, 'node_modules/.cache/juno/bun-test-timings.json')
+    const bun = (workers, ...paths) => ['test', `--parallel=${workers}`, `--timings=${timings}`, '--update-timings', ...paths]
+    assert.deepEqual(unitCommands([], dir, { workers: 3 }), [bun(3, './apps/app/test', './packages/fast'), ['run', '--cwd', 'packages/old', 'test']])
+    assert.deepEqual(unitCommands(['--files', 'packages/fast/test/one.test.ts', 'apps/app/test/three.test.ts', 'packages/old/test/four.test.ts'], dir, { workers: 3 }), [
+      bun(2, './packages/fast/test/one.test.ts', './apps/app/test/three.test.ts'),
+      ['run', '--cwd', 'packages/old', 'test', join(dir, 'packages/old/test/four.test.ts')],
+    ])
+    assert.throws(() => unitCommands(['--files', 'packages/fast/test/load.perf.ts'], dir), /Not a unit test/)
+  } finally { rmSync(dir, { recursive: true, force: true }) }
   assert.throws(() => unitCommands(['--files'], root), /at least one/)
   assert.throws(() => unitCommands(['--files', 'packages/domain/test/absent.test.ts'], root), /Not a unit test/)
 })
@@ -72,7 +93,7 @@ test('ordinary source changes select only files whose import closure reaches the
 
 test('performance-only files are outside the unit matcher', () => {
   const matches = unitTestMatcher(root)
-  for (const file of ['packages/agent/test/activity.perf.ts', 'packages/agent/test/serve/chat-cache.perf.ts', 'packages/engine/test/idle.perf.ts']) assert.equal(matches(file), false, file)
+  for (const file of ['packages/agent/test/activity.perf.ts', 'packages/agent/test/serve/chat-cache.perf.ts', 'packages/engine/test/perf/idle.perf.ts', 'packages/engine/test/conformance/outbox.conformance.ts']) assert.equal(matches(file), false, file)
   assert.ok(matches('packages/agent/test/serve/chat-cache.test.ts'))
 })
 

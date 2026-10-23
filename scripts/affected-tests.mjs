@@ -1,28 +1,28 @@
-// Which files are tests, for bun run affected (scripts/affected.mjs): the vitest
-// files of every package and app, and the Node tests of the repository's
-// scripts with the root script that runs each.
+// Which files are tests, for bun run affected (scripts/affected.mjs): the unit
+// test files of every package and app (bun test), and the Node tests
+// of the repository's scripts with the root script that runs each.
 
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
-const globPattern = (glob) => new RegExp(`^${glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*\*\/|\*/g, (part) => part === '**/' ? '(?:.*/)?' : '[^/]*')}$`)
-
 /**
- * Whether a repo path is a vitest file: in a package or app under `packages/`
- * or `apps/` whose `test` script runs vitest, a file its `vitest.config.ts`
- * includes (every project's `include`; `test/**\/*.test.ts` when it names none).
+ * Whether a repo path is a unit test file: in a package or app under
+ * `packages/` or `apps/` whose `test` script runs `bun test`, a `*.test.*`
+ * file under its bunfig.toml `[test] root` (the package when it names none).
+ * Perf (`*.perf.ts`) and conformance files are run by path, so they are not.
  */
 export function unitTestMatcher(root) {
   const patterns = new Map()
   const patternsOf = (dir) => {
     if (!patterns.has(dir)) {
       const manifest = join(root, dir, 'package.json')
-      const command = existsSync(manifest) ? JSON.parse(readFileSync(manifest, 'utf8')).scripts?.test ?? '' : ''
-      const runsBun = /\bbun\b/.test(command)
-      const runsTests = runsBun || /\bvitest\b/.test(command)
-      const config = join(root, dir, 'vitest.config.ts')
-      const globs = runsTests && existsSync(config) ? [...readFileSync(config, 'utf8').matchAll(/include:\s*\[([^\]]*)\]/g)].flatMap((match) => [...match[1].matchAll(/'([^']+)'/g)].map((glob) => glob[1])) : []
-      patterns.set(dir, runsTests ? (globs.length > 0 ? globs : runsBun ? ['**/*.test.ts', '**/*.test.tsx', '**/*.test.js', '**/*.test.mjs'] : ['test/**/*.test.ts']).map(globPattern) : [])
+      const test = existsSync(manifest) ? JSON.parse(readFileSync(manifest, 'utf8')).scripts?.test ?? '' : ''
+      if (/^bun test\b/.test(test)) {
+        const bunfig = join(root, dir, 'bunfig.toml')
+        const testRoot = existsSync(bunfig) ? /^\s*root\s*=\s*"([^"]+)"/m.exec(readFileSync(bunfig, 'utf8'))?.[1] : undefined
+        const prefix = testRoot === undefined ? '' : `${testRoot.replace(/^\.\/|\/$/g, '')}/`
+        patterns.set(dir, [{ test: (path) => path.startsWith(prefix) && /\.test\.(ts|tsx|mts|js|mjs)$/.test(path) && !path.split('/').includes('node_modules') }])
+      } else patterns.set(dir, [])
     }
     return patterns.get(dir)
   }
