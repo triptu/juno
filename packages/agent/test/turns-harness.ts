@@ -9,7 +9,6 @@ import { createProviderGuard, openTurns, type ActionsOptions, type TurnsOptions,
 
 export const SONNET: ModelRef = { provider: 'openrouter', modelId: 'anthropic/claude-sonnet-5.5' }
 export const HAIKU: ModelRef = { provider: 'openrouter', modelId: 'anthropic/claude-haiku-5.5' }
-export const GROK: ModelRef = { provider: 'openrouter', modelId: 'x-ai/grok-4.7' }
 
 type Fake = ReturnType<typeof fakeProvider>
 type Ended = Extract<TurnEvent, { _tag: 'ended' }>

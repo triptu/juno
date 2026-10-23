@@ -23,7 +23,8 @@ export default {
     'packages/*': { project: ['**/*.{ts,tsx}'] },
     'packages/ai': { vitest: { config: ['vitest.config.ts', 'vitest.perf.config.ts'] } },
     'packages/engine': { entry: ['src/messages/body.ts'], project: ['**/*.{ts,tsx}'], vitest: { config: ['vitest.config.ts', 'vitest.conformance.config.ts', 'vitest.perf.config.ts'] } },
-    'packages/agent': { entry: ['eval/run.ts', 'bench/*.ts'], project: ['**/*.{ts,tsx}'], vitest: { config: ['vitest.config.ts', 'vitest.perf.config.ts'] } },
+    // vitest loads test/profile.ts as a setup file only when JUNO_UNIT_PROFILE=1.
+    'packages/agent': { entry: ['eval/run.ts', 'bench/*.ts', 'test/profile.ts'], project: ['**/*.{ts,tsx}'], vitest: { config: ['vitest.config.ts', 'vitest.perf.config.ts'] } },
     'docs/juno-agent/spikes': { entry: ['*.ts'], project: ['*.ts'] },
     'packages/tokens': {
       project: ['**/*.{ts,tsx}'],

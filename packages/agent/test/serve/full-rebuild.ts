@@ -27,8 +27,6 @@ import type {
   CardId,
   ChatItem,
   ChatMessageId,
-  ChatSummary,
-  ChatWindow as ChatWindowSchema,
   Ending,
   GroupPosition,
   JobId,
@@ -355,77 +353,4 @@ function layout(entries: ReadonlyArray<Entry>, source: ChatSource): ReadonlyArra
   }
   close()
   return items
-}
-
-/** The id a window can be anchored on. */
-export function keyOf(item: ChatItem): string | undefined {
-  switch (item._tag) {
-    case 'owner':
-      return item.id ?? item.opId
-    case 'juno':
-      return item.id
-    case 'card':
-      return item.card.id
-    case 'note':
-      return item.id
-    case 'groupLabel':
-      return item.id
-    default:
-      return undefined
-  }
-}
-
-const indexOf = (items: ReadonlyArray<ChatItem>, anchor: string) =>
-  items.findIndex((item) => keyOf(item) === anchor || (item._tag === 'owner' && item.opId === anchor))
-
-/** The slice of `items` a window asks for, with whether more lies on each side. */
-export type ChatWindow = typeof ChatWindowSchema.Type
-
-export function windowOf(items: ReadonlyArray<ChatItem>, window: ChatWindow) {
-  const slice = (start: number, end: number) => {
-    const from = Math.max(0, start)
-    const to = Math.min(items.length, end)
-    return { items: items.slice(from, to), moreAbove: from > 0, moreBelow: to < items.length }
-  }
-  const latest = (limit: number) => slice(items.length - limit, items.length)
-  switch (window._tag) {
-    case 'latest':
-      return latest(window.limit)
-    case 'unread': {
-      const divider = items.findIndex((item) => item._tag === 'newDivider')
-      // A few rows of context above the divider, the rest below it.
-      return divider < 0 ? latest(window.limit) : slice(divider - Math.floor(window.limit / 4), divider - Math.floor(window.limit / 4) + window.limit)
-    }
-    case 'around': {
-      const at = indexOf(items, window.anchor)
-      return at < 0 ? latest(window.limit) : slice(at - window.before, at - window.before + window.limit)
-    }
-    case 'above': {
-      const at = indexOf(items, window.anchor)
-      return at < 0 ? slice(0, 0) : slice(at - window.limit, at)
-    }
-    case 'below': {
-      const at = indexOf(items, window.anchor)
-      return at < 0 ? slice(items.length, items.length) : slice(at + 1, at + 1 + window.limit)
-    }
-  }
-}
-
-/** The sidebar's Juno row, the nav count and the home's Ask Juno field. */
-export function chatSummary(items: ReadonlyArray<ChatItem>, active: ReadonlyArray<Job>): ChatSummary {
-  const unread = items.filter((item) => (item._tag === 'juno' || item._tag === 'card') && item.unread).length
-  const newest = active.toSorted((a, b) => b.stepAt - a.stepAt)[0]
-  return {
-    unread,
-    busy: active.length > 0,
-    ...(newest?.state ? { jobLine: `${newest.place} · ${newest.state}` } : {}),
-  }
-}
-
-/** The `at` of the item `through` names, a Juno bubble or an archive message, for the read mark. */
-export function readMarkOf(items: ReadonlyArray<ChatItem>, through: string): number | undefined {
-  const item = items[indexOf(items, through)]
-  if (item === undefined) return undefined
-  if (item._tag === 'juno' || item._tag === 'owner') return item.at
-  return undefined
 }
