@@ -287,8 +287,8 @@ test.describe('a long thread', () => {
   })
 })
 
-test('at the minimum window size the topic switcher stays inside the workspace', async ({ juno, app, win }) => {
-  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(720, 480))
+test('at the minimum window size the topic switcher stays inside the workspace', async ({ juno, win }) => {
+  await juno.setWindowSize(720, 480)
   await juno.signIn()
   await juno.waitForSync()
   await juno.sidebar.row(ENG_MAIN).open()
