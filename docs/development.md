@@ -776,9 +776,9 @@ Effect and StyleX pitfalls are in their skills: `.claude/skills/effect/SKILL.md`
 
 ## Typecheck
 
-TypeScript 7.0.2 remains installed for the manual `pnpm typecheck:tsc` path and parity comparison. Routine checks use Bun 1.4.3, installed as an exact root devDependency. `pnpm exec bun` resolves the pinned binary; the global Bun install is not used.
+TypeScript 7.0.2 remains installed for the manual `pnpm typecheck:tsc` path and parity comparison. Routine checks use Bun 1.4.4, installed as an exact root devDependency. `pnpm exec bun` resolves the pinned binary; the global Bun install is not used.
 
-`pnpm typecheck` runs `bun check -b` over every project that Bun supports, locally. The checker reads the project inventory and dependency hashes from `scripts/typecheck.mjs`, builds a temporary solution config, and stores passing results separately in the shared system temp folder (`juno-cache/typecheck-bun`). `--no-cache` checks every supported project. Bun has no incremental build cache. Projects with unsupported compiler settings produce one warning naming the project and are skipped; there is no TypeScript fallback. Today all 29 project configs support Bun.
+`pnpm typecheck` runs `bun check -b` over every project that Bun supports, locally. The checker reads the project inventory and dependency hashes from `scripts/typecheck.mjs`, builds a temporary solution config, and stores passing results separately in the shared system temp folder (`juno-cache/typecheck-bun`). `--no-cache` checks every supported project. Bun has no incremental build cache. Projects with unsupported compiler settings produce one warning naming the project and are skipped; there is no TypeScript fallback. Today all 35 project configs support Bun.
 
 `pnpm typecheck:tsc` is the manual TypeScript-only check. No automatic check, hook, or scheduled run invokes it. `pnpm typecheck:parity` is also manual; it compares Bun and `tsc -b --force`, bypasses result caches, and fails if any project cannot be compared. Neither command is part of routine verification.
 
