@@ -4,8 +4,9 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-24 00:40 · instruction-new-id · An instruction gets a new id whenever its text or direction changes, so a reading made against the old one names an id that is gone and the decision falls through to needs-you (Astra review).
 - 10-24 00:11 · owner-facts-synced · The owner's facts for a notification (wrote last, wrote recently, sender wrote since) come from synced messages in the same topic strictly before the message, not from sent_posts, which hold attempts without a thread (Astra review).
-- 10-24 00:10 · thread-never-level · Never on a thread is stored as its level, as on a channel or person, and still unfollows it in Slack, so @here, mentions and DM-thread replies in it stay quiet (Astra review).
+- 10-24 00:10 · thread-never-level · Never on a thread is stored as its level, as on a channel or person, and still unfollows it in Slack, so @here, mentions and DM-thread replies in it stay quiet A thread with no stored level that is not followed counts as Never, as the menu shows it, since Never before this was only an unfollow; no data migration (Astra review).
 - 10-23 23:50 · notification-log-history · The notification log is history: a settings change re-decides nothing already logged, so Today counts what happened and a message that stayed never notifies later. Settings are read again after the reading, so a change made while it is in flight (Never, the hours ending) decides (Astra review).
 - 10-23 23:36 · huddle-follows-hours · An incoming huddle rings only inside notification hours; inside them Always rings and Never keeps it quiet. The switches and the reading do not apply, and an ignored channel does not hold it (owner, via the spec rewrite).
 - 10-23 23:35 · slack-schedule-always · The Pause Slack switch and Restore are removed: Juno always writes its hours to Slack's schedule under the existing rules, and Use Juno's hours is its own route. Stored enabled and saved values are left unread (owner).
