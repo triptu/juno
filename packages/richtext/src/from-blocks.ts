@@ -4,7 +4,7 @@ import { Block as SlackBlockSchema, type Block as SlackBlock, type RichTextEleme
 import type { ContentBlock as Block, Inline, ListStyle, Lookups, TableColumn } from './model'
 import { channelInline, dateInline, emojiInline, inlineText, linkedRuns, normalize, textRuns, toStyle, usergroupInline, userInline } from './inline'
 import { codeBlock } from './code'
-import { mrkdwnBlocks, mrkdwnInlines } from './from-mrkdwn'
+import { mrkdwnBlocks, mrkdwnInlines, plainTextInlines } from './from-mrkdwn'
 
 /**
  * The text an element kind we do not render carries, if any. Slack puts it in
@@ -96,7 +96,8 @@ function blockFromElement(el: RichTextElement, lookups: Lookups): Block | undefi
 }
 
 function textObjectInlines(text: TextObject, lookups: Lookups): Inline[] {
-  return text.type === 'mrkdwn' ? mrkdwnInlines(text.text, lookups) : normalize(textRuns(text.text))
+  if (text.type === 'mrkdwn') return mrkdwnInlines(text.text, lookups)
+  return text.emoji === false ? normalize(textRuns(text.text)) : plainTextInlines(text.text, lookups)
 }
 
 function blocksFromMessageBlock(block: SlackBlock, lookups: Lookups): Block[] {
@@ -114,7 +115,7 @@ function blocksFromMessageBlock(block: SlackBlock, lookups: Lookups): Block[] {
       return out
     }
     case 'header': {
-      const children = normalize(textRuns(block.text.text))
+      const children = textObjectInlines(block.text, lookups)
       return children.length === 0 ? [] : [{ kind: 'heading', children }]
     }
     case 'context': {
