@@ -35,7 +35,7 @@ Rules of the shape:
 - A proposal and the thing it becomes are different kinds (`proposedTask` and `task`, `proposedSchedule` and `schedule`), so one card never carries two machines.
 - Group position is precomputed per item so a virtualised row renders without its neighbours.
 - A `change` card's field preview is rendered from the stored payload by the agent, never by the model.
-- `test/chat.test.ts` covers the two rules through the package's public API.
+- `test/chat.test.ts` covers the two rules through the package's public API, with the `OpenTarget` URL allowlist and the emoji and reaction name checks.
 
 `effect/rpc` may be imported here (`scripts/check-deps.mjs`, the effect skill).
 
@@ -69,7 +69,7 @@ All five are settled in plan v3 (§0 rows W9 to W13):
 - W11 (Stop's line) no longer applies: the chat has no Stop (decision log, 10-14 11:50).
 - Approval identities and edit revisions travel in RPC metadata, not in `src/chat/**` (W13).
 
-Run `bun run test:agent-contracts` from the root for the property tests and request/response JSON codec round trips for every RPC group. `bun run typecheck` checks the test sources too.
+Run `bun run test:agent-contracts` from the root, or `bun test` here. `test/wire.test.ts` generates values with Effect's `Arbitrary` for every exported schema, every card kind and every route's payload, success and error, and checks each survives a JSON round trip; it reads them from the package's exports, so a new route needs no test edit. `test/files.test.ts` covers the image header, size and text-cut rules. `bun run typecheck` checks the test sources too.
 
 WP19 adds `agent.schedule.watchReply { opId, channelId, ts, threadTs? }` to
 `ScheduledRpcs`. It returns `{ opId, id, at }` after the menu watch is persisted.
