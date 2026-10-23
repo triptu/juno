@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'bun:test'
 import { bootedEngine, readDb, DAY } from './scenario'
-import { waitFor, type RunningEngine } from './harness'
+import { WAIT_MS, waitFor, type RunningEngine } from './harness'
 import { controlledClock } from './controlledClock'
 import { productionTiming } from '../src/config'
 
@@ -50,7 +50,12 @@ it('repairs an edit lost on a half-open socket despite sweeps before timeout det
     expect(engine.online()).toBe(true)
     expect(baseline()).toBe(before)
     expect(message(engine, 'C0ENG', target.ts)?.text).not.toBe('Lost before timeout')
-    await time.advance(pongTimeout + 500)
+    // The pinger arms its next sleep only after each wake, so one large jump can pass over it: move one ping interval at a time.
+    await waitFor(async () => {
+      if (!engine.online()) return true
+      await time.advance(500)
+      return undefined
+    }, WAIT_MS, 'pong timeout')
     await engine.phase('offline')
     engine.fake.releaseFrames({ drop: true })
     await time.advance(500)
