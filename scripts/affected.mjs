@@ -29,7 +29,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { MAP_PATH } from './coverage-map.mjs'
 import { ImportGraph } from './import-graph.mjs'
-import { driverSpecs, galleryComponents, mapProblem, COVERAGE_BUDGET_SECONDS, rankSpecs, reachSpecs, selectSpecs } from './affected-select.mjs'
+import { driverSpecs, galleryComponents, graphCandidates, mapProblem, COVERAGE_BUDGET_SECONDS, rankComponents, rankSpecs, reachSpecs, selectSpecs } from './affected-select.mjs'
 import { HEAVY_AREAS, heavyAreasChanged, perfInteractionsChanged } from './test-areas.mjs'
 import { runPlan } from './affected-run.mjs'
 import { nodeTestScripts, unitTestItems } from './affected-tests.mjs'
@@ -189,7 +189,10 @@ const gallerySpecItems = [...files]
     return { suite: 'gallery', id: file, opens, inputs: new Set([...closure(file), ...galleryBase, ...reached.flatMap((inputs) => [...inputs])]) }
   })
 for (const item of gallerySpecItems) if (named.includes(item.id)) item.force = true
-const components = batch ? [] : pending(componentItems)
+const componentCandidates = batch ? [] : pending(componentItems)
+const componentSelection = wide || heavyActive.has('gallery') ? { items: componentCandidates, dropped: [] }
+  : rankComponents({ components: componentCandidates, all: componentItems, changed, budget, seconds: durations.has('apps/gallery/shift.spec.ts') ? durations.get('apps/gallery/shift.spec.ts') / Math.max(1, componentItems.length) : 30 })
+const components = componentSelection.items
 const gallerySpecs = batch ? [] : pending(gallerySpecItems)
 const touchedComponents = new Set(componentItems.filter((item) => touches(item.inputs)).map((item) => item.id))
 const galleryReason = (item) => {
@@ -211,15 +214,15 @@ if (components.length > 0 || gallerySpecs.length > 0) {
     items: [...components, ...gallerySpecs],
     why: all
       ? 'every component and behaviour spec'
-      : `${components.length} component(s) in the shift guard${components.length ? `: ${components.map((item) => item.id).join(', ')}` : ''}; ${gallerySpecs.length} of ${gallerySpecItems.length} behaviour spec file(s)`,
+      : `${components.length} component(s) in the shift guard${components.length ? `: ${components.map((item) => item.id).join(', ')}` : ''}${componentSelection.dropped.length ? `; ${componentSelection.dropped.length} more exceed the ${budget}-second estimate` : ''}; ${gallerySpecs.length} of ${gallerySpecItems.length} behaviour spec file(s)`,
     reasons: all ? undefined : gallerySpecs.map((item) => [item.id.replace('apps/gallery/', ''), [galleryReason(item)]]),
   })
 }
 
 // Desktop e2e, by spec file. The import graph says the app reaches nearly
 // every file, so the coverage map decides which specs ran a changed file
-// (scripts/affected-select.mjs). Without a usable map, every spec runs when
-// the app or the e2e support changed.
+// (scripts/affected-select.mjs). Without a usable map, the graph supplies
+// candidates within the same budget; a wide plan runs every reached spec.
 const desktopEntries = [...files].filter((file) => /^apps\/desktop\/src\/(main|preload|engine|agent)\/index\.ts$/.test(file) || file === 'apps/desktop/src/renderer/main.tsx')
 // What every spec depends on: the fixtures, the driver, the build and Playwright configs, and what they reach (the fake Slack).
 const supportRoots = [...files].filter((file) => /^apps\/desktop\/e2e\/(fixtures\.ts|build\.ts|coverage\.ts|no-skips\.ts|driver\/)/.test(file) || ['apps/desktop/playwright.config.ts', 'apps/desktop/package.json', 'apps/desktop/electron.vite.config.ts', 'apps/desktop/src/renderer/index.html', 'apps/desktop/src/coverage.ts'].includes(file))
@@ -292,7 +295,8 @@ function desktopSelection() {
   return selectSpecs({ specs: specItems.map((item) => item.id), changed, map, support, own, app, isNew: (file) => !existed.has(file), drift, importers, driver, narrow: !wide, reach })
 }
 const SOURCE_FILE = /\.(ts|tsx|mts|mjs)$/
-const selection = batch ? { specs: new Map(), scores: new Map(), required: new Set(), notes: [] } : desktopSelection()
+let selection = batch ? { specs: new Map(), scores: new Map(), required: new Set(), notes: [] } : desktopSelection()
+if (!wide && selection.all) selection = graphCandidates({ items: specItems, changed, app, support, closure, reason: selection.all })
 const desktopNotes = [...(selection.notes ?? [])]
 let desktopDropped = []
 if (!wide && selection.specs) {
@@ -312,7 +316,7 @@ if (!wide && selection.specs) {
       if (selection.specs.delete(spec)) desktopNotes.push(`${spec.replace('apps/desktop/', '')}: every test is @heavy (${area.area}); no changed file is in that area`)
   const sizes = new Map()
   const map = existsSync(join(root, MAP_PATH)) ? JSON.parse(readFileSync(join(root, MAP_PATH), 'utf8')) : { specs: [], files: {} }
-  for (const at of Object.values(map.files).flat()) sizes.set(map.specs[at], (sizes.get(map.specs[at]) ?? 0) + 1)
+  if (JSON.stringify(map.identity) === JSON.stringify(identity)) for (const at of Object.values(map.files).flat()) sizes.set(map.specs[at], (sizes.get(map.specs[at]) ?? 0) + 1)
   const ranked = rankSpecs({ specs: selection.specs, scores: selection.scores, required: selection.required, budget, seconds: (spec) => durations.get(spec) ?? 60, size: (spec) => sizes.get(spec) ?? Infinity })
   selection.specs = ranked.specs
   desktopDropped = ranked.dropped

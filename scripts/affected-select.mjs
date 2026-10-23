@@ -215,6 +215,22 @@ export function rankSpecs({ specs, scores, required, budget = COVERAGE_BUDGET_SE
   return { specs: new Map(kept.map((spec) => [spec, specs.get(spec)])), dropped, estimatedSeconds }
 }
 
+export function rankComponents({ components, all, changed, budget, seconds = 30 }) {
+  const names = new Set(changed.map((file) => file.split('/').at(-1).replace(/(\.fixtures)?\.[a-z]+$/, '')))
+  const required = new Set(components.filter((item) => names.has(item.id)).map((item) => item.id))
+  const scores = new Map(components.map((item) => [item.id, changed.filter((file) => item.inputs.has(file))
+    .reduce((sum, file) => sum + Math.log(all.length / Math.max(1, all.filter((candidate) => candidate.inputs.has(file)).length)), 0)]))
+  const ranked = rankSpecs({ specs: new Map(components.map((item) => [item.id, []])), scores, required, budget, seconds: () => seconds, size: (id) => components.find((item) => item.id === id).inputs.size })
+  return { items: components.filter((item) => ranked.specs.has(item.id)), dropped: ranked.dropped }
+}
+
+/** Missing coverage broadens the candidates; only a wide/repair plan bypasses the budget. */
+export function graphCandidates({ items, changed, app, support, closure, reason }) {
+  const candidates = items.filter((item) => changed.some((file) => item.inputs.has(file)))
+  const required = new Set(candidates.filter((item) => changed.some((file) => closure(item.id).has(file) && !app.has(file) && !support.has(file))).map((item) => item.id))
+  return { specs: new Map(candidates.map((item) => [item.id, [reason]])), scores: new Map(), required, notes: [reason] }
+}
+
 /** Why the map cannot be used, or undefined when it can. */
 export function mapProblem(map, { now = Date.now(), commitKnown, identity }) {
   if (map === undefined) return 'there is no coverage map'

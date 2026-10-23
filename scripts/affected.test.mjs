@@ -113,7 +113,7 @@ test('protocol checks follow their own inputs, not unrelated sync or UI edits', 
   assert.ok(!scripts('specs/readstate.qnt').includes('specs:conformance'))
   assert.ok(scripts('packages/engine/src/send/worker.ts').includes('specs:conformance'))
   assert.ok(!scripts('packages/engine/src/send/worker.ts').includes('specs:check'))
-  for (const file of ['packages/sync/src/follow.ts', 'packages/views/src/Topic.tsx']) {
+  for (const file of ['packages/sync/src/followFence.ts', 'packages/views/src/Sidebar.tsx']) {
     assert.ok(!scripts(file).includes('specs:check'))
     assert.ok(!scripts(file).includes('specs:conformance'))
   }
@@ -136,4 +136,14 @@ test('Bun packages keep test and eval file selection after their Vitest config i
   assert.ok(matches('packages/example/test/domain.test.ts'))
   assert.ok(matches('packages/example/eval/behavior.test.ts'))
   assert.ok(!matches('packages/example/test/domain.perf.ts'))
+})
+
+test('graph fallback and gallery components respect time budgets while changed files stay required; repairs remain uncapped', () => {
+  const files = 'packages/ui/src/Chip.tsx,apps/desktop/e2e/mentions.spec.ts'
+  const narrow = plan('--graph', '--budget-seconds', '0', '--files', files).steps
+  assert.deepEqual(narrow.find((step) => step.script === 'test:desktop').items, ['apps/desktop/e2e/mentions.spec.ts'])
+  assert.deepEqual(narrow.find((step) => step.script === 'test:gallery').items.filter((file) => !file.startsWith('apps/')), ['Chip'])
+  const wide = plan('--wide', '--graph', '--budget-seconds', '0', '--files', files).steps
+  assert.ok(wide.find((step) => step.script === 'test:desktop').items.length > 10)
+  assert.ok(wide.find((step) => step.script === 'test:gallery').items.filter((file) => !file.startsWith('apps/')).length > 10)
 })
