@@ -1,28 +1,45 @@
-import { AiProvider, urgencyGate } from '@juno/ai'
-import { channelLabel, localTime, decideNotification, scheduledPresence, type NotificationDecision, type Presence } from '@juno/domain'
+import { AiProvider, notificationReading } from '@juno/ai'
+import { channelLabel, decideNotification, localTime, scheduledPresence, type NotificationDecision, type NotificationSettings, type Presence, type Reading } from '@juno/domain'
 import { Invalidation, StoreWriter, type StoreReader } from '@juno/store'
 import { Clock, Effect, Schema, Semaphore, SubscriptionRef } from 'effect'
-import { Candidate, Judgement, type Notifier } from './model'
+import { exchangesWith, readConversation } from './conversation'
+import { Candidate, StoredReading, type Notifier } from './model'
 import { readSettings } from './settings'
 
 interface Row {
   readonly id: number
   readonly at: string
-  readonly channel: string
-  readonly ts: string
-  readonly topic_id: string
   readonly candidate_json: string
   readonly judgement_json: string | null
-  readonly outcome: NotificationDecision['outcome']
-  readonly reason: string
-  readonly delivered_at: string | null
 }
 
-/** One instance per signed-in workspace. All decisions and delivery claims share a permit. */
-export const makeNotifications = Effect.fn('Notifications.make')(function* (notifier: Notifier, setPresence: (value: Presence) => Effect.Effect<boolean>) {
+/** The reading waits this long; then the decision goes on without it. */
+const READING_MILLIS = 2000
+const FOCUSED = '. Topic is visible in a focused window'
+
+const decodeReading = (json: string | null): StoredReading | undefined => {
+  if (json === null) return undefined
+  try {
+    return Schema.decodeUnknownSync(StoredReading)(JSON.parse(json))
+  } catch {
+    return undefined
+  }
+}
+
+const kindOf = (candidate: Candidate) =>
+  candidate.channel.kind === 'im' ? 'dm' as const : candidate.channel.kind === 'mpim' ? 'group DM' as const : candidate.topicId.startsWith('t:') ? 'thread' as const : 'channel' as const
+
+const decide = (candidate: Candidate, at: number, settings: NotificationSettings, aiAssist: boolean, reading?: StoredReading) =>
+  decideNotification({ ...candidate, at: localTime(at) }, settings, { aiAssist, userName: () => candidate.senderName }, reading as Reading | 'failed' | undefined)
+
+/**
+ * One instance per signed-in workspace. All decisions and delivery claims share a permit.
+ * `self` is the owner's user id, for the facts about who wrote what.
+ */
+export const makeNotifications = Effect.fn('Notifications.make')(function* (notifier: Notifier, setPresence: (value: Presence) => Effect.Effect<boolean>, self = '') {
   const sql = yield* StoreWriter
   const invalidation = yield* Invalidation
-  /** The Notifications page's Today and the why popover read the log. */
+  /** The Notifications page's Today and its Details read the log. */
   const logChanged = invalidation.invalidate(['notification_log'])
   const ai = yield* AiProvider
   const settingsContext = yield* Effect.context<StoreReader>()
@@ -33,60 +50,82 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
 
   const storeDecision = (id: number, candidate: Candidate, at: number, decision: NotificationDecision) =>
     Effect.gen(function* () {
-      yield* sql`UPDATE notification_log SET outcome = ${decision.outcome},
-        reason = CASE WHEN suppressed_at IS NULL THEN ${decision.reason} ELSE ${decision.reason + ". Topic is visible in a focused window"} END WHERE id = ${id}`
-      if (decision.outcome !== 'now') return
+      const { outcome, decidedBy, reason, ...rest } = decision
+      yield* sql`UPDATE notification_log SET outcome = ${outcome}, decided_by = ${decidedBy}, decision_json = ${JSON.stringify(rest)},
+        reason = CASE WHEN suppressed_at IS NULL THEN ${reason} ELSE ${reason + FOCUSED} END WHERE id = ${id}`
+      if (outcome !== 'notify') return
       // Claim before the external effect. A repeated event or settings pass cannot ring twice.
       const focused = yield* notifier.viewing(candidate.topicId)
       const claimed = yield* sql<{ id: number }>`UPDATE notification_log
         SET delivered_at = ${focused ? null : new Date(at).toISOString()}, suppressed_at = ${focused ? new Date(at).toISOString() : null},
-          reason = ${focused ? decision.reason + '. Topic is visible in a focused window' : decision.reason}
+          reason = ${focused ? reason + FOCUSED : reason}
         WHERE id = ${id} AND delivered_at IS NULL AND suppressed_at IS NULL RETURNING id`
       if (claimed.length === 0 || focused) return
       yield* notifier.show({ id: `message:${id}`, title: channelLabel(candidate.channel), body: candidate.text,
         target: { kind: 'message', source: { channelId: candidate.channel.id, ts: candidate.ts, topicId: candidate.topicId } } })
     })
 
-  const receive = Effect.fn('Notifications.receive')(function* (candidate: Candidate) {
-    const existing = yield* sql`SELECT id FROM notification_log WHERE channel = ${candidate.channel.id} AND ts = ${candidate.ts}`
+  /** Juno's reading of the message, or `failed` when it gives none within two seconds. */
+  const read = (candidate: Candidate, settings: NotificationSettings, now: number) =>
+    Effect.gen(function* () {
+      const conversation = yield* readConversation(sql, self, candidate, now)
+      const exchanges = yield* exchangesWith(sql, candidate.senderId, now)
+      const answer = yield* ai.decide(notificationReading, {
+        messageTs: candidate.ts, where: channelLabel(candidate.channel), kind: kindOf(candidate),
+        sender: candidate.senderName ?? 'Someone', text: candidate.text, mentionsMe: candidate.mentionsMe, now: new Date(now).toISOString(),
+        ...(conversation.threadRoot === undefined ? {} : { threadRoot: conversation.threadRoot }),
+        before: conversation.before,
+        facts: {
+          ...(conversation.facts.ownerWroteMinutesAgo === undefined ? {} : { ownerWroteMinutesAgo: Math.round(conversation.facts.ownerWroteMinutesAgo) }),
+          ownerWroteLast: conversation.facts.ownerWroteLast === true,
+          ownerStartedThread: conversation.facts.ownerStartedThread === true,
+          senderWroteSinceOwner: conversation.senderWroteSinceOwner,
+          exchangesLast30Days: exchanges,
+        },
+        instructions: settings.instructions ?? [],
+      }).pipe(Effect.timeout(READING_MILLIS), Effect.option)
+      if (answer._tag === 'None' || answer.value._tag !== 'Decided') return 'failed' as const
+      const { instruction, ...rest } = answer.value.value
+      return { ...rest, ...(instruction === null ? {} : { instruction }) } as StoredReading
+    })
+
+  const receive = Effect.fn('Notifications.receive')(function* (incoming: Candidate) {
+    const existing = yield* sql`SELECT id FROM notification_log WHERE channel = ${incoming.channel.id} AND ts = ${incoming.ts}`
     if (existing.length > 0) return
     let now = yield* Clock.currentTimeMillis
     const { settings, aiAssist } = yield* configuration
-    let decision = decideNotification({ ...candidate, at: localTime(now) }, settings, { aiAssist, userName: () => candidate.senderName })
-    let judgement: Judgement | undefined
-    if ('needsJudgement' in decision) {
-      const answer = yield* ai.decide(urgencyGate, {
-        messageTs: candidate.ts, channel: channelLabel(candidate.channel), channelKind: candidate.channel.kind,
-        sender: candidate.senderName ?? candidate.senderId, text: candidate.text, mentionsMe: candidate.mentionsMe,
-        matters: settings.matters, now: new Date(now).toISOString(),
-      }).pipe(Effect.timeout(2000), Effect.option)
-      if (answer._tag === 'Some' && answer.value._tag === 'Decided') judgement = answer.value.value
+    const { facts } = yield* readConversation(sql, self, incoming, now)
+    const candidate: Candidate = { ...incoming, facts }
+    let decision = decide(candidate, now, settings, aiAssist)
+    let reading: StoredReading | undefined
+    if ('needsReading' in decision) {
+      reading = yield* read(candidate, settings, now)
+      // The hours are checked again after the wait, so it cannot notify past their end.
       now = yield* Clock.currentTimeMillis
-      decision = decideNotification({ ...candidate, at: localTime(now) }, settings, { aiAssist: judgement !== undefined, userName: () => candidate.senderName }, judgement)
+      decision = decide(candidate, now, settings, aiAssist, reading)
     }
-    if ('needsJudgement' in decision) return
+    if ('needsReading' in decision) return
     const rows = yield* sql<{ id: number }>`INSERT INTO notification_log
       (at, channel, ts, topic_id, preview, outcome, reason, candidate_json, judgement_json)
       VALUES (${new Date(now).toISOString()}, ${candidate.channel.id}, ${candidate.ts}, ${candidate.topicId}, ${candidate.text},
-        ${decision.outcome}, ${decision.reason}, ${JSON.stringify(candidate)}, ${judgement === undefined ? null : JSON.stringify(judgement)})
+        ${decision.outcome}, ${decision.reason}, ${JSON.stringify(candidate)}, ${reading === undefined ? null : JSON.stringify(reading)})
       ON CONFLICT(channel, ts) DO NOTHING RETURNING id`
     const row = rows[0]
     if (row !== undefined) yield* storeDecision(row.id, candidate, now, decision)
     yield* logChanged
   })
 
+  /** Today's rows again, at their own times, with their stored readings. A row that would need a reading it does not have keeps its decision. */
   const rerun = Effect.gen(function* () {
     const now = yield* Clock.currentTimeMillis
     const midnight = new Date(now)
     midnight.setHours(0, 0, 0, 0)
     const { settings, aiAssist } = yield* configuration
-    const rows = yield* sql<Row>`SELECT * FROM notification_log WHERE at >= ${midnight.toISOString()} AND candidate_json IS NOT NULL`
+    const rows = yield* sql<Row>`SELECT id, at, candidate_json, judgement_json FROM notification_log WHERE at >= ${midnight.toISOString()} AND candidate_json IS NOT NULL`
     for (const row of rows) {
       const candidate = Schema.decodeUnknownSync(Candidate)(JSON.parse(row.candidate_json))
-      const judgement = row.judgement_json === null ? undefined : Schema.decodeUnknownSync(Judgement)(JSON.parse(row.judgement_json))
-      const at = new Date(row.at).getTime()
-      const decision = decideNotification({ ...candidate, at: localTime(at) }, settings, { aiAssist: aiAssist && judgement !== undefined, userName: () => candidate.senderName }, judgement)
-      if (!('needsJudgement' in decision)) yield* storeDecision(row.id, candidate, now, decision)
+      const decision = decide(candidate, new Date(row.at).getTime(), settings, aiAssist, decodeReading(row.judgement_json))
+      if (!('needsReading' in decision)) yield* storeDecision(row.id, candidate, now, decision)
     }
     yield* logChanged
   })
