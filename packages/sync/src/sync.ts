@@ -29,7 +29,7 @@ import type { Acted } from './acted'
 import type { FetchReport, OpenError } from './open'
 import { makeBootLoop } from './run/boot'
 import { makeTopicFetcher } from './run/fetcher'
-import { fetchRoots, lookUpReads } from './run/lookups'
+import { fetchRoots, lookUpConversations, lookUpReads } from './run/lookups'
 import { refreshFiles } from './run/files'
 import { makeReconcile } from './run/reconcile'
 import { watchWindow } from './run/window'
@@ -144,6 +144,6 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
 
     // Stored index rows from an older Juno take the current meaning from local messages, alongside the boot.
     const upgrade = upgradeIndex(ctx).pipe(Effect.catchCause((cause) => Effect.logError('sync: index upgrade failed', { cause })))
-    yield* Effect.all([consumer, bootLoop, upgrade, watchWindow(runtime), fetchRoots(ctx), lookUpReads(ctx), refreshFiles(ctx), nameUsers(ctx), FiberSet.join(background)], { concurrency: 'unbounded', discard: true })
+    yield* Effect.all([consumer, bootLoop, upgrade, watchWindow(runtime), fetchRoots(ctx), lookUpReads(ctx), lookUpConversations(ctx), refreshFiles(ctx), nameUsers(ctx), FiberSet.join(background)], { concurrency: 'unbounded', discard: true })
     return yield* Effect.never
   })

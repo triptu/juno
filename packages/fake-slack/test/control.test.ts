@@ -93,6 +93,20 @@ describe('control API', () => {
     expect(changed.ims.filter((c) => c.has_unreads !== undefined).map((c) => c.id)).toEqual(['D0MAYA'])
   })
 
+  it('counts leaves out a closed group DM until a message opens it again, with no mpim_open', async () => {
+    fake.addGroupDm({ id: 'G0OLD', users: ['U0MAYA', 'U0SAM'], open: false })
+    const before = await client.ok('client.counts', { thread_counts_by_channel: true })
+    expect(before.mpims.map((c) => c.id)).not.toContain('G0OLD')
+    const socket = await client.connect()
+    await socket.next(isType('hello'))
+    fake.injectMessage({ channel: 'G0OLD', user: 'U0SAM', text: 'Picking this back up' })
+    await socket.next((f) => f.type === 'message' && 'text' in f && f.text === 'Picking this back up')
+    expect(socket.frames.some((f) => f.type === 'mpim_open' || f.type === 'mpim_joined')).toBe(false)
+    const after = await client.ok('client.counts', { thread_counts_by_channel: true })
+    expect(after.mpims.map((c) => c.id)).toContain('G0OLD')
+    socket.close()
+  })
+
   it('a reply by self follows the thread and Slack says so with thread_subscribed', async () => {
     const socket = await client.connect()
     await socket.next(isType('hello'))

@@ -17,7 +17,7 @@ import { Invalidation, StoreWriter, transaction, type MessageRow, type SqlError 
 import { Clock, Effect, Queue } from 'effect'
 import { writeHuddleFrame } from './write/huddles'
 import { observeMetadata, patchMetadata, type MetadataFence } from './metadata'
-import { reindexOptions, wantUsers, type SyncContext } from './context'
+import { reindexOptions, wantMembers, type SyncContext } from './context'
 import { mergeRootCounters, mergeTombstone, type MergeSource } from './merge'
 import { mainTopicOf, mergeOne, threadTopicOf } from './pages'
 import { reindexTopics, topicsOfMessages } from './reindex'
@@ -176,8 +176,7 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
             if (typeof frame.channel !== 'string') {
               const row = toConversationRow(frame.channel)
               yield* observeMetadata(ctx.metadata, frame.channel)
-              // The other side of a new DM, or the members of a group DM, before its row shows.
-              wantUsers(ctx, [...(row.user_id === null ? [] : [row.user_id]), ...(row.member_ids_json === null ? [] : (JSON.parse(row.member_ids_json) as Array<string>))])
+              wantMembers(ctx, row)
             }
             yield* patchMetadata(ctx.metadata, id, { is_member: 1 })
           }),
@@ -309,10 +308,27 @@ export const writeReaction = (ctx: SyncContext, change: ReactionChange, eventTs:
     if (last !== existing.last_event_ts) yield* writeMessage({ ...existing, last_event_ts: last, version: existing.version + 1 })
   })
 
+/**
+ * A live message in a DM or group DM shows the user is in it. Slack does not
+ * always say so: a closed group DM, which counts leaves out, comes back with
+ * only the message when someone posts in it again. A conversation the store
+ * has never seen is looked up (`conversationLookups`).
+ */
+const noteMember = (ctx: SyncContext, channel: string): Effect.Effect<void, SqlError, Services> =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    const [row] = yield* sql<{ kind: string; is_member: 0 | 1; user_id: string | null; member_ids_json: string | null }>`
+      SELECT kind, is_member, user_id, member_ids_json FROM conversations WHERE id = ${channel}`
+    if (row === undefined) return yield* Queue.offer(ctx.conversationLookups, channel)
+    if (row.is_member === 1 || (row.kind !== 'im' && row.kind !== 'mpim')) return
+    wantMembers(ctx, row)
+    yield* patchMetadata(ctx.metadata, channel, { is_member: 1 })
+  })
+
 const applyMessageFrame = (ctx: SyncContext, frame: Extract<RtmFrame, { type: 'message' }>, now: number): Effect.Effect<void, SqlError, Services> => {
   if (isMessagePosted(frame)) {
     const { event_ts: _e, hidden: _h, suppress_notification: _s, ...message } = frame
-    return transaction(writePosted(ctx, frame.channel, message as Message, eventTsOf(frame, now), now))
+    return transaction(noteMember(ctx, frame.channel).pipe(Effect.andThen(writePosted(ctx, frame.channel, message as Message, eventTsOf(frame, now), now))))
   }
   if (isMessageChanged(frame)) return transaction(writeChanged(ctx, frame.channel, frame.message, eventTsOf(frame, now)))
   if (isMessageDeleted(frame)) return transaction(writeDeleted(ctx, frame.channel, frame.deleted_ts, { kind: 'event', eventTs: eventTsOf(frame, now) }))
