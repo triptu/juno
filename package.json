@@ -16,7 +16,7 @@
     "typecheck:tsc": "node scripts/typecheck.mjs",
     "typecheck:parity": "node scripts/heavy.mjs --queue typecheck --exclusive bun scripts/typecheck-bun.mjs --parity",
     "typecheck:bun": "bun scripts/typecheck-bun.mjs",
-    "lint": "node scripts/lint.mjs",
+    "lint": "bun scripts/lint.mjs",
     "check-deps": "node scripts/check-deps.mjs",
     "health": "node scripts/health.mjs",
     "health:knip": "knip --config knip.config.mjs --no-exit-code",
@@ -91,7 +91,6 @@
     "effect": "4.0.3",
     "jscpd": "5.4.1",
     "knip": "6.41.0",
-    "oxlint": "1.87.0",
     "typescript": "7.0.2",
     "typescript-5": "npm:typescript@5.9.3"
   },

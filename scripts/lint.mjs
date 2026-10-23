@@ -5,19 +5,20 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const node = (script, ...args) => [process.execPath, [`scripts/${script}`, ...args]]
+const bun = (script, ...args) => [process.execPath, [`scripts/${script}`, ...args]]
 const checks = [
-  ['oxlint', [resolve(root, 'node_modules/.bin/oxlint'), ['.']]],
-  ['decision log', node('decision-log.mjs', '--check')],
-  ['cache epoch', node('check-cache-epoch.mjs')],
-  ['migration order', node('check-migration-order.mjs')],
-  ['cursor rule', node('check-no-pointer-cursor.mjs')],
-  ['duotone icons', node('check-duotone.mjs')],
-  ['tokens', node('check-tokens.mjs')],
-  ['dependencies', node('check-deps.mjs')],
-  ['fixtures redacted', node('check-fixtures-redacted.mjs')],
-  ['lfs', node('check-lfs.mjs')],
-  ['health', node('health.mjs', '--check')],
+  // Reads .oxlintrc.json. --no-script, or it would run this package's lint script.
+  ['bun lint', [process.execPath, ['lint', '--no-script', '.']]],
+  ['decision log', bun('decision-log.mjs', '--check')],
+  ['cache epoch', bun('check-cache-epoch.mjs')],
+  ['migration order', bun('check-migration-order.mjs')],
+  ['cursor rule', bun('check-no-pointer-cursor.mjs')],
+  ['duotone icons', bun('check-duotone.mjs')],
+  ['tokens', bun('check-tokens.mjs')],
+  ['dependencies', bun('check-deps.mjs')],
+  ['fixtures redacted', bun('check-fixtures-redacted.mjs')],
+  ['lfs', bun('check-lfs.mjs')],
+  ['health', bun('health.mjs', '--check')],
 ]
 
 const started = performance.now()
