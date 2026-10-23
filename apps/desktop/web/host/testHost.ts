@@ -52,7 +52,8 @@ export interface HostStart {
 
 export type HostCommand =
   | { readonly type: 'start'; readonly start: HostStart }
-  | { readonly type: 'restart'; readonly engine?: EngineOptions }
+  | { readonly type: 'quitEngine' }
+  | { readonly type: 'startEngine'; readonly engine?: EngineOptions }
   | { readonly type: 'workPass'; readonly name: 'title' | 'art' | 'home' | 'automated' }
   | { readonly type: 'aiCalls' }
   | { readonly type: 'stop' }
@@ -121,6 +122,8 @@ interface Running {
   readonly transport: ReturnType<typeof socketTransport>
   readonly close: () => Promise<void>
   readonly url: string
+  /** Between `quitEngine` and `startEngine`. */
+  stopped: boolean
 }
 
 let running: Running | undefined
@@ -221,6 +224,7 @@ async function begin(start: HostStart): Promise<{ url: string }> {
     calls,
     transport,
     url,
+    stopped: false,
     close: async () => {
       for (const client of sockets.clients) client.terminate()
       await new Promise<void>((resolve) => {
@@ -232,14 +236,24 @@ async function begin(start: HostStart): Promise<{ url: string }> {
   return { url }
 }
 
-/** Stops the engine and starts it again on the same folder, as a relaunch of the app does. */
-async function restart(engine: EngineOptions | undefined): Promise<void> {
+/** Stops the engine, as quitting the app does; the data folder stays for `startEngine`. */
+async function quitEngine(): Promise<void> {
   const current = running
   if (current === undefined) throw new Error('The host has not started')
+  if (current.stopped) return
+  current.stopped = true
   await current.engine.stop()
   await current.log.close()
+}
+
+/** Starts the engine again on the same folder, as opening the app again does. */
+async function startEngineAgain(engine: EngineOptions | undefined): Promise<void> {
+  const current = running
+  if (current === undefined) throw new Error('The host has not started')
+  if (!current.stopped) throw new Error('The engine is still running; quit it first')
   current.engineOptions = { ...current.engineOptions, ...engine }
   const started = await startEngineOn(current.start, current.engineOptions, current.transport, current.calls)
+  current.stopped = false
   current.engine = started.engine
   current.log = started.log
   current.testWork = started.testWork
@@ -269,8 +283,10 @@ async function stop(): Promise<void> {
   const current = running
   running = undefined
   if (current === undefined) return
-  await current.engine.stop().catch(() => undefined)
-  await current.log.close().catch(() => undefined)
+  if (!current.stopped) {
+    await current.engine.stop().catch(() => undefined)
+    await current.log.close().catch(() => undefined)
+  }
   await current.close()
 }
 
@@ -278,8 +294,10 @@ async function run(command: HostCommand): Promise<unknown> {
   switch (command.type) {
     case 'start':
       return begin(command.start)
-    case 'restart':
-      return restart(command.engine)
+    case 'quitEngine':
+      return quitEngine()
+    case 'startEngine':
+      return startEngineAgain(command.engine)
     case 'workPass':
       return workPass(command.name)
     case 'aiCalls':

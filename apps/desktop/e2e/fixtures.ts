@@ -50,11 +50,12 @@ export interface Fixtures {
   /**
    * Quits the app and opens it again on the same data folder, against the same
    * fake, and answers the driver for it: what a test needs to show that state
-   * survives a relaunch. The browser project restarts the host's engine and
-   * reloads the page; what main alone keeps (launch.json, the window) is
-   * Electron's to test.
+   * survives a relaunch. `whileClosed` runs between the two, for a test that
+   * changes the data folder as the app would find it. The browser project
+   * leaves the page, stops the host's engine, starts it again and loads the
+   * page; what main alone keeps (launch.json, the window) is Electron's to test.
    */
-  readonly relaunch: (options?: Pick<LaunchOptions, 'aiJobs' | 'cacheMigration'>) => Promise<Juno>
+  readonly relaunch: (options?: RelaunchOptions) => Promise<Juno>
   readonly app: ElectronApplication
   readonly win: Page
   readonly juno: Juno
@@ -74,6 +75,11 @@ export interface WorkerFixtures {
 }
 
 type SyncOptions = Pick<LaunchOptions, 'timing' | 'fakeAiDelayMillis'>
+
+export interface RelaunchOptions extends Pick<LaunchOptions, 'aiJobs' | 'cacheMigration'> {
+  /** Runs while the app is closed: edit `user.db` or a launch preference here. */
+  readonly whileClosed?: () => unknown
+}
 
 /** Signs in to a fresh default seed on `dir` and syncs, for `SyncedWorkspaces`. */
 async function buildSynced(dir: string, options: SyncOptions): Promise<Omit<SyncedWorkspace, 'dir'>> {
@@ -243,14 +249,18 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   },
   relaunch: async ({ lane, running, fake, slackApp, userData, aiJobs, fakeAiDelayMillis, timing, page }, use) => {
     let latest: RunningApp = running
-    await use(async (options = {}) => {
+    await use(async ({ whileClosed, ...options } = {}) => {
       if (lane === 'web') {
         const host = running.host!
-        await host.restart({ ...(options.aiJobs === undefined ? {} : { aiJobs: options.aiJobs }), ...(options.cacheMigration === undefined ? {} : { cacheMigration: options.cacheMigration }) })
-        await page.reload()
+        await page.goto('about:blank')
+        await host.quitEngine()
+        await whileClosed?.()
+        await host.startEngine({ ...(options.aiJobs === undefined ? {} : { aiJobs: options.aiJobs }), ...(options.cacheMigration === undefined ? {} : { cacheMigration: options.cacheMigration }) })
+        await page.goto(`${host.url}?e2e=1`)
         return new Juno(webSurface(page, host), page)
       }
       await latest.close()
+      await whileClosed?.()
       latest = await launchApp(userData, {
         fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword,
         ...(timing === undefined ? {} : { timing }), aiJobs, ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }),

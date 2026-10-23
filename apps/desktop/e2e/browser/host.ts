@@ -22,7 +22,8 @@ interface Child {
 function forkHost(): Child {
   const child = fork(entry, [], {
     execPath: node,
-    execArgv: ['--disable-warning=ExperimentalWarning'],
+    // JUNO_E2E_HOST_PROFILE=<dir> writes each host's CPU profile there when it exits.
+    execArgv: ['--disable-warning=ExperimentalWarning', ...(process.env.JUNO_E2E_HOST_PROFILE === undefined ? [] : ['--cpu-prof', `--cpu-prof-dir=${process.env.JUNO_E2E_HOST_PROFILE}`])],
     cwd: repoRoot,
     stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
     env: { ...process.env, JUNO_E2E: '1', NODE_OPTIONS: '' },
@@ -91,9 +92,14 @@ export class TestHost implements EngineHooks {
     this.url = url
   }
 
-  /** Stops the engine and starts it again on the same data folder, as a relaunch of the app does. Reload the page after. */
-  restart(engine?: EngineOptions): Promise<void> {
-    return this.#command({ type: 'restart', ...(engine === undefined ? {} : { engine }) })
+  /** Stops the engine, as quitting the app does. Leave the page first. */
+  quitEngine(): Promise<void> {
+    return this.#command({ type: 'quitEngine' })
+  }
+
+  /** Starts the engine again on the same data folder, as opening the app again does. Load the page after. */
+  startEngine(engine?: EngineOptions): Promise<void> {
+    return this.#command({ type: 'startEngine', ...(engine === undefined ? {} : { engine }) })
   }
 
   workPass(name: WorkPassName): Promise<void> {
