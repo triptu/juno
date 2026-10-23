@@ -41,7 +41,11 @@ export function createTurnSession(store: Store, options: TurnsOptions, running: 
   return {
     journal: () => journal!,
     catchUp: () => projection!.catchUp(),
-    position: async (): Promise<JournalPosition> => ({ incarnation: journal!.incarnation, seq: await journal!.lastCommitted() }),
+    position: async (): Promise<JournalPosition> => {
+      // A rotation closes the old journal, and a read of a closed journal never answers: read the new one.
+      while (rotating !== undefined) await rotating.catch(() => undefined)
+      return { incarnation: journal!.incarnation, seq: await journal!.lastCommitted() }
+    },
     rotate: rotateNow,
     rotationDue: () => {
       const row = store.db.prepare('SELECT created_at AS at FROM incarnations WHERE id = ?').get(journal!.incarnation) as { at: number }
