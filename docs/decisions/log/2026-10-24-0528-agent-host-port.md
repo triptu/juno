@@ -1,0 +1,1 @@
+- 10-24 05:28 · Agent host port · Export the engine’s existing memory transport so the browser test host can connect the real agent through a Node message channel without importing Electron.
