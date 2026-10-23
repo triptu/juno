@@ -27,17 +27,12 @@
   "devDependencies": {
     "@types/node": "24.19.2",
     "typescript": "7.0.2",
-    "@openai/codex-sdk": "0.162.1",
-    "@juno/agent-memory": "workspace:*",
     "bun-types": "1.4.2"
   },
   "juno": {
     "allowedDeps": [
       "@juno/agent",
       "@juno/agent-contract"
-    ],
-    "testDeps": [
-      "@juno/agent-memory"
     ]
   }
 }
