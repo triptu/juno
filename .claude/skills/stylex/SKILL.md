@@ -119,6 +119,7 @@ shape, but if they use a raw value that now has a token, use the token. Rules co
   inside the style object is compiled away; the same call stored in a module constant is left in the
   bundle, runs at load and throws, and the renderer shows a blank window (10-18). The ancestor
   carries `stylex.defaultMarker()` in its `stylex.props`.
+- **Emoji and icon centring.** Apple Color Emoji draws high in a text line box, and an odd-size icon centred in an even box lands on a half pixel that Chrome rounds down. Emoji go through the shared `Emoji` component with `--font-emoji` and the emoji shift tokens; a measured optical offset is a token, never a raw number. A change to a control's size or its glyph size runs the alignment specs in `apps/gallery/` (`emoji-align.spec.ts`, `selection-bar-align.spec.ts`); a 1x screenshot is not a check.
 - **Static values only.** `stylex.create` cannot call functions or read runtime values. For a value
   that varies at runtime use a function style: `stylex.create({ w: (px: number) => ({ width: px }) })`.
 - **Workspace setup.** Packages ship TypeScript source and list `@stylexjs/stylex` as their own

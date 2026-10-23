@@ -25,7 +25,7 @@ The bar: the app must feel native and insanely fast. Input paints on the next fr
 1. The sidebar list and the message list are in-flow rows with `content-visibility: auto` and `contain-intrinsic-size: auto <estimate>`; the live query window is the virtualizer (300 topic rows, 100 to 500 message rows). No scroll handlers, no absolute positioning, no `overflow-anchor: none`. Prepends rely on Chromium scroll anchoring, so nothing in that frame may change `position`, `transform`, `overflow` or `display` on the scroller or the anchor's ancestors.
 2. `@tanstack/react-virtual` is the only virtualization library, used for unbounded flat lists (All topics, Browse) and as the measured escalation for the message list (`docs/performance.md` 3.4). Do not add another.
 3. Every image box has `aspect-ratio` from file metadata before the bytes arrive. Late content never moves what the user is reading.
-4. Rows set `contain: content`. Section headers are `position: sticky`. A message row's height depends only on its message, never on its place in the window, and is a whole number of pixels (the content box rounds up with `calc-size`), so scroll anchoring moves the list by exact amounts.
+4. Rows set `contain: content`. Section headers are `position: sticky`. A message row's height depends only on its message, never on its place in the window, and is a whole number of pixels (the content box rounds up with `calc-size`), so scroll anchoring moves the list by exact amounts. Only real upward input lets go of a held bottom: the wheel or trackpad moving up, an up key, or a press held on the list. A change in scroll position alone never does, because a full window drops rows from the top and the scroll position falls with no input (`docs/performance.md` 3.3).
 
 **Interaction**
 
@@ -52,7 +52,7 @@ The bar: the app must feel native and insanely fast. Input paints on the next fr
 **Startup**
 
 18. The shell paints with no data; `show` on `ready-to-show` with `backgroundColor` from the saved theme. The engine answers the first `topics.list` from `cache.db` before any Slack call. AI, notifications, emoji, lazy pages and prefetch run after the first sidebar paint. `juno://` has `codeCache: true`; `v8CacheOptions: 'bypassHeatCheck'`. Latin fonts are preloaded; fallback faces are size-adjusted. Background throttling stays on. A prefetched chunk's components come from `chunk()` (`containers/chunks.ts`); a bare `lazy` waits 300 ms on its first open even when loaded (`docs/performance.md` 8.5).
-19. Adding a dependency or a page to the initial bundle needs a before/after size from the bundle check.
+19. Adding a dependency or a page to the initial bundle needs a before/after size from the bundle check. Never change a budget in `scripts/check-bundle-size.mjs` or `docs/performance.md`, up or down, without Tushar; make room by moving code behind `chunk()`. Moving code out of the initial bundle to fit needs a before/after first-screen run (`pnpm perf -g "launch"`), and launch time decides, not the size number.
 
 **Electron chrome**
 
@@ -63,6 +63,7 @@ The bar: the app must feel native and insanely fast. Input paints on the next fr
 - Instrument with `@juno/state/perf.ts` marks (`juno.topic-open`, `juno.tab-switch`, ...) so the DevTools "Juno" track and the harness see the change.
 - Bundle: `pnpm build` runs `scripts/check-bundle-size.mjs` (initial JS 1.1 MB, CSS 200 KB minified). Phosphor icons ship every weight in one module; `phosphorWeights` in `apps/desktop/renderer.vite.ts` drops thin and light at build time (about 66 KB, measured 10-15), and duotone from every icon `packages/ui/src/duotone.ts` does not import (about 37 KB, 10-17), so a new `IconWeight` must be added to its list too, and a new duotone icon goes in `duotone.ts`.
 - New per-row, per-frame or startup work (`pnpm affected --plan` names matching scenarios from `PERF_INTERACTIONS` in `scripts/test-areas.mjs`): compare manually with the last `pnpm verify:main --with-mac` result and run the matching scenario with `pnpm perf -g "<name>"` (`apps/desktop/e2e/perf.spec.ts`, queued on the heavy-job lock). It fails over budget. To find the cost, add `JUNO_PERF_TRACE=<dir> JUNO_UNMINIFIED=1` and read the result with `node scripts/perf-trace.mjs` (`docs/performance.md` 7.3). Drive clicks with the driver's `press`: a pointerup in the next frame defers the measure's end by a frame.
+- A list or scroll change is tested in a topic past the window cap (more messages than the loaded window), with real gestures: trackpad momentum, fingers resting on the trackpad, a held scrollbar thumb. Reaching the bottom with a programmatic jump, or a fake topic that never fills the window, misses whole classes of bugs.
 - For a change to a measured interaction, run its matching `pnpm test:feel -g "<name>"` scenario and look at its filmstrip (`apps/desktop/feel-report/index.html`).
 - Query change: run the plan test and the engine benchmark.
 - Other UI changes are covered by perf and feel in `pnpm verify:main --with-mac`. If unsure, say so in your report.
