@@ -209,6 +209,13 @@ export function NotificationsPage() {
   const instructionProps = instructionActions(current, ruleCheck, setRuleCheck)
   const lists = page.value
   const rows = decisions._tag === 'Success' ? decisions.value.decisions : undefined
+  // Add it and Just this time both end the proposal, so it does not come back.
+  const dropProposal = (decision: Decision) =>
+    setProposals((shown) => {
+      const next = new Map(shown)
+      next.delete(decision.id)
+      return next
+    })
   const rowOf = (decision: Decision) => rows?.find((row) => String(row.id) === decision.id)
   // A DM on Auto offers Always for its person.
   const alwaysFor = new Map(
@@ -251,7 +258,11 @@ export function NotificationsPage() {
         const row = rowOf(decision)
         if (row !== undefined) setProposals((shown) => new Map(shown).set(decision.id, proposalFor(row)))
       }}
-      onAddInstruction={(_, instruction) => void saveInstruction(registry, instruction).then((id) => id !== undefined && showToast(registry, { text: 'Instruction added' }))}
+      onAddInstruction={(decision, instruction) => {
+        dropProposal(decision)
+        void saveInstruction(registry, instruction).then((id) => id !== undefined && showToast(registry, { text: 'Instruction added' }))
+      }}
+      onDismissSuggestion={dropProposal}
       onAlways={(decision) => setNotifyLevel({ kind: 'person', id: decision.senderId }, 'always', decision.sender)}
       onSettings={() => openNotificationsAt('how-auto')}
       huddleRing={current.huddleRing}

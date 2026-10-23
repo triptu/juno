@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import { useEffect, useId, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { colors, layout, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Avatar, Button, Chip, Segmented, Surface, Text, focusRing, ringRoom } from '@juno/ui'
 import { hueFor, initials } from './look'
@@ -22,8 +22,10 @@ export interface WhyActions {
   readonly onEditInstructions: () => void
   /** Should have notified or Shouldn't have notified: asks for the instruction to propose. */
   readonly onSuggest: (decision: Decision) => void
-  /** Add it. Just this time adds nothing and only closes the proposal. */
+  /** Add it: adds the instruction, and the proposal goes. */
   readonly onAddInstruction: (decision: Decision, instruction: ProposedInstruction) => void
+  /** Just this time: adds nothing, and the proposal goes. */
+  readonly onDismissSuggestion: (decision: Decision) => void
   /** Always for Maya, on a DM on Auto. */
   readonly onAlways: (decision: Decision) => void
   /** Settings › Notifications at How Auto decides. */
@@ -67,6 +69,24 @@ export function NotificationDetails(props: NotificationDetailsProps) {
   }, [initialOpen])
   const [filter, setFilter] = useState<DetailsFilter>(initialFilter)
   const [open, setOpen] = useState<string | undefined>(initialOpen)
+  const toggle = useCallback((id: string) => setOpen((shown) => (shown === id ? undefined : id)), [])
+  // One object for every row, which calls the latest props: a toggle or a filter re-renders only the rows it changes.
+  const latest = useRef<WhyActions>(props)
+  useEffect(() => {
+    latest.current = props
+  })
+  const actions = useMemo<WhyActions>(
+    () => ({
+      onChange: (decision) => latest.current.onChange(decision),
+      onEditInstructions: () => latest.current.onEditInstructions(),
+      onSuggest: (decision) => latest.current.onSuggest(decision),
+      onAddInstruction: (decision, instruction) => latest.current.onAddInstruction(decision, instruction),
+      onDismissSuggestion: (decision) => latest.current.onDismissSuggestion(decision),
+      onAlways: (decision) => latest.current.onAlways(decision),
+      onSettings: () => latest.current.onSettings(),
+    }),
+    [],
+  )
   const decisions = loaded ?? []
   const notified = loaded === undefined ? notifiedToday : decisions.filter((decision) => decision.notified).length
   const total = loaded === undefined ? notifiedToday + stayedToday : decisions.length
@@ -114,10 +134,10 @@ export function NotificationDetails(props: NotificationDetailsProps) {
                 key={decision.id}
                 decision={decision}
                 open={open === decision.id}
-                onToggle={() => setOpen(open === decision.id ? undefined : decision.id)}
+                onToggle={toggle}
                 proposal={proposals.get(decision.id)}
                 alwaysFor={alwaysFor.get(decision.id)}
-                actions={props}
+                actions={actions}
               />
             ))}
           </ul>
@@ -127,11 +147,27 @@ export function NotificationDetails(props: NotificationDetailsProps) {
   )
 }
 
-function DecisionRow({ decision, open, onToggle, proposal, alwaysFor, actions }: { readonly decision: Decision; readonly open: boolean; readonly onToggle: () => void; readonly proposal: ProposedInstruction | undefined; readonly alwaysFor: string | undefined; readonly actions: WhyActions }) {
+/** The reason without the words its label already says: "Your instructions: Don't notify: …" under "Your instructions". */
+function reasonAfter(label: string, reason: string): string {
+  return reason.startsWith(`${label}: `) ? reason.slice(label.length + 2) : reason
+}
+
+interface DecisionRowProps {
+  readonly decision: Decision
+  readonly open: boolean
+  readonly onToggle: (id: string) => void
+  readonly proposal: ProposedInstruction | undefined
+  readonly alwaysFor: string | undefined
+  readonly actions: WhyActions
+}
+
+/** One decision: who, where and what, then what decided and why on one line. Open, the line shows whole and the actions follow. */
+const DecisionRow = memo(function DecisionRow({ decision, open, onToggle, proposal, alwaysFor, actions }: DecisionRowProps) {
   const whyId = useId()
+  const label = decidedByLabels[decision.decidedBy]
   return (
     <li data-decision={decision.id} {...stylex.props(styles.item)}>
-      <button type="button" aria-expanded={open} aria-controls={open ? whyId : undefined} onClick={onToggle} {...stylex.props(styles.row, focusRing.inset, open && styles.rowOpen)}>
+      <button type="button" aria-expanded={open} aria-controls={open ? whyId : undefined} onClick={() => onToggle(decision.id)} {...stylex.props(styles.row, focusRing.inset, open && styles.rowOpen)}>
         <Text variant="meta" tone="muted" numeric sx={styles.time}>
           {clockLabel(decision.at)}
         </Text>
@@ -148,10 +184,11 @@ function DecisionRow({ decision, open, onToggle, proposal, alwaysFor, actions }:
           </Text>
           <span {...stylex.props(styles.reasonLine)}>
             <Chip variant="quiet" size={18}>
-              {decidedByLabels[decision.decidedBy]}
+              {label}
             </Chip>
-            <Text variant="meta" tone="muted" truncate tooltipWhenTruncated>
-              {decision.reason}
+            {/* Open, the reason shows whole in case the line cut it. */}
+            <Text variant="meta" tone="muted" truncate={!open} tooltipWhenTruncated={!open}>
+              {reasonAfter(label, decision.reason)}
             </Text>
           </span>
         </span>
@@ -162,81 +199,59 @@ function DecisionRow({ decision, open, onToggle, proposal, alwaysFor, actions }:
       {open ? <Why id={whyId} decision={decision} proposal={proposal} alwaysFor={alwaysFor} actions={actions} /> : null}
     </li>
   )
-}
+})
 
-/** A row's why: the question, the reason, the action that fits what decided it, and Notification settings. */
+/** Under an open row: the action that fits what decided it, and Notification settings; or the proposed instruction with Add it and Just this time. */
 function Why({ id, decision, proposal, alwaysFor, actions }: { readonly id: string; readonly decision: Decision; readonly proposal: ProposedInstruction | undefined; readonly alwaysFor: string | undefined; readonly actions: WhyActions }) {
-  // Asked for, and closed again by Add it or Just this time.
-  const [suggesting, setSuggesting] = useState(proposal !== undefined)
-  const correctable = fromReading.has(decision.decidedBy)
-  return (
-    <div id={id} data-why="" {...stylex.props(styles.why)}>
-      <Text variant="meta" tone="muted" weight="semibold" as="p">
-        {decision.notified ? 'Why did this notify?' : 'Why no notification?'}
-      </Text>
-      <Text variant="ui" as="p">
-        {decision.reason}
-      </Text>
-      {suggesting && proposal !== undefined ? (
-        <div {...stylex.props(styles.proposal)}>
-          <Text variant="ui" tone="subtle" as="p">
-            Juno suggests adding an instruction:{' '}
-            <Text variant="ui" tone="default" weight="semibold" as="span">
-              {instructionLine(proposal.direction, proposal.text)}
-            </Text>
-          </Text>
-          <span {...stylex.props(styles.actions)}>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => {
-                actions.onAddInstruction(decision, proposal)
-                setSuggesting(false)
-              }}
-            >
-              Add it
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => setSuggesting(false)}>
-              Just this time
-            </Button>
-          </span>
-        </div>
-      ) : (
+  if (proposal !== undefined) {
+    return (
+      <div id={id} data-why="" {...stylex.props(styles.why)}>
+        <Text variant="ui" tone="subtle" as="p">
+          Juno suggests adding an instruction:
+        </Text>
+        <Text variant="ui" weight="semibold" as="p">
+          {instructionLine(proposal.direction, proposal.text)}
+        </Text>
         <span {...stylex.props(styles.actions)}>
-          {fromSetting.has(decision.decidedBy) ? (
-            <Button variant="secondary" size="sm" onClick={() => actions.onChange(decision)}>
-              Change
-            </Button>
-          ) : null}
-          {decision.decidedBy === 'instruction' ? (
-            <Button variant="secondary" size="sm" onClick={actions.onEditInstructions}>
-              Edit instructions
-            </Button>
-          ) : null}
-          {correctable ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                actions.onSuggest(decision)
-                setSuggesting(true)
-              }}
-            >
-              {decision.notified ? "Shouldn't have notified" : 'Should have notified'}
-            </Button>
-          ) : null}
-          {alwaysFor === undefined ? null : (
-            <Button variant="secondary" size="sm" onClick={() => actions.onAlways(decision)}>
-              Always for {alwaysFor}
-            </Button>
-          )}
-          <span {...stylex.props(styles.settings)}>
-            <Text variant="meta">
-              <SettingsLink onClick={actions.onSettings}>Notification settings</SettingsLink>
-            </Text>
-          </span>
+          <Button variant="primary" size="sm" onClick={() => actions.onAddInstruction(decision, proposal)}>
+            Add it
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => actions.onDismissSuggestion(decision)}>
+            Just this time
+          </Button>
         </span>
-      )}
+      </div>
+    )
+  }
+  return (
+    <div id={id} data-why="" aria-label={decision.notified ? 'Why did this notify?' : 'Why no notification?'} role="group" {...stylex.props(styles.why)}>
+      <span {...stylex.props(styles.actions)}>
+        {fromSetting.has(decision.decidedBy) ? (
+          <Button variant="secondary" size="sm" onClick={() => actions.onChange(decision)}>
+            Change
+          </Button>
+        ) : null}
+        {decision.decidedBy === 'instruction' ? (
+          <Button variant="secondary" size="sm" onClick={actions.onEditInstructions}>
+            Edit instructions
+          </Button>
+        ) : null}
+        {fromReading.has(decision.decidedBy) ? (
+          <Button variant="secondary" size="sm" onClick={() => actions.onSuggest(decision)}>
+            {decision.notified ? "Shouldn't have notified" : 'Should have notified'}
+          </Button>
+        ) : null}
+        {alwaysFor === undefined ? null : (
+          <Button variant="secondary" size="sm" onClick={() => actions.onAlways(decision)}>
+            Always for {alwaysFor}
+          </Button>
+        )}
+        <span {...stylex.props(styles.settings)}>
+          <Text variant="meta">
+            <SettingsLink onClick={actions.onSettings}>Notification settings</SettingsLink>
+          </Text>
+        </span>
+      </span>
     </div>
   )
 }
@@ -359,12 +374,6 @@ const styles = stylex.create({
     paddingBottom: spacing['--space-3'],
     paddingInlineStart: `calc(${spacing['--space-2']} + ${TIME_WIDTH}px + ${sizes['--control-20']} + 2 * ${spacing['--space-2-5']})`,
     paddingInlineEnd: spacing['--space-2'],
-  },
-  proposal: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing['--space-2'],
-    marginTop: spacing['--space-1-5'],
   },
   actions: {
     display: 'flex',

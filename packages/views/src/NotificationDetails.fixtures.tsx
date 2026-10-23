@@ -27,7 +27,8 @@ export default defineFixtures(NotificationDetails, {
     reading: fixture({ ...base, initialOpen: 'd1' }, frame),
     setting: fixture({ ...base, initialOpen: 'd8' }, frame),
     instruction: fixture({ ...base, initialOpen: 'd0' }, frame),
-    proposal: fixture({ ...base, proposals: new Map([['d13', proposal]]), initialOpen: 'd13' }, frame),
-    timeout: fixture({ ...base, initialOpen: 'd22' }, frame),
+    proposal: fixture({ ...base, proposals: new Map([['d14', proposal]]), initialOpen: 'd14' }, frame),
+    'addressed-elsewhere': fixture({ ...base, initialOpen: 'd10' }, frame),
+    timeout: fixture({ ...base, initialOpen: 'd23' }, frame),
   },
 })
