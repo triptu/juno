@@ -11,11 +11,11 @@ const started = Date.now()
 const errors = []
 const location = (file) => ({ file: relative(root, file.name), line: file.start, end: file.end })
 
-function run(tool, args) {
+function run(tool, args, runtime = process.execPath) {
   const manifestPath = resolve(root, 'node_modules', tool, 'package.json')
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
   const bin = typeof manifest.bin === 'string' ? manifest.bin : manifest.bin[tool]
-  return runTool(tool, process.execPath, [resolve(dirname(manifestPath), bin), ...args], { cwd: root, env: { ...process.env, NO_COLOR: '1' } })
+  return runTool(tool, runtime, [resolve(dirname(manifestPath), bin), ...args], { cwd: root, env: { ...process.env, NO_COLOR: '1' } })
 }
 
 async function check(name, action) {
@@ -29,7 +29,9 @@ async function main() {
   mkdirSync(output, { recursive: true })
   const knipRun = check('knip', async () => {
     rmSync(resolve(output, 'knip-report.json'), { force: true })
-    const raw = await run('knip', ['--config', 'knip.config.mjs', '--reporter', 'json', '--no-progress', '--no-exit-code'])
+    // Knip runs on Node: it asks the runtime which imports are built in, and Bun
+    // counts `ws` and `undici`, so their dependencies would look unused.
+    const raw = await run('knip', ['--config', 'knip.config.mjs', '--reporter', 'json', '--no-progress', '--no-exit-code'], 'node')
     const report = JSON.parse(raw)
     writeFileSync(resolve(output, 'knip-report.json'), raw)
     const findings = report.issues.flatMap(({ file, ...categories }) => Object.entries(categories)
