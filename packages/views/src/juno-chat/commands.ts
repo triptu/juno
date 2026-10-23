@@ -40,7 +40,7 @@ export interface ChatActions {
   /** Start, Not now or Stop on a proactive ask. */
   readonly onAsk: (id: AskId, answer: AskAnswer) => void
   readonly onGroupLabel: (id: string, action: GroupLabelAction) => void
-  /** Esc on a bubble or card that has keyboard focus: back to the composer. */
+  /** Esc on a bubble or card that has keyboard focus, or ↓ on the newest one: back to the composer. */
   readonly onLeaveRows?: () => void
   /**
    * A right-click on a bubble or card: the container opens its menu when the click completes (`openOnRelease`). The

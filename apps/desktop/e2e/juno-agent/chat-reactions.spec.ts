@@ -215,12 +215,19 @@ test('the keyboard reaches a bubble, ⇧F10 opens its menu under the first line,
   await chat.send('keyboard menu target')
   await chat.expectJuno('You said: keyboard menu target')
 
-  // ↑ in the empty composer: the newest bubble; ↑ again: your own before it; Esc: back to the composer.
+  // ↑ in the empty composer: the newest bubble; ↑ again: your own before it; ↓ twice: the newest, then back to
+  // the composer; Esc from a bubble: back to the composer too.
   await chat.composer.press('ArrowUp')
   const bubble = chat.junoBubble('You said: keyboard menu target').locator('[data-chat-row]')
   await expect(bubble).toBeFocused()
   await juno.win.keyboard.press('ArrowUp')
   await expect(chat.ownerBubble('keyboard menu target').locator('[data-chat-row]')).toBeFocused()
+  await juno.win.keyboard.press('ArrowDown')
+  await expect(bubble).toBeFocused()
+  await juno.win.keyboard.press('ArrowDown')
+  await expect(chat.composer).toBeFocused()
+  await chat.composer.press('ArrowUp')
+  await juno.win.keyboard.press('ArrowUp')
   await juno.win.keyboard.press('Escape')
   await expect(chat.composer).toBeFocused()
 
