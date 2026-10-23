@@ -63,7 +63,7 @@ it('removes every chunk of the message, and of every copy of a resent input', ()
     for (const r of archive) if (r.entry === row.entry) expect(removed.has(r.id)).toBe(true)
     if (row.kind === 'juno' || row.kind === 'tool') return
     const copies = family(ops, row.originOp!)
-    expect(new Set(scope.ops)).toEqual(copies)
+    expect<ReadonlySet<string>>(new Set(scope.ops)).toEqual(copies)
     for (const r of archive) if (copies.has(r.originOp!) && r.kind !== 'juno' && r.kind !== 'tool') expect(removed.has(r.id)).toBe(true)
   }))
 })
@@ -78,7 +78,7 @@ it("takes Juno's reply only when asked, only what Juno's turn wrote, and nothing
       const row = archive[id]!
       if (row.entry === targetEntry) continue
       // Anything beyond the message itself belongs to the removed inputs: their words, or Juno's reply when asked.
-      expect(withReply.ops).toContain(row.originOp)
+      expect<ReadonlyArray<string | null>>(withReply.ops).toContain(row.originOp)
       if (!without.messages.includes(id)) expect(['juno', 'tool']).toContain(row.kind)
     }
     for (const id of without.messages) if (archive[id]!.entry !== targetEntry) expect(['juno', 'tool']).not.toContain(archive[id]!.kind)

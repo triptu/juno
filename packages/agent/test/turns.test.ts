@@ -189,7 +189,7 @@ it('a message sent while a request fails starts the next run instead of waiting 
   const second = h.send('keep it short')
   release.resolve()
 
-  expect((await h.ended(first)).ending).toEqual({ _tag: 'failed', reason: 'offline', retry: first })
+  expect<unknown>((await h.ended(first)).ending).toEqual({ _tag: 'failed', reason: 'offline', retry: first })
   const fresh = await h.started(second)
   expect(fresh.runId).not.toBe(run.runId)
   expect((await h.ended(second)).ending).toEqual({ _tag: 'complete' })
@@ -351,7 +351,7 @@ it('ends a run whose provider call fails with the fixed ending for the cause, an
     const unknown = h.turns.guard.spend.snapshot().unknown
     h.fake.script([step])
     const op = h.send('hello')
-    expect((await h.ended(op)).ending).toEqual({ ...ending, retry: op })
+    expect<unknown>((await h.ended(op)).ending).toEqual({ ...ending, retry: op })
     expect(h.turns.op(op)?.state).toBe('failed')
     expect(h.turns.guard.spend.snapshot().unknown > unknown).toBe(billed)
   }
@@ -400,7 +400,7 @@ it('ends a run whose stream was lost as interrupted, keeps its spend as unknown,
   h = await turnsHarness({ compaction: false })
   h.fake.script([lostStream('<say>Partial answer.</say> and then', { afterChars: 30 }), reply(say('The full answer.'))])
   const op = h.send('explain the outage')
-  expect((await h.ended(op)).ending).toEqual({ _tag: 'interrupted', retry: op })
+  expect<unknown>((await h.ended(op)).ending).toEqual({ _tag: 'interrupted', retry: op })
   expect(h.turns.op(op)?.state).toBe('interrupted')
   // A bubble closed before the stream was lost was shown.
   expect(h.bubbles()).toEqual([['Partial answer.']])

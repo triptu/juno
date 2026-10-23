@@ -14,7 +14,7 @@ source.store.db.prepare("INSERT INTO runs (id, op_id, origin, h, clean, started_
 source = { ...source, live: { runId: 'live', opId: 'live', origin: 'owner', bubbles: [], status: {} },
   cards: [{ runId: 'live', at: source.store.now() + 3_000_000, card: { _tag: 'task', id: CardId.make('bench-card'), jobId: JobId.make('bench-job'), kind: 'subagent', title: 'Task', where: 'Juno', phase: 'running' } }] }
 
-const gc = () => Bun.gc(true)
+const gc = () => (globalThis as unknown as { readonly Bun: { readonly gc: (force: boolean) => void } }).Bun.gc(true)
 gc()
 const initialHeap = process.memoryUsage().heapUsed
 const cache = createChatCache(source.store)

@@ -210,7 +210,7 @@ it('rotation.drained: the old incarnation is still current; it reopens, and rota
   expect(rotated.incarnations.map((i) => i.retiredReason)).toEqual(['rotation', null])
   expect(rotated.incarnation).not.toBe(before.incarnation)
   expect(journalNames()).toEqual([`pi-${rotated.incarnation}.sqlite`])
-  expect(rotated.messages.slice(0, 2)).toEqual(before.messages)
+  expect<unknown>(rotated.messages.slice(0, 2)).toEqual(before.messages)
   expect(rotated.messages.slice(2).map((m) => [m.id, m.text, m.incarnation])).toEqual([[2, 'again', rotated.incarnation], [3, 'Reply 1.', rotated.incarnation]])
 })
 
@@ -333,7 +333,7 @@ it('a journal from a newer pi stops with "needs to update its records" and is le
   }
   setVersion(99)
   const blocked = raw()
-  expect(await run('send:op-2:again', 'idle')).toEqual({ state: 'updateNeeded' })
+  expect<unknown>(await run('send:op-2:again', 'idle')).toEqual({ state: 'updateNeeded' })
   expect(raw()).toEqual(blocked)
 
   setVersion(1)
@@ -347,7 +347,7 @@ it('an agent.sqlite from a newer Juno stops the same way and is not written', as
   agent.prepare("INSERT INTO schema_migrations (\"set\", step, applied_at) VALUES ('future', 1, 0)").run()
   agent.close()
   const blocked = raw()
-  expect(await run('send:op-2:again')).toEqual({ state: 'updateNeeded' })
+  expect<unknown>(await run('send:op-2:again')).toEqual({ state: 'updateNeeded' })
   expect(raw()).toEqual(blocked)
 })
 
