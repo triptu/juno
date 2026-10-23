@@ -7,14 +7,14 @@ import type { FakeSlack } from '@juno/fake-slack'
 import { expect, test, type Fixtures } from './fixtures'
 import type { Juno } from './driver/juno'
 
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 const ENG_MAIN = '#eng'
 const POSTGRES = 'Draft plan is in the doc'
 
 async function openMain(juno: Juno): Promise<void> {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.sidebar.row(ENG_MAIN).open()
   await juno.topic.expectTitle('Main')
 }

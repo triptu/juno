@@ -1,0 +1,1 @@
+- 10-24 04:58 · browser-synced-flows · Default-seed UI flows use the verified synced snapshot; the emoji-catalogue case keeps a cold sign-in because it changes boot data. Test dependency polling and socket pings keep production cadence instead of waking 20 times as often. On one four-core runner comparison, the 25 converted flows used 38.19 s of host CPU versus 50.10 s before.

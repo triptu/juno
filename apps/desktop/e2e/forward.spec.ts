@@ -8,6 +8,8 @@ import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
 
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 const ENG_MAIN = '#eng'
@@ -42,8 +44,6 @@ async function forward(juno: Juno, text: string, destination: string, note: stri
 }
 
 test('Forward… shares a message into a channel with a note', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.sidebar.row(ENG_MAIN).open()
   await juno.topic.expectTitle('Main')
 
@@ -71,8 +71,6 @@ test('Forward… shares a message into a channel with a note', async ({ juno, fa
 })
 
 test('a forward Slack refuses shows Not sent. in the destination, and Retry sends it', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.sidebar.row(ENG_MAIN).open()
   await juno.topic.expectTitle('Main')
 
@@ -91,8 +89,6 @@ test('a forward Slack refuses shows Not sent. in the destination, and Retry send
 })
 
 test('F forwards a focused message, and chooses Forward… in its open menu', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.sidebar.row(ENG_MAIN).open()
   await juno.topic.expectTitle('Main')
   const dialog = sheet(juno.win)

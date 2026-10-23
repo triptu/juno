@@ -2,15 +2,13 @@ import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { expect, test } from './fixtures'
 
-test.use({ fakeAiDelayMillis: 2_000 })
+test.use({ fakeAiDelayMillis: 2_000, synced: true })
 test.describe.configure({ timeout: 120_000 })
 
 for (const destination of ['self-DM', 'channel'] as const) {
   test(`late spelling fixes in a ${destination} can be reviewed, saved and dismissed`, async ({ juno, fake, userData }) => {
     const channel = destination === 'self-DM' ? fake.workspace.open([fake.selfId]).conversation.id : 'C0ENG'
     if (destination === 'self-DM') fake.injectMessage({ channel, user: fake.selfId, text: 'Notes for today' })
-    await juno.signIn()
-    await juno.waitForSync()
     await juno.sidebar.row(destination === 'self-DM' ? 'Tushar' : '#eng').open()
     const original = 'does grammer chek properly happen?'
     const fixed = 'does grammar check properly happen?'
@@ -23,7 +21,6 @@ for (const destination of ['self-DM', 'channel'] as const) {
     await expect(suggestion).toContainText('2 small fixes')
     const row = juno.topic.list.locator('[data-message-row]').filter({ hasText: original })
     await expect(row.locator('[data-send-suggestion]')).toBeVisible()
-    await juno.win.screenshot({ path: test.info().outputPath(`grammar-${destination}.png`) })
     await suggestion.getByRole('button', { name: 'Review', exact: true }).click()
     const editor = juno.topic.list.getByRole('textbox', { name: 'Edit message' })
     await expect(editor).toHaveValue(fixed)

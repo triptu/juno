@@ -9,13 +9,13 @@ import type { FakeSlack } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
 
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 const NEWEST = 'Looking at the replica lag now'
 
 async function openMain(juno: Juno, fake: FakeSlack): Promise<void> {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.sidebar.row('#eng').open()
   await juno.topic.expectTitle('Main')
   await juno.topic.send(NEWEST)
@@ -84,8 +84,6 @@ test('↑ on the composer’s first line selects the newest message, keeping the
 
 test('Esc in the composer selects the message under the pointer, else the newest; keys act on a hovered message', async ({ juno, fake }) => {
   const HOVERED = 'Hover target for Esc'
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.sidebar.row('#eng').open()
   await juno.topic.expectTitle('Main')
   for (const text of [HOVERED, NEWEST]) {

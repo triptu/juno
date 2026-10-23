@@ -46,6 +46,10 @@ export const fastTestTiming: NonNullable<EngineHostOptions['timing']> = {
   // As in the unit harness, explicit catch-ups replace periodic discovery.
   sweepIntervalMillis: 0,
   followPassMillis: 0,
+  // Polling pending dependencies faster does not make their network calls finish sooner.
+  dependencyPollMillis: productionTiming.dependencyPollMillis,
+  // Heartbeats exercise liveness without waking every half second in short UI flows.
+  socketPingMillis: productionTiming.socketPingMillis,
   // The app and the fake run in separate real processes, on a shared runner.
   socketHelloTimeoutMillis: productionTiming.socketHelloTimeoutMillis,
   socketPongTimeoutMillis: productionTiming.socketPongTimeoutMillis,

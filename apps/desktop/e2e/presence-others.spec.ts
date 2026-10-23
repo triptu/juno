@@ -11,9 +11,9 @@
 import { SELF_ID } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 
+test.use({ synced: true })
+
 test('an open DM shows its person active or away, and the sidebar dots follow their own setting, off by default', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const maya = slack.as('Maya')
   const dm = juno.sidebar.row('Maya', { exact: true })
 

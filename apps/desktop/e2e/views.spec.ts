@@ -11,7 +11,7 @@ import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
 
 // A failing test attaches the sidebar's order hold and topic list values (README, "Sidebar trace").
-test.use({ sidebarTrace: true })
+test.use({ sidebarTrace: true, synced: true })
 
 test.describe.configure({ timeout: 90_000 })
 
@@ -29,10 +29,8 @@ function storedColor(userData: string, teamId: string, name: string): string | n
   }
 }
 
-/** Signs in, waits for the sync and deletes Automated, which holds #alerts-prod and #deploys after the first sync. */
+/** Deletes Automated, which holds #alerts-prod and #deploys after the first sync. */
 async function withoutAutomated(juno: Juno): Promise<void> {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.sidebar.viewMenu('Automated', 'view-delete')
   await expect.poll(() => juno.sidebar.viewNames()).toEqual([])
 }
@@ -142,8 +140,6 @@ test('a view with no icon shows its name; edit it, reorder by menu and drag, and
 })
 
 test('an empty view says so and opens its sheet, and many views scroll the pill row sideways', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const { sidebar } = juno
   await test.step('a view with no conversations says so, and Edit view opens its sheet', async () => {
     await sidebar.createView({ name: 'Later' })

@@ -1,5 +1,7 @@
 import { expect, test } from './fixtures'
 
+test.use({ synced: true })
+
 // No full stop: the AI title (the first sentence, cut short) replaces the message text once the title job runs.
 const RINA = 'Rina finished the onsite'
 const ROADMAP = 'Proposal: cut offline mode and public'
@@ -7,8 +9,6 @@ const SWITCH = 'Mark messages read in Slack too'
 const CATCH_UP = 'Mark earlier reads in Slack'
 
 test('default mirroring, peeking, switching off and catching up earlier reads', async ({ juno, slack }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const marks = () => slack.fake.calls.filter((call) => call.method === 'conversations.mark' || call.method === 'subscriptions.thread.mark')
   slack.fake.resetCalls()
   await juno.sidebar.row(RINA).peek()
