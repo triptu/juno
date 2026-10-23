@@ -24,8 +24,8 @@ export interface TopicComposerProps {
   readonly handle?: Ref<ComposerHandle>
   /** Called with the field once the draft has loaded; a topic just opened focuses it. */
   readonly takeFocus?: (field: HTMLTextAreaElement) => void
-  /** ↑ in the empty field: the topic selects its newest message. */
-  readonly onArrowUpEmpty?: () => void
+  /** A plain ↑ on the field's first line: the topic selects its newest message. */
+  readonly onArrowUpTop?: () => void
   /** Files are being dragged over the topic. */
   readonly dropping?: boolean
 }
@@ -69,11 +69,11 @@ export function withQuote(draft: string, text: string): string {
  * shows as sending at once and the engine posts it when the file is ready,
  * or shows it as not sent when the file could not be read.
  */
-export function TopicComposer({ detail, onSent, handle, takeFocus, onArrowUpEmpty, dropping }: TopicComposerProps) {
+export function TopicComposer({ detail, onSent, handle, takeFocus, onArrowUpTop, dropping }: TopicComposerProps) {
   const stored = useAtomValue(draftAtom(detail.id))
   const placeholder = detail.kind === 'main' ? `Message ${detail.channel.label}` : 'Reply'
   if (stored._tag !== 'Success') return <ComposerSlot placeholder={placeholder} />
-  return <LoadedComposer detail={detail} initial={stored.value} latest={stored.value} placeholder={placeholder} onSent={onSent} handle={handle} takeFocus={takeFocus} onArrowUpEmpty={onArrowUpEmpty} dropping={dropping} />
+  return <LoadedComposer detail={detail} initial={stored.value} latest={stored.value} placeholder={placeholder} onSent={onSent} handle={handle} takeFocus={takeFocus} onArrowUpTop={onArrowUpTop} dropping={dropping} />
 }
 
 function LoadedComposer({
@@ -84,7 +84,7 @@ function LoadedComposer({
   onSent,
   handle,
   takeFocus,
-  onArrowUpEmpty,
+  onArrowUpTop,
   dropping = false,
 }: TopicComposerProps & { readonly initial: string; readonly latest: string; readonly placeholder: string }) {
   const id = detail.id
@@ -311,7 +311,7 @@ function LoadedComposer({
       attachments={files.chips}
       onFiles={files.onFiles}
       dropping={dropping}
-      {...(onArrowUpEmpty === undefined ? {} : { onArrowUpEmpty })}
+      {...(onArrowUpTop === undefined ? {} : { onArrowUpTop })}
     />
   )
 }

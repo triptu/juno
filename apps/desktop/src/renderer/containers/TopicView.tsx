@@ -244,7 +244,7 @@ export function Topic({ id, view, detail, readOnly = false, peek = false, onOpen
     <TopicViewFrame
       header={header}
       pill={pill.show ? <NewMessagesPill count={pill.count} onJump={jump} /> : undefined}
-      composer={detail.deactivated ? <Suspense><DeactivatedNote name={detail.channel.label} /></Suspense> : <TopicComposer key={id} detail={id === detail.id ? detail : { ...detail, id }} onSent={sent} handle={composer} takeFocus={(field) => takeComposerFocus(view, field)} onArrowUpEmpty={messageActions.selectNewest} dropping={files.dropping} />}
+      composer={detail.deactivated ? <Suspense><DeactivatedNote name={detail.channel.label} /></Suspense> : <TopicComposer key={id} detail={id === detail.id ? detail : { ...detail, id }} onSent={sent} handle={composer} takeFocus={(field) => takeComposerFocus(view, field)} onArrowUpTop={messageActions.selectNewest} dropping={files.dropping} />}
       floating={messageActions.floating}
       viewer={files.viewer}
       onFiles={(dropped) => attach(id, dropped)}
