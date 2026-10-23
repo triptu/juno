@@ -12,8 +12,9 @@ export function runtimeIdentity(root, remote = false) {
   const bun = remote ? manifest.packageManager?.replace(/^bun@/, '') : process.versions.bun ?? spawnSync('bun', ['--version'], { encoding: 'utf8' }).stdout?.trim()
   const runtime = remote ? /\bnode\b/.test(manifest.scripts?.['test:plan'] ?? '') ? 'node' : 'bun' : process.versions.bun ? 'bun' : 'node'
   const docker = join(root, 'scripts/remote/Dockerfile')
-  const node = remote ? (existsSync(docker) ? /ARG NODE_VERSION=(\S+)/.exec(readFileSync(docker, 'utf8'))?.[1] : undefined) : process.versions.node
-  return { runtime, version: runtime === 'bun' ? bun : node, bun, platform: remote ? 'linux' : process.platform, arch: remote ? 'x64' : process.arch, electron: desktop.devDependencies?.electron ?? desktop.dependencies?.electron ?? null }
+  const node = remote ? (existsSync(docker) ? /ARG NODE_VERSION=(\S+)/.exec(readFileSync(docker, 'utf8'))?.[1] : undefined)
+    : process.versions.bun ? spawnSync('node', ['--version'], { encoding: 'utf8' }).stdout?.trim().replace(/^v/, '') : process.versions.node
+  return { runtime, version: runtime === 'bun' ? bun : node, bun, node, platform: remote ? 'linux' : process.platform, arch: remote ? 'x64' : process.arch, electron: desktop.devDependencies?.electron ?? desktop.dependencies?.electron ?? null }
 }
 
 export const sameIdentity = (left, right) => left !== undefined && right !== undefined && JSON.stringify(left) === JSON.stringify(right)
