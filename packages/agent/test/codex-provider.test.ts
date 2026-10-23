@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, setDefaultTimeout } from 'bun:test'
 import { startFakeCodex, startFakeMcpServer } from '@juno/agent-testing'
 import { createCodexAdapter } from '../src/index'
 import { providerHarness, request } from './providers-harness'
+import { deferred } from './turns-harness'
 
 // Each test starts the fake Codex as child processes, which a loaded machine slows.
 setDefaultTimeout(30_000)
@@ -16,7 +17,7 @@ let called: Promise<void>
 beforeEach(async () => {
   h = await providerHarness()
   fake = startFakeCodex()
-  const reached = Promise.withResolvers<void>()
+  const reached = deferred()
   called = reached.promise
   server = await startFakeMcpServer({ tools: [{ name: 'echo', call: args => { reached.resolve(); return String(args.text) } }], bearer: 'test-turn-token' })
 })

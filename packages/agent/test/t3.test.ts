@@ -5,6 +5,7 @@ import { afterEach, expect, test } from 'bun:test'
 import { json, reply, startFakeMcpServer, type FakeTool } from '@juno/agent-testing'
 import { T3 } from '../src/mcp'
 import { callTool, callsOf, closeAfter, closeConnections, connections, until } from './connections-harness'
+import { deferred } from './turns-harness'
 
 afterEach(closeConnections)
 
@@ -330,8 +331,8 @@ test('shows a session T3 Code started while the account changed, and stops watch
 
 test('sees a session end as soon as t3_thread_wait returns, without another timed read', async () => {
   let state = 'running'
-  const ended = Promise.withResolvers<void>()
-  const called = Promise.withResolvers<void>()
+  const ended = deferred()
+  const called = deferred()
   const { c, start, job } = await t3([launch, read(() => ({ status: state, branch: 'fix-test' })), status,
     { name: 't3_thread_wait', inputSchema: { type: 'object', properties: { threadId: str, timeoutMs: { type: 'number' } }, required: ['threadId'] }, call: async () => {
       called.resolve()

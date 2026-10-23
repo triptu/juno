@@ -3,6 +3,7 @@ import { httpError, lostStream, rateLimited, rejectedKey, reply, serverError } f
 import { AdmissionError, createCompactionProvider, createProviderGuard, dollars, providerFailure } from '../src/index'
 import type { GuardCall } from '../src/providers/guard'
 import { providerHarness, request } from './providers-harness'
+import { deferred } from './turns-harness'
 
 let h: Awaited<ReturnType<typeof providerHarness>>
 beforeEach(async () => { h = await providerHarness() })
@@ -84,7 +85,7 @@ it('asks the fallback model once when the model refuses under its policy, and lo
   const fallback = h.fake.model('google/gemini-3.8-flash')
   const guard = createProviderGuard({ store: h.core.store, transport: h.fake.models, fallback: () => fallback })
   const calls: GuardCall[] = []
-  const both = Promise.withResolvers<void>()
+  const both = deferred()
   guard.onCall((call) => {
     calls.push(call)
     if (calls.length === 2) both.resolve()
