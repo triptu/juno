@@ -87,16 +87,19 @@ export function NotificationDetails(props: NotificationDetailsProps) {
             Done
           </Button>
         </span>
-        <Segmented
-          label="Show"
-          value={filter}
-          onChange={setFilter}
-          options={[
-            { value: 'all', label: 'All', count: total },
-            { value: 'notified', label: 'Notified', count: notified },
-            { value: 'stayed', label: 'Stayed in Juno', count: total - notified },
-          ]}
-        />
+        {/* Choosing a filter changes the list under it, on purpose. */}
+        <span data-expands-in-place="">
+          <Segmented
+            label="Show"
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { value: 'all', label: 'All', count: total },
+              { value: 'notified', label: 'Notified', count: notified },
+              { value: 'stayed', label: 'Stayed in Juno', count: total - notified },
+            ]}
+          />
+        </span>
       </div>
       <div ref={list} {...stylex.props(styles.scroll, ringRoom.inline)}>
         {loaded === undefined ? null : shown.length === 0 ? (
