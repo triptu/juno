@@ -48,6 +48,7 @@ syncedTest('Notify me on a channel lists it on the page, and removing it there h
 })
 
 syncedTest('a group DM notifies under its people\'s names, not Slack\'s internal name', async ({ juno, slack }) => {
+  await juno.notificationHoursNow()
   await juno.sidebar.row('Maya, Leo', { exact: true }).open()
   await juno.topic.chooseInMessageMenu('lunch friday?', 'notify-always', { onSender: true })
   await juno.expectToast('Leo: Always')
@@ -59,10 +60,11 @@ syncedTest('a group DM notifies under its people\'s names, not Slack\'s internal
 
 syncedTest('a DM set to Always notifies, and the click opens it at the message', async ({ juno, slack }) => {
   // Maya's DM is on the page's Always list once set from the person menu.
-  slack.as('Maya').dm('Can you look at the hiring plan today?')
+  await juno.notificationHoursNow()
+  slack.as('Maya').dm('Here is the hiring plan for today.')
   await juno.sidebar.row('Maya', { exact: true }).open()
-  await juno.topic.expectMessage('Can you look at the hiring plan today?')
-  const person = await juno.topic.chooseInMessageMenu('Can you look at the hiring plan today?', 'notify-always', { onSender: true })
+  await juno.topic.expectMessage('Here is the hiring plan for today.')
+  const person = await juno.topic.chooseInMessageMenu('Here is the hiring plan for today.', 'notify-always', { onSender: true })
   expect(person.labels).toEqual(['Notify me about Maya', '> Always', '> Auto ✓', '> Never', '> -', '> How Auto decides…', '-', 'Ask Juno', 'What Juno knows about Maya'])
   await juno.expectToast('Maya: Always')
 
@@ -82,6 +84,7 @@ syncedTest('a DM set to Always notifies, and the click opens it at the message',
 
 syncedTest('a topic on screen in a focused window does not notify, and unread topics badge the dock', async ({ juno, slack }) => {
   await expect.poll(() => juno.dockBadge(), { timeout: 15_000 }).toBe('•')
+  await juno.notificationHoursNow()
 
   await juno.sidebar.selectView('Automated')
   await juno.sidebar.row(ALERTS_MAIN).chooseInMenu('notify-always')
@@ -309,6 +312,7 @@ longThread('a notification for a topic open in another tab focuses it, scrolls t
   longThread.setTimeout(90_000)
   await juno.signIn()
   await juno.waitForSync()
+  await juno.notificationHoursNow()
   const thread = juno.sidebar.row(LONG_THREAD)
   await thread.chooseInMenu('notify-always')
   await juno.expectToast(': Always')

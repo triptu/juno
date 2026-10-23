@@ -8,9 +8,9 @@
  * is not frontmost. The ring is recorded, not played, under JUNO_E2E
  * (`window.__junoHuddleRing`), and main counts the dock's bounces.
  *
- * Notification hours depend on the clock, so the channels that ring are set
- * to Always, which rings at any hour; #product is set to Never, which
- * keeps its card quiet.
+ * Notification hours depend on the clock, so each test first sets them
+ * around now. The channels that ring are set to Always; #product is set to
+ * Never, which keeps its card quiet.
  */
 import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
@@ -27,6 +27,7 @@ const rings = (win: Page) => win.evaluate(() => (window as unknown as RingWindow
 test('someone starts a huddle: the card rings, Join joins, Dismiss hides it, and it goes when the huddle ends', async ({ juno, fake, win }) => {
   await juno.signIn()
   await juno.waitForSync()
+  await juno.notificationHoursNow()
   await juno.sidebar.row('#eng').chooseInMenu('notify-always')
   await juno.expectToast('#eng: Always')
   await juno.sidebar.row('Maya', { exact: true }).chooseInMenu('notify-always')
@@ -98,6 +99,7 @@ test('someone starts a huddle: the card rings, Join joins, Dismiss hides it, and
 test('a huddle the user started on another device shows no card', async ({ juno, fake, win }) => {
   await juno.signIn()
   await juno.waitForSync()
+  await juno.notificationHoursNow()
   await juno.sidebar.row('#eng').chooseInMenu('notify-always')
   await juno.expectToast('#eng: Always')
   await juno.sidebar.row('#product').chooseInMenu('notify-always')
@@ -117,6 +119,7 @@ test('a huddle the user started on another device shows no card', async ({ juno,
 test('an ignored channel rings like any other, the dock bounces while Juno is behind, and Ring for huddles off keeps it silent', async ({ juno, fake, win }) => {
   await juno.signIn()
   await juno.waitForSync()
+  await juno.notificationHoursNow()
   await juno.sidebar.row('#eng').chooseInMenu('notify-always')
   await juno.expectToast('#eng: Always')
   await juno.sidebar.selectView('Automated')

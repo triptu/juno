@@ -40,6 +40,7 @@ test('privacy mode blurs previews from the account menu, hides notification text
   await accountMenu.close()
 
   // A notification says where it came from, not what was written. #alerts-prod is a bot channel, in Automated.
+  await juno.notificationHoursNow()
   await sidebar.selectView('Automated')
   await sidebar.row(ALERTS_MAIN).chooseInMenu('notify-always')
   await juno.expectToast('#alerts-prod: Always')

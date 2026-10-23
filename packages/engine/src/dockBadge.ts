@@ -5,7 +5,7 @@ import { liveQuery, StoreReader } from '@juno/store'
 import { readSettings } from '@juno/notifications'
 import { IN_ALL, unreadFrom } from './sidebarUnread'
 
-const levels: ReadonlyArray<NotifyLevel | undefined> = [undefined, 'every', 'never']
+const levels: ReadonlyArray<NotifyLevel | undefined> = [undefined, 'always', 'never']
 
 /** The SQL encodes inputs, never notification precedence. The domain evaluates each possible input once per settings/time change. */
 export function badgePolicy(settings: NotificationSettings, context: BadgeContext) {
@@ -17,7 +17,7 @@ export function badgePolicy(settings: NotificationSettings, context: BadgeContex
         const active = dockBadgeActive([{
           id: 't:C:1', channel: 'C', kind: dm === 1 ? 'im' : 'public', person: 'U', mentionsMe: mention > 0,
           mentionsMeDirectly: mention === 2, sidebarVisible: visible === 1, ignored: ignored === 1,
-          ...(judgement === 0 ? {} : { judgement: { notify: judgement === 2, reason: '' } }),
+          ...(judgement === 0 ? {} : { auto: judgement === 2 }),
         }], config, context)
         if (active) allowed.push(thread + channel * 3 + person * 9 + dm * 27 + mention * 54 + visible * 162 + ignored * 324 + judgement * 648)
       }
@@ -26,10 +26,12 @@ export function badgePolicy(settings: NotificationSettings, context: BadgeContex
   return { allowed, settings: JSON.stringify(settings), unknownSender: !Object.values(settings.people).includes('never') }
 }
 
-const level = (path: string) => `CASE json_extract(?, ${path}) WHEN 'every' THEN 1 WHEN 'never' THEN 2 ELSE 0 END`
+const level = (path: string) => `CASE json_extract(?, ${path}) WHEN 'always' THEN 1 WHEN 'never' THEN 2 ELSE 0 END`
 const threadLevel = level(`'$.threads."' || i.topic_id || '"'`)
 const channelLevel = level(`'$.channels."' || i.channel || '"'`)
 const personLevel = (sender: string) => level(`'$.people."' || COALESCE(${sender}, '') || '"'`)
+/** What Auto decided for a logged message: 0 not read, 1 stay, 2 notify. */
+const AUTO = `CASE WHEN n.decided_by IN ('closer', 'live', 'instruction', 'reading') THEN CASE n.outcome WHEN 'notify' THEN 2 ELSE 1 END ELSE 0 END`
 const knownRead = `(r.observed_at IS NOT NULL OR r.last_read_ts IS NOT NULL OR (i.kind = 'main' AND cr.counts_updated IS NOT NULL) OR (i.kind = 'thread' AND s.slack_last_read IS NOT NULL))`
 
 export function badgeStatement(policy: ReturnType<typeof badgePolicy>, self: string) {
@@ -42,7 +44,7 @@ export function badgeStatement(policy: ReturnType<typeof badgePolicy>, self: str
       EXISTS(SELECT 1 FROM messages m LEFT JOIN notification_log n ON n.channel = m.channel AND n.ts = m.ts
         WHERE m.channel = i.channel AND (m.ts > COALESCE(r.last_read_ts, CASE WHEN i.kind = 'main' THEN cr.slack_last_read ELSE s.slack_last_read END, '0') OR (r.marked_unread = 1 AND m.ts = i.last_activity_ts)) AND m.deleted = 0 AND COALESCE(m.user_id, '') <> ?
           AND ((i.kind = 'main' AND (m.thread_ts IS NULL OR m.thread_ts = m.ts OR m.subtype = 'thread_broadcast')) OR (i.kind = 'thread' AND (m.thread_ts = i.root_ts OR m.ts = i.root_ts)))
-          AND ${code('m.user_id', 'm.attention', "CASE json_extract(n.judgement_json, '$.notify') WHEN 0 THEN 1 WHEN 1 THEN 2 ELSE 0 END")} LIMIT 1)
+          AND ${code('m.user_id', 'm.attention', AUTO)} LIMIT 1)
       OR ((i.message_count = 0 OR (r.marked_unread = 1 AND c.kind IN ('im', 'mpim'))) AND (c.kind = 'im' OR ${policy.unknownSender ? '1' : '0'}) AND ${code('c.user_id', 'CASE WHEN i.mentions_me = 1 THEN 2 ELSE 0 END', '0')})
     ) LIMIT 1) AS active`,
     params: [self, ...params, ...params],

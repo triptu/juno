@@ -1,0 +1,1 @@
+- 10-23 23:31 · notification-reading-raw · notificationReading returns the classifier's answers as they came (needsYou, its probabilities, the chosen instruction and its confidence); the domain applies the 0.7, 0.85 and 0.5 thresholds, so a settings change can re-decide today's messages from the stored reading without another call.

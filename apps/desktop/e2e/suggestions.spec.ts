@@ -6,6 +6,7 @@
 import type { FakeSlack } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
+import { loggedDecision } from './driver/notificationLog'
 
 test.describe.configure({ timeout: 150_000 })
 
@@ -137,14 +138,13 @@ test('Ignore channels you never read: the reason, nothing in Slack, Ignore, Undo
   await juno.sidebar.row(BUILDS).expectVisible()
 })
 
-test('a mention of you, or of your group, breaks through an ignored channel; @here does not', async ({ juno, fake }) => {
+test('a mention of you, or of your group, breaks through an ignored channel; @here does not', async ({ juno, fake, userData }) => {
   fake.setSelfUsergroups({ ids: ['S0PLATFORM'] })
   await juno.signIn()
   await juno.waitForSync()
 
-  // Always on #incidents, so the hours and AI assist do not decide; then ignore it.
-  await juno.sidebar.row('#incidents').chooseInMenu('notify-always')
-  await juno.expectToast('#incidents: Always')
+  // Inside the hours, mentions notify by the Mentions switch; then ignore #incidents.
+  await juno.notificationHoursNow()
   await juno.sidebar.row('#incidents').chooseInMenu('ignore-channel')
   await juno.expectToast('Ignoring #incidents')
   await juno.sidebar.row('#incidents').expectAbsent()
@@ -154,8 +154,10 @@ test('a mention of you, or of your group, breaks through an ignored channel; @he
   fake.injectMessage({ channel: 'C0INCIDENTS', user: 'U0LEO', text: '<!here> the deploy freeze starts at 3' })
   fake.injectMessage({ channel: 'C0INCIDENTS', user: 'U0MAYA', text: '<@U0TUSHAR> can you approve the rollback?' })
   await expect.poll(async () => (await bodies()).some((body) => body.includes('can you approve the rollback?')), { timeout: 15_000 }).toBe(true)
+  // The group mention gets through too; it comes within a minute of that banner, so the burst rule keeps it quiet.
   fake.injectMessage({ channel: 'C0INCIDENTS', user: 'U0LEO', text: '<!subteam^S0PLATFORM> please check the dashboards' })
-  await expect.poll(async () => (await bodies()).some((body) => body.includes('please check the dashboards')), { timeout: 15_000 }).toBe(true)
+  await expect.poll(() => loggedDecision(userData, fake.teamId, 'please check the dashboards'), { timeout: 15_000 }).toEqual({ outcome: 'stay', decidedBy: 'burst' })
+  expect(loggedDecision(userData, fake.teamId, 'the deploy freeze starts at 3')).toEqual({ outcome: 'stay', decidedBy: 'ignored' })
   expect((await bodies()).some((body) => body.includes('deploy freeze'))).toBe(false)
   await juno.focusWindow()
 

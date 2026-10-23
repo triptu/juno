@@ -17,10 +17,11 @@ it('badges unread DMs, group DMs and mentions, and ignores other channel activit
   expect(dockBadgeActive([], defaultNotificationSettings, context)).toBe(false)
 })
 
-it('applies Never to threads, conversations and DM people, with Every message winning', () => {
+it('applies Never to threads, conversations and DM people, with Always winning', () => {
   const settings = { ...defaultNotificationSettings, channels: { C1: 'never' as const, G1: 'never' as const }, people: { U1: 'never' as const } }
-  expect(dockBadgeActive(topics, settings, context)).toBe(false)
-  expect(dockBadgeActive(topics, { ...settings, threads: { 't:C1:1': 'every' }, channels: { ...settings.channels, D1: 'every' } }, context)).toBe(true)
+  const here = topics.map((topic) => ({ ...topic, mentionsMeDirectly: false }))
+  expect(dockBadgeActive(here, settings, context)).toBe(false)
+  expect(dockBadgeActive(here, { ...settings, threads: { 't:C1:1': 'always' }, channels: { ...settings.channels, D1: 'always' } }, context)).toBe(true)
 })
 
 it('does not badge a kept-out DM unless it mentions the owner', () => {
@@ -34,19 +35,21 @@ it('does not treat a broadcast mention as the sidebar mention exception in a kep
   expect(dockBadgeActive([broadcast], defaultNotificationSettings, context)).toBe(false)
 })
 
-it('applies a Never sender to a channel mention as alerts do', () => {
+it('applies a Never sender to an @here mention, which a direct mention gets through, as alerts do', () => {
   const mention = { ...topics[2]!, person: 'U1' }
-  expect(dockBadgeActive([mention], { ...defaultNotificationSettings, people: { U1: 'never' } }, context)).toBe(false)
+  const never = { ...defaultNotificationSettings, people: { U1: 'never' as const } }
+  expect(dockBadgeActive([{ ...mention, mentionsMeDirectly: false }], never, context)).toBe(false)
+  expect(dockBadgeActive([mention], never, context)).toBe(true)
 })
 
-it('includes ordinary channel messages set to Every message, using the alert decision', () => {
-  expect(dockBadgeActive(topics.slice(4), { ...defaultNotificationSettings, channels: { C2: 'every' } }, context)).toBe(true)
+it('includes ordinary channel messages set to Always, using the alert decision', () => {
+  expect(dockBadgeActive(topics.slice(4), { ...defaultNotificationSettings, channels: { C2: 'always' } }, context)).toBe(true)
 })
 
 it('holds a channel mention outside hours or for AI, while an unread DM in All still counts', () => {
   const outside = { ...context, at: { weekday: 0 as const, minutes: 0 } }
   expect(dockBadgeActive([topics[2]!], defaultNotificationSettings, outside)).toBe(false)
   expect(dockBadgeActive([topics[0]!], defaultNotificationSettings, outside)).toBe(true)
-  const held = { ...topics[2]!, judgement: { notify: false, reason: 'Can wait' } }
-  expect(dockBadgeActive([held], defaultNotificationSettings, { ...context, aiAssist: true })).toBe(false)
+  const held = { ...topics[2]!, auto: false }
+  expect(dockBadgeActive([held], { ...defaultNotificationSettings, alwaysNotify: { mentions: false } }, { ...context, aiAssist: true })).toBe(false)
 })

@@ -124,7 +124,7 @@ const frameHandler = (userId: string, sql: StoreReader['Service'], notifications
   const topicId = threadTs === undefined || threadTs === ts ? `m:${channel.id}` : `t:${channel.id}:${threadTs}`
   if (frame.type === 'message' && !mentionsMe && !isDm(channel.kind)) {
     const { settings } = yield* readSettings
-    if (settings.channels[channel.id] !== 'every' && settings.people[user ?? ''] !== 'every' && settings.threads?.[topicId] !== 'every') return
+    if (settings.channels[channel.id] !== 'always' && settings.people[user ?? ''] !== 'always' && settings.threads?.[topicId] !== 'always') return
   }
   // A group DM is named by its people, as the sidebar names it, not by Slack's "mpdm-…" name.
   const groupName = channel.kind === 'mpim' ? (yield* conversationLabel(channel.id))?.label : undefined
@@ -145,7 +145,7 @@ const sessionNotifications = (control: NotificationControl['Service'], host: Not
   }
   const notifications = yield* makeNotifications(notifier, (presence) => api.call('presence.set', { presence }, { lane: 'send' }).pipe(
     Effect.as(true), Effect.catch(() => Effect.succeed(false)),
-  ))
+  ), session.userId)
   yield* Effect.acquireRelease(control.attach(notifications), () => control.attach(undefined))
   const handle = frameHandler(session.userId, sql, notifications)
   // Re-read persisted preferences only when they change. The initial pass also catches missed starts.

@@ -4,9 +4,9 @@
  * fake Electron notification and dock.
  */
 import { afterEach, expect, it } from 'vitest'
-import { notificationsSetLevel, readsMarkRead, type MainToEngine, type NotificationTarget } from '@juno/contract'
+import { notificationsSetLevel, prefsSet, readsMarkRead, type MainToEngine, type NotificationTarget } from '@juno/contract'
 import { runCommand } from '@juno/state'
-import { Exit } from 'effect'
+import { Exit, Schema } from 'effect'
 import { bootedEngine, readDb } from '../../../packages/engine/test/scenario'
 import { waitFor, type RunningEngine } from '../../../packages/engine/test/harness'
 import { HIDDEN_BODY, Notifier } from '../src/main/notifier'
@@ -62,6 +62,13 @@ it('shows what the engine decides, opens the message on click, hides the topic o
   const engine = await bootedEngine(engines)
   const main = connect(engine)
 
+  // Hours around now: nothing notifies outside them, not even Always.
+  const minute = new Date().getHours() * 60 + new Date().getMinutes()
+  const hours = { days: [0, 1, 2, 3, 4, 5, 6], from: (minute + 1380) % 1440, to: (minute + 60) % 1440 }
+  await runCommand(engine.registry, prefsSet, { key: 'notifications', value: Schema.decodeUnknownSync(Schema.Json)({
+    notificationHours: hours, presenceHours: hours, channels: {}, people: {},
+  }) })
+  await runCommand(engine.registry, notificationsSetLevel, { target: { kind: 'channel', id: 'D0SAM' }, choice: 'always' })
   const set = await runCommand(engine.registry, notificationsSetLevel, { target: { kind: 'channel', id: 'D0MAYA' }, choice: 'always' })
   expect(Exit.isSuccess(set) && set.value).toEqual({ undo: { _tag: 'notifications.setLevel', target: { kind: 'channel', id: 'D0MAYA' }, choice: 'auto' } })
 
@@ -71,18 +78,18 @@ it('shows what the engine decides, opens the message on click, hides the topic o
   main.shown[0]?.click()
   expect(main.opened).toEqual([{ _tag: 'message', source: { channelId: 'D0MAYA', ts: first.ts, topicId: 'm:D0MAYA' } }])
 
-  // The DM is on screen in a focused window: decided, logged, not shown.
-  main.notifier.setViewing('m:D0MAYA')
-  const second = engine.fake.injectMessage({ channel: 'D0MAYA', user: 'U0MAYA', text: 'Never mind, found it' })
+  // Sam's DM is on screen in a focused window: decided, logged, not shown. (Maya's DM stays quiet for a minute after its banner.)
+  main.notifier.setViewing('m:D0SAM')
+  const second = engine.fake.injectMessage({ channel: 'D0SAM', user: 'U0SAM', text: 'Never mind, found it' })
   await waitFor(() => readDb(engine, 'user.db', (db) => db.prepare('SELECT suppressed_at FROM notification_log WHERE ts = ?').get(second.ts))?.suppressed_at ?? undefined, 15_000, 'the suppressed row')
   expect(main.shown).toHaveLength(1)
   main.notifier.setViewing(null)
 
   // Privacy mode: the notification still says who it is from, never what they wrote.
   main.setPrivacy(true)
-  engine.fake.injectMessage({ channel: 'D0MAYA', user: 'U0MAYA', text: 'The salary sheet is attached' })
+  engine.fake.injectMessage({ channel: 'D0SAM', user: 'U0SAM', text: 'The salary sheet is attached' })
   await waitFor(() => (main.shown.length === 2 ? true : undefined), 15_000, 'the notification in privacy mode')
-  expect(main.shown[1]).toMatchObject({ title: 'Maya', body: HIDDEN_BODY })
+  expect(main.shown[1]).toMatchObject({ title: expect.stringMatching(/^Sam/), body: HIDDEN_BODY })
   main.setPrivacy(false)
 
   // Reading all unread topics clears the badge; a new mention brings it back.

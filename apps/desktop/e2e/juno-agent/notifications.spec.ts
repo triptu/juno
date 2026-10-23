@@ -74,7 +74,7 @@ test('outside notification hours a DM is held with its reason and shows no notif
     } finally {
       db.close()
     }
-  }).toMatchObject({ outcome: 'hold', reason: expect.stringContaining('Outside your notification hours.') })
+  }).toMatchObject({ outcome: 'stay', reason: expect.stringContaining('Outside your notification hours.') })
   expect(await juno.osNotifications()).toHaveLength(0)
   expect(model.inputs()).toHaveLength(0)
 })

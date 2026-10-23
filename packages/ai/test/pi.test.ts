@@ -224,14 +224,22 @@ describe('PiAiProvider decisions on a decision model', () => {
     expect(chat.callCount).toBe(0)
   })
 
-  it('maps the main choice to no topic, and a reason choice to the notification decision', async () => {
-    const { provider } = scriptedWithClassifier(
+  it('maps the main choice to no topic, and the reading questions to the reading', async () => {
+    const { provider, asked } = scriptedWithClassifier(
       [],
-      [() => ({ replyTo: { type: 'choice', choice: 'main', probabilities: { main: 0.7 }, confidence: 0.7 } }), () => ({ decision: { type: 'choice', choice: 'incident', probabilities: { incident: 0.9 }, confidence: 0.9 } })],
+      [
+        () => ({ replyTo: { type: 'choice', choice: 'main', probabilities: { main: 0.7 }, confidence: 0.7 } }),
+        () => ({
+          instruction: { type: 'choice', choice: 'none', probabilities: { none: 0.8, i1: 0.2 }, confidence: 0.8 },
+          needsYou: { type: 'choice', choice: 'ask', probabilities: { ask: 0.7, greeting: 0.3 }, confidence: 0.7 },
+        }),
+      ],
     )
     expect(await Effect.runPromise(provider.decide(tasks.routeCheck, routeInput))).toMatchObject({ _tag: 'Decided', value: { replyTo: null, confidence: 0.7 } })
-    const gate = { messageTs: '1', channel: '#eng', channelKind: 'public' as const, sender: 'Jonas', text: 'Checkout is down', mentionsMe: false, now: NOW }
-    expect(await Effect.runPromise(provider.decide(tasks.urgencyGate, gate))).toMatchObject({ _tag: 'Decided', value: { notify: true, reason: 'An incident or customer problem needs you now' } })
+    const message = { messageTs: '1', where: 'Sam', kind: 'dm' as const, sender: 'Sam', text: 'hey! can you approve the contract by 3?', mentionsMe: false, now: NOW, before: [],
+      facts: { ownerWroteLast: false, ownerStartedThread: false, senderWroteSinceOwner: false, exchangesLast30Days: 4 }, instructions: [{ id: 'i1', direction: 'stay' as const, text: 'greetings' }] }
+    expect(await Effect.runPromise(provider.decide(tasks.notificationReading, message))).toMatchObject({ _tag: 'Decided', value: { needsYou: 'ask', probabilities: { ask: 0.7 }, instruction: null } })
+    expect(Object.keys(asked[1]?.questions ?? {})).toEqual(['instruction', 'needsYou'])
   })
 
   it('gives no decision when the classifier answers a topic that is not in the input, after one retry', async () => {

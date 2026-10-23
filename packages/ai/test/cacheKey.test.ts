@@ -23,10 +23,10 @@ describe('cache keys', () => {
   })
 
   it('is stable across runs: a fixed input gives a fixed hash', () => {
-    expect(cacheKeyOf(tasks.urgencyGate, { messageTs: '1.0', channel: '#eng', channelKind: 'public', sender: 's', text: 't', mentionsMe: false, now: '2026-10-13T09:00:00.000Z' })).toEqual({
-      task: 'urgencyGate',
-      key: '1.0',
-      inputHash: '2ca5187db7496d0f',
+    expect(cacheKeyOf(tasks.instructionRule, { text: 'Always notify me about Maya', people: [{ id: 'U1', name: 'Maya' }], channels: [] })).toEqual({
+      task: 'instructionRule',
+      key: '',
+      inputHash: '4442eae0867b8aee',
     })
   })
 
