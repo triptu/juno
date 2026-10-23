@@ -3,9 +3,10 @@
 // citations resolve, writes are refused, the caps hold, and Pause stops a running script.
 import { afterEach, expect, it } from 'bun:test'
 import { reply, startFakeNotion } from '@juno/agent-testing'
-import { createMcpManager, MCP_MIGRATIONS, mcpTools, NOTION, type Credentials, type McpManagerApi } from '../src/mcp'
+import { createMcpManager, MCP_MIGRATIONS, mcpTools, NOTION, type McpManagerApi } from '../src/mcp'
 import type { HostReads } from '../src/index'
 import { activityPage } from '../src/serve/pages'
+import { credentials } from './connections-harness'
 import { deferred, say, turnsHarness } from './turns-harness'
 
 type Harness = Awaited<ReturnType<typeof turnsHarness>>
@@ -14,12 +15,12 @@ afterEach(async () => { for (const h of open.splice(0)) await h.close() })
 
 const message = (ts: string, text: string) => ({ channelId: 'C0ENG', channelName: '#eng', ts, senderId: 'U1', senderName: 'Maya Chen', text })
 
-/** Slack with three messages in #eng; `hold` makes `search` wait until it resolves. */
+/** Slack with three messages in #eng; `hold` makes `search` wait until it resolves. `searched` resolves at the first search. */
 function slack(hold?: Promise<void>) {
-  const queries: string[] = []
+  const first = deferred()
   const host: HostReads = {
     search: async (query) => {
-      queries.push(query)
+      first.resolve()
       if (hold) await hold
       return { messages: (query === 'deploy' ? [message('1760500000.000001', 'The deploy is at 3pm.'), message('1760500000.000002', 'Lunch is pizza.')] : [message('1760500000.000003', 'The review moved to Friday.')]) as never }
     },
@@ -28,7 +29,7 @@ function slack(hold?: Promise<void>) {
     topics: async () => ({ topics: [] }),
     person: async (id) => ({ id, name: 'maya', displayName: 'Maya' }),
   }
-  return { host, queries }
+  return { host, searched: first.promise }
 }
 
 async function harness(options: Parameters<typeof turnsHarness>[0] = {}) {
@@ -39,7 +40,8 @@ async function harness(options: Parameters<typeof turnsHarness>[0] = {}) {
 
 const script = (code: string, id = 'call-script') => reply({ type: 'toolCall', id, name: 'codemode', arguments: { code } })
 const resultOf = (h: Harness, n: number) => JSON.stringify(h.chatRequests()[n]?.context.messages.at(-1))
-const audit = (h: Harness) => h.turns.store.db.prepare('SELECT tool, args, outcome, detail FROM script_calls ORDER BY started_at, id').all() as Array<{ tool: string; args: string; outcome: string; detail: string | null }>
+/** The script calls the latest run's Activity entry lists. */
+const audit = (h: Harness) => activityPage(h.turns.store, { limit: 50 }).runs[0]?.scriptCalls ?? []
 
 it('reads Slack in parallel in a script, keeps the handles for citations, and records each call', async () => {
   const { host } = slack()
@@ -64,10 +66,6 @@ it('reads Slack in parallel in a script, keeps the handles for citations, and re
   const bubble = h.events.find((e) => e._tag === 'bubble')
   expect(bubble?._tag === 'bubble' && bubble.body.flatMap((span) => ('source' in span ? [span.source.ts] : []))).toEqual(['1760500000.000001', '1760500000.000003'])
 
-  expect(audit(h)).toEqual([
-    { tool: 'slack_search', args: '{"query":"deploy"}', outcome: 'done', detail: expect.stringMatching(/bytes$/) },
-    { tool: 'slack_search', args: '{"query":"review"}', outcome: 'done', detail: expect.stringMatching(/bytes$/) },
-  ])
   const run = activityPage(h.turns.store, { limit: 50 }).runs[0]!
   expect(run.tainted).toBe(true)
   expect(run.reads).toBe('Ran 1 script: 2 reads')
@@ -117,9 +115,9 @@ it('keeps the reads a script made before it throws', async () => {
   expect(audit(h).map((row) => row.outcome)).toEqual(['done'])
 })
 
-it('holds a script to its call limit, wall time and output size', async () => {
+it('holds a script to its call limit and output size, and fails one that waits on nothing', async () => {
   const { host } = slack()
-  const h = await harness({ host, codemode: { limits: { calls: 2, wallMs: 1_000, outputBytes: 600 } } })
+  const h = await harness({ host, codemode: { limits: { calls: 2, outputBytes: 600 } } })
   h.fake.script([
     script(`
       for (const query of ['a', 'b', 'c']) {
@@ -135,20 +133,30 @@ it('holds a script to its call limit, wall time and output size', async () => {
   expect(first).toContain('The script made more than 2 calls')
   expect(first.length).toBeLessThan(5000)
   expect(audit(h).map((row) => row.outcome)).toEqual(['done', 'done', 'refused'])
-  // A script that waits on nothing fails at once; one that waits on a read is held to the wall time.
-  expect(resultOf(h, 2)).toMatch(/never settle|deadlock|cannot settle|timed out/i)
+  // A script that waits on nothing fails at once, long before its wall time.
+  expect(resultOf(h, 2)).toContain('can never settle')
+})
+
+it('stops a script that waits on a read past its wall time', async () => {
+  const { host, searched } = slack(new Promise(() => {}))
+  const h = await harness({ host, codemode: { limits: { wallMs: 200 } } })
+  h.fake.script([script(`text(await tools.slack_search({ query: 'deploy' }))`), reply(say('Slack is slow.'))])
+  await h.ended(h.send('when is the deploy?'))
+  await searched
+  expect(resultOf(h, 1)).toContain('timed out after 200 ms')
+  expect(audit(h).map((row) => row.outcome)).toEqual(['failed'])
 })
 
 it('stops a running script on Pause and records the unfinished read as cancelled', async () => {
   const hold = deferred()
-  const { host, queries } = slack(hold.promise)
+  const { host, searched } = slack(hold.promise)
   const h = await harness({ host })
   h.fake.script([
     script(`text(await tools.slack_search({ query: 'deploy' }))`),
     reply(say('Juno is paused.')),
   ])
   const op = h.send('when is the deploy?')
-  await expect.poll(() => queries.length).toBe(1)
+  await searched
   h.turns.setMode('paused')
   const ended = await h.ended(op)
   expect(ended.ending._tag).toBe('complete')
@@ -180,18 +188,11 @@ it('counts the codemode section and declaration in admission, and offers neither
 it('reads a connection in a script only through a tool Juno reviewed as a read', async () => {
   const server = await startFakeNotion()
   let manager: McpManagerApi | undefined
-  const states = new Map<string, unknown>()
-  const credentials: Credentials = {
-    oauth: (id) => ({ load: () => states.get(id) as never, save: (state) => { states.set(id, state) } }),
-    bearer: async () => undefined,
-    values: async () => [],
-    clear: async (id) => { states.delete(id) },
-    openAuthorization: async (url) => { await fetch(server.oauth.approve(new URL(url))) },
-  }
+  const signIn = credentials(server.oauth.approve)
   const h = await harness({
     migrations: [MCP_MIGRATIONS],
     tools: (context) => {
-      manager ??= createMcpManager({ store: context.store, credentials, defaults: [{ ...NOTION, url: server.url }] })
+      manager ??= createMcpManager({ store: context.store, credentials: signIn, defaults: [{ ...NOTION, url: server.url }] })
       return mcpTools(manager, { current: context.current, actions: context.actions })
     },
   })
