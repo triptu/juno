@@ -84,6 +84,7 @@ describe('the decision order', () => {
     ['a channel on Never stays', candidate({ channel: eng }), settings, ai, asks, { outcome: 'stay', decidedBy: 'never', reason: '#eng is set to Never.', target: { kind: 'channel', id: 'C0ENG' } }],
     ['a person on Never stays', candidate({ senderId: sam }), settings, ai, asks, { outcome: 'stay', decidedBy: 'never', reason: 'Sam Okafor is set to Never.' }],
     ['a thread on Never stays', candidate({ topicId: thread }), { ...settings, threads: { [thread]: 'never' } }, ai, asks, { outcome: 'stay', decidedBy: 'never', reason: 'This thread is set to Never.' }],
+    ['@here in a thread on Never stays, though Mentions is on', candidate({ topicId: thread, mentionsMe: true, mentionsMeDirectly: false }), { ...settings, threads: { [thread]: 'never' } }, ai, undefined, { outcome: 'stay', decidedBy: 'never' }],
     ['an ignored channel stays', candidate({ channel: alerts }), settings, ai, asks, { outcome: 'stay', decidedBy: 'ignored', reason: '#alerts-prod is ignored.' }],
     ['a direct mention gets through Never', candidate({ channel: eng, mentionsMe: true, mentionsMeDirectly: true }), settings, ai, undefined, { outcome: 'notify', decidedBy: 'directMention', reason: 'Mentions you by name. That gets through Never.' }],
     ['a direct mention gets through an ignored channel', candidate({ channel: alerts, mentionsMe: true, mentionsMeDirectly: true }), settings, ai, undefined, { outcome: 'notify', decidedBy: 'directMention', reason: 'Mentions you by name. That gets through ignored channels.' }],

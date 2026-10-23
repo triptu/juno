@@ -6,8 +6,8 @@
  * pref changes (`notificationRuntime.ts`).
  *
  * Notify me on a thread is also its follow (SPEC 5): Always and Auto
- * follow it in Slack through `topics.subscribe`, Never unfollows it. Only
- * Always is stored as a thread level.
+ * follow it in Slack through `topics.subscribe`, Never unfollows it. Always
+ * and Never are also stored as the thread's level, which the decision reads.
  *
  * Slack's own schedule (the `dnd_*` user prefs) follows the notification
  * hours through `SlackSchedule` (`../slackSchedule.ts`), which watches the
@@ -199,20 +199,19 @@ const thread = (id: string) => {
   return parsed?.kind === 'thread' ? parsed : undefined
 }
 
-/** The settings with one Notify me choice applied. Auto is no entry; a thread's Never is its follow flag, not an entry. */
+/** The settings with one Notify me choice applied. Auto is no entry; Always and Never are stored for a thread, channel or person alike. */
 const withLevel = (settings: NotificationSettings, target: NotifyTargetView, choice: NotifyChoice): NotificationSettings => {
-  const set = (map: Readonly<Record<string, NotifyLevel>> | undefined, allowNever: boolean) => {
+  const set = (map: Readonly<Record<string, NotifyLevel>> | undefined) => {
     const { [target.id]: _, ...rest } = map ?? {}
-    return choice === 'always' || (choice === 'never' && allowNever) ? { ...rest, [target.id]: choice } : rest
+    return choice === 'auto' ? rest : { ...rest, [target.id]: choice }
   }
   switch (target.kind) {
     case 'channel':
-      return { ...settings, channels: set(settings.channels, true) }
+      return { ...settings, channels: set(settings.channels) }
     case 'person':
-      return { ...settings, people: set(settings.people, true) }
+      return { ...settings, people: set(settings.people) }
     case 'thread':
-      // A thread's Never is its follow flag, not a stored level.
-      return { ...settings, threads: set(settings.threads, false) }
+      return { ...settings, threads: set(settings.threads) }
   }
 }
 
