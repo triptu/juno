@@ -20,6 +20,7 @@ import { menuShortcuts, type JunoBridge, type MenuCommand } from '@juno/contract
 import { DOWNLOAD_PATH } from '../paths'
 import { saveLaunch, savedLaunch } from './launch'
 import { popupMenu } from './menu'
+import { answerMenu, installTestSeam, seam, testing } from './testSeam'
 import { pageUrl } from './urls'
 
 const nothing = (): Promise<undefined> => Promise.resolve(undefined)
@@ -48,8 +49,13 @@ function menuCommandFor(event: KeyboardEvent): MenuCommand | undefined {
   return undefined
 }
 
-/** After the page's own handlers: a key nothing took goes to the "app menu". */
+/**
+ * After the page's own handlers: a key nothing took goes to the "app menu".
+ * Not under test: keys Playwright sends never reach Electron's app menu, so the
+ * lane's driver chooses menu items itself (`testSeam.ts`).
+ */
 function forwardMenuKeys(): void {
+  if (testing) return
   window.addEventListener('keydown', (event) => {
     if (event.defaultPrevented || menuListeners.size === 0) return
     const command = menuCommandFor(event)
@@ -133,19 +139,30 @@ const bridge: JunoBridge = {
     // The fake media session, so the huddle views load; the host gives the engine no huddle pages, so a join fails.
     register: () => Promise.resolve({ generation: 1, fakeMedia: true }),
     setMenu: nothing,
-    openMicrophoneSettings: nothing,
+    openMicrophoneSettings: () => {
+      if (testing) seam.microphoneSettingsOpened += 1
+      return nothing()
+    },
     shareSources: () => Promise.resolve(noSources),
     allowScreenRecording: () => Promise.resolve(noSources),
     openScreenRecordingSettings: nothing,
     shareWindowOpen: () => Promise.resolve(false),
   },
-  contextMenu: { popup: (items, at) => popupMenu(items, at) },
+  contextMenu: { popup: (items, at) => (testing ? answerMenu(items, at) : undefined) ?? popupMenu(items, at) },
   shell: {
     openExternal: (url) => {
-      if (/^https?:\/\//i.test(url)) window.open(url, '_blank', 'noopener')
+      // As main's openInBrowser: web links and T3 threads only.
+      if (testing && (/^(https?|mailto):/i.test(url) || /^t3-thread:\/\/v1\/[a-zA-Z0-9_-]+$/.test(url))) seam.browserLinks.push(url)
+      else if (/^https?:\/\//i.test(url)) window.open(url, '_blank', 'noopener')
       return nothing()
     },
-    openInSlack: nothing,
+    openInSlack: ({ teamId, channelId }) => {
+      const url = new URL('slack://channel')
+      url.searchParams.set('team', teamId)
+      url.searchParams.set('id', channelId)
+      if (testing) seam.slackLinks.push(url.toString())
+      return nothing()
+    },
     editUndo: () => {
       document.execCommand('undo')
       return nothing()
@@ -183,5 +200,9 @@ const bridge: JunoBridge = {
 
 export function installBridge(): void {
   Object.assign(window, { juno: bridge })
+  seam.menu = (command) => {
+    for (const listener of menuListeners) listener(command)
+  }
+  installTestSeam()
   forwardMenuKeys()
 }
