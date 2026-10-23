@@ -1,5 +1,5 @@
 /**
- * `pnpm notif:replay run`: every notification candidate of the last N days,
+ * `bun run notif:replay run`: every notification candidate of the last N days,
  * decided by the new pipeline as of its own time. The store is a copy; the
  * readings go to OpenRouter and are cached by their input under `--out`.
  */

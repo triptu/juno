@@ -1,5 +1,5 @@
 /**
- * `pnpm notif:replay report`: the labels against the new decision and the
+ * `bun run notif:replay report`: the labels against the new decision and the
  * old one, the misses by reason, and a sweep of each constant. Rates are
  * weighted by how many replayed messages each label stands for. Message
  * text is printed only with `--show-text`.

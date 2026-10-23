@@ -1,5 +1,5 @@
 /**
- * `pnpm notif:replay label --dir DIR`: serves the labelling page on
+ * `bun run notif:replay label --dir DIR`: serves the labelling page on
  * 127.0.0.1 and saves each change to `DIR/labels.json`. Ctrl-C stops it.
  */
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
@@ -15,7 +15,7 @@ export async function serve(argv: ReadonlyArray<string>) {
   const port = Number(options.port ?? 4791)
   const pagePath = join(dir, 'index.html')
   const labelsPath = join(dir, 'labels.json')
-  if (!existsSync(pagePath)) throw new Error(`No index.html in ${dir}. Run pnpm notif:replay sample first.`)
+  if (!existsSync(pagePath)) throw new Error(`No index.html in ${dir}. Run bun run notif:replay sample first.`)
 
   const server = createServer((request, response) => {
     if (request.method === 'GET' && (request.url === '/' || request.url === '/index.html')) {

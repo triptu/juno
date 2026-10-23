@@ -1,6 +1,6 @@
 /**
  * The labelling page: one message at a time with its conversation, and two
- * choices. Served by `pnpm notif:replay label`, which saves `labels.json`
+ * choices. Served by `bun run notif:replay label`, which saves `labels.json`
  * next to it. Opened as a file, labels stay in the browser's storage.
  */
 import type { Kind, ShownMessage } from './model'

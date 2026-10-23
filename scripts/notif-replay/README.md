@@ -9,7 +9,7 @@ Everything it writes holds real Slack content. Keep `--out` and `--dir` under `/
 1. Replay. It copies the app's store to `<out>/store` (the app's folder is only read), finds every notification candidate of the last N days (DMs, group DMs, mentions, replies in threads you follow or started, anything set to Always), and decides each one as of its own time. The facts come only from messages before it. The reading goes to the real classifier on OpenRouter, using `OPENROUTER_API_KEY` from the environment, the repo's `.env` or the main checkout's `.env`.
 
    ```sh
-   pnpm notif:replay run --out /Volumes/AgentWork/scratch/notif-replay/run --days 21
+   bun run notif:replay run --out /Volumes/AgentWork/scratch/notif-replay/run --days 21
    ```
 
    Flags: `--data <workspace folder>` (default: the only folder under `~/Library/Application Support/Juno/workspaces`), `--concurrency 4`, `--instructions <file>` (a JSON list of `{ id, direction, text }` to replay with instead of your saved instructions), `--env <file>`. Readings are cached in `<out>/readings` by their input, so a rerun costs nothing. Failed readings are not cached. It writes `<out>/replay.json`, with the old check's decision where the old notification log has the message.
@@ -17,8 +17,8 @@ Everything it writes holds real Slack content. Keep `--out` and `--dir` under `/
 2. Sample and label. `sample` picks about 300 messages, stratified by what decided them and the kind of conversation, with borderline readings oversampled. `label` serves the page and saves `labels.json` next to it.
 
    ```sh
-   pnpm notif:replay sample --replay /Volumes/AgentWork/scratch/notif-replay/run/replay.json --out /Volumes/AgentWork/scratch/notif-labels
-   pnpm notif:replay label --dir /Volumes/AgentWork/scratch/notif-labels
+   bun run notif:replay sample --replay /Volumes/AgentWork/scratch/notif-replay/run/replay.json --out /Volumes/AgentWork/scratch/notif-labels
+   bun run notif:replay label --dir /Volumes/AgentWork/scratch/notif-labels
    ```
 
    On the page, N is Notify, D is Don't notify and U undoes the last label. The page does not show what Juno decided.
@@ -26,7 +26,7 @@ Everything it writes holds real Slack content. Keep `--out` and `--dir` under `/
 3. Report.
 
    ```sh
-   pnpm notif:replay report --replay /Volumes/AgentWork/scratch/notif-replay/run/replay.json --labels /Volumes/AgentWork/scratch/notif-labels/labels.json
+   bun run notif:replay report --replay /Volumes/AgentWork/scratch/notif-replay/run/replay.json --labels /Volumes/AgentWork/scratch/notif-labels/labels.json
    ```
 
    It prints agreement, recall and precision for the new decision and the old one, the misses and extra banners grouped by what decided them, and a sweep of each constant: notifications a day against recall. It recommends, for each constant, the value with the fewest notifications a day whose recall on messages that reach Auto is at least `--recall` (0.9). Rates are weighted by how many replayed messages each label stands for. `--show-text` adds the message text to the lists.

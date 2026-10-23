@@ -1,5 +1,5 @@
 /**
- * `pnpm notif:replay sample`: picks about 300 replayed messages to label,
+ * `bun run notif:replay sample`: picks about 300 replayed messages to label,
  * stratified by what decided them and the kind of conversation, with
  * borderline readings oversampled, and writes the labelling page.
  */
@@ -98,9 +98,9 @@ export async function sample(argv: ReadonlyArray<string>) {
     ...(item.threadRoot === undefined ? {} : { threadRoot: item.threadRoot }),
     before: item.before.slice(-SHOWN_BEFORE),
   }))
-  const report = `pnpm notif:replay report --replay ${replayPath} --labels ${join(dir, 'labels.json')}`
-  writeFileSync(join(dir, 'index.html'), page(items, { serve: `pnpm notif:replay label --dir ${dir}`, report }))
+  const report = `bun run notif:replay report --replay ${replayPath} --labels ${join(dir, 'labels.json')}`
+  writeFileSync(join(dir, 'index.html'), page(items, { serve: `bun run notif:replay label --dir ${dir}`, report }))
   console.log(`${entries.length} messages from ${groups.size} strata:`)
   for (const [key, items] of [...groups].sort((a, b) => a[0].localeCompare(b[0]))) console.log(`  ${key}: ${counts.get(key)} of ${items.length}`)
-  console.log(`Wrote ${join(dir, 'index.html')}. Label with: pnpm notif:replay label --dir ${dir}`)
+  console.log(`Wrote ${join(dir, 'index.html')}. Label with: bun run notif:replay label --dir ${dir}`)
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `pnpm notif:replay <command>`: measure the notification decision against
+ * `bun run notif:replay <command>`: measure the notification decision against
  * the owner's own messages. See `scripts/notif-replay/README.md`.
  */
 const [command, ...rest] = process.argv.slice(2)
@@ -14,7 +14,7 @@ const commands: Record<string, () => Promise<{ readonly [name: string]: (argv: R
 
 const load = command === undefined ? undefined : commands[command]
 if (load === undefined) {
-  console.log('Usage: pnpm notif:replay run|sample|label|report [flags]. See scripts/notif-replay/README.md.')
+  console.log('Usage: bun run notif:replay run|sample|label|report [flags]. See scripts/notif-replay/README.md.')
   process.exitCode = 1
 } else {
   const module = await load()
