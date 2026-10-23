@@ -306,7 +306,7 @@ Left island (`flex: 0 1 auto`, `min-width: 0`, padding `3 3 3 5`):
 Right island (`flex: none`, padding 3), in this order: the huddle control (§22.3) when shown, Resolve, Reopen or Follow, Juno, then ⋯ last.
 
 - **Resolve / Reopen**: `IconButton variant="island"`, 28 round, icon 16: `check-circle` for Resolve, `check-circle` fill for Reopen (the thread is done; a click undoes it) in `--icon-tint-neutral` (`iconTint="neutral"`, the muted grey), since a filled disc in the island's default ink outweighs the stroked icons beside it. Name and tooltip "Resolve" / "Reopen"; no visible word. Undo toast. Not on Main. [built M5] It runs the row check's resolve call, and Reopen runs `topics.reopen`.
-- **Follow** (on a thread you do not follow, in Resolve's place; SPEC 5 and 7): the same 28 round icon button with `bell` 16, name and tooltip "Follow". A click follows the thread with When it matters, through `notifications.setLevel` as Notify me does; no menu opens. The level is changed afterwards in ⋯ › Notify me. Follow and Resolve are the same size, so following moves nothing. [built 10-16]
+- **Follow** (on a thread you do not follow, in Resolve's place; SPEC 5 and 7): the same 28 round icon button with `bell` 16, name and tooltip "Follow". A click follows the thread with Auto, through `notifications.setLevel` as Notify me does; no menu opens. The level is changed afterwards in ⋯ › Notify me. Follow and Resolve are the same size, so following moves nothing. [built 10-16]
 - **⋯** (`dots-three` 18 bold, `IconButton variant="island"`, 28 round, name "More", `aria-haspopup="menu"`): opens the topic menu (§15.1), the row's menu, at the button's left edge 6px under the island; keeps its hover fill (`--secondary-default`) while the menu is open [decided 10-17]. Always last. Main has no Threads button: the title's switcher lists the channel's threads.
 - **Juno**: 28 round icon button (`sparkle` 16 regular outline), a toggle (`aria-pressed`) for the panel (§12.1). Name "Juno ⌘J". `IconButton variant="island"`: hover `--secondary-default`; pressed `--secondary-hover` (`--secondary-active` under the pointer). Hidden when AI assist is off. [not built] Hidden until the Juno panel is built, since a button that does nothing is worse than none.
 - **States.** Every island control has the same three: hover a secondary fill (on the island's `--surface-default`, `--surface-hover` was too close to see), static geometry with instant pressed colour and the keyboard focus ring. The context pill's hover is its tint one step deeper (`--tint-public-hover`, `--tint-private-hover`, `--tint-dm-hover`). The Juno panel's Open in a tab and Close use the same `island` variant. Gallery: `TopicHeader` › Interaction (hover, press and focus for each control).
@@ -638,52 +638,70 @@ The Backup folder path is measured in its rendered font and cut in the middle to
 
 ## 13. Notifications page
 
-**Shows:** `docs/design/notifications/compare-light.png` (right column). SPEC 14 decides behaviour.
+**Shows:** `docs/design/notifications/v2/index.html` (the Settings section). SPEC 14 decides behaviour.
 
 `Page width="settings"`: max-width `--page-width-settings` 760, the column of every section of Settings (§14), padding `40 32 72`, gap 36.
 
-- Title "Notifications" serif 34; sub "During your notification hours, Juno lets through what needs you and holds the rest. Everything is in Juno whenever you open it." 14 lh 1.6 subtle max-width 620.
+- Title "Notifications" serif 34; sub "Inside your notification hours, Juno notifies you about what needs you. Everything is in Juno whenever you open it." 14 lh 1.6 subtle max-width 620.
 - Section pattern: heading 15/600, optional sub 13 muted (gap 2), then a group card (radius 10, bg surface, `--card-ring`, rows divided by 1px `--border-subtle`).
+- Sections in order: permission line, Notification hours, Active in Slack, Always notify, Your instructions, People, channels and threads, How Auto decides, Today, Huddles, Test.
 
-**Permission line** (only while macOS does not let Juno notify), between the title and Hours, the page's gap above and below: a group card with one row (padding `8 14`): bell-slash 15 · "macOS is not showing Juno's notifications." 13 · secondary button 28px **Open Notification Settings** when denied, **Allow notifications** when macOS has not asked yet. `role="status"`, named "Notification permission".
+**Permission line** (only while macOS does not let Juno notify), between the title and Notification hours, the page's gap above and below: a group card with one row (padding `8 14`): bell-slash 15 · "macOS is not showing Juno's notifications." 13 · secondary button 28px **Open Notification Settings** when denied, **Allow notifications** when macOS has not asked yet. `role="status"`, named "Notification permission".
 
-**Hours** (no sub)
+**Notification hours** — "Outside these hours your Mac doesn't notify. Slack pauses at the same times, so your phone stays quiet too."
 
-- Two rows, min-height 60, padding `8 14` (the ListRow settings inset, the same at both ends), gap 12: label block 260px (title 14/500, sub 12 muted) · flexible gap · seven day toggles (28px round, gap 4, 12/500; on: bg `--secondary-default`, fg default; off: transparent, muted; names "Monday"…) · from select · "to" 13 muted · to select. Selects 32px, radius 7, 1px `--input-border`, 13px, hours in half-hour steps ("9am", "6:30pm"). When the label would get narrower than 200px the controls move under it (ListRow `wrap`), the days and the times wrapping as two groups.
-  - "Notifications" — sub "Outside these hours, messages stay in Juno without notifying you."
-  - "Active in Slack" — sub "Outside these hours you show as away."
+- One group card with one row, min-height 60, padding `8 14` (the ListRow settings inset, the same at both ends), gap 12: seven day toggles (28px round, gap 4, 12/500; on: bg `--secondary-default`, fg default; off: transparent, muted; names "Monday"…) · from select · "to" 13 muted · to select. Selects 32px, radius 7, 1px `--input-border`, 13px, hours in half-hour steps ("9am", "6:30pm"). In a narrow column the days and the times wrap as two groups (ListRow `wrap`).
+- Slack line, under the row, inset 14, 12 muted, its height kept when empty so nothing below moves: while the hours are still the defaults on this install, "Slack's schedule changes once you set your notification hours."; while the schedule was changed in Slack, "Your schedule was changed in Slack. Juno leaves it until you change your hours here." and **Use Juno's hours** (secondary, small). There is no switch for Slack's schedule.
+- Default: weekdays, 9am to 7pm. A to before from crosses midnight.
+
+**Active in Slack** — "Outside these hours you show as away."
+
+- One group card: the same days-and-times row as Notification hours, then the note row.
 - Note row (border-top 1px `--border-subtle`, padding `10 14 12`, 12 muted): "Juno switches your status while it's open. If it's closed when your active hours start, you stay away until you open it."
-- Defaults: both weekdays, 9am to 7pm. A to before from crosses midnight.
+- Default: weekdays, 9am to 7pm, the same as Notification hours. A to before from crosses midnight.
 
-**What matters to you** — "Juno reads this for every message. You can also just tell Juno."
+**Always notify** — "These notify inside your hours, whatever they say. Turn them all on to be notified the way Slack does by default."
 
-- Plain multi-line text field, margin-top 12, max-width 620, min-height 68, padding `10 12`, radius 8, 1px `--input-border`, bg `--background`, 14 lh 1.55. Placeholder "For example: the launch, hiring, and anything from my reports that needs a decision today." Saved on blur. With AI assist off, the field is replaced by "AI assist is off. DMs and mentions notify you." 13 muted.
+- One group card, five rows, padding `8 14`, each a `Checkbox` with `role="switch"` and its label 14: "Direct messages" (off), "Group DMs" (off), "Mentions" (on; description "You, groups you're in, @here and @channel"), "Threads you started" (off), "Threads you follow" (off). Each saves at once. While Threads you follow is on, Threads you started shows on and dimmed, disabled, with the description "Included in Threads you follow."
 
-**People and channels** (no sub)
+**Your instructions** — "For each instruction, choose Notify me or Don't notify, then describe it in your own words. Juno follows them when it reads messages on Auto. If one is about a single person or channel, Juno offers to make it a setting instead."
 
-- Two rows, padding `10 10 10 14`: label block 260px ("Every message" / sub "Even outside notification hours"; "Never" / sub "Still in Juno, no alerts") · tags right-aligned, wrapping, gap 6. Tag: 28px, padding `0 4 0 8`, radius 7, bg `--secondary-default`, 13/500, gap 5: channel icon 13 muted or avatar 16 · name · remove 20×20 `x` (name "Remove"). Removing sets the item back to When it matters, with an Undo toast.
-- Both lists empty: one row "Every channel and person is set to When it matters." 13 muted, padding 14.
-- Hint below the card, margin-top 8, 12 muted: "Right-click a channel or person to change how it notifies you."
+- One group card. Each instruction is a row, padding `8 14`, gap 10: a segmented control (as Appearance's) Notify me · Don't notify · the text, an inline field 14 that looks like plain text until focused, saved on blur · remove 20×20 `x` (name "Remove instruction").
+- The add row, last: the same segmented control with neither segment chosen · a text field (placeholder "Describe it in your own words") · secondary button 28px **Add**. The field and Add are disabled until a direction is chosen. Enter in the field adds.
+- Found rule: after an add, under the new row, 13: "Juno found a rule: **Alex Chen → Always**. A setting is exact and shows below." with **Make it a setting** (secondary, small), which removes the instruction and sets the level, and **Keep as instruction** (ghost, small). The line's height is reserved while the check runs, so nothing moves when it answers.
+- With AI assist off, a line under the sub, 13 muted: "AI assist is off. DMs and mentions notify you." The list stays editable.
 
-**Huddles** (no sub)
+**People, channels and threads** — "Set from any conversation's menu: Notify me › Always, Auto or Never. Everything else is on Auto."
 
-- One group card, padding `12 14` (as Slack on your phone): the switch **Ring for huddles** (a `Checkbox` with `role="switch"`, on by default) with the description "A soft ring for up to 30 seconds when someone starts a huddle. It plays even during Focus." It saves at once (`notifications.setHuddleRing`, stored with the notification settings) and applies to the next incoming huddle (SPEC 20, "Incoming huddles"). The section is `HuddleRingSection` in `@juno/views`; fixtures `HuddleRingSection` › `on` and `off`.
+- Two rows, padding `10 10 10 14`: label block 260px ("Always" / sub "Notifies for every message, inside your hours."; "Never" / sub "No notifications. A direct mention of you or a group you're in still notifies. Ignored channels work the same way.", "Ignored channels" a link to Settings › Ignored) · tags right-aligned, wrapping, gap 6, then a ghost small **Add…**, which opens a searchable list of people and channels. Tag: 28px, padding `0 4 0 8`, radius 7, bg `--secondary-default`, 13/500, gap 5: channel icon 13 muted or avatar 16 · name · remove 20×20 `x` (name "Remove"). Removing sets the item back to Auto, with an Undo toast "#incidents: Auto".
+
+**How Auto decides** (no sub; the target of How Auto decides… and Notification settings, scrolled into view and its heading focused)
+
+- A box: radius 10, bg `--surface-hover`, padding `12 14`, 13 lh 1.55. "For everything on Auto, Juno checks in this order:" then a numbered list:
+  1. "**Closers.** "thanks", "ok" and the like don't notify."
+  2. "**Messages to someone else.** A message that names someone else and not you doesn't notify."
+  3. "**Conversations you're in.** If you wrote in the last 10 minutes, replies notify."
+  4. "**Juno reads it.** If it clearly falls under your instructions, Juno does what they say. Otherwise, questions to you, answers to your questions, follow-ups you haven't answered, decisions in threads you started and serious problems notify. Greetings, updates and chatter stay in Juno."
 
 **Today** (no sub)
 
-- One line, margin-top 8, 14 subtle: "**4** messages interrupted you. Juno held **23**." (counts 600 tabular) · ghost button **Show why** 28px. Zero: "Nothing has interrupted you today."
-- Show why expands a list under the line (rows padding `8 2`, divided by 1px `--border-subtle`, 13px): time 44px muted tabular · place 120px subtle · "**Sender** text" ellipsis; the reason on a second line, 12 muted. Only messages that notified are listed, newest first. The button becomes **Hide**.
+- One line, margin-top 8, 14 subtle: "Today: **4** notified you, **23** stayed in Juno." (counts 600 tabular) · ghost button **Details** 28px. Zero: "Nothing has notified you today."
+- Details opens a sheet over the window, "Today's notifications", sub "Every message Juno decided on today, and why.", **Done** at the top right. Under the header a segmented control: All (n) · Notified (n) · Stayed in Juno (n). Rows, newest first, padding `8 2`, divided by 1px `--border-subtle`, 13px: time 44px muted tabular · avatar 20 · "**Sender** · conversation" over the preview, ellipsis · on a third line, 12 muted, what decided it as a small label ("Your setting", "Always notify", "Notification hours", "Your instructions", "Juno's reading") then the reason · an outcome pill at the end ("Notified" or "In Juno"). The list scrolls inside the sheet.
+- Choosing a row opens its why under it, inset to the text: "Why did this notify?" or "Why no notification?" 12/600 muted, the reason 13, then the actions (secondary, small): **Change**, **Edit instructions**, or **Should have notified** / **Shouldn't have notified**, plus **Always for Maya** on a DM on Auto, and the link **Notification settings** at the end. Should have notified replaces the actions with "Juno suggests adding an instruction:" and the instruction in bold, with **Add it** (primary, small) and **Just this time**.
 
-**Test** (no sub), after Today
+**Huddles** (no sub)
+
+- One group card, padding `12 14`: the switch **Ring for huddles** (a `Checkbox` with `role="switch"`, on by default) with the description "A soft ring for up to 30 seconds when someone starts a huddle. It plays even during Focus." It saves at once (`notifications.setHuddleRing`, stored with the notification settings) and applies to the next incoming huddle (SPEC 20, "Incoming huddles"). The section is `HuddleRingSection` in `@juno/views`; fixtures `HuddleRingSection` › `on` and `off`.
+
+**Test** (no sub), after Huddles
 
 - One row in a group card, padding `8 14`: label block 260px ("Test notification" / sub "If none appears, Focus or Do Not Disturb may be on.") · secondary button 28px **Send test notification**. When Juno cannot read macOS's permission, a ghost subtle button **Open Notification Settings** sits before it, gap 8.
 
 [built 10-16] Send test notification posts through main's `Notifier` (title "Juno", body "Notifications from Juno look like this."); its click brings the window forward. Authorization and badge permission come separately from `main/notificationPermission.ts`, which asks `UNUserNotificationCenter` through koffi; the page renders once both the settings and the permission are known, and keeps the last answer so it opens again without a shift. macOS keeps the permission per bundle id: `app.juno.desktop` when packaged, Electron's own id in development. An unsigned build may never show the prompt or may read as not determined; Allow notifications then opens System Settings, and a reading that does not come back within 3 s counts as unknown. The first Home or topic view after setup requests permission once in packaged builds; Juno persists the attempt before requesting, and development asks only through Allow notifications. Gallery fixtures: `Permission/denied`, `Permission/badges-disabled`, `Permission/not-determined`, `Permission/unknown`.
 
-[built M10] `NotificationsPage` in `@juno/views`, Settings › Notifications (§14), opened from the avatar menu's Notifications or the section list. Hours selects are named "Notifications from", "Active in Slack to" and so on, and the day toggles are `DayToggles` in `@juno/ui` (Monday first). A change to the hours saves at once; What matters to you saves on blur. Removing a tag shows "#incidents: When it matters" with Undo. Show why opens a popover above the button (340px) with at most 50 messages, each as the time and place, the sender and text, and the reason, rather than expanding a list under the line: no interaction may move the page (the gallery's shift test), and the button keeps its label. [built 10-17] Below Hours, the section "Slack on your phone" is one card: the switch "Pause Slack outside your notification hours" (a `Checkbox` with `role="switch"`, on by default) with the description "Juno sets Slack's own notification schedule to your notification hours, so your phone goes quiet too. Slack can't let a channel through, so Every message on a channel reaches only this Mac then." Under it, indented to the label, one row of actions, its height kept when empty so nothing below moves: while the switch is on but the hours are still the defaults on this install, the muted line "Slack's schedule changes once you set your notification hours above."; while the schedule was changed in Slack, the muted line "Your schedule was changed in Slack. Juno leaves it until you change your hours here." and **Use Juno's hours** (secondary, small); while Juno holds the schedule from before its first write, **Restore Slack's previous schedule** (ghost, small), which shows the toast "Restored Slack's schedule" or "Couldn't restore Slack's schedule. Try again." The switch is disabled until the engine answers. The section is `SlackScheduleSection` and the macOS permission line `PermissionLine`, both in `@juno/views`. Fixtures: `Slack schedule` › `changed-in-slack`, `waiting-for-hours` and `off`.
+[built M10] `NotificationsPage` in `@juno/views`, Settings › Notifications (§14), opened from the avatar menu's Notifications or the section list. Hours selects are named "Notifications from", "Active in Slack to" and so on, and the day toggles are `DayToggles` in `@juno/ui` (Monday first). A change to the hours saves at once. The macOS permission line is `PermissionLine` in `@juno/views`. [not built, v2 10-23] Notification hours and Active in Slack as two sections, Always notify, Your instructions, the Always and Never labels, How Auto decides, the Today line with Details, the why under a row, the Slack line under the hours row in place of the Slack on your phone card, and the Notify me menu's How Auto decides….
 
-**Decision** (`@juno/domain` `decideNotification`): ignored channel, unless the message mentions the user by name or a group they are in (`mentionsMeDirectly`) → Every message (channel or person) → Never → outside notification hours (hold) → AI assist off (DMs and mentions) → Juno's judgement. Reasons are the strings the Notifications page shows: "#incidents is set to Every message", "Maya Chen is set to Never", "Outside your notification hours. Juno: …", "AI assist is off, and DMs and mentions notify you", "Juno: asks you to approve the release before 2pm".
-
+**Decision** (`@juno/domain` `decideNotification`), SPEC 14, "The order": outside notification hours → Always (thread, channel or person; beats Never) → Never or ignored, unless the message mentions the user by name or a group they are in (`mentionsMeDirectly`) → Always notify switches → AI assist off (DMs and mentions) → Auto: closer → addressed to someone else → live conversation → Juno's reading; then the 10-second burst rule. Each decision is stored with its `decidedBy` and a reason from SPEC 14, "Why" ("#incidents is set to Always.", "Maya thanked you. Nothing to do.", "Sam asks you something.").
 
 ## 14. Settings
 
@@ -734,13 +752,13 @@ Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, ra
 | — | | | | |
 | Copy Slack link | `link` | | always | |
 | Open in Slack | `arrow-square-out` | | always | opens the Slack app at the topic (`slack://` deep link, falling back to the web permalink) |
-| Notify me | `bell` | current level | always | submenu §15.3: for a thread, the thread's own choice (Every message and When it matters follow it in Slack, Never unfollows it; SPEC §5); for Main, the channel's or DM's. [built M10] Through `notifications.setLevel`: on a thread the engine follows or unfollows it and keeps Every message as its level; on Main it sets the channel's or DM's level |
+| Notify me | `bell` | current level | always | submenu §15.3: for a thread, the thread's own choice (Always and Auto follow it in Slack, Never unfollows it; SPEC §5); for Main, the channel's or DM's. [built M10] Through `notifications.setLevel`: on a thread the engine follows or unfollows it and keeps Always as its level; on Main it sets the channel's or DM's level |
 | Add to view | `stack` | | Main only | submenu §15.8 for the row's channel or DM |
 | Ignore #product | `ban` | | channel is not a DM | toast "Ignoring #product" with Undo |
 | — | | | | |
 | What Juno knows about Maya | | | a one-to-one DM's topics, while the Juno Agent runs | opens Maya's file on What Juno remembers (SPEC 13.8), or the toast "Juno has no file on Maya yet. …" |
 
-[built] The row and the header's title show this menu, and every item works (M5). Rename from the row edits the row's title (§3.2), from the header the header's title (§5). Each action shows its toast with Undo (§16). The hints are not drawn, since a native menu has only a shortcut column. A second line under an item (`sublabel`, macOS 14.4 and later) is drawn where one is set, as on Follow's When it matters.
+[built] The row and the header's title show this menu, and every item works (M5). Rename from the row edits the row's title (§3.2), from the header the header's title (§5). Each action shows its toast with Undo (§16). The hints are not drawn, since a native menu has only a shortcut column. A second line under an item (`sublabel`, macOS 14.4 and later) is drawn where one is set.
 
 ### 15.2 Channel menu (context pill, #channel chip, ⌘K channel result)
 
@@ -763,7 +781,7 @@ Native menus **[spec]**. Prototype rendering for reference: 236px, padding 5, ra
 
 ### 15.3 Notify me submenu
 
-Shown from 15.1 (also opened from the header's title, §5), 15.2 and 15.6. Three items with a checkmark (13, `--foreground-default`) on the current one: **Every message**, **When it matters** (default), **Never**. For a person the parent reads "Notify me about Maya". Choosing one applies at once with the toast "#design-review: Never" and Undo.
+Shown from 15.1 (also opened from the header's title, §5), 15.2 and 15.6. Three items with a checkmark (13, `--foreground-default`) on the current one: **Always**, **Auto** (default), **Never**, then a separator and **How Auto decides…**, which opens Settings › Notifications at the How Auto decides box (§13). [not built] How Auto decides… and the new names. For a person the parent reads "Notify me about Maya". Choosing one applies at once with the toast "#design-review: Never" and Undo.
 
 ### 15.4 Message menu
 

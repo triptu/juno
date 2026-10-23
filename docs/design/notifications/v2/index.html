@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Juno notifications: proposal</title>
+<style>
+:root{
+  --bg:#f5f5f3;--surface:#ffffff;--surface-2:#fafaf8;--fg:#1d1d1f;--muted:#6e6e73;--faint:#a1a1a6;--line:#e3e3df;--line-2:#d2d2cc;
+  --accent:#3b5bdb;--accent-soft:#eef1fd;
+  --yes:#c2410c;--yes-soft:#fff1e8;--no:#6b7280;--no-soft:#f1f1ef;
+  --shadow:0 1px 2px rgba(0,0,0,.05),0 8px 24px rgba(0,0,0,.06);
+  --banner:rgba(246,246,246,.94);
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#141415;--surface:#1c1c1e;--surface-2:#202023;--fg:#ececee;--muted:#9b9ba1;--faint:#6b6b70;--line:#2e2e31;--line-2:#3a3a3e;
+  --accent:#8ea2ff;--accent-soft:#232842;
+  --yes:#fb923c;--yes-soft:#3a2416;--no:#a1a1aa;--no-soft:#26262a;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
+  --banner:rgba(48,48,52,.94);
+}}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text","Inter",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+button{font:inherit;color:inherit;cursor:default}
+nav{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--bg) 85%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+nav .in{max-width:1240px;margin:0 auto;padding:10px 28px;display:flex;gap:22px;align-items:center}
+nav b{font-size:13px;margin-right:auto}
+nav a{color:var(--muted);text-decoration:none;font-size:13px}
+nav a:hover{color:var(--fg)}
+main{max-width:1240px;margin:0 auto;padding:0 28px 80px}
+section{padding-top:56px;scroll-margin-top:40px}
+.eyebrow{font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin:0 0 8px}
+h1{font-size:34px;line-height:1.15;letter-spacing:-.02em;margin:0 0 12px;max-width:820px}
+h2{font-size:22px;letter-spacing:-.01em;margin:0 0 6px}
+h3{font-size:14px;margin:0 0 6px}
+.lead{font-size:16px;color:var(--muted);max-width:780px;margin:0}
+.sub{color:var(--muted);margin:0 0 20px;max-width:780px}
+.pillars{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:28px}
+.pillar{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px}
+.pillar b{display:block;margin-bottom:4px}
+.pillar span{color:var(--muted);font-size:13px}
+@media (max-width:960px){.pillars{grid-template-columns:1fr 1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.pad{padding:14px}
+.label{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+
+.flow{display:grid;grid-template-columns:repeat(5,1fr);gap:0;align-items:stretch}
+@media (max-width:1000px){.flow{grid-template-columns:1fr}}
+.fs{position:relative;padding:14px 16px;background:var(--surface);border:1px solid var(--line);border-radius:14px;margin-right:22px}
+.fs:not(:last-child)::after{content:"→";position:absolute;right:-18px;top:50%;transform:translateY(-50%);color:var(--faint)}
+@media (max-width:1000px){.fs{margin:0 0 18px}.fs:not(:last-child)::after{content:"↓";right:auto;left:50%;top:auto;bottom:-19px}}
+.fs .n{font-size:11px;font-weight:700;color:var(--faint)}
+.fs b{display:block;font-size:13.5px;margin:2px 0 4px}
+.fs p{margin:0;font-size:12.5px;color:var(--muted)}
+.fs .o{margin-top:8px;font-size:12px}
+.fs.auto{border-color:var(--accent);background:var(--accent-soft)}
+.pill{display:inline-block;font-size:11.5px;font-weight:600;border-radius:5px;padding:1px 7px;margin:2px 4px 0 0}
+.p-yes{background:var(--yes-soft);color:var(--yes)}
+.p-no{background:var(--no-soft);color:var(--no)}
+
+.ladder{display:grid;gap:10px}
+.rung{display:grid;grid-template-columns:34px 1fr 150px;gap:14px;align-items:start;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.rung .k{width:26px;height:26px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:700;font-size:12px}
+.rung b{display:block;font-size:13.5px}
+.rung p{margin:2px 0 0;font-size:12.5px;color:var(--muted)}
+.rung .by{font-size:11.5px;color:var(--muted);text-align:right}
+.rung .by span{display:block;font-weight:600;color:var(--fg)}
+@media (max-width:700px){.rung{grid-template-columns:30px 1fr}.rung .by{grid-column:2;text-align:left}}
+
+.sim{display:grid;grid-template-columns:270px 1fr 380px;gap:16px;align-items:start}
+@media (max-width:1180px){.sim{grid-template-columns:250px 1fr}.sim .right{grid-column:1/-1}}
+@media (max-width:760px){.sim{grid-template-columns:1fr}}
+.scen{display:flex;flex-direction:column;gap:2px;max-height:700px;overflow:auto;padding:6px}
+.scen button{background:none;border:0;text-align:left;padding:8px 10px;border-radius:8px}
+.scen button:hover{background:var(--surface-2)}
+.scen button.on{background:var(--accent-soft)}
+.scen button b{display:block;font-size:13px;font-weight:600}
+.scen button span{display:block;font-size:12px;color:var(--muted)}
+.controls{display:flex;flex-direction:column;gap:14px}
+.seg{display:flex;flex-wrap:wrap;gap:4px;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:3px}
+.seg button{flex:1 1 auto;border:0;background:none;border-radius:6px;padding:5px 8px;font-size:12.5px;color:var(--muted);white-space:nowrap}
+.seg button.on{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.ctlrow{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;padding:3px 0}
+.ctlrow small{display:block;color:var(--muted);font-size:11.5px}
+.sw{width:32px;height:19px;border-radius:10px;background:var(--line-2);position:relative;flex:none;border:0;padding:0;transition:background .12s}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:left .12s}
+.sw.on{background:var(--accent)}
+.sw.on::after{left:15px}
+.instr{font-size:12.5px;color:var(--muted);background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin-top:6px}
+.instr b{color:var(--fg);font-weight:500}
+
+.conv-head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.av{width:28px;height:28px;border-radius:7px;display:grid;place-items:center;font-size:10px;font-weight:700;color:#fff;flex:none}
+.conv-head b{font-size:14px}
+.conv-head span{color:var(--muted);font-size:12px;display:block}
+.msgs{padding:10px 14px 14px;display:flex;flex-direction:column;gap:10px;min-height:150px}
+.msg{display:grid;grid-template-columns:28px 1fr;gap:10px}
+.msg .who{font-size:13px;font-weight:600}
+.msg .who time{font-weight:400;color:var(--faint);font-size:11.5px;margin-left:6px}
+.msg .txt{font-size:13.5px}
+.msg.new .who::after{content:"new";font-size:10px;font-weight:600;color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:0 4px;margin-left:8px;vertical-align:1px}
+.msg.you .who{color:var(--muted)}
+.gap{font-size:11.5px;color:var(--faint);text-align:center}
+.context{border-top:1px solid var(--line);padding:12px 14px;font-size:12.5px;color:var(--muted);background:var(--surface-2);border-radius:0 0 14px 14px}
+.context b{color:var(--fg);font-weight:600}
+
+.trace{padding:4px 0}
+.step{display:grid;grid-template-columns:22px 1fr;gap:10px;padding:6px 14px;opacity:0;transform:translateY(3px);animation:in .16s ease-out forwards}
+@keyframes in{to{opacity:1;transform:none}}
+.dot{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--line-2);display:grid;place-items:center;font-size:9px;font-weight:700;margin-top:1px;color:var(--faint)}
+.step.pass .t{color:var(--muted)}
+.step.hit .dot{background:var(--accent);border-color:var(--accent);color:#fff}
+.step.ai .dot{border-color:var(--accent);color:var(--accent)}
+.step .t{font-size:13px}
+.step .t small{display:block;color:var(--muted);font-size:12px;margin-top:1px}
+.reading{margin:2px 14px 8px 46px;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 10px;font:11.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}
+.reading b{color:var(--fg);font-weight:600}
+.outcome{margin:6px 14px 14px;border-radius:12px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.outcome b{font-size:16px}
+.outcome small{display:block;font-size:11px;letter-spacing:.05em;text-transform:uppercase;font-weight:600;opacity:.8}
+.o-yes{background:var(--yes-soft);color:var(--yes)}
+.o-no{background:var(--no-soft);color:var(--no)}
+.desk{margin:0 14px 14px;border-radius:12px;padding:14px;min-height:96px;background:linear-gradient(135deg,#b9c6e4,#d8c9e6 55%,#e9d4c8);display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+@media (prefers-color-scheme:dark){.desk{background:linear-gradient(135deg,#25304a,#3a2c48 55%,#4a3329)}}
+.desk .when{font-size:11.5px;color:rgba(0,0,0,.55)}
+@media (prefers-color-scheme:dark){.desk .when{color:rgba(255,255,255,.6)}}
+.banner{width:300px;max-width:100%;background:var(--banner);backdrop-filter:blur(20px);border-radius:14px;padding:10px 12px;box-shadow:0 6px 20px rgba(0,0,0,.18);display:grid;grid-template-columns:30px 1fr;gap:10px;animation:drop .22s ease-out both}
+@keyframes drop{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+.banner .ic{width:30px;height:30px;border-radius:7px;background:linear-gradient(160deg,#6d83f2,#3b5bdb);display:grid;place-items:center;color:#fff;font-weight:800;font-size:14px}
+.banner .top{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+.banner .ttl{font-size:13px;font-weight:600;line-height:1.3}
+.banner .bd{font-size:12.5px;line-height:1.35;opacity:.9;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.inapp{width:300px;max-width:100%;background:var(--surface);border-radius:10px;padding:8px 10px;box-shadow:0 4px 14px rgba(0,0,0,.14);font-size:12.5px}
+.inapp .row{display:flex;align-items:center;gap:8px}
+.inapp .u{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none}
+.inapp .note{color:var(--muted);font-size:11.5px;margin-top:3px}
+.why{margin:0 14px 14px;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--surface-2)}
+.why .q{font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px}
+.why p{margin:0 0 3px;font-size:13px}
+.why .acts{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;align-items:center}
+.why .acts a{font-size:12px;margin-left:auto}
+.btn{border:1px solid var(--line-2);background:var(--surface);border-radius:7px;padding:4px 10px;font-size:12px}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.toast{margin:0 14px 14px;font-size:12.5px;padding:9px 12px;border-radius:9px;background:var(--accent-soft);display:none}
+.toast .acts{display:flex;gap:6px;margin-top:6px}
+
+.menuwrap{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+@media (max-width:860px){.menuwrap{grid-template-columns:1fr}}
+.menu{width:250px;background:var(--surface);border:1px solid var(--line);border-radius:9px;box-shadow:var(--shadow);padding:5px;font-size:13px;position:relative}
+.menu div{padding:4px 10px;border-radius:5px;display:flex;justify-content:space-between}
+.menu div.hl{background:var(--accent);color:#fff}
+.menu hr{border:0;border-top:1px solid var(--line);margin:4px 6px}
+.menu .subm{position:absolute;left:236px;top:58px;width:220px}
+.menu .chk{width:14px;display:inline-block}
+.menu .dim{color:var(--muted)}
+
+.settings{display:grid;grid-template-columns:190px 1fr;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+@media (max-width:760px){.settings{grid-template-columns:1fr}.settings .side{display:none}}
+.settings .side{background:var(--surface-2);border-right:1px solid var(--line);padding:16px 10px;font-size:13px}
+.settings .side div{padding:5px 10px;border-radius:6px;color:var(--muted)}
+.settings .side div.on{background:var(--accent-soft);color:var(--fg);font-weight:500}
+.settings .body{padding:24px 32px 32px;max-width:740px}
+.settings h4{font-size:13.5px;margin:28px 0 3px;scroll-margin-top:60px}
+.settings h4:first-child{margin-top:0}
+.settings .hs{font-size:12.5px;color:var(--muted);margin:0 0 10px}
+.grp{border:1px solid var(--line);border-radius:10px}
+.grp .ctlrow{padding:10px 12px;border-bottom:1px solid var(--line)}
+.grp .ctlrow:last-child{border-bottom:0}
+.days{display:flex;gap:4px}
+.days span{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:11px;border:1px solid var(--line-2);color:var(--muted)}
+.days span.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.time{border:1px solid var(--line-2);border-radius:6px;padding:2px 8px;font-size:12.5px;font-variant-numeric:tabular-nums}
+textarea{width:100%;font:13px/1.5 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:var(--fg);background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;resize:vertical;min-height:92px}
+textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.ilist{border:1px solid var(--line);border-radius:10px}
+.irow{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);font-size:13px}
+.irow:last-child{border-bottom:0}
+.irow .seg{flex-wrap:nowrap}.irow .seg button{padding:3px 8px;font-size:12px;flex:0 0 auto}
+.irow input{width:100%;border:1px solid transparent;background:none;font:13px -apple-system,BlinkMacSystemFont,system-ui,sans-serif;color:var(--fg);padding:4px 6px;border-radius:6px}
+.irow input:focus{outline:none;border-color:var(--accent);background:var(--surface)}
+.irow.add input{border-color:var(--line)}
+.irow .x{border:0;background:none;color:var(--faint);font-size:15px;padding:0 4px}
+.irow .x:hover{color:var(--fg)}
+.empty{font-size:12.5px;color:var(--muted);padding:10px 12px;border-bottom:1px solid var(--line)}
+.confirm{display:none;margin-top:8px;padding:9px 12px;border-radius:9px;background:var(--accent-soft);font-size:12.5px;align-items:center;justify-content:space-between;gap:10px}
+.confirm.show{display:flex}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.tag{font-size:12px;border-radius:12px;padding:2px 9px;background:var(--surface-2);border:1px solid var(--line)}
+.tag i{font-style:normal;color:var(--muted);margin-left:4px}
+.today{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:10px 12px;border:1px solid var(--line);border-radius:10px}
+.explain{font-size:12.5px;color:var(--muted);background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.explain ol{margin:6px 0 0;padding-left:18px}
+.explain li{margin:2px 0}
+.explain b{color:var(--fg);font-weight:600}
+
+dialog{border:0;padding:0;border-radius:14px;background:var(--surface);color:var(--fg);box-shadow:0 20px 60px rgba(0,0,0,.3);width:min(780px,94vw);max-height:84vh}
+dialog::backdrop{background:rgba(0,0,0,.28)}
+.dh{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line)}
+.dh b{font-size:15px}
+.dh span{display:block;font-size:12.5px;color:var(--muted)}
+.dtabs{display:flex;gap:4px;padding:12px 20px 0}
+.dlist{padding:6px 12px 16px;overflow:auto;max-height:60vh}
+.drow{display:grid;grid-template-columns:44px 28px 1fr auto;gap:10px;padding:10px 8px;border-bottom:1px solid var(--line);align-items:start}
+.drow:last-child{border-bottom:0}
+.drow time{font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums;padding-top:5px}
+.drow .nm{font-size:13px;font-weight:600}
+.drow .nm span{font-weight:400;color:var(--muted)}
+.drow .pv{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:440px}
+.drow .rs{font-size:12.5px;margin-top:3px}
+.drow .by{font-size:11px;font-weight:600;color:var(--accent);background:var(--accent-soft);border-radius:4px;padding:1px 6px;margin-right:6px}
+
+.ev{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media (max-width:960px){.ev{grid-template-columns:1fr 1fr}}
+@media (max-width:640px){.ev{grid-template-columns:1fr}}
+.evc{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.evc .n{font-size:22px;font-weight:700;letter-spacing:-.02em}
+.evc p{margin:4px 0 8px;font-size:13px;color:var(--muted)}
+.evc .so{font-size:12px}
+.evc .imp{font-size:12.5px;border-top:1px solid var(--line);padding-top:8px;margin-top:8px}
+.ml{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:900px){.ml{grid-template-columns:1fr}}
+pre.code{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;font:12px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;margin:0}
+.list{margin:0;padding-left:18px;color:var(--muted);font-size:13px}
+.list li{margin:3px 0}
+.oq{display:grid;gap:12px}
+.oqi{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.oqi b{display:block;margin-bottom:4px}
+.oqi p{margin:0;color:var(--muted);font-size:13px}
+.oqi .rec{color:var(--fg);margin-top:6px}
+.foot{color:var(--faint);font-size:12px;margin-top:40px}
+</style>
+</head>
+<body>
+<nav><div class="in"><b>Juno · Notifications proposal</b><a href="#flow">The rules</a><a href="#auto">Auto</a><a href="#sim">Try it</a><a href="#settings">Settings</a><a href="#ai">The AI's job</a><a href="#measure">Measuring</a><a href="#open">Open questions</a></div></nav>
+<main>
+
+<section style="padding-top:44px">
+  <p class="eyebrow">Proposal · v2 · October 2026</p>
+  <h1>Judge the conversation, not the message.</h1>
+  <p class="lead">Almost everything, from DMs to topics, is set to Auto, so Auto is what has to be right. Today Auto asks whether one message sounds urgent. That holds chit-chat in a conversation you're in, and can't tell a bare "hey" from a real ask. This version looks at the conversation first, then reads the message with your own instructions, and has two outcomes: notify, or stay in Juno.</p>
+  <div class="pillars">
+    <div class="pillar"><b>Two outcomes</b><span>A banner, which stays in Notification Center if you're away, or it waits in Juno. Nothing in between.</span></div>
+    <div class="pillar"><b>Your words in the reading</b><span>When Juno reads a message and it clearly falls under your instructions, Juno does what they say.</span></div>
+    <div class="pillar"><b>Conversation, not message</b><span>A reply in a conversation you're in notifies, even if it's chit-chat. A bare "hey" doesn't.</span></div>
+    <div class="pillar"><b>Real words, clear reasons</b><span>Banners show what people wrote. Every call has a one-line reason you can correct.</span></div>
+  </div>
+</section>
+
+<section id="flow">
+  <p class="eyebrow">The rules</p>
+  <h2>Five steps, top to bottom. The first that applies decides.</h2>
+  <p class="sub">Juno makes every call. Steps 1 to 4 are your settings, followed exactly. Step 5 is Auto, the default for everything.</p>
+  <div class="flow">
+    <div class="fs"><span class="n">1</span><b>Notification hours</b><p>Outside them, nothing notifies. No exceptions.</p><div class="o"><span class="pill p-no">Stays in Juno</span></div></div>
+    <div class="fs"><span class="n">2</span><b>Always</b><p>A person, channel or thread you set to Always. Beats Never.</p><div class="o"><span class="pill p-yes">Notifies</span></div></div>
+    <div class="fs"><span class="n">3</span><b>Never, or ignored</b><p>Set to Never, or an ignored channel. A direct mention of you or your group still gets through.</p><div class="o"><span class="pill p-no">Stays in Juno</span><span class="pill p-yes">Direct mention: notifies</span></div></div>
+    <div class="fs"><span class="n">4</span><b>Always notify</b><p>Switches: Direct messages, Group DMs, Mentions (including @here and @channel), Threads you started, Threads you follow. All on gives Slack's default behaviour.</p><div class="o"><span class="pill p-yes">Notifies</span></div></div>
+    <div class="fs auto"><span class="n">5</span><b>Auto</b><p>The conversation first, then Juno reads it with your instructions.</p><div class="o"><a href="#auto">How Auto decides ↓</a></div></div>
+  </div>
+</section>
+
+<section id="auto">
+  <p class="eyebrow">Auto</p>
+  <h2>How Auto decides</h2>
+  <p class="sub">Three checks, in order. The first two are plain facts about the conversation. The last is one reading of the message with its conversation and your instructions.</p>
+  <div class="ladder">
+    <div class="rung"><div class="k">1</div><div><b>Is it only a closer?</b><p>"thanks", "ok", "got it", a thumbs up and the like, right after you wrote. It ends the exchange. "thanks, can you approve?" is not a closer.</p></div><div class="by"><span>The conversation</span>Fixed list</div></div>
+    <div class="rung"><div class="k">2</div><div><b>Are you in this conversation right now?</b><p>You wrote in it in the last 10 minutes and they replied. Then it notifies, whatever it says, because you were talking. Switching apps doesn't end it.</p></div><div class="by"><span>The conversation</span>Timestamps</div></div>
+    <div class="rung"><div class="k">3</div><div><b>Juno reads it</b><p>First, does it clearly fall under your instructions? Then Juno does what they say. "Don't notify: social plans" holds a cold "who's in for dinner?". Otherwise, does it need you? It notifies when someone asks you to reply, act or decide, answers something you asked, follows up on an ask you haven't answered, or something serious is happening that you're part of. A greeting with nothing asked, an FYI, or chatter you're not part of stays in Juno.</p></div><div class="by"><span>Juno's reading</span>One classifier call</div></div>
+  </div>
+</section>
+
+<section id="sim">
+  <p class="eyebrow">Try it</p>
+  <h2>Pick a situation and see what Juno does</h2>
+  <p class="sub">Change the setting for this conversation, your hours, the Always notify switches, or turn on example instructions, and watch the call change.</p>
+  <div class="sim">
+    <div class="card">
+      <div class="pad" style="padding-bottom:4px"><p class="label">Situation</p></div>
+      <div class="scen" id="scen"></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="card pad controls">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div><p class="label">This conversation is set to</p><div class="seg" id="level"></div></div>
+          <div><p class="label">Time</p><div class="seg" id="hours"></div></div>
+        </div>
+        <div><p class="label">Always notify</p><div id="simSwitches"></div></div>
+        <div><p class="label">Your instructions</p><div class="seg" id="instr"></div><div class="instr" id="instrText"></div></div>
+      </div>
+      <div class="card" id="conv"></div>
+    </div>
+    <div class="card right" id="result"></div>
+  </div>
+</section>
+
+<section id="menu">
+  <p class="eyebrow">From a conversation</p>
+  <h2>Change it where you are, and find out what Auto means</h2>
+  <p class="sub">Most people never open notification settings. So a conversation's menu sets the level and links to the page that explains Auto. The same link sits at the bottom of "Why did this notify?".</p>
+  <div class="menuwrap">
+    <div style="position:relative;height:240px">
+      <div class="menu">
+        <div>Open in new tab</div><div>Copy link</div><hr>
+        <div class="hl">Notify me <span>›</span></div>
+        <div>Why did this notify?</div><hr>
+        <div>Mark as unread</div><div>Ignore channel</div>
+        <div class="menu subm">
+          <div><span><span class="chk"></span>Always</span></div>
+          <div><span><span class="chk">✓</span>Auto</span></div>
+          <div><span><span class="chk"></span>Never</span></div>
+          <hr>
+          <div class="dim"><span><span class="chk"></span>How Auto decides…</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card pad">
+      <h3>"How Auto decides…"</h3>
+      <p style="color:var(--muted);font-size:13px;margin:0">Opens Settings › Notifications at its <a href="#howauto">How Auto decides</a> box, which lists the four checks in plain words. In "Why did this notify?" the same link reads Notification settings.</p>
+    </div>
+  </div>
+</section>
+
+<section id="settings">
+  <p class="eyebrow">Settings</p>
+  <h2>Settings › Notifications</h2>
+  <p class="sub">The switches here are the same as in the simulator. Try typing a rule in Your instructions, and open Details.</p>
+  <div class="settings">
+    <div class="side"><div>General</div><div>Appearance</div><div class="on">Notifications</div><div>Ignored</div><div>Tidy up</div><div>Juno</div><div>AI activity</div><div>Connections</div></div>
+    <div class="body">
+      <h4>Notification hours</h4>
+      <p class="hs">Outside these hours your Mac doesn't notify. Slack pauses at the same times, so your phone stays quiet too.</p>
+      <div class="grp"><div class="ctlrow"><div class="days"><span>S</span><span class="on">M</span><span class="on">T</span><span class="on">W</span><span class="on">T</span><span class="on">F</span><span>S</span></div><div><span class="time">9:00</span> to <span class="time">19:00</span></div></div></div>
+
+      <h4>Active in Slack</h4>
+      <p class="hs">Outside these hours you show as away.</p>
+      <div class="grp"><div class="ctlrow"><div class="days"><span>S</span><span class="on">M</span><span class="on">T</span><span class="on">W</span><span class="on">T</span><span class="on">F</span><span>S</span></div><div><span class="time">9:00</span> to <span class="time">19:00</span></div></div></div>
+      <p class="hs" style="margin-top:8px">Juno switches your status while it's open. If it's closed when your active hours start, you stay away until you open it.</p>
+
+      <h4>Always notify</h4>
+      <p class="hs">These notify inside your hours, whatever they say. Turn them all on to be notified the way Slack does by default.</p>
+      <div class="grp" id="setSwitches"></div>
+
+      <h4>Your instructions</h4>
+      <p class="hs">For each instruction, choose Notify me or Don't notify, then describe it in your own words. Juno follows them when it reads messages on Auto. If one is about a single person or channel, Juno offers to make it a setting instead.</p>
+      <div class="ilist" id="ilist"></div>
+      <div class="confirm" id="confirm"><span>Juno found a rule: <b>Alex Chen → Always</b>. A setting is exact and shows below.</span><span style="white-space:nowrap"><button class="btn primary" id="apply">Make it a setting</button> <button class="btn" id="keep">Keep as instruction</button></span></div>
+
+      <h4>People, channels and threads</h4>
+      <p class="hs">Set from any conversation's menu: Notify me › Always, Auto or Never. Everything else is on Auto.</p>
+      <div class="grp">
+        <div class="ctlrow"><div>Always<small>Notifies for every message, inside your hours.</small><div class="tags" id="alwaysTags"><span class="tag">#incidents<i>×</i></span></div></div><span class="btn">Add…</span></div>
+        <div class="ctlrow"><div>Never<small>No notifications. A direct mention of you or a group you're in still notifies. <a href="#settings">Ignored channels</a> work the same way.</small><div class="tags"><span class="tag">#random<i>×</i></span><span class="tag">Deploy bot<i>×</i></span></div></div><span class="btn">Add…</span></div>
+      </div>
+
+      <h4 id="howauto">How Auto decides</h4>
+      <div class="explain">For everything on Auto, Juno checks in this order:
+        <ol>
+          <li><b>Closers.</b> "thanks", "ok" and the like don't notify.</li>
+          <li><b>Conversations you're in.</b> If you wrote in the last 10 minutes, replies notify.</li>
+          <li><b>Juno reads it.</b> If it clearly falls under your instructions, Juno does what they say. Otherwise asks, answers to your questions, follow-ups you haven't answered and serious problems notify. Greetings, FYIs and chatter wait in Juno.</li>
+        </ol>
+      </div>
+
+      <h4>Today</h4>
+      <div class="today"><span>Today: 4 notified you, 6 stayed in Juno.</span><button class="btn" id="openDetails">Details</button></div>
+    </div>
+  </div>
+</section>
+
+<section id="ai">
+  <p class="eyebrow">The AI's job</p>
+  <h2>One classifier call, not a chat model</h2>
+  <p class="sub">Juno already calls Jev (typesafe/jev-1.13) for decisions: about 0.5 s, about $0.03 per 1,000 calls, and 100% on the bench. Jev takes structured state and typed questions, and every answer comes with probabilities. So it gives its own confidence, and it can ask about your instructions and whether the message needs you in the same call. No chat model is needed on this path.</p>
+  <div class="ml">
+    <div>
+      <h3>What it reads (the state)</h3>
+      <ul class="list" style="margin-bottom:14px">
+        <li>The new message, and any that arrived with it</li>
+        <li>The thread's first message and up to 10 earlier messages, yours marked, with times</li>
+        <li>Facts: whether you wrote last and how long ago, whether you started the thread, DM or channel</li>
+        <li>How often you talk to the sender, counted, never a guessed org chart</li>
+        <li>Your instructions, each with its direction</li>
+      </ul>
+      <h3>Your instructions are already a list</h3>
+      <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Each instruction is saved with its direction, Notify me or Don't notify, so nothing needs splitting or guessing. Each message needs one question: which instruction, if any, covers it? Why quotes that instruction. When you add one, a single chat-model call checks whether it is really a rule about one person or channel ("Found a rule"); that is once per instruction, never per message.</p>
+      <h3>When part of a message matches</h3>
+      <p style="color:var(--muted);font-size:13px;margin:0 0 14px">"hey! can you approve the contract by 3?" starts with a greeting, but it is mainly an ask. Jev is asked what each message is mainly about, so "Don't notify: greetings" doesn't match it. A Don't notify instruction also needs a higher confidence than a Notify me one, because holding something that needed you costs more than one extra banner. A borderline case goes on to whether it needs you.</p>
+      <h3>Existing free text</h3>
+      <p style="color:var(--muted);font-size:13px;margin:0 0 14px">The list is a new setting. The old What matters to you text is left where it is and no longer read, so nothing breaks for anyone who set it. It isn't converted.</p>
+      <h3>Why lines without generated text</h3>
+      <p style="color:var(--muted);font-size:13px;margin:0 0 14px">Jev picks from fixed options and doesn't write sentences. Why is built from the option and the facts, for example "Sam asks you something." or "Dev is following up, and you haven't replied." It is less specific than generated text, but it never invents anything.</p>
+      <h3>Uncertain or slow</h3>
+      <p style="color:var(--muted);font-size:13px;margin:0">If no instruction clears the bar, the instructions don't decide. "Needs you" adds up the probabilities of the options that notify and compares the total with one threshold. Both bars come from your replay labels, not from guesses. A chat model is used only if the replay shows Jev's uncertain cases are frequent and a chat model gets them right. If the call takes more than 2 s, DMs and mentions notify and the rest stays in Juno.</p>
+    </div>
+    <pre class="code">// One Jev call
+state: {
+  message, earlier, facts,
+  instructions: { i1: "Notify me: anything on the Q4 launch",
+                  i2: "Don't notify: social plans" }
+}
+questions: {
+  instruction: { type: "choice",            // only if you wrote any
+    criteria: {
+      i1: "The main point of this message is: anything on the Q4 launch",
+      i2: "The main point of this message is: social plans",
+      none: "The main point is something else, even if part of it touches an instruction" } },
+  needsYou: { type: "choice",
+    criteria: {
+      ask:       "Asks the owner to reply, act or decide",
+      answer:    "Answers something the owner asked",
+      follow_up: "Follows up on an ask the owner hasn't answered",
+      decision:  "A decision the owner should weigh in on",
+      serious:   "Something serious the owner is part of",
+      greeting:  "A greeting with nothing asked yet",
+      fyi:       "An update with nothing asked of the owner",
+      chatter:   "Talk the owner isn't part of" } }
+}
+
+// Answers come with probabilities
+instruction → { choice: "i2", confidence: 0.94, probabilities }
+needsYou    → { choice: "ask", confidence: 0.81, probabilities }
+
+// How Juno applies it
+only a closer                     → stay in Juno
+you wrote ≤ 10 min ago            → notify
+Notify me match, conf ≥ bar       → notify
+Don't notify match, conf ≥ higher bar → stay in Juno
+P(ask+answer+follow_up+decision+serious) ≥ bar → notify
+otherwise                         → stay in Juno</pre>
+  </div>
+</section>
+
+<section id="measure">
+  <p class="eyebrow">Measuring</p>
+  <h2>Test it on your own messages first</h2>
+  <div class="ml">
+    <div class="card pad"><h3>Before it ships</h3><p style="color:var(--muted);font-size:13px;margin:0">Replay your last few weeks of Slack, in time order, through today's check and the new one. You label about 300 sampled messages: should it have notified, yes or no. Compare both against your labels. Then ship it, log both side by side for two weeks, and treat your corrections in Why as more labels.</p></div>
+    <div class="card pad"><h3>What good looks like</h3><p style="color:var(--muted);font-size:13px;margin:0">9 in 10 notifications are ones you'd keep. 95% of your "yes" labels notify. Fewer notifications than today at the same recall, not just fewer. Instructions followed every time they clearly apply. Zero notifications outside hours, zero duplicates.</p></div>
+  </div>
+</section>
+
+<section id="evidence">
+  <p class="eyebrow">Evidence</p>
+  <h2>What the research and other apps say</h2>
+  <div class="ev">
+    <div class="evc"><div class="n">10–15 min</div><p>to get back to a task after an alert. 27% of suspended tasks were left for over 2 hours.</p><div class="so"><a href="https://www.erichorvitz.com/CHI_2007_Iqbal_Horvitz.pdf">Iqbal &amp; Horvitz, CHI 2007</a> · strong</div><div class="imp">→ Each notification has to earn it.</div></div>
+    <div class="evc"><div class="n">3 minutes</div><p>iOS lets a second call within 3 minutes ring through Focus. No chat app treats a live back-and-forth differently from a cold opener.</p><div class="so"><a href="https://www.macworld.com/article/617705/focus-mode.html">iOS Repeated calls</a> · gap in the market</div><div class="imp">→ Check 3: conversations you're in.</div></div>
+    <div class="evc"><div class="n">"hey"</div><p>A bare greeting makes the other person wait. The fix people ask for is the question in the same message.</p><div class="so"><a href="https://nohello.net/en/">nohello.net</a> · weak but consistent</div><div class="imp">→ A greeting alone waits in Juno.</div></div>
+    <div class="evc"><div class="n">BBC</div><p>Apple's AI summaries invented headlines and garbled personal messages. Apple Mail's priority feature promoted phishing.</p><div class="so"><a href="https://www.mediaite.com/media/news/apple-suspends-ai-news-alerts-after-false-bbc-story-claimed-luigi-mangione-shot-himself">Mediaite</a>, <a href="https://tomsguide.com/ai/apple-intelligence-is-marking-phishing-scams-as-priority-emails-heres-what-you-need-to-know">Tom's Guide</a> · moderate</div><div class="imp">→ Banners show real words.</div></div>
+    <div class="evc"><div class="n">11%</div><p>YouTube's "Not interested" stopped only 11% of unwanted videos. Explanation plus correction doubled how well people fixed mistakes.</p><div class="so"><a href="https://www.mozillafoundation.org/en/blog/mozilla-investigation-youtubes-dislike-button-other-user-controls-largely-fail-to-stop-unwanted-recommendations/">Mozilla</a>, <a href="https://openaccess.city.ac.uk/id/eprint/13819/1/paper326.pdf">Kulesza 2015</a> · strong</div><div class="imp">→ Corrections make a visible, undoable change.</div></div>
+    <div class="evc"><div class="n">~10%</div><p>of people change advanced notification settings. Slack's settings sprawl leads to silent misses.</p><div class="so"><a href="https://arxiv.org/pdf/1612.02314">Pielot &amp; Rello 2017</a> · moderate</div><div class="imp">→ Small page; change it from the conversation.</div></div>
+  </div>
+</section>
+
+<section id="open">
+  <p class="eyebrow">Open questions</p>
+  <h2>Small decisions left</h2>
+  <div class="oq">
+    <div class="oqi"><b>The Replies switch is gone. Fine?</b><p>"Replies where you wrote recently" skipped Juno's reading, so "ok" notified too. Check 3 in Auto already covers live replies, and a thread that matters can be set to Always.</p><p class="rec"><b style="display:inline">Recommendation:</b> remove it.</p></div>
+    <div class="oqi"><b>How long is "a conversation you're in"?</b><p>10 minutes since you last wrote. Long enough for a slow back-and-forth, short enough that an old chat goes back to the normal checks.</p><p class="rec"><b style="display:inline">Recommendation:</b> start at 10 and check it against your history: how often a reply came within 10 minutes of your last message.</p></div>
+    <div class="oqi"><b>How long does a burst count as one banner?</b><p>Banners are never updated once shown. After one, more messages in the same conversation don't notify again for a short while.</p><p class="rec"><b style="display:inline">Recommendation:</b> 1 minute. Anything in that minute is in Juno when you open the conversation.</p></div>
+    <div class="oqi"><b>What counts as a clear match with your instructions?</b><p>A loose match, such as "social plans" against a team offsite, could hold something you wanted. Only a clear match decides; a loose one falls back to whether it needs you.</p><p class="rec"><b style="display:inline">Recommendation:</b> set the bar from the replay labels, and quote the instruction in Why so a wrong match is easy to spot and fix.</p></div>
+  </div>
+  <h3 style="margin-top:28px">Later ideas, not in this version</h3>
+  <ul class="list">
+    <li>Pause notifications for an hour, set in Slack, so others can see you're paused too.</li>
+    <li>Holding things that can wait until a natural break, such as unlocking or leaving a huddle.</li>
+    <li>Watching busy channels you're not part of, such as an incident channel heating up.</li>
+  </ul>
+  <p class="foot">Built from a web research review, two independent designs (Claude Fable, GPT-6 Astra), their critiques, Juno's code and SPEC section 14, and Tushar's review of v1.</p>
+</section>
+</main>
+
+<dialog id="details">
+  <div class="dh"><div><b>Today's notifications</b><span>Every message Juno decided on today, and why.</span></div><button class="btn" id="closeDetails">Done</button></div>
+  <div class="dtabs"><div class="seg" id="dtab"></div></div>
+  <div class="dlist" id="dlist"></div>
+</dialog>
+
+<script>
+const PEOPLE={
+  Priya:{n:'Priya Raman',c:'#d9480f'},Sam:{n:'Sam Okafor',c:'#2b8a3e'},Dev:{n:'Dev Shah',c:'#5f3dc4'},
+  Maya:{n:'Maya Lin',c:'#c2255c'},Alex:{n:'Alex Chen',c:'#1971c2'},Jonas:{n:'Jonas Weber',c:'#e67700'},
+  Lena:{n:'Lena Park',c:'#0c8599'},you:{n:'You',c:'#868e96'}
+};
+const INSTR='<b>Notify me:</b> anything on the Q4 launch<br><b>Don\'t notify:</b> social plans';
+// f: facts known in code. m: Juno's reading of whether it needs you. mi: match with the example instructions.
+const S=[
+ {id:'live',title:'Live DM, they reply with chit-chat',sub:'You were chatting, then switched apps',kind:'im',place:'Priya Raman',with:'Priya',
+  msgs:[['Priya','2:01','did you see the new onboarding draft?'],['you','2:02','yes, the second screen is so much better'],['Priya','2:04','haha right, took me forever to get the spacing right',1]],
+  ctx:'You wrote <b>2 minutes ago</b>. Priya replied.',f:{live:2}},
+ {id:'cold',title:'Cold "hey, how are you?"',sub:'No chat with Sam this week',kind:'im',place:'Sam Okafor',with:'Sam',
+  msgs:[['Sam','10:12','hey! how are you doing?',1]],
+  ctx:'No exchange with Sam in the last <b>9 days</b>.',f:{},
+  m:{cat:'greeting',p:0.91,notify:false}},
+ {id:'heyask',title:'"hey", then the real ask 90 s later',sub:'Greeting first, question after',kind:'im',place:'Sam Okafor',with:'Sam',
+  msgs:[['Sam','10:12','hey!'],['Sam','10:13','can you review the pricing PR before standup? need it merged by 11',1]],
+  ctx:'"hey!" stayed in Juno. The question came <b>90 s</b> later and is read with it.',f:{},
+  m:{cat:'ask',p:0.88,notify:true}},
+ {id:'chase',title:'A report follows up',sub:'You haven\'t replied in 25 minutes',kind:'im',place:'Dev Shah',with:'Dev',
+  msgs:[['Dev','11:05','can I go ahead with the vendor contract? need a yes or no'],['Dev','11:30','sorry to chase, legal is waiting on me for the contract',1]],
+  ctx:'Fact passed to Juno: Dev wrote at 11:05 and <b>you haven\'t written since</b>.',f:{},
+  m:{cat:'follow_up',p:0.86,notify:true}},
+ {id:'answer',title:'Someone answers your question',sub:'You asked an hour ago',kind:'thread',place:'#eng · Release checklist',with:'Lena',
+  msgs:[['you','13:10','@Lena is the migration safe to run on prod tonight?'],['Lena','14:22','yes, ran it on staging twice, no locks. good to go',1]],
+  ctx:'Fact passed to Juno: <b>you wrote last</b>, 72 minutes ago.',f:{following:true},
+  m:{cat:'answer',p:0.9,notify:true}},
+ {id:'decision',title:'A decision forming in your thread',sub:'You started it, people decide without you',kind:'thread',place:'#launch · Ship date',with:'Maya',
+  msgs:[['you','9:40','what\'s our realistic ship date for the iOS app?'],['Jonas','15:02','QA says Friday is tight'],['Maya','15:03','let\'s just move it to the 14th then, I\'ll tell marketing',1]],
+  ctx:'Facts: you <b>started this thread</b> and haven\'t written in 6 hours.',f:{started:true,following:true},
+  m:{cat:'decision',p:0.79,notify:true},
+  mi:{id:'i1',p:0.91,result:'notify',quote:'Notify me: anything on the Q4 launch'}},
+ {id:'burst',title:'Dinner plans in a group DM',sub:'10 messages in a minute, you haven\'t written',kind:'mpim',place:'Priya, Sam, Maya',with:'Priya',
+  msgs:[['Priya','16:20','who\'s in for dinner friday? tushar you too?'],['Sam','16:21','yes'],['Maya','16:21','depends where'],['','','+ 6 more in the next minute'],['Maya','16:22','fine, thai it is',1]],
+  ctx:'You haven\'t written here today. 10 messages from 3 people in a minute.',f:{burst:10},
+  m:{cat:'ask',p:0.72,notify:true},
+  mi:{id:'i2',p:0.94,result:'stay',quote:'Don\'t notify: social plans'}},
+ {id:'thanks',title:'"thanks!" to your message',sub:'You just helped someone',kind:'im',place:'Maya Lin',with:'Maya',
+  msgs:[['Maya','12:01','where\'s the brand kit?'],['you','12:02','in Drive › Brand › 2026'],['Maya','12:02','thanks!',1]],
+  ctx:'You wrote <b>a minute ago</b>. Maya\'s reply is on the closer list.',f:{live:1,closer:true}},
+ {id:'minute',title:'"got a minute?"',sub:'Someone needs you right now',kind:'im',place:'Alex Chen',with:'Alex',
+  msgs:[['Alex','15:40','got a minute? want to talk about the reorg before my 4pm',1]],
+  ctx:'No recent exchange. You talk to Alex most days.',f:{},
+  m:{cat:'ask',p:0.93,notify:true}},
+ {id:'fyi',title:'An FYI in a thread you follow',sub:'Nothing asked of you',kind:'thread',place:'#design · Icon refresh',with:'Priya',
+  msgs:[['Priya','11:00','new icon set is uploaded to Figma, no action needed, just fyi',1]],
+  ctx:'You replied in this thread <b>3 days ago</b>.',f:{following:true},
+  m:{cat:'fyi',p:0.89,notify:false}},
+ {id:'here',title:'@here in #incidents',sub:'Mentions include @here and @channel',kind:'channel',place:'#incidents',with:'Jonas',
+  msgs:[['Jonas','14:01','checkout errors spiking, 8% of requests'],['Sam','14:03','rolling back the 13:50 deploy'],['Jonas','14:04','@here still failing after rollback, customers noticing',1]],
+  ctx:'An @here. You\'re a member of #incidents.',f:{mention:true},
+  m:{cat:'serious',p:0.84,notify:true}},
+ {id:'ignored',title:'Direct mention in an ignored channel',sub:'#deploys is ignored',kind:'channel',place:'#deploys',with:'Jonas',
+  msgs:[['Jonas','17:10','deploy 412 is green'],['Jonas','17:12','@Tushar the hotfix is blocked on your approval',1]],
+  ctx:'You ignored #deploys. This mentions you <b>by name</b>.',f:{ignored:true,mention:true,direct:true}},
+];
+const SW=[
+ ['dm','Direct messages','Every one-to-one DM, even "hey".'],
+ ['group','Group DMs','Any size.'],
+ ['mention','Mentions','Of you, your groups, @here and @channel.'],
+ ['started','Threads you started','Every reply in a thread you started.'],
+ ['threads','Threads you follow','Every reply. You follow a thread you started, replied in or were mentioned in, or one you chose to follow, as in Slack.'],
+];
+const st={scen:'live',level:'auto',inside:true,instr:'none',sw:{dm:false,group:false,mention:true,started:false,threads:false}};
+const $=s=>document.querySelector(s);
+const esc=t=>t.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+function seg(el,opts,get,set,after){el.innerHTML=opts.map(([v,l])=>`<button data-v="${v}" class="${get()===v?'on':''}">${l}</button>`).join('');el.onclick=e=>{const b=e.target.closest('button');if(!b)return;set(b.dataset.v);(after||render)()}}
+function swRow(k,l,d){const locked=k==='started'&&st.sw.threads;return `<div class="ctlrow" style="${locked?'opacity:.55':''}"><div>${l}<small>${locked?'Included in Threads you follow.':d}</small></div><button class="sw ${st.sw[k]||locked?'on':''}" data-k="${k}" ${locked?'disabled':''} aria-label="${l}"></button></div>`}
+function bindSw(el){el.onclick=e=>{const b=e.target.closest('.sw');if(!b||b.disabled)return;st.sw[b.dataset.k]=!st.sw[b.dataset.k];render()}}
+
+function decide(s){
+  const steps=[];const P=PEOPLE[s.with].n;const f=s.f;
+  const where=s.kind==='im'?P:s.place.split(' · ')[0];
+  const add=(cls,t,sm)=>steps.push({cls,t,sm});
+  const out=(notify,reason,by,extra)=>({steps,notify,reason,by,...extra});
+  if(!st.inside){add('hit','Inside your notification hours?','No. Nothing notifies outside them.');return out(false,'Outside your notification hours.','Notification hours')}
+  add('pass','Inside your notification hours?','Yes');
+  if(st.level==='always'){add('hit',`${where} is set to Always`,'');return out(true,`${where} is set to Always.`,'Your setting')}
+  add('pass','Set to Always?','No');
+  if(st.level==='never'||f.ignored){
+    const ign=f.ignored&&st.level!=='never';
+    const why=ign?`${where} is ignored`:`${where} is set to Never`;
+    if(f.direct){add('hit',why+', but it mentions you by name','A direct mention gets through Never and ignored channels.');return out(true,`Mentions you by name. That gets through ${ign?'ignored channels':'Never'}.`,'Your setting')}
+    add('hit',why,'No notification. Still in Juno.');return out(false,why+'.','Your setting');
+  }
+  add('pass','Set to Never, or ignored?','No');
+  if(st.sw.dm&&s.kind==='im'){add('hit','Always notify: Direct messages','');return out(true,'Direct messages always notify.','Always notify')}
+  if(st.sw.group&&s.kind==='mpim'){add('hit','Always notify: Group DMs','');return out(true,'Group DMs always notify.','Always notify')}
+  if(st.sw.started&&f.started){add('hit','Always notify: Threads you started','A reply in a thread you started.');return out(true,'A reply in a thread you started.','Always notify')}
+  if(st.sw.threads&&f.following){add('hit','Always notify: Threads you follow','A reply in a thread you follow.');return out(true,'A reply in a thread you follow.','Always notify')}
+  if(st.sw.mention&&f.mention){add('hit','Always notify: Mentions',f.direct?'Mentions you by name.':'@here counts as a mention.');return out(true,f.direct?'Mentions you.':'An @here in #incidents. Mentions always notify.','Always notify')}
+  add('pass','Always notify applies?','No. Auto decides.');
+  if(f.closer){add('hit','1 · Only a closer','"thanks!" right after you wrote.');return out(false,`${P} thanked you. Nothing to do.`,'The conversation')}
+  add('pass','1 · Only a closer?','No');
+  if(f.live){add('hit','2 · You\'re in this conversation',`You wrote ${f.live} minutes ago and they replied.`);return out(true,`You were talking with ${s.kind==='im'?P:'them'} ${f.live} minutes ago.`,'The conversation')}
+  add('pass','2 · You\'re in this conversation?','No');
+  const hasInstr=st.instr==='on';
+  const reading={mi:hasInstr?(s.mi||{}):null,m:s.m};
+  add('ai','3 · Jev reads it with the conversation',hasInstr?'One call, two questions: which instruction covers it, and does it need you?':'One call: does it need you?');
+  if(hasInstr){
+    const mi=s.mi;
+    if(mi){add('hit','Falls under your instructions',`"${mi.quote}"`);return out(mi.result==='notify',`Your instructions: "${mi.quote}"`,'Your instructions',{reading})}
+    add('pass','Falls under your instructions?','No clear match.');
+  }
+  add(s.m.notify?'hit':'pass','Does it need you?',s.m.notify?'Yes':'No');
+  return out(s.m.notify,reasonFor(s),"Juno's reading",{reading});
+}
+function reasonFor(s){const f=PEOPLE[s.with].n.split(' ')[0];const where=s.place.split(' · ')[0];return{
+  ask:`${f} asks you something.`,answer:`${f} answered your question.`,follow_up:`${f} is following up, and you haven't replied.`,
+  decision:`A decision is being made in ${where}, in a thread you started.`,serious:`Something serious in ${where}, and you're part of it.`,
+  greeting:`${f} said hello. Nothing asked yet.`,fyi:'An update with nothing asked of you.',chatter:'Talk you\'re not part of.'}[s.m.cat]}
+function av(k){const p=PEOPLE[k];return `<div class="av" style="background:${p.c}">${k==='you'?'You':p.n.split(' ').map(x=>x[0]).join('')}</div>`}
+function renderConv(s){
+  const head=`<div class="conv-head">${s.kind==='im'?av(s.with):`<div class="av" style="background:#495057">${s.kind==='mpim'?'3':'#'}</div>`}<div><b>${s.place}</b><span>${{im:'Direct message',mpim:'Group DM',thread:'Thread',channel:'Channel'}[s.kind]}</span></div></div>`;
+  const ms=s.msgs.map(([w,t,x,isNew])=>w===''?`<div class="gap">${x}</div>`:`<div class="msg ${isNew?'new':''} ${w==='you'?'you':''}">${av(w)}<div><div class="who">${PEOPLE[w].n}<time>${t}</time></div><div class="txt">${esc(x)}</div></div></div>`).join('');
+  $('#conv').innerHTML=head+`<div class="msgs">${ms}</div><div class="context">${s.ctx}</div>`;
+}
+function renderResult(s,r){
+  const steps=r.steps.map((x,i)=>`<div class="step ${x.cls}" style="animation-delay:${i*40}ms"><div class="dot">${x.cls==='hit'?'✓':x.cls==='ai'?'AI':''}</div><div class="t">${x.t}${x.sm?`<small>${x.sm}</small>`:''}</div></div>`).join('');
+  let reading='';
+  if(r.reading){
+    const a=[];
+    if(r.reading.mi){const mi=r.reading.mi;a.push(mi.id?`instruction: <b>${mi.id}</b> · confidence <b>${mi.p}</b> → <b>${mi.result}</b>`:`instruction: <b>none</b> · confidence <b>0.88</b>`)}
+    if(r.reading.m){const m=r.reading.m;a.push(`needsYou: <b>${m.cat}</b> · confidence <b>${m.p}</b> → <b>${m.notify?'notify':'stay'}</b>`)}
+    reading=`<div class="reading">${a.join('<br>')}</div>`;
+  }
+  const P=PEOPLE[s.with].n;
+  const last=s.msgs.filter(m=>m[0]!=='').slice(-1)[0];
+  const title=s.kind==='im'?P:`${s.kind==='mpim'?PEOPLE[s.msgs[0][0]].n:P} · ${s.place.split(' · ')[0]}`;
+  const delay=r.steps.length*40+120;
+  const burst=s.f.burst&&r.notify;
+  const desk=r.notify?`<div class="banner" style="animation-delay:${delay}ms"><div class="ic">J</div><div><div class="top"><span>JUNO</span><span>now</span></div><div class="ttl">${esc(title)}</div><div class="bd">${esc(burst?s.msgs[0][2]:last[2])}</div></div></div><div class="when">${burst?'One banner for the burst. The rest are in Juno when you open it.':'Banner. Stays in Notification Center if you\'re away.'}</div>`
+   :`<div class="inapp"><div class="row"><span class="u"></span><b>${esc(s.kind==='im'?P:s.place)}</b></div><div class="note">No banner. Unread in Juno.</div></div><div class="when">Stays in Juno</div>`;
+  const q=r.notify?'Why did this notify?':'Why no notification?';
+  let acts='';
+  if(['Your setting','Always notify','Notification hours'].includes(r.by))acts=`<button class="btn" data-a="change">Change</button>`;
+  else if(r.by==='Your instructions')acts=`<button class="btn" data-a="edit">Edit instructions</button>`;
+  else acts=`<button class="btn" data-a="${r.notify?'nope':'should'}">${r.notify?'Shouldn\'t have notified':'Should have notified'}</button>`;
+  if(s.kind==='im'&&st.level==='auto')acts+=`<button class="btn" data-a="always">Always for ${P.split(' ')[0]}</button>`;
+  $('#result').innerHTML=`<div class="pad" style="padding-bottom:4px"><p class="label">Juno's call</p></div><div class="trace">${steps}</div>${reading}
+   <div class="outcome ${r.notify?'o-yes':'o-no'}"><div><small>Outcome</small><b>${r.notify?'Notifies':'Stays in Juno'}</b></div><div style="text-align:right"><small>Decided by</small>${r.by}</div></div>
+   <div class="desk">${desk}</div>
+   <div class="why"><div class="q">${q}</div><p>${esc(r.reason)}</p><div class="acts">${acts}<a href="#howauto">Notification settings</a></div></div><div class="toast" id="toast"></div>`;
+  $('#result').querySelector('.acts').onclick=e=>{const b=e.target.closest('button');if(!b)return;const t=$('#toast');const a=b.dataset.a;
+    if(a==='always'){st.level='always';render();const t2=$('#toast');t2.innerHTML=`${P} set to Always. <a href="#" id="undoAlways">Undo</a>`;t2.style.display='block';$('#undoAlways').onclick=ev=>{ev.preventDefault();st.level='auto';render()};return}
+    if(a==='change'){t.innerHTML='Opens the setting that decided this.';t.style.display='block';return}
+    if(a==='edit'){t.innerHTML='Opens Settings › Notifications at Your instructions.';t.style.display='block';return}
+    const first=P.split(' ')[0];
+    const line=a==='should'?(s.id==='cold'?`Notify me: ${first} saying hello`:`Notify me: updates in ${s.place.split(' · ')[0]}`):(s.kind==='im'?`Don't notify: ${first} sharing updates`:`Don't notify: updates in ${s.place.split(' · ')[0]}`);
+    t.innerHTML=`Juno suggests adding an instruction:<br><b>${esc(line)}</b><div class="acts"><button class="btn primary">Add it</button><button class="btn">Just this time</button></div>`;t.style.display='block'};
+}
+function render(){
+  const s=S.find(x=>x.id===st.scen);
+  $('#scen').innerHTML=S.map(x=>`<button data-id="${x.id}" class="${x.id===st.scen?'on':''}"><b>${x.title}</b><span>${x.sub}</span></button>`).join('');
+  seg($('#level'),[['auto','Auto'],['always','Always'],['never','Never']],()=>st.level,v=>st.level=v);
+  seg($('#hours'),[['in','Inside hours'],['out','Outside hours']],()=>st.inside?'in':'out',v=>st.inside=v==='in');
+  seg($('#instr'),[['none','None'],['on','Example']],()=>st.instr,v=>st.instr=v);
+  $('#instrText').innerHTML=st.instr==='on'?INSTR:'None. Try Example, then pick "Dinner plans" or "A decision forming".';
+  $('#simSwitches').innerHTML=SW.map(([k,l,d])=>swRow(k,l,d)).join('');
+  $('#setSwitches').innerHTML=SW.map(([k,l,d])=>swRow(k,l,d)).join('');
+  renderConv(s);renderResult(s,decide(s));
+}
+$('#scen').onclick=e=>{const b=e.target.closest('button');if(!b)return;st.scen=b.dataset.id;st.level='auto';render()};
+bindSw($('#simSwitches'));bindSw($('#setSwitches'));
+
+const INS=[{dir:'notify',text:'Anything on the Q4 launch'},{dir:'stay',text:'Social plans'}];
+let pending=null;
+function renderIns(){
+  const rows=INS.map((x,i)=>`<div class="irow"><div class="seg" data-i="${i}"><button data-v="notify" class="${x.dir==='notify'?'on':''}">Notify me</button><button data-v="stay" class="${x.dir==='stay'?'on':''}">Don't notify</button></div><input data-i="${i}" value="${x.text.replace(/"/g,'&quot;')}" aria-label="Instruction"><button class="x" data-i="${i}" aria-label="Remove">×</button></div>`).join('');
+  $('#ilist').innerHTML=(INS.length?rows:'<div class="empty">No instructions. Juno decides from the conversation alone.</div>')+
+   `<div class="irow add"><div class="seg" id="newDir"><button data-v="notify" class="${newDir==='notify'?'on':''}">Notify me</button><button data-v="stay" class="${newDir==='stay'?'on':''}">Don't notify</button></div><input id="newText" placeholder="${newDir===null?'Choose Notify me or Don\'t notify first':newDir==='notify'?'For example: anything on hiring':'For example: deploy updates'}" aria-label="New instruction" ${newDir===null?'disabled':''}><button class="btn" id="addIns" ${newDir===null?'disabled style="opacity:.5"':''}>Add</button></div>`;
+}
+let newDir=null;
+$('#ilist').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  const sg=b.closest('.seg');
+  if(sg&&sg.id==='newDir'){newDir=b.dataset.v;const t=$('#newText').value;renderIns();$('#newText').value=t;$('#newText').focus();return}
+  if(sg){INS[+sg.dataset.i].dir=b.dataset.v;renderIns();return}
+  if(b.classList.contains('x')){INS.splice(+b.dataset.i,1);renderIns();return}
+  if(b.id==='addIns')addIns();
+});
+$('#ilist').addEventListener('keydown',e=>{if(e.target.id==='newText'&&e.key==='Enter')addIns()});
+$('#ilist').addEventListener('change',e=>{if(e.target.dataset.i!==undefined&&e.target.tagName==='INPUT')INS[+e.target.dataset.i].text=e.target.value});
+function addIns(){const t=$('#newText').value.trim();if(!t||!newDir)return;
+  if(/alex/i.test(t)){pending={dir:newDir,text:t};$('#confirm').classList.add('show');return}
+  INS.push({dir:newDir,text:t});newDir=null;renderIns()}
+$('#apply').onclick=()=>{pending=null;newDir=null;$('#confirm').classList.remove('show');$('#alwaysTags').insertAdjacentHTML('afterbegin','<span class="tag">Alex Chen<i>×</i></span>');renderIns()};
+$('#keep').onclick=()=>{if(pending)INS.push(pending);pending=null;newDir=null;$('#confirm').classList.remove('show');renderIns()};
+renderIns();
+
+const LOG=[
+ {t:'16:20',w:'Priya',where:'Priya, Sam, Maya',pv:'who\'s in for dinner friday? tushar you too? (10 messages)',n:false,by:'Your instructions',rs:'"Don\'t notify: social plans"'},
+ {t:'15:40',w:'Alex',where:'',pv:'got a minute? want to talk about the reorg before my 4pm',n:true,by:"Juno's reading",rs:'Alex asks you something.'},
+ {t:'15:03',w:'Maya',where:'#launch · Ship date',pv:'let\'s just move it to the 14th then, I\'ll tell marketing',n:true,by:'Your instructions',rs:'"Notify me: anything on the Q4 launch"'},
+ {t:'14:22',w:'Lena',where:'#eng · Release checklist',pv:'yes, ran it on staging twice, no locks. good to go',n:true,by:"Juno's reading",rs:'Lena answered your question.'},
+ {t:'14:04',w:'Jonas',where:'#incidents',pv:'@here still failing after rollback, customers noticing',n:true,by:'Always notify',rs:'Mentions always notify.'},
+ {t:'12:02',w:'Maya',where:'',pv:'thanks!',n:false,by:'The conversation',rs:'Maya thanked you. Nothing to do.'},
+ {t:'11:00',w:'Priya',where:'#design · Icon refresh',pv:'new icon set is uploaded to Figma, no action needed, just fyi',n:false,by:"Juno's reading",rs:'An update with nothing asked of you.'},
+ {t:'10:12',w:'Sam',where:'',pv:'hey! how are you doing?',n:false,by:"Juno's reading",rs:'Sam said hello. Nothing asked yet.'},
+ {t:'09:58',w:'Jonas',where:'#random',pv:'anyone else see the eclipse photos?',n:false,by:'Your setting',rs:'#random is set to Never.'},
+ {t:'08:12',w:'Dev',where:'',pv:'morning! contract notes are in the doc',n:false,by:'Notification hours',rs:'Before your notification hours.'},
+];
+let dt='all';
+function renderDetails(){
+  const n=LOG.filter(x=>x.n).length;
+  seg($('#dtab'),[['all',`All (${LOG.length})`],['yes',`Notified (${n})`],['no',`Stayed in Juno (${LOG.length-n})`]],()=>dt,v=>dt=v,renderDetails);
+  $('#dlist').innerHTML=LOG.filter(x=>dt==='all'||(dt==='yes')===x.n).map(x=>`<div class="drow"><time>${x.t}</time>${av(x.w)}<div><div class="nm">${PEOPLE[x.w].n}${x.where?` <span>· ${x.where}</span>`:''}</div><div class="pv">${esc(x.pv)}</div><div class="rs"><span class="by">${x.by}</span>${esc(x.rs)}</div></div><div><span class="pill ${x.n?'p-yes':'p-no'}">${x.n?'Notified':'In Juno'}</span></div></div>`).join('');
+}
+$('#openDetails').onclick=()=>{renderDetails();$('#details').showModal()};
+$('#closeDetails').onclick=()=>$('#details').close();
+$('#details').addEventListener('click',e=>{if(e.target.id==='details')$('#details').close()});
+render();
+</script>
+</body>
+</html>
