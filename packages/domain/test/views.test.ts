@@ -60,7 +60,7 @@ describe('Add to view', () => {
 
   it('is on a Main row and the channel menu, not on a thread', () => {
     const channel = { id: 'C1' as ChannelId, kind: 'public' as const, name: 'eng' }
-    const state = { channel, unread: false, pinned: false, resolved: false, notify: 'matters' as const, canDraw: false, views }
+    const state = { channel, unread: false, pinned: false, resolved: false, notify: 'auto' as const, canDraw: false, views }
     expect(labels(topicMenuItems({ ...state, kind: 'main' }))).toContain('Add to view')
     expect(labels(topicMenuItems({ ...state, kind: 'thread' }))).not.toContain('Add to view')
     expect(labels(channelMenuItems({ channel, hasMain: true, views }))).toContain('Add to view')

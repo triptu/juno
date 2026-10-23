@@ -1,7 +1,7 @@
-/** The dock uses the alert decision, with unread DMs in All also counting when held for hours or AI. */
+/** The dock uses the notification decision, with unread DMs in All also counting unless Never or ignored kept them quiet. */
 import { isDm, type ConversationKind } from './channel'
 import { ChannelId, UserId } from './ids'
-import { decideWithCause, type DecisionContext, type Judgement, type LocalTime, type NotificationSettings } from './notifications'
+import { decideNotification, type DecisionContext, type LocalTime, type NotificationSettings } from './notifications'
 
 export interface BadgeTopic {
   readonly id: string
@@ -13,7 +13,8 @@ export interface BadgeTopic {
   readonly mentionsMeDirectly?: boolean
   readonly sidebarVisible?: boolean
   readonly ignored?: boolean
-  readonly judgement?: Judgement
+  /** What Auto decided when the message was read, if it was. */
+  readonly auto?: boolean
 }
 
 export interface BadgeContext extends DecisionContext { readonly at: LocalTime }
@@ -21,13 +22,14 @@ export interface BadgeContext extends DecisionContext { readonly at: LocalTime }
 export function dockBadgeActive(items: ReadonlyArray<BadgeTopic>, settings: NotificationSettings, context: BadgeContext): boolean {
   return items.some((item) => {
     if (item.sidebarVisible === false && !(item.mentionsMeDirectly ?? item.mentionsMe)) return false
-    const decision = decideWithCause({
+    const reading = item.auto === undefined ? undefined : { needsYou: item.auto ? 'ask' as const : 'fyi' as const, probabilities: { [item.auto ? 'ask' : 'fyi']: 1 } }
+    const decision = decideNotification({
       topicId: item.id, channel: { id: ChannelId.make(item.channel), kind: item.kind, name: '', ignored: item.ignored === true },
       senderId: UserId.make(item.person ?? ''), mentionsMe: item.mentionsMe,
       mentionsMeDirectly: item.mentionsMeDirectly ?? item.mentionsMe, at: context.at,
-    }, settings, { ...context, aiAssist: context.aiAssist && item.judgement !== undefined }, item.judgement)
-    if ('needsJudgement' in decision) return false
-    if (decision.decision.outcome === 'now') return true
-    return isDm(item.kind) && ['hours', 'aiOff', 'juno'].includes(decision.cause.kind)
+    }, settings, { ...context, aiAssist: context.aiAssist && reading !== undefined }, reading)
+    if ('needsReading' in decision) return false
+    if (decision.outcome === 'notify') return true
+    return isDm(item.kind) && decision.decidedBy !== 'never' && decision.decidedBy !== 'ignored'
   })
 }
