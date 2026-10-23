@@ -13,7 +13,7 @@ test("a thread started in a channel shows on its Main row, your own does not, an
   const main = juno.sidebar.row('#eng')
   // #eng was read up to the Postgres plan; the staging bill thread started after it.
   await main.expectNewThreads(1)
-  const height = (await main.root.boundingBox())!.height
+  const height = await main.height()
 
   const root = fake.injectMessage({ channel: 'C0ENG', user: 'U0SAM', text: 'Load test results are in.' })
   fake.injectMessage({ channel: 'C0ENG', threadTs: root.ts, user: 'U0DEV', text: 'Looking now.' })
@@ -25,10 +25,10 @@ test("a thread started in a channel shows on its Main row, your own does not, an
   await main.expectPreview('You: Who owns the flaky deploy step?')
   await main.expectNewThreads(2)
   // The count sits on the title line: the row keeps its height.
-  expect((await main.root.boundingBox())!.height).toBe(height)
+  expect(await main.height()).toBe(height)
 
   await main.open()
   await juno.topic.expectTitle('Main')
   await main.expectNoNewThreads()
-  expect((await main.root.boundingBox())!.height).toBe(height)
+  expect(await main.height()).toBe(height)
 })

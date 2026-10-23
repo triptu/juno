@@ -196,6 +196,11 @@ export class SidebarRow {
     await expect(this.root.getByTitle(count === 1 ? '1 new thread' : `${count} new threads`)).toHaveText(String(count))
   }
 
+  /** The row's laid-out height. A row sliding to its new place is moved by a transform, which a bounding box would include. */
+  height(): Promise<number> {
+    return this.root.evaluate((node) => Number.parseFloat(getComputedStyle(node).height))
+  }
+
   async expectNoNewThreads(): Promise<void> {
     await expect(this.root.getByTitle(/^\d+ new threads?$/)).toHaveCount(0)
   }
