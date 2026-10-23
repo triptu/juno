@@ -28,8 +28,8 @@ Authentication errors and connected-host failures stop the run.
 
 ```sh
 bun run runner:check
-bun run remote test --passWithNoTests test/messages.test.ts
-bun run remote test:plan test --passWithNoTests test/messages.test.ts + test:desktop e2e/app.spec.ts
+bun run remote test --files packages/engine/test/messages.test.ts
+bun run remote test:plan test --files packages/engine/test/messages.test.ts + test:desktop e2e/app.spec.ts
 ```
 
 Standalone jobs wait up to 60 seconds for capacity; split plans default to one hour so queued jobs can wait for capacity released by their siblings. `--wait <seconds>` or
@@ -59,8 +59,7 @@ On quota hosts these counts are CPUs: a narrow job gets one CPU, with no burst t
 
 Workers use tstack's actual `RUNNER_THREADS`, exposed in Juno's log as
 `remote: allocated threads=N`, rather than assuming two threads per core.
-At four allocated threads, wide units use four Vitest workers in each of two
-packages, standalone desktop uses three workers (two in sequential app plans),
+At four allocated threads, units run four `bun test` processes, standalone desktop uses three workers (two in sequential app plans),
 and gallery uses four workers. Quint uses one simulation per two threads and
 one Apalache checker per four, at least one each. Explicit worker settings win.
 

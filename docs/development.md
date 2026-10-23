@@ -869,7 +869,7 @@ Looked at and left: the 429 storm in `realtime.spec.ts` (33 s) and `idle-cpu.spe
 
 **Round 4** (10-18): the audit in `docs/testing-audit.md` measured what each suite costs and what it caught in a week, removed a gallery hang that cost every full run on main 13 minutes, merged desktop tests that shared their setup (474 to 408 launches), and removed or rewrote tests of internals. Its rules follow.
 
-**Unit setup and parallel files** (10-19). The engine harness builds an empty migrated database template once per test file, closes it, then copies it into each fresh engine's private directory. It does not copy synced workspace data or share engines. Store migration tests still run from scratch. Related engine checks can share one named flow; tests of different starting states and failure cases remain independent. Large-seed repair and socket-liveness cases are separate files so existing remote file parallelism can overlap them. `bun run remote test` already sets `JUNO_TEST_FILE_PARALLEL=1` and bounds workers to the runner; the local serial default is unchanged. Measurements and the assertion inventory are in [Unit suite timing](unit-suite-timing.md).
+**Unit setup and parallel files** (10-19). The engine harness builds an empty migrated database template once per test file, closes it, then copies it into each fresh engine's private directory. It does not copy synced workspace data or share engines. Store migration tests still run from scratch. Related engine checks can share one named flow; tests of different starting states and failure cases remain independent. Large-seed repair and socket-liveness cases are separate files so existing remote file parallelism can overlap them. Under `bun test --parallel` every file runs in its own process, locally and remotely. Measurements and the assertion inventory are in [Unit suite timing](unit-suite-timing.md).
 
 **Further unit tuning** (10-19). Store now overlaps files on remote workers because every test owns a private temporary directory and database handles. The mutation scenarios use a smaller 20,000-message fixture while keeping 300 conversations, all 150 activity targets and the exact repair budgets; the 100,000-message performance fixture stays intact. The send flush check advances retry deadlines with TestClock. Home's AI-off setup now precedes its job startup, and quick-start's Automated hold is advanced explicitly, so both work under load. Five paired Agent pool/isolation samples found no consistent improvement, so its defaults stay unchanged. Wall-clock and CPU budgets are excluded from normal unit runs and `affected`: `bun run perf --unit` runs the Agent, Engine and AI performance configurations on the Mac. Mixed tests keep their correctness assertions in the normal suite; query-count and payload limits remain normal checks. The Agent no longer has a separate timing project in `bun run test`. Profiling commands and measurements are in [Unit suite timing](unit-suite-timing.md#round-3-smaller-repair-fixtures-and-independent-store-workers).
 
@@ -930,7 +930,7 @@ An import graph over `apps/` and `packages/` decides what each change reaches, a
 | --- | --- |
 | `bun.lock`, `bunfig.toml`, the root `package.json`, `tsconfig.base.json` | every unit test, `specs:check`, conformance, gallery and desktop picks within their time budgets (no spec can be told apart) |
 | `scripts/affected.mjs`, `scripts/affected-select.mjs`, `scripts/affected-run.mjs`, `scripts/affected-tests.mjs`, `scripts/test-areas.mjs`, `scripts/import-graph.mjs`, `scripts/coverage-map.mjs`, `scripts/remote*`, `scripts/heavy.mjs`, `scripts/build-cached.mjs`, `scripts/without-run-as-node.mjs` | the tool tests (`test:health`, `test:repo-tools`, `test:runner`) and `e2e/app.spec.ts`, as a check that a run still works |
-| A unit file, a file one reaches, or a package's `package.json`, `vitest.config.ts`, `bunfig.toml` or `tsconfig.json` | those vitest files (`bun run test --files <repository paths>`). Selection reads `vitest.config.ts` includes while present. A Bun package without that config selects `.test.ts`, `.test.tsx`, `.test.js` and `.test.mjs` files, including `eval/`; performance-only files stay excluded. This covers `packages/` and `apps/` alike |
+| A unit file, a file one reaches, or a package's `package.json`, `bunfig.toml` or `tsconfig.json` | those unit files (`bun run test --files <repository paths>`): a package's `.test.ts`, `.test.tsx`, `.test.js` and `.test.mjs` files under its `bunfig.toml` `[test] root` (the package when it names none), including `eval/`; performance and conformance files stay excluded. This covers `packages/` and `apps/` alike |
 | A script under `scripts/` that a tool test imports, or the test itself | the root script that runs that test with `bun test` (`test:repo-tools`, `test:health`, `test:runner`); every `scripts/**/*.test.mjs` belongs to one (`scripts/affected.test.mjs` checks) |
 | `specs/` (not Markdown) | `bun run specs:check`, narrowed to `--memory`, `--actions` or `--recovery` when only that agent spec changed; its cache skips checks whose inputs passed before |
 | Outbox inputs (`protocolInputs` in `scripts/verify-inputs.mjs`): the engine's `outbox.ts` and `send/` and their imports, outbox specs and the conformance harness | `bun run specs:conformance` |
@@ -945,7 +945,7 @@ An import graph over `apps/` and `packages/` decides what each change reaches, a
 | Anything but Markdown | `bun run lint`, on the Mac (about 3 s, less than a remote machine's overhead) |
 | Documentation only | nothing |
 
-**Unit file selection.** Each test runs only when its import closure contains a changed file, or its package configuration changed. Engine tests often import the whole engine through their shared harness, so an engine edit can legitimately select most engine tests. The runner keeps each selected path's package, starts only those packages, and excludes nested namesakes that Vitest's substring filters would also match. A package config change still runs that package's tests; root config and lockfile changes still run every unit file. In desktop selection, they keep changed specs and specs importing a changed private helper mandatory, then add the usual sample of other specs. Full `bun run test` and the older package-relative filters keep their existing behaviour.
+**Unit file selection.** Each test runs only when its import closure contains a changed file, or its package configuration changed. Engine tests often import the whole engine through their shared harness, so an engine edit can legitimately select most engine tests. The runner passes the selected repository paths to one `bun test`, so a file never selects a namesake in another package. A package config change still runs that package's tests; root config and lockfile changes still run every unit file. In desktop selection, they keep changed specs and specs importing a changed private helper mandatory, then add the usual sample of other specs. Full `bun run test` runs every package.
 
 Replaying the 15 first-parent merges ending at `f601148d2` with `--plan --json --no-cache --range <merge>^1..<merge>` selected 1,113 unit files before and after. The old package-relative filters matched 1,196 files; the new commands run the selected 1,113. Examples: `home-muted-levels` matched 74 files for 62 selected, `newchat-toasts` 25 for 19, and `sync-sweep-cheaper` 73 for 57. These are file-match counts against the same checkout, not historical test executions. The JSON output is written synchronously so a large replay remains complete when piped.
 
@@ -1012,8 +1012,8 @@ runs every step in order. `KEY=VALUE` before a step overrides its environment.
 
 ```sh
 bun run runner:check
-bun run remote test --passWithNoTests test/messages.test.ts
-bun run remote test:plan test --passWithNoTests test/messages.test.ts + test:desktop e2e/app.spec.ts
+bun run remote test --files packages/engine/test/messages.test.ts
+bun run remote test:plan test --files packages/engine/test/messages.test.ts + test:desktop e2e/app.spec.ts
 bun run remote --cores 2 --wait 120 test:gallery shift.spec.ts
 bun run remote test:plan test:browser + test:electron app.spec.ts engine.spec.ts session.spec.ts text-menu.spec.ts updates.spec.ts
 ```
@@ -1045,7 +1045,7 @@ run the fine budgets through the heavy lock with
 
 `bun run flake <spec...> [-g <title>] [--repeat 40] [--machines 2] [--workers n]` runs the specs (all under `apps/desktop/e2e` or all under `apps/gallery`) through `bun run remote` with Playwright's `--repeat-each`, no retries and traces kept on failure. The repeats are split across the machines (at most two, so other agents keep theirs), and each machine runs its usual number of workers, so the tests run under the load of a normal remote run; `--workers` raises it. It ends with one line, `flake: 2 of 160 failed`, and the names of the failing tests. Traces are in `.remote/<run>/`; `bun run playwright show-trace <trace.zip>` opens one. For the gallery's shift and focus-ring walks, each repeat walks every state again, and `GALLERY_SHIFT_ONLY=MediaViewer bun run flake apps/gallery/shift.spec.ts --repeat 20 --machines 1` limits the walk to those components.
 
-Package tests under `packages/` use Vitest's `--repeats` with retries off. Their summary counts test cases, each failed if any repetition failed, and states the number of executions per case. For example, `bun run flake packages/engine/test/sidebar-state.test.ts -g "four people" --repeat 200 --machines 1` runs that case 200 times on one small machine. Every repetition runs its setup and teardown.
+Unit tests under `packages/` and `apps/desktop/test` run through `bun run test` with `bun test --rerun-each`. Their summary counts executions and names each failing test. For example, `bun run flake packages/engine/test/sidebar-state.test.ts -g "four people" --repeat 200 --machines 1` runs that case 200 times on one small machine. Every repetition runs its setup and teardown.
 
 ```sh
 bun run flake apps/desktop/e2e/sidebar.spec.ts -g "list scrollbar" --repeat 120
@@ -1149,8 +1149,8 @@ CPU, with no burst to two.
 
 The shared host maps sibling CPUs and sets the actual thread quota. Workers
 use its `RUNNER_THREADS`, forwarded as `JUNO_RUNNER_JOB_CORES`; they never infer
-threads from the request. At four threads wide units run four Vitest workers
-in each of two packages, desktop runs three workers (two in sequential plans),
+threads from the request. At four threads units run four `bun test` processes,
+desktop runs three workers (two in sequential plans),
 and gallery runs three. Quint uses one simulation per two threads and one
 Apalache checker per four, at least one each. Explicit worker settings win.
 

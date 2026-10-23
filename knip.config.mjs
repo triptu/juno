@@ -18,8 +18,8 @@ export default {
       entry: ['scripts/*.{mjs,ts}', 'specs/check.mjs', 'specs/conformance.mjs', 'knip.config.mjs'],
       project: ['scripts/**/*.{mjs,ts}', 'specs/**/*.mjs'],
     },
-    // Knip reads every package.json exports map and discovers test/config entries
-    // through its Vitest plugin. Package scripts also cover the AI eval entries.
+    // Knip reads every package.json exports map; bun test's *.test.ts files are entries
+    // by default. Package scripts also cover the AI eval entries.
     'packages/*': { project: ['**/*.{ts,tsx}'] },
     // Bun's test runner finds *.test.ts; the perf and conformance files are run by path (scripts/perf.mjs, specs/conformance.mjs).
     'packages/engine': { entry: ['src/messages/body.ts', 'test/**/*.test.ts', 'test/perf/*.perf.ts', 'test/conformance/*.conformance.ts'], project: ['**/*.{ts,tsx}'] },
