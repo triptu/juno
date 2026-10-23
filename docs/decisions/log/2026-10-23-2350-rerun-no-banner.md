@@ -1,1 +1,0 @@
-- 10-23 23:50 · rerun-no-banner · When a settings change re-decides today's messages, Today and Details follow, but no banner is shown: a message that stayed never notifies later, as the contract has no later. Before, a message held outside the hours could notify when the hours changed.
