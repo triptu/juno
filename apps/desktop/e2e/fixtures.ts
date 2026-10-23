@@ -12,6 +12,7 @@ import { Slack } from './driver/slack'
 import { startDisplay } from './display'
 import { copySynced, fakeState, syncedKey, SyncedWorkspaces, type SyncedWorkspace } from './synced'
 import { attachSendTrace, attachSidebarTrace } from './traces'
+import { cpuMeter } from './cpu'
 import { launchApp, launchTiming, tempUserData, writeSlackApp, type Lane, type LaunchOptions, type RunningApp, type SlackAppFixture } from './launch'
 
 export * from './launch'
@@ -44,6 +45,8 @@ export interface Fixtures {
   readonly slackApp: SlackAppFixture
   readonly userData: string
   readonly running: RunningApp
+  /** Under JUNO_E2E_CPU=1, counts what the test's processes burn (`cpu.ts`); `running` prints it before it closes the app. */
+  readonly cpu: ReturnType<typeof cpuMeter> | undefined
   /**
    * Quits the app and opens it again on the same data folder, against the same
    * fake, and answers the driver for it: what a test needs to show that state
@@ -196,7 +199,14 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   updateServer: [undefined, { option: true }],
   sidebarTrace: [false, { option: true }],
   sendTrace: [false, { option: true }],
-  running: async ({ lane, fake, slackApp, userData, syncedStart, aiJobs, fakeAiDelayMillis, screenShared, updateServer, sidebarTrace, sendTrace, timing, hostPool, page }, use, testInfo) => {
+  // oxlint-disable-next-line no-empty-pattern
+  cpu: async ({}, use) => {
+    await use(process.env.JUNO_E2E_CPU === '1' ? cpuMeter() : undefined)
+  },
+  running: async ({ lane, fake, slackApp, userData, syncedStart, aiJobs, fakeAiDelayMillis, screenShared, updateServer, sidebarTrace, sendTrace, timing, hostPool, page, cpu }, use, testInfo) => {
+    const printCpu = () => {
+      for (const [kind, millis] of Object.entries(cpu?.stop() ?? {})) console.log(`e2e timing: cpu-${kind} ${Math.round(millis)} ms`)
+    }
     if (lane === 'web') {
       if (screenShared || updateServer !== undefined) throw new Error('screenShared and updateServer are Electron launch options; tag the test @electron.')
       const running = await startWebApp(hostPool, page, fake, userData, syncedStart?.snapshot, {
@@ -205,6 +215,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
       await use(running)
       if (sidebarTrace && testInfo.status !== testInfo.expectedStatus) await attachSidebarTrace(page, testInfo)
       if (sendTrace && testInfo.status !== testInfo.expectedStatus) await attachSendTrace(page, fake, testInfo)
+      printCpu()
       await running.close()
       return
     }
@@ -227,6 +238,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     await use(running)
     if (sidebarTrace && testInfo.status !== testInfo.expectedStatus) await attachSidebarTrace(running.win, testInfo)
     if (sendTrace && testInfo.status !== testInfo.expectedStatus) await attachSendTrace(running.win, fake, testInfo)
+    printCpu()
     await running.close()
   },
   relaunch: async ({ lane, running, fake, slackApp, userData, aiJobs, fakeAiDelayMillis, timing, page }, use) => {
