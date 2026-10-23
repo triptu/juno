@@ -37,8 +37,7 @@ export async function openHuddlePage(options: { readonly headed: boolean; readon
     for (const cleanup of cleanups.toReversed()) await cleanup().catch(() => {})
   }
   try {
-    const bun = join(root, 'node_modules/.bin/bun')
-    const built = spawnSync(bun, ['build', join(root, 'scripts/huddle-live-page.ts'), '--target=browser', '--define', 'global=globalThis', '--outfile', join(dir, 'page.js')], {
+    const built = spawnSync(process.versions.bun ? process.execPath : 'bun', ['build', join(root, 'scripts/huddle-live-page.ts'), '--target=browser', '--define', 'global=globalThis', '--outfile', join(dir, 'page.js')], {
       encoding: 'utf8',
     })
     if (built.status !== 0) throw new Error(`bundling the page failed: ${built.stderr.slice(0, 300)}`)
