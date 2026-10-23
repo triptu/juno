@@ -30,8 +30,9 @@ comparisons below are alternating samples within one job.
 ### What the profiles found
 
 The five target files also ran serially with one worker and CPU sampling, apart from the
-uninstrumented full-suite measurements. `test/profile.ts` prints wall time, process CPU, boot phase
-timings and the twenty largest CPU samples when `JUNO_UNIT_PROFILE=1`. The phase intervals overlap
+uninstrumented full-suite measurements. The agent's `test/profile.ts` printed wall time, process CPU,
+boot phase timings and the twenty largest CPU samples when `JUNO_UNIT_PROFILE=1`; it was a Vitest
+setup file and was removed with the move to `bun test` (10-24). The phase intervals overlap
 engine work; do not add CPU to wall time or subtract every phase to infer a wait. CPU includes
 Node's helper threads and can exceed wall time. The following baseline samples are diagnostic, not
 performance budgets:

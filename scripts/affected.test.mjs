@@ -73,7 +73,7 @@ test('ordinary source changes select only files whose import closure reaches the
 test('performance-only files are outside the unit matcher', () => {
   const matches = unitTestMatcher(root)
   for (const file of ['packages/agent/test/activity.perf.ts', 'packages/agent/test/serve/chat-cache.perf.ts', 'packages/engine/test/idle.perf.ts']) assert.equal(matches(file), false, file)
-  assert.ok(matches('packages/agent/test/serve/chat-cache-budget.test.ts'))
+  assert.ok(matches('packages/agent/test/serve/chat-cache.test.ts'))
 })
 
 test('selected unit files exclude nested namesakes that Vitest substring filters would also run', async () => {
