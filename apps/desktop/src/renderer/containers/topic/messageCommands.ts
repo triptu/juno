@@ -188,7 +188,7 @@ function rowKeyAction(event: KeyboardEvent<HTMLElement>, message: MessageView, {
   return undefined
 }
 
-/** The row keys (`rowKeyAction`), the reaction toggle, the row menu and ↑ in an empty composer. */
+/** The row keys (`rowKeyAction`), the reaction toggle, the row menu, ↑ in an empty composer and ↓ from the newest message back to it. */
 export function rowHandlers(actions: MessageCommands, rowMessage: (ts: string) => MessageView | undefined, latest: Latest, scrollRef: RefObject<HTMLElement | null>, composer: RefObject<ComposerHandle | null>) {
   const onRowKey = (ts: string, event: KeyboardEvent<HTMLElement>) => {
     const message = rowMessage(ts)
@@ -218,6 +218,8 @@ export function rowHandlers(actions: MessageCommands, rowMessage: (ts: string) =
     last.scrollIntoView({ block: 'nearest', behavior: 'instant' })
   }
 
+  const focusComposer = () => composer.current?.focus()
+
   const onToggleReaction = (ts: string, name: string) => {
     const message = rowMessage(ts)
     if (message !== undefined) actions.react(message, name)
@@ -229,5 +231,5 @@ export function rowHandlers(actions: MessageCommands, rowMessage: (ts: string) =
     if (message !== undefined && row !== null) actions.menu(message, anchorFor(row, at), onSender)
   }
 
-  return { onRowKey, selectNewest, onToggleReaction, onMessageMenu }
+  return { onRowKey, selectNewest, focusComposer, onToggleReaction, onMessageMenu }
 }
