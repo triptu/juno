@@ -13,9 +13,10 @@ import { workTools } from './work'
 import { stopSession } from './stop'
 import { content, launched } from './protocol'
 import { proposeQuestions, questionExecutor } from './questions'
-import { t3Driver, t3Wakes } from './watch'
+import { t3Driver, t3Wakes, type Sleep } from './watch'
 
-export function createT3Adapter(manager: McpManagerApi) {
+/** `sleep` is the watcher's wait between reads; tests pass a clock they move by hand. */
+export function createT3Adapter(manager: McpManagerApi, options: { readonly sleep?: Sleep } = {}) {
   let bound: { readonly actions: Actions; readonly jobs: Jobs } | undefined
   /**
    * Records a session T3 Code confirmed, so its Task card can watch and stop it.
@@ -58,7 +59,7 @@ export function createT3Adapter(manager: McpManagerApi) {
   return {
     executors: [executor, questionExecutor(manager, wakes.wake)],
     stop: async (job: Parameters<typeof stopSession>[2], click: string | undefined) => bound ? stopSession(manager, bound.actions, job, click) : false,
-    driver: t3Driver(manager, async (job, threadId, signal) => bound ? proposeQuestions(manager, bound.actions, job, threadId, signal) : { shown: false, requestIds: [] }, wakes),
+    driver: t3Driver(manager, async (job, threadId, signal) => bound ? proposeQuestions(manager, bound.actions, job, threadId, signal) : { shown: false, requestIds: [] }, wakes, options.sleep),
     tools: (context: { readonly actions: Actions; readonly jobs: Jobs; readonly current: () => Promise<ToolRun | undefined> }) => {
       bound = context
       return [...workTools(manager, context), defineTool<Start>({

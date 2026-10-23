@@ -9,6 +9,10 @@ const FAST_MS = 1000
 export const IDLE_MS = 10_000
 const TERMINAL: ReadonlySet<string> = new Set(['completed', 'failed', 'rolled_back', 'interrupted', 'cancelled'])
 
+/** The watcher's wait between reads. It resolves early, without an error, when `signal` aborts. */
+export type Sleep = (ms: number, signal: AbortSignal) => Promise<void>
+const sleep: Sleep = (ms, signal) => setTimeout(ms, undefined, { signal }).then(() => undefined, () => undefined)
+
 /** Wakes a session's watcher now, after Juno itself changed the session (an answer it sent). */
 export interface T3Wakes {
   readonly wake: (threadId: string) => void
@@ -51,7 +55,7 @@ async function ended(manager: McpManagerApi, threadId: string, timeoutMs: number
 }
 
 /** Resuming observes a recorded thread. It never launches or sends anything. */
-export function t3Driver(manager: McpManagerApi, questions: (job: Job, threadId: string, signal: AbortSignal) => ReturnType<typeof proposeQuestions>, wakes: T3Wakes): JobDriver {
+export function t3Driver(manager: McpManagerApi, questions: (job: Job, threadId: string, signal: AbortSignal) => ReturnType<typeof proposeQuestions>, wakes: T3Wakes, wait: Sleep = sleep): JobDriver {
   return {
     kind: 't3', resumable: true,
     run: async (job, signal, update) => {
@@ -63,7 +67,7 @@ export function t3Driver(manager: McpManagerApi, questions: (job: Job, threadId:
         const stop = new AbortController()
         const either = AbortSignal.any([signal, stop.signal])
         await Promise.race([
-          setTimeout(ms, undefined, { signal: either }).catch(() => undefined),
+          wait(ms, either),
           wakes.next(session.threadId, either),
           ended(manager, session.threadId, ms),
         ])
@@ -74,7 +78,7 @@ export function t3Driver(manager: McpManagerApi, questions: (job: Job, threadId:
         if (manager.state('t3') !== 'ready') {
           update({ event: 'lostSight', state: 'Sign in to T3 Code to keep watching' })
           seen = undefined
-          await setTimeout(1000, undefined, { signal }).catch(() => undefined)
+          await wait(1000, signal)
           continue
         }
         try {
@@ -110,7 +114,7 @@ export function t3Driver(manager: McpManagerApi, questions: (job: Job, threadId:
         } catch {
           update({ event: 'lostSight', state: manager.state('t3') === 'needsSignIn' ? 'Sign in to T3 Code to keep watching' : 'Cannot read this T3 Code session. Check the connection and tool schemas.' })
           seen = undefined
-          await setTimeout(5000, undefined, { signal }).catch(() => undefined)
+          await wait(5000, signal)
         }
       }
       return { event: 'cancelled' }
