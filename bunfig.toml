@@ -1,0 +1,8 @@
+[install]
+# pnpm-style layout: a package resolves only what it declares.
+linker = "isolated"
+# Every checkout links packages from one shared store, so a worktree's
+# node_modules stays small and cheap to create and remove.
+globalStore = true
+# Hold back versions published less than a day ago.
+minimumReleaseAge = 86400

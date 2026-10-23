@@ -10,8 +10,9 @@ import ts from 'typescript-5'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const require = createRequire(import.meta.url)
-const bun = join(dirname(require.resolve('bun/package.json')), 'bin/bun.exe')
-const version = require('bun/package.json').version
+// The Bun that runs the repo's scripts; scripts/check-bun.mjs pins its version.
+const bun = process.versions.bun ? process.execPath : 'bun'
+const version = process.versions.bun ?? spawnSync(bun, ['--version'], { encoding: 'utf8' }).stdout.trim()
 const parity = process.argv.includes('--parity')
 const noCache = parity || process.argv.includes('--no-cache')
 const cache = join(tmpdir(), 'juno-cache', 'typecheck-bun')

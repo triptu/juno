@@ -4,17 +4,18 @@
   "private": true,
   "type": "module",
   "description": "Juno, a topic-first desktop Slack client",
-  "packageManager": "pnpm@12.11.2",
+  "packageManager": "bun@1.4.4",
   "engines": {
     "node": ">=24"
   },
   "scripts": {
-    "dev": "pnpm --filter @juno/desktop dev",
-    "build": "pnpm --filter @juno/desktop build",
-    "typecheck": "node scripts/typecheck-bun.mjs",
+    "preinstall": "bun scripts/check-bun.mjs",
+    "dev": "bun run --cwd apps/desktop dev",
+    "build": "bun run --cwd apps/desktop build",
+    "typecheck": "bun scripts/typecheck-bun.mjs",
     "typecheck:tsc": "node scripts/typecheck.mjs",
-    "typecheck:parity": "node scripts/heavy.mjs --queue typecheck --exclusive node scripts/typecheck-bun.mjs --parity",
-    "typecheck:bun": "node scripts/typecheck-bun.mjs",
+    "typecheck:parity": "node scripts/heavy.mjs --queue typecheck --exclusive bun scripts/typecheck-bun.mjs --parity",
+    "typecheck:bun": "bun scripts/typecheck-bun.mjs",
     "lint": "node scripts/lint.mjs",
     "check-deps": "node scripts/check-deps.mjs",
     "health": "node scripts/health.mjs",
@@ -22,21 +23,21 @@
     "health:clones": "jscpd --config .jscpd.json --workers 2 --absolute packages/*/src apps/*/src",
     "health:size": "node scripts/health-size.mjs",
     "bench:sync": "node scripts/heavy.mjs node --import ./scripts/ts-resolve-hooks.mjs scripts/sync-live-dry-run.ts --fake --large --paced --seconds 3600",
-    "bench:engine": "env JUNO_BENCH=1 JUNO_TEST_FILE_PARALLEL=0 JUNO_VITEST_WORKERS=1 node scripts/heavy.mjs --exclusive pnpm --filter @juno/engine exec vitest run test/bench --silent=false",
+    "bench:engine": "env JUNO_BENCH=1 JUNO_TEST_FILE_PARALLEL=0 JUNO_VITEST_WORKERS=1 node scripts/heavy.mjs --exclusive bun run --cwd packages/engine vitest run test/bench --silent=false",
     "test": "node scripts/heavy.mjs node scripts/unit.mjs",
-    "test:e2e": "node scripts/heavy.mjs --electron sh -c \"pnpm --filter @juno/desktop test:e2e && pnpm --filter @juno/gallery test:e2e\"",
-    "test:desktop": "node scripts/heavy.mjs --electron pnpm --filter @juno/desktop test:e2e",
+    "test:e2e": "node scripts/heavy.mjs --electron sh -c \"bun run --cwd apps/desktop test:e2e && bun run --cwd apps/gallery test:e2e\"",
+    "test:desktop": "node scripts/heavy.mjs --electron bun run --cwd apps/desktop test:e2e",
     "perf": "node scripts/heavy.mjs --exclusive node scripts/perf.mjs",
-    "test:feel": "node scripts/heavy.mjs --exclusive pnpm --filter @juno/desktop test:feel",
-    "test:gallery": "node scripts/heavy.mjs --electron pnpm --filter @juno/gallery test:e2e",
+    "test:feel": "node scripts/heavy.mjs --exclusive bun run --cwd apps/desktop test:feel",
+    "test:gallery": "node scripts/heavy.mjs --electron bun run --cwd apps/gallery test:e2e",
     "test:plan": "node scripts/plan.mjs",
     "package": "node scripts/heavy.mjs --exclusive --priority release node scripts/package.mjs",
     "release:version": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/release-version.ts",
     "release:scheduled": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/release-scheduled.mjs",
     "release:publish": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/release-publish.ts",
-    "gallery": "pnpm --filter @juno/gallery dev",
+    "gallery": "bun run --cwd apps/gallery dev",
     "web": "node --max-old-space-size=384 --import ./scripts/ts-resolve-hooks.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON apps/desktop/web/host/cli.ts",
-    "gallery:shots": "node scripts/heavy.mjs --electron pnpm --filter @juno/gallery shots",
+    "gallery:shots": "node scripts/heavy.mjs --electron bun run --cwd apps/gallery shots",
     "smoke:live": "node scripts/smoke-live.ts",
     "presence:live": "node scripts/presence-live.ts",
     "presence:sub-live": "node scripts/presence-sub-live.ts",
@@ -47,9 +48,9 @@
     "huddle:live": "node --import ./scripts/ts-resolve-hooks.mjs scripts/huddle-live.ts",
     "sync:timeline": "node --import ./scripts/ts-resolve-hooks.mjs scripts/first-sync-live.ts",
     "sync:live": "node --import ./scripts/ts-resolve-hooks.mjs scripts/sync-live-dry-run.ts",
-    "ai:eval": "pnpm --filter @juno/ai eval",
+    "ai:eval": "bun run --cwd packages/ai eval",
     "notif:replay": "node --import ./scripts/ts-resolve-hooks.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/notif-replay/cli.ts",
-    "agent:eval": "pnpm --filter @juno/agent exec node --import ../../scripts/ts-resolve-hooks.mjs eval/run.ts",
+    "agent:eval": "cd packages/agent && node --import ../../scripts/ts-resolve-hooks.mjs eval/run.ts",
     "remote": "node scripts/remote.mjs",
     "runner:check": "node scripts/remote/runner.mjs",
     "remote:usage": "node scripts/remote/usage.mjs",
@@ -58,12 +59,12 @@
     "specs:check": "node scripts/heavy.mjs node specs/check.mjs",
     "specs:traces": "node scripts/heavy.mjs node specs/check.mjs --traces",
     "specs:conformance": "node scripts/heavy.mjs node specs/conformance.mjs",
-    "test:agent-contracts": "node scripts/heavy.mjs pnpm --filter @juno/agent-cards --filter @juno/agent-contract test",
-    "test:agent-testing": "node scripts/heavy.mjs pnpm --filter @juno/agent-testing test",
-    "test:agent": "node scripts/heavy.mjs pnpm --filter @juno/agent test",
-    "test:notifications": "node scripts/heavy.mjs pnpm --filter @juno/engine test",
+    "test:agent-contracts": "node scripts/heavy.mjs sh -c \"bun run --cwd packages/agent-cards test && bun run --cwd packages/agent-contract test\"",
+    "test:agent-testing": "node scripts/heavy.mjs bun run --cwd packages/agent-testing test",
+    "test:agent": "node scripts/heavy.mjs bun run --cwd packages/agent test",
+    "test:notifications": "node scripts/heavy.mjs bun run --cwd packages/engine test",
     "flake": "node scripts/flake.mjs",
-    "test:package": "env JUNO_E2E_AI_JOBS=1 node scripts/heavy.mjs --exclusive pnpm --filter @juno/desktop test:package",
+    "test:package": "env JUNO_E2E_AI_JOBS=1 node scripts/heavy.mjs --exclusive bun run --cwd apps/desktop test:package",
     "health:baseline": "node scripts/health.mjs --update-baseline",
     "test:health": "node --test scripts/health.test.mjs",
     "test:repo-tools": "node scripts/heavy.mjs node --test scripts/build-cached.test.mjs scripts/batch-merge.test.mjs scripts/check-migration-order.test.mjs scripts/affected-select.test.mjs scripts/heavy.test.mjs scripts/release-gate.test.mjs scripts/release-main.test.mjs scripts/release-schedule.test.mjs scripts/verify-main.test.mjs scripts/test-results-reporter.test.mjs scripts/check-tokens.test.mjs scripts/affected.test.mjs",
@@ -87,12 +88,45 @@
     "@juno/sync": "workspace:*",
     "@playwright/test": "1.64.0",
     "@types/node": "24.19.2",
-    "bun": "1.4.4",
     "effect": "4.0.3",
     "jscpd": "5.4.1",
     "knip": "6.41.0",
     "oxlint": "1.87.0",
     "typescript": "7.0.2",
     "typescript-5": "npm:typescript@5.9.3"
-  }
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "docs/juno-agent/spikes"
+  ],
+  "packageExtensions": {
+    "@informalsystems/quint": {
+      "dependencies": {
+        "protobufjs": "7.6.6",
+        "semver": "7.7.4"
+      }
+    },
+    "@phosphor-icons/react": {
+      "peerDependencies": {
+        "@types/react": "*"
+      },
+      "peerDependenciesMeta": {
+        "@types/react": {
+          "optional": true
+        }
+      }
+    },
+    "playwright-core": {
+      "peerDependencies": {
+        "electron": "*"
+      },
+      "peerDependenciesMeta": {
+        "electron": {
+          "optional": true
+        }
+      }
+    }
+  },
+  "trustedDependencies": []
 }
