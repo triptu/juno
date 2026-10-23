@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-24 00:40 · notif-replay · The notification replay (`pnpm notif:replay`) asks the reading for every message that gets past the closer, including live ones, so the report can sweep the live window; it plays the burst rule from its own banners at message times, waits up to 20 s for a reading and counts the ones over 2 s, and recommends the value with the fewest notifications a day whose recall on Auto messages is at least 90%, weighted by stratum; messages in the old notification log get their own oversampled strata.
 - 10-24 00:11 · owner-facts-synced · The owner's facts for a notification (wrote last, wrote recently, sender wrote since) come from synced messages in the same topic strictly before the message, not from sent_posts, which hold attempts without a thread (Astra review).
 - 10-24 00:10 · thread-never-level · Never on a thread is stored as its level, as on a channel or person, and still unfollows it in Slack, so @here, mentions and DM-thread replies in it stay quiet (Astra review).
 - 10-23 23:50 · notification-log-history · The notification log is history: a settings change re-decides nothing already logged, so Today counts what happened and a message that stayed never notifies later. Settings are read again after the reading, so a change made while it is in flight (Never, the hours ending) decides (Astra review).

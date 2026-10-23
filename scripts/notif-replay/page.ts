@@ -65,7 +65,7 @@ h1 { font-size: 15px; font-weight: 600; margin: 0; }
 .context .msg .text { color: var(--muted); }
 .msg.mine { background: var(--mine); margin: 2px -8px; padding: 6px 8px; border-radius: 6px; }
 .empty { color: var(--faint); padding: 8px 0; }
-.new { border-top: 1px solid var(--line); padding: 12px 16px 14px; background: var(--sunken); max-height: 40%; overflow-y: auto; }
+.new { border-top: 1px solid var(--line); padding: 12px 16px 14px; background: var(--sunken); max-height: 55%; overflow-y: auto; }
 .new .text { font-size: 15px; }
 .tag { color: var(--accent); font-size: 12px; margin-left: 6px; }
 .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }

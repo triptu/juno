@@ -112,12 +112,14 @@ export async function report(argv: ReadonlyArray<string>) {
 
   const sweep = (name: string, knob: keyof Knobs, values: ReadonlyArray<number>) => {
     console.log(`\n${name} (now ${currentKnobs[knob]})`)
-    console.log(row(['value', 'a day', 'recall', 'precision', 'agreement'], [8, 8, 8, 10, 10]))
+    const widths = [8, 8, 14, 12, 16, 16]
+    console.log(row(['value', 'a day', 'recall (Auto)', 'recall (all)', 'precision (Auto)', 'agreement (Auto)'], widths))
     const results = values.map((value) => {
       const decided = decideAll(replay.items, { ...currentKnobs, [knob]: value }, replay.instructions)
       const notified = (item: ReplayItem) => decided.get(item.id)?.outcome === 'notify'
-      const m = metrics(scored, notified, replay.items.filter(notified).length, days)
-      console.log(row([String(value), m.perDay.toFixed(1), pct(m.recall), pct(m.precision), pct(m.agreement)], [8, 8, 8, 10, 10]))
+      const m = metrics(auto, notified, replay.items.filter(notified).length, days)
+      const overall = metrics(scored, notified, 0, days)
+      console.log(row([String(value), m.perDay.toFixed(1), pct(m.recall), pct(overall.recall), pct(m.precision), pct(m.agreement)], widths))
       return { value, ...m }
     })
     const enough = results.filter((r) => r.recall >= target)
@@ -129,6 +131,9 @@ export async function report(argv: ReadonlyArray<string>) {
       : `No value reaches recall ${pct(target)}. The highest recall is at ${best.value} (${pct(best.recall)}, ${best.perDay.toFixed(1)} a day).`)
     return best.value
   }
+  // The constants only move messages that reach Auto's live or reading steps, so the recommendation is judged on those.
+  const auto = scored.filter((s) => s.item.early === undefined)
+  console.log(`\nSweeps: ${auto.length} labelled messages reach the live or reading step. "a day" counts every replayed banner.`)
   const steps = (from: number, to: number, step: number) => Array.from({ length: Math.round((to - from) / step) + 1 }, (_, i) => Number((from + i * step).toFixed(2)))
   const recommended: Partial<Record<keyof Knobs, number>> = {}
   recommended.needsYou = sweep('Needs-you sum, NEEDS_YOU_THRESHOLD', 'needsYou', steps(0.2, 0.8, 0.05))

@@ -10,6 +10,7 @@ import { page, type PageItem } from './page'
 
 /** Borderline strata get this much more of the sample than their size alone would give. */
 const BORDERLINE_BOOST = 2.5
+const OLD_LOG_BOOST = 3
 /** The context the page shows above the message. */
 const SHOWN_BEFORE = 6
 
@@ -23,7 +24,9 @@ function borderline(item: ReplayItem): boolean {
   return (sum >= 0.25 && sum <= 0.75) || (item.reading.instruction !== undefined && item.reading.instruction.confidence >= 0.5)
 }
 
-const stratumOf = (item: ReplayItem) => `${borderline(item) ? 'borderline' : item.decision.decidedBy} · ${item.kind}`
+/** Messages the old check logged get strata of their own, so the old and new decisions are compared on enough of them. */
+const stratumOf = (item: ReplayItem) => `${item.old === undefined ? '' : 'old log · '}${borderline(item) ? 'borderline' : item.decision.decidedBy} · ${item.kind}`
+const boostOf = (key: string) => (key.startsWith('old log') ? OLD_LOG_BOOST : 1) * (key.includes('borderline') ? BORDERLINE_BOOST : 1)
 
 function random(seed: number) {
   let state = seed >>> 0
@@ -45,13 +48,13 @@ function shuffle<A>(values: ReadonlyArray<A>, next: () => number): A[] {
   return out
 }
 
-/** Shares of `size` by the square root of each stratum's size (boosted when borderline), capped at the stratum's size. */
+/** Shares of `size` by the square root of each stratum's size (boosted for borderline and old-log strata), capped at the stratum's size. */
 function allocate(strata: ReadonlyMap<string, number>, size: number): Map<string, number> {
   const out = new Map([...strata.keys()].map((key) => [key, 0]))
   let left = Math.min(size, [...strata.values()].reduce((a, b) => a + b, 0))
   while (left > 0) {
     const open = [...strata].filter(([key, n]) => out.get(key)! < n)
-    const weight = (key: string, n: number) => Math.sqrt(n) * (key.startsWith('borderline') ? BORDERLINE_BOOST : 1)
+    const weight = (key: string, n: number) => Math.sqrt(n) * boostOf(key)
     const total = open.reduce((sum, [key, n]) => sum + weight(key, n), 0)
     let given = 0
     for (const [key, n] of open) {

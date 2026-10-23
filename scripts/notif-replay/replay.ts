@@ -135,11 +135,10 @@ export async function run(argv: ReadonlyArray<string>) {
     const lookups = { user: (id: string) => users.get(id), usergroup: (id: string) => groups.get(id) }
     const readable = (text: string) => readableText(messageBody({ text }, lookups))
 
-    // The old check's decisions, then a clean log and no Juno sends: the burst rule is played below, and a send has its Slack copy in messages.
+    // The old check's decisions, then a clean log: the burst rule is played below, from the replay's own banners.
     const old = new Map((yield* sql<{ channel: string; ts: string; outcome: string; reason: string | null }>`SELECT channel, ts, outcome, reason FROM notification_log`)
       .map((row) => [`${row.channel}:${row.ts}`, { outcome: row.outcome === 'notify' || row.outcome === 'now' ? 'notify' as const : 'stay' as const, reason: row.reason ?? '' }]))
     yield* sql`DELETE FROM notification_log`
-    yield* sql`DELETE FROM sent_posts`
 
     const stored = yield* readSettings
     const settings: NotificationSettings = instructionsOverride === undefined ? stored.settings : { ...stored.settings, instructions: instructionsOverride }
