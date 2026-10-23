@@ -20,7 +20,7 @@ Cold and warm typecheck runs used the same solution config: a temporary root con
 
 ## Recommendation
 
-Use Bun's test runner for the pure `@juno/domain` suite: it ran the existing tests unchanged and was more than 11× faster on cold runs and about 25× faster on warm runs. Keep oxlint because Bun has no comparable standalone linter. Bun check is about 10× faster in this full-build measurement and matched the injected errors, but it has no build cache and the error probe is not proof of complete checker parity; keep the existing project-cached typecheck path for now.
+Use Bun's test runner for the pure `@juno/domain` suite: it ran the existing tests unchanged and was more than 11× faster on cold runs and about 25× faster on warm runs. Bun 1.4.3 had no standalone linter, so this recommended keeping oxlint; the later canary builds have `bun lint`, which replaced it (see "Bun canary" below). Bun check is about 10× faster in this full-build measurement and matched the injected errors, but it has no build cache and the error probe is not proof of complete checker parity; keep the existing project-cached typecheck path for now.
 
 These are local tool timings, not app performance measurements. Typecheck timings varied substantially between runs, and install timings include local package-cache effects.
 
@@ -41,3 +41,13 @@ On 2026-10-24, Bun 1.4.3 and 1.4.4 ran `bun check -b --all` five times each, in 
 ## Bun as the package manager
 
 On 2026-10-24 `bun install` (1.4.4) replaced pnpm. Its first run migrated `pnpm-lock.yaml` into `bun.lock` with every resolved version unchanged (60 s, once), and moved the workspace list and `packageExtensions` into `package.json`. With the isolated linker and the global store, an install into an empty `node_modules` took 0.4 s and one with nothing to change 0.05 s (pnpm: 2.77 s and 0.38 s above), and a worktree's `node_modules` held about 1,100 entries. Electron's binary appeared on the first `require('electron')`, from its download cache in 1 s. The desktop build, the domain unit tests, one desktop and one gallery e2e spec, an unsigned DMG and the packaged-app smoke test passed on this install.
+
+## Bun canary
+
+On 2026-10-24 the repo moved to Bun canary 1.4.4-canary.20261023.1 for `bun lint`, which no stable release has yet. Measured on the shared Mac that night, under load from other agents (one run each, so treat the times as rough):
+
+- `bun lint` reads `.oxlintrc.json` and reported the same 419 warnings, 0 errors, over the same 2,238 files and 148 rules as oxlint 1.87.0, in 0.08 s against 0.21 s. Moving the rules into `bunfig.toml` would drop 22 React rules, because Bun turns those on only when the package lists React, so the rules stay in `.oxlintrc.json`. `--type-aware` added about 1.4 s and reported 266 errors and over 2,500 warnings, so it is off.
+- `bun run typecheck` passed all 35 projects in 3.6 s, and `typecheck:parity` matched TypeScript in 66 s.
+- The repo's scripts run on Bun. Scripts that open the store stay on Node: `@effect/sql-sqlite-node` always opens SQLite with `allowExtension: true`, and Bun on macOS uses the system SQLite, which has no extension support. knip also stays on Node, because Bun's `module.isBuiltin()` counts `ws` and `undici` as built in, which made knip report `ws` and `@types/ws` as unused. knip takes 1.6 s on either runtime.
+- The tool tests run under Bun's `node:test`, which handled `after`, `mock.method`, timeouts and skips the same as Node. The runner tests took 66.6 s on Bun and 61.4 s on Node; one verify-main test fails under heavy load on both runtimes.
+- A remote run built the toolchain image with the pinned canary and passed.
