@@ -28,7 +28,6 @@ import {
   compareTs,
   fileMediaKind,
   hashId,
-  messageMentionsMe,
   firstName,
   startsGroup,
   threadLinkLabel,
@@ -68,7 +67,6 @@ interface CachedBody {
   readonly version: number
   readonly epoch: number
   readonly body: MessageBody
-  readonly mentionsMe: boolean
   /** For your own messages: the text the edit field starts with. */
   readonly editText?: string
 }
@@ -340,7 +338,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       }
       const body = row.deleted === 1 ? { blocks: [] } : messageBody(content, lookups)
       const own = row.deleted !== 1 && selfId !== undefined && row.user_id === selfId
-      return { version: row.version, epoch: cache.epoch, body, mentionsMe: me !== undefined && messageMentionsMe(body, me), ...(own ? { editText: editMarkup(content, lookups) } : {}) }
+      return { version: row.version, epoch: cache.epoch, body, ...(own ? { editText: editMarkup(content, lookups) } : {}) }
     }
     const bodies = new Map<string, CachedBody>()
     const parsedNow: Array<WindowMessage> = []
@@ -580,7 +578,6 @@ function shapeRow(row: WindowMessage, body: CachedBody, input: ShapeInput): Mess
     body: body.body,
     edited: row.edited_ts !== null && kind === 'message',
     groupStart: input.groupStart,
-    mentionsMe: body.mentionsMe,
     broadcast: row.subtype === 'thread_broadcast',
     root: input.isRoot,
     reactions: kind === 'message' ? reactions : [],

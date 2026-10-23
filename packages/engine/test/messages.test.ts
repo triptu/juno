@@ -101,7 +101,7 @@ it('shows each bot message name and icon without changing other bot senders', as
   expect(topics.find((row) => row.id === 'm:C0ENG')?.preview.sender).toBe('Build helper')
 })
 
-it('tints mentions of stored user groups and leaves other groups plain', async () => {
+it('marks mentions of stored user groups as yours and leaves other groups plain', async () => {
   const engine = await boot(engines, { initial: (fake) => {
     fake.setSelfUsergroups({ ids: ['S0PLATFORM'] })
     return fake.signIn()
@@ -110,8 +110,8 @@ it('tints mentions of stored user groups and leaves other groups plain', async (
   const own = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: '<!subteam^S0PLATFORM|@platform> Review this.' })
   const other = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: '<!subteam^S0OTHER|@other> Review this.' })
   const window = await list.until((value) => value.rows.has(other.ts), 'group mentions')
-  expect(window.rows.get(own.ts)?.mentionsMe).toBe(true)
-  expect(window.rows.get(other.ts)?.mentionsMe).toBe(false)
+  const group = (ts: string) => window.rows.get(ts)?.body.blocks.flatMap((block) => ('children' in block ? block.children : [])).find((inline) => inline.kind === 'usergroup')
+  expect([group(own.ts), group(other.ts)]).toMatchObject([{ id: 'S0PLATFORM', isMine: true }, { id: 'S0OTHER', isMine: false }])
 })
 
 describe('locating a message for a link', () => {

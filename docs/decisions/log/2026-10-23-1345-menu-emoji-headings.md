@@ -1,0 +1,1 @@
+- 10-23 13:45 · emoji picker headings in the menu · In the message menu's emoji picker the section headings scroll with their emoji, and the emoji fade out over 16px under the search field. A sticky heading on the translucent menu could only blur the emoji under it (a coloured band) or carry the menu's fill (a visible box); the popover picker keeps its opaque sticky headings.

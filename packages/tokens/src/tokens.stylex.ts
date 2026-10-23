@@ -161,7 +161,7 @@ export const colors = stylex.defineVars({
  * - --hl-fg: text on the fill
  * - --hl-text: accent-coloured text and icons on paper or on a tint (the
  *   "new" label, the selected nav item, the subscribed bell)
- * - --hl-soft: the tint behind a message that mentions you, my reaction
+ * - --hl-soft: my reaction, the @ tag, a chosen emoji in the picker
  * - --hl-bubble: the owner's bubble in the Juno chat, a stronger tint than
  *   --hl-soft (16% light, 22% dark) with --foreground-default text
  * - --hl-nav: the selected nav item's fill, over the sidebar
@@ -306,7 +306,6 @@ export const tints = stylex.defineVars({
   '--tint-resolved-fg': `color-mix(in oklch, ${colors['--success']} 70%, ${colors['--foreground-default']})`,
   '--tint-warning-bg': `color-mix(in oklch, ${colors['--warning']} 14%, ${colors['--surface-default']})`,
   '--tint-warning-fg': `color-mix(in oklch, ${colors['--warning']} 45%, ${colors['--foreground-default']})`,
-  '--tint-mention-bg': accent['--hl-soft'],
   // A clickable context pill under the pointer: its tint with a little of the text colour mixed in.
   '--tint-public-hover': colors['--secondary-hover'],
   '--tint-private-hover': `color-mix(in oklch, ${colors['--warning']} 24%, ${colors['--background']})`,

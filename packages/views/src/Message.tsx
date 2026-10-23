@@ -1,7 +1,7 @@
 import * as stylex from '@stylexjs/stylex'
 import { memo, useLayoutEffect, useRef, type FocusEvent, type ReactNode } from 'react'
 import type { FileView, MessageView, Person, ReactionIssue } from '@juno/contract'
-import { colors, density, layout, motion, opacity, radii, sizes, spacing, text, tints, z } from '@juno/tokens/tokens.stylex'
+import { colors, density, layout, motion, opacity, radii, sizes, spacing, text, z } from '@juno/tokens/tokens.stylex'
 import { WarningCircle } from '@phosphor-icons/react/dist/icons/WarningCircle'
 import { Avatar, focusRing, Icon, Text, type ActivateEvent, type HueName } from '@juno/ui'
 import { SharedFileLines, type FileBlock } from './AttachmentCard'
@@ -150,9 +150,9 @@ const dim = stylex.keyframes({
 /**
  * One flat message (inventory 6.1): the avatar column, then the name and
  * time on the first message of a run, the body, files, reactions and, in
- * Main, the thread link. A message that mentions you sits on the accent
- * tint. Under the pointer the row takes a faint fill and shows no controls:
- * its actions are in its menu (a right-click, the context-menu key or ⇧F10).
+ * Main, the thread link. Under the pointer the row looks as it does at
+ * rest and shows no controls: its actions are in its menu (a right-click,
+ * the context-menu key or ⇧F10).
  * A delete waiting for its confirm asks at the row's top right, straddling
  * its top edge, so it covers neither the name and time nor the first line.
  *
@@ -252,7 +252,6 @@ export const Message = memo(function Message({
         (active || confirmingDelete || editor !== undefined) && styles.rowHeld,
         active && styles.rowMenuOpen,
         editor !== undefined && styles.rowEditing,
-        message.mentionsMe && styles.rowMention,
       )}
     >
       <span data-sender={header ? '' : undefined} {...stylex.props(styles.gutter, !header && styles.gutterContinuation)}>
@@ -473,10 +472,6 @@ const styles = stylex.create({
   },
   rowGroupStart: {
     marginTop: density['--density-message-group-gap'],
-  },
-  // Mentions you (SPEC section 7): the tint stays, its menu open or not.
-  rowMention: {
-    backgroundColor: tints['--tint-mention-bg'],
   },
   gutter: {
     display: 'inline-flex',

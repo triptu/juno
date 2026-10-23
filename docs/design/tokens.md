@@ -116,7 +116,7 @@ The accent is a user setting (`AppearanceSettings`, persisted in `launch.json` l
 | `--hl` | The fill: primary button, send, Now chip, own bubbles | #CC4628 | #FF8A73 |
 | `--hl-fg` | Text on the fill | #FFFFFF | #2A0D06 |
 | `--hl-text` | Accent text and icons on paper or a tint: the "new" label, the selected nav item | #B4351F | #FF9C87 |
-| `--hl-soft` | `color-mix(in oklch, var(--hl) <mix>, var(--background))`: mention-row tint, my reaction, the @ tag | 10% | 14% |
+| `--hl-soft` | `color-mix(in oklch, var(--hl) <mix>, var(--background))`: my reaction, the @ tag | 10% | 14% |
 | `--hl-bubble` | `color-mix(in oklch, var(--hl) <mix>, var(--background))`: the owner's bubble in the Juno chat (option B, `docs/design/juno-chat/README.md`), with `--foreground-default` text. Ink mixes 12% and 14% | 16% | 22% |
 | `--hl-nav` | `color-mix(in oklch, var(--hl) <mix>, var(--background-subtle))`: the selected nav item's fill | 9% | 16% |
 | `--hl-count`, `--hl-count-fg` | The sidebar's counters (row unread counts, the Juno nav count): the accent at reduced brightness. Literal values per accent, below | #F7DED4 / #B3371B | #462E26 / #F8846D |
@@ -227,7 +227,6 @@ Used by: page header context pill, Juno send-card pill. Icons: `hash` (public), 
 | Resolved chip | bg `color-mix(in oklch, var(--success) 12%, var(--background))`, fg `color-mix(in oklch, var(--success) 70%, var(--foreground-default))` light, `52%` dark | proto / redesign | Light #DCE9E4 / #165240 (7.27:1); dark #18231F / #7AA696 (5.94:1; 70% was 4.27:1 on the new palette) |
 | Audience guard | bg `color-mix(in oklch, var(--warning) 14%, var(--surface-default))`, fg `color-mix(in oklch, var(--warning) 45%, var(--foreground-default))` | proto | Light #F9EFDE / #725824 (5.88:1); dark #3C3426 / #E9CC96 (7.91:1) |
 | Notification decision chips | Now: `--hl` / `--hl-fg`. Digest: `--secondary-default` / `--foreground-subtle`. Silent: transparent / `--foreground-muted` (summary chips use `--surface-hover` instead of transparent) | proto | |
-| Mention tint (message that mentions you) | `--hl-soft` on the message row | proto | |
 | Traffic lights | #FF5F57, #FEBC2E, #28C840 | proto | Only for mock-ups; Electron draws real ones |
 | `--warm` | #E39A3B | friendly layer | Illustration fill only; never text, never a control |
 | `--warm-soft` | `color-mix(in oklch, var(--warm) 26%, var(--background))` light (#F8E2CA), `22%` dark (#423221) | friendly layer | The one flat layer inside every spot illustration |
@@ -740,7 +739,7 @@ Other literal lengths and colours require tokens, or a trailing
 
 | Token | Value | Used for |
 | --- | --- | --- |
-| `--topic-time-width` | 48px | Stable relative-time slot in topic rows: at least this wide, the time aligned to its end, so every time ends at the row's trailing inset. |
+| `--topic-time-width` | 48px | Stable relative-time column in All topics and the dev log. Sidebar rows keep no slot: their time shows on hover over the title's end. |
 
 ### Topic title line limit
 

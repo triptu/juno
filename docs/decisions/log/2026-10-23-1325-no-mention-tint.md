@@ -1,0 +1,1 @@
+- 10-23 13:25 · mention tint · A message that mentions you has no fill of its own; the @you chip marks it. The `--tint-mention-bg` token and the per-message `mentionsMe` field went with it (owner).

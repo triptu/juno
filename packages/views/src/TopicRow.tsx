@@ -76,6 +76,10 @@ const PRIVATE_TITLE = 'Private channel'
  * the new-thread count follows the title. The row activates on mouse down.
  * Resolve is in its menu (right-click), the topic header and ⌘K.
  *
+ * The time shows only while the row is hovered or has keyboard focus. It
+ * floats over the end of line one, on a fade of the row's fill, so the
+ * title has the whole line at rest and nothing moves when it appears.
+ *
  * The row is a focusable list item, named by its title. Enter and Space
  * open it, as on a button.
  */
@@ -250,7 +254,7 @@ export const TopicRow = memo(function TopicRow({
               <Icon icon={BellSlash} size={13} label="Unsubscribed" />
             </span>
           ) : null}
-          <Text variant="meta" tone="muted" numeric data-row-part="time" sx={styles.time}>
+          <Text variant="meta" tone="muted" numeric data-row-part="time" sx={[styles.time, renaming && styles.timeRenaming]}>
             {time}
           </Text>
         </span>
@@ -371,6 +375,19 @@ const styles = stylex.create({
       default: colors['--foreground-preview-read'],
       ':hover': { default: null, [HOVER]: colors['--foreground-muted'] },
     },
+    // The time is shown under the pointer and with keyboard focus, at once,
+    // and always where nothing can hover.
+    '--row-time-opacity': {
+      default: '0',
+      ':hover': { default: null, [HOVER]: '1' },
+      ':focus-visible': '1',
+      '@media (hover: none)': '1',
+    },
+    // What the row is drawn on, for the time's fade: the sidebar, or the hover fill.
+    '--row-fill': {
+      default: colors['--background-subtle'],
+      ':hover': { default: null, [HOVER]: colors['--surface-hover'] },
+    },
   },
   // A Main has no meta line, so its minimum and off-screen estimate are shorter.
   twoLineRow: {
@@ -387,6 +404,7 @@ const styles = stylex.create({
     },
     '--foreground-muted': colors['--foreground-muted-on-fill'],
     '--row-read-preview': colors['--foreground-muted-on-fill'],
+    '--row-fill': colors['--secondary-default'],
   },
   tile: {
     display: 'inline-flex',
@@ -423,6 +441,7 @@ const styles = stylex.create({
   // The time, icons and tags beside the title each centre in a box one title
   // line tall, so a wrapped title keeps them on its first line, as Mail does.
   line1: {
+    position: 'relative',
     display: 'flex',
     alignItems: 'center',
     gap: spacing['--space-1-5'],
@@ -477,18 +496,26 @@ const styles = stylex.create({
     flexShrink: 0,
     color: colors['--foreground-muted'],
   },
-  // At least the stable slot, and the time ends at the row's trailing inset,
-  // so "4m" and "Yesterday" end on one edge.
+  // Over the end of line one, ending at the row's trailing inset, so "4m"
+  // and "Yesterday" end on one edge. It takes no room in the line: what is
+  // under it fades into the row's fill. The pointer passes through, so a
+  // cut-off title still shows its tooltip.
   time: {
+    position: 'absolute',
+    insetBlockStart: 0,
+    insetInlineEnd: 0,
     display: 'inline-flex',
-    alignSelf: 'flex-start',
     alignItems: 'center',
-    justifyContent: 'flex-end',
     height: text['--text-row-title-leading'],
-    minWidth: sizes['--topic-time-width'],
-    flexShrink: 0,
-    marginInlineStart: 'auto',
-    paddingInlineStart: spacing['--space-1'],
+    // A fade, then a little clear fill, so no faded letter touches the time.
+    paddingInlineStart: spacing['--space-8'],
+    backgroundImage: `linear-gradient(to right, transparent, var(--row-fill) ${spacing['--space-6']})`,
+    opacity: 'var(--row-time-opacity)',
+    pointerEvents: 'none',
+  },
+  // The rename field has the whole line.
+  timeRenaming: {
+    opacity: 0,
   },
   // The preview has one size, read or unread, so reading the row changes only
   // its colour and no letter moves.

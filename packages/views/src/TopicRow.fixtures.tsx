@@ -63,6 +63,9 @@ const ROW = '[data-topic-row]'
 /** A stand-in for a feature's mark in a Main row's `accessory` slot (the huddle glyph is drawn in `@juno/huddle-views`). */
 const accessory = { accessory: <Icon icon={Headphones} size={13} />, accessoryLabel: 'huddle with 3 people' } as const
 
+/** A channel's Main whose name runs to the line's end, with the huddle mark and the thread count after it. */
+const longMain: TopicRowProps['row'] = { ...rows.alertsMain, id: 'C0ALERTSLONG:main', title: '#alerts-prod-billing-consumer-queue-depth-and-latency' }
+
 /** A DM's Main whose latest message is yours: the preview keeps "You:". */
 const devMain: TopicRowProps['row'] = { ...rows.mayaMain, id: 'm:D0DEV', title: 'Dev Patel', channel: channels.dev, preview: { sender: 'You', text: 'its good' } }
 
@@ -208,11 +211,36 @@ export default defineFixtures(
         </div>
       )),
     },
+    // The time shows only on hover and keyboard focus, over the end of line one.
     Interaction: {
       hover: state(rows.postgres, {}, { hover: ROW }),
       focus: state(rows.postgres, {}, { focus: ROW }),
       press: state(rows.postgres, {}, { press: ROW }),
       'hover-resolved': state(rows.notes, {}, { hover: ROW }),
+      'hover-long-title': state(rows.long, {}, { hover: ROW }),
+      'focus-long-title': state(rows.long, {}, { focus: ROW }),
+      'hover-selected-long-title': state(rows.long, { selected: true }, { hover: ROW }),
+      'hover-main-long-name': state(longMain, { ...accessory, newThreads: newThreadsById.get(rows.alertsMain.id) }, { hover: ROW }),
+      'hover-dm-main': state(rows.mayaMain, {}, { hover: ROW }),
+      'hover-group-dm-main': state(rows.lunch, {}, { hover: ROW }),
+      // Every kind of row with a short and a long title, for the shift check that hovers each in turn.
+      'each-kind': scene(() => (
+        <div style={column}>
+          {[
+            { ...rows.postgres, title: 'Plan' },
+            rows.long,
+            rows.alertsMain,
+            longMain,
+            rows.mayaMain,
+            { ...rows.mayaMain, id: 'm:D0LONG', title: 'Maximiliana Konstantinopoulou-Abernathy' },
+            rows.lunch,
+            rows.notes,
+          ].map((row) => (
+            <TopicRow key={row.id} {...one(row)} />
+          ))}
+          <TopicRow {...one({ ...rows.long, id: `${rows.long.id}-selected` }, { selected: true })} />
+        </div>
+      )),
     },
     // The three text levels across every kind of row, read and unread, with
     // one selected and one past four people: the shot for contrast in light,

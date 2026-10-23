@@ -137,8 +137,6 @@ export const MessageView = Schema.Struct({
    * divider also starts a group; the view applies that one.
    */
   groupStart: Schema.Boolean,
-  /** The message mentions the signed-in user (directly, a group of theirs, or @here and friends): the tinted row. */
-  mentionsMe: Schema.Boolean,
   /** A thread reply also sent to the channel. */
   broadcast: Schema.Boolean,
   /** The thread's root, the first row of a thread. */
