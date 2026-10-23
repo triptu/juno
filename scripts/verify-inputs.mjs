@@ -19,11 +19,12 @@ export function runtimeIdentity(root, remote = false) {
 
 export const sameIdentity = (left, right) => left !== undefined && right !== undefined && JSON.stringify(left) === JSON.stringify(right)
 
-export function inputKey(root, files, identity) {
+export function inputKey(root, files, identity, hashes = new Map()) {
   const hash = createHash('sha256').update(JSON.stringify(identity))
   for (const file of [...new Set(files)].toSorted()) {
     hash.update(`\0${file}\0`)
-    hash.update(existsSync(join(root, file)) ? readFileSync(join(root, file)) : 'absent')
+    if (!hashes.has(file)) hashes.set(file, existsSync(join(root, file)) ? createHash('sha256').update(readFileSync(join(root, file))).digest('hex') : 'absent')
+    hash.update(hashes.get(file))
   }
   return hash.digest('hex')
 }

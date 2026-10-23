@@ -22,7 +22,6 @@
 // tests"); --wide plans as before 10-18. scripts/affected-run.mjs runs the plan.
 
 import { spawnSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -33,7 +32,7 @@ import { driverSpecs, galleryComponents, graphCandidates, mapProblem, COVERAGE_B
 import { HEAVY_AREAS, heavyAreasChanged, perfInteractionsChanged } from './test-areas.mjs'
 import { runPlan } from './affected-run.mjs'
 import { nodeTestScripts, unitTestItems } from './affected-tests.mjs'
-import { protocolInputs, runtimeIdentity, sameIdentity } from './verify-inputs.mjs'
+import { inputKey, protocolInputs, runtimeIdentity, sameIdentity } from './verify-inputs.mjs'
 import { readRecords, statusFolder } from './release-gate.mjs'
 import { specDurations } from './verify-records.mjs'
 
@@ -104,16 +103,8 @@ if (!batch) {
 const resultsDir = join(tmpdir(), 'juno-cache', 'results')
 const useCache = !flag('--no-cache')
 const contentHash = new Map()
-const hashOf = (file) => {
-  if (!contentHash.has(file)) contentHash.set(file, existsSync(join(root, file)) ? createHash('sha256').update(readFileSync(join(root, file))).digest('hex') : 'absent')
-  return contentHash.get(file)
-}
 const shared = ['bun.lock', 'bunfig.toml', 'package.json', 'tsconfig.base.json']
-const keyOf = (suite, id, inputs) => {
-  const hash = createHash('sha256').update(`${JSON.stringify(identity)}\0${suite}\0${id}\0${JSON.stringify({ wide, heavy: heavyAreasChanged(changed) })}\0`)
-  for (const file of [...new Set([...shared, ...inputs])].toSorted()) hash.update(`${file}\0${hashOf(file)}\0`)
-  return hash.digest('hex')
-}
+const keyOf = (suite, id, inputs) => inputKey(root, [...shared, ...inputs], { ...identity, suite, id, wide, heavy: heavyAreasChanged(changed) }, contentHash)
 const passed = (key) => useCache && existsSync(join(resultsDir, key))
 let skipped = 0
 /** The items that need a run: their inputs changed (or everything did) and their key has not passed. A forced item (named with --spec) always runs. */
