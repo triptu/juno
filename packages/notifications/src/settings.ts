@@ -1,6 +1,6 @@
 import { defaultNotificationSettings, readLevel, type NotificationSettings, type NotifyLevel } from '@juno/domain'
 import { prefs } from '@juno/store'
-import { Effect, Schema } from 'effect'
+import { Effect, Option, Schema } from 'effect'
 
 const minute = Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 1439 }))
 const hours = Schema.Struct({ days: Schema.Array(Schema.Literals([0, 1, 2, 3, 4, 5, 6])), from: minute, to: minute })
@@ -48,11 +48,14 @@ const current = (raw: unknown): unknown => {
   }
 }
 
+const decodeSettings = Schema.decodeUnknownOption(NotificationSettingsSchema)
+
+/** The `notifications` pref as it reads now: old levels read as today's, and anything missing or invalid is the defaults. */
+export const settingsOf = (raw: unknown): NotificationSettings =>
+  Option.getOrElse(decodeSettings(current(raw ?? defaultNotificationSettings)), () => defaultNotificationSettings)
+
 export const readSettings = Effect.gen(function* () {
-  const raw = yield* prefs.get('notifications')
-  const settings: NotificationSettings = yield* Schema.decodeUnknownEffect(NotificationSettingsSchema)(current(raw ?? defaultNotificationSettings)).pipe(
-    Effect.catch(() => Effect.succeed(defaultNotificationSettings)),
-  )
+  const settings = settingsOf(yield* prefs.get('notifications'))
   const aiAssist = (yield* prefs.get('aiAssist')) !== false
   return { settings, aiAssist }
 })
