@@ -11,13 +11,13 @@ import type { MenuPoint, MessageMenuEntry, MessageMenuIcon } from '@juno/views'
 import { askJunoAboutSelection } from '../juno/actions'
 import type { ComposerHandle } from '../messageActions'
 import { openMessageMenu } from '../messageMenu'
-import { isOwnEditable, landedTs } from '../messageRows'
+import { isOwnEditable, landedTs, opensThread } from '../messageRows'
 import { showPersonMenu } from '../notifyActions'
 import { broadcastLabel, openTopicInSlack, type ActionTopic } from '../topicActions'
 import { rowOf, textOf, type Latest } from './messageCommands'
 
 const SEPARATOR: MessageMenuEntry = { separator: true }
-const item = (id: string, label: string, icon: MessageMenuIcon, disabled = false): MessageMenuEntry => ({ id, label, icon, ...(disabled ? { disabled } : {}) })
+const item = (id: string, label: string, icon: MessageMenuIcon, disabled = false, shortcut?: string): MessageMenuEntry => ({ id, label, icon, ...(disabled ? { disabled } : {}), ...(shortcut === undefined ? {} : { shortcut }) })
 
 export interface MenuFacts {
   readonly topic: Pick<ActionTopic, 'kind' | 'channel'>
@@ -37,6 +37,7 @@ export interface MenuFacts {
  * The rows, in groups: Start thread or Open thread (Main), Quote, Ask Juno;
  * Copy text, Forward…, Open in Slack; on your own, Also send
  * to #eng (a thread reply) and Tell me if nobody replies; then Edit and Delete….
+ * Rows whose key works on a focused message show it (`rowHandlers`): T, E and ⌫.
  */
 export function topicMenuItems({ topic, message, editable, own, selection, juno, mayWatch }: MenuFacts): ReadonlyArray<MessageMenuEntry> {
   // Only a message Slack has can be shared or linked to.
@@ -44,7 +45,7 @@ export function topicMenuItems({ topic, message, editable, own, selection, juno,
   // Only a reply Slack has, as Slack's own client offers it.
   const broadcastable = own && topic.kind === 'thread' && linkable && message.kind === 'message' && !message.root && !message.broadcast
   return [
-    ...(topic.kind === 'main' && linkable ? [item('reply', message.thread === undefined ? 'Start thread' : 'Open thread', 'thread')] : []),
+    ...(opensThread(topic.kind, message) ? [item('reply', message.thread === undefined ? 'Start thread' : 'Open thread', 'thread', false, 'T')] : []),
     item('quote', 'Quote', 'quote'),
     ...(juno ? [item('ask-juno', 'Ask Juno', 'juno')] : []),
     SEPARATOR,
@@ -54,7 +55,7 @@ export function topicMenuItems({ topic, message, editable, own, selection, juno,
     ...(broadcastable || (own && linkable) ? [SEPARATOR] : []),
     ...(broadcastable ? [item('broadcast', broadcastLabel(topic.channel), 'broadcast')] : []),
     ...(own && linkable ? [item('watch-reply', 'Tell me if nobody replies', 'bell', !mayWatch)] : []),
-    ...(editable ? [SEPARATOR, item('edit', 'Edit', 'edit'), item('delete', 'Delete…', 'delete')] : []),
+    ...(editable ? [SEPARATOR, item('edit', 'Edit', 'edit', false, 'E'), item('delete', 'Delete…', 'delete', false, '⌫')] : []),
   ]
 }
 
