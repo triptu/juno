@@ -43,7 +43,7 @@ export function createTurnSession(store: Store, options: TurnsOptions, running: 
     catchUp: () => projection!.catchUp(),
     position: async (): Promise<JournalPosition> => {
       // A rotation closes the old journal, and a read of a closed journal never answers: read the new one.
-      while (rotating !== undefined) await rotating.catch(() => undefined)
+      for (let current = rotating; current !== undefined; current = rotating) await current.catch(() => undefined)
       return { incarnation: journal!.incarnation, seq: await journal!.lastCommitted() }
     },
     rotate: rotateNow,
