@@ -1,5 +1,22 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { sameIdentity } from './verify-inputs.mjs'
+
+/** Newest matching successful per-file measurements, in test seconds (not wall time). */
+export function specDurations(records, identity) {
+  const durations = new Map()
+  for (const record of records) {
+    for (const suite of record.suites) {
+      if (!sameIdentity(suite.identity ?? record.identity, identity) || suite.code !== 0) continue
+      const files = new Map()
+      for (const test of suite.tests?.cases ?? []) {
+        if (test.file && test.durationMs > 0) files.set(test.file, (files.get(test.file) ?? 0) + test.durationMs / 1000)
+      }
+      for (const [file, seconds] of files) if (!durations.has(file)) durations.set(file, seconds)
+    }
+  }
+  return durations
+}
 
 /** Keep the old latest result during migration, then atomically replace it. */
 export function writeRecord(status, runId, summary) {

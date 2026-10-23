@@ -12,6 +12,7 @@ import { git, isAncestor, printGate, readRecords, releaseGate, statusFolder } fr
 import { highlightLines, releaseDue, selectCommit, userFacingChanges } from './release-schedule.mjs'
 import { syncReleasedVersion } from './release-main.mjs'
 import { mainCheckout, worktreeFolder } from './worktree-folder.mjs'
+import { recordReleaseTiming } from './release-timings.mjs'
 
 const root = resolve(import.meta.dirname, '..')
 const { values } = parseArgs({ options: { 'dry-run': { type: 'boolean', default: false }, repo: { type: 'string', default: 'triptu/juno-releases' }, notes: { type: 'string' } } })
@@ -86,19 +87,27 @@ function previousCommit(tag) {
 }
 
 function publish(candidate, version, notes) {
+  const timed = (step, work) => {
+    const started = Date.now()
+    let status = 'failed'
+    try { const result = work(); status = 'passed'; return result }
+    finally { recordReleaseTiming(step, started, { version, source: candidate, status }) }
+  }
   const name = `scheduled-release-${version}`
   const checkout = join(worktreeFolder(mainCheckout(root)), name)
   const notesFile = join(status, `${name}-notes.md`)
   writeFileSync(notesFile, notes)
   // Keep a failed checkout for inspection. Never silently resume a partial publish.
-  run('node', ['scripts/worktree.mjs', 'add', name, '--base', candidate])
-  run('bun', ['run', 'release:version', version], checkout)
-  run('git', ['add', 'apps/desktop/package.json'], checkout)
-  run('git', ['commit', '-m', `Release ${version}`], checkout)
+  timed('prepare', () => {
+    run('node', ['scripts/worktree.mjs', 'add', name, '--base', candidate])
+    run('bun', ['run', 'release:version', version], checkout)
+    run('git', ['add', 'apps/desktop/package.json'], checkout)
+    run('git', ['commit', '-m', `Release ${version}`], checkout)
+  })
   const heavy = join(root, 'scripts/heavy.mjs')
   const priority = readFileSync(heavy, 'utf8').includes('--priority') ? ['--priority', 'release'] : []
-  run('node', [heavy, ...priority, '--electron', 'bun', 'run', 'package'], checkout)
-  run('node', [heavy, ...priority, '--electron', 'bun', 'run', 'test:package'], checkout, { JUNO_E2E_AI_JOBS: '1' })
-  run('node', [join(root, 'scripts/release-publish.ts'), '--checkout', checkout, '--source', candidate, '--repo', values.repo, '--notes', notesFile], checkout)
-  run('node', ['scripts/worktree.mjs', 'remove', name])
+  timed('package', () => run('node', [heavy, ...priority, '--electron', 'bun', 'run', 'package'], checkout))
+  timed('package-smoke', () => run('node', [heavy, ...priority, '--electron', 'bun', 'run', 'test:package'], checkout, { JUNO_E2E_AI_JOBS: '1' }))
+  timed('publish', () => run('node', [join(root, 'scripts/release-publish.ts'), '--checkout', checkout, '--source', candidate, '--repo', values.repo, '--notes', notesFile], checkout))
+  timed('cleanup', () => run('node', ['scripts/worktree.mjs', 'remove', name]))
 }

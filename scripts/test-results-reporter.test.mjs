@@ -40,3 +40,12 @@ test('real Playwright output names retry-only passes as flaky', async (t) => {
   assert.equal(report.flaky.length, 1)
   assert.equal(report.failures.length, 0)
 })
+
+test('failure causes distinguish cancellation and infrastructure from provisional test failures and confirmed product defects', async () => {
+  const { failureCause } = await import('./test-results-reporter.mjs')
+  assert.equal(failureCause({ code: 130 }).category, 'cancellation')
+  assert.equal(failureCause({ code: 255 }).category, 'infrastructure')
+  assert.equal(failureCause({ code: 1, tests: { incomplete: 2 } }).category, 'infrastructure')
+  assert.equal(failureCause({ code: 1 }).provisional, true)
+  assert.deepEqual(failureCause({ code: 1, cause: 'product', note: 'Socket update dropped a reply' }), { category: 'product', provisional: false, evidence: 'Socket update dropped a reply' })
+})

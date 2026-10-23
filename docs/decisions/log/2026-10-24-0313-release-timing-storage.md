@@ -1,0 +1,1 @@
+- 10-24 03:13 · release-timing-storage · Store release step timings in the main checkout's shared .juno-status so prepare, package, smoke, publish and cleanup measurements survive deletion of release worktrees.

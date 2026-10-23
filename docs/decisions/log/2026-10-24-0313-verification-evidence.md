@@ -1,0 +1,1 @@
+- 10-24 03:13 · verification-evidence · Key verification reuse and timing estimates by Bun/runtime, OS/architecture and Electron identity as well as inputs; retain structured per-test outcomes and JSON reports, and classify each failed or cancelled attempt with evidence. Automatic defect classifications remain provisional until triage.

@@ -1,7 +1,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { statusFolder } from './release-gate.mjs'
 
-const file = join(resolve(import.meta.dirname, '..'), '.juno-status/release-timings.json')
+const file = join(statusFolder(resolve(import.meta.dirname, '..')), 'release-timings.json')
 
 export function recordReleaseTiming(step, started, detail = {}) {
   const finished = Date.now()
