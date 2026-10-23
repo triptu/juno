@@ -6,6 +6,7 @@ Browser-only fixtures for primitives, views and compositions. No Slack session o
 - `bun run test:gallery`: cache checks, build, then parallel Chromium behavior tests with zero retries.
 - `GALLERY_SHIFT_ALL=1 bun run test:gallery`: refresh every selected shift and focus state, even if cached.
 - `bun run remote --env GALLERY_SHIFT_ALL=1 test:gallery`: the same full check on the runner.
+- `verify:main --nightly` and `verify:main --no-cache` force both broad walks automatically.
 - `bun run gallery:shots`: review screenshots in both themes. `GALLERY_SHOTS_ONLY=Button` narrows them.
 
 Install the pinned headless shell with `bunx playwright install chromium --only-shell`. Each test run chooses its own preview port. `GALLERY_WORKERS` controls concurrency. Every test owns one context; long walks reset the document between states and recycle pages every 20 states. Screenshots remain review artifacts, not pixel baselines in the behavior gate.

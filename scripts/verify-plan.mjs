@@ -14,7 +14,7 @@ export function fullSuites(scripts, { nightly = false, noCache = false, seed } =
     { name: 'test', words: ['test'] },
     { name: 'specs:check', words: [...(noCache ? ['SPECS_CACHE=off'] : []), ...(seed !== undefined ? [`SPECS_SEED=${seed}`] : []), 'specs:check', ...(noCache ? ['--no-cache'] : [])] },
     { name: 'specs:conformance', words: ['specs:conformance'] },
-    { name: 'test:gallery', words: ['test:gallery'] },
+    { name: 'test:gallery', words: [...(nightly || noCache ? ['GALLERY_SHIFT_ALL=1'] : []), 'test:gallery'] },
     ...apps.map((name) => ({ name, words: [...(nightly ? ['JUNO_COVERAGE=1'] : []), name] })),
   ]
 }

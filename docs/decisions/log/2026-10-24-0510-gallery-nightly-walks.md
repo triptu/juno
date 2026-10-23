@@ -1,0 +1,1 @@
+- 10-24 05:10 · gallery-nightly-walks · Set GALLERY_SHIFT_ALL=1 in nightly and no-cache verification plans, so both broad gallery walks are exercised regularly while ordinary verification reuses matching successful states.
