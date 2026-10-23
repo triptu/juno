@@ -1,14 +1,15 @@
 // MCP connections end to end (plan v3 §10, SPEC 13.9) on the real engine, against the fake Notion,
 // Littlebird and MCP servers, the scripted chat model and the fake decision model: sign-in, the
-// auto-review of writes and the owner's rules, locked tools, secrets, lost writes, results and
-// discovery as the model reads them, and the owner's choices across a relaunch.
+// auto-review of writes and the owner's rules, locked tools, secrets, lost writes, what a card shows,
+// adding servers and the owner's choices across a relaunch. connection-discovery.test.ts has what
+// the model is told about tools.
 import { afterEach, expect, test } from 'bun:test'
 import { fakeReview, json, reply, startFakeLittlebird, startFakeMcpServer, startFakeNotion, unknownTool, type FakeReviewRequest, type FakeTool } from '@juno/agent-testing'
 import { LITTLEBIRD, NOTION, T3, serveMcp } from '../src/mcp'
 import { slackTool } from '../src/mcp/catalogue'
 import { activityActions } from '../src/actions/activity'
 import { activityPage } from '../src/serve/pages'
-import { callTool, callsOf, closeAfter, closeConnections, connections, credentials, findTools, until, type ConnectionsOptions } from './connections-harness'
+import { callTool, callsOf, closeAfter, closeConnections, connections, credentials, until, type ConnectionsOptions } from './connections-harness'
 
 afterEach(closeConnections)
 
@@ -142,8 +143,8 @@ test("follows the owner's rules: Always ask, Never ask in a clean run and after 
 })
 
 test('a rule the owner makes stricter while the review runs is the rule that applies', async () => {
-  let during = () => {}
-  const { c, writes } = await notion({ review: (request) => { during(); return fakeReview(request) } })
+  let during: (() => void) | undefined
+  const { c, writes } = await notion({ review: (request) => { during?.(); return fakeReview(request) } })
   during = () => c.manager.setTool('notion', 'notion-update-page', { review: 'always' })
   await c.ask('Update the roadmap page: add "Ship on Friday."', update('Ship on Friday.'))
   expect(writes()).toHaveLength(0)
@@ -276,80 +277,6 @@ test('checks the page version on the click, and never repeats a lost write', asy
   await c.turns.actions.idle()
   expect(writes()).toHaveLength(1)
   expect(lastCard(c)).toMatchObject({ status: { _tag: 'done' } })
-})
-
-test("keeps a large result out of the model's next request", async () => {
-  const { c, server } = await notion()
-  server.editElsewhere('page-roadmap', 'Invented content. '.repeat(2000))
-  await c.ask('Read the page.', fetchPage)
-  const next = JSON.stringify(c.fake.requests.at(-1)?.context)
-  expect(next).toContain('exceeds 20 KB')
-  expect(next).not.toContain('Invented content. '.repeat(100))
-  expect(Buffer.byteLength(next)).toBeLessThan(30_000)
-})
-
-/** A `find_tools` result: its text, size, and the JSON after the untrusted-data line when it has one. */
-const parse = (text: string) => ({ text, bytes: Buffer.byteLength(text), body: text.startsWith('Untrusted') ? JSON.parse(text.slice(text.indexOf('\n') + 1)) as Record<string, unknown> : undefined })
-
-test('find_tools tells the model the servers, then matching tools, then one schema, with nothing internal and within budget', async () => {
-  const notionServer = await startFakeNotion()
-  closeAfter(notionServer.close)
-  const search = { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] }
-  const docs = await startFakeMcpServer({ name: 'docs', tools: [
-    { name: 'search_docs', description: 'Search the team handbook.\nLonger notes the model reads only with the schema.', annotations: { readOnlyHint: true }, inputSchema: search, call: () => json({ results: [] }) },
-    { name: 'publish_page', description: 'Publish a handbook page.', inputSchema: { type: 'object', properties: { page: { type: 'string' } } }, call: () => json({}) },
-    { name: 'purge_archive', description: 'Remove every archived page.', inputSchema: { type: 'object', properties: {} }, call: () => json({}) },
-  ] })
-  closeAfter(docs.close)
-  const c = await connections({ credentials: credentials(notionServer.oauth.approve), defaults: [{ ...NOTION, url: notionServer.url }, LITTLEBIRD, T3] })
-  await c.manager.authorize('notion')
-  await c.manager.add('Team docs', docs.url)
-  const added = c.manager.configs().find((config) => config.label === 'Team docs')!
-  await c.manager.authorize(added.id)
-  c.manager.setTool(added.id, 'purge_archive', { enabled: false })
-  const before = Buffer.byteLength(JSON.stringify(c.manager.page()))
-
-  const { runId } = await c.ask('What can my connections do?',
-    findTools(), findTools({ query: 'page' }), findTools({ server: 'team-docs', query: 'handbook' }), findTools({ server: 'team-docs', tool: 'search_docs' }),
-    findTools({ server: 'team-docs', tool: 'purge_archive' }), findTools({ query: 'archive' }), callTool('team-docs', 'purge_archive', {}),
-    findTools({ server: 'nowhere' }), findTools({ server: 'littlebird' }))
-  const [index, query, scoped, schema, disabled, archive, call, nowhere, off] = c.results().map(parse)
-  const listed = (result: ReturnType<typeof parse> | undefined) => (result?.body?.tools as Array<{ server: string; tool: string; inputSchema?: unknown }>).map((tool) => `${tool.server}/${tool.tool}`)
-
-  // 1. The servers that are on, and the ones that are off.
-  expect(JSON.stringify(index?.body)).toContain('"Team docs"')
-  expect(index?.body?.off).toEqual(['littlebird', 't3'])
-  // 2. Matching tools, one line each, no schemas; scoped to a server when asked.
-  expect(listed(query)).toEqual(expect.arrayContaining(['notion/notion-fetch', 'notion/notion-update-page', 'team-docs/publish_page']))
-  expect(query?.text).not.toContain('inputSchema')
-  expect(listed(scoped)).toEqual(['team-docs/publish_page', 'team-docs/search_docs'])
-  expect(scoped?.text).not.toContain('Longer notes')
-  // 3. One tool's schema, whole, only by name.
-  expect(schema?.body).toMatchObject({ server: 'team-docs', tool: 'search_docs', inputSchema: search })
-  // A tool the owner turned off is never shown and never called.
-  for (const result of [index, query, scoped, archive]) expect(result?.text).not.toContain('purge_archive')
-  expect(disabled?.text).not.toContain('inputSchema')
-  expect(listed(archive)).toEqual([])
-  expect(call?.body).toBeUndefined()
-  expect(callsOf(docs, 'purge_archive')).toHaveLength(0)
-  // An unknown server is an error; one that is off proposes its Connect card.
-  expect(nowhere?.body).toBeUndefined()
-  expect(off?.text).toContain('Connect card')
-  expect(c.turns.actions.views().map((view) => view.card._tag)).toEqual(['connect'])
-  // Nothing internal: no connection id, no schema hash, no address.
-  for (const result of [index, query, scoped, schema]) {
-    expect(result?.text).not.toContain(added.id)
-    expect(result?.text).not.toMatch(/[0-9a-f]{64}|https?:\/\//)
-    for (const url of [notionServer.url, docs.url]) expect(result?.text).not.toContain(new URL(url).host)
-  }
-  // What each step costs, against the whole page the bare call used to return.
-  expect(index!.bytes * 5).toBeLessThan(before)
-  expect(index!.bytes).toBeLessThan(250)
-  expect(query!.bytes).toBeLessThan(700)
-  expect(scoped!.bytes).toBeLessThan(400)
-  expect(schema!.bytes).toBeLessThan(400)
-  // Discovery reads what servers wrote: the run is no longer clean.
-  expect(tainted(c, runId)).toBe(true)
 })
 
 test("keeps the owner's tool switches, rules and the connection's identity across a relaunch", async () => {

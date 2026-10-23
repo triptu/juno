@@ -54,7 +54,7 @@ export function pollClock() {
     sleeping.add(done)
     signal.addEventListener('abort', done, { once: true })
     waits.push(ms)
-    for (const listener of [...listeners]) listener()
+    for (const listener of listeners) listener()
   })
   /** Resolves once the watcher has started `n` waits in all. */
   const waited = (n: number) => new Promise<void>((resolve) => {
@@ -70,7 +70,7 @@ export function pollClock() {
     sleep, waits, waited,
     tick: async () => {
       const n = waits.length
-      for (const done of [...sleeping]) done()
+      for (const done of sleeping) done()
       await waited(n + 1)
     },
   }
@@ -95,48 +95,53 @@ export interface Step { readonly name: string; readonly args: unknown }
 export const callTool = (server: string, tool: string, args: unknown): Step => ({ name: 'call_tool', args: { server, tool, args } })
 export const findTools = (args: { readonly server?: string; readonly query?: string; readonly tool?: string } = {}): Step => ({ name: 'find_tools', args })
 
+/** The engine with the manager, its tools and executors and, with `t3`, the T3 adapter. Closed after the test. */
+async function openEngine(dir: string, options: ConnectionsOptions, parts: {
+  readonly credentials: Credentials; readonly fake: ReturnType<typeof fakeProvider>; readonly reviewer: ReturnType<typeof fakeReviewer>; readonly clock: ReturnType<typeof pollClock>
+}) {
+  let manager: McpManagerApi | undefined
+  let t3: ReturnType<typeof createT3Adapter> | undefined
+  const review = options.review === null ? {} : { review: parts.reviewer.model }
+  const timeout = options.reviewTimeoutMs === undefined ? {} : { reviewTimeoutMs: options.reviewTimeoutMs }
+  const turns = await openTurns({
+    agentDir: dir, model: SONNET, migrations: [MCP_MIGRATIONS],
+    provider: (store) => {
+      manager = createMcpManager({ store, credentials: parts.credentials, ...(options.defaults ? { defaults: options.defaults } : {}) })
+      if (options.t3) t3 = createT3Adapter(manager, { sleep: parts.clock.sleep })
+      return createProviderGuard({ store, transport: parts.fake.models })
+    },
+    jobDrivers: () => t3 ? [t3.driver] : [],
+    stopExternalJob: async (job, click) => t3?.stop(job, click) ?? false,
+    actions: { executors: () => [...(manager ? mcpExecutors(manager) : []), ...(t3?.executors ?? [])] },
+    tools: (context) => {
+      if (!manager) throw new Error('No manager')
+      return [...mcpTools(manager, { current: context.current, actions: context.actions, ...review, ...timeout }), ...(t3?.tools(context) ?? [])]
+    },
+  })
+  if (turns._tag !== 'running' || !manager) throw new Error('No engine')
+  const m: McpManagerApi = manager
+  const events: TurnEvent[] = []
+  turns.subscribe((event) => events.push(event))
+  m.subscribe(() => turns.actions.kick())
+  let closed = false
+  const close = async () => {
+    if (closed) return
+    closed = true
+    await m.close()
+    await turns.close()
+  }
+  closeAfter(close)
+  return { turns: turns as Turns, manager: m, events, close }
+}
+
 export async function connections(options: ConnectionsOptions = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'juno-connections-'))
   closeAfter(() => rm(dir, { recursive: true, force: true }))
-  const creds = options.credentials ?? credentials()
   const fake = fakeProvider()
   const reviewer = fakeReviewer(options.review ?? fakeReview)
   const clock = pollClock()
-  const open = async () => {
-    let manager: McpManagerApi | undefined
-    let t3: ReturnType<typeof createT3Adapter> | undefined
-    const turns = await openTurns({
-      agentDir: dir, model: SONNET, migrations: [MCP_MIGRATIONS],
-      provider: (store) => {
-        manager = createMcpManager({ store, credentials: creds, ...(options.defaults ? { defaults: options.defaults } : {}) })
-        if (options.t3) t3 = createT3Adapter(manager, { sleep: clock.sleep })
-        return createProviderGuard({ store, transport: fake.models })
-      },
-      jobDrivers: () => t3 ? [t3.driver] : [],
-      stopExternalJob: async (job, click) => t3?.stop(job, click) ?? false,
-      actions: { executors: () => [...(manager ? mcpExecutors(manager) : []), ...(t3?.executors ?? [])] },
-      tools: (context) => {
-        if (!manager) throw new Error('No manager')
-        const review = options.review === null ? {} : { review: reviewer.model }
-        const timeout = options.reviewTimeoutMs === undefined ? {} : { reviewTimeoutMs: options.reviewTimeoutMs }
-        return [...mcpTools(manager, { current: context.current, actions: context.actions, ...review, ...timeout }), ...(t3?.tools(context) ?? [])]
-      },
-    })
-    if (turns._tag !== 'running' || !manager) throw new Error('No engine')
-    const m: McpManagerApi = manager
-    const events: TurnEvent[] = []
-    turns.subscribe((event) => events.push(event))
-    m.subscribe(() => turns.actions.kick())
-    let closed = false
-    const close = async () => {
-      if (closed) return
-      closed = true
-      await m.close()
-      await turns.close()
-    }
-    closeAfter(close)
-    return { turns: turns as Turns, manager: m, events, close }
-  }
+  const parts = { credentials: options.credentials ?? credentials(), fake, reviewer, clock }
+  const open = () => openEngine(dir, options, parts)
   let engine = await open()
   let serial = 0
 
