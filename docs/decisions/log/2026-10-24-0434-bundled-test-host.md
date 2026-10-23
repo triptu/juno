@@ -1,0 +1,1 @@
+- 10-24 04:34 · bundled-test-host · The browser lane forks a bundled test host (`dist/host/testHost.mjs`, `bun build` in `build:web`) instead of the TypeScript source under resolve hooks: loading it costs 0.35 s of CPU instead of 1.6 s per test, and it is built and cached with the web renderer.

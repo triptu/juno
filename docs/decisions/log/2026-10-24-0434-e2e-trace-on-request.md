@@ -1,0 +1,1 @@
+- 10-24 04:34 · e2e-trace-on-request · Desktop e2e records no Playwright trace by default and the browser project does not retry; `JUNO_E2E_TRACE=1` keeps a trace of each failing test. Tracing cost about a fifth of browser-lane test time, and a test that passes only on a retry is a bug to fix.

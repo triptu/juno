@@ -1,0 +1,1 @@
+- 10-24 04:34 · browser-workers-by-threads · The browser e2e project runs one worker per two threads of the remote job's allocation (`JUNO_RUNNER_JOB_CORES`), else of the machine: a container sees all 16 host threads, so a 2-core job ran 8 workers, hit its 6 GB cap and the kernel killed page renderers ("Target crashed").
