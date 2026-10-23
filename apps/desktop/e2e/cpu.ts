@@ -48,7 +48,7 @@ function macProcesses(): Process[] {
 
 function kindOf(process: Process, worker: number): string {
   if (process.pid === worker) return 'worker'
-  if (process.args.includes('testHost.ts')) return 'host'
+  if (/testHost\.(ts|mjs)/.test(process.args)) return 'host'
   const type = /--type=([\w-]+)/.exec(process.args)?.[1]
   if (/headless_shell|chrom/i.test(process.args)) return type === undefined ? 'chrome' : `chrome-${type}`
   if (/electron/i.test(process.args)) return type === undefined ? 'electron' : `electron-${type}`
