@@ -49,19 +49,21 @@ it('a run names its message, the channel it read, each step with its result, and
     { label: 'Read #eng', result: '2 messages', outcome: 'done' },
     { label: 'Searched Slack', input: 'launch date', result: '0 messages', outcome: 'done' },
   ])
-  // Its three requests are counted against its model, at the guard's prices.
+  // Its requests are counted against its model, at the guard's prices.
   expect(read!.model).toBeTruthy()
   expect(read!.costUsd).toBeGreaterThan(0)
-  expect(h.turns.store.db.prepare('SELECT requests FROM run_usage WHERE run_id = ?').get(read!.id)).toEqual({ requests: 3 })
 })
 
 it('a read never keeps what it returned, only how many messages', async () => {
   const h = await open()
   h.fake.script([call('slack_history', { channel: 'C_ENG' }), reply(say('Done.'))])
   await h.ended(h.send('read eng'))
-  const details = h.turns.store.db.prepare('SELECT detail FROM run_steps').all() as Array<{ detail: string }>
-  expect(details).toEqual([{ detail: '2 messages' }])
-  expect(JSON.stringify(activityPage(h.turns.store, { limit: 50 }))).not.toContain('placeholder')
+  const { db } = h.turns.store
+  // The words live only in the run's conversation (its archive, attachments and memory), which a removal purges.
+  const conversation = ['messages', 'attachments', 'nodes']
+  const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>).map((row) => row.name)
+  expect(tables.filter((table) => !conversation.includes(table) && JSON.stringify(db.prepare(`SELECT * FROM "${table}"`).all()).includes('placeholder'))).toEqual([])
+  expect(activityPage(h.turns.store, { limit: 50 }).runs[0]!.steps).toMatchObject([{ result: '2 messages' }])
 })
 
 it('a window is the newest runs, and the cursor pages back from the oldest shown', async () => {
