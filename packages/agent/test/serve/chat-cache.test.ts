@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import fc from 'fast-check'
 import { BubbleId, CardId, JobId, OpId } from '@juno/agent-contract'
 import { createChatCache, invalidateChatCaches, windowOf } from '../../src/serve/chat'

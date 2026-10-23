@@ -1,6 +1,6 @@
 import { Schema } from 'effect'
 import fc from 'fast-check'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { Card } from '@juno/agent-contract'
 
 const text = fc.string()

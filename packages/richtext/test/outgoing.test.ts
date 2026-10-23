@@ -1,5 +1,5 @@
 import { composeEdit } from '../src/index'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import type { Block, RichTextInline } from '@juno/slack-schema'
 import { composeOutgoing, editMarkup, type MentionTargets } from '../src/index'
 

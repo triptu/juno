@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { bodyFromMrkdwn } from '@juno/richtext'
 import { UsergroupId, indexTopic, messageMentionsMe, messageMentionsMeDirectly, type IndexInput, type IndexMessage } from '../src/index'
 import { HOUR, NOW, leoId, mayaId, me, ts } from './fixtures'

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { customEmoji, emojiQueryAt, matchEmoji, mergeEmoji, type EmojiChoice } from '../src/index'
 
 const glyph = (name: string, insert: string): EmojiChoice => ({ id: name, name, insert })

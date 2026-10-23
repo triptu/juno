@@ -5,7 +5,7 @@
 import { cpSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { fakeActionHost, reply, TEST_CHANNEL, type FakeActionHost } from '@juno/agent-testing'
 import { generations, manifestPath, parseManifest, type Turns } from '../src/index'
 import { readText } from '../src/backup/folder'

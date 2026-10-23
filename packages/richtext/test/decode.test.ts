@@ -6,7 +6,7 @@
  */
 import { Message } from '@juno/slack-schema'
 import { Schema } from 'effect'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { messageBody, plainText, previewText, type Lookups, type MessageContent } from '../src/index'
 
 const lookups: Lookups = {

@@ -1,5 +1,5 @@
 /** Opt-in timing marks; CPU belongs to this worker, so child-process time appears as waiting. */
-import { afterEach, beforeEach } from 'vitest'
+import { afterEach, beforeEach } from 'bun:test'
 
 let wall = 0
 let cpu = process.cpuUsage()

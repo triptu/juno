@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { noTabs, openPlace, tabTopic, topicPlace, type OpenOptions, type Tabs } from '../src/tabs'
 
 const open = (tabs: Tabs, topicId: string, options?: OpenOptions) => openPlace(tabs, topicPlace(topicId), options)

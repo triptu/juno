@@ -1,4 +1,4 @@
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { fakeProvider } from '@juno/agent-testing'
 import { createCatalogue, resolveCatalogue, resolveCodexModels } from '../src/index'
 import { providerHarness } from './providers-harness'

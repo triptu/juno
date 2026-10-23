@@ -1,13 +1,15 @@
 // The chat as the renderer sees it (plan v3 §12, §13): the agent's renderer RPCs over a port, on the
 // real turn engine with the scripted fake provider (`serve-harness.ts`).
-import { expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { Effect, Stream } from 'effect'
 import { fakeActionHost, rateLimited, reply, TEST_CHANNEL } from '@juno/agent-testing'
 import { Digest, Revision } from '@juno/agent-cards'
 import { junoText, type CardId, type ChatItem, type ChatPage, type OpId } from '@juno/agent-contract'
 import type { HostReads } from '../src/index'
-import { ONLINE, run, served as chat } from './serve-harness'
+import { ONLINE, run, served as chat, closeServed } from './serve-harness'
 import { deferred, say } from './turns-harness'
+
+afterEach(closeServed)
 
 const of = <T extends ChatItem['_tag']>(page: ChatPage, tag: T) => page.items.filter((item): item is Extract<ChatItem, { _tag: T }> => item._tag === tag)
 

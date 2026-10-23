@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import { reply } from '@juno/agent-testing'
 import { turnsHarness, say } from './turns-harness'
 

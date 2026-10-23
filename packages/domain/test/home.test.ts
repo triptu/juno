@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { asksUser, draftFirstLine, followUpDelivery, isOldDraft, isQuestion, OLD_DRAFT_MILLIS, rankHomeItems, settledEvidence, type HomeCandidate, type LaterMessage } from '../src/home'
 
 const item = (kind: HomeCandidate<string>['kind'], ...topicIds: string[]): HomeCandidate<string> => ({ kind, topicIds, value: `${kind}:${topicIds.join(',')}` })

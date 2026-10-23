@@ -1,5 +1,5 @@
 import { Schema } from 'effect'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import fc from 'fast-check'
 import { CardPayload, CardRecord, ChildEvidence, actionDigest, childOutcome, expandChildActions, toCard, transitionAttempt, transitionCard, transitionJob } from '@juno/agent-cards'
 import { message, payloads } from './fixtures'

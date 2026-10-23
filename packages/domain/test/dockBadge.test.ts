@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import { defaultNotificationSettings, dockBadgeActive, type BadgeTopic } from '../src/index'
 
 const context = { aiAssist: false, at: { weekday: 1 as const, minutes: 600 } }

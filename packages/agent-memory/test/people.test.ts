@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import {
   checkPersonEntry, docLimits, dueForUpdate, mayKeepFile, outline, peopleContext, peopleIn, peopleLimits, peopleLine,

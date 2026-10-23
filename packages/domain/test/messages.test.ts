@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { startsGroup, threadLinkLabel, type GroupMessage } from '../src/messages'
 
 const message: GroupMessage = { senderId: 'U0LEO', body: { blocks: [] }, isThreadRoot: false, at: 0 }

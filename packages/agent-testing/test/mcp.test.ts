@@ -1,5 +1,5 @@
 // The generic fake MCP server against pi-mcp's real client, over HTTP and in memory.
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { McpAuthRequiredError, McpClient, StreamableHttpTransport } from '@earendil-works/pi-mcp'
 import { startFakeMcpServer, type FakeMcpServer, type FakeTool } from '../src/index'
 

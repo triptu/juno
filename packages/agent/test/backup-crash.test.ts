@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { afterEach, beforeEach, expect, it } from 'vitest'
+import { afterEach, beforeEach, expect, it } from 'bun:test'
 import { crashAt, runAgent } from '@juno/agent-testing'
 
 const program = fileURLToPath(new URL('./fixtures/backup.ts', import.meta.url))

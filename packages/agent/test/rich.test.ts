@@ -1,6 +1,6 @@
 // The rich text of a Juno bubble (SPEC 13.1): what the model writes, in
 // markdown or in HTML, and the blocks the chat draws from it.
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import { junoText } from '@juno/agent-contract'
 import { blocksOf } from '../src/router/rich'
 import type { BubbleSpan } from '../src/router/sources'

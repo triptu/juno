@@ -2,7 +2,7 @@
 // click is consumed into one authorization, the host sends once, and the receipt settles the card.
 // A failed or unknown action shows "Failed" and is never tried again; a dismissal is a no the model
 // reads with its next input. In-process, on the real engine, with the scripted model and the fake host.
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { fakeActionHost, forgedSendReceipt, hostile, reply, TEST_CHANNEL, type FakeActionHost } from '@juno/agent-testing'
 import { ActionId, ConnectionId, AccountId, Digest, Revision, SourceGeneration, type CardPayload } from '@juno/agent-cards'
 import type { Card, CardBinding } from '@juno/agent-contract'

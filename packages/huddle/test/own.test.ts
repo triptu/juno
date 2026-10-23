@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import * as L from '../src/lifecycle'
 import { callRoom, followOwn, frameOwn, readOwn, type OwnRoom } from '../src/own'
 import { applyInfo, type RoomFrame } from '../src/running'

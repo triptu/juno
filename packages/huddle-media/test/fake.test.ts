@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { createFakeMediaSession } from '../src/fake.ts'
 import type { MediaSnapshot } from '../src/index.ts'
 

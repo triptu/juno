@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { fakeProvider, reply, startFakeMcpServer, startFakeNotion, startFakeLittlebird, unknownTool } from '@juno/agent-testing'
 import { createMcpManager, MCP_MIGRATIONS, NOTION, T3, mcpExecutors, mcpTools, changeCard, serveMcp, type Credentials, type McpManagerApi } from '../src/mcp'
 import { createProviderGuard, openTurns } from '../src'

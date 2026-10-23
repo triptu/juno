@@ -1,6 +1,6 @@
 // The action policy's pure rules (plan v3 §6, §9; specs/agent-actions.qnt): authorization, the tier
 // table with the clean-run rule, grant authorities and click bindings.
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import fc from 'fast-check'
 import {
   authorizeDecision, bindingMatches, floorRisk, mayMintGrant, needsReview, reviewDecision, toolDecision,

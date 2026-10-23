@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { splitLanguageTag } from '../src/index'
 
 describe('a language tag on the first line', () => {

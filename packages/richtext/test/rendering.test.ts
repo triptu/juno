@@ -1,5 +1,5 @@
 import type { Block, RichTextElement } from '@juno/slack-schema'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { bodyFromMrkdwn, inlinesOf, messageBody, plainText, previewLine, previewText, type Lookups, type MessageBody } from '../src/index'
 
 const lookups: Lookups = {

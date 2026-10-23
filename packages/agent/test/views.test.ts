@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { Schema } from 'effect'
 import { AccountId } from '@juno/agent-cards'
 import { HostChannelId, HostView, OpId } from '@juno/agent-contract'
@@ -7,7 +7,9 @@ import type { ViewHost } from '../src/view-tools/host'
 import { fakeHost, say, turnsHarness } from './turns-harness'
 
 import { activityActions } from '../src/actions/activity'
-import { served, run } from './serve-harness'
+import { served, run, closeServed } from './serve-harness'
+
+afterEach(closeServed)
 const account = AccountId.make('test-owner')
 let calls = 0
 const call = (name: string, args: Record<string, unknown>) => reply({ type: 'toolCall', id: `view-call-${++calls}`, name, arguments: args as never })

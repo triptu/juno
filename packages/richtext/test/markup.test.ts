@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { markupLayout, toggleMarkup, type MarkupEdit, type MarkupStyle } from '../src/index'
 
 /** `text` with `[` and `]` around the selection (or one `|` for the caret), after the key's edit. */

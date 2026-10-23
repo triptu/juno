@@ -1,6 +1,6 @@
 // The Activity page's read time against the Juno switcher budget (docs/performance.md), alone under bun run perf --unit:
 // beside the other packages' tests, one cold read measured the machine, not the query.
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { activityPage } from '../src/serve/pages'
 import { seedRuns } from './activity-seed'
 import { fakeHost, turnsHarness } from './turns-harness'

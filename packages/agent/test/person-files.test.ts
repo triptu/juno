@@ -2,7 +2,7 @@
 // file, the sensitive-detail refusal, the owner's relationship, the file in a DM run's request after
 // the recent messages, the outline that names people but not their notes, the split of the older
 // People doc, the background update, and a deleted file.
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { reply } from '@juno/agent-testing'
 import type { HostReads } from '../src/index'
 import type { HostInteraction } from '../src/router/host-tools'

@@ -1,7 +1,7 @@
 // Activity's run log (SPEC 13.9): what started each run, what it read, the steps it took and what
 // they returned, and its model and cost, on the real turn engine with the scripted fake provider.
 import { Schema } from 'effect'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { reply } from '@juno/agent-testing'
 import { HostMessagePage } from '@juno/agent-contract'
 import { activityPage } from '../src/serve/pages'

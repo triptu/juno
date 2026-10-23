@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { sidebarMoves, type ShownOrder } from '../src/sidebarMoves'
 import { defaultTopicListFilter } from '../src/topics'
 

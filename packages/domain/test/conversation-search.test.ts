@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { indexSubject, matchSubject, rankSearchResults, searchWords, type SearchSubject } from '../src/conversation-search'
 
 const DAY = 86_400_000

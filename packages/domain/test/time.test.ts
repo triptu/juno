@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { clockTime, hourLabel, messageHeaderTime, messageTime, relativeTime } from '../src/index'
 import { DAY, HOUR, NOW } from './fixtures'
 

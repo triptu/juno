@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { slackScheduleFor, slackScheduleMatches, slackScheduleSnapshot } from '../src/index'
 
 describe("Slack's schedule from notification hours", () => {

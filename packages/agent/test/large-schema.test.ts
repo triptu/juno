@@ -6,7 +6,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { fakeProvider, fakeReviewer, json, reply, startFakeMcpServer } from '@juno/agent-testing'
 import { createMcpManager, MCP_MIGRATIONS, mcpExecutors, mcpTools, type Credentials, type McpManagerApi } from '../src/mcp'
 import { SCHEMA_LIMIT } from '../src/mcp/discovery'

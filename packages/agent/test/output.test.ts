@@ -1,5 +1,5 @@
 // The block format the model writes (plan v3 §8): what becomes a bubble or a reaction, and what never shows.
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import { parseOutput } from '../src/index'
 
 it('shows only closed blocks, in order, and never a half-written one', () => {

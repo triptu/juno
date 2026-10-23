@@ -1,5 +1,5 @@
 // The T3 Code fake: the one-time code sign-in, loopback against LAN, a missing tool and scripted threads.
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { McpClient } from '@earendil-works/pi-mcp'
 import { authorizeMcp, McpOAuthAuthorizationRequiredError, OAuthError, OAuthInsecureEndpointError } from '@earendil-works/pi-mcp/oauth'
 import { T3_ANSWER_TOOLS, T3_READ_TOOLS, T3_WORK_TOOLS, startFakeT3, type FakeT3 } from '../src/index'

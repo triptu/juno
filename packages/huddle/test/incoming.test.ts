@@ -1,5 +1,5 @@
 // Which huddles get the incoming card (SPEC 20, "Incoming huddles"), and when the card goes.
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import type { HuddleCall, RunningHuddle, RunningHuddles } from '@juno/contract'
 import { dismiss, incomingOf, lookAt, noIncoming, offer, settle, NEW_HUDDLE_MILLIS, RING_MILLIS } from '../src/incoming'
 

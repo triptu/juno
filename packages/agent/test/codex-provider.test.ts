@@ -1,6 +1,6 @@
 import { purgeCodexThreads } from '../src/providers/codex-purge'
 import { existsSync } from 'node:fs'
-import { afterEach, beforeEach, expect, it } from 'vitest'
+import { afterEach, beforeEach, expect, it } from 'bun:test'
 import { startFakeCodex, startFakeMcpServer } from '@juno/agent-testing'
 import { createCodexAdapter } from '../src/index'
 import { providerHarness, request } from './providers-harness'

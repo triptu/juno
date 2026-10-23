@@ -4,7 +4,7 @@
 // cannot be made on demand, so this drives the service's listener directly,
 // with a Slack client that only answers `huddles/info`.
 import { Context, Effect } from 'effect'
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import { SlackApi, SlackEdge } from '@juno/slack'
 import { Huddle } from '../src/Huddle'
 

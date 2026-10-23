@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { closeTab, expireTabs, homePlace, noTabs, openPlace, parseTabs, reopenClosedTab, savedTabs, stampViewed, tabExpiryMs, tabTopic, topicPlace, type Tabs } from '../src/tabs'
 
 const HOUR = 60 * 60 * 1000

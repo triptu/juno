@@ -3,12 +3,14 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { reply } from '@juno/agent-testing'
 import type { ChatItem, ChatPage, OpId } from '@juno/agent-contract'
 import { fakeKeychain, type FakeKeychain } from './fixtures/keychain'
-import { run, served } from './serve-harness'
+import { run, served, closeServed } from './serve-harness'
 import { say } from './turns-harness'
+
+afterEach(closeServed)
 
 const of = <T extends ChatItem['_tag']>(page: ChatPage, tag: T) => page.items.filter((item): item is Extract<ChatItem, { _tag: T }> => item._tag === tag)
 

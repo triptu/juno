@@ -4,7 +4,7 @@
  * a refusal's explanation, or a network error. The bodies are shaped like
  * OpenRouter's (`{ error: { code, message, metadata } }`); none is real.
  */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { classifyFailure, fallbackHelps, isRetryable, modelMaker, refusedBeforeOutput } from '../src/index'
 
 const body = (code: number, message: string, metadata?: object) => JSON.stringify({ error: { code, message, ...(metadata ? { metadata } : {}) } })

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import type { File } from '@juno/slack-schema'
 import { messagePreviewText, previewSender, shortName, namesakes, type PreviewPerson } from '../src/index'
 

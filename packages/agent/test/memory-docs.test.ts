@@ -1,7 +1,7 @@
 // Juno's memory of the owner (SPEC 13.8) on the turn engine, with the scripted fake provider:
 // writes with no card and their marks, Undo, removal, the outline in each request, and the
 // learning pass behind a proactive ask.
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { reply } from '@juno/agent-testing'
 import type { HostReads } from '../src/index'
 import { asks, offerConnection, offerSetup } from '../src/memory-docs/asks'

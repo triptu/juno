@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { cacheKeyOf, canonicalJson, defineStructuredTask, tasks } from '../src/index'
 import { NOW, msg, stagingBill } from './fixtures'
 

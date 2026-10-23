@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { ignoreEvidence, textMentionsMeDirectly, unfollowEvidence, UserId, UsergroupId, type UnreadStretch } from '../src/index'
 import { DAY, NOW } from './fixtures'
 

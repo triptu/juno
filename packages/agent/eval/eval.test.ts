@@ -1,6 +1,6 @@
 // The eval harness on the scripted model: every case passes with a good answer, each grader
 // fails the bad answer it exists for, and the report counts what happened.
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { reply, type ModelStep } from '@juno/agent-testing'
 import { CASES, type Case } from './cases'
 import { parseAnswers, scriptedJudge, type JudgeAnswer } from './judge'

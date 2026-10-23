@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { automatedReason, classifyConversation, integrationName, junoVerdict, movedBackReason, postingCounts, type SampledMessage, type Sender } from '../src'
 
 /** Top-level messages, apps first, then people, then the user. */

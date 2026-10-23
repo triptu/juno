@@ -1,7 +1,7 @@
 // Codemode for reads (docs/research/codemode.md), on the real engine with the scripted model:
 // a script reads Slack through the host, its child calls are audited and shown in Activity,
 // citations resolve, writes are refused, the caps hold, and Pause stops a running script.
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { reply, startFakeNotion } from '@juno/agent-testing'
 import { createMcpManager, MCP_MIGRATIONS, mcpTools, NOTION, type Credentials, type McpManagerApi } from '../src/mcp'
 import type { HostReads } from '../src/index'

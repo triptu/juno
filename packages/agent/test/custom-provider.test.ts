@@ -1,9 +1,11 @@
 // A custom OpenAI-compatible endpoint (SPEC 13.10) as the renderer sees it: the app's providers
 // (`providerTurns`) over HTTP against a fake local model server, behind the same guard and ledger.
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { startFakeOpenAi, type FakeOpenAi, type FakeOpenAiOptions } from '@juno/agent-testing'
 import { junoText, type ChatItem, type ChatPage, type OpId } from '@juno/agent-contract'
-import { run, served } from './serve-harness'
+import { run, served, closeServed } from './serve-harness'
+
+afterEach(closeServed)
 
 const servers: FakeOpenAi[] = []
 afterEach(async () => {

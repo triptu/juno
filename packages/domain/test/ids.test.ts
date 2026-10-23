@@ -1,5 +1,5 @@
 import { Schema } from 'effect'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { ChannelId, TopicId, Ts, compareTs, mainTopicId, maxTs, parseTopicId, threadTopicId, topicKindOf, millisToTs, tsToMillis } from '../src/index'
 
 const C = ChannelId.make('C0ENG')

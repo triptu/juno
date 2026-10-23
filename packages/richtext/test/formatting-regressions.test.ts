@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import { composeOutgoing, markupLayout, toggleMarkup } from '../src/index'
 
 it.each(['𠮷*bold*', '*bold*𠮷', '*bold**', '_italic__', '~strike~~'])('keeps literal boundaries in %s', (input) => {

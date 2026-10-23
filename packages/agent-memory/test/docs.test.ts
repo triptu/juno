@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { checkEntry, DOCS, docLimits, looksSecret, outline, renderDocs, searchDocs, utf8Bytes } from '../src/index.ts';
 import type { Doc, DocEntry } from '../src/index.ts';

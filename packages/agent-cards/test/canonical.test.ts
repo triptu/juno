@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import fc from 'fast-check'
 import { Schema } from 'effect'
 import { actionDigest, canonicalIdentity, canonicalJson, canonicalPayload, decodePayload, digestJson, ExecutableIdentity, payloadDigest, payloadSchemas, modelPayloadSchema } from '@juno/agent-cards'

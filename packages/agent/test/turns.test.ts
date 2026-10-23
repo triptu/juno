@@ -1,7 +1,7 @@
 // Turns as the owner sees them (plan v3 §5, §8, §13.2): one owner message is one run, messages
 // that join a run at its next step, every ending, the budget, compaction beside a run, and pins. In-process, through the
 // engine's public API, with the scripted fake provider behind the provider guard.
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { fakeCatalogue, lostStream, rateLimited, rejectedKey, reply, serverError } from '@juno/agent-testing'
 import type { BubbleId } from '@juno/agent-contract'
 import { dollars, type HostReads } from '../src/index'

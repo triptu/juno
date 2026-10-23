@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { addToViewMenu, channelMenuItems, dropViewOrder, moveViewOrder, topicMenuItems, viewMenuChoice, viewName, type ChannelId } from '../src'
 
 describe('view order', () => {

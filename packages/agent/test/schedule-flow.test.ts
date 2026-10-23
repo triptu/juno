@@ -1,10 +1,12 @@
-import { expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { Effect } from 'effect'
 import { OpId } from '@juno/agent-contract'
 import { fakeActionHost, reply, TEST_CHANNEL } from '@juno/agent-testing'
 import { answer } from './turns-harness'
-import { served } from './serve-harness'
+import { served, closeServed } from './serve-harness'
 import type { Reply } from '../src/schedule/rules'
+
+afterEach(closeServed)
 
 async function watching() {
   let now = Date.UTC(2026, 9, 19, 10)

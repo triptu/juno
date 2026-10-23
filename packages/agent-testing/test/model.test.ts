@@ -1,5 +1,5 @@
 // The scripted model through pi-ai's own Models API, as the guard and providers call it.
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import { fauxToolCall, type AssistantMessage, type AssistantMessageEvent, type Context } from '@earendil-works/pi-ai'
 import { compactionTask, start } from '@juno/agent-memory'
 import { fakeReview, fakeProvider, lostStream, rateLimited, rejectedKey, reply, serverError, type FakeProvider } from '../src/index'

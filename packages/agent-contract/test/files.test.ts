@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { cutText, fitImage, imageSize, imageTokenBound, JUNO_IMAGE_LIMITS, junoFileKind, junoTakes, thumbBox } from '../src/index'
 
 const file = (name: string, mimetype: string, size = 1_000) => ({ name, mimetype, size })

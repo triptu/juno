@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { channelMenuItems, followsThread, notifyChoiceOf, personMenuItems, tabMenuItems, threadNotifyChoice, topicMenuItems, type MenuItem, type TopicMenuState } from '../src/index'
 import { eng, group, maya } from './fixtures'
 

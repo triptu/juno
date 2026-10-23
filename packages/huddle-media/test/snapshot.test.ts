@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { INITIAL_SNAPSHOT, patchAttendee, presence, setConnection, setLocalShare, shareReady, startCall } from '../src/snapshot.ts'
 import { share, SnapshotStore } from '../src/store.ts'
 

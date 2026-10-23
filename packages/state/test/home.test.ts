@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import type { HomeItem } from '@juno/contract'
 import { holdHome, homeItemLimit } from '../src/home'
 import { homeGreeting, homeScene } from '../src/homeScene'

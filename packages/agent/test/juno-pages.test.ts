@@ -1,14 +1,16 @@
 // Settings › Juno and the Juno menu's pages as the renderer reads them (SPEC 13.10, plan v3 §13.3),
 // on the real turn engine with the scripted fake provider and the fake OpenRouter catalogue.
-import { expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { Effect, Stream } from 'effect'
 import { fakeActionHost, rejectedKey, reply, TEST_CHANNEL } from '@juno/agent-testing'
 import { Revision } from '@juno/agent-cards'
 import type { ChatItem, ChatPage, JunoSettingsPage, OpId, PinId, ScheduleId } from '@juno/agent-contract'
 import { providerTurns } from '../src/index'
 import { fallbackSlug } from '../src/settings/store'
-import { run, served } from './serve-harness'
+import { run, served, closeServed } from './serve-harness'
 import { say } from './turns-harness'
+
+afterEach(closeServed)
 
 const of = <T extends ChatItem['_tag']>(page: ChatPage, tag: T) => page.items.filter((item): item is Extract<ChatItem, { _tag: T }> => item._tag === tag)
 const first = <A, E>(stream: Stream.Stream<A, E>) => Effect.runPromise(Stream.runHead(stream)).then((head) => (head._tag === 'Some' ? head.value : undefined))

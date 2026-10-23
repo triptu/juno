@@ -1,9 +1,11 @@
-import { expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { reply } from '@juno/agent-testing'
 import { say } from './turns-harness'
 import { OpId, PinId } from '@juno/agent-contract'
 import { Revision } from '@juno/agent-cards'
-import { served, run } from './serve-harness'
+import { served, run, closeServed } from './serve-harness'
+
+afterEach(closeServed)
 
 it('pins a UTF-8 span, expires Undo, and removes its source while paused', async () => {
   let now = 100_000

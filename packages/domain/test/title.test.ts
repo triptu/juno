@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { channelKindLabel, channelLabel, contextPillText, contextTint, firstWords, mainLabel, manualTitleAfterRename, resolveTitle } from '../src/index'
 import { eng, group, hiring, maya, topic } from './fixtures'
 

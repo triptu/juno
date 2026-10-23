@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import type { TopicDetail, TopicRow } from '@juno/contract'
 import { emptyWindow } from '../src/list'
 import { retainOpenTopics, type SidebarWindow } from '../src/sidebar'

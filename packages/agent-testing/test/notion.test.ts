@@ -1,5 +1,5 @@
 // The Notion fake through pi-mcp's real client and OAuth flow.
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { McpOAuthAuthorizationRequiredError } from '@earendil-works/pi-mcp/oauth'
 import { startFakeNotion, type FakeNotion } from '../src/index'
 import { signIn } from './signIn'

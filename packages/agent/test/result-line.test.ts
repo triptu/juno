@@ -1,5 +1,5 @@
 // The one line a card shows for what a connection call gave back (SPEC 13.3): plain words, never JSON.
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import { clickOutput, resultLine } from '../src/mcp/results'
 
 it.each([

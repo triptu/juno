@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { bodyFromMarkdown } from '../src/index'
 
 describe('markdown files', () => {

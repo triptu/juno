@@ -1,6 +1,6 @@
 import { Message } from '@juno/slack-schema'
 import { Schema } from 'effect'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { customEmojiLookup, inlinesOf, messageBody, plainText, reactionDisplay } from '../src/index'
 
 const emoji = customEmojiLookup([

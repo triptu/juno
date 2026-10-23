@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { parseSlackLink, slackLink } from '../src/links'
 
 const channel = { id: 'C024BE91L' } as never

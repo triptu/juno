@@ -11,13 +11,13 @@
   "devDependencies": {
     "typescript": "7.0.2",
     "fast-check": "4.3.0",
-    "vitest": "5.0.4"
+    "@types/bun": "1.4.2"
   },
   "juno": {
     "allowedDeps": []
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "test": "bun ../../scripts/heavy.mjs vitest run"
+    "test": "bun test"
   }
 }

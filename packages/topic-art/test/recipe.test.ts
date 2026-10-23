@@ -1,7 +1,7 @@
 // The recipe vocabulary as a user of the package sees it: a model reply in,
 // a checked recipe or a quotable reason out; the canonical text reads back
 // unchanged; and nothing hostile in a reply reaches the rendered markup.
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { countElements, HUE_NAMES, parseRecipe, pebbleHue, pebbleShape, renderArt, renderPebble, serialiseRecipe, type Recipe } from '../src/index'
 
 const database = `<svg viewBox="0 0 40 40" data-hue="teal">

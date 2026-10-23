@@ -5,7 +5,7 @@
 import { createModels, createProvider, fauxAssistantMessage, fauxProvider, fauxToolCall, type ClassifierAnswer, type ClassifierContext, type FauxResponseStep } from '@earendil-works/pi-ai'
 import { createFauxCore } from '@earendil-works/pi-ai/providers/faux'
 import { Effect, Fiber } from 'effect'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { OPENROUTER, defineStructuredTask, defineTextTask, isFinal, makePiAiProvider, tasks, type AiConfig, type Decision } from '../src/index'
 import { NOW, postgres, stagingBill } from './fixtures'
 

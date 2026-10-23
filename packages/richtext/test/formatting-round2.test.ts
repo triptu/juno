@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import type { Block, RichTextBlock, RichTextElement } from '@juno/slack-schema'
 import { composeEdit, composeOutgoing, editMarkup, toggleMarkup } from '../src/index'
 

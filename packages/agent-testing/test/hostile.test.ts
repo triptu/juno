@@ -1,5 +1,5 @@
 // The hostile Slack fixtures are valid AgentHost messages and say what they test.
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import { Schema } from 'effect'
 import { HostMessage } from '@juno/agent-contract'
 import { FAKE_SECRET, forgedSendReceipt, hostile, hostileMessages, hostilePage } from '../src/index'

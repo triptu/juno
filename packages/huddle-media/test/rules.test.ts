@@ -1,5 +1,5 @@
 import { MeetingSessionStatusCode as Code } from 'amazon-chime-sdk-js'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { endReasonOf } from '../src/chime/endReason.ts'
 import { microphoneProblem } from '../src/chime/microphone.ts'
 import { slackUserIdOf } from '../src/externalUserId.ts'

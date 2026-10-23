@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { csvRows, fileMediaKind, fileTextKind, knownMimetype } from '../src/index'
 
 describe('file kind', () => {

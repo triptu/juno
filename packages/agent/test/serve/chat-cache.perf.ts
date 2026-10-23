@@ -1,5 +1,5 @@
 import { writeFileSync } from 'node:fs'
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import { measure, type Measurement } from './chat-cache-measure'
 
 const percentile = (values: ReadonlyArray<number>, p: number) => values.toSorted((a, b) => a - b)[Math.floor(values.length * p)]!

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import type { TopicRow } from '@juno/contract'
 import { emptyWindow, type ListWindow } from '../src/list'
 import { holdOrder } from '../src/holdOrder'

@@ -1,5 +1,5 @@
 /** Task outputs: what the schema and the accept rule let through. */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { decisionTasks, tasks, validateOutput } from '../src/index'
 import { channels, people, postgres, stagingBill } from './fixtures'
 

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it } from 'vitest'
+import { afterEach, beforeEach, expect, it } from 'bun:test'
 import { httpError, lostStream, rateLimited, rejectedKey, reply, serverError } from '@juno/agent-testing'
 import { AdmissionError, createCompactionProvider, createProviderGuard, dollars, providerFailure } from '../src/index'
 import type { GuardCall } from '../src/providers/guard'

@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test } from 'bun:test';
 import fc from 'fast-check';
 import { buildRequest, children, complete, compactionTask, context, deps, limits, mask, merge,
   nodeKey, partition, renderSource, renderView, requiredWindow, start, taintClosure, upper, utf8Bytes, withinCutoff } from '../src/index.ts';

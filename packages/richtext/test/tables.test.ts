@@ -6,7 +6,7 @@
  */
 import { Message } from '@juno/slack-schema'
 import { Schema } from 'effect'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { composeEdit, editMarkup, messageBody, plainText, previewLine, previewText, readableText, tableText, type Lookups, type MessageBody } from '../src/index'
 
 const lookups: Lookups = { me: 'U0ME', user: (id) => ({ U0ME: 'Tushar', U0MAYA: 'Maya Chen' })[id] }

@@ -4,14 +4,16 @@
 // owner's click. In-process, on the real engine, with the scripted model, the fake host and a fake backup.
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { fakeActionHost, reply, TEST_CHANNEL } from '@juno/agent-testing'
 import { junoText, type Card, type CardBinding, type ChatItem, type ChatPage, type OpId, type ChatMessageId } from '@juno/agent-contract'
 import { liveGrant, mintGrant, type RemovalBackup, type Turns } from '../src/index'
-import { ONLINE, run, served } from './serve-harness'
+import { ONLINE, run, served, closeServed } from './serve-harness'
 import { createChatCache, type ChatSource } from '../src/serve/chat'
 import { CHAT_MIGRATIONS } from '../src/serve/schema'
 import { deferred, HAIKU, say, turnsHarness } from './turns-harness'
+
+afterEach(closeServed)
 
 /** A made-up marker for the words the owner removes. */
 const SECRET = 'ZEBRA-4417'

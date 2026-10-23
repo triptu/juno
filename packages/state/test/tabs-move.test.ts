@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { moveTab, noTabs, openPlace, setPinned, tabTopic, topicPlace, type Tabs } from '../src/tabs'
 
 const open = (tabs: Tabs, topicId: string, newTab = false) => openPlace(tabs, topicPlace(topicId), { newTab })

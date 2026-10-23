@@ -1,7 +1,7 @@
 // The pure rules of @juno/huddle: room frame decoding and merging, and the
 // lifecycle with the pages' media as current state (specs/huddle.qnt). The flows themselves
 // are tested in the engine against the fake Slack (engine/test/huddle.test.ts).
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import type { HuddlePageReport } from '@juno/contract'
 import { aloneNow, leaveAt, ALONE_LEAVE_MILLIS } from '../src/alone'
 import * as L from '../src/lifecycle'

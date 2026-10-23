@@ -3,7 +3,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { fakeProvider, fakeReview, fakeReviewer, reply, startFakeNotion, type FakeReviewAnswers, type FakeReviewRequest } from '@juno/agent-testing'
 import { createMcpManager, MCP_MIGRATIONS, NOTION, mcpExecutors, mcpTools, type Credentials, type McpManagerApi } from '../src/mcp'
 import { activityActions } from '../src/actions/activity'

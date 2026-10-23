@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { audienceCheck, clarityCheck, sendChecksApply } from '../src/index'
 import { eng, hiring, maya } from './fixtures'
 

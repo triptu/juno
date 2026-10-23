@@ -14,7 +14,7 @@
 // - strip: the requests with her file taken out, as before person files.
 // - after: as built: her file in <people-now> after the recent messages, read once per run.
 // - first: her file read fresh for every request and put first in the memory message, the naive place.
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { reply } from '@juno/agent-testing'
 import type { SendContext } from '@juno/agent-contract'
 import { peopleContext } from '@juno/agent-memory'

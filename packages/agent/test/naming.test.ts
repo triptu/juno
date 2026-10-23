@@ -1,5 +1,5 @@
 // What a Change card calls a connection call (SPEC 13.3, 17): the action by what it does, and a short verb.
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import { actionName, actionStatus } from '../src/mcp/naming'
 
 it.each([

@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { fileURLToPath } from 'node:url'
-import { afterEach, beforeEach, expect, it } from 'vitest'
+import { afterEach, beforeEach, expect, it } from 'bun:test'
 import { agentDatabaseFiles, crashAt, journalFiles, runAgent, snapshotFiles, type CrashPoint } from '@juno/agent-testing'
 
 const program = fileURLToPath(new URL('./fixtures/program.ts', import.meta.url))

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { UserId, confidenceLabel, parseCommand, threadTopicId, type CommandContext } from '../src/index'
 import { eng, hiring, maya, mayaId, ts, NOW } from './fixtures'
 

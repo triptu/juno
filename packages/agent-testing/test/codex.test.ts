@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
-import { afterEach, beforeEach, expect, it } from 'vitest'
+import { afterEach, beforeEach, expect, it } from 'bun:test'
 import { Codex } from '@openai/codex-sdk'
 import { startFakeCodex, startFakeMcpServer, type FakeCodex, type FakeMcpServer } from '../src/index'
 

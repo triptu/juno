@@ -1,5 +1,5 @@
 import { Schema } from 'effect'
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import fc from 'fast-check'
 import { CardRecord, actionDigest, expandChildActions, SendMessagePayload } from '@juno/agent-cards'
 import { Card, projectCard, sendMessageStatus } from '@juno/agent-contract'

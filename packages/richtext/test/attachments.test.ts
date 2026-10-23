@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { Schema } from 'effect'
 import { Message } from '@juno/slack-schema'
 import { inlinesOf, messageBody, messageTitle, plainText, previewText, type PlaceName } from '../src'

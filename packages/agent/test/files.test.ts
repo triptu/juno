@@ -1,6 +1,6 @@
 // Images and text files an owner message gives Juno (SPEC 12, 13.1): what the model gets, in which
 // run, what the archive keeps, and what a removal takes. In-process, through the engine's public API.
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { reply } from '@juno/agent-testing'
 import type { JunoFileInput } from '@juno/agent-contract'
 import { say, turnsHarness } from './turns-harness'

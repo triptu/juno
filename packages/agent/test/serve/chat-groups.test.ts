@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import { createChatCache } from '../../src/serve/chat'
 import { chatFixture } from './cache-fixture'
 

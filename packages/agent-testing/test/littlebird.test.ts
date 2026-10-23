@@ -1,5 +1,5 @@
 // The Littlebird fake: OAuth, paginated discovery and a tool list that changes.
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { McpClient, StreamableHttpTransport } from '@earendil-works/pi-mcp'
 import { adaptOAuthProvider } from '@earendil-works/pi-mcp/oauth'
 import { LITTLEBIRD_READ_TOOLS, LITTLEBIRD_WRITE_TOOLS, startFakeLittlebird, unknownTool, type FakeLittlebird } from '../src/index'

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { highlightCode, MAX_HIGHLIGHT_LENGTH } from '../src/highlight'
 
 const joined = (tokens: ReadonlyArray<{ readonly text: string }>) => tokens.map((token) => token.text).join('')

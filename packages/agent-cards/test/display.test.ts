@@ -1,5 +1,5 @@
 // How a card shows a value (SPEC 13.3): strings bare, short string lists on one line, the rest as indented lines.
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import { readableValue } from '../src/display'
 
 it.each([

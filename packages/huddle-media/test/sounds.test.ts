@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { huddleSounds, type SoundView } from '../src/sounds.ts'
 
 const out: SoundView = { own: 'out', attendeeId: null, others: [] }

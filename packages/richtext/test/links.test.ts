@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { composeOutgoing, findLinks, linkOf, messageBody } from '../src/index'
 
 const section = (text: string, targets?: Parameters<typeof composeOutgoing>[1]) => composeOutgoing(text, targets).blocks[0]?.elements[0]

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { shouldMarkRead, type ReadView } from '../src/reads'
 
 const watching: ReadView = { active: true, focused: true, atBottom: true, markedUnread: false }

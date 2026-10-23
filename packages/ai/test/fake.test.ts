@@ -1,7 +1,7 @@
 /** Behaviour through the AiProvider interface with the fake, the way the assistant will use it. */
 import { Effect, Fiber } from 'effect'
 import { TestClock } from 'effect/testing'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { AiProvider, FakeAiProvider, makeFakeAiProvider, tasks, validateOutput, type Decision } from '../src/index'
 import { NOW, T, channels, msg, people, postgres, stagingBill } from './fixtures'
 

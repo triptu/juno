@@ -1,6 +1,6 @@
 // Invariants every catalog entry keeps (SPEC 12, "Pictures and the gallery").
 // No entry is pinned: the list changes as pictures are added and dropped.
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { PICTURE_ID, PICTURE_KINDS, pictureYear, yearOf } from '../src/index'
 import { PICTURES } from '../src/catalog'
 

@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { Schema } from 'effect'
-import { expect } from 'vitest'
+import { expect } from 'bun:test'
 import type { BenchmarkMode } from './chat-cache-bench'
 
 export const Measurement = Schema.Struct({

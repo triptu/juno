@@ -4,7 +4,7 @@
 // credentials and blocks every later join. The window is the durable write,
 // so this drives the service with a store whose write waits for the test.
 import { Context, Deferred, Effect, Fiber, Ref } from 'effect'
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import type { HuddlePageReport } from '@juno/contract'
 import { SlackApi, SlackEdge } from '@juno/slack'
 import { Huddle } from '../src/Huddle'

@@ -4,7 +4,6 @@
 // on OpenRouter it reads the fake catalogue, beside the scripted model; with `custom`, the engine runs
 // on the app's providers (`providerTurns`) against a fake OpenAI-compatible server over HTTP.
 import { MessageChannel, type MessagePort } from 'node:worker_threads'
-import { afterEach } from 'vitest'
 import { Effect, Exit, Layer, Scope, Stream, SubscriptionRef } from 'effect'
 import { RpcClient, type RpcClientError, type RpcGroup } from 'effect/rpc'
 import { openRouterCatalogue } from '@juno/agent-testing'
@@ -19,9 +18,10 @@ export type Client = RpcClient.RpcClient<RpcGroup.Rpcs<typeof AgentRpcs>, RpcCli
 export type Presence = typeof HostPresence.Type
 
 const cleanups: Array<() => Promise<void>> = []
-afterEach(async () => {
+/** Closes every engine, settings and scope `served` opened. Each test file calls it in its own `afterEach`. */
+export async function closeServed() {
   for (const cleanup of cleanups.splice(0).toReversed()) await cleanup()
-})
+}
 
 const nodePort = (port: MessagePort): HostPort => ({
   postMessage: (message) => port.postMessage(message),

@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { afterEach, beforeEach, expect, it } from 'vitest'
+import { afterEach, beforeEach, expect, it } from 'bun:test'
 import { CRASH_POINTS, crashAt, journalFiles, runAgent, snapshotFiles } from '../src/index'
 
 const program = fileURLToPath(new URL('./fixtures/agent.ts', import.meta.url))

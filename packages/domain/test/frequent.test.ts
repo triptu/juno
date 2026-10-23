@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { rankConversations } from '../src/frequent'
 
 const DAY = 86_400_000

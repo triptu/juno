@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { grammarCheck, validateOutput } from '../src/index'
 
 const edit = (from: string, to: string, start = 0, kind = 'confusion') => ({ from, to, start, kind })

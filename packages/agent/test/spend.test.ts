@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it } from 'vitest'
+import { afterEach, beforeEach, expect, it } from 'bun:test'
 import { reply } from '@juno/agent-testing'
 import { dollars, type SpendLedger } from '../src/index'
 import { providerHarness, request } from './providers-harness'

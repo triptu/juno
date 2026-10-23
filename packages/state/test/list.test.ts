@@ -1,6 +1,6 @@
 // The renderer's delta cache: unchanged rows and an unchanged order keep
 // their identity, so per-row atoms and React.memo do not re-render.
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { applyListDelta, emptyWindow } from '../src/index'
 
 const meta = { seq: 1, queryMs: 0, encodeMs: 0, at: 0 }

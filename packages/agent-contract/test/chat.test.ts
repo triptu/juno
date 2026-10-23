@@ -1,5 +1,5 @@
 import { Schema } from 'effect'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { Emoji, Reaction, endGroupsAtDividers, OpenTarget, selectionSnippet, selectionSource, selectionTooltip, type Selection, sendMessageStatus, type BubbleId, type ChatItem, type GroupPosition, type ProposedMessage, type RunId } from '../src/index'
 
 const decodeOpen = Schema.decodeUnknownSync(OpenTarget)

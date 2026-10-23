@@ -2,7 +2,7 @@
 // of the message goes, a resent message goes with every copy, Juno's reply goes only when asked and only what
 // its turn wrote, other inputs stay, and every run that could have carried the message is found.
 import fc from 'fast-check'
-import { expect, it } from 'vitest'
+import { expect, it } from 'bun:test'
 import { removalScope, replyOf, runsThatSaw, type ArchiveRow, type MessageKind, type OpRow, type RunRow } from '../src/redaction/scope'
 
 type Turn = { readonly kind: 'user' | 'card' | 'wake' | 'work'; readonly chunks: number; readonly retryOf: number | undefined; readonly after: ReadonlyArray<{ kind: 'juno' | 'tool'; chunks: number }> }

@@ -4,7 +4,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it } from 'bun:test'
 import { json, startFakeMcpServer, startFakeNotion } from '@juno/agent-testing'
 import { createMcpManager, LITTLEBIRD, MCP_MIGRATIONS, NOTION, T3, mcpTools, type Credentials } from '../src/mcp'
 import type { Actions } from '../src/actions'
