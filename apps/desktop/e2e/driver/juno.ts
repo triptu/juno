@@ -6,6 +6,9 @@ import type { NotificationPermission } from '@juno/contract'
  * verb is missing.
  */
 import { expect, type ElectronApplication, type Locator, type Page } from '@playwright/test'
+import { electronSurface, lastMenu as surfaceLastMenu, type AppMenuItem, type AppSurface, type WorkPassName } from './surface'
+
+export type { AppMenuItem, AppSurface } from './surface'
 
 /**
  * How long a click holds the button, as a real one does. A pointerup in the
@@ -14,10 +17,6 @@ import { expect, type ElectronApplication, type Locator, type Page } from '@play
  * frame late.
  */
 const PRESS_MS = 60
-
-interface WorkHooks {
-  readonly workPass: (name: 'title' | 'art' | 'home' | 'automated') => Promise<void>
-}
 
 /** Presses and releases the primary button where the mouse is. */
 export async function press(win: Page): Promise<void> {
@@ -94,6 +93,13 @@ export interface Landing {
   readonly tops: ReadonlyArray<number>
 }
 export type SidebarFilterName = 'All' | 'Channels' | 'DMs'
+
+/**
+ * A selector for an element loading from main's `juno://<host>/` scheme. The
+ * browser lane's page loads the same addresses from `/__juno/<host>/` on its
+ * own origin (`web/page/urls.ts`).
+ */
+export const schemeSrc = (host: string, attribute = 'src'): string => `:is([${attribute}^="juno://${host}/"], [${attribute}^="/__juno/${host}/"])`
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
@@ -711,7 +717,7 @@ export class PeekPopover {
 }
 
 export class Juno {
-  readonly app: ElectronApplication
+  readonly surface: AppSurface
   readonly win: Page
   readonly sidebar: Sidebar
   readonly accountMenu: AccountMenu
@@ -730,25 +736,32 @@ export class Juno {
   readonly palette: PaletteDriver
   readonly welcome: WelcomeDriver
 
-  constructor(app: ElectronApplication, win: Page) {
-    this.app = app
+  /** On Electron, the app or its surface; on the web, the web surface (`webSurface`). */
+  constructor(app: ElectronApplication | AppSurface, win: Page) {
+    const surface = 'kind' in app ? app : electronSurface(app)
+    this.surface = surface
     this.win = win
-    appOf.set(win, app)
+    surfaceOf.set(win, surface)
     this.sidebar = new Sidebar(win)
     this.accountMenu = new AccountMenu(win, this.sidebar)
     this.settings = new SettingsPage(win)
     this.notifications = new NotificationsPage(win)
     this.topic = new TopicPane(win)
     this.write = new HomeWritePane(win)
-    this.tabs = new TabStrip(app, win)
-    this.nav = new Navigation(app, win)
-    this.frame = new SidebarFrame(app, win)
+    this.tabs = new TabStrip(surface, win)
+    this.nav = new Navigation(surface, win)
+    this.frame = new SidebarFrame(surface, win)
     this.allTopics = new AllTopicsPane(win)
     this.home = new HomePane(win)
     this.peek = new PeekPopover(win)
-    this.privacy = new PrivacyMode(app, win)
-    this.palette = new PaletteDriver(app, win)
-    this.welcome = new WelcomeDriver(app, win)
+    this.privacy = new PrivacyMode(surface, win)
+    this.palette = new PaletteDriver(surface, win)
+    this.welcome = new WelcomeDriver(surface, win)
+  }
+
+  /** The Electron app, for a test about Electron itself. The browser project has none (README, "Browser lane"). */
+  get app(): ElectronApplication {
+    return this.surface.electron
   }
 
   /**
@@ -771,13 +784,13 @@ export class Juno {
   }
 
   /** How many native context menus were asked for since launch, Juno's and the text menu. */
-  menusAsked(): Promise<number> {
-    return this.app.evaluate(() => (globalThis as unknown as { junoTest: { contextMenu: { asked: number } } }).junoTest.contextMenu.asked)
+  async menusAsked(): Promise<number> {
+    return (await this.surface.menuState()).asked
   }
 
   /** Picks the item of the menu `chooseNextMenuItem` held open. */
   releaseMenu(): Promise<void> {
-    return releaseMenu(this.app)
+    return releaseMenu(this.surface)
   }
 
   /** The toast that says `text` (inventory 16). */
@@ -796,7 +809,7 @@ export class Juno {
 
   /** Edit › Undo, as ⌘Z. */
   async undo(): Promise<void> {
-    await clickAppMenu(this.app, 'undo')
+    await this.surface.appMenu('undo')
   }
 
   /** The title field of a rename, in a row or the header. */
@@ -814,12 +827,12 @@ export class Juno {
 
   /** The text the app last put on the clipboard. */
   clipboard(): Promise<string> {
-    return this.app.evaluate(({ clipboard }) => clipboard.readText())
+    return this.surface.clipboard()
   }
 
   /** The links a click sent to the browser, oldest first. */
   browserLinks(): Promise<string[]> {
-    return this.app.evaluate(() => [...(globalThis as unknown as { junoTest: { browserLinks: string[] } }).junoTest.browserLinks])
+    return this.surface.browserLinks()
   }
 
   /** The web panel's page as main has it: its url, or null with no panel, and whether it is drawn. */
@@ -829,7 +842,7 @@ export class Juno {
 
   /** The `slack://` links Open in Slack opened, oldest first. */
   slackLinks(): Promise<string[]> {
-    return this.app.evaluate(() => [...(globalThis as unknown as { junoTest: { slackLinks: string[] } }).junoTest.slackLinks])
+    return this.surface.slackLinks()
   }
 
   /**
@@ -927,9 +940,9 @@ export class Juno {
   }
 
   /** Wait for a real job pass, including a pass that chooses not to call the model. */
-  async workPass(name: Parameters<WorkHooks['workPass']>[0]): Promise<void> {
+  async workPass(name: WorkPassName): Promise<void> {
     const started = performance.now()
-    await this.app.evaluate((_electron, job) => (globalThis as unknown as { junoTest: WorkHooks }).junoTest.workPass(job), name)
+    await this.surface.workPass(name)
     if (process.env.JUNO_E2E_TIMINGS === '1') console.log(`e2e timing: work-pass ${Math.round(performance.now() - started)} ms`)
   }
 
@@ -938,6 +951,16 @@ export class Juno {
    * hold still. The sidebar paints before this; tests that compare rows or
    * measure a hover wait for it first.
    */
+  /** How many times the engine called the model, by task, since launch. */
+  aiCalls(): Promise<Record<string, number>> {
+    return this.surface.aiCalls()
+  }
+
+  /** The window's content size, as a user drags it to. */
+  async setWindowSize(width: number, height: number): Promise<void> {
+    await this.surface.setWindowSize(width, height)
+  }
+
   async waitForSync(): Promise<void> {
     const started = performance.now()
     await this.sidebar.expectRows()
@@ -1146,42 +1169,28 @@ export interface StartupTimes {
   readonly rows: number
 }
 
-const appOf = new WeakMap<Page, ElectronApplication>()
+const surfaceOf = new WeakMap<Page, AppSurface>()
 
-/** Makes the next native context menu pick `id` without showing (main's JUNO_E2E hook). */
-/** What the last native menu showed and where it was asked to open (see `contextMenuForTests` in main). */
-async function lastMenu(win: Page): Promise<{ readonly labels: string[]; readonly at: { readonly x: number; readonly y: number } | null }> {
-  const app = appOf.get(win)
-  if (app === undefined) throw new Error('lastMenu needs the app; use the Juno driver')
-  // A menu may wait for the engine before it opens (the why item asks first); wait until it took the chosen item.
-  await expect
-    .poll(() => app.evaluate(() => (globalThis as unknown as { junoTest: { contextMenu: { next: string | null | undefined } } }).junoTest.contextMenu.next === undefined), { timeout: 10_000 })
-    .toBe(true)
-  return app.evaluate(() => {
-    const menu = (globalThis as unknown as { junoTest: { contextMenu: { lastLabels: string[]; lastAt: { x: number; y: number } | null } } }).junoTest.contextMenu
-    return { labels: [...menu.lastLabels], at: menu.lastAt }
-  })
+function surfaceFor(win: Page): AppSurface {
+  const surface = surfaceOf.get(win)
+  if (surface === undefined) throw new Error('Menus need the app; use the Juno driver')
+  return surface
 }
 
+/** What the last native menu showed and where it was asked to open (see `contextMenuForTests` in main). */
+function lastMenu(win: Page): Promise<{ readonly labels: string[]; readonly at: { readonly x: number; readonly y: number } | null }> {
+  return surfaceLastMenu(surfaceFor(win))
+}
+
+/** Makes the next native context menu pick `id` without showing (main's JUNO_E2E hook, or the web page's seam). */
 async function chooseNextMenuItem(win: Page, id: string | null, options: { readonly hold?: boolean } = {}): Promise<void> {
-  const app = appOf.get(win)
-  if (app === undefined) throw new Error('chooseNextMenuItem needs the app; use the Juno driver')
-  await app.evaluate(
-    (_electron, { choice, hold }) => {
-      const menu = (globalThis as unknown as { junoTest: { contextMenu: { next: string | null | undefined; hold: boolean } } }).junoTest.contextMenu
-      menu.next = choice
-      menu.hold = hold
-    },
-    { choice: id, hold: options.hold === true },
-  )
+  await surfaceFor(win).chooseNextMenuItem(id, options.hold === true)
 }
 
 /** Chooses the item of a menu opened with `hold`, which stayed open until now. */
-async function releaseMenu(app: ElectronApplication): Promise<void> {
-  await expect
-    .poll(() => app.evaluate(() => (globalThis as unknown as { junoTest: { contextMenu: { release: (() => void) | undefined } } }).junoTest.contextMenu.release !== undefined))
-    .toBe(true)
-  await app.evaluate(() => (globalThis as unknown as { junoTest: { contextMenu: { release: () => void } } }).junoTest.contextMenu.release())
+async function releaseMenu(surface: AppSurface): Promise<void> {
+  await expect.poll(async () => (await surface.menuState()).held).toBe(true)
+  await surface.releaseMenu()
 }
 
 const BOTTOM_SLACK = 2
@@ -1829,18 +1838,12 @@ export class TopicPane {
 
   /** Clicks Follow and waits for it to give way. Answers whether a native menu opened on the way (none should). */
   async follow(): Promise<{ readonly menuOpened: boolean }> {
-    const app = appOf.get(this.win)
-    if (app === undefined) throw new Error('follow needs the app; use the Juno driver')
+    const surface = surfaceFor(this.win)
     // A menu that opens takes the armed choice; with none, it is still armed afterwards.
     await chooseNextMenuItem(this.win, 'no-menu-expected')
     await this.followButton.click()
     await expect(this.followButton).toHaveCount(0, { timeout: 10_000 })
-    const menuOpened = await app.evaluate(() => {
-      const menu = (globalThis as unknown as { junoTest: { contextMenu: { next: string | null | undefined } } }).junoTest.contextMenu
-      const taken = menu.next !== 'no-menu-expected'
-      menu.next = undefined
-      return taken
-    })
+    const menuOpened = await surface.disarmMenu('no-menu-expected')
     return { menuOpened }
   }
 
@@ -2099,7 +2102,7 @@ export class TopicPane {
   /** At least one image thumbnail in view has its bytes, served by main from the Slack session. */
   async expectThumbnailsLoaded(): Promise<void> {
     await expect
-      .poll(() => this.list.locator('[data-thumbnail] img[src^="juno://files/"]').evaluateAll((images) => images.filter((image) => (image as HTMLImageElement).naturalWidth > 0).length), { timeout: 15_000 })
+      .poll(() => this.list.locator(`[data-thumbnail] img${schemeSrc('files')}`).evaluateAll((images) => images.filter((image) => (image as HTMLImageElement).naturalWidth > 0).length), { timeout: 15_000 })
       .toBeGreaterThan(0)
   }
 
@@ -2181,7 +2184,7 @@ export class TabStrip {
   readonly root: Locator
 
   constructor(
-    readonly app: ElectronApplication,
+    readonly surface: AppSurface,
     readonly win: Page,
   ) {
     this.root = win.getByRole('tablist')
@@ -2290,7 +2293,7 @@ export class TabStrip {
 
   /** An item of the app menu, as its shortcut would choose it. */
   async menu(id: AppMenuItem): Promise<void> {
-    await clickAppMenu(this.app, id)
+    await this.surface.appMenu(id)
   }
 
   /**
@@ -2305,14 +2308,14 @@ export class TabStrip {
       const target = document.activeElement ?? document.body
       target.dispatchEvent(new KeyboardEvent('keydown', { key, code: `Key${key.toUpperCase()}`, metaKey: true, bubbles: true, cancelable: true }))
     }, id === 'new-message' ? 'n' : 't')
-    await clickAppMenu(this.app, id)
+    await this.surface.appMenu(id)
   }
 
   /** Right-clicks a tab and picks `item` in the tab menu. Returns the menu's labels, "-" for a separator and "(label)" for a disabled item. */
   async contextMenu(title: string, item: 'pin' | 'close' | 'close-others' | 'close-right' | 'close-all' | 'copy-link' | 'open-in-slack'): Promise<string[]> {
     await chooseNextMenuItem(this.win, item)
     await this.tab(title).click({ button: 'right' })
-    return this.app.evaluate(() => [...(globalThis as unknown as { junoTest: { contextMenu: { lastLabels: string[] } } }).junoTest.contextMenu.lastLabels])
+    return (await this.surface.menuState()).labels
   }
 
   async expectPinned(title: string, pinned = true): Promise<void> {
@@ -2333,35 +2336,6 @@ export class TabStrip {
   }
 }
 
-/** App menu items the tests click, as their shortcuts would. */
-export type AppMenuItem =
-  | 'close-tab'
-  | 'next-tab'
-  | 'previous-tab'
-  | 'next-tab-control'
-  | 'previous-tab-control'
-  | 'new-tab'
-  | 'new-message'
-  | 'reopen-tab'
-  | 'back'
-  | 'forward'
-  | 'toggle-sidebar'
-  | 'toggle-privacy'
-  | 'juno'
-  | 'search'
-  | 'undo'
-  | 'tour'
-  | `tab-${1 | 2 | 3 | 4 | 5 | 6 | 7 | 8}`
-  | 'tab-last'
-
-async function clickAppMenu(app: ElectronApplication, id: AppMenuItem): Promise<void> {
-  await app.evaluate(({ Menu, BrowserWindow }, itemId) => {
-    const item = Menu.getApplicationMenu()?.getMenuItemById(itemId)
-    if (!item) throw new Error(`No menu item ${itemId}`)
-    item.click(undefined, BrowserWindow.getAllWindows()[0])
-  }, id)
-}
-
 /**
  * The welcome card (SPEC 4, "The welcome"): three things to try on Home,
  * by itself once per workspace when the sidebar has rows (only in apps
@@ -2371,7 +2345,7 @@ export class WelcomeDriver {
   readonly root: Locator
 
   constructor(
-    readonly app: ElectronApplication,
+    readonly surface: AppSurface,
     readonly win: Page,
   ) {
     // The card's room can stay on Home, empty and hidden; this is the card on screen.
@@ -2420,7 +2394,7 @@ export class WelcomeDriver {
 
   /** Help › Show the Tour, through its app menu item. */
   async openFromHelp(): Promise<void> {
-    await clickAppMenu(this.app, 'tour')
+    await this.surface.appMenu('tour')
     await this.expectShown()
   }
 }
@@ -2430,7 +2404,7 @@ export class PaletteDriver {
   readonly root: Locator
 
   constructor(
-    readonly app: ElectronApplication,
+    readonly surface: AppSurface,
     readonly win: Page,
   ) {
     this.root = win.getByRole('dialog', { name: 'Search and commands' })
@@ -2442,7 +2416,7 @@ export class PaletteDriver {
 
   /** ⌘K, through its app menu item (Go › Search…). */
   async shortcut(): Promise<void> {
-    await clickAppMenu(this.app, 'search')
+    await this.surface.appMenu('search')
   }
 
   async open(): Promise<void> {
@@ -2543,7 +2517,7 @@ export class PaletteDriver {
 /** Back and Forward: the title bar buttons, the app menu (⌘[ and ⌘]), the mouse's side buttons and the swipe. */
 export class Navigation {
   constructor(
-    readonly app: ElectronApplication,
+    readonly surface: AppSurface,
     readonly win: Page,
   ) {}
 
@@ -2565,7 +2539,7 @@ export class Navigation {
   }
 
   async menu(id: 'back' | 'forward'): Promise<void> {
-    await clickAppMenu(this.app, id)
+    await this.surface.appMenu(id)
   }
 
   /** The mouse's back (3) or forward (4) button. Playwright's mouse has neither, so the event is sent as the page would get it. */
@@ -2575,9 +2549,7 @@ export class Navigation {
 
   /** The three-finger swipe, as macOS reports it to the window. */
   async swipe(direction: 'left' | 'right'): Promise<void> {
-    await this.app.evaluate(({ BrowserWindow }, way) => {
-      BrowserWindow.getAllWindows()[0]?.emit('swipe', {}, way)
-    }, direction)
+    await this.surface.swipe(direction)
   }
 
   async expectCanGo(back: boolean, forward: boolean): Promise<void> {
@@ -2594,7 +2566,7 @@ export class SidebarFrame {
   readonly edge: Locator
 
   constructor(
-    readonly app: ElectronApplication,
+    readonly surface: AppSurface,
     readonly win: Page,
   ) {
     this.sidebar = win.getByRole('complementary', { name: 'Sidebar' })
@@ -2633,7 +2605,7 @@ export class SidebarFrame {
   }
 
   async toggleWithMenu(): Promise<void> {
-    await clickAppMenu(this.app, 'toggle-sidebar')
+    await this.surface.appMenu('toggle-sidebar')
   }
 
   async expectHidden(hidden = true): Promise<void> {
@@ -2643,14 +2615,14 @@ export class SidebarFrame {
 
   /** View › Hide Sidebar's label, which names what it will do. */
   async menuLabel(): Promise<string | undefined> {
-    return this.app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById('toggle-sidebar')?.label)
+    return this.surface.menuLabel('toggle-sidebar')
   }
 }
 
 /** Privacy mode (SPEC section 5): blurred message text, the sidebar footer, View › Hide Message Text. */
 export class PrivacyMode {
   constructor(
-    readonly app: ElectronApplication,
+    readonly surface: AppSurface,
     readonly win: Page,
   ) {}
 
@@ -2675,13 +2647,13 @@ export class PrivacyMode {
   /** ⌃⌘H through View, and waits until main has the change (the menu names the other action). */
   async toggleWithMenu(): Promise<void> {
     const before = await this.menuLabel()
-    await clickAppMenu(this.app, 'toggle-privacy')
+    await this.surface.appMenu('toggle-privacy')
     await expect.poll(() => this.menuLabel()).not.toBe(before)
   }
 
   /** View › Hide or Show Message Text, which names what it will do. */
   menuLabel(): Promise<string | undefined> {
-    return this.app.evaluate(({ Menu }) => Menu.getApplicationMenu()?.getMenuItemById('toggle-privacy')?.label)
+    return this.surface.menuLabel('toggle-privacy')
   }
 
   /** The footer's text: "Message text hidden", or "… while sharing" when sharing turned it on. */
@@ -2701,11 +2673,11 @@ export class PrivacyMode {
 
   /** Moves the screen watch's clock on, as if the signal had stayed as it is for that long. */
   async elapse(ms: number): Promise<void> {
-    await this.app.evaluate((_electron, by) => (globalThis as unknown as { junoTest: { screenWatchElapse: (ms: number) => void } }).junoTest.screenWatchElapse(by), ms)
+    await this.surface.electron.evaluate((_electron, by) => (globalThis as unknown as { junoTest: { screenWatchElapse: (ms: number) => void } }).junoTest.screenWatchElapse(by), ms)
   }
 
   private async screenShared(shared: boolean): Promise<void> {
-    await this.app.evaluate((_electron, value) => (globalThis as unknown as { junoTest: { screenShared: (shared: boolean) => Promise<void> } }).junoTest.screenShared(value), shared)
+    await this.surface.electron.evaluate((_electron, value) => (globalThis as unknown as { junoTest: { screenShared: (shared: boolean) => Promise<void> } }).junoTest.screenShared(value), shared)
   }
 }
 
