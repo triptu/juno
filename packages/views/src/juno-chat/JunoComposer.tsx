@@ -3,7 +3,7 @@ import { ArrowUp } from '@phosphor-icons/react/dist/icons/ArrowUp'
 import type { KeyboardEvent, ReactNode, Ref } from 'react'
 import { chatCopy, type Quote } from '@juno/agent-contract'
 import { layout, opacity, spacing } from '@juno/tokens/tokens.stylex'
-import { IconButton, Surface, Textarea, type TextareaMark } from '@juno/ui'
+import { arrowUpLeavesField, IconButton, Surface, Textarea, type TextareaMark } from '@juno/ui'
 import { mentionProps, transfers, type ComposerMention } from '../Composer'
 import { QuoteStub } from './QuoteStub'
 
@@ -16,6 +16,8 @@ export interface JunoComposerProps {
   readonly mention?: ComposerMention
   readonly onFieldKey?: (event: KeyboardEvent<HTMLTextAreaElement>) => boolean
   readonly onCaret?: (caret: number) => void
+  /** A plain ↑ with the caret on the field's first line (`arrowUpLeavesField`): the newest bubble or card takes focus, as in a topic. */
+  readonly onArrowUpTop?: () => void
   /** Enter, or the send button, with a non-empty draft. Sending while Juno works is like any send: it joins at the next step. */
   readonly onSend: () => void
   /** Esc with the composer empty and no quote: the Juno panel closes (SPEC, Juno panel). Never a Stop. */
@@ -49,12 +51,17 @@ export interface JunoComposerProps {
  * the textarea growing to 160px, and the round send button, dimmed while the
  * draft is empty and never disabled by a run. Enter sends, Shift Enter adds a line.
  */
-export function JunoComposer({ value, onChange, onSend, onEscape, quote, onClearQuote, enabled, placeholder = chatCopy.composer.placeholder, inputRef, column = 'page', context, marks = NO_MARKS, mention, onFieldKey, onCaret, leading, attachments, onFiles, hasFiles = false }: JunoComposerProps) {
+export function JunoComposer({ value, onChange, onSend, onEscape, quote, onClearQuote, enabled, placeholder = chatCopy.composer.placeholder, inputRef, column = 'page', context, marks = NO_MARKS, mention, onFieldKey, onCaret, onArrowUpTop, leading, attachments, onFiles, hasFiles = false }: JunoComposerProps) {
   const panel = column === 'panel'
   const canSend = enabled && (value.trim().length > 0 || hasFiles)
   const files = transfers(enabled ? onFiles : undefined, undefined)
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (onFieldKey?.(event) === true) return
+    if (onArrowUpTop !== undefined && arrowUpLeavesField(event)) {
+      event.preventDefault()
+      onArrowUpTop()
+      return
+    }
     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault()
       if (canSend) onSend()

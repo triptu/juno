@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { ArrowUp } from '@phosphor-icons/react/dist/icons/ArrowUp'
 import type { ClipboardEvent, DragEvent, KeyboardEvent, MouseEvent, ReactNode, Ref, SyntheticEvent } from 'react'
 import { accent, layout, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { IconButton, Surface, Textarea, type TextareaFormat, type TextareaMark } from '@juno/ui'
+import { arrowUpLeavesField, IconButton, Surface, Textarea, type TextareaFormat, type TextareaMark } from '@juno/ui'
 
 /** The open @, # or emoji suggestions (inventory 7.1). */
 export interface ComposerMention {
@@ -38,8 +38,8 @@ export interface ComposerProps {
   /** Above the field, inside its column: Home's destination chip. */
   readonly above?: ReactNode
   readonly inputRef?: Ref<HTMLTextAreaElement>
-  /** ↑ in an empty field: a topic selects its newest message (SPEC section 7, Keyboard). */
-  readonly onArrowUpEmpty?: () => void
+  /** A plain ↑ with the caret on the field's first line (`arrowUpLeavesField`): a topic selects its newest message (SPEC section 7, Keyboard). */
+  readonly onArrowUpTop?: () => void
   /** Inside the box, above the text: the audience warning and the send check bar (inventory 7). */
   readonly notices?: ReactNode
   /** Esc in the field, while there is something to close (the send check bar). */
@@ -131,13 +131,13 @@ export function transfers(onFiles: ComposerProps['onFiles'], onPasteText: Compos
  * as in the Juno composer; `leading` is where the attach button goes.
  * `notices` grow the box upwards; the text row stays where it is.
  */
-export function Composer({ value, onChange, onSend, placeholder, sending = false, above, inputRef, onArrowUpEmpty, leading, notices, onEscape, attachments, onFiles, dropping = false, marks, format, mention, onFieldKey, onCaret, onPasteText, onFieldClick, popover }: ComposerProps) {
+export function Composer({ value, onChange, onSend, placeholder, sending = false, above, inputRef, onArrowUpTop, leading, notices, onEscape, attachments, onFiles, dropping = false, marks, format, mention, onFieldKey, onCaret, onPasteText, onFieldClick, popover }: ComposerProps) {
   const empty = value.trim().length === 0
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (onFieldKey?.(event) === true) return
-    if (event.key === 'ArrowUp' && value === '' && onArrowUpEmpty !== undefined && !event.shiftKey && !event.metaKey && !event.altKey && !event.ctrlKey) {
+    if (onArrowUpTop !== undefined && popover === undefined && arrowUpLeavesField(event)) {
       event.preventDefault()
-      onArrowUpEmpty()
+      onArrowUpTop()
       return
     }
     if (event.key === 'Escape' && onEscape !== undefined && !event.nativeEvent.isComposing) {

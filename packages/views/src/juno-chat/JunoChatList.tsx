@@ -95,7 +95,7 @@ export function JunoChatList({ items, banner, moreAbove, moreBelow, now, actions
 const ROW = '[data-chat-row]'
 
 /**
- * The keys of a bubble or card with keyboard focus (↑ in the empty composer
+ * The keys of a bubble or card with keyboard focus (↑ on the composer's first line
  * gives the newest one focus): ↑ and ↓ move between them, ↓ on the newest
  * one and Esc go back to the composer, and ⇧F10 opens its menu, as the
  * context-menu key does. With newer items still to load (`moreBelow`), ↓ on

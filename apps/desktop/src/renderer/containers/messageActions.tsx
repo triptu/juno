@@ -7,7 +7,7 @@
  *   reactions, then the message's actions (`topic/messageMenu.ts`).
  * - Your own messages: Edit turns the body into a field in place; Delete…
  *   asks once at the message's top right (ADR 0010). Neither has an undo.
- * - The keyboard: ↑ in an empty composer selects the newest message, ↑ and
+ * - The keyboard: ↑ on the composer's first line selects the newest message, ↑ and
  *   ↓ move, Esc goes back to the composer. Q quotes the selected message,
  *   F forwards it and R opens its menu as the emoji picker.
  *   On your own selected message E
@@ -65,7 +65,7 @@ export interface MessageActionsOutput {
   /** Retry (`on` as asked) or Dismiss (the opposite) on a reaction Slack refused. */
   /** A right-click on a row, or on its sender's name or avatar, or a press on its menu button (`at.trigger`). */
   readonly onMessageMenu: (ts: string, at: MenuAt, onSender: boolean) => void
-  /** ↑ in an empty composer. */
+  /** ↑ on the composer's first line. */
   readonly selectNewest: () => void
   /** ↓ on the newest message: back to the composer, its draft as it was. */
   readonly focusComposer: () => void

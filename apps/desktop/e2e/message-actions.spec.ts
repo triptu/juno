@@ -113,15 +113,7 @@ async function moveSelection(juno: Juno, fake: FakeSlack): Promise<void> {
   await expect(topic.message('Looking now')).toBeFocused()
   await juno.win.keyboard.press('Escape')
   await expect(topic.composer).toBeFocused()
-  // ↑ only selects from an empty composer; with text it moves the caret.
-  await topic.composer.fill('half a thought')
-  await topic.composer.press('ArrowUp')
-  await expect(topic.composer).toBeFocused()
-  // A message selected while the composer holds a draft: ↓ comes back to the draft as it was.
-  await topic.message('Looking now').focus()
-  await juno.win.keyboard.press('ArrowDown')
-  await expect(topic.composer).toBeFocused()
-  await expect(topic.composer).toHaveValue('half a thought')
+  // ↑ with a draft: composer-up.spec.ts.
 }
 
 async function reactToMessage({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {

@@ -230,6 +230,17 @@ test('the keyboard reaches a bubble, ⇧F10 opens its menu under the first line,
   await juno.win.keyboard.press('ArrowUp')
   await juno.win.keyboard.press('Escape')
   await expect(chat.composer).toBeFocused()
+  // A two-line draft with the caret on its second line: ↑ moves the caret, ↑ again reaches the bubble, ↓ comes
+  // back to the draft and its caret.
+  await chat.composer.fill('first line\nsecond line')
+  await chat.composer.press('ArrowUp')
+  await expect(chat.composer).toBeFocused()
+  await chat.composer.press('ArrowUp')
+  await expect(bubble).toBeFocused()
+  await juno.win.keyboard.press('ArrowDown')
+  await expect(chat.composer).toBeFocused()
+  await expect(chat.composer).toHaveValue('first line\nsecond line')
+  await chat.composer.fill('')
 
   // ⇧F10 on the bubble: its menu, under the bubble's first line, at its text.
   await chat.composer.press('ArrowUp')

@@ -188,7 +188,7 @@ function rowKeyAction(event: KeyboardEvent<HTMLElement>, message: MessageView, {
   return undefined
 }
 
-/** The row keys (`rowKeyAction`), the reaction toggle, the row menu, ↑ in an empty composer and ↓ from the newest message back to it. */
+/** The row keys (`rowKeyAction`), the reaction toggle, the row menu, ↑ on the composer's first line and ↓ from the newest message back to it. */
 export function rowHandlers(actions: MessageCommands, rowMessage: (ts: string) => MessageView | undefined, latest: Latest, scrollRef: RefObject<HTMLElement | null>, composer: RefObject<ComposerHandle | null>) {
   const onRowKey = (ts: string, event: KeyboardEvent<HTMLElement>) => {
     const message = rowMessage(ts)
