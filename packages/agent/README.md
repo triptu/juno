@@ -1,6 +1,6 @@
 # @juno/agent
 
-The Juno Agent core: a portable, durable personal assistant. A plain Node program that runs in its own Electron utility process (ADR 0012) and, for tests, under plain Node. Plan v3 (`docs/juno-agent/plan-v3.md`) is the design; `docs/juno-agent/spikes.md` records what the pinned libraries actually do.
+The Juno Agent core: a portable, durable personal assistant. A plain Node program that runs in its own Electron utility process (ADR 0012) and, for tests, under Bun. Plan v3 (`docs/juno-agent/plan-v3.md`) is the design; `docs/juno-agent/spikes.md` records what the pinned libraries actually do.
 
 ## What it owns today
 
@@ -66,9 +66,11 @@ Versions are pinned exactly: pi 1.2.0 and the Codex SDK 0.162.1.
 
 ## Testing
 
-`bun run test:agent` from the root, behind the machine-wide lock. `test/recovery.test.ts` runs the core as a process (`test/fixtures/program.ts`) under the crash harness: it kills it at each named point or restores files from an earlier commit boundary, restarts it and checks the spec's post-condition. `bench/commit-cost.ts` measures the cost of a commit. `bun run perf --unit` runs Activity's read budget (`test/activity.perf.ts`), cached chat-window budgets (`test/serve/chat-cache.perf.ts`) and turn latency (`test/turn-timing.test.ts`) on the Mac under the exclusive heavy lock. Normal tests keep turn correctness and cached-window content/payload checks, without timing assertions.
+`bun run test:agent` from the root runs `bun test` here behind the machine-wide lock; one file runs with `bun test ./test/<file>`. The tests are flows on the real engine against fakes at its edges (the scripted model, fake Slack reads and actions, fake MCP, Notion, Codex and OpenRouter servers), checked by what the owner or the model sees. `test/turns-harness.ts` opens the engine in-process, `test/serve-harness.ts` serves it to an RPC client over a `MessageChannel` as the renderer reads it (each file calls `closeServed` in its own `afterEach`), and `test/providers-harness.ts` opens the core with the spend ledger. Files pass alone and under `bun test --parallel`.
 
-Set `JUNO_UNIT_PROFILE=1` on a focused remote run to print per-test wall and worker CPU time, including setup and cleanup. Child-process work is outside the worker's CPU count: a crash test waiting on a child is not necessarily idle CPU on the machine. `node packages/agent/test/runner-matrix.mjs` runs five alternating samples of the Agent pool/isolation settings and Store file parallelism, after one warmup per setting. Measurements are in [Unit suite timing](../../docs/unit-suite-timing.md).
+The crash tests run the agent as a Bun process (`test/fixtures/*.ts`) under the crash harness of `@juno/agent-testing`: `test/recovery.test.ts` kills the core at each named point or restores files from an earlier commit boundary, restarts it and checks the spec's post-condition, and `actions-crash`, `backup-crash`, `redaction-crash`, `turns-crash` and the scheduler's SIGKILL cases do the same for their own crash points. Each starts several processes, so these files allow 60 s a test; the others keep bun's 5 s.
+
+No unit test asserts a time. `bun run perf --unit` runs the `*.perf.ts` files on the Mac under the exclusive heavy lock: Activity's read budget (`test/activity.perf.ts`), the cached chat window's budgets (`test/serve/chat-cache.perf.ts`, five benchmark processes of `test/serve/chat-cache-bench.ts`) and turn latency (`test/turn-timing.perf.ts`). `bench/commit-cost.ts` measures the cost of a commit.
 
 **Evals** (WP23) are in `eval/`: behaviour cases on the real turn engine, graded by code checks and a model judge. `eval/eval.test.ts` runs them on the scripted model in `bun run test`; `bun run agent:eval --live` runs them on OpenRouter. See `eval/README.md`.
 

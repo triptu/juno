@@ -127,7 +127,7 @@ it.each(['queued', 'admitted'])('recovers after SIGKILL with a persisted %s occu
   const again = await runAgent({ args: args('finish'), timeoutMs: 30_000 })
   expect(again.code, again.stderr).toBe(0)
   expect(JSON.parse(again.stdout)).toEqual({ started: false, occurrences: 1, runs: 1 })
-})
+}, 30_000)
 
 it('repeating a page command after restart returns its result without changing the schedule again', () => {
   const h = harness(); const row = h.create()

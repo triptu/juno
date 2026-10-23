@@ -6,8 +6,11 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { afterEach, beforeEach, expect, it } from 'bun:test'
+import { afterEach, beforeEach, expect, it, setDefaultTimeout } from 'bun:test'
 import { crashAt, runAgent } from '@juno/agent-testing'
+
+// Each test starts the agent as a process several times, about a second each on an idle Mac.
+setDefaultTimeout(60_000)
 
 const program = fileURLToPath(new URL('./fixtures/backup.ts', import.meta.url))
 let root: string
