@@ -28,10 +28,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 26
-      # Reads the Bun version from packageManager in package.json.
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: package.json
+      # setup-bun cannot install a given canary, so install the build packageManager
+      # pins from npm; the preinstall check compares its commit.
+      - name: Install the pinned Bun
+        run: npm install -g "bun@$(node -p "require('./package.json').packageManager.replace(/^bun@/, '').split('+')[0]")"
       - run: bun install --frozen-lockfile
       - name: Check tag matches the app version
         run: node -e 'if (process.env.GITHUB_REF_NAME !== "v" + require("./apps/desktop/package.json").version) process.exit(1)'

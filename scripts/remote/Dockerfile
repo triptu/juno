@@ -10,7 +10,9 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends openjdk-21-jre-headless xz-utils \
   && rm -rf /var/lib/apt/lists/* \
   && curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" | tar -xJ -C /usr/local --strip-components=1 \
-  && npm install -g --silent "bun@$(node -p "require('/tmp/toolchain.json').bun")" \
+  && BUN_PIN="$(node -p "require('/tmp/toolchain.json').bun")" \
+  && npm install -g --silent "bun@${BUN_PIN%%+*}" \
+  && case "$BUN_PIN" in *+*) bun --revision | grep -qx "[^+]*+${BUN_PIN#*+}" ;; esac \
   && chown pwuser /tmp/toolchain.json
 
 # tstack runs jobs as the SSH uid; the image builds its toolchain as pwuser.
