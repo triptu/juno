@@ -14,9 +14,6 @@
 import { json, type FakeTool } from './handler'
 import { startFakeMcpServer, type FakeMcpServer } from './server'
 
-export const LITTLEBIRD_READ_TOOLS = ['search_meetings', 'get_meeting', 'search_context', 'get_routine_report', 'get_account'] as const
-export const LITTLEBIRD_WRITE_TOOLS = ['add_material', 'delete_material', 'create_routine', 'update_routine'] as const
-
 export interface FakeLittlebirdOptions {
   /** More tools, listed after the known ones (for example `unknownTool()`). */
   readonly extraTools?: ReadonlyArray<FakeTool>

@@ -25,9 +25,6 @@ export const tasks = {
   automatedChannel,
 } as const
 
-/** The structured tasks, for the eval and for schema tests. */
-export const decisionTasks = [grammarCheck, routeCheck, settledScore, notificationReading, instructionRule, parseCommand, followUps, automatedChannel] as const
-
 export * from './shared'
 export * from './titleTopic'
 export * from './routeCheck'

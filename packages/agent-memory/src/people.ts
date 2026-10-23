@@ -269,7 +269,7 @@ export function peopleIn(text: string, files: ReadonlyArray<{ readonly id: strin
 /* The split of the older People doc ----------------------------------------- */
 
 /** A guess at the relationship from a note's words, or none. */
-export function relationshipFrom(text: string): Relationship | undefined {
+function relationshipFrom(text: string): Relationship | undefined {
   if (/\b(reports to me|direct report|my report|on my team|i manage (?:her|him|them))\b/i.test(text)) return 'report';
   if (/\b(skip[- ]level|my manager's manager|my boss's boss)\b/i.test(text)) return 'skip';
   if (/\b(my (?:manager|boss)|i report to|manages me)\b/i.test(text)) return 'manager';

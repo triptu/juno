@@ -8,7 +8,7 @@
  * hosts and the "secret" is a made-up string in a real key's shape.
  */
 import { Schema } from 'effect'
-import { HostMessage, HostMessagePage } from '@juno/agent-contract'
+import { HostMessage } from '@juno/agent-contract'
 
 export type SlackMessage = typeof HostMessage.Type
 
@@ -64,8 +64,6 @@ export function hostile(name: string): SlackMessage {
   return found.message
 }
 
-/** All of them as one page of `host.slack.history`. */
-export const hostilePage = (): typeof HostMessagePage.Type => Schema.decodeUnknownSync(HostMessagePage)({ messages: hostileMessages.map((f) => f.message) })
 
 /**
  * Someone else posts a message carrying the `client_msg_id` of Juno's send.

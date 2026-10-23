@@ -44,7 +44,6 @@ export {
   peopleContext,
   peopleLine,
   peopleIn,
-  relationshipFrom,
   splitPeopleNotes,
   workLine,
 } from './people.ts';
