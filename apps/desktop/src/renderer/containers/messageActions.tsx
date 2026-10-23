@@ -7,8 +7,10 @@
  *   reactions, then the message's actions (`topic/messageMenu.ts`).
  * - Your own messages: Edit turns the body into a field in place; Delete…
  *   asks once at the message's top right (ADR 0010). Neither has an undo.
- * - The keyboard: ↑ on the composer's first line selects the newest message, ↑ and
- *   ↓ move, Esc goes back to the composer. Q quotes the selected message,
+ * - The keyboard: ↑ on the composer's first line selects the newest message, and Esc
+ *   there the one under the pointer, else the newest; ↑ and ↓ move, Esc goes back to
+ *   the composer. With no row focused and focus in no field, the keys below act on
+ *   the message under the pointer. Q quotes the selected message,
  *   F forwards it and R opens its menu as the emoji picker.
  *   On your own selected message E
  *   edits, and Delete or Backspace asks to delete; Enter confirms and Esc
@@ -21,7 +23,7 @@
  * list shows it from the engine's next window. The edit field stays until
  * that window has the new text, so the old text never flashes back.
  */
-import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
+import { Suspense, useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import type { TopicDetail } from '@juno/contract'
 import { resolveMessageAction, editMessage, junoAvailableAtom, registry, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
@@ -52,6 +54,8 @@ export interface MessageActionsInput {
   readonly list: MessageWindow
   readonly scrollRef: RefObject<HTMLElement | null>
   readonly composer: RefObject<ComposerHandle | null>
+  /** A peek: its rows take no hover keys. */
+  readonly readOnly?: boolean
 }
 
 export interface MessageActionsOutput {
@@ -67,6 +71,8 @@ export interface MessageActionsOutput {
   readonly onMessageMenu: (ts: string, at: MenuAt, onSender: boolean) => void
   /** ↑ on the composer's first line. */
   readonly selectNewest: () => void
+  /** Esc in the composer with nothing of its own to close: the message under the pointer, else the newest. */
+  readonly selectHovered: () => void
   /** ↓ on the newest message: back to the composer, its draft as it was. */
   readonly focusComposer: () => void
   /** The selection's bar and the reactions dialog, for `TopicView`'s floating slot. */
@@ -106,12 +112,22 @@ function useEditState(detail: TopicDetail, list: MessageWindow) {
   return { editing, setEditing, confirming, setConfirming, latest }
 }
 
+/** Message keys on the row under the pointer: one window listener for the topic, none in a peek. */
+function useHoverKeys(onKey: (event: globalThis.KeyboardEvent) => void, readOnly: boolean): void {
+  const onWindowKey = useEffectEvent(onKey)
+  useEffect(() => {
+    if (readOnly) return
+    window.addEventListener('keydown', onWindowKey)
+    return () => window.removeEventListener('keydown', onWindowKey)
+  }, [readOnly])
+}
+
 /**
  * The React Compiler skipped this hook while it was one function (its lint
  * suppression, now in `useMessageCommands`), so it and its parts stay out
  * (`'use no memo'`): the list's props change identity as they did.
  */
-export function useMessageActions({ detail, list, scrollRef, composer }: MessageActionsInput): MessageActionsOutput {
+export function useMessageActions({ detail, list, scrollRef, composer, readOnly = false }: MessageActionsInput): MessageActionsOutput {
   'use no memo'
   const channel = detail.channel.id
   const { editing, setEditing, confirming, setConfirming, latest } = useEditState(detail, list)
@@ -164,6 +180,7 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
         }
 
   const handlers = rowHandlers(actions, rowMessage, latest, scrollRef, composer)
+  useHoverKeys(handlers.onWindowKey, readOnly)
   return {
     actions,
     suggestions,
@@ -172,6 +189,10 @@ export function useMessageActions({ detail, list, scrollRef, composer }: Message
     selectNewest: () => {
       void editField.load()
       handlers.selectNewest()
+    },
+    selectHovered: () => {
+      void editField.load()
+      handlers.selectHovered()
     },
     activeMessage: menuMessage,
     confirmingDelete: confirming?.ts,

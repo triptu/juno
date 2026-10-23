@@ -140,6 +140,9 @@ export function useMessageCommands({ channel, scrollRef, composer, latest, setEd
 
 type MessageCommands = ReturnType<typeof useMessageCommands>
 
+/** A key on a focused row (React's event) or on the row under the pointer (the window's). */
+type RowKey = Pick<KeyboardEvent<HTMLElement>, 'key' | 'shiftKey' | 'metaKey' | 'ctrlKey' | 'altKey' | 'preventDefault'>
+
 interface RowKeyInput {
   readonly actions: MessageCommands
   readonly latest: Latest
@@ -151,7 +154,7 @@ interface RowKeyInput {
  * What a key does on a focused message, or undefined when it does nothing there, with Slack's keys where Juno has
  * the action. The menu shows the letters and ⌫ beside their rows (`topicMenuItems`); R is More reactions' key. A letter held with ⌘, ⌃ or ⌥ is the app's or the system's (⌘Q quits).
  */
-function rowKeyAction(event: KeyboardEvent<HTMLElement>, message: MessageView, { actions, latest, scrollRef, composer }: RowKeyInput): (() => void) | undefined {
+function rowKeyAction(event: RowKey, message: MessageView, { actions, latest, scrollRef, composer }: RowKeyInput): (() => void) | undefined {
   const key = event.key.length === 1 ? event.key.toLowerCase() : event.key
   if (event.key.length === 1 && (event.metaKey || event.ctrlKey || event.altKey)) return undefined
   const own = isOwnEditable(message)
@@ -188,9 +191,9 @@ function rowKeyAction(event: KeyboardEvent<HTMLElement>, message: MessageView, {
   return undefined
 }
 
-/** The row keys (`rowKeyAction`), the reaction toggle, the row menu, ↑ on the composer's first line and ↓ from the newest message back to it. */
+/** The row keys (`rowKeyAction`), on a focused row or the one under the pointer, the reaction toggle, the row menu, ↑ and Esc from the composer and ↓ from the newest message back to it. */
 export function rowHandlers(actions: MessageCommands, rowMessage: (ts: string) => MessageView | undefined, latest: Latest, scrollRef: RefObject<HTMLElement | null>, composer: RefObject<ComposerHandle | null>) {
-  const onRowKey = (ts: string, event: KeyboardEvent<HTMLElement>) => {
+  const onRowKey = (ts: string, event: RowKey) => {
     const message = rowMessage(ts)
     if (message === undefined) return
     const asking = latest.current.confirming
@@ -210,12 +213,33 @@ export function rowHandlers(actions: MessageCommands, rowMessage: (ts: string) =
     run()
   }
 
+  const hoveredRow = () => scrollRef.current?.querySelector<HTMLElement>(`${ROW}:hover`) ?? undefined
+  const select = (row: HTMLElement | undefined) => {
+    if (row === undefined) return
+    row.focus({ preventScroll: true })
+    row.scrollIntoView({ block: 'nearest', behavior: 'instant' })
+  }
   const selectNewest = () => {
     const rows = scrollRef.current?.querySelectorAll<HTMLElement>(ROW)
-    const last = rows?.[rows.length - 1]
-    if (last === undefined) return
-    last.focus({ preventScroll: true })
-    last.scrollIntoView({ block: 'nearest', behavior: 'instant' })
+    select(rows?.[rows.length - 1])
+  }
+  /** Esc in the composer: the message under the pointer, else the newest. */
+  const selectHovered = () => {
+    const row = hoveredRow()
+    if (row === undefined) selectNewest()
+    else select(row)
+  }
+
+  /**
+   * A message key (not Esc) with focus outside text fields, menus and dialogs, and on no row, acts on the message
+   * under the pointer. One listener for the topic; a focused row's own keys come first.
+   */
+  const onWindowKey = (event: globalThis.KeyboardEvent) => {
+    const active = document.activeElement
+    if (event.defaultPrevented || event.key === 'Escape' || !(active instanceof HTMLElement)) return
+    if (active.isContentEditable || active.closest(`input, textarea, select, [role="menu"], [role="dialog"], ${ROW}`) !== null) return
+    const ts = hoveredRow()?.dataset['messageRow']
+    if (ts !== undefined) onRowKey(ts, event)
   }
 
   const focusComposer = () => composer.current?.focus()
@@ -231,5 +255,5 @@ export function rowHandlers(actions: MessageCommands, rowMessage: (ts: string) =
     if (message !== undefined && row !== null) actions.menu(message, anchorFor(row, at), onSender)
   }
 
-  return { onRowKey, selectNewest, focusComposer, onToggleReaction, onMessageMenu }
+  return { onRowKey, selectNewest, selectHovered, onWindowKey, focusComposer, onToggleReaction, onMessageMenu }
 }

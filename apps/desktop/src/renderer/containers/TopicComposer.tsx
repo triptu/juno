@@ -26,6 +26,8 @@ export interface TopicComposerProps {
   readonly takeFocus?: (field: HTMLTextAreaElement) => void
   /** A plain ↑ on the field's first line: the topic selects its newest message. */
   readonly onArrowUpTop?: () => void
+  /** Esc with no check bar to close (the open suggestions take it first): the topic selects a message. */
+  readonly onEscape?: () => void
   /** Files are being dragged over the topic. */
   readonly dropping?: boolean
 }
@@ -69,11 +71,11 @@ export function withQuote(draft: string, text: string): string {
  * shows as sending at once and the engine posts it when the file is ready,
  * or shows it as not sent when the file could not be read.
  */
-export function TopicComposer({ detail, onSent, handle, takeFocus, onArrowUpTop, dropping }: TopicComposerProps) {
+export function TopicComposer({ detail, onSent, handle, takeFocus, onArrowUpTop, onEscape, dropping }: TopicComposerProps) {
   const stored = useAtomValue(draftAtom(detail.id))
   const placeholder = detail.kind === 'main' ? `Message ${detail.channel.label}` : 'Reply'
   if (stored._tag !== 'Success') return <ComposerSlot placeholder={placeholder} />
-  return <LoadedComposer detail={detail} initial={stored.value} latest={stored.value} placeholder={placeholder} onSent={onSent} handle={handle} takeFocus={takeFocus} onArrowUpTop={onArrowUpTop} dropping={dropping} />
+  return <LoadedComposer detail={detail} initial={stored.value} latest={stored.value} placeholder={placeholder} onSent={onSent} handle={handle} takeFocus={takeFocus} onArrowUpTop={onArrowUpTop} onEscape={onEscape} dropping={dropping} />
 }
 
 function LoadedComposer({
@@ -85,6 +87,7 @@ function LoadedComposer({
   handle,
   takeFocus,
   onArrowUpTop,
+  onEscape,
   dropping = false,
 }: TopicComposerProps & { readonly initial: string; readonly latest: string; readonly placeholder: string }) {
   const id = detail.id
@@ -306,7 +309,7 @@ function LoadedComposer({
       inputRef={field}
       sending={waiting}
       notices={notices}
-      {...(bar === undefined ? {} : { onEscape: () => setBar(undefined) })}
+      {...(bar !== undefined ? { onEscape: () => setBar(undefined) } : onEscape === undefined ? {} : { onEscape })}
       leading={files.leading}
       attachments={files.chips}
       onFiles={files.onFiles}

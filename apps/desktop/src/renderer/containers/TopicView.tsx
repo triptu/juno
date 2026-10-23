@@ -197,7 +197,7 @@ export function Topic({ id, view, detail, readOnly = false, peek = false, onOpen
   useMarkRead(detail.id, readOnly, detail.unreadCount, detail.markedUnread === true, position.positioned, focused, position.atBottom)
   const header = useTopicHeader(detail, readOnly, position.drawnAll)
   const composer = useRef<ComposerHandle>(null)
-  const messageActions = useMessageActions({ detail, list, scrollRef: position.scrollRef, composer })
+  const messageActions = useMessageActions({ detail, list, scrollRef: position.scrollRef, composer, readOnly })
   const jump = useJumpToLatest(position, view, list)
   const people = list.refs.people
   const hueOf = (personId: string) => hueFor(people.get(personId)?.color ?? '', personId)
@@ -244,7 +244,7 @@ export function Topic({ id, view, detail, readOnly = false, peek = false, onOpen
     <TopicViewFrame
       header={header}
       pill={pill.show ? <NewMessagesPill count={pill.count} onJump={jump} /> : undefined}
-      composer={detail.deactivated ? <Suspense><DeactivatedNote name={detail.channel.label} /></Suspense> : <TopicComposer key={id} detail={id === detail.id ? detail : { ...detail, id }} onSent={sent} handle={composer} takeFocus={(field) => takeComposerFocus(view, field)} onArrowUpTop={messageActions.selectNewest} dropping={files.dropping} />}
+      composer={detail.deactivated ? <Suspense><DeactivatedNote name={detail.channel.label} /></Suspense> : <TopicComposer key={id} detail={id === detail.id ? detail : { ...detail, id }} onSent={sent} handle={composer} takeFocus={(field) => takeComposerFocus(view, field)} onArrowUpTop={messageActions.selectNewest} onEscape={messageActions.selectHovered} dropping={files.dropping} />}
       floating={messageActions.floating}
       viewer={files.viewer}
       onFiles={(dropped) => attach(id, dropped)}
