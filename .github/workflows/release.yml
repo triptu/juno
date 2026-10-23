@@ -28,8 +28,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 26
-      - run: npm install --global pnpm@12.11.2
-      - run: pnpm install --frozen-lockfile
+      # Reads the Bun version from packageManager in package.json.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
       - name: Check tag matches the app version
         run: node -e 'if (process.env.GITHUB_REF_NAME !== "v" + require("./apps/desktop/package.json").version) process.exit(1)'
       - name: Select unsigned or signed release
@@ -48,13 +51,13 @@ jobs:
           else
             echo 'Release credentials absent; building unsigned artifacts only.'
           fi
-      - run: pnpm package
+      - run: bun run package
       - name: Check the signed package
         if: env.JUNO_RELEASE == '1'
         run: |
           codesign --verify --deep --strict apps/desktop/release/mac-arm64/Juno.app
           xcrun stapler validate apps/desktop/release/mac-arm64/Juno.app
-      - run: pnpm test:package
+      - run: bun run test:package
       - uses: actions/upload-artifact@v4
         with:
           name: macos-arm64

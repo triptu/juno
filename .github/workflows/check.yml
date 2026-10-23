@@ -14,8 +14,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 26
-      - run: npm install --global pnpm@12.11.2
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-      - run: pnpm typecheck
-      # Heavy suites run through pnpm affected and pnpm verify:main on the SSH laptop.
+      # Reads the Bun version from packageManager in package.json.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+      - run: bun run typecheck
+      # Heavy suites run through bun run affected and bun run verify:main on the SSH laptop.
