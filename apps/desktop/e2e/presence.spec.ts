@@ -23,6 +23,9 @@ test.use({ timing: 'production' })
 const PAST_SPACING_MS = 2_500
 /** Main's "active" reaches the engine, and a tickle the fake, well within this. */
 const TICKLE_WINDOW_MS = 1_500
+/** Main keeps you active while the Mac was used in the last 10 minutes (`ACTIVE_WITHIN_SECONDS`). */
+const IDLE_UNDER_LIMIT_SECONDS = 9 * 60
+const IDLE_OVER_LIMIT_SECONDS = 11 * 60
 
 /** Past the spacing, main reads the idle time at once; returns after a tickle would have reached the fake. */
 async function pollAndWait(juno: Juno, idleSeconds: number): Promise<void> {
@@ -86,8 +89,8 @@ test('the avatar shows what Slack shows colleagues, while the setting stays acti
   await juno.sidebar.expectOwnPresence('active')
 
   await test.step("Slack's timeout shows you away; the setting stays active", async () => {
-    await juno.setSystemIdle(5 * 60)
-    await pollAndWait(juno, 5 * 60)
+    await juno.setSystemIdle(IDLE_OVER_LIMIT_SECONDS)
+    await pollAndWait(juno, IDLE_OVER_LIMIT_SECONDS)
     slack.advanceClock(AUTO_AWAY_MILLIS + 1_000)
     await slack.expectSeenAs('away')
     expect(slack.fake.workspace.manualPresence).toBe('active')
@@ -116,7 +119,7 @@ test('the avatar shows what Slack shows colleagues, while the setting stays acti
 })
 
 // The first step reads every tickle since launch, so it runs before any idle change.
-test('opening Juno shows you active, an idle Mac stops keeping you active, and coming back starts it again', async ({ juno, slack }) => {
+test('opening Juno shows you active, a Mac idle over 10 minutes stops keeping you active, and coming back starts it again', async ({ juno, slack }) => {
   test.setTimeout(120_000)
   await juno.signIn()
   await juno.waitForSync()
@@ -128,13 +131,18 @@ test('opening Juno shows you active, an idle Mac stops keeping you active, and c
     expect(slack.tickles()).toBeGreaterThan(0)
   })
 
-  await test.step('an idle Mac stops keeping you active, and coming back starts it again', async () => {
+  await test.step('a Mac idle under 10 minutes keeps you active, over 10 minutes stops, and coming back starts it again', async () => {
     await setActive(juno)
     await slack.expectSeenAs('active')
 
-    await juno.setSystemIdle(5 * 60)
+    // Away from the keyboard for under 10 minutes still counts as here.
     slack.resetCalls()
-    await pollAndWait(juno, 5 * 60)
+    await juno.setSystemIdle(IDLE_UNDER_LIMIT_SECONDS)
+    await expect.poll(() => slack.tickles(), { timeout: 15_000 }).toBeGreaterThan(0)
+
+    await juno.setSystemIdle(IDLE_OVER_LIMIT_SECONDS)
+    slack.resetCalls()
+    await pollAndWait(juno, IDLE_OVER_LIMIT_SECONDS)
     expect(slack.tickles()).toBe(0)
     // Slack's own timeout runs out with no tickle: colleagues see you away.
     slack.advanceClock(AUTO_AWAY_MILLIS + 1_000)
