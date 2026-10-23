@@ -520,3 +520,20 @@ it('lowering the cap leaves the current reply running and blocks the next one', 
   expect((await h.ended(second)).ending).toEqual({ _tag: 'blocked', reason: 'budget' })
   expect(h.chatRequests()).toHaveLength(1)
 })
+
+it('stores input sent offline without a model request, and sends it once after the network returns', async () => {
+  let online = false
+  h = await turnsHarness({ online: () => online, compaction: false })
+  h.fake.script([reply(say('Back online.'))])
+  const op = h.send('Hold this for the network')
+  await h.turns.idle()
+  expect(h.turns.op(op)?.state).toBe('accepted')
+  expect(h.chatRequests()).toEqual([])
+  online = true
+  // The host may report the socket back more than once.
+  h.turns.networkChanged()
+  h.turns.networkChanged()
+  await h.turns.idle()
+  expect(h.turns.op(op)?.state).toBe('done')
+  expect(h.chatRequests()).toHaveLength(1)
+})
