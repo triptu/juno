@@ -1,3 +1,6 @@
+// The package has no DOM or Node types; bun and every browser have this clock.
+declare const performance: { now(): number }
+
 /**
  * How a parser's time grows with its input, for the catastrophic-backtracking
  * guards. A wall-clock bound fails on a loaded machine; a ratio does not.

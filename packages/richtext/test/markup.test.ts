@@ -2,12 +2,12 @@ import { describe, expect, it } from 'bun:test'
 import { markupLayout, toggleMarkup, type MarkupEdit, type MarkupStyle } from '../src/index'
 
 /** `text` with `[` and `]` around the selection (or one `|` for the caret), after the key's edit. */
-function press(marked: string, style: MarkupStyle | 'quote'): string {
+function press(marked: string, style: MarkupStyle | 'quote', opaque?: ReadonlyArray<{ readonly start: number; readonly end: number }>): string {
   const caret = marked.indexOf('|')
   const start = caret >= 0 ? caret : marked.indexOf('[')
   const end = caret >= 0 ? caret : marked.indexOf(']') - 1
   const text = marked.replace(/[[\]|]/g, '')
-  const edit: MarkupEdit | undefined = toggleMarkup(text, { start, end }, style)
+  const edit: MarkupEdit | undefined = toggleMarkup(text, { start, end }, style, opaque)
   if (edit === undefined) return marked
   const after = text.slice(0, edit.start) + edit.insert + text.slice(edit.end)
   const { start: from, end: to } = edit.selection
@@ -15,7 +15,7 @@ function press(marked: string, style: MarkupStyle | 'quote'): string {
 }
 
 describe('formatting keys', () => {
-  const cases: ReadonlyArray<readonly [string, MarkupStyle | 'quote', string]> = [
+  const cases: ReadonlyArray<readonly [string, MarkupStyle | 'quote', string, ReadonlyArray<{ readonly start: number; readonly end: number }>?]> = [
     ['make [this] bold', 'bold', 'make *[this]* bold'],
     ['make *[this]* bold', 'bold', 'make [this] bold'],
     ['make [*this*] bold', 'bold', 'make [this] bold'],
@@ -31,9 +31,16 @@ describe('formatting keys', () => {
     ['> quote |me', 'quote', 'quote |me'],
     ['[a\nb\n]c', 'quote', '[> a\n> b]\nc'],
     ['[> a\nb]', 'quote', '[> a\n> b]'],
+    // A code block keeps every line's indent and trims only line breaks at the selection's edges.
+    ['[  first\n  second]', 'code', '```\n[  first\n  second]\n```'],
+    ['[  first\n  second\n]next', 'code', '```\n[  first\n  second]\n```\nnext'],
+    ['[\n  first\n  second\n]', 'code', '\n```\n[  first\n  second]\n```\n'],
+    ['[  first\n  second] next', 'code', '```\n[  first\n  second]\n```\n next'],
+    // Part of a picked name (the opaque range) styles the whole name.
+    ['ask @M[ay]a Chen now', 'italic', 'ask _[@Maya Chen]_ now', [{ start: 4, end: 14 }]],
   ]
-  for (const [before, style, after] of cases) {
-    it(`${style}: ${JSON.stringify(before)}`, () => expect(press(before, style)).toBe(after))
+  for (const [before, style, after, opaque] of cases) {
+    it(`${style}: ${JSON.stringify(before)}`, () => expect(press(before, style, opaque)).toBe(after))
   }
 })
 
