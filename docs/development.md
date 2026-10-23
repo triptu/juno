@@ -9,6 +9,7 @@ How to build and run Juno, and how the repo is put together.
 - macOS for the window chrome and e2e tests. Nothing else is platform-specific yet.
 - Google Chrome, for the gallery tests and screenshots.
 - Git LFS (`brew install git-lfs`, then `git lfs install` once), for the images and videos under `docs/`.
+- On macOS, Homebrew's SQLite (`brew install sqlite`), for the store's unit tests on Bun (see "Pitfalls", `node:sqlite`). `JUNO_SQLITE=<libsqlite3.dylib>` names another full build.
 
 No Playwright browser download is needed for the desktop e2e tests. Electron is the browser. The
 gallery projects use the installed Google Chrome (`channel: 'chrome'`); set
@@ -53,7 +54,7 @@ Run these from the repo root.
 | `bun run lint` | Runs `bun lint` with the rules in `.oxlintrc.json`, cursor and token checks, dependency and fixture checks, and the health ratchet, all at once (`scripts/lint.mjs`; see "Typecheck"). |
 | `bun run check-deps` | The package graph and the import rules in `docs/architecture.md` section 3. Part of `bun run lint`; run it alone for a quicker loop. |
 | `bun run health` | Reports unused code and dependencies, duplication, and large files and functions. Writes `.juno-status/health.json`. |
-| `bun run test` | Runs every package's `test` script (`bun test` or vitest; `packages/*/test` and `apps/desktop/test`). |
+| `bun run test` | Runs every package's unit tests in one `bun test --parallel` from the root (`scripts/unit.mjs`). `--files <repo paths>` runs only those files. |
 | `bun run test:e2e` | Builds, runs the Playwright tests against the built app, then the gallery behaviour tests. |
 | `bun run perf` | Builds and runs the perf scenarios (`apps/desktop/e2e/perf.spec.ts`, config `playwright.perf.config.ts`), which fail over the budgets in `docs/performance.md`. A scenario that did not run, because its group's setup or an earlier scenario failed, fails the run too (`e2e/no-skips.ts`). `-g "<name>"` runs some of them; `JUNO_PERF_TRACE=<dir>` also writes traces for `scripts/perf-trace.mjs`. Passing `--reporter` replaces that check, so do not. |
 | `bun run test:gallery` | Builds the gallery and runs only its behaviour tests (mouse-down activation, cursor rule, state switcher, layout-shift guard). |
@@ -351,7 +352,7 @@ Three processes talk to each other, four with Juno Agent on (`docs/architecture.
   called through `liveQuery(route)` and `command(route)` from `packages/state`.
 
 `startEngine(transport, config, { host, httpTransport })` in `@juno/engine` runs
-under plain Node too: the vitest suite in `packages/engine/test` connects the real
+under plain Node and Bun too: the `bun test` suite in `packages/engine/test` connects the real
 state client to it over a `worker_threads` `MessageChannel`, with `memoryHost()` in
 place of main and Node `fetch` in place of `net.fetch`. Under `JUNO_E2E=1` main
 exposes `globalThis.junoTest` (engine pid and supervisor state) for Playwright.
@@ -590,9 +591,8 @@ Names are explained in `docs/architecture.md` sections 2.6 and 7.
 
 | Kind | Where | Run |
 | --- | --- | --- |
-| Store, Slack client, Slack-app import, merge rules, engine protocol, session and sync | `packages/<name>/test/` (vitest) | `bun run test` |
-| The Juno agent's flows (turns, cards, connections, T3 and Codex, backup, crash recovery, memory, settings), the AI provider (`PiAiProvider` against pi-ai's scripted faux provider), the agent libraries, and the pure rules of domain, rich text, state, huddle and the small libraries | `packages/<name>/test/` (`bun test`; each file passes alone and with `--parallel`) | `bun test` in the package, or `bun run test` |
-| The sidebar query and boot on the large seed (report only) | `packages/engine/test/bench/` | `JUNO_BENCH=1 bun run --cwd packages/engine vitest run test/bench` |
+| Store, Slack client, Slack-app import, merge rules, engine protocol, session and sync; the Juno agent's flows (turns, cards, connections, T3 and Codex, backup, crash recovery, memory, settings), the AI provider (`PiAiProvider` against pi-ai's scripted faux provider), the agent libraries, and the pure rules of domain, rich text, state, huddle and the small libraries | `packages/<name>/test/`, `apps/desktop/test/` (`bun test`; each file passes alone and with `--parallel`) | `bun run test`, or `bun test <files>` in the package |
+| Engine idle CPU, and the sidebar, topic and search queries on the large seed, failed on their budgets | `packages/engine/test/perf/*.perf.ts` | `bun run perf --unit` (Mac) |
 | User flows against the engine host; native Electron integration | `apps/desktop/e2e/` (Playwright browser and Electron projects) | `bun run test:browser`, `bun run test:electron`, or both with `bun run test:desktop` |
 | Mouse-down activation, state switcher, in a real browser | `apps/gallery/activation.spec.ts`, `apps/gallery/behaviour.spec.ts` | `bun run test:gallery` |
 | Sidebar row text contrast, each level in both themes and every accent | `apps/gallery/contrast.spec.ts` | `bun run test:gallery` |
@@ -603,7 +603,7 @@ Names are explained in `docs/architecture.md` sections 2.6 and 7.
 | Screenshots of every state | `apps/gallery/shots.spec.ts` | `bun run gallery:shots` |
 | Feel: no shift, jump, flicker, empty frame or late feedback, frame by frame, in the built app | `apps/desktop/e2e/feel/*.feel.ts` | `bun run test:feel` |
 
-Tests that need the Effect test clock use `@effect/vitest` in the vitest packages. Under `bun test`, a plain `test` provides `TestClock` from `effect/testing` and runs the effect with `Effect.runPromise`; to time out a call that is in flight, fork it, wait until the request reaches the fake (a promise the fake resolves), then `TestClock.adjust` (`packages/ai/test/pi.test.ts`). Wait on a real signal (a Deferred, a subscription, a fake's call log); where there is none, `eventually` from `@juno/testing/eventually` retries a check. See the effect skill.
+Unit tests run on `bun test` with the preload in `packages/testing/src/preload.ts` (Node-compatible SQLite, a 30 s test timeout). Tests that need the Effect test clock use `itEffect` from `@juno/testing/effect`, which provides `TestClock` and runs the effect; to time out a call that is in flight, fork it, wait until the request reaches the fake (a promise the fake resolves), then `TestClock.adjust` (`packages/ai/test/pi.test.ts`). Wait on a real signal (a Deferred, a subscription, a fake's call log); where there is none, `eventually` from `@juno/testing/eventually` retries a check. See the effect skill.
 
 ### Text-menu spelling checks
 
@@ -732,13 +732,18 @@ At the end of each UI milestone, run these reviews in parallel and turn the find
   so only `presence_sub` showed it, 10-21). `electron.vite.config.ts` defines
   `process.env.WS_NO_BUFFER_UTIL` for the main build, which keeps `ws` on its own
   JavaScript masking. Engine tests under plain Node never saw it.
-- **`node:sqlite` and Node versions.** Electron 44 runs Node 24.21; the system Node is
-  26. `@effect/sql-sqlite-node` uses `isTransaction`, `columns()`, `setReturnArrays`
-  and `backup`, and the store uses FTS5; all were checked in Electron's own Node. To
-  run a package's tests under that Node:
-  `ELECTRON_RUN_AS_NODE=1 apps/desktop/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron node_modules/vitest/vitest.mjs run`
-  from the package directory. Node 24 prints an ExperimentalWarning for `node:sqlite`;
-  it is harmless.
+- **`node:sqlite` on Electron, Node and Bun.** Electron 44 runs Node 24.21 with SQLite
+  3.53.4; the system Node is 26 (SQLite 3.54); Bun 1.4.4 uses the system SQLite on macOS
+  (3.51) and its own on Linux. `@effect/sql-sqlite-node` uses `isTransaction`, `columns()`,
+  `setReturnArrays` and `backup`, and the store uses FTS5, WAL and a read-only open of a
+  WAL file; all were checked in Electron's own Node. Unit tests run on Bun, whose
+  `node:sqlite` differs: the system SQLite cannot open a WAL database read-only without
+  its `-shm` file and has no extension support, and Bun refuses booleans as bind values.
+  The test preload (`packages/testing/src/preload.ts`) loads Homebrew's SQLite on macOS
+  (`brew install sqlite`, or `JUNO_SQLITE=<libsqlite3.dylib>`), drops the `allowExtension`
+  option, and binds booleans as 1 and 0 as Node does; `undefined` is refused on both.
+  `packages/store/test/node-sqlite.test.ts` pins this. The desktop e2e suite runs the
+  real store on Electron.
 - **Workspace packages and `effect` in main and preload.** `externalizeDepsPlugin`
   externalises every dependency, and workspace packages ship TypeScript, so
   `electron.vite.config.ts` excludes `@juno/contract`, `@juno/engine`, `@juno/state`
@@ -775,7 +780,8 @@ Effect and StyleX pitfalls are in their skills: `.claude/skills/effect/SKILL.md`
 - **Spec cache.** `bun run specs:check` stores each passing Quint run in the system temp folder (`juno-cache/specs`), keyed by its arguments, what is checked on its output, the spec file and what it imports, the Quint and Apalache versions, Bun/runtime version, OS and architecture. Every worktree shares it. The default seed is reproducible; `SPECS_SEED=<integer>` selects another. Full runs reuse unchanged checks; nightly runs choose and record a fresh seed while keeping deterministic checks cached. A run whose key matches is not repeated: its saved output goes through the same checks and its trace is written back to `specs/traces/`. A changed spec reruns only its own checks. `SPECS_CACHE=off bun run specs:check` or `--no-cache` runs everything; `SPECS_JOBS=<n>` sets how many typechecks and simulations run at once (default 3). The Apalache checks run after them, one at a time, on one Apalache server started for the run, so a check no longer pays for starting a JVM. Bump `cacheVersion` in `specs/check.mjs` when you change how a result is checked.
 - **Build skip.** `test:e2e`, `perf`, `test:feel`, `test:gallery` and `gallery:shots` build through `scripts/build-cached.mjs`. It hashes the app, packages, scripts, root configuration and lockfile, build command, Node version, platform, architecture and build flags (including Vite variables and local `.env` files). Desktop e2e files, app-level specs, Playwright configs, package/app `test/` and `tests/` directories, and `scripts/*.test.mjs` do not affect the build key. Seed definitions and other helpers under `src/` still do. It verifies output bytes before reuse. Remote runs also restore matching output from a persistent cache; a changed input, missing output or failed checksum rebuilds. `JUNO_REBUILD=1` forces a build. `bun run build` and `bun run dev` always build.
 - **Shift guard.** The gallery's guard waits only for running transitions and animations that can move a box, touches once a state that draws the same DOM as one already checked, and its twelve parts take components from one queue in the temp folder, so they finish together. The parts also check the cursor rule on each state they open. `GALLERY_SHIFT_ONLY=Button,Chip bun run test:gallery` checks a few components while you iterate.
-- **Changed tests only.** `bun run test --changed main` runs only the vitest files affected by changes since `main` (vitest follows imports across packages).
+- **Changed tests only.** `bun run test --changed=main` runs only the `bun test` files affected by changes since `main` (Bun follows imports across packages).
+- **One parallel unit run.** `bun run test` runs every `bun test` package in one `bun test --parallel` from the root, a process per file, `JUNO_TEST_WORKERS` at once (default half the cores), slowest files first by the checkout's last timings (`node_modules/.cache/juno/bun-test-timings.json`).
 - **Remote runs.** `bun run remote <script>` takes no local slot. See "Remote runs" below.
 
 ## Typecheck
@@ -1509,7 +1515,7 @@ the hardened package; the packaged smoke instead uses Chromium CDP. The
 
 ### Engine and sync benchmarks
 
-`bun run bench:engine` runs `packages/engine/test/bench` with one worker and serial files, through the exclusive machine lock. `bun run bench:sync` runs the read-only sync harness against the large fake seed with production pacing; it never opens a real session and fails if it cannot reach `live` within an hour. Both can run through `bun run remote` on a dedicated 4x8 Linux machine. Compare runs on the same shape; renderer performance budgets still run on the Mac. The fake's normal engine tests disable pacing, so their boot time does not measure the request budget.
+`bun run bench:engine` runs the large-seed benchmarks in `packages/engine/test/perf` one after another, through the exclusive machine lock. `bun run bench:sync` runs the read-only sync harness against the large fake seed with production pacing; it never opens a real session and fails if it cannot reach `live` within an hour. Both can run through `bun run remote` on a dedicated 4x8 Linux machine. Compare runs on the same shape; renderer performance budgets still run on the Mac. The fake's normal engine tests disable pacing, so their boot time does not measure the request budget.
 
 ## StyleX token check
 

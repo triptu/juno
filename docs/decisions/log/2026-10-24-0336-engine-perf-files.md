@@ -1,0 +1,1 @@
+- 10-24 03:36 · engine-perf-files · Engine measurements (idle CPU, large-seed query budgets) are `packages/engine/test/perf/*.perf.ts`, run only by `bun run perf --unit` on the Mac with their budgets always enforced; `bun run test` never runs them.

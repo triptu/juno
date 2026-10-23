@@ -1,0 +1,1 @@
+- 10-24 03:33 · unit-tests-on-bun · Unit tests of engine, store, sync, slack, slack-schema, fake-slack and desktop run on `bun test` instead of vitest; `bun run test` runs every bun package in one `bun test --parallel` from the root, a process per file (engine suite 351 s serial on vitest, 46 s with four Bun workers).

@@ -1,0 +1,1 @@
+- 10-24 03:35 · synced-test-workspace · Engine tests whose first sync is only setup start warm on a copy of the default seed synced once per test process (`syncedEngine`), with a fresh fake at the same seed time and port; tests of the first sync itself still cold-boot.

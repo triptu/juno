@@ -1,16 +1,20 @@
 # Engine test harness
 
-The tests run the real engine and state client over a MessageChannel against the fake Slack server. Run them through the root machine lock:
+The tests run the real engine and state client over a MessageChannel against the fake Slack server, on `bun test` (the preload in `packages/testing/src/preload.ts` gives Bun's `node:sqlite` Electron's behaviour). A test has 30 s and a harness wait 15 s (`WAIT_MS`), so a slow step fails with its own label. Run a few files in the package, or every package's tests from the root through the machine lock:
 
 ```sh
-bun scripts/heavy.mjs bun run --cwd packages/engine vitest run test/sync.test.ts
+cd packages/engine && bun test test/send.test.ts
+bun run test --files packages/engine/test/send.test.ts
+bun run test
 ```
 
 `startTestEngine()` uses `fastTiming`: the scheduling fields from `src/config.ts` divided by 20. Retry ratios, attempt limits and timer order stay the same. Pass `timing: { ... }` for a scenario override. Periodic sweeps remain disabled (`sweepIntervalMillis: 0`) and `followPassMillis: 0` checks follows at every catch-up. Boot, reconnect and `force_reload` run normally. Data ages, server Retry-After values and network request timeouts keep their real meaning. The app retains its existing defaults.
 
-Timing assertions use `controlledClock()` (Effect TestClock), supplied as `clock`, to freeze after boot and advance to an exact boundary. The send flush test advances stored retry deadlines and proves reconnect settles before the next one. `controlledSleep(millis)` controls only one duration, leaving all other sleeps and clock reads live; quick-start uses it for Automated's production 5,000 ms hold. The read test checks the production 400 ms window this way. The half-open socket repair test advances the production pong deadline only after two sweeps finish. The notification schedule coalescing test keeps its production one-second debounce. Tests measuring actual idle CPU keep production schedules and real observation windows; their names say `[production timing]`.
+Timing assertions use `controlledClock()` (Effect TestClock), supplied as `clock`, to freeze after boot and advance to an exact boundary. The send flush test advances stored retry deadlines and proves reconnect settles before the next one. `controlledSleep(millis)` controls only one duration, leaving all other sleeps and clock reads live; quick-start uses it for Automated's production 5,000 ms hold. The read test checks the production 400 ms window this way. The half-open socket repair test advances the production pong deadline only after two sweeps finish. The notification schedule coalescing test keeps its production one-second debounce. Tests measuring actual idle CPU keep production schedules and real observation windows; they are `test/perf/*.perf.ts`, which `bun run test` does not run: `bun run perf --unit` runs them on the Mac with the large-seed benchmarks there.
 
-A fresh test engine copies an empty migrated store from a template built once per file's isolated module context (`migratedWorkspace.ts`). The template is closed before copying and removed after the file. Each engine has its own database files, fake Slack server on an allocated port, scope and atom registry. It still performs a cold sign-in and sync. Warm restarts reuse their existing files without copying; store migration and recovery tests continue to start from scratch.
+A fresh test engine copies an empty migrated store from a template built once per test process (`migratedWorkspace.ts`). The template is closed before copying and removed when the process exits. Each engine has its own database files, fake Slack server on an allocated port, scope and atom registry. It still performs a cold sign-in and sync. Warm restarts reuse their existing files without copying; store migration and recovery tests continue to start from scratch.
+
+`syncedEngine()` (`synced.ts`) is for tests whose first sync is only setup. The first call in a process cold-boots the default seed once and keeps a copy of its user data; each call then starts a fresh fake at the same seed time and port (so stored ids, timestamps and avatar URLs match) and a warm engine on its own copy, as a relaunch does. Use `bootedEngine()` when the first sync, a custom seed or a change to the fake before boot is what the test is about. `JUNO_BOOT_LOG=<file>` writes one line per engine started, `cold` or `warm`, to count boots.
 
 Related assertions can share one engine inside a named `step` flow. Separate tests never share a mutable engine. Cold-boot scenarios, different seeds and independent failure cases stay separate. The large-workspace and socket-liveness repair tests live in separate files so remote workers can overlap them. Each large-seed file creates one fake; its warm restart reuses that fake. The two mutation scenarios use `mutationSeed.ts`: 20,000 messages, 1,000 threads and 300 conversations over seven days. They retain the 150-conversation activity check and exact repair budgets. Performance fixtures keep 100,000 messages.
 
@@ -35,7 +39,7 @@ The engine runs the fake AI, but its background AI jobs (titles, topic art, Home
 `stress-flakes.mjs` starts eight CPU-burning Node processes, runs the command serially, saves each run under `.juno-status/flake-check/<label>/`, and stops the load processes even when tests fail. Retries stay off.
 
 ```sh
-bun scripts/heavy.mjs bun scripts/stress-flakes.mjs engine 20 bun run --cwd packages/engine vitest run test/sync.test.ts test/reconnect.test.ts -t 'warm boot reads every page|reads followed threads past the first getView page|Unsubscribe|rejected unsubscribe'
+bun scripts/heavy.mjs bun scripts/stress-flakes.mjs engine 20 sh -c "cd packages/engine && bun test test/sync.test.ts test/reconnect.test.ts -t 'warm boot reads every page|Unsubscribe|rejected unsubscribe'"
 ```
 
 Build before repeating desktop tests:
@@ -56,8 +60,8 @@ CONFORMANCE_ONLY=copy-7 bun run specs:conformance          # only the traces who
 ```
 
 - `itf.ts` reads ITF. `replay.ts` is the loop for any spec: it cuts a trace into rounds (a step the harness drives, then the steps Juno takes on its own), drives the first step, waits until the projections agree, and reports the first round where they do not, with the fields that differ, the gated calls and the outbox.
-- `outbox.ts` is the outbox mapping: how each step is driven through the fake (`gate`, `decide`, `holdFramesWhere`, `releaseFramesWhere`) and the commands, and the projection both sides are compared on. A new spec adds a file like it and a `*.conformance.ts` entry. The outbox suite is in `outbox-suite.ts`; `outbox.conformance.ts` and `outbox-2` to `outbox-4` each take a share of the traces, slowest first, so vitest runs them in four workers.
-- The files are not `*.test.ts`, so `bun run test` does not run them: they need the generated traces. `vitest.conformance.config.ts` runs up to `JUNO_CONFORMANCE_CONCURRENCY` traces at once (default 6); each boots its own engine and fake.
+- `outbox.ts` is the outbox mapping: how each step is driven through the fake (`gate`, `decide`, `holdFramesWhere`, `releaseFramesWhere`) and the commands, and the projection both sides are compared on. A new spec adds a file like it and a `*.conformance.ts` entry. The outbox suite is in `outbox-suite.ts`; `outbox.conformance.ts` and `outbox-2` to `outbox-4` each take a share of the traces, slowest first, so `bun test --parallel` runs them in separate processes.
+- The files are not `*.test.ts`, so `bun run test` does not run them: they need the generated traces. `specs/conformance.mjs` passes them to `bun test` by path, with up to `JUNO_CONFORMANCE_CONCURRENCY` traces at once in each file (default 6); each boots its own engine and fake.
 - A divergence is a finding. Fix the code or the spec, or record why the trace cannot be replayed. Do not loosen the projection to make a trace pass.
 
 Replays use the same fast timing profile. Their projection is checked again after the socket barrier and sync completion, instead of waiting 300 ms per round. Deliberately broken traces get a 2.5 s divergence bound. No trace step depends on a wall-clock duration: retry refusals are stutters and the trace gates the successful operation. The projections, traces and pre-existing skips are unchanged.
@@ -65,12 +69,11 @@ Replays use the same fast timing profile. Their projection is checked again afte
 ## Timing diagnostics
 
 `JUNO_UNIT_PROFILE=1` enables phase timing and CPU sampling in `profile.ts`. Run
-one worker so the files' CPU profiles do not compete. Sampling distorts event-loop
-utilization, so exclude the production idle checks from diagnostic runs; keep
-profiling off for validation and before/after suite timings.
+one worker so the files' CPU profiles do not compete. Sampling distorts CPU
+use, so keep profiling off for validation, the perf files and before/after suite timings.
 
 ```sh
-bun run remote --machine linux/amd64:4x8 --env JUNO_TEST_PACKAGE_JOBS=1 --env JUNO_VITEST_WORKERS=1 --env JUNO_UNIT_PROFILE=1 test --passWithNoTests test/mutation-activity.test.ts test/mutation-repair-large.test.ts test/sync.test.ts test/send.test.ts test/actions.test.ts -t '^(?!.*production timing)'
+bun run remote --machine linux/amd64:4x8 --env JUNO_TEST_WORKERS=1 --env JUNO_UNIT_PROFILE=1 test --files packages/engine/test/sync.test.ts packages/engine/test/send.test.ts
 ```
 
 The profile's wall and CPU figures include asynchronous engine work; phases can
