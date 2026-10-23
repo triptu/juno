@@ -22,14 +22,15 @@ declare global {
  * `edge: 'bottom'` samples the anchor's bottom-left corner instead of its top-left: a row that grows while the list
  * holds its bottom (stick to bottom) keeps its bottom edge.
  * `outside` skips a shift whose every moved node is inside that element: for a region whose movement during the
- * action is intended and checked by its own test. A shift that also moves anything else still fails, but Chromium
+ * action is intended and checked by its own test. `within` skips a shift whose every moved node is outside that
+ * element: for a test about one region while another fills with content. A shift that also moves anything else still fails, but Chromium
  * names at most five nodes per shift, so the anchor's samples and the test's own boxes guard the region under test.
  * A shift counts only if a source outside that region has a different box before and after, as in the feel suite: Chromium
  * reports some text changes as a shift whose every box stays where it was.
  */
-export async function expectStableAnchor(page: Page, selector: string, action: () => Promise<unknown>, options: { readonly edge?: 'top' | 'bottom'; readonly outside?: string } = {}): Promise<void> {
+export async function expectStableAnchor(page: Page, selector: string, action: () => Promise<unknown>, options: { readonly edge?: 'top' | 'bottom'; readonly outside?: string; readonly within?: string } = {}): Promise<void> {
   await waitForLayoutReady(page)
-  await page.evaluate(({ target, edge, outside }) => {
+  await page.evaluate(({ target, edge, outside, within }) => {
     if (!PerformanceObserver.supportedEntryTypes.includes('layout-shift')) throw new Error('layout-shift observer unavailable')
     const shifts: Array<{ value: number; sources: string[] }> = []
     const collect = (entries: PerformanceEntry[]) => {
@@ -37,8 +38,9 @@ export async function expectStableAnchor(page: Page, selector: string, action: (
         if ('hadRecentInput' in entry && entry.hadRecentInput === false && 'value' in entry && typeof entry.value === 'number') {
           const shift = entry as PerformanceEntry & { sources?: Array<{ node: Node | null; previousRect: DOMRectReadOnly; currentRect: DOMRectReadOnly }> }
           const region = outside === undefined ? null : document.querySelector(outside)
+          const scope = within === undefined ? null : document.querySelector(within)
           const sources = shift.sources ?? []
-          const others = sources.filter(({ node }) => region === null || node === null || !region.contains(node))
+          const others = sources.filter(({ node }) => (region === null || node === null || !region.contains(node)) && (scope === null || node === null || scope.contains(node)))
           // Chromium reports a text that moves inside a box that stays (a right-aligned count going from 9 to 10) with only
           // that box as its source, the same before and after. Nothing on screen moved a box, so it does not count. An
           // entry without sources cannot be told apart from a real one, so it counts.
@@ -67,7 +69,7 @@ export async function expectStableAnchor(page: Page, selector: string, action: (
     }
     window.junoShiftProbe = { shifts, observer, drain: () => collect(observer.takeRecords()), samples, sample, stop: () => cancelAnimationFrame(frame) }
     tick()
-  }, { target: selector, edge: options.edge ?? 'top', outside: options.outside })
+  }, { target: selector, edge: options.edge ?? 'top', outside: options.outside, within: options.within })
   try {
     await action()
     await waitForLayoutReady(page)
