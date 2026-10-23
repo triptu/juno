@@ -5,7 +5,7 @@
  * OpenRouter's (`{ error: { code, message, metadata } }`); none is real.
  */
 import { describe, expect, it } from 'bun:test'
-import { classifyFailure, fallbackHelps, isRetryable, modelMaker, refusedBeforeOutput } from '../src/index'
+import { classifyFailure, modelMaker, refusedBeforeOutput } from '../src/index'
 
 const body = (code: number, message: string, metadata?: object) => JSON.stringify({ error: { code, message, ...(metadata ? { metadata } : {}) } })
 
@@ -39,21 +39,11 @@ describe('classifyFailure', () => {
     ['unavailable', body(502, 'Provider returned error')],
     ['unknown', 'Something odd happened'],
   ])('%s: %s', (kind, text) => {
-    expect(classifyFailure(text)).toBe(kind)
+    expect(classifyFailure(text)).toBe<string>(kind)
   })
 })
 
-describe('what a kind means for the next try', () => {
-  it('retries only what trying again can change', () => {
-    for (const kind of ['policy', 'bad-request', 'context-length', 'model-not-found', 'auth', 'credits'] as const) expect(isRetryable(kind)).toBe(false)
-    for (const kind of ['network', 'timeout', 'rate-limited', 'unavailable', 'server', 'unknown'] as const) expect(isRetryable(kind)).toBe(true)
-  })
-
-  it('asks another maker after a policy refusal or a missing or unavailable model, never after a request error', () => {
-    expect(['policy', 'model-not-found', 'unavailable'].every((kind) => fallbackHelps(kind as never))).toBe(true)
-    expect(['bad-request', 'context-length', 'auth', 'credits', 'rate-limited', 'network'].some((kind) => fallbackHelps(kind as never))).toBe(false)
-  })
-
+describe('billing and fallback', () => {
   it('counts a 4xx before output as unbilled, and an error inside a 200 stream as possibly billed', () => {
     expect(refusedBeforeOutput(`400 ${body(400, 'Your request was blocked by our content policy.')}`)).toBe(true)
     expect(refusedBeforeOutput(`402 ${body(402, 'Insufficient credits')}`)).toBe(true)

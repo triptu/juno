@@ -13,7 +13,7 @@ Sorts a model provider's error into a kind, from the text pi-ai gives: the HTTP 
 
 ## Tests
 
-`bun run --cwd packages/ai-failure test`: OpenRouter-shaped error bodies (none real) to kinds, and what each kind means for the next try.
+`bun run --cwd packages/ai-failure test`: OpenRouter-shaped error bodies (none real) to kinds, which refusals came before any output (and so cost nothing), and the maker of a model slug. What each kind means for a retry or a fallback is tested through the provider in `packages/ai/test/pi.test.ts`.
 
 ## Must not
 
