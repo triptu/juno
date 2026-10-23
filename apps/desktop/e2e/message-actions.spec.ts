@@ -146,15 +146,12 @@ async function reactToMessage({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): 
   await expect(row.getByRole('button', { name: '1 👀', exact: true })).toBeVisible()
   await expect.poll(() => reactionsOf().find((r) => r.name === 'eyes')?.count).toBe(1)
 
-  // A mention keeps its tint, hovered or with its menu open (SPEC 7).
-  const mentionTint = await row.evaluate((element) => getComputedStyle(element).backgroundColor)
-  await row.hover()
-  await expect(row).toHaveCSS('background-color', mentionTint)
-  const mentionMenu = await topic.messageMenu('Staging is green again')
+  // A message that mentions you has no fill of its own, at rest or hovered (SPEC 7): the @you chip marks it.
+  const clear = 'rgba(0, 0, 0, 0)'
   await juno.win.mouse.move(0, 0)
-  await expect(row).toHaveAttribute('data-popover-active', '')
-  await expect(row).toHaveCSS('background-color', mentionTint)
-  await mentionMenu.close()
+  await expect(row).toHaveCSS('background-color', clear)
+  await row.hover()
+  await expect(row).toHaveCSS('background-color', clear)
 
   // Hovering a plain message adds no fill. While its menu is open, and the picker More reactions turns it into, the
   // message takes a faint fill, so it is clear which message the menu belongs to.
@@ -162,7 +159,6 @@ async function reactToMessage({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): 
   const plain = topic.message('Preview builds are back to five minutes')
   await expect(plain).toBeVisible()
   const plainTs = fake.messages('C0ENG').find((m) => m.text === 'Preview builds are back to five minutes')!.ts
-  const clear = 'rgba(0, 0, 0, 0)'
   await plain.hover()
   await expect(plain).toHaveCSS('background-color', clear)
   const open = await topic.messageMenu('Preview builds are back to five minutes')

@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-23 13:25 · mention tint · A message that mentions you has no fill of its own; the @you chip marks it. The `--tint-mention-bg` token and the per-message `mentionsMe` field went with it (owner).
 - 10-23 01:00 · forward note · The Forward sheet's note is a multi-line field that grows to eight lines (the shared field Textarea), with Enter forwarding and Shift-Enter adding a line as in the composer, since SPEC 7 says Enter forwards. The preview leaves out the place when it is the sender's own name (owner).
 - 10-23 00:50 · header times · A message header's time always has the clock ("Yesterday 15:42", "Oct 16, 15:42", "Oct 16, 2025, 15:42"), since headers repeat after ten quiet minutes and a date alone would not tell them apart. Juno chat bubble times follow. The app's 24-hour clock stays; it has no 12-hour setting (owner).
 - 10-23 00:35 · message hover · A message under the pointer has no fill. Only a message whose menu, or the picker the menu turned into, is open takes a faint fill (`--message-menu-open`, renamed from `--message-hover`), so it is clear which message the menu belongs to (owner).

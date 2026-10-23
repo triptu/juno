@@ -98,7 +98,6 @@ interface MessageInput {
   readonly files?: ReadonlyArray<FileView>
   readonly thread?: ThreadLink
   readonly edited?: boolean
-  readonly mentionsMe?: boolean
   readonly broadcast?: boolean
   /** Main: the thread a broadcast reply came from. */
   readonly broadcastFrom?: MessageView['broadcastFrom']
@@ -132,7 +131,6 @@ export function message(input: MessageInput, previous?: MessageListItem): Messag
     body: { blocks },
     edited: input.edited ?? false,
     groupStart,
-    mentionsMe: input.mentionsMe ?? blocks.some((block) => 'children' in block && block.children.some((inline) => inline.kind === 'user' && inline.isMe)),
     broadcast: input.broadcast ?? false,
     root: input.root ?? false,
     reactions: input.reactions ?? [],
