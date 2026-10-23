@@ -73,7 +73,7 @@ describe('query plans', () => {
       for (const filter of filters) {
         for (const statement of listStatements(filter, '1700000000.000000', 300)) {
           const lines = yield* plan(statement.sql, statement.params)
-          expect(scans(lines), name).toStrictEqual([])
+          expect(scans(lines), lines.join('\n')).toStrictEqual([])
           expect(lines.some((line) => line.includes('topic_index'))).toBe(true)
         }
         // Unscoped (a view included), Pinned and older unread rows come through their own partial indexes, never every topic of a channel.
@@ -93,7 +93,7 @@ describe('query plans', () => {
       for (const scope of [undefined, 'C0ENG']) {
         const statement = countsStatement(scope)
         const lines = yield* plan(statement.sql, statement.params)
-        expect(scans(lines), name).toStrictEqual([])
+        expect(scans(lines), lines.join('\n')).toStrictEqual([])
       }
     }).pipe(Effect.provide(freshStore)),
   )
@@ -117,7 +117,7 @@ describe('query plans', () => {
           for (const sort of ['recent', 'oldest', 'messages'] as const) {
             const statement = orderStatement({ ...narrowing, status, sort }, cutoff, 200, 200)
             const lines = yield* plan(statement.sql, statement.params)
-            expect(scans(lines), name).toStrictEqual([])
+            expect(scans(lines), lines.join('\n')).toStrictEqual([])
             expect(lines.some((line) => /SEARCH i USING (COVERING )?INDEX topic_index_channel/.test(line))).toBe(true)
           }
         }
@@ -141,7 +141,7 @@ describe('query plans', () => {
         for (const anchor of [undefined, '1700000000.000200']) {
           for (const statement of windowStatements(target, { anchor, before: 50, limit: 300 })) {
             const lines = yield* plan(statement.sql, statement.params)
-            expect(scans(lines), name).toStrictEqual([])
+            expect(scans(lines), lines.join('\n')).toStrictEqual([])
             const index = target.kind === 'main' ? 'messages_main' : 'messages_thread'
             expect(lines.some((line) => line.includes(index))).toBe(true)
           }
@@ -149,7 +149,7 @@ describe('query plans', () => {
       }
       for (const statement of [broadcastTitlesStatement(['t:C0ENG:1700000000.000100']), rootStatement({ kind: 'thread', channel: 'C0ENG', threadTs: '1700000000.000100' }), reactionsStatement('C0ENG', ['1700000000.000100', '1700000000.000200']), firstRepliesStatement('C0ENG', ['1700000000.000100']), messagesByTsStatement('C0ENG', ['1700000000.000100', '1700000000.000200'])]) {
         const lines = yield* plan(statement.sql, statement.params)
-        expect(scans(lines), name).toStrictEqual([])
+        expect(scans(lines), lines.join('\n')).toStrictEqual([])
       }
     }).pipe(Effect.provide(freshStore)),
   )
@@ -168,7 +168,7 @@ describe('query plans', () => {
       const statements = whoReactedStatements('C0ENG', '1700000000.000100')
       for (const statement of [statements.message, statements.reactions]) {
         const lines = yield* plan(statement.sql, statement.params)
-        expect(scans(lines), name).toStrictEqual([])
+        expect(scans(lines), lines.join('\n')).toStrictEqual([])
       }
     }).pipe(Effect.provide(freshStore)),
   )
@@ -179,7 +179,7 @@ describe('query plans', () => {
       const all = threadsStatements('C0ENG', undefined, 100)
       for (const statement of [recent.list, recent.count, all.list, all.count]) {
         const lines = yield* plan(statement.sql, statement.params)
-        expect(scans(lines), name).toStrictEqual([])
+        expect(scans(lines), lines.join('\n')).toStrictEqual([])
         expect(lines.some((line) => line.includes('topic_index_channel_activity'))).toBe(true)
       }
     }).pipe(Effect.provide(freshStore)),
@@ -215,7 +215,7 @@ describe('query plans', () => {
       ]
       for (const statement of statements) {
         const lines = yield* plan(statement.sql, statement.params)
-        expect(scans(lines), name).toStrictEqual([])
+        expect(scans(lines), lines.join('\n')).toStrictEqual([])
       }
     }).pipe(Effect.provide(freshStore)),
   )
@@ -244,7 +244,7 @@ describe('query plans', () => {
       ]
       for (const statement of statements) {
         const lines = yield* plan(statement.sql, statement.params)
-        expect(scans(lines), name).toStrictEqual([])
+        expect(scans(lines), lines.join('\n')).toStrictEqual([])
       }
     }).pipe(Effect.provide(freshStore)),
   )
@@ -255,7 +255,7 @@ describe('query plans', () => {
       for (const [name, statement] of Object.entries(searchStatements(reader, '"roll"*', 50))) {
         const [sql, params] = statement.compile()
         const lines = yield* plan(sql, params)
-        expect(scans(lines), name).toStrictEqual([])
+        expect(scans(lines), `${name}\n${lines.join('\n')}`).toStrictEqual([])
       }
     }).pipe(Effect.provide(freshStore)),
   )
