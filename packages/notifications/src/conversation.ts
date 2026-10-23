@@ -55,11 +55,13 @@ export const readConversation = (sql: StoreWriter['Service'], self: string, cand
           AND (thread_ts IS NULL OR thread_ts = ts OR subtype = 'thread_broadcast') AND ts < ${candidate.ts}`)[0]?.ts
       : (yield* sql<{ ts: string | null }>`SELECT MAX(ts) AS ts FROM messages WHERE channel = ${channel} AND user_id = ${self} AND deleted = 0
           AND (thread_ts = ${threadTs} OR ts = ${threadTs}) AND ts < ${candidate.ts}`)[0]?.ts
-    // A send from Juno is in `sent_posts` before Slack's copy reaches `messages`. It has no thread, so it counts for Main unless its copy is a reply.
-    const sent = threadTs !== undefined ? undefined
-      : (yield* sql<{ at: number | null }>`SELECT MAX(s.sent_at) AS at FROM sent_posts s WHERE s.channel = ${channel} AND s.user_id = ${self} AND s.deleted_by_user = 0
-          AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.channel = s.channel AND m.ts = s.ts AND m.thread_ts IS NOT NULL AND m.thread_ts <> m.ts)`)[0]?.at
-    const ownerAt = Math.max(ownerLast == null ? 0 : tsToMillis(ownerLast as never), sent ?? 0)
+    // Whether the sender wrote in the topic after the owner's last message (or at all, when the owner has not written), before this one.
+    const after = ownerLast ?? ''
+    const senderSince = threadTs === undefined
+      ? (yield* sql`SELECT 1 FROM messages WHERE channel = ${channel} AND user_id = ${candidate.senderId} AND deleted = 0
+          AND (thread_ts IS NULL OR thread_ts = ts OR subtype = 'thread_broadcast') AND ts > ${after} AND ts < ${candidate.ts} LIMIT 1`).length > 0
+      : (yield* sql`SELECT 1 FROM messages WHERE channel = ${channel} AND user_id = ${candidate.senderId} AND deleted = 0
+          AND (thread_ts = ${threadTs} OR ts = ${threadTs}) AND ts > ${after} AND ts < ${candidate.ts} LIMIT 1`).length > 0
     const started = threadTs !== undefined && (root?.user_id === self
       || (yield* sql`SELECT 1 FROM started_threads WHERE channel = ${channel} AND root_ts = ${threadTs}`).length > 0)
     const followed = threadTs !== undefined
@@ -68,21 +70,18 @@ export const readConversation = (sql: StoreWriter['Service'], self: string, cand
       WHERE topic_id = ${candidate.topicId} AND delivered_at IS NOT NULL`)[0]?.at
     // The thread's first message counts as the previous one for its first reply.
     const previous = earlier[0] ?? root
-    const previousAt = previous === undefined ? 0 : tsToMillis(previous.ts as never)
     const facts: ConversationFacts = {
-      ...(ownerAt === 0 ? {} : { ownerWroteMinutesAgo: Math.max(0, (now - ownerAt) / 60_000) }),
-      ownerWroteLast: previous?.user_id === self || (sent != null && sent > previousAt),
+      ...(ownerLast == null ? {} : { ownerWroteMinutesAgo: Math.max(0, (now - tsToMillis(ownerLast as never)) / 60_000) }),
+      ownerWroteLast: previous?.user_id === self,
       ownerStartedThread: started,
       followed,
       ...(banner == null ? {} : { bannerSecondsAgo: Math.max(0, (now - Date.parse(banner)) / 1000) }),
     }
-    const ownerIndex = earlier.findIndex((row) => row.user_id === self)
-    const sinceOwner = ownerIndex < 0 ? earlier : earlier.slice(0, ownerIndex)
     return {
       facts,
       before: earlier.toReversed().map((row) => message(row, self)),
       ...(root === undefined ? {} : { threadRoot: message(root, self) }),
-      senderWroteSinceOwner: ownerIndex >= 0 && sinceOwner.some((row) => row.user_id === candidate.senderId),
+      senderWroteSinceOwner: senderSince,
     } satisfies Conversation
   })
 

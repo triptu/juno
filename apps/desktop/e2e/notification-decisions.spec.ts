@@ -7,7 +7,7 @@
  */
 import { expect, syncedTest } from './fixtures'
 import type { Juno } from './driver/juno'
-import { loggedDecision as decision } from './driver/notificationLog'
+import { loggedDecision as decision, syncedMessage } from './driver/notificationLog'
 
 const bodies = async (juno: Juno) => (await juno.osNotifications()).map((notification) => notification.body)
 
@@ -19,6 +19,8 @@ syncedTest('a cold greeting stays, and a reply while you talk in the DM notifies
   await juno.sidebar.row('Maya', { exact: true }).open()
   await juno.topic.send('Hey Maya, what is up?')
   await juno.topic.expectMessage('Hey Maya, what is up?')
+  // Facts come from synced messages, so wait for Slack's copy of the reply.
+  await expect.poll(() => syncedMessage(userData, fake.teamId, 'Hey Maya, what is up?'), { timeout: 15_000 }).toBe(true)
   // Away from the DM, Maya's answer is an update the reading would keep, but you were talking a moment ago.
   await juno.openNotifications()
   slack.as('Maya').dm('The doc is in the shared folder now')

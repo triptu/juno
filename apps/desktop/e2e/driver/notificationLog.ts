@@ -10,3 +10,13 @@ export function loggedDecision(userData: string, teamId: string, text: string): 
     db.close()
   }
 }
+
+/** Whether a message with this text is in the synced mirror, as Slack sent it back. */
+export function syncedMessage(userData: string, teamId: string, text: string): boolean {
+  const db = new DatabaseSync(join(userData, 'workspaces', teamId, 'cache.db'), { readOnly: true })
+  try {
+    return db.prepare('SELECT 1 FROM messages WHERE text = ? AND deleted = 0').get(text) !== undefined
+  } finally {
+    db.close()
+  }
+}
