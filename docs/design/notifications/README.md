@@ -1,48 +1,40 @@
-# Notifications: a simplification pass
+# Notifications
 
-Approved by the owner on 10-14 and applied to SPEC 14, inventory 13 and `@juno/domain`. It replaces the old notification page and adds a presence schedule. `mock.html` shows the current page next to the proposal, and what moves off the page. `node ../../../scripts/heavy.mjs node render.mjs` writes the PNGs.
+The current design is v2, approved by the owner on 10-23 and written into SPEC 14 and inventory 13 and 15.3. SPEC 14 decides behaviour; where this folder and the spec differ, the spec wins.
 
 | File | What |
 | --- | --- |
-| `compare-light.png`, `compare-dark.png` | The current page (SPEC 14, inventory 13) beside the proposed page |
-| `around-light.png`, `around-dark.png` | The sidebar menu, the avatar menu, the message "why" popover, and changing settings in the Juno chat |
+| `v2/index.html` | The v2 design page. Open it in a browser. A simulator shows how each case is decided, then the Settings page, the menus, the AI call and the research. Every person, channel and message in it is invented. |
+| `mock.html`, `compare-light.png`, `compare-dark.png`, `around-light.png`, `around-dark.png` | The 10-14 page, before v2: the What matters to you text and the Every message and When it matters levels. `node ../../../scripts/heavy.mjs node render.mjs` writes the PNGs. |
 
-## The problem
+## The model
 
-The owner: "the notifications preferences might have become overcomplicated as a setting, the page looks so busy".
+Every message Juno decides on gets one of two outcomes. It **notifies** (a macOS banner, which then stays in Notification Center) or it **stays** (no banner, unread in Juno as usual). Nothing waits to notify later, nothing is bundled, and the owner has no state such as deep work to set.
 
-The current page asks a busy manager to run a small rules engine:
+The first step that applies decides:
 
-- **Ordered rules, first match wins.** Order is an engineer's idea. If Maya posts in #design-review, the owner has to know which row comes first to predict the result. There is no way to reorder rows anyway.
-- **Three outcomes on every row.** Now, Digest and Silent, as a segmented control repeated five times. Digest and Silent look the same to the owner in the moment (no buzz); they differ only later.
-- **A rule builder with three selects.** Type, value, action. It is a form for writing a rule, when the owner already knows the channel they want to change and is usually looking at it.
-- **Hit counts on every rule.** "1 today" five times is noise. It answers a question nobody asked.
-- **A threshold slider.** "80% sure it's urgent" is the wrong mental model. Nobody knows what 75% feels like, and the score is not calibrated the same way from month to month as the model changes.
-- **Two timing concepts that overlap.** Digest times and quiet hours both say when you may be interrupted, in different words.
-- **A five-column Today log.** Time, place, message, outcome chip, reason, for every message of the day. It is the busiest thing on the page, and the owner needs it only when one specific message surprised them.
-- **Keyword rules.** "Contains lunch" is the kind of judgement a model does better than a substring.
+1. **Notification hours.** Outside them, nothing notifies, not even Always.
+2. **Always** on the thread, channel or person notifies. Always beats Never.
+3. **Never**, or an ignored channel, stays. A direct mention of the owner by name, or of a group they are in, still notifies. @here and @channel do not.
+4. **Always notify** switches: Direct messages, Group DMs, Mentions (on by default), Threads you started and Threads you follow.
+5. **AI assist off:** DMs and mentions notify, as in Slack.
+6. **Auto:** a closer ("thanks", "ok") after the owner's own message stays; a reply within 10 minutes of the owner writing in the conversation notifies; otherwise Juno reads it.
 
-Every row on the page is a control, and the page needs a scroll before the log starts. In the proposal, most of the page is read rather than operated, and it fits in one screen.
+Then, after a banner, the same conversation does not notify again for one minute.
 
-## The simplified model
+**Juno's reading** is one decision-classifier call. It asks which of the owner's instructions the message is mainly about, and whether it needs the owner: an ask, an answer to the owner's question, a follow-up, a decision, something serious, or else a greeting, an update or chatter. A clear instruction decides. Otherwise the first five kinds notify and the rest stay. With no answer within 2 seconds, DMs and mentions notify.
 
-Two sets of hours, one paragraph of plain words, two short lists, and Juno's judgement for everything else.
+**Your instructions** replace the What matters to you text. Each is one line with a direction the owner picks, Notify me or Don't notify. An instruction that is really about one person or channel is offered as a setting instead, since a setting is exact.
 
-1. **Hours.** Two rows, each with days and a from and to time. Both default to weekdays, 9am to 7pm. They can differ: active until 8pm, notifications until 6pm.
-   - **Notifications.** Outside them your Mac does not notify, and Juno writes the same hours to Slack's own schedule so your phone goes quiet too, behind a switch that is on by default (SPEC 14, "Slack's notification schedule"). Held messages stay in Juno without a summary at hours start or next launch.
-   - **Active in Slack.** Inside them Slack shows you as active; outside, away.
-2. **Inside notification hours, Juno decides** each message: notify now, or hold. Held means no notification; the message is in the sidebar as always. There is no threshold. The decision model's cutoff is calibrated by us and checked by the gate eval, not set by the owner.
-3. **What matters to you.** A short text the owner writes ("The launch and hiring. Anything from my reports that needs a decision today."). Juno's gate reads it with every message. It replaces keyword rules and most person and channel rules. The owner can edit it on the page or tell Juno in chat.
-4. **People and channels** have three levels, set from their context menu:
-   - **Every message** notifies, even outside notification hours. This is the safety valve (#incidents, your manager).
-   - **When it matters** is the default. Juno decides. It is not listed on the page.
-   - **Never** notifies, but the messages stay in Juno. Ignore (Settings › Ignored) still exists for hiding a channel entirely.
-   - There is no order. If a person and a channel disagree, **Every message wins**, so nothing important is silently lost.
-5. **Away by hand.** The avatar menu has "Set yourself away" or "Set yourself active". It changes presence only, and lasts until the next switch in the active hours.
-6. **Why, on demand.** A message's context menu has "Why did this notify?" or "Why no notification?". A small popover gives the reason in words. If the reason is a setting, it offers Change; if it was Juno's call, Tell Juno opens the chat quoting the message. The page keeps only a one-line Today ("4 messages interrupted you. Juno held 23.") with Show why, which lists the ones that interrupted you and their reasons.
-7. **AI assist off.** Juno's judgement is off, so inside notification hours you are notified for DMs and mentions, as in Slack. Every message and Never still apply. The "What matters" field shows "AI assist is off. You're notified about DMs and mentions." in place of its text.
+**Why.** Each decision keeps what decided it and a one-line reason built from facts, never from generated text ("You were talking with Priya 2 minutes ago."). The page shows one line for today with Details, which lists every decision of the day. From a row the owner can change the setting that decided it, or say it should or shouldn't have notified, which proposes an instruction.
 
-What Juno decides: whether a message needs you now, given what matters to you, who wrote it, where, and whether it asks you something. What the owner decides: the two sets of hours, the words, and Every message or Never for a few places and people.
+What Juno decides: whether a message on Auto needs the owner. What the owner decides: the two sets of hours, the levels for a few people, channels and threads, the Always notify switches, and the instructions.
+
+## Hours and presence
+
+1. **Notification hours.** Outside them the Mac does not notify. Juno always writes the same hours to Slack's own schedule, so the phone goes quiet too (SPEC 14, "Slack's notification schedule"). It writes only when the hours change, never its defaults, and leaves a schedule changed in Slack alone until Use Juno's hours.
+2. **Active in Slack.** Inside them Slack shows the owner as active; outside, away. Both sets of hours default to weekdays, 9am to 7pm, and can differ.
+3. **Away by hand.** The avatar menu has "Set yourself away" or "Set yourself active". It changes presence only, and lasts until the next switch in the active hours.
 
 ### Presence and the honest limits
 
@@ -53,70 +45,34 @@ What Juno decides: whether a message needs you now, given what matters to you, w
 
 ## The page
 
-`compare-*.png`, right column. Page max-width 880, padding `40 40 56`, gap 36, as today.
+Inventory 13 has the measurements. Top to bottom: Notification hours, Active in Slack, Always notify, Your instructions, People, channels and threads (the Always and Never lists), How Auto decides, Today with Details, then Huddles and Test notification. A conversation's menu has Notify me › Always, Auto or Never, and How Auto decides…, which opens the page at that box.
 
-1. Title "Notifications". Sub: "During your notification hours, Juno lets through what needs you and holds the rest. Everything is in Juno whenever you open it."
-2. **Hours.** One group card, two rows. Each row: a label (14/500) with a 12px muted sub, seven day toggles (28px round, on is `--secondary-default`), then the from and to selects.
-   - "Notifications", sub "Outside these hours, messages stay in Juno without notifying you."
-   - "Active in Slack", sub "Outside these hours you show as away."
-   Below a hairline, one 12px muted line: "Juno switches your status while it's open. If it's closed when your active hours start, you stay away until you open it." Slack's own schedule has its own card below Hours, "Slack on your phone" (inventory 13).
-3. **What matters to you.** Sub: "Juno reads this for every message. You can also just tell Juno." A plain text field, max-width 620, at least three lines, saved on blur.
-4. **People and channels.** One group card, two rows: "Every message" (sub "Even outside notification hours") and "Never" (sub "Still in Juno, no alerts"). Each row holds removable tags (channel icon or avatar, name, `x`). Hint below: "Right-click a channel or person to change how it notifies you." With both lists empty, the card is one muted row: "Every channel and person is set to When it matters."
-5. **Today.** One line: "4 messages interrupted you. Juno held 23." and a ghost button Show why. Show why expands the interrupted messages only (time, place, sender and text, and the reason under them in 12px muted). Held messages are not listed; the per-message menu answers for them.
-
-No segmented controls, no slider, no builder, no counts per rule, no digest chips.
-
-## What moves elsewhere
-
-| Thing | Where it goes | Why |
-| --- | --- | --- |
-| Per-channel and per-DM setting | "Notify me" submenu in the sidebar row, tab, header More and channel menus (inventory 15.1, 15.2): Every message, When it matters, Never | You decide while looking at the channel, not on a form |
-| Per-person setting | The same submenu on a person (DM row, name or avatar in a message) | Same reason |
-| Manual away | Avatar menu: "Set yourself away" or "Set yourself active", header shows "Away until 9am" | It's a status, and the avatar menu is where status lives |
-| The why for one message | Message context menu, "Why did this notify?" or "Why no notification?" | The question comes up about one message, so the answer sits on it |
-| Anything else | Say it to Juno: "stop pinging me about #design-review", "I'm off Friday", "Sam can always reach me" | The model already understands this; a form would only constrain it |
-| Extra digests | A Juno schedule: "summarise what you held at 1pm on weekdays" (SPEC 13.6) | Digests at fixed times are a schedule, and schedules already exist |
-
-Changing notification settings from the chat is a Local action (SPEC 13.9): no click, a quiet "Notifications changed · Undo" line under Juno's reply. It is taken only from the owner's own words in a clean conversation, like a new schedule, so a Slack message Juno read cannot silence #incidents.
-
-## What's cut
+## Cut from the page
 
 | Cut | Reason |
 | --- | --- |
-| Rule order and "first match wins" | No order needed: Every message wins over Never, and there are only two levels to compare |
-| Now, Digest, Silent on every rule | The owner picks Every message or Never; the default is Juno |
-| The rule builder (three selects and Add) | Rules are set from the menu on the thing itself, or in words |
-| Hit counts per rule | Noise; the why popover answers the real question |
-| Keyword rules | "What matters to you" covers them, with judgement instead of substrings |
-| "Mentions of me in" rules | Juno already weighs mentions; Every message covers a channel where every mention matters |
-| "Let Juno decide" checkbox | Juno deciding is the product. AI assist off has a fixed fallback (DMs and mentions) |
-| Threshold slider | A percentage is the wrong model and the score shifts as models change; the cutoff is ours to calibrate |
-| Digest times | Removed; requested digests are a Juno schedule |
-| Quiet hours | Folded into notification hours, inverted |
-| Today so far chips | Replaced by one sentence |
-| Five-column Today log | Replaced by Show why (interrupted messages only) and the per-message why |
-| "Next digest 3pm" hint in the avatar menu | No digest times; the hint becomes "Paused until 9am" outside notification hours, and nothing inside |
+| Rule order and "first match wins" set by the owner | The order is fixed and short. Always beats Never |
+| Now, Digest and Silent on every rule | A message notifies or stays. Requested digests are a Juno schedule (SPEC 13.6) |
+| Keyword rules | Instructions cover them, read by the classifier instead of matched as substrings |
+| A threshold slider | The cutoffs are named constants we set from labelled replays |
+| Quiet hours and digest times | Folded into notification hours |
+| The What matters to you text | Replaced by instructions, each with its direction |
+| The switch for Slack's schedule and Restore | Juno always writes the hours to Slack |
+| An exception for outside hours | Nothing notifies outside notification hours |
 
-## Where it was applied
+## Where it is written
 
-- **SPEC.md:** section 3 (presence and notification settings in the Slack table), section 5 (avatar menu), 13.6 (schedule delivery), 13.9 (notification settings change from the owner's own words, with Undo), section 14 (rewritten), section 15 (the gate), section 19 (Slack's notification schedule).
-- **inventory.md:** the avatar menu, section 6 (the message menu's why), section 13 (rewritten), section 14 (Preferences link), 15.1 and 15.2 (Notify me).
-- **`@juno/domain` `notifications.ts`:** `decideNotification` (ignored → Every message → Never → outside notification hours → AI assist off → Juno), `inHours`, `nextSwitch`, `untilLabel`, `scheduledPresence` and `slackPresence`. Table tests in `test/notifications.test.ts`.
-- **docs/architecture.md:** the M10 line.
-- **docs/backlog.md:** the engine presence job, the gate change, Juno's settings tool, and the read-only check of Slack's notification schedule.
+- **SPEC.md:** section 3 (following), section 5 (Notify me on a thread), 13.9 (corrections from a message Juno read), section 14 (rewritten), section 15 (the reading), section 20 (incoming huddles follow the hours and levels).
+- **inventory.md:** section 13 (the page), 15.1 and 15.3 (Notify me).
+- **docs/architecture.md** and **packages/ai/README.md:** the reading in place of the old gate.
 
-Not changed: no Quint spec, since presence and notification settings are owner-set values, not a sync protocol.
+Not changed: no Quint spec, since notification settings are owner-set values, not a sync protocol.
 
-The M10 engine implementation is in `packages/notifications` and `packages/engine/src/notificationRuntime.ts`. The page, Preferences' Appearance group, the Notify me menus, Set yourself away or active, main's OS notifier and the dock badge are built (`NotificationsPage`, `PreferencesPage`, `WhyPopover` and `AccountMenu` in `@juno/views`, `engine/src/notifications/handlers.ts`, `apps/desktop/src/main/notifier.ts`); inventory 2.1, 13, 14 and 15 say what differs. Writing the hours into Slack's schedule is built (`engine/src/slackSchedule.ts`, 10-17). The remaining work is in `docs/backlog.md`.
+The engine is in `packages/notifications` and `packages/engine/src/notificationRuntime.ts`; the page is `NotificationsPage` in `@juno/views`. Inventory 13 marks what v2 still has to build.
 
-## Open items
+## Owner decisions
 
-- **Slack's own notification schedule.** Resolved: it is the `dnd_*` user prefs (`docs/research/slack-data-access.md` section 7), and Juno writes them (SPEC 14).
-- **Every message on the phone.** Resolved: Slack lets only VIP people through a pause, so the switch's description says Every message on a channel reaches only the Mac outside notification hours.
-
-## Owner decisions (10-14)
-
-1. Apply the proposal.
-2. Automatic summaries are removed (owner 10-16 reverses 10-14); requested digests remain Juno schedules.
-3. Presence and notifications have separate hours, two rows in one section, the same hours by default.
-4. Once verified read-only, notification hours also set Slack's own notification schedule, with no extra switch. Revised 10-17: a switch, on by default, so Restore can hand the schedule back to Slack.
+1. 10-14: simplify the page to hours, a few levels and Juno's judgement.
+2. 10-16: no automatic summaries; requested digests are Juno schedules.
+3. 10-14: presence and notifications have separate hours, the same by default.
+4. 10-23: v2. Two outcomes, the fixed order above, the Always notify switches, instructions with a direction, the Always, Auto and Never levels, Slack's schedule always written, and Why with Details.
