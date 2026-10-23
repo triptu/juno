@@ -7,7 +7,7 @@ import { Page, PageHeader } from '@juno/ui'
 import { AlwaysNotifySection } from './AlwaysNotifySection'
 import { HuddleRingSection, type HuddleRingProps } from './HuddleRingSection'
 import { InstructionsSection, type InstructionsSectionProps } from './InstructionsSection'
-import { NotificationDetails, type DetailsFilter, type ProposedInstruction, type WhyActions } from './NotificationDetails'
+import { NotificationDetails, type ProposedInstruction, type WhyActions } from './NotificationDetails'
 import type { AlwaysNotify, AlwaysNotifyKey, Decision, LevelTag } from './notificationRules'
 import { NotifyLevelsSection, type LevelPicker, type ListedLevel } from './NotifyLevelsSection'
 import { HoursSections, HowAutoDecides, TestSection, TodaySection, type HoursProps } from './NotificationsParts'
@@ -54,8 +54,6 @@ export interface NotificationsPageProps extends HoursProps, HuddleRingProps, Omi
    */
   readonly anchor?: NotificationsAnchor
   readonly anchorKey?: number
-  /** Details starts open (fixtures), on this filter and with this row's why open. */
-  readonly details?: { readonly filter?: DetailsFilter; readonly open?: string }
   /** The add row's direction to start with (fixtures). */
   readonly initialDirection?: InstructionsSectionProps['initialDirection']
 }
@@ -69,9 +67,9 @@ export interface NotificationsPageProps extends HoursProps, HuddleRingProps, Omi
  * turn it on.
  */
 export function NotificationsPage(props: NotificationsPageProps) {
-  const { aiAssist, alwaysNotify, onAlwaysNotifyChange, always, never, onRemoveLevel, picker, onPickLevel, onOpenIgnored, notifiedToday, stayedToday, onDetailsOpenChange, permission, onSendTest, onOpenSettings, onAllow, huddleRing, onHuddleRingChange, anchor, anchorKey, details, initialDirection } = props
+  const { aiAssist, alwaysNotify, onAlwaysNotifyChange, always, never, onRemoveLevel, picker, onPickLevel, onOpenIgnored, notifiedToday, stayedToday, onDetailsOpenChange, permission, onSendTest, onOpenSettings, onAllow, huddleRing, onHuddleRingChange, anchor, anchorKey, initialDirection } = props
   const anchors = useRef<Partial<Record<NotificationsAnchor, HTMLDivElement | null>>>({})
-  const [detailsOpen, setDetailsShown] = useState(details !== undefined)
+  const [detailsOpen, setDetailsShown] = useState(false)
   const setDetailsOpen = (open: boolean) => {
     setDetailsShown(open)
     onDetailsOpenChange?.(open)
@@ -116,7 +114,7 @@ export function NotificationsPage(props: NotificationsPageProps) {
 
 /** Today's Details over the window, outside the page's scroller. An action that opens a part of the page closes the sheet first. */
 function DetailsSheet(props: NotificationsPageProps & { readonly onClose: () => void }) {
-  const { onClose, details } = props
+  const { onClose } = props
   const closing = <A extends ReadonlyArray<unknown>>(action: (...args: A) => void) => (...args: A) => {
     onClose()
     action(...args)
@@ -128,8 +126,6 @@ function DetailsSheet(props: NotificationsPageProps & { readonly onClose: () => 
         onSettings={closing(props.onSettings)}
         onEditInstructions={closing(props.onEditInstructions)}
         onChange={closing(props.onChange)}
-        {...(details?.filter === undefined ? {} : { initialFilter: details.filter })}
-        {...(details?.open === undefined ? {} : { initialOpen: details.open })}
       />
     </SheetLayer>,
     document.body,

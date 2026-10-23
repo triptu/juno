@@ -1,6 +1,5 @@
 import { defineFixtures, fixture } from '@juno/ui'
 import { recentConversations as conversations } from './fixtures/newChat'
-import type { ProposedInstruction } from './NotificationDetails'
 import type { Decision, DecidedBy, Instruction } from './notificationRules'
 import { NotificationsPage, type NotificationsPageProps } from './NotificationsPage'
 
@@ -132,8 +131,6 @@ const manyNever: NotificationsPageProps['never'] = [
   { kind: 'person', id: 'B3', name: 'Jira' },
 ]
 
-const proposal: ProposedInstruction = { direction: 'stay', text: 'Updates in #design with nothing asked of me' }
-
 /** Scrolled to a part, as the menu and the why open it. */
 const tall = { width: 1000, height: 900 }
 
@@ -170,15 +167,7 @@ export default defineFixtures(
       many: fixture({ ...notificationsBase, always: manyAlways, never: manyNever, anchor: 'instructions', anchorKey: 1 }, tall),
       empty: fixture({ ...notificationsBase, always: [], never: [], anchor: 'instructions', anchorKey: 1 }, tall),
     },
-    Details: {
-      all: fixture({ ...notificationsBase, details: {} }, tall),
-      notified: fixture({ ...notificationsBase, details: { filter: 'notified' } }, tall),
-      stayed: fixture({ ...notificationsBase, details: { filter: 'stayed' } }, tall),
-      'why-reading': fixture({ ...notificationsBase, details: { open: 'd1' } }, tall),
-      'why-setting': fixture({ ...notificationsBase, details: { open: 'd8' } }, tall),
-      'why-instruction': fixture({ ...notificationsBase, details: { open: 'd0' } }, tall),
-      'why-proposal': fixture({ ...notificationsBase, proposals: new Map([['d13', proposal]]), details: { open: 'd13' } }, tall),
-      loading: fixture({ ...notificationsBase, decisions: undefined, details: {} }, tall),
+    Today: {
       nothing: fixture({ ...notificationsBase, notifiedToday: 0, stayedToday: 0, decisions: [] }),
     },
     'Slack schedule': {
