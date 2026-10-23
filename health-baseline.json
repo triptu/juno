@@ -8,7 +8,7 @@
     "unusedDependencies": 0,
     "unlistedDependencies": 0,
     "clonePairs": 4,
-    "oversizedFiles": 45,
+    "oversizedFiles": 44,
     "oversizedFunctions": 128
   },
   "clonedLines": 76,
@@ -28,7 +28,6 @@
     "packages/agent/test/actions.test.ts",
     "packages/agent/test/adapters.test.ts",
     "packages/agent/test/backup.test.ts",
-    "packages/agent/test/serve/full-rebuild.ts",
     "packages/agent/test/turns.test.ts",
     "packages/ai/eval/bench.ts",
     "packages/engine/src/messages/query.ts",
