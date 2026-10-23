@@ -27,7 +27,7 @@ Unknown inline elements (`file`, `canvas`, `message_mention`, future ones) decod
 
 ## Testing
 
-`bun run --cwd packages/richtext test`. Table-driven tests with real payload shapes: `decode.test.ts` (a payload decoded with `Schema.decodeUnknownSync(Message)`, including an unknown element, then rendered), `rendering.test.ts`, `tables.test.ts` (table blocks and their text views), `outgoing.test.ts` (the markup rules and the edit round trip too), `edit-roundtrip.test.ts` (Slack-origin and generated edit preservation), `markup.test.ts` (the formatting keys and the field's look), `links.test.ts`, `emoji.test.ts`, and `content.test.ts` (dates, files, attachment text and workspace emoji). Use redacted or invented text, never real message content.
+`bun run --cwd packages/richtext test`. Two corpora hold most cases as rows. `inbound.corpus.test.ts` decodes Slack payload shapes with `Schema.decodeUnknownSync(Message)` (rich_text, mrkdwn, layout blocks, attachments and shared messages, tables, files, dates, user groups, code tag lines, unknown kinds) and checks what a person sees: blocks, inlines and the text views. `roundtrip.corpus.test.ts` follows composer text through `composeOutgoing`, `messageBody`, `editMarkup` and `composeEdit`, then edits of shapes only Slack sends, and a seeded generator. The rest: `markup.test.ts` (the formatting keys and the field's look), `links.test.ts` (`findLinks`, `linkOf`), `emoji.test.ts`, `markdown.test.ts` and `clipboard-html.test.ts` (it sets `DOMParser` from a happy-dom window). The 200 KB guards against catastrophic backtracking compare the time of a 4 times larger input (`test/scaling.ts`), not a wall-clock bound. Use redacted or invented text, never real message content.
 
 Integration attachments retain titles and links, mrkdwn bodies, two-column fields,
 context, images, footer dates and URL actions. A shared Slack message (`is_share`
@@ -42,7 +42,7 @@ buttons become links; Juno never invokes interactive callbacks.
 
 ## Slack-origin edit coverage
 
-The shapes below come from [research section 5](../../docs/research/slack-data-access.md#5-messages-content-and-rendering) and the fake server’s rich-text fixtures. `test/edit-roundtrip.test.ts` checks them with invented content, plus 150 generated combinations unchanged, with another paragraph edited, and with the paragraph itself edited and compared against the ordinary markup parser.
+The shapes below come from [research section 5](../../docs/research/slack-data-access.md#5-messages-content-and-rendering) and the fake server’s rich-text fixtures. `test/roundtrip.corpus.test.ts` checks them with invented content, plus 150 generated combinations unchanged, with another paragraph edited, and with the paragraph itself edited and compared against the ordinary markup parser.
 
 | Original shape | Edit rule |
 | --- | --- |

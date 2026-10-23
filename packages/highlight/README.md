@@ -29,4 +29,4 @@ The package has three entry points, because their costs differ.
 
 ## Testing
 
-`bun run remote test --passWithNoTests test/tag.test.ts test/detect.test.ts test/highlight.test.ts`. The tests cover the tag line, detection on real-looking samples (TypeScript, Python, SQL, JSON and shell found; prose, stack traces, compiler errors, logs and letters plain) and tokens that keep the text. `apps/desktop/e2e/code-highlight.spec.ts` covers the whole path against the fake Slack.
+`bun run --cwd packages/highlight test`. The tests cover detection on real-looking samples (TypeScript, Python, SQL, JSON and shell found; prose, stack traces, compiler errors, logs and letters plain) and tokens that keep the text. The tag line is tested through `@juno/richtext` (`test/inbound.corpus.test.ts`, the code block rows). `apps/desktop/e2e/code-highlight.spec.ts` covers the whole path against the fake Slack.
