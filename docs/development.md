@@ -1381,6 +1381,9 @@ typecheck and lint, remote unit tests, and `pnpm test:package` against the
 packaged app before publishing. It adds an `urgent` marker to the GitHub release
 notes metadata. No full run covers an urgent release yet, so run
 `pnpm verify:main --ref <commit>` for it next; the command prints the commit. An urgent publish is still a normal visible release.
+It records the commit it built from as the release source, so merge that
+`Release x.y.z` commit into main afterwards; the next `release:scheduled` refuses
+any commit that does not descend from the last release source.
 
 `pnpm release:version`, `pnpm package` and `pnpm release:publish` print their
 step durations and append them to `.juno-status/release-timings.json` (local,

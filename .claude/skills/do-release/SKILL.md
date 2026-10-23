@@ -32,7 +32,7 @@ If a step fails after the upload, rerun the same command: it finishes only the m
 
 ## Urgent releases
 
-`--urgent` skips the full-run gate. Use it only for a fix to a problem hurting Tushar now: a CPU spin, data loss, a crash on launch. A new feature he wants to try is not urgent. The manual path is `pnpm release:version patch`, commit it, `JUNO_UPDATE_TOKEN=… pnpm package`, `pnpm test:package`, then `pnpm release:publish --urgent --notes <file>` with highlights written as in step 3. Run `pnpm verify:main --ref <commit>` for it afterwards; the command prints the commit.
+`--urgent` skips the full-run gate. Use it only for a fix to a problem hurting Tushar now: a CPU spin, data loss, a crash on launch. A new feature he wants to try is not urgent. The manual path is `pnpm release:version patch`, commit it, `JUNO_UPDATE_TOKEN=… pnpm package`, `pnpm test:package`, then `pnpm release:publish --urgent --notes <file>` with highlights written as in step 3. Then merge that `Release x.y.z` commit into main: the release records it as its source, and the next `release:scheduled` refuses any commit that does not descend from it. Run `pnpm verify:main --ref <commit>` for it afterwards; the command prints the commit.
 
 ## Rules
 
