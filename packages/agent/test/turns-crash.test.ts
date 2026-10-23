@@ -8,14 +8,13 @@ import { afterEach, beforeEach, expect, it } from 'bun:test'
 import { runAgent } from '@juno/agent-testing'
 
 const program = fileURLToPath(new URL('./fixtures/turns.ts', import.meta.url))
-const hooks = fileURLToPath(new URL('../../../scripts/ts-resolve-hooks.mjs', import.meta.url))
 let dir: string
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'juno-turns-crash-'))
 })
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
-const args = (...commands: string[]) => ['--no-warnings', '--import', hooks, program, dir, ...commands]
+const args = (...commands: string[]) => [program, dir, ...commands]
 
 async function run(...commands: string[]) {
   const result = await runAgent({ args: args(...commands), timeoutMs: 60_000 })

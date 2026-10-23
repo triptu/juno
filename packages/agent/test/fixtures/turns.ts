@@ -3,7 +3,7 @@
 // a request whose last message is the owner's answers with a call to `slack_search`; a request
 // after a tool result answers "Found it.", or, with `killInAnswer`, kills the process first.
 //
-//   node --import scripts/ts-resolve-hooks.mjs turns.ts <dir> [command...]
+//   bun turns.ts <dir> [command...]
 //
 // Commands: send:<op>:<text>  idle  killInAnswer
 import { fakeProvider, reply } from '@juno/agent-testing'

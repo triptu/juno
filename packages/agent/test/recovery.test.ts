@@ -12,14 +12,13 @@ import { afterEach, beforeEach, expect, it } from 'bun:test'
 import { agentDatabaseFiles, crashAt, journalFiles, runAgent, snapshotFiles, type CrashPoint } from '@juno/agent-testing'
 
 const program = fileURLToPath(new URL('./fixtures/program.ts', import.meta.url))
-const hooks = fileURLToPath(new URL('../../../scripts/ts-resolve-hooks.mjs', import.meta.url))
 let dir: string
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'juno-core-'))
 })
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
-const args = (...commands: string[]) => ['--no-warnings', '--import', hooks, program, dir, ...commands]
+const args = (...commands: string[]) => [program, dir, ...commands]
 
 interface State {
   readonly state: 'running' | 'updateNeeded'

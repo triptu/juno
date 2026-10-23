@@ -2,7 +2,7 @@
 // file beside the agent directory, so a restarted process reads it again. Runs the commands, prints a
 // summary as JSON and closes.
 //
-//   node --import scripts/ts-resolve-hooks.mjs backup.ts <dir> <folder> <name> [command...]
+//   bun backup.ts <dir> <folder> <name> [command...]
 //
 // Commands: folder (back up into <folder>)  phrase  say:<op>:<text>  flush  move  restore (from <folder>)  activate  idle
 import { mkdirSync } from 'node:fs'

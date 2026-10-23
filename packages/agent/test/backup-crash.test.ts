@@ -10,7 +10,6 @@ import { afterEach, beforeEach, expect, it } from 'bun:test'
 import { crashAt, runAgent } from '@juno/agent-testing'
 
 const program = fileURLToPath(new URL('./fixtures/backup.ts', import.meta.url))
-const hooks = fileURLToPath(new URL('../../../scripts/ts-resolve-hooks.mjs', import.meta.url))
 let root: string
 let folder: string
 beforeEach(() => {
@@ -20,7 +19,7 @@ beforeEach(() => {
 afterEach(() => rmSync(root, { recursive: true, force: true }))
 
 const dirOf = (mac: string) => join(root, mac)
-const args = (mac: string, ...commands: string[]) => ['--no-warnings', '--import', hooks, program, dirOf(mac), folder, mac, ...commands]
+const args = (mac: string, ...commands: string[]) => [program, dirOf(mac), folder, mac, ...commands]
 
 interface Summary {
   readonly state: string

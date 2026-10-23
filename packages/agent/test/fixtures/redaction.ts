@@ -3,7 +3,7 @@
 // `<dir>/backup.json`, runs the commands, prints what still holds the marker as JSON and closes. The
 // scripted model answers every message with "Noted.".
 //
-//   node --import scripts/ts-resolve-hooks.mjs redaction.ts <dir> [command...]
+//   bun redaction.ts <dir> [command...]
 //
 // Commands: send:<op>:<text>  idle  remove:<op>:<send op>  purge
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'

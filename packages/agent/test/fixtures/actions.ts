@@ -3,7 +3,7 @@
 // runs the commands, prints the ledger as JSON and closes. The scripted model proposes a Send message
 // card when the last message is the owner's, and answers "Drafted." after the tool result.
 //
-//   node --import scripts/ts-resolve-hooks.mjs actions.ts <dir> [command...]
+//   bun actions.ts <dir> [command...]
 //
 // Commands: send:<op>:<text>  click:<op>  idle
 import { join } from 'node:path'

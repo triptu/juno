@@ -6,7 +6,7 @@
 // records a receipt; `killBeforeTool` kills the process before pi commits the
 // call's execute intent.
 //
-//   node --import scripts/ts-resolve-hooks.mjs program.ts <dir> [command...]
+//   bun program.ts <dir> [command...]
 //
 // Commands: send:<op>:<text>  idle  pause  resume  off  rotate  hang  tool  killBeforeTool
 //           authorize:<intent>  attempt  compact  killWhenRunning:<op>  hold

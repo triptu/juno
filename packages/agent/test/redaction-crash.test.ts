@@ -10,14 +10,13 @@ import { afterEach, beforeEach, expect, it } from 'bun:test'
 import { crashAt, runAgent } from '@juno/agent-testing'
 
 const program = fileURLToPath(new URL('./fixtures/redaction.ts', import.meta.url))
-const hooks = fileURLToPath(new URL('../../../scripts/ts-resolve-hooks.mjs', import.meta.url))
 let dir: string
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'juno-redaction-crash-'))
 })
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
-const args = (...commands: string[]) => ['--no-warnings', '--import', hooks, program, dir, ...commands]
+const args = (...commands: string[]) => [program, dir, ...commands]
 
 interface Summary {
   readonly gen: number

@@ -120,9 +120,8 @@ it.each(['queued', 'admitted'])('recovers after SIGKILL with a persisted %s occu
   const path = h.store.db.prepare('PRAGMA database_list').get()?.file
   if (typeof path !== 'string') throw new Error('Missing test database path')
   const { dirname } = await import('node:path')
-  const hooks = fileURLToPath(new URL('../../../scripts/ts-resolve-hooks.mjs', import.meta.url))
   const program = fileURLToPath(new URL('./fixtures/schedule.ts', import.meta.url))
-  const args = (step: string) => ['--no-warnings', '--import', hooks, program, dirname(path), step]
+  const args = (step: string) => [program, dirname(path), step]
   const killed = await runAgent({ args: args(phase), timeoutMs: 30_000 })
   expect(killed.signal).toBe('SIGKILL')
   const resumed = await runAgent({ args: args('finish'), timeoutMs: 30_000 })
