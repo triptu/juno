@@ -24,47 +24,48 @@ syncedTest('Notify me on a channel lists it on the page, and removing it there h
   await juno.sidebar.selectView('Automated')
   const alerts = juno.sidebar.row(ALERTS_MAIN)
   const before = await alerts.chooseInMenu('notify-never')
-  expect(before.labels).toContain('> When it matters ✓')
+  expect(before.labels).toContain('> Auto ✓')
   await juno.expectToast('#alerts-prod: Never')
   const after = await alerts.chooseInMenu('mark-read')
   expect(after.labels).toContain('> Never ✓')
 
-  // A thread: Every message follows it and is kept as its level.
+  // A thread: Always follows it and is kept as its level.
   await juno.sidebar.filter('All')
   const rina = juno.sidebar.row(RINA)
-  await rina.chooseInMenu('notify-every')
+  await rina.chooseInMenu('notify-always')
   // The toast names the topic by its title, which drops the final full stop.
-  await juno.expectToast(': Every message')
-  expect((await rina.chooseInMenu('mark-read')).labels).toContain('> Every message ✓')
+  await juno.expectToast(': Always')
+  expect((await rina.chooseInMenu('mark-read')).labels).toContain('> Always ✓')
 
   await juno.openNotifications()
   const page = juno.notifications
   await expect(page.level('Never')).toContainText('alerts-prod')
   await page.removeTag('alerts-prod')
-  await juno.expectToast('#alerts-prod: When it matters')
+  await juno.expectToast('#alerts-prod: Auto')
   await expect(page.root.getByText('Every channel and person is set to When it matters.')).toBeVisible()
   await juno.undoFromToast()
   await expect(page.level('Never')).toContainText('alerts-prod')
 })
 
 syncedTest('a group DM notifies under its people\'s names, not Slack\'s internal name', async ({ juno, slack }) => {
+  await juno.notificationHoursNow()
   await juno.sidebar.row('Maya, Leo', { exact: true }).open()
-  await juno.topic.chooseInMessageMenu('lunch friday?', 'notify-every', { onSender: true })
-  await juno.expectToast('Leo: Every message')
+  await juno.topic.chooseInMessageMenu('lunch friday?', 'notify-always', { onSender: true })
+  await juno.expectToast('Leo: Always')
 
   await juno.openNotifications()
   slack.as('Leo').groupDm('Moved it to 1pm')
   await expect.poll(() => juno.osNotifications(), { timeout: 15_000 }).toContainEqual({ title: 'Maya, Leo', body: 'Moved it to 1pm' })
 })
 
-syncedTest('a DM set to Every message notifies, and the click opens it at the message', async ({ juno, slack }) => {
-  // Maya's DM is on the page's Every message list once set from the person menu.
+syncedTest('a DM set to Always notifies, and the click opens it at the message', async ({ juno, slack }) => {
+  await juno.notificationHoursNow()
   slack.as('Maya').dm('Can you look at the hiring plan today?')
   await juno.sidebar.row('Maya', { exact: true }).open()
   await juno.topic.expectMessage('Can you look at the hiring plan today?')
-  const person = await juno.topic.chooseInMessageMenu('Can you look at the hiring plan today?', 'notify-every', { onSender: true })
-  expect(person.labels).toEqual(['Notify me about Maya', '> Every message', '> When it matters ✓', '> Never', '-', 'Ask Juno', 'What Juno knows about Maya'])
-  await juno.expectToast('Maya: Every message')
+  const person = await juno.topic.chooseInMessageMenu('Can you look at the hiring plan today?', 'notify-always', { onSender: true })
+  expect(person.labels).toEqual(['Notify me about Maya', '> Always', '> Auto ✓', '> Never', '-', 'Ask Juno', 'What Juno knows about Maya'])
+  await juno.expectToast('Maya: Always')
 
   // Away from the DM, a new message from Maya notifies. Clicking it opens the DM at the message.
   await juno.openNotifications()
@@ -82,9 +83,10 @@ syncedTest('a DM set to Every message notifies, and the click opens it at the me
 
 syncedTest('a topic on screen in a focused window does not notify, and unread topics badge the dock', async ({ juno, slack }) => {
   await expect.poll(() => juno.dockBadge(), { timeout: 15_000 }).toBe('•')
+  await juno.notificationHoursNow()
 
   await juno.sidebar.selectView('Automated')
-  await juno.sidebar.row(ALERTS_MAIN).chooseInMenu('notify-every')
+  await juno.sidebar.row(ALERTS_MAIN).chooseInMenu('notify-always')
   await juno.sidebar.row(ALERTS_MAIN).open()
   await juno.focusWindow()
   slack.as('Leo').postIn('alerts-prod', 'Disk at 91% on db-2')
@@ -103,7 +105,7 @@ test('Settings: Notifications and Appearance save, the test notification and per
   await juno.signIn()
   await juno.waitForSync()
 
-  await test.step('Settings › Notifications saves hours and what matters, and Appearance changes the density', () => notificationsAndAppearance(juno))
+  await test.step('Settings › Notifications saves hours, and Appearance changes the density', () => notificationsAndAppearance(juno))
   await test.step('Send test notification posts one notification, and a line shows when macOS does not let Juno notify', () => testNotificationAndPermission(juno))
   await test.step('Settings › Ignored lists an ignored channel, and Stop ignoring has Undo', () => ignoredChannels(juno))
   await test.step('Settings › Ignored ignores a channel picked by keyboard, as its menu does, with Undo', () => ignoreFromSettings(juno))
@@ -116,7 +118,6 @@ async function notificationsAndAppearance(juno: Juno): Promise<void> {
   await page.setFrom('Notifications', '10am')
   await page.setTo('Active in Slack', '8pm')
   await page.day('Notifications', 'Saturday').click()
-  await page.writeMatters('The launch and hiring.')
 
   // Every value comes back from the engine: close Settings and open it again.
   await juno.tabs.close('Settings')
@@ -125,7 +126,6 @@ async function notificationsAndAppearance(juno: Juno): Promise<void> {
   await expect(page.root.getByRole('combobox', { name: 'Active in Slack to' })).toHaveValue(String(20 * 60))
   await expect(page.day('Notifications', 'Saturday')).toHaveAttribute('aria-pressed', 'true')
   await expect(page.day('Active in Slack', 'Saturday')).toHaveAttribute('aria-pressed', 'false')
-  await expect(page.matters).toHaveValue('The launch and hiring.')
 
   // Settings is one tab: the avatar menu's Settings shows General in it, and the list moves between sections.
   await juno.openSettings('Appearance')
@@ -137,7 +137,7 @@ async function notificationsAndAppearance(juno: Juno): Promise<void> {
   await juno.settings.densityRadio('Comfortable').click()
   await expect.poll(() => juno.win.evaluate(() => document.documentElement.dataset['density'])).toBe('comfortable')
   await juno.settings.show('Notifications')
-  await expect(page.matters).toHaveValue('The launch and hiring.')
+  await expect(page.root.getByRole('combobox', { name: 'Notifications from' })).toHaveValue(String(10 * 60))
 }
 
 syncedTest('Notification day buttons keep rapid changes', async ({ juno }) => {
@@ -284,9 +284,10 @@ longThread('a notification for a topic open in another tab focuses it, scrolls t
   longThread.setTimeout(90_000)
   await juno.signIn()
   await juno.waitForSync()
+  await juno.notificationHoursNow()
   const thread = juno.sidebar.row(LONG_THREAD)
-  await thread.chooseInMenu('notify-every')
-  await juno.expectToast(': Every message')
+  await thread.chooseInMenu('notify-always')
+  await juno.expectToast(': Always')
   await thread.open()
   await juno.topic.expectAtBottom()
   await juno.topic.scrollToTop()

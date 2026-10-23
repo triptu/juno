@@ -62,8 +62,8 @@ it('shows what the engine decides, opens the message on click, hides the topic o
   const engine = await bootedEngine(engines)
   const main = connect(engine)
 
-  const set = await runCommand(engine.registry, notificationsSetLevel, { target: { kind: 'channel', id: 'D0MAYA' }, choice: 'every' })
-  expect(Exit.isSuccess(set) && set.value).toEqual({ undo: { _tag: 'notifications.setLevel', target: { kind: 'channel', id: 'D0MAYA' }, choice: 'matters' } })
+  const set = await runCommand(engine.registry, notificationsSetLevel, { target: { kind: 'channel', id: 'D0MAYA' }, choice: 'always' })
+  expect(Exit.isSuccess(set) && set.value).toEqual({ undo: { _tag: 'notifications.setLevel', target: { kind: 'channel', id: 'D0MAYA' }, choice: 'auto' } })
 
   const first = engine.fake.injectMessage({ channel: 'D0MAYA', user: 'U0MAYA', text: 'Can you look at the draft?' })
   await waitFor(() => (main.shown.length === 1 ? true : undefined), 15_000, 'the first notification')
@@ -91,7 +91,7 @@ it('shows what the engine decides, opens the message on click, hides the topic o
   expect(main.badge()).toBe('•')
   for (const { topic_id } of mentioned) await runCommand(engine.registry, readsMarkRead, { id: topic_id })
   await waitFor(() => (main.badge() === '' ? true : undefined), 15_000, 'the badge to clear')
-  await runCommand(engine.registry, notificationsSetLevel, { target: { kind: 'channel', id: 'C0ENG' }, choice: 'every' })
+  await runCommand(engine.registry, notificationsSetLevel, { target: { kind: 'channel', id: 'C0ENG' }, choice: 'always' })
   engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: '<@U0TUSHAR> can you review the plan?' })
   await waitFor(() => (main.badge() === '•' ? true : undefined), 15_000, 'the dock badge')
 })

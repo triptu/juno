@@ -142,9 +142,8 @@ test('a mention of you, or of your group, breaks through an ignored channel; @he
   await juno.signIn()
   await juno.waitForSync()
 
-  // Every message on #incidents, so the hours and AI assist do not decide; then ignore it.
-  await juno.sidebar.row('#incidents').chooseInMenu('notify-every')
-  await juno.expectToast('#incidents: Every message')
+  // Inside the hours, mentions notify by the Mentions switch; then ignore #incidents.
+  await juno.notificationHoursNow()
   await juno.sidebar.row('#incidents').chooseInMenu('ignore-channel')
   await juno.expectToast('Ignoring #incidents')
   await juno.sidebar.row('#incidents').expectAbsent()

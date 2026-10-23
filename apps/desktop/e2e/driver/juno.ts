@@ -643,16 +643,6 @@ export class NotificationsPage {
     return this.root.getByRole('group', { name: `${which} days` }).getByRole('button', { name: day })
   }
 
-  get matters(): Locator {
-    return this.root.getByRole('textbox', { name: 'What matters to you' })
-  }
-
-  /** Types into What matters to you and leaves the field, which saves it. */
-  async writeMatters(text: string): Promise<void> {
-    await this.matters.fill(text)
-    await this.matters.blur()
-  }
-
   /** The Every message or Never row. */
   level(name: 'Every message' | 'Never'): Locator {
     return this.root.getByLabel(name, { exact: true })
@@ -973,6 +963,31 @@ export class Juno {
     await expect(this.settings.section('Notifications')).toHaveAttribute('aria-current', 'page')
   }
 
+  /**
+   * Sets notification hours on every day to two hours around now, or with
+   * `outside`, to twelve hours starting six hours from now, so rules that
+   * depend on the hours hold whatever the runner's timezone or weekday.
+   * Reopens the page to wait for the engine to have saved them.
+   */
+  async notificationHoursNow(options: { readonly outside?: boolean } = {}): Promise<void> {
+    await this.openNotifications()
+    const minutes = await this.win.evaluate(() => new Date().getHours() * 60 + new Date().getMinutes())
+    const half = Math.floor(minutes / 30) * 30
+    const from = options.outside === true ? (half + 360) % 1440 : (half + 1380) % 1440
+    const to = options.outside === true ? (half + 1080) % 1440 : (from + 120) % 1440
+    for (const day of ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']) {
+      const button = this.notifications.day('Notifications', day)
+      if (await button.getAttribute('aria-pressed') === 'false') await button.click()
+      await expect(button).toHaveAttribute('aria-pressed', 'true')
+    }
+    await this.notifications.root.getByRole('combobox', { name: 'Notifications from' }).selectOption(String(from))
+    await this.notifications.root.getByRole('combobox', { name: 'Notifications to' }).selectOption(String(to))
+    await this.tabs.close('Settings')
+    await this.openNotifications()
+    await expect(this.notifications.root.getByRole('combobox', { name: 'Notifications from' })).toHaveValue(String(from))
+    await expect(this.notifications.root.getByRole('combobox', { name: 'Notifications to' })).toHaveValue(String(to))
+  }
+
   /** The OS notifications main showed (recorded under JUNO_E2E), oldest first. `silent` only on one posted without a sound. */
   osNotifications(): Promise<Array<{ readonly title: string; readonly body: string; readonly silent?: true }>> {
     return this.app.evaluate(() => (globalThis as unknown as { junoTest: { notifications: () => Array<{ title: string; body: string; silent?: true }> } }).junoTest.notifications())
@@ -1166,8 +1181,8 @@ export type TopicMenuItem =
   | 'reopen'
   | 'copy-link'
   | 'open-in-slack'
-  | 'notify-every'
-  | 'notify-matters'
+  | 'notify-always'
+  | 'notify-auto'
   | 'notify-never'
   | 'ignore-channel'
   // What Juno knows about a DM's other person (SPEC 13.8).
