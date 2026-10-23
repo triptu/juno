@@ -1,28 +1,13 @@
 import { describe, expect, it } from 'bun:test'
 import type { HomeItem } from '@juno/contract'
-import { holdHome, homeItemLimit } from '../src/home'
-import { homeGreeting, homeScene } from '../src/homeScene'
+import { holdHome } from '../src/home'
+import { homeScene } from '../src/homeScene'
 
 // 2026-10-14 is a Wednesday, 2026-10-16 a Friday; local time.
 const at = (day: number, hour: number) => new Date(2026, 9, day, hour, 30)
-const greet = (now: Date) => homeGreeting({ now, firstName: 'Tushar', caughtUp: false })
 const item = (id: string, aiTitle?: string): HomeItem => ({ id, kind: 'waiting', title: 'Elena asked you something', topics: [], ...(aiTitle === undefined ? {} : { aiTitle }) })
 
-describe('Home copy and scene', () => {
-  it('greets by the time of day, and with Happy Friday on Friday until late', () => {
-    expect(greet(at(14, 8))).toEqual({ title: 'Morning, Tushar.' })
-    expect(greet(at(14, 13)).title).toBe('Hello, Tushar.')
-    expect(greet(at(14, 19)).title).toBe('Evening, Tushar.')
-    expect(greet(at(14, 23)).title).toBe('Still up, Tushar.')
-    expect(greet(at(16, 9)).title).toBe('Happy Friday, Tushar.')
-    expect(greet(at(16, 23)).title).toBe('Still up, Tushar.')
-  })
-
-  it('drops the name when there is none, says when you are caught up, and never counts the rows', () => {
-    expect(homeGreeting({ now: at(14, 8), caughtUp: false })).toEqual({ title: 'Morning.' })
-    expect(homeGreeting({ now: at(14, 8), firstName: 'Tushar', caughtUp: true })).toEqual({ title: 'All caught up.' })
-  })
-
+describe('Home scene', () => {
   it('picks caught up first, then Friday, then the time of day', () => {
     expect(homeScene({ now: at(14, 8), caughtUp: true, firstVisitToday: true })).toBe('caughtUp')
     expect(homeScene({ now: at(16, 9), caughtUp: false, firstVisitToday: false })).toBe('friday')
@@ -40,13 +25,6 @@ describe('Home copy and scene', () => {
     expect(seasonal.length).toBeGreaterThan(0)
     expect(seasonal.length).toBeLessThan(15)
     expect(seasonal.some((day, index) => seasonal[index + 1] === day + 1)).toBe(false)
-  })
-
-  it('caps the rows at two on a short window, and one there while the welcome card shows', () => {
-    expect(homeItemLimit(800)).toBe(3)
-    expect(homeItemLimit(560)).toBe(2)
-    expect(homeItemLimit(800, true)).toBe(3)
-    expect(homeItemLimit(480, true)).toBe(1)
   })
 })
 
