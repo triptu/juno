@@ -16,7 +16,7 @@ Install the pinned headless shell with `bunx playwright install chromium --only-
 
 Only a completed successful state is recorded. Before rechecking a state its old record is removed, so failure or interruption cannot preserve a previous pass. Records are written atomically under `$JUNO_BUILD_CACHE_DIR/gallery-walk-v1`, or the shared system temp directory's `juno-cache/results/gallery-walk-v1`. The remote runner uses `/cache/builds/gallery-walk-v1`.
 
-`GALLERY_SHIFT_ONLY`, `GALLERY_SHIFT_PARTS`, `GALLERY_RING_ONLY`, `GALLERY_RING_PARTS` and `JUNO_SHARD` retain their meanings. `GALLERY_SHIFT_ALL=1` and `--repeat-each` bypass both caches. The queue is isolated by run, repeat, guard and retry. Targeted regression tests always run. Identical DOM is not proof of identical behavior and is never a persistent cache key.
+`GALLERY_SHIFT_ONLY`, `GALLERY_SHIFT_PARTS`, `GALLERY_RING_ONLY`, `GALLERY_RING_PARTS` and `JUNO_SHARD` retain their meanings. `GALLERY_SHIFT_ALL=1` and `--repeat-each` bypass both caches. The queue is isolated by run, repeat, guard and retry. The shift walk budgets three seconds per selected state across its active workers, with a 20-minute minimum for a full walk (15 minutes for a component selection). Each state, including its document reset, still has a 30-second limit. Playwright owns context teardown. Targeted regression tests always run. Identical DOM is not proof of identical behavior and is never a persistent cache key.
 
 ## Measurements, 2026-10-24
 

@@ -1,0 +1,1 @@
+- 10-24 04:23 · gallery-walk-budget · Size the gallery shift walk’s timeout by its selected states and active workers, at three seconds per state with the existing minimum; the uncached three-worker Mac walk reached the old 20-minute limit while still completing states. Keep each state, including document reset, bounded to 30 seconds and let Playwright tear down its context.

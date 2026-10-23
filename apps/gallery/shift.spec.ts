@@ -4,7 +4,7 @@ import { claimQueue, openState, readRoutes, stateCache, walkPages, type Route } 
 
 /**
  * Nothing in the product may move when the pointer or the keyboard touches
- * it. For every state, every interactive element is hovered, left, pressed,
+ * it. For every state, up to eight interactive elements are hovered, left, pressed,
  * released, focused from the keyboard and blurred, and none of that may
  * shift the layout (see packages/testing for what counts as a shift).
  *
@@ -177,13 +177,14 @@ for (let part = 0; part < shards; part++) {
   // The states come from the built gallery, so the list can only be read once a page is open.
   // Over every component the walk is @heavy (scripts/test-areas.mjs); limited with GALLERY_SHIFT_ONLY it is not.
   test(`no interaction shifts the layout, in any state of any component (part ${part + 1} of ${shards})`, { tag: only ? [] : ['@heavy', '@heavy-gallery'] }, async ({ browser, context }) => {
-    // A part walks states until the queue is empty, at up to eight elements and six touches per state.
-    // The full walk took 14.3 minutes on three cores; each state still has its own 30 s limit.
-    test.setTimeout((only ? 15 : 20) * 60_000)
     const pages = await walkPages(context)
     // JUNO_SHARD=i/n (bun run remote --shards n): this machine takes every n-th state.
     const routes = (await readRoutes(pages.page())).filter((route, index) => (!only || only.includes(route.component)) && (!shard || index % shard.total === shard.index))
     expect(routes.length, 'the selected gallery states exist').toBeGreaterThan(0)
+    // Budget the whole queue for the workers that can actually walk it. Three seconds per state
+    // leaves room above the measured two-second average; each individual state still has a 30 s limit.
+    const parallelParts = Math.min(shards, test.info().config.workers)
+    test.setTimeout(Math.max((only ? 15 : 20) * 60_000, Math.ceil(routes.length * 3_000 / parallelParts)))
     const queue = claimQueue('shift')
     const cache = stateCache('shift', browser)
     const failures: string[] = []
@@ -195,8 +196,8 @@ for (let part = 0; part < shards; part++) {
         cache.forget(route)
         const failedBefore = failures.length + cursors.length
         const started = Date.now()
-        const page = await pages.next()
         await checkStateWithin(route, async () => {
+          const page = await pages.next()
           await openState(page, route)
           states++
           for (const hit of await cursorOffenders(page, route)) cursors.push(`${route.route}: ${hit}`)
@@ -221,7 +222,6 @@ for (let part = 0; part < shards; part++) {
       }
     } finally {
       console.log(`shift walk: ${states} states, ${cached} cached, ${elements} elements, ${resets} resets`)
-      await pages.close()
     }
     expect.soft(cursors, 'no state shows the pointer outside external links, and the text cursor only over selectable text').toEqual([])
     expect(failures.join('\n\n')).toBe('')

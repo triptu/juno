@@ -147,6 +147,5 @@ export async function walkPages(context: BrowserContext) {
       await page.mouse.move(0, 0)
       return page
     },
-    close: () => page.close({ runBeforeUnload: false }),
   }
 }

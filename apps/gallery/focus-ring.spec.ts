@@ -199,7 +199,6 @@ for (let part = 0; part < parts; part++) {
       if (failures.length === before) cache.pass(route)
     }
     console.log(`focus walk: ${states} states, ${cached} cached`)
-    await pages.close()
     expect([...new Set(failures)].join('\n')).toBe('')
   })
 }
