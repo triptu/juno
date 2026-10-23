@@ -245,7 +245,7 @@ const measured = results.map((result) => {
   const expected = suites.some(({ name }) => name === result.suite) || result.suite === 'plan' ? identity : runtimeIdentity(root)
   const actual = reported[0] ?? (local || expected !== identity ? expected : undefined)
   const mismatch = actual === undefined || reported.some((value) => !sameIdentity(value, expected))
-  let code = cancelled ? 130 : mismatch ? 1 : result.code
+  let code = cancelled && result.code !== 0 ? 130 : mismatch ? 1 : result.code
   let tests = testResults(log)
   if (baseline && tests) tests = mergeRepairTests(baseline.suites.find((suite) => suite.suite === result.suite)?.tests, tests)
   if (!suitePassed({ ...result, code, tests })) code ||= 1
@@ -263,6 +263,7 @@ const summary = {
   version: 2, commit, subject, ref, identity, execution,
   finishedAt: new Date().toISOString(),
   passed: !cancelled && outcomes.every(suitePassed),
+  cause: cancelled ? failureCause({ code: 130, signal: cancelled }) : undefined,
   required: required.map((suite) => suite.name),
   repair: baseline ? { commit: baseline.commit, finishedAt: baseline.finishedAt, selection: 'graph-uncapped', changed: affected.changed, steps: affected.steps } : undefined,
   coverage: coverageNote, nightly, seed,

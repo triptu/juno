@@ -46,7 +46,7 @@ export async function runPlan(plan, { root, local: localAll }) {
     const tests = testResults(result.text)
     const reported = /^juno-runtime: (.+)$/m.exec(result.text)
     const identity = reported ? JSON.parse(reported[1]) : remote ? undefined : runtimeIdentity(root)
-    const code = cancelled ? 130 : suitePassed({ code: result.code, tests }) ? 0 : result.code || 1
+    const code = cancelled && result.code !== 0 ? 130 : suitePassed({ code: result.code, tests }) ? 0 : result.code || 1
     return { step, code, seconds: result.seconds, log, tests, identity,
       cause: failureCause({ code, signal: cancelled ?? result.signal, tests, log: result.text }) }
   }
