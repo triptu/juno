@@ -70,9 +70,9 @@ describe('topic row menu', () => {
     expect(labels(topicMenuItems({ ...base, kind: 'main', channel: group }))).not.toContain('Redraw art')
   })
 
-  it('offers Always, Auto and Never with the current one checked and named in the hint, then How Auto decides…', () => {
+  it('offers the three Notify me choices with the current one checked and named in the hint', () => {
     const notify = topicMenuItems({ ...base, notify: threadNotifyChoice(false) }).find((i) => i.type === 'submenu')
-    expect(notify).toEqual({
+    expect(notify?.type === 'submenu' ? { ...notify, items: notify.items.slice(0, 3) } : notify).toEqual({
       type: 'submenu',
       label: 'Notify me',
       hint: 'Never',
@@ -80,8 +80,6 @@ describe('topic row menu', () => {
         { type: 'item', id: 'notify-always', label: 'Always', checked: false },
         { type: 'item', id: 'notify-auto', label: 'Auto', checked: false },
         { type: 'item', id: 'notify-never', label: 'Never', checked: true },
-        { type: 'separator' },
-        { type: 'item', id: 'how-auto', label: 'How Auto decides…' },
       ],
     })
   })
@@ -94,6 +92,13 @@ describe('topic row menu', () => {
   it('carries the hints and ids the shell needs', () => {
     const items = topicMenuItems(base)
     expect(items[0]).toEqual({ type: 'item', id: 'open-new-tab', label: 'Open in new tab', hint: '⌘ click' })
+  })
+})
+
+describe('How Auto decides…', () => {
+  it('ends every Notify me submenu, after a separator', () => {
+    const submenus = [topicMenuItems(base), channelMenuItems({ channel: eng, hasMain: true, notify: 'auto' }), personMenuItems({ name: 'Maya Chen', notify: 'auto' })].map((items) => items.find((i) => i.type === 'submenu'))
+    for (const notify of submenus) expect(notify?.type === 'submenu' && notify.items.slice(3)).toEqual([{ type: 'separator' }, { type: 'item', id: 'how-auto', label: 'How Auto decides…' }])
   })
 })
 
@@ -115,7 +120,7 @@ describe('person menu', () => {
   it('names the person by first name and checks their level', () => {
     const [notify] = personMenuItems({ name: 'Maya Chen', notify: 'always' })
     expect(notify?.type === 'submenu' && notify.label).toBe('Notify me about Maya')
-    expect(notify?.type === 'submenu' && notify.items.map((item) => item.type === 'item' && item.checked)).toEqual([true, false, false, false, false])
+    expect(notify?.type === 'submenu' && notify.items.slice(0, 3).map((item) => item.type === 'item' && item.checked)).toEqual([true, false, false])
   })
 })
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 import type { Hours, InstructionRule, NotificationPermission, NotificationSettingsView, NotifyTag, PickConversation, TodayRow } from '@juno/contract'
 import {
   applyJunoHours,
@@ -134,6 +134,52 @@ interface RuleCheck {
   readonly rule?: InstructionRule
 }
 
+/** Change opens the part of the page, or the place in Settings, that decided. */
+function changeSetting(decision: Decision): void {
+  switch (decision.decidedBy) {
+    case 'hours':
+      return openNotificationsAt('hours')
+    case 'alwaysNotify':
+      return openNotificationsAt('always-notify')
+    case 'ignored':
+      return openSettings('ignored')
+    default:
+      return openNotificationsAt('levels')
+  }
+}
+
+/** Your instructions' props: the list, the rule check after an add, and the edits. */
+function instructionActions(current: NotificationSettingsView, ruleCheck: RuleCheck | undefined, setRuleCheck: Dispatch<SetStateAction<RuleCheck | undefined>>) {
+  const add = async (direction: InstructionDirection, text: string) => {
+    const id = await saveInstruction(registry, { direction, text })
+    // The check is a chat-model call: only with AI assist on, once for this instruction.
+    if (id === undefined || !current.aiAssist) return
+    setRuleCheck({ instructionId: id })
+    const rule = await checkInstruction(registry, text)
+    setRuleCheck((shown) => (shown?.instructionId !== id ? shown : rule === undefined ? undefined : { instructionId: id, rule }))
+  }
+  const makeSetting = (instructionId: string) => {
+    const rule = ruleCheck?.rule
+    setRuleCheck(undefined)
+    if (rule === undefined) return
+    removeInstruction(registry, instructionId)
+    setNotifyLevel({ kind: rule.kind, id: rule.id }, rule.level, rule.name)
+  }
+  const edit = (id: string, change: { readonly direction?: InstructionDirection; readonly text?: string }) => {
+    const instruction = current.instructions.find((each) => each.id === id)
+    if (instruction !== undefined) void saveInstruction(registry, { id, direction: change.direction ?? instruction.direction, text: change.text ?? instruction.text })
+  }
+  return {
+    instructions: current.instructions,
+    ...(ruleCheck === undefined ? {} : { ruleCheck: { instructionId: ruleCheck.instructionId, ...(ruleCheck.rule === undefined ? {} : { found: { name: ruleCheck.rule.name, level: ruleCheck.rule.level } }) } }),
+    onAdd: (direction: InstructionDirection, text: string) => void add(direction, text),
+    onEdit: edit,
+    onRemove: (id: string) => remove(current, id),
+    onMakeSetting: makeSetting,
+    onKeepInstruction: () => setRuleCheck(undefined),
+  }
+}
+
 /**
  * The Notifications page (SPEC 14): the settings, the page's lists and
  * counts from the engine, today's decisions while Details is open, and
@@ -160,6 +206,7 @@ export function NotificationsPage() {
   // All three are local and come at once; waiting for the page keeps Slack's line from appearing late.
   if (settings._tag !== 'Success' || page._tag !== 'Success' || permission === undefined) return null
   const current = settings.value
+  const instructionProps = instructionActions(current, ruleCheck, setRuleCheck)
   const lists = page.value
   const rows = decisions._tag === 'Success' ? decisions.value.decisions : undefined
   const rowOf = (decision: Decision) => rows?.find((row) => String(row.id) === decision.id)
@@ -167,39 +214,6 @@ export function NotificationsPage() {
   const alwaysFor = new Map(
     (rows ?? []).filter((row) => isDm(row) && current.people[row.senderId] === undefined && current.channels[row.channelId] === undefined).map((row) => [String(row.id), firstName(row.sender)] as const),
   )
-
-  const add = async (direction: InstructionDirection, text: string) => {
-    const id = await saveInstruction(registry, { direction, text })
-    // The check is a chat-model call: only with AI assist on, once for this instruction.
-    if (id === undefined || !current.aiAssist) return
-    setRuleCheck({ instructionId: id })
-    const rule = await checkInstruction(registry, text)
-    setRuleCheck((shown) => (shown?.instructionId !== id ? shown : rule === undefined ? undefined : { instructionId: id, rule }))
-  }
-  const makeSetting = (instructionId: string) => {
-    const rule = ruleCheck?.rule
-    setRuleCheck(undefined)
-    if (rule === undefined) return
-    removeInstruction(registry, instructionId)
-    setNotifyLevel({ kind: rule.kind, id: rule.id }, rule.level, rule.name)
-  }
-  const edit = (id: string, change: { readonly direction?: InstructionDirection; readonly text?: string }) => {
-    const instruction = current.instructions.find((each) => each.id === id)
-    if (instruction !== undefined) void saveInstruction(registry, { id, direction: change.direction ?? instruction.direction, text: change.text ?? instruction.text })
-  }
-  // Change opens the part of the page, or the place in Settings, that decided.
-  const change = (decision: Decision) => {
-    switch (decision.decidedBy) {
-      case 'hours':
-        return openNotificationsAt('hours')
-      case 'alwaysNotify':
-        return openNotificationsAt('always-notify')
-      case 'ignored':
-        return openSettings('ignored')
-      default:
-        return openNotificationsAt('levels')
-    }
-  }
 
   return (
     <NotificationsPageView
@@ -212,13 +226,7 @@ export function NotificationsPage() {
       aiAssist={current.aiAssist}
       alwaysNotify={current.alwaysNotify}
       onAlwaysNotifyChange={(which, enabled) => setAlwaysNotify(registry, which, enabled)}
-      instructions={current.instructions}
-      {...(ruleCheck === undefined ? {} : { ruleCheck: { instructionId: ruleCheck.instructionId, ...(ruleCheck.rule === undefined ? {} : { found: { name: ruleCheck.rule.name, level: ruleCheck.rule.level } }) } })}
-      onAdd={(direction, text) => void add(direction, text)}
-      onEdit={edit}
-      onRemove={(id) => remove(current, id)}
-      onMakeSetting={makeSetting}
-      onKeepInstruction={() => setRuleCheck(undefined)}
+      {...instructionProps}
       always={lists.always.map(asTag)}
       never={lists.never.map(asTag)}
       onRemoveLevel={removeLevel}
@@ -237,7 +245,7 @@ export function NotificationsPage() {
       onDetailsOpenChange={setDetailsOpen}
       proposals={proposals}
       alwaysFor={alwaysFor}
-      onChange={change}
+      onChange={changeSetting}
       onEditInstructions={() => openNotificationsAt('instructions')}
       onSuggest={(decision) => {
         const row = rowOf(decision)
