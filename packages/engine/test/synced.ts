@@ -5,7 +5,8 @@
  * copy of its user-data folder. Each `syncedEngine` then starts a fresh fake on
  * the same seed time and port (so stored ids, timestamps and avatar URLs match)
  * and a fresh engine on its own copy of that folder: a warm start, the same as
- * a relaunch of the app.
+ * a relaunch of the app. When another process holds the port by then, the fake
+ * takes a free one and only the stored avatar URLs point at the old port.
  *
  * The copy lives in the temp folder under this process's id and is removed when
  * the process exits, so files that share a process (`bun test` without
@@ -71,10 +72,14 @@ export type SyncedOptions = Omit<EngineOptions, 'initial' | 'fakeOptions' | 'ent
 /** An engine live on a copy of the synced default workspace. `track` collects engines for `afterEach` to stop. */
 export async function syncedEngine(track: Array<RunningEngine>, options: SyncedOptions = {}): Promise<RunningEngine> {
   const template = await (synced ??= makeSynced())
-  const fake = await startFakeSlack({ port: template.port, seedTime: template.seedTime, sessions: template.sessions })
+  const start = (port: number) => startFakeSlack({ port, seedTime: template.seedTime, sessions: template.sessions })
+  const fake = await start(template.port).catch((error: unknown) => {
+    if ((error as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw error
+    return start(0)
+  })
   const userData = await mkdtemp(join(tmpdir(), 'juno-engine-test-'))
   await cp(template.dir, userData, { recursive: true })
-  const engine = await startTestEngine({ ...options, reuse: { userData, fake, credentials: template.sessions[0]! } })
+  const engine = await startTestEngine({ ...options, reuse: { userData, fake, credentials: { ...template.sessions[0]!, url: fake.url } } })
   const owned: RunningEngine = {
     ...engine,
     stop: async () => {
