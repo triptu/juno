@@ -1,17 +1,24 @@
 import { purgeCodexThreads } from '../src/providers/codex-purge'
 import { existsSync } from 'node:fs'
-import { afterEach, beforeEach, expect, it } from 'bun:test'
+import { afterEach, beforeEach, expect, it, setDefaultTimeout } from 'bun:test'
 import { startFakeCodex, startFakeMcpServer } from '@juno/agent-testing'
 import { createCodexAdapter } from '../src/index'
 import { providerHarness, request } from './providers-harness'
 
+// Each test starts the fake Codex as child processes, which a loaded machine slows.
+setDefaultTimeout(30_000)
+
 let h: Awaited<ReturnType<typeof providerHarness>>
 let fake: ReturnType<typeof startFakeCodex>
 let server: Awaited<ReturnType<typeof startFakeMcpServer>>
+/** Resolves at the first call that reaches Juno's tool server. */
+let called: Promise<void>
 beforeEach(async () => {
   h = await providerHarness()
   fake = startFakeCodex()
-  server = await startFakeMcpServer({ tools: [{ name: 'echo', call: args => String(args.text) }], bearer: 'test-turn-token' })
+  let reached = () => {}
+  called = new Promise((resolve) => { reached = resolve })
+  server = await startFakeMcpServer({ tools: [{ name: 'echo', call: args => { reached(); return String(args.text) } }], bearer: 'test-turn-token' })
 })
 afterEach(async () => { await server.close(); fake.close(); await h.close() })
 
@@ -98,8 +105,7 @@ it('removal drains an active writer and purges even a session without a recorded
   fake.signIn(codex.home)
   fake.script([{ toolCalls: [{ server: 'juno', tool: 'echo', arguments: { text: 'started' } }], delayMs: 10_000 }])
   const running = codex.turn({ revision: request().revision, prompt: 'hello', model: h.model, mcp: { url: server.url, token: 'test-turn-token' } })
-  // The fake Codex is a child process: under a loaded machine its start and first tool call take more than poll's default 1 s.
-  await expect.poll(() => server.calls.length, { timeout: 5_000 }).toBe(1)
+  await called
   // Crash window: a file exists before its id has been committed to Juno.
   h.core.store.db.prepare('UPDATE codex_turns SET thread_id = NULL').run()
   expect(await purgeCodexThreads(h.core.store)).toBe(1)
