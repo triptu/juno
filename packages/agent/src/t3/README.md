@@ -105,8 +105,10 @@ the poll. Positive launch recovery
 reconstructs a missing Task card after a crash between launch and local job
 insertion. It does not mint a grant again and never relaunches.
 
-`test/adapters.test.ts` uses real loopback MCP, the manager, scripted provider,
-turn engine and dispatcher, with synthetic schemas and content.
+`test/t3.test.ts` uses real loopback MCP, the manager, scripted provider,
+turn engine and dispatcher, with synthetic schemas and content. The adapter
+takes the watcher's wait as `sleep`; the test passes a clock it moves by hand,
+so no test waits for a real poll.
 
 A blocked brief records only its call id, run id and time in `tool_blocks`.
 The chat renders the fixed Secret blocked note, including after a restart.
