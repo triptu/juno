@@ -6,10 +6,12 @@
       "ES2023"
     ],
     "types": [
-      "node"
+      "node",
+      "bun-types/test"
     ]
   },
   "include": [
-    "src"
+    "src",
+    "test"
   ]
 }

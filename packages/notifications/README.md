@@ -20,4 +20,4 @@ Delivery is claimed in SQLite before the OS call, to prevent a duplicate interru
 
 ## Tests
 
-Run `bun run test:notifications test/notifications.test.ts` from the root. The engine tests cover fake Slack input, duplicate events, the reading's timeout, settings changed while it is in flight, focused-topic suppression, held messages across hours starts and relaunches, message targets, and presence. Domain tests cover the pure decisions and calendar boundaries. Run `bun run test` for the full suite.
+`bun run --cwd packages/notifications test` checks `settingsOf`, the pure read of the stored pref: levels stored before 2026-10-23 and invalid settings. Run `bun run test:notifications test/notifications.test.ts` from the root for the rest. The engine tests cover fake Slack input, duplicate events, the reading's timeout, settings changed while it is in flight, focused-topic suppression, held messages across hours starts and relaunches, message targets, and presence. Domain tests cover the pure decisions and calendar boundaries. Run `bun run test` for the full suite.
