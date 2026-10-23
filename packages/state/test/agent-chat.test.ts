@@ -10,8 +10,6 @@ import { Effect, Exit, Layer, Scope, Stream } from 'effect'
 import { CHAT_MIGRATIONS, createProviderGuard, openTurns, rendererPorts, rendererServer, type HostPort, type Turns } from '@juno/agent'
 import { fakeProvider, reply } from '@juno/agent-testing'
 import type { ChatPage, HostPresence } from '@juno/agent-contract'
-import type * as AsyncResult from 'effect/reactivity/AsyncResult'
-import type * as Atom from 'effect/reactivity/Atom'
 import { makeRegistry, type PortLike, type Registry } from '../src/index'
 import { chatActions, chatItemsAtom, chatSummaryAtom, configureAgentConnection } from '../src/agent'
 
@@ -65,33 +63,37 @@ async function agentChat() {
   return { fake, turns, registry }
 }
 
-/** Resolves with what `pick` reads from the atom's first value it accepts, now or on a later change. The test's timeout bounds the wait. */
-function when<A, B>(registry: Registry, atom: Atom.Atom<A>, pick: (value: A) => B | undefined): Promise<B> {
+/** Resolves with `read()` once it gives a value, now or after a change `subscribe` reports. The test's timeout bounds the wait. */
+function when<B>(subscribe: (changed: () => void) => () => void, read: () => B | undefined): Promise<B> {
   return new Promise((resolve) => {
-    let cancel: (() => void) | undefined
-    let done = false
-    const check = (value: A) => {
-      const picked = done ? undefined : pick(value)
-      if (picked === undefined) return
-      done = true
-      cancel?.()
-      resolve(picked)
-    }
-    cancel = registry.subscribe(atom, check, { immediate: true })
-    if (done) cancel()
+    const now = read()
+    if (now !== undefined) return resolve(now)
+    const cancel = subscribe(() => {
+      const value = read()
+      if (value === undefined) return
+      cancel()
+      resolve(value)
+    })
   })
 }
 
 const LATEST = { _tag: 'latest', limit: 50 } as const
-const page = (result: AsyncResult.AsyncResult<ChatPage, unknown>) => (result._tag === 'Success' ? result.value : undefined)
-const pageOf = (registry: Registry) => page(registry.get(chatItemsAtom(LATEST)))
-const unread = (count: number) => (result: AsyncResult.AsyncResult<{ readonly unread: number }, unknown>) => (result._tag === 'Success' && result.value.unread === count ? true : undefined)
+function pageOf(registry: Registry): ChatPage | undefined {
+  const result = registry.get(chatItemsAtom(LATEST))
+  return result._tag === 'Success' ? result.value : undefined
+}
+function unreadOf(registry: Registry): number | undefined {
+  const result = registry.get(chatSummaryAtom)
+  return result._tag === 'Success' ? result.value.unread : undefined
+}
+const pageChanged = (registry: Registry) => (changed: () => void) => registry.subscribe(chatItemsAtom(LATEST), changed)
+const summaryChanged = (registry: Registry) => (changed: () => void) => registry.subscribe(chatSummaryAtom, changed)
 
 it('a send shows at once, then as the agent stored it, and Juno answers it', async () => {
   const { fake, registry } = await agentChat()
   registry.mount(chatItemsAtom(LATEST))
   registry.mount(chatSummaryAtom)
-  await when(registry, chatItemsAtom(LATEST), page)
+  await when(pageChanged(registry), () => pageOf(registry))
   const actions = chatActions(registry)
 
   fake.script([reply('<say>Morning. Two meetings today.</say>')])
@@ -104,8 +106,8 @@ it('a send shows at once, then as the agent stored it, and Juno answers it', asy
   // From the first frame, before the agent has it.
   expect(pageOf(registry)?.items).toContainEqual(expect.objectContaining({ _tag: 'owner', opId, text: 'what is on today?', delivery: { _tag: 'sending' } }))
 
-  const answered = await when(registry, chatItemsAtom(LATEST), (result) => {
-    const shown = page(result)
+  const answered = await when(pageChanged(registry), () => {
+    const shown = pageOf(registry)
     return shown?.items.some((item) => item._tag === 'juno') && !shown.items.some((item) => item._tag === 'status') ? shown : undefined
   })
   const owners = answered.items.filter((item) => item._tag === 'owner')
@@ -118,8 +120,8 @@ it('a send shows at once, then as the agent stored it, and Juno answers it', asy
   const bubble = answered.items.find((item) => item._tag === 'juno')!
   expect(bubble).toMatchObject({ body: [{ _tag: 'paragraph', inlines: [{ _tag: 'text', text: 'Morning. Two meetings today.' }] }], unread: true })
 
-  await when(registry, chatSummaryAtom, unread(1))
+  await when(summaryChanged(registry), () => (unreadOf(registry) === 1 ? true : undefined))
   await actions.read(bubble._tag === 'juno' ? bubble.id : '')
-  await when(registry, chatSummaryAtom, unread(0))
+  await when(summaryChanged(registry), () => (unreadOf(registry) === 0 ? true : undefined))
 })
 
