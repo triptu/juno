@@ -7,7 +7,7 @@
 // subscription to its first snapshot). Like the sidebar benchmark it boots
 // against 100 000 messages, so it runs only with JUNO_BENCH=1:
 //
-//   JUNO_BENCH=1 pnpm --filter @juno/engine exec vitest run test/bench/messages-large.test.ts --silent=false
+//   JUNO_BENCH=1 bun run --cwd packages/engine vitest run test/bench/messages-large.test.ts --silent=false
 //
 // The thread mirrors the M4 gate's fixture (performance 3.4): 300 messages,
 // 20 % with an image (dimensions included), 10 % with a code block, a few

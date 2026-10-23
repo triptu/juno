@@ -31,10 +31,11 @@ test('local and fallback runs archive eligible records, refresh coverage, and pr
   writeFileSync(join(root, 'bin/package.json'), '{"type":"commonjs"}')
   mkdirSync(join(root, 'tstack/scripts/runner'), { recursive: true })
   writeFileSync(join(root, 'tstack/scripts/runner/host.sh'), '# fixture\n')
-  writeFileSync(join(root, 'package.json'), '{"type":"module","devDependencies":{"@informalsystems/quint":"0.33.0"}}')
-  writeFileSync(join(root, 'bin/pnpm'), `#!/usr/bin/env node
+  writeFileSync(join(root, 'package.json'), '{"type":"module","packageManager":"bun@1.4.4","devDependencies":{"@informalsystems/quint":"0.33.0"}}')
+  writeFileSync(join(root, 'bin/bun'), `#!/usr/bin/env node
 const fs = require('node:fs');
-const [suite, ...args] = process.argv.slice(2);
+const argv = process.argv.slice(2);
+const [suite, ...args] = argv[0] === 'run' ? argv.slice(1) : argv;
 fs.appendFileSync(process.env.TEST_CALLS, JSON.stringify({suite,args,held:process.env.JUNO_HEAVY_HELD,skip:process.env.JUNO_SKIP_TAGS,coverage:process.env.JUNO_COVERAGE,workers:process.env.JUNO_E2E_WORKERS})+'\\n');
 if (suite === 'install') { fs.writeFileSync('installed', 'yes'); process.exit(0); }
 if (!fs.existsSync('installed')) process.exit(9);
@@ -49,7 +50,7 @@ process.exit(suite === process.env.TEST_FAIL_SUITE ? 7 : 0);
 require('node:fs').appendFileSync(process.env.TEST_PROBES, 'probe\\n');
 console.error('Connection refused'); process.exit(255);
 `)
-  for (const name of ['pnpm', 'ssh']) chmodSync(join(root, 'bin', name), 0o755)
+  for (const name of ['bun', 'ssh']) chmodSync(join(root, 'bin', name), 0o755)
   git(root, 'init', '-q')
   git(root, 'config', 'user.name', 'Test')
   git(root, 'config', 'user.email', 'test@example.com')

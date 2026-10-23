@@ -8,7 +8,8 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
 // Only values used to build the toolchain belong in its tag and build context.
 function toolchainVersions(directory = root) {
-  return { quint: JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8')).devDependencies['@informalsystems/quint'] }
+  const manifest = JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8'))
+  return { quint: manifest.devDependencies['@informalsystems/quint'], bun: manifest.packageManager.replace(/^bun@/, '') }
 }
 
 export function imageTag(directory = root) {

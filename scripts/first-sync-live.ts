@@ -2,7 +2,7 @@
 /**
  * The first sync timeline: the whole engine, signed in from an empty data
  * folder, against your real workspace (read-only) or an in-process fake.
- * Run with `JUNO_LIVE=1 pnpm sync:timeline`, or `pnpm sync:timeline -- --fake`.
+ * Run with `JUNO_LIVE=1 bun run sync:timeline`, or `bun run sync:timeline --fake`.
  *
  * It records, from the moment the engine starts:
  * - every Slack request: method, `_x_reason`, start and end, HTTP status,
@@ -95,7 +95,7 @@ if (useFake) {
   cached = await readCachedSession(flag('--team'))
 }
 if (cached === undefined) {
-  console.error('first-sync-live: no cached session. Run `JUNO_LIVE=1 pnpm smoke:live -- --cache-session` first.')
+  console.error('first-sync-live: no cached session. Run `JUNO_LIVE=1 bun run smoke:live --cache-session` first.')
   process.exit(2)
 }
 const { session, cookie } = cached

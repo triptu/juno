@@ -57,8 +57,8 @@ const engineLogger = Logger.make<unknown, void>((options) => {
 })
 
 /**
- * The folders Vite may serve files from: the repo, and pnpm's store, where
- * packages such as the fonts really live (`virtualStoreType: global`).
+ * The folders Vite may serve files from: the repo, and Bun's global store,
+ * where packages such as the fonts really live (`globalStore` in bunfig.toml).
  */
 function servedFolders(): string[] {
   const react = realpathSync(join(desktopDir, 'node_modules/react'))

@@ -1,6 +1,6 @@
 // Runs Juno's Linux-safe suites through tstack's shared SSH host allocator.
-// pnpm remote [--cores n] [--wait seconds] [--env KEY=value] <script> [args...]
-// pnpm remote --local <script> [args...] uses the Mac's heavy-job queue.
+// bun run remote [--cores n] [--wait seconds] [--env KEY=value] <script> [args...]
+// bun run remote --local <script> [args...] uses the Mac's heavy-job queue.
 import { randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
@@ -47,12 +47,12 @@ function parse(argv) {
   if (!Number.isSafeInteger(options.wait) || options.wait < 0) throw new Error('--wait must be a non-negative number of seconds')
   for (const pair of options.env) if (!/^[A-Za-z_][A-Za-z0-9_]*=[^\n\r]*$/.test(pair ?? '')) throw new Error('--env takes NAME=value on one line')
   const [script, ...args] = argv.slice(index)
-  if (!script) throw new Error('usage: pnpm remote [--local] [--cores n] [--wait seconds] <script> [args...]')
+  if (!script) throw new Error('usage: bun run remote [--local] [--cores n] [--wait seconds] <script> [args...]')
   // A split plan can queue an app job behind the unit/spec jobs in the same allocation.
   if (runnerPlanJobs({ ...options, script, args }).length > 0 && !argv.includes('--wait') && process.env.JUNO_RUNNER_WAIT === undefined) options.wait = 3600
   const steps = script === 'test:plan' ? parsePlan(args) : [{ script, args }]
   for (const step of steps) {
-    if (localOnly[step.script]) throw new Error(`${step.script} measures ${localOnly[step.script]} and runs only on the Mac. Run pnpm ${step.script} locally.`)
+    if (localOnly[step.script]) throw new Error(`${step.script} measures ${localOnly[step.script]} and runs only on the Mac. Run bun run ${step.script} locally.`)
     if (!remoteScripts.includes(step.script)) throw new Error(`${step.script} is not set up for remote runs`)
     if (step.script === 'test:e2e' && step.args.length) throw new Error('Select files with test:desktop or test:gallery')
   }
@@ -72,7 +72,7 @@ if (options.local) {
   const steps = options.script === 'test:plan' ? parsePlan(options.args) : [{ script: options.script, args: options.args }]
   const env = Object.fromEntries(options.env.map((pair) => [pair.slice(0, pair.indexOf('=')), pair.slice(pair.indexOf('=') + 1)]))
   const plan = steps.map((step) => ({ ...step, env: { ...env, ...step.env } }))
-  if (options.dryRun) console.log(plan.map((step) => `pnpm ${step.script} ${step.args.join(' ')}`).join('\n'))
+  if (options.dryRun) console.log(plan.map((step) => `bun run ${step.script} ${step.args.join(' ')}`).join('\n'))
   else process.exit((await runPlan(plan, { root, local: true })).every(({ code }) => code === 0) ? 0 : 1)
   process.exit(0)
 }
@@ -100,7 +100,7 @@ try {
   }
   mkdirSync(reportDir, { recursive: true })
   runLog = join(reportDir, 'run.log')
-  writeFileSync(runLog, `pnpm ${[options.script, ...options.args].map(quote).join(' ')}\nremote: run ${JSON.stringify({ version: 1, script: options.script, args: options.args, started: new Date(started).toISOString() })}\n`)
+  writeFileSync(runLog, `bun run ${[options.script, ...options.args].map(quote).join(' ')}\nremote: run ${JSON.stringify({ version: 1, script: options.script, args: options.args, started: new Date(started).toISOString() })}\n`)
   const health = checkRunner(runner)
   if (!health.reachable) throw new Error(`runner unreachable: ${health.reason}. ${localHint}.`)
   if (cancelled) throw new Error('run cancelled')

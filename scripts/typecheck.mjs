@@ -1,7 +1,7 @@
 // Typechecks every TypeScript project, skipping the ones whose inputs passed before.
 //
-//   pnpm typecheck:tsc            every project (unchanged ones are skipped)
-//   pnpm typecheck:tsc --no-cache check them all
+//   bun run typecheck:tsc            every project (unchanged ones are skipped)
+//   bun run typecheck:tsc --no-cache check them all
 //   node scripts/typecheck.mjs --pending   list the projects that would run
 //
 // The projects are each package's `tsc -p <config>` from its typecheck script,
@@ -11,7 +11,7 @@
 // files, the files of every workspace package it depends on (directly or not),
 // the tsconfig chain, the lockfile and the TypeScript version. A passing key is
 // recorded in the system temp folder (juno-cache/typecheck), shared by every
-// worktree and brought back from pnpm remote, and is skipped the next time.
+// worktree and brought back from bun run remote, and is skipped the next time.
 //
 // A project that does run uses tsc --incremental with its .tsbuildinfo in the
 // package's node_modules/.cache, so files that did not change are not checked
@@ -111,7 +111,7 @@ if (existsSync(join(root, 'scripts/tsconfig.json'))) {
   projects.push({ label: 'scripts tsconfig.json', cwd: '.', config: 'scripts/tsconfig.json', inputs: [...scripts, ...deps, ...configChain('scripts/tsconfig.json')] })
 }
 
-const shared = ['pnpm-lock.yaml', 'tsconfig.base.json']
+const shared = ['bun.lock', 'tsconfig.base.json']
 for (const project of projects) {
   const hash = createHash('sha256').update(`${tsVersion}\0${project.label}\0`)
   for (const file of [...new Set([...shared, ...project.inputs])].toSorted()) if (existsSync(join(root, file))) hash.update(`${file}\0${hashOf(file)}\0`)
@@ -128,7 +128,7 @@ const selectedAt = process.argv.indexOf('--projects')
 const selected = selectedAt < 0 ? undefined : JSON.parse(process.argv[selectedAt + 1])
 if (selected && selected.some((path) => !projects.some((project) => `${project.cwd}/${project.config}` === path))) throw new Error('Unknown typecheck project')
 const pending = projects.filter((project) => (!selected || selected.includes(`${project.cwd}/${project.config}`)) && !(useCache && existsSync(join(cacheDir, project.key))))
-// --pending prints the projects that would run, as JSON, for pnpm affected.
+// --pending prints the projects that would run, as JSON, for bun run affected.
 if (process.argv.includes('--pending')) {
   console.log(JSON.stringify(pending.map((project) => project.label)))
   process.exit(0)

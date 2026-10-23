@@ -76,7 +76,7 @@ export function selectSpecs({ specs, changed, map, support, own, app, isNew, dri
     if (!SOURCE.test(file)) {
       const reason = `${file} is an app file outside the JavaScript bundles (style sheet, page or asset)`
       if (!narrow) return { all: reason }
-      notes.push(`${reason}: no spec picked for it; the gallery and a full run (pnpm verify:main) check it`)
+      notes.push(`${reason}: no spec picked for it; the gallery and a full run (bun run verify:main) check it`)
       continue
     }
     if (file in map.files) for (const spec of ran(file)) pick(spec, `ran ${file}${ranBy(file)}`, weightOf(file))

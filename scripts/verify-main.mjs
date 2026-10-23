@@ -1,12 +1,12 @@
 // The full run: every suite against main, in separate SSH jobs or locally,
 // then a short summary.
 //
-//   pnpm verify:main                 local main
-//   pnpm verify:main --local --dry-run  inspect the local plan without running it
-//   pnpm verify:main --ref origin/main
-//   pnpm verify:main --nightly         uncached Quint plus the Mac suites
-//   pnpm verify:main --no-cache        rerun every Quint check
-//   pnpm verify:main --with-mac      also, on this Mac: the e2e tests tagged @mac,
+//   bun run verify:main                 local main
+//   bun run verify:main --local --dry-run  inspect the local plan without running it
+//   bun run verify:main --ref origin/main
+//   bun run verify:main --nightly         uncached Quint plus the Mac suites
+//   bun run verify:main --no-cache        rerun every Quint check
+//   bun run verify:main --with-mac      also, on this Mac: the e2e tests tagged @mac,
 //                                    then `perf` and `test:feel`
 //
 // It checks main out into a temporary detached worktree, so nothing local is
@@ -20,7 +20,7 @@
 // contact sheet is copied next to the logs.
 //
 // The desktop suite records coverage (JUNO_COVERAGE=1), and the run writes the
-// coverage map pnpm affected selects specs by to
+// coverage map bun run affected selects specs by to
 // apps/desktop/e2e/coverage-map.json in this checkout; commit it after a
 // run on main (docs/development.md, "Affected tests").
 
@@ -67,7 +67,7 @@ const suites = [
 const words = suites.flatMap((suite, index) => [...(index ? ['+'] : []), ...suite.words])
 if (argv.includes('--dry-run')) {
   console.log(`verify:main: ${commit} on ${execution.host} (${execution.mode}); no checkout, tests or record written`)
-  if (local) console.log('pnpm install --frozen-lockfile; exclusive heavy lock; serial plan; desktop skips @mac')
+  if (local) console.log('bun install --frozen-lockfile; exclusive heavy lock; serial plan; desktop skips @mac')
   if (local) console.log(JSON.stringify(localVerifyEnv))
   console.log(`test:plan ${words.join(' ')}`)
   if (withMac) console.log('On this Mac: test:desktop --grep @mac, then perf, then test:feel (exclusive heavy lock)')
@@ -117,7 +117,7 @@ const heavy = join(checkout, 'scripts/heavy.mjs')
 const planStarted = Date.now()
 let installed = true
 if (local) {
-  installed = (await run('install', process.execPath, [heavy, '--exclusive', 'pnpm', 'install', '--frozen-lockfile', '--reporter=silent'], checkout)).code === 0
+  installed = (await run('install', process.execPath, [heavy, '--exclusive', 'bun', 'install', '--frozen-lockfile', '--silent'], checkout)).code === 0
 }
 const runs = [!installed ? Promise.resolve(suites.map(({ name }) => ({ suite: name, code: 1, seconds: 0, log: join(logDir, 'install.log') })))
   : run('plan', process.execPath, local
@@ -129,9 +129,9 @@ if (withMac) {
     (async () => {
       // Local Electron suites share the checkout and must not overlap.
       if (local) await runs[0]
-      const install = local ? { status: installed ? 0 : 1 } : spawnSync('pnpm', ['install', '--frozen-lockfile', '--reporter=silent'], { cwd: checkout, stdio: 'ignore' })
+      const install = local ? { status: installed ? 0 : 1 } : spawnSync('bun', ['install', '--frozen-lockfile', '--silent'], { cwd: checkout, stdio: 'ignore' })
       if (install.status !== 0) return [{ suite: 'test:desktop @mac', code: 1, seconds: 0, log: '' }]
-      return [await run('test:desktop @mac', 'pnpm', ['test:desktop', '--grep', '@mac'], checkout, local ? localVerifyEnv : {})]
+      return [await run('test:desktop @mac', 'bun', ['run', 'test:desktop', '--grep', '@mac'], checkout, local ? localVerifyEnv : {})]
     })(),
   )
 }
@@ -156,7 +156,7 @@ if (partials.length > 0) {
 console.log(`verify:main: ${coverageNote}`)
 if (withMac) {
   // After the rest, so they do not time a machine the other suites are using.
-  for (const suite of ['perf', 'test:feel']) results = [...results, await run(suite, 'pnpm', [suite], checkout, local ? localVerifyEnv : {})]
+  for (const suite of ['perf', 'test:feel']) results = [...results, await run(suite, 'bun', ['run', suite], checkout, local ? localVerifyEnv : {})]
   const sheet = join(checkout, 'apps/desktop/feel-report')
   if (existsSync(sheet)) cpSync(sheet, join(logDir, 'feel-report'), { recursive: true, force: true })
 }

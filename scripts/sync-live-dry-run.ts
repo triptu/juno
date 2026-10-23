@@ -2,7 +2,7 @@
 /**
  * The live sync dry run: the real `@juno/sync` cold boot against your real
  * workspace, into a temporary data directory that is deleted afterwards.
- * Run with `JUNO_LIVE=1 pnpm sync:live`. It refuses to run without
+ * Run with `JUNO_LIVE=1 bun run sync:live`. It refuses to run without
  * `JUNO_LIVE=1`.
  *
  * Read-only, by construction:
@@ -253,7 +253,7 @@ async function main(): Promise<number> {
 async function liveTarget(): Promise<Target | undefined> {
   const cached = await readCachedSession(teamId)
   if (cached === undefined) {
-    console.error('sync-live: no cached session. Run `JUNO_LIVE=1 pnpm smoke:live -- --cache-session` first (docs/development.md).')
+    console.error('sync-live: no cached session. Run `JUNO_LIVE=1 bun run smoke:live --cache-session` first (docs/development.md).')
     return undefined
   }
   return { cached, allowedHosts: ['slack.com'], close: async () => {} }

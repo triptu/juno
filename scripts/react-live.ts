@@ -2,7 +2,7 @@
 /**
  * The live reaction check: Juno's real reaction path (the `messages.react`
  * command, the outbox row and `ActionWorker`) against your real workspace,
- * on one message in your self-DM. Run with `JUNO_LIVE=1 pnpm react:live`.
+ * on one message in your self-DM. Run with `JUNO_LIVE=1 bun run react:live`.
  * It refuses to run without `JUNO_LIVE=1`.
  *
  * What it does:
@@ -70,7 +70,7 @@ const EDGE = /\/(users\/info|users\/list|users\/search|channels\/info|channels\/
 
 const cached = await readCachedSession(process.argv.includes('--team') ? process.argv[process.argv.indexOf('--team') + 1] : undefined)
 if (cached === undefined) {
-  console.error('react-live: no cached session. Run `JUNO_LIVE=1 pnpm smoke:live -- --cache-session` first.')
+  console.error('react-live: no cached session. Run `JUNO_LIVE=1 bun run smoke:live --cache-session` first.')
   process.exit(2)
 }
 const { session, cookie } = cached

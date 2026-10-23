@@ -9,7 +9,7 @@
  * - No id appears twice.
  *
  * Main is `origin/main`, or `main` without a remote. Without git or either
- * branch, only the uniqueness check runs. Run by `pnpm lint`.
+ * branch, only the uniqueness check runs. Run by `bun run lint`.
  */
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'

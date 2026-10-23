@@ -7,7 +7,7 @@
  * engine builds, and here, which the route encodes. The contract may not
  * import richtext, so the engine checks at compile time that the two are
  * the same type (`packages/engine/src/messages/body.ts`); a change to one
- * without the other fails `pnpm typecheck`.
+ * without the other fails `bun run typecheck`.
  *
  * Every mention already carries a display name and every emoji a unicode
  * string or an image url, so a view draws a body without lookups.

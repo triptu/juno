@@ -1,15 +1,15 @@
-//   pnpm affected                 local Bun check, then the affected suites in one remote plan
-//   pnpm affected --plan          print the plan only
-//   pnpm affected --local         run the plan through the local root scripts
-//   pnpm affected --base <ref>    compare with another ref (default: the merge base with main)
-//   pnpm affected --plan --files packages/ui/src/Chip.tsx   plan for those files
-//   pnpm affected --graph         pick desktop specs by the import graph, not the coverage map
-//   pnpm affected --plan --range a..b   plan for what changed between two commits
-//   pnpm affected --plan --json   the plan as JSON
-//   pnpm affected --spec e2e/tabs.spec.ts   also run that spec (desktop or gallery; repeat or comma-separate)
-//   pnpm affected --max-specs 20  allow more coverage-picked desktop specs (default 10)
-//   pnpm affected --wide          the wide plan: every spec the change can reach, heavy tests included
-//   pnpm affected --batch --base <ref>   the batch gate: unit tests, specs:check and conformance only
+//   bun run affected                 local Bun check, then the affected suites in one remote plan
+//   bun run affected --plan          print the plan only
+//   bun run affected --local         run the plan through the local root scripts
+//   bun run affected --base <ref>    compare with another ref (default: the merge base with main)
+//   bun run affected --plan --files packages/ui/src/Chip.tsx   plan for those files
+//   bun run affected --graph         pick desktop specs by the import graph, not the coverage map
+//   bun run affected --plan --range a..b   plan for what changed between two commits
+//   bun run affected --plan --json   the plan as JSON
+//   bun run affected --spec e2e/tabs.spec.ts   also run that spec (desktop or gallery; repeat or comma-separate)
+//   bun run affected --max-specs 20  allow more coverage-picked desktop specs (default 10)
+//   bun run affected --wide          the wide plan: every spec the change can reach, heavy tests included
+//   bun run affected --batch --base <ref>   the batch gate: unit tests, specs:check and conformance only
 //
 // The change is every file that differs from the merge base, committed or not,
 // plus new files. An import graph over apps/ and packages/ (relative imports,
@@ -64,7 +64,7 @@ const changed = argv.includes('--files')
 const files = new Set(git('ls-files', '--cached', '--others', '--exclude-standard', '--', 'apps', 'packages').filter((file) => existsSync(join(root, file))))
 
 /** What every suite installs and compiles with: a change reaches every unit test, and a sample of every e2e suite. */
-const dependencies = ['pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', 'tsconfig.base.json']
+const dependencies = ['bun.lock', 'bunfig.toml', 'package.json', 'tsconfig.base.json']
 /** The tools that plan and run the suites: a change runs the tool tests and one spec end to end (--wide: everything). */
 const tools = ['scripts/affected.mjs', 'scripts/affected-select.mjs', 'scripts/affected-run.mjs', 'scripts/affected-tests.mjs', 'scripts/unit.mjs', 'scripts/plan.mjs', 'scripts/test-areas.mjs', 'scripts/import-graph.mjs', 'scripts/coverage-map.mjs', 'scripts/remote.mjs', 'scripts/heavy.mjs', 'scripts/build-cached.mjs', 'scripts/without-run-as-node.mjs']
 const toolChanged = changed.filter((file) => tools.includes(file) || file.startsWith('scripts/remote/'))
@@ -103,7 +103,7 @@ const hashOf = (file) => {
   if (!contentHash.has(file)) contentHash.set(file, existsSync(join(root, file)) ? createHash('sha256').update(readFileSync(join(root, file))).digest('hex') : 'absent')
   return contentHash.get(file)
 }
-const shared = ['pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', 'tsconfig.base.json']
+const shared = ['bun.lock', 'bunfig.toml', 'package.json', 'tsconfig.base.json']
 const keyOf = (suite, id, inputs) => {
   const hash = createHash('sha256').update(`${suite}\0${id}\0`)
   for (const file of [...new Set([...shared, ...inputs])].toSorted()) hash.update(`${file}\0${hashOf(file)}\0`)
@@ -377,21 +377,21 @@ const scope = wide
   : everythingChanged.length ? `; ${everythingChanged.join(', ')} changed, so every unit test runs, with a sample of each e2e suite (--wide: everything)` : ''
 console.log(`affected: ${changed.length} changed file(s) since ${range ? range.join('..') : base.slice(0, 10)}${scope}${batch ? ' (the batch gate)' : ''}`)
 for (const step of plan) {
-  console.log(`  pnpm ${step.script}${step.args.length ? ` ${step.args.length > 6 ? `${step.args.slice(0, 6).join(' ')} ... (${step.args.length} args)` : step.args.join(' ')}` : ''}${step.env ? ` with ${Object.entries(step.env).map(([key, value]) => `${key}=${value}`).join(' ')}` : ''}   # ${step.why}`)
+  console.log(`  bun run ${step.script}${step.args.length ? ` ${step.args.length > 6 ? `${step.args.slice(0, 6).join(' ')} ... (${step.args.length} args)` : step.args.join(' ')}` : ''}${step.env ? ` with ${Object.entries(step.env).map(([key, value]) => `${key}=${value}`).join(' ')}` : ''}   # ${step.why}`)
   for (const [id, why] of step.reasons ?? []) console.log(`      ${id}: ${why[0]}${why.length > 1 ? ` (and ${why.length - 1} more)` : ''}`)
 }
 if (skipped > 0) console.log(`  (${skipped} item(s) skipped: they passed before with the same inputs; --no-cache runs them)`)
-if (desktopDropped.length > 0) console.log(`  (${desktopDropped.length} more desktop spec(s) ran a changed file less directly; a full run (pnpm verify:main) covers them, --wide or --max-specs runs them)`)
+if (desktopDropped.length > 0) console.log(`  (${desktopDropped.length} more desktop spec(s) ran a changed file less directly; a full run (bun run verify:main) covers them, --wide or --max-specs runs them)`)
 for (const note of desktopNotes) console.log(`  (${note})`)
-if (!batch && skipTags.length > 0 && plan.some((step) => step.script === 'test:desktop')) console.log(`  (@heavy tests skipped: ${HEAVY_AREAS.filter((area) => area.suite === 'desktop' && !heavyActive.has(area.area)).map((area) => area.area).join(', ')}; no changed file is in their area. A full run (pnpm verify:main) and --wide run them)`)
+if (!batch && skipTags.length > 0 && plan.some((step) => step.script === 'test:desktop')) console.log(`  (@heavy tests skipped: ${HEAVY_AREAS.filter((area) => area.suite === 'desktop' && !heavyActive.has(area.area)).map((area) => area.area).join(', ')}; no changed file is in their area. A full run (bun run verify:main) and --wide run them)`)
 if (plan.length === 0) console.log('  nothing to run')
 for (const entry of interactions)
-  console.log(`  (${entry.interaction} has a perf budget and ${entry.files.length === 1 ? entry.files[0] : `${entry.files.length} of its files`} changed: on the Mac, pnpm perf -g "${entry.perf}"${entry.feel ? ` and pnpm test:feel ${entry.feel}` : ''})`)
+  console.log(`  (${entry.interaction} has a perf budget and ${entry.files.length === 1 ? entry.files[0] : `${entry.files.length} of its files`} changed: on the Mac, bun run perf -g "${entry.perf}"${entry.feel ? ` and bun run test:feel ${entry.feel}` : ''})`)
 if (flag('--plan') || plan.length === 0) process.exit(0)
 
 const results = await runPlan(plan, { root, local: flag('--local') })
 mkdirSync(resultsDir, { recursive: true })
 for (const { step, code } of results) if (code === 0) for (const item of step.items) writeFileSync(join(resultsDir, item.key), `${item.suite} ${item.id}\n`)
 console.log('affected: results')
-for (const { step, code } of results) console.log(`  ${code === 0 ? 'passed' : `failed (${code})`}  pnpm ${step.script}`)
+for (const { step, code } of results) console.log(`  ${code === 0 ? 'passed' : `failed (${code})`}  bun run ${step.script}`)
 process.exit(results.every(({ code }) => code === 0) ? 0 : 1)

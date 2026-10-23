@@ -16,7 +16,7 @@ export function healthBaseline(report) {
 export function healthRegressions(report, baseline) {
   if (!report.complete) {
     const late = (report.errors ?? []).filter((error) => error.timedOut).map((error) => error.tool)
-    if (late.length && late.length === report.errors.length) return [`Health tools timed out (${late.join(', ')}); no finding was checked. Run pnpm lint again when the machine is less busy`]
+    if (late.length && late.length === report.errors.length) return [`Health tools timed out (${late.join(', ')}); no finding was checked. Run bun run lint again when the machine is less busy`]
     return ['Health tools failed; fix the report errors before checking the baseline']
   }
   if (baseline.schemaVersion !== 1 || !Array.isArray(baseline.oversizedFiles)

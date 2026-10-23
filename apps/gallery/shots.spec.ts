@@ -6,7 +6,7 @@ import { openState, readRoutes, type Route } from './support'
 const shotsDir = join(import.meta.dirname, 'shots')
 const themes = ['light', 'dark'] as const
 
-/** To shoot a few components: GALLERY_SHOTS_ONLY=Message,MessageList pnpm gallery:shots. Keeps the other shots. */
+/** To shoot a few components: GALLERY_SHOTS_ONLY=Message,MessageList bun run gallery:shots. Keeps the other shots. */
 const only = process.env.GALLERY_SHOTS_ONLY?.split(',').map((name) => name.trim())
 /** To see another accent: GALLERY_SHOTS_ACCENT=teal writes <state>-<theme>-teal.png next to the default accent's shots. */
 const accent = process.env.GALLERY_SHOTS_ACCENT

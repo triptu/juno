@@ -104,9 +104,9 @@ function launchTiming(options: LaunchOptions): 'fast' | 'production' {
 export async function launchApp(userData: string, options: LaunchOptions = {}): Promise<RunningApp> {
   const started = performance.now()
   const env: Record<string, string> = {}
-  // pnpm's global virtual store gives the scripts it runs NODE_PATH and a
-  // NODE_OPTIONS resolve hook. The app is bundled and the packaged app gets
-  // neither, so the app under test does not either.
+  // A package manager or test runner may give the scripts it runs NODE_PATH
+  // or NODE_OPTIONS. The app is bundled and the packaged app gets neither, so
+  // the app under test does not either.
   const dropped = new Set(['ELECTRON_RUN_AS_NODE', 'NODE_OPTIONS', 'NODE_PATH'])
   for (const [key, value] of Object.entries(process.env)) {
     if (value !== undefined && !dropped.has(key)) env[key] = value
@@ -144,7 +144,7 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   // Launch the package directory (like `electron .`), not the script, so
   // Electron reads package.json for the app name and version.
   const app = await electron.launch({
-    // Under xvfb (pnpm remote) Chromium may find no pointing device and match
+    // Under xvfb (bun run remote) Chromium may find no pointing device and match
     // `(hover: none)`, which turns off every hover style. Say there is a mouse.
     args: [...(process.platform === 'linux' ? ['--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4'] : []), resolve(__dirname, '..')],
     env,

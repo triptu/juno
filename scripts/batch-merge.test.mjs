@@ -36,12 +36,13 @@ function fixture(t) {
   mkdirSync(resolve(dir, 'scripts'))
   for (const script of ['batch-merge.mjs', 'decision-log.mjs', 'worktree-folder.mjs']) copyFileSync(resolve(root, 'scripts', script), resolve(dir, 'scripts', script))
   assert.equal(command(process.execPath, ['scripts/decision-log.mjs']).status, 0)
-  write('bin/pnpm', `#!/bin/sh
+  write('bin/bun', `#!/bin/sh
+if [ "$1" = run ]; then shift; fi
 printf '%s\\n' "$*"
 if [ "$1" = health:baseline ]; then printf '{"rebuilt":true}\\n' > health-baseline.json; fi
 if [ "$1" = affected ] && [ "$FAIL_CHECK" = 1 ]; then exit 7; fi
 `)
-  command('chmod', ['+x', 'bin/pnpm'])
+  command('chmod', ['+x', 'bin/bun'])
   git(['add', '.'])
   git(['commit', '-m', 'Initial fixture'])
   git(['update-ref', 'refs/remotes/origin/main', 'HEAD'])
@@ -83,7 +84,7 @@ test('failed checks retain the batch and --continue retries without merging twic
   f.branch('one', { 'one.txt': 'one\n' })
   const failed = f.batch(['--push', 'one'], { FAIL_CHECK: '1' })
   assert.equal(failed.status, 1)
-  assert.match(failed.stderr, /pnpm failed/)
+  assert.match(failed.stderr, /bun failed/)
   assert.ok(existsSync(f.tree))
   const before = f.git(['rev-parse', 'HEAD'], f.tree)
   const resumed = f.batch(['--continue', 'batch-1'])

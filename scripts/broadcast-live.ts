@@ -3,7 +3,7 @@
  * The live broadcast check: how Slack sends an existing thread reply to the
  * channel, all inside your self-DM (research `slack-data-access.md`,
  * "Send an existing reply to the channel"). Run with
- * `JUNO_LIVE=1 pnpm broadcast:live` after `pnpm smoke:live -- --cache-session`.
+ * `JUNO_LIVE=1 bun run broadcast:live` after `bun run smoke:live --cache-session`.
  * It refuses to run without `JUNO_LIVE=1`.
  *
  * What it does, as the official client's "Send reply to this conversation"
@@ -34,7 +34,7 @@ type Json = Record<string, unknown>
 
 const cached = await readCachedSession(process.argv.includes('--team') ? process.argv[process.argv.indexOf('--team') + 1] : undefined)
 if (cached === undefined) {
-  console.error('broadcast-live: no cached session. Run `JUNO_LIVE=1 pnpm smoke:live -- --cache-session` first.')
+  console.error('broadcast-live: no cached session. Run `JUNO_LIVE=1 bun run smoke:live --cache-session` first.')
   process.exit(2)
 }
 const { session, cookie } = cached

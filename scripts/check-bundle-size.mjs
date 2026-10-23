@@ -4,7 +4,7 @@
 // means what index.html loads before any user action: its <script> tags,
 // <link rel="modulepreload"> and stylesheets. Lazy chunks are not counted.
 //
-// Runs at the end of `pnpm build` (apps/desktop/package.json) and fails the
+// Runs at the end of `bun run build` (apps/desktop/package.json) and fails the
 // build when a budget is exceeded. Prints gzip sizes too, for the record.
 import { readFileSync, statSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'

@@ -58,7 +58,7 @@ export function Index({ theme, accent, query: initialQuery }: Props) {
       <p className="g-hint">
         {components.length} components, {allRoutes.length} states. Each state has its own address, for example{' '}
         <code>#/Button?__state=variant/primary&amp;theme=dark&amp;accent=claret</code>. On a component page, <kbd>j</kbd> <kbd>k</kbd> move between
-        states and <kbd>[</kbd> <kbd>]</kbd> between components. Screenshots: <code>pnpm gallery:shots</code>.
+        states and <kbd>[</kbd> <kbd>]</kbd> between components. Screenshots: <code>bun run gallery:shots</code>.
       </p>
       <ul className="g-components">
         {visible.map((entry) => (

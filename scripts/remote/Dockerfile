@@ -4,20 +4,20 @@
 FROM mcr.microsoft.com/playwright:v1.64.0-noble AS toolchain
 
 ARG NODE_VERSION=26.11.1
-ARG PNPM_VERSION=12.11.2
+# Only the Quint and Bun pins are sent here, never the workspace or lockfile.
+COPY toolchain.json /tmp/toolchain.json
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openjdk-21-jre-headless xz-utils \
   && rm -rf /var/lib/apt/lists/* \
   && curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" | tar -xJ -C /usr/local --strip-components=1 \
-  && npm install -g --silent "pnpm@${PNPM_VERSION}"
+  && npm install -g --silent "bun@$(node -p "require('/tmp/toolchain.json').bun")" \
+  && chown pwuser /tmp/toolchain.json
 
 # tstack runs jobs as the SSH uid; the image builds its toolchain as pwuser.
 RUN mkdir -p /work && chmod 1777 /work && chmod 755 /home/pwuser
 USER pwuser
 WORKDIR /work
 ENV QUINT_HOME=/home/pwuser/.quint
-# Only the Quint pin is sent here, never the workspace or lockfile.
-COPY --chown=pwuser toolchain.json /tmp/toolchain.json
 RUN npm install --prefix /tmp/quint --no-audit --no-fund "@informalsystems/quint@$(node -p "require('/tmp/toolchain.json').quint")"
 
 # Quint downloads its Rust evaluator and Apalache on first use; do it here.

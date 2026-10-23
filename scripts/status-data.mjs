@@ -84,7 +84,7 @@ export const readLanded = (root, limit = 30) => {
     })
 }
 
-// The newest full run (pnpm verify:main) that passed, from the records the
+// The newest full run (bun run verify:main) that passed, from the records the
 // release gate reads.
 export const readLastGreen = (root) => {
   try {

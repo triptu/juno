@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Publishes a built release to the private releases repository (docs/development.md,
- * "Releasing"). Run with `pnpm release:publish -- --notes <file>` after `pnpm package`.
+ * "Releasing"). Run with `bun run release:publish --notes <file>` after `bun run package`.
  *
  * It uses `gh` with the local login; no token is read, printed or written here.
  * Steps: check the build in apps/desktop/release matches the version in
@@ -12,7 +12,7 @@
  *
  * Flags:
  *   --notes <file>   the highlights of this version, one per line, at most ten (required)
- *   --urgent         publish after typecheck, lint, unit tests and package smoke; start pnpm verify:main for it next
+ *   --urgent         publish after typecheck, lint, unit tests and package smoke; start bun run verify:main for it next
  *   --prerelease     publish as a pre-release: the app never offers it, and CHANGELOG.md is left alone
  *   --dry-run        check everything and print the plan; change nothing
  *   --dir <path>     the build folder (default apps/desktop/release)
@@ -83,7 +83,7 @@ try {
 }
 
 // The build.
-if (!existsSync(join(dir, 'latest-mac.yml'))) fail(`no latest-mac.yml in ${dir}; run pnpm package first`)
+if (!existsSync(join(dir, 'latest-mac.yml'))) fail(`no latest-mac.yml in ${dir}; run bun run package first`)
 const metadata = readFileSync(join(dir, 'latest-mac.yml'), 'utf8')
 const built = /^version:\s*['"]?([^'"\s]+)/m.exec(metadata)?.[1]
 if (built !== version) fail(`latest-mac.yml is for ${built ?? 'no version'}, package.json says ${version}; rebuild`)
@@ -112,17 +112,17 @@ try {
   signed = String((error as { stderr?: unknown }).stderr ?? '').includes('Developer ID Application')
 }
 if (signed && !urls.some((url) => url.endsWith('.zip'))) fail('a signed build needs a ZIP in latest-mac.yml for in-place updates')
-if (!signed && files.some((name) => name.endsWith('.zip'))) fail('an unsigned build must not upload a ZIP; rebuild with pnpm package')
+if (!signed && files.some((name) => name.endsWith('.zip'))) fail('an unsigned build must not upload a ZIP; rebuild with bun run package')
 
 if (!urgent) {
   const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
   if (execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim()) fail('commit or remove working-tree changes before publishing')
   const gate = releaseGate(root, commit)
-  if (!gate) fail('no eligible full-run record for this commit; inspect pnpm verify:main results')
+  if (!gate) fail('no eligible full-run record for this commit; inspect bun run verify:main results')
   printGate(gate)
 }
 
-if (releases.some((release) => release.tagName === tag)) fail(`${repo} already has ${tag}; bump the version (pnpm release:version)`)
+if (releases.some((release) => release.tagName === tag)) fail(`${repo} already has ${tag}; bump the version (bun run release:version)`)
 const newest = releases.filter((release) => !release.isDraft && !release.isPrerelease && isVersion(release.tagName))
   .map((release) => normalizeVersion(release.tagName)).sort(compareVersions).at(-1)
 if (newest !== undefined && compareVersions(version, newest) <= 0) fail(`${version} is not newer than the published ${newest}`)
@@ -134,8 +134,8 @@ if (dry) process.exit(0)
 
 if (urgent) {
   for (const args of [['typecheck'], ['lint'], ['remote', 'test'], ['test:package']]) {
-    console.log(`release:publish: urgent gate: pnpm ${args.join(' ')}`)
-    execFileSync('pnpm', args, { cwd: root, stdio: 'inherit', env: { ...process.env, JUNO_E2E_AI_JOBS: '1' } })
+    console.log(`release:publish: urgent gate: bun run ${args.join(' ')}`)
+    execFileSync('bun', ['run', ...args], { cwd: root, stdio: 'inherit', env: { ...process.env, JUNO_E2E_AI_JOBS: '1' } })
   }
 }
 
@@ -160,7 +160,7 @@ try {
   gh(['release', 'edit', tag, '--repo', repo, '--draft=false', ...(values.prerelease ? [] : ['--latest'])])
   if (urgent) {
     const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
-    console.log(`release:publish: no full run covers this urgent release; run pnpm verify:main --ref ${commit} next`)
+    console.log(`release:publish: no full run covers this urgent release; run bun run verify:main --ref ${commit} next`)
   }
   console.log(`release:publish: published ${tag}`)
   if (!values.prerelease) syncReleasedVersion(root, version)

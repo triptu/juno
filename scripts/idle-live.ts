@@ -12,7 +12,7 @@
  * never a parameter). `--profile DIR` writes a CPU profile of the idle
  * window there: function names and source locations only.
  *
- * Read-only as `pnpm sync:timeline`: every request goes through one fetch
+ * Read-only as `bun run sync:timeline`: every request goes through one fetch
  * that refuses any method outside the read list before it leaves. AI has no
  * key here; `--fake-ai` runs the AI jobs on the engine's fake model, so
  * nothing leaves the Mac. `--dir DIR` keeps the data folder, so a second run is a
@@ -61,7 +61,7 @@ if (!useFake && process.env.JUNO_LIVE !== '1') {
   process.exit(2)
 }
 
-// The read list of `pnpm sync:timeline` (scripts/first-sync-live.ts).
+// The read list of `bun run sync:timeline` (scripts/first-sync-live.ts).
 const READS = new Set([
   'auth.test', 'client.userBoot', 'client.counts', 'client.getWebSocketURL', 'api.getFlannelHttpUrl', 'users.prefs.get',
   'subscriptions.thread.getView', 'conversations.history', 'conversations.replies', 'conversations.info', 'search.modules.messages',
@@ -79,7 +79,7 @@ if (useFake) {
   cached = await readCachedSession(flag('--team'))
 }
 if (cached === undefined) {
-  console.error('idle-live: no cached session. Run `JUNO_LIVE=1 pnpm smoke:live -- --cache-session` first.')
+  console.error('idle-live: no cached session. Run `JUNO_LIVE=1 bun run smoke:live --cache-session` first.')
   process.exit(2)
 }
 const { session, cookie } = cached

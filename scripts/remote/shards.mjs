@@ -35,7 +35,7 @@ export async function runShards({ total, rest, self, root, desktop, dryRun }) {
     })
   })))
   if (desktop && !dryRun && readdirSync(blobs).length) {
-    const merged = spawnSync('pnpm', ['--filter', '@juno/desktop', 'exec', 'playwright', 'merge-reports', '--reporter=html', blobs], {
+    const merged = spawnSync('bun', ['run', '--cwd', 'apps/desktop', 'playwright', 'merge-reports', '--reporter=html', blobs], {
       cwd: root, stdio: 'inherit', env: { ...process.env, PLAYWRIGHT_HTML_OUTPUT_DIR: join(group, 'html'), PLAYWRIGHT_HTML_OPEN: 'never' },
     })
     if (merged.status !== 0) codes.push(merged.status ?? 255)

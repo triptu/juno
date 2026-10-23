@@ -40,7 +40,7 @@ const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 
 const cached = await readCachedSession(flag('--team'))
 if (cached === undefined) {
-  console.error('dnd-live: no cached session; run `JUNO_LIVE=1 pnpm smoke:live -- --cache-session` first')
+  console.error('dnd-live: no cached session; run `JUNO_LIVE=1 bun run smoke:live --cache-session` first')
   process.exit(2)
 }
 const { session, cookie } = cached

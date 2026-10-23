@@ -78,7 +78,7 @@ async function target(): Promise<Target> {
     return { session: { teamId: c.teamId, userId: c.userId, workspaceUrl: c.url, token: c.token }, cookie: `d=${c.cookie}`, allowedHosts: ['127.0.0.1', 'localhost'], close: () => fake.close() }
   }
   const cached = await readCachedSession(flag('--team'))
-  if (cached === undefined) throw new Error('no cached session; run `JUNO_LIVE=1 pnpm smoke:live -- --cache-session` first')
+  if (cached === undefined) throw new Error('no cached session; run `JUNO_LIVE=1 bun run smoke:live --cache-session` first')
   log('cached session found')
   return { session: cached.session, cookie: cached.cookie, allowedHosts: ['slack.com'], close: async () => {} }
 }

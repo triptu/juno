@@ -2,7 +2,7 @@
 /**
  * The live smoke (architecture 13 and 16 M2): read-only calls against a real
  * workspace, decoded through @juno/slack-schema, plus 30 s of socket events.
- * Run with `pnpm smoke:live`. Questions it does not answer go to `probe-live.ts`. It refuses to run without `JUNO_LIVE=1`.
+ * Run with `bun run smoke:live`. Questions it does not answer go to `probe-live.ts`. It refuses to run without `JUNO_LIVE=1`.
  *
  * Session: imported from the installed Slack app the way the desktop app does
  * it (copies of its files, the "Slack Safe Storage" keychain password, which

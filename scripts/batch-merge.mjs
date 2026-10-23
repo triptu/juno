@@ -110,9 +110,9 @@ function create(branches) {
 }
 
 function regenerate() {
-  run('pnpm', ['install', '--frozen-lockfile'])
+  run('bun', ['install', '--frozen-lockfile'])
   run(process.execPath, ['scripts/decision-log.mjs'])
-  run('pnpm', ['health:baseline'])
+  run('bun', ['run', 'health:baseline'])
   git(state.worktree, 'add', '--', ...generated)
   if (git(state.worktree, 'diff', '--cached', '--name-only')) {
     run('git', ['commit', '-m', 'Regenerate batch decision log and health baseline'])
@@ -187,15 +187,15 @@ function main() {
     checkMessages()
     const checkedHead = git(state.worktree, 'rev-parse', 'HEAD')
     // Merge first, test in full afterwards (docs/development.md, "Testing"): a batch gates on
-    // typecheck, lint and the unit tests the merged change reaches (pnpm affected --batch, which
+    // typecheck, lint and the unit tests the merged change reaches (bun run affected --batch, which
     // adds specs:check and conformance when the code the specs model changed). Files that passed
     // with the same inputs, in an agent's run or an earlier batch, are skipped by the shared
     // results cache. The full suites run on main afterwards.
     if (!state.dryRun) {
-      run('pnpm', ['typecheck'])
-      run('pnpm', ['lint'])
+      run('bun', ['run', 'typecheck'])
+      run('bun', ['run', 'lint'])
       // --local runs them on this Mac through the machine lock, for when the runner is unavailable.
-      run('pnpm', ['affected', '--batch', '--base', state.base, ...(argv.includes('--local') ? ['--local'] : [])])
+      run('bun', ['run', 'affected', '--batch', '--base', state.base, ...(argv.includes('--local') ? ['--local'] : [])])
     }
     clean()
     if (git(state.worktree, 'rev-parse', 'HEAD') !== checkedHead) throw new Error('HEAD changed during checks; continue to check again')

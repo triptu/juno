@@ -13,7 +13,7 @@ import { claimQueue, openState, readRoutes, walkPages, type Route } from './supp
  * width or offset, an overflow or a containment, so dark draws every ring in
  * the same box and the same clips.
  *
- * To look at one component: GALLERY_RING_ONLY=Sidebar pnpm test:gallery
+ * To look at one component: GALLERY_RING_ONLY=Sidebar bun run test:gallery
  * (GALLERY_RING_ONLY=* walks every component).
  */
 

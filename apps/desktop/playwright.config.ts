@@ -28,12 +28,12 @@ export default defineConfig({
   timeout: 30_000,
   expect: { timeout: 5_000 },
   // One Electron app at a time on the shared Mac. Each test has its own fake
-  // Slack and user-data directory, so a machine of its own (pnpm remote) can
+  // Slack and user-data directory, so a machine of its own (bun run remote) can
   // run more with JUNO_E2E_WORKERS.
   workers: Number(process.env.JUNO_E2E_WORKERS ?? 1),
   fullyParallel: false,
   retries: process.env.CI || process.env.JUNO_REMOTE_CONTAINER ? 1 : 0,
-  // Tests tagged @mac depend on macOS behaviour. pnpm remote runs on Linux and
+  // Tests tagged @mac depend on macOS behaviour. bun run remote runs on Linux and
   // skips them.
   grepInvert: excludedTags.length ? new RegExp(excludedTags.map((tag) => `${tag}\\b`).join('|')) : undefined,
   reporter: [

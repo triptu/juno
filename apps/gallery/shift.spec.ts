@@ -16,7 +16,7 @@ import { claimQueue, openState, readRoutes, walkPages, type Route } from './supp
  * The same walk checks the cursor rule on each state as it opens it, so the
  * states are opened once for both.
  *
- * To look at one component: GALLERY_SHIFT_ONLY=Button,Chip pnpm test:gallery
+ * To look at one component: GALLERY_SHIFT_ONLY=Button,Chip bun run test:gallery
  */
 test.use({ reducedMotion: 'no-preference' })
 
@@ -45,7 +45,7 @@ const perState = 8
 const shardMatch = /^(\d+)\/(\d+)$/.exec(process.env.JUNO_SHARD ?? '')
 const shard = shardMatch ? { index: Number(shardMatch[1]), total: Number(shardMatch[2]) } : undefined
 
-/** The tests share the states between them so they run in parallel. GALLERY_SHIFT_PARTS sets how many (pnpm remote uses one per worker). */
+/** The tests share the states between them so they run in parallel. GALLERY_SHIFT_PARTS sets how many (bun run remote uses one per worker). */
 const shards = Number(process.env.GALLERY_SHIFT_PARTS ?? 12)
 
 async function targets(page: Page, route: Route): Promise<Locator[]> {
@@ -196,7 +196,7 @@ for (let part = 0; part < shards; part++) {
     // The full walk took 14.3 minutes on three cores; each state still has its own 30 s limit.
     test.setTimeout((only ? 15 : 20) * 60_000)
     const pages = await walkPages(browser)
-    // JUNO_SHARD=i/n (pnpm remote --shards n): this machine takes every n-th state.
+    // JUNO_SHARD=i/n (bun run remote --shards n): this machine takes every n-th state.
     const routes = (await readRoutes(pages.page())).filter((route, index) => (!only || only.includes(route.component)) && (!shard || index % shard.total === shard.index))
     const queue = claimQueue('shift')
     const failures: string[] = []

@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * `pnpm agent:eval`: runs the Juno Agent eval cases and prints the report.
+ * `bun run agent:eval`: runs the Juno Agent eval cases and prints the report.
  *
- *   pnpm agent:eval                         the scripted model, as CI runs it
- *   pnpm agent:eval --live                  OpenRouter, the default chat model (Sonnet)
- *   pnpm agent:eval --live --model haiku    another family; repeat --model to run several
- *   pnpm agent:eval --case remember         only these cases; repeatable
- *   pnpm agent:eval --live --judge opus     the judge's family (default opus)
- *   pnpm agent:eval --live --case x --repeat 3   run the cases 3 times, to tell noise from a change
+ *   bun run agent:eval                         the scripted model, as CI runs it
+ *   bun run agent:eval --live                  OpenRouter, the default chat model (Sonnet)
+ *   bun run agent:eval --live --model haiku    another family; repeat --model to run several
+ *   bun run agent:eval --case remember         only these cases; repeatable
+ *   bun run agent:eval --live --judge opus     the judge's family (default opus)
+ *   bun run agent:eval --live --case x --repeat 3   run the cases 3 times, to tell noise from a change
  *
  * Live runs need `OPENROUTER_API_KEY` in the environment or in the repo's
  * `.env` and cost money. A full live run saves its report under

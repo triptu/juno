@@ -105,7 +105,7 @@ it('the outline keeps the cached prefix: it costs only its own bytes, and a writ
   const none = await conversation('none')
   const outline = await conversation('outline')
   const top = await conversation('top')
-  // The numbers for the report: `pnpm remote test --passWithNoTests test/memory-cache.test.ts`.
+  // The numbers for the report: `bun run remote test --passWithNoTests test/memory-cache.test.ts`.
   console.log(`memory-cache ${JSON.stringify({ none, outline, top })}`)
 
   expect(outline.requests).toBe(none.requests)
@@ -155,7 +155,7 @@ it('a person\'s file after the recent messages costs only its own bytes, and a c
   const strip = await dm('strip')
   const after = await dm('after')
   const first = await dm('first')
-  // The numbers for the report: `pnpm remote test --passWithNoTests test/memory-cache.test.ts`.
+  // The numbers for the report: `bun run remote test --passWithNoTests test/memory-cache.test.ts`.
   console.log(`memory-cache people ${JSON.stringify({ strip, after, first })}`)
   expect(after.requests).toBe(strip.requests)
   // Within three points of the same conversation without the file: what it costs is its own bytes.

@@ -1,4 +1,4 @@
-// Which files are tests, for pnpm affected (scripts/affected.mjs): the vitest
+// Which files are tests, for bun run affected (scripts/affected.mjs): the vitest
 // files of every package and app, and the Node tests of the repository's
 // scripts with the root script that runs each.
 

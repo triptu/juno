@@ -4,7 +4,7 @@
  * (`packages/contract/src/body.ts`). The engine builds bodies with
  * richtext and sends them through the contract's codec, so a node kind one
  * side has and the other lacks would be dropped or rejected on the wire.
- * Changing either side without the other fails `pnpm typecheck` here.
+ * Changing either side without the other fails `bun run typecheck` here.
  */
 import type { MessageBody as WireBody } from '@juno/contract'
 import type { MessageBody as RichBody } from '@juno/richtext'

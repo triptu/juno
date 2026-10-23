@@ -4,7 +4,7 @@ import { defineConfig } from '@playwright/test'
 delete process.env.ELECTRON_RUN_AS_NODE
 
 /**
- * The feel suite (`pnpm test:feel`): scripted interactions recorded frame by
+ * The feel suite (`bun run test:feel`): scripted interactions recorded frame by
  * frame, with checks for shift, jumps, flicker, empty frames and late
  * feedback. Artefacts and the contact sheet go to `feel-report/`.
  */

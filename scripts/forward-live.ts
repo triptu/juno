@@ -2,7 +2,7 @@
 /**
  * The live forward check: what `chat.shareMessage` does in your real
  * workspace, all inside your self-DM (research `slack-forward.md`). Run with
- * `JUNO_LIVE=1 pnpm forward:live` after `pnpm smoke:live -- --cache-session`.
+ * `JUNO_LIVE=1 bun run forward:live` after `bun run smoke:live --cache-session`.
  * It refuses to run without `JUNO_LIVE=1`.
  *
  * What it does, as the official client's Forward dialog does it:
@@ -33,7 +33,7 @@ type Json = Record<string, unknown>
 
 const cached = await readCachedSession(process.argv.includes('--team') ? process.argv[process.argv.indexOf('--team') + 1] : undefined)
 if (cached === undefined) {
-  console.error('forward-live: no cached session. Run `JUNO_LIVE=1 pnpm smoke:live -- --cache-session` first.')
+  console.error('forward-live: no cached session. Run `JUNO_LIVE=1 bun run smoke:live --cache-session` first.')
   process.exit(2)
 }
 const { session, cookie } = cached

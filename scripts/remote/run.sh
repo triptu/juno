@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Runs inside the remote container (scripts/remote/Dockerfile) after the
 # worktree has been unpacked over /work: links the workspace from the
-# installed store, runs `pnpm <script> [args...]` under a virtual display, and
+# installed store, runs `bun run <script> [args...]` under a virtual display, and
 # packs the reports into .remote for scripts/remote.mjs to fetch.
 set -uo pipefail
 cd /work
 export JUNO_RUNNER_JOB_CORES=${RUNNER_THREADS:?tstack did not provide allocated threads}
 echo "remote: allocated threads=$JUNO_RUNNER_JOB_CORES"
 export JUNO_REMOTE_INSTALL=1 JUNO_BUILD_CACHE_DIR=/cache/builds
-export PNPM_CONFIG_CACHE_DIR=/cache/pnpm-store/metadata electron_config_cache=/cache/electron
+export electron_config_cache=/cache/electron
 export TMP=/tmp TEMP=/tmp XDG_RUNTIME_DIR=/tmp/juno-runtime
 mkdir -p "$XDG_RUNTIME_DIR" /cache/builds /cache/electron .remote
 chmod 700 "$XDG_RUNTIME_DIR"
@@ -41,7 +41,7 @@ script_started=$SECONDS
     echo "$(( SECONDS - script_started )) ${running:-0} ${pressure:-0}" >> /out/load.txt
   done ) &
 sampler=$!
-xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' pnpm "$@"
+xvfb-run --auto-servernum --server-args='-screen 0 1920x1080x24' bun run "$@"
 code=$?
 echo "remote: script time $(( SECONDS - script_started )) s" >&2
 kill $sampler 2>/dev/null
@@ -71,7 +71,7 @@ reports=()
 for path in specs/traces apps/desktop/coverage/map apps/desktop/test-results apps/desktop/playwright-report apps/desktop/blob-report apps/gallery/test-results apps/gallery/playwright-report apps/gallery/shots; do
   [ -e "$path" ] && reports+=("$path")
 done
-# The spec cache pnpm remote brought along, with what this run added to it.
+# The spec cache `bun run remote` brought along, with what this run added to it.
 [ -n "${SPECS_CACHE_DIR:-}" ] && [ -d "$SPECS_CACHE_DIR" ] && reports+=("${SPECS_CACHE_DIR#/work/}")
 [ -n "${JUNO_TYPECHECK_CACHE_DIR:-}" ] && [ -d "$JUNO_TYPECHECK_CACHE_DIR" ] && reports+=("${JUNO_TYPECHECK_CACHE_DIR#/work/}")
 [ ${#reports[@]} -gt 0 ] && tar -czf .remote/reports.tgz "${reports[@]}"

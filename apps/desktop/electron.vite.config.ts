@@ -101,7 +101,7 @@ function runtimeImports(): Plugin {
  * input, `codemode-worker`.
  */
 function codemodeFiles(): Plugin {
-  // pi-codemode exports ESM only, so it is found by its folder, where pnpm links it for the agent.
+  // pi-codemode exports ESM only, so it is found by its folder, where Bun links it for the agent.
   const fromCodemode = createRequire(realpathSync(resolve(__dirname, '../../packages/agent/node_modules/@earendil-works/pi-codemode/package.json')))
   return {
     name: 'juno:codemode-files',

@@ -1,12 +1,17 @@
-// Run selected files only in their own packages; full runs keep pnpm's scheduler.
+// Runs each workspace package's tests, at most `jobs` packages at a time.
+// With --files, runs only those files, each in its own package.
 import { spawn } from 'node:child_process'
-import { existsSync, globSync } from 'node:fs'
+import { existsSync, globSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { unitTestMatcher } from './affected-tests.mjs'
 import { forwardSignals } from './remote/children.mjs'
 
-export function unitCommands(args, root, jobs) {
-  if (args[0] !== '--files') return [['-r', `--workspace-concurrency=${jobs}`, '--if-present', 'test', ...args]]
+export function unitCommands(args, root) {
+  if (args[0] !== '--files') {
+    const { workspaces } = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
+    const dirs = globSync(workspaces.map((pattern) => `${pattern}/package.json`), { cwd: root }).map((file) => file.slice(0, -'/package.json'.length)).toSorted()
+    return dirs.filter((dir) => JSON.parse(readFileSync(resolve(root, dir, 'package.json'), 'utf8')).scripts?.test).map((dir) => ['run', '--cwd', dir, 'test', ...args])
+  }
   if (args.length === 1) throw new Error('--files needs at least one repository test path')
   const matches = unitTestMatcher(root)
   const packages = new Map()
@@ -23,7 +28,7 @@ export function unitCommands(args, root, jobs) {
     const prefix = resolve(root, dir) + '/'
     const filters = files.map((file) => file.slice(prefix.length).toLowerCase())
     const extra = candidates.filter((file) => file.startsWith(prefix) && !files.includes(file) && filters.some((filter) => file.slice(prefix.length).toLowerCase().includes(filter)))
-    return ['--dir', dir, 'test', ...files, ...extra.flatMap((file) => ['--exclude', file.slice(prefix.length)])]
+    return ['run', '--cwd', dir, 'test', ...files, ...extra.flatMap((file) => ['--exclude', file.slice(prefix.length)])]
   })
 }
 
@@ -31,18 +36,18 @@ if (import.meta.main) {
   const jobs = Number(process.env.JUNO_TEST_PACKAGE_JOBS ?? 2)
   if (!Number.isSafeInteger(jobs) || jobs < 1) throw new Error('JUNO_TEST_PACKAGE_JOBS must be a positive integer')
   const args = process.argv.slice(2)
-  const commands = unitCommands(args, process.cwd(), jobs)
+  const commands = unitCommands(args, process.cwd())
   const children = new Set()
   forwardSignals(children)
   let cancelled = false
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => { cancelled = true })
   const run = (command) => new Promise((done) => {
-    const child = spawn('pnpm', command, { stdio: 'inherit' })
+    const child = spawn('bun', command, { stdio: 'inherit' })
     children.add(child)
     child.on('error', (error) => console.error(error.message))
     child.on('close', (code) => { children.delete(child); done(code ?? 1) })
   })
-  const codes = await Promise.all(Array.from({ length: args[0] === '--files' ? Math.min(jobs, commands.length) : 1 }, async () => {
+  const codes = await Promise.all(Array.from({ length: Math.min(jobs, commands.length) }, async () => {
     let result = 0
     while (commands.length) {
       if (cancelled) break

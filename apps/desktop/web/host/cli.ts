@@ -1,5 +1,5 @@
 /**
- * `pnpm web [--host]`: starts the web shell (`shell.ts`) on this worktree's
+ * `bun run web [--host]`: starts the web shell (`shell.ts`) on this worktree's
  * port (`port.ts`, or JUNO_WEB_PORT) and prints one line with the app's and
  * the fake Slack's control addresses. `--host` listens on every interface,
  * for a phone or another machine on the LAN; the fake Slack stays on this
@@ -30,8 +30,8 @@ const stop = (code: number) => {
 process.on('SIGINT', () => stop(0))
 process.on('SIGTERM', () => stop(0))
 process.on('SIGHUP', () => stop(0))
-// The processes that started us: the parent, and pnpm too when the parent is the `sh -c` pnpm runs
-// scripts in, since that shell outlives a pnpm killed without a signal. When one goes, so do we.
+// The processes that started us: the parent, and Bun too when the parent is the `sh -c` Bun runs
+// scripts in, since that shell outlives a Bun killed without a signal. When one goes, so do we.
 const ps = (field: 'ppid' | 'comm', pid: number) => execFileSync('ps', ['-o', `${field}=`, '-p', String(pid)], { encoding: 'utf8' }).trim()
 const starters = [process.ppid]
 try {
@@ -57,7 +57,7 @@ try {
   shell = await starting
 } catch (cause) {
   const inUse = cause instanceof Error && /port .* is already in use|EADDRINUSE/i.test(cause.message)
-  console.error(inUse ? `web shell: port ${port} is in use. Is pnpm web already running in this worktree? Stop it, or set JUNO_WEB_PORT.` : cause)
+  console.error(inUse ? `web shell: port ${port} is in use. Is bun run web already running in this worktree? Stop it, or set JUNO_WEB_PORT.` : cause)
   process.exit(1)
 }
 

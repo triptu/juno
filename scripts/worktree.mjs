@@ -6,9 +6,9 @@
 // `add` checks out <branch> (default <name>; an existing branch is reused, a
 // new one starts at --base, default origin/main; --detach checks out <ref>
 // with no branch, as a DMG build does) and runs
-// `pnpm install --frozen-lockfile`. The workspace uses pnpm's global virtual
-// store, so the install links about 1,000 entries and takes about a second
-// when the store is warm. It prints the worktree's path last.
+// `bun install --frozen-lockfile`. The workspace uses Bun's global store, so
+// the install links about 1,100 entries and takes under a second when the
+// store is warm. It prints the worktree's path last.
 //
 // Worktrees go on /Volumes/AgentWork when that volume is mounted (file event
 // logging and Spotlight are off there), else in <repo>/.claude/worktrees
@@ -63,7 +63,7 @@ async function add(name) {
       if (waited % 300 === 0) console.error(`worktree: load ${loadavg()[0].toFixed(1)} is above 8; waiting to install`)
       await sleep(30_000)
     }
-    execFileSync('pnpm', ['install', '--frozen-lockfile', '--prefer-offline'], { cwd: path, stdio: 'inherit' })
+    execFileSync('bun', ['install', '--frozen-lockfile', '--prefer-offline'], { cwd: path, stdio: 'inherit' })
   }
   console.log(path)
 }

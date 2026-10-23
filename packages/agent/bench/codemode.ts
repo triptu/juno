@@ -14,7 +14,7 @@
 // what the model read). The scripted model writes the same answer whatever it is sent, so turns,
 // sizes and success measure the tool path, not model behaviour.
 //
-//   node scripts/heavy.mjs pnpm --filter @juno/agent exec node --import ../../scripts/ts-resolve-hooks.mjs bench/codemode.ts
+//   node scripts/heavy.mjs bun run --cwd packages/agent node --import ../../scripts/ts-resolve-hooks.mjs bench/codemode.ts
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'

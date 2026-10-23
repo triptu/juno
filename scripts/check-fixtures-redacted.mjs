@@ -5,7 +5,7 @@
  * Slack ids other than the redacted placeholders, no tokens, no emails, no
  * URLs other than https://redacted.invalid/, no timestamps other than the
  * placeholder, and no free text (every string must be one of the kept
- * enum-like values, a placeholder, or empty). Run by `pnpm lint`.
+ * enum-like values, a placeholder, or empty). Run by `bun run lint`.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'

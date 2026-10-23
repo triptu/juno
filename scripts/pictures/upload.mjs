@@ -4,8 +4,8 @@
 // Cloudflare resource. Safe to run again: it creates the bucket and turns on its public
 // r2.dev URL only when needed, and uploads only files the bucket lacks or that changed.
 //
-//   pnpm dlx wrangler login            (once, in a browser)
-//   pnpm pictures:upload [--out /Volumes/AgentWork/pictures-juno-art] [--dry-run]
+//   bunx wrangler login            (once, in a browser)
+//   bun run pictures:upload [--out /Volumes/AgentWork/pictures-juno-art] [--dry-run]
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -23,7 +23,7 @@ const wrangler = (...rest) => {
     console.log(['wrangler', ...rest].join(' '))
     return ''
   }
-  return execFileSync('pnpm', ['dlx', 'wrangler@4', ...rest], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+  return execFileSync('bun', ['x', 'wrangler@4', ...rest], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
 }
 
 const files = readdirSync(out).filter((name) => /^[a-z0-9]+(?:-[a-z0-9]+)*-(?:small|large)\.webp$/.test(name)).sort()
@@ -31,7 +31,7 @@ if (files.length === 0) throw new Error(`No picture files in ${out}; run build.m
 
 if (!dryRun) {
   const who = wrangler('whoami')
-  if (/not authenticated/i.test(who)) throw new Error('Run `pnpm dlx wrangler login` first')
+  if (/not authenticated/i.test(who)) throw new Error('Run `bunx wrangler@4 login` first')
 }
 
 // The bucket, once.

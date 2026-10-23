@@ -2,7 +2,7 @@
 /**
  * The live presence check (research section 3, Presence): how Slack shows
  * the owner while only Juno's socket is connected, with and without
- * `tickle`. Run with `JUNO_LIVE=1 pnpm presence:live`. It refuses to run
+ * `tickle`. Run with `JUNO_LIVE=1 bun run presence:live`. It refuses to run
  * without `JUNO_LIVE=1`, and reuses the session `smoke-live.ts
  * --cache-session` kept.
  *
@@ -44,7 +44,7 @@ const READS = new Set(['auth.test', 'client.getWebSocketURL', 'users.getPresence
 
 const cached = await readCachedSession()
 if (cached === undefined) {
-  console.error('presence-live: no cached session. Run `JUNO_LIVE=1 pnpm smoke:live -- --cache-session` first.')
+  console.error('presence-live: no cached session. Run `JUNO_LIVE=1 bun run smoke:live --cache-session` first.')
   process.exit(2)
 }
 const { session, cookie } = cached

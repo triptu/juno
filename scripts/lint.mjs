@@ -1,4 +1,4 @@
-// pnpm lint: runs the independent checks at once and prints each one's output
+// bun run lint: runs the independent checks at once and prints each one's output
 // as one group when it finishes. Fails if any check fails, and names them.
 import { spawn } from 'node:child_process'
 import { dirname, resolve } from 'node:path'

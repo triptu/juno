@@ -4,7 +4,7 @@
  * matches the newest decision fragment that records it. A change of the
  * epoch deletes every user's cache.db and syncs everything from Slack again,
  * so it needs a fragment in docs/decisions/log/ that says "cache reset epoch
- * N" and why. Run by `pnpm lint`.
+ * N" and why. Run by `bun run lint`.
  */
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'

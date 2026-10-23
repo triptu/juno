@@ -1,4 +1,4 @@
-// Replays the outbox traces Quint generated (`pnpm specs:conformance`)
+// Replays the outbox traces Quint generated (`bun run specs:conformance`)
 // against the engine and the fake Slack. See README, "Conformance".
 //
 // The engine runs in the test's own thread, so one file's replays share one
@@ -67,7 +67,7 @@ function shard(index: number): ReadonlyArray<Entry> {
 export function outboxConformance(index: number) {
   describe.concurrent(`outbox conformance ${index + 1} of ${SHARDS}`, () => {
     it('has traces', () => {
-      expect(entries.length, 'run pnpm specs:conformance, which generates them first').toBeGreaterThan(0)
+      expect(entries.length, 'run bun run specs:conformance, which generates them first').toBeGreaterThan(0)
     })
     for (const entry of shard(index)) {
       if (entry.skip !== undefined) {

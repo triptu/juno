@@ -4,8 +4,8 @@
 // its samples and the load average and fails when a p95 (or a p50 where the
 // budget says so) is over its budget.
 //
-//   pnpm perf                  every scenario
-//   pnpm perf -g "topic view"  some of them
+//   bun run perf                  every scenario
+//   bun run perf -g "topic view"  some of them
 //   JUNO_PERF_TRACE=<dir>      also write traces and CPU profiles (scripts/perf-trace.mjs)
 import { rm } from 'node:fs/promises'
 import { DatabaseSync } from 'node:sqlite'

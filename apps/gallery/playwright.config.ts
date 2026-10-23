@@ -7,7 +7,7 @@ const worktreeOffset = [...import.meta.dirname].reduce((hash, char) => (hash * 3
 const port = Number(process.env.GALLERY_PORT ?? 4174 + worktreeOffset)
 // One id per run, set before the workers start, so the shift guard's parts share one queue.
 process.env.GALLERY_SHIFT_RUN ??= `${Date.now()}-${process.pid}`
-// JUNO_SHARD=i/n (pnpm remote --shards n): shard 0 runs every test; the others
+// JUNO_SHARD=i/n (bun run remote --shards n): shard 0 runs every test; the others
 // run only the shift guard's parts, which split the states between the shards.
 const shardIndex = Number(/^(\d+)\/\d+$/.exec(process.env.JUNO_SHARD ?? '')?.[1] ?? 0)
 // JUNO_SKIP_TAGS=@heavy-gallery skips the shift guard over every component, as the desktop config does for its tags.
@@ -27,7 +27,7 @@ export default defineConfig({
   timeout: 120_000,
   // Tests are independent pages against a static server. The shift guard
   // splits itself into parts to use the workers.
-  // GALLERY_WORKERS lets a machine of its own (pnpm remote) run more.
+  // GALLERY_WORKERS lets a machine of its own (bun run remote) run more.
   workers: Number(process.env.GALLERY_WORKERS ?? (process.env.CI ? 2 : 3)),
   fullyParallel: true,
   retries: process.env.CI || process.env.JUNO_REMOTE_CONTAINER ? 1 : 0,
@@ -49,7 +49,7 @@ export default defineConfig({
     { name: 'behaviour', testMatch: '*.spec.ts', testIgnore: ['shots.spec.ts', '**/node_modules/**'] },
   ],
   webServer: {
-    command: `pnpm exec vite preview --port ${port} --strictPort`,
+    command: `bun run vite preview --port ${port} --strictPort`,
     url: `http://localhost:${port}/`,
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,

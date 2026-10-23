@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { parseRun, report } from './usage.mjs'
 
 test('usage keeps failures and missing legacy fields visible', () => {
-  const legacy = parseRun('pnpm test\nremote: CPU busy 50% on average, 45% at the median, over 80 s on 4 cores\nremote: exited with 1\n')
+  const legacy = parseRun('bun run test\nremote: CPU busy 50% on average, 45% at the median, over 80 s on 4 cores\nremote: exited with 1\n')
   const current = parseRun('remote: run {"script":"test","machine":"linux/amd64:2x4"}\nremote: summary {"code":0,"warm":false,"machineSeconds":120,"wallSeconds":125}\nremote: script time 90 s\n')
   const output = report([legacy, current])
   assert.match(output, /test \/ unknown \| 1 \(1\) \| 4/)

@@ -90,7 +90,7 @@ export async function openState(page: Page, route: Route, theme: Theme = 'light'
  * A queue of states that several tests (the parts of one check) share, so
  * the parts finish together however long each state takes. The run's id
  * comes from playwright.config.ts, so every worker sees the same queue.
- * Each repeat (`--repeat-each`, as `pnpm flake` runs) has its own queue, so
+ * Each repeat (`--repeat-each`, as `bun run flake` runs) has its own queue, so
  * every repeat walks every state. A claim is a directory: mkdir succeeds for
  * one process only.
  *

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Sets the app's version in apps/desktop/package.json (docs/development.md,
- * "Releasing"). `pnpm release:version patch|minor|major|<x.y.z>`. Refuses to
+ * "Releasing"). `bun run release:version patch|minor|major|<x.y.z>`. Refuses to
  * go backwards. Commit the result before packaging.
  */
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -21,7 +21,7 @@ const next = bump === 'major' ? `${major + 1}.0.0`
   : bump !== undefined && isVersion(bump) ? normalizeVersion(bump)
   : undefined
 if (next === undefined) {
-  console.error('Usage: pnpm release:version patch|minor|major|<x.y.z>')
+  console.error('Usage: bun run release:version patch|minor|major|<x.y.z>')
   process.exit(1)
 }
 if (compareVersions(next, current) <= 0) {

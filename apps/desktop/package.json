@@ -17,7 +17,7 @@
     "test": "vitest run",
     "test:e2e": "node ../../scripts/without-run-as-node.mjs playwright test",
     "perf": "JUNO_PERF=1 node ../../scripts/without-run-as-node.mjs playwright test -c playwright.perf.config.ts",
-    "test:feel": "node ../../scripts/build-cached.mjs out pnpm build && node ../../scripts/without-run-as-node.mjs playwright test -c playwright.feel.config.ts",
+    "test:feel": "node ../../scripts/build-cached.mjs out bun run build && node ../../scripts/without-run-as-node.mjs playwright test -c playwright.feel.config.ts",
     "package": "node ../../scripts/package.mjs",
     "test:package": "node ../../scripts/without-run-as-node.mjs playwright test -c playwright.package.config.ts"
   },

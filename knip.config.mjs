@@ -41,7 +41,7 @@ export default {
         'src/engine/index.ts',
         'src/preload/index.ts',
         'src/renderer/index.html',
-        // The web shell (`pnpm web`): its host and the page entry it serves.
+        // The web shell (`bun run web`): its host and the page entry it serves.
         'web/host/cli.ts',
         'web/page/main.ts',
       ],

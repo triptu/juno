@@ -5,7 +5,7 @@
  * A branch that added screenshots before docs moved to LFS, or a commit made
  * without git-lfs installed, stores the file itself; every checkout then shows
  * it as modified. Reads the index with git alone, so it runs where git-lfs is
- * not installed (CI). Run by `pnpm lint`.
+ * not installed (CI). Run by `bun run lint`.
  */
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'

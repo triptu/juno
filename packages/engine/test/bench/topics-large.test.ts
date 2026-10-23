@@ -5,7 +5,7 @@
 // 5 000 threads and 100 000 messages, which takes a while, so it runs only
 // with JUNO_BENCH=1:
 //
-//   JUNO_BENCH=1 pnpm --filter @juno/engine exec vitest run test/bench --silent=false
+//   JUNO_BENCH=1 bun run --cwd packages/engine vitest run test/bench --silent=false
 //
 // The machine is often shared, so the report carries the load average. The
 // query is timed twice: alone on its own connection ("isolated", with and

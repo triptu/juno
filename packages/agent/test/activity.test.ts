@@ -99,7 +99,7 @@ it('500 runs: a window stays a small payload', async () => {
   const first = activityPage(h.turns.store, { limit: 50 })
   expect(first.runs).toHaveLength(50)
   expect(first.runs[0]!.trigger).toMatchObject({ words: 'question 499 about the rollout plan and who reviews it' })
-  // Its time against the switch budget is checked on the Mac by pnpm perf, in activity.perf.ts.
+  // Its time against the switch budget is checked on the Mac by bun run perf, in activity.perf.ts.
   // A snapshot stays under 200 KB even at the page's largest window (performance rule 16).
   expect(JSON.stringify(activityPage(h.turns.store, { limit: 200 })).length).toBeLessThan(200_000)
 })

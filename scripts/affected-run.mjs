@@ -1,4 +1,4 @@
-// Runs a pnpm affected plan (scripts/affected.mjs). The remote steps run as one
+// Runs a bun run affected plan (scripts/affected.mjs). The remote steps run as one
 // plan (separate SSH jobs), beside the local steps;
 // `local` runs every step one after another here. Each step's result comes
 // back separately, so the caller records the steps that passed.
@@ -29,7 +29,7 @@ export async function runPlan(plan, { root, local: localAll }) {
       }
       child.on('close', (code) => resolvePromise(code ?? 1))
     })
-  const run = async (step) => ({ step, code: await spawnStep(['pnpm', [step.script, ...step.args]], step.env, (line) => process.stdout.write(`[${step.script}] ${line}\n`)) })
+  const run = async (step) => ({ step, code: await spawnStep(['bun', ['run', step.script, ...step.args]], step.env, (line) => process.stdout.write(`[${step.script}] ${line}\n`)) })
   /** One remote invocation; each step's result comes from the plan's `plan: step` lines. */
   const runRemote = async (steps) => {
     const words = steps.flatMap((step, index) => [...(index ? ['+'] : []), ...Object.entries(step.env ?? {}).map(([key, value]) => `${key}=${value}`), step.script, ...step.args])

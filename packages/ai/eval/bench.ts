@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * `pnpm --filter @juno/ai bench`: measures decision setups on the decision
+ * `bun run --cwd packages/ai bench`: measures decision setups on the decision
  * examples and prints one row per setup: p50 and p95 latency, accuracy against
  * each example's `expect`, the no-decision rate and the cost per 1k decisions.
  * Live only; needs `OPENROUTER_API_KEY` in the environment or the repo's `.env`.
  *
- * Usage: `pnpm --filter @juno/ai bench [--reps 3] [--setups a,b] [--tasks routeCheck,notificationReading] [--concurrency 3] [--list]`
+ * Usage: `bun run --cwd packages/ai bench [--reps 3] [--setups a,b] [--tasks routeCheck,notificationReading] [--concurrency 3] [--list]`
  *
  * A setup is a model plus request options: how the output is asked for (a
  * forced tool call, tool choice auto, a JSON schema response), OpenRouter

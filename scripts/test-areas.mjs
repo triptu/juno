@@ -1,8 +1,8 @@
-// The code areas pnpm affected reads to decide what a change needs beyond the
+// The code areas bun run affected reads to decide what a change needs beyond the
 // tests that reach it (docs/development.md, "Affected tests"):
 //
 // - HEAVY_AREAS: the tests tagged @heavy, and the code each one checks. A
-//   full run (pnpm verify:main) always runs them. An affected plan runs an area's heavy
+//   full run (bun run verify:main) always runs them. An affected plan runs an area's heavy
 //   tests only when a changed file is in that area.
 // - PROTOCOL_PATHS: the code the Quint specs model. specs:check and
 //   specs:conformance run in agent and batch plans only when one of these changed.

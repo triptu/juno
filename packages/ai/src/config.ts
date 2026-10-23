@@ -30,7 +30,7 @@ export interface ModelPrefs {
 }
 
 /**
- * Measured with `pnpm --filter @juno/ai bench` on 2026-10-13 (the README has the
+ * Measured with `bun run --cwd packages/ai bench` on 2026-10-13 (the README has the
  * table). Jev 1.13 answered every mapped example right at about 0.5 s;
  * GPT-6 Luna was the most accurate small chat model on grouping and command
  * parsing; Sonnet 5.5 stays the generation model. Change them in preferences,

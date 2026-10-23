@@ -2,8 +2,8 @@
 /**
  * The live probe: read-only questions about Slack's behaviour that the
  * smoke does not answer (research section 10, "Live probe"). Run with
- * `JUNO_LIVE=1 pnpm probe:live`. It reuses the session the smoke cached
- * (`pnpm smoke:live -- --cache-session`), so there is no keychain prompt.
+ * `JUNO_LIVE=1 bun run probe:live`. It reuses the session the smoke cached
+ * (`bun run smoke:live --cache-session`), so there is no keychain prompt.
  *
  * What it does, in order, one call at a time, starts at least 1.5 s apart
  * (the background lane's spacing):
@@ -137,7 +137,7 @@ async function main(): Promise<number> {
   }
   const cached = await readCachedSession(flag('--team'))
   if (cached === undefined) {
-    console.error('probe-live: no cached session; run `JUNO_LIVE=1 pnpm smoke:live -- --cache-session` first')
+    console.error('probe-live: no cached session; run `JUNO_LIVE=1 bun run smoke:live --cache-session` first')
     return 2
   }
   const { session, cookie } = cached

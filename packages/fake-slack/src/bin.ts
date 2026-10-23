@@ -1,5 +1,5 @@
 /**
- * Runs the fake on its own: `pnpm --filter @juno/fake-slack start`.
+ * Runs the fake on its own: `bun run --cwd packages/fake-slack start`.
  * PORT and HOST override the defaults (8788, 127.0.0.1).
  */
 import { startFakeSlack } from './index.ts'

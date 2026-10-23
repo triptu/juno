@@ -1,4 +1,4 @@
-// pnpm affected's unit test selection, through its real plan (--plan --json) on this repository.
+// bun run affected's unit test selection, through its real plan (--plan --json) on this repository.
 import assert from 'node:assert/strict'
 import { unitTestMatcher } from './affected-tests.mjs'
 import { spawnSync } from 'node:child_process'
@@ -43,11 +43,11 @@ test('unit execution keeps package identity and starts no unrelated packages', a
   const selected = plan('--batch', '--files', file).steps.find((step) => step.script === 'test')
   assert.deepEqual(selected.items, [file])
   assert.deepEqual(selected.args, ['--files', file])
-  assert.deepEqual(unitCommands(selected.args, root, 2), [['--dir', 'packages/domain', 'test', join(root, file)]])
+  assert.deepEqual(unitCommands(selected.args, root), [['run', '--cwd', 'packages/domain', 'test', join(root, file)]])
   const other = 'packages/engine/test/notifications.test.ts'
-  assert.deepEqual(unitCommands(['--files', file, other], root, 2).map((args) => args[1]), ['packages/domain', 'packages/engine'])
-  assert.throws(() => unitCommands(['--files'], root, 2), /at least one/)
-  assert.throws(() => unitCommands(['--files', 'packages/domain/test/absent.test.ts'], root, 2), /Not a unit test/)
+  assert.deepEqual(unitCommands(['--files', file, other], root).map((args) => args[2]), ['packages/domain', 'packages/engine'])
+  assert.throws(() => unitCommands(['--files'], root), /at least one/)
+  assert.throws(() => unitCommands(['--files', 'packages/domain/test/absent.test.ts'], root), /Not a unit test/)
 })
 
 test('package configs select the whole package, while lockfile changes select every unit file', () => {
@@ -56,7 +56,7 @@ test('package configs select the whole package, while lockfile changes select ev
     const selected = unitFiles(plan('--batch', '--files', `packages/domain/${name}`))
     for (const file of own) assert.ok(selected.includes(file), `${name} must run ${file}`)
   }
-  assert.deepEqual(unitFiles(plan('--batch', '--files', 'pnpm-lock.yaml')).toSorted(), tracked('apps/**/*.test.ts', 'packages/**/*.test.ts').toSorted())
+  assert.deepEqual(unitFiles(plan('--batch', '--files', 'bun.lock')).toSorted(), tracked('apps/**/*.test.ts', 'packages/**/*.test.ts').toSorted())
 })
 
 test('ordinary source changes select only files whose import closure reaches them', async () => {
@@ -87,8 +87,8 @@ test('selected unit files exclude nested namesakes that Vitest substring filters
     const file = 'packages/example/test/one.test.ts'
     writeFileSync(join(dir, file), '')
     writeFileSync(join(dir, 'packages/example/test/nested/test/one.test.ts'), '')
-    assert.deepEqual(unitCommands(['--files', file], dir, 2), [
-      ['--dir', 'packages/example', 'test', join(dir, file), '--exclude', 'test/nested/test/one.test.ts'],
+    assert.deepEqual(unitCommands(['--files', file], dir), [
+      ['run', '--cwd', 'packages/example', 'test', join(dir, file), '--exclude', 'test/nested/test/one.test.ts'],
     ])
   } finally { rmSync(dir, { recursive: true, force: true }) }
 })

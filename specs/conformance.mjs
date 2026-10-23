@@ -9,7 +9,7 @@
 // CONFORMANCE_ONLY=<part of a file name> replays only the matching traces.
 //
 // Each Quint run's traces are cached as specs:check caches its runs: in
-// SPECS_CACHE_DIR (pnpm remote carries it along and back) or the system temp
+// SPECS_CACHE_DIR (bun run remote carries it along and back) or the system temp
 // folder, keyed by the run's arguments, the spec and what it imports, and
 // the Quint version. SPECS_CACHE=off or --no-cache generates everything.
 // CONFORMANCE_JOBS sets how many Quint runs go at once (default: cores, at most 4).
@@ -145,7 +145,7 @@ console.log(`Generated ${replayed} outbox traces (${manifest.length - replayed} 
 
 if (!process.argv.includes('--generate')) {
   const status = await new Promise((resolve) => {
-    const child = spawn('pnpm', ['--filter', '@juno/engine', 'exec', 'vitest', 'run', '--config', 'vitest.conformance.config.ts'], { cwd: root, stdio: 'inherit' })
+    const child = spawn('bun', ['run', '--cwd', 'packages/engine', 'vitest', 'run', '--config', 'vitest.conformance.config.ts'], { cwd: root, stdio: 'inherit' })
     child.on('close', resolve)
   })
   console.log(`Conformance runtime: ${((Date.now() - startedAt) / 1000).toFixed(1)} seconds (excludes machine-lock wait).`)

@@ -24,7 +24,7 @@ export function contention(): string {
     // A checkout's own Electron app running: a queued or idle test runner is no load.
     const program = line.split(' ')[0] ?? ''
     if (!program.includes('/node_modules/') || !program.includes('/electron/dist/')) continue
-    // Electron runs from the shared pnpm store, so the checkout is the app path in the
+    // Electron runs from Bun's shared store, so the checkout is the app path in the
     // arguments. The main and renderer processes carry it; helpers without it are skipped.
     const app = line.match(/(\/[^\s=]*\/([^/ ]+))\/apps\/desktop(?:\s|$)/)
     if (app === null || app[1] === ROOT) continue

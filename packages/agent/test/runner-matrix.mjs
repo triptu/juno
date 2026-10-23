@@ -14,7 +14,7 @@ for (let sample = 0; sample < 6; sample++) {
     plan.push('+', 'test:agent', '--root', '../store', '--config', '/work/packages/store/vitest.config.ts', `--fileParallelism=${parallel}`)
   }
 }
-const result = spawnSync('pnpm', ['remote', '--machine', 'linux/amd64:4x8', '--env', 'JUNO_PLAN_SERIAL=1', '--env', 'JUNO_VITEST_WORKERS=4', 'test:plan', ...plan], {
+const result = spawnSync('bun', ['run', 'remote', '--machine', 'linux/amd64:4x8', '--env', 'JUNO_PLAN_SERIAL=1', '--env', 'JUNO_VITEST_WORKERS=4', 'test:plan', ...plan], {
   stdio: 'inherit', env: { ...process.env, JUNO_REMOTE_MAX_VCPU: '0' },
 })
 process.exitCode = result.status ?? 1

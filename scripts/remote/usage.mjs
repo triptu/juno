@@ -13,7 +13,7 @@ export function parseRun(text) {
   const cpu = /CPU busy (\d+)% on average, \d+% at the median, over (\d+) s on (\d+) cores/.exec(text)
   return {
     backend: summary?.backend ?? (/^remote: backend (.+)$/m.exec(text)?.[1] ?? 'unknown'),
-    script: run?.script ?? /^pnpm (\S+)/m.exec(text)?.[1] ?? 'unknown',
+    script: run?.script ?? /^(?:pnpm|bun run) (\S+)/m.exec(text)?.[1] ?? 'unknown',
     code: summary?.code ?? Number(/remote: exited with (\d+)/.exec(text)?.[1] ?? NaN),
     cores: Number(/:(\d+)x/.exec(run?.machine ?? '')?.[1] ?? cpu?.[3] ?? NaN),
     busy: cpu ? Number(cpu[1]) : NaN,

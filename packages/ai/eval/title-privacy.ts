@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `pnpm --filter @juno/ai eval:title-privacy`: titles the invented threads in
+ * `bun run --cwd packages/ai eval:title-privacy`: titles the invented threads in
  * `title-privacy-cases.ts` with the prompt before the sensitive-details rule
  * (version 1, kept below) and with the current one, and prints both, so the
  * rule can be judged by eye (SPEC section 2, Topic titles).

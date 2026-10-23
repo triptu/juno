@@ -4,7 +4,7 @@
  * Presence): whether Slack answers a `presence_sub` with the current
  * presence of the subscribed users, on Juno's socket parameters (which
  * include `no_query_on_subscribe=1`). Run with
- * `JUNO_LIVE=1 pnpm presence:sub-live`. It refuses to run without
+ * `JUNO_LIVE=1 bun run presence:sub-live`. It refuses to run without
  * `JUNO_LIVE=1`, and reuses the session `smoke-live.ts --cache-session` kept.
  *
  * 1. Lists up to `--people` (default 30) DM partners with
@@ -45,7 +45,7 @@ const READS = new Set(['client.getWebSocketURL'])
 
 const cached = await readCachedSession()
 if (cached === undefined) {
-  console.error('presence-sub-live: no cached session. Run `JUNO_LIVE=1 pnpm smoke:live -- --cache-session` first.')
+  console.error('presence-sub-live: no cached session. Run `JUNO_LIVE=1 bun run smoke:live --cache-session` first.')
   process.exit(2)
 }
 const { session, cookie } = cached

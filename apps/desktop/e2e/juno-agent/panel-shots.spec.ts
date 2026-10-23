@@ -2,7 +2,7 @@
 // and a fake model into docs/design/reviews/2026-10-17-juno-panel/. Not part
 // of the suite: run it by hand after a change to the panel and look at them.
 //
-//   JUNO_SCREENS=1 JUNO_SHOTS_PREFIX=after pnpm test:desktop e2e/juno-agent/panel-shots.spec.ts
+//   JUNO_SCREENS=1 JUNO_SHOTS_PREFIX=after bun run test:desktop e2e/juno-agent/panel-shots.spec.ts
 import { resolve } from 'node:path'
 import { hooks } from '../fixtures'
 import { expect, JunoChatPane, test } from './chat'

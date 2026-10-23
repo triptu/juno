@@ -4,7 +4,7 @@
 // (scripts/pictures/README.md), so the screenshots show the real pictures
 // rather than the fake's one stand-in:
 //
-//   JUNO_SCREENS=1 JUNO_SCREENS_PICTURES=/Volumes/AgentWork/pictures-juno-art pnpm --filter @juno/desktop exec playwright test e2e/home-pictures-screens.spec.ts
+//   JUNO_SCREENS=1 JUNO_SCREENS_PICTURES=/Volumes/AgentWork/pictures-juno-art bun run --cwd apps/desktop playwright test e2e/home-pictures-screens.spec.ts
 import { cp, mkdir, readdir, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { SELF_ID, startFakeSlack, TEAM, type Workspace } from '@juno/fake-slack'

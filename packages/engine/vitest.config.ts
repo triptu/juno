@@ -4,10 +4,10 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     // Each package keeps its own module cache. The default is one folder at the
-    // repo root, which parallel `pnpm test` runs race on.
+    // repo root, which parallel `bun run test` runs race on.
     fsModuleCachePath: fileURLToPath(new URL('./node_modules/.vitest-cache', import.meta.url)),
     // Several agents share one machine; keep each run small (see scripts/heavy.mjs).
-    // A machine of its own (pnpm remote) sets JUNO_VITEST_WORKERS higher.
+    // A machine of its own (bun run remote) sets JUNO_VITEST_WORKERS higher.
     maxWorkers: Number(process.env.JUNO_VITEST_WORKERS ?? 2),
     include: ['test/**/*.test.ts'],
     // Engine tests boot a whole engine against an in-process fake Slack. On a
@@ -16,7 +16,7 @@ export default defineConfig({
     // files run one at a time and a test gets 90 s. The harness waits take at
     // most half of that, so a slow step fails with its own label, not a bare
     // timeout. A real hang still fails. JUNO_TEST_FILE_PARALLEL=1 runs files
-    // in parallel on a machine of its own (pnpm remote).
+    // in parallel on a machine of its own (bun run remote).
     fileParallelism: process.env.JUNO_TEST_FILE_PARALLEL === '1',
     testTimeout: 90_000,
     hookTimeout: 90_000,

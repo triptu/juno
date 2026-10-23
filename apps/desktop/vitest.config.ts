@@ -5,7 +5,7 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     // Each package keeps its own module cache. The default is one folder at the
-    // repo root, which parallel `pnpm test` runs race on.
+    // repo root, which parallel `bun run test` runs race on.
     fsModuleCachePath: fileURLToPath(new URL('./node_modules/.vitest-cache', import.meta.url)),
     // Several agents share one machine; keep each run small (see scripts/heavy.mjs).
     maxWorkers: Number(process.env.JUNO_VITEST_WORKERS ?? 2),

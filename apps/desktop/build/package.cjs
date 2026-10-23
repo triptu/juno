@@ -1,7 +1,6 @@
 const { build } = require('electron-builder')
-const { execFileSync } = require('node:child_process')
-const { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } = require('node:fs')
-const { join, resolve } = require('node:path')
+const { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } = require('node:fs')
+const { dirname, join, resolve } = require('node:path')
 
 // Updates come from GitHub Releases of a private repository, read with a
 // fine-grained token that can only read it (docs/development.md, "Releasing").
@@ -41,10 +40,10 @@ for (const name of (existsSync(output) ? readdirSync(output, { withFileTypes: tr
   if (name === 'latest-mac.yml' || name.includes(`-${version}-`) || name.includes(`-${version}.`)) rmSync(join(output, name), { force: true })
 }
 
-// The workspace links dependencies from pnpm's global virtual store, where
-// electron-builder cannot find the dependencies of a dependency. Package from
-// `pnpm deploy` instead: the built app and its production dependencies as
-// real files in a temporary folder. Native rebuilds then touch only this copy.
+// The workspace links dependencies from Bun's global store, where
+// electron-builder cannot find the dependencies of a dependency. Package from a
+// copy instead: the built app and its production dependencies as real files in
+// a temporary folder (`deploy`). Native rebuilds then touch only this copy.
 // The folder is on the AgentWork volume when it is mounted, so writing and
 // deleting the copy does not load fseventsd (scripts/worktree-folder.mjs).
 async function main() {
@@ -55,7 +54,7 @@ async function main() {
   const app = join(staging, 'app')
   try {
     const deployStarted = Date.now()
-    execFileSync('pnpm', ['--filter', '@juno/desktop', 'deploy', '--prod', app], { cwd: resolve(__dirname, '..'), stdio: 'inherit' })
+    deploy(resolve(__dirname, '..'), app)
     recordReleaseTiming('deploy', deployStarted)
     // Read by main (src/main/releaseFeed.ts). `signed` says whether Squirrel.Mac can install in place.
     if (updateToken) writeFileSync(join(app, 'update.json'), JSON.stringify({ repository, token: updateToken, signed: release }), { mode: 0o600 })
@@ -66,7 +65,7 @@ async function main() {
         extends: './electron-builder.yml',
         directories: { app, output: 'release', buildResources: 'build' },
         forceCodeSigning: release,
-        // Writes latest-mac.yml for `pnpm release:publish`. Nothing is uploaded here.
+        // Writes latest-mac.yml for `bun run release:publish`. Nothing is uploaded here.
         publish: { provider: 'github', owner, repo, private: true },
         mac: { notarize: release, target: release ? ['dmg', 'zip'] : ['dmg'], ...(!release ? { identity: null } : {}) },
         afterPack: async () => { artifactStarted = Date.now() },
@@ -88,6 +87,46 @@ async function main() {
   } finally {
     rmSync(staging, { recursive: true, force: true })
   }
+}
+
+/**
+ * Copies the app's packaged files and its installed production dependencies,
+ * with theirs, into `target` as a hoisted node_modules of real files. A package
+ * goes at the top level unless another version is already there, and then
+ * under the package that needs it. Optional dependencies that were not
+ * installed (other platforms' binaries) are skipped.
+ */
+function deploy(source, target) {
+  const manifest = JSON.parse(readFileSync(join(source, 'package.json'), 'utf8'))
+  mkdirSync(target, { recursive: true })
+  for (const name of manifest.files) cpSync(join(source, name), join(target, name), { recursive: true })
+  delete manifest.devDependencies
+  writeFileSync(join(target, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`)
+  const top = new Map()
+  const find = (from, name) => {
+    for (let dir = from; ; dir = dirname(dir)) {
+      const candidate = join(dir, 'node_modules', name)
+      if (existsSync(join(candidate, 'package.json'))) return realpathSync(candidate)
+      if (dirname(dir) === dir) return undefined
+    }
+  }
+  const visit = (from, pkg, into) => {
+    const optional = new Set(Object.keys(pkg.optionalDependencies ?? {}))
+    for (const name of new Set([...Object.keys(pkg.dependencies ?? {}), ...optional])) {
+      const real = find(from, name)
+      if (!real) {
+        if (optional.has(name)) continue
+        throw new Error(`deploy: ${name}, needed by ${pkg.name}, is not installed`)
+      }
+      if (top.get(name) === real) continue
+      const dest = top.has(name) ? join(into, 'node_modules', name) : join(target, 'node_modules', name)
+      if (!top.has(name)) top.set(name, real)
+      if (existsSync(dest)) continue
+      cpSync(real, dest, { recursive: true, dereference: true, filter: (path) => !path.slice(real.length).split('/').includes('node_modules') })
+      visit(real, JSON.parse(readFileSync(join(real, 'package.json'), 'utf8')), dest)
+    }
+  }
+  visit(source, manifest, target)
 }
 
 void main()

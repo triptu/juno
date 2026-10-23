@@ -37,7 +37,7 @@ mkdirSync(generated, { recursive: true })
 // Apalache adapter below change. The cache is shared by every worktree. SPECS_RUN_CACHE=off
 // reruns simulations while retaining deterministic results; SPECS_CACHE=off or --no-cache runs everything.
 const jobs = []
-// SPECS_CACHE_DIR: pnpm remote brings the Mac's cache along and back.
+// SPECS_CACHE_DIR: bun run remote brings the Mac's cache along and back.
 const cacheDir = process.env.SPECS_CACHE_DIR ?? join(tmpdir(), 'juno-cache', 'specs')
 const useCache = process.env.SPECS_CACHE !== 'off' && !process.argv.includes('--no-cache')
 const cacheRuns = process.env.SPECS_RUN_CACHE !== 'off'
@@ -180,7 +180,7 @@ async function runJob(job, lane = 0) {
   return `${log}${notes}`
 }
 
-// JUNO_SHARD=i/n (pnpm remote --shards n) keeps this machine's share of the
+// JUNO_SHARD=i/n (bun run remote --shards n) keeps this machine's share of the
 // jobs: typechecks on every shard, the rest dealt by expected cost to the
 // lightest shard, so every job runs on exactly one shard.
 function shardJobs() {
@@ -204,7 +204,7 @@ async function runAll() {
   // On the Mac (SPECS_APALACHE=1): simulations first, SPECS_JOBS at a time, then
   // the Apalache checks one at a time and alone, because a JVM warming up next
   // to simulations on a loaded machine can miss its deadline. A machine of its
-  // own (pnpm remote) sets SPECS_OVERLAP=1, and SPECS_APALACHE servers, each
+  // own (bun run remote) sets SPECS_OVERLAP=1, and SPECS_APALACHE servers, each
   // with its own lane, run alongside the simulations.
   const queues = [jobs.filter(job => job.args[0] === 'verify'), jobs.filter(job => job.args[0] !== 'verify')]
   let failed

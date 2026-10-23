@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `pnpm ai:eval`: runs every task on the invented examples and prints the
+ * `bun run ai:eval`: runs every task on the invented examples and prints the
  * output, latency and cost, so prompt quality can be judged by eye.
  *
  * Default: the fake provider. `JUNO_AI=live` uses OpenRouter through pi-ai with

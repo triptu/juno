@@ -2,7 +2,7 @@
 // docs/design/screens/. Not part of the suite: run it by hand after a UI
 // change and look at the result.
 //
-//   JUNO_SCREENS=1 pnpm --filter @juno/desktop exec playwright test e2e/screens.spec.ts
+//   JUNO_SCREENS=1 bun run --cwd apps/desktop playwright test e2e/screens.spec.ts
 import { resolve } from 'node:path'
 import { expect, test } from './fixtures'
 

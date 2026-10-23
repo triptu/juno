@@ -4,7 +4,7 @@ import { launchWebShell, messages as fakeMessages } from './host'
 import type { WebPageHandle } from '../../web/page/connect'
 
 /**
- * The web shell (`pnpm web`, docs/development.md "Web shell") in Chrome: the
+ * The web shell (`bun run web`, docs/development.md "Web shell") in Chrome: the
  * real renderer over the engine's WebSocket, with the page's bridge in place
  * of Electron's. Opens Main of a seeded channel, sends, reacts, copies a
  * link through the HTML context menu, and sends again after the socket

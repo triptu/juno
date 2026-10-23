@@ -1,7 +1,7 @@
-// Runs several root scripts on one machine, for `pnpm affected` and
-// `pnpm verify:main`:
+// Runs several root scripts on one machine, for `bun run affected` and
+// `bun run verify:main`:
 //
-//   pnpm remote test:plan test --passWithNoTests a.test.ts + GALLERY_SHIFT_ONLY=Chip test:gallery + test:desktop
+//   bun run remote test:plan test --passWithNoTests a.test.ts + GALLERY_SHIFT_ONLY=Chip test:gallery + test:desktop
 //
 // Steps are separated by `+`. `KEY=VALUE` words before a step's script set its
 // environment. The app suites (test:desktop, test:gallery, test:e2e) run one
@@ -74,7 +74,7 @@ if (import.meta.main) {
     steps = parsePlan(process.argv.slice(2))
   } catch (error) {
     console.error(`plan: ${error.message}`)
-    console.error('usage: pnpm test:plan [KEY=VALUE...] <script> [args...] [+ [KEY=VALUE...] <script> [args...]]...')
+    console.error('usage: bun run test:plan [KEY=VALUE...] <script> [args...] [+ [KEY=VALUE...] <script> [args...]]...')
     process.exit(2)
   }
   const children = new Set()
@@ -86,7 +86,7 @@ if (import.meta.main) {
   const run = (step, low) =>
     new Promise((resolvePromise) => {
       const started = Date.now()
-      const command = low ? ['nice', ['-n', '10', 'pnpm', step.script, ...step.args]] : ['pnpm', [step.script, ...step.args]]
+      const command = low ? ['nice', ['-n', '10', 'bun', 'run', step.script, ...step.args]] : ['bun', ['run', step.script, ...step.args]]
       const laneEnv = appSuites.includes(step.script) ? shared?.app : step.script === 'specs:check' ? shared?.specs : shared?.rest
       const child = spawn(command[0], command[1], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...laneEnv, ...step.env, JUNO_HEAVY_HELD: '1' } })
       children.add(child)

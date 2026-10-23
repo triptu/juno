@@ -12,7 +12,7 @@
 // macOS `sips`. Prints each picture's width over height, after the crop, and fails when the
 // catalog's `ratio` differs from the file's by more than 0.01.
 //
-//   pnpm pictures:build [--out /Volumes/AgentWork/pictures-juno-art] [--only id1,id2]
+//   bun run pictures:build [--out /Volumes/AgentWork/pictures-juno-art] [--only id1,id2]
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'

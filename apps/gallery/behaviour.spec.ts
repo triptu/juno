@@ -339,7 +339,7 @@ test.describe('state switcher', () => {
 })
 
 // Shift and screenshot checks assume the bundled faces on every platform
-// (Linux under pnpm remote too), never a system fallback.
+// (Linux under bun run remote too), never a system fallback.
 test('every font family comes from the bundle', async ({ page }) => {
   await page.goto('/#/Button')
   const families = await page.evaluate(async () => {

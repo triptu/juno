@@ -1,4 +1,4 @@
-// Builds the e2e coverage map that `pnpm affected` selects desktop specs by
+// Builds the e2e coverage map that `bun run affected` selects desktop specs by
 // (docs/development.md, "Affected tests").
 //
 //   node scripts/coverage-map.mjs reduce
