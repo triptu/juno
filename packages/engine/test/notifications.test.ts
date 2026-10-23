@@ -93,8 +93,8 @@ describe('notifications service', () => {
     expect(record.shown).toHaveLength(0)
   }).pipe(Effect.provide(Layer.merge(freshStore, aiLayer)), Effect.scoped))
 
-  effectIt.effect('re-runs stored readings without reading again, and suppresses a focused topic', () => Effect.gen(function* () {
-    yield* TestClock.setTime(monday(8))
+  effectIt.effect('re-runs today\'s rows with their stored readings, without reading again or showing a banner later', () => Effect.gen(function* () {
+    yield* TestClock.setTime(monday(12))
     yield* setSettings()
     let calls = 0
     const inputs: unknown[] = []
@@ -105,23 +105,22 @@ describe('notifications service', () => {
     } }
     const record = recorder()
     const service = yield* makeNotifications(record.notifier, () => Effect.succeed(true)).pipe(Effect.provideService(AiProvider, observed))
+    record.focus(true)
     yield* service.receive(candidate('1.000001'))
     expect(calls).toBe(1)
     expect(inputs[0]).toMatchObject({ instructions: settings.instructions, kind: 'channel' })
-    yield* setSettings({ ...settings, channels: { C0ENG: 'never' } })
-    yield* service.settingsChanged
     const sql = yield* StoreWriter
-    expect(yield* sql`SELECT outcome FROM notification_log`).toEqual([{ outcome: 'stay' }])
-    yield* setSettings({ ...settings, notificationHours: { days: [1], from: 0, to: 1439 } })
-    record.focus(true)
-    yield* service.settingsChanged
-    expect(record.shown).toHaveLength(0)
-    const suppressed = yield* sql<{ delivered_at: string | null; suppressed_at: string | null; reason: string }>`SELECT delivered_at, suppressed_at, reason FROM notification_log`
-    expect(suppressed[0]?.delivered_at).toBeNull()
+    const suppressed = yield* sql<{ outcome: string; decided_by: string; suppressed_at: string | null; reason: string }>`SELECT outcome, decided_by, suppressed_at, reason FROM notification_log`
+    expect(suppressed[0]).toMatchObject({ outcome: 'notify', decided_by: 'instruction' })
     expect(suppressed[0]?.suppressed_at).not.toBeNull()
     expect(suppressed[0]?.reason).toContain('focused window')
     record.focus(false)
+    yield* setSettings({ ...settings, channels: { C0ENG: 'never' } })
     yield* service.settingsChanged
+    expect(yield* sql`SELECT outcome, decided_by FROM notification_log`).toEqual([{ outcome: 'stay', decided_by: 'never' }])
+    yield* setSettings(settings)
+    yield* service.settingsChanged
+    expect(yield* sql`SELECT outcome, decided_by FROM notification_log`).toEqual([{ outcome: 'notify', decided_by: 'instruction' }])
     expect(record.shown).toHaveLength(0)
     expect(calls).toBe(1)
   }).pipe(Effect.provide(Layer.merge(freshStore, aiLayer)), Effect.scoped))
@@ -167,21 +166,24 @@ it('consumes both socket inputs, observes manual presence and responds to prefs 
   const configure = async (value: NotificationSettings) => {
     await runCommand(engine.registry, prefsSet, { key: 'notifications', value: Schema.decodeUnknownSync(Schema.Json)(value) })
   }
-  await configure({ ...settings, channels: { C0ENG: 'always' } })
+  // Hours around now: nothing notifies outside them, not even Always.
+  const minute = localTime(Date.now()).minutes
+  const live: NotificationSettings = { ...settings, notificationHours: { days: [0, 1, 2, 3, 4, 5, 6], from: (minute + 1380) % 1440, to: (minute + 60) % 1440 } }
+  await configure({ ...live, channels: { C0ENG: 'always' } })
   const message = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: '<@U0TUSHAR> Can you approve this?' })
   await waitFor(() => record.shown.length === 1 ? true : undefined)
   const rows = readDb(engine, 'user.db', (db) => db.prepare('SELECT * FROM notification_log WHERE channel = ? AND ts = ?').all('C0ENG', message.ts))
   expect(rows).toHaveLength(1)
   engine.fake.emitFrame({ type: 'desktop_notification', channel: 'C0ENG', msg: message.ts, user: 'U0MAYA', title: 'eng', content: '<@U0TUSHAR> Can you approve this?' })
-  await configure({ ...settings, channels: { C0ENG: 'never' } })
-  await waitFor(() => readDb(engine, 'user.db', (db) => db.prepare('SELECT outcome FROM notification_log WHERE ts = ?').get(message.ts))?.outcome === 'stay' ? true : undefined)
+  // Re-decided under Never, the direct mention gets through; the re-run shows no second banner.
+  await configure({ ...live, channels: { C0ENG: 'never' } })
+  await waitFor(() => readDb(engine, 'user.db', (db) => db.prepare('SELECT decided_by FROM notification_log WHERE ts = ?').get(message.ts))?.decided_by === 'directMention' ? true : undefined)
   expect(record.shown).toHaveLength(1)
   // Another conversation: C0ENG just had a banner, so it stays quiet for a minute.
-  await configure({ ...settings, channels: { C0PRODUCT: 'always' } })
+  await configure({ ...live, channels: { C0PRODUCT: 'always' } })
   engine.fake.injectMessage({ channel: 'C0PRODUCT', user: 'U0MAYA', text: 'A normal update without a mention' })
   await waitFor(() => record.shown.length === 2 ? true : undefined)
-  const minute = localTime(Date.now()).minutes
-  await configure({ ...settings, notificationHours: { days: [0, 1, 2, 3, 4, 5, 6], from: (minute + 1380) % 1440, to: (minute + 60) % 1440 } })
+  await configure(live)
   engine.fake.emitFrame({ type: 'message', channel: 'C0HIRING', user: 'U0MAYA', ts: millisToTs(Date.now() + 1000), text: '', blocks: [{ type: 'rich_text', elements: [
     { type: 'rich_text_section', elements: [{ type: 'user', user_id: 'U0TUSHAR' }, { type: 'text', text: ' Can you approve the release now?' }] },
   ] }] })

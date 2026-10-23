@@ -48,12 +48,13 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
   let scheduled: Presence | undefined
   const current = yield* SubscriptionRef.make<Presence | undefined>(undefined)
 
-  const storeDecision = (id: number, candidate: Candidate, at: number, decision: NotificationDecision) =>
+  /** Stores the decision; on arrival (`deliver`), claims and shows the banner. A re-run never shows one: a message that stayed does not notify later. */
+  const storeDecision = (id: number, candidate: Candidate, at: number, decision: NotificationDecision, deliver: boolean) =>
     Effect.gen(function* () {
       const { outcome, decidedBy, reason, ...rest } = decision
       yield* sql`UPDATE notification_log SET outcome = ${outcome}, decided_by = ${decidedBy}, decision_json = ${JSON.stringify(rest)},
         reason = CASE WHEN suppressed_at IS NULL THEN ${reason} ELSE ${reason + FOCUSED} END WHERE id = ${id}`
-      if (outcome !== 'notify') return
+      if (outcome !== 'notify' || !deliver) return
       // Claim before the external effect. A repeated event or settings pass cannot ring twice.
       const focused = yield* notifier.viewing(candidate.topicId)
       const claimed = yield* sql<{ id: number }>`UPDATE notification_log
@@ -111,11 +112,14 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
         ${decision.outcome}, ${decision.reason}, ${JSON.stringify(candidate)}, ${reading === undefined ? null : JSON.stringify(reading)})
       ON CONFLICT(channel, ts) DO NOTHING RETURNING id`
     const row = rows[0]
-    if (row !== undefined) yield* storeDecision(row.id, candidate, now, decision)
+    if (row !== undefined) yield* storeDecision(row.id, candidate, now, decision, true)
     yield* logChanged
   })
 
-  /** Today's rows again, at their own times, with their stored readings. A row that would need a reading it does not have keeps its decision. */
+  /**
+   * Today's rows again, at their own times, with their stored facts and readings, so Today and Details
+   * say what the settings decide now. A row that would need a reading it does not have keeps its decision.
+   */
   const rerun = Effect.gen(function* () {
     const now = yield* Clock.currentTimeMillis
     const midnight = new Date(now)
@@ -125,7 +129,7 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
     for (const row of rows) {
       const candidate = Schema.decodeUnknownSync(Candidate)(JSON.parse(row.candidate_json))
       const decision = decide(candidate, new Date(row.at).getTime(), settings, aiAssist, decodeReading(row.judgement_json))
-      if (!('needsReading' in decision)) yield* storeDecision(row.id, candidate, now, decision)
+      if (!('needsReading' in decision)) yield* storeDecision(row.id, candidate, now, decision, false)
     }
     yield* logChanged
   })

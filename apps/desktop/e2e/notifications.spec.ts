@@ -60,10 +60,10 @@ syncedTest('a group DM notifies under its people\'s names, not Slack\'s internal
 
 syncedTest('a DM set to Always notifies, and the click opens it at the message', async ({ juno, slack }) => {
   await juno.notificationHoursNow()
-  slack.as('Maya').dm('Can you look at the hiring plan today?')
+  slack.as('Maya').dm('Here is the hiring plan for today.')
   await juno.sidebar.row('Maya', { exact: true }).open()
-  await juno.topic.expectMessage('Can you look at the hiring plan today?')
-  const person = await juno.topic.chooseInMessageMenu('Can you look at the hiring plan today?', 'notify-always', { onSender: true })
+  await juno.topic.expectMessage('Here is the hiring plan for today.')
+  const person = await juno.topic.chooseInMessageMenu('Here is the hiring plan for today.', 'notify-always', { onSender: true })
   expect(person.labels).toEqual(['Notify me about Maya', '> Always', '> Auto ✓', '> Never', '-', 'Ask Juno', 'What Juno knows about Maya'])
   await juno.expectToast('Maya: Always')
 
