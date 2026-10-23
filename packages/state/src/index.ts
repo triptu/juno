@@ -150,15 +150,14 @@ export {
   currentNotificationSettings,
   loadNotificationSettings,
   notificationSettingsAtom,
+  notificationDecisionsAtom,
   notificationsPageAtom,
   notificationStatusAtom,
-  restoreSlackSchedule,
   setHours,
   setHuddleRing,
   setHoursDay,
-  setMatters,
   setPresence,
-  setSlackSchedule,
+  useJunoHours,
 } from './notifications'
 export { ignorableChannelsAtom, ignoreChannel, ignoredChannelsAtom, stopIgnoring } from './ignored'
 export { acquireRendererPort } from './port'

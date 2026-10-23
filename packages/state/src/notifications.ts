@@ -3,19 +3,17 @@
  * and the why popover (spec section 14). The engine decides; these atoms
  * only read and write.
  */
-import { Exit } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
 import {
+  notificationsDecisions,
   notificationsPage,
-  notificationsRestoreSlackSchedule,
   notificationsSetHours,
   notificationsSetHuddleRing,
   notificationsSetDay,
-  notificationsSetMatters,
   notificationsSetPresence,
-  notificationsSetSlackSchedule,
   notificationsSettings,
+  notificationsUseJunoHours,
   notificationsStatus,
   type Hours,
   type NotificationSettingsView,
@@ -23,7 +21,6 @@ import {
 } from '@juno/contract'
 import { liveQuery, runCommand } from './atoms'
 import type { Registry } from './client'
-import { showToast } from './undo'
 
 /** The settings as stored, with AI assist. The menus read the Notify me levels here. */
 export const notificationSettingsAtom = liveQuery(notificationsSettings)(undefined)
@@ -34,8 +31,11 @@ export const aiAssistOnAtom = Atom.make((get): boolean => {
   return !(AsyncResult.isSuccess(settings) && settings.value.aiAssist === false)
 })
 
-/** The Notifications page beyond the settings: the two lists and today. */
+/** The Notifications page beyond the settings: the two lists, today's counts and Slack's schedule. */
 export const notificationsPageAtom = liveQuery(notificationsPage)(undefined)
+
+/** Every decision today, for Details. */
+export const notificationDecisionsAtom = liveQuery(notificationsDecisions)(undefined)
 
 /** Presence and "Paused until 9am", for the avatar menu. */
 export const notificationStatusAtom = liveQuery(notificationsStatus)(undefined)
@@ -81,10 +81,6 @@ export function setHoursDay(registry: Registry, which: 'notifications' | 'presen
   void runCommand(registry, notificationsSetDay, { which, day, enabled })
 }
 
-export function setMatters(registry: Registry, text: string): void {
-  void runCommand(registry, notificationsSetMatters, { text })
-}
-
 /** Ring for huddles (SPEC 20, "Incoming huddles"). */
 export function setHuddleRing(registry: Registry, enabled: boolean): void {
   void runCommand(registry, notificationsSetHuddleRing, { enabled })
@@ -95,13 +91,7 @@ export function setPresence(registry: Registry, presence: PresenceValue): void {
   void runCommand(registry, notificationsSetPresence, { presence })
 }
 
-/** Use the notification hours in Slack's own schedule, or stop. On applies them once at once. */
-export function setSlackSchedule(registry: Registry, enabled: boolean): void {
-  void runCommand(registry, notificationsSetSlackSchedule, { enabled })
-}
-
-/** Puts back the schedule Slack had before Juno first wrote it, and stops using the hours there. */
-export async function restoreSlackSchedule(registry: Registry): Promise<void> {
-  const exit = await runCommand(registry, notificationsRestoreSlackSchedule, {})
-  showToast(registry, { text: Exit.isSuccess(exit) ? "Restored Slack's schedule" : "Couldn't restore Slack's schedule. Try again." })
+/** Use Juno's hours: writes the notification hours to Slack's schedule again after it was changed in Slack. */
+export function useJunoHours(registry: Registry): void {
+  void runCommand(registry, notificationsUseJunoHours, {})
 }

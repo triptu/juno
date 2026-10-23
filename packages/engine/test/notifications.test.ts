@@ -23,7 +23,11 @@ function recorder() {
   }
   return { shown, notifier, focus: (value: boolean) => { focused = value } }
 }
-const settings: NotificationSettings = { ...defaultNotificationSettings, matters: "The release and hiring", notificationHours: { days: [1], from: 540, to: 1140 } }
+// Mentions are read, not notified by the switch, so these tests reach Juno's reading.
+const settings: NotificationSettings = {
+  ...defaultNotificationSettings, alwaysNotify: { mentions: false }, instructions: [{ id: 'i1', direction: 'notify', text: 'the release' }],
+  notificationHours: { days: [1], from: 540, to: 1140 },
+}
 const monday = (hour: number) => new Date(2026, 9, 12, hour).getTime()
 const candidate = (ts: string, mentionsMe = true): Candidate => ({
   channel: { id: ChannelId.make('C0ENG'), kind: 'public', name: 'eng', ignored: false },
@@ -48,12 +52,12 @@ describe('notifications service', () => {
     yield* service.receive(candidate('1.000001'))
     expect(record.shown).toHaveLength(1)
     const sql = yield* StoreWriter
-    expect(yield* sql`SELECT outcome, reason FROM notification_log`).toEqual([{ outcome: 'now', reason: 'AI assist is off, and DMs and mentions notify you' }])
+    expect(yield* sql`SELECT outcome, decided_by, reason FROM notification_log`).toEqual([{ outcome: 'notify', decided_by: 'timeout', reason: "Juno couldn't read this in time." }])
     const held = yield* Effect.forkChild(service.receive(candidate('2.000001', false)))
     yield* TestClock.adjust(2000)
     yield* Fiber.join(held)
     const dm = candidate('3.000001', false)
-    const direct = yield* Effect.forkChild(service.receive({ ...dm, channel: { ...dm.channel, kind: 'im' } }))
+    const direct = yield* Effect.forkChild(service.receive({ ...dm, topicId: 'm:D0MAYA', channel: { ...dm.channel, id: ChannelId.make('D0MAYA'), kind: 'im' } }))
     yield* TestClock.adjust(2000)
     yield* Fiber.join(direct)
     expect(record.shown).toHaveLength(2)
@@ -62,7 +66,7 @@ describe('notifications service', () => {
     yield* TestClock.adjust(2000)
     yield* Fiber.join(atClosing)
     expect(record.shown).toHaveLength(2)
-    expect(yield* sql`SELECT outcome FROM notification_log WHERE ts = '4.000001'`).toEqual([{ outcome: 'hold' }])
+    expect(yield* sql`SELECT outcome FROM notification_log WHERE ts = '4.000001'`).toEqual([{ outcome: 'stay' }])
   }).pipe(Effect.provide(Layer.merge(freshStore, Layer.succeed(AiProvider, { ...fakeProvider, decide: () => Effect.never }))), Effect.scoped))
 
   effectIt.effect('keeps messages held at hours start and after a missed start on relaunch', () => Effect.gen(function* () {
@@ -89,7 +93,7 @@ describe('notifications service', () => {
     expect(record.shown).toHaveLength(0)
   }).pipe(Effect.provide(Layer.merge(freshStore, aiLayer)), Effect.scoped))
 
-  effectIt.effect('re-runs stored judgements without calling the gate, and suppresses a focused topic', () => Effect.gen(function* () {
+  effectIt.effect('re-runs stored readings without reading again, and suppresses a focused topic', () => Effect.gen(function* () {
     yield* TestClock.setTime(monday(8))
     yield* setSettings()
     let calls = 0
@@ -103,11 +107,11 @@ describe('notifications service', () => {
     const service = yield* makeNotifications(record.notifier, () => Effect.succeed(true)).pipe(Effect.provideService(AiProvider, observed))
     yield* service.receive(candidate('1.000001'))
     expect(calls).toBe(1)
-    expect(inputs[0]).toMatchObject({ matters: settings.matters })
+    expect(inputs[0]).toMatchObject({ instructions: settings.instructions, kind: 'channel' })
     yield* setSettings({ ...settings, channels: { C0ENG: 'never' } })
     yield* service.settingsChanged
     const sql = yield* StoreWriter
-    expect(yield* sql`SELECT outcome FROM notification_log`).toEqual([{ outcome: 'hold' }])
+    expect(yield* sql`SELECT outcome FROM notification_log`).toEqual([{ outcome: 'stay' }])
     yield* setSettings({ ...settings, notificationHours: { days: [1], from: 0, to: 1439 } })
     record.focus(true)
     yield* service.settingsChanged
@@ -163,21 +167,22 @@ it('consumes both socket inputs, observes manual presence and responds to prefs 
   const configure = async (value: NotificationSettings) => {
     await runCommand(engine.registry, prefsSet, { key: 'notifications', value: Schema.decodeUnknownSync(Schema.Json)(value) })
   }
-  await configure({ ...settings, channels: { C0ENG: 'every' } })
+  await configure({ ...settings, channels: { C0ENG: 'always' } })
   const message = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: '<@U0TUSHAR> Can you approve this?' })
   await waitFor(() => record.shown.length === 1 ? true : undefined)
   const rows = readDb(engine, 'user.db', (db) => db.prepare('SELECT * FROM notification_log WHERE channel = ? AND ts = ?').all('C0ENG', message.ts))
   expect(rows).toHaveLength(1)
   engine.fake.emitFrame({ type: 'desktop_notification', channel: 'C0ENG', msg: message.ts, user: 'U0MAYA', title: 'eng', content: '<@U0TUSHAR> Can you approve this?' })
   await configure({ ...settings, channels: { C0ENG: 'never' } })
-  await waitFor(() => readDb(engine, 'user.db', (db) => db.prepare('SELECT outcome FROM notification_log WHERE ts = ?').get(message.ts))?.outcome === 'hold' ? true : undefined)
+  await waitFor(() => readDb(engine, 'user.db', (db) => db.prepare('SELECT outcome FROM notification_log WHERE ts = ?').get(message.ts))?.outcome === 'stay' ? true : undefined)
   expect(record.shown).toHaveLength(1)
-  await configure({ ...settings, channels: { C0ENG: 'every' } })
-  engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'A normal update without a mention' })
+  // Another conversation: C0ENG just had a banner, so it stays quiet for a minute.
+  await configure({ ...settings, channels: { C0PRODUCT: 'always' } })
+  engine.fake.injectMessage({ channel: 'C0PRODUCT', user: 'U0MAYA', text: 'A normal update without a mention' })
   await waitFor(() => record.shown.length === 2 ? true : undefined)
   const minute = localTime(Date.now()).minutes
   await configure({ ...settings, notificationHours: { days: [0, 1, 2, 3, 4, 5, 6], from: (minute + 1380) % 1440, to: (minute + 60) % 1440 } })
-  engine.fake.emitFrame({ type: 'message', channel: 'C0ENG', user: 'U0MAYA', ts: millisToTs(Date.now() + 1000), text: '', blocks: [{ type: 'rich_text', elements: [
+  engine.fake.emitFrame({ type: 'message', channel: 'C0HIRING', user: 'U0MAYA', ts: millisToTs(Date.now() + 1000), text: '', blocks: [{ type: 'rich_text', elements: [
     { type: 'rich_text_section', elements: [{ type: 'user', user_id: 'U0TUSHAR' }, { type: 'text', text: ' Can you approve the release now?' }] },
   ] }] })
   await waitFor(() => record.shown.length === 3 ? true : undefined)
