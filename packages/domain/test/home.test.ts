@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { asksUser, draftFirstLine, followUpDelivery, isOldDraft, isQuestion, OLD_DRAFT_MILLIS, rankHomeItems, settledEvidence, type HomeCandidate, type LaterMessage } from '../src/home'
+import { asksUser, followUpDelivery, isOldDraft, isQuestion, OLD_DRAFT_MILLIS, rankHomeItems, settledEvidence, type HomeCandidate, type LaterMessage } from '../src/home'
 
 const item = (kind: HomeCandidate<string>['kind'], ...topicIds: string[]): HomeCandidate<string> => ({ kind, topicIds, value: `${kind}:${topicIds.join(',')}` })
 
@@ -135,11 +135,6 @@ describe('An old draft', () => {
     const updatedAt = NOW - 20 * DAY
     expect(isOldDraft({ updatedAt, keptAt: updatedAt }, NOW, NOW)).toBe(false)
     expect(isOldDraft({ updatedAt, keptAt: updatedAt - DAY }, NOW, NOW)).toBe(true)
-  })
-
-  it('shows its first line with words', () => {
-    expect(draftFirstLine('\n  Thanks for the notes, I think\nsecond line')).toBe('Thanks for the notes, I think')
-    expect(draftFirstLine('   ')).toBe('')
   })
 })
 

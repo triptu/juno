@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { UserId, confidenceLabel, parseCommand, threadTopicId, type CommandContext } from '../src/index'
+import { UserId, parseCommand, threadTopicId, type CommandContext } from '../src/index'
 import { eng, hiring, maya, mayaId, ts, NOW } from './fixtures'
 
 const ctx: CommandContext = {
@@ -23,93 +23,53 @@ function confidenceOf(text: string): number {
 }
 
 describe('⌘K commands', () => {
-  it('turns "tell maya …" into a send with the text, a label and a confidence', () => {
-    const c = parseCommand('tell maya the wednesday slot works', ctx)
-    expect(c).toMatchObject({
-      kind: 'send-dm',
-      userId: mayaId,
-      text: 'the wednesday slot works',
-      label: 'Send to Maya Chen',
-      sub: '"the wednesday slot works"',
-      hint: '↵ Send',
-    })
-    expect(c!.confidence).toBeGreaterThan(0)
-    expect(c!.confidence).toBeLessThanOrEqual(1)
+  // [typed, what it parses to; undefined when it is a search]
+  it.each<[string, Record<string, unknown> | undefined]>([
+    ['tell maya the wednesday slot works', { kind: 'send-dm', userId: mayaId, text: 'the wednesday slot works' }],
+    // Other verbs; a leading "that" or "to" is dropped.
+    ['message Jonas that the build is green', { kind: 'send-dm', userId: 'U0JONAS', text: 'the build is green' }],
+    ['ping jonas to check staging', { kind: 'send-dm', text: 'check staging' }],
+    ['dm Jonas Weber hi', { kind: 'send-dm', userId: 'U0JONAS', text: 'hi' }],
+    // No text opens the DM.
+    ['message Maya Chen', { kind: 'open-dm', userId: mayaId }],
+    // A full name wins over a first name.
+    ['tell maya lindqvist hello', { userId: 'U0MAYA2', text: 'hello' }],
+    ['tell maya hello', { userId: mayaId }],
+    ['tell nobody anything', undefined],
+    ['tell', undefined],
+    // Posts go to a channel, never to a DM.
+    ['post in #eng deploy is done', { kind: 'post', channelId: eng.id, text: 'deploy is done' }],
+    ['say to hiring the loop is set', { kind: 'post', channelId: hiring.id }],
+    ['post in #nope hi', undefined],
+    // Summaries and catching up go to Juno.
+    ['summarize #eng today', { kind: 'ask', prompt: 'summarize #eng today' }],
+    ['what did I miss', { kind: 'ask' }],
+    ['catch me up on hiring', { kind: 'ask' }],
+    ['tl;dr', { kind: 'ask' }],
+    // Resolve takes the topic with the best word match.
+    ['resolve pricing', { kind: 'resolve', topicId: ctx.topics[0]!.id }],
+    ['resolve staging bill', { kind: 'resolve', topicId: ctx.topics[1]!.id }],
+    ['resolve nothing here', undefined],
+    // Short or plain queries are a search.
+    ['eng', undefined],
+    ['staging bill', undefined],
+  ])('%j', (typed, expected) => {
+    const command = parseCommand(typed, ctx)
+    if (expected === undefined) expect(command).toBeUndefined()
+    else expect(command).toMatchObject(expected)
   })
 
-  it('accepts message, ask, dm, ping and text as verbs, and drops a leading "that" or "to"', () => {
-    expect(parseCommand('message Jonas that the build is green', ctx)).toMatchObject({ kind: 'send-dm', text: 'the build is green' })
-    expect(parseCommand('ping jonas to check staging', ctx)).toMatchObject({ kind: 'send-dm', text: 'check staging' })
-    expect(parseCommand('dm Jonas Weber hi', ctx)).toMatchObject({ kind: 'send-dm', userId: 'U0JONAS', text: 'hi' })
-  })
-
-  it('"message maya" with no text opens the DM', () => {
-    expect(parseCommand('message Maya Chen', ctx)).toMatchObject({
-      kind: 'open-dm',
-      userId: mayaId,
-      label: 'Message Maya Chen',
-      sub: 'Opens your Main thread with Maya',
-      hint: '↵',
-    })
-  })
-
-  it('prefers a full name over a first name and lowers confidence for an ambiguous first name', () => {
-    expect(parseCommand('tell maya lindqvist hello', ctx)).toMatchObject({ userId: 'U0MAYA2', text: 'hello' })
-    expect(parseCommand('tell maya hello', ctx)).toMatchObject({ userId: mayaId })
-    expect(parseCommand('tell jonas hello', ctx)).toMatchObject({ userId: 'U0JONAS' })
-    // Two people are called Maya, so a bare "maya" is less certain than a full name or a unique first name.
+  it('is less certain of an ambiguous first name than of a full or unique name', () => {
+    // Two people are called Maya.
     expect(confidenceOf('tell maya hello')).toBeLessThan(confidenceOf('tell maya lindqvist hello'))
     expect(confidenceOf('tell maya hello')).toBeLessThan(confidenceOf('tell jonas hello'))
     expect(confidenceOf('tell jonas hello')).toBe(confidenceOf('tell jonas weber hello'))
+    expect(confidenceOf('tell maya the wednesday slot works')).toBeGreaterThan(0)
+    expect(confidenceOf('tell maya the wednesday slot works')).toBeLessThanOrEqual(1)
   })
 
-  it('does not treat unknown names as commands', () => {
-    expect(parseCommand('tell nobody anything', ctx)).toBeUndefined()
-    expect(parseCommand('tell', ctx)).toBeUndefined()
-  })
-
-  it('"post in #eng …" posts to a channel, never to a DM', () => {
-    expect(parseCommand('post in #eng deploy is done', ctx)).toMatchObject({
-      kind: 'post',
-      channelId: eng.id,
-      text: 'deploy is done',
-      label: 'Post in #eng',
-      sub: '"deploy is done"',
-      hint: '↵ Send',
-    })
-    expect(parseCommand('say to hiring the loop is set', ctx)).toMatchObject({ kind: 'post', channelId: hiring.id })
-    expect(parseCommand('post in #nope hi', ctx)).toBeUndefined()
-  })
-
-  it('routes summaries and "what did I miss" to Juno', () => {
-    expect(parseCommand('summarize #eng today', ctx)).toMatchObject({ kind: 'ask', prompt: 'summarize #eng today', label: 'Ask Juno to summarize #eng today', sub: 'Opens Juno with this request' })
-    expect(parseCommand('what did I miss', ctx)).toMatchObject({ kind: 'ask', label: 'Ask Juno to catch you up' })
-    expect(parseCommand('catch me up on hiring', ctx)).toMatchObject({ kind: 'ask', label: 'Ask Juno to catch you up on hiring' })
-    expect(parseCommand('tl;dr', ctx)).toMatchObject({ kind: 'ask', label: 'Ask Juno to summarize' })
-  })
-
-  it('"resolve pricing" resolves the best-matching topic', () => {
-    expect(parseCommand('resolve pricing', ctx)).toMatchObject({
-      kind: 'resolve',
-      topicId: ctx.topics[0]!.id,
-      label: 'Resolve Pricing page copy',
-      sub: '#product · hides it until there is new activity',
-      hint: '↵ Resolve',
-    })
-    expect(parseCommand('resolve staging bill', ctx)).toMatchObject({ topicId: ctx.topics[1]!.id })
-    // More matching words make a resolve more certain, and it never exceeds 1.
+  it('is more certain of a resolve as more words match, and never above 1', () => {
     expect(confidenceOf('resolve staging bill')).toBeGreaterThan(confidenceOf('resolve staging'))
     expect(confidenceOf('resolve staging bill doubled since august')).toBeLessThanOrEqual(1)
-    expect(parseCommand('resolve nothing here', ctx)).toBeUndefined()
-  })
-
-  it('treats short or plain queries as search', () => {
-    expect(parseCommand('eng', ctx)).toBeUndefined()
-    expect(parseCommand('staging bill', ctx)).toBeUndefined()
-  })
-
-  it('formats the confidence badge', () => {
-    expect(confidenceLabel(0.95)).toBe('95%')
-    expect(confidenceLabel(1.2)).toBe('100%')
   })
 })

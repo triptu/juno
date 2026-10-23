@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
-import { channelKindLabel, channelLabel, contextPillText, contextTint, firstWords, mainLabel, manualTitleAfterRename, resolveTitle } from '../src/index'
-import { eng, group, hiring, maya, topic } from './fixtures'
+import { firstWords, manualTitleAfterRename, resolveTitle, viewName } from '../src/index'
+import { eng, hiring, maya, topic } from './fixtures'
 
 describe('title resolution', () => {
   it('prefers a manual title, then the AI title, then the first six words', () => {
@@ -26,7 +26,6 @@ describe('title resolution', () => {
     expect(resolveTitle(topic({ firstMessageText: text, overlay: { aiTitle: 'Comp discussion for Donna' } })).sensitive).toBe(false)
     expect(resolveTitle(topic({ firstMessageText: text, overlay: { manualTitle: 'Donna 100k', aiTitle: 'Comp discussion for Donna' } })).sensitive).toBe(false)
   })
-
 })
 
 describe('first words', () => {
@@ -74,30 +73,10 @@ describe('rename', () => {
     expect(manualTitleAfterRename('AI title', 'AI title')).toBeUndefined()
     expect(manualTitleAfterRename('AI title', undefined)).toBe('AI title')
   })
-})
 
-describe('channel labels', () => {
-  it('prints #name, a person, or first names of a group DM', () => {
-    expect(channelLabel(eng)).toBe('#eng')
-    expect(channelLabel(hiring)).toBe('#hiring')
-    expect(channelLabel(maya)).toBe('Maya Chen')
-    expect(channelLabel(group)).toBe('Maya, Leo')
-  })
-
-  it('labels Main as "#eng · Main" and the context pill without the hash', () => {
-    expect(mainLabel(eng)).toBe('#eng · Main')
-    expect(mainLabel(maya)).toBe('Maya Chen · Main')
-    expect(contextPillText(eng)).toBe('eng · Public channel')
-    expect(contextPillText(hiring)).toBe('hiring · Private channel')
-    expect(contextPillText(maya)).toBe('Maya Chen · Direct message')
-    expect(contextPillText(group)).toBe('Maya, Leo · Group DM')
-  })
-
-  it('tints public neutral, private amber and DMs blue', () => {
-    expect(contextTint('public')).toBe('public')
-    expect(contextTint('private')).toBe('private')
-    expect(contextTint('im')).toBe('dm')
-    expect(contextTint('mpim')).toBe('dm')
-    expect(channelKindLabel('mpim')).toBe('Group DM')
+  it('saves a view name trimmed and at most 32 characters', () => {
+    expect(viewName('  Bots  ')).toBe('Bots')
+    expect(viewName('   ')).toBe('')
+    expect(viewName('x'.repeat(40))).toBe('x'.repeat(32))
   })
 })

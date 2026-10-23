@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { startsGroup, threadLinkLabel, type GroupMessage } from '../src/messages'
+import { startsGroup, type GroupMessage } from '../src/messages'
 
 const message: GroupMessage = { senderId: 'U0LEO', body: { blocks: [] }, isThreadRoot: false, at: 0 }
 
@@ -18,9 +18,5 @@ describe('message headers', () => {
   ] satisfies ReadonlyArray<readonly [string, GroupMessage | undefined, GroupMessage, boolean]>)('%s', (_, prev, next, expected) => {
     expect(startsGroup(prev, next)).toBe(expected)
   })
-})
-
-it.each([[0, 'Thread'], [1, '1 reply'], [2, '2 replies']] satisfies ReadonlyArray<readonly [number, string]>)('labels %i replies', (count, label) => {
-  expect(threadLinkLabel(count)).toBe(label)
 })
 

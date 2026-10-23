@@ -6,7 +6,6 @@ import {
   markUnreadLocally,
   observeServerRead,
   rejectLocalWrite,
-  tsBefore,
   type ReadState,
   type Ts,
 } from '../src/index'
@@ -116,12 +115,5 @@ describe('local marks', () => {
     const refused = rejectLocalWrite(markReadLocally(settled, pointer.latest, at(1), true)!, at(2))
     expect(refused).toMatchObject({ pendingLocalWrite: false, lastReadTs: pointer.latest })
     expect(observeServerRead(refused, page(pointer.mid, at(3))).state.lastReadTs).toBe(pointer.mid)
-  })
-})
-
-describe('tsBefore', () => {
-  it('is one microsecond earlier, across a second boundary', () => {
-    expect(tsBefore('1700000000.000100' as Ts)).toBe('1700000000.000099')
-    expect(tsBefore('1700000001.000000' as Ts)).toBe('1700000000.999999')
   })
 })

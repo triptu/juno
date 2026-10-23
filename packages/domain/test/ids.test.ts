@@ -1,36 +1,26 @@
 import { Schema } from 'effect'
 import { describe, expect, it } from 'bun:test'
-import { ChannelId, TopicId, Ts, compareTs, mainTopicId, maxTs, parseTopicId, threadTopicId, topicKindOf, millisToTs, tsToMillis } from '../src/index'
+import { ChannelId, TopicId, Ts, compareTs, mainTopicId, maxTs, parseTopicId, threadTopicId, millisToTs, tsBefore, tsToMillis } from '../src/index'
 
 const C = ChannelId.make('C0ENG')
 
 describe('topic ids', () => {
-  it('builds the two kinds', () => {
-    expect(threadTopicId(C, Ts.make('1728000000.123456'))).toBe('t:C0ENG:1728000000.123456')
-    expect(mainTopicId(C)).toBe('m:C0ENG')
-  })
-
-  it('parses them back', () => {
-    expect(parseTopicId('t:C0ENG:1728000000.123456')).toEqual({ kind: 'thread', channel: 'C0ENG', threadTs: '1728000000.123456' })
-    expect(parseTopicId('m:C0ENG')).toEqual({ kind: 'main', channel: 'C0ENG' })
+  it('parse back what they were built from', () => {
+    expect(parseTopicId(threadTopicId(C, Ts.make('1728000000.123456')))).toEqual<unknown>({ kind: 'thread', channel: 'C0ENG', threadTs: '1728000000.123456' })
+    expect(parseTopicId(mainTopicId(C))).toEqual<unknown>({ kind: 'main', channel: 'C0ENG' })
   })
 
   it.each(['', 'x:C0ENG', 'm:', 'm:C0ENG:extra', 't:C0ENG', 't:C0ENG:notats', 'g:C0ENG:g1', 'C0ENG'])('rejects %j', (bad) => {
     expect(parseTopicId(bad)).toBeUndefined()
   })
 
-  it('knows the kind without parsing', () => {
-    expect(topicKindOf(mainTopicId(C))).toBe('main')
-    expect(topicKindOf(threadTopicId(C, Ts.make('1.000000')))).toBe('thread')
-  })
-
   it('rejects malformed timestamps and topic ids at the schema', () => {
     const decode = Schema.decodeUnknownSync(Ts)
     expect(() => decode('1728000000')).toThrow()
     expect(() => decode('abc')).toThrow()
-    expect(decode('1728000000.000001')).toBe('1728000000.000001')
+    expect(decode('1728000000.000001')).toBe<string>('1728000000.000001')
     expect(() => Schema.decodeUnknownSync(TopicId)('x:C0ENG')).toThrow()
-    expect(Schema.decodeUnknownSync(TopicId)('m:C0ENG')).toBe('m:C0ENG')
+    expect(Schema.decodeUnknownSync(TopicId)('m:C0ENG')).toBe<string>('m:C0ENG')
   })
 })
 
@@ -47,9 +37,14 @@ describe('timestamps', () => {
     expect(maxTs(a, b)).toBe(b)
   })
 
+  it('steps one microsecond earlier, across a second boundary', () => {
+    expect(tsBefore(Ts.make('1700000000.000100'))).toBe<string>('1700000000.000099')
+    expect(tsBefore(Ts.make('1700000001.000000'))).toBe<string>('1700000000.999999')
+  })
+
   it('round-trips through milliseconds', () => {
     const millis = Date.UTC(2026, 9, 12, 9, 12, 30, 250)
     expect(tsToMillis(millisToTs(millis))).toBe(millis)
-    expect(millisToTs(millis)).toBe(`${Math.floor(millis / 1000)}.250000`)
+    expect(millisToTs(millis)).toBe<string>(`${Math.floor(millis / 1000)}.250000`)
   })
 })

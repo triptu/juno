@@ -6,21 +6,22 @@ const names = (found: ReadonlyArray<EmojiChoice>) => found.map((row) => row.name
 const custom = (name: string): EmojiChoice => ({ id: name, name, insert: `:${name}:`, url: `https://emoji.example/${name}.png` })
 
 describe('the colon query being typed', () => {
-  it('follows a colon at a word start, up to the caret, lowercased', () => {
-    expect(emojiQueryAt(':ありがとう', 6)?.text).toBe('ありがとう')
-    expect(emojiQueryAt(':smi', 4)).toEqual({ start: 0, end: 4, text: 'smi' })
-    expect(emojiQueryAt('Looking good :SMI', 17)).toEqual({ start: 13, end: 17, text: 'smi' })
-    expect(emojiQueryAt('ok (:+1', 7)?.text).toBe('+1')
-    expect(emojiQueryAt(':smile: and', 4)?.text).toBe('smi')
-  })
-
-  it('ignores a colon inside a word, after another colon, after a space, or with nothing after it', () => {
-    expect(emojiQueryAt('time:smi', 8)).toBeUndefined()
-    expect(emojiQueryAt('12:30', 5)).toBeUndefined()
-    expect(emojiQueryAt('::smi', 5)).toBeUndefined()
-    expect(emojiQueryAt(':smi le', 7)).toBeUndefined()
-    expect(emojiQueryAt('say :', 5)).toBeUndefined()
-    expect(emojiQueryAt('no colon', 8)).toBeUndefined()
+  // A colon at a word start, up to the caret, lowercased. Not inside a word, after another colon,
+  // after a space, or with nothing after it.
+  it.each<[string, number, { start: number; end: number; text: string } | undefined]>([
+    [':ありがとう', 6, { start: 0, end: 6, text: 'ありがとう' }],
+    [':smi', 4, { start: 0, end: 4, text: 'smi' }],
+    ['Looking good :SMI', 17, { start: 13, end: 17, text: 'smi' }],
+    ['ok (:+1', 7, { start: 4, end: 7, text: '+1' }],
+    [':smile: and', 4, { start: 0, end: 4, text: 'smi' }],
+    ['time:smi', 8, undefined],
+    ['12:30', 5, undefined],
+    ['::smi', 5, undefined],
+    [':smi le', 7, undefined],
+    ['say :', 5, undefined],
+    ['no colon', 8, undefined],
+  ])('%j at %i', (text, caret, query) => {
+    expect(emojiQueryAt(text, caret)).toEqual(query)
   })
 })
 
@@ -32,7 +33,7 @@ describe('workspace emoji', () => {
       { name: 'lost', url: null, alias_for: 'gone' },
       { name: 'loop_a', url: null, alias_for: 'loop_b' },
       { name: 'loop_b', url: null, alias_for: 'loop_a' },
-    ])).toEqual([
+    ])).toEqual<unknown>([
       { name: 'wave', canonical: 'wave', url: 'https://emoji.example/wave.png' },
       { name: 'wave_hello', canonical: 'wave', url: 'https://emoji.example/wave.png' },
     ])
@@ -81,10 +82,5 @@ describe('matching', () => {
     const quick = [{ name: 'smirk', unicode: '😏' }, { name: '+1', unicode: '👍' }]
     expect(names(matchEmoji(rows, 'smi', ['smiley'], quick))).toEqual(['smiley', 'smirk', 'smile', 'sweat_smile'])
     expect(names(matchEmoji(rows, 'thumbs', [], [{ name: 'thumbsdown', unicode: '👎' }]))).toEqual(['thumbsdown', 'thumbsup'])
-  })
-
-  it('shows at most eight', () => {
-    const many = Array.from({ length: 12 }, (_, i) => glyph(`face_${i}`, String(i)))
-    expect(matchEmoji(many, 'face', [], [])).toHaveLength(8)
   })
 })

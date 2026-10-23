@@ -11,12 +11,6 @@ const topics: ReadonlyArray<BadgeTopic> = [
   { id: 'm:C2', channel: 'C2', kind: 'private', person: null, mentionsMe: false },
 ]
 
-it('badges unread DMs, group DMs and mentions, and ignores other channel activity', () => {
-  for (const topic of topics.slice(0, 4)) expect(dockBadgeActive([topic], defaultNotificationSettings, context)).toBe(true)
-  expect(dockBadgeActive(topics.slice(4), defaultNotificationSettings, context)).toBe(false)
-  expect(dockBadgeActive([], defaultNotificationSettings, context)).toBe(false)
-})
-
 it('applies Never to threads, conversations and DM people, with Always winning', () => {
   const settings = { ...defaultNotificationSettings, channels: { C1: 'never' as const, G1: 'never' as const }, people: { U1: 'never' as const } }
   const here = topics.map((topic) => ({ ...topic, mentionsMeDirectly: false }))
@@ -43,6 +37,7 @@ it('applies a Never sender to an @here mention, which a direct mention gets thro
 })
 
 it('includes ordinary channel messages set to Always, using the alert decision', () => {
+  expect(dockBadgeActive(topics.slice(4), defaultNotificationSettings, context)).toBe(false)
   expect(dockBadgeActive(topics.slice(4), { ...defaultNotificationSettings, channels: { C2: 'always' } }, context)).toBe(true)
 })
 

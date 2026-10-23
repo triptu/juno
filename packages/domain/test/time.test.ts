@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { clockTime, hourLabel, messageHeaderTime, messageTime, relativeTime } from '../src/index'
+import { hourLabel, messageHeaderTime, messageTime, relativeTime } from '../src/index'
 import { DAY, HOUR, NOW } from './fixtures'
 
 const MINUTE = 60_000
@@ -54,22 +54,13 @@ describe('message time', () => {
     expect(messageTime(at, NOW, { timeZone: 'America/Los_Angeles' })).toBe('Yesterday')
     expect(messageTime(at, NOW, tz)).toBe('6:30')
   })
-
-  it('formats log times with two digits', () => {
-    expect(clockTime(Date.UTC(2026, 9, 12, 9, 5), tz)).toBe('09:05')
-  })
 })
 
 describe('hour labels', () => {
   it.each([
     [0, '12am'],
-    [8 * 60, '8am'],
-    [10 * 60, '10am'],
     [12 * 60, '12pm'],
-    [13 * 60, '1pm'],
     [16 * 60 + 30, '4:30pm'],
-    [19 * 60, '7pm'],
-    [23 * 60 + 59, '11:59pm'],
   ])('%d → %s', (minutes, label) => {
     expect(hourLabel(minutes)).toBe(label)
   })

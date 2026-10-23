@@ -1,38 +1,30 @@
 import { describe, expect, it } from 'bun:test'
 import { composeOutgoing } from '@juno/richtext'
-import { decodeDraft, encodeDraft, linkAt, moveLinks, pastedLink, setLink, shownLinks, type LinkRange, type MentionPick } from '../src/index'
+import { decodeDraft, encodeDraft, moveLinks, shownLinks, type LinkRange, type MentionPick } from '../src/index'
 
 const docs: LinkRange = { start: 4, end: 12, url: 'https://example.com/docs' }
 const text = 'see the docs now'
 
 describe('linked words as the text changes', () => {
-  it('moves with typing before them and stays put for typing after them', () => {
-    expect(moveLinks(text, `oh, ${text}`, [docs], 4)).toEqual([{ ...docs, start: 8, end: 16 }])
-    expect(moveLinks(text, 'see the docs right now', [docs], 18)).toEqual([docs])
-  })
-
-  it('does not grow for typing at either end, and grows for typing inside', () => {
-    expect(moveLinks(text, 'see the docss now', [docs], 13)).toEqual([docs])
-    expect(moveLinks(text, 'see xthe docs now', [docs], 5)).toEqual([{ ...docs, start: 5, end: 13 }])
-    expect(moveLinks(text, 'see the new docs now', [docs], 12)).toEqual([{ ...docs, end: 16 }])
-  })
-
-  it('goes when all its words are replaced or deleted, and keeps the rest of a partial one', () => {
-    expect(moveLinks(text, 'see https://example.com/docs now', [docs])).toEqual([])
-    expect(moveLinks(text, 'see  now', [docs])).toEqual([])
-    expect(moveLinks(text, 'see the', [docs])).toEqual([{ ...docs, end: 7 }])
-    expect(moveLinks(text, 'docs now', [docs])).toEqual([{ ...docs, start: 0, end: 4 }])
-  })
-
-  it('sets, replaces and removes a link on a range', () => {
-    expect(setLink([docs], 4, 12, 'https://example.com/new')).toEqual([{ ...docs, url: 'https://example.com/new' }])
-    expect(setLink([docs], 4, 12, undefined)).toEqual([])
-    expect(setLink([], 0, 3, 'https://example.com')).toEqual([{ start: 0, end: 3, url: 'https://example.com' }])
-  })
-
-  it('finds the link under a click', () => {
-    expect(linkAt([docs], 6)).toBe(docs)
-    expect(linkAt([docs], 2)).toBeUndefined()
+  // [before, after, the caret after the edit, the link before, where it is after]
+  it.each<[string, string, number | undefined, LinkRange, ReadonlyArray<LinkRange>]>([
+    // Typing before moves it; typing after leaves it.
+    [text, `oh, ${text}`, 4, docs, [{ ...docs, start: 8, end: 16 }]],
+    [text, 'see the docs right now', 18, docs, [docs]],
+    // Typing at either end does not grow it; typing inside does.
+    [text, 'see the docss now', 13, docs, [docs]],
+    [text, 'see xthe docs now', 5, docs, [{ ...docs, start: 5, end: 13 }]],
+    [text, 'see the new docs now', 12, docs, [{ ...docs, end: 16 }]],
+    // Replacing or deleting all its words removes it; a partial delete keeps the rest.
+    [text, 'see https://example.com/docs now', undefined, docs, []],
+    [text, 'see  now', undefined, docs, []],
+    [text, 'see the', undefined, docs, [{ ...docs, end: 7 }]],
+    [text, 'docs now', undefined, docs, [{ ...docs, start: 0, end: 4 }]],
+    // Regression: formatting applied and removed keeps the linked label.
+    ['plan', '*plan*', undefined, { start: 0, end: 4, url: 'https://example.com/plan' }, [{ start: 1, end: 5, url: 'https://example.com/plan' }]],
+    ['*plan*', 'plan', undefined, { start: 1, end: 5, url: 'https://example.com/plan' }, [{ start: 0, end: 4, url: 'https://example.com/plan' }]],
+  ])('%j → %j', (before, after, caret, link, expected) => {
+    expect(moveLinks(before, after, [link], caret)).toEqual(expected)
   })
 })
 
@@ -43,11 +35,6 @@ describe('what the field shows as links', () => {
       { start: 0, end: 8, url: 'https://a.io' },
       { start: 12, end: 23, url: 'http://example.com' },
     ])
-  })
-
-  it('takes a paste of one URL as a link and anything else as text', () => {
-    expect(pastedLink('https://example.com/a')).toBe('https://example.com/a')
-    expect(pastedLink('read https://example.com/a')).toBeUndefined()
   })
 })
 

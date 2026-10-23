@@ -27,4 +27,6 @@ Import from `@juno/domain`; everything is exported from `src/index.ts`.
 
 ## Testing
 
-`bun run --cwd packages/domain test` (vitest, `test/*.test.ts`). Tests build topics with `test/fixtures.ts` and assert behaviour: a resolved topic with later activity shows the reopen tag, an ambiguous command scores below an unambiguous one. Prefer table-driven cases from the spec's examples.
+`bun run --cwd packages/domain test` (`bun test`, `test/*.test.ts`). Tests build topics with `test/fixtures.ts` and assert behaviour: a resolved topic with later activity shows the reopen tag, an ambiguous command scores below an unambiguous one. Prefer one table per rule, with rows from the spec's examples.
+
+Only tricky rules get a unit test: ordering, precedence, parsing, time zones, the read-state machine. Labels, menu item lists and other copy are not tested here; the e2e specs click the real menus (`menus.spec.ts`, `topic.spec.ts` for Notify me, `views.spec.ts` for view order and Add to view). Pass a time zone to anything that formats a time; the notification hours read the host zone, so their tests check local weekday and minutes rather than fixed instants.

@@ -2,10 +2,8 @@ import { describe, expect, it } from 'bun:test'
 import {
   allTopicsList,
   filterDots,
-  rowTags,
   showsReopenedTag,
   showsResolvedCheck,
-  sidebarEmptyState,
   sidebarList,
   sidebarPlacement,
   topicStatus,
@@ -66,12 +64,6 @@ describe('reopened tag', () => {
   it('does not show on open, resolved or fresh topics', () => {
     expect(showsReopenedTag(topic())).toBe(false)
     expect(showsReopenedTag(topic({ overlay: { resolvedAt: NOW, resolvedActivityTs: ts(NOW - HOUR) } }))).toBe(false)
-  })
-
-  it('is listed after Main in the row tags', () => {
-    expect(rowTags(topic({ kind: 'main', overlay: { reopenedAt: NOW } }))).toEqual(['main', 'reopened'])
-    expect(rowTags(topic({ subscribed: false }))).toEqual(['unsubscribed'])
-    expect(rowTags(topic())).toEqual([])
   })
 })
 
@@ -164,18 +156,6 @@ describe('sidebar list', () => {
     expect(filterDots([...all, topic({ unread: 2 })], { kind: 'dms', unreadOnly: false }, ctx)).toEqual({ channels: true, dms: false })
     // An unread thread the user does not follow is not in the sidebar, so it lights no dot.
     expect(filterDots([...all, topic({ unread: 2, subscribed: null })], { kind: 'dms', unreadOnly: false }, ctx)).toEqual({ channels: false, dms: false })
-  })
-
-  it('explains an empty list and offers one next step', () => {
-    const empty = { pinned: [], recent: [] }
-    expect(sidebarEmptyState(empty, { kind: 'all', unreadOnly: true }, ctx)).toMatchObject({ title: 'No unread topics', actionLabel: 'Clear filters' })
-    expect(sidebarEmptyState(empty, { kind: 'dms', unreadOnly: false }, ctx)).toMatchObject({ title: 'No recent topics here', actionLabel: 'Clear filters' })
-    expect(sidebarEmptyState(empty, { kind: 'all', unreadOnly: false }, ctx)).toMatchObject({
-      title: 'No recent topics here',
-      body: 'Topics with activity in the last 3 days show up here.',
-      actionLabel: 'View all topics',
-    })
-    expect(sidebarEmptyState(sidebarList(all, { kind: 'all', unreadOnly: false }, ctx), { kind: 'all', unreadOnly: false }, ctx)).toBeUndefined()
   })
 })
 

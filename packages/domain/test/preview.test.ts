@@ -3,7 +3,6 @@ import type { File } from '@juno/slack-schema'
 import { messagePreviewText, previewSender, shortName, namesakes, type PreviewPerson } from '../src/index'
 
 const image = (id: string, name = `${id}.png`): File => ({ id, name, mimetype: 'image/png' })
-const video: File = { id: 'F0VID', name: 'demo.mov', mimetype: 'video/quicktime' }
 const pdf: File = { id: 'F0PDF', name: 'report.pdf', title: 'report.pdf', mimetype: 'application/pdf' }
 
 describe('preview text', () => {
@@ -23,16 +22,10 @@ describe('preview text', () => {
     // A fresh upload Slack has not typed yet: its name says what it is.
     expect(messagePreviewText({ text: '', files: [{ id: 'F0NEW', name: 'shot.png', mimetype: '', filetype: '' }] })).toBe('Image')
     expect(messagePreviewText({ text: '', files: [image('F1'), image('F2')] })).toBe('2 images')
-    expect(messagePreviewText({ text: '', files: [video] })).toBe('Video')
-    expect(messagePreviewText({ text: '', files: [video, { ...video, id: 'F0VID2' }] })).toBe('2 videos')
-    expect(messagePreviewText({ text: '', files: [pdf] })).toBe('File: report.pdf')
     expect(messagePreviewText({ text: '', files: [image('F1'), pdf] })).toBe('2 files')
+    expect(messagePreviewText({ text: '', files: [pdf] })).toBe('File: report.pdf')
     expect(messagePreviewText({ text: '', files: [{ id: 'F0AUD', name: 'audio_message.webm', mimetype: 'audio/webm', subtype: 'slack_audio' }] })).toBe('Voice clip')
-    expect(messagePreviewText({ text: '', files: [{ id: 'F0CLIP', mimetype: 'video/mp4', subtype: 'slack_video' }] })).toBe('Video')
-    expect(messagePreviewText({ text: '', files: [{ id: 'F0SNIP', title: 'deploy.sh', mode: 'snippet', mimetype: 'text/plain' }] })).toBe('Snippet: deploy.sh')
-    expect(messagePreviewText({ text: '', files: [{ id: 'F0CANVAS', title: 'Launch plan', filetype: 'quip' }] })).toBe('Canvas: Launch plan')
     expect(messagePreviewText({ text: '', files: [{ id: 'F0GONE', mode: 'tombstone' }] })).toBe('Deleted file')
-    expect(messagePreviewText({ text: '', files: [{ id: 'F0NONAME' }] })).toBe('File')
   })
 
   it('names a link alone by its domain, but keeps a link inside words', () => {
@@ -64,7 +57,7 @@ describe('preview text', () => {
     expect(messagePreviewText({ text: 'Release status', blocks: [{ type: 'rich_text', elements: [{ type: 'rich_text_section', elements: [{ type: 'text', text: 'Release status:' }] }] }, table] })).toBe('Release status:')
   })
 
-    it('keeps an emoji-only message as its emoji', () => {
+  it('keeps an emoji-only message as its emoji', () => {
     expect(messagePreviewText({ text: ':tada:' })).toBe('🎉')
   })
 

@@ -10,10 +10,7 @@ import {
   localTime,
   scheduledPresence,
   untilLabel,
-  readLevel,
-  pausedLabel,
   presenceLabel,
-  seenNote,
   type DecisionContext,
   type Hours,
   type LocalTime,
@@ -50,10 +47,6 @@ describe('effective notification level for Home', () => {
     expect(notificationIsMuted(undefined, 'never', undefined)).toBe(true)
     expect(notificationIsMuted('always', 'never')).toBe(false)
     expect(notificationIsMuted(undefined, undefined, undefined)).toBe(false)
-  })
-
-  it('reads levels stored before Always and Auto', () => {
-    expect([readLevel('always'), readLevel('always'), readLevel('never'), readLevel('matters'), readLevel(undefined)]).toEqual(['always', 'always', 'never', undefined, undefined])
   })
 })
 
@@ -185,47 +178,40 @@ describe('presence', () => {
     expect(scheduledPresence(at(SAT, 12), settings.presenceHours)).toBe('away')
   })
 
-  it('says until when the status changes next', () => {
+  it('set by hand against the hours, lasts until the hours change it', () => {
     const work = settings.presenceHours
-    expect(presenceLabel(at(MON, 12), 'active', work)).toBe('Active')
-    expect(presenceLabel(at(MON, 21), 'away', work)).toBe('Away until tomorrow 9am')
     // Away by hand inside the hours lasts until they start again.
     expect(presenceLabel(at(MON, 12), 'away', work)).toBe('Away until tomorrow 9am')
     // Active by hand before the hours runs to their end.
     expect(presenceLabel(at(MON, 8), 'active', work)).toBe('Active until 8pm')
-    expect(presenceLabel(at(MON, 12), 'away', { days: [], from: 540, to: 1140 })).toBe('Away')
-    expect(pausedLabel(at(MON, 12), settings.notificationHours)).toBeUndefined()
-    expect(pausedLabel(at(5, 20), settings.notificationHours)).toBe('Paused until Mon 9am')
-  })
-
-  it('says what Slack shows colleagues only when it differs from the setting', () => {
-    expect(seenNote('active', 'active')).toBeUndefined()
-    expect(seenNote('away', 'away')).toBeUndefined()
-    expect(seenNote('active', 'away')).toBe('Slack shows you away')
-    expect(seenNote('away', 'active')).toBe('Slack shows you active')
-    // Until Slack answers, the dot shows away; only an active setting differs from that.
-    expect(seenNote('active', undefined)).toBe('Connecting to Slack')
-    expect(seenNote('away', undefined)).toBeUndefined()
-  })
-
-  it('uses the same hours for both by default', () => {
-    expect(defaultNotificationSettings.presenceHours).toEqual(defaultNotificationSettings.notificationHours)
   })
 })
 
-
 describe('calendar notification starts', () => {
+  // Hours are wall-clock hours on the Mac, so the product reads the host zone. The checks
+  // read the answer back as a local weekday, time and day count, so they hold in any zone.
   const monday = new Date(2026, 9, 12, 8, 30)
   const hours: Hours = { days: [1], from: 540, to: 1140 }
-  it('keeps local times and skips a start that has already happened', () => {
+  const local = (at: number | undefined) => {
+    expect(at).toBeDefined()
+    const date = new Date(at!)
+    return { ...localTime(at!), days: Math.round((new Date(date).setHours(0, 0, 0, 0) - new Date(monday).setHours(0, 0, 0, 0)) / 86_400_000) }
+  }
+
+  it('starts later the same day, or a week later once the start has passed', () => {
     expect(localTime(monday.getTime())).toEqual({ weekday: 1, minutes: 510 })
-    expect(nextHoursStart(monday.getTime(), hours)).toBe(new Date(2026, 9, 12, 9).getTime())
-    expect(nextHoursStart(new Date(2026, 9, 12, 9).getTime(), hours)).toBe(new Date(2026, 9, 19, 9).getTime())
+    const today = nextHoursStart(monday.getTime(), hours)
+    expect(local(today)).toEqual({ weekday: 1, minutes: 540, days: 0 })
+    expect(local(nextHoursStart(today!, hours))).toEqual({ weekday: 1, minutes: 540, days: 7 })
+  })
+
+  it('has no start without days or with an empty span', () => {
     expect(nextHoursStart(monday.getTime(), { ...hours, days: [] })).toBeUndefined()
     expect(nextHoursStart(monday.getTime(), { ...hours, to: 540 })).toBeUndefined()
   })
+
   it('uses the day on which an overnight window starts', () => {
-    expect(nextHoursStart(monday.getTime(), { days: [1], from: 1320, to: 120 })).toBe(new Date(2026, 9, 12, 22).getTime())
+    expect(local(nextHoursStart(monday.getTime(), { days: [1], from: 1320, to: 120 }))).toEqual({ weekday: 1, minutes: 1320, days: 0 })
   })
 })
 

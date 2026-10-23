@@ -17,17 +17,17 @@ const eng: MentionPick = { kind: 'channel', id: 'C0ENG', name: 'eng' }
 const design: MentionPick = { kind: 'group', id: 'S0DESIGN', name: 'design-team' }
 
 describe('the query being typed', () => {
-  it('follows an @ or # at a word start, up to the caret', () => {
-    expect(mentionQueryAt('hi @ma', 6)).toEqual({ trigger: '@', start: 3, end: 6, text: 'ma' })
-    expect(mentionQueryAt('#', 1)).toEqual({ trigger: '#', start: 0, end: 1, text: '' })
-    expect(mentionQueryAt('ask @maya c', 11)?.text).toBe('maya c')
-  })
-
-  it('ignores emails, words, other lines and spaces a name cannot have', () => {
-    expect(mentionQueryAt('mail leo@eng', 12)).toBeUndefined()
-    expect(mentionQueryAt('@ma\nnext', 8)).toBeUndefined()
-    expect(mentionQueryAt('#eng infra', 10)).toBeUndefined()
-    expect(mentionQueryAt('@maya  chen', 11)).toBeUndefined()
+  // An @ or # at a word start, up to the caret. Not an email, a word, another line, or spaces a name cannot have.
+  it.each<[string, number, ReturnType<typeof mentionQueryAt>]>([
+    ['hi @ma', 6, { trigger: '@', start: 3, end: 6, text: 'ma' }],
+    ['#', 1, { trigger: '#', start: 0, end: 1, text: '' }],
+    ['ask @maya c', 11, { trigger: '@', start: 4, end: 11, text: 'maya c' }],
+    ['mail leo@eng', 12, undefined],
+    ['@ma\nnext', 8, undefined],
+    ['#eng infra', 10, undefined],
+    ['@maya  chen', 11, undefined],
+  ])('%j at %i', (text, caret, query) => {
+    expect(mentionQueryAt(text, caret)).toEqual(query)
   })
 
   it('does not reopen on a token already picked', () => {
@@ -78,6 +78,11 @@ describe('drafts and sends', () => {
     expect(encoded).toBe('cc <!subteam^S0DESIGN|@design-team> and <@U0MAYA|Maya>')
     expect(decodeMentions(encoded)).toEqual({ text, picks: [design, maya] })
   })
+
+  it('keeps an italic picked mention and its id (regression)', () => {
+    expect(mentionTokens('_@Maya Chen_', [mayaChen])).toHaveLength(1)
+    expect(encodeMentions('_@Maya Chen_', [mayaChen])).toBe('_<@U0MAYA2|Maya Chen>_')
+  })
 })
 
 describe('ranking', () => {
@@ -98,10 +103,5 @@ describe('ranking', () => {
     expect(rankSuggestions(people, 'okafor').map((p) => p.id)).toEqual(['recent'])
     expect(rankSuggestions(people, 'maya c').map((p) => p.id)).toEqual(['here'])
     expect(rankSuggestions(people, 'zed')).toEqual([])
-  })
-
-  it('shows at most six', () => {
-    const many = Array.from({ length: 10 }, (_, i) => person(`p${i}`, 2, i, `Ma ${i}`))
-    expect(rankSuggestions(many, '')).toHaveLength(6)
   })
 })

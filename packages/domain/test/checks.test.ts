@@ -1,157 +1,84 @@
 import { describe, expect, it } from 'bun:test'
-import { audienceCheck, clarityCheck, sendChecksApply } from '../src/index'
+import { audienceCheck, clarityCheck, sendChecksApply, type ClarityPrefs } from '../src/index'
 import { eng, hiring, maya } from './fixtures'
 
-describe('doubled words', () => {
-  it('removes doubled words', () => {
-    const r = clarityCheck('I think the the plan is fine.')
-    expect(r?.fixes.map((f) => f.label)).toEqual(['the the → the'])
-    expect(r?.fixed).toBe('I think the plan is fine.')
-    expect(clarityCheck('He had had enough.')).toBeUndefined()
-  })
-
-  it('removes a doubled is, except where English doubles it', () => {
-    const r = clarityCheck('The build is is green.')
-    expect(r?.fixes.map((f) => f.label)).toEqual(['is is → is'])
-    expect(r?.fixed).toBe('The build is green.')
-    expect(clarityCheck('Sure, what it is is a bug.')).toBeUndefined()
-  })
-
-  it('finds doubled words whatever their case', () => {
-    const r = clarityCheck('The the build is green.')
-    expect(r?.fixes.map((f) => f.label)).toEqual(['The the → The'])
-    expect(r?.fixed).toBe('The build is green.')
-    expect(clarityCheck('I think THE the build is green.')?.fixed).toBe('I think THE build is green.')
-  })
-
-  it('finds a word doubled across a line break', () => {
-    const r = clarityCheck('I think the\nthe build is green.')
-    expect(r?.fixes.map((f) => f.label)).toEqual(['the the → the'])
-    expect(r?.fixed).toBe('I think the\nbuild is green.')
-    // A quote or code line on either side is left alone.
-    expect(clarityCheck('> I think the\nthe build is green.')).toBeUndefined()
-    expect(clarityCheck('I think `the`\nthe build is green.')).toBeUndefined()
-  })
-})
+const long = (words: number, prefix = '') => prefix + Array.from({ length: words }, (_, i) => `word${i}`).join(' ')
 
 describe('clarity check', () => {
-  it('sends clean text without a check', () => {
-    expect(clarityCheck('Friday works for me.')).toBeUndefined()
-    expect(clarityCheck('Can you take a look?')).toBeUndefined()
+  // [typed, options, what Fix and send sends; undefined when the text is sent without a check]
+  it.each<[string, ClarityPrefs | undefined, string | undefined]>([
+    ['Friday works for me.', undefined, undefined],
+    ['Can you take a look?', undefined, undefined],
+    // Doubled words, whatever their case and across a line break; not where English doubles them.
+    ['I think the the plan is fine.', undefined, 'I think the plan is fine.'],
+    ['He had had enough.', undefined, undefined],
+    ['The build is is green.', undefined, 'The build is green.'],
+    ['Sure, what it is is a bug.', undefined, undefined],
+    ['The the build is green.', undefined, 'The build is green.'],
+    ['I think THE the build is green.', undefined, 'I think THE build is green.'],
+    ['I think the\nthe build is green.', undefined, 'I think the\nbuild is green.'],
+    ['> I think the\nthe build is green.', undefined, undefined],
+    ['I think `the`\nthe build is green.', undefined, undefined],
+    // Typos from the table keep their capital.
+    ['Did you recieve it? Recieve again.', undefined, 'Did you receive it? Receive again.'],
+    // A missing question mark; short exclamations and statements are left alone; never on a quote.
+    ['Can we ship this on Friday', undefined, 'Can we ship this on Friday?'],
+    ['Can we ship this on Friday.', undefined, 'Can we ship this on Friday?'],
+    ['Can do', undefined, undefined],
+    ['We ship on Friday', undefined, undefined],
+    ['> are we done\nCan we ship this on Friday', undefined, '> are we done\nCan we ship this on Friday?'],
+    // Quotes, code, URLs, emails, mentions and emoji are left alone; a fence ends.
+    ['> teh original the the\n`teh` and https://example.com/teh teh@example.com @Teh Person :teh: stays', undefined, undefined],
+    ['```\nteh code\n```\nteh prose', undefined, '```\nteh code\n```\nthe prose'],
+    // A lone lowercase i only when asked to; lowercase style is never flagged by default.
+    ["i think i'll do it, if i can.", { capitalI: true }, "I think I'll do it, if I can."],
+    ['see i.e. the doc', { capitalI: true }, undefined],
+    ["i think i'll ship it friday, im around after lunch", undefined, "i think i'll ship it friday, i'm around after lunch"],
+    ['sounds good, i can take it', undefined, undefined],
+    ['i think so', { capitalI: false }, undefined],
+    ['i recieve it', { capitalI: false }, 'i receive it'],
+    ['im ready', { capitalI: false }, "i'm ready"],
+    // Each switch turns off its own kind.
+    ['i recieve the the report', { typos: false, capitalI: true }, 'I recieve the the report'],
+    ['can i recieve the report', { questionMarks: false }, 'can i receive the report'],
+  ])('%j with %j', (typed, options, fixed) => {
+    expect(clarityCheck(typed, options)?.fixed).toBe(fixed)
   })
 
-  it('fixes typos from the table, keeping the capital', () => {
-    const r = clarityCheck('Did you recieve it? Recieve again.')
-    expect(r?.fixes.map((f) => f.label)).toEqual(['recieve → receive', 'Recieve → Receive'])
-    expect(r?.fixed).toBe('Did you receive it? Receive again.')
-  })
-
-  it('capitalises a lone lowercase i only when asked to', () => {
-    const r = clarityCheck("i think i'll do it, if i can.", { capitalI: true })
-    expect(r?.fixes.map((f) => f.label)).toEqual(['i → I'])
-    expect(r?.fixed).toBe("I think I'll do it, if I can.")
-    expect(clarityCheck('see i.e. the doc', { capitalI: true })).toBeUndefined()
-  })
-
-
-  it('adds a missing question mark to a question', () => {
-    const r = clarityCheck('Can we ship this on Friday')
-    expect(r?.fixes.map((f) => f.label)).toEqual(['add ?'])
-    expect(r?.fixed).toBe('Can we ship this on Friday?')
-    expect(clarityCheck('Can we ship this on Friday.')?.fixed).toBe('Can we ship this on Friday?')
-    // Short exclamations and non-questions are left alone.
-    expect(clarityCheck('Can do')).toBeUndefined()
-    expect(clarityCheck('We ship on Friday')).toBeUndefined()
-  })
-
-  it('summarises the fixes as the bar shows them', () => {
-    const r = clarityCheck('Did you recieve the the invite')
-    expect(r?.summary).toBe('3 fixes: recieve → receive, the the → the, add ?')
-    expect(r?.confidence).toBeGreaterThan(0)
-    expect(r?.confidence).toBeLessThanOrEqual(1)
-    expect(r?.primaryLabel).toBe('Fix and send')
-    expect(r?.secondaryLabel).toBe('Send as is')
-    expect(clarityCheck('teh plan')?.summary).toBe('1 fix: teh → the')
-  })
-
-  it('notes a sentence over 40 words without rewriting it', () => {
-    const long = Array.from({ length: 45 }, (_, i) => `word${i}`).join(' ') + '.'
-    const r = clarityCheck(long)
-    expect(r?.fixes).toEqual([])
-    expect(r?.fixed).toBe(long)
-    expect(r?.longSentence).toBe(true)
-    expect(r?.summary).toBe('Reads a bit long. One sentence runs over 40 words.')
-    // A note with nothing to fix is less certain than a table fix.
-    expect(r?.confidence).toBeLessThan(clarityCheck('teh plan')!.confidence)
-    expect(r?.primaryLabel).toBe('Send')
-    expect(r?.secondaryLabel).toBe('Keep editing')
-  })
-
-  it('combines fixes with the long-sentence note', () => {
-    const long = 'teh ' + Array.from({ length: 45 }, (_, i) => `w${i}`).join(' ') + '.'
-    expect(clarityCheck(long)?.summary).toBe('1 fix: teh → the · One sentence runs over 40 words.')
-  })
-
-  it('leaves quotes, code, urls, emails, mentions and emoji alone', () => {
-    const text = '> teh original the the\n`teh` and https://example.com/teh teh@example.com @Teh Person :teh: stays'
+  it('notes a sentence over 40 words without rewriting it, with less confidence than a fix', () => {
+    const text = long(45) + '.'
     const r = clarityCheck(text)
-    expect(r).toBeUndefined()
-    const fenced = '```\nteh code\n```\nteh prose'
-    expect(clarityCheck(fenced)?.fixed).toBe('```\nteh code\n```\nthe prose')
+    expect(r?.fixes).toEqual([])
+    expect(r?.fixed).toBe(text)
+    expect(r?.longSentence).toBe(true)
+    expect(r?.confidence).toBeGreaterThan(0)
+    expect(r?.confidence).toBeLessThan(clarityCheck('teh plan')!.confidence)
+    expect(clarityCheck('teh plan')!.confidence).toBeLessThanOrEqual(1)
   })
 
-  it('puts the question mark on the reply, not on a quote', () => {
-    const r = clarityCheck('> are we done\nCan we ship this on Friday')
-    expect(r?.fixed).toBe('> are we done\nCan we ship this on Friday?')
-  })
-})
-
-describe('audience check', () => {
-  it('warns about hiring or people details in a public channel', () => {
-    const r = audienceCheck("Let's discuss the candidate's salary before the offer", eng)
-    expect(r?.matched).toEqual(['candidate', 'salary', 'offer'])
-    expect(r?.message).toBe('This reads like hiring or people detail. eng is a public channel.')
-  })
-
-  it('stays quiet in private channels and DMs, and for ordinary text', () => {
-    expect(audienceCheck('candidate salary', hiring)).toBeUndefined()
-    expect(audienceCheck('candidate salary', maya)).toBeUndefined()
-    expect(audienceCheck('the compiler is slow', eng)).toBeUndefined()
-    expect(audienceCheck('', eng)).toBeUndefined()
-  })
-
-  it('matches whole words only', () => {
-    expect(audienceCheck('compose the offering', eng)).toBeUndefined()
-    expect(audienceCheck('new headcount for Q1', eng)?.matched).toEqual(['headcount'])
-    expect(audienceCheck('performance review tomorrow', eng)?.matched).toEqual(['performance review'])
-  })
-})
-
-describe('clarity preferences', () => {
-  it('never flags lowercase style by default', () => {
-    expect(clarityCheck("i think i'll ship it friday, im around after lunch")?.fixed).toBe("i think i'll ship it friday, i'm around after lunch")
-    expect(clarityCheck('sounds good, i can take it')).toBeUndefined()
-  })
-  it('leaves lowercase i alone without suppressing typos', () => {
-    expect(clarityCheck('i think so', { capitalI: false })).toBeUndefined()
-    expect(clarityCheck('i recieve it', { capitalI: false })?.fixed).toBe('i receive it')
-  })
-  it('turns off typos and doubled words together, leaving capital i enabled', () => {
-    expect(clarityCheck('i recieve the the report', { typos: false, capitalI: true })?.fixed).toBe('I recieve the the report')
-  })
-  it('turns off question marks independently', () => {
-    expect(clarityCheck('can i recieve the report', { questionMarks: false })?.fixed).toBe('can i receive the report')
-  })
-  it('turns off the long sentence note independently', () => {
-    const text = 'i ' + Array.from({ length: 41 }, (_, i) => `word${i}`).join(' ')
+  it('turns off the long sentence note on its own', () => {
+    const text = long(41, 'i ')
     expect(clarityCheck(text, { capitalI: true, longSentences: false })?.longSentence).toBe(false)
     expect(clarityCheck(text, { capitalI: false })?.longSentence).toBe(true)
     expect(clarityCheck(text, { capitalI: false, longSentences: false })).toBeUndefined()
   })
 })
 
-it('keeps lowercase contractions when Capital i is off', () => {
-  expect(clarityCheck('im ready', { capitalI: false })?.fixed).toBe("i'm ready")
+describe('audience check', () => {
+  it.each([
+    ["Let's discuss the candidate's salary before the offer", eng, ['candidate', 'salary', 'offer']],
+    ['new headcount for Q1', eng, ['headcount']],
+    ['performance review tomorrow', eng, ['performance review']],
+    // Whole words only.
+    ['compose the offering', eng, undefined],
+    ['the compiler is slow', eng, undefined],
+    ['', eng, undefined],
+    // Private channels and DMs are not checked.
+    ['candidate salary', hiring, undefined],
+    ['candidate salary', maya, undefined],
+  ] as const)('%j in %#', (text, channel, matched) => {
+    expect(audienceCheck(text, channel)?.matched).toEqual(matched)
+  })
 })
 
 describe('which messages the checks on send read', () => {
