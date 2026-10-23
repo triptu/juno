@@ -107,16 +107,16 @@ test('a root config change keeps changed desktop specs and their private helpers
   assert.ok(!desktop.some((file) => file.endsWith('.perf.spec.ts')))
 })
 
-test('protocol checks follow their own inputs, not unrelated sync or UI edits', () => {
+test('protocol checks follow spec and outbox inputs, including transitive dependencies', () => {
   const scripts = (file) => plan('--batch', '--files', file).steps.map((step) => step.script)
   assert.ok(scripts('specs/readstate.qnt').includes('specs:check'))
   assert.ok(!scripts('specs/readstate.qnt').includes('specs:conformance'))
   assert.ok(scripts('packages/engine/src/send/worker.ts').includes('specs:conformance'))
   assert.ok(!scripts('packages/engine/src/send/worker.ts').includes('specs:check'))
-  for (const file of ['packages/sync/src/followFence.ts', 'packages/views/src/Sidebar.tsx']) {
-    assert.ok(!scripts(file).includes('specs:check'))
-    assert.ok(!scripts(file).includes('specs:conformance'))
-  }
+  assert.ok(scripts('packages/sync/src/followFence.ts').includes('specs:conformance'))
+  assert.ok(!scripts('packages/sync/src/followFence.ts').includes('specs:check'))
+  assert.ok(!scripts('packages/views/src/Sidebar.tsx').includes('specs:check'))
+  assert.ok(!scripts('packages/views/src/Sidebar.tsx').includes('specs:conformance'))
 })
 
 test('a repair conservatively reruns app suites when a deleted source cannot be followed in the current graph', () => {
