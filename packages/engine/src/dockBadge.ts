@@ -31,7 +31,7 @@ const threadLevel = level(`'$.threads."' || i.topic_id || '"'`)
 const channelLevel = level(`'$.channels."' || i.channel || '"'`)
 const personLevel = (sender: string) => level(`'$.people."' || COALESCE(${sender}, '') || '"'`)
 /** What Auto decided for a logged message: 0 not read, 1 stay, 2 notify. */
-const AUTO = `CASE WHEN n.decided_by IN ('closer', 'live', 'instruction', 'reading') THEN CASE n.outcome WHEN 'notify' THEN 2 ELSE 1 END ELSE 0 END`
+const AUTO = `CASE WHEN n.decided_by IN ('closer', 'addressedElsewhere', 'live', 'instruction', 'reading') THEN CASE n.outcome WHEN 'notify' THEN 2 ELSE 1 END ELSE 0 END`
 const knownRead = `(r.observed_at IS NOT NULL OR r.last_read_ts IS NOT NULL OR (i.kind = 'main' AND cr.counts_updated IS NOT NULL) OR (i.kind = 'thread' AND s.slack_last_read IS NOT NULL))`
 
 export function badgeStatement(policy: ReturnType<typeof badgePolicy>, self: string) {

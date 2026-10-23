@@ -3,8 +3,8 @@
  * banner) or stays (unread in Juno). The first step that applies decides:
  * notification hours, Always, Never or an ignored channel (a direct mention
  * gets through), the Always notify switches, AI assist off, then Auto: a
- * closer, a live conversation, Juno's reading. A banner then holds the
- * conversation quiet for a minute.
+ * closer, a message addressed to someone else, a live conversation, Juno's
+ * reading. A banner then holds the conversation quiet for 10 seconds.
  */
 import { channelLabel, firstName, isDm, type ChannelInfo } from './channel'
 import type { UserId } from './ids'
@@ -34,15 +34,16 @@ export interface NotificationCandidate {
    * and an ignored channel.
    */
   readonly mentionsMeDirectly?: boolean
+  /** The names of the other people the message mentions by name, in order. */
+  readonly mentionsOthers?: ReadonlyArray<string>
   readonly text?: string
   readonly facts?: ConversationFacts
   readonly at: LocalTime
 }
 
-/** The options of the reading's `needsYou` question, the first five of which need the owner. */
+/** The options of the reading's `needsYou` question. Which of them count towards notifying depends on the conversation (`counts`). */
 export const needsYouOptions = ['ask', 'answer', 'follow_up', 'decision', 'serious', 'greeting', 'fyi', 'chatter'] as const
 export type NeedsYou = (typeof needsYouOptions)[number]
-const needsOwner: ReadonlyArray<NeedsYou> = ['ask', 'answer', 'follow_up', 'decision', 'serious']
 
 /** Juno's reading of one message: the classifier's answers as they came, before any threshold. */
 export interface Reading {
@@ -59,13 +60,13 @@ export const INSTRUCTION_STAY_CONFIDENCE = 0.85
 export const NEEDS_YOU_THRESHOLD = 0.5
 /** The owner wrote in the topic this recently: it is a live conversation. */
 export const LIVE_MINUTES = 10
-/** After a banner, the same topic does not notify again for this long. */
-export const BURST_SECONDS = 60
+/** After a banner, the same topic does not notify again for this many seconds; later messages are decided on their own. */
+export const BURST_SECONDS = 10
 
 export type NotificationOutcome = 'notify' | 'stay'
 export type DecidedBy =
   | 'hours' | 'always' | 'never' | 'ignored' | 'directMention' | 'alwaysNotify' | 'aiOff'
-  | 'closer' | 'live' | 'instruction' | 'reading' | 'timeout' | 'burst'
+  | 'closer' | 'addressedElsewhere' | 'live' | 'instruction' | 'reading' | 'timeout' | 'burst'
 
 /** What a Notify me choice applies to: a thread topic id, a channel or DM id, or a user id. */
 export interface NotifyTarget {
@@ -91,7 +92,7 @@ export interface DecisionContext {
   readonly userName?: (id: string) => string | undefined
 }
 
-const CLOSERS = new Set(['thanks', 'thank you', 'ty', 'thx', 'got it', 'ok', 'okay', 'k', 'cool', 'great', 'perfect', 'sounds good', 'will do', 'np', 'no worries'])
+const CLOSERS = new Set(['thanks', 'thank you', 'ty', 'thx', 'got it', 'ok', 'okay', 'k', 'sure', 'yep', 'cool', 'great', 'nice', 'perfect', 'sounds good', 'will do', 'np', 'no worries'])
 const THANKS = new Set(['thanks', 'thank you', 'ty', 'thx'])
 const EMOJI_ONLY = /^(?:\s|:[a-z0-9_+-]+:|\p{Extended_Pictographic}|\p{Emoji_Modifier}|\u200d|\ufe0f)+$/u
 
@@ -124,7 +125,7 @@ export function decideNotification(
   if ('needsReading' in decision || decision.outcome === 'stay') return decision
   const since = candidate.facts?.bannerSecondsAgo
   return since !== undefined && since < BURST_SECONDS
-    ? { outcome: 'stay', decidedBy: 'burst', reason: 'Juno notified you about this conversation less than a minute ago.' }
+    ? { outcome: 'stay', decidedBy: 'burst', reason: 'Juno notified you about this conversation a few seconds ago.' }
     : decision
 }
 
@@ -198,12 +199,16 @@ function bySwitches(candidate: NotificationCandidate, settings: NotificationSett
   return undefined
 }
 
-/** Auto: a closer, a live conversation, then Juno's reading. */
+/** Auto: a closer, a message addressed to someone else, a live conversation, then Juno's reading. */
 function auto(candidate: NotificationCandidate, settings: NotificationSettings, names: Names, reading: Reading | 'failed' | undefined): NotificationDecision | NeedsReading {
   const facts = candidate.facts ?? {}
   const text = candidate.text ?? ''
   if (facts.ownerWroteLast === true && isCloser(text)) {
     return { outcome: 'stay', decidedBy: 'closer', reason: `${names.first} ${THANKS.has(plain(text)) ? 'thanked you' : 'closed the conversation'}. Nothing to do.` }
+  }
+  const other = candidate.mentionsOthers?.[0]
+  if (candidate.channel.kind !== 'im' && other !== undefined && candidate.mentionsMeDirectly !== true) {
+    return { outcome: 'stay', decidedBy: 'addressedElsewhere', reason: `Asks ${firstName(other)}, not you.` }
   }
   const minutes = facts.ownerWroteMinutesAgo
   if (minutes !== undefined && minutes <= LIVE_MINUTES) {
@@ -232,18 +237,41 @@ function byInstruction(settings: NotificationSettings, reading: Reading): Notifi
   }
 }
 
-/** Notifies when the needs-the-owner options add up to the threshold. The reason names the likeliest option on the side that won. */
+/**
+ * Whether an option counts towards notifying here: an answer, a follow-up and
+ * something serious always; an ask in a DM or group DM, or elsewhere when the
+ * owner started the thread, wrote the previous message or is named; a
+ * decision only in a thread the owner started.
+ */
+function counts(option: NeedsYou, candidate: NotificationCandidate): boolean {
+  const facts = candidate.facts ?? {}
+  switch (option) {
+    case 'answer':
+    case 'follow_up':
+    case 'serious':
+      return true
+    case 'ask':
+      return isDm(candidate.channel.kind) || facts.ownerStartedThread === true || facts.ownerWroteLast === true || candidate.mentionsMeDirectly === true
+    case 'decision':
+      return facts.ownerStartedThread === true
+    default:
+      return false
+  }
+}
+
+/** Notifies when the options that count add up to the threshold. The reason names the likeliest option on the side that won. */
 function byNeeds(candidate: NotificationCandidate, names: Names, reading: Reading): NotificationDecision {
   const p = (option: NeedsYou) => reading.probabilities[option] ?? 0
-  const notify = needsOwner.reduce((sum, option) => sum + p(option), 0) >= NEEDS_YOU_THRESHOLD
-  const side = needsYouOptions.filter((option) => needsOwner.includes(option) === notify)
+  const counted = needsYouOptions.filter((option) => counts(option, candidate))
+  const notify = counted.reduce((sum, option) => sum + p(option), 0) >= NEEDS_YOU_THRESHOLD
+  const side = needsYouOptions.filter((option) => counted.includes(option) === notify)
   const named = side.includes(reading.needsYou) ? reading.needsYou : side.reduce((best, option) => (p(option) > p(best) ? option : best))
   const place = isDm(candidate.channel.kind) ? '' : ` in ${names.where}`
   const reasons: Record<NeedsYou, string> = {
-    ask: `${names.first} asks you something.`,
+    ask: notify ? `${names.first} asks you something.` : `${names.first} asks everyone, not you.`,
     answer: `${names.first} answered your question.`,
     follow_up: `${names.first} is following up, and you haven't replied.`,
-    decision: `A decision is being made${place}.`,
+    decision: notify ? `A decision is being made${place}.` : `A discussion${place}, with nothing asked of you.`,
     serious: `Something serious${place}, and you're part of it.`,
     greeting: `${names.first} said hello. Nothing asked yet.`,
     fyi: 'An update with nothing asked of you.',
