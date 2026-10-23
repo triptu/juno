@@ -37,30 +37,30 @@ export type MenuItem<A extends string> =
 
 /**
  * Notify me (spec sections 5 and 14, inventory 15.3). On a thread the
- * choice is also how you follow it: Every message and When it matters
- * follow it in Slack, Never unfollows it.
+ * choice is also how you follow it: Always and Auto follow it in Slack,
+ * Never unfollows it.
  */
-export type NotifyChoice = NotifyLevel | 'matters'
-export type NotifyAction = 'notify-every' | 'notify-matters' | 'notify-never'
+export type NotifyChoice = NotifyLevel | 'auto'
+export type NotifyAction = 'notify-always' | 'notify-auto' | 'notify-never'
 
-const notifyLabels: Record<NotifyChoice, string> = { every: 'Every message', matters: 'When it matters', never: 'Never' }
+const notifyLabels: Record<NotifyChoice, string> = { always: 'Always', auto: 'Auto', never: 'Never' }
 
 /**
  * A thread's Notify me choice: Never when you do not follow it in Slack,
- * else Every message when its level says so, else When it matters.
+ * else Always when its level says so, else Auto.
  */
 export function threadNotifyChoice(subscribed: boolean, level?: NotifyLevel): NotifyChoice {
-  return !subscribed ? 'never' : level === 'every' ? 'every' : 'matters'
+  return !subscribed ? 'never' : level === 'always' ? 'always' : 'auto'
 }
 
-/** A channel's, DM's or person's Notify me choice: When it matters unless a level is stored. */
+/** A channel's, DM's or person's Notify me choice: Auto unless a level is stored. */
 export function notifyChoice(level: NotifyLevel | undefined): NotifyChoice {
-  return level ?? 'matters'
+  return level ?? 'auto'
 }
 
 /** The Notify me choice an action picks. */
 export function notifyChoiceOf(action: NotifyAction): NotifyChoice {
-  return action === 'notify-every' ? 'every' : action === 'notify-matters' ? 'matters' : 'never'
+  return action === 'notify-always' ? 'always' : action === 'notify-auto' ? 'auto' : 'never'
 }
 
 /** Whether a thread with this choice is followed in Slack. */
@@ -142,7 +142,7 @@ function item<A extends string>(id: A, label: string, hint?: string): MenuItem<A
 
 function notifyMenu(current: NotifyChoice, label = 'Notify me'): MenuItem<NotifyAction> {
   const choice = (level: NotifyChoice): MenuItem<NotifyAction> => ({ type: 'item', id: `notify-${level}`, label: notifyLabels[level], checked: level === current })
-  return { type: 'submenu', label, hint: notifyLabels[current], items: [choice('every'), choice('matters'), choice('never')] }
+  return { type: 'submenu', label, hint: notifyLabels[current], items: [choice('always'), choice('auto'), choice('never')] }
 }
 
 /** How a toast names a choice: "#design-review: Never". */
