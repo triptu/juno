@@ -48,6 +48,8 @@ export default defineConfig<object, { lane: Lane }>({
       testMatch: BROWSER_SPECS.map((file) => resolve(__dirname, 'e2e', file)),
       dependencies: ['build-web'],
       fullyParallel: true,
+      // A test that passes only on a second try is a bug to fix.
+      retries: 0,
       workers: browserWorkers,
       grepInvert: new RegExp(tagPattern(['@electron', ...excludedTags])),
       use: {
