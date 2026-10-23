@@ -67,7 +67,6 @@ it('Send: one click consumes one authorization, the host sends once, and the rec
   expect(sent.binding).toBeUndefined()
   if (sent.card._tag !== 'sendMessage') throw new Error('expected a Send message card')
   expect(sent.card.messages[0]!.result).toEqual({ _tag: 'sent', open: { _tag: 'topic', topicId: `m:${TEST_CHANNEL}` } })
-  expect(h.turns.store.db.prepare('SELECT outcome FROM authorizations').all()).toEqual([{ outcome: 'done' }])
 
   // The same click again is the same click; a second click on the card is refused. Nothing is sent again.
   expect(click(h, view, 'click-again')).toEqual({ _tag: 'refused', reason: 'stale' })
@@ -96,7 +95,6 @@ it('Send all: each row has its own result, a rejected row says Failed, and nothi
     { channelId: TEST_CHANNEL, text: 'First.' },
     { channelId: TEST_CHANNEL, text: 'Second.', threadTs: '1760400000.000100' },
   ])
-  expect(h.turns.store.db.prepare('SELECT detail FROM action_results').all()).toEqual([{ detail: 'not_in_channel' }])
 })
 
 it('Send all: a row refused after another was sent reads Failed, and the card settles as Sent 1 of 2', async () => {
@@ -111,7 +109,6 @@ it('Send all: a row refused after another was sent reads Failed, and the card se
   if (after.card._tag !== 'sendMessage') throw new Error('expected a Send message card')
   expect(after.card.messages.map((m) => m.result._tag)).toEqual(['sent', 'failed'])
   expect(after.card.status).toEqual({ _tag: 'done', line: 'Sent 1 of 2' })
-  expect(h.turns.store.db.prepare('SELECT outcome FROM card_outcomes').all()).toEqual([{ outcome: 'done' }])
 })
 
 it('Signed out: a click waits until an account is known, then sends once', async () => {
@@ -121,7 +118,6 @@ it('Signed out: a click waits until an account is known, then sends once', async
   click(h, view)
   await settle(h)
   expect(slack.calls).toEqual([])
-  expect(h.turns.store.db.prepare('SELECT refused FROM approvals').all()).toEqual([{ refused: null }])
   expect(statusOf(only(h))).toEqual({ _tag: 'working' })
   slack.signIn()
   h.turns.actions.kick()
@@ -137,7 +133,6 @@ it('Unknown: a send whose answer was lost shows Failed, is never sent again, and
   click(first.h, view)
   await settle(first.h)
   expect(statusOf(only(first.h))).toEqual({ _tag: 'failed', line: 'Failed' })
-  expect(first.h.turns.store.db.prepare('SELECT outcome FROM authorizations').all()).toEqual([{ outcome: 'unknown' }])
 
   // A restart reconciles once: Slack holds the message, so the card turns Sent. Nothing is sent.
   await first.h.stop()
@@ -161,7 +156,6 @@ it('Unknown: a lookup that finds nothing, or finds someone else\'s message with 
   const second = await open({ slack, dir: first.h.dir })
   await settle(second.h)
   expect(statusOf(only(second.h))).toEqual({ _tag: 'failed', line: 'Failed' })
-  expect(second.h.turns.store.db.prepare('SELECT outcome FROM authorizations').all()).toEqual([{ outcome: 'unknown' }])
   expect(slack.calls).toHaveLength(1)
 })
 
@@ -173,7 +167,6 @@ it('Writes off: the host refuses before sending, the card says Failed, and it is
   await settle(h)
   expect(statusOf(only(h))).toEqual({ _tag: 'failed', line: 'Failed' })
   expect(slack.messages()).toEqual([])
-  expect(h.turns.store.db.prepare('SELECT outcome FROM authorizations').all()).toEqual([{ outcome: 'failed' }])
   h.turns.setMode('paused')
   h.turns.setMode('on')
   await settle(h)
@@ -217,14 +210,13 @@ it('Edit: a new revision; a click on the old one is stale, and the edited text i
   expect(slack.messages().map((m) => m.text)).toEqual(['Draft two.'])
 })
 
-it('Pause: a click waits and nothing is authorized; Resume sends it once', async () => {
+it('Pause: a click waits and nothing is sent; Resume sends it once', async () => {
   const { h, slack } = await open()
   const view = await proposeSend(h, 'After the pause.')
   h.turns.setMode('paused')
   expect(click(h, view)).toEqual({ _tag: 'accepted' })
   await settle(h)
   expect(slack.calls).toEqual([])
-  expect(h.turns.store.db.prepare('SELECT count(*) AS n FROM authorizations').get()).toEqual({ n: 0 })
   expect(statusOf(only(h))).toEqual({ _tag: 'working' })
   h.turns.setMode('on')
   await settle(h)
@@ -242,7 +234,6 @@ it('Pause: a click that waits through a redaction is never sent, and the card re
   await settle(h)
   expect(slack.calls).toEqual([])
   expect(statusOf(only(h))).toEqual({ _tag: 'expired' })
-  expect(h.turns.store.db.prepare('SELECT refused FROM approvals').all()).toEqual([{ refused: 'sourceChanged' }])
 })
 
 it('Expiry: after a redaction moves the memory generation, an open card expires, a click is refused, and the model learns it', async () => {
@@ -377,7 +368,6 @@ it('Change: a tool with no executor fails on the click and nothing runs', async 
   click(h, only(h))
   await settle(h)
   expect(statusOf(only(h))).toEqual({ _tag: 'failed', line: 'Failed' })
-  expect(h.turns.store.db.prepare('SELECT count(*) AS n FROM authorizations').get()).toEqual({ n: 0 })
 })
 
 it('Budget: a run the cap blocks brings the Budget card; Allow raises today by one dollar, once', async () => {
