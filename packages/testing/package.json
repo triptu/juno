@@ -5,7 +5,8 @@
   "description": "Shared Playwright helpers for the gallery and the desktop e2e tests. Test code only; no app package imports it.",
   "type": "module",
   "exports": {
-    "./layout-shift": "./src/layoutShift.ts"
+    "./layout-shift": "./src/layoutShift.ts",
+    "./eventually": "./src/eventually.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
