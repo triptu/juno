@@ -1,5 +1,5 @@
 import { cpus } from 'node:os'
-import { resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { defineConfig } from '@playwright/test'
 import type { Lane } from './e2e/fixtures'
 import { BROWSER_SPECS } from './e2e/lanes'
@@ -19,9 +19,11 @@ const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 // Slack and user-data directory, so a machine of its own (bun run remote) can
 // run more with JUNO_E2E_WORKERS.
 const electronWorkers = Number(process.env.JUNO_E2E_WORKERS ?? 1)
-// A browser test is a headless page and a small Node host: about half a core
-// and 0.4 GB. Half the cores locally, where other agents share the Mac.
-const browserWorkers = Number(process.env.JUNO_BROWSER_WORKERS ?? Math.max(2, Math.floor(cpus().length / 2)))
+// A browser test is a headless page and a small Node host: about two threads
+// and 0.6 GB while it runs. One worker per two threads of the remote job's
+// allocation (a container sees every core of its host), else of this machine.
+const threads = Number(process.env.JUNO_RUNNER_JOB_CORES) || cpus().length
+const browserWorkers = Number(process.env.JUNO_BROWSER_WORKERS ?? Math.max(1, Math.floor(threads / 2)))
 
 // The electron project runs its own files whole, and of the browser files
 // only tests tagged @electron (they need main) or @canary (they run in both).
@@ -29,13 +31,20 @@ const browserWorkers = Number(process.env.JUNO_BROWSER_WORKERS ?? Math.max(2, Ma
 // space-separated, so one pattern selects both.
 const electronGrep = new RegExp(`${tagPattern(['@electron', '@canary'])}|^(?!\\s*\\S+\\s(?:${BROWSER_SPECS.map(escape).join('|')})\\s)`)
 
+// Each project, and each step of a `test:plan` run (JUNO_PLAN_STEP), writes its
+// own folder, so one step does not empty another's traces and results.
+const results = join(__dirname, 'test-results', process.env.JUNO_PLAN_STEP === undefined ? '' : `step-${process.env.JUNO_PLAN_STEP}`)
+
 export default defineConfig<object, { lane: Lane }>({
   testDir: 'e2e',
+  // The build steps' folder; a project's own replaces it.
+  outputDir: join(results, 'setup'),
   projects: [
     { name: 'build-electron', testMatch: 'setup/electron.setup.ts' },
     { name: 'build-web', testMatch: 'setup/web.setup.ts' },
     {
       name: 'browser',
+      outputDir: join(results, 'browser'),
       testMatch: BROWSER_SPECS.map((file) => resolve(__dirname, 'e2e', file)),
       dependencies: ['build-web'],
       fullyParallel: true,
@@ -51,6 +60,7 @@ export default defineConfig<object, { lane: Lane }>({
     },
     {
       name: 'electron',
+      outputDir: join(results, 'electron'),
       testIgnore: ['web/web-shell.spec.ts', 'setup/**'],
       dependencies: ['build-electron'],
       workers: electronWorkers,
@@ -59,6 +69,7 @@ export default defineConfig<object, { lane: Lane }>({
     },
     {
       name: 'web',
+      outputDir: join(results, 'web'),
       testMatch: 'web-shell.spec.ts',
       use: {
         channel: process.env.GALLERY_BROWSER === 'chromium' ? undefined : 'chrome',
@@ -81,7 +92,8 @@ export default defineConfig<object, { lane: Lane }>({
     ...(process.env.JUNO_E2E_TIMINGS === '1' ? [['./e2e/timings.ts'] as const] : []),
   ],
   use: {
-    // JUNO_E2E_TRACE=off skips recording, to measure what tracing costs.
-    trace: process.env.JUNO_E2E_TRACE === 'off' ? 'off' : 'retain-on-failure',
+    // Recording a trace costs about a fifth of a test's time. Rerun a failure
+    // with JUNO_E2E_TRACE=1 to keep a trace of each failing test.
+    trace: process.env.JUNO_E2E_TRACE === '1' ? 'retain-on-failure' : 'off',
   },
 })
