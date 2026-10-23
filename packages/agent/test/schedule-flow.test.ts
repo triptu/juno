@@ -2,9 +2,14 @@ import { afterEach, expect, it } from 'bun:test'
 import { Effect } from 'effect'
 import { OpId } from '@juno/agent-contract'
 import { fakeActionHost, reply, TEST_CHANNEL } from '@juno/agent-testing'
-import { answer } from './turns-harness'
+import { answer, turnsHarness } from './turns-harness'
 import { served, closeServed } from './serve-harness'
+import type { Executor } from '../src/actions/executor'
+import { liveGrant } from '../src/grants/grants'
+import { proposedScheduleCard, scheduleExecutors } from '../src/schedule/cards'
 import type { Reply } from '../src/schedule/rules'
+import { SCHEDULE_MIGRATIONS } from '../src/schedule/schema'
+import { createScheduler } from '../src/schedule/scheduler'
 
 afterEach(closeServed)
 
@@ -140,4 +145,34 @@ it('a proactive run cannot write to Slack: its send waits for the click, which s
   expect(h.turns.actions.approve('second-click', send.binding!.identity, send.binding!.children)._tag).not.toBe('accepted')
   await h.turns.actions.idle()
   expect(slack.calls).toHaveLength(1)
+})
+
+it('a Proposed schedule Start mints the grant and posts a Schedule card through the real action dispatcher', async () => {
+  // The executors need the scheduler, which needs the engine's store: proxies stand in until it opens.
+  let installed: ReadonlyArray<Executor> = []
+  const proxies: ReadonlyArray<Executor> = ['schedule_create', 'schedule_action'].map((tool) => ({
+    tool, tier: 1, deduped: true, run: async (call) => {
+      const executor = installed.find((e) => e.tool === tool)
+      if (executor === undefined) throw new Error('Executor not installed')
+      return executor.run(call)
+    },
+  }))
+  const h = await turnsHarness({ compaction: false, migrations: [SCHEDULE_MIGRATIONS], actions: { executors: proxies } })
+  try {
+    const scheduler = createScheduler({ store: h.turns.store, changed: () => {}, replies: async () => ({ owner: 'owner', messages: [] }) })
+    installed = scheduleExecutors({ store: h.turns.store, scheduler, propose: h.turns.actions.propose })
+    h.turns.actions.propose({ runId: 'test-run', callId: 'test-call', payload: proposedScheduleCard(h.turns.store, {
+      what: 'Catch up tomorrow', prompt: 'Read the topic.', deliver: 'now', schedule: { _tag: 'once', at: h.turns.store.now() + 60_000 },
+    }) })
+    expect(scheduler.list()).toHaveLength(0)
+    const binding = h.turns.actions.views()[0]?.binding
+    if (binding === undefined) throw new Error('Missing proposal binding')
+    expect(h.turns.actions.approve('start-schedule', binding.identity, binding.children)).toEqual({ _tag: 'accepted' })
+    await h.turns.actions.idle()
+    const row = scheduler.list()[0]
+    expect(row?.definition.prompt).toBe('Read the topic.')
+    expect(liveGrant(h.turns.store, 'schedule', row!.id)?.authority).toBe('click')
+    expect(h.turns.actions.views().map((v) => v.card._tag)).toEqual(['proposedSchedule', 'schedule'])
+    expect(h.fake.requests).toHaveLength(0)
+  } finally { await h.close() }
 })

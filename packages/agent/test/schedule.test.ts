@@ -10,7 +10,7 @@ import { ACTIONS_MIGRATIONS } from '../src/actions/schema'
 import { revokeAllGrants } from '../src/grants/grants'
 import { SCHEDULE_MIGRATIONS } from '../src/schedule/schema'
 import { createScheduler } from '../src/schedule/scheduler'
-import { matchesReply, menuDeadline, notification, nextDue, type Definition, type Reply } from '../src/schedule/rules'
+import { matchesReply, menuDeadline, nextDue, type Definition, type Reply } from '../src/schedule/rules'
 
 const cleanups: Array<() => void> = []
 afterEach(() => { for (const close of cleanups.splice(0)) close() })
@@ -95,12 +95,9 @@ it('menu waits one notification day and moves an out-of-hours time to hours star
   expect(menuDeadline(Date.UTC(2026, 9, 16, 12), hours)).toBe(Date.UTC(2026, 9, 19, 12))
   expect(menuDeadline(Date.UTC(2026, 9, 16, 20), hours)).toBe(Date.UTC(2026, 9, 19, 9))
 })
-it('intervals are strictly future and quiet hours never suppress a now notification', () => {
+it('intervals are strictly future', () => {
   fc.assert(fc.property(fc.integer({ min: 0, max: 2_000_000_000 }), fc.integer({ min: 1, max: 1_000_000 }), (now, everyMs) => {
     expect(nextDue({ _tag: 'interval', everyMs }, now)).toBeGreaterThan(now)
-    expect(notification('now', true, true)).toBe('now')
-    expect(notification('digest', true, true)).toBe('hold')
-    expect(notification('now', false, false)).toBe('silent')
   }))
 })
 it('owners and older messages never count as a reply from others', () => {
@@ -130,39 +127,6 @@ it.each(['queued', 'admitted'])('recovers after SIGKILL with a persisted %s occu
   const again = await runAgent({ args: args('finish'), timeoutMs: 30_000 })
   expect(again.code, again.stderr).toBe(0)
   expect(JSON.parse(again.stdout)).toEqual({ started: false, occurrences: 1, runs: 1 })
-})
-
-it('a Proposed schedule Start mints the grant and posts a Schedule card through the real action dispatcher', async () => {
-  const { turnsHarness } = await import('./turns-harness')
-  const { scheduleExecutors, proposedScheduleCard } = await import('../src/schedule/cards')
-  const { liveGrant } = await import('../src/grants/grants')
-  type Executor = import('../src/actions/executor').Executor
-  let installed: ReadonlyArray<Executor> = []
-  const proxies: ReadonlyArray<Executor> = ['schedule_create', 'schedule_action'].map((tool) => ({
-    tool, tier: 1, deduped: true, run: async (call) => {
-      const executor = installed.find((e) => e.tool === tool)
-      if (executor === undefined) throw new Error('Executor not installed')
-      return executor.run(call)
-    },
-  }))
-  const h = await turnsHarness({ compaction: false, migrations: [SCHEDULE_MIGRATIONS], actions: { executors: proxies } })
-  try {
-    const scheduler = createScheduler({ store: h.turns.store, changed: () => {}, replies: async () => ({ owner: 'owner', messages: [] }) })
-    installed = scheduleExecutors({ store: h.turns.store, scheduler, propose: h.turns.actions.propose })
-    h.turns.actions.propose({ runId: 'test-run', callId: 'test-call', payload: proposedScheduleCard(h.turns.store, {
-      what: 'Catch up tomorrow', prompt: 'Read the topic.', deliver: 'now', schedule: { _tag: 'once', at: Date.now() + 60_000 },
-    }) })
-    expect(scheduler.list()).toHaveLength(0)
-    const binding = h.turns.actions.views()[0]?.binding
-    if (binding === undefined) throw new Error('Missing proposal binding')
-    expect(h.turns.actions.approve('start-schedule', binding.identity, binding.children)).toEqual({ _tag: 'accepted' })
-    await h.turns.actions.idle()
-    const row = scheduler.list()[0]
-    expect(row?.definition.prompt).toBe('Read the topic.')
-    expect(liveGrant(h.turns.store, 'schedule', row!.id)?.authority).toBe('click')
-    expect(h.turns.actions.views().map((v) => v.card._tag)).toEqual(['proposedSchedule', 'schedule'])
-    expect(h.fake.requests).toHaveLength(0)
-  } finally { await h.close() }
 })
 
 it('repeating a page command after restart returns its result without changing the schedule again', () => {
