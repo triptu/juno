@@ -53,7 +53,7 @@ Run these from the repo root.
 | `bun run lint` | Runs `bun lint` with the rules in `.oxlintrc.json`, cursor and token checks, dependency and fixture checks, and the health ratchet, all at once (`scripts/lint.mjs`; see "Typecheck"). |
 | `bun run check-deps` | The package graph and the import rules in `docs/architecture.md` section 3. Part of `bun run lint`; run it alone for a quicker loop. |
 | `bun run health` | Reports unused code and dependencies, duplication, and large files and functions. Writes `.juno-status/health.json`. |
-| `bun run test` | Runs every package's vitest suite (`packages/*/test` and `apps/desktop/test`). |
+| `bun run test` | Runs every package's `test` script (`bun test` or vitest; `packages/*/test` and `apps/desktop/test`). |
 | `bun run test:e2e` | Builds, runs the Playwright tests against the built app, then the gallery behaviour tests. |
 | `bun run perf` | Builds and runs the perf scenarios (`apps/desktop/e2e/perf.spec.ts`, config `playwright.perf.config.ts`), which fail over the budgets in `docs/performance.md`. A scenario that did not run, because its group's setup or an earlier scenario failed, fails the run too (`e2e/no-skips.ts`). `-g "<name>"` runs some of them; `JUNO_PERF_TRACE=<dir>` also writes traces for `scripts/perf-trace.mjs`. Passing `--reporter` replaces that check, so do not. |
 | `bun run test:gallery` | Builds the gallery and runs only its behaviour tests (mouse-down activation, cursor rule, state switcher, layout-shift guard). |
@@ -590,7 +590,8 @@ Names are explained in `docs/architecture.md` sections 2.6 and 7.
 
 | Kind | Where | Run |
 | --- | --- | --- |
-| Pure rules, store, Slack client, Slack-app import, merge rules, engine protocol, session, sync and the AI provider (fake, and pi-ai's scripted faux provider) | `packages/<name>/test/` (vitest) | `bun run test` |
+| Store, Slack client, Slack-app import, merge rules, engine protocol, session and sync | `packages/<name>/test/` (vitest) | `bun run test` |
+| The Juno agent's flows (turns, cards, connections, T3 and Codex, backup, crash recovery, memory, settings), the AI provider (`PiAiProvider` against pi-ai's scripted faux provider), the agent libraries, and the pure rules of domain, rich text, state, huddle and the small libraries | `packages/<name>/test/` (`bun test`; each file passes alone and with `--parallel`) | `bun test` in the package, or `bun run test` |
 | The sidebar query and boot on the large seed (report only) | `packages/engine/test/bench/` | `JUNO_BENCH=1 bun run --cwd packages/engine vitest run test/bench` |
 | User flows in the built app | `apps/desktop/e2e/` (Playwright, one worker) | `bun run test:e2e` |
 | Mouse-down activation, state switcher, in a real browser | `apps/gallery/activation.spec.ts`, `apps/gallery/behaviour.spec.ts` | `bun run test:gallery` |
@@ -602,7 +603,7 @@ Names are explained in `docs/architecture.md` sections 2.6 and 7.
 | Screenshots of every state | `apps/gallery/shots.spec.ts` | `bun run gallery:shots` |
 | Feel: no shift, jump, flicker, empty frame or late feedback, frame by frame, in the built app | `apps/desktop/e2e/feel/*.feel.ts` | `bun run test:feel` |
 
-Tests that need the Effect test clock use `@effect/vitest`; see the effect skill.
+Tests that need the Effect test clock use `@effect/vitest` in the vitest packages. Under `bun test`, a plain `test` provides `TestClock` from `effect/testing` and runs the effect with `Effect.runPromise`; to time out a call that is in flight, fork it, wait until the request reaches the fake (a promise the fake resolves), then `TestClock.adjust` (`packages/ai/test/pi.test.ts`). Wait on a real signal (a Deferred, a subscription, a fake's call log); where there is none, `eventually` from `@juno/testing/eventually` retries a check. See the effect skill.
 
 ### Text-menu spelling checks
 
