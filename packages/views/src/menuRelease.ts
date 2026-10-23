@@ -9,6 +9,8 @@ import type { MouseEvent } from 'react'
 export interface MenuAt {
   readonly clientX: number
   readonly clientY: number
+  /** From a message's menu button: its size, with `clientX` its left edge and `clientY` its bottom (`MenuPoint`). */
+  readonly trigger?: { readonly width: number; readonly height: number }
 }
 
 /**

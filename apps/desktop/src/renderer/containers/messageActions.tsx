@@ -23,7 +23,7 @@ import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type K
 import type { TopicDetail } from '@juno/contract'
 import { resolveMessageAction, editMessage, junoAvailableAtom, registry, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import type { MessageActions } from '@juno/views'
+import type { MenuAt, MessageActions } from '@juno/views'
 import { chunk, usePreloaded } from './chunks'
 import { landedTs, refOf } from './messageRows'
 import { preloadMessageMenu, useMessageMenuOpen } from './messageMenu'
@@ -61,8 +61,8 @@ export interface MessageActionsOutput {
   readonly onRowKey: (ts: string, event: KeyboardEvent<HTMLElement>) => void
   readonly onToggleReaction: (ts: string, name: string) => void
   /** Retry (`on` as asked) or Dismiss (the opposite) on a reaction Slack refused. */
-  /** A right-click on a row, or on its sender's name or avatar. */
-  readonly onMessageMenu: (ts: string, at: { readonly clientX: number; readonly clientY: number }, onSender: boolean) => void
+  /** A right-click on a row, or on its sender's name or avatar, or a press on its menu button (`at.trigger`). */
+  readonly onMessageMenu: (ts: string, at: MenuAt, onSender: boolean) => void
   /** ↑ in an empty composer. */
   readonly selectNewest: () => void
   /** The selection's bar and the reactions dialog, for `TopicView`'s floating slot. */

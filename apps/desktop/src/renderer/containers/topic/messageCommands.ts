@@ -69,8 +69,10 @@ interface CommandsInput {
  * Where a message's menu opens: at the pointer for a right-click, and from
  * the keyboard under the row's first line, at its text. A context-menu key
  * press reports a point that may be anywhere; inside the row it is kept.
+ * From the row's menu button, under the button.
  */
 export function anchorFor(row: HTMLElement, at: MenuAt | undefined): MenuPoint {
+  if (at?.trigger !== undefined) return { x: at.clientX, y: at.clientY, trigger: at.trigger }
   const box = row.getBoundingClientRect()
   if (at !== undefined && at.clientX > box.left && at.clientX < box.right && at.clientY > box.top && at.clientY < box.bottom) return { x: at.clientX, y: at.clientY }
   const text = row.querySelector<HTMLElement>('[data-msg-text]')
