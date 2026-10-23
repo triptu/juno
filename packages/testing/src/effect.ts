@@ -1,7 +1,7 @@
 /**
- * Effect tests on `bun test`, as `it.effect` and `it.live` of `@effect/vitest`
- * ran them: the body's effect runs scoped, and `itEffect` gives it a
- * `TestClock`, so time moves only when the test adjusts it.
+ * Effect tests on `bun test`: the body's effect runs scoped, and `itEffect`
+ * gives it a `TestClock` and `TestConsole`, so time moves only when the test
+ * adjusts it. `itLive` keeps real time.
  */
 import { it } from 'bun:test'
 import { Effect, Layer, type Scope } from 'effect'
