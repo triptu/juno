@@ -62,6 +62,18 @@ export async function restart(track: Array<RunningEngine>, engine: RunningEngine
   return owned
 }
 
+/** Web API methods that change something in Slack. Every other method Juno calls only reads. */
+const WRITE_METHODS = new Set([
+  'users.prefs.set', 'users.profile.set', 'presence.set', 'conversations.mark', 'conversations.open', 'conversations.create',
+  'subscriptions.thread.mark', 'subscriptions.thread.add', 'subscriptions.thread.remove', 'chat.postMessage', 'chat.shareMessage',
+  'chat.update', 'chat.delete', 'reactions.add', 'reactions.remove', 'files.getUploadURL', 'files.completeUpload', 'files.share',
+  'rooms.join', 'rooms.leave',
+])
+
+/** The calls since the `since`-th that wrote to Slack. Background reads may land at any time, so "nothing was written" is the check that holds. */
+export const slackWrites = (engine: RunningEngine, since = 0) =>
+  engine.fake.calls.slice(since).filter((call) => call.kind === 'upload' || WRITE_METHODS.has(call.method))
+
 export const apiCalls = (engine: RunningEngine, method?: string) =>
   engine.fake.calls.filter((c) => c.kind === 'api' && (method === undefined || c.method === method))
 

@@ -18,7 +18,7 @@ import { agentWritesApprove, messagesRetry, prefsSet } from '@juno/contract'
 import { runCommand, topicAtom } from '@juno/state'
 import { memoryTransport, type MessagePortLike } from '../src/protocol/transport'
 import { startTestEngine, waitFor, type RunningEngine } from './harness'
-import { bootedEngine } from './scenario'
+import { bootedEngine, slackWrites } from './scenario'
 
 const CHANNEL = 'C0ENG'
 const engines: Array<RunningEngine> = []
@@ -187,7 +187,7 @@ describe('the AgentHost port', () => {
     expect(await failure(client['host.views.update']({ accountId: account, id: 'missing', view }))).toMatchObject({ reason: 'notFound' })
     expect(await failure(client['host.views.create']({ accountId: account, view: { ...view, icon: 'invalid' } }))).toMatchObject({ reason: 'rejected' })
     expect(await failure(client['host.views.create']({ accountId: Schema.decodeUnknownSync(HostPresence.fields.accountId)('other')!, view }))).toMatchObject({ reason: 'stale' })
-    expect(engine.fake.calls).toHaveLength(slackCalls)
+    expect(slackWrites(engine, slackCalls)).toEqual([])
   })
 
   it('serves Slack and topic reads from the store, hostile text as it is', async () => {

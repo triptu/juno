@@ -50,7 +50,8 @@ describe('who reacted: the full fetch', () => {
     const seed = await seeded(engine)
     expect(storedUsers(engine, seed.ts, '+1')).toHaveLength(REACTORS_LISTED)
     const dialog = who(engine, seed)
-    const first = await dialog.until(() => true, 'a first value')
+    // The first value the subscription delivered, not the latest: the full fetch may already have answered.
+    const first = await waitFor(() => dialog.seen.find((value) => value !== null) ?? undefined, WAIT_MS, 'a first value')
     expect(reaction(first, '+1')?.users).toHaveLength(REACTORS_LISTED)
     expect(first.loading).toBe(true)
 
