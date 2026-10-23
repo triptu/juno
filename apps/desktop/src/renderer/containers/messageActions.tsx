@@ -8,7 +8,8 @@
  * - Your own messages: Edit turns the body into a field in place; Delete…
  *   asks once at the message's top right (ADR 0010). Neither has an undo.
  * - The keyboard: ↑ in an empty composer selects the newest message, ↑ and
- *   ↓ move, Esc goes back to the composer. On your own selected message E
+ *   ↓ move, Esc goes back to the composer. Q quotes the selected message.
+ *   On your own selected message E
  *   edits, and Delete or Backspace asks to delete; Enter confirms and Esc
  *   cancels.
  * - Quote: the whole message from the menu, or the selected text from the

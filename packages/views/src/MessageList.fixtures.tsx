@@ -81,7 +81,7 @@ const menuGrid = [
   { name: 'slightly_smiling_face', unicode: '🙂' },
 ].map((emoji) => ({ ...emoji, selected: false }))
 const menuItems: ReadonlyArray<MessageMenuEntry> = [
-  { id: 'quote', label: 'Quote', icon: 'quote' },
+  { id: 'quote', label: 'Quote', icon: 'quote', shortcut: 'Q' },
   { id: 'ask-juno', label: 'Ask Juno', icon: 'juno' },
   { separator: true },
   { id: 'copy', label: 'Copy text', icon: 'copy' },

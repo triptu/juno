@@ -3,7 +3,7 @@
 // context-menu key and ⇧F10 open it at once. More reactions turns it into the
 // emoji picker in one motion, growing from the corner of the menu that stays
 // put, near every edge of the window. Rows show the keys that work on a
-// focused message (T, E, ⌫), which also choose them while the menu is open.
+// focused message (T, Q, E, ⌫), which also choose them while the menu is open.
 // One sender's messages start a new header after ten quiet minutes.
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from './fixtures'
@@ -116,7 +116,7 @@ test('a key the menu shows runs its row; T on a focused message in Main starts i
 
   await test.step('E in the open menu edits, and types nothing', async () => {
     await menu.openOnRow(row)
-    expect(await menu.shortcuts()).toEqual({ reply: 'T', edit: 'E', delete: '⌫' })
+    expect(await menu.shortcuts()).toEqual({ reply: 'T', quote: 'Q', edit: 'E', delete: '⌫' })
     await juno.win.keyboard.press('e')
     await expect(menu.root).toHaveCount(0)
     const field = topic.list.getByRole('textbox', { name: 'Edit message' })
@@ -137,6 +137,25 @@ test('a key the menu shows runs its row; T on a focused message in Main starts i
     await expect(row).toBeVisible()
   })
 
+  await test.step('Q in the open menu quotes the message in the composer', async () => {
+    await menu.openOnRow(row)
+    await juno.win.keyboard.press('q')
+    await expect(menu.root).toHaveCount(0)
+    await expect(topic.composer).toHaveValue('> Keys in the menu\n')
+    await expect(topic.composer).toBeFocused()
+    await topic.composer.fill('')
+  })
+
+  await test.step('Q on the focused message quotes it too', async () => {
+    await topic.composer.focus()
+    await topic.composer.press('ArrowUp')
+    await expect(row).toBeFocused()
+    await row.press('q')
+    await expect(topic.composer).toHaveValue('> Keys in the menu\n')
+    await expect(topic.composer).toBeFocused()
+    await topic.composer.fill('')
+  })
+
   await test.step('T on the focused message starts its thread', async () => {
     await topic.composer.focus()
     await topic.composer.press('ArrowUp')
@@ -155,7 +174,7 @@ test('a key the menu shows runs its row; T on a focused message in Main starts i
     await expect(root).toBeFocused()
     await topic.expectTitle(/Keys in the menu/)
     await menu.openOnRow(root)
-    expect(await menu.shortcuts()).toEqual({ edit: 'E', delete: '⌫' })
+    expect(await menu.shortcuts()).toEqual({ quote: 'Q', edit: 'E', delete: '⌫' })
     // T is no key here: it only jumps to a row by its name, and the menu stays open.
     await juno.win.keyboard.press('t')
     await expect(menu.root).toBeVisible()

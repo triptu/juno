@@ -32,7 +32,7 @@ const withCustom: ReadonlyArray<GridReaction> = [{ name: 'ship-it', unicode: ':s
 const S: MessageMenuEntry = { separator: true }
 /** Someone else's message in a thread. */
 const others: ReadonlyArray<MessageMenuEntry> = [
-  { id: 'quote', label: 'Quote', icon: 'quote' },
+  { id: 'quote', label: 'Quote', icon: 'quote', shortcut: 'Q' },
   { id: 'ask-juno', label: 'Ask Juno', icon: 'juno' },
   S,
   { id: 'copy', label: 'Copy text', icon: 'copy' },
@@ -42,7 +42,7 @@ const others: ReadonlyArray<MessageMenuEntry> = [
 /** Someone else's message in Main, with text selected in it. */
 const mainSelection: ReadonlyArray<MessageMenuEntry> = [
   { id: 'reply', label: 'Start thread', icon: 'thread', shortcut: 'T' },
-  { id: 'quote', label: 'Quote', icon: 'quote' },
+  { id: 'quote', label: 'Quote', icon: 'quote', shortcut: 'Q' },
   { id: 'ask-juno', label: 'Ask Juno', icon: 'juno' },
   S,
   { id: 'copy', label: 'Copy', icon: 'copy' },
@@ -51,7 +51,7 @@ const mainSelection: ReadonlyArray<MessageMenuEntry> = [
 ]
 /** Your own reply in a thread. */
 const own: ReadonlyArray<MessageMenuEntry> = [
-  { id: 'quote', label: 'Quote', icon: 'quote' },
+  { id: 'quote', label: 'Quote', icon: 'quote', shortcut: 'Q' },
   { id: 'ask-juno', label: 'Ask Juno', icon: 'juno' },
   S,
   { id: 'copy', label: 'Copy text', icon: 'copy' },
@@ -67,7 +67,7 @@ const own: ReadonlyArray<MessageMenuEntry> = [
 /** Your own message in Main. */
 const ownMain: ReadonlyArray<MessageMenuEntry> = [
   { id: 'reply', label: 'Open thread', icon: 'thread', shortcut: 'T' },
-  { id: 'quote', label: 'Quote', icon: 'quote' },
+  { id: 'quote', label: 'Quote', icon: 'quote', shortcut: 'Q' },
   { id: 'ask-juno', label: 'Ask Juno', icon: 'juno' },
   S,
   { id: 'copy', label: 'Copy text', icon: 'copy' },

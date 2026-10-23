@@ -37,7 +37,7 @@ export interface MenuFacts {
  * The rows, in groups: Start thread or Open thread (Main), Quote, Ask Juno;
  * Copy text, Forward…, Open in Slack; on your own, Also send
  * to #eng (a thread reply) and Tell me if nobody replies; then Edit and Delete….
- * Rows whose key works on a focused message show it (`rowHandlers`): T, E and ⌫.
+ * Rows whose key works on a focused message show it (`rowHandlers`): T, Q, E and ⌫.
  */
 export function topicMenuItems({ topic, message, editable, own, selection, juno, mayWatch }: MenuFacts): ReadonlyArray<MessageMenuEntry> {
   // Only a message Slack has can be shared or linked to.
@@ -46,7 +46,7 @@ export function topicMenuItems({ topic, message, editable, own, selection, juno,
   const broadcastable = own && topic.kind === 'thread' && linkable && message.kind === 'message' && !message.root && !message.broadcast
   return [
     ...(opensThread(topic.kind, message) ? [item('reply', message.thread === undefined ? 'Start thread' : 'Open thread', 'thread', false, 'T')] : []),
-    item('quote', 'Quote', 'quote'),
+    item('quote', 'Quote', 'quote', false, 'Q'),
     ...(juno ? [item('ask-juno', 'Ask Juno', 'juno')] : []),
     SEPARATOR,
     item('copy', selection === undefined ? 'Copy text' : 'Copy', 'copy'),
