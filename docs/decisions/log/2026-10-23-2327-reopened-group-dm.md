@@ -1,0 +1,1 @@
+- 10-23 23:27 · reopened-group-dm · A live message in a DM or group DM marks it as the user's own, and one in a conversation Juno has never seen is looked up with `conversations.info`: Slack sends no membership event when a message opens a closed group DM again, so it stayed out of the sidebar until the next counts call.

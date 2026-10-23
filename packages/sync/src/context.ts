@@ -30,6 +30,8 @@ export interface SyncContext {
   readonly rootFetches: Queue.Queue<RootFetch>
   /** Channels whose Main read pointer Slack must settle (`conversations.info`): an event Juno cannot order, or a page too old to apply. A background fiber asks. */
   readonly readLookups: Queue.Queue<string>
+  /** Conversations a live message arrived in that the store has never seen (`conversations.info`). A background fiber asks. */
+  readonly conversationLookups: Queue.Queue<string>
   /** Images stored without thumbnails, and file events. A background fiber tries file info, then the message, a few times at most. */
   readonly fileFetches: Queue.Queue<FileFetch>
   /**
@@ -90,6 +92,10 @@ export const awaitEarlierFetches = (ctx: SyncContext): Effect.Effect<void> =>
  * Asks `nameUsers` for `ids`, with the topic to re-index once each arrives.
  * Synchronous, so a re-index can call it from inside a transaction.
  */
+/** The other side of a DM, or the members of a group DM, so its row can name them. */
+export const wantMembers = (ctx: SyncContext, row: { readonly user_id: string | null; readonly member_ids_json: string | null }): void =>
+  wantUsers(ctx, [...(row.user_id === null ? [] : [row.user_id]), ...(row.member_ids_json === null ? [] : (JSON.parse(row.member_ids_json) as Array<string>))])
+
 export const wantUsers = (ctx: SyncContext, ids: Iterable<string>, background = false, topicId?: string): void => {
   let added = false
   for (const id of ids) {

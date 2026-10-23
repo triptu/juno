@@ -33,6 +33,7 @@ export const makeSyncRuntime = (options: RunSyncOptions) => Effect.gen(function*
     config: { ...config, quietDays },
     rootFetches: yield* Queue.unbounded<RootFetch>(),
     readLookups: yield* Queue.unbounded<string>(),
+    conversationLookups: yield* Queue.unbounded<string>(),
     fileFetches: yield* Queue.unbounded<FileFetch>(),
     missingUsers: new Map(),
     usersWanted: yield* Queue.sliding<void>(1),
