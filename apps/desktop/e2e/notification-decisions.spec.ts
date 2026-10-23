@@ -5,22 +5,11 @@
  * notification hours but not outside them. Each decision is read from the
  * log that Today › Details shows.
  */
-import { join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
 import { expect, syncedTest } from './fixtures'
 import type { Juno } from './driver/juno'
+import { loggedDecision as decision } from './driver/notificationLog'
 
 const bodies = async (juno: Juno) => (await juno.osNotifications()).map((notification) => notification.body)
-
-/** The decision logged for the message with this text, once there is one. */
-function decision(userData: string, teamId: string, text: string): unknown {
-  const db = new DatabaseSync(join(userData, 'workspaces', teamId, 'user.db'), { readOnly: true })
-  try {
-    return db.prepare('SELECT outcome, decided_by AS decidedBy FROM notification_log WHERE preview = ?').get(text)
-  } finally {
-    db.close()
-  }
-}
 
 syncedTest('a cold greeting stays, and a reply while you talk in the DM notifies', async ({ juno, slack, fake, userData }) => {
   await juno.notificationHoursNow()
