@@ -106,7 +106,7 @@ function InstructionRow({ instruction, onEdit, onRemove, divided }: { readonly i
 /** Under a new instruction: the rule Juno found in it, with its two answers. Its height is kept while the check runs. */
 function RuleLine({ found, onMake, onKeep }: { readonly found: FoundRule | undefined; readonly onMake: () => void; readonly onKeep: () => void }) {
   return (
-    <div data-found-rule="" aria-live="polite" {...stylex.props(styles.rule, styles.divided)}>
+    <div data-found-rule="" aria-live="polite" {...stylex.props(styles.rule, found !== undefined && styles.ruleFound, styles.divided)}>
       {found === undefined ? null : (
         <>
           <Text variant="ui" tone="subtle" as="p" sx={styles.ruleText}>
@@ -232,6 +232,8 @@ const styles = stylex.create({
     paddingBlock: spacing['--space-2'],
     paddingInline: spacing['--space-3-5'],
     boxSizing: 'border-box',
+  },
+  ruleFound: {
     backgroundColor: colors['--surface-hover'],
   },
   ruleText: {

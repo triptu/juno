@@ -134,13 +134,11 @@ interface RuleCheck {
   readonly rule?: InstructionRule
 }
 
-const emptyPage = { always: [], never: [], notified: 0, stayed: 0, slackSchedule: undefined }
-
 /**
  * The Notifications page (SPEC 14): the settings, the page's lists and
  * counts from the engine, today's decisions while Details is open, and
- * macOS's permission from main. Nothing shows until the settings and the
- * permission arrive, which are local and come at once.
+ * macOS's permission from main. Nothing shows until the settings, the page
+ * and the permission arrive, which are local and come at once.
  */
 export function NotificationsPage() {
   const settings = useAtomValue(notificationSettingsAtom)
@@ -154,14 +152,15 @@ export function NotificationsPage() {
   const conversations = useAtomValue(pickConversationsAtom(pickerOpen ? query : undefined))
   const [ruleCheck, setRuleCheck] = useState<RuleCheck | undefined>(undefined)
   const [proposals, setProposals] = useState<ReadonlyMap<string, ProposedInstruction>>(new Map())
-  const shownKey = settings._tag === 'Success' && permission !== undefined ? anchor?.key : undefined
+  const shownKey = settings._tag === 'Success' && page._tag === 'Success' && permission !== undefined ? anchor?.key : undefined
   // After the page has scrolled there in its layout effect.
   useEffect(() => {
     if (shownKey !== undefined) notificationsAnchorShown(shownKey)
   }, [shownKey])
-  if (settings._tag !== 'Success' || permission === undefined) return null
+  // All three are local and come at once; waiting for the page keeps Slack's line from appearing late.
+  if (settings._tag !== 'Success' || page._tag !== 'Success' || permission === undefined) return null
   const current = settings.value
-  const lists = page._tag === 'Success' ? page.value : emptyPage
+  const lists = page.value
   const rows = decisions._tag === 'Success' ? decisions.value.decisions : undefined
   const rowOf = (decision: Decision) => rows?.find((row) => String(row.id) === decision.id)
   // A DM on Auto offers Always for its person.

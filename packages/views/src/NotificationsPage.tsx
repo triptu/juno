@@ -268,8 +268,9 @@ function HowAutoDecides() {
   )
 }
 
-/** Under the notification hours: what Juno is doing with Slack's schedule. Its height is kept when empty, so nothing below moves. */
+/** Under the notification hours, only while there is something to say about Slack's schedule. The owner renders the page once the schedule is known, so it never appears late. */
 function SlackLine({ schedule, onUseJunoHours }: { readonly schedule: SlackScheduleState | undefined; readonly onUseJunoHours: () => void }) {
+  if (schedule?.waitingForHours !== true && schedule?.changedInSlack !== true) return null
   return (
     <div aria-live="polite" {...stylex.props(styles.slackLine)}>
       {schedule?.waitingForHours === true ? (
@@ -414,14 +415,13 @@ const styles = stylex.create({
     paddingBlockEnd: spacing['--space-3'],
     paddingInline: spacing['--space-3-5'],
   },
-  // Under the hours row, at its start; its height kept when empty.
+  // Under the hours row, at its start.
   slackLine: {
     display: 'flex',
     flexWrap: 'wrap',
     alignItems: 'center',
     columnGap: spacing['--space-2'],
     rowGap: spacing['--space-1'],
-    // As tall as Use Juno's hours, so the line coming or going moves nothing.
     minHeight: sizes['--control-28'],
     paddingInline: spacing['--space-3-5'],
     paddingBottom: spacing['--space-2'],

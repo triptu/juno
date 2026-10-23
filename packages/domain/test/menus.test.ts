@@ -10,7 +10,7 @@ const base: TopicMenuState = {
   unread: false,
   pinned: false,
   resolved: false,
-  notify: 'matters',
+  notify: 'auto',
   canDraw: true,
 }
 
@@ -70,16 +70,18 @@ describe('topic row menu', () => {
     expect(labels(topicMenuItems({ ...base, kind: 'main', channel: group }))).not.toContain('Redraw art')
   })
 
-  it('offers the three Notify me choices with the current one checked and named in the hint', () => {
+  it('offers Always, Auto and Never with the current one checked and named in the hint, then How Auto decides…', () => {
     const notify = topicMenuItems({ ...base, notify: threadNotifyChoice(false) }).find((i) => i.type === 'submenu')
     expect(notify).toEqual({
       type: 'submenu',
       label: 'Notify me',
       hint: 'Never',
       items: [
-        { type: 'item', id: 'notify-every', label: 'Every message', checked: false },
-        { type: 'item', id: 'notify-matters', label: 'When it matters', checked: false },
+        { type: 'item', id: 'notify-always', label: 'Always', checked: false },
+        { type: 'item', id: 'notify-auto', label: 'Auto', checked: false },
         { type: 'item', id: 'notify-never', label: 'Never', checked: true },
+        { type: 'separator' },
+        { type: 'item', id: 'how-auto', label: 'How Auto decides…' },
       ],
     })
   })
@@ -96,24 +98,24 @@ describe('topic row menu', () => {
 })
 
 describe('Notify me on a thread', () => {
-  it('follows the thread for Every message and When it matters, and unfollows it for Never', () => {
-    expect(followsThread(notifyChoiceOf('notify-every'))).toBe(true)
-    expect(followsThread(notifyChoiceOf('notify-matters'))).toBe(true)
+  it('follows the thread for Always and Auto, and unfollows it for Never', () => {
+    expect(followsThread(notifyChoiceOf('notify-always'))).toBe(true)
+    expect(followsThread(notifyChoiceOf('notify-auto'))).toBe(true)
     expect(followsThread(notifyChoiceOf('notify-never'))).toBe(false)
   })
 
   it('shows a followed thread by its level, and one you do not follow as Never', () => {
-    expect(threadNotifyChoice(true)).toBe('matters')
-    expect(threadNotifyChoice(true, 'every')).toBe('every')
-    expect(threadNotifyChoice(false, 'every')).toBe('never')
+    expect(threadNotifyChoice(true)).toBe('auto')
+    expect(threadNotifyChoice(true, 'always')).toBe('always')
+    expect(threadNotifyChoice(false, 'always')).toBe('never')
   })
 })
 
 describe('person menu', () => {
   it('names the person by first name and checks their level', () => {
-    const [notify] = personMenuItems({ name: 'Maya Chen', notify: 'every' })
+    const [notify] = personMenuItems({ name: 'Maya Chen', notify: 'always' })
     expect(notify?.type === 'submenu' && notify.label).toBe('Notify me about Maya')
-    expect(notify?.type === 'submenu' && notify.items.map((item) => item.type === 'item' && item.checked)).toEqual([true, false, false])
+    expect(notify?.type === 'submenu' && notify.items.map((item) => item.type === 'item' && item.checked)).toEqual([true, false, false, false, false])
   })
 })
 
@@ -158,8 +160,8 @@ describe('Juno in the menus', () => {
   })
 
   it('the person menu ends with Ask Juno and What Juno knows about them while the Juno Agent is on', () => {
-    expect(labels(personMenuItems({ name: 'Maya Chen', notify: 'matters', askJuno: true }))).toEqual(['Notify me about Maya', '—', 'Ask Juno', 'What Juno knows about Maya'])
-    expect(labels(personMenuItems({ name: 'Maya Chen', notify: 'matters' }))).toEqual(['Notify me about Maya'])
+    expect(labels(personMenuItems({ name: 'Maya Chen', notify: 'auto', askJuno: true }))).toEqual(['Notify me about Maya', '—', 'Ask Juno', 'What Juno knows about Maya'])
+    expect(labels(personMenuItems({ name: 'Maya Chen', notify: 'auto' }))).toEqual(['Notify me about Maya'])
   })
 })
 

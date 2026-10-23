@@ -37,6 +37,9 @@ export interface NotificationDetailsProps extends WhyActions {
   readonly proposals: ReadonlyMap<string, ProposedInstruction>
   /** A DM on Auto: the person's first name for Always for Maya, by decision id. */
   readonly alwaysFor: ReadonlyMap<string, string>
+  /** Today's counts from the page, for the filter while the decisions load, so its width does not change when they arrive. */
+  readonly notifiedToday: number
+  readonly stayedToday: number
   readonly onClose: () => void
   readonly initialFilter?: DetailsFilter
   /** The row whose why starts open (fixtures). */
@@ -55,7 +58,7 @@ const fromReading: ReadonlySet<DecidedBy> = new Set(['reading'])
  * and the way to Settings › Notifications. A panel for `SheetLayer`.
  */
 export function NotificationDetails(props: NotificationDetailsProps) {
-  const { decisions: loaded, proposals, alwaysFor, onClose, initialFilter = 'all', initialOpen } = props
+  const { decisions: loaded, notifiedToday, stayedToday, proposals, alwaysFor, onClose, initialFilter = 'all', initialOpen } = props
   const titleId = useId()
   const list = useRef<HTMLDivElement>(null)
   // A why that starts open is shown in view.
@@ -65,7 +68,8 @@ export function NotificationDetails(props: NotificationDetailsProps) {
   const [filter, setFilter] = useState<DetailsFilter>(initialFilter)
   const [open, setOpen] = useState<string | undefined>(initialOpen)
   const decisions = loaded ?? []
-  const notified = decisions.filter((decision) => decision.notified).length
+  const notified = loaded === undefined ? notifiedToday : decisions.filter((decision) => decision.notified).length
+  const total = loaded === undefined ? notifiedToday + stayedToday : decisions.length
   const shown = filter === 'all' ? decisions : decisions.filter((decision) => decision.notified === (filter === 'notified'))
   return (
     <Surface kind="popover" as="section" role="dialog" aria-labelledby={titleId} aria-modal aria-busy={loaded === undefined || undefined} padding="none" sx={[styles.sheet, styles.sheetHeight]} data-sheet="notifications">
@@ -88,9 +92,9 @@ export function NotificationDetails(props: NotificationDetailsProps) {
           value={filter}
           onChange={setFilter}
           options={[
-            { value: 'all', label: 'All', count: decisions.length },
+            { value: 'all', label: 'All', count: total },
             { value: 'notified', label: 'Notified', count: notified },
-            { value: 'stayed', label: 'Stayed in Juno', count: decisions.length - notified },
+            { value: 'stayed', label: 'Stayed in Juno', count: total - notified },
           ]}
         />
       </div>
