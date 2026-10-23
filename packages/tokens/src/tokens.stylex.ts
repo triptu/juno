@@ -1223,6 +1223,8 @@ export const menu = stylex.defineVars({
   '--menu-row-inset': '9px',
   '--menu-row-radius': '6px',
   '--menu-icon-gap': '7px',
+  // At least this from a row's label to its key equivalent, as a macOS menu leaves.
+  '--menu-shortcut-gap': '20px',
   // The rows' icons and the grid's emoji share this size.
   '--menu-icon-size': '14px',
   '--menu-text': 'hsla(0, 0%, 0%, 0.85)',
