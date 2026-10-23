@@ -1,0 +1,1 @@
+- 10-24 03:37 · test-revamp · Test fakes (the agent fakes, the fake AI provider, the huddle media fake) are tested only through the tests and e2e specs that run on them; the exceptions are the crash harness and one file that checks each fault injector really injects, since a fault that silently stops makes every "sent once" test pass without testing anything.

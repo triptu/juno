@@ -1,0 +1,1 @@
+- 10-24 03:39 · test-revamp · Huddle lifecycle schedules are tested through the huddle service (TestClock and Deferreds) and the engine's fake Slack tests, not by driving internal transitions by hand; replaying Quint traces of `huddle.qnt` against `lifecycle.ts` is deferred, since it needs the spec's whole state mapped onto the code.

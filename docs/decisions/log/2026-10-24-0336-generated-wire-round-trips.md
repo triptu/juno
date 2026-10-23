@@ -1,0 +1,1 @@
+- 10-24 03:36 · test-revamp · The agent contract's wire round trips are generated with Effect `Arbitrary` from every schema and route the package exports, so a new route needs no test edit; the hand-kept example per route (19 commits, all "add the new route") is gone, and a schema `Arbitrary` cannot fill is skipped rather than kept in a table.
