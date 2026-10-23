@@ -1,7 +1,6 @@
 import { MeetingSessionStatusCode as Code } from 'amazon-chime-sdk-js'
 import { describe, expect, it } from 'bun:test'
 import { endReasonOf } from '../src/chime/endReason.ts'
-import { microphoneProblem } from '../src/chime/microphone.ts'
 import { slackUserIdOf } from '../src/externalUserId.ts'
 
 describe('the Slack user in a Chime ExternalUserId', () => {
@@ -18,42 +17,14 @@ describe('the Slack user in a Chime ExternalUserId', () => {
   })
 })
 
-describe("why a call ended, from Chime's stop code", () => {
-  const live = { leaving: false, everConnected: true }
-
-  it.each([
-    [Code.Left, 'left'],
-    [Code.AudioJoinedFromAnotherDevice, 'another-device'],
-    [Code.MeetingEnded, 'meeting-ended'],
-    [Code.AudioAttendeeRemoved, 'removed'],
-    [Code.AudioCallAtCapacity, 'full'],
-    [Code.SignalingChannelClosedUnexpectedly, 'connection-lost'],
-    [Code.ConnectionHealthReconnect, 'connection-lost'],
-    [Code.AudioAuthenticationRejected, 'failed'],
-    [Code.TURNCredentialsForbidden, 'failed'],
-  ])('reads code %s as %s', (code, reason) => {
-    expect(endReasonOf(code, live)).toBe(reason)
-  })
-
+describe("why a call ended: the context Chime's stop code does not give", () => {
+  // The code itself maps one to one (endReason.ts); these two rules read what the session did before it.
   it('reads any stop after leave() as left', () => {
     expect(endReasonOf(Code.SignalingChannelClosedUnexpectedly, { leaving: true, everConnected: true })).toBe('left')
   })
 
   it('reads a dropped connection before the call ever connected as a failed join', () => {
     expect(endReasonOf(Code.SignalingChannelClosedUnexpectedly, { leaving: false, everConnected: false })).toBe('failed')
-  })
-})
-
-describe('why the microphone would not start', () => {
-  const named = (name: string) => Object.assign(new Error(name), { name })
-  it.each([
-    ['PermissionDeniedError', 1, 'denied'],
-    ['PermissionDeniedError', 0, 'denied'],
-    ['NotFoundError', 1, 'unavailable'],
-    ['NotReadableError', 0, 'unavailable'],
-    ['NotReadableError', 1, 'failed'],
-    ['GetUserMediaError', 2, 'failed'],
-  ] as const)('%s with %i microphones is %s', (name, count, access) => {
-    expect(microphoneProblem(named(name), count)).toBe(access)
+    expect(endReasonOf(Code.SignalingChannelClosedUnexpectedly, { leaving: false, everConnected: true })).toBe('connection-lost')
   })
 })
