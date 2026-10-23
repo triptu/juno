@@ -149,8 +149,9 @@ export const coreMethods = {
     const ws = ctx.workspace
     const wanted = args.channel_ids === undefined ? undefined : new Set(args.channel_ids)
     const since = args.counts_last_fetched
+    // As recorded live, a closed group DM is left out (research section 2).
     const records = [...ws.conversations.values()].filter(
-      (c) => c.members.has(ws.selfId) && (wanted === undefined || wanted.has(c.id)),
+      (c) => c.members.has(ws.selfId) && (c.kind !== 'mpim' || c.isOpen) && (wanted === undefined || wanted.has(c.id)),
     )
     const entry = (c: (typeof records)[number]): CountEntry => {
       const full = ws.countEntry(c)

@@ -226,6 +226,22 @@ syncedTest('a reply from another client updates its row in place and moves it to
   // The time from the engine's write to pixels is measured in perf.spec.ts.
 })
 
+test('a group DM shows as soon as someone posts in it, when it was closed or Juno has never seen it', async ({ juno, fake }) => {
+  // Slack's counts leaves a closed group DM out, and a message opens it again with no membership event.
+  fake.addGroupDm({ id: 'G0CLOSED', users: ['U0MAYA', 'U0SAM'], open: false })
+  await juno.signIn()
+  await juno.waitForSync()
+  const closed = juno.win.locator('[data-topic-id="m:G0CLOSED"]')
+  await expect(closed).toHaveCount(0)
+  fake.injectMessage({ channel: 'G0CLOSED', user: 'U0SAM', text: 'Picking the launch notes back up' })
+  await expect(closed).toBeVisible()
+
+  // One made after Juno loaded the list, which Slack never announced either.
+  fake.addGroupDm({ id: 'G0FRESH', users: ['U0LEO', 'U0JONAS'] })
+  fake.injectMessage({ channel: 'G0FRESH', user: 'U0LEO', text: 'Quick question about the offsite' })
+  await expect(juno.win.locator('[data-topic-id="m:G0FRESH"]')).toBeVisible()
+})
+
 syncedTest('rows that scroll under a still pointer are not warmed; moving onto a row warms it', async ({ juno, win }) => {
   const { sidebar } = juno
   const list = sidebar.list

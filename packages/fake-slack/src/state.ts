@@ -441,6 +441,8 @@ export class Workspace {
 
     if (root !== undefined) this.#touchRoot(input.channel, root.ts)
     this.#touchConversation(input.channel, input.at)
+    // A message opens a closed DM or group DM again, with no `im_open` or `mpim_open`: only the message says so.
+    conversation.isOpen = true
 
     if (input.silent === true) return message
 
