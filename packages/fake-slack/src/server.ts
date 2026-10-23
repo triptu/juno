@@ -177,7 +177,13 @@ export class FakeServer {
   }
 
   async listen(port: number, host: string): Promise<string> {
-    await new Promise<void>((resolve) => this.#http.listen(port, host, resolve))
+    await new Promise<void>((resolve, reject) => {
+      this.#http.once('error', reject)
+      this.#http.listen(port, host, () => {
+        this.#http.off('error', reject)
+        resolve()
+      })
+    })
     const address = this.#http.address()
     const actualPort = typeof address === 'object' && address !== null ? address.port : port
     this.#baseUrl = `http://${host}:${actualPort}`
