@@ -31,7 +31,7 @@ test('real Playwright output names retry-only passes as flaky', async (t) => {
   const playwright = join(root, 'apps/desktop/node_modules/@playwright/test')
   writeFileSync(join(dir, 'reporter.spec.mjs'), `import { test, expect } from '${playwright}/index.mjs'; test('passes on retry', async ({}, info) => { expect(info.retry).toBe(1) })`)
   writeFileSync(join(dir, 'playwright.config.mjs'), `export default { testDir: '.', workers: 1, retries: 1, reporter: [['list'], ['${join(root, 'scripts/test-results-reporter.mjs')}']] }`)
-  const env = { ...process.env, NO_COLOR: '1' }
+  const env = { ...process.env, CI: '1', NO_COLOR: '1' }
   delete env.FORCE_COLOR
   const output = execFileSync(process.execPath, [join(playwright, 'cli.js'), 'test', '--config', join(dir, 'playwright.config.mjs')], { encoding: 'utf8', env })
   assert.match(output, /1 flaky/)
@@ -39,6 +39,9 @@ test('real Playwright output names retry-only passes as flaky', async (t) => {
   assert.equal(report.status, 'passed')
   assert.equal(report.flaky.length, 1)
   assert.equal(report.failures.length, 0)
+  assert.equal(report.cases.length, 1)
+  assert.ok(report.cases[0].durationMs > 0)
+  assert.deepEqual(report.cases[0].attempts.map((run) => run.status), ['failed', 'passed'])
 })
 
 test('failure causes distinguish cancellation and infrastructure from provisional test failures and confirmed product defects', async () => {
