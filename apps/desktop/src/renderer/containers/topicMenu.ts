@@ -12,7 +12,7 @@ const dmPartner = (topic: ActionTopic) => topic.channel.kind === 'im' ? topic.ch
 /**
  * The topic menu (inventory 15.1), on a sidebar row and the header's title,
  * at the pointer or at `at`. `from` says which title Rename edits. Notify me
- * on a thread is how it is followed: Every message and When it matters
+ * on a thread is how it is followed: Always and Auto
  * follow it in Slack, Never unfollows it (SPEC 5). On Main it is the
  * channel's or DM's choice.
  */

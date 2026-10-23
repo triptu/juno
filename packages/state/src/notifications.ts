@@ -1,23 +1,29 @@
 /**
- * Notification settings, the Notifications page, the avatar menu's status
- * and the why popover (spec section 14). The engine decides; these atoms
+ * Notification settings, the Notifications page, today's decisions and the
+ * avatar menu's status (spec section 14). The engine decides; these atoms
  * only read and write.
  */
 import { Exit } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
 import {
+  notificationsCheckInstruction,
+  notificationsDecisions,
   notificationsPage,
-  notificationsRestoreSlackSchedule,
+  notificationsRemoveInstruction,
+  notificationsSaveInstruction,
+  notificationsSetAlwaysNotify,
   notificationsSetHours,
   notificationsSetHuddleRing,
   notificationsSetDay,
-  notificationsSetMatters,
   notificationsSetPresence,
-  notificationsSetSlackSchedule,
   notificationsSettings,
   notificationsStatus,
+  notificationsUseJunoHours,
+  type AlwaysNotifySwitch,
   type Hours,
+  type InstructionDirection,
+  type InstructionRule,
   type NotificationSettingsView,
   type PresenceValue,
 } from '@juno/contract'
@@ -34,8 +40,15 @@ export const aiAssistOnAtom = Atom.make((get): boolean => {
   return !(AsyncResult.isSuccess(settings) && settings.value.aiAssist === false)
 })
 
-/** The Notifications page beyond the settings: the two lists and today. */
+/** The Notifications page beyond the settings: the Always and Never lists, today's counts and Slack's schedule. */
 export const notificationsPageAtom = liveQuery(notificationsPage)(undefined)
+
+const decisionsAtom = liveQuery(notificationsDecisions)(undefined)
+/** What Details reads while it is closed: nothing, and no subscription. */
+const closed = Atom.make(AsyncResult.initial<never, never>())
+
+/** Today's decisions, newest first, for Today › Details, while it is open. */
+export const notificationDecisionsAtom = (open: boolean) => (open ? decisionsAtom : closed)
 
 /** Presence and "Paused until 9am", for the avatar menu. */
 export const notificationStatusAtom = liveQuery(notificationsStatus)(undefined)
@@ -81,8 +94,27 @@ export function setHoursDay(registry: Registry, which: 'notifications' | 'presen
   void runCommand(registry, notificationsSetDay, { which, day, enabled })
 }
 
-export function setMatters(registry: Registry, text: string): void {
-  void runCommand(registry, notificationsSetMatters, { text })
+/** One Always notify switch. */
+export function setAlwaysNotify(registry: Registry, which: AlwaysNotifySwitch, enabled: boolean): void {
+  void runCommand(registry, notificationsSetAlwaysNotify, { which, enabled })
+}
+
+/** Adds an instruction (no id) or changes one. Resolves with its id, or undefined when it failed. */
+export async function saveInstruction(registry: Registry, instruction: { readonly id?: string; readonly direction: InstructionDirection; readonly text: string }): Promise<string | undefined> {
+  const exit = await runCommand(registry, notificationsSaveInstruction, instruction)
+  if (Exit.isSuccess(exit)) return exit.value.id
+  showToast(registry, { text: "Couldn't save the instruction. Try again." })
+  return undefined
+}
+
+export function removeInstruction(registry: Registry, id: string): void {
+  void runCommand(registry, notificationsRemoveInstruction, { id })
+}
+
+/** Whether an added instruction is really a rule about one person or channel. Undefined when it is not, or when Juno could not tell. */
+export async function checkInstruction(registry: Registry, text: string): Promise<InstructionRule | undefined> {
+  const exit = await runCommand(registry, notificationsCheckInstruction, { text })
+  return Exit.isSuccess(exit) && exit.value !== null ? exit.value : undefined
 }
 
 /** Ring for huddles (SPEC 20, "Incoming huddles"). */
@@ -95,13 +127,7 @@ export function setPresence(registry: Registry, presence: PresenceValue): void {
   void runCommand(registry, notificationsSetPresence, { presence })
 }
 
-/** Use the notification hours in Slack's own schedule, or stop. On applies them once at once. */
-export function setSlackSchedule(registry: Registry, enabled: boolean): void {
-  void runCommand(registry, notificationsSetSlackSchedule, { enabled })
-}
-
-/** Puts back the schedule Slack had before Juno first wrote it, and stops using the hours there. */
-export async function restoreSlackSchedule(registry: Registry): Promise<void> {
-  const exit = await runCommand(registry, notificationsRestoreSlackSchedule, {})
-  showToast(registry, { text: Exit.isSuccess(exit) ? "Restored Slack's schedule" : "Couldn't restore Slack's schedule. Try again." })
+/** Use Juno's hours: writes the notification hours to Slack's schedule again after it was changed in Slack. */
+export function applyJunoHours(registry: Registry): void {
+  void runCommand(registry, notificationsUseJunoHours, {})
 }

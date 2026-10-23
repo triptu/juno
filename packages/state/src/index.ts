@@ -147,18 +147,21 @@ export { forwardMessage, forwardSheetAtom, type ForwardSheetState } from './forw
 export { errorOf } from './result'
 export {
   aiAssistOnAtom,
+  checkInstruction,
   currentNotificationSettings,
   loadNotificationSettings,
+  notificationDecisionsAtom,
   notificationSettingsAtom,
   notificationsPageAtom,
   notificationStatusAtom,
-  restoreSlackSchedule,
+  removeInstruction,
+  saveInstruction,
+  setAlwaysNotify,
   setHours,
   setHuddleRing,
   setHoursDay,
-  setMatters,
   setPresence,
-  setSlackSchedule,
+  applyJunoHours,
 } from './notifications'
 export { ignorableChannelsAtom, ignoreChannel, ignoredChannelsAtom, stopIgnoring } from './ignored'
 export { acquireRendererPort } from './port'

@@ -45,6 +45,7 @@ import {
 } from '@juno/state'
 import { openTopic, openTopicFromList } from './navigation'
 import { runViewMenuAction } from './viewActions'
+import { openNotificationsAt } from './notificationsAnchor'
 import { setNotifyLevel } from './notifyActions'
 import { showWhatJunoKnows } from './juno/actions'
 import { joinHuddleFromMenu } from './huddle/menuItem'
@@ -157,10 +158,12 @@ export function runTopicAction(topic: ActionTopic, chosen: TopicMenuAction, from
     }
     case 'open-in-slack':
       return openTopicInSlack(topic)
-    case 'notify-every':
-    case 'notify-matters':
+    case 'notify-always':
+    case 'notify-auto':
     case 'notify-never':
       return setNotifyLevel(notify.target, notifyChoiceOf(chosen), notify.label)
+    case 'how-auto':
+      return openNotificationsAt('how-auto')
     case 'ignore-channel':
       flushSidebar(registry)
       return void ignoreChannel(registry, topic.channel)
