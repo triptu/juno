@@ -2,7 +2,7 @@ import { AiProvider, notificationReading } from '@juno/ai'
 import { channelLabel, decideNotification, localTime, scheduledPresence, type NotificationDecision, type NotificationSettings, type Presence, type Reading } from '@juno/domain'
 import { Invalidation, StoreWriter, type StoreReader } from '@juno/store'
 import { Clock, Effect, Schema, Semaphore, SubscriptionRef } from 'effect'
-import { exchangesWith, readConversation } from './conversation'
+import { exchangesWith, readConversation, type Conversation } from './conversation'
 import { Candidate, StoredReading, type Notifier } from './model'
 import { readSettings } from './settings'
 
@@ -67,9 +67,8 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
     })
 
   /** Juno's reading of the message, or `failed` when it gives none within two seconds. */
-  const read = (candidate: Candidate, settings: NotificationSettings, now: number) =>
+  const read = (candidate: Candidate, conversation: Conversation, settings: NotificationSettings, now: number) =>
     Effect.gen(function* () {
-      const conversation = yield* readConversation(sql, self, candidate, now)
       const exchanges = yield* exchangesWith(sql, candidate.senderId, now)
       const answer = yield* ai.decide(notificationReading, {
         messageTs: candidate.ts, where: channelLabel(candidate.channel), kind: kindOf(candidate),
@@ -95,12 +94,12 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
     if (existing.length > 0) return
     let now = yield* Clock.currentTimeMillis
     const { settings, aiAssist } = yield* configuration
-    const { facts } = yield* readConversation(sql, self, incoming, now)
-    const candidate: Candidate = { ...incoming, facts }
+    const conversation = yield* readConversation(sql, self, incoming, now)
+    const candidate: Candidate = { ...incoming, facts: conversation.facts }
     let decision = decide(candidate, now, settings, aiAssist)
     let reading: StoredReading | undefined
     if ('needsReading' in decision) {
-      reading = yield* read(candidate, settings, now)
+      reading = yield* read(candidate, conversation, settings, now)
       // The hours are checked again after the wait, so it cannot notify past their end.
       now = yield* Clock.currentTimeMillis
       decision = decide(candidate, now, settings, aiAssist, reading)

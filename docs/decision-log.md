@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-23 23:50 · rerun-no-banner · When a settings change re-decides today's messages, Today and Details follow, but no banner is shown: a message that stayed never notifies later, as the contract has no later. Before, a message held outside the hours could notify when the hours changed.
 - 10-23 23:36 · huddle-follows-hours · An incoming huddle rings only inside notification hours; inside them Always rings and Never keeps it quiet. The switches and the reading do not apply, and an ignored channel does not hold it (owner, via the spec rewrite).
 - 10-23 23:35 · slack-schedule-always · The Pause Slack switch and Restore are removed: Juno always writes its hours to Slack's schedule under the existing rules, and Use Juno's hours is its own route. Stored enabled and saved values are left unread (owner).
 - 10-23 23:34 · instruction-rule-candidates · The instruction rule check sends the chat model only the people and channels whose names appear in the instruction, found in the store, and makes no call when none does or AI assist is off. Instructions are edited by saveInstruction (add or change one) and removeInstruction, not by writing the whole list, so a stale page cannot drop another change.
