@@ -3,9 +3,9 @@
  * "Active in Slack"; docs/research/slack-data-access.md section 3, Presence).
  *
  * Main reads the Mac's idle time every 10 s and sends `active` while the
- * owner used the Mac in the last 20 s and the screen is not locked. On each
- * one, and when the socket connects within that window, the running session
- * sends a socket `tickle`, which `SlackSocket` paces to one per 19 s, as the
+ * owner used the Mac in the last 10 minutes and the screen is not locked.
+ * On each one, and when the socket connects within 20 s of one, the running
+ * session sends a socket `tickle`, which `SlackSocket` paces to one per 19 s, as the
  * official client does. Nothing is sent while the owner's presence is away
  * (Set yourself away, or outside active hours), so Slack keeps them away.
  * When the Mac goes idle the tickles stop and Slack's own timeout shows the
@@ -17,7 +17,7 @@ import { NotificationControl } from './notificationRuntime'
 import { HostLink } from './protocol/host'
 import { SocketEvents, type SessionStart } from './socketEvents'
 
-/** How long one `active` from main counts: main sends it every 10 s, for use in the last 20 s. */
+/** How long one `active` from main counts: main sends it every 10 s while the owner is at the Mac. */
 export const ACTIVE_WINDOW_MILLIS = 20_000
 
 export class OwnerActivity extends Context.Service<OwnerActivity, {

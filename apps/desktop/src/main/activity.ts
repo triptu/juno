@@ -1,8 +1,9 @@
 /**
  * Tells the engine the owner is at the Mac, so Slack shows them active
- * (docs/research/slack-data-access.md section 3, Presence). As the official
- * desktop app does: every 10 s, while the Mac's idle time is at most 20 s
- * and the screen is not locked, main sends `active`. The engine then sends
+ * (docs/research/slack-data-access.md section 3, Presence). Every 10 s, as
+ * the official desktop app does, while the Mac's idle time is at most
+ * 10 minutes (the official app: 20 s) and the screen is not locked, main
+ * sends `active`. The engine then sends
  * a socket `tickle`, paced and skipped while the owner is away. An idle or
  * locked Mac sends nothing, so Slack's own timeout shows the owner away.
  *
@@ -14,8 +15,8 @@ import type { MainToEngine } from '@juno/contract'
 /** How often the idle time is read. The official app: 10 s. */
 export const POLL_MS = 10_000
 
-/** In use when the last input was at most this long ago. The official app: 20 s. */
-export const ACTIVE_WITHIN_SECONDS = 20
+/** In use when the last input was at most this long ago. The official app uses 20 s; Juno keeps the owner active longer on purpose. */
+export const ACTIVE_WITHIN_SECONDS = 10 * 60
 
 export interface ActivityWatchDeps {
   /** `powerMonitor.getSystemIdleTime()`: seconds since the last keyboard or mouse input. */
