@@ -21,7 +21,7 @@ import {
   showToast,
 } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { NotificationsPage as NotificationsPageView, type Decision, type HoursKind, type InstructionDirection, type LevelTag, type ListedLevel, type ProposedInstruction } from '@juno/views'
+import { NotificationsPage as NotificationsPageView, type Decision, type HoursKind, type InstructionDirection, type LevelPicker, type LevelTag, type ListedLevel, type ProposedInstruction } from '@juno/views'
 import { openSettings } from './navigation'
 import { notificationsAnchorShown, openNotificationsAt, useNotificationsAnchor } from './notificationsAnchor'
 import { setNotifyLevel } from './notifyActions'
@@ -180,6 +180,50 @@ function instructionActions(current: NotificationSettingsView, ruleCheck: RuleCh
   }
 }
 
+/** The instructions Should have notified proposed, by decision id. Add it and Just this time both end one, so it does not come back. */
+function useProposals() {
+  const [shown, setShown] = useState<ReadonlyMap<string, ProposedInstruction>>(new Map())
+  const add = (id: string, proposal: ProposedInstruction) => setShown((current) => new Map(current).set(id, proposal))
+  const drop = (decision: Decision) =>
+    setShown((current) => {
+      const next = new Map(current)
+      next.delete(decision.id)
+      return next
+    })
+  return { shown, add, drop }
+}
+
+/** Add…'s searchable list: the rows are asked for only while it is open. */
+function useLevelPicker(): LevelPicker {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const conversations = useAtomValue(pickConversationsAtom(open ? query : undefined))
+  return { query, onQuery: setQuery, conversations: conversations._tag === 'Success' ? conversations.value : undefined, loading: conversations._tag !== 'Success', onOpenChange: setOpen }
+}
+
+/** What Details needs beyond its rows: the proposals, Always for a DM on Auto, and each action. */
+function whyProps(current: NotificationSettingsView, rows: ReadonlyArray<TodayRow> | undefined, proposals: ReturnType<typeof useProposals>) {
+  const rowOf = (decision: Decision) => rows?.find((row) => String(row.id) === decision.id)
+  return {
+    proposals: proposals.shown,
+    // A DM on Auto offers Always for its person.
+    alwaysFor: new Map((rows ?? []).filter((row) => isDm(row) && current.people[row.senderId] === undefined && current.channels[row.channelId] === undefined).map((row) => [String(row.id), firstName(row.sender)] as const)),
+    onChange: changeSetting,
+    onEditInstructions: () => openNotificationsAt('instructions'),
+    onSuggest: (decision: Decision) => {
+      const row = rowOf(decision)
+      if (row !== undefined) proposals.add(decision.id, proposalFor(row))
+    },
+    onAddInstruction: (decision: Decision, instruction: ProposedInstruction) => {
+      proposals.drop(decision)
+      void saveInstruction(registry, instruction).then((id) => id !== undefined && showToast(registry, { text: 'Instruction added' }))
+    },
+    onDismissSuggestion: proposals.drop,
+    onAlways: (decision: Decision) => setNotifyLevel({ kind: 'person', id: decision.senderId }, 'always', decision.sender),
+    onSettings: () => openNotificationsAt('how-auto'),
+  }
+}
+
 /**
  * The Notifications page (SPEC 14): the settings, the page's lists and
  * counts from the engine, today's decisions while Details is open, and
@@ -193,11 +237,9 @@ export function NotificationsPage() {
   const anchor = useNotificationsAnchor()
   const [detailsOpen, setDetailsOpen] = useState(false)
   const decisions = useAtomValue(notificationDecisionsAtom(detailsOpen))
-  const [pickerOpen, setPickerOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const conversations = useAtomValue(pickConversationsAtom(pickerOpen ? query : undefined))
+  const picker = useLevelPicker()
   const [ruleCheck, setRuleCheck] = useState<RuleCheck | undefined>(undefined)
-  const [proposals, setProposals] = useState<ReadonlyMap<string, ProposedInstruction>>(new Map())
+  const proposals = useProposals()
   const shownKey = settings._tag === 'Success' && page._tag === 'Success' && permission !== undefined ? anchor?.key : undefined
   // After the page has scrolled there in its layout effect.
   useEffect(() => {
@@ -209,19 +251,6 @@ export function NotificationsPage() {
   const instructionProps = instructionActions(current, ruleCheck, setRuleCheck)
   const lists = page.value
   const rows = decisions._tag === 'Success' ? decisions.value.decisions : undefined
-  // Add it and Just this time both end the proposal, so it does not come back.
-  const dropProposal = (decision: Decision) =>
-    setProposals((shown) => {
-      const next = new Map(shown)
-      next.delete(decision.id)
-      return next
-    })
-  const rowOf = (decision: Decision) => rows?.find((row) => String(row.id) === decision.id)
-  // A DM on Auto offers Always for its person.
-  const alwaysFor = new Map(
-    (rows ?? []).filter((row) => isDm(row) && current.people[row.senderId] === undefined && current.channels[row.channelId] === undefined).map((row) => [String(row.id), firstName(row.sender)] as const),
-  )
-
   return (
     <NotificationsPageView
       notificationHours={current.notificationHours}
@@ -237,34 +266,14 @@ export function NotificationsPage() {
       always={lists.always.map(asTag)}
       never={lists.never.map(asTag)}
       onRemoveLevel={removeLevel}
-      picker={{
-        query,
-        onQuery: setQuery,
-        conversations: conversations._tag === 'Success' ? conversations.value : undefined,
-        loading: conversations._tag !== 'Success',
-        onOpenChange: setPickerOpen,
-      }}
+      picker={picker}
       onPickLevel={pickLevel}
       onOpenIgnored={() => openSettings('ignored')}
       notifiedToday={lists.notified}
       stayedToday={lists.stayed}
       decisions={rows?.map(asDecision)}
       onDetailsOpenChange={setDetailsOpen}
-      proposals={proposals}
-      alwaysFor={alwaysFor}
-      onChange={changeSetting}
-      onEditInstructions={() => openNotificationsAt('instructions')}
-      onSuggest={(decision) => {
-        const row = rowOf(decision)
-        if (row !== undefined) setProposals((shown) => new Map(shown).set(decision.id, proposalFor(row)))
-      }}
-      onAddInstruction={(decision, instruction) => {
-        dropProposal(decision)
-        void saveInstruction(registry, instruction).then((id) => id !== undefined && showToast(registry, { text: 'Instruction added' }))
-      }}
-      onDismissSuggestion={dropProposal}
-      onAlways={(decision) => setNotifyLevel({ kind: 'person', id: decision.senderId }, 'always', decision.sender)}
-      onSettings={() => openNotificationsAt('how-auto')}
+      {...whyProps(current, rows, proposals)}
       huddleRing={current.huddleRing}
       onHuddleRingChange={(enabled) => setHuddleRing(registry, enabled)}
       permission={permission}

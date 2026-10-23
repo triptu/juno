@@ -53,6 +53,60 @@ const fromSetting: ReadonlySet<DecidedBy> = new Set(['hours', 'always', 'never',
 /** The decisions Juno's reading made, which can be corrected. */
 const fromReading: ReadonlySet<DecidedBy> = new Set(['reading'])
 
+/** One object for every row, which calls the latest props: a toggle or a filter re-renders only the rows it changes. */
+function useLatestActions(props: WhyActions): WhyActions {
+  const latest = useRef<WhyActions>(props)
+  useEffect(() => {
+    latest.current = props
+  })
+  return useMemo<WhyActions>(
+    () => ({
+      onChange: (decision) => latest.current.onChange(decision),
+      onEditInstructions: () => latest.current.onEditInstructions(),
+      onSuggest: (decision) => latest.current.onSuggest(decision),
+      onAddInstruction: (decision, instruction) => latest.current.onAddInstruction(decision, instruction),
+      onDismissSuggestion: (decision) => latest.current.onDismissSuggestion(decision),
+      onAlways: (decision) => latest.current.onAlways(decision),
+      onSettings: () => latest.current.onSettings(),
+    }),
+    [],
+  )
+}
+
+/** The title, Done, and the filter. */
+function DetailsHead({ titleId, filter, onFilter, total, notified, onClose }: { readonly titleId: string; readonly filter: DetailsFilter; readonly onFilter: (filter: DetailsFilter) => void; readonly total: number; readonly notified: number; readonly onClose: () => void }) {
+  return (
+    <div {...stylex.props(styles.head)}>
+      <span {...stylex.props(styles.titleLine)}>
+        <span {...stylex.props(styles.titles)}>
+          <Text variant="heading" as="h2" id={titleId}>
+            Today's notifications
+          </Text>
+          <Text variant="bodySmall" tone="subtle" as="p">
+            Every message Juno decided on today, and why.
+          </Text>
+        </span>
+        <Button variant="primary" size="md" onClick={onClose}>
+          Done
+        </Button>
+      </span>
+      {/* Choosing a filter changes the list under it, on purpose. */}
+      <span data-expands-in-place="">
+        <Segmented
+          label="Show"
+          value={filter}
+          onChange={onFilter}
+          options={[
+            { value: 'all', label: 'All', count: total },
+            { value: 'notified', label: 'Notified', count: notified },
+            { value: 'stayed', label: 'Stayed in Juno', count: total - notified },
+          ]}
+        />
+      </span>
+    </div>
+  )
+}
+
 /**
  * Today's notifications (SPEC 14, "Today"; inventory 13): every decision
  * of the day, newest first, filterable by outcome. Choosing a row opens
@@ -70,57 +124,14 @@ export function NotificationDetails(props: NotificationDetailsProps) {
   const [filter, setFilter] = useState<DetailsFilter>(initialFilter)
   const [open, setOpen] = useState<string | undefined>(initialOpen)
   const toggle = useCallback((id: string) => setOpen((shown) => (shown === id ? undefined : id)), [])
-  // One object for every row, which calls the latest props: a toggle or a filter re-renders only the rows it changes.
-  const latest = useRef<WhyActions>(props)
-  useEffect(() => {
-    latest.current = props
-  })
-  const actions = useMemo<WhyActions>(
-    () => ({
-      onChange: (decision) => latest.current.onChange(decision),
-      onEditInstructions: () => latest.current.onEditInstructions(),
-      onSuggest: (decision) => latest.current.onSuggest(decision),
-      onAddInstruction: (decision, instruction) => latest.current.onAddInstruction(decision, instruction),
-      onDismissSuggestion: (decision) => latest.current.onDismissSuggestion(decision),
-      onAlways: (decision) => latest.current.onAlways(decision),
-      onSettings: () => latest.current.onSettings(),
-    }),
-    [],
-  )
+  const actions = useLatestActions(props)
   const decisions = loaded ?? []
   const notified = loaded === undefined ? notifiedToday : decisions.filter((decision) => decision.notified).length
   const total = loaded === undefined ? notifiedToday + stayedToday : decisions.length
   const shown = filter === 'all' ? decisions : decisions.filter((decision) => decision.notified === (filter === 'notified'))
   return (
     <Surface kind="popover" as="section" role="dialog" aria-labelledby={titleId} aria-modal aria-busy={loaded === undefined || undefined} padding="none" sx={[styles.sheet, styles.sheetHeight]} data-sheet="notifications">
-      <div {...stylex.props(styles.head)}>
-        <span {...stylex.props(styles.titleLine)}>
-          <span {...stylex.props(styles.titles)}>
-            <Text variant="heading" as="h2" id={titleId}>
-              Today's notifications
-            </Text>
-            <Text variant="bodySmall" tone="subtle" as="p">
-              Every message Juno decided on today, and why.
-            </Text>
-          </span>
-          <Button variant="primary" size="md" onClick={onClose}>
-            Done
-          </Button>
-        </span>
-        {/* Choosing a filter changes the list under it, on purpose. */}
-        <span data-expands-in-place="">
-          <Segmented
-            label="Show"
-            value={filter}
-            onChange={setFilter}
-            options={[
-              { value: 'all', label: 'All', count: total },
-              { value: 'notified', label: 'Notified', count: notified },
-              { value: 'stayed', label: 'Stayed in Juno', count: total - notified },
-            ]}
-          />
-        </span>
-      </div>
+      <DetailsHead titleId={titleId} filter={filter} onFilter={setFilter} total={total} notified={notified} onClose={onClose} />
       <div ref={list} {...stylex.props(styles.scroll, ringRoom.inline)}>
         {loaded === undefined ? null : shown.length === 0 ? (
           <Text variant="ui" tone="muted" as="p" sx={styles.empty}>
