@@ -39,9 +39,11 @@ export interface NotificationDetailsProps extends WhyActions {
   readonly proposals: ReadonlyMap<string, ProposedInstruction>
   /** A DM on Auto: the person's first name for Always for Maya, by decision id. */
   readonly alwaysFor: ReadonlyMap<string, string>
-  /** Today's counts from the page, for the filter while the decisions load, so its width does not change when they arrive. */
+  /** Today's counts from the page: the whole day's, for the filter, also while the decisions load or when the list is capped. */
   readonly notifiedToday: number
   readonly stayedToday: number
+  /** The list holds only the latest of today's decisions. */
+  readonly capped?: boolean
   readonly onClose: () => void
   readonly initialFilter?: DetailsFilter
   /** The row whose why starts open (fixtures). */
@@ -114,7 +116,7 @@ function DetailsHead({ titleId, filter, onFilter, total, notified, onClose }: { 
  * and the way to Settings › Notifications. A panel for `SheetLayer`.
  */
 export function NotificationDetails(props: NotificationDetailsProps) {
-  const { decisions: loaded, notifiedToday, stayedToday, proposals, alwaysFor, onClose, initialFilter = 'all', initialOpen } = props
+  const { decisions: loaded, notifiedToday, stayedToday, capped = false, proposals, alwaysFor, onClose, initialFilter = 'all', initialOpen } = props
   const titleId = useId()
   const list = useRef<HTMLDivElement>(null)
   // A why that starts open is shown in view.
@@ -126,8 +128,8 @@ export function NotificationDetails(props: NotificationDetailsProps) {
   const toggle = useCallback((id: string) => setOpen((shown) => (shown === id ? undefined : id)), [])
   const actions = useLatestActions(props)
   const decisions = loaded ?? []
-  const notified = loaded === undefined ? notifiedToday : decisions.filter((decision) => decision.notified).length
-  const total = loaded === undefined ? notifiedToday + stayedToday : decisions.length
+  const notified = notifiedToday
+  const total = notifiedToday + stayedToday
   const shown = filter === 'all' ? decisions : decisions.filter((decision) => decision.notified === (filter === 'notified'))
   return (
     <Surface kind="popover" as="section" role="dialog" aria-labelledby={titleId} aria-modal aria-busy={loaded === undefined || undefined} padding="none" sx={[styles.sheet, styles.sheetHeight]} data-sheet="notifications">
@@ -153,6 +155,11 @@ export function NotificationDetails(props: NotificationDetailsProps) {
             ))}
           </ul>
         )}
+        {capped && loaded !== undefined ? (
+          <Text variant="meta" tone="muted" as="p" sx={styles.capped}>
+            Showing the latest {loaded.length}.
+          </Text>
+        ) : null}
       </div>
     </Surface>
   )
@@ -318,6 +325,10 @@ const styles = stylex.create({
     overscrollBehavior: 'contain',
     paddingInline: spacing['--space-3'],
     paddingBottom: spacing['--space-3'],
+  },
+  capped: {
+    paddingBlock: spacing['--space-3'],
+    textAlign: 'center',
   },
   empty: {
     paddingBlock: spacing['--space-6'],

@@ -34,6 +34,8 @@ export interface NotificationsPageProps extends HoursProps, HuddleRingProps, Omi
   readonly stayedToday: number
   /** Today's decisions, newest first, for Details; undefined while they load. */
   readonly decisions: ReadonlyArray<Decision> | undefined
+  /** Details lists only the latest of today's decisions. */
+  readonly capped?: boolean
   /** Details opened or closed: the owner reads the decisions only while it is open. */
   readonly onDetailsOpenChange?: (open: boolean) => void
   readonly proposals: ReadonlyMap<string, ProposedInstruction>

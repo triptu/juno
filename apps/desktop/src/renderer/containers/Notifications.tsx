@@ -1,5 +1,5 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
-import type { Hours, InstructionRule, NotificationPermission, NotificationSettingsView, NotifyTag, PickConversation, TodayRow } from '@juno/contract'
+import { TODAY_DECISIONS_LIMIT, type Hours, type Instruction, type InstructionRule, type NotificationPermission, type NotificationSettingsView, type NotifyTag, type PickConversation, type TodayRow } from '@juno/contract'
 import {
   applyJunoHours,
   checkInstruction,
@@ -128,12 +128,6 @@ function useNotificationPermission(): readonly [NotificationPermission | undefin
   return [permission, allow]
 }
 
-/** The rule check after an add: running, or the rule it found. */
-interface RuleCheck {
-  readonly instructionId: string
-  readonly rule?: InstructionRule
-}
-
 /** Change opens the part of the page, or the place in Settings, that decided. */
 function changeSetting(decision: Decision): void {
   switch (decision.decidedBy) {
@@ -148,35 +142,54 @@ function changeSetting(decision: Decision): void {
   }
 }
 
-/** Your instructions' props: the list, the rule check after an add, and the edits. */
-function instructionActions(current: NotificationSettingsView, ruleCheck: RuleCheck | undefined, setRuleCheck: Dispatch<SetStateAction<RuleCheck | undefined>>) {
+type RuleChecks = ReadonlyMap<string, InstructionRule | undefined>
+
+/** One edit after another per instruction, each on the id the last save answered with: a changed instruction gets a new id. */
+const edits = new Map<string, Promise<Instruction | undefined>>()
+
+function editInstruction(saved: Instruction | undefined, id: string, change: { readonly direction?: InstructionDirection; readonly text?: string }): void {
+  const next = (edits.get(id) ?? Promise.resolve(saved)).then(async (base) => {
+    if (base === undefined) return undefined
+    const wanted = { direction: change.direction ?? base.direction, text: change.text ?? base.text }
+    const newId = await saveInstruction(registry, { id: base.id, ...wanted })
+    return newId === undefined ? base : { id: newId, ...wanted }
+  })
+  edits.set(id, next)
+  // The row shows the new id once the settings arrive; an edit made then joins the same chain.
+  void next.then((result) => result === undefined || edits.set(result.id, next))
+}
+
+/** Your instructions' props: the list, each added instruction's rule check, and the edits. */
+function instructionActions(current: NotificationSettingsView, ruleChecks: RuleChecks, setRuleChecks: Dispatch<SetStateAction<RuleChecks>>) {
+  const without = (id: string) => setRuleChecks((shown) => {
+    const next = new Map(shown)
+    next.delete(id)
+    return next
+  })
   const add = async (direction: InstructionDirection, text: string) => {
     const id = await saveInstruction(registry, { direction, text })
     // The check is a chat-model call: only with AI assist on, once for this instruction.
     if (id === undefined || !current.aiAssist) return
-    setRuleCheck({ instructionId: id })
-    const rule = await checkInstruction(registry, text)
-    setRuleCheck((shown) => (shown?.instructionId !== id ? shown : rule === undefined ? undefined : { instructionId: id, rule }))
+    setRuleChecks((shown) => new Map(shown).set(id, undefined))
+    const rule = await checkInstruction(registry, text, direction)
+    if (rule === undefined) without(id)
+    else setRuleChecks((shown) => (shown.has(id) ? new Map(shown).set(id, rule) : shown))
   }
   const makeSetting = (instructionId: string) => {
-    const rule = ruleCheck?.rule
-    setRuleCheck(undefined)
+    const rule = ruleChecks.get(instructionId)
+    without(instructionId)
     if (rule === undefined) return
     removeInstruction(registry, instructionId)
     setNotifyLevel({ kind: rule.kind, id: rule.id }, rule.level, rule.name)
   }
-  const edit = (id: string, change: { readonly direction?: InstructionDirection; readonly text?: string }) => {
-    const instruction = current.instructions.find((each) => each.id === id)
-    if (instruction !== undefined) void saveInstruction(registry, { id, direction: change.direction ?? instruction.direction, text: change.text ?? instruction.text })
-  }
   return {
     instructions: current.instructions,
-    ...(ruleCheck === undefined ? {} : { ruleCheck: { instructionId: ruleCheck.instructionId, ...(ruleCheck.rule === undefined ? {} : { found: { name: ruleCheck.rule.name, level: ruleCheck.rule.level } }) } }),
+    ruleChecks: new Map([...ruleChecks].map(([id, rule]) => [id, rule === undefined ? undefined : { name: rule.name, level: rule.level }] as const)),
     onAdd: (direction: InstructionDirection, text: string) => void add(direction, text),
-    onEdit: edit,
+    onEdit: (id: string, change: { readonly direction?: InstructionDirection; readonly text?: string }) => editInstruction(current.instructions.find((each) => each.id === id), id, change),
     onRemove: (id: string) => remove(current, id),
     onMakeSetting: makeSetting,
-    onKeepInstruction: () => setRuleCheck(undefined),
+    onKeepInstruction: without,
   }
 }
 
@@ -238,7 +251,7 @@ export function NotificationsPage() {
   const [detailsOpen, setDetailsOpen] = useState(false)
   const decisions = useAtomValue(notificationDecisionsAtom(detailsOpen))
   const picker = useLevelPicker()
-  const [ruleCheck, setRuleCheck] = useState<RuleCheck | undefined>(undefined)
+  const [ruleChecks, setRuleChecks] = useState<RuleChecks>(new Map())
   const proposals = useProposals()
   const shownKey = settings._tag === 'Success' && page._tag === 'Success' && permission !== undefined ? anchor?.key : undefined
   // After the page has scrolled there in its layout effect.
@@ -248,7 +261,7 @@ export function NotificationsPage() {
   // All three are local and come at once; waiting for the page keeps Slack's line from appearing late.
   if (settings._tag !== 'Success' || page._tag !== 'Success' || permission === undefined) return null
   const current = settings.value
-  const instructionProps = instructionActions(current, ruleCheck, setRuleCheck)
+  const instructionProps = instructionActions(current, ruleChecks, setRuleChecks)
   const lists = page.value
   const rows = decisions._tag === 'Success' ? decisions.value.decisions : undefined
   return (
@@ -272,6 +285,7 @@ export function NotificationsPage() {
       notifiedToday={lists.notified}
       stayedToday={lists.stayed}
       decisions={rows?.map(asDecision)}
+      capped={rows !== undefined && rows.length >= TODAY_DECISIONS_LIMIT && rows.length < lists.notified + lists.stayed}
       onDetailsOpenChange={setDetailsOpen}
       {...whyProps(current, rows, proposals)}
       huddleRing={current.huddleRing}

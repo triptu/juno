@@ -112,8 +112,8 @@ export function removeInstruction(registry: Registry, id: string): void {
 }
 
 /** Whether an added instruction is really a rule about one person or channel. Undefined when it is not, or when Juno could not tell. */
-export async function checkInstruction(registry: Registry, text: string): Promise<InstructionRule | undefined> {
-  const exit = await runCommand(registry, notificationsCheckInstruction, { text })
+export async function checkInstruction(registry: Registry, text: string, direction: InstructionDirection): Promise<InstructionRule | undefined> {
+  const exit = await runCommand(registry, notificationsCheckInstruction, { text, direction })
   return Exit.isSuccess(exit) && exit.value !== null ? exit.value : undefined
 }
 

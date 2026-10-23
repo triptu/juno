@@ -74,6 +74,7 @@ export const notificationsBase: NotificationsPageProps = {
   alwaysNotify: { dms: false, groupDms: false, mentions: true, startedThreads: false, followedThreads: false },
   onAlwaysNotifyChange: noop,
   instructions: instructions.slice(0, 2),
+  ruleChecks: new Map(),
   onAdd: noop,
   onEdit: noop,
   onRemove: noop,
@@ -152,12 +153,12 @@ export default defineFixtures(
       many: fixture({ ...notificationsBase, instructions, anchor: 'instructions', anchorKey: 1 }, tall),
       empty: fixture({ ...notificationsBase, instructions: [], anchor: 'instructions', anchorKey: 1 }, tall),
       'direction-chosen': fixture({ ...notificationsBase, initialDirection: 'notify', anchor: 'instructions', anchorKey: 1 }, tall),
-      checking: fixture({ ...notificationsBase, instructions: [...instructions.slice(0, 2), { id: 'i9', direction: 'notify', text: 'Always notify me when Alex messages me' }], ruleCheck: { instructionId: 'i9' }, anchor: 'instructions', anchorKey: 1 }, tall),
+      checking: fixture({ ...notificationsBase, instructions: [...instructions.slice(0, 2), { id: 'i9', direction: 'notify', text: 'Always notify me when Alex messages me' }], ruleChecks: new Map([['i9', undefined]]), anchor: 'instructions', anchorKey: 1 }, tall),
       'found-rule': fixture(
         {
           ...notificationsBase,
           instructions: [...instructions.slice(0, 2), { id: 'i9', direction: 'notify', text: 'Always notify me when Alex messages me' }],
-          ruleCheck: { instructionId: 'i9', found: { name: 'Alex Chen', level: 'always' } },
+          ruleChecks: new Map([['i9', { name: 'Alex Chen', level: 'always' }]]),
           anchor: 'instructions',
           anchorKey: 1,
         },

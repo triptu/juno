@@ -10,10 +10,10 @@ export interface InstructionsSectionProps {
   /** Off: one line says DMs and mentions notify. The list stays editable. */
   readonly aiAssist: boolean
   /**
-   * The check after an add, under the instruction it is about: its line's
-   * height is kept while `found` is undefined, then the rule shows.
+   * The checks after adds, by instruction id, each under its instruction:
+   * Checking… while the value is undefined, then the rule it found.
    */
-  readonly ruleCheck?: { readonly instructionId: string; readonly found?: FoundRule }
+  readonly ruleChecks: ReadonlyMap<string, FoundRule | undefined>
   readonly onAdd: (direction: InstructionDirection, text: string) => void
   readonly onEdit: (id: string, change: { readonly direction?: InstructionDirection; readonly text?: string }) => void
   readonly onRemove: (id: string) => void
@@ -38,7 +38,7 @@ const directions = [
  * direction, since there is no default. After an add, a line under the new
  * row offers a rule about one person or channel as a setting.
  */
-export function InstructionsSection({ instructions, aiAssist, ruleCheck, onAdd, onEdit, onRemove, onMakeSetting, onKeepInstruction, initialDirection, headingRef }: InstructionsSectionProps) {
+export function InstructionsSection({ instructions, aiAssist, ruleChecks, onAdd, onEdit, onRemove, onMakeSetting, onKeepInstruction, initialDirection, headingRef }: InstructionsSectionProps) {
   return (
     <Section
       headingRef={headingRef}
@@ -60,8 +60,8 @@ export function InstructionsSection({ instructions, aiAssist, ruleCheck, onAdd, 
         ) : null}
         {instructions.map((instruction) => (
           <Fragment key={instruction.id}>
-            <InstructionRow instruction={instruction} onEdit={onEdit} onRemove={onRemove} divided={ruleCheck?.instructionId !== instruction.id} />
-            {ruleCheck?.instructionId === instruction.id ? <RuleLine found={ruleCheck.found} onMake={() => onMakeSetting(instruction.id)} onKeep={() => onKeepInstruction(instruction.id)} /> : null}
+            <InstructionRow instruction={instruction} onEdit={onEdit} onRemove={onRemove} divided={!ruleChecks.has(instruction.id)} />
+            {ruleChecks.has(instruction.id) ? <RuleLine found={ruleChecks.get(instruction.id)} onMake={() => onMakeSetting(instruction.id)} onKeep={() => onKeepInstruction(instruction.id)} /> : null}
           </Fragment>
         ))}
         <AddRow onAdd={onAdd} initialDirection={initialDirection} />

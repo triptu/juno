@@ -21,6 +21,8 @@ export default defineFixtures(NotificationDetails, {
     notified: fixture({ ...base, initialFilter: 'notified' }, frame),
     stayed: fixture({ ...base, initialFilter: 'stayed' }, frame),
     loading: fixture({ ...base, decisions: undefined }, frame),
+    // A long day: the filter counts the whole day, the list the latest.
+    capped: fixture({ ...base, notifiedToday: 212, stayedToday: 431, capped: true }, frame),
     'nothing-notified': fixture({ ...base, initialFilter: 'notified', decisions: (base.decisions ?? []).filter((decision) => !decision.notified) }, frame),
   },
   Why: {
