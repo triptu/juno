@@ -83,6 +83,12 @@ export interface MessageListProps {
    * container acts on the row's message.
    */
   readonly onRowKey?: (ts: string, event: KeyboardEvent<HTMLElement>) => void
+  /**
+   * ↓ on the last row: the container moves focus on, to the composer. Pass it
+   * only while the last row is the topic's newest message; without it ↓ there
+   * does nothing.
+   */
+  readonly onPastEnd?: (() => void) | undefined
   readonly onOpenThread?: (id: string, event: ActivateEvent) => void
   /** A broadcast reply's "in <topic title>" in Main: the thread `id`, opened at the reply `ts`. */
   readonly onOpenReply?: (id: string, ts: string, event: ActivateEvent) => void
@@ -158,8 +164,11 @@ function watchSelectionDrag(event: PointerEvent<HTMLDivElement>): void {
   window.addEventListener('pointercancel', end, true)
 }
 
-/** Arrow keys move focus between rows; the row that takes focus becomes the tabbable one. Other keys on a row go to `onRowKey`. */
-function onKeyDown(event: KeyboardEvent<HTMLDivElement>, onRowKey: MessageListProps['onRowKey']) {
+/**
+ * Arrow keys move focus between rows; the row that takes focus becomes the tabbable one. ↓ on the last row goes to
+ * `onPastEnd`. Other keys on a row go to `onRowKey`.
+ */
+function onKeyDown(event: KeyboardEvent<HTMLDivElement>, onRowKey: MessageListProps['onRowKey'], onPastEnd: MessageListProps['onPastEnd']) {
   const target = event.target
   if (!(target instanceof HTMLElement) || !target.matches(ROW)) return
   if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') {
@@ -170,7 +179,13 @@ function onKeyDown(event: KeyboardEvent<HTMLDivElement>, onRowKey: MessageListPr
   const rows = Array.from(event.currentTarget.querySelectorAll<HTMLElement>(ROW))
   const index = rows.indexOf(target)
   const next = rows[event.key === 'ArrowDown' ? index + 1 : index - 1]
-  if (next === undefined) return
+  if (next === undefined) {
+    if (event.key === 'ArrowDown' && onPastEnd !== undefined && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
+      event.preventDefault()
+      onPastEnd()
+    }
+    return
+  }
   event.preventDefault()
   next.focus()
   next.scrollIntoView({ block: 'nearest', behavior: 'instant' })
@@ -264,6 +279,7 @@ export function MessageList({
   editing,
   suggestions,
   onRowKey,
+  onPastEnd,
   onOpenThread,
   onOpenReply,
   onPrefetchThread,
@@ -316,7 +332,7 @@ export function MessageList({
         role="list"
         aria-label="Messages"
         aria-busy={status === 'loading' || status === 'pending'}
-        onKeyDown={(event) => onKeyDown(event, onRowKey)}
+        onKeyDown={(event) => onKeyDown(event, onRowKey, onPastEnd)}
         onPointerDown={watchSelectionDrag}
         onPointerOver={
           onPrefetchThread === undefined

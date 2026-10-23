@@ -67,6 +67,8 @@ export interface MessageActionsOutput {
   readonly onMessageMenu: (ts: string, at: MenuAt, onSender: boolean) => void
   /** ↑ in an empty composer. */
   readonly selectNewest: () => void
+  /** ↓ on the newest message: back to the composer, its draft as it was. */
+  readonly focusComposer: () => void
   /** The selection's bar and the reactions dialog, for `TopicView`'s floating slot. */
   readonly floating: ReactNode
 }

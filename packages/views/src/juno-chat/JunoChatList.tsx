@@ -73,7 +73,7 @@ export function JunoChatList({ items, banner, moreAbove, moreBelow, now, actions
   const compact = useNarrowerThan(columnRef, COMPACT_BELOW)
   return (
     <ScrollArea scrollbar="hover" evenInset underHeader ref={scrollRef} data-scroll="" sx={styles.scroller}>
-      <div ref={columnRef} role="list" aria-label="Juno chat" onKeyDown={(event) => rowKey(event, actions)} data-chat-compact={compact || undefined} {...stylex.props(styles.column, column === 'panel' && styles.panel, column === 'page' && compact && styles.compact)}>
+      <div ref={columnRef} role="list" aria-label="Juno chat" onKeyDown={(event) => rowKey(event, actions, moreBelow)} data-chat-compact={compact || undefined} {...stylex.props(styles.column, column === 'panel' && styles.panel, column === 'page' && compact && styles.compact)}>
         <div ref={topEdgeRef} data-chat-edge={moreAbove ? 'more' : 'end'} aria-hidden {...stylex.props(styles.edge)} />
         {empty ? <EmptyChat onSuggest={onSuggest} enter={enterEmpty} /> : null}
         {rows.map((item, index) => (
@@ -96,16 +96,24 @@ const ROW = '[data-chat-row]'
 
 /**
  * The keys of a bubble or card with keyboard focus (↑ in the empty composer
- * gives the newest one focus): ↑ and ↓ move between them, Esc goes back to
- * the composer, and ⇧F10 opens its menu, as the context-menu key does.
+ * gives the newest one focus): ↑ and ↓ move between them, ↓ on the newest
+ * one and Esc go back to the composer, and ⇧F10 opens its menu, as the
+ * context-menu key does. With newer items still to load (`moreBelow`), ↓ on
+ * the last row stays put.
  */
-function rowKey(event: KeyboardEvent<HTMLDivElement>, actions: ChatActions): void {
+function rowKey(event: KeyboardEvent<HTMLDivElement>, actions: ChatActions, moreBelow: boolean): void {
   const target = event.target
   if (!(target instanceof HTMLElement) || !target.matches(ROW)) return
   if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
     const rows = [...event.currentTarget.querySelectorAll<HTMLElement>(ROW)]
     const next = rows[rows.indexOf(target) + (event.key === 'ArrowUp' ? -1 : 1)]
-    if (next === undefined) return
+    if (next === undefined) {
+      if (event.key === 'ArrowDown' && !moreBelow && actions.onLeaveRows !== undefined && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        event.preventDefault()
+        actions.onLeaveRows()
+      }
+      return
+    }
     event.preventDefault()
     next.focus({ preventScroll: true })
     next.scrollIntoView({ block: 'nearest', behavior: 'instant' })

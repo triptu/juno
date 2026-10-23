@@ -86,29 +86,42 @@ async function keyboardActions({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>):
     await expect.poll(() => fake.messages('C0ENG').some((m) => m.ts === ts)).toBe(false)
     expect(fake.calls.filter((call) => call.method === 'chat.delete')).toHaveLength(1)
   })
-  await test.step('the keyboard: ↑ and ↓ move the selection, Esc goes back to the composer, and E does nothing on others’ messages', async () => {
-    fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Can someone look at the replica lag?' })
-    await topic.expectMessage('Can someone look at the replica lag?')
-    await sendOwn(juno, fake, 'Looking now')
+  await test.step('the keyboard: ↑ and ↓ move the selection, ↓ on the newest or Esc goes back to the composer, and E does nothing on others’ messages', () => moveSelection(juno, fake))
+}
 
-    await topic.composer.press('ArrowUp')
-    await expect(topic.message('Looking now')).toBeFocused()
-    await juno.win.keyboard.press('ArrowUp')
-    const theirs = topic.message('Can someone look at the replica lag?')
-    await expect(theirs).toBeFocused()
-    await juno.win.keyboard.press('e')
-    await expect(theirs.getByRole('textbox', { name: 'Edit message' })).toHaveCount(0)
-    await juno.win.keyboard.press('Delete')
-    await expect(theirs.locator('[data-delete-confirm]')).toHaveCount(0)
-    await juno.win.keyboard.press('ArrowDown')
-    await expect(topic.message('Looking now')).toBeFocused()
-    await juno.win.keyboard.press('Escape')
-    await expect(topic.composer).toBeFocused()
-    // ↑ only selects from an empty composer; with text it moves the caret.
-    await topic.composer.fill('half a thought')
-    await topic.composer.press('ArrowUp')
-    await expect(topic.composer).toBeFocused()
-  })
+async function moveSelection(juno: Juno, fake: FakeSlack): Promise<void> {
+  const { topic } = juno
+  fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Can someone look at the replica lag?' })
+  await topic.expectMessage('Can someone look at the replica lag?')
+  await sendOwn(juno, fake, 'Looking now')
+
+  await topic.composer.press('ArrowUp')
+  await expect(topic.message('Looking now')).toBeFocused()
+  await juno.win.keyboard.press('ArrowUp')
+  const theirs = topic.message('Can someone look at the replica lag?')
+  await expect(theirs).toBeFocused()
+  await juno.win.keyboard.press('e')
+  await expect(theirs.getByRole('textbox', { name: 'Edit message' })).toHaveCount(0)
+  await juno.win.keyboard.press('Delete')
+  await expect(theirs.locator('[data-delete-confirm]')).toHaveCount(0)
+  await juno.win.keyboard.press('ArrowDown')
+  await expect(topic.message('Looking now')).toBeFocused()
+  // ↓ on the newest message goes back to the composer, the inverse of ↑.
+  await juno.win.keyboard.press('ArrowDown')
+  await expect(topic.composer).toBeFocused()
+  await topic.composer.press('ArrowUp')
+  await expect(topic.message('Looking now')).toBeFocused()
+  await juno.win.keyboard.press('Escape')
+  await expect(topic.composer).toBeFocused()
+  // ↑ only selects from an empty composer; with text it moves the caret.
+  await topic.composer.fill('half a thought')
+  await topic.composer.press('ArrowUp')
+  await expect(topic.composer).toBeFocused()
+  // A message selected while the composer holds a draft: ↓ comes back to the draft as it was.
+  await topic.message('Looking now').focus()
+  await juno.win.keyboard.press('ArrowDown')
+  await expect(topic.composer).toBeFocused()
+  await expect(topic.composer).toHaveValue('half a thought')
 }
 
 async function reactToMessage({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
