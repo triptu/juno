@@ -1,5 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { NotificationPermission, PickConversation } from '@juno/contract'
 import { spacing } from '@juno/tokens/tokens.stylex'
 import { Page, PageHeader } from '@juno/ui'
@@ -57,8 +58,6 @@ export interface NotificationsPageProps extends HoursProps, HuddleRingProps, Omi
   readonly details?: { readonly filter?: DetailsFilter; readonly open?: string }
   /** The add row's direction to start with (fixtures). */
   readonly initialDirection?: InstructionsSectionProps['initialDirection']
-  /** Which Add… starts open (fixtures). */
-  readonly initialPicker?: ListedLevel
 }
 
 /**
@@ -70,7 +69,7 @@ export interface NotificationsPageProps extends HoursProps, HuddleRingProps, Omi
  * turn it on.
  */
 export function NotificationsPage(props: NotificationsPageProps) {
-  const { aiAssist, alwaysNotify, onAlwaysNotifyChange, always, never, onRemoveLevel, picker, onPickLevel, onOpenIgnored, notifiedToday, stayedToday, onDetailsOpenChange, permission, onSendTest, onOpenSettings, onAllow, huddleRing, onHuddleRingChange, anchor, anchorKey, details, initialDirection, initialPicker } = props
+  const { aiAssist, alwaysNotify, onAlwaysNotifyChange, always, never, onRemoveLevel, picker, onPickLevel, onOpenIgnored, notifiedToday, stayedToday, onDetailsOpenChange, permission, onSendTest, onOpenSettings, onAllow, huddleRing, onHuddleRingChange, anchor, anchorKey, details, initialDirection } = props
   const anchors = useRef<Partial<Record<NotificationsAnchor, HTMLDivElement | null>>>({})
   const [detailsOpen, setDetailsShown] = useState(details !== undefined)
   const setDetailsOpen = (open: boolean) => {
@@ -102,7 +101,7 @@ export function NotificationsPage(props: NotificationsPageProps) {
         <InstructionsSection {...props} aiAssist={aiAssist} {...(initialDirection === undefined ? {} : { initialDirection })} />
       </div>
       <div ref={part('levels')} {...stylex.props(styles.anchor)}>
-        <NotifyLevelsSection always={always} never={never} onRemove={onRemoveLevel} picker={picker} onPick={onPickLevel} onOpenIgnored={onOpenIgnored} {...(initialPicker === undefined ? {} : { initialPicker })} />
+        <NotifyLevelsSection always={always} never={never} onRemove={onRemoveLevel} picker={picker} onPick={onPickLevel} onOpenIgnored={onOpenIgnored} />
       </div>
       <div ref={part('how-auto')} {...stylex.props(styles.anchor)}>
         <HowAutoDecides />
@@ -115,14 +114,14 @@ export function NotificationsPage(props: NotificationsPageProps) {
   )
 }
 
-/** Today's Details over the page. An action that opens a part of the page closes the sheet first. */
+/** Today's Details over the window, outside the page's scroller. An action that opens a part of the page closes the sheet first. */
 function DetailsSheet(props: NotificationsPageProps & { readonly onClose: () => void }) {
   const { onClose, details } = props
   const closing = <A extends ReadonlyArray<unknown>>(action: (...args: A) => void) => (...args: A) => {
     onClose()
     action(...args)
   }
-  return (
+  return createPortal(
     <SheetLayer onClose={onClose}>
       <NotificationDetails
         {...props}
@@ -132,7 +131,8 @@ function DetailsSheet(props: NotificationsPageProps & { readonly onClose: () => 
         {...(details?.filter === undefined ? {} : { initialFilter: details.filter })}
         {...(details?.open === undefined ? {} : { initialOpen: details.open })}
       />
-    </SheetLayer>
+    </SheetLayer>,
+    document.body,
   )
 }
 

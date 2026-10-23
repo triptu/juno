@@ -169,7 +169,6 @@ export default defineFixtures(
     Levels: {
       many: fixture({ ...notificationsBase, always: manyAlways, never: manyNever, anchor: 'instructions', anchorKey: 1 }, tall),
       empty: fixture({ ...notificationsBase, always: [], never: [], anchor: 'instructions', anchorKey: 1 }, tall),
-      'add-open': fixture({ ...notificationsBase, initialPicker: 'always', anchor: 'how-auto', anchorKey: 1 }, tall),
     },
     Details: {
       all: fixture({ ...notificationsBase, details: {} }, tall),

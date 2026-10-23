@@ -104,7 +104,8 @@ export function NotificationDetails(props: NotificationDetailsProps) {
             {filter === 'notified' ? 'Nothing has notified you today.' : filter === 'stayed' ? 'Nothing stayed in Juno today.' : 'Juno has not decided on any message today.'}
           </Text>
         ) : (
-          <ul aria-label="Today's decisions" {...stylex.props(styles.list)}>
+          // A row's why opens under it and moves the rows below, on purpose.
+          <ul aria-label="Today's decisions" data-expands-in-place="" {...stylex.props(styles.list)}>
             {shown.map((decision) => (
               <DecisionRow
                 key={decision.id}

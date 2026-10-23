@@ -35,8 +35,6 @@ export interface NotifyLevelsSectionProps {
   readonly onPick: (level: ListedLevel, conversation: PickConversation) => void
   /** Settings › Ignored. */
   readonly onOpenIgnored: () => void
-  /** Which Add… starts open (fixtures). */
-  readonly initialPicker?: ListedLevel
 }
 
 const channelIcons: Record<Extract<LevelTag, { kind: 'channel' }>['channelKind'], PhosphorIcon> = { public: Hash, private: Lock, im: User, mpim: Users }
@@ -47,8 +45,8 @@ const channelIcons: Record<Extract<LevelTag, { kind: 'channel' }>['channelKind']
  * and Add… on each row, which searches people and channels. Everything
  * else is on Auto.
  */
-export function NotifyLevelsSection({ always, never, onRemove, picker, onPick, onOpenIgnored, initialPicker }: NotifyLevelsSectionProps) {
-  const [open, setOpen] = useState<ListedLevel | undefined>(initialPicker)
+export function NotifyLevelsSection({ always, never, onRemove, picker, onPick, onOpenIgnored }: NotifyLevelsSectionProps) {
+  const [open, setOpen] = useState<ListedLevel | undefined>(undefined)
   const show = (level: ListedLevel | undefined) => {
     setOpen(level)
     picker.onOpenChange?.(level !== undefined)
