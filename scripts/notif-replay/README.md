@@ -6,7 +6,7 @@ Everything it writes holds real Slack content. Keep `--out` and `--dir` under `/
 
 ## Steps
 
-1. Replay. It copies the app's store to `<out>/store` (the app's folder is only read), finds every notification candidate of the last N days (DMs, group DMs, mentions, replies in threads you follow, anything set to Always), and decides each one as of its own time. The facts come only from messages before it. The reading goes to the real classifier on OpenRouter, using `OPENROUTER_API_KEY` from the environment, the repo's `.env` or the main checkout's `.env`.
+1. Replay. It copies the app's store to `<out>/store` (the app's folder is only read), finds every notification candidate of the last N days (DMs, group DMs, mentions, replies in threads you follow or started, anything set to Always), and decides each one as of its own time. The facts come only from messages before it. The reading goes to the real classifier on OpenRouter, using `OPENROUTER_API_KEY` from the environment, the repo's `.env` or the main checkout's `.env`.
 
    ```sh
    pnpm notif:replay run --out /Volumes/AgentWork/scratch/notif-replay/run --days 21

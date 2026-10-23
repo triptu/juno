@@ -44,6 +44,7 @@ interface MessageRow {
   readonly sender_name: string | null
   readonly bot_name: string | null
   readonly subscribed: number | null
+  readonly started: number
 }
 
 const parse = <A>(json: string | null): A | undefined => {
@@ -135,11 +136,12 @@ type Copy = Effect.Success<ReturnType<typeof openCopy>>
 const candidateRows = (sql: Sql, self: string, from: number) =>
   sql<MessageRow>`SELECT m.channel, m.ts, m.thread_ts, m.user_id, m.subtype, m.text, m.blocks_json, m.attachments_json, m.files_json, m.bot_name,
       c.kind, c.name, c.user_id AS dm_user, c.member_ids_json, ig.channel IS NOT NULL AS ignored,
-      COALESCE(NULLIF(u.display_name, ''), NULLIF(u.real_name, ''), u.name) AS sender_name, s.subscribed
+      COALESCE(NULLIF(u.display_name, ''), NULLIF(u.real_name, ''), u.name) AS sender_name, s.subscribed, st.root_ts IS NOT NULL AS started
     FROM messages m JOIN conversations c ON c.id = m.channel
     LEFT JOIN ignored_channels ig ON ig.channel = m.channel
     LEFT JOIN users u ON u.id = m.user_id
     LEFT JOIN thread_subs s ON s.channel = m.channel AND s.thread_ts = m.thread_ts
+    LEFT JOIN started_threads st ON st.channel = m.channel AND st.root_ts = m.thread_ts
     WHERE m.ts >= ${millisToTs(from)} AND m.deleted = 0 AND (m.user_id IS NULL OR m.user_id <> ${self})
     ORDER BY m.ts`
 
@@ -158,8 +160,8 @@ function toCandidate(copy: Copy, row: MessageRow): Candidate | undefined {
   const topicId = reply ? `t:${row.channel}:${row.thread_ts}` : `m:${row.channel}`
   const sender = row.user_id ?? ''
   const always = settings.channels[row.channel] === 'always' || settings.people[sender] === 'always' || settings.threads?.[topicId] === 'always'
-  // The candidates: DMs and group DMs, mentions, replies in threads the owner follows (Slack's desktop_notification), and Always.
-  if (!isDm(row.kind) && !mentionsMe && !(reply && row.subscribed === 1) && !always) return undefined
+  // The candidates, as the engine's frame handler takes them: DMs and group DMs, mentions, replies in threads the owner follows or started, and Always.
+  if (!isDm(row.kind) && !mentionsMe && !(reply && (row.subscribed === 1 || row.started === 1)) && !always) return undefined
   const memberNames = row.kind === 'mpim' ? (parse<string[]>(row.member_ids_json) ?? []).filter((id) => id !== self).map((id) => users.get(id) ?? id) : []
   const name = row.kind === 'im' ? users.get(row.dm_user ?? '') ?? row.name ?? row.channel
     : row.kind === 'mpim' ? channelLabel({ kind: 'mpim', name: row.name ?? row.channel, memberNames }) : row.name ?? row.channel
