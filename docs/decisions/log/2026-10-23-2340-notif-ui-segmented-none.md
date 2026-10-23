@@ -1,0 +1,1 @@
+- 10-23 23:40 · notif-ui-segmented-none · `Segmented` takes `null` for nothing chosen yet: no segment is raised and the first is the Tab stop. The instructions add row needs it, since an instruction has no default direction.
