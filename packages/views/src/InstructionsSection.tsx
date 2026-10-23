@@ -1,6 +1,6 @@
 import * as stylex from '@stylexjs/stylex'
 import { X } from '@phosphor-icons/react/dist/icons/X'
-import { Fragment, useRef, useState, type KeyboardEvent } from 'react'
+import { Fragment, useRef, useState, type KeyboardEvent, type Ref } from 'react'
 import { accent, colors, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
 import { Button, IconButton, Section, Segmented, Surface, Text, TextField } from '@juno/ui'
 import type { FoundRule, Instruction, InstructionDirection } from './notificationRules'
@@ -22,6 +22,8 @@ export interface InstructionsSectionProps {
   readonly onKeepInstruction: (instructionId: string) => void
   /** The add row's direction to start with (fixtures). */
   readonly initialDirection?: InstructionDirection
+  /** The heading, for the page to scroll to. */
+  readonly headingRef?: Ref<HTMLElement>
 }
 
 const directions = [
@@ -36,11 +38,12 @@ const directions = [
  * direction, since there is no default. After an add, a line under the new
  * row offers a rule about one person or channel as a setting.
  */
-export function InstructionsSection({ instructions, aiAssist, ruleCheck, onAdd, onEdit, onRemove, onMakeSetting, onKeepInstruction, initialDirection }: InstructionsSectionProps) {
+export function InstructionsSection({ instructions, aiAssist, ruleCheck, onAdd, onEdit, onRemove, onMakeSetting, onKeepInstruction, initialDirection, headingRef }: InstructionsSectionProps) {
   return (
     <Section
+      headingRef={headingRef}
       heading="Your instructions"
-      sub="For each instruction, choose Notify me or Don't notify, then describe it in your own words. Juno follows them when it reads messages on Auto. If one is about a single person or channel, Juno offers to make it a setting instead."
+      sub="Juno follows these when it reads a message on Auto."
     >
       {aiAssist ? null : (
         <Text variant="ui" tone="muted" as="p">
@@ -103,11 +106,15 @@ function InstructionRow({ instruction, onEdit, onRemove, divided }: { readonly i
   )
 }
 
-/** Under a new instruction: the rule Juno found in it, with its two answers. Its height is kept while the check runs. */
+/** Under a new instruction: Checking… while Juno checks it, then the rule it found, with its two answers. */
 function RuleLine({ found, onMake, onKeep }: { readonly found: FoundRule | undefined; readonly onMake: () => void; readonly onKeep: () => void }) {
   return (
     <div data-found-rule="" aria-live="polite" {...stylex.props(styles.rule, found !== undefined && styles.ruleFound, styles.divided)}>
-      {found === undefined ? null : (
+      {found === undefined ? (
+        <Text variant="meta" tone="muted">
+          Checking…
+        </Text>
+      ) : (
         <>
           <Text variant="ui" tone="subtle" as="p" sx={styles.ruleText}>
             Juno found a rule:{' '}
@@ -204,10 +211,10 @@ const styles = stylex.create({
     borderColor: {
       default: 'transparent',
       ':hover': { default: null, '@media (hover: hover)': colors['--input-border'] },
-      ':focus': colors['--input-border'],
+      ':focus-visible': colors['--input-border'],
     },
     borderRadius: radii['--radius-md'],
-    backgroundColor: { default: 'transparent', ':focus': colors['--surface-default'] },
+    backgroundColor: { default: 'transparent', ':focus-visible': colors['--surface-default'] },
     color: colors['--foreground-default'],
     fontFamily: text['--text-body-small-family'],
     fontSize: text['--text-body-small-size'],

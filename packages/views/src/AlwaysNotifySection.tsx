@@ -1,9 +1,12 @@
+import type { Ref } from 'react'
 import { Checkbox, ListRow, Section, Surface } from '@juno/ui'
 import type { AlwaysNotify, AlwaysNotifyKey } from './notificationRules'
 
 export interface AlwaysNotifySectionProps {
   readonly alwaysNotify: AlwaysNotify
   readonly onAlwaysNotifyChange: (key: AlwaysNotifyKey, enabled: boolean) => void
+  /** The heading, for the page to scroll to. */
+  readonly headingRef?: Ref<HTMLElement>
 }
 
 const switches: ReadonlyArray<{ readonly key: AlwaysNotifyKey; readonly label: string; readonly description?: string }> = [
@@ -20,9 +23,9 @@ const switches: ReadonlyArray<{ readonly key: AlwaysNotifyKey; readonly label: s
  * While Threads you follow is on, Threads you started shows on and dimmed,
  * since every thread you started is one you follow.
  */
-export function AlwaysNotifySection({ alwaysNotify, onAlwaysNotifyChange }: AlwaysNotifySectionProps) {
+export function AlwaysNotifySection({ alwaysNotify, onAlwaysNotifyChange, headingRef }: AlwaysNotifySectionProps) {
   return (
-    <Section heading="Always notify" sub="These notify inside your hours, whatever they say. Turn them all on to be notified the way Slack does by default.">
+    <Section headingRef={headingRef} heading="Always notify" sub="These notify inside your hours, whatever they say. Turn them all on to be notified the way Slack does by default.">
       <Surface kind="group">
         {switches.map(({ key, label, description }, index) => {
           const included = key === 'startedThreads' && alwaysNotify.followedThreads

@@ -1,8 +1,6 @@
-import * as stylex from '@stylexjs/stylex'
 import { useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { NotificationPermission, PickConversation } from '@juno/contract'
-import { spacing } from '@juno/tokens/tokens.stylex'
 import { Page, PageHeader } from '@juno/ui'
 import { AlwaysNotifySection } from './AlwaysNotifySection'
 import { HuddleRingSection, type HuddleRingProps } from './HuddleRingSection'
@@ -68,7 +66,7 @@ export interface NotificationsPageProps extends HoursProps, HuddleRingProps, Omi
  */
 export function NotificationsPage(props: NotificationsPageProps) {
   const { aiAssist, alwaysNotify, onAlwaysNotifyChange, always, never, onRemoveLevel, picker, onPickLevel, onOpenIgnored, notifiedToday, stayedToday, onDetailsOpenChange, permission, onSendTest, onOpenSettings, onAllow, huddleRing, onHuddleRingChange, anchor, anchorKey, initialDirection } = props
-  const anchors = useRef<Partial<Record<NotificationsAnchor, HTMLDivElement | null>>>({})
+  const headings = useRef<Partial<Record<NotificationsAnchor, HTMLElement | null>>>({})
   const [detailsOpen, setDetailsShown] = useState(false)
   const setDetailsOpen = (open: boolean) => {
     setDetailsShown(open)
@@ -77,33 +75,23 @@ export function NotificationsPage(props: NotificationsPageProps) {
   // Before paint, so the page opens already at the part asked for; again for each new ask.
   useLayoutEffect(() => {
     if (anchor === undefined || anchorKey === undefined) return
-    const part = anchors.current[anchor]
-    // The section's heading: the first line of its head.
-    const heading = part?.querySelector<HTMLElement>('section > div > :first-child') ?? part
+    const heading = headings.current[anchor]
     if (heading === null || heading === undefined) return
     heading.scrollIntoView({ block: 'start', behavior: 'instant' })
     heading.tabIndex = -1
     // Focus for screen readers and the next Tab, with no ring: the owner did not press a key here.
     heading.focus({ preventScroll: true, focusVisible: false } as FocusOptions)
   }, [anchor, anchorKey])
-  const part = (name: NotificationsAnchor) => (element: HTMLDivElement | null) => void (anchors.current[name] = element)
+  const heading = (name: NotificationsAnchor) => (element: HTMLElement | null) => void (headings.current[name] = element)
   return (
     <Page width="settings">
       <PageHeader title="Notifications" subtitle="Inside your notification hours, Juno notifies you about what needs you. Everything is in Juno whenever you open it." />
       <PermissionLine permission={permission} onOpenSettings={onOpenSettings} onAllow={onAllow} />
-      <HoursSections {...props} hoursRef={part('hours')} />
-      <div ref={part('always-notify')} {...stylex.props(styles.anchor)}>
-        <AlwaysNotifySection alwaysNotify={alwaysNotify} onAlwaysNotifyChange={onAlwaysNotifyChange} />
-      </div>
-      <div ref={part('instructions')} {...stylex.props(styles.anchor)}>
-        <InstructionsSection {...props} aiAssist={aiAssist} {...(initialDirection === undefined ? {} : { initialDirection })} />
-      </div>
-      <div ref={part('levels')} {...stylex.props(styles.anchor)}>
-        <NotifyLevelsSection always={always} never={never} onRemove={onRemoveLevel} picker={picker} onPick={onPickLevel} onOpenIgnored={onOpenIgnored} />
-      </div>
-      <div ref={part('how-auto')} {...stylex.props(styles.anchor)}>
-        <HowAutoDecides />
-      </div>
+      <HoursSections {...props} hoursRef={heading('hours')} />
+      <AlwaysNotifySection alwaysNotify={alwaysNotify} onAlwaysNotifyChange={onAlwaysNotifyChange} headingRef={heading('always-notify')} />
+      <InstructionsSection {...props} aiAssist={aiAssist} headingRef={heading('instructions')} {...(initialDirection === undefined ? {} : { initialDirection })} />
+      <NotifyLevelsSection always={always} never={never} onRemove={onRemoveLevel} picker={picker} onPick={onPickLevel} onOpenIgnored={onOpenIgnored} headingRef={heading('levels')} />
+      <HowAutoDecides headingRef={heading('how-auto')} />
       <TodaySection notifiedToday={notifiedToday} stayedToday={stayedToday} detailsOpen={detailsOpen} onDetails={() => setDetailsOpen(true)} />
       <HuddleRingSection huddleRing={huddleRing} onHuddleRingChange={onHuddleRingChange} />
       <TestSection permission={permission} onSendTest={onSendTest} onOpenSettings={onOpenSettings} />
@@ -132,9 +120,3 @@ function DetailsSheet(props: NotificationsPageProps & { readonly onClose: () => 
   )
 }
 
-const styles = stylex.create({
-  // Scrolled to the top of the page's scroller with the section's own room above it.
-  anchor: {
-    scrollMarginTop: spacing['--space-6'],
-  },
-})
