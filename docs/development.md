@@ -7,13 +7,13 @@ How to build and run Juno, and how the repo is put together.
 - Node 24 or newer (Node 26 is what this was built with), for the few tools that stay on Node (see "Runtimes").
 - The Bun canary build that `packageManager` in `package.json` names: `1.4.4-canary.20261023.1`, commit `5c6d4e24c`. Canary builds have `bun lint`. Every canary of a release prints the same `bun --version`, so check the build with `bun --revision`, which prints `1.4.4-canary.1+5c6d4e24c`. `bun upgrade --canary` installs the newest canary, which may be another build, so install this one from npm: `npm pack @oven/bun-darwin-aarch64@1.4.4-canary.20261023.1`, `tar -xzf oven-bun-darwin-aarch64-1.4.4-canary.20261023.1.tgz package/bin/bun`, then move `package/bin/bun` to `~/.bun/bin/bun`. The root `preinstall` script (`scripts/check-bun.mjs`) stops an install with any other build. The remote image and CI install the same build with `npm install -g bun@<version>`.
 - macOS for the window chrome and e2e tests. Nothing else is platform-specific yet.
-- Google Chrome, for the gallery tests and screenshots.
+- Playwright's Chromium headless shell (`bunx playwright install chromium --only-shell`), for gallery tests and screenshots.
 - Git LFS (`brew install git-lfs`, then `git lfs install` once), for the images and videos under `docs/`.
 - On macOS, Homebrew's SQLite (`brew install sqlite`), for the store's unit tests on Bun (see "Pitfalls", `node:sqlite`). `JUNO_SQLITE=<libsqlite3.dylib>` names another full build.
 
 No Playwright browser download is needed for the desktop e2e tests. Electron is the browser. The
-gallery projects use the installed Google Chrome (`channel: 'chrome'`); set
-`GALLERY_BROWSER=chromium` after `npx playwright install chromium` to use Playwright's own build.
+gallery projects use Playwright's pinned Chromium headless shell. Set
+`GALLERY_BROWSER=chrome` to diagnose a problem with the installed Google Chrome instead.
 
 ### Git LFS
 
@@ -88,7 +88,7 @@ Run these from the repo root.
 
 `GALLERY_SHOTS_ONLY=Sidebar,Workspace bun run gallery:shots` refreshes only those components and leaves other shots untouched. Add `GALLERY_SHOTS_ACCENT=teal` to shoot them in another accent as `<state>-<theme>-teal.png`, beside the default accent's shots.
 
-The switcher, key and index tests use `GalleryTestComponent`, declared in `apps/gallery/src/testFixtures.tsx`. It is registered only when the page is opened as `/?test-fixtures#/...`, so it never shows in the normal gallery or the screenshots. The tests serve the built gallery on a port derived from the worktree's path, so two worktrees never share a server; a run reuses a server only if one is already up on its own port. Set `GALLERY_PORT` to choose the port.
+The switcher, key and index tests use `GalleryTestComponent`, declared in `apps/gallery/src/testFixtures.tsx`. It is registered only when the page is opened as `/?test-fixtures#/...`, so it never shows in the normal gallery or the screenshots. Each test run serves the built gallery on an ephemeral port and starts its own preview server. It never reuses another run's server.
 
 Before calling work done: `bun run affected`, which covers typecheck, lint and the tests the change reaches (see "Affected tests").
 
