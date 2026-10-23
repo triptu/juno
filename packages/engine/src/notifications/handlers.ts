@@ -297,9 +297,15 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
           }).pipe(Effect.orDie),
         )
         if (target.kind === 'thread') {
-          if (thread(target.id) === undefined) return yield* new NotFound({ kind: 'topic', id: target.id })
+          const parsed = thread(target.id)
+          if (parsed === undefined) return yield* new NotFound({ kind: 'topic', id: target.id })
           const follow = choice !== 'never'
-          if (follow !== (before !== 'never')) {
+          // The follow flag as Slack last said, not the stored level: Slack may have followed the thread again since.
+          const followed = yield* inWorkspace(
+            Effect.map(StoreReader.use((sql) => sql<{ subscribed: number }>`SELECT subscribed FROM thread_subs WHERE channel = ${parsed.channel} AND thread_ts = ${parsed.threadTs}`),
+              (rows) => rows[0]?.subscribed === 1).pipe(Effect.orDie),
+          )
+          if (follow !== followed) {
             yield* setSubscribed(target.id, follow).pipe(Effect.provideService(Workspace, workspace), Effect.provideService(Outbox, outbox))
           }
         }
@@ -348,11 +354,15 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
         updateSettings((settings) => ({ ...settings, alwaysNotify: { ...settings.alwaysNotify, [which]: enabled } })).pipe(Effect.asVoid),
       'notifications.saveInstruction': ({ id, direction, text }) =>
         Effect.gen(function* () {
-          const saved = id ?? `i${randomUUID().replaceAll('-', '').slice(0, 12)}`
+          const fresh = `i${randomUUID().replaceAll('-', '').slice(0, 12)}`
+          let saved = fresh
           yield* updateSettings((settings) => {
             const list = settings.instructions ?? []
+            const old = list.find((other) => other.id === id)
+            // A changed instruction gets a new id, so a reading made against the old one names an id that is gone and is ignored.
+            saved = old !== undefined && old.text === text.trim() && old.direction === direction ? old.id : fresh
             const item = { id: saved, direction, text: text.trim() }
-            return { ...settings, instructions: list.some((other) => other.id === saved) ? list.map((other) => (other.id === saved ? item : other)) : [...list, item] }
+            return { ...settings, instructions: old === undefined ? [...list, item] : list.map((other) => (other.id === id ? item : other)) }
           })
           return { id: saved }
         }),
