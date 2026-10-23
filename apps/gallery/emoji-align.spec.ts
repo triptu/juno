@@ -6,10 +6,12 @@ import { openState, type Route, type Theme } from './support'
  * A text emoji drawn next to text or in a pill sits on the centre line of
  * what holds it, read from screenshots: the reaction chips (the emoji and
  * the count), the quick-reaction pills in Settings, the emoji picker's cells
- * and the reactors card's large emoji. In Figtree's line box a chip's emoji
+ * and the reactors card's large emoji. The composer suggestion list also
+ * keeps text and image emoji in the same square, so every label starts at
+ * the same point. In Figtree's line box a chip's emoji
  * drew 1.25px under the chip's centre and a pill's 1px over it; the picker's
- * emoji, centred by its advance, drew 1px left. `toolbar-align.spec.ts`
- * covers the hover toolbar.
+ * emoji, centred by its advance, drew 1px left. `message-menu.spec.ts`
+ * covers the message menu's quick reactions.
  */
 
 const open = (page: Page, component: string, id: string, theme: Theme) =>
@@ -37,6 +39,34 @@ async function readChips(page: Page, chips: Locator) {
 }
 
 for (const theme of ['light', 'dark'] as const) {
+  test(`Composer emoji suggestions (${theme}): text and image emoji use the same square`, async ({ page }) => {
+    await open(page, 'Composer', 'emoji/suggestions-open', theme)
+    const rows = await page.locator('[data-fixture-frame="Composer/emoji/suggestions-open"] [data-mention-suggestions] [role="option"]').all()
+    expect(rows.length).toBe(5)
+    const found = []
+    for (const row of rows) {
+      const emoji = row.locator(':scope > span').first().locator('[aria-hidden="true"]')
+      const box = await emoji.boundingBox()
+      const label = await row.locator(':scope > span').nth(1).boundingBox()
+      const rowBox = await row.boundingBox()
+      expect(box).not.toBeNull()
+      expect(label).not.toBeNull()
+      expect(rowBox).not.toBeNull()
+      if (box === null || label === null || rowBox === null) throw new Error('Suggestion row did not have measurable emoji and label boxes')
+      found.push({ box, label, row: rowBox, image: await emoji.locator('img').count() === 1 })
+    }
+    expect(found.filter(({ image }) => image)).toHaveLength(2)
+    const first = found[0]
+    if (first === undefined) throw new Error('No emoji suggestions were measured')
+    for (const { box, label, row } of found) {
+      expect(box.width).toBeCloseTo(20, 5)
+      expect(box.height).toBeCloseTo(20, 5)
+      expect(box.x).toBeCloseTo(first.box.x, 5)
+      expect(box.y + box.height / 2).toBeCloseTo(row.y + row.height / 2, 5)
+      expect(label.x).toBeCloseTo(first.label.x, 5)
+    }
+  })
+
   for (const id of ['display/few', 'display/many', 'toggle/toggleable', 'display/custom']) {
     test(`Reactions ${id} (${theme}): each chip's emoji and count are on the chip's centre line`, async ({ page }) => {
       await open(page, 'Reactions', id, theme)
@@ -55,7 +85,7 @@ for (const theme of ['light', 'dark'] as const) {
     test.skip(!appleEmoji, 'text emoji are checked where Apple Color Emoji draws them')
     await open(page, 'QuickReactionsSetting', 'reactions/full', theme)
     const pills = await page.locator('[data-quick-reaction]').all()
-    expect(pills.length).toBe(7)
+    expect(pills.length).toBe(11)
     for (const pill of pills) {
       const reading = await readInk(page, pill, { parts: ':scope > [aria-hidden], :scope > img', fillAt: { x: 3, y: 14 } })
       expectOn(reading.parts[0], reading.height / 2, `${await pill.getAttribute('data-quick-reaction')}`)

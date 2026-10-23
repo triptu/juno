@@ -15,6 +15,11 @@ import { SendCheckBar, type SendCheckFinding } from './SendCheckBar'
 
 const noop = () => {}
 
+const imageEmoji = (fill: string) =>
+  `data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="14" fill="${fill}"/><circle cx="11" cy="13" r="2" fill="#2B1E00"/><circle cx="21" cy="13" r="2" fill="#2B1E00"/><path d="M10 20c3 4 9 4 12 0" stroke="#2B1E00" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`,
+  )}`
+
 const base = { onChange: noop, onSend: noop }
 
 const attach = { leading: <AttachButton onFiles={noop} />, onFiles: noop }
@@ -278,10 +283,16 @@ export default defineFixtures(
       quote: scene(() => <MarkupField initial={'> Can we ship Friday?\n> Or Monday\nFriday works.'} />, { height: 160 }),
     },
     Emoji: {
-      'suggestions-open': scene(() => <div {...stylex.props(styles.column)}><Composer {...base} value=":smi" placeholder="Reply" marks={[]}
+      'suggestions-open': scene(() => <div {...stylex.props(styles.column)}><Composer {...base} value=":smile" placeholder="Reply" marks={[]}
         mention={{ anchorAt: 0, listId: 'emoji', activeId: 'emoji-smile', onDismiss: noop,
           list: <MentionSuggestions kind="emoji" id="emoji" activeId="emoji-smile" onActivate={noop} onPick={noop}
-            rows={[{ id: 'smile', name: 'smile', insert: '😄' }, { id: 'smiley', name: 'smiley', insert: '😃' }, { id: 'smirk', name: 'smirk', insert: '😏' }]} /> }} /></div>, { height: 260 }),
+            rows={[
+              { id: 'smile', name: 'smile', insert: '😄' },
+              { id: 'sweat-smile', name: 'sweat_smile', insert: '😅' },
+              { id: 'smile-cat', name: 'smile_cat', insert: '😸' },
+              { id: 'simple-smile', name: 'simple_smile', insert: ':simple_smile:', url: imageEmoji('#F4BC58') },
+              { id: 'workspace-smile', name: 'workspace_smile', insert: ':workspace_smile:', url: imageEmoji('#C86BD6') },
+            ]} /> }} /></div>, { height: 320 }),
     },
     Shift: {
       'notices-come-and-go': scene(() => <NoticesComeAndGo />, { height: 320 }),
