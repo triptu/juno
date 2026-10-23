@@ -1,0 +1,1 @@
+- 10-24 10:01 · burst-ten-seconds · Within 10 seconds of a banner the same conversation does not notify again; later messages are decided on their own, since the 1-minute rule hid real questions (owner).

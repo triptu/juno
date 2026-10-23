@@ -17,6 +17,8 @@ export const Candidate = Schema.Struct({
   mentionsMe: Schema.Boolean,
   /** By name or a group the owner is in, not @here: gets through Never and ignored. Absent in rows logged before it existed. */
   mentionsMeDirectly: Schema.optionalKey(Schema.Boolean),
+  /** The names of the other people the message mentions by name. Absent in rows logged before 2026-10-24. */
+  mentionsOthers: Schema.optionalKey(Schema.Array(Schema.String)),
   ts: Schema.String,
   topicId: Schema.String,
   text: Schema.String,

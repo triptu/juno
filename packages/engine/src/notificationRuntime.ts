@@ -134,7 +134,8 @@ const frameHandler = (userId: string, sql: StoreReader['Service'], notifications
   const groupName = channel.kind === 'mpim' ? (yield* conversationLabel(channel.id))?.label : undefined
   yield* notifications.receive({ channel: { id: ChannelId.make(channel.id), kind: channel.kind,
     name: groupName ?? channel.person_name ?? channel.name ?? (channel.kind === 'im' ? UNKNOWN_PERSON : channel.id), ignored: channel.ignored === 1 },
-    senderId: UserId.make(user ?? ''), ...(channel.sender_name === null ? {} : { senderName: channel.sender_name }), mentionsMe, mentionsMeDirectly, ts, text: readableText(body),
+    senderId: UserId.make(user ?? ''), ...(channel.sender_name === null ? {} : { senderName: channel.sender_name }), mentionsMe, mentionsMeDirectly,
+    mentionsOthers: [...mentioned].filter((id) => id !== userId && id !== user).flatMap((id) => names.get(id) ?? []), ts, text: readableText(body),
     topicId })
 })
 

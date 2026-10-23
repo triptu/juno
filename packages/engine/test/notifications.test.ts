@@ -161,7 +161,7 @@ it('consumes both socket inputs, observes manual presence and responds to prefs 
   expect(rows).toHaveLength(1)
   engine.fake.emitFrame({ type: 'desktop_notification', channel: 'C0ENG', msg: message.ts, user: 'U0MAYA', title: 'eng', content: '<@U0TUSHAR> Can you approve this?' })
   expect(record.shown).toHaveLength(1)
-  // Another conversation: C0ENG just had a banner, so it stays quiet for a minute.
+  // Another conversation: C0ENG just had a banner, so it stays quiet for 10 seconds.
   await configure({ ...live, channels: { C0PRODUCT: 'always' } })
   engine.fake.injectMessage({ channel: 'C0PRODUCT', user: 'U0MAYA', text: 'A normal update without a mention' })
   await waitFor(() => record.shown.length === 2 ? true : undefined)
