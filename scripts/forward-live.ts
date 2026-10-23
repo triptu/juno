@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * The live forward check: what `chat.shareMessage` does in your real
  * workspace, all inside your self-DM (research `slack-forward.md`). Run with

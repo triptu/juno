@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * The live smoke (architecture 13 and 16 M2): read-only calls against a real
  * workspace, decoded through @juno/slack-schema, plus 30 s of socket events.

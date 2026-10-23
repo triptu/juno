@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Runs on Node: Bun's node:sqlite on macOS cannot open the store (docs/development.md, "Runtimes").
 /**
  * The live sync dry run: the real `@juno/sync` cold boot against your real
  * workspace, into a temporary data directory that is deleted afterwards.

@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Sets the app's version in apps/desktop/package.json (docs/development.md,
  * "Releasing"). `bun run release:version patch|minor|major|<x.y.z>`. Refuses to

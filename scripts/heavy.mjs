@@ -27,7 +27,7 @@ const priority = priorityIndex === -1 ? 'normal' : rest[priorityIndex + 1]
 const args = rest.slice(offset)
 
 if (args.length === 0 && !flags.includes('--status')) {
-  console.error('usage: node scripts/heavy.mjs [--exclusive] [--priority release] <command> [args...]')
+  console.error('usage: bun scripts/heavy.mjs [--exclusive] [--priority release] <command> [args...]')
   process.exit(2)
 }
 if (priority !== 'normal' && priority !== 'release') {
@@ -138,7 +138,7 @@ let slot = tryAcquire()
 let lastNotice = 0
 while (!slot) {
   if (Date.now() - lastNotice >= 30000) {
-    console.error(`heavy: waiting (${since(queuedAt)}). Run node scripts/heavy.mjs --status to inspect the queue.`)
+    console.error(`heavy: waiting (${since(queuedAt)}). Run bun scripts/heavy.mjs --status to inspect the queue.`)
     lastNotice = Date.now()
   }
   await new Promise((resolve) => setTimeout(resolve, 500))

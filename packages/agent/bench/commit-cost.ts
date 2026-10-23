@@ -1,3 +1,4 @@
+// Runs on Node: Bun's node:sqlite on macOS cannot open its SQLite files (docs/development.md, "Runtimes").
 // The cost of the core's own commits in agent.sqlite: an inbox accept, a
 // projection commit of one message (row, memory keys, cursor), and clearing
 // one message's text as a removal does (a 400-byte row, and a 16 KB row on
@@ -6,7 +7,7 @@
 // secure_delete's own cost, which the fsync hides), interleaved in rounds;
 // minimums and medians.
 //
-//   node scripts/heavy.mjs node --import ./scripts/ts-resolve-hooks.mjs packages/agent/bench/commit-cost.ts
+//   bun scripts/heavy.mjs node --import ./scripts/ts-resolve-hooks.mjs packages/agent/bench/commit-cost.ts
 //   ELECTRON_RUN_AS_NODE=1 apps/desktop/node_modules/.bin/electron --import ./scripts/ts-resolve-hooks.mjs packages/agent/bench/commit-cost.ts
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'

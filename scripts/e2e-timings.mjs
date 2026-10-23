@@ -1,14 +1,14 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 // Sums the `e2e-timing:` lines a desktop run prints under JUNO_E2E_TIMINGS=1
 // (apps/desktop/e2e/timings.ts): where test time went, the slowest specs, and
-// how busy each worker was. Usage: node scripts/e2e-timings.mjs <run.log> [--top 15] [--json]
+// how busy each worker was. Usage: bun scripts/e2e-timings.mjs <run.log> [--top 15] [--json]
 import { readFileSync } from 'node:fs'
 
 const args = process.argv.slice(2)
 const file = args.find((arg) => !arg.startsWith('--') && !/^\d+$/.test(arg))
 const top = Number(args[args.indexOf('--top') + 1]) || 15
 if (file === undefined) {
-  console.error('usage: node scripts/e2e-timings.mjs <run.log> [--top 15] [--json]')
+  console.error('usage: bun scripts/e2e-timings.mjs <run.log> [--top 15] [--json]')
   process.exit(2)
 }
 

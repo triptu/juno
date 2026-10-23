@@ -1,7 +1,7 @@
 // Explains where the time of a perf scenario went, from the files the perf
 // spec writes with JUNO_PERF_TRACE (docs/performance.md 7.2).
 //
-//   node scripts/perf-trace.mjs <dir>/<name>.trace.json [measure]
+//   bun scripts/perf-trace.mjs <dir>/<name>.trace.json [measure]
 //
 // For every `juno.*` measure in the trace (or only `measure`), it sums the
 // renderer main thread's self time by trace event inside the measure, and,
@@ -12,7 +12,7 @@ import { existsSync, readFileSync } from 'node:fs'
 
 const [file, only] = process.argv.slice(2)
 if (file === undefined) {
-  console.error('usage: node scripts/perf-trace.mjs <trace.json> [measure]')
+  console.error('usage: bun scripts/perf-trace.mjs <trace.json> [measure]')
   process.exit(2)
 }
 

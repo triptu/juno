@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Checks that every file `.gitattributes` sends to Git LFS (the images and
  * videos under docs/) is stored as an LFS pointer, not as the file itself.

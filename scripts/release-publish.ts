@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Publishes a built release to the private releases repository (docs/development.md,
  * "Releasing"). Run with `bun run release:publish --notes <file>` after `bun run package`.

@@ -1,7 +1,7 @@
 // Creates and removes agent worktrees with a cheap install.
 //
-//   node scripts/worktree.mjs add <name> [--base <ref>] [--branch <branch>] [--detach <ref>] [--no-install]
-//   node scripts/worktree.mjs remove <name-or-path> [--force] [--delete-branch]
+//   bun scripts/worktree.mjs add <name> [--base <ref>] [--branch <branch>] [--detach <ref>] [--no-install]
+//   bun scripts/worktree.mjs remove <name-or-path> [--force] [--delete-branch]
 //
 // `add` checks out <branch> (default <name>; an existing branch is reused, a
 // new one starts at --base, default origin/main; --detach checks out <ref>
@@ -38,8 +38,8 @@ const folder = worktreeFolder(main)
 if (command === 'add' && target) await add(target)
 else if (command === 'remove' && target) remove(target)
 else {
-  console.error('usage: node scripts/worktree.mjs add <name> [--base <ref>] [--branch <branch>] [--detach <ref>] [--no-install]')
-  console.error('       node scripts/worktree.mjs remove <name-or-path> [--force] [--delete-branch]')
+  console.error('usage: bun scripts/worktree.mjs add <name> [--base <ref>] [--branch <branch>] [--detach <ref>] [--no-install]')
+  console.error('       bun scripts/worktree.mjs remove <name-or-path> [--force] [--delete-branch]')
   process.exitCode = 2
 }
 

@@ -2,7 +2,7 @@
 //
 //   bun run typecheck:tsc            every project (unchanged ones are skipped)
 //   bun run typecheck:tsc --no-cache check them all
-//   node scripts/typecheck.mjs --pending   list the projects that would run
+//   bun scripts/typecheck.mjs --pending   list the projects that would run
 //
 // The projects are each package's `tsc -p <config>` from its typecheck script,
 // plus scripts/tsconfig.json; the tsconfigs, and so the rules, are unchanged.

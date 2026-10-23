@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Checks that `CACHE_RESET_EPOCH` (packages/store/src/migrations/cache/index.ts)
  * matches the newest decision fragment that records it. A change of the

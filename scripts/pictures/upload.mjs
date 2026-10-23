@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 // Uploads the picture files build.mjs made to the R2 bucket `juno-art` and prints the
 // bucket's public URL (scripts/pictures/README.md). Touches no other bucket or
 // Cloudflare resource. Safe to run again: it creates the bucket and turns on its public

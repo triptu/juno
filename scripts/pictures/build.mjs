@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 // Makes the two image files of every picture in the catalog (SPEC 12, "A picture";
 // scripts/pictures/README.md), ready for upload.ts:
 //

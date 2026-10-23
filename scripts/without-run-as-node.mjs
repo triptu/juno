@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 // Runs a command with ELECTRON_RUN_AS_NODE removed from the environment.
 //
 // Tools built on Electron (editors, agents) often export ELECTRON_RUN_AS_NODE=1
@@ -6,7 +6,7 @@
 // Node and never opens a window, so `electron-vite dev` and Playwright's
 // _electron.launch fail in confusing ways. Usage:
 //
-//   node scripts/without-run-as-node.mjs electron-vite dev
+//   bun scripts/without-run-as-node.mjs electron-vite dev
 import { spawn } from 'node:child_process'
 
 const [command, ...args] = process.argv.slice(2)

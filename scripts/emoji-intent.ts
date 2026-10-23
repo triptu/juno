@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Writes scripts/emoji-intent.json: for each standard emoji, the everyday
  * phrases people type when they want it ("ugh", "so done" for 😩), written by
@@ -6,12 +6,12 @@
  * overrides and writes the words into the search keywords. Nothing runs this
  * at build time; the output is checked in.
  *
- *   node --import ./scripts/ts-resolve-hooks.mjs scripts/emoji-intent.ts         asks only for emoji the file lacks
- *   node --import ./scripts/ts-resolve-hooks.mjs scripts/emoji-intent.ts --all   asks for every emoji again
+ *   bun scripts/emoji-intent.ts         asks only for emoji the file lacks
+ *   bun scripts/emoji-intent.ts --all   asks for every emoji again
  *
  * Uses OpenRouter through `@juno/ai` with `OPENROUTER_API_KEY` from the
  * environment or the repo's `.env`. `JUNO_AI_GENERATION_MODEL` overrides the
- * model. Flags and keycaps get no phrases. Run `node scripts/emoji-catalog.mjs`
+ * model. Flags and keycaps get no phrases. Run `bun scripts/emoji-catalog.mjs`
  * afterwards.
  */
 import { Effect } from 'effect'

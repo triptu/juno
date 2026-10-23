@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Runs on Node: Bun's node:sqlite on macOS cannot open the store (docs/development.md, "Runtimes").
 /**
  * The live reaction check: Juno's real reaction path (the `messages.react`
  * command, the outbox row and `ActionWorker`) against your real workspace,

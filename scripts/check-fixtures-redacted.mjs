@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Checks that the shapes recorded by the live smoke
  * (packages/slack-schema/test/fixtures/recorded/) hold no real data: no

@@ -149,7 +149,7 @@ function cleanup() {
 
 function main() {
   if (argv.includes('--help')) {
-    console.log('node scripts/batch-merge.mjs [--dry-run | --push] [--local] branch...\nnode scripts/batch-merge.mjs --continue batch-N [--push] [--local]\nChecks are typecheck, lint, and the unit tests the batch reaches (with specs:check and conformance when the code the specs model changed), on the SSH runner or with --local on this Mac. Dry run merges and regenerates locally, runs no checks and cannot push.')
+    console.log('bun scripts/batch-merge.mjs [--dry-run | --push] [--local] branch...\nbun scripts/batch-merge.mjs --continue batch-N [--push] [--local]\nChecks are typecheck, lint, and the unit tests the batch reaches (with specs:check and conformance when the code the specs model changed), on the SSH runner or with --local on this Mac. Dry run merges and regenerates locally, runs no checks and cannot push.')
     return
   }
   if (push && dryRun) throw new Error('--dry-run cannot be combined with --push')
@@ -169,7 +169,7 @@ function main() {
       if (push && state.dryRun) throw new Error('Dry-run batches cannot push; start a new batch without --dry-run')
     } else create(positional)
     logPath = resolve(directory, `${state.name}.log`)
-    console.log(`Batch: ${state.name}\nWorktree: ${state.worktree}\nResume: node scripts/batch-merge.mjs --continue ${state.name}`)
+    console.log(`Batch: ${state.name}\nWorktree: ${state.worktree}\nResume: bun scripts/batch-merge.mjs --continue ${state.name}`)
     if (state.pushed) { cleanup(); return }
     if (git(state.worktree, 'branch', '--show-current') !== state.name) throw new Error('Batch worktree is on a different branch')
     if (!ancestor(state.base)) throw new Error('Batch no longer contains its original base')

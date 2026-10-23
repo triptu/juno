@@ -1,6 +1,6 @@
 // Builds the owner's local status page. Output: .juno-status/index.html (gitignored).
 //
-//   node scripts/status-page.mjs [--root <checkout>]
+//   bun scripts/status-page.mjs [--root <checkout>]
 //
 // A git post-commit and post-merge hook runs this, so it must stay fast and must
 // never fail on a missing or broken file. The page reloads itself every 20 s and

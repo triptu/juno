@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Runs on Node: Bun's node:sqlite on macOS cannot open the store (docs/development.md, "Runtimes").
 /**
  * `bun run notif:replay <command>`: measure the notification decision against
  * the owner's own messages. See `scripts/notif-replay/README.md`.

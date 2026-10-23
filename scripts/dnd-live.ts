@@ -1,7 +1,7 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * The live check of Slack's notification schedule (SPEC 14, research
- * section 7). Run with `JUNO_LIVE=1 node --import ./scripts/ts-resolve-hooks.mjs scripts/dnd-live.ts`; it refuses to run
+ * section 7). Run with `JUNO_LIVE=1 bun scripts/dnd-live.ts`; it refuses to run
  * without `JUNO_LIVE=1`. It uses the session `smoke-live.ts --cache-session`
  * kept.
  *

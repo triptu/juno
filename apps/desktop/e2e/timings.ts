@@ -4,7 +4,7 @@ import type { FullResult, Reporter, TestCase, TestResult, TestStep } from '@play
  * Under JUNO_E2E_TIMINGS=1, prints one `e2e-timing:` JSON line per test run: where its
  * time went (fixture setup and teardown, fixed waits, polls, other expects and API
  * calls), the `e2e timing:` phases the fixtures and driver print, and its worker and
- * start time. `node scripts/e2e-timings.mjs <run.log>` sums them.
+ * start time. `bun scripts/e2e-timings.mjs <run.log>` sums them.
  */
 export default class TimingReporter implements Reporter {
   readonly #phases = new Map<TestResult, Record<string, number>>()

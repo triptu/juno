@@ -1,7 +1,7 @@
 // Explains a scroll sweep's frame work, from the traces the perf spec writes
 // with JUNO_PERF_TRACE (docs/performance.md 7.3).
 //
-//   node scripts/perf-frames.mjs <dir>/<name>.trace.json [--top 20] [--frames 10] [--sequence <first frame>]
+//   bun scripts/perf-frames.mjs <dir>/<name>.trace.json [--top 20] [--frames 10] [--sequence <first frame>]
 //
 // Splits the renderer main thread's work per frame, measured as the scroll gate
 // measures it (perfTrace.ts), into stages by self time: script, garbage
@@ -22,7 +22,7 @@ const option = (name, fallback) => {
   return at === -1 ? fallback : Number(args[at + 1])
 }
 if (file === undefined) {
-  console.error('usage: node scripts/perf-frames.mjs <trace.json> [--top 20] [--frames 10] [--sequence <first frame>]')
+  console.error('usage: bun scripts/perf-frames.mjs <trace.json> [--top 20] [--frames 10] [--sequence <first frame>]')
   process.exit(2)
 }
 const BUDGET = 8.3

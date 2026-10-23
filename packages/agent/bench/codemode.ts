@@ -1,3 +1,4 @@
+// Runs on Node: Bun's node:sqlite on macOS cannot open its SQLite files (docs/development.md, "Runtimes").
 // Direct tools against codemode (docs/research/codemode.md, "Measurement"), on the real turn
 // engine with the scripted model, so it needs no network and no key. Two sets:
 //
@@ -14,7 +15,7 @@
 // what the model read). The scripted model writes the same answer whatever it is sent, so turns,
 // sizes and success measure the tool path, not model behaviour.
 //
-//   node scripts/heavy.mjs bun run --cwd packages/agent node --import ../../scripts/ts-resolve-hooks.mjs bench/codemode.ts
+//   bun scripts/heavy.mjs bun run --cwd packages/agent node --import ../../scripts/ts-resolve-hooks.mjs bench/codemode.ts
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'

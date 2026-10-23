@@ -10,16 +10,16 @@
     "THIRD_PARTY_NOTICES.txt"
   ],
   "scripts": {
-    "dev": "node ../../scripts/without-run-as-node.mjs electron-vite dev",
-    "build": "electron-vite build && node ../../scripts/check-bundle-size.mjs",
-    "start": "node ../../scripts/without-run-as-node.mjs electron-vite preview",
+    "dev": "bun ../../scripts/without-run-as-node.mjs electron-vite dev",
+    "build": "electron-vite build && bun ../../scripts/check-bundle-size.mjs",
+    "start": "bun ../../scripts/without-run-as-node.mjs electron-vite preview",
     "typecheck": "tsc -p tsconfig.node.json && tsc -p tsconfig.web.json && tsc -p tsconfig.e2e.json",
     "test": "vitest run",
-    "test:e2e": "node ../../scripts/without-run-as-node.mjs playwright test",
-    "perf": "JUNO_PERF=1 node ../../scripts/without-run-as-node.mjs playwright test -c playwright.perf.config.ts",
-    "test:feel": "node ../../scripts/build-cached.mjs out bun run build && node ../../scripts/without-run-as-node.mjs playwright test -c playwright.feel.config.ts",
-    "package": "node ../../scripts/package.mjs",
-    "test:package": "node ../../scripts/without-run-as-node.mjs playwright test -c playwright.package.config.ts"
+    "test:e2e": "bun ../../scripts/without-run-as-node.mjs playwright test",
+    "perf": "JUNO_PERF=1 bun ../../scripts/without-run-as-node.mjs playwright test -c playwright.perf.config.ts",
+    "test:feel": "bun ../../scripts/build-cached.mjs out bun run build && bun ../../scripts/without-run-as-node.mjs playwright test -c playwright.feel.config.ts",
+    "package": "bun ../../scripts/package.mjs",
+    "test:package": "bun ../../scripts/without-run-as-node.mjs playwright test -c playwright.package.config.ts"
   },
   "dependencies": {
     "electron-updater": "6.8.3",

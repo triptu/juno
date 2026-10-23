@@ -6,7 +6,7 @@ import { join } from 'node:path'
 const [label, roundsArg, command, ...args] = process.argv.slice(2)
 const rounds = Number(roundsArg)
 if (process.env.JUNO_HEAVY_HELD !== '1' || !label || !/^[a-z0-9-]+$/.test(label) || !Number.isInteger(rounds) || rounds < 1 || !command) {
-  console.error('usage: node scripts/heavy.mjs node scripts/stress-flakes.mjs <label> <rounds> <command> [args...]')
+  console.error('usage: bun scripts/heavy.mjs bun scripts/stress-flakes.mjs <label> <rounds> <command> [args...]')
   process.exit(2)
 }
 const directory = join('.juno-status', 'flake-check', label)

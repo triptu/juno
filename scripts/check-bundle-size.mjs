@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 // Holds the renderer to the bundle budget in docs/performance.md section 1:
 // initial JS at most 1.1 MB and CSS at most 200 KB, uncompressed. "Initial"
 // means what index.html loads before any user action: its <script> tags,

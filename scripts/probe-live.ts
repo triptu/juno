@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * The live probe: read-only questions about Slack's behaviour that the
  * smoke does not answer (research section 10, "Live probe"). Run with

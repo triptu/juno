@@ -33,7 +33,8 @@ test('real Playwright output names retry-only passes as flaky', async (t) => {
   writeFileSync(join(dir, 'playwright.config.mjs'), `export default { testDir: '.', workers: 1, retries: 1, reporter: [['list'], ['${join(root, 'scripts/test-results-reporter.mjs')}']] }`)
   const env = { ...process.env, CI: '1', NO_COLOR: '1' }
   delete env.FORCE_COLOR
-  const output = execFileSync(process.execPath, [join(playwright, 'cli.js'), 'test', '--config', join(dir, 'playwright.config.mjs')], { encoding: 'utf8', env })
+  // Playwright's test runner runs on Node, as in the real suites.
+  const output = execFileSync('node', [join(playwright, 'cli.js'), 'test', '--config', join(dir, 'playwright.config.mjs')], { encoding: 'utf8', env })
   assert.match(output, /1 flaky/)
   const report = testResults(output)
   assert.equal(report.status, 'passed')

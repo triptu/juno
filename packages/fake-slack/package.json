@@ -11,7 +11,7 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "start": "node --experimental-strip-types src/bin.ts"
+    "start": "bun src/bin.ts"
   },
   "dependencies": {
     "@juno/slack-schema": "workspace:*",

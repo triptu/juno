@@ -1,3 +1,4 @@
+// Runs on Node: Bun's node:sqlite on macOS cannot open the store (docs/development.md, "Runtimes").
 /**
  * `bun run web [--host]`: starts the web shell (`shell.ts`) on this worktree's
  * port (`port.ts`, or JUNO_WEB_PORT) and prints one line with the app's and

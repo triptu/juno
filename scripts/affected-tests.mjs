@@ -41,11 +41,11 @@ function scriptImports(root, file, seen = new Set()) {
 }
 
 /**
- * Each root script that runs `node --test <files>`, with `reached`: the
+ * Each root script that runs `bun test <files>`, with `reached`: the
  * changed files that are one of its tests or a file they import, each with the
  * test (`{ test, file }`).
  */
-export function nodeTestScripts(root, changed) {
+export function bunTestScripts(root, changed) {
   const scripts = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts
   return Object.entries(scripts)
     .filter(([, command]) => /\b(?:node --test|bun test)\b/.test(command))

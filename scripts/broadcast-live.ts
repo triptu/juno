@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * The live broadcast check: how Slack sends an existing thread reply to the
  * channel, all inside your self-DM (research `slack-data-access.md`,

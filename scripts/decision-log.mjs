@@ -26,7 +26,7 @@ try {
   const built = header + entries.map(({ line }) => line).join('\n') + '\n'
   const target = resolve(root, 'docs/decision-log.md')
   if (process.argv.includes('--check')) {
-    if (readFileSync(target, 'utf8') !== built) throw new Error('Decision log is out of date; run node scripts/decision-log.mjs')
+    if (readFileSync(target, 'utf8') !== built) throw new Error('Decision log is out of date; run bun scripts/decision-log.mjs')
   } else writeFileSync(target, built)
   console.log(`Decision log: ${entries.length} entries${process.argv.includes('--check') ? ' checked' : ' built'}`)
 } catch (error) {

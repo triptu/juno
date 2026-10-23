@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 // The desktop build keeps each Phosphor icon's duotone weight only for the
 // icons packages/ui/src/duotone.ts imports (`phosphorWeights` in
 // apps/desktop/renderer.vite.ts). Any other icon asked for duotone

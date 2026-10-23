@@ -1,9 +1,9 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * The huddle spike (docs/plans/huddles.md, phase 2): join a Slack huddle
  * from Juno's own session and hand the answer to the open-source Chime SDK
  * in a Playwright Chromium page, with Chromium's fake microphone (a beep).
- * Run with `JUNO_LIVE=1 node --import ./scripts/ts-resolve-hooks.mjs scripts/huddle-live.ts`.
+ * Run with `JUNO_LIVE=1 bun scripts/huddle-live.ts`.
  * It refuses to run without `JUNO_LIVE=1` (or `--fake`).
  *
  * It works in one private test channel, `juno-huddle-test` (or

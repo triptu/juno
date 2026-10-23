@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 // Checks the Juno package graph (docs/architecture.md sections 3 and 15).
 //
 // Edges come from each package.json:

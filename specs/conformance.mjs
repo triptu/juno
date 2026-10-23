@@ -3,8 +3,8 @@
 // replays each one against the engine and the fake Slack, comparing the
 // two after every round.
 //
-//   node specs/conformance.mjs             generate, then replay
-//   node specs/conformance.mjs --generate  generate only
+//   bun specs/conformance.mjs             generate, then replay
+//   bun specs/conformance.mjs --generate  generate only
 //
 // CONFORMANCE_ONLY=<part of a file name> replays only the matching traces.
 //

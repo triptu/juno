@@ -1,11 +1,11 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Writes the huddle's sounds (SPEC 20, "Sounds") as small WAV files: soft
  * sine notes with a quiet octave above, a short fade in and an exponential
  * fade out. They are Juno's own, made here from plain tones, so nothing is
  * copied from Slack. Run it again only to change them:
  *
- *   node scripts/huddle-sounds.mjs
+ *   bun scripts/huddle-sounds.mjs
  *
  * - The join and leave sounds: two notes, rising for a join, falling for a leave.
  * - The incoming huddle's ring: the same tone, lower, slower and softer, so

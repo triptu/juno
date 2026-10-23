@@ -18,6 +18,6 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "test": "node ../../scripts/heavy.mjs vitest run"
+    "test": "bun ../../scripts/heavy.mjs vitest run"
   }
 }

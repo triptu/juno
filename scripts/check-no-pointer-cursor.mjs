@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 // Juno never uses the pointer (hand) cursor. macOS apps use the arrow cursor
 // on buttons, rows, tabs and menu items. This script fails the lint step if
 // any source file sets cursor: pointer, in StyleX, CSS, or inline styles.

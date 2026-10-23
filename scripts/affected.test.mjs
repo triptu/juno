@@ -28,13 +28,13 @@ test('every vitest file in apps and packages runs when it changes', () => {
   assert.deepEqual(unitFiles(plan('--batch', '--files', tests.join(','))).toSorted(), tests.toSorted())
 })
 
-test('a script change runs the root Node test scripts whose tests import it, and every script test is in one', () => {
+test('a script change runs the root Bun test scripts whose tests import it, and every script test is in one', () => {
   const steps = (file) => plan('--batch', '--files', file).steps.map((step) => step.script)
   assert.ok(steps('scripts/check-tokens.mjs').includes('test:repo-tools'))
   assert.ok(steps('scripts/remote/usage.mjs').includes('test:runner'))
   assert.ok(!steps('scripts/check-tokens.mjs').includes('test:runner'))
-  const scripts = Object.values(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts).filter((command) => /\b(?:node --test|bun test)\b/.test(command)).join(' ')
-  for (const file of tracked('scripts/**/*.test.mjs', 'scripts/*.test.mjs')) assert.ok(scripts.includes(file), `${file} is in no root node --test script`)
+  const scripts = Object.values(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts).filter((command) => /\bbun test\b/.test(command)).join(' ')
+  for (const file of tracked('scripts/**/*.test.mjs', 'scripts/*.test.mjs')) assert.ok(scripts.includes(file), `${file} is in no root bun test script`)
 })
 
 test('unit execution keeps package identity and starts no unrelated packages', async () => {

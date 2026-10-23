@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Runs on Node: Bun's node:sqlite on macOS cannot open the store (docs/development.md, "Runtimes").
 /**
  * The first sync timeline: the whole engine, signed in from an empty data
  * folder, against your real workspace (read-only) or an in-process fake.

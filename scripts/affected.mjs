@@ -31,7 +31,7 @@ import { ImportGraph } from './import-graph.mjs'
 import { driverSpecs, galleryComponents, graphCandidates, mapProblem, COVERAGE_BUDGET_SECONDS, rankComponents, rankSpecs, reachSpecs, selectSpecs } from './affected-select.mjs'
 import { HEAVY_AREAS, heavyAreasChanged, perfInteractionsChanged } from './test-areas.mjs'
 import { runPlan } from './affected-run.mjs'
-import { nodeTestScripts, unitTestItems } from './affected-tests.mjs'
+import { bunTestScripts, unitTestItems } from './affected-tests.mjs'
 import { inputKey, protocolInputs, runtimeIdentity, sameIdentity } from './verify-inputs.mjs'
 import { readRecords, statusFolder } from './release-gate.mjs'
 import { specDurations } from './verify-records.mjs'
@@ -340,7 +340,7 @@ if (specs.length > 0) {
 }
 
 // The Node tests of the repository's scripts (scripts/affected-tests.mjs).
-for (const { script, reached } of nodeTestScripts(root, changed))
+for (const { script, reached } of bunTestScripts(root, changed))
   if (everythingChanged.length > 0 || toolChanged.length > 0 || reached.length > 0)
     plan.push({ script, args: [], local: true, items: [], why: reached.length > 0 ? `${reached[0].file} ${reached[0].test === reached[0].file ? 'changed' : `reaches ${reached[0].test}`}${reached.length > 1 ? ` (and ${reached.length - 1} more)` : ''}` : 'the tools or dependencies changed' })
 

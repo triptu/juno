@@ -1,7 +1,7 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 // Rebuilds the macOS app icon from assets/icon.svg.
 //
-//   node scripts/build-icons.mjs
+//   bun scripts/build-icons.mjs
 //
 // Renders each iconset size straight from the SVG (not scaled down from the
 // large one), then runs `iconutil` to make apps/desktop/build/icon.icns.

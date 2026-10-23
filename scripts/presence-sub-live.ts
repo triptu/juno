@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * The live check for other people's presence (research section 3,
  * Presence): whether Slack answers a `presence_sub` with the current

@@ -99,15 +99,15 @@ function publish(candidate, version, notes) {
   writeFileSync(notesFile, notes)
   // Keep a failed checkout for inspection. Never silently resume a partial publish.
   timed('prepare', () => {
-    run('node', ['scripts/worktree.mjs', 'add', name, '--base', candidate])
+    run(process.execPath, ['scripts/worktree.mjs', 'add', name, '--base', candidate])
     run('bun', ['run', 'release:version', version], checkout)
     run('git', ['add', 'apps/desktop/package.json'], checkout)
     run('git', ['commit', '-m', `Release ${version}`], checkout)
   })
   const heavy = join(root, 'scripts/heavy.mjs')
   const priority = readFileSync(heavy, 'utf8').includes('--priority') ? ['--priority', 'release'] : []
-  timed('package', () => run('node', [heavy, ...priority, '--electron', 'bun', 'run', 'package'], checkout))
-  timed('package-smoke', () => run('node', [heavy, ...priority, '--electron', 'bun', 'run', 'test:package'], checkout, { JUNO_E2E_AI_JOBS: '1' }))
-  timed('publish', () => run('node', [join(root, 'scripts/release-publish.ts'), '--checkout', checkout, '--source', candidate, '--repo', values.repo, '--notes', notesFile], checkout))
-  timed('cleanup', () => run('node', ['scripts/worktree.mjs', 'remove', name]))
+  timed('package', () => run(process.execPath, [heavy, ...priority, '--electron', 'bun', 'run', 'package'], checkout))
+  timed('package-smoke', () => run(process.execPath, [heavy, ...priority, '--electron', 'bun', 'run', 'test:package'], checkout, { JUNO_E2E_AI_JOBS: '1' }))
+  timed('publish', () => run(process.execPath, [join(root, 'scripts/release-publish.ts'), '--checkout', checkout, '--source', candidate, '--repo', values.repo, '--notes', notesFile], checkout))
+  timed('cleanup', () => run(process.execPath, ['scripts/worktree.mjs', 'remove', name]))
 }

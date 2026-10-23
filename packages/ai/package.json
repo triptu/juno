@@ -11,10 +11,10 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "eval": "node --import ../../scripts/ts-resolve-hooks.mjs eval/run.ts",
-    "eval:title-privacy": "node --import ../../scripts/ts-resolve-hooks.mjs eval/title-privacy.ts",
-    "bench": "node --import ../../scripts/ts-resolve-hooks.mjs eval/bench.ts",
-    "grammar:bench": "node --import ../../scripts/ts-resolve-hooks.mjs eval/grammar-bench.ts"
+    "eval": "bun eval/run.ts",
+    "eval:title-privacy": "bun eval/title-privacy.ts",
+    "bench": "bun eval/bench.ts",
+    "grammar:bench": "bun eval/grammar-bench.ts"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "1.2.0",

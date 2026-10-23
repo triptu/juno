@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * The live presence check (research section 3, Presence): how Slack shows
  * the owner while only Juno's socket is connected, with and without

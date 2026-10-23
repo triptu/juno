@@ -1,12 +1,12 @@
 // Builds the e2e coverage map that `bun run affected` selects desktop specs by
 // (docs/development.md, "Affected tests").
 //
-//   node scripts/coverage-map.mjs reduce
+//   bun scripts/coverage-map.mjs reduce
 //       After a desktop e2e run with JUNO_COVERAGE=1 (e2e/coverage.ts runs it):
 //       maps what each launch ran (apps/desktop/coverage/raw, written by
 //       src/coverage.ts) back to source files with the build's source maps,
 //       and writes apps/desktop/coverage/map/partial-<shard>.json.
-//   node scripts/coverage-map.mjs merge <partial.json or dir>... --commit <sha> [--out <file>]
+//   bun scripts/coverage-map.mjs merge <partial.json or dir>... --commit <sha> [--out <file>]
 //       Joins the partials of a full run into the committed map
 //       (default apps/desktop/e2e/coverage-map.json).
 //
@@ -234,7 +234,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (command === 'reduce') reduce()
   else if (command === 'merge') merge(args)
   else {
-    console.error('usage: node scripts/coverage-map.mjs reduce | merge <partials...> --commit <sha> [--out <file>]')
+    console.error('usage: bun scripts/coverage-map.mjs reduce | merge <partials...> --commit <sha> [--out <file>]')
     process.exit(2)
   }
 }

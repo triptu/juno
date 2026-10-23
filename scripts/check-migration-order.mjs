@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 /**
  * Checks the migration ids of `cache.db` and `user.db`
  * (packages/store/src/migrations/<db>/index.ts):
