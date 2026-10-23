@@ -382,11 +382,11 @@ describe('messages from Slack, as shown', () => {
       if (row.readable !== undefined) expect(readableText(body)).toBe(row.readable)
       if (row.preview !== undefined) expect(previewText(body)).toBe(row.preview)
       if (row.line !== undefined) expect(previewLine(row.line[0], body)).toBe(row.line[1])
-      for (const words of row.shows ?? []) {
-        expect(plain).toContain(words)
-        expect(previewText(body)).toContain(words)
+      for (const shown of row.shows ?? []) {
+        expect(plain).toContain(shown)
+        expect(previewText(body)).toContain(shown)
       }
-      for (const words of row.hides ?? []) expect(plain).not.toContain(words)
+      for (const hidden of row.hides ?? []) expect(plain).not.toContain(hidden)
       if (row.once !== undefined) expect(plain.split(row.once)).toHaveLength(2)
       if (row.title !== undefined) expect(messageTitle(content)).toBe(row.title)
       if (row.copied !== undefined) {
