@@ -151,7 +151,7 @@ test('someone shares their screen: the bar says so, the tab shows it, two can sh
   await chimeDrops(win, fake, attendeeId!)
 })
 
-test('start, mute and leave a huddle from the palette, with the Huddle menu following', async ({ juno, fake, win, app }) => {
+test('start, mute and leave a huddle from the palette, with the Huddle menu following', { tag: '@electron' }, async ({ juno, fake, win, app }) => {
   await openEngMain(juno)
   // No huddle: the Huddle menu is dimmed, and the palette offers only Start huddle on a Main.
   expect(await huddleMenuItem(app, 'huddle-show')).toEqual({ label: 'Show Huddle', enabled: false })
@@ -226,7 +226,7 @@ test('join a running huddle, and Join here after joining on another device', asy
   await chimeDrops(win, fake, second!)
 })
 
-test('quitting in a huddle asks first: Cancel keeps the huddle, Quit leaves it', async ({ juno, fake, win, app, running }) => {
+test('quitting in a huddle asks first: Cancel keeps the huddle, Quit leaves it', { tag: '@electron' }, async ({ juno, fake, win, app, running }) => {
   await openEngMain(juno)
   await startHuddleFromMenu(juno)
   const bar = win.getByRole('region', { name: 'Huddle', exact: true })
@@ -248,7 +248,7 @@ test('quitting in a huddle asks first: Cancel keeps the huddle, Quit leaves it',
   expect(fake.calls.find((call) => call.method === 'rooms.leave')?.args).toMatchObject({ channel_id: 'C0ENG', attendee_id: attendeeId })
 })
 
-test('once the engine stops for good, quitting in a huddle does not ask', async ({ juno, win, app }) => {
+test('once the engine stops for good, quitting in a huddle does not ask', { tag: '@electron' }, async ({ juno, win, app }) => {
   await openEngMain(juno)
   await startHuddleFromMenu(juno)
   // The bar shows once the media session has loaded.
@@ -263,7 +263,7 @@ test('once the engine stops for good, quitting in a huddle does not ask', async 
   await closed
 })
 
-test('while macOS blocks the microphone, Mute says so and opens System Settings; with no microphone it only says so', async ({ juno, fake, win, app }) => {
+test('while macOS blocks the microphone, Mute says so and opens System Settings; with no microphone it only says so', { tag: '@electron' }, async ({ juno, fake, win, app }) => {
   await openEngMain(juno)
   await startHuddleFromMenu(juno)
   const bar = win.getByRole('region', { name: 'Huddle', exact: true })

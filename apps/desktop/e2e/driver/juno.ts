@@ -1045,45 +1045,16 @@ export class Juno {
 
   /** The OS notifications main showed (recorded under JUNO_E2E), oldest first. `silent` only on one posted without a sound. */
   osNotifications(): Promise<Array<{ readonly title: string; readonly body: string; readonly silent?: true }>> {
-    return this.app.evaluate(() => (globalThis as unknown as { junoTest: { notifications: () => Array<{ title: string; body: string; silent?: true }> } }).junoTest.notifications())
+    return this.surface.system('notifications')
   }
 
-  /** Clicks the OS notification at `index`, as the user would in Notification Center. */
-  async clickOsNotification(index: number): Promise<void> {
-    await this.app.evaluate((_electron, at) => (globalThis as unknown as { junoTest: { clickNotification: (i: number) => void } }).junoTest.clickNotification(at), index)
-  }
-
-  /** What macOS says about Juno's notifications from now on (main's seam); `allowed` at launch. */
-  async setNotificationPermission(permission: NotificationPermission): Promise<void> {
-    await this.app.evaluate((_electron, value) => {
-      ;(globalThis as unknown as { junoTest: { notificationPermission: (p: NotificationPermission) => void } }).junoTest.notificationPermission(value)
-    }, permission)
-  }
-
-  /** How many times Open Notification Settings opened System Settings. */
-  notificationSettingsOpened(): Promise<number> {
-    return this.app.evaluate(() => (globalThis as unknown as { junoTest: { notificationSettingsOpened: () => number } }).junoTest.notificationSettingsOpened())
-  }
-
-  /** The Mac's idle time from now on, in seconds (main's seam for `powerMonitor`); 0 at launch, a user at the Mac. */
-  async setSystemIdle(seconds: number): Promise<void> {
-    await this.app.evaluate((_electron, value) => (globalThis as unknown as { junoTest: { systemIdle: (s: number) => void } }).junoTest.systemIdle(value), seconds)
-  }
-
-  /** The dock's badge text: "•" with eligible unread items, else empty. */
-  dockBadge(): Promise<string> {
-    return this.app.evaluate(() => (globalThis as unknown as { junoTest: { dockBadge: () => string } }).junoTest.dockBadge())
-  }
-
-  /** How many times the dock icon bounced (main counts them under JUNO_E2E). */
-  dockBounces(): Promise<number> {
-    return this.app.evaluate(() => (globalThis as unknown as { junoTest: { dockBounces: () => number } }).junoTest.dockBounces())
-  }
-
-  /** Whether Juno is the frontmost app, as main's dock bounce reads it. Juno starts frontmost. */
-  async setFrontmost(frontmost: boolean): Promise<void> {
-    await this.app.evaluate((_electron, value) => (globalThis as unknown as { junoTest: { frontmost: (f: boolean) => void } }).junoTest.frontmost(value), frontmost)
-  }
+  clickOsNotification(index: number): Promise<void> { return this.surface.system('clickNotification', index) }
+  setNotificationPermission(permission: NotificationPermission): Promise<void> { return this.surface.system('notificationPermission', permission) }
+  notificationSettingsOpened(): Promise<number> { return this.surface.system('notificationSettingsOpened') }
+  setSystemIdle(seconds: number): Promise<void> { return this.surface.system('systemIdle', seconds) }
+  dockBadge(): Promise<string> { return this.surface.system('dockBadge') }
+  dockBounces(): Promise<number> { return this.surface.system('dockBounces') }
+  setFrontmost(frontmost: boolean): Promise<void> { return this.surface.system('frontmost', frontmost) }
 
   /**
    * Waits until the engine is live and its sync cycle has ended: the sidebar

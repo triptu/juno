@@ -52,7 +52,7 @@ async function fromFake(request: IncomingMessage, response: ServerResponse, sour
   const answer = await fetch(url, { headers: { cookie: source.cookie(), ...(range === undefined ? {} : { range }) }, redirect: 'manual' })
   if (answer.status >= 300 && answer.status < 400) return false
   const headers: Record<string, string> = { 'cache-control': 'no-store', ...extra }
-  for (const name of ['content-type', 'content-length', 'content-range', 'accept-ranges']) {
+  for (const name of ['content-type', 'content-length', 'content-range', 'accept-ranges', 'content-disposition']) {
     const value = answer.headers.get(name)
     if (value !== null) headers[name] = value
   }

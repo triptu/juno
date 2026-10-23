@@ -4,6 +4,7 @@
 // message's image opens in the viewer and a file downloads into Downloads.
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { schemeSrc } from './driver/juno'
 import { expect, test, type Fixtures } from './fixtures'
 import { brief, chart, chip, chips, drop, paste, staged } from './attach'
 import { expectStableAnchor } from './shiftProbe'
@@ -30,7 +31,7 @@ test('multi-chunk archives and files with no MIME type can be pasted, picked and
   await topic.root.getByRole('button', { name: 'Attach files', exact: true }).click()
   await (await chooser).setFiles(archive)
   await staged(topic, 2)
-  await win.screenshot({ path: test.info().outputPath('attachments-ready.png') })
+
   await topic.send('Archives attached')
   await topic.expectSent('Archives attached')
   const posted = fake.messages('C0ENG').find((message) => message.text === 'Archives attached')
@@ -58,7 +59,7 @@ for (const failure of ['read_error', 'bad_chunk'] as const) {
     await paste(topic.composer, [{ name: 'unreadable.dmg', mimeType: '', buffer: Buffer.alloc(3 * 1024 * 1024) }])
     const failed = topic.root.locator('[data-attachment="failed"]')
     await expect(failed).toHaveCount(1)
-    await win.screenshot({ path: test.info().outputPath(`attachment-${failure}.png`) })
+
     await expect(failed).toHaveAttribute('title', failure === 'read_error' ? 'Could not read this file' : 'Could not attach this file. Try attaching it again.')
     await expect.poll(async () => readFile(join(userData, 'logs', 'main.log'), 'utf8')).toMatch(new RegExp(`files: staging failed.*reason=${failure}.*offset=${failure === 'read_error' ? 0 : 1024 * 1024}`))
     const log = await readFile(join(userData, 'logs', 'main.log'), 'utf8')
@@ -71,14 +72,14 @@ for (const failure of ['read_error', 'bad_chunk'] as const) {
   })
 }
 
-test('a pasted image goes with the message and shows in it at its final size', async ({ juno, fake }) => {
+test('a pasted image goes with the message and shows in it at its final size', { tag: '@canary' }, async ({ juno, fake }) => {
   const { topic } = juno
   await juno.sidebar.row(ENG_MAIN).open()
   await topic.expectTitle('Main')
 
   await paste(topic.composer, [chart()])
   await expect(chip(topic, 'chart.png')).toBeVisible()
-  await expect(topic.root.locator('[data-composer] img[src^="juno://uploads/"]')).toHaveCount(1)
+  await expect(topic.root.locator(`[data-composer] img${schemeSrc('uploads')}`)).toHaveCount(1)
 
   fake.holdNext({ method: 'files.share', before: true })
   await topic.send('The chart for Thursday')
@@ -92,7 +93,7 @@ test('a pasted image goes with the message and shows in it at its final size', a
 
   fake.release()
   await topic.expectSent('The chart for Thursday')
-  await expect(row.getByRole('button', { name: 'Open chart.png' }).locator('img[src^="juno://files/"]')).toHaveCount(1, { timeout: 15_000 })
+  await expect(row.getByRole('button', { name: 'Open chart.png' }).locator(`img${schemeSrc('files')}`)).toHaveCount(1, { timeout: 15_000 })
   const settled = await row.getByRole('button', { name: 'Open chart.png' }).boundingBox()
   expect({ width: settled!.width, height: settled!.height }).toEqual({ width: 360, height: 225 })
 
@@ -125,15 +126,13 @@ test('a sent image Slack has no thumbnails for yet shows at once from the local 
     fake.release()
     await topic.expectSent('Before the thumbnails')
     // Stored without thumbnails: still the staged copy, still an image.
-    await expect(image.locator('img[src^="juno://uploads/"]')).toHaveCount(1)
+    await expect(image.locator(`img${schemeSrc('uploads')}`)).toHaveCount(1)
     await expect(row.getByRole('button', { name: 'Download chart.png' })).toHaveCount(0)
     // Processing can outlast all four background tries. Only file_created follows.
     await expect.poll(() => fake.calls.filter((call) => call.method === 'conversations.history' && call.args['_x_reason'] === 'file').length, { timeout: 60_000 }).toBe(4)
-    // Let the final empty response reach the sync before delivering the completion event.
-    await win.waitForTimeout(1_000)
     fake.releaseThumbnails({ event: 'file_created' })
-    await expect(image.locator('img[src^="juno://files/"]')).toHaveCount(1, { timeout: 15_000 })
-    await expect.poll(() => image.locator('img[src^="juno://files/"]').evaluate((node: HTMLImageElement) => node.naturalWidth), { timeout: 15_000 }).toBeGreaterThan(0)
+    await expect(image.locator(`img${schemeSrc('files')}`)).toHaveCount(1, { timeout: 15_000 })
+    await expect.poll(() => image.locator(`img${schemeSrc('files')}`).evaluate((node: HTMLImageElement) => node.naturalWidth), { timeout: 15_000 }).toBeGreaterThan(0)
   })
   expect(await image.boundingBox()).toMatchObject({ width: 360, height: 225 })
   expect(fake.calls.filter((call) => call.method === 'conversations.history' && call.args['_x_reason'] === 'file').length).toBeGreaterThan(0)
@@ -152,7 +151,7 @@ test('another person\'s image that arrives without thumbnails fills in after the
   await expect.poll(() => fake.calls.filter((call) => call.method === 'conversations.history' && call.args['_x_reason'] === 'file').length, { timeout: 15_000 }).toBeGreaterThan(0)
   fake.releaseThumbnails({ event: 'none' })
   const image = row.getByRole('button', { name: 'Open whiteboard.png' })
-  await expect(image.locator('img[src^="juno://files/"]')).toHaveCount(1, { timeout: 20_000 })
+  await expect(image.locator(`img${schemeSrc('files')}`)).toHaveCount(1, { timeout: 20_000 })
   expect(await image.boundingBox()).toMatchObject({ width: 320, height: 240 })
 })
 
@@ -168,10 +167,10 @@ test('a reply image takes Slack thumbnails after processing without a message up
   await topic.send('The processed reply image')
   await topic.expectSent('The processed reply image')
   const image = topic.message('The processed reply image').getByRole('button', { name: 'Open chart.png' })
-  await expect(image.locator('img[src^="juno://uploads/"]')).toHaveCount(1)
+  await expect(image.locator(`img${schemeSrc('uploads')}`)).toHaveCount(1)
   await expect.poll(() => fake.calls.filter((call) => call.method === 'conversations.replies' && call.args['_x_reason'] === 'file').length, { timeout: 15_000 }).toBeGreaterThan(0)
   fake.releaseThumbnails({ event: 'none' })
-  const remote = image.locator('img[src^="juno://files/"]')
+  const remote = image.locator(`img${schemeSrc('files')}`)
   await expect(remote).toHaveCount(1, { timeout: 20_000 })
   await expect.poll(() => remote.evaluate((node: HTMLImageElement) => node.naturalWidth)).toBeGreaterThan(0)
   const reads = fake.calls.filter((call) => call.method === 'conversations.replies' && call.args['_x_reason'] === 'file')
@@ -293,7 +292,7 @@ test('Home keeps its files through a change of destination and sends them to the
   await expect(briefChip).toHaveCount(0)
 })
 
-test("a stored message's image opens in the viewer and its file downloads into Downloads", async ({ juno }) => {
+test("a stored message's image opens in the viewer and its file downloads into Downloads", async ({ juno, userData }) => {
   const { topic } = juno
   await juno.sidebar.row(PROPOSAL).open()
   await test.step('an image opens in the viewer, and Esc closes it', async () => {
@@ -311,11 +310,17 @@ test("a stored message's image opens in the viewer and its file downloads into D
   await test.step('Download saves the file into Downloads', async () => {
     const download = topic.list.getByRole('button', { name: /^Download (q4-plan\.pdf|Q4 plan)$/ })
     await download.scrollIntoViewIfNeeded()
+    const browserDownload = juno.surface.kind === 'web' ? juno.win.waitForEvent('download') : undefined
     await download.click()
-    const saved = await expect
-      .poll(() => juno.app.evaluate(() => (globalThis as unknown as { junoTest: { downloads: string[] } }).junoTest.downloads.slice()), { timeout: 15_000 })
-      .toHaveLength(1)
-      .then(() => juno.app.evaluate(() => (globalThis as unknown as { junoTest: { downloads: string[] } }).junoTest.downloads[0]!))
+    let saved: string
+    if (browserDownload !== undefined) {
+      const file = await browserDownload
+      saved = join(userData, 'Downloads', file.suggestedFilename())
+      await file.saveAs(saved)
+    } else {
+      await expect.poll(() => juno.app.evaluate(() => (globalThis as unknown as { junoTest: { downloads: string[] } }).junoTest.downloads.length)).toBe(1)
+      saved = await juno.app.evaluate(() => (globalThis as unknown as { junoTest: { downloads: string[] } }).junoTest.downloads[0]!)
+    }
     expect(saved).toMatch(/Downloads\/q4-plan\.pdf$/)
     expect((await readFile(saved)).subarray(0, 5).toString('latin1')).toBe('%PDF-')
   })

@@ -2,6 +2,7 @@ import { fork, type ChildProcess } from 'node:child_process'
 import { basename, resolve } from 'node:path'
 import type { FakeSlack } from '@juno/fake-slack'
 import type { EngineOptions, HostCommand, HostMessage, HostStart, WorkerMessage } from '../../web/host/testHost'
+import type { SystemCall, SystemHooks } from '../../web/shell'
 import type { EngineHooks, WorkPassName } from '../driver/surface'
 
 const repoRoot = resolve(__dirname, '../../../..')
@@ -90,6 +91,10 @@ export class TestHost implements EngineHooks {
   async start(start: HostStart): Promise<void> {
     const { url } = await this.#command<{ url: string }>({ type: 'start', start })
     this.url = url
+  }
+
+  system<K extends keyof SystemHooks>(name: K, ...args: Parameters<SystemHooks[K]>): Promise<ReturnType<SystemHooks[K]>> {
+    return this.#command({ type: 'system', call: { name, args } as SystemCall })
   }
 
   /** Stops the engine, as quitting the app does. Leave the page first. */

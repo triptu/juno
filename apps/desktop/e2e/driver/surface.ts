@@ -1,5 +1,6 @@
 import { expect, type ElectronApplication, type Page } from '@playwright/test'
 import type { MenuCommand } from '@juno/contract/channels'
+import type { SystemHooks } from '../../web/shell'
 import type { WebTestSeam } from '../../web/page/testSeam'
 
 /**
@@ -11,6 +12,7 @@ import type { WebTestSeam } from '../../web/page/testSeam'
  * (README, "Browser lane").
  */
 export interface AppSurface {
+  system<K extends keyof SystemHooks>(name: K, ...args: Parameters<SystemHooks[K]>): Promise<ReturnType<SystemHooks[K]>>
   readonly kind: 'electron' | 'web'
   /** The Electron app, for a test that is about Electron itself; throws on the web surface. */
   readonly electron: ElectronApplication
@@ -102,6 +104,10 @@ type MainHooks = { junoTest: { contextMenu: ContextMenuHook; browserLinks: strin
 export function electronSurface(app: ElectronApplication): AppSurface {
   return {
     kind: 'electron',
+    system: (name, ...args) => app.evaluate((_electron, call) => {
+      const hooks = (globalThis as unknown as { junoTest: SystemHooks }).junoTest
+      return Reflect.apply(hooks[call.name], undefined, call.args)
+    }, { name, args }),
     electron: app,
     chooseNextMenuItem: (id, hold) =>
       app.evaluate((_electron, { choice, held }) => {
@@ -148,6 +154,7 @@ export function electronSurface(app: ElectronApplication): AppSurface {
 
 /** The engine's test passes and counters, which the web surface asks the test's host for. */
 export interface EngineHooks {
+  system<K extends keyof SystemHooks>(name: K, ...args: Parameters<SystemHooks[K]>): Promise<ReturnType<SystemHooks[K]>>
   workPass(name: WorkPassName): Promise<void>
   aiCalls(): Promise<Record<string, number>>
 }
@@ -157,6 +164,7 @@ type PageSeam = { __junoWebTest: WebTestSeam }
 export function webSurface(page: Page, engine: EngineHooks): AppSurface {
   return {
     kind: 'web',
+    system: (name, ...args) => engine.system(name, ...args),
     get electron(): ElectronApplication {
       throw new Error('This test needs Electron. Tag it @electron so only the electron project runs it (README, "Browser lane").')
     },

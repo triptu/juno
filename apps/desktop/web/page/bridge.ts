@@ -16,12 +16,13 @@
  *   Codex, notifications, the web panel, Quick Look, folder pickers, Open in
  *   Slack, updates. Those answer "unavailable" or do nothing.
  */
-import { menuShortcuts, type JunoBridge, type MenuCommand } from '@juno/contract/channels'
+import { Channels, menuShortcuts, type JunoBridge, type MenuCommand } from '@juno/contract/channels'
 import { DOWNLOAD_PATH } from '../paths'
 import { saveLaunch, savedLaunch } from './launch'
 import { popupMenu } from './menu'
 import { answerMenu, installTestSeam, seam, testing } from './testSeam'
 import { pageUrl } from './urls'
+import { hostRequest, hostSyncLog, onHostEvent } from './host'
 
 const nothing = (): Promise<undefined> => Promise.resolve(undefined)
 const never = (): (() => void) => () => {}
@@ -96,9 +97,9 @@ const bridge: JunoBridge = {
     getInfo: () => Promise.resolve({ name: 'Juno', version: 'web', platform: 'darwin', electron: '' }),
     diagnostics: () => Promise.resolve({ processes: [], engine: 'web shell', agent: 'stopped', uptime: performance.now() / 1000, window: document.hasFocus() ? 'window focused' : 'window hidden' }),
     copyDiagnostics: (input) => navigator.clipboard.writeText((input as { report: string }).report).then(() => 'copied', () => 'failed'),
-    copySyncLog: () => Promise.resolve('failed'),
+    copySyncLog: (input) => testing ? hostSyncLog(input).then((text) => navigator.clipboard.writeText(text)).then(() => 'copied', () => 'failed') : Promise.resolve('failed'),
     showLogs: nothing,
-    reportStagingFailure: nothing,
+    reportStagingFailure: (failure) => testing ? hostRequest(Channels.appReportStagingFailure, failure) : nothing(),
     reportState: nothing,
   },
   engine: {
@@ -123,7 +124,10 @@ const bridge: JunoBridge = {
     setAccent: (accent) => Promise.resolve(saveLaunch('accent', accent)),
     setTopicTitleLines: (lines) => Promise.resolve(saveLaunch('topicTitleLines', lines)),
     setDensity: (density) => Promise.resolve(saveLaunch('density', density)),
-    setPrivacy: (privacy) => Promise.resolve(saveLaunch('privacy', privacy ? 'on' : undefined)),
+    setPrivacy: (privacy) => {
+      saveLaunch('privacy', privacy ? 'on' : undefined)
+      return testing ? hostRequest(Channels.launchSetPrivacy, { privacy }) : nothing()
+    },
     setSidebar: ({ width, collapsed }) => Promise.resolve(saveLaunch('sidebar', `${width}${collapsed ? '-hidden' : ''}`)),
     onPrivacy: never,
   },
@@ -136,8 +140,7 @@ const bridge: JunoBridge = {
     },
   },
   huddle: {
-    // The fake media session, so the huddle views load; the host gives the engine no huddle pages, so a join fails.
-    register: () => Promise.resolve({ generation: 1, fakeMedia: true }),
+    register: () => testing ? hostRequest(Channels.huddleRegister, undefined) : Promise.resolve({ generation: 1, fakeMedia: true }),
     setMenu: nothing,
     openMicrophoneSettings: () => {
       if (testing) seam.microphoneSettingsOpened += 1
@@ -187,13 +190,13 @@ const bridge: JunoBridge = {
     },
   },
   notifications: {
-    contentShown: nothing,
-    setViewing: nothing,
-    onOpen: never,
-    test: nothing,
-    permission: () => Promise.resolve(noPermission),
-    requestPermission: () => Promise.resolve(noPermission),
-    openSettings: nothing,
+    contentShown: () => testing ? hostRequest(Channels.notificationsContentShown, undefined) : nothing(),
+    setViewing: (topicId) => testing ? hostRequest(Channels.notificationsViewing, { topicId }) : nothing(),
+    onOpen: (listener) => onHostEvent((event) => { if (event.event === 'notification') listener(event.value) }),
+    test: () => testing ? hostRequest(Channels.notificationsTest, undefined) : nothing(),
+    permission: () => testing ? hostRequest(Channels.notificationsPermission, undefined) : Promise.resolve(noPermission),
+    requestPermission: () => testing ? hostRequest(Channels.notificationsRequestPermission, undefined) : Promise.resolve(noPermission),
+    openSettings: () => testing ? hostRequest(Channels.notificationsOpenSettings, undefined) : nothing(),
   },
   webPanel: { show: nothing, setBounds: nothing, hide: nothing, close: nothing, onState: never },
 }

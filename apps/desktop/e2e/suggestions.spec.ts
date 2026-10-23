@@ -138,7 +138,7 @@ test('Ignore channels you never read: the reason, nothing in Slack, Ignore, Undo
   await juno.sidebar.row(BUILDS).expectVisible()
 })
 
-test('a mention of you, or of your group, breaks through an ignored channel; @here does not', { tag: '@electron' }, async ({ juno, fake, userData }) => {
+test('a mention of you, or of your group, breaks through an ignored channel; @here does not', async ({ juno, fake, userData }) => {
   fake.setSelfUsergroups({ ids: ['S0PLATFORM'] })
   await juno.signIn()
   await juno.waitForSync()

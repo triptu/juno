@@ -23,7 +23,7 @@ const badgeTest = test.extend({
   },
 })
 
-badgeTest('dock dot follows unread DMs, group DMs and mentions through reads, wake and engine restart', async ({ juno, slack, fake }) => {
+badgeTest('dock dot follows unread DMs, group DMs and mentions through reads, wake and engine restart', { tag: '@electron' }, async ({ juno, slack, fake }) => {
   await juno.signIn()
   await juno.waitForSync()
   await juno.notificationHoursNow()
@@ -68,7 +68,7 @@ badgeTest('the first Home view asks for authorization before any notification is
   await juno.setNotificationPermission({ authorization: 'notDetermined', badges: 'unknown' })
   await juno.signIn()
   await juno.waitForSync()
-  await expect.poll(() => hooks(juno.app, 'notificationRequests')).toBe(1)
+  await expect.poll(() => juno.surface.system('notificationRequests')).toBe(1)
   await expect.poll(() => juno.dockBadge()).toBe('•')
   expect(await juno.osNotifications()).toEqual([])
   await juno.openNotifications()
@@ -106,12 +106,12 @@ badgeTest('badge regression: no permission prompt during onboarding', async ({ j
   await juno.signIn({ skipSetUp: false })
   await expect(juno.setUp).toBeVisible()
   await expect.poll(() => juno.dockBadge()).toBe('•')
-  expect(await hooks(juno.app, 'notificationRequests')).toBe(0)
+  expect(await juno.surface.system('notificationRequests')).toBe(0)
   await juno.skipSetUp()
-  await expect.poll(() => hooks(juno.app, 'notificationRequests')).toBe(1)
+  await expect.poll(() => juno.surface.system('notificationRequests')).toBe(1)
 })
 
-badgeTest('badge regression: an engine that gives up clears the dot', async ({ juno, app }) => {
+badgeTest('badge regression: an engine that gives up clears the dot', { tag: '@electron' }, async ({ juno, app }) => {
   await juno.signIn()
   await juno.waitForSync()
   await expect.poll(() => juno.dockBadge()).toBe('•')
@@ -119,7 +119,7 @@ badgeTest('badge regression: an engine that gives up clears the dot', async ({ j
   await expect.poll(() => juno.dockBadge()).toBe('')
 })
 
-badgeTest('a denied request is remembered across a full app restart', async ({ fake, slackApp, userData }) => {
+badgeTest('a denied request is remembered across a full app restart', { tag: '@electron' }, async ({ fake, slackApp, userData }) => {
   const options = { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, notificationInitial: 'notDetermined' as const, notificationResponse: 'denied' as const }
   const first = await launchApp(userData, options)
   try {

@@ -29,6 +29,8 @@ import { createTestWork, fastTestTiming } from '../../src/engine/testWork'
 import { ENGINE_SOCKET_PATH } from '../paths'
 import { fakeMain, type SessionStore, type StoredSession } from './fakeMain'
 import { serveFile } from './files'
+import { createShell } from './system'
+import { SHELL_SOCKET_PATH, type SystemCall } from '../shell'
 
 /** How the engine starts: the launch options the Electron fixture passes main as environment variables. */
 export interface EngineOptions {
@@ -56,6 +58,7 @@ export type HostCommand =
   | { readonly type: 'startEngine'; readonly engine?: EngineOptions }
   | { readonly type: 'workPass'; readonly name: 'title' | 'art' | 'home' | 'automated' }
   | { readonly type: 'aiCalls' }
+  | { readonly type: 'system'; readonly call: SystemCall }
   | { readonly type: 'stop' }
 
 export type HostMessage =
@@ -118,6 +121,7 @@ interface Running {
   log: ReturnType<typeof createLog>
   testWork: ReturnType<typeof createTestWork>
   cookie: () => string
+  readonly shell: ReturnType<typeof createShell>
   readonly calls: Record<string, number>
   readonly transport: ReturnType<typeof socketTransport>
   readonly close: () => Promise<void>
@@ -130,9 +134,10 @@ let running: Running | undefined
 const workReplies = new Map<number, (error: string | undefined) => void>()
 let nextWork = 0
 
-async function startEngineOn(start: HostStart, options: EngineOptions, transport: ReturnType<typeof socketTransport>, calls: Record<string, number>) {
+async function startEngineOn(start: HostStart, options: EngineOptions, transport: ReturnType<typeof socketTransport>, calls: Record<string, number>, shell: ReturnType<typeof createShell>) {
   const log = createLog('engine', join(start.userData, 'logs'))
   const host = memoryHost()
+  shell.connect(host)
   const main = fakeMain(host, { fakeUrl: start.fakeUrl, aliases: start.aliases, store: fileSessionStore(start.userData), signIn: askSignIn })
   // In Electron the engine entry answers main; here the answers come back to `workPass`.
   const work = createTestWork((reply) => workReplies.get(reply.id)?.(reply.error))
@@ -199,7 +204,8 @@ async function begin(start: HostStart): Promise<{ url: string }> {
   const address = server.address()
   const port = typeof address === 'object' && address !== null ? address.port : 0
   const transport = socketTransport({ host: '127.0.0.1', port })
-  const started = await startEngineOn(start, start.engine, transport, calls)
+  const shell = createShell(start.userData)
+  const started = await startEngineOn(start, start.engine, transport, calls, shell)
   server.on('request', (request, response) => {
     const files = { origin: new URL(start.fakeUrl).origin, aliases: start.aliases, cookie: () => running?.cookie() ?? '', userData: start.userData }
     serveFile(request, response, files)
@@ -210,8 +216,12 @@ async function begin(start: HostStart): Promise<{ url: string }> {
       })
   })
   server.on('upgrade', (request, socket, head) => {
-    if (new URL(request.url ?? '/', 'http://host').pathname !== ENGINE_SOCKET_PATH) return socket.destroy()
-    sockets.handleUpgrade(request, socket, head, (ws) => running?.transport.add(ws))
+    const path = new URL(request.url ?? '/', 'http://host').pathname
+    if (path !== ENGINE_SOCKET_PATH && path !== SHELL_SOCKET_PATH) return socket.destroy()
+    sockets.handleUpgrade(request, socket, head, (ws) => {
+      if (path === SHELL_SOCKET_PATH) shell.attach(ws)
+      else running?.transport.add(ws)
+    })
   })
   const url = `http://127.0.0.1:${port}/`
   running = {
@@ -222,6 +232,7 @@ async function begin(start: HostStart): Promise<{ url: string }> {
     testWork: started.testWork,
     cookie: started.cookie,
     calls,
+    shell,
     transport,
     url,
     stopped: false,
@@ -252,7 +263,7 @@ async function startEngineAgain(engine: EngineOptions | undefined): Promise<void
   if (current === undefined) throw new Error('The host has not started')
   if (!current.stopped) throw new Error('The engine is still running; quit it first')
   current.engineOptions = { ...current.engineOptions, ...engine }
-  const started = await startEngineOn(current.start, current.engineOptions, current.transport, current.calls)
+  const started = await startEngineOn(current.start, current.engineOptions, current.transport, current.calls, current.shell)
   current.stopped = false
   current.engine = started.engine
   current.log = started.log
@@ -284,10 +295,11 @@ async function stop(): Promise<void> {
   running = undefined
   if (current === undefined) return
   if (!current.stopped) {
-    await current.engine.stop().catch(() => undefined)
+  await current.engine.stop().catch(() => undefined)
     await current.log.close().catch(() => undefined)
   }
   await current.close()
+  await current.shell.close()
 }
 
 async function run(command: HostCommand): Promise<unknown> {
@@ -302,6 +314,10 @@ async function run(command: HostCommand): Promise<unknown> {
       return workPass(command.name)
     case 'aiCalls':
       return { ...running?.calls }
+    case 'system': {
+      if (running === undefined) throw new Error('The host has not started')
+      return Reflect.apply(running.shell.hooks[command.call.name], undefined, command.call.args)
+    }
     case 'stop':
       return stop()
   }

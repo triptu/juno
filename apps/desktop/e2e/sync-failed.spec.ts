@@ -5,25 +5,23 @@ import { expect, test } from './fixtures'
 // A first sync that keeps failing says why: "You're offline" only when the
 // network failed, else "Couldn't finish syncing" with Copy log (SPEC section 5, item 5).
 
-test('a boot Slack answers with data Juno cannot read shows the sync failure and copies the log', async ({ juno, fake, app, userData }, testInfo) => {
+test('a boot Slack answers with data Juno cannot read shows the sync failure and copies the log', async ({ juno, fake, userData }) => {
   test.setTimeout(90_000)
   fake.forceMalformed({ method: 'client.userBoot', times: 1_000 })
   await juno.signIn()
   const card = juno.sidebar.root.locator('[data-sync-status]')
   await juno.sidebar.expectSyncStatus("Couldn't finish syncing")
   await expect(card).toContainText("Slack sent data Juno can't read.")
-  // Past the offline grace it still says the same.
-  await juno.win.waitForTimeout(6_000)
+  // Five failed boots span the offline grace, and the reason must still describe Slack's malformed data.
+  await expect.poll(() => fake.callCount('client.userBoot'), { timeout: 15_000 }).toBeGreaterThanOrEqual(5)
   await expect(juno.sidebar.syncStatus).toHaveText("Couldn't finish syncing")
-  await card.screenshot({ path: testInfo.outputPath('sync-failed-card.png') })
-  await testInfo.attach('sync-failed-card', { path: testInfo.outputPath('sync-failed-card.png'), contentType: 'image/png' })
 
   const line = /WARN engine sync: boot failed, retrying cause=SlackDecodeError method=client\.userBoot/
   await expect.poll(() => readFile(join(userData, 'logs', 'engine.log'), 'utf8').catch(() => '')).toMatch(line)
   await card.getByRole('button', { name: 'Copy log' }).click()
   await juno.expectToast('Copied the log')
-  const copied = await app.evaluate(({ clipboard }) => clipboard.readText())
-  const version = await app.evaluate(({ app: electron }) => electron.getVersion())
+  const copied = await juno.clipboard()
+  const version = juno.surface.kind === 'web' ? 'web' : await juno.app.evaluate(({ app: electron }) => electron.getVersion())
   expect(copied).toContain('Juno sync log')
   expect(copied).toContain(`Juno ${version} on `)
   expect(copied).toMatch(/on (macOS|linux|darwin)/)
