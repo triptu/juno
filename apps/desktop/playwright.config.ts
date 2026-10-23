@@ -1,4 +1,5 @@
 import { cpus } from 'node:os'
+import { resolve } from 'node:path'
 import { defineConfig } from '@playwright/test'
 import type { Lane } from './e2e/fixtures'
 import { BROWSER_SPECS } from './e2e/lanes'
@@ -24,8 +25,9 @@ const browserWorkers = Number(process.env.JUNO_BROWSER_WORKERS ?? Math.max(2, Ma
 
 // The electron project runs its own files whole, and of the browser files
 // only tests tagged @electron (they need main) or @canary (they run in both).
-// A title path holds the file's name, so one pattern selects both.
-const electronGrep = new RegExp(`${tagPattern(['@electron', '@canary'])}|^(?!.*(?:${BROWSER_SPECS.map(escape).join('|')}))`)
+// A test's grep title starts with its project and its file relative to e2e/,
+// space-separated, so one pattern selects both.
+const electronGrep = new RegExp(`${tagPattern(['@electron', '@canary'])}|^(?!\\s*\\S+\\s(?:${BROWSER_SPECS.map(escape).join('|')})\\s)`)
 
 export default defineConfig<object, { lane: Lane }>({
   testDir: 'e2e',
@@ -34,7 +36,7 @@ export default defineConfig<object, { lane: Lane }>({
     { name: 'build-web', testMatch: 'setup/web.setup.ts' },
     {
       name: 'browser',
-      testMatch: BROWSER_SPECS.map((file) => `**/${file}`),
+      testMatch: BROWSER_SPECS.map((file) => resolve(__dirname, 'e2e', file)),
       dependencies: ['build-web'],
       fullyParallel: true,
       workers: browserWorkers,
@@ -79,6 +81,7 @@ export default defineConfig<object, { lane: Lane }>({
     ...(process.env.JUNO_E2E_TIMINGS === '1' ? [['./e2e/timings.ts'] as const] : []),
   ],
   use: {
-    trace: 'retain-on-failure',
+    // JUNO_E2E_TRACE=off skips recording, to measure what tracing costs.
+    trace: process.env.JUNO_E2E_TRACE === 'off' ? 'off' : 'retain-on-failure',
   },
 })
