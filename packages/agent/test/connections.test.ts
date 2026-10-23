@@ -3,13 +3,16 @@
 // auto-review of writes and the owner's rules, locked tools, secrets, lost writes, what a card shows,
 // adding servers and the owner's choices across a relaunch. connection-discovery.test.ts has what
 // the model is told about tools.
-import { afterEach, expect, test } from 'bun:test'
+import { afterEach, expect, setDefaultTimeout, test } from 'bun:test'
 import { fakeReview, json, reply, startFakeLittlebird, startFakeMcpServer, startFakeNotion, unknownTool, type FakeReviewRequest, type FakeTool } from '@juno/agent-testing'
 import { LITTLEBIRD, NOTION, T3, serveMcp } from '../src/mcp'
 import { slackTool } from '../src/mcp/catalogue'
 import { activityActions } from '../src/actions/activity'
 import { activityPage } from '../src/serve/pages'
 import { callTool, callsOf, closeAfter, closeConnections, connections, credentials, until, type ConnectionsOptions } from './connections-harness'
+
+// Each test opens the engine; a run takes under a second, but a loaded machine can stretch it past bun's 5 s.
+setDefaultTimeout(30_000)
 
 afterEach(closeConnections)
 
