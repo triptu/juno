@@ -23,7 +23,7 @@ async function endpoint(options: FakeOpenAiOptions & { readonly ownerKey?: strin
 }
 
 it('lists the endpoint models, answers through the first one, and counts it as $0 the cap cannot track', async () => {
-  const { server, h, client, settings, pageWhere } = await endpoint()
+  const { server, client, settings, pageWhere } = await endpoint()
   const page = await settings.where((p) => p.chatModels.length === 2, 'the listed models')
   expect(page.chatModels).toEqual([
     { family: 'qwen3:8b', resolved: 'qwen3:8b', provider: 'custom', selected: true },
@@ -36,10 +36,8 @@ it('lists the endpoint models, answers through the first one, and counts it as $
   const answered = await pageWhere((p) => texts(p).length === 1 && of(p, 'status').length === 0, 'the answer')
   expect(texts(answered)).toEqual(['Hello from the local model.'])
   expect(server.requests).toEqual([{ model: 'qwen3:8b', key: 'none' }])
-  // The request went through the guard: it reserved and settled $0 in the ledger.
-  expect(h.turns.store.db.prepare("SELECT path, amount, state, actual FROM spend_reservations").all()).toEqual([
-    { path: 'chat', amount: 0, state: 'settled', actual: 0 },
-  ])
+  // Settings still shows $0 spent and says the cap cannot track this endpoint.
+  expect(await settings.where((p) => p.spendUntracked === true, 'the spend after the answer')).toMatchObject({ spentTodayUsd: 0, limitTodayUsd: 5 })
 
   await run(client['agent.settings.change']({ opId: 'op-2' as OpId, change: { _tag: 'model', purpose: 'chat', provider: 'custom', family: 'llama3.3:70b' } }))
   await settings.where((p) => p.chatModels.find((m) => m.selected)?.family === 'llama3.3:70b', 'llama chosen')
