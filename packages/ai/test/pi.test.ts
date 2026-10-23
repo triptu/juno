@@ -66,10 +66,10 @@ const noDecision = (d: Decision<unknown>) => (d._tag === 'NoDecision' ? { reason
 
 /** A model that never answers, and a promise that resolves once the request has reached it. */
 function silentModel() {
-  let arrive = () => {}
+  let arrive: (() => void) | undefined
   const reached = new Promise<void>((resolve) => { arrive = resolve })
   const step: FauxResponseStep = () => {
-    arrive()
+    arrive?.()
     return new Promise(() => {})
   }
   return { step, reached }
@@ -84,12 +84,13 @@ const onTestClock = <A>(decision: Effect.Effect<A>, reached: Promise<void>, mill
     return yield* Fiber.join(fiber)
   }).pipe(Effect.provide(TestClock.layer())))
 
-const admitting = () => {
+/** A spend ledger that admits while `open` says so, and records what was asked and settled. */
+const admitting = (open = () => true) => {
   const asked: number[] = []
   const settled: Array<number | undefined> = []
   const admit = (upper: number) => Effect.sync(() => {
     asked.push(upper)
-    return { _tag: 'Admitted' as const, settle: (usd: number | undefined) => Effect.sync(() => { settled.push(usd) }) }
+    return open() ? { _tag: 'Admitted' as const, settle: (usd: number | undefined) => Effect.sync(() => { settled.push(usd) }) } : { _tag: 'Blocked' as const }
   })
   return { asked, settled, admit }
 }
@@ -148,13 +149,8 @@ describe('PiAiProvider decisions', () => {
   })
 
   it('reserves before the request and settles the reported cost; at the cap it makes no request', async () => {
-    const asked: number[] = []
-    const settled: Array<number | undefined> = []
     let open = true
-    const admit = (upper: number) => Effect.sync(() => {
-      asked.push(upper)
-      return open ? { _tag: 'Admitted' as const, settle: (usd: number | undefined) => Effect.sync(() => { settled.push(usd) }) } : { _tag: 'Blocked' as const }
-    })
+    const { asked, settled, admit } = admitting(() => open)
     const { provider, faux } = scripted([fauxAssistantMessage(fauxToolCall('route', { replyTo: null, confidence: 1 }))], { ...chatConfig, admit })
     const decision = await Effect.runPromise(provider.decide(tasks.routeCheck, routeInput))
     expect(decision).toMatchObject({ _tag: 'Decided' })
@@ -212,15 +208,12 @@ describe('PiAiProvider on output that names ids not in the input', () => {
   const reading = { messageTs: '1', where: '#eng', kind: 'channel' as const, sender: 's', text: 't', mentionsMe: false, now: NOW, before: [],
     facts: { ownerWroteLast: false, ownerStartedThread: false, senderWroteSinceOwner: false, exchangesLast30Days: 0 }, instructions: [{ id: 'i1', direction: 'stay' as const, text: 'greetings' }] }
   const promises = { topicId: postgres.id, title: postgres.title, channel: '#eng', now: NOW, messages: [{ ...msg('Dev Patel', "I'll check.", 5), id: '1.000001' }] }
-  const dm = (userId: string) => ({ command: { kind: 'send_dm', userId, text: 'hi' }, confidence: 0.9 })
-  const post = (channelId: string) => ({ command: { kind: 'post', channelId, text: 'hi' }, confidence: 0.9 })
-  const instruction = (id: string) => ({ needsYou: 'ask', probabilities: {}, instruction: { id, confidence: 0.9 } })
 
   it.each([
     ['an unknown topic', tasks.routeCheck, routeInput, { replyTo: 't:C0ENG:9.000001', confidence: 0.7 }, { replyTo: null, confidence: 0.7 }],
-    ['an unknown user', tasks.parseCommand, commands, dm('U0NOBODY'), dm('U0MAYA')],
-    ['a post to a DM', tasks.parseCommand, commands, post('D0MAYA'), post('C0ENG')],
-    ['an unknown instruction', tasks.notificationReading, reading, instruction('i9'), instruction('i1')],
+    ['an unknown user', tasks.parseCommand, commands, { command: { kind: 'send_dm', userId: 'U0NOBODY', text: 'hi' }, confidence: 0.9 }, { command: { kind: 'send_dm', userId: 'U0MAYA', text: 'hi' }, confidence: 0.9 }],
+    ['a post to a DM', tasks.parseCommand, commands, { command: { kind: 'post', channelId: 'D0MAYA', text: 'hi' }, confidence: 0.9 }, { command: { kind: 'post', channelId: 'C0ENG', text: 'hi' }, confidence: 0.9 }],
+    ['an unknown instruction', tasks.notificationReading, reading, { needsYou: 'ask', probabilities: {}, instruction: { id: 'i9', confidence: 0.9 } }, { needsYou: 'ask', probabilities: {}, instruction: { id: 'i1', confidence: 0.9 } }],
     ["a follow-up on someone else's message", tasks.followUps, promises, { followUps: [{ messageId: '1.000001', text: "You said you'd check" }] }, { followUps: [] }],
   ] as const)('refuses %s and takes the valid retry', async (_, task, input, invented, valid) => {
     const { provider, faux } = scripted([fauxAssistantMessage(fauxToolCall(task.tool.name, invented)), fauxAssistantMessage(fauxToolCall(task.tool.name, valid))])
