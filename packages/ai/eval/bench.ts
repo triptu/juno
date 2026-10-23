@@ -5,7 +5,7 @@
  * each example's `expect`, the no-decision rate and the cost per 1k decisions.
  * Live only; needs `OPENROUTER_API_KEY` in the environment or the repo's `.env`.
  *
- * Usage: `pnpm --filter @juno/ai bench [--reps 3] [--setups a,b] [--tasks routeCheck,urgencyGate] [--concurrency 3] [--list]`
+ * Usage: `pnpm --filter @juno/ai bench [--reps 3] [--setups a,b] [--tasks routeCheck,notificationReading] [--concurrency 3] [--list]`
  *
  * A setup is a model plus request options: how the output is asked for (a
  * forced tool call, tool choice auto, a JSON schema response), OpenRouter

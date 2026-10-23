@@ -36,11 +36,13 @@ describe('output validation', () => {
     expect(validateOutput(tasks.automatedChannel, input, { reason: 'bots' }).ok).toBe(false)
   })
 
-  it('urgencyGate takes a decision and a reason', () => {
-    const input = { messageTs: '1', channel: '#eng', channelKind: 'public' as const, sender: 's', text: 't', mentionsMe: false, now: 'now' }
-    expect(validateOutput(tasks.urgencyGate, input, { notify: true, reason: 'An incident' }).ok).toBe(true)
-    expect(validateOutput(tasks.urgencyGate, input, { notify: 'yes', reason: 'An incident' }).ok).toBe(false)
-    expect(validateOutput(tasks.urgencyGate, input, { notify: true }).ok).toBe(false)
+  it('notificationReading accepts only an instruction from the input and a known option', () => {
+    const input = { messageTs: '1', where: '#eng', kind: 'channel' as const, sender: 's', text: 't', mentionsMe: false, now: 'now', before: [],
+      facts: { ownerWroteLast: false, ownerStartedThread: false, senderWroteSinceOwner: false, exchangesLast30Days: 0 }, instructions: [{ id: 'i1', direction: 'stay' as const, text: 'greetings' }] }
+    expect(validateOutput(tasks.notificationReading, input, { needsYou: 'ask', probabilities: { ask: 0.9 }, instruction: null }).ok).toBe(true)
+    expect(validateOutput(tasks.notificationReading, input, { needsYou: 'ask', probabilities: {}, instruction: { id: 'i1', confidence: 0.9 } }).ok).toBe(true)
+    expect(validateOutput(tasks.notificationReading, input, { needsYou: 'ask', probabilities: {}, instruction: { id: 'i9', confidence: 0.9 } }).ok).toBe(false)
+    expect(validateOutput(tasks.notificationReading, input, { needsYou: 'urgent', probabilities: {}, instruction: null }).ok).toBe(false)
   })
 
   it('parseCommand only accepts targets from the lists, and post only in a channel', () => {
