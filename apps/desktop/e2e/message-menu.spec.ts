@@ -356,6 +356,8 @@ test('one sender’s messages start a new header after ten quiet minutes', async
   reply('Nine minutes later', 21)
   reply('Ten quiet minutes later', 11)
   reply('Right after that', 10)
+  // The new root moves the Main row up; press it once it is in its new place.
+  await juno.sidebar.row('#eng').expectPreview('Leo: Header gap thread')
   await juno.sidebar.row('#eng').open()
   await juno.topic.list.locator(`[data-thread-link="t:C0ENG:${root.ts}"]`).click()
   await juno.topic.expectMessage('Right after that')
