@@ -93,7 +93,7 @@ What the numbers say:
 
 ## Tests
 
-`bun run --cwd packages/ai test`. Behaviour through the interface with the fake; the schema and `accept` rules; `PiAiProvider` against pi-ai's scripted faux provider plus a scripted System One classifier (valid call, retry, two invalid answers, provider error, timeout, missing key, tool choice by tier and the `auto` fallback, classifier questions and answers, classifier off, no retry of a refusal, the fallback model and its reservation); cache key stability. No test depends on prompt wording.
+`bun run --cwd packages/ai test`. `test/pi.test.ts` runs `PiAiProvider` against pi-ai's scripted faux provider plus a scripted System One classifier: a valid call, a retry after output that names a topic, person, channel, instruction or message not in the input (the `accept` rules), two invalid answers, provider error, missing key, tool choice by tier and the `auto` fallback, classifier questions and answers, classifier off, no retry of a refusal, the fallback model and its reservation. The timeout runs on Effect's `TestClock`, and the timeout and interrupt cases wait for the request to reach the faux model, so no case depends on real time. `test/grammar.test.ts` covers the grammar filter and `test/cacheKey.test.ts` cache key stability. The fake is tested through the e2e specs that run on it. No test depends on prompt wording.
 
 ## Open questions
 

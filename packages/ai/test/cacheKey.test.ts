@@ -11,6 +11,8 @@ describe('cache keys', () => {
     const b = cacheKeyOf(tasks.settledScore, reordered)
     expect(a).toEqual({ task: 'settledScore', key: stagingBill.id, inputHash: expect.stringMatching(/^[0-9a-f]{16}$/) })
     expect(b).toEqual(a)
+    // Keys sorted, undefined dropped.
+    expect(canonicalJson({ b: 1, a: [{ d: undefined, c: 2 }] })).toBe('{"a":[{"c":2}],"b":1}')
   })
 
   it('changes when the input changes, and when the task version changes', () => {
@@ -30,7 +32,4 @@ describe('cache keys', () => {
     })
   })
 
-  it('canonical JSON sorts keys and drops undefined', () => {
-    expect(canonicalJson({ b: 1, a: [{ d: undefined, c: 2 }] })).toBe('{"a":[{"c":2}],"b":1}')
-  })
 })
