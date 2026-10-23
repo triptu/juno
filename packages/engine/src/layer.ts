@@ -8,6 +8,7 @@ import type { EnginePhase, SessionStatus } from '@juno/contract'
 import type { SyncPhase } from '@juno/sync'
 import { NotificationControl } from './notificationRuntime'
 import { OwnerActivity } from './activity'
+import { SelfPresence } from './selfPresence'
 import { AgentWritesHandlers } from './agent-host/handlers'
 import { JunoHostLive, PhaseSource } from './agent-host/host'
 import { AiFallback } from './aiFallback'
@@ -111,7 +112,7 @@ export const Services = Layer.mergeAll(EnginePhases, ArtJob, TitleJob, HomeJob, 
   Layer.provideMerge(ActionWorker.layer),
   Layer.provideMerge(SyncRunner.layer),
   Layer.provideMerge(Layer.merge(OwnerActivity.layer, OthersPresence.layer)),
-  Layer.provideMerge(Layer.merge(NotificationControl.layer, HuddleLive).pipe(Layer.provideMerge(SocketEvents.layer))),
+  Layer.provideMerge(Layer.mergeAll(NotificationControl.layer, HuddleLive, SelfPresence.layer).pipe(Layer.provideMerge(SocketEvents.layer))),
   Layer.provideMerge(AiProviderLive),
   Layer.provideMerge(AiCredentials.layer),
   Layer.provideMerge(AiSpend.layer),

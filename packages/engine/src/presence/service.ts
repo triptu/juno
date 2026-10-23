@@ -19,14 +19,16 @@
  * `batch_presence_aware=1`; checked live 2026-10-21).
  *
  * Presence is kept in memory only. It is cleared when the socket drops and
- * when the sync ends, because Juno cannot know it then. The user's own is
- * kept apart from the others' (`self`), so it never shows as a DM partner's.
+ * when the sync ends, because Juno cannot know it then. The user's own goes
+ * to `SelfPresence`, apart from the others', so it never shows as a DM
+ * partner's.
  */
 import { SHOW_PRESENCE_PREF, type PresencePeople } from '@juno/contract'
-import { parseTopicId, type Presence } from '@juno/domain'
+import { parseTopicId } from '@juno/domain'
 import { SlackSession, SlackSocket } from '@juno/slack'
 import { liveQuery, prefs, StoreReader } from '@juno/store'
 import { Context, Effect, Layer, Semaphore, Stream, SubscriptionRef } from 'effect'
+import { SelfPresence } from '../selfPresence'
 import { SocketEvents, type SessionStart } from '../socketEvents'
 import { SyncLink } from '../syncLink'
 
@@ -41,18 +43,14 @@ const unknown: PresencePeople = { active: [], away: [] }
 export class OthersPresence extends Context.Service<OthersPresence, {
   /** What Slack last said about each followed user other than the user, sorted; the current value first. */
   readonly people: Stream.Stream<PresencePeople>
-  /** What Slack last said about the user, on this connection; undefined until it answers and while the socket is down. */
-  readonly self: Effect.Effect<Presence | undefined>
-  /** `self`, the current value first, then each change. */
-  readonly selfChanges: Stream.Stream<Presence | undefined>
 }>()('juno/engine/OthersPresence') {
   static readonly layer = Layer.effect(OthersPresence, Effect.gen(function* () {
     const people = yield* SubscriptionRef.make(unknown)
-    const self = yield* SubscriptionRef.make<Presence | undefined>(undefined)
+    const self = yield* SelfPresence
     const events = yield* SocketEvents
     const link = yield* SyncLink
     yield* events.subscribe('presence', sessionPresence(people, self, link))
-    return OthersPresence.of({ people: SubscriptionRef.changes(people), self: SubscriptionRef.get(self), selfChanges: SubscriptionRef.changes(self).pipe(Stream.changes) })
+    return OthersPresence.of({ people: SubscriptionRef.changes(people) })
   }))
 }
 
@@ -84,7 +82,7 @@ const wantedIds = (selfId: string, openChannels: ReadonlyArray<string>) => Effec
 })
 
 /** Runs for each sync, in its scope, and shares its socket. */
-const sessionPresence = (people: SubscriptionRef.SubscriptionRef<PresencePeople>, self: SubscriptionRef.SubscriptionRef<Presence | undefined>, link: SyncLink['Service']): SessionStart => Effect.gen(function* () {
+const sessionPresence = (people: SubscriptionRef.SubscriptionRef<PresencePeople>, self: SelfPresence['Service'], link: SyncLink['Service']): SessionStart => Effect.gen(function* () {
   const socket = yield* SlackSocket
   const session = yield* SlackSession
   const lock = yield* Semaphore.make(1)
@@ -97,16 +95,9 @@ const sessionPresence = (people: SubscriptionRef.SubscriptionRef<PresencePeople>
   const presence = new Map<string, 'active' | 'away'>()
 
   const publish = Effect.suspend(() => {
-    const active: Array<string> = []
-    const away: Array<string> = []
-    for (const id of [...wanted].toSorted()) {
-      if (id === session.userId) continue
-      const value = presence.get(id)
-      if (value === 'active') active.push(id)
-      else if (value === 'away') away.push(id)
-    }
+    const { active, away } = split(wanted, presence, session.userId)
     return SubscriptionRef.update(people, (last) => (sameIds(last.active, active) && sameIds(last.away, away) ? last : { active, away })).pipe(
-      Effect.andThen(SubscriptionRef.set(self, presence.get(session.userId))),
+      Effect.andThen(self.set(presence.get(session.userId))),
     )
   })
   // Sends the list when it differs from the last one sent; nothing before the first read.
@@ -131,7 +122,7 @@ const sessionPresence = (people: SubscriptionRef.SubscriptionRef<PresencePeople>
     Stream.debounce(SUB_SETTLE),
   )
 
-  yield* Effect.addFinalizer(() => Effect.andThen(SubscriptionRef.set(people, unknown), SubscriptionRef.set(self, undefined)))
+  yield* Effect.addFinalizer(() => Effect.andThen(SubscriptionRef.set(people, unknown), self.set(undefined)))
   yield* Effect.forkScoped(Stream.runForEach(wantedChanges, (result) => {
     if (result._tag === 'Failure') return Effect.logWarning('presence: could not read whom to follow', { error: String(result.failure) })
     const key = result.success.join(',')
@@ -166,5 +157,17 @@ const sessionPresence = (people: SubscriptionRef.SubscriptionRef<PresencePeople>
     }
   }))
 })
+
+/** The followed people other than the user, by what Slack last said, sorted; those it has not answered for are left out. */
+const split = (wanted: ReadonlySet<string>, presence: ReadonlyMap<string, 'active' | 'away'>, selfId: string): PresencePeople => {
+  const active: Array<string> = []
+  const away: Array<string> = []
+  for (const id of [...wanted].toSorted()) {
+    const value = id === selfId ? undefined : presence.get(id)
+    if (value === 'active') active.push(id)
+    else if (value === 'away') away.push(id)
+  }
+  return { active, away }
+}
 
 const sameIds = (a: ReadonlyArray<string>, b: ReadonlyArray<string>) => a.length === b.length && a.every((id, index) => id === b[index])
