@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Hours, NotificationPermission, NotifyTag } from '@juno/contract'
-import { getNotificationPermission, notificationSettingsAtom, notificationsPageAtom, openNotificationSettings, registry, requestNotificationPermission, restoreSlackSchedule, sendTestNotification, setHours, setHoursDay, setHuddleRing, setMatters, setSlackSchedule } from '@juno/state'
+import { getNotificationPermission, notificationDecisionsAtom, notificationSettingsAtom, notificationsPageAtom, openNotificationSettings, registry, requestNotificationPermission, sendTestNotification, setHours, setHoursDay, setHuddleRing, useJunoHours } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { NotificationsPage as NotificationsPageView, type HoursKind } from '@juno/views'
 import { setNotifyLevel } from './notifyActions'
@@ -9,25 +9,18 @@ function changeHours(which: HoursKind, hours: Partial<Hours>): void {
   setHours(registry, which, hours)
 }
 
-function changeSlackSchedule(enabled: boolean): void {
-  setSlackSchedule(registry, enabled)
-}
-
-function restoreSlack(): void {
-  void restoreSlackSchedule(registry)
+/** Until the page is rebuilt for Notifications v2 (SPEC 14), its schedule switch only offers Use Juno's hours. */
+function changeSlackSchedule(): void {
+  useJunoHours(registry)
 }
 
 function changeHuddleRing(enabled: boolean): void {
   setHuddleRing(registry, enabled)
 }
 
-function saveMatters(text: string): void {
-  setMatters(registry, text)
-}
-
-/** A tag's x: back to When it matters, with Undo. */
+/** A tag's x: back to Auto, with Undo. */
 function remove(tag: NotifyTag): void {
-  setNotifyLevel({ kind: tag.kind, id: tag.id }, 'matters', tag.kind === 'channel' && tag.channelKind !== 'im' && tag.channelKind !== 'mpim' ? `#${tag.name}` : tag.name)
+  setNotifyLevel({ kind: tag.kind, id: tag.id }, 'auto', tag.kind === 'channel' && tag.channelKind !== 'im' && tag.channelKind !== 'mpim' ? `#${tag.name}` : tag.name)
 }
 
 /** The last answer, so the page opens again with it and nothing moves while main answers. */
@@ -73,24 +66,26 @@ function useNotificationPermission(): readonly [NotificationPermission | undefin
 export function NotificationsPage() {
   const settings = useAtomValue(notificationSettingsAtom)
   const page = useAtomValue(notificationsPageAtom)
+  const decisions = useAtomValue(notificationDecisionsAtom)
   const [permission, allow] = useNotificationPermission()
   if (settings._tag !== 'Success' || permission === undefined) return null
-  const lists = page._tag === 'Success' ? page.value : { every: [], never: [], interrupted: 0, held: 0, today: [], slackSchedule: undefined }
+  const lists = page._tag === 'Success' ? page.value : { always: [], never: [], notified: 0, stayed: 0, slackSchedule: undefined }
+  const today = decisions._tag === 'Success' ? decisions.value.decisions.filter((row) => row.outcome === 'notify') : []
   return (
     <NotificationsPageView
       notificationHours={settings.value.notificationHours}
       presenceHours={settings.value.presenceHours}
-      matters={settings.value.matters}
+      matters=""
       aiAssist={settings.value.aiAssist}
-      every={lists.every}
+      every={lists.always}
       never={lists.never}
-      interrupted={lists.interrupted}
-      held={lists.held}
-      today={lists.today}
+      interrupted={lists.notified}
+      held={lists.stayed}
+      today={today}
       onHoursChange={changeHours}
       onDayChange={(which, day, enabled) => setHoursDay(registry, which, day, enabled)}
-      slack={{ schedule: lists.slackSchedule, onChange: changeSlackSchedule, onRestore: restoreSlack }}
-      onMattersSave={saveMatters}
+      slack={{ schedule: lists.slackSchedule, onChange: changeSlackSchedule, onRestore: () => {} }}
+      onMattersSave={() => {}}
       onRemove={remove}
       huddleRing={settings.value.huddleRing}
       onHuddleRingChange={changeHuddleRing}

@@ -157,8 +157,8 @@ export function runTopicAction(topic: ActionTopic, chosen: TopicMenuAction, from
     }
     case 'open-in-slack':
       return openTopicInSlack(topic)
-    case 'notify-every':
-    case 'notify-matters':
+    case 'notify-always':
+    case 'notify-auto':
     case 'notify-never':
       return setNotifyLevel(notify.target, notifyChoiceOf(chosen), notify.label)
     case 'ignore-channel':

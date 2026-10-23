@@ -75,10 +75,10 @@ export async function showPersonMenu(person: { readonly id: string; readonly nam
 
 /**
  * The header's Follow on a thread you do not follow (SPEC 5 and 7): it
- * follows at once with When it matters, set as Notify me sets it, so the
+ * follows at once with Auto, set as Notify me sets it, so the
  * thread follows in Slack, joins the sidebar, and ⌘Z undoes it. Notify me
  * in ⋯ changes the level afterwards.
  */
 export function followThread(thread: { readonly id: string; readonly title: string }): void {
-  setNotifyLevel({ kind: 'thread', id: thread.id }, 'matters', thread.title)
+  setNotifyLevel({ kind: 'thread', id: thread.id }, 'auto', thread.title)
 }

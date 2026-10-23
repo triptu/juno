@@ -18,8 +18,8 @@ export interface SlackScheduleProps {
  * changed in Slack, one line says so with Use Juno's hours. Restore shows
  * while Juno holds the schedule from before its first write.
  */
-export function SlackScheduleSection({ schedule, onChange, onRestore }: SlackScheduleProps) {
-  const enabled = schedule?.enabled ?? true
+export function SlackScheduleSection({ schedule, onChange }: SlackScheduleProps) {
+  const enabled = true
   return (
     <Section heading="Slack on your phone">
       <Surface kind="group" padding="md" sx={styles.card}>
@@ -47,11 +47,6 @@ export function SlackScheduleSection({ schedule, onChange, onRestore }: SlackSch
                 Use Juno's hours
               </Button>
             </>
-          ) : null}
-          {schedule?.canRestore === true ? (
-            <Button variant="ghost" size="sm" tone="subtle" onClick={onRestore}>
-              Restore Slack's previous schedule
-            </Button>
           ) : null}
         </div>
       </Surface>
