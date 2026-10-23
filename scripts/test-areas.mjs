@@ -72,7 +72,6 @@ export const PROTOCOL_PATHS = [
   'packages/engine/src/outbox.ts',
   'packages/engine/src/send/',
   'packages/engine/test/conformance/',
-  'packages/engine/vitest.conformance.config.ts',
 ]
 
 /** Interactions with a budget, the perf.spec.ts tests that time them (`perf`, a title pattern) and their feel scenarios. */

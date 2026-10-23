@@ -31,7 +31,7 @@ export function inputKey(root, files, identity, hashes = new Map()) {
 
 export const sharedInputs = ['bun.lock', 'bunfig.toml', 'package.json', 'tsconfig.base.json', 'scripts/verify-inputs.mjs']
 export const quintInput = (file) => /^specs\/(?!traces\/).*\.(qnt|mjs)$/.test(file) && file !== 'specs/conformance.mjs'
-export const outboxInput = (file) => /^packages\/engine\/(src\/(outbox\.ts|send\/)|test\/conformance\/|(?:vitest|bun)\.conformance\.)/.test(file)
+export const outboxInput = (file) => /^packages\/engine\/(src\/(outbox\.ts|send\/)|test\/conformance\/)/.test(file)
   || /^specs\/(outbox[^/]*\.(qnt|mjs)|conformance\.mjs)$/.test(file)
 
 /** Inputs are shared by the affected selector and the full-run reuse gate. */

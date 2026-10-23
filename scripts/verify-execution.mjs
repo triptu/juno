@@ -15,7 +15,7 @@ export function verifyExecution(local, { config = runnerConfig, probe = checkRun
 // and renderer processes and one 1536 MB Apalache JVM on the 8 GB Mac.
 export const localVerifyEnv = {
   JUNO_PLAN_SERIAL: '1', JUNO_PLAN_MAX_LOAD: '8',
-  JUNO_TEST_PACKAGE_JOBS: '1', JUNO_VITEST_WORKERS: '2', JUNO_TEST_FILE_PARALLEL: '1',
+  JUNO_TEST_WORKERS: '4',
   JUNO_E2E_WORKERS: '1', GALLERY_WORKERS: '3', GALLERY_SHIFT_PARTS: '3',
   SPECS_JOBS: '2', SPECS_APALACHE: '1', SPECS_OVERLAP: '0', SPECS_APALACHE_HEAP: '1536m',
   CONFORMANCE_JOBS: '2', CI: '1',

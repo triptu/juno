@@ -10,8 +10,7 @@
 // running `--repeat-each` with no retries and its usual workers, so the tests
 // run under the same load as a normal remote run. Traces of failures land in
 // .remote/<run>/. Exits 1 if any repetition failed.
-// Package tests use Vitest's repeats (with retries off); its counts are test
-// cases, each failed if any repetition failed, rather than individual runs.
+// Package tests use bun test's --rerun-each; its counts are executions.
 
 import { spawn } from 'node:child_process'
 import { dirname, join, relative, resolve } from 'node:path'
@@ -48,13 +47,13 @@ if (!suite || !(options.repeat >= 1) || !(options.machines >= 1 && options.machi
 }
 
 const each = Math.ceil(options.repeat / options.machines)
-const vitest = suite.script === 'test'
+const unit = suite.script === 'test'
 // The gallery script ends in `--project=behaviour`, so spec paths may follow it.
-const runner = vitest
-  ? ['--passWithNoTests', '--retry=0', `--repeats=${each - 1}`, ...options.specs.map((spec) => spec.split('/').slice(2).join('/'))]
-  : ['--retries=0', ...options.specs.map((spec) => spec.slice(suite.dir.length)), `--repeat-each=${each}`, '--trace=retain-on-failure', '--reporter=line']
-if (options.grep) runner.push(vitest ? '-t' : '-g', options.grep)
-const env = options.workers ? ['--env', `JUNO_E2E_WORKERS=${options.workers}`, '--env', `GALLERY_WORKERS=${options.workers}`, '--env', `JUNO_VITEST_WORKERS=${options.workers}`] : []
+// The unit runner takes bun test flags before `--files` and repository paths after it.
+const runner = unit
+  ? [`--rerun-each=${each}`, ...(options.grep ? ['-t', options.grep] : []), '--files', ...options.specs]
+  : ['--retries=0', ...options.specs.map((spec) => spec.slice(suite.dir.length)), `--repeat-each=${each}`, '--trace=retain-on-failure', '--reporter=line', ...(options.grep ? ['-g', options.grep] : [])]
+const env = options.workers ? ['--env', `JUNO_E2E_WORKERS=${options.workers}`, '--env', `GALLERY_WORKERS=${options.workers}`, '--env', `JUNO_TEST_WORKERS=${options.workers}`] : []
 // GALLERY_SHIFT_ONLY=MediaViewer bun run flake apps/gallery/shift.spec.ts: the walk covers only those components.
 if (process.env.GALLERY_SHIFT_ONLY) env.push('--env', `GALLERY_SHIFT_ONLY=${process.env.GALLERY_SHIFT_ONLY}`)
 const args = [join(root, 'scripts/remote.mjs'), ...(options.machines > 1 ? ['--shards', String(options.machines)] : []), ...env, suite.script, ...runner]
@@ -68,21 +67,24 @@ for (const stream of [child.stdout, child.stderr]) {
   createInterface({ input: stream }).on('line', (line) => {
     console.log(line)
     const plain = stripVTControlCharacters(line).replace(/^\[\d+\/\d+\] /, '')
+    if (unit) {
+      // bun test ends with ` 12 pass` and ` 1 fail` lines and marks each failure `(fail) <describe> > <test>`.
+      const total = /^\s*(\d+) (pass|fail|skip)$/.exec(plain)
+      if (total) counts[{ pass: 'passed', fail: 'failed', skip: 'skipped' }[total[2]]] += Number(total[1])
+      const failure = /^\(fail\) (.+?)(?: \[[\d.]+m?s\])?$/.exec(plain)
+      if (failure) failures.push(failure[1].trim())
+      return
+    }
     const total = /^\s*(\d+) (passed|failed|flaky|skipped)\b/.exec(plain)
     if (total) counts[total[2]] += Number(total[1])
-    if (vitest && /\bTests\s+/.test(plain)) {
-      for (const count of plain.matchAll(/(\d+) (passed|failed|skipped)\b/g)) counts[count[2]] += Number(count[1])
-    }
     const failed = /^\s*\d+\) (.+)$/.exec(plain)
     if (failed && plain.includes('›')) failures.push(failed[1].trim())
-    const unitFailure = /\bFAIL\s+(.+›.+)$/.exec(plain)
-    if (vitest && unitFailure) failures.push(unitFailure[1].trim())
   })
 }
 const code = await new Promise((resolvePromise) => child.on('close', (exit) => resolvePromise(exit ?? 1)))
 const ran = counts.passed + counts.failed + counts.flaky
-console.log(vitest
-  ? `\nflake: ${counts.failed} of ${ran} test cases failed, ${each} executions per case; remote exited with ${code}`
+console.log(unit
+  ? `\nflake: ${counts.failed} of ${ran} test executions failed, ${each} per test on each job; remote exited with ${code}`
   : `\nflake: ${counts.failed} of ${ran} failed${counts.skipped ? `, ${counts.skipped} skipped` : ''}; remote exited with ${code}`)
 for (const failure of new Set(failures)) console.log(`  ${failure}`)
 if (ran === 0) console.log('flake: no results were read; see the output above')

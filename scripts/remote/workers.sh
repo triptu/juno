@@ -2,25 +2,15 @@
 # SSH workers scale with the CPU limit, since nproc can see the whole host.
 cores=${JUNO_RUNNER_JOB_CORES:-$(nproc)}
 at_least() { echo $(( $1 > $2 ? $1 : $2 )); }
-export GALLERY_BROWSER=chromium JUNO_HEAVY_SLOTS=1 JUNO_TEST_FILE_PARALLEL=1
+export GALLERY_BROWSER=chromium JUNO_HEAVY_SLOTS=1
 # Marks the isolated test workspace; build-cached.mjs uses the mounted build cache.
 export JUNO_REMOTE_CONTAINER=1
 export JUNO_TYPECHECK_JOBS=${JUNO_TYPECHECK_JOBS:-$(at_least $(( cores / 2 )) 1)}
-package_jobs=2
-vitest_workers=$(at_least $cores 4)
+# Unit tests run in one bun test, a process per file.
+test_workers=$(at_least $cores 4)
 gallery_workers=$(( cores * 3 ))
 if [ -n "${JUNO_RUNNER_JOB_CORES:-}" ]; then
-  package_jobs=1
-  vitest_workers=$cores
-  # Keep the existing package and worker counts for narrow and app jobs.
-  if [ "$cores" -ge 4 ]; then
-    package_jobs=2
-    vitest_workers=$(( cores / package_jobs ))
-  fi
-  # Wide unit jobs overlap I/O with one worker per allocated core in each package.
-  if [ "${JUNO_RUNNER_WIDE_UNIT:-0}" -eq 1 ]; then
-    vitest_workers=$cores
-  fi
+  test_workers=$cores
   gallery_workers=$(at_least $(( cores * 3 / 4 )) 1)
   if [ "$cores" -eq 3 ]; then gallery_workers=3; fi
   # Four threads on the usual two physical cores overlap the frame waits.
@@ -28,8 +18,7 @@ if [ -n "${JUNO_RUNNER_JOB_CORES:-}" ]; then
 fi
 # The standalone gallery spends part of each touch waiting for animation frames.
 if [ "$cores" -eq 3 ] && [ "$1" = test:gallery ]; then gallery_workers=4; fi
-export JUNO_TEST_PACKAGE_JOBS=${JUNO_TEST_PACKAGE_JOBS:-$package_jobs}
-export JUNO_VITEST_WORKERS=${JUNO_VITEST_WORKERS:-$vitest_workers}
+export JUNO_TEST_WORKERS=${JUNO_TEST_WORKERS:-$test_workers}
 # An Electron test runs the app, its engine and a fake Slack: half a core's worth
 # of workers kept tests on time on 4 cores, one per core did not (8 cores take
 # one per core, below).

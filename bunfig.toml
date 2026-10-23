@@ -12,5 +12,5 @@ minimumReleaseAge = 86400
 # them together with --parallel). The same preload as each package's own
 # bunfig.toml: Node-compatible SQLite and the default test timeout.
 preload = ["./packages/testing/src/preload.ts"]
-# Playwright specs, repository scripts' node:test files and docs are not unit tests.
-pathIgnorePatterns = ["apps/desktop/e2e/**", "apps/desktop/packaging/**", "apps/gallery/**", "scripts/**", "docs/**", "specs/**", "**/node_modules/**"]
+# Playwright specs and docs are not unit tests. The repository scripts' tests run by path (test:repo-tools, test:runner).
+pathIgnorePatterns = ["apps/desktop/e2e/**", "apps/desktop/packaging/**", "apps/gallery/**", "docs/**", "specs/**", "**/node_modules/**"]

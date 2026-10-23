@@ -22,7 +22,7 @@ if (!unitsOnly) commands.push({ args: ['run', '--cwd', 'apps/desktop', 'perf', .
 let failed = 0
 for (const command of commands) {
   const cwd = command.cwd === undefined ? undefined : fileURLToPath(new URL(`../${command.cwd}`, import.meta.url))
-  const result = spawnSync('bun', command.args, { cwd, stdio: 'inherit', env: { ...process.env, JUNO_PERF: '1', JUNO_BENCH: '1', JUNO_BENCH_STRICT: '1', JUNO_TEST_FILE_PARALLEL: '0', JUNO_VITEST_WORKERS: '1' } })
+  const result = spawnSync('bun', command.args, { cwd, stdio: 'inherit', env: { ...process.env, JUNO_PERF: '1', JUNO_BENCH: '1', JUNO_BENCH_STRICT: '1' } })
   if (result.error) throw result.error
   if (result.signal) process.exit(1)
   failed ||= result.status ?? 1

@@ -18,11 +18,11 @@ const tracked = (...patterns) => spawnSync('git', ['ls-files', ...patterns], { c
 
 test('a change to desktop code outside the renderer reaches the desktop unit tests that import it, in the batch gate too', () => {
   // main-rejection-nonfatal (b1c55d3c): the batch gate ran no tests for these.
-  for (const args of [[], ['--batch']]) assert.ok(unitFiles(plan(...args, '--files', 'apps/desktop/src/processLog.ts')).includes('apps/desktop/test/processLog.test.ts'), args.join(' '))
+  for (const args of [[], ['--batch']]) assert.ok(unitFiles(plan(...args, '--files', 'apps/desktop/src/logging.ts')).includes('apps/desktop/test/logging.test.ts'), args.join(' '))
   assert.ok(unitFiles(plan('--files', 'apps/desktop/src/main/processes.ts')).includes('apps/desktop/test/processes.test.ts'))
 })
 
-test('every vitest file in apps and packages runs when it changes', () => {
+test('every unit test file in apps and packages runs when it changes', () => {
   const tests = tracked('apps/**/*.test.ts', 'packages/**/*.test.ts')
   assert.ok(tests.includes('packages/agent/eval/eval.test.ts'))
   assert.deepEqual(unitFiles(plan('--batch', '--files', tests.join(','))).toSorted(), tests.toSorted())
@@ -37,10 +37,10 @@ test('a script change runs the root Bun test scripts whose tests import it, and 
   for (const file of tracked('scripts/**/*.test.mjs', 'scripts/*.test.mjs')) assert.ok(scripts.includes(file), `${file} is in no root bun test script`)
 })
 
-test('unit execution runs bun packages together and other packages in their own folder, starting no unrelated packages', async () => {
+test('unit execution runs every package in one bun test, and selected files alone', async () => {
   const { existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs')
   const { tmpdir } = await import('node:os')
-  const { unitCommands } = await import('./unit.mjs')
+  const { unitCommand } = await import('./unit.mjs')
   const file = 'packages/domain/test/notifications.test.ts'
   const selected = plan('--batch', '--files', file).steps.find((step) => step.script === 'test')
   assert.deepEqual(selected.items, [file])
@@ -56,24 +56,20 @@ test('unit execution runs bun packages together and other packages in their own 
     make('packages/fast', 'bun test', ['test/one.test.ts', 'test/two.test.ts', 'test/load.perf.ts'])
     make('apps/app', 'bun test', ['test/three.test.ts'])
     writeFileSync(join(dir, 'apps/app/bunfig.toml'), '[test]\nroot = "test"\n')
-    make('packages/old', 'vitest run', ['test/four.test.ts'])
     make('packages/none', '', [])
     const timings = join(dir, 'node_modules/.cache/juno/bun-test-timings.json')
     const bun = (workers, ...paths) => ['test', `--parallel=${workers}`, `--timings=${timings}`, '--update-timings', ...paths]
-    assert.deepEqual(unitCommands([], dir, { workers: 3 }), [bun(3, './apps/app/test', './packages/fast'), ['run', '--cwd', 'packages/old', 'test']])
-    assert.deepEqual(unitCommands(['--files', 'packages/fast/test/one.test.ts', 'apps/app/test/three.test.ts', 'packages/old/test/four.test.ts'], dir, { workers: 3 }), [
-      bun(2, './packages/fast/test/one.test.ts', './apps/app/test/three.test.ts'),
-      ['run', '--cwd', 'packages/old', 'test', join(dir, 'packages/old/test/four.test.ts')],
-    ])
-    assert.throws(() => unitCommands(['--files', 'packages/fast/test/load.perf.ts'], dir), /Not a unit test/)
+    assert.deepEqual(unitCommand([], dir, { workers: 3 }), bun(3, './apps/app/test', './packages/fast'))
+    assert.deepEqual(unitCommand(['--files', 'packages/fast/test/one.test.ts', 'apps/app/test/three.test.ts'], dir, { workers: 3 }), bun(2, './packages/fast/test/one.test.ts', './apps/app/test/three.test.ts'))
+    assert.throws(() => unitCommand(['--files', 'packages/fast/test/load.perf.ts'], dir), /Not a unit test/)
   } finally { rmSync(dir, { recursive: true, force: true }) }
-  assert.throws(() => unitCommands(['--files'], root), /at least one/)
-  assert.throws(() => unitCommands(['--files', 'packages/domain/test/absent.test.ts'], root), /Not a unit test/)
+  assert.throws(() => unitCommand(['--files'], root), /at least one/)
+  assert.throws(() => unitCommand(['--files', 'packages/domain/test/absent.test.ts'], root), /Not a unit test/)
 })
 
 test('package configs select the whole package, while lockfile changes select every unit file', () => {
   const own = tracked('packages/domain/**/*.test.ts')
-  for (const name of ['package.json', 'vitest.config.ts', 'tsconfig.json']) {
+  for (const name of ['package.json', 'tsconfig.json']) {
     const selected = unitFiles(plan('--batch', '--files', `packages/domain/${name}`))
     for (const file of own) assert.ok(selected.includes(file), `${name} must run ${file}`)
   }
@@ -95,23 +91,6 @@ test('performance-only files are outside the unit matcher', () => {
   const matches = unitTestMatcher(root)
   for (const file of ['packages/agent/test/activity.perf.ts', 'packages/agent/test/serve/chat-cache.perf.ts', 'packages/engine/test/perf/idle.perf.ts', 'packages/engine/test/conformance/outbox.conformance.ts']) assert.equal(matches(file), false, file)
   assert.ok(matches('packages/agent/test/serve/chat-cache.test.ts'))
-})
-
-test('selected unit files exclude nested namesakes that Vitest substring filters would also run', async () => {
-  const { existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs')
-  const { tmpdir } = await import('node:os')
-  const { unitCommands } = await import('./unit.mjs')
-  const dir = mkdtempSync(join(existsSync('/Volumes/AgentWork') ? '/Volumes/AgentWork' : tmpdir(), 'juno-unit-selection-'))
-  try {
-    mkdirSync(join(dir, 'packages/example/test/nested/test'), { recursive: true })
-    writeFileSync(join(dir, 'packages/example/package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }))
-    const file = 'packages/example/test/one.test.ts'
-    writeFileSync(join(dir, file), '')
-    writeFileSync(join(dir, 'packages/example/test/nested/test/one.test.ts'), '')
-    assert.deepEqual(unitCommands(['--files', file], dir), [
-      ['run', '--cwd', 'packages/example', 'test', join(dir, file), '--exclude', 'test/nested/test/one.test.ts'],
-    ])
-  } finally { rmSync(dir, { recursive: true, force: true }) }
 })
 
 test('tool changes keep the desktop smoke spec through the final input filter', () => {
@@ -146,7 +125,7 @@ test('a repair conservatively reruns app suites when a deleted source cannot be 
   assert.ok(result.steps.some((step) => step.script === 'test:desktop' && step.args.length === 0))
 })
 
-test('Bun packages keep test and eval file selection after their Vitest config is removed', async (t) => {
+test('Bun packages select test and eval files, not perf files', async (t) => {
   const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs')
   const { scratchFolder } = await import('./worktree-folder.mjs')
   const fixture = mkdtempSync(join(scratchFolder(), 'affected-bun-'))

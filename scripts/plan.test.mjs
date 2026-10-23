@@ -25,12 +25,12 @@ test('app, unit, and spec suites run in separate lanes', () => {
 test('lane workers scale with the reserved cores', () => {
   assert.deepEqual(sideBySide(8), {
     app: { JUNO_E2E_WORKERS: '4', GALLERY_WORKERS: '6', GALLERY_SHIFT_PARTS: '6' },
-    rest: { JUNO_VITEST_WORKERS: '2', JUNO_TEST_PACKAGE_JOBS: '1' },
+    rest: { JUNO_TEST_WORKERS: '2' },
     specs: { SPECS_JOBS: '2', SPECS_APALACHE: '1' },
   })
   assert.deepEqual(sideBySide(4), {
     app: { JUNO_E2E_WORKERS: '2', GALLERY_WORKERS: '3', GALLERY_SHIFT_PARTS: '3' },
-    rest: { JUNO_VITEST_WORKERS: '1', JUNO_TEST_PACKAGE_JOBS: '1' },
+    rest: { JUNO_TEST_WORKERS: '1' },
     specs: { SPECS_JOBS: '1', SPECS_APALACHE: '1' },
   })
   assert.equal(sideBySide(2).app.JUNO_E2E_WORKERS, '1')
@@ -40,7 +40,7 @@ test('lane workers scale with the reserved cores', () => {
 test('wide unit-only plans keep inherited unit concurrency while other lanes stay unchanged', () => {
   const normal = sideBySide(4)
   assert.deepEqual(sideBySide(4, true), { ...normal, rest: {} })
-  assert.deepEqual(normal.rest, { JUNO_VITEST_WORKERS: '1', JUNO_TEST_PACKAGE_JOBS: '1' })
+  assert.deepEqual(normal.rest, { JUNO_TEST_WORKERS: '1' })
 })
 
 test('SSH jobs split gallery and desktop, isolate conformance from units, and retain step indices and environments', async () => {

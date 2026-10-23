@@ -117,12 +117,11 @@ const pending = (items) =>
     return !passed(item.key)
   })
 
-// Unit tests: the vitest files of every package and app (scripts/affected-tests.mjs).
+// Unit tests: the bun test files of every package and app (scripts/affected-tests.mjs).
 const unitItems = unitTestItems(root, files, changed, closure)
 const unit = pending(unitItems)
-// Keep package identity all the way to Vitest. Relative filters used to run
-// namesakes in unrelated packages and start every package's test process.
-if (unit.length > 0) plan.push({ script: 'test', args: unit.length === unitItems.length ? [] : ['--files', ...unit.map((item) => item.id)], items: unit, why: `${unit.length} vitest file(s)` })
+// Repository paths, so a file never selects a namesake in another package.
+if (unit.length > 0) plan.push({ script: 'test', args: unit.length === unitItems.length ? [] : ['--files', ...unit.map((item) => item.id)], items: unit, why: `${unit.length} unit test file(s)` })
 
 // Protocol checks follow their inputs, independently of the breadth of e2e selection.
 const protocols = protocolInputs(git('ls-files', '--cached', '--others', '--exclude-standard'), closure)

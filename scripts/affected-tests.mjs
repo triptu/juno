@@ -61,7 +61,7 @@ export function unitTestItems(root, files, changed, closure) {
     .filter(unitTestMatcher(root))
     .map((file) => {
       const dir = file.split('/').slice(0, 2).join('/')
-      const config = [`${dir}/package.json`, `${dir}/vitest.config.ts`, `${dir}/bunfig.toml`, `${dir}/tsconfig.json`]
+      const config = [`${dir}/package.json`, `${dir}/bunfig.toml`, `${dir}/tsconfig.json`]
       return { suite: 'test', id: file, inputs: new Set([...closure(file), ...config]), own: changed.some((path) => config.includes(path)) }
     })
 }
