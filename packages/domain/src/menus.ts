@@ -23,9 +23,10 @@ export type TopicMenuAction =
   | ViewMenuAction
   | 'ignore-channel'
   | 'juno-knows'
+  | 'how-auto'
 
-export type ChannelMenuAction = 'show-topics' | 'open-main' | 'huddle' | 'mark-channel-read' | 'mark-channel-unread' | NotifyAction | ViewMenuAction | 'ignore-channel' | 'ask-juno'
-export type PersonMenuAction = 'ask-juno' | 'juno-knows'
+export type ChannelMenuAction = 'show-topics' | 'open-main' | 'huddle' | 'mark-channel-read' | 'mark-channel-unread' | NotifyAction | 'how-auto' | ViewMenuAction | 'ignore-channel' | 'ask-juno'
+export type PersonMenuAction = 'ask-juno' | 'juno-knows' | 'how-auto'
 
 /** Add to view (inventory 15.8): add to or remove from a view by id, or a new view with the conversation in it. */
 export type ViewMenuAction = `view-add:${string}` | `view-remove:${string}` | 'view-new'
@@ -140,9 +141,10 @@ function item<A extends string>(id: A, label: string, hint?: string): MenuItem<A
   return hint === undefined ? { type: 'item', id, label } : { type: 'item', id, label, hint }
 }
 
-function notifyMenu(current: NotifyChoice, label = 'Notify me'): MenuItem<NotifyAction> {
+/** The three levels, then How Auto decides…, which opens Settings › Notifications at its box. */
+function notifyMenu(current: NotifyChoice, label = 'Notify me'): MenuItem<NotifyAction | 'how-auto'> {
   const choice = (level: NotifyChoice): MenuItem<NotifyAction> => ({ type: 'item', id: `notify-${level}`, label: notifyLabels[level], checked: level === current })
-  return { type: 'submenu', label, hint: notifyLabels[current], items: [choice('always'), choice('auto'), choice('never')] }
+  return { type: 'submenu', label, hint: notifyLabels[current], items: [choice('always'), choice('auto'), choice('never'), separator, item('how-auto', 'How Auto decides…')] }
 }
 
 /** How a toast names a choice: "#design-review: Never". */
