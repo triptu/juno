@@ -38,16 +38,17 @@ export type EmojiProps = EmojiBaseProps & (
 export function Emoji(props: EmojiProps) {
   'use no memo' // A leaf in every reaction chip; the compiler's cache would only add bytes to the start bundle.
   const { size = 14, label, title } = props
+  const image = 'url' in props
   return (
     <span
       aria-hidden={label === undefined ? true : undefined}
-      aria-label={label}
-      role={label === undefined ? undefined : 'img'}
+      aria-label={image ? undefined : label}
+      role={image || label === undefined ? undefined : 'img'}
       title={title}
       {...stylex.props(styles.box, sizeStyles[size], size === 'inline' && styles.inline)}
     >
-      {'url' in props ? (
-        <img src={props.url} alt="" draggable={false} decoding="async" loading={props.loading} onError={props.onError} {...stylex.props(styles.image)} />
+      {image ? (
+        <img src={props.url} alt={label ?? ''} draggable={false} decoding="async" loading={props.loading} onError={props.onError} {...stylex.props(styles.image)} />
       ) : (
         <span {...stylex.props(styles.glyph, shiftStyles[size])}>{props.glyph}</span>
       )}

@@ -19,6 +19,10 @@ const custom = [
   { name: 'juno_heart', url: image('<path d="M16 29 3 16C-5 5 9-3 16 7 23-3 37 5 29 16Z" fill="#e66b86"/><path d="M5 11q0-5 5-5" fill="none" stroke="#ffbdc8" stroke-width="2"/>') },
   { name: 'juno_check', url: image('<circle cx="16" cy="16" r="15" fill="#69ad85"/><path d="m8 16 5 5L25 10" stroke="#f4fff6" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>') },
   { name: 'juno_juno', url: image('<circle cx="16" cy="16" r="14" fill="#96a5e4"/><path d="M10 10v9q0 7 8 6t7-8V9h-5v9q0 4-3 4t-3-4v-8Z" fill="#f5f1ff"/><circle cx="7" cy="6" r="3" fill="#e7ba66"/>') },
+]
+
+const smileImages = [
+  ...custom,
   { name: 'simple_smile', url: image('<circle cx="16" cy="16" r="14" fill="#f4bc58"/><circle cx="11" cy="13" r="2" fill="#2b1e00"/><circle cx="21" cy="13" r="2" fill="#2b1e00"/><path d="M10 20c3 4 9 4 12 0" stroke="#2b1e00" stroke-width="2" fill="none" stroke-linecap="round"/>') },
   { name: 'workspace_smile', url: image('<circle cx="16" cy="16" r="14" fill="#c86bd6"/><circle cx="11" cy="13" r="2" fill="#2b1e00"/><circle cx="21" cy="13" r="2" fill="#2b1e00"/><path d="M10 20c3 4 9 4 12 0" stroke="#2b1e00" stroke-width="2" fill="none" stroke-linecap="round"/>') },
 ]
@@ -38,7 +42,7 @@ export default defineFixtures(EmojiPicker, {
     'hover-emoji': picker({ recent, data: prepareEmojiPicker(emojiCatalog, custom) }, { hover: 'button[data-emoji]' }),
   },
   Search: {
-    matches: picker({ data: prepareEmojiPicker(emojiCatalog, custom), initialQuery: 'smile' }),
+    matches: picker({ data: prepareEmojiPicker(emojiCatalog, smileImages), initialQuery: 'smile' }),
     alias: picker({ data: prepareEmojiPicker(emojiCatalog, custom), initialQuery: 'hello_juno' }),
     'no-match': picker({ data: prepareEmojiPicker(emojiCatalog, custom), initialQuery: 'zzqx' }),
   },
