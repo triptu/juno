@@ -56,7 +56,7 @@ type Binding = typeof CardBinding.Type
 const IDLE_TTL = '30 seconds'
 const RETRY_DELAY = '1 second'
 /** §13.2: longer text is refused locally, before it reaches the agent. */
-export const MAX_SEND_BYTES = 65_536
+const MAX_SEND_BYTES = 65_536
 
 const isRpcClientError = (error: unknown): error is RpcClientError => error instanceof RpcClientError
 

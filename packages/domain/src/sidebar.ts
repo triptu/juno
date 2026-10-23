@@ -2,7 +2,7 @@
 import { isDm } from './channel'
 import { compareTs, type ChannelId } from './ids'
 import { isUnread, sidebarPlacement } from './status'
-import { quietDaysOf, type RuleContext, type Topic } from './topic'
+import { type RuleContext, type Topic } from './topic'
 
 export type KindFilter = 'all' | 'channels' | 'dms'
 
@@ -83,26 +83,3 @@ export function filterDots(topics: ReadonlyArray<Topic>, filter: SidebarFilter, 
   return { channels: channels && filter.kind !== 'channels', dms: dms && filter.kind !== 'dms' }
 }
 
-export type SidebarEmptyState = {
-  readonly title: string
-  readonly body: string
-  readonly action: 'clear-filters' | 'view-all-topics'
-  readonly actionLabel: string
-}
-
-/** Copy for the empty list (inventory 2.6). `undefined` when the list is not empty. */
-export function sidebarEmptyState(list: SidebarList, filter: SidebarFilter, ctx: RuleContext): SidebarEmptyState | undefined {
-  if (list.pinned.length > 0 || list.recent.length > 0) return undefined
-  const hiding = 'Your filters are hiding everything. Older and resolved topics are in All topics.'
-  if (filter.unreadOnly) return { title: 'No unread topics', body: hiding, action: 'clear-filters', actionLabel: 'Clear filters' }
-  if (filter.kind !== 'all' || filter.scope !== undefined) {
-    return { title: 'No recent topics here', body: hiding, action: 'clear-filters', actionLabel: 'Clear filters' }
-  }
-  const days = quietDaysOf(ctx)
-  return {
-    title: 'No recent topics here',
-    body: `Topics with activity in the last ${days} ${days === 1 ? 'day' : 'days'} show up here.`,
-    action: 'view-all-topics',
-    actionLabel: 'View all topics',
-  }
-}

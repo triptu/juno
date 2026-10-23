@@ -64,11 +64,6 @@ export function notifyChoiceOf(action: NotifyAction): NotifyChoice {
   return action === 'notify-always' ? 'always' : action === 'notify-auto' ? 'auto' : 'never'
 }
 
-/** Whether a thread with this choice is followed in Slack. */
-export function followsThread(level: NotifyChoice): boolean {
-  return level !== 'never'
-}
-
 export interface TopicMenuState {
   readonly kind: TopicKind
   readonly channel: ChannelNaming
@@ -211,11 +206,4 @@ export function personMenuItems(person: PersonMenuState): ReadonlyArray<MenuItem
   const first = person.name.split(' ')[0] ?? person.name
   const notify: MenuItem<NotifyAction | PersonMenuAction> = notifyMenu(person.notify, `Notify me about ${first}`)
   return person.askJuno === true ? [notify, separator, item('ask-juno', 'Ask Juno'), item('juno-knows', knowsAbout(person.name))] : [notify]
-}
-
-export type TabKind = 'topic' | 'all-topics' | 'juno' | 'settings'
-
-/** Topic tabs get the topic menu; page tabs have none. */
-export function tabMenuItems(tab: { readonly kind: TabKind; readonly topic?: TopicMenuState }): ReadonlyArray<MenuItem<TopicMenuAction>> {
-  return tab.kind === 'topic' && tab.topic ? topicMenuItems(tab.topic) : []
 }

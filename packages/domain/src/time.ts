@@ -86,11 +86,6 @@ function shortDate(at: number, sameYear: boolean, options: TimeOptions): string 
   return new Intl.DateTimeFormat(options.locale ?? 'en-US', { timeZone: options.timeZone, month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) }).format(new Date(at))
 }
 
-/** "13:42" for the notification log. */
-export function clockTime(at: number, options: TimeOptions = {}): string {
-  return new Intl.DateTimeFormat(options.locale ?? 'en-US', { timeZone: options.timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(at))
-}
-
 /** "10am", "4:30pm", "12pm" for digest chips and quiet hours. */
 export function hourLabel(minutesOfDay: number): string {
   const total = ((Math.round(minutesOfDay) % 1440) + 1440) % 1440

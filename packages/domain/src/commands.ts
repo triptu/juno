@@ -158,8 +158,3 @@ export function describeCommand(raw: RawCommand, ctx: CommandContext, confidence
     }
   }
 }
-
-/** "95%" for the badge. */
-export function confidenceLabel(confidence: number): string {
-  return `${Math.round(Math.min(1, Math.max(0, confidence)) * 100)}%`
-}

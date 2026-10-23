@@ -52,7 +52,3 @@ export function parseTopicId(id: string): ParsedTopicId | undefined {
   if (tail.length === 0 || tail.includes(':')) return undefined
   return kind === 't' && isTs(tail) ? { kind: 'thread', channel, threadTs: tail } : undefined
 }
-
-export function topicKindOf(id: TopicId): TopicKind {
-  return id.startsWith('t:') ? 'thread' : 'main'
-}

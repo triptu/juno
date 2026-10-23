@@ -14,7 +14,7 @@ Pure product rules. No I/O, no Effect services, no React. The same code runs in 
 - Clarity and audience checks before send, and which messages the checks read (`sendChecksApply`: not empty, at most 1,000 characters).
 - The composer's colon emoji: the query at the caret (`composer-emoji.ts`), shared search and ranking for the picker and the colon list (`emoji-ranking.ts`: exact names and whole name or curated words first; for queries of at least three characters, whole CLDR or phrase words before mere name prefixes; then frequent, quick and popular emoji within a tier; SPEC 8), and composer choices from the shared alias resolver (`custom-emoji.ts`). `emoji-picker.ts` prepares immutable browse data and alias-aware selection lookup.
 - `rankConversations`: conversations ranked by own sends and topic visits, each counting half as much per week over the last 30 days, then by activity, for the ⌘K Conversations tab.
-- The command palette grammar (`parseCommand`, with `confidenceLabel`), mention detection, context menu item lists.
+- The command palette grammar (`parseCommand`), mention detection, context menu item lists.
 
 Import from `@juno/domain`; everything is exported from `src/index.ts`.
 

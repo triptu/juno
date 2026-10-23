@@ -70,11 +70,6 @@ export function mainLabel(channel: ChannelInfo): string {
   return `${channelLabel(channel)} · Main`
 }
 
-/** The header context pill: "eng · Public channel". No "#" next to the hash icon. */
-export function contextPillText(channel: ChannelInfo): string {
-  return `${channelLabelBare(channel)} · ${channelKindLabel(channel.kind)}`
-}
-
 /** Which tint a context pill or a channel label gets: neutral, amber or blue. */
 export const ContextTint = Schema.Literals(['public', 'private', 'dm'])
 export type ContextTint = typeof ContextTint.Type
