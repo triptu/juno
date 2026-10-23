@@ -171,6 +171,12 @@ importers:
       '@informalsystems/quint':
         specifier: 0.33.0
         version: 0.33.0
+      '@juno/ai':
+        specifier: workspace:*
+        version: link:packages/ai
+      '@juno/domain':
+        specifier: workspace:*
+        version: link:packages/domain
       '@juno/engine':
         specifier: workspace:*
         version: link:packages/engine
@@ -180,6 +186,12 @@ importers:
       '@juno/huddle-media':
         specifier: workspace:*
         version: link:packages/huddle-media
+      '@juno/notifications':
+        specifier: workspace:*
+        version: link:packages/notifications
+      '@juno/richtext':
+        specifier: workspace:*
+        version: link:packages/richtext
       '@juno/slack':
         specifier: workspace:*
         version: link:packages/slack
