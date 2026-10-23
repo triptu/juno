@@ -65,8 +65,4 @@ export function nextDue(schedule: typeof ScheduleDefinition.Type, after: number)
     }
   }
 }
-export function notification(deliver: Definition['deliver'], quiet: boolean, aiOn: boolean): 'now' | 'hold' | 'silent' {
-  if (!aiOn || deliver === 'silent') return 'silent'
-  return deliver === 'now' || !quiet ? 'now' : 'hold'
-}
 export const NUDGE_PROMPT = 'Check the watched conversation for a reply. If nobody matching the watch has replied, draft a short nudge in the owner’s voice as a Send message card in that conversation. Do not send it or create another watch. If a reply arrived, say nothing.'

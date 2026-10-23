@@ -6,7 +6,7 @@ An occurrence's primary key is `(schedule_id, revision, due_at)`. Queuing is
 idempotent. Admission checks the current revision, owner mode and live grant,
 and commits the inbox wake and admission together. Start repeats those checks.
 Cancellation increments the revision, revokes the grant and interrupts an
-accepted inbox wake. Quiet hours affect `notification()` only.
+accepted inbox wake. The scheduler itself does not read quiet hours.
 
 `createScheduler({ store, replies, changed })` exposes the synchronous ledger
 and an asynchronous `tick()`. `ScheduleService.layer` exposes the Effect service. The router owns the serialized
