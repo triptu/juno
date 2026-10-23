@@ -175,11 +175,18 @@ const unstable = [
     allow: [],
   },
   {
+    // Test-only: generates the agent contract's wire round trips.
+    label: 'Arbitrary',
+    spec: /^effect\/Arbitrary$/,
+    names: new Set(['Arbitrary']),
+    allow: ['packages/agent-contract/test/wire.test.ts'],
+  },
+  {
     label: 'unstable root modules',
-    spec: /^effect\/(?:FileSystem|Path|Terminal|Stdio|Newtype|LayerMap|Graph|ExecutionPlan|ErrorReporter|Arbitrary|Crypto)$/,
+    spec: /^effect\/(?:FileSystem|Path|Terminal|Stdio|Newtype|LayerMap|Graph|ExecutionPlan|ErrorReporter|Crypto)$/,
     names: new Set([
       'FileSystem', 'Path', 'Terminal', 'Stdio', 'Newtype', 'LayerMap', 'Graph', 'ExecutionPlan',
-      'ErrorReporter', 'Arbitrary', 'Crypto',
+      'ErrorReporter', 'Crypto',
     ]),
     allow: [],
   },

@@ -57,6 +57,7 @@ Juno wrappers (`scripts/check-deps.mjs` fails `bun run lint` on an import from a
 | `effect/workers` | the port transports: `packages/state/src/transport.ts`, `packages/engine/src/protocol/runner.ts`, `packages/agent/src/host/port.ts` (the agent's client side of the AgentHost port, ADR 0012), `packages/agent/src/serve/runner.ts` (the agent's server side of the renderer ports) |
 | `effect/socket`, `effect/net` | the web shell's engine socket (`docs/development.md`, "Web shell"): the client in `packages/state/src/socket.ts` (`@juno/state/socket`, imported only by the web page) and the server in `packages/engine/src/protocol/socket.ts` (`socketTransport`; `effect/net` only for the server's address) |
 | `effect/sql`, `@effect/sql-sqlite-node` | `@juno/store` only. See below. |
+| `Arbitrary` | `packages/agent-contract/test/wire.test.ts` only: generates values for the wire round trips of every exported schema and route; no wrapper, since it is test-only |
 | everything else listed above | nowhere yet. Add a wrapper module and an entry in `check-deps.mjs` first. |
 
 **`effect/sql` is a decision, not an accident.** The store exports `SqlClient` (as a type) from
