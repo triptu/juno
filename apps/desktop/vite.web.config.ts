@@ -1,8 +1,9 @@
 /**
  * The renderer built for a browser, with the web page entry (`web/page/main.ts`)
- * in place of `main.tsx`, into `dist/`. The browser e2e lane serves it from
- * each test's host (`web/host/testHost.ts`); `bun run web` keeps Vite's dev
- * server instead. Built once per run through `build-cached`, like `out/`.
+ * in place of `main.tsx`, into `dist/renderer/`. The browser e2e lane serves it
+ * from each test's host (`web/host/testHost.ts`, bundled into `dist/host/` by
+ * the same `build:web`); `bun run web` keeps Vite's dev server instead. Built
+ * once per run through `build-cached`, like `out/`.
  *
  * It uses the same renderer plugins as the Electron build (`renderer.vite.ts`)
  * and is minified the same way, so the browser runs the code Electron runs. It
@@ -29,7 +30,7 @@ export default defineConfig({
   root: resolve(__dirname, 'src/renderer'),
   base: '/',
   build: {
-    outDir: resolve(__dirname, 'dist'),
+    outDir: resolve(__dirname, 'dist/renderer'),
     emptyOutDir: true,
     minify: 'esbuild',
     sourcemap: process.env['JUNO_COVERAGE'] === '1' ? 'hidden' : false,

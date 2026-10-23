@@ -5,9 +5,11 @@ import type { EngineOptions, HostCommand, HostMessage, HostStart, WorkerMessage 
 import type { EngineHooks, WorkPassName } from '../driver/surface'
 
 const repoRoot = resolve(__dirname, '../../../..')
-const entry = resolve(__dirname, '../../web/host/testHost.ts')
-/** The built renderer the hosts serve (`vite.web.config.ts`). */
-export const WEB_ROOT = resolve(__dirname, '../../dist')
+/** What `build:web` makes: the renderer the hosts serve (`vite.web.config.ts`) and the host bundled into one file. */
+export const WEB_BUILD = resolve(__dirname, '../../dist')
+export const WEB_ROOT = resolve(WEB_BUILD, 'renderer')
+// One bundled file loads in about a fifth of the CPU time Node takes to strip and resolve the source's modules.
+const entry = resolve(WEB_BUILD, 'host/testHost.mjs')
 
 /** Node, even when Playwright itself was started by another runtime. */
 const node = basename(process.execPath).startsWith('node') ? process.execPath : 'node'
@@ -20,7 +22,7 @@ interface Child {
 function forkHost(): Child {
   const child = fork(entry, [], {
     execPath: node,
-    execArgv: ['--import', resolve(repoRoot, 'scripts/ts-resolve-hooks.mjs'), '--disable-warning=MODULE_TYPELESS_PACKAGE_JSON', '--disable-warning=ExperimentalWarning'],
+    execArgv: ['--disable-warning=ExperimentalWarning'],
     cwd: repoRoot,
     stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
     env: { ...process.env, JUNO_E2E: '1', NODE_OPTIONS: '' },

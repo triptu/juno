@@ -12,7 +12,7 @@
   "scripts": {
     "dev": "bun ../../scripts/without-run-as-node.mjs electron-vite dev",
     "build": "electron-vite build && bun ../../scripts/check-bundle-size.mjs",
-    "build:web": "vite build -c vite.web.config.ts",
+    "build:web": "rm -rf dist && vite build -c vite.web.config.ts && bun build web/host/testHost.ts --target=node --format=esm --outfile dist/host/testHost.mjs",
     "start": "bun ../../scripts/without-run-as-node.mjs electron-vite preview",
     "typecheck": "tsc -p tsconfig.node.json && tsc -p tsconfig.web.json && tsc -p tsconfig.e2e.json",
     "test": "vitest run",

@@ -8,7 +8,7 @@
  *   with the e2e scheduling profile and test work passes (`src/engine`);
  * - main's part of the session (`fakeMain.ts`), kept in `web-session.json`
  *   in the data folder so a restart, or a copy of a synced snapshot, keeps it;
- * - one HTTP server on a free port: the built renderer (`dist/`), the
+ * - one HTTP server on a free port: the built renderer (`dist/renderer/`), the
  *   `/__juno/` files and the engine socket.
  *
  * The worker sends commands over Node IPC (`HostCommand`), each answered by
@@ -45,7 +45,7 @@ export interface HostStart {
   readonly fakeUrl: string
   /** Origins a synced snapshot's addresses name, which mean this fake. */
   readonly aliases: ReadonlyArray<string>
-  /** The built renderer (`dist/`). */
+  /** The built renderer (`dist/renderer/`). */
   readonly webRoot: string
   readonly engine: EngineOptions
 }

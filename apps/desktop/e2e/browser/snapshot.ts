@@ -8,7 +8,7 @@ import { startFakeSlack, type Credentials, type FakeSlack } from '@juno/fake-sla
 import type { EngineOptions } from '../../web/host/testHost'
 import { Juno } from '../driver/juno'
 import { webSurface } from '../driver/surface'
-import { WEB_ROOT, type HostPool } from './host'
+import { WEB_BUILD, type HostPool } from './host'
 
 /**
  * A data folder signed in to the default seed and synced, for the browser
@@ -49,7 +49,7 @@ export function snapshotState(fake: FakeSlack): string {
 }
 
 async function snapshotKey(options: EngineOptions): Promise<string> {
-  const build = await readFile(join(WEB_ROOT, '.inputs-hash'), 'utf8')
+  const build = await readFile(join(WEB_BUILD, '.inputs-hash'), 'utf8')
   return createHash('sha256').update(build).update(JSON.stringify(options)).digest('hex').slice(0, 24)
 }
 
