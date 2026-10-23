@@ -1,10 +1,17 @@
+import { createServer } from 'node:net'
 import { defineConfig } from '@playwright/test'
 
-// Each worktree gets its own port, so a local run never reuses a gallery
-// server another worktree left running (reuseExistingServer below).
-// GALLERY_PORT overrides it.
-const worktreeOffset = [...import.meta.dirname].reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) % 997, 7)
-const port = Number(process.env.GALLERY_PORT ?? 4174 + worktreeOffset)
+// Ask the OS for a free port for this run. Never connect to a previous run's server.
+const port = process.env.GALLERY_TEST_PORT ? Number(process.env.GALLERY_TEST_PORT) : await new Promise<number>((resolve, reject) => {
+  const server = createServer()
+  server.on('error', reject)
+  server.listen(0, '127.0.0.1', () => {
+    const address = server.address()
+    if (address === null || typeof address === 'string') throw new Error('No gallery port assigned')
+    server.close(error => error ? reject(error) : resolve(address.port))
+  })
+})
+process.env.GALLERY_TEST_PORT = String(port)
 // One id per run, set before the workers start, so the shift guard's parts share one queue.
 process.env.GALLERY_SHIFT_RUN ??= `${Date.now()}-${process.pid}`
 // JUNO_SHARD=i/n (bun run remote --shards n): shard 0 runs every test; the others
@@ -13,15 +20,8 @@ const shardIndex = Number(/^(\d+)\/\d+$/.exec(process.env.JUNO_SHARD ?? '')?.[1]
 // JUNO_SKIP_TAGS=@heavy-gallery skips the shift guard over every component, as the desktop config does for its tags.
 const skipTags = (process.env.JUNO_SKIP_TAGS ?? '').split(',').filter(Boolean)
 
-/**
- * Two projects against the built gallery. `shots` screenshots every state
- * in light and dark; `behaviour` checks what a screenshot cannot show
- * (mouse-down activation, the cursor rule, the state switcher) and runs the
- * layout-shift guard over every interactive element. Both use the installed Google
- * Chrome (`channel: 'chrome'`) so no browser download is needed; set
- * GALLERY_BROWSER=chromium after `npx playwright install chromium` to use
- * Playwright's own build instead.
- */
+// The default Chromium headless shell is the same pinned browser locally and remotely.
+// `bunx playwright install chromium --only-shell` installs it.
 export default defineConfig({
   testDir: '.',
   timeout: 120_000,
@@ -30,11 +30,11 @@ export default defineConfig({
   // GALLERY_WORKERS lets a machine of its own (bun run remote) run more.
   workers: Number(process.env.GALLERY_WORKERS ?? (process.env.CI ? 2 : 3)),
   fullyParallel: true,
-  retries: process.env.CI || process.env.JUNO_REMOTE_CONTAINER ? 1 : 0,
+  retries: 0,
   reporter: [[process.env.CI ? 'github' : 'list'], ['json', { outputFile: 'playwright-report/results.json' }], ['../../scripts/test-results-reporter.mjs']],
   use: {
-    baseURL: `http://localhost:${port}`,
-    channel: process.env.GALLERY_BROWSER === 'chromium' ? undefined : 'chrome',
+    baseURL: `http://127.0.0.1:${port}`,
+    channel: process.env.GALLERY_BROWSER === 'chrome' ? 'chrome' : undefined,
     viewport: { width: 1280, height: 800 },
     deviceScaleFactor: 2,
     colorScheme: 'light',
@@ -49,9 +49,9 @@ export default defineConfig({
     { name: 'behaviour', testMatch: '*.spec.ts', testIgnore: ['shots.spec.ts', '**/node_modules/**'] },
   ],
   webServer: {
-    command: `bun run vite preview --port ${port} --strictPort`,
-    url: `http://localhost:${port}/`,
-    reuseExistingServer: !process.env.CI,
+    command: `bun run vite preview --host 127.0.0.1 --port ${port} --strictPort`,
+    url: `http://127.0.0.1:${port}/`,
+    reuseExistingServer: false,
     timeout: 30_000,
   },
 })

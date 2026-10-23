@@ -1,7 +1,8 @@
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { mkdirSync } from 'node:fs'
+import { tmpdir, release } from 'node:os'
+import { join, resolve as resolvePath } from 'node:path'
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test'
+import { walkCache } from './walk-cache.mjs'
 
 /** One state, as the gallery lists it on `window.__galleryRoutes`. */
 export interface Route {
@@ -51,6 +52,7 @@ export async function openState(page: Page, route: Route, theme: Theme = 'light'
   // Let the frame's images load or fail: a failed unfurl image removes its box (AttachmentCard), and on a busy machine
   // the error can land after the state looks drawn. The held Avatar photo and lazy images out of view are not waited for.
   await page.evaluate(async (frameName) => {
+    document.body.getBoundingClientRect()
     await document.fonts.ready
     const frame = document.querySelector(`[data-fixture-frame="${frameName}"]`)
     const inView = (img: HTMLImageElement) => {
@@ -64,7 +66,12 @@ export async function openState(page: Page, route: Route, theme: Theme = 'light'
       img.addEventListener('load', resolve, { once: true })
       img.addEventListener('error', resolve, { once: true })
     }))
-    await Promise.race([Promise.all(settled), new Promise((resolve) => setTimeout(resolve, 10_000))])
+    let timer: ReturnType<typeof setTimeout> | undefined
+    try {
+      await Promise.race([Promise.all(settled), new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`Images did not settle in ${frameName}`)), 10_000)
+      })])
+    } finally { clearTimeout(timer) }
     // Two frames, so React has drawn what the load or error changed.
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
     // Usually already applied. Keep the check beside readiness, avoiding another driver round trip.
@@ -74,157 +81,72 @@ export async function openState(page: Page, route: Route, theme: Theme = 'light'
       await new Promise((resolve) => requestAnimationFrame(resolve))
     }
     // Let entrances finish, with the same cap for long finite motion. Endless spinners are not waited for.
-    await Promise.race([
-      Promise.all(
-        document
-          .getAnimations()
-          .filter((animation) => Number.isFinite(Number(animation.effect?.getComputedTiming().endTime)))
-          .map((animation) => animation.finished.catch(() => {})),
-      ),
-      new Promise((resolve) => setTimeout(resolve, 600)),
-    ])
+    try {
+      await Promise.race([
+        Promise.all(document.getAnimations()
+          .filter(animation => Number.isFinite(Number(animation.effect?.getComputedTiming().endTime)))
+          .map(animation => animation.finished.catch(() => {}))),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error(`Entrance motion did not settle in ${frameName}`)), 5_000)
+        }),
+      ])
+    } finally { clearTimeout(timer) }
+
   }, route.route)
 }
 
-/**
- * A queue of states that several tests (the parts of one check) share, so
- * the parts finish together however long each state takes. The run's id
- * comes from playwright.config.ts, so every worker sees the same queue.
- * Each repeat (`--repeat-each`, as `bun run flake` runs) has its own queue, so
- * every repeat walks every state. A claim is a directory: mkdir succeeds for
- * one process only.
- *
- * A retry walks again the states its test took on the first attempt; the
- * other parts passed theirs. Without that list a retry found every state
- * taken, walked none and passed (10-20).
- */
+/** Each test owns its browser context; parts claim work through atomic directories. */
 export function claimQueue(name: string) {
-  const { repeatEachIndex, retry, testId } = test.info()
-  const dir = join(tmpdir(), 'juno-gallery-shift', process.env.GALLERY_SHIFT_RUN ?? 'local', `${name}-${repeatEachIndex}`)
-  const claims = join(dir, `attempt-${retry}`)
-  mkdirSync(claims, { recursive: true })
-  const claim = (key: string): boolean => {
-    try {
-      mkdirSync(join(claims, encodeURIComponent(key)))
-      return true
-    } catch {
-      return false
-    }
-  }
-  // Written as each state is taken, so a retry after a timeout or a crash also has the state it stopped in.
-  const taken = join(dir, `${testId}.txt`)
-  if (retry > 0) {
-    const own = existsSync(taken) ? readFileSync(taken, 'utf8').split('\n').filter(Boolean) : []
-    let at = 0
-    return {
-      next: (routes: ReadonlyArray<Route>): Route | undefined => {
-        while (at < own.length) {
-          const found = routes.find((route) => route.route === own[at])
-          at++
-          if (found) return found
-        }
-        return undefined
-      },
-      claim,
-    }
-  }
-  // Every state before the last one claimed here was taken by some part already.
+  const { repeatEachIndex, retry } = test.info()
+  const dir = join(tmpdir(), 'juno-gallery-shift', process.env.GALLERY_SHIFT_RUN ?? 'local', `${name}-${repeatEachIndex}-${retry}`)
+  mkdirSync(dir, { recursive: true })
   let from = 0
   return {
-    /** The next state of `routes` no part has taken yet, in order. Pass the same list each time. */
-    next: (routes: ReadonlyArray<Route>): Route | undefined => {
-      for (; from < routes.length; from++) {
-        const route = routes[from]!
-        if (claim(`state ${route.route}`)) {
-          appendFileSync(taken, `${route.route}\n`)
-          from++
+    next(routes: ReadonlyArray<Route>): Route | undefined {
+      while (from < routes.length) {
+        const route = routes[from++]!
+        try {
+          mkdirSync(join(dir, encodeURIComponent(route.route)))
           return route
+        } catch (error) {
+          if (!(error instanceof Error && 'code' in error && error.code === 'EEXIST')) throw error
         }
       }
       return undefined
     },
-    /** Claims any other key (a DOM signature); false when a part already has it. */
-    claim,
   }
 }
 
-/**
- * States opened on one page before a walk moves to a fresh context. A state
- * changes only the address's hash, so one document stays loaded for the whole
- * walk and its renderer keeps the code and styles of every component it drew.
- * On a remote 8x16 machine the shift guard's 24 parts grew from about 100 MB
- * to 370 MB each over 60 states, until the kernel ended a renderer (10-18).
- */
-const statesPerContext = 20
-const closeTimeoutMs = 5_000
-
-class CloseTimeout extends Error {}
-
-async function closeWithin(promise: Promise<void>, label: string): Promise<void> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  try {
-    await Promise.race([
-      promise,
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new CloseTimeout(`${label} did not close within ${closeTimeoutMs} ms`)), closeTimeoutMs)
-      }),
-    ])
-  } finally {
-    clearTimeout(timer)
-  }
+export function stateCache(kind: 'shift' | 'ring', browser: Browser) {
+  const { baseURL: _baseURL, ...options } = test.info().project.use
+  return walkCache({
+    root: resolvePath(import.meta.dirname, '../..'),
+    kind,
+    runtime: { playwright: test.info().config.version, browser: browser.version(), platform: process.platform, arch: process.arch, os: release(), options },
+    // Repeats are flake hunts: every repeat must exercise the state again.
+    all: process.env.GALLERY_SHIFT_ALL === '1' || test.info().project.repeatEach > 1 || test.info().retry > 0,
+  })
 }
 
-async function closeWalkContext(browser: Browser, context: BrowserContext, page: Page): Promise<void> {
-  let pageError: unknown
-  try {
-    // Closing the page first bypasses beforeunload and removes it before context teardown.
-    await closeWithin(page.close({ runBeforeUnload: false }), 'Gallery page')
-  } catch (error) {
-    pageError = error
-  }
-  try {
-    await closeWithin(context.close(), 'Gallery context')
-  } catch (error) {
-    // A context left alive at every rollover would undo the 20-state memory limit.
-    try {
-      await closeWithin(browser.close(), 'Gallery browser')
-    } catch (browserError) {
-      throw new Error(`Gallery context and browser cleanup stalled: ${String(error)}; ${String(browserError)}`)
-    }
-    throw new Error(`Gallery context cleanup stalled; closed the worker browser: ${String(error)}`)
-  }
-  if (pageError instanceof CloseTimeout) {
-    console.log(`Gallery page close timed out; its context closed (${page.url()})`)
-  } else if (pageError !== undefined) {
-    // In particular, do not turn a renderer crash into a successful walk.
-    throw pageError
-  }
-}
-
-/**
- * The page for a walk over many states (the shift guard, the focus ring).
- * `next()` returns the page to open the next state on: the same one for
- * `statesPerContext` states, then one in a fresh context. A context made in a
- * test takes the project's options (viewport, scale, motion, base URL), as
- * the `page` fixture's does.
- */
-export async function walkPages(browser: Browser) {
-  let context = await browser.newContext()
+/** Recycle documents, not contexts: the test fixture owns exactly one context. */
+export async function walkPages(context: BrowserContext) {
   let page = await context.newPage()
   let opened = 0
   return {
-    /** The current page, to read the state list from before the walk. */
     page: () => page,
     next: async (): Promise<Page> => {
-      if (opened === statesPerContext) {
-        await closeWalkContext(browser, context, page)
-        context = await browser.newContext()
+      if (opened === 20) {
+        await page.close({ runBeforeUnload: false })
         page = await context.newPage()
         opened = 0
       }
       opened++
+      // A new document resets fixture/module state, focus, selection and scroll.
+      // HTTP caching remains in the context; the previous document can be collected.
+      await page.goto('about:blank')
+      await page.mouse.move(0, 0)
       return page
     },
-    close: () => closeWalkContext(browser, context, page),
+    close: () => page.close({ runBeforeUnload: false }),
   }
 }

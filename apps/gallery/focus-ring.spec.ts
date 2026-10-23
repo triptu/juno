@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { claimQueue, openState, readRoutes, walkPages, type Route } from './support'
+import { claimQueue, openState, readRoutes, stateCache, walkPages, type Route } from './support'
 
 /**
  * A focus ring must show whole. Every state of each main surface is tabbed
@@ -174,15 +174,21 @@ async function tabThrough(page: Page, route: Route): Promise<Clip[]> {
 }
 
 for (let part = 0; part < parts; part++) {
-  test(`a focus ring is never cut off by a scroller (part ${part + 1} of ${parts})`, async ({ browser }) => {
+  test(`a focus ring is never cut off by a scroller (part ${part + 1} of ${parts})`, async ({ browser, context }) => {
     test.setTimeout(15 * 60_000)
-    const pages = await walkPages(browser)
+    const pages = await walkPages(context)
     const wanted = only ?? surfaces
     const routes = (await readRoutes(pages.page())).filter((route) => (wanted.includes('*') || wanted.includes(route.component)) && !exempt.has(route.route))
     expect(routes.length).toBeGreaterThan(0)
     const queue = claimQueue('ring')
+    const cache = stateCache('ring', browser)
+    let states = 0, cached = 0
     const failures: string[] = []
     for (let route = queue.next(routes); route !== undefined; route = queue.next(routes)) {
+      if (cache.passed(route)) { cached++; continue }
+      cache.forget(route)
+      states++
+      const before = failures.length
       const page = await pages.next()
       await openState(page, route)
       // A key first, so the browser is in keyboard mode and :focus-visible matches.
@@ -190,7 +196,9 @@ for (let part = 0; part < parts; part++) {
       for (const clip of await tabThrough(page, route)) {
         failures.push(`${route.route}: ${clip.element} is cut off at the ${clip.sides} by ${clip.ancestor}`)
       }
+      if (failures.length === before) cache.pass(route)
     }
+    console.log(`focus walk: ${states} states, ${cached} cached`)
     await pages.close()
     expect([...new Set(failures)].join('\n')).toBe('')
   })

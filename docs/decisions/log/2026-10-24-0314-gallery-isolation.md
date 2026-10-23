@@ -1,0 +1,1 @@
+- 10-24 03:14 · gallery-isolation · Run gallery behavior checks in the pinned Chromium headless shell with zero retries, an independent preview port per run and one context per test; reset each walked document before measuring input.

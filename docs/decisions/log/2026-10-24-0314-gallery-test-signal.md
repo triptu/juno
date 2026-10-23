@@ -1,0 +1,1 @@
+- 10-24 03:14 · gallery-test-signal · Keep gallery interaction, delayed-load, keyboard, cursor, contrast and clipping regressions; combine small behavior cases and remove fixed design dimensions and decorative screenshot probes after reviewing their history.

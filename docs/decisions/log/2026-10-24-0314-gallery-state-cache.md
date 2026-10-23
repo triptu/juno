@@ -1,0 +1,1 @@
+- 10-24 03:14 · gallery-state-cache · Cache successful gallery shift and focus states by fixture/import content, shared layout inputs and browser/OS identity; preserve uncached full and repeat modes, and never reuse a pass for an incomplete state.
