@@ -13,7 +13,7 @@ const WRAP_STYLES = [
  * wrap. A hidden copy of the field, as wide as its text area, lays out the first line up to the caret and the rest
  * of that line after it, so a word the caret sits in wraps as it does in the field.
  */
-export function caretOnFirstLine(field: HTMLTextAreaElement): boolean {
+function caretOnFirstLine(field: HTMLTextAreaElement): boolean {
   const at = field.selectionStart
   const before = field.value.slice(0, at)
   if (at === 0) return true
