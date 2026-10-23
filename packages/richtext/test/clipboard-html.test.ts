@@ -1,6 +1,23 @@
-// @vitest-environment happy-dom
-import { describe, expect, it } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { Window } from 'happy-dom'
 import { clipboardHtml } from '../src/index'
+import { growth } from './scaling'
+
+/** `clipboardHtml` reads the browser's DOMParser, Node and Element; these come from a happy-dom window, put back after the file. */
+const dom = ['DOMParser', 'Node', 'Element'] as const
+const saved = dom.map((name) => Object.getOwnPropertyDescriptor(globalThis, name))
+const window = new Window()
+beforeAll(() => {
+  for (const name of dom) Object.defineProperty(globalThis, name, { value: window[name], configurable: true, writable: true })
+})
+afterAll(async () => {
+  for (const [index, name] of dom.entries()) {
+    const descriptor = saved[index]
+    if (descriptor === undefined) delete (globalThis as Record<string, unknown>)[name]
+    else Object.defineProperty(globalThis, name, descriptor)
+  }
+  await window.happyDOM.close()
+})
 
 describe('rich clipboard HTML', () => {
   it('keeps Notion links and formatting', () => {
@@ -65,11 +82,10 @@ describe('rich clipboard HTML', () => {
 
   it('reads a large paste without turning it into typing work', () => {
     const paragraph = '<p><strong>Release note</strong> <a href="https://example.com/release">read more</a></p>'
-    const html = paragraph.repeat(Math.ceil(200_000 / paragraph.length))
-    const started = Date.now()
-    const pasted = clipboardHtml(html)
-    expect(Date.now() - started).toBeLessThan(1_000)
+    const html = (bytes: number) => paragraph.repeat(Math.ceil(bytes / paragraph.length))
+    const pasted = clipboardHtml(html(200_000))
     expect(pasted.text.length).toBeGreaterThan(50_000)
     expect(pasted.links.length).toBeGreaterThan(1_000)
+    expect(growth((bytes) => clipboardHtml(html(bytes)), 50_000)).toBeLessThan(10)
   })
 })
