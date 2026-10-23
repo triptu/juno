@@ -1,5 +1,5 @@
-import { AiProvider, notificationReading } from '@juno/ai'
-import { channelLabel, decideNotification, localTime, scheduledPresence, type NotificationDecision, type NotificationSettings, type Presence, type Reading } from '@juno/domain'
+import { AiProvider, notificationReading, type NotificationReadingInput } from '@juno/ai'
+import { channelLabel, decideNotification, localTime, scheduledPresence, type Instruction, type NotificationDecision, type NotificationSettings, type Presence, type Reading } from '@juno/domain'
 import { Invalidation, StoreWriter, type StoreReader } from '@juno/store'
 import { Clock, Effect, Semaphore, SubscriptionRef } from 'effect'
 import { exchangesWith, readConversation, type Conversation } from './conversation'
@@ -15,6 +15,22 @@ const kindOf = (candidate: Candidate) =>
 
 const decide = (candidate: Candidate, at: number, settings: NotificationSettings, aiAssist: boolean, reading?: StoredReading) =>
   decideNotification({ ...candidate, at: localTime(at) }, settings, { aiAssist, userName: () => candidate.senderName }, reading as Reading | 'failed' | undefined)
+
+/** What Juno's reading is given about one message. The replay tool (`scripts/notif-replay`) builds it the same way. */
+export const readingInput = (candidate: Candidate, conversation: Conversation, instructions: ReadonlyArray<Instruction>, exchanges: number, now: number): NotificationReadingInput => ({
+  messageTs: candidate.ts, where: channelLabel(candidate.channel), kind: kindOf(candidate),
+  sender: candidate.senderName ?? 'Someone', text: candidate.text, mentionsMe: candidate.mentionsMe, now: new Date(now).toISOString(),
+  ...(conversation.threadRoot === undefined ? {} : { threadRoot: conversation.threadRoot }),
+  before: conversation.before,
+  facts: {
+    ...(conversation.facts.ownerWroteMinutesAgo === undefined ? {} : { ownerWroteMinutesAgo: Math.round(conversation.facts.ownerWroteMinutesAgo) }),
+    ownerWroteLast: conversation.facts.ownerWroteLast === true,
+    ownerStartedThread: conversation.facts.ownerStartedThread === true,
+    senderWroteSinceOwner: conversation.senderWroteSinceOwner,
+    exchangesLast30Days: exchanges,
+  },
+  instructions,
+})
 
 /**
  * One instance per signed-in workspace. All decisions and delivery claims share a permit.
@@ -54,20 +70,8 @@ export const makeNotifications = Effect.fn('Notifications.make')(function* (noti
   const read = (candidate: Candidate, conversation: Conversation, settings: NotificationSettings, now: number) =>
     Effect.gen(function* () {
       const exchanges = yield* exchangesWith(sql, candidate.senderId, now)
-      const answer = yield* ai.decide(notificationReading, {
-        messageTs: candidate.ts, where: channelLabel(candidate.channel), kind: kindOf(candidate),
-        sender: candidate.senderName ?? 'Someone', text: candidate.text, mentionsMe: candidate.mentionsMe, now: new Date(now).toISOString(),
-        ...(conversation.threadRoot === undefined ? {} : { threadRoot: conversation.threadRoot }),
-        before: conversation.before,
-        facts: {
-          ...(conversation.facts.ownerWroteMinutesAgo === undefined ? {} : { ownerWroteMinutesAgo: Math.round(conversation.facts.ownerWroteMinutesAgo) }),
-          ownerWroteLast: conversation.facts.ownerWroteLast === true,
-          ownerStartedThread: conversation.facts.ownerStartedThread === true,
-          senderWroteSinceOwner: conversation.senderWroteSinceOwner,
-          exchangesLast30Days: exchanges,
-        },
-        instructions: settings.instructions ?? [],
-      }).pipe(Effect.timeout(READING_MILLIS), Effect.option)
+      const answer = yield* ai.decide(notificationReading, readingInput(candidate, conversation, settings.instructions ?? [], exchanges, now))
+        .pipe(Effect.timeout(READING_MILLIS), Effect.option)
       if (answer._tag === 'None' || answer.value._tag !== 'Decided') return 'failed' as const
       const { instruction, ...rest } = answer.value.value
       return { ...rest, ...(instruction === null ? {} : { instruction }) } as StoredReading
