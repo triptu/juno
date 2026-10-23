@@ -1,0 +1,1 @@
+- 10-24 02:55 · bun-install · Keep Node as the runtime for repo scripts: under Bun, lint took 2.7 s against 2.2 s (its time is in the tools it starts) and knip's health check reported six unused dependencies that Node does not.
