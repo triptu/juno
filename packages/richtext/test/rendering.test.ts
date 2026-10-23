@@ -248,6 +248,28 @@ describe('rich_text blocks', () => {
     expect(plainText(body)).toBe('Due Nov 14, 2023')
   })
 
+  it('shows shortcodes in plain_text headers and fields as emoji unless emoji is false', () => {
+    const body = messageBody(
+      {
+        blocks: [
+          { type: 'header', text: { type: 'plain_text', text: ':dart: What to target' } },
+          { type: 'section', fields: [{ type: 'plain_text', text: 'ratio 3:2 :rocket:' }, { type: 'plain_text', text: ':dart:', emoji: false }] },
+        ],
+      },
+      lookups,
+    )
+    expect(body.blocks).toEqual([
+      { kind: 'heading', children: [{ kind: 'emoji', name: 'dart', unicode: '\u{1F3AF}' }, { kind: 'text', text: ' What to target' }] },
+      {
+        kind: 'fields',
+        items: [
+          [{ kind: 'text', text: 'ratio 3:2 ' }, { kind: 'emoji', name: 'rocket', unicode: '\u{1F680}' }],
+          [{ kind: 'text', text: ':dart:' }],
+        ],
+      },
+    ])
+  })
+
   it('renders a bot section block through mrkdwn and a header block as a heading', () => {
     const body = messageBody(
       {

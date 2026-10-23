@@ -143,6 +143,28 @@ function parseLine(line: string, lookups: Lookups, style: InlineStyle | undefine
   return out
 }
 
+/**
+ * A Block Kit `plain_text` object's text: no styles or links, but its
+ * `:name:` shortcodes are emoji, as Slack shows them unless `emoji` is false.
+ */
+export function plainTextInlines(text: string, lookups: Lookups = {}): Inline[] {
+  const out: Inline[] = []
+  text.split('\n').forEach((line, i) => {
+    if (i > 0) out.push({ kind: 'break' })
+    let from = 0
+    for (let at = line.indexOf(':'); at !== -1; at = line.indexOf(':', at + 1)) {
+      const m = EMOJI_RE.exec(line.slice(at))
+      if (!m || m[1] === undefined || !isBoundaryBefore(line, at)) continue
+      if (at > from) out.push({ kind: 'text', text: line.slice(from, at) })
+      out.push(emojiInline(m[1], lookups))
+      at += m[0].length - 1
+      from = at + 1
+    }
+    if (from < line.length) out.push({ kind: 'text', text: line.slice(from) })
+  })
+  return normalize(out)
+}
+
 /** Inline parse of mrkdwn that may contain newlines. Quotes and code fences are not split out. */
 export function mrkdwnInlines(text: string, lookups: Lookups = {}): Inline[] {
   const out: Inline[] = []
