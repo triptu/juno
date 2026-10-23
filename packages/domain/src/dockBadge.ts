@@ -1,7 +1,8 @@
 /** The dock uses the notification decision, with unread DMs in All also counting unless Never or ignored kept them quiet. */
 import { isDm, type ConversationKind } from './channel'
 import { ChannelId, UserId } from './ids'
-import { decideNotification, type DecisionContext, type LocalTime, type NotificationSettings } from './notifications'
+import { decideNotification, type DecisionContext } from './notificationDecision'
+import type { LocalTime, NotificationSettings } from './notifications'
 
 export interface BadgeTopic {
   readonly id: string
