@@ -32,7 +32,7 @@ no live sample was recorded. The owner saw the words drawn twice. The parser now
 reads `message_blocks` and attachment `blocks`, and draws `text` only when they
 give nothing, as a message's own body does. Unknown: which of the two block
 fields the owner's message carried; both are covered by
-`packages/richtext/test/attachments.test.ts`. A share also carries `is_share`
+the shared-message rows of `packages/richtext/test/inbound.corpus.test.ts`. A share also carries `is_share`
 and the source's `channel_id` (and sometimes `channel_name`), and a reply's
 `from_url` carries `?thread_ts=…&cid=…`, also from Slack's API shape, not a
 live sample. Juno names the place from its own data by `channel_id`, else by the
