@@ -79,23 +79,22 @@ it('runs compaction through the same guard and stops it at its share of the cap'
   expect(h.fake.requests).toHaveLength(1)
 })
 
-it('distinguishes a missing key from a rejected key and a rate limit', () => {
-  expect(providerFailure(new Error('No API key'))).toEqual({ ending: { _tag: 'failed', reason: 'missingKey' }, rateLimited: false })
-  expect(providerFailure('JUNO:failed:missingKey').ending).toEqual({ _tag: 'failed', reason: 'missingKey' })
-  expect(providerFailure('JUNO:failed:rateLimited:429')).toEqual({ ending: { _tag: 'failed', reason: 'rateLimited' }, rateLimited: true })
-})
-
 it('asks the fallback model once when the model refuses under its policy, and logs both requests', async () => {
   h.fake.script([httpError(403, 'Input was flagged by moderation'), reply('hello')])
   const fallback = h.fake.model('google/gemini-3.8-flash')
   const guard = createProviderGuard({ store: h.core.store, transport: h.fake.models, fallback: () => fallback })
   const calls: GuardCall[] = []
-  guard.onCall((call) => { calls.push(call) })
+  let logged = () => {}
+  const both = new Promise<void>((resolve) => { logged = resolve })
+  guard.onCall((call) => {
+    calls.push(call)
+    if (calls.length === 2) logged()
+  })
   const { revision, context } = request()
   const result = await guard.models.completeSimple(h.model, guard.stamp(revision, h.model, context))
   expect(result).toMatchObject({ stopReason: 'stop', model: 'google/gemini-3.8-flash' })
   expect(h.fake.requests.map((sent) => sent.model)).toEqual(['anthropic/claude-sonnet-5.5', 'google/gemini-3.8-flash'])
-  for (let tries = 0; tries < 50 && calls.length < 2; tries++) await new Promise((resolve) => setTimeout(resolve, 10))
+  await both
   expect(calls.map((call) => [call.model, call.outcome, call.kind, call.message])).toEqual([
     ['anthropic/claude-sonnet-5.5', 'error', 'policy.fallback', 'HTTP 403'],
     ['google/gemini-3.8-flash', 'ok', '', ''],

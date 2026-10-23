@@ -23,7 +23,7 @@ const fixture = { data: [
 let h: Awaited<ReturnType<typeof providerHarness>> | undefined
 afterEach(async () => { await h?.close(); h = undefined })
 
-it('resolves each family from a fixed catalogue, joins pi data and uses the compaction minimum', () => {
+it('resolves each family from a fixed catalogue, joins pi data, uses the compaction minimum and limits Codex to its listing', () => {
   const fake = fakeProvider()
   const rows = resolveCatalogue(fixture, { systemAndTools: ['system', '[]'], piModels: fake.models.getModels() })
   expect(rows.map(r => r.model.id)).toEqual([
@@ -38,6 +38,12 @@ it('resolves each family from a fixed catalogue, joins pi data and uses the comp
   expect(next.model).toMatchObject({ api: 'openai-completions', cost: { input: 2, output: 10 }, contextWindow: 1_000_000 })
   expect(next.choice).toEqual({ family: 'sonnet', provider: 'openrouter' })
   expect(resolveCatalogue(fixture, { systemAndTools: ['x'.repeat(2_000_000)] })).toEqual([])
+  // Codex offers only what its listing names, and falls back to the catalogue's Sol when it lists nothing.
+  const sol = resolveCodexModels(undefined, { systemAndTools: [] })
+  expect(sol).toMatchObject({ choice: { family: 'sol', provider: 'codex' } })
+  expect(sol!.model.contextWindow).toBeGreaterThanOrEqual(250_000)
+  expect(resolveCodexModels([], { systemAndTools: [] })).toBeUndefined()
+  expect(resolveCodexModels([sol!.model.id], { systemAndTools: [] })?.model.id).toBe(sol!.model.id)
 })
 
 it('pins the catalogue for a day, persists it, reports changes and falls back offline', async () => {
@@ -60,14 +66,6 @@ it('pins the catalogue for a day, persists it, reports changes and falls back of
   const cached = await createCatalogue(h.core.store, { systemAndTools: [], fetch: async () => { throw new Error('offline') } }).refresh()
   expect(cached.stale).toBe(true)
   expect(cached.rows[0]!.model.id).toBe('anthropic/claude-sonnet-6')
-})
-
-it('limits Codex choices to the listing and uses the catalogue only when listing is unavailable', () => {
-  const fallback = resolveCodexModels(undefined, { systemAndTools: [] })
-  expect(fallback?.choice).toEqual({ family: 'sol', provider: 'codex' })
-  expect(fallback?.model.contextWindow).toBeGreaterThanOrEqual(250_000)
-  expect(resolveCodexModels([], { systemAndTools: [] })).toBeUndefined()
-  expect(resolveCodexModels([fallback!.model.id], { systemAndTools: [] })?.model.id).toBe(fallback!.model.id)
 })
 
 it("takes what a model reads from OpenRouter's input modalities, over pi-ai's entry", () => {
