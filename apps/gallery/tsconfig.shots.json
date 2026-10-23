@@ -1,8 +1,16 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["ES2023", "DOM"],
-    "types": ["node"]
+    "lib": [
+      "ES2023",
+      "DOM"
+    ],
+    "types": [
+      "node"
+    ]
   },
-  "include": ["shots.spec.ts", "home-write-geometry.spec.ts", "behaviour.spec.ts", "activation.spec.ts", "tooltip.spec.ts", "shift.spec.ts", "support.ts", "playwright.config.ts", "vite.config.ts"]
+  "include": [
+    "*.ts",
+    "*.mts"
+  ]
 }

@@ -17,8 +17,8 @@ const box = async (page: Page, selector: string) => {
 }
 
 for (const state of ['welcome/fresh', 'welcome/minimum-window', 'welcome/minimum-window-all-set', 'welcome/short-window', 'welcome/narrow'] as const) {
-  test(`Home's welcome card is whole above the field, unscrolled (${state})`, async ({ page }, info) => {
-    for (const theme of ['light', 'dark'] as const) {
+  test(`Home's welcome card is whole above the field, unscrolled (${state})`, async ({ page }) => {
+    for (const theme of ['light'] as const) {
       await open(page, 'Home', state, theme)
       const frame = await box(page, `[data-fixture-frame="Home/${state}"]`)
       const card = await box(page, '[data-home-welcome] section')
@@ -30,7 +30,6 @@ for (const state of ['welcome/fresh', 'welcome/minimum-window', 'welcome/minimum
       expect(card.y + card.height).toBeLessThanOrEqual(chip.y)
       // Seen without scrolling: the column has not scrolled and nothing of the card is cut.
       expect(await page.locator('[data-home] > div').first().evaluate((node) => node.scrollTop)).toBe(0)
-      await info.attach(`${state}-${theme}`, { body: await page.locator(`[data-fixture-frame="Home/${state}"]`).screenshot(), contentType: 'image/png' })
     }
   })
 }

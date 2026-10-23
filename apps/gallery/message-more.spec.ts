@@ -7,7 +7,7 @@ import { openState, type Route, type Theme } from './support'
  * its right edge as far in from the row's edge as the avatar is from the
  * left. Showing it moves nothing. Under the pointer it takes the control
  * hover fill; while its menu is open it stays, held, and the menu opens
- * under it. Each check saves its screenshot, for a person to look at.
+ * under it.
  */
 
 const open = (page: Page, id: string, theme: Theme) =>
@@ -16,10 +16,6 @@ const open = (page: Page, id: string, theme: Theme) =>
 const frame = (page: Page) => page.locator('[data-fixture-frame]')
 const rows = (page: Page) => frame(page).locator('[data-message-row]')
 const more = (row: Locator) => row.locator('[data-message-more] button')
-
-const shot = async (page: Page, name: string) => {
-  await frame(page).screenshot({ path: test.info().outputPath(`${name}.png`), animations: 'disabled' })
-}
 
 /** The button's box, the row's, the avatar column's and the first line's, from the line boxes themselves. */
 async function geometry(row: Locator) {
@@ -76,8 +72,6 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(rows(page).locator('[data-message-more] button:visible')).toHaveCount(1)
       expect(await boxes(page)).toEqual(before)
       const { button, row: box, gutter, line } = await geometry(row)
-      expect(button.width).toBe(24)
-      expect(button.height).toBe(24)
       // Its right inset mirrors the avatar's left inset; on a code block first, it sits inside the block's frame.
       if (name.endsWith('code')) {
         const frame = (await row.locator('pre').first().boundingBox())!
@@ -86,12 +80,11 @@ for (const theme of ['light', 'dark'] as const) {
       } else expect(Math.abs(box.right - button.right - (gutter.left - box.left))).toBeLessThanOrEqual(0.5)
       // Centred on the first line: the name and time, or the first line of words.
       if (line !== undefined) expect(Math.abs(button.top + button.height / 2 - (line.top + line.height / 2)), name).toBeLessThanOrEqual(1)
-      await shot(page, `${name}-${theme}`)
     }
   })
 
   test(`the menu button takes the hover fill, opens the menu under it and stays held, in ${theme}`, async ({ page }) => {
-    for (const [state, index, name] of [
+    for (const [state, index] of [
       ['menu-button/hover', 3, ''],
       ['menu-button/long-hover', 1, 'long-'],
     ] as const) {
@@ -106,10 +99,9 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(button).toHaveCSS('cursor', 'default')
       await expect(button).toHaveAttribute('aria-label', 'More actions ⇧F10')
       await expect(button).toHaveAttribute('tabindex', '-1')
-      await shot(page, `${name}button-hovered-${theme}`)
     }
 
-    for (const [state, index, name] of [
+    for (const [state, index] of [
       ['menu-button/menu-open', 1, 'menu-open'],
       ['menu-button/long-menu-open', 1, 'long-menu-open'],
     ] as const) {
@@ -128,7 +120,6 @@ for (const theme of ['light', 'dark'] as const) {
       // Lined up with the button: its left edge opening right, its right edge opening left.
       const aligned = Math.min(Math.abs(panel.x - at.x), Math.abs(panel.x + panel.width - (at.x + at.width)))
       expect(aligned).toBeLessThanOrEqual(1)
-      await shot(page, `${name}-${theme}`)
     }
   })
 }

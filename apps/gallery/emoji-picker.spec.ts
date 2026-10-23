@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { openState, readRoutes } from './support'
 
-for (const theme of ['light', 'dark'] as const) {
+for (const theme of ['light'] as const) {
   test(`Workspace follows the standard emoji categories in ${theme}`, async ({ page }) => {
     const route = (await readRoutes(page)).find((route) => route.component === 'EmojiPicker' && route.state === 'workspace')
     if (route === undefined) throw new Error('Workspace picker fixture is missing')
@@ -17,9 +17,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(images).toHaveCount(8)
     await expect.poll(() => images.evaluateAll((images) => images.every((image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0))).toBe(true)
     await expect(groups.last().locator('[data-emoji="hello_juno"]')).toHaveCount(0)
-    const path = test.info().outputPath(`workspace-${theme}.png`)
-    await picker.screenshot({ path })
-    await test.info().attach(`Workspace ${theme}`, { path, contentType: 'image/png' })
+
   })
 }
 

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`composer formatting keeps glyph geometry in ${theme}`, async ({ page }, testInfo) => {
+  test(`composer formatting keeps glyph geometry in ${theme}`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: theme })
     await page.goto(`/#/Composer?__state=markup/mixed&theme=${theme}`)
     const field = page.locator('[data-composer] textarea')
@@ -39,7 +39,6 @@ for (const theme of ['light', 'dark'] as const) {
       return Math.max(...styled.flatMap((box, i) => box.map((value, axis) => Math.abs(value - plain[i]![axis]!))))
     })
     expect(geometry).toBeLessThan(0.5)
-    await page.locator('[data-fixture-frame]').screenshot({ path: testInfo.outputPath(`composer-${theme}.png`) })
     for (const text of ['שלום', 'שלום hello עולם', 'hello שלום world']) {
       await field.fill(text)
       const layer = page.locator('[data-textarea-layer]')

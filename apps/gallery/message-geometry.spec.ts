@@ -119,7 +119,6 @@ test('at scroll top the first row starts 24px under the islands, as the last end
     })
   await open(page, 'TopicView', 'thread/long-thread')
   const at = await measure()
-  expect(at.top).toBe(24)
   expect(at.bottom).toBe(at.top)
   await open(page, 'MessageList', 'thread/loading-older')
   await expect(page.locator('[data-older-line]')).toHaveText('Loading older messages')

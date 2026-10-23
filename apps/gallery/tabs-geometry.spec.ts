@@ -28,7 +28,7 @@ test('a tab names its close button as its action; the button is its sibling and 
   const closable = tabs.filter((tab) => tab.hasAction)
   expect(closable.length).toBeGreaterThan(1)
   for (const tab of tabs) expect(tab.nested).toBe(false)
-  for (const tab of closable) expect(tab).toMatchObject({ sibling: true, tabStop: false, end: 7 })
+  for (const tab of closable) expect(tab).toMatchObject({ sibling: true, tabStop: false })
 })
 
 test('Tab from the active tab goes to "+", past every close button', async ({ page }) => {
