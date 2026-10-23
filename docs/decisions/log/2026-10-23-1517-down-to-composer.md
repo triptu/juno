@@ -1,0 +1,1 @@
+- 10-23 15:17 · down to composer · ↓ on the newest message, in a topic or Juno's chat, puts focus back in the composer with its draft as it was, the inverse of ↑ from the empty composer. Only when the list ends at the newest message: in a window anchored in older history, or a chat with newer items still to load, ↓ on the last row stays put (owner).
