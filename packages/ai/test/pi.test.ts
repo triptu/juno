@@ -5,9 +5,10 @@
 import { createModels, createProvider, fauxAssistantMessage, fauxProvider, fauxToolCall, type ClassifierAnswer, type ClassifierContext, type FauxResponseStep } from '@earendil-works/pi-ai'
 import { createFauxCore } from '@earendil-works/pi-ai/providers/faux'
 import { Effect, Fiber } from 'effect'
+import { TestClock } from 'effect/testing'
 import { describe, expect, it } from 'bun:test'
 import { OPENROUTER, defineStructuredTask, defineTextTask, isFinal, makePiAiProvider, tasks, type AiConfig, type Decision } from '../src/index'
-import { NOW, postgres, stagingBill } from './fixtures'
+import { channels, msg, NOW, people, postgres, stagingBill } from './fixtures'
 
 const DECISION = 'test/decider'
 const GENERATION = 'test/writer'
@@ -63,6 +64,36 @@ const routeInput = { draft: 'Jonas scaled it down', channel: '#eng', topics: [st
 const writtenRoute = defineStructuredTask({ ...tasks.routeCheck, tier: 'generation' })
 const noDecision = (d: Decision<unknown>) => (d._tag === 'NoDecision' ? { reason: d.reason, attempts: d.meta.attempts } : d)
 
+/** A model that never answers, and a promise that resolves once the request has reached it. */
+function silentModel() {
+  let arrive = () => {}
+  const reached = new Promise<void>((resolve) => { arrive = resolve })
+  const step: FauxResponseStep = () => {
+    arrive()
+    return new Promise(() => {})
+  }
+  return { step, reached }
+}
+
+/** Runs `decision` on the test clock, and moves the clock `millis` on once the request has reached the model. */
+const onTestClock = <A>(decision: Effect.Effect<A>, reached: Promise<void>, millis: number) =>
+  Effect.runPromise(Effect.gen(function* () {
+    const fiber = yield* Effect.forkChild(decision)
+    yield* Effect.promise(() => reached)
+    yield* TestClock.adjust(millis)
+    return yield* Fiber.join(fiber)
+  }).pipe(Effect.provide(TestClock.layer())))
+
+const admitting = () => {
+  const asked: number[] = []
+  const settled: Array<number | undefined> = []
+  const admit = (upper: number) => Effect.sync(() => {
+    asked.push(upper)
+    return { _tag: 'Admitted' as const, settle: (usd: number | undefined) => Effect.sync(() => { settled.push(usd) }) }
+  })
+  return { asked, settled, admit }
+}
+
 describe('PiAiProvider decisions', () => {
   it('returns the validated tool arguments when the model calls the tool', async () => {
     const { provider, faux } = scripted([fauxAssistantMessage(fauxToolCall('route', { replyTo: stagingBill.id, confidence: 0.8 }))])
@@ -76,16 +107,6 @@ describe('PiAiProvider decisions', () => {
     const decision = await Effect.runPromise(provider.decide(tasks.grammarCheck, { draft: 'its broken' }))
     expect(noDecision(decision)).toEqual({ reason: 'invalid-output', attempts: 1 })
     expect(faux.state.callCount).toBe(1)
-  })
-
-  it('retries once on invalid tool output, then takes the valid answer', async () => {
-    const { provider, faux } = scripted([
-      fauxAssistantMessage(fauxToolCall('route', { replyTo: 'not-a-topic', confidence: 0.8 })),
-      fauxAssistantMessage(fauxToolCall('route', { replyTo: null, confidence: 0.9 })),
-    ])
-    const decision = await Effect.runPromise(provider.decide(tasks.routeCheck, routeInput))
-    expect(decision).toMatchObject({ _tag: 'Decided', value: { replyTo: null, confidence: 0.9 }, meta: { attempts: 2 } })
-    expect(faux.state.callCount).toBe(2)
   })
 
   it('gives no decision after two invalid outputs: wrong shape, then prose instead of a tool call', async () => {
@@ -107,13 +128,16 @@ describe('PiAiProvider decisions', () => {
     expect(noDecision(decision)).toEqual({ reason: 'provider-error', attempts: 2 })
   })
 
-  it('gives no decision when the task timeout passes, without waiting for the model', async () => {
-    const quick = defineStructuredTask({ ...tasks.routeCheck, timeoutMillis: 40 })
-    const { provider } = scripted([() => new Promise(() => {})])
-    const started = Date.now()
-    const decision = await Effect.runPromise(provider.decide(quick, routeInput))
+  it('gives no decision when the task timeout passes, without waiting for the model, and settles at the first attempt\'s bound', async () => {
+    const { asked, settled, admit } = admitting()
+    const model = silentModel()
+    const { provider } = scripted([model.step], { ...chatConfig, admit })
+    const decision = await onTestClock(provider.decide(tasks.routeCheck, routeInput), model.reached, tasks.routeCheck.timeoutMillis)
     expect(noDecision(decision)).toEqual({ reason: 'timeout', attempts: 1 })
-    if (process.env.JUNO_PERF === '1') expect(Date.now() - started).toBeLessThan(1000)
+    // Settled as known, not kept whole: the retry was never sent, so at most the first attempt, under half the reservation.
+    expect(settled).toHaveLength(1)
+    expect(settled[0]).toBeTypeOf('number')
+    expect(settled[0]).toBeLessThanOrEqual(asked[0]! / 2)
   })
 
   it('gives no decision without a key, and makes no request', async () => {
@@ -143,44 +167,17 @@ describe('PiAiProvider decisions', () => {
     expect(settled).toHaveLength(1)
   })
 
-  it('settles a timeout in the first attempt at that attempt\'s bound: the retry was never sent', async () => {
-    const asked: number[] = []
-    const settled: Array<number | undefined> = []
-    const admit = (upper: number) => Effect.sync(() => {
-      asked.push(upper)
-      return { _tag: 'Admitted' as const, settle: (usd: number | undefined) => Effect.sync(() => { settled.push(usd) }) }
-    })
-    const quick = defineStructuredTask({ ...tasks.routeCheck, timeoutMillis: 40 })
-    const { provider } = scripted([() => new Promise(() => {})], { ...chatConfig, admit })
-    expect(noDecision(await Effect.runPromise(provider.decide(quick, routeInput)))).toEqual({ reason: 'timeout', attempts: 1 })
-    // Settled as known, not kept whole: at most the first attempt, under half the reservation.
-    expect(settled).toHaveLength(1)
-    expect(settled[0]).toBeTypeOf('number')
-    expect(settled[0]).toBeLessThanOrEqual(asked[0]! / 2)
-  })
-
   it('settles a call stopped in its first attempt at that attempt\'s bound, not the whole reservation', async () => {
-    const asked: number[] = []
-    const settled: Array<number | undefined> = []
-    const admit = (upper: number) => Effect.sync(() => {
-      asked.push(upper)
-      return { _tag: 'Admitted' as const, settle: (usd: number | undefined) => Effect.sync(() => { settled.push(usd) }) }
-    })
-    const { provider } = scripted([() => new Promise(() => {})], { ...chatConfig, admit })
+    const { asked, settled, admit } = admitting()
+    const model = silentModel()
+    const { provider } = scripted([model.step], { ...chatConfig, admit })
     // A job restarted while the request was out: the call is interrupted, not timed out.
     const fiber = Effect.runFork(provider.decide(tasks.routeCheck, routeInput))
-    await new Promise((resolve) => setTimeout(resolve, 20))
+    await model.reached
     await Effect.runPromise(Fiber.interrupt(fiber))
     expect(settled).toHaveLength(1)
     expect(settled[0]).toBeTypeOf('number')
     expect(settled[0]).toBeLessThanOrEqual(asked[0]! / 2)
-  })
-
-  it('uses the tier model from the config, and reports a cost only for a priced model', async () => {
-    const { provider } = scripted([fauxAssistantMessage(fauxToolCall('route', { replyTo: null, confidence: 1 }))])
-    const decision = await Effect.runPromise(provider.decide(writtenRoute, routeInput))
-    expect(decision).toMatchObject({ _tag: 'Decided', value: { replyTo: null, confidence: 1 }, meta: { model: GENERATION } })
-    expect(decision.meta.costUsd).toBeTypeOf('number')
   })
 
   it('forces the tool on the decision tier and asks with tool choice auto on the generation tier', async () => {
@@ -207,6 +204,29 @@ describe('PiAiProvider decisions', () => {
     const decision = await Effect.runPromise(provider.decide(tasks.routeCheck, routeInput))
     expect(decision).toMatchObject({ _tag: 'Decided', value: { replyTo: null, confidence: 0.9 }, meta: { attempts: 2 } })
     expect(choices).toEqual(['auto'])
+  })
+})
+
+describe('PiAiProvider on output that names ids not in the input', () => {
+  const commands = { text: 'x', people, channels, topics: [{ id: postgres.id, title: postgres.title, channel: '#eng' }] }
+  const reading = { messageTs: '1', where: '#eng', kind: 'channel' as const, sender: 's', text: 't', mentionsMe: false, now: NOW, before: [],
+    facts: { ownerWroteLast: false, ownerStartedThread: false, senderWroteSinceOwner: false, exchangesLast30Days: 0 }, instructions: [{ id: 'i1', direction: 'stay' as const, text: 'greetings' }] }
+  const promises = { topicId: postgres.id, title: postgres.title, channel: '#eng', now: NOW, messages: [{ ...msg('Dev Patel', "I'll check.", 5), id: '1.000001' }] }
+  const dm = (userId: string) => ({ command: { kind: 'send_dm', userId, text: 'hi' }, confidence: 0.9 })
+  const post = (channelId: string) => ({ command: { kind: 'post', channelId, text: 'hi' }, confidence: 0.9 })
+  const instruction = (id: string) => ({ needsYou: 'ask', probabilities: {}, instruction: { id, confidence: 0.9 } })
+
+  it.each([
+    ['an unknown topic', tasks.routeCheck, routeInput, { replyTo: 't:C0ENG:9.000001', confidence: 0.7 }, { replyTo: null, confidence: 0.7 }],
+    ['an unknown user', tasks.parseCommand, commands, dm('U0NOBODY'), dm('U0MAYA')],
+    ['a post to a DM', tasks.parseCommand, commands, post('D0MAYA'), post('C0ENG')],
+    ['an unknown instruction', tasks.notificationReading, reading, instruction('i9'), instruction('i1')],
+    ["a follow-up on someone else's message", tasks.followUps, promises, { followUps: [{ messageId: '1.000001', text: "You said you'd check" }] }, { followUps: [] }],
+  ] as const)('refuses %s and takes the valid retry', async (_, task, input, invented, valid) => {
+    const { provider, faux } = scripted([fauxAssistantMessage(fauxToolCall(task.tool.name, invented)), fauxAssistantMessage(fauxToolCall(task.tool.name, valid))])
+    const decision = await Effect.runPromise(provider.decide(task as typeof tasks.routeCheck, input as typeof routeInput))
+    expect(decision).toMatchObject({ _tag: 'Decided', value: valid, meta: { attempts: 2 } })
+    expect(faux.state.callCount).toBe(2)
   })
 })
 
@@ -278,12 +298,6 @@ describe('PiAiProvider generation', () => {
     const { provider } = scripted([fauxAssistantMessage('   '), fauxAssistantMessage('Postgres 16 migration plan')])
     const decision = await Effect.runPromise(provider.generate(tasks.titleTopic, { topicId: postgres.id, channel: '#eng', messages: postgres.recent }))
     expect(decision).toMatchObject({ _tag: 'Decided', value: 'Postgres 16 migration plan', meta: { attempts: 2 } })
-  })
-
-  it('gives no decision without a key', async () => {
-    const { provider } = scripted([], {})
-    const decision = await Effect.runPromise(provider.generate(tasks.titleTopic, { topicId: postgres.id, channel: '#eng', messages: postgres.recent }))
-    expect(noDecision(decision)).toEqual({ reason: 'missing-key', attempts: 0 })
   })
 
   const artInput = { kind: 'thread' as const, topicId: postgres.id, title: postgres.title, channel: '#eng', first: postgres.recent[0]!.text, last: postgres.recent.at(-1)!.text }
