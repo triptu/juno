@@ -344,14 +344,16 @@ type ReadingInput = Parameters<typeof tasks.notificationReading.render>[0]
 type ReadingOutput = Static<typeof tasks.notificationReading.output>
 
 /** Whether a reading notifies, with the thresholds `decideNotification` applies. */
-function notifies(o: ReadingOutput, instructions: ReadonlyArray<Instruction>): boolean {
-  const chosen = instructions.find((item) => item.id === o.instruction?.id)
+function notifies(o: ReadingOutput, input: ReadingInput): boolean {
+  const chosen = input.instructions.find((item) => item.id === o.instruction?.id)
   if (chosen !== undefined && o.instruction !== null) {
     if (chosen.direction === 'notify' && o.instruction.confidence >= INSTRUCTION_NOTIFY_CONFIDENCE) return true
     if (chosen.direction === 'stay' && o.instruction.confidence >= INSTRUCTION_STAY_CONFIDENCE) return false
   }
   const p = o.probabilities
-  return (p['ask'] ?? 0) + (p['answer'] ?? 0) + (p['follow_up'] ?? 0) + (p['decision'] ?? 0) + (p['serious'] ?? 0) >= NEEDS_YOU_THRESHOLD
+  // As `decideNotification` counts them: an ask only where it is put to the owner, a decision only in a thread the owner started.
+  const asked = input.kind === 'dm' || input.kind === 'group DM' || input.facts.ownerStartedThread || input.facts.ownerWroteLast || input.mentionsMe
+  return (p['answer'] ?? 0) + (p['follow_up'] ?? 0) + (p['serious'] ?? 0) + (asked ? p['ask'] ?? 0 : 0) + (input.facts.ownerStartedThread ? p['decision'] ?? 0 : 0) >= NEEDS_YOU_THRESHOLD
 }
 
 function readingExamples(): ReadonlyArray<Example> {
@@ -362,7 +364,7 @@ function readingExamples(): ReadonlyArray<Example> {
   let n = 0
   const reading = (label: string, input: Partial<ReadingInput> & Pick<ReadingInput, 'sender' | 'text'>, notify: boolean): Example => {
     const full: ReadingInput = { messageTs: `1728812${String(n++).padStart(3, '0')}.000100`, where: input.sender, kind: 'dm', mentionsMe: false, now: NOW, before: [], facts: noFacts, instructions: [], ...input }
-    return ex(tasks.notificationReading, label, full, (o) => notifies(o, full.instructions) === notify)
+    return ex(tasks.notificationReading, label, full, (o) => notifies(o, full) === notify)
   }
   return [
     reading('incident in a channel', { where: '#incidents', kind: 'channel', sender: 'Jonas Weber', text: 'Checkout is returning 500s for about 20% of requests since 09:05. @tushar could use a second pair of eyes.', mentionsMe: true }, true),

@@ -1,1 +1,1 @@
-- 10-23 23:33 · burst-every-outcome · The 1-minute burst rule applies after every banner in a topic, including one an Always level gave, since a delivered banner is never updated or replaced.
+- 10-23 23:33 · burst-every-outcome · The burst rule applies after every banner in a topic, including one an Always level gave, since a delivered banner is never updated or replaced.

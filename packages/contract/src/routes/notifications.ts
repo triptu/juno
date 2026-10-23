@@ -93,7 +93,7 @@ export type NotifyTag = typeof NotifyTag.Type
 
 /** What decided a message, first in the order that applied (SPEC 14). */
 export const DecidedBy = Schema.Literals([
-  'hours', 'always', 'never', 'ignored', 'directMention', 'alwaysNotify', 'aiOff', 'closer', 'live', 'instruction', 'reading', 'timeout', 'burst',
+  'hours', 'always', 'never', 'ignored', 'directMention', 'alwaysNotify', 'aiOff', 'closer', 'addressedElsewhere', 'live', 'instruction', 'reading', 'timeout', 'burst',
 ])
 export type DecidedBy = typeof DecidedBy.Type
 
