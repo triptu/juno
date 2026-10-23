@@ -1,41 +1,60 @@
 import * as stylex from '@stylexjs/stylex'
-import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
-import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
-import { User } from '@phosphor-icons/react/dist/icons/User'
-import { Users } from '@phosphor-icons/react/dist/icons/Users'
-import { useState, type ReactNode } from 'react'
-import type { Hours, NotificationPermission, NotifyTag, TodayRow } from '@juno/contract'
-import { colors, spacing } from '@juno/tokens/tokens.stylex'
-import { Avatar, Button, Chip, DayToggles, ListRow, Page, PageHeader, Popover, Section, Select, Surface, Text, Textarea, type PhosphorIcon } from '@juno/ui'
-import { hueFor, initials } from './look'
-import { PermissionLine } from './PermissionLine'
+import { useLayoutEffect, useRef, useState } from 'react'
+import type { Hours, NotificationPermission, PickConversation } from '@juno/contract'
+import { colors, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
+import { Button, DayToggles, ListRow, Page, PageHeader, Section, Select, Surface, Text } from '@juno/ui'
+import { AlwaysNotifySection } from './AlwaysNotifySection'
 import { HuddleRingSection, type HuddleRingProps } from './HuddleRingSection'
-import { SlackScheduleSection, type SlackScheduleProps } from './SlackScheduleSection'
-import { clockLabel, hourLabel } from './time'
+import { InstructionsSection, type InstructionsSectionProps } from './InstructionsSection'
+import { NotificationDetails, type DetailsFilter, type ProposedInstruction, type WhyActions } from './NotificationDetails'
+import type { AlwaysNotify, AlwaysNotifyKey, Decision, LevelTag } from './notificationRules'
+import { NotifyLevelsSection, type LevelPicker, type ListedLevel } from './NotifyLevelsSection'
+import { PermissionLine } from './PermissionLine'
+import { SheetLayer } from './SheetLayer'
+import { hourLabel } from './time'
 
 export type HoursKind = 'notifications' | 'presence'
 
-export interface NotificationsPageProps extends HuddleRingProps {
+/** Slack's own schedule, which Juno writes from the notification hours. */
+export interface SlackScheduleState {
+  /** Changed in Slack after Juno wrote it: Juno leaves it until Use Juno's hours. */
+  readonly changedInSlack: boolean
+  /** The hours are still the defaults on this install, so nothing is written yet. */
+  readonly waitingForHours: boolean
+}
+
+/** A part of the page another place opens it at. */
+export type NotificationsAnchor = 'hours' | 'always-notify' | 'instructions' | 'levels' | 'how-auto'
+
+export interface NotificationsPageProps extends HuddleRingProps, Omit<InstructionsSectionProps, 'aiAssist' | 'initialDirection'>, WhyActions {
   readonly notificationHours: Hours
   readonly presenceHours: Hours
-  /** "What matters to you", as saved. */
-  readonly matters: string
-  /** Off: the field gives way to one line, DMs and mentions notify. */
-  readonly aiAssist: boolean
-  readonly every: ReadonlyArray<NotifyTag>
-  readonly never: ReadonlyArray<NotifyTag>
-  readonly interrupted: number
-  readonly held: number
-  /** The messages that notified today, newest first. */
-  readonly today: ReadonlyArray<TodayRow>
   readonly onDayChange: (which: HoursKind, day: Hours['days'][number], enabled: boolean) => void
   readonly onHoursChange: (which: HoursKind, hours: Partial<Hours>) => void
-  /** Slack's own schedule, its switch and Restore. */
-  readonly slack: SlackScheduleProps
-  /** On blur, with the text as typed. */
-  readonly onMattersSave: (text: string) => void
-  /** Back to When it matters. */
-  readonly onRemove: (tag: NotifyTag) => void
+  /** Slack's own schedule; undefined until the engine answers. */
+  readonly slackSchedule: SlackScheduleState | undefined
+  /** Use Juno's hours, while the schedule was changed in Slack. */
+  readonly onUseJunoHours: () => void
+  /** Off: DMs and mentions notify, the rest stays; the instructions are not read. */
+  readonly aiAssist: boolean
+  readonly alwaysNotify: AlwaysNotify
+  readonly onAlwaysNotifyChange: (key: AlwaysNotifyKey, enabled: boolean) => void
+  readonly always: ReadonlyArray<LevelTag>
+  readonly never: ReadonlyArray<LevelTag>
+  /** Back to Auto. */
+  readonly onRemoveLevel: (tag: LevelTag) => void
+  readonly picker: LevelPicker
+  readonly onPickLevel: (level: ListedLevel, conversation: PickConversation) => void
+  readonly onOpenIgnored: () => void
+  /** Today's counts, for the line. */
+  readonly notifiedToday: number
+  readonly stayedToday: number
+  /** Today's decisions, newest first, for Details; undefined while they load. */
+  readonly decisions: ReadonlyArray<Decision> | undefined
+  /** Details opened or closed: the owner reads the decisions only while it is open. */
+  readonly onDetailsOpenChange?: (open: boolean) => void
+  readonly proposals: ReadonlyMap<string, ProposedInstruction>
+  readonly alwaysFor: ReadonlyMap<string, string>
   /** Whether macOS lets Juno notify. Denied or not determined puts a line at the top of the page. */
   readonly permission: NotificationPermission
   /** Send test notification. */
@@ -44,8 +63,21 @@ export interface NotificationsPageProps extends HuddleRingProps {
   readonly onOpenSettings: () => void
   /** Allow notifications, while macOS has not asked yet: its prompt. */
   readonly onAllow: () => void
-  /** Show why starts open (fixtures). */
-  readonly showWhy?: boolean
+  /**
+   * Scrolls this part into view and focuses its heading, once for each new
+   * `anchorKey`: How Auto decides… and Notification settings, Edit instructions.
+   */
+  readonly anchor?: NotificationsAnchor
+  readonly anchorKey?: number
+  /** Details starts open (fixtures), on this filter and with this row's why open. */
+  readonly details?: {
+    readonly filter?: DetailsFilter
+    readonly open?: string
+  }
+  /** The add row's direction to start with (fixtures). */
+  readonly initialDirection?: InstructionsSectionProps['initialDirection']
+  /** Which Add… starts open (fixtures). */
+  readonly initialPicker?: ListedLevel
 }
 
 const HALF_HOUR = 30
@@ -54,28 +86,83 @@ const times = Array.from({ length: (24 * 60) / HALF_HOUR }, (_, index) => {
   return { value: String(minutes), label: hourLabel(minutes) }
 })
 
-const channelIcons: Record<Extract<NotifyTag, { kind: 'channel' }>['channelKind'], PhosphorIcon> = { public: Hash, private: Lock, im: User, mpim: Users }
-
 /**
- * The Notifications page (SPEC 14, inventory 13): two sets of hours, whether
- * Slack's own schedule follows them, what matters in the owner's words, the
- * channels and people set to Every message or Never, Ring for huddles, one
- * line for today with Show why, and a test notification. Everything else is
- * said to Juno or set from a channel's or person's menu. While macOS does not let Juno notify, a line at the top
- * says so, with the way to turn it on.
+ * Settings › Notifications (SPEC 14, inventory 13): the two sets of hours
+ * with Slack's schedule line, the Always notify switches, the owner's
+ * instructions, what is set to Always and Never, how Auto decides, today's
+ * line with Details, Ring for huddles and a test notification. While macOS
+ * does not let Juno notify, a line at the top says so, with the way to
+ * turn it on.
  */
 export function NotificationsPage(props: NotificationsPageProps) {
-  const { notificationHours, presenceHours, matters, aiAssist, every, never, interrupted, held, today, onHoursChange, onDayChange, slack, onMattersSave, onRemove, huddleRing, onHuddleRingChange, permission, onSendTest, onOpenSettings, onAllow, showWhy = false } = props
+  const {
+    notificationHours,
+    presenceHours,
+    onHoursChange,
+    onDayChange,
+    slackSchedule,
+    onUseJunoHours,
+    aiAssist,
+    alwaysNotify,
+    onAlwaysNotifyChange,
+    always,
+    never,
+    onRemoveLevel,
+    picker,
+    onPickLevel,
+    onOpenIgnored,
+    notifiedToday,
+    stayedToday,
+    decisions,
+    onDetailsOpenChange,
+    permission,
+    onSendTest,
+    onOpenSettings,
+    onAllow,
+    huddleRing,
+    onHuddleRingChange,
+    anchor,
+    anchorKey,
+    details,
+    initialDirection,
+    initialPicker,
+  } = props
+  const anchors = useRef<Partial<Record<NotificationsAnchor, HTMLDivElement | null>>>({})
+  const [detailsOpen, setDetailsShown] = useState(details !== undefined)
+  const setDetailsOpen = (open: boolean) => {
+    setDetailsShown(open)
+    onDetailsOpenChange?.(open)
+  }
+  // Before paint, so the page opens already at the part asked for.
+  useLayoutEffect(() => {
+    if (anchor === undefined) return
+    const part = anchors.current[anchor]
+    // The section's heading: the first line of its head.
+    const heading = part?.querySelector<HTMLElement>('section > div > :first-child') ?? part
+    if (heading === null || heading === undefined) return
+    heading.scrollIntoView({ block: 'start', behavior: 'instant' })
+    heading.tabIndex = -1
+    // Focus for screen readers and the next Tab, with no ring: the owner did not press a key here.
+    heading.focus({ preventScroll: true, focusVisible: false } as FocusOptions)
+  }, [anchor, anchorKey])
   return (
     <Page width="settings">
-      <PageHeader title="Notifications" subtitle="During your notification hours, Juno lets through what needs you and holds the rest. Everything is in Juno whenever you open it." />
+      <PageHeader title="Notifications" subtitle="Inside your notification hours, Juno notifies you about what needs you. Everything is in Juno whenever you open it." />
 
       <PermissionLine permission={permission} onOpenSettings={onOpenSettings} onAllow={onAllow} />
 
-      <Section heading="Hours">
+      <div ref={(element) => void (anchors.current.hours = element)} {...stylex.props(styles.anchor)}>
+        <Section heading="Notification hours" sub="Outside these hours your Mac doesn't notify. Slack pauses at the same times, so your phone stays quiet too.">
+          <Surface kind="group">
+            <HoursRow which="notifications" title="Notification hours" hours={notificationHours} onChange={onHoursChange} onDayChange={onDayChange} />
+            <SlackLine schedule={slackSchedule} onUseJunoHours={onUseJunoHours} />
+          </Surface>
+        </Section>
+      </div>
+
+      <Section heading="Active in Slack" sub="Outside these hours you show as away.">
         <Surface kind="group">
-          <HoursRow which="notifications" title="Notifications" sub="Outside these hours, messages stay in Juno without notifying you." hours={notificationHours} onChange={onHoursChange} onDayChange={onDayChange} />
-          <HoursRow which="presence" title="Active in Slack" sub="Outside these hours you show as away." hours={presenceHours} onChange={onHoursChange} onDayChange={onDayChange} />
+          <HoursRow which="presence" title="Active in Slack" hours={presenceHours} onChange={onHoursChange} onDayChange={onDayChange} />
           <div {...stylex.props(styles.note)}>
             <Text variant="meta" tone="muted" as="p">
               Juno switches your status while it's open. If it's closed when your active hours start, you stay away until you open it.
@@ -84,60 +171,123 @@ export function NotificationsPage(props: NotificationsPageProps) {
         </Surface>
       </Section>
 
-      <SlackScheduleSection {...slack} />
+      <div ref={(element) => void (anchors.current['always-notify'] = element)} {...stylex.props(styles.anchor)}>
+        <AlwaysNotifySection alwaysNotify={alwaysNotify} onAlwaysNotifyChange={onAlwaysNotifyChange} />
+      </div>
 
-      <Section heading="What matters to you" sub="Juno reads this for every message. You can also just tell Juno.">
-        {aiAssist ? (
-          <div {...stylex.props(styles.matters)}>
-            <Textarea
-              key={matters}
-              variant="card"
-              rows={3}
-              label="What matters to you"
-              defaultValue={matters}
-              placeholder="For example: the launch, hiring, and anything from my reports that needs a decision today."
-              onBlur={(event) => {
-                if (event.currentTarget.value.trim() !== matters) onMattersSave(event.currentTarget.value)
-              }}
-            />
-          </div>
-        ) : (
-          <Text variant="ui" tone="muted" as="p">
-            AI assist is off. DMs and mentions notify you.
+      <div ref={(element) => void (anchors.current.instructions = element)} data-anchor="instructions" {...stylex.props(styles.anchor)}>
+        <InstructionsSection {...props} aiAssist={aiAssist} {...(initialDirection === undefined ? {} : { initialDirection })} />
+      </div>
+
+      <div ref={(element) => void (anchors.current.levels = element)} {...stylex.props(styles.anchor)}>
+        <NotifyLevelsSection always={always} never={never} onRemove={onRemoveLevel} picker={picker} onPick={onPickLevel} onOpenIgnored={onOpenIgnored} {...(initialPicker === undefined ? {} : { initialPicker })} />
+      </div>
+
+      <div ref={(element) => void (anchors.current['how-auto'] = element)} data-anchor="how-auto" {...stylex.props(styles.anchor)}>
+        <HowAutoDecides />
+      </div>
+
+      <Section heading="Today">
+        <div {...stylex.props(styles.todayLine)}>
+          <Text variant="body" tone="subtle">
+            {notifiedToday === 0 ? (
+              'Nothing has notified you today.'
+            ) : (
+              <>
+                Today: {count(notifiedToday)} notified you, {count(stayedToday)} stayed in Juno.
+              </>
+            )}
           </Text>
-        )}
-      </Section>
-
-      <Section heading="People and channels">
-        <Surface kind="group">
-          {every.length === 0 && never.length === 0 ? (
-            <ListRow divider={false}>
-              <Text variant="ui" tone="muted">
-                Every channel and person is set to When it matters.
-              </Text>
-            </ListRow>
-          ) : (
-            <>
-              <LevelRow title="Every message" sub="Even outside notification hours" tags={every} onRemove={onRemove} divider />
-              <LevelRow title="Never" sub="Still in Juno, no alerts" tags={never} onRemove={onRemove} divider={false} />
-            </>
+          {notifiedToday + stayedToday === 0 ? null : (
+            <Button variant="ghost" size="sm" tone="subtle" aria-haspopup="dialog" expanded={detailsOpen} onClick={() => setDetailsOpen(true)}>
+              Details
+            </Button>
           )}
-        </Surface>
-        <Text variant="meta" tone="muted" as="p">
-          Right-click a channel or person to change how it notifies you.
-        </Text>
+        </div>
       </Section>
 
       <HuddleRingSection huddleRing={huddleRing} onHuddleRingChange={onHuddleRingChange} />
 
-      <Section heading="Today">
-        <Today interrupted={interrupted} held={held} rows={today} initiallyOpen={showWhy} />
-      </Section>
-
       <Section heading="Test">
         <TestRow permission={permission} onSendTest={onSendTest} onOpenSettings={onOpenSettings} />
       </Section>
+      {detailsOpen ? (
+        <SheetLayer onClose={() => setDetailsOpen(false)}>
+          <NotificationDetails
+            {...props}
+            decisions={decisions}
+            onClose={() => setDetailsOpen(false)}
+            // The page's part opens under the sheet, so the sheet closes first.
+            onSettings={() => {
+              setDetailsOpen(false)
+              props.onSettings()
+            }}
+            onEditInstructions={() => {
+              setDetailsOpen(false)
+              props.onEditInstructions()
+            }}
+            onChange={(decision) => {
+              setDetailsOpen(false)
+              props.onChange(decision)
+            }}
+            {...(details?.filter === undefined ? {} : { initialFilter: details.filter })}
+            {...(details?.open === undefined ? {} : { initialOpen: details.open })}
+          />
+        </SheetLayer>
+      ) : null}
     </Page>
+  )
+}
+
+/** How Auto decides: the three checks in plain words. How Auto decides… and Notification settings open the page here. */
+function HowAutoDecides() {
+  const line = (title: string, words: string) => (
+    <li>
+      <Text variant="ui" weight="semibold" as="span">
+        {title}
+      </Text>{' '}
+      {words}
+    </li>
+  )
+  return (
+    <Section heading="How Auto decides">
+      <div {...stylex.props(styles.howAuto)}>
+        <Text variant="ui" tone="subtle" as="div">
+          <p {...stylex.props(styles.howLead)}>For everything on Auto, Juno checks in this order:</p>
+          <ol {...stylex.props(styles.howList)}>
+            {line('Closers.', '"thanks", "ok" and the like don\'t notify.')}
+            {line("Conversations you're in.", 'If you wrote in the last 10 minutes, replies notify.')}
+            {line(
+              'Juno reads it.',
+              "If it clearly falls under your instructions, Juno does what they say. Otherwise, asks, answers to your questions, follow-ups you haven't answered, decisions you should weigh in on and serious problems notify. Greetings, updates and chatter stay in Juno.",
+            )}
+          </ol>
+        </Text>
+      </div>
+    </Section>
+  )
+}
+
+/** Under the notification hours: what Juno is doing with Slack's schedule. Its height is kept when empty, so nothing below moves. */
+function SlackLine({ schedule, onUseJunoHours }: { readonly schedule: SlackScheduleState | undefined; readonly onUseJunoHours: () => void }) {
+  return (
+    <div aria-live="polite" {...stylex.props(styles.slackLine)}>
+      {schedule?.waitingForHours === true ? (
+        <Text variant="meta" tone="muted">
+          Slack's schedule changes once you set your notification hours.
+        </Text>
+      ) : null}
+      {schedule?.changedInSlack === true ? (
+        <>
+          <Text variant="meta" tone="muted">
+            Your schedule was changed in Slack. Juno leaves it until you change your hours here.
+          </Text>
+          <Button variant="secondary" size="sm" onClick={onUseJunoHours}>
+            Use Juno's hours
+          </Button>
+        </>
+      ) : null}
+    </div>
   )
 }
 
@@ -167,30 +317,37 @@ function TestRow({ permission, onSendTest, onOpenSettings }: Pick<NotificationsP
   )
 }
 
-function HoursRow({ which, title, sub, hours, onChange, onDayChange }: { readonly which: HoursKind; readonly title: string; readonly sub: string; readonly hours: Hours; readonly onChange: NotificationsPageProps['onHoursChange']; readonly onDayChange: NotificationsPageProps['onDayChange'] }) {
+/** The days on the left, the times on the right. The section's heading names the row. */
+function HoursRow({
+  which,
+  title,
+  hours,
+  onChange,
+  onDayChange,
+}: {
+  readonly which: HoursKind
+  readonly title: string
+  readonly hours: Hours
+  readonly onChange: NotificationsPageProps['onHoursChange']
+  readonly onDayChange: NotificationsPageProps['onDayChange']
+}) {
+  // The controls keep their short names: "Notifications from", "Active in Slack days".
+  const name = which === 'notifications' ? 'Notifications' : title
   const set = (patch: Partial<Hours>) => onChange(which, patch)
   const from = String(Math.floor(hours.from / HALF_HOUR) * HALF_HOUR)
   const to = String(Math.floor(hours.to / HALF_HOUR) * HALF_HOUR)
   return (
-    <ListRow
-      aria-label={title}
-      wrap
-      trailing={
-        <span {...stylex.props(styles.controls)}>
-          <DayToggles days={hours.days} label={`${title} days`} onChange={(day, enabled) => onDayChange(which, day, enabled)} />
-          {/* The times stay together when the controls wrap. */}
-          <span {...stylex.props(styles.times)}>
-            <Select size={32} label={`${title} from`} options={times} value={from} onChange={(event) => set({ from: Number(event.currentTarget.value) })} />
-            <Text variant="ui" tone="muted">
-              to
-            </Text>
-            <Select size={32} label={`${title} to`} options={times} value={to} onChange={(event) => set({ to: Number(event.currentTarget.value) })} />
-          </span>
-        </span>
-      }
-    >
-      <Label title={title} sub={sub} />
-    </ListRow>
+    <div role="group" aria-label={title} {...stylex.props(styles.hoursRow)}>
+      <DayToggles days={hours.days} label={`${name} days`} onChange={(day, enabled) => onDayChange(which, day, enabled)} />
+      {/* The times stay together when the row wraps. */}
+      <span {...stylex.props(styles.times)}>
+        <Select size={32} label={`${name} from`} options={times} value={from} onChange={(event) => set({ from: Number(event.currentTarget.value) })} />
+        <Text variant="ui" tone="muted">
+          to
+        </Text>
+        <Select size={32} label={`${name} to`} options={times} value={to} onChange={(event) => set({ to: Number(event.currentTarget.value) })} />
+      </span>
+    </div>
   )
 }
 
@@ -207,44 +364,6 @@ function Label({ title, sub }: { readonly title: string; readonly sub: string })
   )
 }
 
-function LevelRow({ title, sub, tags, onRemove, divider }: { readonly title: string; readonly sub: string; readonly tags: ReadonlyArray<NotifyTag>; readonly onRemove: (tag: NotifyTag) => void; readonly divider: boolean }) {
-  return (
-    <ListRow
-      aria-label={title}
-      divider={divider}
-      trailing={
-        <span {...stylex.props(styles.tags)}>
-          {tags.map((tag) => (
-            <Tag key={`${tag.kind}:${tag.id}`} tag={tag} onRemove={() => onRemove(tag)} />
-          ))}
-        </span>
-      }
-    >
-      <Label title={title} sub={sub} />
-    </ListRow>
-  )
-}
-
-function Tag({ tag, onRemove }: { readonly tag: NotifyTag; readonly onRemove: () => void }) {
-  const removeLabel = `Remove ${tag.name}`
-  if (tag.kind === 'channel') {
-    return (
-      <Chip variant="filled" size={28} icon={channelIcons[tag.channelKind]} onRemove={onRemove} removeLabel={removeLabel}>
-        {tag.name}
-      </Chip>
-    )
-  }
-  const avatar: ReactNode = <Avatar size={18} label={initials(tag.name)} name={tag.name} hue={hueFor('', tag.id)} {...(tag.avatarUrl === undefined ? {} : { src: tag.avatarUrl })} />
-  return (
-    <Chip variant="filled" size={28} onRemove={onRemove} removeLabel={removeLabel}>
-      <span {...stylex.props(styles.person)}>
-        {avatar}
-        {tag.name}
-      </span>
-    </Chip>
-  )
-}
-
 function count(n: number) {
   return (
     <Text variant="body" tone="inherit" weight="semibold" numeric as="span">
@@ -253,60 +372,8 @@ function count(n: number) {
   )
 }
 
-function Today({ interrupted, held, rows, initiallyOpen }: { readonly interrupted: number; readonly held: number; readonly rows: ReadonlyArray<TodayRow>; readonly initiallyOpen: boolean }) {
-  const [open, setOpen] = useState(initiallyOpen)
-  const showWhy = (
-    <Button variant="ghost" size="sm" tone="subtle" expanded={open} aria-haspopup="dialog" onClick={() => setOpen(!open)}>
-      Show why
-    </Button>
-  )
-  return (
-    <div {...stylex.props(styles.todayLine)}>
-      <Text variant="body" tone="subtle">
-        {interrupted === 0 ? (
-          <>Nothing has interrupted you today.{held > 0 ? <> Juno held {count(held)}.</> : null}</>
-        ) : (
-          <>
-            {count(interrupted)}
-            {interrupted === 1 ? ' message interrupted you.' : ' messages interrupted you.'} Juno held {count(held)}.
-          </>
-        )}
-      </Text>
-      {rows.length === 0 ? null : (
-        <Popover open={open} onClose={() => setOpen(false)} anchor={showWhy} placement="top-start" width="picker" maxHeight="picker" padding="sm" label="Messages that interrupted you">
-          <div role="list" aria-label="Messages that interrupted you" {...stylex.props(styles.log)}>
-            {rows.map((row) => (
-              <div key={row.id} role="listitem" {...stylex.props(styles.logRow)}>
-                <span {...stylex.props(styles.logLine)}>
-                  <Text variant="meta" tone="muted" numeric>
-                    {clockLabel(row.at)}
-                  </Text>
-                  <Text variant="meta" tone="subtle" truncate>
-                    {row.place}
-                  </Text>
-                </span>
-                <Text variant="ui" clamp={2}>
-                  {row.sender === '' ? null : (
-                    <Text variant="ui" weight="semibold" as="span">{`${row.sender} `}</Text>
-                  )}
-                  {row.text}
-                </Text>
-                <Text variant="meta" tone="muted">
-                  {row.reason}
-                </Text>
-              </div>
-            ))}
-          </div>
-        </Popover>
-      )}
-    </div>
-  )
-}
-
 /** The label column of a row: 260px (inventory 13). */
 const LABEL_WIDTH = 260 // tokens-allow: the row's label column
-/** What matters to you: at most 620px wide. */
-const MATTERS_WIDTH = 620 // tokens-allow: the What matters field's widest
 
 const styles = stylex.create({
   label: {
@@ -324,6 +391,16 @@ const styles = stylex.create({
     gap: spacing['--space-2'],
     minWidth: 0,
   },
+  hoursRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    columnGap: spacing['--space-3'],
+    rowGap: spacing['--space-2'],
+    paddingBlock: spacing['--space-2'],
+    paddingInline: spacing['--space-3-5'],
+  },
   times: {
     display: 'flex',
     alignItems: 'center',
@@ -337,46 +414,43 @@ const styles = stylex.create({
     paddingBlockEnd: spacing['--space-3'],
     paddingInline: spacing['--space-3-5'],
   },
-  matters: {
-    display: 'flex',
-    flexDirection: 'column',
-    maxWidth: MATTERS_WIDTH,
-  },
-  tags: {
+  // Under the hours row, at its start; its height kept when empty.
+  slackLine: {
     display: 'flex',
     flexWrap: 'wrap',
-    justifyContent: 'flex-end',
-    gap: spacing['--space-1-5'],
-    minWidth: 0,
-  },
-  person: {
-    display: 'inline-flex',
     alignItems: 'center',
-    gap: spacing['--space-1-5'],
+    columnGap: spacing['--space-2'],
+    rowGap: spacing['--space-1'],
+    // As tall as Use Juno's hours, so the line coming or going moves nothing.
+    minHeight: sizes['--control-28'],
+    paddingInline: spacing['--space-3-5'],
+    paddingBottom: spacing['--space-2'],
+  },
+  // Scrolled to the top of the page's scroller with the section's own room above it.
+  anchor: {
+    scrollMarginTop: spacing['--space-6'],
+  },
+  howAuto: {
+    paddingBlock: spacing['--space-3'],
+    paddingInline: spacing['--space-3-5'],
+    borderRadius: radii['--radius-lg'],
+    backgroundColor: colors['--surface-hover'],
+  },
+  howLead: {
+    margin: 0,
+  },
+  howList: {
+    margin: 0,
+    marginTop: spacing['--space-1-5'],
+    paddingInlineStart: spacing['--space-5'],
+    display: 'flex',
+    flexDirection: 'column',
+    gap: spacing['--space-1'],
   },
   todayLine: {
     display: 'flex',
     alignItems: 'center',
     gap: spacing['--space-3'],
-  },
-  log: {
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  logRow: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: spacing['--space-0-5'],
-    paddingBlock: spacing['--space-2'],
-    paddingInline: spacing['--space-1-5'],
-    borderBottomWidth: '1px',
-    borderBottomStyle: 'solid',
-    borderBottomColor: colors['--border-subtle'],
-  },
-  logLine: {
-    display: 'flex',
-    alignItems: 'baseline',
-    gap: spacing['--space-2'],
-    minWidth: 0,
+    minHeight: sizes['--control-28'],
   },
 })
