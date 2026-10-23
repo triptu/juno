@@ -4,7 +4,7 @@ Test doubles for Juno Agent (plan v3 §16). Imported only by tests (declare it i
 
 pi packages and the Codex SDK may be imported anywhere in this package (`check-deps`), because the fakes stand in for them.
 
-`bun run test:agent-testing` runs this package's tests behind the machine-wide lock.
+`bun run test:agent-testing` runs this package's tests behind the machine-wide lock (`bun test` here runs them directly). The fakes are tested through their consumers in `packages/agent` and the e2e specs. This package tests only what those consumers rely on and cannot see: `test/faults.test.ts` checks that each injected fault really happens (a lost stream, the 5xx, 401 and 429 shapes, a lost MCP call applied or not, a lost Notion write), and `test/crash.test.ts` checks the crash harness and that every crash point names labels in the Quint specs.
 
 ## Which fake to use
 
