@@ -2,23 +2,36 @@
   "name": "@juno/testing",
   "version": "0.1.0",
   "private": true,
-  "description": "Shared Playwright helpers for the gallery and the desktop e2e tests. Test code only; no app package imports it.",
+  "description": "Shared test helpers: Playwright helpers for the gallery and the desktop e2e tests, and the bun test preload and helpers for unit tests. Test code only; no app package imports it.",
   "type": "module",
   "exports": {
     "./layout-shift": "./src/layoutShift.ts",
-    "./eventually": "./src/eventually.ts"
+    "./eventually": "./src/eventually.ts",
+    "./effect": "./src/effect.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
   },
   "peerDependencies": {
-    "@playwright/test": "^1.64.0"
+    "@playwright/test": "^1.64.0",
+    "effect": "4.0.3"
   },
   "devDependencies": {
     "@playwright/test": "1.64.0",
+    "@types/node": "24.19.2",
+    "bun-types": "1.4.2",
+    "effect": "4.0.3",
     "typescript": "7.0.2"
   },
   "juno": {
     "allowedDeps": []
+  },
+  "peerDependenciesMeta": {
+    "@playwright/test": {
+      "optional": true
+    },
+    "effect": {
+      "optional": true
+    }
   }
 }
