@@ -18,7 +18,7 @@ import { runPlan } from './affected-run.mjs'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const self = fileURLToPath(import.meta.url)
 const started = Date.now()
-const remoteScripts = ['bench:engine', 'bench:sync', 'lint', 'test', 'specs:check', 'specs:traces', 'specs:conformance', 'test:agent', 'test:agent-contracts', 'test:agent-testing', 'test:gallery', 'test:desktop', 'test:e2e', 'test:plan', 'test:runner']
+const remoteScripts = ['bench:engine', 'bench:sync', 'lint', 'test', 'specs:check', 'specs:traces', 'specs:conformance', 'test:agent', 'test:agent-contracts', 'test:agent-testing', 'test:gallery', 'test:desktop', 'test:browser', 'test:electron', 'test:e2e', 'test:plan', 'test:runner']
 const localOnly = { perf: 'timing', 'test:feel': 'timing', 'gallery:shots': 'the Mac look' }
 
 function parse(argv) {

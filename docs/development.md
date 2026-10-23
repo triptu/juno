@@ -593,7 +593,7 @@ Names are explained in `docs/architecture.md` sections 2.6 and 7.
 | Store, Slack client, Slack-app import, merge rules, engine protocol, session and sync | `packages/<name>/test/` (vitest) | `bun run test` |
 | The Juno agent's flows (turns, cards, connections, T3 and Codex, backup, crash recovery, memory, settings), the AI provider (`PiAiProvider` against pi-ai's scripted faux provider), the agent libraries, and the pure rules of domain, rich text, state, huddle and the small libraries | `packages/<name>/test/` (`bun test`; each file passes alone and with `--parallel`) | `bun test` in the package, or `bun run test` |
 | The sidebar query and boot on the large seed (report only) | `packages/engine/test/bench/` | `JUNO_BENCH=1 bun run --cwd packages/engine vitest run test/bench` |
-| User flows in the built app | `apps/desktop/e2e/` (Playwright, one worker) | `bun run test:e2e` |
+| User flows against the engine host; native Electron integration | `apps/desktop/e2e/` (Playwright browser and Electron projects) | `bun run test:browser`, `bun run test:electron`, or both with `bun run test:desktop` |
 | Mouse-down activation, state switcher, in a real browser | `apps/gallery/activation.spec.ts`, `apps/gallery/behaviour.spec.ts` | `bun run test:gallery` |
 | Sidebar row text contrast, each level in both themes and every accent | `apps/gallery/contrast.spec.ts` | `bun run test:gallery` |
 | No layout shift on hover, press or focus, and the cursor rule, in every state | `apps/gallery/shift.spec.ts` (helper: `packages/testing`) | `bun run test:gallery` |
@@ -696,7 +696,7 @@ What it cannot do:
 - Files from anywhere but the fake Slack. Other images show a grey placeholder.
 - Perf and feel numbers. It is a dev build with React in development mode and no Content Security Policy, so those come from Electron only (`bun run perf`, `bun run test:feel`).
 
-Desktop e2e on Electron stays the merge gate.
+Desktop verification runs the browser and Electron lanes. The browser lane uses a production renderer build against a per-test engine host; the web shell above stays a development tool. See [Desktop e2e](../apps/desktop/e2e/README.md#browser-lane).
 
 ## The feel suite
 
@@ -812,7 +812,7 @@ Agents run selective checks before reporting. A scheduled task runs the full sui
 
 **Full runs.** `bun run verify:main --ref origin/main` runs every suite on main, including heavy sync tests; `--nightly` adds uncached Quint and the Mac suites ("Full runs" below). Run Quint uncached when its specs or checker change too. Conformance is in the full plan. Do not repeat `test:agent` separately; the unit suite already includes it.
 
-**Flakes.** Remote Playwright runs retry once. Tests that pass only on retry remain listed as flaky in the console and full-run summary. A failed test fails the gate. Fix intermittent failures without weakening assertions or running retry loops to obtain green results. Use `bun run flake` to investigate them ("Hunting a flaky test" below).
+**Flakes.** Desktop Playwright projects have zero retries. Tests that pass only on retry remain listed as flaky in the console and full-run summary. A failed test fails the gate. Fix intermittent failures without weakening assertions or running retry loops to obtain green results. Use `bun run flake` to investigate them ("Hunting a flaky test" below).
 
 **Remote plan shape**: `bun run affected` and `bun run verify:main` use separate unit, app and specs jobs when running on the SSH runner. The app job builds the desktop app once and does not shard desktop e2e. See "Remote runs" and "Machine shapes".
 
@@ -999,7 +999,7 @@ this Mac through the heavy lock. These commands have no automatic local fallback
 unreachable host (see "Full runs").
 Namespace, if needed again, is available only through `/tstack:runner`.
 
-`test:plan` splits unit, desktop and gallery, and specs steps into independent SSH jobs. Browser and Electron desktop steps run in order and share builds; conformance stays with specs. Each job
+`test:plan` splits unit, desktop and gallery, and specs steps into independent SSH jobs. Browser and Electron desktop steps run in order and share builds; conformance stays with specs. `verify:main` includes both as separate recorded steps. `affected` selects spec files and runs `test:desktop`, whose Playwright projects route each selected test to its lane (and run canaries in both). Each job
 gets a separate install and report directory, and releases its cores when it
 finishes. `JUNO_RUNNER_PLAN=single` keeps one job; `JUNO_PLAN_SERIAL=1` also
 runs every step in order. `KEY=VALUE` before a step overrides its environment.
@@ -1009,6 +1009,7 @@ bun run runner:check
 bun run remote test --passWithNoTests test/messages.test.ts
 bun run remote test:plan test --passWithNoTests test/messages.test.ts + test:desktop e2e/app.spec.ts
 bun run remote --cores 2 --wait 120 test:gallery shift.spec.ts
+bun run remote test:plan test:browser + test:electron app.spec.ts engine.spec.ts session.spec.ts text-menu.spec.ts updates.spec.ts
 ```
 
 The worktree snapshot includes tracked and unignored files, with non-Markdown

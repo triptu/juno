@@ -86,10 +86,11 @@ export default defineConfig<object, { lane: Lane }>({
   expect: { timeout: 5_000 },
   workers: Math.max(electronWorkers, browserWorkers),
   fullyParallel: false,
-  retries: process.env.CI || process.env.JUNO_REMOTE_CONTAINER ? 1 : 0,
+  retries: 0,
   reporter: [
     [process.env.CI ? 'github' : 'list'],
     ['../../scripts/test-results-reporter.mjs'],
+    ['json', { outputFile: join(results, 'results.json') }],
     // Per-test timing lines for `bun scripts/e2e-timings.mjs`.
     ...(process.env.JUNO_E2E_TIMINGS === '1' ? [['./e2e/timings.ts'] as const] : []),
   ],

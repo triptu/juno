@@ -1,0 +1,1 @@
+- 10-24 04:44 · browser-lane-root-commands · Root browser and Electron commands run through the heavy queue and remote allowlist; full verification records both lanes, affected routes selected specs through both projects, and desktop tests have zero retries. ADR 0018 records the engine-host boundary.
