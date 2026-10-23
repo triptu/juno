@@ -14,9 +14,9 @@ export const SYNC_LOG_LINES = 200
 
 export const osVersion = (): string => process.platform === 'darwin' ? `macOS ${process.getSystemVersion()}` : `${process.platform} ${release()}`
 
-export async function syncLogText(version: string, { phase, reason }: SyncLogInput, at = new Date()): Promise<string> {
+export async function syncLogText(version: string, { phase, reason }: SyncLogInput, at = new Date(), folder?: string): Promise<string> {
   const why = reason === undefined ? '' : ` (${[reason.error, reason.method, reason.detail].filter((part) => part !== undefined).join(', ')})`
-  const lines = await lastLines('engine', SYNC_LOG_LINES)
+  const lines = await lastLines('engine', SYNC_LOG_LINES, folder)
   return [
     'Juno sync log',
     `Juno ${version} on ${osVersion()}`,

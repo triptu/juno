@@ -1,0 +1,1 @@
+- 10-24 05:17 · main-service-boundaries · Extract huddle generation bookkeeping from Electron window events, and allow the notification permission fake and sync-log reader to receive their launch settings and log folder explicitly. Electron keeps its existing defaults; the browser host can run the same code against its own isolated data folder.

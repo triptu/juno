@@ -12,52 +12,31 @@
  * one within the launch.
  */
 import { app, BrowserWindow } from 'electron'
+import { createHuddlePageRegistry } from './huddlePageRegistry'
 import type { EngineSupervisor } from './engine'
 
 /** Call once (`registerIpc` does). Windows that never register a generation are watched to no effect. */
 export function watchHuddlePages(supervisor: Pick<EngineSupervisor, 'send' | 'onReady'>) {
-  const live = new Map<number, number>()
-  /** The generation each page had when its main frame started to leave its document. */
+  const registry = createHuddlePageRegistry((message) => supervisor.send(message))
   const leaving = new Map<number, number>()
-  let maxIssued = Date.now() * 1000
-  const report = () => supervisor.send({ _tag: 'huddlePages', live: [...live.values()], maxIssued })
-  const forget = (id: number, generation?: number) => {
-    if (live.has(id) && (generation === undefined || live.get(id) === generation)) {
-      live.delete(id)
-      report()
-    }
-  }
-  // A new engine process hears them at its `ready`.
-  supervisor.onReady(report)
+  supervisor.onReady(registry.report)
   const watch = (window: BrowserWindow): void => {
     const contents = window.webContents
     const id = contents.id
     contents.on('did-start-navigation', (details) => {
-      const generation = live.get(id)
+      const generation = registry.generation(id)
       if (details.isMainFrame && !details.isSameDocument && generation !== undefined) leaving.set(id, generation)
     })
     // Only the generation of the document that left: the new page may have registered already.
     contents.on('did-navigate', () => {
       const generation = leaving.get(id)
       leaving.delete(id)
-      if (generation !== undefined) forget(id, generation)
+      if (generation !== undefined) registry.forget(id, generation)
     })
-    contents.on('render-process-gone', () => forget(id))
-    contents.on('destroyed', () => forget(id))
+    contents.on('render-process-gone', () => registry.forget(id))
+    contents.on('destroyed', () => registry.forget(id))
   }
   for (const window of BrowserWindow.getAllWindows()) watch(window)
   app.on('browser-window-created', (_event, window) => watch(window))
-  return {
-    /** Gives a page's media service its generation. A newer page of the same contents replaces the one before, which is gone by then. */
-    register(contentsId: number): number {
-      // Only the order within one launch matters, and the clock is read once, at launch. The engine is this process's
-      // utility process and cannot outlive it, so every Start and report it gets names a generation from this counter; a stored record
-      // from an earlier launch is judged by whether main lists its page (media.ts), so a clock set back between launches is harmless.
-      const generation = ++maxIssued
-      live.set(contentsId, generation)
-      // The engine holds back a Start from a generation above the highest it has heard of, so this report and the page's Start may come in either order.
-      report()
-      return generation
-    },
-  }
+  return { register: registry.register }
 }

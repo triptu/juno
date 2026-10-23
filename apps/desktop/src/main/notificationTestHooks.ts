@@ -1,8 +1,8 @@
 /** Notification permission stand-in for JUNO_E2E. */
 import type { NotificationPermission } from '@juno/contract'
 
-export function testNotificationPermission() {
-  let status: NotificationPermission = process.env.JUNO_E2E_NOTIFICATION_INITIAL === 'notDetermined'
+export function testNotificationPermission(options: { readonly initial?: string; readonly response?: string } = { initial: process.env.JUNO_E2E_NOTIFICATION_INITIAL, response: process.env.JUNO_E2E_NOTIFICATION_RESPONSE }) {
+  let status: NotificationPermission = options.initial === 'notDetermined'
     ? { authorization: 'notDetermined', badges: 'unknown' } : { authorization: 'allowed', badges: 'enabled' }
   let requests = 0
   return {
@@ -10,7 +10,7 @@ export function testNotificationPermission() {
     read: () => Promise.resolve(status),
     request: () => {
       requests += 1
-      if (status.authorization === 'notDetermined') status = process.env.JUNO_E2E_NOTIFICATION_RESPONSE === 'denied'
+      if (status.authorization === 'notDetermined') status = options.response === 'denied'
         ? { authorization: 'denied', badges: 'disabled' }
         : { authorization: 'allowed', badges: 'enabled' }
       return Promise.resolve(status)
