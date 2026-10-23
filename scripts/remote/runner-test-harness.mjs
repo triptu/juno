@@ -41,7 +41,7 @@ else if(sub==='build') {
 `)
   // Forward only the remote command, preserving its shell quoting.
   writeFileSync(join(dir, 'ssh'), '#!/usr/bin/env node\nconst {spawn}=require("node:child_process"); if(process.env.TEST_MODE==="unreachable") process.exit(255); const c=spawn("sh",["-c",process.argv.at(-1)],{stdio:"inherit"}); c.on("exit",code=>process.exit(code??255));\n')
-  writeFileSync(join(dir, 'git'), "#!/bin/sh\nprintf 'package.json\\0scripts/remote.mjs\\0scripts/remote/run.sh\\0'\n")
+  writeFileSync(join(dir, 'git'), "#!/bin/sh\nif [ \"$1\" = rev-parse ]; then printf '%s\\n' \"$TMPDIR/repo.git\"; else printf 'package.json\\0scripts/remote.mjs\\0scripts/remote/run.sh\\0'; fi\n")
   writeFileSync(join(dir, 'bun'), '#!/bin/sh\nif [ "$1" = run ]; then shift; fi\nprintf "local: %s\\n" "$*"\n')
   for (const name of ['ssh', 'git', 'bun']) chmodSync(join(dir, name), 0o755)
   const env = { ...process.env, HOME: dir, TMPDIR: dir, TMP: dir, TEMP: dir, PATH: `${dir}:${process.env.PATH}`, TSTACK_HOME: dir, TEST_HOST_JS: join(dir, 'host.cjs'), TEST_CALLS: calls, JUNO_RUNNER_HOST: 'runner-test', JUNO_RUNNER_IMAGE: 'test/image:tag', JUNO_RUNNER_PARENT: undefined, JUNO_RUNNER_PLAN: undefined, JUNO_PLAN_SERIAL: undefined, JUNO_REMOTE_MACHINE: undefined }

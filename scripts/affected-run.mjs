@@ -89,6 +89,7 @@ export async function runPlan(plan, { root, local: localAll }) {
   }
   for (const step of plan.filter((step) => !results.some((result) => result.step === step)))
     results.push(record(step, { code: cancelled ? 130 : 255, seconds: 0, text: 'Step did not run because a prerequisite failed or the run was cancelled' }))
-  writeFileSync(join(folder, 'record.json'), JSON.stringify({ runId, reports: keepReports(root, folder, started), finishedAt: new Date().toISOString(), passed: results.every(({ code }) => code === 0), suites: results.map(({ step, ...result }) => ({ ...result, suite: step.script, args: step.args, env: step.env, items: step.items.map((item) => item.id) })) }, null, 2) + '\n')
+  if (cancelled && results.every(({ code }) => code === 0)) results.push(record({ script: 'plan', args: [] }, { code: 130, seconds: 0, text: 'Coordinator cancelled after suites finished' }))
+  writeFileSync(join(folder, 'record.json'), JSON.stringify({ runId, reports: keepReports(root, folder, started), finishedAt: new Date().toISOString(), passed: results.every(({ code }) => code === 0), suites: results.map(({ step, ...result }) => ({ ...result, suite: step.script, args: step.args, env: step.env, items: (step.items ?? []).map((item) => item.id) })) }, null, 2) + '\n')
   return results
 }
