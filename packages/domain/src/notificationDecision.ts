@@ -97,7 +97,7 @@ const THANKS = new Set(['thanks', 'thank you', 'ty', 'thx'])
 const EMOJI_ONLY = /^(?:\s|:[a-z0-9_+-]+:|\p{Extended_Pictographic}|\p{Emoji_Modifier}|\u200d|\ufe0f)+$/u
 
 /** The text without case, outer space or trailing punctuation. */
-const plain = (text: string) => text.trim().toLowerCase().replace(/[\s.!,;:)]+$/u, '')
+const plain = (text: string) => text.trim().toLowerCase().replace(/[\s.!?…,;:)]+$/u, '')
 
 /**
  * Whether a message is only a closer: one of a short fixed list, or emoji

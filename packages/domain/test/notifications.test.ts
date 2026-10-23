@@ -109,6 +109,8 @@ describe('the decision order', () => {
     ['an emoji closer stays', candidate({ channel: maya, text: '👍', facts: live }), settings, ai, undefined, { outcome: 'stay', decidedBy: 'closer' }],
     ['"Yep!" is a closer', candidate({ channel: maya, text: 'Yep!', facts: live }), settings, ai, undefined, { outcome: 'stay', decidedBy: 'closer' }],
     ['"nice" is a closer', candidate({ channel: group, text: 'nice', facts: live }), settings, ai, undefined, { outcome: 'stay', decidedBy: 'closer' }],
+    ['"sure?" is a closer', candidate({ channel: maya, text: 'sure?', facts: live }), settings, ai, undefined, { outcome: 'stay', decidedBy: 'closer' }],
+    ['"nice…" is a closer', candidate({ channel: maya, text: 'nice…', facts: live }), settings, ai, undefined, { outcome: 'stay', decidedBy: 'closer' }],
     ['a question to someone else in a channel stays', candidate({ mentionsOthers: ['Dev Patel'], facts: { ownerWroteMinutesAgo: 2 } }), settings, ai, asks, { outcome: 'stay', decidedBy: 'addressedElsewhere', reason: 'Asks Dev, not you.' }],
     ['a question to someone else that also names the owner is read', candidate({ mentionsOthers: ['Dev Patel'], mentionsMe: true, mentionsMeDirectly: true }), { ...settings, alwaysNotify: { mentions: false } }, ai, undefined, { needsReading: true }],
     ['a question to someone else in a group DM stays', candidate({ channel: group, mentionsOthers: ['Maya Chen'] }), settings, ai, undefined, { outcome: 'stay', decidedBy: 'addressedElsewhere', reason: 'Asks Maya, not you.' }],
