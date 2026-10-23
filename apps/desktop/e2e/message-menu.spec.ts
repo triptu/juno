@@ -2,8 +2,9 @@
 // click completes, at the pointer, with the emoji grid on top; the
 // context-menu key and ⇧F10 open it at once. More reactions turns it into the
 // emoji picker in one motion, growing from the corner of the menu that stays
-// put, near every edge of the window. One sender's messages start a new
-// header after ten quiet minutes.
+// put, near every edge of the window. Rows show the keys that work on a
+// focused message (T, E, ⌫), which also choose them while the menu is open.
+// One sender's messages start a new header after ten quiet minutes.
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from './fixtures'
 import type { Juno, MessageMenuDriver } from './driver/juno'
@@ -100,6 +101,66 @@ test('a right-click opens the menu as it comes up, over the same message, with t
     await menu.openOnRow(target)
     await juno.win.mouse.click(5, 300)
     await expect(menu.root).toHaveCount(0)
+  })
+})
+
+test('a key the menu shows runs its row; T on a focused message in Main starts its thread, and does nothing in the thread', async ({ juno, fake }) => {
+  fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Something to bring #eng up' })
+  await juno.sidebar.expectTop('#eng')
+  await juno.sidebar.row('#eng').open()
+  const { topic } = juno
+  const menu = juno.messageMenu
+  await topic.send('Keys in the menu')
+  await topic.expectSent('Keys in the menu')
+  const row = topic.message('Keys in the menu')
+
+  await test.step('E in the open menu edits, and types nothing', async () => {
+    await menu.openOnRow(row)
+    expect(await menu.shortcuts()).toEqual({ reply: 'T', edit: 'E', delete: '⌫' })
+    await juno.win.keyboard.press('e')
+    await expect(menu.root).toHaveCount(0)
+    const field = topic.list.getByRole('textbox', { name: 'Edit message' })
+    await expect(field).toBeFocused()
+    await expect(field).toHaveValue('Keys in the menu')
+    await field.press('Escape')
+    await expect(field).toHaveCount(0)
+  })
+
+  await test.step('⌫ in the open menu asks to delete', async () => {
+    await menu.openOnRow(row)
+    await juno.win.keyboard.press('Backspace')
+    await expect(menu.root).toHaveCount(0)
+    const confirm = row.locator('[data-delete-confirm]')
+    await expect(confirm).toBeVisible()
+    await juno.win.keyboard.press('Escape')
+    await expect(confirm).toHaveCount(0)
+    await expect(row).toBeVisible()
+  })
+
+  await test.step('T on the focused message starts its thread', async () => {
+    await topic.composer.focus()
+    await topic.composer.press('ArrowUp')
+    await expect(row).toBeFocused()
+    await row.press('t')
+    await topic.expectTitle(/Keys in the menu/)
+    await expect(topic.composer).toHaveAttribute('aria-label', 'Reply')
+  })
+
+  await test.step('in the thread the menu shows no T, and T does nothing', async () => {
+    await topic.composer.focus()
+    await topic.composer.press('ArrowUp')
+    const root = topic.message('Keys in the menu')
+    await expect(root).toBeFocused()
+    await root.press('t')
+    await expect(root).toBeFocused()
+    await topic.expectTitle(/Keys in the menu/)
+    await menu.openOnRow(root)
+    expect(await menu.shortcuts()).toEqual({ edit: 'E', delete: '⌫' })
+    // T is no key here: it only jumps to a row by its name, and the menu stays open.
+    await juno.win.keyboard.press('t')
+    await expect(menu.root).toBeVisible()
+    await topic.expectTitle(/Keys in the menu/)
+    await menu.close()
   })
 })
 
