@@ -1,6 +1,6 @@
 import type { EngineToMain, MainToEngine } from '@juno/contract'
-import type { EngineHostOptions } from '@juno/engine'
-import { Effect } from 'effect'
+import { productionTiming, type EngineHostOptions } from '@juno/engine'
+import { Effect, Record } from 'effect'
 
 type Request = Extract<MainToEngine, { _tag: 'testWork' }>
 type Reply = Extract<EngineToMain, { _tag: 'testWorkDone' }>
@@ -34,4 +34,21 @@ export function createTestWork(send: (reply: Reply) => void) {
       }
     },
   }
+}
+
+/**
+ * The e2e scheduling profile for a launch against the fake Slack (e2e README,
+ * "Scheduling and setup timings"): the unit harness's 1:20 scale, with
+ * explicit catch-ups in place of periodic discovery.
+ */
+export const fastTestTiming: NonNullable<EngineHostOptions['timing']> = {
+  ...Record.map(productionTiming, (millis) => millis / 20),
+  // As in the unit harness, explicit catch-ups replace periodic discovery.
+  sweepIntervalMillis: 0,
+  followPassMillis: 0,
+  // The app and the fake run in separate real processes, on a shared runner.
+  socketHelloTimeoutMillis: productionTiming.socketHelloTimeoutMillis,
+  socketPongTimeoutMillis: productionTiming.socketPongTimeoutMillis,
+  // Stands for how far Slack's edge lags its socket, which the fake keeps in real time (`setHuddleInfoLag`).
+  huddleInfoSettleMillis: productionTiming.huddleInfoSettleMillis,
 }

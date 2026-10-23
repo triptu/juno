@@ -17,11 +17,11 @@
 // First, so coverage (test runs only) starts before the rest of the bundle runs.
 import '../coverage'
 import { installProcessLog } from '../processLog'
-import { createTestWork } from './testWork'
+import { createTestWork, fastTestTiming } from './testWork'
 import { net } from 'electron'
-import { Effect, Layer, Record, Schema } from 'effect'
+import { Effect, Layer, Schema } from 'effect'
 import { MainToEngine, type EngineToMain } from '@juno/contract'
-import { electronTransport, productionTiming, startEngine, type EngineHandle, type Host } from '@juno/engine'
+import { electronTransport, startEngine, type EngineHandle, type Host } from '@juno/engine'
 import { HttpTransport, HttpTransportError, type HttpResponse } from '@juno/slack'
 
 const processLog = installProcessLog('engine')
@@ -88,19 +88,7 @@ parent.on('message', (event) => {
       engine = startEngine(transport, message.config, {
         host, httpTransport: ElectronNet, agentTransport, agentWrites: 'enabled', logger: processLog.effectLogger,
         ...(fastTiming && testWork ? { work: testWork.control } : {}),
-        ...(fastTiming
-          ? { timing: {
-              ...Record.map(productionTiming, (millis) => millis / 20),
-              // As in the unit harness, explicit catch-ups replace periodic discovery.
-              sweepIntervalMillis: 0,
-              followPassMillis: 0,
-              // Electron and the fake run in separate real processes, on a shared runner.
-              socketHelloTimeoutMillis: productionTiming.socketHelloTimeoutMillis,
-              socketPongTimeoutMillis: productionTiming.socketPongTimeoutMillis,
-              // Stands for how far Slack's edge lags its socket, which the fake keeps in real time (`setHuddleInfoLag`).
-              huddleInfoSettleMillis: productionTiming.huddleInfoSettleMillis,
-            } }
-          : {}),
+        ...(fastTiming ? { timing: fastTestTiming } : {}),
       })
       engine.then(
         () => { processLog.log('INFO', 'process ready'); send({ _tag: 'ready' }) },
