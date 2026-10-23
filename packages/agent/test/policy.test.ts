@@ -88,7 +88,7 @@ describe('what a tool call does, by tier and run', () => {
       ['destructive', 'refused', 'refused', 'refused'],
     ]
     for (const [op, inClean, inTainted, inWake] of table) {
-      expect([op, toolDecision(op, clean)._tag, toolDecision(op, tainted)._tag, toolDecision(op, wake)._tag]).toEqual([op, inClean, inTainted, inWake])
+      expect([op, toolDecision(op, clean)._tag, toolDecision(op, tainted)._tag, toolDecision(op, wake)._tag]).toEqual<string[]>([op, inClean, inTainted, inWake])
     }
   })
 
