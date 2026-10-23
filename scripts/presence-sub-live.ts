@@ -15,6 +15,10 @@
  *    counts how many agree with what the socket said.
  * 4. Sends an empty `presence_sub` and counts frames for `--seconds` more.
  *
+ * With `--self`, step 1 is skipped and the subscription holds only the
+ * signed-in user's own id, as Juno's does among the others: the output says
+ * whether Slack named that id, and what it and `users.getPresence` said.
+ *
  * Writes nothing to Slack: the HTTP calls are `conversations.list`,
  * `client.getWebSocketURL` and `users.getPresence`; the socket sends only
  * `ping` and `presence_sub`. Output is counts and times. No token, cookie,
@@ -35,6 +39,7 @@ const flag = (name: string, fallback: number) => {
 }
 const people = flag('--people', 30)
 const seconds = flag('--seconds', 10)
+const selfOnly = process.argv.includes('--self')
 
 const READS = new Set(['client.getWebSocketURL'])
 
@@ -52,16 +57,16 @@ async function read<A>(method: 'conversations.list' | 'users.getPresence', args:
   return (await response.json()) as ({ ok: true } & A) | { ok: false; error?: string }
 }
 
-const listed = await read<{ channels: ReadonlyArray<{ user?: string; is_user_deleted?: boolean }> }>('conversations.list', { types: 'im', limit: '200', exclude_archived: 'true' })
+const listed = selfOnly ? { ok: true as const, channels: [] } : await read<{ channels: ReadonlyArray<{ user?: string; is_user_deleted?: boolean }> }>('conversations.list', { types: 'im', limit: '200', exclude_archived: 'true' })
 if (!listed.ok) {
   console.error(`presence-sub-live: conversations.list failed: ${listed.error ?? 'unknown'}`)
   process.exit(1)
 }
-const ids = listed.channels
+const ids = selfOnly ? [session.userId] : listed.channels
   .filter((channel) => channel.user !== undefined && channel.user !== session.userId && channel.user !== 'USLACKBOT' && channel.is_user_deleted !== true)
   .map((channel) => channel.user as string)
   .slice(0, people)
-console.log(`presence-sub-live: ${ids.length} DM partners`)
+console.log(selfOnly ? 'presence-sub-live: your own id only' : `presence-sub-live: ${ids.length} DM partners`)
 
 const guard = Layer.effect(
   HttpTransport,
@@ -118,6 +123,7 @@ const program = Effect.gen(function* () {
   const values = [...seen.values()]
   console.log(`  after presence_sub: ${frames} presence_change frames (${singleUser} with a single user), first ${firstAt === undefined ? 'never' : `${firstAt - sentAt} ms`} after sending`)
   console.log(`  batches in order: ${batches.join(' ')}`)
+  if (selfOnly) console.log(`  your own id named: ${seen.get(session.userId) ?? 'no'}`)
   console.log(`  users named: ${seen.size} of ${ids.length} (${values.filter((v) => v === 'active').length} active, ${values.filter((v) => v === 'away').length} away)`)
 
   let agree = 0
