@@ -111,7 +111,7 @@ it('local and Slack identity/date filters agree; apps and Automated are hidden w
     const thin = await session(engine, parseSearchQuery('scopedprobe'), 'thin').until((s) => s.state === 'done')
     expect(thin.pagination.page).toBe(2)
     expect(ids(thin)).toHaveLength(2)
-    const scoped = await session(engine, parseSearchQuery('scopedprobe', { scope: { topic: { channel: 'C0ENG', threadTs: root.ts } } }), 'topic').until((s) => s.state === 'done')
+    const scoped = await session(engine, parseSearchQuery('scopedprobe', { scope: { topic: { channel: 'C0ENG', threadTs: root.ts }, groupByThread: true } }), 'topic').until((s) => s.state === 'done')
     expect(ids(scoped)).toEqual(ids(thin))
     expect(scoped.groups).toHaveLength(1)
     expect(scoped.groups[0]?.kind).toBe('thread')

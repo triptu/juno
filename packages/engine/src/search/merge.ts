@@ -30,13 +30,19 @@ export function literalRanges(text: string, query: SearchQuery) {
   return merged
 }
 
-/** Coverage follows raw source pages, before hidden rows are removed. Local copies win dedupe. */
+/**
+ * Coverage follows raw source pages, before hidden rows are removed. Local copies win dedupe.
+ * Flat (the default) gives each match and each title-only topic a group of its own, in time order, so a later
+ * page only adds rows at the end. `group` gathers a thread's matches under its newest, and consecutive Main
+ * matches from one channel.
+ */
 export function mergeSearch(input: {
   readonly local: ReadonlyArray<SearchHit>
   readonly titles: ReadonlyArray<SearchTitleHit>
   readonly localCoverage: Coverage
   readonly pages: ReadonlyArray<SearchPage>
   readonly sort: 'newest' | 'oldest'
+  readonly group?: boolean
 }): { groups: ReadonlyArray<SearchGroup>; frontier: { through: string | null; complete: boolean; olderGroupIndex: number } } {
   const direction = input.sort === 'newest' ? -1 : 1
   const slack = input.pages.at(-1)?.coverage ?? { through: null, complete: false }
@@ -60,14 +66,14 @@ export function mergeSearch(input: {
     const kind = entry.kind === 'title' ? 'topic' : topicId.startsWith('t:') ? 'thread' : 'main'
     const key = `${isOlder ? 'older:' : ''}${topicId}`
     const previous = groups.at(-1)
-    const index = kind === 'thread' ? threads.get(key) : kind === 'main' && previous?.kind === 'main' && previous.place.id === entry.row.place.id && previous.older === isOlder ? groups.length - 1 : undefined
+    const index = input.group !== true ? undefined : kind === 'thread' ? threads.get(key) : kind === 'main' && previous?.kind === 'main' && previous.place.id === entry.row.place.id && previous.older === isOlder ? groups.length - 1 : undefined
     const title = titles.get(topicId)
     if (index !== undefined && entry.kind === 'message') {
       const group = groups[index]
       if (group !== undefined) groups[index] = { ...group, messages: [...group.messages, entry.row], matchCount: group.matchCount + 1 }
     } else {
       if (kind === 'thread') threads.set(key, groups.length)
-      groups.push({ id: kind === 'main' ? `${key}:${entry.row.id}` : key, kind, topicId, title: title?.title ?? entry.row.title, titleRanges: title?.ranges ?? [], place: entry.row.place, at: entry.at, messages: entry.kind === 'message' ? [entry.row] : [], older: isOlder, matchCount: entry.kind === 'message' ? 1 : 0 })
+      groups.push({ id: kind === 'main' || (input.group !== true && entry.kind === 'message') ? `${key}:${entry.row.id}` : key, kind, topicId, title: title?.title ?? entry.row.title, titleRanges: title?.ranges ?? [], place: entry.row.place, at: entry.at, messages: entry.kind === 'message' ? [entry.row] : [], older: isOlder, matchCount: entry.kind === 'message' ? 1 : 0 })
     }
   }
   const index = groups.findIndex((g) => g.older)

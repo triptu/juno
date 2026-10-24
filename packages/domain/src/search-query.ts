@@ -17,6 +17,8 @@ export const SearchScope = Schema.Struct({
   hideApps: Schema.Boolean,
   hideAutomated: Schema.Boolean,
   sort: Schema.Literals(['newest', 'oldest']),
+  /** The Search tab's Group by thread: a thread's matches share one group. Without it each match is its own row. */
+  groupByThread: Schema.optionalKey(Schema.Boolean),
   topic: Schema.optionalKey(Schema.Struct({ channel: Schema.String, threadTs: Schema.optionalKey(Schema.String) })),
 })
 export const SearchQuery = Schema.Struct({

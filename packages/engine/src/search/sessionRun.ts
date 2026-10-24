@@ -71,7 +71,7 @@ export const localHidden = (run: SearchRun) => Effect.gen(function* () {
 })
 
 export function snapshot(run: SearchRun): SearchSnapshot {
-  const merged = mergeSearch({ local: run.local, titles: run.titles, localCoverage: run.localCoverage, pages: run.pages, sort: run.resolved.query.scope.sort })
+  const merged = mergeSearch({ local: run.local, titles: run.titles, localCoverage: run.localCoverage, pages: run.pages, sort: run.resolved.query.scope.sort, group: run.resolved.query.scope.groupByThread === true })
   const window = windowSearchGroups(merged.groups, run.offset, 100)
   const olderIndex = window.groups.findIndex((g) => g.older)
   const hidden = Math.max(run.hidden.size, run.automatedHidden.size + run.hiddenApps)
