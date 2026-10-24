@@ -11,10 +11,9 @@ import { MESSAGE_LANDING_OFFSET } from '@juno/tokens/layout'
  */
 import { useEffect, useEffectEvent, useLayoutEffect, useState, type RefObject } from 'react'
 import { afterPaint, mark, measure } from '@juno/state/perf'
-import { searchMatchesAtom, searchSessionAtom, bottomWindow, flashMessage, loadOlderMessages, matchWindow, messageListAtom, messageWindowSpecAtom, registry, scrollSnapshotAtom, topicAtom, topicView, type SearchSelection } from '@juno/state'
+import { searchMatchesAtom, searchSessionAtom, bottomWindow, flashMessage, loadMessageAt, matchWindow, messageListAtom, messageWindowSpecAtom, registry, scrollSnapshotAtom, topicAtom, topicView, type SearchSelection } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { openTopicAtInBackground, openTopicInBackground } from '../navigation'
-import { justAfter } from '../slackLinks'
 import { Topic } from '../TopicView'
 import { markMatches } from './matches'
 import type { SearchSnapshot } from '@juno/contract'
@@ -53,7 +52,7 @@ export function moveReader(sessionId: string, target: SearchSelection, how: 'poi
     }
     if (target.stored !== false) return land()
     // A match only Slack found is fetched first, as for another topic (`Waiter`), and landed on if it is still the selection.
-    void loadOlderMessages(registry, target.topicId, justAfter(ts)).then(() => {
+    void loadMessageAt(registry, target.topicId, ts).then(() => {
       if (registry.get(searchSessionAtom(sessionId)).selected?.ts === ts) land()
     })
     return
@@ -66,7 +65,7 @@ export function moveReader(sessionId: string, target: SearchSelection, how: 'poi
 /** Open in new tab, and ⌘Enter on a row: the topic at the match in a tab behind this one. */
 export async function openResultBehind(target: SearchSelection): Promise<void> {
   if (target.ts === undefined) return openTopicInBackground(target.topicId)
-  if (target.stored === false) await loadOlderMessages(registry, target.topicId, justAfter(target.ts))
+  if (target.stored === false) await loadMessageAt(registry, target.topicId, target.ts)
   openTopicAtInBackground(target.topicId, target.ts)
 }
 
@@ -112,7 +111,7 @@ function Waiter({ sessionId, target, onReady }: { readonly sessionId: string; re
   useLayoutEffect(() => {
     // A restored selection had no event to set the view; a match only Slack found is fetched first, as ⌘K does.
     moveReader(sessionId, target, 'pointer')
-    if (target.stored === false && target.ts !== undefined) void loadOlderMessages(registry, target.topicId, justAfter(target.ts))
+    if (target.stored === false && target.ts !== undefined) void loadMessageAt(registry, target.topicId, target.ts)
   }, [sessionId, target])
   const [late, setLate] = useState(false)
   useEffect(() => {

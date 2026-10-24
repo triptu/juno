@@ -20,7 +20,7 @@ import type { ActivateEvent, LinkInfo } from '@juno/views'
 import {
   locateMessage,
   locatePerson,
-  loadOlderMessages,
+  loadMessageAt,
   openExternal,
   openInSlack,
   openWebPanel,
@@ -34,13 +34,6 @@ import {
   type SlackLinkTarget,
 } from '@juno/state'
 import { newMessage, openTopic, openTopicAt, openTopicAtInBackground, openTopicInBackground } from './navigation'
-
-/** The ts just after `ts`, so a page fetched "before" it includes it. */
-export function justAfter(ts: string): string {
-  const [seconds = '0', micros = '0'] = ts.split('.')
-  const next = Number(micros) + 1
-  return next >= 1_000_000 ? `${Number(seconds) + 1}.000000` : `${seconds}.${String(next).padStart(6, '0')}`
-}
 
 /** The link read against the signed-in workspace; undefined for a link that is not to Slack, or when signed out. */
 function read(url: string): SlackLinkMatch | undefined {
@@ -146,7 +139,7 @@ async function openSlackLink(url: string, match: SlackLinkMatch, event: Activate
       const topic = await messageTopic(target)
       if (topic?.place === undefined) return openOutside(url, match, NO_CONVERSATION)
       if (!topic.stored) {
-        const loaded = await loadOlderMessages(registry, topic.topicId, justAfter(target.ts))
+        const loaded = await loadMessageAt(registry, topic.topicId, target.ts)
         if (loaded._tag === 'Success' && loaded.value.outcome === 'rejected') return openOutside(url, match, NO_CONVERSATION)
       }
       return openLinked(topic.topicId, target.ts, event.metaKey)

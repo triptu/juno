@@ -11,9 +11,7 @@
  *   in full (a search match is not), later opens ask only for replies after
  *   the newest stored one.
  * - The page before a message: for a thread, the replies from the root up
- *   to the oldest stored one; for a message past every stored reply (a
- *   search match deep in a long thread), the replies from the newest stored
- *   one up to it, at most `OPEN_FETCH_MAX`.
+ *   to the oldest stored one.
  * - A jump to a message the store lacks in full (a search match, a link):
  *   for a thread, the replies after the newest stored one before it, up to
  *   it, when they fit one page; else the page that starts at it, so a reply
@@ -205,11 +203,6 @@ const olderThread = (ctx: SyncContext, channel: string, threadTs: string, before
   Effect.gen(function* () {
     const coverage = yield* threadCoverage(channel, threadTs)
     if (repliesComplete(coverage)) return { fetched: false, complete: true, unknownUsers: [] }
-    // A message past every stored reply (a search match deep in a long thread): fill forward from the newest stored reply up to it.
-    if (coverage.newest !== undefined && compareTs(coverage.newest, before) < 0) {
-      const { messages } = yield* pageReplies(ctx, channel, threadTs, { oldest: coverage.newest, latest: before }, OPEN_FETCH_MAX, lane)
-      return { fetched: true, complete: false, unknownUsers: yield* unknownSenders(messages) }
-    }
     // The stored replies have a gap at the start; fetch forward from the root up to the oldest stored one.
     const latest = coverage.oldest !== undefined && compareTs(coverage.oldest, before) < 0 ? coverage.oldest : before
     const { messages, reachedEnd } = yield* pageReplies(ctx, channel, threadTs, { latest }, OPEN_PAGE, lane)

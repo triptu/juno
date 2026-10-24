@@ -7,10 +7,9 @@
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import type { SearchSnapshot } from '@juno/contract'
-import { loadMoreSearch, loadOlderMessages, prefetchSearchResult, registry, updateSearchSession, type SearchSelection, type SearchSession } from '@juno/state'
+import { loadMessageAt, loadMoreSearch, prefetchSearchResult, registry, updateSearchSession, type SearchSelection, type SearchSession } from '@juno/state'
 import { isStop, readerTarget, searchRows, type SearchRowItem } from '@juno/views'
 import { openTopic, openTopicAt } from '../navigation'
-import { justAfter } from '../slackLinks'
 
 /** The engine sends 100 rows at a time; near either end the window moves by half. */
 const WINDOW = 100
@@ -25,7 +24,7 @@ export function selectionOf(row: SearchRowItem | undefined): SearchSelection | u
 /** The result at the match in this tab, as Enter opens it; Back returns to the search as it was. */
 export async function openResultHere(target: SearchSelection): Promise<void> {
   if (target.ts === undefined) return openTopic(target.topicId)
-  if (target.stored === false) await loadOlderMessages(registry, target.topicId, justAfter(target.ts))
+  if (target.stored === false) await loadMessageAt(registry, target.topicId, target.ts)
   openTopicAt(target.topicId, target.ts, { flash: true })
 }
 
