@@ -111,7 +111,7 @@ export async function tabAndEdge({ juno, slack }: Pick<Fixtures, 'juno' | 'slack
   await page.row('Heron migration is done').click()
   await expect(page.reader.getByText('Heron migration is done')).toBeVisible()
   // The chosen row is not among the next query's rows: Tab lands on the first row, selects it, and the reader follows.
-  await page.field.pressSequentially(' dashboards')
+  await page.field.fill('heron dashboards')
   await expect(page.rows).toHaveCount(1)
   const row = page.row('Heron dashboards are live')
   await expect(row).toHaveAttribute('aria-selected', 'false')

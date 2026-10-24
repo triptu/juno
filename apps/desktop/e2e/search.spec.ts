@@ -114,10 +114,6 @@ async function localThenSlack({ juno, fake }: Context): Promise<void> {
   fake.holdNext({ method: SEARCH, reason: 'search' })
   await page.field.pressSequentially('flamingo')
   await expect(page.row('Flamingo launch moved to Thursday')).toBeVisible()
-  // A fresh search shows its first result in the reader as a peek; focus stays in the field (arrowThrough checks nothing was read).
-  await expect(page.row('Flamingo launch moved to Thursday')).toHaveAttribute('aria-selected', 'true')
-  await expect(page.reader.getByText('Flamingo launch moved to Thursday')).toBeVisible()
-  await expect(page.field).toBeFocused()
   await expect(page.row('Flamingo from Leo')).toHaveCount(0)
   await expect.poll(() => fake.heldCalls({ method: SEARCH }).some((call) => String(call['query']).includes('flamingo'))).toBe(true)
   await expect(page.results.getByText('Searching Slack…')).toBeVisible()
@@ -127,6 +123,10 @@ async function localThenSlack({ juno, fake }: Context): Promise<void> {
   await expect(page.row('Flamingo plan from last quarter')).toHaveCount(1)
   await expect(page.results.getByText('Searching Slack…')).toHaveCount(0)
   expect(await rowIds(page, 6)).toEqual(first)
+  // With Slack's answer, a fresh search shows its first result in the reader as a peek; focus stays in the field (arrowThrough checks nothing was read).
+  await expect(page.row('Flamingo launch moved to Thursday')).toHaveAttribute('aria-selected', 'true')
+  await expect(page.reader.getByText('Flamingo launch moved to Thursday')).toBeVisible()
+  await expect(page.field).toBeFocused()
   // Flat, a run of matches from one topic shows the topic's line once.
   await expect(page.rows.filter({ hasText: 'on the pager' })).toHaveCount(24)
   await expect(page.rows.filter({ hasText: '#incidents' })).toHaveCount(1)
@@ -172,8 +172,9 @@ async function openAndBack({ juno }: Context): Promise<void> {
   const box = await page.results.boundingBox()
   if (box === null) throw new Error('No results column')
   await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-  await win.mouse.wheel(0, 360)
-  await expect.poll(() => page.results.evaluate((list) => list.scrollTop)).toBeGreaterThan(200)
+  // Part way down, so Back's restore is not clamped at the list's end.
+  await win.mouse.wheel(0, 160)
+  await expect.poll(() => page.results.evaluate((list) => list.scrollTop)).toBeGreaterThan(100)
   const scrolled = await page.results.evaluate((list) => list.scrollTop)
   const target = page.row('Flamingo note 17 on the pager')
   await target.click()
