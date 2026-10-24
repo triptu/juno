@@ -9,7 +9,7 @@ import { resolve } from 'node:path'
  */
 export default function coverage(): (() => void) | undefined {
   if (process.env.JUNO_COVERAGE !== '1') return undefined
-  rmSync(resolve(__dirname, '../coverage'), { recursive: true, force: true })
+  rmSync(resolve(__dirname, '../coverage/raw'), { recursive: true, force: true })
   return () => {
     execFileSync(process.execPath, [resolve(__dirname, '../../../scripts/coverage-map.mjs'), 'reduce'], { stdio: 'inherit' })
   }

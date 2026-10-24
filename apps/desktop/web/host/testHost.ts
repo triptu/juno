@@ -30,6 +30,7 @@ import { ENGINE_SOCKET_PATH } from '../paths'
 import { fakeMain, type SessionStore, type StoredSession } from './fakeMain'
 import { serveFile } from './files'
 import { createShell } from './system'
+import { recordHostCoverage } from './coverage'
 import type { AgentOptions } from './agent'
 import { AGENT_SOCKET_PATH, SHELL_SOCKET_PATH, type SystemCall } from '../shell'
 
@@ -44,6 +45,7 @@ export interface EngineOptions extends AgentOptions {
 }
 
 export interface HostStart {
+  readonly coverage?: string
   readonly userData: string
   readonly fakeUrl: string
   /** Origins a synced snapshot's addresses name, which mean this fake. */
@@ -197,6 +199,7 @@ async function serveStatic(webRoot: string, request: IncomingMessage, response: 
 
 async function begin(start: HostStart): Promise<{ url: string }> {
   if (running !== undefined) throw new Error('The host already started')
+  recordHostCoverage(start.coverage)
   const calls: Record<string, number> = {}
   const server = createServer()
   const sockets = new WebSocketServer({ noServer: true })
@@ -301,7 +304,7 @@ async function stop(): Promise<void> {
   if (current === undefined) return
   if (!current.stopped) {
     await current.shell.agent.stop()
-  await current.engine.stop().catch(() => undefined)
+    await current.engine.stop().catch(() => undefined)
     await current.log.close().catch(() => undefined)
   }
   await current.close()

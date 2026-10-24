@@ -119,6 +119,10 @@ function bundle(file) {
 function builtFile(url) {
   const app = /^juno:\/\/app\/(.+)$/.exec(url)
   if (app) return join(desktop, 'out/renderer', decodeURIComponent(app[1].split(/[?#]/)[0]))
+  const web = /\/dist\/(host|renderer)\/(.+)$/.exec(url)
+  if (web) return join(desktop, 'dist', web[1], decodeURIComponent(web[2]))
+  const asset = /^https?:\/\/(?:127\.0\.0\.1|localhost):\d+\/(assets\/[^?#]+)$/.exec(url)
+  if (asset) return join(desktop, 'dist/renderer', decodeURIComponent(asset[1]))
   const out = /\/out\/(main|preload|renderer)\/(.+)$/.exec(url)
   return out ? join(desktop, 'out', out[1], decodeURIComponent(out[2])) : undefined
 }
@@ -128,7 +132,7 @@ const walk = (dir) => (existsSync(dir) ? readdirSync(dir, { recursive: true }).m
 /** The repo files in every bundle under out/. */
 function bundled() {
   const files = new Set()
-  for (const map of walk(join(desktop, 'out')).filter((path) => path.endsWith('.js.map'))) for (const source of bundle(map.slice(0, -4))?.sources ?? []) if (source) files.add(source)
+  for (const map of [...walk(join(desktop, 'out')), ...walk(join(desktop, 'dist'))].filter((path) => /\.m?js\.map$/.test(path))) for (const source of bundle(map.slice(0, -4))?.sources ?? []) if (source) files.add(source)
   return files
 }
 
@@ -170,7 +174,7 @@ function reduce() {
     specs[spec] = [...files].toSorted()
   }
   const shard = process.env.JUNO_SHARD?.replace('/', '-of-') ?? 'all'
-  const out = join(desktop, 'coverage/map', `partial-${shard}.json`)
+  const out = join(desktop, 'coverage/map', `partial-${shard}${process.env.JUNO_PLAN_STEP === undefined ? "" : `-step-${process.env.JUNO_PLAN_STEP}`}.json`)
   mkdirSync(dirname(out), { recursive: true })
   writeFileSync(out, `${JSON.stringify({ specs, bundled: [...bundled()].toSorted() })}\n`)
   rmSync(raw, { recursive: true, force: true })
