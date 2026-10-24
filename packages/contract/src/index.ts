@@ -12,6 +12,7 @@ export {
   Events,
   SIDEBAR_WIDTH,
   JUNO_PANEL_WIDTH,
+  SEARCH_COLUMN_WIDTH,
   menuShortcuts,
   type ContextMenuAt,
   type ContextMenuItem,

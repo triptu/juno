@@ -9,7 +9,7 @@ import type { SessionClient } from '../sessionClient'
 import type { SyncLink } from '../syncLink'
 import { literalRanges, mergeSearch, windowSearchGroups, type Coverage, type SearchPage } from './merge'
 import { messageHits, titleResults } from './query'
-import { localHits, remoteHits, threadOf } from './sessionRows'
+import { localHits, namedFacets, remoteHits, threadOf } from './sessionRows'
 
 export interface SearchRun {
   input: { sessionId: string; generation: number; query: SearchQuery; immediate?: boolean }
@@ -119,7 +119,7 @@ export const fetchSearch = (run: SearchRun) => Effect.gen(function* () {
     const page = p?.page ?? args.page ?? 1
     run.slackTotal = answer.success.total ?? 0
     run.pagination = { page, pageCount: p?.page_count ?? page, perPage: p?.per_page ?? 50, first: p?.first ?? 0, last: p?.last ?? 0, hasMore: page < (p?.page_count ?? page) && raw.length > 0 }
-    run.facets = { from: (answer.success.facets?.from ?? []).map((r) => ({ id: r.id, count: r.facet_count })), in: (answer.success.facets?.in ?? []).map((r) => ({ id: r.id, count: r.facet_count })) }
+    run.facets = yield* namedFacets({ from: (answer.success.facets?.from ?? []).map((r) => ({ id: r.id, count: r.facet_count })), in: (answer.success.facets?.in ?? []).map((r) => ({ id: r.id, count: r.facet_count })) })
     const rows = yield* remoteHits(visibleMatches(run, raw), run.resolved.query)
     shown += rows.length
     run.pages.push({ rows, coverage: { through: raw.at(-1)?.ts ?? run.pages.at(-1)?.coverage.through ?? null, complete: !run.pagination.hasMore } })

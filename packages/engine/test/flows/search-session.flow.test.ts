@@ -53,7 +53,7 @@ it('paints local rows before Slack, pages a stable merged list and rejects old g
   expect(ids(complete).slice(0, established.length)).toEqual(established)
   expect(new Set(ids(complete)).size).toBe(77)
   expect(complete.frontier.complete).toBe(true)
-  expect(complete.facets.from).toContainEqual({ id: 'U0LEO', count: 75 })
+  expect(complete.facets.from.find((f) => f.id === 'U0LEO')).toMatchObject({ count: 75, person: { id: 'U0LEO' } })
   expect(complete.groups.flatMap((g) => g.messages).every((m) => m.ranges.length > 0)).toBe(true)
 
   await step('an answer from an older generation cannot replace the new query', async () => {

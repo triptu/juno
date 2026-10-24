@@ -136,6 +136,10 @@ export const SearchGroup = Schema.Struct({
   matchCount: Schema.Int,
 })
 export type SearchGroup = typeof SearchGroup.Type
+export const SearchFacetPerson = Schema.Struct({ id: Schema.String, count: Schema.Int, person: Schema.optionalKey(Person) })
+export type SearchFacetPerson = typeof SearchFacetPerson.Type
+export const SearchFacetPlace = Schema.Struct({ id: Schema.String, count: Schema.Int, place: Schema.optionalKey(SearchPlace) })
+export type SearchFacetPlace = typeof SearchFacetPlace.Type
 export const SearchSnapshot = Schema.Struct({
   sessionId: Schema.String,
   generation: Schema.Int,
@@ -144,7 +148,8 @@ export const SearchSnapshot = Schema.Struct({
   state: Schema.Literals(['searching', 'done', 'slackUnavailable', 'offline', 'onlyHidden']),
   groups: Schema.Array(SearchGroup),
   frontier: Schema.Struct({ through: Schema.NullOr(Schema.String), complete: Schema.Boolean, olderGroupIndex: Schema.Int }),
-  facets: Schema.Struct({ from: Schema.Array(Schema.Struct({ id: Schema.String, count: Schema.Int })), in: Schema.Array(Schema.Struct({ id: Schema.String, count: Schema.Int })) }),
+  /** Slack's top people and conversations for the query with their match counts, named from the store when it knows them. */
+  facets: Schema.Struct({ from: Schema.Array(SearchFacetPerson), in: Schema.Array(SearchFacetPlace) }),
   counts: Schema.Struct({ local: Schema.Int, slackLoaded: Schema.Int, hidden: Schema.Int, slackTotal: Schema.NullOr(Schema.Int) }),
   pagination: Schema.Struct({ page: Schema.Int, pageCount: Schema.Int, perPage: Schema.Int, first: Schema.Int, last: Schema.Int, hasMore: Schema.Boolean }),
   window: Schema.Struct({ offset: Schema.Int, totalGroups: Schema.Int, totalRows: Schema.Int }),
