@@ -198,15 +198,9 @@ function activeTopicId(): string | undefined {
   return tab === undefined ? undefined : tabTopic(tab)
 }
 
-/** The topic in the active tab, if a topic is open there. */
-function activeTopic(): ActionTopic | undefined {
-  const id = activeTopicId()
-  return id === undefined ? undefined : topicOf(id)
-}
-
-/** The open topic's commands, under its name ("#eng" for a Main). Undefined when no topic is open. */
-export function topicCommands(): { readonly heading: string; readonly rows: ReadonlyArray<CommandRow> } | undefined {
-  const topic = activeTopic()
+/** A topic's commands, under its name ("#eng" for a Main). Undefined when no topic is open. */
+function topicCommands(id: string | undefined): { readonly heading: string; readonly rows: ReadonlyArray<CommandRow> } | undefined {
+  const topic: ActionTopic | undefined = id === undefined ? undefined : topicOf(id)
   if (topic === undefined) return undefined
   const run = (action: Parameters<typeof runTopicAction>[1]) => () => runTopicAction(topic, action, 'header')
   const selected = topic.kind === 'main' ? messageBeforePalette() : undefined
@@ -234,18 +228,25 @@ export function topicCommands(): { readonly heading: string; readonly rows: Read
 export function useTopicCommands(): ReturnType<typeof topicCommands> {
   const [opened] = useState(() => {
     const id = activeTopicId()
-    return { id, header: id === undefined ? undefined : registry.get(topicAtom(id)), commands: topicCommands() }
+    return { id, header: id === undefined ? undefined : registry.get(topicAtom(id)), commands: topicCommands(id) }
   })
   const [commands, setCommands] = useState(opened.commands)
   useEffect(() => {
     if (opened.id === undefined) return
     const header = topicAtom(opened.id)
-    const update = () => setCommands(topicCommands())
+    // A Main's header changes with every message; the list renders again only when a command does.
+    const update = () => setCommands((shown) => {
+      const next = topicCommands(opened.id)
+      return commandsKey(next) === commandsKey(shown) ? shown : next
+    })
     if (registry.get(header) !== opened.header) update()
     return registry.subscribe(header, update)
   }, [opened])
   return commands
 }
+
+const commandsKey = (commands: ReturnType<typeof topicCommands>) =>
+  commands === undefined ? '' : [commands.heading, ...commands.rows.map((command) => `${command.id}\t${command.label}\t${command.hint ?? ''}`)].join('\n')
 
 /** Start huddle or Join huddle on a channel's or DM's Main, as its header button; none while the user is in this one. */
 function huddleRow(channelId: string): CommandRow | false {
