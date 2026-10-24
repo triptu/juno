@@ -155,7 +155,8 @@ it('replies arriving live during a jump never make the thread look complete', as
 it('after a drop a followed thread keeps an exact unread count and an unfollowed one shows a dot until it is opened', async () => {
   let followed = ''
   let unfollowed = ''
-  const engine = await bootedEngine(engines, { initial: (fake) => {
+  // No recheck on the reconnect: its page would prove the unfollowed thread again, as the open below does.
+  const engine = await bootedEngine(engines, { recheckTopics: 0, initial: (fake) => {
     followed = seedThread(fake, { channel: 'C0ENG', text: 'Followed rollout', ago: 60 * 60_000, replies: [50, 40].map((m) => m * 60_000), follow: true, unread: 1 }).id
     unfollowed = seedThread(fake, { channel: 'C0ENG', text: 'Unfollowed rollout', ago: 60 * 60_000, replies: [50, 40].map((m) => m * 60_000), follow: false }).id
     return fake.signIn()
@@ -225,6 +226,7 @@ it('a thread stored before ranges existed is unknown until its first open, which
 
   // What the update leaves: the replies stored, no range (the migration starts every thread unknown), the index
   // rows from the older build. A reply posted meanwhile is the kind the old count could not see was missing.
+  // No recheck after it: its page would prove this recently active thread before the open.
   const engine = await restart(engines, first, (fake) => {
     const db = new DatabaseSync(join(first.userData, 'workspaces', fake.teamId, 'cache.db'))
     try {
@@ -234,7 +236,7 @@ it('a thread stored before ranges existed is unknown until its first open, which
       db.close()
     }
     fake.workspace.post({ channel: 'C0ENG', user: 'U0SAM', text: 'old reply 20', threadTs: root as never, at: fake.now() - 20 * 60_000, silent: true })
-  })
+  }, { recheckTopics: 0 })
 
   await step('before the open the window shows no stretch it cannot prove, and the count is not exact', async () => {
     const window = await windowOf(engine, id, { limit: 150 }, (value) => value.order.length > 0, 'the stored thread')
