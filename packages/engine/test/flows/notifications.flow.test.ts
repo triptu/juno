@@ -5,7 +5,7 @@
 import { itEffect } from '@juno/testing/effect'
 import { afterEach, expect, it } from 'bun:test'
 import { AiProvider, makeFakeAiProvider } from '@juno/ai'
-import { notificationsDecisions, notificationsSetHours, notificationsUseJunoHours, prefsSet, type Hours, type NotificationDecisions, type SlackScheduleView, type TodayRow } from '@juno/contract'
+import { notificationsDecisions, notificationsSetGroupHours, notificationsUseJunoHours, prefsSet, type Hours, type NotificationDecisions, type SlackScheduleView, type TodayRow } from '@juno/contract'
 import { ChannelId, UserId, defaultNotificationSettings, localTime, millisToTs, type NotificationSettings } from '@juno/domain'
 import { makeNotifications, type Candidate, type Notification, type Notifier } from '@juno/notifications'
 import { SlackApi } from '@juno/slack'
@@ -247,7 +247,6 @@ it('decides socket messages within the hours: Always once per message, a reading
 const before = { dnd_enabled: true, dnd_days: 'every_day', dnd_start_hour: '22:00', dnd_end_hour: '8:00' }
 /** Juno's default notification hours, Monday to Friday 9 to 7, as Slack prefs. */
 const weekdays = { dnd_enabled: true, dnd_days: 'weekdays', dnd_start_hour: '19:00', dnd_end_hour: '09:00' }
-const workdays: Hours = { days: [1, 2, 3, 4, 5], from: 9 * 60, to: 19 * 60 }
 
 const apiSince = (engine: RunningEngine, method: string, since: number) =>
   engine.fake.calls.slice(since).filter((call) => call.kind === 'api' && call.method === method)
@@ -264,8 +263,9 @@ async function changeInSlack(engine: RunningEngine, changes: Record<string, unkn
 }
 /** A real pass decides whether the current hours need a write. */
 const settled = (engine: RunningEngine) => engine.workPass('slackSchedule')
-const setHours = async (engine: RunningEngine, which: 'notifications' | 'presence', hours: Hours) =>
-  valueOf(await runCommand(engine.registry, notificationsSetHours, { which, hours }))
+/** Sets the weekdays row, as Settings does: only the edges that changed. */
+const setWeekdays = async (engine: RunningEngine, which: 'notifications' | 'presence', hours: { from?: number; to?: number }) =>
+  valueOf(await runCommand(engine.registry, notificationsSetGroupHours, { which, group: 'weekdays', hours }))
 const useJunoHours = async (engine: RunningEngine) => valueOf(await runCommand(engine.registry, notificationsUseJunoHours, {}))
 
 function page(engine: RunningEngine, predicate: (view: SlackScheduleView) => boolean, label: string): Promise<SlackScheduleView> {
@@ -289,7 +289,7 @@ it('default hours never reach Slack; hours set on the page are written once afte
 
   await step('setting the hours, even to the defaults, reads Slack’s schedule and writes the hours once', async () => {
     const since = engine.fake.calls.length
-    await setHours(engine, 'notifications', workdays)
+    await setWeekdays(engine, 'notifications', { from: 9 * 60, to: 19 * 60 })
     await waitFor(() => (writes(engine, since).length > 0 ? true : undefined), WAIT_MS, 'the write')
     await settled(engine)
     expect(writes(engine, since)).toEqual([weekdays])
@@ -300,7 +300,7 @@ it('default hours never reach Slack; hours set on the page are written once afte
 
   await step('presence hours are not Slack’s schedule', async () => {
     const since = engine.fake.calls.length
-    await setHours(engine, 'presence', { days: [1, 2, 3], from: 600, to: 960 })
+    await setWeekdays(engine, 'presence', { from: 600, to: 960 })
     await settled(engine)
     expect(writes(engine, since)).toEqual([])
   })
@@ -343,8 +343,8 @@ it('Use Juno’s hours writes nothing when Slack holds them; a change made in Sl
 
   await step('two quick changes to the hours write once, with the last values', async () => {
     const since = engine.fake.calls.length
-    await setHours(engine, 'notifications', { ...workdays, from: 8 * 60 })
-    await setHours(engine, 'notifications', { ...workdays, from: 8 * 60, to: 18 * 60 + 30 })
+    await setWeekdays(engine, 'notifications', { from: 8 * 60 })
+    await setWeekdays(engine, 'notifications', { to: 18 * 60 + 30 })
     await waitFor(() => (writes(engine, since).length > 0 ? true : undefined), WAIT_MS, 'the write')
     await settled(engine)
     expect(writes(engine, since)).toEqual([{ dnd_enabled: true, dnd_days: 'weekdays', dnd_start_hour: '18:30', dnd_end_hour: '08:00' }])

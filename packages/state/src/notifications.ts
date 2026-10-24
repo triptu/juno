@@ -13,15 +13,14 @@ import {
   notificationsRemoveInstruction,
   notificationsSaveInstruction,
   notificationsSetAlwaysNotify,
-  notificationsSetHours,
   notificationsSetHuddleRing,
-  notificationsSetDay,
+  notificationsSetGroupHours,
   notificationsSetPresence,
   notificationsSettings,
   notificationsStatus,
   notificationsUseJunoHours,
   type AlwaysNotifySwitch,
-  type Hours,
+  type HoursGroup,
   type InstructionDirection,
   type InstructionRule,
   type NotificationSettingsView,
@@ -86,12 +85,9 @@ export function loadNotificationSettings(
   })
 }
 
-export function setHours(registry: Registry, which: 'notifications' | 'presence', hours: Partial<Hours>): void {
-  void runCommand(registry, notificationsSetHours, { which, hours })
-}
-
-export function setHoursDay(registry: Registry, which: 'notifications' | 'presence', day: Hours['days'][number], enabled: boolean): void {
-  void runCommand(registry, notificationsSetDay, { which, day, enabled })
+/** One row of the notification or active hours: weekdays, Saturday or Sunday. */
+export function setGroupHours(registry: Registry, which: 'notifications' | 'presence', group: HoursGroup, hours: { readonly from?: number; readonly to?: number } | 'off'): void {
+  void runCommand(registry, notificationsSetGroupHours, { which, group, hours })
 }
 
 /** One Always notify switch. */

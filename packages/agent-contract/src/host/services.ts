@@ -59,7 +59,11 @@ export const HostReadRpcs = RpcGroup.make(hostSearch, hostHistory, hostReplies, 
 export const WatchConversation = Schema.Struct({ channelId: Schema.String, ts: Schema.String, threadTs: Schema.optionalKey(Schema.String) })
 export const WatchReply = Schema.Struct({ channelId: Schema.String, ts: Schema.String, threadTs: Schema.optionalKey(Schema.String), userId: Schema.String })
 export const WatchSnapshot = Schema.Struct({ owner: Schema.String, ownMessage: Schema.Boolean, messages: Schema.Array(WatchReply) })
-export const WatchHours = Schema.Struct({ timeZone: Schema.String, weekdays: Schema.Array(Schema.Int), start: Schema.Int, end: Schema.Int })
+/** The notification hours: ISO weekdays with hours, their shared start and end in minutes, and the days whose own hours differ. */
+export const WatchHours = Schema.Struct({
+  timeZone: Schema.String, weekdays: Schema.Array(Schema.Int), start: Schema.Int, end: Schema.Int,
+  dayHours: Schema.optionalKey(Schema.Array(Schema.Struct({ weekday: Schema.Int, start: Schema.Int, end: Schema.Int }))),
+})
 export const hostWatchCheck = Rpc.make('host.schedule.check', { payload: { accountId: AccountId, conversation: WatchConversation, refresh: Schema.Boolean }, success: WatchSnapshot, error: AgentHostError })
 export const hostWatchHours = Rpc.make('host.schedule.hours', { payload: { accountId: AccountId }, success: WatchHours, error: AgentHostError })
 export const hostWatchChanges = Rpc.make('host.schedule.changes', { success: Schema.Void, stream: true })

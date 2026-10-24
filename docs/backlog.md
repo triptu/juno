@@ -23,7 +23,7 @@ Small items noticed during work that are not yet assigned to a milestone. The ch
 - Sign-out: one loaded baseline run stalled after sync stopped, with Sign out disabled and the session still signed in. It did not recur in 40 loaded runs after the driver fix. Capture teardown stages if it returns.
 - Feel pass: compare stored filmstrips across CI runs; reaction and Juno chat feel scenarios and CI execution are in place.
 - Notifications (v2): set the reading's three thresholds (0.7 Notify me, 0.85 Don't notify, 0.5 needs you) from labelled replays of real decisions. The engine budget is two seconds with the AI-off fallback.
-- Notifications (M10): a Juno Agent tool to read and change notification settings and hours (Local tier, Undo, only from the owner's own words), over `notifications.settings`, `notifications.setHours`, the instructions and `notifications.setLevel`.
+- Notifications (M10): a Juno Agent tool to read and change notification settings and hours (Local tier, Undo, only from the owner's own words), over `notifications.settings`, `notifications.setGroupHours` (one row of either set of hours: weekdays, Saturday or Sunday, a from, a to or off, as "Saturdays 11 to 2"), the instructions and `notifications.setLevel`.
 - Notifications: `docs/design/handoff/screenshots/12-ui.png` shows the old page; replace it with a shot of the built page in M10.
 - Juno Agent ideas adopted 10-14 from `docs/research/agent-native-chat-products.md`: specced in SPEC, inventory and plan v3. Still to build:
   - Corrections that propose an instruction, added with Undo (SPEC 14; the rule is WP15's `toolDecision('notificationsSet', run)`: run in a clean owner run, a Change card otherwise).

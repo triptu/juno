@@ -42,6 +42,7 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'sync-failed.spec.ts',
   'attachments.spec.ts',
   'notifications.spec.ts',
+  'notification-hours.spec.ts',
   'notification-decisions.spec.ts',
   'notification-badge.spec.ts',
   'presence.spec.ts',

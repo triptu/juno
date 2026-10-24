@@ -1,8 +1,8 @@
 import * as stylex from '@stylexjs/stylex'
 import type { Ref } from 'react'
-import type { Hours, NotificationPermission } from '@juno/contract'
+import { groupHours, type Hours, type HoursGroup, type NotificationPermission } from '@juno/contract'
 import { colors, layout, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
-import { Button, DayToggles, ListRow, Section, Select, Surface, Text } from '@juno/ui'
+import { Button, ListRow, Section, Select, Surface, Text } from '@juno/ui'
 import { hourLabel } from './time'
 
 /**
@@ -11,7 +11,7 @@ import { hourLabel } from './time'
  * line and the test notification.
  */
 
-export type HoursKind = 'notifications' | 'presence'
+type HoursKind = 'notifications' | 'presence'
 
 /** Slack's own schedule, which Juno writes from the notification hours. */
 export interface SlackScheduleState {
@@ -24,33 +24,44 @@ export interface SlackScheduleState {
 export interface HoursProps {
   readonly notificationHours: Hours
   readonly presenceHours: Hours
-  readonly onDayChange: (which: HoursKind, day: Hours['days'][number], enabled: boolean) => void
-  readonly onHoursChange: (which: HoursKind, hours: Partial<Hours>) => void
+  /** One row's hours: a from or to turns the row on, `off` turns it off. */
+  readonly onHoursChange: (which: HoursKind, group: HoursGroup, hours: Partial<Span> | 'off') => void
   /** Slack's own schedule; undefined until the engine answers. */
   readonly slackSchedule: SlackScheduleState | undefined
   /** Use Juno's hours, while the schedule was changed in Slack. */
   readonly onUseJunoHours: () => void
 }
 
+type Span = Pick<Hours, 'from' | 'to'>
+
 const HALF_HOUR = 30
 const times = Array.from({ length: (24 * 60) / HALF_HOUR }, (_, index) => {
   const minutes = index * HALF_HOUR
   return { value: String(minutes), label: hourLabel(minutes) }
 })
+const OFF = 'off'
+const timesOrOff = [{ value: OFF, label: 'Off' }, ...times]
+const halfHour = (minutes: number) => String(Math.floor(minutes / HALF_HOUR) * HALF_HOUR)
 
-/** Notification hours, then Active in Slack, each its own section. */
-export function HoursSections({ notificationHours, presenceHours, onHoursChange, onDayChange, slackSchedule, onUseJunoHours, hoursRef }: HoursProps & { readonly hoursRef: Ref<HTMLElement> }) {
+const rows: ReadonlyArray<{ readonly group: HoursGroup; readonly name: string }> = [
+  { group: 'weekdays', name: 'Weekdays' },
+  { group: 'saturday', name: 'Saturday' },
+  { group: 'sunday', name: 'Sunday' },
+]
+
+/** Notification hours, then Active in Slack, each its own section with the same three rows. */
+export function HoursSections({ notificationHours, presenceHours, onHoursChange, slackSchedule, onUseJunoHours, hoursRef }: HoursProps & { readonly hoursRef: Ref<HTMLElement> }) {
   return (
     <>
       <Section headingRef={hoursRef} heading="Notification hours" sub="Outside these hours your Mac doesn't notify. Slack pauses at the same times, so your phone stays quiet too.">
-          <Surface kind="group">
-            <HoursRow which="notifications" title="Notification hours" hours={notificationHours} onChange={onHoursChange} onDayChange={onDayChange} />
-            <SlackLine schedule={slackSchedule} onUseJunoHours={onUseJunoHours} />
-          </Surface>
-        </Section>
+        <Surface kind="group">
+          <HoursRows which="notifications" title="Notification hours" hours={notificationHours} onChange={onHoursChange} />
+          <SlackLine schedule={slackSchedule} onUseJunoHours={onUseJunoHours} />
+        </Surface>
+      </Section>
       <Section heading="Active in Slack" sub="Outside these hours you show as away.">
         <Surface kind="group">
-          <HoursRow which="presence" title="Active in Slack" hours={presenceHours} onChange={onHoursChange} onDayChange={onDayChange} />
+          <HoursRows which="presence" title="Active in Slack" hours={presenceHours} onChange={onHoursChange} />
           <div {...stylex.props(styles.note)}>
             <Text variant="meta" tone="muted" as="p">
               Juno switches your status while it's open. If it's closed when your active hours start, you stay away until you open it.
@@ -62,24 +73,37 @@ export function HoursSections({ notificationHours, presenceHours, onHoursChange,
   )
 }
 
-/** The days on the left, the times on the right. The section's heading names the row. */
-function HoursRow({ which, title, hours, onChange, onDayChange }: { readonly which: HoursKind; readonly title: string; readonly hours: Hours; readonly onChange: HoursProps['onHoursChange']; readonly onDayChange: HoursProps['onDayChange'] }) {
-  // The controls keep their short names: "Notifications from", "Active in Slack days".
-  const name = which === 'notifications' ? 'Notifications' : title
-  const set = (patch: Partial<Hours>) => onChange(which, patch)
-  const from = String(Math.floor(hours.from / HALF_HOUR) * HALF_HOUR)
-  const to = String(Math.floor(hours.to / HALF_HOUR) * HALF_HOUR)
+/** Weekdays, Saturday and Sunday, each with its from and to, or Off. The section's heading names the group. */
+function HoursRows({ which, title, hours, onChange }: { readonly which: HoursKind; readonly title: string; readonly hours: Hours; readonly onChange: HoursProps['onHoursChange'] }) {
   return (
-    <div role="group" aria-label={title} {...stylex.props(styles.hoursRow)}>
-      <DayToggles days={hours.days} label={`${name} days`} onChange={(day, enabled) => onDayChange(which, day, enabled)} />
-      {/* The times stay together when the row wraps. */}
-      <span {...stylex.props(styles.times)}>
-        <Select size={32} label={`${name} from`} options={times} value={from} onChange={(event) => set({ from: Number(event.currentTarget.value) })} />
-        <Text variant="ui" tone="muted">
-          to
-        </Text>
-        <Select size={32} label={`${name} to`} options={times} value={to} onChange={(event) => set({ to: Number(event.currentTarget.value) })} />
-      </span>
+    <div role="group" aria-label={title} {...stylex.props(styles.rows)}>
+      {rows.map(({ group, name }) => (
+        <HoursRow key={group} name={name} span={groupHours(hours, group)} onChange={(change) => onChange(which, group, change)} />
+      ))}
+    </div>
+  )
+}
+
+/** One row: its name, then its from and to. Off is the first choice in from, and an off row has no to. */
+function HoursRow({ name, span, onChange }: { readonly name: string; readonly span: Span | undefined; readonly onChange: (change: Partial<Span> | 'off') => void }) {
+  return (
+    <div role="group" aria-label={name} {...stylex.props(styles.row)}>
+      <Text variant="ui">{name}</Text>
+      <Select
+        size={32}
+        label={`${name} from`}
+        options={timesOrOff}
+        value={span === undefined ? OFF : halfHour(span.from)}
+        onChange={(event) => onChange(event.currentTarget.value === OFF ? OFF : { from: Number(event.currentTarget.value) })}
+      />
+      {span === undefined ? null : (
+        <>
+          <Text variant="ui" tone="muted">
+            to
+          </Text>
+          <Select size={32} label={`${name} to`} options={times} value={halfHour(span.to)} onChange={(event) => onChange({ to: Number(event.currentTarget.value) })} />
+        </>
+      )}
     </div>
   )
 }
@@ -219,20 +243,21 @@ const styles = stylex.create({
     gap: spacing['--space-2'],
     minWidth: 0,
   },
-  hoursRow: {
-    display: 'flex',
-    flexWrap: 'wrap',
+  // The row names, then from, "to" and to, each in its own column so an off row's from lines up.
+  rows: {
+    display: 'grid',
+    gridTemplateColumns: '1fr auto auto auto',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    columnGap: spacing['--space-3'],
-    rowGap: spacing['--space-2'],
-    paddingBlock: spacing['--space-2'],
+    columnGap: spacing['--space-2'],
+    rowGap: spacing['--space-1-5'],
+    paddingBlock: spacing['--space-2-5'],
     paddingInline: spacing['--space-3-5'],
   },
-  times: {
-    display: 'flex',
+  row: {
+    display: 'grid',
+    gridColumn: '1 / -1',
+    gridTemplateColumns: 'subgrid',
     alignItems: 'center',
-    gap: spacing['--space-2'],
   },
   note: {
     borderTopWidth: '1px',
@@ -242,7 +267,7 @@ const styles = stylex.create({
     paddingBlockEnd: spacing['--space-3'],
     paddingInline: spacing['--space-3-5'],
   },
-  // Under the hours row, at its start.
+  // Under the rows, at their start.
   slackLine: {
     display: 'flex',
     flexWrap: 'wrap',

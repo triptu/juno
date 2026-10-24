@@ -12,7 +12,6 @@ import { HoursSections, HowAutoDecides, TestSection, TodaySection, type HoursPro
 import { PermissionLine } from './PermissionLine'
 import { SheetLayer } from './SheetLayer'
 
-export type { HoursKind } from './NotificationsParts'
 
 /** A part of the page another place opens it at. */
 export type NotificationsAnchor = 'hours' | 'always-notify' | 'instructions' | 'levels' | 'how-auto'

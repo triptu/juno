@@ -37,6 +37,7 @@ import {
   scheduledPresence,
   seenNote,
   threadNotifyChoice,
+  withGroupHours,
   type NotificationSettings,
   type NotifyChoice,
   type NotifyLevel,
@@ -240,11 +241,7 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
           // run read (the two start together), so it is not dropped: it costs one more run.
           runs(SETTINGS_KEYS, status, Stream.merge(Stream.merge(control.presence, selfPresence.changes), Stream.tick('1 minute').pipe(Stream.drop(1)))),
         ).pipe(retryFirstRun('notifications.status'), Stream.orDie),
-      'notifications.setHours': ({ which, hours }) => changeHours(which, (saved) => ({ ...saved, ...hours })),
-      'notifications.setDay': ({ which, day, enabled }) => changeHours(which, (saved) => ({
-        ...saved,
-        days: enabled ? [...saved.days.filter((other) => other !== day), day].toSorted((a, b) => a - b) : saved.days.filter((other) => other !== day),
-      })),
+      'notifications.setGroupHours': ({ which, group, hours }) => changeHours(which, (saved) => withGroupHours(saved, group, hours)),
       'notifications.setAlwaysNotify': ({ which, enabled }) =>
         updateSettings((settings) => ({ ...settings, alwaysNotify: { ...settings.alwaysNotify, [which]: enabled } })).pipe(Effect.asVoid),
       'notifications.saveInstruction': ({ id, direction, text }) =>

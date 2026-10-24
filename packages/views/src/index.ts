@@ -83,7 +83,7 @@ export { TopicArt } from '@juno/ui'
 export { TooltipLayer } from '@juno/ui'
 // Keys typed while focus is on its way: after ⌘N and ⌘T, until Home's field or search has it.
 export { holdKeys, releaseKeys } from '@juno/ui'
-export { NotificationsPage, type HoursKind, type NotificationsAnchor } from './NotificationsPage'
+export { NotificationsPage, type NotificationsAnchor } from './NotificationsPage'
 export type { ProposedInstruction } from './NotificationDetails'
 export type { LevelPicker, ListedLevel } from './NotifyLevelsSection'
 export type { Decision, InstructionDirection, LevelTag } from './notificationRules'

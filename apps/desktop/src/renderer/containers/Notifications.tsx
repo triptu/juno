@@ -1,5 +1,5 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
-import { TODAY_DECISIONS_LIMIT, type Hours, type Instruction, type InstructionRule, type NotificationPermission, type NotificationSettingsView, type NotifyTag, type PickConversation, type TodayRow } from '@juno/contract'
+import { TODAY_DECISIONS_LIMIT, type Instruction, type InstructionRule, type NotificationPermission, type NotificationSettingsView, type NotifyTag, type PickConversation, type TodayRow } from '@juno/contract'
 import {
   applyJunoHours,
   checkInstruction,
@@ -15,20 +15,15 @@ import {
   saveInstruction,
   sendTestNotification,
   setAlwaysNotify,
-  setHours,
-  setHoursDay,
+  setGroupHours,
   setHuddleRing,
   showToast,
 } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { NotificationsPage as NotificationsPageView, type Decision, type HoursKind, type InstructionDirection, type LevelPicker, type LevelTag, type ListedLevel, type ProposedInstruction } from '@juno/views'
+import { NotificationsPage as NotificationsPageView, type Decision, type InstructionDirection, type LevelPicker, type LevelTag, type ListedLevel, type ProposedInstruction } from '@juno/views'
 import { openSettings } from './navigation'
 import { notificationsAnchorShown, openNotificationsAt, useNotificationsAnchor } from './notificationsAnchor'
 import { setNotifyLevel } from './notifyActions'
-
-function changeHours(which: HoursKind, hours: Partial<Hours>): void {
-  setHours(registry, which, hours)
-}
 
 /** How a toast names a tag: "#incidents", "Maya Chen". */
 function tagLabel(tag: LevelTag): string {
@@ -268,8 +263,7 @@ export function NotificationsPage() {
     <NotificationsPageView
       notificationHours={current.notificationHours}
       presenceHours={current.presenceHours}
-      onHoursChange={changeHours}
-      onDayChange={(which, day, enabled) => setHoursDay(registry, which, day, enabled)}
+      onHoursChange={(which, group, hours) => setGroupHours(registry, which, group, hours)}
       slackSchedule={lists.slackSchedule}
       onUseJunoHours={() => applyJunoHours(registry)}
       aiAssist={current.aiAssist}

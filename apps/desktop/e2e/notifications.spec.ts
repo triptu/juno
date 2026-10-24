@@ -14,8 +14,6 @@ import { seedWorkspace, startFakeSlack, topic300Seed } from '@juno/fake-slack'
 import { expect, syncedTest, test } from './fixtures'
 import { watchFlashes } from './driver/flashes'
 import type { Juno } from './driver/juno'
-import { test as agentTest } from './juno-agent/chat'
-import { agentReady } from './juno-agent/agent'
 
 const ALERTS_MAIN = '#alerts-prod'
 const ROADMAP = 'Proposal: cut offline mode and public'
@@ -116,17 +114,15 @@ async function notificationsAndAppearance(juno: Juno): Promise<void> {
   await juno.openNotifications()
   const page = juno.notifications
 
-  await page.setFrom('Notifications', '10am')
-  await page.setTo('Active in Slack', '8pm')
-  await page.day('Notifications', 'Saturday').click()
+  await page.edge('Notifications', 'Weekdays', 'from').selectOption({ label: '10am' })
+  await page.edge('Active in Slack', 'Weekdays', 'to').selectOption({ label: '8pm' })
 
   // Every value comes back from the engine: close Settings and open it again.
   await juno.tabs.close('Settings')
   await juno.openNotifications()
-  await expect(page.root.getByRole('combobox', { name: 'Notifications from' })).toHaveValue(String(10 * 60))
-  await expect(page.root.getByRole('combobox', { name: 'Active in Slack to' })).toHaveValue(String(20 * 60))
-  await expect(page.day('Notifications', 'Saturday')).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.day('Active in Slack', 'Saturday')).toHaveAttribute('aria-pressed', 'false')
+  await page.expectRow('Notifications', 'Weekdays', { from: 10 * 60, to: 19 * 60 })
+  await page.expectRow('Active in Slack', 'Weekdays', { from: 9 * 60, to: 20 * 60 })
+  await page.expectRow('Active in Slack', 'Saturday', 'off')
 
   // Settings is one tab: the avatar menu's Settings shows General in it, and the list moves between sections.
   await juno.openSettings('Appearance')
@@ -138,7 +134,7 @@ async function notificationsAndAppearance(juno: Juno): Promise<void> {
   await juno.settings.densityRadio('Comfortable').click()
   await expect.poll(() => juno.win.evaluate(() => document.documentElement.dataset['density'])).toBe('comfortable')
   await juno.settings.show('Notifications')
-  await expect(page.root.getByRole('combobox', { name: 'Notifications from' })).toHaveValue(String(10 * 60))
+  await expect(page.edge('Notifications', 'Weekdays', 'from')).toHaveValue(String(10 * 60))
 }
 
 syncedTest('Your instructions: add one with a direction, see it in the list, remove it', async ({ juno }) => {
@@ -321,80 +317,4 @@ longThread('a notification for a topic open in another tab focuses it, scrolls t
   await juno.tabs.select('Review the rollout checklist 1')
   await juno.topic.expectMessage('Cutover is a go')
   expect(await flashes()).toHaveLength(before)
-})
-
-// Hours becoming active is covered by the TestClock flow in packages/engine/test/flows/notifications.flow.test.ts.
-const standingByTest = agentTest.extend({ synced: true })
-
-const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-
-/** Read the saved settings: a select's DOM value changes before its RPC commits. */
-function savedSettings(userData: string, teamId: string): unknown {
-  return readUserDb(userData, teamId, (db) => {
-    const row = db.prepare("SELECT value_json FROM prefs WHERE key = 'notifications'").get()
-    return typeof row?.value_json === 'string' ? JSON.parse(row.value_json) : undefined
-  })
-}
-
-type ReadSettings = () => unknown
-
-/** Include both sides of midnight, even when the test starts on a weekend. */
-async function everyDay(juno: Juno, saved: ReadSettings): Promise<void> {
-  for (const [day, name] of weekdays.entries()) {
-    const toggle = juno.notifications.day('Notifications', name)
-    if ((await toggle.getAttribute('aria-pressed')) !== 'true') await toggle.click()
-    await expect.poll(saved).toMatchObject({ notificationHours: { days: expect.arrayContaining([day]) } })
-    await expect(toggle).toHaveAttribute('aria-pressed', 'true')
-  }
-}
-
-/** Set one edge of the notification hours and check it saved. */
-async function setHours(juno: Juno, saved: ReadSettings, edge: 'from' | 'to', minutes: number): Promise<void> {
-  const select = juno.notifications.root.getByRole('combobox', { name: `Notifications ${edge}` })
-  await select.selectOption(String(minutes))
-  await expect.poll(saved).toMatchObject({ notificationHours: { [edge]: minutes } })
-  // Reopen to check the saved value, rather than the select's optimistic DOM value.
-  await juno.tabs.close('Settings')
-  await juno.openNotifications()
-  await expect(select).toHaveValue(String(minutes))
-}
-
-/** A twelve-hour window that starts six hours from now, so now is outside it. */
-async function excludeNow(juno: Juno, saved: ReadSettings): Promise<void> {
-  await everyDay(juno, saved)
-  const middle = Math.floor(minutesNow() / 30) * 30
-  await setHours(juno, saved, 'from', (middle + 6 * 60) % 1440)
-  await setHours(juno, saved, 'to', (middle + 18 * 60) % 1440)
-}
-
-const minutesNow = () => {
-  const now = new Date()
-  return now.getHours() * 60 + now.getMinutes()
-}
-
-standingByTest('outside notification hours a DM is held with its reason and shows no notification', async ({ juno, slack, model, userData, fake }) => {
-  await agentReady(juno.surface)
-  await juno.openNotifications()
-  const page = juno.notifications
-  const saturday = page.day('Notifications', 'Saturday')
-  const sunday = page.day('Notifications', 'Sunday')
-  await expect(saturday).toHaveAttribute('aria-pressed', 'false')
-  await expect(sunday).toHaveAttribute('aria-pressed', 'false')
-  // Both events use the same saved model, before either command can update the page.
-  await saturday.or(sunday).evaluateAll((nodes) => {
-    for (const node of nodes) if (node instanceof HTMLButtonElement) node.click()
-  })
-  await juno.tabs.close('Settings')
-  await juno.openNotifications()
-  await expect(saturday).toHaveAttribute('aria-pressed', 'true')
-  await expect(sunday).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.day('Active in Slack', 'Saturday')).toHaveAttribute('aria-pressed', 'false')
-  await juno.openNotifications()
-  await excludeNow(juno, () => savedSettings(userData, fake.teamId))
-  await juno.blurWindow()
-  const held = 'Can you approve the release now?'
-  slack.as('Maya').dm(held)
-  await expect.poll(() => readUserDb(userData, fake.teamId, (db) => db.prepare('SELECT outcome, reason FROM notification_log WHERE preview = ?').get(held))).toMatchObject({ outcome: 'stay', reason: expect.stringContaining('Outside your notification hours.') })
-  expect(await juno.osNotifications()).toHaveLength(0)
-  expect(model.inputs()).toHaveLength(0)
 })

@@ -19,10 +19,12 @@ export const watchSnapshot = (conversation: typeof WatchConversation.Type) => Ef
     messages: messages.map((row) => ({ channelId: row.channelId, ts: row.ts, userId: row.userId, ...(row.threadTs === null || row.threadTs === row.ts ? {} : { threadTs: row.threadTs }) })),
   })
 })
-export const watchHours = Effect.map(readSettings, ({ settings }) => ({
+const isoWeekday = (day: number) => (day === 0 ? 7 : day)
+export const watchHours = Effect.map(readSettings, ({ settings: { notificationHours: hours } }) => ({
   timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-  weekdays: settings.notificationHours.days.map((day) => day === 0 ? 7 : day),
-  start: settings.notificationHours.from, end: settings.notificationHours.to,
+  weekdays: hours.days.map(isoWeekday),
+  start: hours.from, end: hours.to,
+  ...(hours.dayHours === undefined ? {} : { dayHours: hours.dayHours.map(({ day, from, to }) => ({ weekday: isoWeekday(day), start: from, end: to })) }),
 }))
 export const watchChanges = (workspace: Context.Service.Shape<typeof Workspace>) => workspace.changes.pipe(
   Stream.switchMap((open) => open === undefined ? Stream.make(undefined) : liveQuery(['messages'], Effect.void).pipe(

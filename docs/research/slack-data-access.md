@@ -441,7 +441,7 @@ Observed
 
 Inferred
 
-- To make the phone match Juno's notification hours, Juno writes `dnd_days` (`every_day`, `weekdays`, or `custom` with the per-day keys for any other days), `dnd_end_hour: <hours start>`, `dnd_start_hour: <hours end>` and `dnd_enabled: true` in one `users.prefs.set` call (`slackScheduleFor` in `@juno/domain`). Times are written as Juno holds them, which the page's selects already keep to the half hour; the official page inserts an unknown value as an extra option.
+- To make the phone match Juno's notification hours, Juno writes `dnd_enabled: true` and, when every day with hours has the same hours on every day or Monday to Friday, `dnd_days` `every_day` or `weekdays` with `dnd_end_hour: <hours start>` and `dnd_start_hour: <hours end>`; otherwise `dnd_days: custom` with each day's `dnd_enabled_<day>` (`partial` with its own `dnd_before_<day>` and `dnd_after_<day>`, or `all_day` on a day without hours), in one `users.prefs.set` call (`slackScheduleFor` in `@juno/domain`). Times are written as Juno holds them, which the page's selects already keep to the half hour; the official page inserts an unknown value as an extra option.
 - Pauses for mobile push are applied by Slack's server from these prefs, and `next_dnd_*_ts` show the server works out the times. Juno's desktop notifications are its own and do not depend on them.
 
 Unknown

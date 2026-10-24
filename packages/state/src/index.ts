@@ -157,9 +157,8 @@ export {
   removeInstruction,
   saveInstruction,
   setAlwaysNotify,
-  setHours,
+  setGroupHours,
   setHuddleRing,
-  setHoursDay,
   setPresence,
   applyJunoHours,
 } from './notifications'

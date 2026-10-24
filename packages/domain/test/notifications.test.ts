@@ -7,7 +7,12 @@ import {
   notificationIsMuted,
   nextSwitch,
   nextHoursStart,
+  normalHours,
+  groupHours,
+  withGroupHours,
   localTime,
+  pausedLabel,
+  slackScheduleFor,
   scheduledPresence,
   untilLabel,
   presenceLabel,
@@ -166,6 +171,67 @@ describe('hours', () => {
     expect(untilLabel(at(5, 20), work)).toBe('until Mon 9am')
     expect(untilLabel(at(MON, 7, 30), work)).toBe('until 9am')
     expect(untilLabel(at(MON, 12), { days: [], from: 0, to: 60 })).toBeUndefined()
+  })
+
+  it('each day keeps its own hours: the check, the next start and Slack\'s schedule', () => {
+    const FRI = 5
+    const SUN = 0
+    // Monday to Thursday 9 to 7, Friday 10pm to 2am, Saturday 11 to 2, Sunday off.
+    const week: Hours = { days: [1, 2, 3, 4, 5, 6], from: 9 * 60, to: 19 * 60, dayHours: [{ day: 5, from: 22 * 60, to: 2 * 60 }, { day: 6, from: 11 * 60, to: 14 * 60 }] }
+    expect(inHours(at(MON, 12), week)).toBe(true)
+    expect(inHours(at(FRI, 12), week)).toBe(false)
+    expect(inHours(at(FRI, 23), week)).toBe(true)
+    expect(inHours(at(SAT, 1), week)).toBe(true)
+    expect(inHours(at(SAT, 3), week)).toBe(false)
+    expect(inHours(at(SAT, 12), week)).toBe(true)
+    expect(inHours(at(SAT, 23), week)).toBe(false)
+    expect(inHours(at(SUN, 1), week)).toBe(false)
+
+    expect(pausedLabel(at(FRI, 12), week)).toBe('Paused until 10pm')
+    expect(pausedLabel(at(SAT, 3), week)).toBe('Paused until 11am')
+    expect(pausedLabel(at(SAT, 15), week)).toBe('Paused until Mon 9am')
+    expect(pausedLabel(at(4, 20), { ...week, days: [1, 2, 3, 4, 6] })).toBe('Paused until Sat 11am')
+
+    // The same hours on every day with hours are the shared hours again, and Slack's own modes.
+    const sameEveryWeekday = normalHours({ days: [1, 2, 3, 4, 5], from: 8 * 60, to: 17 * 60, dayHours: [1, 2, 3, 4, 5].map((day) => ({ day: day as 1, from: 600, to: 1080 })) })
+    expect(sameEveryWeekday).toEqual({ days: [1, 2, 3, 4, 5], from: 600, to: 1080 })
+    expect(slackScheduleFor(sameEveryWeekday)).toEqual({ dnd_enabled: true, dnd_days: 'weekdays', dnd_start_hour: '18:00', dnd_end_hour: '10:00' })
+    expect(slackScheduleFor({ days: [0, 1, 2, 3, 4, 5, 6], from: 540, to: 1140, dayHours: [{ day: 6, from: 540, to: 1140 }] })).toMatchObject({ dnd_days: 'every_day' })
+    expect(slackScheduleFor(week)).toEqual({
+      dnd_enabled: true,
+      dnd_days: 'custom',
+      ...Object.fromEntries(['monday', 'tuesday', 'wednesday', 'thursday'].flatMap((day) => [[`dnd_enabled_${day}`, 'partial'], [`dnd_before_${day}`, '09:00'], [`dnd_after_${day}`, '19:00']])),
+      dnd_enabled_friday: 'partial', dnd_before_friday: '22:00', dnd_after_friday: '23:59',
+      dnd_enabled_saturday: 'partial', dnd_before_saturday: '11:00', dnd_after_saturday: '14:00',
+      dnd_enabled_sunday: 'all_day',
+    })
+  })
+})
+
+describe('hours by row', () => {
+  it('Settings reads weekdays as the hours most of them have, and a row sets every day in it', () => {
+    // Saved before the rows: Monday to Thursday only, Thursday later.
+    const old: Hours = { days: [1, 2, 3, 4], from: 600, to: 1020, dayHours: [{ day: 4, from: 720, to: 1200 }] }
+    expect(groupHours(old, 'weekdays')).toEqual({ from: 600, to: 1020 })
+    expect(groupHours(old, 'saturday')).toBeUndefined()
+    expect(groupHours({ days: [1, 5], from: 600, to: 1020 }, 'weekdays')).toBeUndefined()
+    // A tie goes to the earlier day: Monday and Tuesday off, Wednesday and Thursday 10 to 5, Friday 9 to 7.
+    expect(groupHours({ days: [3, 4, 5], from: 600, to: 1020, dayHours: [{ day: 5, from: 540, to: 1140 }] }, 'weekdays')).toBeUndefined()
+
+    // Changing the row gives all five weekdays the shown hours with the new edge.
+    expect(withGroupHours(old, 'weekdays', { to: 1080 })).toEqual({ days: [1, 2, 3, 4, 5], from: 600, to: 1080 })
+    // An off Saturday turned on keeps the weekdays' other edge; a from on that edge keeps the row's length.
+    const saturday = withGroupHours(old, 'saturday', { from: 660 })
+    expect(groupHours(saturday, 'saturday')).toEqual({ from: 660, to: 1020 })
+    expect(groupHours(withGroupHours(old, 'saturday', { from: 1020 }), 'saturday')).toEqual({ from: 1020, to: 0 })
+    expect(groupHours(withGroupHours(saturday, 'weekdays', 'off'), 'weekdays')).toBeUndefined()
+
+    // Active hours follow the same rows: Saturday 11 to 2 is active, Sunday off is away.
+    const active = withGroupHours(withGroupHours({ days: [1, 2, 3, 4, 5], from: 540, to: 1140 }, 'saturday', { from: 660, to: 840 }), 'sunday', 'off')
+    expect(scheduledPresence(at(SAT, 12), active)).toBe('active')
+    expect(scheduledPresence(at(SAT, 15), active)).toBe('away')
+    expect(scheduledPresence(at(0, 12), active)).toBe('away')
+    expect(presenceLabel(at(5, 20), 'away', active)).toBe('Away until tomorrow 11am')
   })
 })
 

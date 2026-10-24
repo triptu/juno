@@ -85,7 +85,6 @@ Channels are `ChannelIcon` (section 4a).
 
 `Swatch`: a round 24px colour choice, a bold check and a ring when `selected` (`aria-pressed`; in a radio group, `radioItem` makes it a radio with `aria-checked`). Required `label`. `hue` draws a person or channel colour in the avatar mix (the channel picker); `accent` draws an accent's solid fill from the `accentSwatches` tokens (the appearance settings). The accent picker uses it too. `tint` draws an icon tint (`iconTints`, `neutral` included) with the check in the page colour (the view sheet's Colour). The label is the tooltip.
 
-`DayToggles`: seven 28px round toggle buttons, Monday first ("M T W T F S S", each named by its day, `aria-pressed`), in a group named by `label`. An on day is filled with `--secondary-default`; an off day is muted text. `days` uses 0 for Sunday, as `Date.getDay`. The Notifications page's hours rows use it.
 
 ## 5. Chip
 
@@ -223,7 +222,7 @@ The huddle views (`@juno/huddle-views`, inventory 22) add no primitive. They are
 
 ## Count
 
-24 primitives (Surface gains the `island` kind and `HeaderBand`): Icon, Button, NavItem, IconButton, Avatar (+AvatarStack, AvatarButton, PresenceDot), ChannelIcon (+Swatch, DayToggles), Chip, ContextPill, Kbd, Text, Surface (+Divider, LabelledRule), Popover/OptionList, ScrollArea, Tabs, Fields (TextField, Textarea, Select, Checkbox, Slider, Segmented), ListRow, Toast, EmptyState, Illustration, Logo (+Pebble), ProgressRing, Page/PageHeader/Section, CodeBlock, Card.
+24 primitives (Surface gains the `island` kind and `HeaderBand`): Icon, Button, NavItem, IconButton, Avatar (+AvatarStack, AvatarButton, PresenceDot), ChannelIcon (+Swatch), Chip, ContextPill, Kbd, Text, Surface (+Divider, LabelledRule), Popover/OptionList, ScrollArea, Tabs, Fields (TextField, Textarea, Select, Checkbox, Slider, Segmented), ListRow, Toast, EmptyState, Illustration, Logo (+Pebble), ProgressRing, Page/PageHeader/Section, CodeBlock, Card.
 
 Differences from the first proposal: Button's accent variant is called `primary`; Tile and Avatar are one component; Menu/MenuItem were folded into OptionList (same row anatomy, one keyboard model); PageHeader got a `Page` container for the width and padding instead of setting them itself; `Icon` takes a component rather than a name.
 

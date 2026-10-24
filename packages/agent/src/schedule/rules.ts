@@ -29,6 +29,14 @@ export interface NotificationHours {
   readonly weekdays: ReadonlyArray<number>
   readonly start: number
   readonly end: number
+  /** Days whose own hours differ from `start` and `end`. */
+  readonly dayHours?: ReadonlyArray<{ readonly weekday: number; readonly start: number; readonly end: number }>
+}
+/** The hours on an ISO weekday. Hours that cross midnight end there: they belong to the day they start on. */
+function hoursOn(hours: NotificationHours, weekday: number): { readonly start: number; readonly end: number } | undefined {
+  if (!hours.weekdays.includes(weekday)) return undefined
+  const { start, end } = hours.dayHours?.find((own) => own.weekday === weekday) ?? hours
+  return start === end ? undefined : { start, end: end < start ? 24 * 60 : end }
 }
 function formatter(timeZone: string) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -50,10 +58,17 @@ function nextLocal(after: number, timeZone: string, accepts: (value: ReturnType<
   }
   throw new Error('No notification day in the next week.')
 }
+/** The same time on the next notification day, or that day's start when the time is outside its hours or today's. */
 export function menuDeadline(now: number, hours: NotificationHours): number {
   const today = local(now, formatter(hours.timeZone))
-  const minute = today.minute >= hours.start && today.minute < hours.end ? today.minute : hours.start
-  return nextLocal(now, hours.timeZone, (v) => v.day > today.day && hours.weekdays.includes(v.weekday) && v.minute >= minute && v.minute < hours.end)
+  const todays = hoursOn(hours, today.weekday)
+  const minute = todays !== undefined && today.minute >= todays.start && today.minute < todays.end ? today.minute : undefined
+  return nextLocal(now, hours.timeZone, (v) => {
+    const day = v.day > today.day ? hoursOn(hours, v.weekday) : undefined
+    if (day === undefined) return false
+    const from = minute !== undefined && minute >= day.start && minute < day.end ? minute : day.start
+    return v.minute >= from && v.minute < day.end
+  })
 }
 export function nextDue(schedule: typeof ScheduleDefinition.Type, after: number): number {
   switch (schedule._tag) {
