@@ -58,8 +58,8 @@ export function ViewerDocument({ file, now, loadText, onLink, linkInfo }: Viewer
       </div>
     )
   }
-  // Not sandboxed: Chromium does not run its PDF viewer in a sandboxed frame. The frame shows only main's PDF answer.
-  if (file.kind === 'pdf') return <iframe src={file.content} title={file.name} {...stylex.props(styles.embed)} />
+  // Chromium's PDF viewer needs scripts; it does not need the file's origin, forms, downloads, popups or navigation.
+  if (file.kind === 'pdf') return <iframe src={file.content} title={file.name} sandbox="allow-scripts" referrerPolicy="no-referrer" {...stylex.props(styles.embed)} />
   // No scripts, forms, popups or top navigation; main's answer adds a policy that allows no network.
   if (file.kind === 'html') return <iframe src={file.content} title={file.name} sandbox="" referrerPolicy="no-referrer" {...stylex.props(styles.embed, styles.page)} />
   return <TextFile file={file} now={now} loadText={loadText} onLink={onLink} linkInfo={linkInfo} />

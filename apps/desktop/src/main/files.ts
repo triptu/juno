@@ -10,9 +10,9 @@
  *   or an audio file for the player, passing its `Range` on, so it can seek.
  *   `juno://files/<file id>/content/<name>?url=…` streams a PDF, HTML or text file
  *   for the viewer with the type Slack answers (text with a charset). Any
- *   answer but a PDF carries a sandbox policy that allows no scripts and no
+ *   answer but a PDF carries a CSP sandbox that allows no scripts and no
  *   network, so an HTML file in the viewer's frame cannot run code or load
- *   anything.
+ *   anything. The PDF frame itself is sandboxed with only scripts allowed.
  * - `juno://uploads/<id>.<ext>`: an image the composer staged, from the
  *   engine's `uploads/` folder, for its chip and the pending row.
  * - `downloadFile`: Download, into ~/Downloads, then shown in Finder.
@@ -146,7 +146,7 @@ export async function serveThumbnail(request: URL, extraOrigin: string | undefin
 /**
  * The headers of a `content` answer: Slack's type, with a charset on text
  * (UTF-8 when Slack names none), never sniffed, and the sandbox policy on
- * anything but a PDF, which Chromium's viewer cannot show in a sandbox.
+ * anything but a PDF, whose Chromium viewer needs its own scripts.
  * The app's page may read it (`fetch` for a text file); no other origin may.
  */
 export function contentHeaders(type: string, length: string | null, origin: string | null | undefined): Headers {
