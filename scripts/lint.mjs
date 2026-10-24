@@ -8,7 +8,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const bun = (script, ...args) => [process.execPath, [`scripts/${script}`, ...args]]
 const checks = [
   // Reads .oxlintrc.json. --no-script, or it would run this package's lint script.
-  ['bun lint', [process.execPath, ['lint', '--no-script', '.']]],
+  ['bun lint', [process.execPath, ['lint', '--no-script', '--deny-warnings', '.']]],
   ['decision log', bun('decision-log.mjs', '--check')],
   ['cache epoch', bun('check-cache-epoch.mjs')],
   ['migration order', bun('check-migration-order.mjs')],

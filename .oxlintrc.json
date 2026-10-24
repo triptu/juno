@@ -2,13 +2,28 @@
   "plugins": ["typescript", "react", "unicorn"],
   "categories": {
     "correctness": "error",
-    "suspicious": "warn"
+    "suspicious": "error"
   },
   "rules": {
     "no-unused-vars": "error",
+    "no-new": "error",
+    "no-unmodified-loop-condition": "error",
+    "preserve-caught-error": "error",
+    "react/exhaustive-deps": "error",
+    "react/hooks": "error",
+    "react/no-unstable-nested-components": "error",
+    "react/iframe-missing-sandbox": "error",
     "react/jsx-key": "error",
     "react/react-in-jsx-scope": "off",
     "react/no-unknown-property": "off",
+    "unicorn/no-array-reverse": "error",
+    "unicorn/no-array-sort": "error",
+    "unicorn/prefer-add-event-listener": "error",
+    "unicorn/require-post-message-target-origin": "error",
+    // Pure style: moving nested functions to module scope would not improve correctness or measured performance.
+    "unicorn/consistent-function-scoping": "off",
+    // Pure style: shadowed names are local and renaming 133 existing sites would add noise without preventing bugs.
+    "no-shadow": "off",
     "no-underscore-dangle": "off"
   },
   "ignorePatterns": [

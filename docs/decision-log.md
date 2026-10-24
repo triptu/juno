@@ -4,6 +4,7 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-24 18:21 · lint-zero-warnings · Lint accepts no warnings: every active rule is an error, `--deny-warnings` guards future configuration, and the pure-style function-scoping and shadowing rules are off because their 309 findings did not justify code churn.
 - 10-24 18:01 · search-query-window · Search probes at most the requested FTS window plus one candidate, then uses the date index for larger result sets and FTS row lookups for smaller ones; the real session and codec benchmark guards the first 100-row payload. Unicode highlights build offset maps only when normalization changes boundaries.
 - 10-24 17:47 · search-session-review · Search coalesces window requests, pages local sources incrementally, preserves established title anchors, and cancels network work with zero idle TTL. Reader navigation uses the same resolved query in the engine across the whole stored topic; state folds changed-group updates by id, and date presets use the profile calendar.
 - 10-24 17:40 · search-shared-geometry · Search uses shared numeric layout constants for the reader minimum and message landing offset; topic navigation and scrolling share the offset, and Search borders use the pixel token. Geometry stays unchanged.

@@ -1,0 +1,1 @@
+- 10-24 18:21 · lint-zero-warnings · Lint accepts no warnings: every active rule is an error, `--deny-warnings` guards future configuration, and the pure-style function-scoping and shadowing rules are off because their 309 findings did not justify code churn.
