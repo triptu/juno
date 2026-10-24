@@ -135,6 +135,8 @@ export interface ListRun<Row> {
   readonly gapBefore?: boolean
   /** The same after its last proven row, whose ts it is (`LiveMeta.gapAfter`). */
   readonly gapAfter?: string
+  /** No page proves the thread yet; the window shows what the store holds (`LiveMeta.standIn`). */
+  readonly standIn?: boolean
   /**
    * Every person and channel the rows name. `serveLiveList` sends only the
    * ones the subscription has not been sent, or that changed since.
@@ -203,7 +205,7 @@ export function serveLiveList<Row extends RowLike, E, SE, R>(
           people.length === 0 && channels.length === 0 && art.length === 0
             ? undefined
             : { ...(people.length === 0 ? {} : { people }), ...(channels.length === 0 ? {} : { channels }), ...(art.length === 0 ? {} : { art }) }
-        const runGaps = `${run.gapBefore === true ? 'b' : ''}:${run.gapAfter ?? ''}`
+        const runGaps = `${run.gapBefore === true ? 'b' : ''}${run.standIn === true ? 's' : ''}:${run.gapAfter ?? ''}`
         if (windowCovered === run.windowCovered && atNewest === run.atNewest && gaps === runGaps && !reset && upsert.length === 0 && remove.length === 0 && refs === undefined && sameOrder(order, nextOrder)) return Option.none()
         let encodeMs = 0
         if (options.measure) {
@@ -227,6 +229,7 @@ export function serveLiveList<Row extends RowLike, E, SE, R>(
           ...(atNewest === undefined ? {} : { atNewest }),
           ...(run.gapBefore === true ? { gapBefore: true } : {}),
           ...(run.gapAfter === undefined ? {} : { gapAfter: run.gapAfter }),
+          ...(run.standIn === true ? { standIn: true } : {}),
           seq: ++seq, queryMs, encodeMs, at, ...(outcome.success.own ? { own: true } : {}), ...(run.total === undefined ? {} : { total: run.total }) }
         return Option.some({ reset, order, upsert, remove, ...(refs === undefined ? {} : { refs }), meta })
       }),

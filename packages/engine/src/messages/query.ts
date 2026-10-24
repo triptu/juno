@@ -207,6 +207,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     let coverage: ThreadCoverage | undefined
     let gapBefore = false
     let gapAfter: string | undefined
+    let standIn = false
     if (target.kind === 'thread' && !target.threadTs.startsWith('pending:')) {
       coverage = yield* threadCoverage(target)
       const clipped = clipThread(stored, { threadTs: target.threadTs, anchor: range.anchor, previous: beforeWindow, next: afterWindow, atNewest, coverage, own: (row) => row.user_id === selfId })
@@ -216,6 +217,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       beforeWindow = clipped.previous
       gapBefore = clipped.gapBefore
       gapAfter = clipped.gapAfter
+      standIn = clipped.standIn
     }
 
     const me = (yield* syncState.get<Me>('me')) ?? (selfId === undefined ? undefined : { userId: selfId as UserId })
@@ -418,6 +420,7 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       windowCovered: yield* windowCovered(target, stored[0]?.ts, coverage),
       ...(gapBefore ? { gapBefore } : {}),
       ...(gapAfter === undefined ? {} : { gapAfter }),
+      ...(standIn ? { standIn } : {}),
       refs: { people: [...people.values()] },
     }
   })
