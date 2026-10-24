@@ -1,7 +1,8 @@
 // Opening topics Juno holds, from the press to the first frame that shows their rows (performance.md 1, topic
 // open cached: 50 ms), with Slack answering in 150 ms as it does from a laptop: Main and a short thread from the
-// sidebar, a 600-reply thread opened again, and a link to a reply in it. `juno.topic-open` ends on the first frame
-// with the header in place, so it cannot see a list held back for Slack; this probe looks at the rows themselves.
+// sidebar, a 600-reply thread opened again, and a link to a reply in it Juno holds, timed from the click, as links
+// open. `juno.topic-open` ends on the first frame with the header in place, so it cannot see a list held back for
+// Slack; this probe looks at the rows themselves.
 import type { Page } from '@playwright/test'
 import { expect, test } from './fixtures'
 import { press, type Juno } from './driver/juno'
@@ -15,19 +16,22 @@ const ENG = '#eng'
 const LONG = 'Long rollout log for perf'
 const ROWS = '[data-topic-view] [data-message-row]'
 
-/** From the next pointerdown to the first frame that draws a row `selector` matches in a shown topic. */
-async function rowsAfterPress(win: Page, act: () => Promise<void>, selector = ROWS): Promise<number> {
-  await win.evaluate((selector) => {
+/**
+ * From the next `pointerdown` (a sidebar row opens on it) or `click` (a link in a message opens on it) to the first
+ * frame that draws a row `selector` matches in a shown topic.
+ */
+async function rowsAfterPress(win: Page, act: () => Promise<void>, selector = ROWS, on: 'pointerdown' | 'click' = 'pointerdown'): Promise<number> {
+  await win.evaluate(({ selector, on }) => {
     const w = window as unknown as { __rows?: Promise<number> }
     w.__rows = new Promise((resolve) => {
-      addEventListener('pointerdown', (event) => {
+      addEventListener(on, (event) => {
         const start = event.timeStamp
         const shown = () => [...document.querySelectorAll<HTMLElement>(selector)].some((row) => row.offsetParent !== null && row.getBoundingClientRect().height > 0)
         const frame = (at: number) => (shown() ? resolve(at - start) : requestAnimationFrame(frame))
         requestAnimationFrame(frame)
       }, { capture: true, once: true })
     })
-  }, selector)
+  }, { selector, on })
   await act()
   return win.evaluate(() => (window as unknown as { __rows: Promise<number> }).__rows)
 }
@@ -64,6 +68,11 @@ test('topic reopen: Main, a thread and a 600-reply thread from the sidebar, and 
     await expect(juno.topic.list.locator('[data-message-row]').first()).toBeVisible({ timeout: 15_000 })
     await juno.sidebar.row(title).expectRead()
   }
+  // The link's reply once, so Juno holds it.
+  await juno.sidebar.row(ENG).open()
+  await juno.topic.message('Look at the middle step').getByRole('link', { name: 'the middle step' }).click()
+  await juno.topic.expectMessage('rollout step 300')
+  await juno.tabs.close(LONG)
   fake.setLatency({ ms: 150 })
 
   const samples = new Map<string, number[]>()
@@ -79,7 +88,7 @@ test('topic reopen: Main, a thread and a 600-reply thread from the sidebar, and 
     await juno.sidebar.row(ENG).open()
     const anchor = juno.topic.message('Look at the middle step').getByRole('link', { name: 'the middle step' })
     const box = (await anchor.boundingBox())!
-    add('link', await rowsAfterPress(juno.win, () => pressAt(juno, box), `[data-topic-view] [data-message-row="${replies[299]!.ts}"]`))
+    add('link', await rowsAfterPress(juno.win, () => pressAt(juno, box), `[data-topic-view] [data-message-row="${replies[299]!.ts}"]`, 'click'))
     await juno.topic.expectMessage('rollout step 300')
     await juno.tabs.close(LONG)
     await expect(juno.topic.message('Look at the middle step')).toBeVisible()
