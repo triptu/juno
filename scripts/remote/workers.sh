@@ -35,4 +35,5 @@ export GALLERY_SHIFT_PARTS=${GALLERY_SHIFT_PARTS:-$GALLERY_WORKERS}
 # Spec simulations run beside the Apalache checks here (on the Mac they run first).
 spec_jobs=$(at_least $(( cores / 2 )) 1)
 if [ "$1" = specs:traces ]; then spec_jobs=$cores; fi
-export SPECS_JOBS=${SPECS_JOBS:-$spec_jobs} SPECS_APALACHE=${SPECS_APALACHE:-$(at_least $(( cores / 4 )) 1)} SPECS_OVERLAP=1
+# check.mjs sizes Apalache lanes from allocated threads and cgroup memory.
+export SPECS_JOBS=${SPECS_JOBS:-$spec_jobs} SPECS_OVERLAP=1

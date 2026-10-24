@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { actionCases, recoveryCases, replayCases } from './agent-checks.mjs'
 import { outboxPairs, outboxSchedules } from './outbox-checks.mjs'
 import { runtimeIdentity } from '../scripts/verify-inputs.mjs'
+import { simulationBatch } from './simulate-batch.mjs'
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)))
 const require = createRequire(import.meta.url)
@@ -31,8 +32,8 @@ const apalacheVersion = '0.62.1' // Quint 0.33.0's default distribution.
 const generated = join(root, 'specs/traces')
 mkdirSync(generated, { recursive: true })
 
-// Jobs are collected first. Typechecks and simulations run SPECS_JOBS at a time
-// (default 3), then the Apalache checks run one at a time on one server.
+// Jobs retain individual cache entries. Single-sample schedules share one
+// parsed/typechecked Quint process per file; each still gets a fresh evaluator.
 // A passing job is cached under a hash of its arguments, what is checked on its
 // output, its spec file and the Quint and Apalache versions, so an unchanged
 // check is not run again. Bump cacheVersion when the checks on a result or the
@@ -44,14 +45,25 @@ const cacheDir = process.env.SPECS_CACHE_DIR ?? join(tmpdir(), 'juno-cache', 'sp
 const useCache = process.env.SPECS_CACHE !== 'off' && !process.argv.includes('--no-cache')
 const cacheRuns = process.env.SPECS_RUN_CACHE !== 'off'
 const parallel = Math.max(1, Number(process.env.SPECS_JOBS ?? 3))
-const apalacheLanes = Math.max(1, Number(process.env.SPECS_APALACHE ?? 1))
+const runnerThreads = Number(process.env.RUNNER_THREADS ?? process.env.JUNO_RUNNER_JOB_CORES ?? 0)
+const memoryLimit = '/sys/fs/cgroup/memory.max'
+const memoryBytes = existsSync(memoryLimit) ? Number(readFileSync(memoryLimit, 'utf8')) : Infinity
+const memoryMiB = Number.isFinite(memoryBytes) ? memoryBytes / 1024 ** 2 : Infinity
+// Leave 2 GiB for simulations, the checkout and tmpfs, plus 512 MiB of native
+// JVM memory per lane. The default heap is 1.5 GiB. Local runs keep one server.
+const memoryLanes = Number.isFinite(memoryMiB) ? Math.max(1, Math.floor((memoryMiB - 2048) / 2048)) : 1
+const apalacheLanes = runnerThreads > 0
+  ? Math.max(1, Math.min(Number(process.env.SPECS_APALACHE ?? Math.floor(runnerThreads / 2)), memoryLanes)) : 1
+const apalacheHeap = process.env.SPECS_APALACHE_HEAP ?? `${Math.max(512, Math.min(1536, Math.floor((memoryMiB - 2048) / apalacheLanes) - 512))}m`
+const measurements = []
+let processes = 0
 const sha = (...parts) => {
   const hash = createHash('sha256')
   for (const part of parts) hash.update(String(part)).update('\0')
   return hash.digest('hex')
 }
-const cacheVersion = 1
-const runnerHash = sha(cacheVersion, require('@informalsystems/quint/package.json').version, apalacheVersion, backend, JSON.stringify(runtimeIdentity(root)), ...['check.mjs', 'agent-checks.mjs', 'outbox-checks.mjs'].map((file) => readFileSync(join(root, 'specs', file))))
+const cacheVersion = 2
+const runnerHash = sha(cacheVersion, require('@informalsystems/quint/package.json').version, apalacheVersion, backend, JSON.stringify(runtimeIdentity(root)), ...['check.mjs', 'simulate-batch.mjs', 'agent-checks.mjs', 'outbox-checks.mjs'].map((file) => readFileSync(join(root, 'specs', file))))
 function specHash(file, seen = new Set()) {
   if (seen.has(file)) return ''
   seen.add(file)
@@ -79,10 +91,10 @@ function freePort() {
   })
 }
 
-// One Apalache server for the whole run. Starting its JVM takes from a few
+// One Apalache server per lane. Starting its JVM takes from a few
 // seconds to over a minute on a loaded machine; Quint would start one per
 // check. It starts on the first uncached Apalache check and has its own
-// two-minute deadline; each check still has 60 seconds. Without a downloaded
+// two-minute deadline; each check has 180 seconds. Without a downloaded
 // Apalache, each check lets Quint start (and download) its own on a free port.
 const servers = []
 function apalacheServer(lane) {
@@ -92,7 +104,7 @@ function apalacheServer(lane) {
     if (!existsSync(exe)) return { port, stop: () => {} }
     // Apalache's default 4 GB heap gets swapped out on a loaded 8 GB machine and
     // stalls a check past its deadline. The bounded checks fit in much less.
-    const env = { ...process.env, JVM_ARGS: process.env.JVM_ARGS ?? `-Xmx${process.env.SPECS_APALACHE_HEAP ?? '1536m'}` }
+    const env = { ...process.env, JVM_ARGS: process.env.JVM_ARGS ?? `-Xmx${apalacheHeap}` }
     const child = spawn(exe, ['server', `--port=${port}`], { cwd: generated, env, stdio: 'ignore', detached: process.platform !== 'win32' })
     const stop = () => { try { process.kill(process.platform === 'win32' ? child.pid : -child.pid, 'SIGKILL') } catch { /* Already exited. */ } }
     process.on('exit', stop)
@@ -114,6 +126,7 @@ function apalacheServer(lane) {
 }
 
 function spawnQuint(args, timeout, port) {
+  processes++
   const verify = args[0] === 'verify'
   const commandArgs = verify ? [args[0], join(root, args[1]), ...args.slice(2), '--server-endpoint', `localhost:${port}`] : args
   const agentVerify = verify && args[1].startsWith('specs/agent-')
@@ -144,7 +157,8 @@ function spawnQuint(args, timeout, port) {
   })
 }
 
-async function runJob(job, lane = 0) {
+async function runJob(job, lane = 0, execute = spawnQuint) {
+  const started = Date.now()
   const { args, violation, timeout, trace, check, checks } = job
   const cacheJob = useCache && (args[0] !== 'run' || cacheRuns)
   const label = `quint ${args.join(' ')}`
@@ -154,13 +168,14 @@ async function runJob(job, lane = 0) {
     const saved = JSON.parse(readFileSync(cached, 'utf8'))
     if (trace) writeFileSync(trace, saved.trace)
     check(saved.output)
+    measurements.push({ args, outcome: violation ? 'violation' : 'ok', cached: true, seconds: 0 })
     return `${label}\n(unchanged, passed before: cached)\n${saved.notes}`
   }
   const budget = 720000 - (Date.now() - startedAt)
   if (budget <= 0) throw new Error('Spec check exceeded its twelve-minute execution budget')
   if (trace) rmSync(trace, { force: true })
   const port = args[0] !== 'verify' ? undefined : existsSync(join(process.env.QUINT_HOME ?? join(homedir(), '.quint'), `apalache-dist-${apalacheVersion}`)) ? (await apalacheServer(lane)).port : await freePort()
-  const result = await spawnQuint(args, Math.min(timeout, Math.max(0, 720000 - (Date.now() - startedAt))), port)
+  const result = await execute(args, Math.min(timeout, Math.max(0, 720000 - (Date.now() - startedAt))), port)
   const output = result.stdout + result.stderr
   const log = `${label}\n${output}`
   // A syntax, runtime, download, or tool failure is never an expected counterexample.
@@ -179,6 +194,7 @@ async function runJob(job, lane = 0) {
     writeFileSync(temporary, JSON.stringify({ output, notes, trace: trace ? readFileSync(trace, 'utf8') : undefined }))
     renameSync(temporary, cached)
   }
+  measurements.push({ args, outcome: violation ? 'violation' : 'ok', cached: false, seconds: (Date.now() - started) / 1000 })
   return `${log}${notes}`
 }
 
@@ -203,21 +219,37 @@ function shardJobs() {
 
 async function runAll() {
   shardJobs()
-  // On the Mac (SPECS_APALACHE=1): simulations first, SPECS_JOBS at a time, then
-  // the Apalache checks one at a time and alone, because a JVM warming up next
-  // to simulations on a loaded machine can miss its deadline. A machine of its
-  // own (bun run remote) sets SPECS_OVERLAP=1, and SPECS_APALACHE servers, each
-  // with its own lane, run alongside the simulations.
-  const queues = [jobs.filter(job => job.args[0] === 'verify'), jobs.filter(job => job.args[0] !== 'verify')]
+  // Local execution serializes the JVM lane after simulations. Remote jobs
+  // overlap independent JVM lanes with simulation groups within their quota.
+  const groups = new Map()
+  for (const job of jobs.filter(job => job.args[0] !== 'verify')) {
+    const fixed = job.args[0] === 'run' && job.args[job.args.indexOf('--max-samples') + 1] === '1'
+    const key = fixed ? job.args[1] : job
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(job)
+  }
+  const queues = [jobs.filter(job => job.args[0] === 'verify').map(job => [job]), [...groups.values()].toSorted((a, b) => b.length - a.length)]
+  console.log(`Quint: ${jobs.length} jobs; ${parallel} simulation lanes; ${apalacheLanes} Apalache lanes, heap ${apalacheHeap} each.`)
   let failed
   const lane = async (queue, index = 0) => {
     while (queue.length > 0 && !failed) {
-      const job = queue.shift()
-      const started = Date.now()
+      const group = queue.shift()
+      const batch = group.length > 1 ? simulationBatch(root) : undefined
+      let launched = false
+      const execute = batch ? (args, timeout) => {
+        if (!launched) { processes++; launched = true }
+        return batch.run(args, timeout)
+      } : spawnQuint
       try {
-        console.log(`${await runJob(job, index)}\n(${((Date.now() - started) / 1000).toFixed(1)} s)`)
+        for (const job of group) {
+          if (failed) break
+          const started = Date.now()
+          console.log(`${await runJob(job, index, execute)}\n(${((Date.now() - started) / 1000).toFixed(1)} s)`)
+        }
       } catch (error) {
         failed ??= error
+      } finally {
+        batch?.stop()
       }
     }
   }
@@ -230,6 +262,8 @@ async function runAll() {
   }
   // A lane whose checks were all cached never started a server, so the array can have holes.
   for (const server of servers) if (server !== undefined) (await server.catch(() => ({ stop: () => {} }))).stop()
+  writeFileSync(join(generated, 'check-results.json'), JSON.stringify({ seconds: (Date.now() - startedAt) / 1000, processes, jobs: measurements }, null, 2))
+  console.log(`Quint jobs: ${measurements.length}/${jobs.length} passed, ${measurements.filter(job => job.cached).length} cached; ${processes} processes; ${measurements.reduce((sum, job) => sum + job.seconds, 0).toFixed(1)} summed job seconds.`)
   if (failed) {
     if (failed.log) console.log(failed.log)
     throw failed
