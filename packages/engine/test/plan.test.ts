@@ -1,12 +1,12 @@
-// Every live query statement has an index (performance 6): the plan may not
-// scan messages, topic_index, reactions or topic_overlay. The sidebar's
-// statements, and the topic view's: the Main and thread windows, their
-// reactions and first-reply previews, a channel's active threads, who reacted to a message, and the New chat
-// pickers, All topics (its order, counts and places), and ⌘K's local search.
+// Every live query statement reads through an index (performance 6): its plan may not scan messages,
+// topic_index, reactions or topic_overlay, which grow with the workspace. Which index each one picks is
+// the planner's business; only a full scan fails. The list names the statements of every live query:
+// the sidebar and its counts, the dock badge, All topics, the topic view, who reacted, a channel's
+// threads, the New chat pickers, the ignore list, the @ and # suggestions, Home and ⌘K's local search.
 import { countsStatement } from '../src/sidebarUnread'
 import { badgeStatement, badgePolicy } from '../src/dockBadge'
 import { defaultNotificationSettings } from '@juno/domain'
-import { describe, expect } from 'bun:test'
+import { expect } from 'bun:test'
 import { itEffect } from '@juno/testing/effect'
 import { Effect, Layer } from 'effect'
 import * as fs from 'node:fs/promises'
@@ -29,6 +29,11 @@ import { ignorableStatement } from '../src/topics/ignored'
 import { searchStatements } from '../src/search/query'
 import { countsStatement as allTopicsCountsStatement, orderStatement, placesStatement } from '../src/topics/allTopics'
 import { listStatements, type ListFilter } from '../src/topics/query'
+
+interface Statement {
+  readonly sql: string
+  readonly params: ReadonlyArray<unknown>
+}
 
 const tempDir = Effect.acquireRelease(
   Effect.promise(() => fs.mkdtemp(path.join(os.tmpdir(), 'juno-plan-'))),
@@ -67,196 +72,85 @@ const filters: ReadonlyArray<ListFilter> = [
   { kind: 'all', unreadOnly: true, view: 'vbots' },
 ]
 
-describe('query plans', () => {
-  itEffect('topics.list never scans the guarded tables, for every filter', () =>
-    Effect.gen(function* () {
-      for (const filter of filters) {
-        for (const statement of listStatements(filter, '1700000000.000000', 300)) {
-          const lines = yield* plan(statement.sql, statement.params)
-          expect(scans(lines), lines.join('\n')).toStrictEqual([])
-          expect(lines.some((line) => line.includes('topic_index'))).toBe(true)
-        }
-        // Unscoped (a view included), Pinned and older unread rows come through their own partial indexes, never every topic of a channel.
-        if (filter.scope === undefined) {
-          const [, pinned, unread] = listStatements(filter, '1700000000.000000', 300)
-          const pinnedLines = yield* plan(pinned!.sql, pinned!.params)
-          expect(pinnedLines.some((line) => line.includes('topic_overlay_pinned'))).toBe(true)
-          const unreadLines = yield* plan(unread!.sql, unread!.params)
-          expect(unreadLines.some((line) => line.includes('topic_index_unread'))).toBe(true)
-        }
-      }
-    }).pipe(Effect.provide(freshStore)),
-  )
+const cutoff = '1700000000.000000'
+const thread = { kind: 'thread', channel: 'C0ENG', threadTs: '1700000000.000100' } as const
+const narrowings = [{ kind: 'all' }, { kind: 'channels' }, { kind: 'dms', scope: 'D0MAYA' }, { kind: 'all', query: 'postgres plan' }] as const
 
-  itEffect('topics.counts never scans the guarded tables', () =>
-    Effect.gen(function* () {
-      for (const scope of [undefined, 'C0ENG']) {
-        const statement = countsStatement(scope)
-        const lines = yield* plan(statement.sql, statement.params)
-        expect(scans(lines), lines.join('\n')).toStrictEqual([])
-      }
-    }).pipe(Effect.provide(freshStore)),
-  )
+/** Every live query statement, by name, with the parameters it is run with. */
+function statements(): ReadonlyArray<readonly [string, Statement]> {
+  const named = (name: string, list: ReadonlyArray<Statement>) => list.map((statement, i) => [`${name} #${i}`, statement] as const)
+  const windows = ([{ kind: 'main', channel: 'C0ENG' }, thread] satisfies ReadonlyArray<WindowTarget>).flatMap((target) =>
+    [undefined, '1700000000.000200'].flatMap((anchor) => named(`messages.list ${target.kind} window, anchor ${anchor}`, windowStatements(target, { anchor, before: 50, limit: 300 }))))
+  const recent = threadsStatements('C0ENG', cutoff, 100)
+  const all = threadsStatements('C0ENG', undefined, 100)
+  const who = whoReactedStatements('C0ENG', '1700000000.000100')
+  return [
+    ...filters.flatMap((filter) => named(`topics.list ${JSON.stringify(filter)}`, listStatements(filter, cutoff, 300))),
+    ...[undefined, 'C0ENG'].map((scope) => [`topics.counts ${scope}`, countsStatement(scope)] as const),
+    ['dock badge', badgeStatement(badgePolicy(defaultNotificationSettings, { aiAssist: false, at: { weekday: 1, minutes: 600 } }), 'U0SELF')],
+    ...narrowings.flatMap((narrowing) => [
+      ...(['all', 'quiet'] as const).flatMap((status) => (['recent', 'oldest', 'messages'] as const).map((sort) =>
+        [`allTopics.list ${JSON.stringify(narrowing)} ${status} ${sort}`, orderStatement({ ...narrowing, status, sort }, cutoff, 200, 200)] as const)),
+      [`allTopics.summary ${JSON.stringify(narrowing)}`, allTopicsCountsStatement(narrowing, cutoff)] as const,
+      [`allTopics places ${narrowing.kind}`, placesStatement(narrowing.kind)] as const,
+    ]),
+    ...windows,
+    ['broadcast titles', broadcastTitlesStatement(['t:C0ENG:1700000000.000100'])],
+    ['thread root', rootStatement(thread)],
+    ['reactions', reactionsStatement('C0ENG', ['1700000000.000100', '1700000000.000200'])],
+    ['first replies', firstRepliesStatement('C0ENG', ['1700000000.000100'])],
+    ['messages by ts', messagesByTsStatement('C0ENG', ['1700000000.000100', '1700000000.000200'])],
+    ['reactions.who message', who.message],
+    ['reactions.who reactions', who.reactions],
+    ...[recent.list, recent.count, all.list, all.count].map((statement, i) => [`channel.threads #${i}`, statement] as const),
+    ['New chat frequent conversations', { sql: frequentConversationsStatement, params: [] }],
+    ['New chat frequent sends', frequentSendsStatement('U0SELF', 1_800_000_000_000)],
+    ['New chat activity', activityStatement(['C0ENG', 'D0MAYA'])],
+    ['New chat recent', pickerStatements(cutoff).recent],
+    ['ignore list', { sql: ignorableStatement, params: [] }],
+    ['@ thread posters', mentionStatements.threadPosters('C0ENG', '1700000000.000100')],
+    ['@ channel posters', mentionStatements.channelPosters('C0ENG')],
+    ['@ recent contacts', mentionStatements.recentContacts(cutoff)],
+    ['# your channels', mentionStatements.yourChannels(cutoff)],
+    ...named('Home', [
+      homeStatements.unread(cutoff),
+      homeStatements.topics(['t:C0ENG:1700000000.000100', 'm:D0MAYA']),
+      homeStatements.threadAfter('C0ENG', '1700000000.000100', cutoff),
+      homeStatements.mainAfter('D0MAYA', cutoff),
+      staleStatement('settledScore', cutoff, '1800000000.000000', 12),
+      homeStatements.automated(),
+      homeStatements.askedWhy('C0ALERTS'),
+      suggestedStatements.ignoredMentions(cutoff),
+      suggestedStatements.unreadChannels(cutoff),
+      suggestedStatements.mentionChannels(cutoff),
+      suggestedStatements.firstThreadUnread('C0ENG', '1700000000.000100', '1700000000.000100', 'U0ME'),
+      homeStatements.kept(['t:C0ENG:1700000000.000100', 'm:D0MAYA']),
+      automatedStatements.candidates(),
+      automatedStatements.sample('C0ALERTS'),
+      automatedStatements.moved(),
+      movesStatements.unseen(),
+      homeStatements.mains(['C0ALERTS', 'C0DEPLOYS']),
+      missedHuddleStatement(Date.now()),
+    ]),
+  ]
+}
 
-  itEffect('dock badge uses EXISTS and indexed unread message probes', () =>
-    Effect.gen(function* () {
-      const statement = badgeStatement(badgePolicy(defaultNotificationSettings, { aiAssist: false, at: { weekday: 1, minutes: 600 } }), 'U0SELF')
+itEffect('no live query statement scans a table that grows with the workspace', () =>
+  Effect.gen(function* () {
+    const reader = yield* StoreReader
+    const search = Object.entries(searchStatements(reader, '"roll"*', 50)).map(([name, statement]) => {
+      const [sql, params] = statement.compile()
+      return [`⌘K search ${name}`, { sql, params }] as const
+    })
+    const scanning: Array<string> = []
+    for (const [name, statement] of [...statements(), ...search]) {
       const lines = yield* plan(statement.sql, statement.params)
-      expect(scans(lines)).toStrictEqual([])
-      expect(lines.some((line) => line.includes('topic_index_unread'))).toBe(true)
-      expect(statement.sql.includes('EXISTS')).toBe(true)
-    }).pipe(Effect.provide(freshStore)),
-  )
-
-  itEffect('allTopics.list and allTopics.summary never scan the guarded tables, for every chip, narrowing, sort and a text filter', () =>
-    Effect.gen(function* () {
-      const cutoff = '1700000000.000000'
-      const narrowings = [{ kind: 'all' }, { kind: 'channels' }, { kind: 'dms', scope: 'D0MAYA' }, { kind: 'all', query: 'postgres plan' }] as const
-      for (const narrowing of narrowings) {
-        for (const status of ['all', 'quiet'] as const) {
-          for (const sort of ['recent', 'oldest', 'messages'] as const) {
-            const statement = orderStatement({ ...narrowing, status, sort }, cutoff, 200, 200)
-            const lines = yield* plan(statement.sql, statement.params)
-            expect(scans(lines), lines.join('\n')).toStrictEqual([])
-            expect(lines.some((line) => /SEARCH i USING (COVERING )?INDEX topic_index_channel/.test(line))).toBe(true)
-          }
-        }
-        const counts = allTopicsCountsStatement(narrowing, cutoff)
-        const countLines = yield* plan(counts.sql, counts.params)
-        expect(scans(countLines)).toStrictEqual([])
-        const places = placesStatement(narrowing.kind)
-        const placeLines = yield* plan(places.sql, places.params)
-        expect(scans(placeLines)).toStrictEqual([])
-      }
-    }).pipe(Effect.provide(freshStore)),
-  )
-
-  itEffect('messages.list reads the Main and thread windows through their indexes', () =>
-    Effect.gen(function* () {
-      const targets: ReadonlyArray<WindowTarget> = [
-        { kind: 'main', channel: 'C0ENG' },
-        { kind: 'thread', channel: 'C0ENG', threadTs: '1700000000.000100' },
-      ]
-      for (const target of targets) {
-        for (const anchor of [undefined, '1700000000.000200']) {
-          for (const statement of windowStatements(target, { anchor, before: 50, limit: 300 })) {
-            const lines = yield* plan(statement.sql, statement.params)
-            expect(scans(lines), lines.join('\n')).toStrictEqual([])
-            const index = target.kind === 'main' ? 'messages_main' : 'messages_thread'
-            expect(lines.some((line) => line.includes(index))).toBe(true)
-          }
-        }
-      }
-      for (const statement of [broadcastTitlesStatement(['t:C0ENG:1700000000.000100']), rootStatement({ kind: 'thread', channel: 'C0ENG', threadTs: '1700000000.000100' }), reactionsStatement('C0ENG', ['1700000000.000100', '1700000000.000200']), firstRepliesStatement('C0ENG', ['1700000000.000100']), messagesByTsStatement('C0ENG', ['1700000000.000100', '1700000000.000200'])]) {
-        const lines = yield* plan(statement.sql, statement.params)
-        expect(scans(lines), lines.join('\n')).toStrictEqual([])
-      }
-    }).pipe(Effect.provide(freshStore)),
-  )
-
-  itEffect("messages.list finds an app's or a deactivated person's DM through the DM index", () =>
-    Effect.gen(function* () {
-      const statement = messageUsersStatement(['U0GRAFANA', 'U0MAYA'])
-      const lines = yield* plan(statement.sql, statement.params)
-      expect(lines.some((line) => /^SCAN (d|conversations)\b/.test(line))).toBe(false)
-      expect(lines.some((line) => line.includes('conversations_im_user'))).toBe(true)
-    }).pipe(Effect.provide(freshStore)),
-  )
-
-  itEffect('reactions.who reads the message and its reactions by key', () =>
-    Effect.gen(function* () {
-      const statements = whoReactedStatements('C0ENG', '1700000000.000100')
-      for (const statement of [statements.message, statements.reactions]) {
-        const lines = yield* plan(statement.sql, statement.params)
-        expect(scans(lines), lines.join('\n')).toStrictEqual([])
-      }
-    }).pipe(Effect.provide(freshStore)),
-  )
-
-  itEffect("channel.threads reads a channel's threads through the channel index", () =>
-    Effect.gen(function* () {
-      const recent = threadsStatements('C0ENG', '1700000000.000000', 100)
-      const all = threadsStatements('C0ENG', undefined, 100)
-      for (const statement of [recent.list, recent.count, all.list, all.count]) {
-        const lines = yield* plan(statement.sql, statement.params)
-        expect(scans(lines), lines.join('\n')).toStrictEqual([])
-        expect(lines.some((line) => line.includes('topic_index_channel_activity'))).toBe(true)
-      }
-    }).pipe(Effect.provide(freshStore)),
-  )
-
-  itEffect('the New chat pickers read topic_index through an index', () =>
-    Effect.gen(function* () {
-      expect(scans(yield* plan(frequentConversationsStatement, []))).toStrictEqual([])
-      const sends = frequentSendsStatement('U0SELF', 1_800_000_000_000)
-      expect(scans(yield* plan(sends.sql, sends.params))).toStrictEqual([])
-      const activity = activityStatement(['C0ENG', 'D0MAYA'])
-      expect(scans(yield* plan(activity.sql, activity.params))).toStrictEqual([])
-      const { recent } = pickerStatements('1700000000.000000')
-      const lines = yield* plan(recent.sql, recent.params)
-      expect(scans(lines)).toStrictEqual([])
-    }).pipe(Effect.provide(freshStore)),
-  )
-
-  itEffect('the ignore list\'s add row reads no message or topic table', () =>
-    Effect.gen(function* () {
-      const lines = yield* plan(ignorableStatement, [])
-      expect(scans(lines)).toStrictEqual([])
-    }).pipe(Effect.provide(freshStore)),
-  )
-
-  itEffect('the @ and # suggestions read messages and topic_index through their indexes', () =>
-    Effect.gen(function* () {
-      const statements = [
-        mentionStatements.threadPosters('C0ENG', '1700000000.000100'),
-        mentionStatements.channelPosters('C0ENG'),
-        mentionStatements.recentContacts('1700000000.000000'),
-        mentionStatements.yourChannels('1700000000.000000'),
-      ]
-      for (const statement of statements) {
-        const lines = yield* plan(statement.sql, statement.params)
-        expect(scans(lines), lines.join('\n')).toStrictEqual([])
-      }
-    }).pipe(Effect.provide(freshStore)),
-  )
-
-  itEffect('Home reads topic_index and messages through their indexes', () =>
-    Effect.gen(function* () {
-      const statements = [
-        homeStatements.unread('1700000000.000000'),
-        homeStatements.topics(['t:C0ENG:1700000000.000100', 'm:D0MAYA']),
-        homeStatements.threadAfter('C0ENG', '1700000000.000100', '1700000000.000000'),
-        homeStatements.mainAfter('D0MAYA', '1700000000.000000'),
-        staleStatement('settledScore', '1700000000.000000', '1800000000.000000', 12),
-        homeStatements.automated(),
-        homeStatements.askedWhy('C0ALERTS'),
-        suggestedStatements.ignoredMentions('1700000000.000000'),
-        suggestedStatements.unreadChannels('1700000000.000000'),
-        suggestedStatements.mentionChannels('1700000000.000000'),
-        suggestedStatements.firstThreadUnread('C0ENG', '1700000000.000100', '1700000000.000100', 'U0ME'),
-        homeStatements.kept(['t:C0ENG:1700000000.000100', 'm:D0MAYA']),
-        automatedStatements.candidates(),
-        automatedStatements.sample('C0ALERTS'),
-        automatedStatements.moved(),
-        movesStatements.unseen(),
-        homeStatements.mains(['C0ALERTS', 'C0DEPLOYS']),
-        missedHuddleStatement(Date.now()),
-      ]
-      for (const statement of statements) {
-        const lines = yield* plan(statement.sql, statement.params)
-        expect(scans(lines), lines.join('\n')).toStrictEqual([])
-      }
-    }).pipe(Effect.provide(freshStore)),
-  )
-
-  itEffect('⌘K search reads every table through FTS or an index', () =>
-    Effect.gen(function* () {
-      const reader = yield* StoreReader
-      for (const [name, statement] of Object.entries(searchStatements(reader, '"roll"*', 50))) {
-        const [sql, params] = statement.compile()
-        const lines = yield* plan(sql, params)
-        expect(scans(lines), `${name}\n${lines.join('\n')}`).toStrictEqual([])
-      }
-    }).pipe(Effect.provide(freshStore)),
-  )
-})
+      if (scans(lines).length > 0) scanning.push(`${name}\n  ${lines.join('\n  ')}`)
+    }
+    // An app's or a deactivated person's DM is found through the DM index, not by reading every conversation.
+    const dms = messageUsersStatement(['U0GRAFANA', 'U0MAYA'])
+    const dmLines = yield* plan(dms.sql, dms.params)
+    if (dmLines.some((line) => /^SCAN (d|conversations)\b/.test(line))) scanning.push(`DM by user\n  ${dmLines.join('\n  ')}`)
+    expect(scanning).toEqual([])
+  }).pipe(Effect.provide(freshStore)),
+)

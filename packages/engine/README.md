@@ -76,7 +76,7 @@ Renderer command middleware marks writes through `CommandWrite`. Live queries ca
 - `test/thread-view-boot.test.ts`: a malformed or unidentified getView row at the first sync keeps the good rows and never reads as an unfollow, and getView refusals move to the background lane.
 - `test/sidebar-rule.test.ts`: the sidebar and counts SQL against `sidebarPlacement` over a table of every topic status.
 - `test/reads.test.ts`: the read commands against the fake: the calls each kind of topic makes, coalescing, retries and a restart with a pending mark, marks from other clients during and after a pending mark, the mirror setting, and that nothing marks by itself.
-- `test/session.test.ts`: sign-in, sign-out and session expiry. `test/plan.test.ts` checks the query plans of the sidebar and the topic view.
+- `test/session.test.ts`: sign-in, sign-out and session expiry. `test/plan.test.ts` checks that no live query statement scans a table that grows with the workspace.
 - `test/slack-schedule.test.ts`: Slack's notification schedule against the fake: the first write once and none on restart, none when Slack already holds the hours, one write for two quick changes, Restore and the switch, and a change made in Slack left alone until Use Juno's hours.
 - `test/who-reacted.test.ts`: `reactions.who` against the fake's 40-reactor seed: the stored list at once, then everyone after one `reactions.get` `full`, names arriving for new people, the window still at ten per chip, no second fetch while the store lists everyone, socket adds and removes, a same-count truncated snapshot replacing stale names, shared concurrent reads, a response raced by an event, a refused fetch, the user's own unsent reaction, and an unknown message.
 
