@@ -24,7 +24,7 @@ it('keeps its room after a missing read, accepts a later leave, and rejects an o
 it('keeps a known start through partial reads and never borrows another room in the same channel', () => {
   const core: { s: L.Lifecycle; own: OwnRoom | undefined } = { s: current(), own: room() }
   readOwn(core, ['C1'], applyInfo(new Map(), ['C1'], [{ channel_id: 'C1', call_id: 'R1', active_members: ['ME'] }]))
-  expect(core.own).toMatchObject({ participants: ['ME'], startedAt: 1000 })
+  expect(callRoom(core.s, new Map(), core.own)).toMatchObject({ participants: ['ME'], startedAt: 1000 })
   const nextRoom = applyInfo(new Map(), ['C1'], [{ channel_id: 'C1', call_id: 'R2', active_members: ['LEO'] }])
   readOwn(core, ['C1'], nextRoom)
   frameOwn(core, frame({ roomId: 'R2', participants: ['LEO'], eventTs: '99' }))
