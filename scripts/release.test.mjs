@@ -55,11 +55,12 @@ const required = ['test', 'specs:check', 'specs:conformance', 'test:gallery', 't
 const red = outcome === 'red'
 if (args.includes('--nightly')) writeFileSync('apps/desktop/e2e/coverage-map.json', JSON.stringify({ version: 1, commit, specs: [], files: {} }))
 const finishedAt = new Date().toISOString()
-const record = { version: 2, commit, finishedAt, passed: !red, identity: { bun: '1', platform: 'linux', arch: 'x64', electron: '44' }, required,
+const identity = { bun: '1', platform: 'linux', arch: 'x64', electron: '44' }
+const record = { version: 2, commit, finishedAt, passed: !red, identity, plannedIdentity: { ...identity, bun: 'canary' }, required,
   repair: repair && { commit: repair.commit, finishedAt: repair.finishedAt, selection: 'graph-uncapped' },
   suites: required.map((suite) => red && suite === 'test:desktop'
-    ? { suite, code: 1, failures: ['1) sidebar.spec.ts:40 › keeps the selected row'], log: '.juno-status/verify-main/run/test_desktop.log', cause: { category: 'test', provisional: true, evidence: 'timed out waiting for the row' } }
-    : { suite, code: 0, failures: [] }) }
+    ? { suite, identity, code: 1, failures: ['1) sidebar.spec.ts:40 › keeps the selected row'], log: '.juno-status/verify-main/run/test_desktop.log', cause: { category: 'test', provisional: true, evidence: 'timed out waiting for the row' } }
+    : { suite, identity, code: 0, failures: [] }) }
 const folder = '.juno-status/verify-main/commits/' + commit
 mkdirSync(folder, { recursive: true })
 writeFileSync(folder + '/' + finishedAt.replace(/\\W/g, '') + '.json', JSON.stringify(record))

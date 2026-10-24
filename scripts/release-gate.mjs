@@ -22,9 +22,10 @@ export function readRecords(status) {
 export function assessRecord(record) {
   const required = record.version === 2 ? ['test', 'specs:check', 'specs:conformance', 'test:gallery',
     ...(record.required?.includes('test:browser') ? ['test:browser', 'test:electron'] : ['test:desktop'])] : ['test', 'specs:check', 'test:gallery', 'test:desktop']
-  return record.passed === true
+  return record.smoke !== true && record.passed === true
     && required.every((name) => record.suites.some((suite) => suite.suite === name))
     && record.suites.every(suitePassed)
+    && record.suites.filter((suite) => !['test:desktop @mac', 'perf', 'test:feel'].includes(suite.suite)).every((suite) => !suite.identity || sameIdentity(suite.identity, record.identity))
     && (record.version !== 2 || (record.identity && record.required?.every((name) => record.suites.some((suite) => suite.suite === name))))
 }
 

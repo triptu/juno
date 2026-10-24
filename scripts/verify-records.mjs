@@ -4,6 +4,13 @@ import { sameIdentity } from './verify-inputs.mjs'
 import { failureCause } from './test-results-reporter.mjs'
 import { statusFolder } from './release-gate.mjs'
 
+/** Jobs establish the runtime; reused evidence must agree before it can pass. */
+export function reportedRuntime(log, fallback, reused = [], baseline) {
+  const reports = [...log.matchAll(/^juno-runtime: (.+)$/gm)].map((match) => JSON.parse(match[1]))
+  const identity = reports[0] ?? fallback
+  return { identity, mismatch: !identity || [...reports, ...reused, ...(baseline ? [baseline] : [])].some((value) => !sameIdentity(value, identity)) }
+}
+
 /** Confirm triage on a full-run or affected record without changing its outcome. */
 export function classifyRecord(file, suite, category, evidence, status) {
   if (!evidence?.trim()) throw new Error('Classification needs evidence')
@@ -44,9 +51,10 @@ export function specDurations(records, identity) {
 
 /** Keep the old latest result during migration, then atomically replace it. */
 export function writeRecord(status, runId, summary) {
-  const latest = join(status, 'verify-main.json')
+  const name = summary.smoke ? 'verify-smoke' : 'verify-main'
+  const latest = join(status, `${name}.json`)
   const archive = (id, record) => {
-    const folder = join(status, 'verify-main', 'commits', record.commit)
+    const folder = join(status, name, 'commits', record.commit)
     mkdirSync(folder, { recursive: true })
     const target = join(folder, `${id}.json`)
     const temporary = `${target}.${process.pid}.tmp`

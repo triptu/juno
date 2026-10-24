@@ -79,7 +79,8 @@ if (import.meta.main) {
     process.exit(2)
   }
   const children = new Set()
-  console.log(`juno-runtime: ${JSON.stringify(runtimeIdentity(process.cwd()))}`)
+  const identity = runtimeIdentity(process.cwd())
+  console.log(`juno-runtime: ${JSON.stringify(identity)}`)
   forwardSignals(children)
   const serial = process.env.JUNO_PLAN_SERIAL === '1'
   const planned = lanes(steps, serial)
@@ -93,6 +94,7 @@ if (import.meta.main) {
       const child = spawn(command[0], command[1], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...laneEnv, ...step.env, JUNO_HEAVY_HELD: '1', JUNO_PLAN_STEP: String(steps.indexOf(step)) } })
       children.add(child)
       const prefix = `[${step.script}] `
+      console.log(`${prefix}juno-runtime: ${JSON.stringify(identity)}`)
       for (const [stream, out] of [[child.stdout, process.stdout], [child.stderr, process.stderr]]) createInterface({ input: stream }).on('line', (line) => out.write(prefix + line + '\n'))
       child.on('error', () => {})
       child.on('close', (code) => {

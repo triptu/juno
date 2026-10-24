@@ -30,9 +30,10 @@ import { cpSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, readdirS
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomInt } from 'node:crypto'
+import { createInterface } from 'node:readline'
 import { hostname } from 'node:os'
-import { writeRecord } from './verify-records.mjs'
-import { isAncestor, readRecords, statusFolder } from './release-gate.mjs'
+import { reportedRuntime, writeRecord } from './verify-records.mjs'
+import { assessRecord, isAncestor, readRecords, statusFolder } from './release-gate.mjs'
 import { failureCause, testResults } from './test-results-reporter.mjs'
 import { fullSuites, planOutcomes } from './verify-plan.mjs'
 import { scratchFolder } from './worktree-folder.mjs'
@@ -48,6 +49,8 @@ const argv = process.argv.slice(2)
 const ref = argv.includes('--ref') ? argv[argv.indexOf('--ref') + 1] : 'main'
 const withMac = argv.includes('--with-mac') || argv.includes('--nightly')
 const nightly = argv.includes('--nightly')
+const smoke = argv.includes('--smoke')
+if (smoke && ['--repair', '--nightly', '--with-mac'].some((flag) => argv.includes(flag))) throw new Error('--smoke cannot repair a full run or run Mac suites')
 const noCache = argv.includes('--no-cache')
 const seed = process.env.SPECS_SEED ?? (nightly ? String(randomInt(1, 2 ** 32)) : undefined)
 
@@ -64,7 +67,7 @@ const statusDir = statusFolder(root)
 const logDir = join(statusDir, 'verify-main', runId)
 const failedSetup = (error) => {
   const message = error instanceof Error ? error.message : String(error)
-  writeRecord(statusDir, runId, { version: 2, commit, subject, ref, finishedAt: new Date().toISOString(), passed: false,
+  writeRecord(statusDir, runId, { version: 2, commit, subject, ref, smoke, finishedAt: new Date().toISOString(), passed: false,
     suites: [{ suite: 'setup', code: 1, seconds: 0, failures: [message], cause: { category: 'infrastructure', provisional: true, evidence: message } }] })
   console.error(`verify:main: ${message}`)
   process.exit(1)
@@ -74,15 +77,18 @@ process.on('unhandledRejection', failedSetup)
 const execution = verifyExecution(argv.includes('--local'))
 const local = execution.mode === 'local'
 if (local && argv.includes('--require-remote')) throw new Error('This run requires the laptop; local fallback is disabled')
-const identity = runtimeIdentity(root, !local)
+const plannedIdentity = runtimeIdentity(root, !local)
 const records = readRecords(statusDir)
 const scripts = JSON.parse(git('show', `${commit}:package.json`)).scripts ?? {}
-const required = fullSuites(scripts, { nightly, noCache, seed })
+const required = smoke ? [{ name: 'test', words: ['test', '--files', 'packages/domain/test/title.test.ts'] }] : fullSuites(scripts, { nightly, noCache, seed })
 const repairArg = argv.includes('--repair') ? argv[argv.indexOf('--repair') + 1] : undefined
 const baseline = repairArg === 'latest' ? records[0] : repairArg ? JSON.parse(readFileSync(resolve(repairArg), 'utf8')) : undefined
 if (repairArg && (!baseline || baseline.version !== 2 || !isAncestor(root, baseline.commit, commit)))
   throw new Error('--repair needs a version 2 record at an ancestor of the target commit')
 if (baseline && (nightly || noCache)) throw new Error('--repair cannot be combined with --nightly or --no-cache')
+// Reuse is provisional until this run's jobs confirm the recorded identity.
+const identity = local ? plannedIdentity : baseline?.identity ?? records.find((record) =>
+  record.execution?.mode === execution.mode && record.execution.host === execution.host && record.suites.some(suitePassed))?.identity ?? plannedIdentity
 const tracked = git('ls-tree', '-r', '--name-only', commit).split('\n')
 const protocolRoots = protocolInputs(tracked)
 const reused = []
@@ -117,6 +123,8 @@ const removeCheckout = () => spawnSync('git', ['worktree', 'remove', '--force', 
 process.on('exit', removeCheckout)
 const children = new Set()
 let cancelled
+let liveIdentity
+let runtimeFailure
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => { cancelled = signal; for (const child of children) child.kill(signal) })
 
 /** Runs one suite, writing its log; resolves with the outcome. */
@@ -131,6 +139,16 @@ function run(suite, command, args, cwd, env = {}) {
     child.on('error', (error) => out.write(`${error.message}\n`))
     child.stdout.pipe(out)
     child.stderr.pipe(out)
+    if (suite === 'plan') for (const stream of [child.stdout, child.stderr]) createInterface({ input: stream }).on('line', (line) => {
+      const report = /^(?:\[runner:[^\]]+\] )?(?:\[[^\]]+\] )?juno-runtime: (.+)$/.exec(line)
+      if (!report || runtimeFailure) return
+      const checked = reportedRuntime(`juno-runtime: ${report[1]}`, undefined, [...reused.map((suite) => suite.identity), ...(liveIdentity ? [liveIdentity] : [])], baseline?.identity)
+      liveIdentity ??= checked.identity
+      if (!checked.mismatch) return
+      runtimeFailure = 'Job runtimes disagree with this run or its reused results; stopped every job'
+      console.error(`verify:main: ${runtimeFailure}`)
+      child.kill('SIGTERM')
+    })
     child.on('close', (code, signal) => {
       children.delete(child)
       out.end(() => resolvePromise({ suite, code: code ?? (signal ? 130 : 1), signal, seconds: Math.round((Date.now() - started) / 1000), log }))
@@ -149,7 +167,7 @@ function splitPlan(planned) {
     const suite = suites.find((suite) => suite.name === outcome.suite)
     const prefix = `[${suite.name}] `
     const log = join(logDir, `${suite.name.replace(/[^\w-]/g, '_')}.log`)
-    writeFileSync(log, lines.filter((line) => line.startsWith(prefix) || !line.startsWith('[')).map((line) => line.startsWith(prefix) ? line.slice(prefix.length) : line).join('\n'))
+    writeFileSync(log, lines.filter((line) => line.startsWith(prefix) || (!line.startsWith('[') && !line.startsWith('juno-runtime:'))).map((line) => line.startsWith(prefix) ? line.slice(prefix.length) : line).join('\n'))
     return { ...outcome, log }
   })
 }
@@ -196,6 +214,8 @@ if (withMac) {
   )
 }
 let results = (await Promise.all(runs)).flat()
+const readLog = (result) => result.log && existsSync(result.log) ? readFileSync(result.log, 'utf8') : ''
+const runtime = reportedRuntime(results.filter((result) => suites.some(({ name }) => name === result.suite) || result.suite === 'plan').map(readLog).join('\n'), local ? identity : undefined, reused.map((suite) => suite.identity), baseline?.identity)
 
 // The coverage map, from the partials this run's desktop machines brought back
 // (scripts/coverage-map.mjs). A failed test still ran its code, so a failure
@@ -210,7 +230,7 @@ const partials = nightly && existsSync(coverageRoot)
 let coverageNote = nightly ? 'no coverage partials came back; the coverage map was not refreshed' : 'coverage recording is nightly only'
 if (partials.length > 0) {
   const map = mergePartials(partials.map((path) => JSON.parse(readFileSync(path, 'utf8'))), commit)
-  map.identity = identity
+  map.identity = runtime.identity
   writeFileSync(join(root, MAP_PATH), formatMap(map))
   coverageNote = `coverage map refreshed from ${partials.length} partial(s): ${map.specs.length} spec file(s), ${Object.keys(map.files).length} source file(s); commit ${MAP_PATH}`
 }
@@ -242,11 +262,11 @@ function failures(log) {
 }
 
 const measured = results.map((result) => {
-  const log = result.log && existsSync(result.log) ? readFileSync(result.log, 'utf8') : ''
-  const reported = [...log.matchAll(/^juno-runtime: (.+)$/gm)].map((match) => JSON.parse(match[1]))
-  const expected = suites.some(({ name }) => name === result.suite) || result.suite === 'plan' ? identity : runtimeIdentity(root)
-  const actual = reported[0] ?? (local || expected !== identity ? expected : undefined)
-  const mismatch = actual === undefined || reported.some((value) => !sameIdentity(value, expected))
+  const log = readLog(result)
+  const inPlan = suites.some(({ name }) => name === result.suite) || result.suite === 'plan'
+  const checked = inPlan ? reportedRuntime(log, local ? identity : undefined, [runtime.identity]) : reportedRuntime(log, runtimeIdentity(root))
+  const actual = checked.identity
+  const mismatch = checked.mismatch || (inPlan && (runtime.mismatch || Boolean(runtimeFailure)))
   let code = cancelled && result.code !== 0 ? 130 : mismatch ? 1 : result.code
   let tests = testResults(log)
   if (baseline && tests) tests = mergeRepairTests(baseline.suites.find((suite) => suite.suite === result.suite)?.tests, tests)
@@ -256,15 +276,15 @@ const measured = results.map((result) => {
   return { ...result, code, command: suites.find(({ name }) => name === result.suite)?.words, identity: actual, inputs, inputKey: inputs ? committedInputKey(root, commit, inputs, actual) : undefined,
     host: suites.some(({ name }) => name === result.suite) || result.suite === 'plan' ? execution.host : hostname(),
     log: result.log ? join('.juno-status', relative(statusDir, result.log)) : '',
-    failures: code === 0 ? [] : mismatch ? ['The job runtime differs from the planned runtime; reuse was refused'] : failures(result.log), tests,
-    cause: failureCause({ code, signal: cancelled ?? result.signal, tests, unfinished: result.unfinished, log, cause: override ?? (mismatch ? 'infrastructure' : undefined), note: mismatch ? 'The job did not report the expected runtime identity' : undefined }),
+    failures: code === 0 ? [] : mismatch ? ['Job runtimes are missing or disagree with this run or its reused results; reuse was refused'] : failures(result.log), tests,
+    cause: failureCause({ code, signal: cancelled ?? result.signal, tests, unfinished: result.unfinished, log, cause: override ?? (mismatch ? 'infrastructure' : undefined), note: mismatch ? 'The job must report the same runtime identity as this run and its reused results' : undefined }),
   }
 })
 const outcomes = [...measured, ...reused]
 const summary = {
-  version: 2, commit, subject, ref, identity, execution,
+  version: 2, commit, subject, ref, identity: runtime.identity, plannedIdentity, execution, smoke,
   finishedAt: new Date().toISOString(),
-  passed: !cancelled && outcomes.every(suitePassed),
+  passed: !cancelled && !runtimeFailure && !runtime.mismatch && outcomes.every(suitePassed),
   cause: cancelled ? failureCause({ code: 130, signal: cancelled }) : undefined,
   required: required.map((suite) => suite.name),
   repair: baseline ? { commit: baseline.commit, finishedAt: baseline.finishedAt, selection: 'graph-uncapped', changed: affected.changed, steps: affected.steps } : undefined,
@@ -294,6 +314,10 @@ const markdown = [
     .flatMap((suite) => ['', `## ${suite.suite}`, '', ...suite.failures.map((failure) => `- ${failure}`)]),
   '',
 ].join('\n')
-writeFileSync(join(statusDir, 'verify-main.md'), markdown)
+writeFileSync(join(statusDir, smoke ? 'verify-smoke.md' : 'verify-main.md'), markdown)
 console.log(markdown)
+if (smoke) {
+  if (assessRecord(summary)) throw new Error('A smoke record must never pass the release gate')
+  console.log('verify:main: smoke record checked; the release gate correctly requires a full run')
+}
 process.exit(summary.passed ? 0 : 1)

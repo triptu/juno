@@ -163,3 +163,75 @@ test('a repair installs its planner, reruns the failed suite, and retains passin
   assert.deepEqual(readFileSync(env.TEST_CALLS, 'utf8').trim().split('\n').map(JSON.parse).map((call) => call.suite), ['install', 'test:desktop', 'lint'])
   assert.ok(releaseGate(root, record.commit))
 })
+
+test('remote jobs establish the record identity; reuse and release refuse a different runtime', { timeout: 60_000 }, (t) => {
+  const { root, env, invoke, git: fixtureGit } = verificationFixture(t)
+  // Fake the SSH transport, preserving the planner, records, input hashes and release gate.
+  writeFileSync(join(root, 'bin/ssh'), `#!/usr/bin/env node
+console.log('__juno_runner_connected\\nos=Linux fixture\\narch=x86_64\\ndocker=ready\\ncapacity=8 pinned');
+`)
+  writeFileSync(join(root, 'scripts/remote.mjs'), `
+import { appendFileSync } from 'node:fs'
+import { parsePlan } from './plan.mjs'
+const identity = { runtime: 'bun', version: '1.4.4', bun: '1.4.4', node: '26.11.1', platform: process.env.TEST_PLATFORM ?? 'linux', arch: 'x64', electron: '44.7.0' }
+for (const [index, step] of parsePlan(process.argv.slice(3)).entries()) {
+  appendFileSync(process.env.TEST_CALLS, step.script + '\\n')
+  const actual = step.script === process.env.TEST_MISMATCH ? { ...identity, arch: 'arm64' } : identity
+  if (step.script !== process.env.TEST_MISSING) console.log('[' + step.script + '] juno-runtime: ' + JSON.stringify(actual))
+  console.log('plan: step ' + index + ' ' + step.script + ' exited with 0 after 1 s')
+}
+`)
+  const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+  writeFileSync(join(root, 'package.json'), JSON.stringify({ ...manifest, packageManager: 'bun@1.4.4-canary.fixture' }))
+  fixtureGit('add', 'bin/ssh', 'scripts/remote.mjs', 'package.json')
+  fixtureGit('commit', '-qm', 'Remote transport fixture')
+  const record = () => JSON.parse(readFileSync(join(root, '.juno-status/verify-main.json'), 'utf8'))
+  const run = (extra = {}) => invoke([], extra)
+  const first = run()
+  assert.equal(first.status, 0, first.stderr + first.stdout)
+  const linux = record()
+  assert.equal(linux.identity.platform, 'linux')
+  assert.equal(linux.identity.version, '1.4.4')
+  assert.notEqual(linux.plannedIdentity.version, linux.identity.version)
+  assert.ok(linux.suites.every((suite) => JSON.stringify(suite.identity) === JSON.stringify(linux.identity)))
+  assert.ok(releaseGate(root, linux.commit, [linux]))
+  writeFileSync(env.TEST_CALLS, '')
+  const second = run()
+  assert.equal(second.status, 0, second.stderr + second.stdout)
+  assert.deepEqual(record().suites.filter((suite) => suite.reusedFrom).map((suite) => suite.suite), ['specs:check', 'specs:conformance'])
+  assert.doesNotMatch(readFileSync(env.TEST_CALLS, 'utf8'), /specs:/)
+  for (const extra of [{ TEST_PLATFORM: 'darwin' }, { TEST_MISMATCH: 'test:gallery' }, { TEST_MISSING: 'test:gallery' }]) {
+    const failed = run(extra)
+    assert.equal(failed.status, 1, failed.stderr + failed.stdout)
+    const rejected = record()
+    assert.equal(rejected.passed, false)
+    assert.equal(releaseGate(root, rejected.commit, [rejected]), null)
+    assert.ok(rejected.suites.some((suite) => suite.cause?.category === 'infrastructure'))
+  }
+  const smoke = invoke(['--smoke'])
+  assert.equal(smoke.status, 0, smoke.stderr + smoke.stdout)
+  const smokeRecord = JSON.parse(readFileSync(join(root, '.juno-status/verify-smoke.json'), 'utf8'))
+  assert.equal(smokeRecord.passed, true)
+  assert.equal(smokeRecord.smoke, true)
+  assert.equal(releaseGate(root, smokeRecord.commit, [smokeRecord]), null)
+  assert.ok(!readRecords(join(root, '.juno-status')).some((record) => record.smoke))
+  assert.deepEqual(smokeRecord.suites[0].command, ['test', '--files', 'packages/domain/test/title.test.ts'])
+  const mixed = { ...linux, suites: linux.suites.map((suite) => suite.suite === 'test:gallery' ? { ...suite, identity: { ...suite.identity, platform: 'darwin' } } : suite) }
+  assert.equal(releaseGate(root, mixed.commit, [mixed]), null)
+  writeFileSync(join(root, 'scripts/remote.mjs'), `
+import { writeFileSync } from 'node:fs'
+const first = ${JSON.stringify(linux.identity)}
+console.log('[runner:unit] juno-runtime: ' + JSON.stringify(first))
+console.log('[runner:gallery] juno-runtime: ' + JSON.stringify({ ...first, arch: 'arm64' }))
+process.on('SIGTERM', () => { writeFileSync(process.env.TEST_CALLS, 'stopped before suites finished'); process.exit(143) })
+setInterval(() => {}, 1000)
+`)
+  fixtureGit('add', 'scripts/remote.mjs')
+  fixtureGit('commit', '-qm', 'Different job runtime')
+  const stopped = run()
+  assert.equal(stopped.status, 1, stopped.stderr + stopped.stdout)
+  assert.match(stopped.stderr, /stopped every job/)
+  assert.equal(readFileSync(env.TEST_CALLS, 'utf8'), 'stopped before suites finished')
+  assert.equal(record().passed, false)
+  assert.ok(record().suites.filter((suite) => !suite.reusedFrom).every((suite) => suite.cause?.category === 'infrastructure'))
+})
