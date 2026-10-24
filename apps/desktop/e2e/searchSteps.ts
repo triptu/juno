@@ -183,12 +183,16 @@ async function matchInView(page: ReturnType<typeof searchPage>, text: string, wo
   }, word)
 }
 
-/** A long message whose match is near its end: folded, its match still shows; Show more unfolds it whole, in place. */
+/**
+ * A long message whose match is near its end: folded, its match still shows; Show more unfolds it whole, in place,
+ * and leaves the selection on the card that had it. Space and Enter on a focused Show more fold and unfold it.
+ */
 export async function foldedMatch({ juno, slack }: Pick<Fixtures, 'juno' | 'slack'>) {
   const { surface, sidebar, win } = juno
   const page = searchPage(win)
   const lines = Array.from({ length: 30 }, (_, i) => `Line ${i + 1} of the launch notes, about the rollout order and who signs off on each step.`)
   slack.as('Elena').postIn('product', [...lines, 'The gannet pilot starts on Thursday with the billing team.'].join('\n'))
+  slack.as('Leo').postIn('product', 'Gannet pilot budget is approved')
   await sidebar.row('#product').expectVisible()
 
   if (process.env.JUNO_SEARCH_SHOTS === '1') await surface.setWindowSize(1440, 900)
@@ -196,6 +200,10 @@ export async function foldedMatch({ juno, slack }: Pick<Fixtures, 'juno' | 'slac
   await page.field.pressSequentially('gannet')
   const card = page.row('Line 1 of the launch notes')
   await expect(card).toBeVisible()
+  // ↓ from the field selects the newest card; no topic shows.
+  const selected = page.row('Gannet pilot budget is approved')
+  await win.keyboard.press('ArrowDown')
+  await expect(selected).toHaveAttribute('aria-selected', 'true')
   const body = card.locator('[data-search-body]')
   await expect(body).toHaveAttribute('data-folded', '')
   await expect.poll(() => matchInView(page, 'Line 1 of the launch notes', 'gannet')).toBe(true)
@@ -212,7 +220,48 @@ export async function foldedMatch({ juno, slack }: Pick<Fixtures, 'juno' | 'slac
   // Unfolding grows the card downward; the card itself stays where it was, and no topic opened.
   expect(await card.evaluate((element) => Math.round(element.getBoundingClientRect().top))).toBe(top)
   await expect(page.reader).toHaveCount(0)
+  // The press did not move focus into the card, so the selection stayed where it was.
+  await expect(selected).toHaveAttribute('aria-selected', 'true')
+  await expect(card).toHaveAttribute('aria-selected', 'false')
   await shot(win, 'card-unfolded-light')
+
+  // With Show less focused, Space and Enter are the button's, not the list's: they fold and unfold, and no topic shows.
+  await card.locator('[data-search-more]').focus()
+  await win.keyboard.press('Space')
+  await expect(body).toHaveAttribute('data-folded', '')
+  await win.keyboard.press('Enter')
+  await expect(body).not.toHaveAttribute('data-folded', '')
+  await expect(page.reader).toHaveCount(0)
+}
+
+/** The topic beside the results opens at the match; Jump to latest shows only while newer messages are out of view, as in a topic tab. */
+export async function jumpToLatest({ juno, slack }: Pick<Fixtures, 'juno' | 'slack'>) {
+  const page = searchPage(juno.win)
+  slack.as('Leo').postIn('eng', 'Kestrel cutover plan for Friday')
+  slack.as('Maya').replyIn('Kestrel cutover plan', 'Kestrel cutover moved to Monday')
+  slack.as('Leo').replyIn('Kestrel cutover plan', 'Monday works for the billing team')
+  slack.as('Maya').postIn('product', 'Plover review notes')
+  slack.as('Leo').replyIn('Plover review notes', 'Plover review starts with billing')
+  for (let i = 1; i <= 40; i++) slack.as(i % 2 === 0 ? 'Maya' : 'Leo').replyIn('Plover review notes', `Follow-up ${i} on the review order`)
+  await juno.sidebar.row('#product').expectVisible()
+  await juno.surface.appMenu('search-messages')
+  const jump = page.reader.getByRole('button', { name: 'Jump to latest' })
+
+  // A short thread opens at its match with its newest reply in view: nothing newer to jump to.
+  await page.field.pressSequentially('kestrel monday')
+  await page.row('Kestrel cutover moved to Monday').click()
+  await expect(page.reader.getByText('Monday works for the billing team')).toBeVisible()
+  await expect(page.reader.getByText('Kestrel cutover moved to Monday')).toBeVisible()
+  await expect(jump).toHaveCount(0)
+
+  // A long one opens at its match with forty replies below it: the pill brings the newest.
+  await page.field.fill('plover billing')
+  await page.row('Plover review starts with billing').click()
+  await expect(page.reader.getByText('Plover review starts with billing')).toBeVisible()
+  await expect(jump).toBeVisible()
+  await jump.click()
+  await expect(page.reader.getByText('Follow-up 40 on the review order')).toBeVisible()
+  await expect(jump).toHaveCount(0)
 }
 
 const HISTORY = 'conversations.history'

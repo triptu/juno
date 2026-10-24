@@ -1,4 +1,4 @@
-import { searchPage, restoreWindow, navigateMatches, profileDates, readerWithoutCache, tabAndEdge, foldedMatch, topCard } from './searchSteps'
+import { searchPage, restoreWindow, navigateMatches, profileDates, readerWithoutCache, tabAndEdge, foldedMatch, jumpToLatest, topCard } from './searchSteps'
 import { expect, test, type Fixtures } from './fixtures'
 import { readUserDb } from './driver/userDb'
 import type { Juno } from './driver/juno'
@@ -392,5 +392,6 @@ test('search: a held Slack answer restores a saved window beyond 200 matches', a
 test('search: reader navigation applies the whole query beyond the message window', async ({ juno, fake }) => navigateMatches({ juno, fake }))
 test('search: date presets use the Slack profile calendar across midnight', async ({ juno, fake }) => profileDates({ juno, fake }))
 test('search: Tab from the field lands on a card, Space shows its topic, and the topic’s edge moves with the keys', async ({ juno, slack }) => tabAndEdge({ juno, slack }))
-test('search: a long message folds with its match in view, and Show more unfolds it in place', async ({ juno, slack }) => foldedMatch({ juno, slack }))
+test('search: a long message folds with its match in view, and Show more unfolds it in place without changing the selection', async ({ juno, slack }) => foldedMatch({ juno, slack }))
+test('search: the topic beside the results shows Jump to latest only while newer messages are out of view', async ({ juno, slack }) => jumpToLatest({ juno, slack }))
 test('search: a result not on this Mac shows in the reader at once, never the last topic, and held arrows load only where they stop', async ({ juno, slack, fake }) => readerWithoutCache({ juno, slack, fake }))
