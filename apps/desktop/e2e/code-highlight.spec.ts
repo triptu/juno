@@ -26,6 +26,8 @@ function colouredRuns(selector: string): Record<string, string[]> {
 }
 
 test('a ts block shows coloured tokens and no tag line, and a prose block stays plain', async ({ juno, fake }) => {
+  await juno.sidebar.row('#eng').open()
+  await juno.topic.expectTitle('Main')
   fake.workspace.post({
     channel: 'C0ENG',
     user: 'U0LEO',
@@ -39,7 +41,6 @@ test('a ts block shows coloured tokens and no tag line, and a prose block stays 
       ],
     }],
   })
-  await juno.sidebar.row('#eng').open()
   const message = juno.topic.message('The retry helper')
   await expect(message).toBeVisible({ timeout: 15_000 })
 

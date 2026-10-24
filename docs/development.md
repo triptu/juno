@@ -605,6 +605,14 @@ Names are explained in `docs/architecture.md` sections 2.6 and 7.
 
 Unit tests run on `bun test` with the preload in `packages/testing/src/preload.ts` (Node-compatible SQLite, a 30 s test timeout). Tests that need the Effect test clock use `itEffect` from `@juno/testing/effect`, which provides `TestClock` and runs the effect; to time out a call that is in flight, fork it, wait until the request reaches the fake (a promise the fake resolves), then `TestClock.adjust` (`packages/ai/test/pi.test.ts`). Wait on a real signal (a Deferred, a subscription, a fake's call log); where there is none, `eventually` from `@juno/testing/eventually` retries a check. See the effect skill.
 
+### Desktop lane measurements, 2026-10-24
+
+The browser and Electron commands ran in sequence on the SSH laptop, with zero retries and coverage and traces off. On two physical cores (four allocated threads), browser took 711 s and Electron 187 s: 898 s of desktop command wall time, including builds. That run passed 448 browser flows and 71 Electron flows; the AI activity redraw failed, and one browser case and 51 Electron manual/performance cases were skipped. Build setup contributes one additional passing case to each Playwright summary.
+
+The confirmation with CPU timing on four physical cores (eight threads, four browser workers and four Electron workers) took 387 s for browser and 111 s for Electron, 498 s combined. The redraw repair passed; the code-highlight flow clicked a sidebar row while its new message moved it. Its repair opens Main before posting the sample. These are single observations at different allocations, not a controlled speedup claim.
+
+The 449 executed browser flows in the confirmation recorded 901.02 CPU-seconds in hosts, 805.39 in renderers, 238.54 in Chrome's browser/utility/GPU processes, and 178.68 in Playwright workers including the fake Slack. Median host and renderer cost was 1,930 and 1,680 CPU-ms per flow. Process counters cover the running fixture, omit processes that already exited, and combine fake Slack with its worker; they are not wall times or a separate fake-server profile. Browser startup and fixture setup timings are retained alongside the counters in the run log.
+
 ### Text-menu spelling checks
 
 Electron uses the native macOS spellchecker, which detects the language itself.
