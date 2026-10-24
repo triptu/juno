@@ -55,7 +55,7 @@ test('CLI uploads the workspace, uses host allocation and preserves the test exi
 
 test('missing tstack, unreachable hosts and full hosts fail with actionable messages', (t) => {
   const f = fixture(t)
-  for (const [env, code, message] of [[{ TSTACK_HOME: '/nonexistent' }, 255, /\/tstack:setup/], [{ TEST_MODE: 'unreachable' }, 255, /runner unreachable.*--local.*heavy lock/], [{ TEST_MODE: 'busy' }, 75, /full past the wait.*--local.*heavy lock/], [{ TEST_MODE: 'lost' }, 255, /lost the connection/]]) {
+  for (const [env, code, message] of [[{ TSTACK_HOME: '/nonexistent' }, 255, /\/tstack:setup/], [{ TEST_MODE: 'unreachable' }, 255, /runner unreachable.*--local/], [{ TEST_MODE: 'busy' }, 75, /full past the wait.*--local/], [{ TEST_MODE: 'lost' }, 255, /lost the connection/]]) {
     const result = f.run(['test', 'test/messages.test.ts'], env)
     assert.equal(result.status, code, result.output)
     assert.match(result.output, message)

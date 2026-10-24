@@ -8,16 +8,14 @@ import { localVerifyEnv, verifyExecution } from './verify-execution.mjs'
 import { assessRecord, git, readRecords, releaseGate } from './release-gate.mjs'
 import { scratchFolder } from './worktree-folder.mjs'
 
-test('explicit local skips probing; unreachable falls back once; reachable stays remote; configuration errors fail', () => {
+test('explicit local skips probing; an unreachable runner fails; reachable stays remote; configuration errors fail', () => {
   assert.equal(localVerifyEnv.JUNO_PLAN_MAX_LOAD, '8')
   let calls = 0
-  const messages = []
-  const deps = { config: () => ({ host: 'runner' }), probe: () => { calls++; return { reachable: false, reason: 'offline' } }, log: (line) => messages.push(line) }
+  const deps = { config: () => ({ host: 'runner' }), probe: () => { calls++; return { reachable: false, reason: 'offline' } } }
   assert.deepEqual(verifyExecution(true, deps), { mode: 'local', host: hostname() })
   assert.equal(calls, 0)
-  assert.equal(verifyExecution(false, deps).mode, 'local')
+  assert.throws(() => verifyExecution(false, deps), /runner unreachable: offline.*do not fall back to this Mac/)
   assert.equal(calls, 1)
-  assert.match(messages[0], /runner.*unreachable: offline.*heavy lock.*no retry/)
   assert.deepEqual(verifyExecution(false, { ...deps, probe: () => ({ reachable: true }) }), { mode: 'remote', host: 'runner' })
   assert.throws(() => verifyExecution(false, { ...deps, probe: () => { throw new Error('SSH configuration failed') } }), /SSH configuration failed/)
 })
@@ -69,7 +67,7 @@ console.error('Connection refused'); process.exit(255);
   return { root, commit, env, invoke }
 }
 
-test('local and fallback runs archive eligible records, refresh coverage, and preserve failed suites', { timeout: 120_000 }, (t) => {
+test('local runs archive eligible records, refresh coverage, and preserve failed suites; an unreachable runner runs nothing', { timeout: 120_000 }, (t) => {
   const { root, commit, env, invoke } = verificationFixture(t)
   const dry = invoke(['--local', '--dry-run', '--nightly'])
   assert.equal(dry.status, 0, dry.stderr)
@@ -77,7 +75,7 @@ test('local and fallback runs archive eligible records, refresh coverage, and pr
   assert.match(dry.stdout, /test:desktop --grep @mac, then perf, then test:feel/)
   assert.equal(existsSync(join(root, '.juno-status')), false)
   assert.equal(existsSync(env.TEST_CALLS), false)
-  for (const [args, failing] of [[['--local'], false], [['--nightly'], false], [['--local', '--with-mac', '--no-cache'], true]]) {
+  for (const [args, failing] of [[['--local'], false], [['--local', '--nightly'], false], [['--local', '--with-mac', '--no-cache'], true]]) {
     writeFileSync(env.TEST_CALLS, '')
     const result = invoke(args, { TEST_FAIL_SUITE: failing ? 'specs:conformance' : '' })
     assert.equal(result.status, failing ? 1 : 0, result.stderr + result.stdout)
@@ -107,6 +105,11 @@ test('local and fallback runs archive eligible records, refresh coverage, and pr
       assert.equal(calls[6].skip, undefined)
     }
   }
+  writeFileSync(env.TEST_CALLS, '')
+  const unreachable = invoke(['--nightly'])
+  assert.notEqual(unreachable.status, 0)
+  assert.match(unreachable.stderr, /unreachable.*do not fall back to this Mac/)
+  assert.equal(readFileSync(env.TEST_CALLS, 'utf8'), '')
   assert.equal(readFileSync(env.TEST_PROBES, 'utf8'), 'probe\n')
   assert.equal(readRecords(join(root, '.juno-status')).filter((r) => r.execution).length, 3)
   assert.equal(releaseGate(root, commit).record.passed, true)

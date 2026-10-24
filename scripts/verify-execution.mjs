@@ -1,14 +1,17 @@
 import { hostname } from 'node:os'
 import { checkRunner, runnerConfig } from './remote/runner.mjs'
 
-/** Probe once before starting work. Test failures and configuration errors never trigger a rerun. */
-export function verifyExecution(local, { config = runnerConfig, probe = checkRunner, log = console.log } = {}) {
+/**
+ * Probe once before starting work. An unreachable runner fails the run: heavy
+ * suites never move to this Mac on their own, because it hangs under them.
+ * `--local` runs here only when Tushar asks for it.
+ */
+export function verifyExecution(local, { config = runnerConfig, probe = checkRunner } = {}) {
   if (local) return { mode: 'local', host: hostname() }
   const runner = config()
   const health = probe(runner)
   if (health.reachable) return { mode: 'remote', host: runner.host }
-  log(`verify:main: runner ${runner.host} unreachable: ${health.reason}; running the full plan on ${hostname()} through the heavy lock (no retry).`)
-  return { mode: 'local', host: hostname() }
+  throw new Error(`verify:main: runner ${runner.host} unreachable: ${health.reason}. Heavy runs do not fall back to this Mac; wait for the runner (\`bun run runner:check\`), or pass --local only when Tushar asks.`)
 }
 
 // Serial suites under an exclusive reservation leave room for Electron's engine

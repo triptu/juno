@@ -167,8 +167,8 @@ change reaches, plus `specs:check` and `specs:conformance` when the code the
 specs model changed ("Affected tests"), on one machine. Files that passed with
 the same inputs, in an agent's run or an earlier batch, are skipped through the
 shared results cache. The full suites are not part of a batch (see "Testing").
-When the SSH runner is unavailable, `--local` runs those steps on this Mac instead, through
-the machine lock. A failed command retains the worktree;
+When the SSH runner is unavailable, the batch waits for it; `--local` runs those steps on this Mac
+through the machine lock, and is only for when Tushar asks, since heavy runs make the Mac hang. A failed command retains the worktree;
 fix the cause, commit source fixes, and continue to rerun checks.
 
 Nothing pushes without `--push`. Publishing checks commit messages for attribution
@@ -998,10 +998,9 @@ See [Juno runner configuration](self-hosted-runner.md); use `/tstack:runner`
 for machine setup, lessons and troubleshooting.
 
 Jobs wait up to 60 seconds for capacity (`--wait <seconds>` or
-`JUNO_RUNNER_WAIT` changes this). An unavailable or full runner fails. Use
-`bun run remote --local <script>` or `bun run affected --local` to run the steps on
-this Mac through the heavy lock. These commands have no automatic local fallback.
-`bun run verify:main` falls back locally when its runner health check reports an
+`JUNO_RUNNER_WAIT` changes this). An unavailable or full runner fails. `bun run remote --local <script>` and `bun run affected --local` run the steps on
+this Mac through the heavy lock; use them only when Tushar asks, since heavy runs make the Mac hang and restart. These commands have no automatic local fallback.
+`bun run verify:main` fails when its runner health check reports an
 unreachable host (see "Full runs").
 Namespace, if needed again, is available only through `/tstack:runner`.
 
@@ -1557,7 +1556,7 @@ Use `fake.holdNext({ method, reason: 'open' })`, assert the call is held, then `
 
 Quint runs only when a spec or one of its inputs changes, or when no matching successful result exists. Outbox conformance follows outbox code, its imports, outbox specs and the replay harness. Successful protocol results from earlier runs can be reused only with matching input hashes, Bun/runtime version, OS/architecture and Electron version. Every reused suite names its source record. `--no-cache` forces both protocol suites.
 
-`bun run verify:main --ref origin/main --local` runs the plan on this Mac. Without `--local`, an unreachable runner triggers local execution after the health check. Authentication, configuration and runner setup errors fail; a failing remote suite never triggers a local rerun. `--require-remote` disables fallback for laptop benchmarks.
+`bun run verify:main --ref origin/main --local` runs the plan on this Mac, only when Tushar asks. Without `--local`, an unreachable runner fails the run after the health check, and so do authentication, configuration and runner setup errors; nothing falls back to the Mac, and a failing remote suite never triggers a local rerun.
 
 The local plan installs the detached checkout, takes the exclusive machine-wide heavy lock and runs suites sequentially. Worker limits live in `scripts/verify-execution.mjs`. Before each step it waits while load exceeds 8. The ordinary app steps skip `@mac`, matching Linux; `--with-mac` adds those tests, perf and feel. Timing suites run sequentially after the other work and hold the exclusive lock. `--dry-run --local` prints the plan without a checkout, installs, suites or a successful verification record.
 

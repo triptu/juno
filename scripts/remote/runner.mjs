@@ -7,7 +7,7 @@ import { imageContext, imageTag } from './image.mjs'
 import { parsePlan } from '../plan.mjs'
 
 export const quote = (value) => `'${String(value).replaceAll("'", "'\\''")}'`
-export const localHint = '--local runs the steps on this Mac through the heavy lock'
+export const localHint = 'wait for the runner; --local runs the steps on this Mac, which hangs under heavy runs, so use it only when Tushar asks'
 
 /** Juno sizes work in physical cores; quota hosts use the same counts as CPUs. */
 export function runnerJobSize({ script, args, cores, specsCached = false }, capacity) {
