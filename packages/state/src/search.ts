@@ -271,12 +271,23 @@ export const searchPicksAtom = (query: string | undefined) => (query === undefin
 
 export const searchMatchesAtom = liveQuery(searchMatches, { idleTTL: 0 })
 
-/** The window around an older match, for the reader when the topic's newest messages do not reach back to it. */
+/** The window around a match, as a link to a message opens. */
 export const matchWindow = (ts: string): MessageWindowSpec => ({ anchor: ts, before: MESSAGE_WINDOW_BEFORE, limit: MESSAGE_WINDOW_DEFAULT })
 
-/** Warms a result the arrows may reach next: its header and the newest messages, where most matches are (performance 4.2). */
-export function prefetchSearchResult(registry: Registry, topicId: string): void {
-  prefetch(registry, [messagesAtom(topicId, bottomWindow), topicAtom(topicId)])
+/** The reader's window for a result: around its match, or the newest messages for a topic whose title matched. */
+export const readerWindow = (ts: string | undefined): MessageWindowSpec => (ts === undefined ? bottomWindow : matchWindow(ts))
+
+/** Where a result stands among its topic's matches, for the reader's "2 of 5" and ⌘↑ ⌘↓; no marks. */
+export const searchStepsAtom = (sessionId: string, generation: number, topicId: string, ts: string | undefined) =>
+  searchMatchesAtom({ sessionId, generation, topicId, ...(ts === undefined ? {} : { ts }) })
+
+/**
+ * Warms a result the arrows or the pointer may reach next, as the reader
+ * reads it: its header, the window around its match and its "2 of 5"
+ * (performance 4.2). One prefetch entry.
+ */
+export function prefetchSearchResult(registry: Registry, sessionId: string, generation: number, result: { readonly topicId: string; readonly ts?: string | undefined }): void {
+  prefetch(registry, [messagesAtom(result.topicId, readerWindow(result.ts)), topicAtom(result.topicId), searchStepsAtom(sessionId, generation, result.topicId, result.ts)])
 }
 
 // Recent searches

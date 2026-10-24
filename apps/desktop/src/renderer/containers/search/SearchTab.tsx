@@ -212,10 +212,11 @@ interface ColumnProps {
   readonly paging: ReturnType<typeof useWindowPaging>
   readonly setText: (text: string, change?: (current: SearchSession) => SearchSession) => void
   readonly onExpand: (groupId: string) => void
+  readonly onHoverRow: (id: string) => void
 }
 
 /** The results column: the rows and states for the query, or the recent searches on an empty field. */
-function ResultsColumn({ sessionId, session, snapshot, prefs, rows, empty, listRef, inputRef, readerRef, narrow, readerShown, listFocused, actions, paging, setText, onExpand }: ColumnProps) {
+function ResultsColumn({ sessionId, session, snapshot, prefs, rows, empty, listRef, inputRef, readerRef, narrow, readerShown, listFocused, actions, paging, setText, onExpand, onHoverRow }: ColumnProps) {
   const recent = useAtomValue(recentSearchesAtom)
   return (
     <SearchResults
@@ -233,6 +234,7 @@ function ResultsColumn({ sessionId, session, snapshot, prefs, rows, empty, listR
       onSelect={actions.select}
       onOpen={actions.open}
       onExpand={onExpand}
+      onHoverRow={onHoverRow}
       onLeaveTop={() => inputRef.current?.focus()}
       onTab={() => {
         const composer = readerRef.current?.querySelector<HTMLTextAreaElement>('[data-composer] textarea')
@@ -283,7 +285,7 @@ export function SearchTab({ sessionId }: { readonly tabId: string; readonly sess
   const paging = useWindowPaging(sessionId, snapshot, session.offset ?? 0)
   useFieldFocus(sessionId, inputRef)
   useListScroll(sessionId, listRef, rows, session.scrollTop, snapshot?.window.offset === (session.offset ?? 0))
-  useWarmNeighbours(session.selected?.id, stops)
+  const warmRow = useWarmNeighbours(sessionId, snapshot?.generation ?? 0, session.selected?.id, stops)
   const onChosen = usePeekFirst(sessionId, session.selected?.id, stops, snapshot)
   const actions = useListActions({ sessionId, session, rows, stops, narrow, inputRef, setReaderShown, onChosen })
   const onStepper = useCallback((step: ((direction: 1 | -1) => void) | undefined) => {
@@ -310,11 +312,12 @@ export function SearchTab({ sessionId }: { readonly tabId: string; readonly sess
           }}
         />
       }
-      results={<ResultsColumn {...{ sessionId, session, snapshot, prefs, rows, empty, listRef, inputRef, readerRef, narrow, readerShown, listFocused, actions, paging, setText }} onExpand={expand} />}
+      results={<ResultsColumn {...{ sessionId, session, snapshot, prefs, rows, empty, listRef, inputRef, readerRef, narrow, readerShown, listFocused, actions, paging, setText }} onExpand={expand} onHoverRow={warmRow} />}
       reader={
         <SearchReader
           sessionId={sessionId}
           selection={empty ? undefined : session.selected}
+          row={rows?.find((row) => row.id === session.selected?.id)}
           snapshot={snapshot}
           narrow={narrow}
           readerRef={readerRef}

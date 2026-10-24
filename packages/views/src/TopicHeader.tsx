@@ -11,8 +11,11 @@ import { ReaderBack, ReaderOpen, ReaderStep, WideOnly, type TopicHeaderReader } 
 import { kindIcon } from './look'
 import { RenameField } from './RenameField'
 
+/** What the header shows of a topic. The Search reader draws it from a result's row until the topic's own header is local. */
+export type TopicHeaderTopic = Pick<TopicDetail, 'kind' | 'title' | 'subscribed' | 'resolved'> & { readonly channel: Pick<TopicDetail['channel'], 'kind' | 'name'> }
+
 export interface TopicHeaderProps {
-  readonly detail: TopicDetail
+  readonly detail: TopicHeaderTopic
   /** The topic menu, from ⋯ or a right-click on the title, is showing. */
   readonly menuOpen?: boolean
   /** ⋯ or a right-click on the title asked for the topic menu (the row's menu, inventory 15.1), to open at `at`. */

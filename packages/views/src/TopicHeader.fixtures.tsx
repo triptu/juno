@@ -1,4 +1,5 @@
 import { Headphones } from '@phosphor-icons/react/dist/icons/Headphones'
+import type { TopicDetail } from '@juno/contract'
 import { defineFixtures, fixture, IconButton, type FixtureFrame } from '@juno/ui'
 import { details, engTopics } from './fixtures/messages'
 import { NOW } from './fixtures/topics'
@@ -17,7 +18,7 @@ const base: Pick<TopicHeaderProps, 'onMenu' | 'onPill' | 'onResolve' | 'onFollow
   switcher: { open: false, onOpen: noop, content: null },
 }
 
-const state = (props: Partial<TopicHeaderProps> & Pick<TopicHeaderProps, 'detail'>, frame?: FixtureFrame) => fixture<TopicHeaderProps>({ ...base, ...props }, frame)
+const state = (props: Partial<Omit<TopicHeaderProps, 'detail'>> & { readonly detail: TopicDetail }, frame?: FixtureFrame) => fixture<TopicHeaderProps>({ ...base, ...props }, frame)
 
 /** The title's switcher, open, on a thread of #eng or on its Main. */
 const switcher = (currentId: string, query = '') => ({
@@ -27,7 +28,10 @@ const switcher = (currentId: string, query = '') => ({
 })
 
 /** The same threads, not followed (Notify me is Never). */
-const unfollowed = <D extends TopicHeaderProps['detail']>(detail: D): D => ({ ...detail, subscribed: false, status: 'unsubscribed' })
+const unfollowed = (detail: TopicDetail): TopicDetail => ({ ...detail, subscribed: false, status: 'unsubscribed' })
+
+/** The same thread, resolved. */
+const resolved = (detail: TopicDetail): TopicDetail => ({ ...detail, resolved: true, status: 'resolved' })
 
 /** A stand-in for a feature's control in the `actions` slot (the huddle control is drawn in `@juno/huddle-views`). */
 const action = <IconButton icon={Headphones} label="Start huddle" size={28} iconSize={16} radius="full" variant="island" />
@@ -42,7 +46,7 @@ export default defineFixtures(
       public: state({ detail: details.postgres }),
       private: state({ detail: details.hiring }),
       'direct-message': state({ detail: details.offsite }),
-      resolved: state({ detail: { ...details.postgres, resolved: true, status: 'resolved' } }),
+      resolved: state({ detail: resolved(details.postgres) }),
     },
     Main: {
       'channel-main': state({ detail: details.engMain }),
@@ -77,8 +81,8 @@ export default defineFixtures(
     },
     // Resolve becomes Reopen once the topic is resolved. The app has no Juno button until the panel exists.
     Resolve: {
-      'resolved-no-juno': fixture<TopicHeaderProps>({ detail: { ...details.postgres, resolved: true, status: 'resolved' }, onMenu: noop, onPill: noop, onResolve: noop }),
-      'resolved-336': state({ detail: { ...details.hiring, resolved: true, status: 'resolved' } }, narrow),
+      'resolved-no-juno': fixture<TopicHeaderProps>({ detail: resolved(details.postgres), onMenu: noop, onPill: noop, onResolve: noop }),
+      'resolved-336': state({ detail: resolved(details.hiring) }, narrow),
     },
     // A thread you do not follow shows Follow in Resolve's place; a click follows it, with no menu.
     // Both are 28px icons, so following moves nothing.
@@ -133,7 +137,7 @@ export default defineFixtures(
       'focus-more': state({ detail: details.postgres }, { focus: 'button[aria-label="More"]' }),
       'menu-open-main': state({ detail: details.engMain, menuOpen: true }),
       'hover-resolve': state({ detail: details.postgres }, { hover: 'button[aria-label="Resolve"]' }),
-      'hover-reopen': state({ detail: { ...details.postgres, resolved: true, status: 'resolved' } }, { hover: 'button[aria-label="Reopen"]' }),
+      'hover-reopen': state({ detail: resolved(details.postgres) }, { hover: 'button[aria-label="Reopen"]' }),
       'hover-resolve-336': state({ detail: details.hiring }, { ...narrow, hover: 'button[aria-label="Resolve"]' }),
       'hover-juno': state({ detail: details.postgres }, { hover: 'button[aria-label="Juno ⌘J"]' }),
       'hover-pill': state({ detail: details.postgres }, { hover: '[data-island="left"] button' }),

@@ -2,10 +2,10 @@
  * The Search list's wiring (SPEC 10a): its rows from the engine's groups,
  * where it was scrolled (kept with the session for Back, ⌘⇧T and a
  * restart), the engine's 100-row window moved as the list nears either
- * end, and the arrows' next stops kept warm so the reader follows in one
- * frame.
+ * end, and the arrows' next stops and the hovered row kept warm so the
+ * reader follows in one frame.
  */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import type { SearchSnapshot } from '@juno/contract'
 import { loadMessageAt, loadMoreSearch, prefetchSearchResult, registry, updateSearchSession, type SearchSelection, type SearchSession } from '@juno/state'
 import { isStop, readerTarget, searchRows, type SearchRowItem } from '@juno/views'
@@ -111,16 +111,22 @@ export function useWindowPaging(sessionId: string, snapshot: SearchSnapshot | un
   }
 }
 
-/** The stops before and after the selection are warm, so the arrows' next reader shows from the cache. */
-export function useWarmNeighbours(selectedId: string | undefined, stops: ReadonlyArray<SearchRowItem>) {
+/**
+ * The stops before and after the selection are warm, so the arrows' next reader shows from the cache, and so is
+ * the row under the pointer (the returned call). Three prefetch entries in all (performance 4.2).
+ */
+export function useWarmNeighbours(sessionId: string, generation: number, selectedId: string | undefined, stops: ReadonlyArray<SearchRowItem>) {
   useEffect(() => {
     if (selectedId === undefined) return
     const at = stops.findIndex((row) => row.id === selectedId)
-    for (const row of [stops[at - 1], stops[at + 1]]) {
-      const target = row === undefined ? undefined : readerTarget(row)
-      if (target !== undefined) prefetchSearchResult(registry, target.topicId)
-    }
-  }, [selectedId, stops])
+    for (const row of [stops[at - 1], stops[at + 1]]) warmRow(sessionId, generation, row)
+  }, [sessionId, generation, selectedId, stops])
+  return useCallback((id: string) => warmRow(sessionId, generation, stops.find((row) => row.id === id)), [sessionId, generation, stops])
+}
+
+function warmRow(sessionId: string, generation: number, row: SearchRowItem | undefined): void {
+  const target = row === undefined ? undefined : readerTarget(row)
+  if (target !== undefined) prefetchSearchResult(registry, sessionId, generation, target)
 }
 
 function sameRow(a: SearchRowItem, b: SearchRowItem): boolean {

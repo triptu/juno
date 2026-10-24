@@ -47,6 +47,8 @@ export interface SearchResultsProps extends SearchRecentProps {
   readonly onSelect: (id: string, how: 'pointer' | 'keyboard') => void
   readonly onOpen: (id: string, options: { readonly newTab: boolean }) => void
   readonly onExpand: (groupId: string) => void
+  /** The pointer came onto a row: warm what the reader would show for it. */
+  readonly onHoverRow?: (id: string) => void
   /** ↑ on the first row. */
   readonly onLeaveTop: () => void
   /** Tab from a row; true when the owner moved focus on. */
@@ -106,7 +108,7 @@ function nothingLine(words: string, filtered: boolean): string {
 }
 
 function Results(props: SearchResultsProps & { readonly rows: ReadonlyArray<SearchRowItem> }) {
-  const { rows, state, note, selectedId, focused, now, time, onSelect, onOpen, onExpand, onTryAgain, onNearEnd, onNearStart, windowKey } = props
+  const { rows, state, note, selectedId, focused, now, time, onSelect, onOpen, onExpand, onHoverRow, onTryAgain, onNearEnd, onNearStart, windowKey } = props
   const stops = rows.filter(isStop).map((row) => row.id)
   // The selection, or the first row when the selection is not among these rows: Tab always has a row to land on.
   const tabStop = selectedId !== undefined && stops.includes(selectedId) ? selectedId : stops[0]
@@ -115,6 +117,8 @@ function Results(props: SearchResultsProps & { readonly rows: ReadonlyArray<Sear
   useNear(end, onNearEnd, '0px 0px 480px 0px', windowKey)
   useNear(start, onNearStart, '480px 0px 0px 0px', windowKey)
   const onListKey = useListKeys(props, stops)
+  // The row last warmed, so moving within one row warms it once.
+  const hovered = useRef<string | undefined>(undefined)
   const empty = rows.length === 0
   const banner = state === 'slackUnavailable' || (state === 'offline' && !empty)
   return (
@@ -133,7 +137,23 @@ function Results(props: SearchResultsProps & { readonly rows: ReadonlyArray<Sear
       {empty ? (
         <EmptyNote {...props} />
       ) : (
-        <div role="listbox" aria-label="Results" tabIndex={-1} onKeyDown={onListKey} {...stylex.props(styles.list)}>
+        <div
+          role="listbox"
+          aria-label="Results"
+          tabIndex={-1}
+          onKeyDown={onListKey}
+          onPointerOver={
+            onHoverRow === undefined
+              ? undefined
+              : (event) => {
+                  const id = (event.target as Element).closest<HTMLElement>('[data-search-row]')?.dataset.searchRow
+                  if (id === undefined || id === hovered.current) return
+                  hovered.current = id
+                  onHoverRow(id)
+                }
+          }
+          {...stylex.props(styles.list)}
+        >
           {rows.map((row) => (
             <SearchRow key={row.id} row={row} now={now} time={time} selected={row.id === selectedId} focused={focused} tabbable={row.id === tabStop} onSelect={onSelect} onOpen={onOpen} onExpand={onExpand} />
           ))}

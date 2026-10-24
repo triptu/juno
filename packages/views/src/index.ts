@@ -51,7 +51,7 @@ export { WelcomeCard } from './WelcomeCard'
 export { Shell } from './Shell'
 export { Sidebar, type SidebarNavTarget } from './Sidebar'
 
-export { TopicHeader, type TopicHeaderProps, type TopicHeaderReader } from './TopicHeader'
+export { TopicHeader, type TopicHeaderProps, type TopicHeaderReader, type TopicHeaderTopic } from './TopicHeader'
 export { SearchField } from './search/SearchField'
 export { SearchFilters, type SearchFilterMenu, type SearchToggle } from './search/SearchFilters'
 export { searchTime } from './search/model'

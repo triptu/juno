@@ -2,37 +2,56 @@ import { MESSAGE_LANDING_OFFSET } from '@juno/tokens/layout'
 /**
  * The Search tab's reader (SPEC 10a): the chosen result's topic itself,
  * with its header, composer, reactions and menus, landed at the match with
- * the matched words marked. It reads the local store, so a cached topic
- * shows in the frame the selection moved (the list warms the neighbours).
- * Until it is used it marks nothing read (`Topic`'s `reader`). Another
- * topic replaces the shown one once its header and window are local, so
- * the reader never flashes empty; a move within the shown topic flashes
- * the match there (`moveReader`).
+ * the matched words marked. Until it is used it marks nothing read
+ * (`Topic`'s `reader`).
+ *
+ * A new selection shows in the frame it was made, and the last topic's
+ * messages never stay on screen. A topic whose header and window around
+ * the match are local shows at once; the list keeps the rows the arrows
+ * and the pointer reach next warm. Otherwise the reader draws the result's
+ * header and message from its row (`ReaderPreview`), and the topic takes
+ * its place once the match is local, with the match where it was. Slack is
+ * asked only once an arrow stops (`KEY_SETTLE_MS`), so a held arrow loads
+ * only the result it stops on. A move within the shown topic flashes the
+ * match there (`moveReader`).
  */
-import { useEffect, useEffectEvent, useLayoutEffect, useState, type RefObject } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { defaultPersonColor, mainTopicOf, threadTopicOf, type SearchHit, type SearchSnapshot, type TopicDetail } from '@juno/contract'
 import { afterPaint, mark, measure } from '@juno/state/perf'
-import { searchMatchesAtom, searchSessionAtom, bottomWindow, flashMessage, loadMessageAt, matchWindow, messageListAtom, messageWindowSpecAtom, registry, scrollSnapshotAtom, topicAtom, topicView, type SearchSelection } from '@juno/state'
+import { flashMessage, loadMessageAt, matchWindow, messageListAtom, messageWindowSpecAtom, nowAtom, readerWindow, registry, scrollSnapshotAtom, searchMatchesAtom, searchSessionAtom, searchStepsAtom, topicAtom, topicView, type SearchSelection } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
+import { ComposerSlot, MessageList, TopicHeader, TopicView as TopicViewFrame, type MessageListItem, type SearchRowItem, type TopicHeaderReader, type TopicHeaderTopic } from '@juno/views'
 import { openTopicAtInBackground, openTopicInBackground } from '../navigation'
+import { useTopicHeader } from '../topic/header'
+import { rowSelector } from '../topic/scroll'
 import { Topic } from '../TopicView'
 import { markMatches } from './matches'
-import type { SearchSnapshot } from '@juno/contract'
 
 /** Where a match lands: under the header band, as a notification's message does. */
 const READER_TOP = MESSAGE_LANDING_OFFSET
-/** The longest the reader keeps the last topic while the next one loads. */
-const READY_WAIT_MS = 1500
+/** After an arrow, how long the selection must stay before its topic asks Slack for anything: longer than a held key repeats. */
+const KEY_SETTLE_MS = 120
+/** How long the reader keeps a result's own message once the topic is local without it (deleted, or Slack lost it). */
+const GONE_WAIT_MS = 400
 
 /** The reader's own view of a topic, apart from any tab's: its window and scroll position. */
 const readerView = (sessionId: string, topicId: string) => topicView(topicId, `search:${sessionId}`)
 
 /** The topic each session's reader shows, for `moveReader`. */
 const shownTopics = new Map<string, string>()
+/** How each session's selection last moved: an arrow's Slack fetches wait for the arrows to stop. */
+const lastMoves = new Map<string, 'pointer' | 'keyboard' | 'step'>()
 
 let measureFrom: number | undefined
 /** An arrow moved the selection: the reader's paint at it is `juno.search-reader`. */
 function startMeasure(): void {
   measureFrom = mark('juno.search-reader', undefined, { replace: true })
+}
+
+/** The reader's window around the target's match, which lands under the header band. */
+function aim(view: string, target: SearchSelection): void {
+  registry.set(messageWindowSpecAtom(view), readerWindow(target.ts))
+  registry.set(scrollSnapshotAtom(view), target.ts === undefined ? undefined : { anchorKey: target.ts, offset: READER_TOP })
 }
 
 /**
@@ -42,24 +61,20 @@ function startMeasure(): void {
  */
 export function moveReader(sessionId: string, target: SearchSelection, how: 'pointer' | 'keyboard' | 'step'): void {
   if (how === 'keyboard') startMeasure()
+  lastMoves.set(sessionId, how)
   const view = readerView(sessionId, target.topicId)
-  if (shownTopics.get(sessionId) === target.topicId) {
-    const ts = target.ts
-    if (ts === undefined) return
-    const land = () => {
-      if (!registry.get(messageListAtom(view)).rows.has(ts)) registry.set(messageWindowSpecAtom(view), matchWindow(ts))
-      flashMessage(registry, target.topicId, ts)
-    }
-    if (target.stored !== false) return land()
-    // A match only Slack found is fetched first, as for another topic (`Waiter`), and landed on if it is still the selection.
-    void loadMessageAt(registry, target.topicId, ts).then(() => {
-      if (registry.get(searchSessionAtom(sessionId)).selected?.ts === ts) land()
-    })
-    return
+  if (shownTopics.get(sessionId) !== target.topicId) return aim(view, target)
+  const ts = target.ts
+  if (ts === undefined) return
+  const land = () => {
+    if (!registry.get(messageListAtom(view)).rows.has(ts)) registry.set(messageWindowSpecAtom(view), matchWindow(ts))
+    flashMessage(registry, target.topicId, ts)
   }
-  // The newest messages first, as a topic opens; the waiter moves the window to an older match (`Waiter`).
-  registry.set(messageWindowSpecAtom(view), bottomWindow)
-  registry.set(scrollSnapshotAtom(view), target.ts === undefined ? undefined : { anchorKey: target.ts, offset: READER_TOP })
+  if (target.stored !== false) return land()
+  // A match only Slack found is fetched first, and landed on if it is still the selection.
+  void loadMessageAt(registry, target.topicId, ts).then(() => {
+    if (registry.get(searchSessionAtom(sessionId)).selected?.ts === ts) land()
+  })
 }
 
 /** Open in new tab, and ⌘Enter on a row: the topic at the match in a tab behind this one. */
@@ -72,6 +87,8 @@ export async function openResultBehind(target: SearchSelection): Promise<void> {
 export interface SearchReaderProps {
   readonly sessionId: string
   readonly selection: SearchSelection | undefined
+  /** The selected row, for the result's header and message while its topic is not local. */
+  readonly row: SearchRowItem | undefined
   readonly snapshot: SearchSnapshot | undefined
   /** The page is one column: Back to results leads the header. */
   readonly narrow: boolean
@@ -88,87 +105,189 @@ export interface SearchReaderProps {
 }
 
 export function SearchReader(props: SearchReaderProps) {
-  const { sessionId, selection } = props
-  const [shown, setShown] = useState<SearchSelection | undefined>(undefined)
-  if (selection === undefined && shown !== undefined) setShown(undefined)
-  const sameTopic = shown !== undefined && selection !== undefined && shown.topicId === selection.topicId
-  const displayed = sameTopic ? selection : shown
-  const waiting = selection !== undefined && !sameTopic ? selection : undefined
-
-  return (
-    <>
-      {waiting === undefined ? null : <Waiter key={`${waiting.topicId}\n${waiting.ts ?? ''}`} sessionId={sessionId} target={waiting} onReady={() => setShown(waiting)} />}
-      {displayed === undefined ? null : <ShownTopic key={displayed.topicId} {...props} selection={displayed} />}
-    </>
-  )
+  const { selection } = props
+  return selection === undefined ? null : <ReaderTopic key={selection.topicId} {...props} selection={selection} />
 }
 
-/** Says when the next topic's header and the window around its match are local, or after a bounded wait. */
-function Waiter({ sessionId, target, onReady }: { readonly sessionId: string; readonly target: SearchSelection; readonly onReady: () => void }) {
-  const view = readerView(sessionId, target.topicId)
-  const detail = useAtomValue(topicAtom(target.topicId))
-  const list = useAtomValue(messageListAtom(view))
-  useLayoutEffect(() => {
-    // A restored selection had no event to set the view; a match only Slack found is fetched first, as ⌘K does.
-    moveReader(sessionId, target, 'pointer')
-    if (target.stored === false && target.ts !== undefined) void loadMessageAt(registry, target.topicId, target.ts)
-  }, [sessionId, target])
-  const [late, setLate] = useState(false)
-  useEffect(() => {
-    const timer = setTimeout(() => setLate(true), READY_WAIT_MS)
-    return () => clearTimeout(timer)
-  }, [])
-  // A match older than the newest messages: the window around it instead, as a link to an old message opens.
-  const ts = target.ts
-  const older = list.ready && list.spec.anchor === undefined && ts !== undefined && !list.rows.has(ts)
-  useLayoutEffect(() => {
-    if (older && ts !== undefined) registry.set(messageWindowSpecAtom(view), matchWindow(ts))
-  }, [older, view, ts])
-  const known = detail._tag === 'Success'
-  const ready = known && (detail.value === null || late || (list.ready && (target.ts === undefined || list.rows.has(target.ts))))
-  const report = useEffectEvent(onReady)
-  useLayoutEffect(() => {
-    if (ready) report()
-  }, [ready])
-  return null
-}
-
-function ShownTopic({ sessionId, selection, snapshot, narrow, readerRef, onStepper, onBack, onEscape, onStep, onUsed }: SearchReaderProps & { readonly selection: SearchSelection }) {
-  const view = readerView(sessionId, selection.topicId)
-  const result = useAtomValue(topicAtom(selection.topicId))
+function ReaderTopic({ sessionId, selection, row, snapshot, narrow, readerRef, onStepper, onBack, onEscape, onStep, onUsed }: SearchReaderProps & { readonly selection: SearchSelection }) {
+  const { topicId, ts } = selection
+  const view = readerView(sessionId, topicId)
+  const result = useAtomValue(topicAtom(topicId))
   const detail = result._tag === 'Success' ? result.value : undefined
   const list = useAtomValue(messageListAtom(view))
-  const painted = list.ready && (selection.ts === undefined || list.rows.has(selection.ts))
+  // A restored selection had no move to aim the reader's view.
+  useLayoutEffect(() => {
+    if (registry.get(messageWindowSpecAtom(view)).anchor !== ts) aim(view, selection)
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- Once, as the topic comes in; later moves aim the view themselves.
+  }, [])
+  const fetch = useSettled(sessionId, ts)
+  const asked = useLoadAt(selection, fetch)
+  const local = list.ready && (ts === undefined || list.rows.has(ts))
+  const gone = useAfter(asked && list.ready && list.spec.anchor === ts && !local, GONE_WAIT_MS)
+  // The match the topic landed on, once its rows are local; from then on the topic shows.
+  const [landed, setLanded] = useState<{ readonly at: string | undefined } | undefined>(undefined)
+  if (landed === undefined && detail != null && (local || gone)) setLanded({ at: ts })
+  const shown = landed !== undefined && detail != null
+
+  const painted = !shown || local || gone
   useEffect(() => {
     if (!painted || measureFrom === undefined) return
     const from = measureFrom
     measureFrom = undefined
-    afterPaint(() => measure('juno.search-reader', from))
+    afterPaint(() => measure('juno.search-reader', from, { detail: { reader: shown ? 'topic' : 'preview' } }))
   // oxlint-disable-next-line react-hooks/exhaustive-deps -- A same-topic move starts a new measure even while `painted` stays true.
-  }, [painted, selection.ts])
+  }, [painted, ts])
 
-  const navigation = useAtomValue(searchMatchesAtom({ sessionId, generation: snapshot?.generation ?? 0, topicId: selection.topicId, ...(selection.ts === undefined ? {} : { ts: selection.ts }), ...(list.order[0] === undefined ? {} : { first: list.order[0] }), ...(list.order.at(-1) === undefined ? {} : { last: list.order.at(-1)! }) }))
-  const nav = navigation._tag === 'Success' ? navigation.value : undefined
+  const generation = snapshot?.generation ?? 0
+  const steps = useAtomValue(searchStepsAtom(sessionId, generation, topicId, ts))
+  const nav = steps._tag === 'Success' ? steps.value : undefined
+  const marked = useMarked(sessionId, generation, selection, shown ? list.order : undefined)
   const words = (snapshot?.query.clauses ?? []).flatMap((clause) => (clause.kind === 'term' || clause.kind === 'phrase') && !clause.negated ? [clause.value] : [])
   const go = (direction: 1 | -1) => {
-    const ts = direction === -1 ? nav?.previous : nav?.next
-    if (ts != null) onStep(ts)
+    const next = direction === -1 ? nav?.previous : nav?.next
+    if (next != null) onStep(next)
   }
   const stepTo = useEffectEvent(go)
   useEffect(() => {
-    shownTopics.set(sessionId, selection.topicId)
     onStepper((direction) => stepTo(direction))
+    return () => onStepper(undefined)
+  }, [onStepper])
+  useLayoutEffect(() => {
+    if (!shown) return
+    shownTopics.set(sessionId, topicId)
     return () => {
-      if (shownTopics.get(sessionId) === selection.topicId) shownTopics.delete(sessionId)
-      onStepper(undefined)
+      if (shownTopics.get(sessionId) === topicId) shownTopics.delete(sessionId)
     }
-  }, [sessionId, selection.topicId, onStepper])
-  useMarks(readerRef, nav?.marked ?? [], selection.ts, words)
+  }, [shown, sessionId, topicId])
+  useMarks(readerRef, marked, ts, words)
 
-  if (detail == null) return null
   const step = nav !== undefined && nav.count > 1 ? { index: nav.index, count: nav.count, onPrevious: () => go(-1), onNext: () => go(1) } : undefined
   const header = { onOpenInNewTab: () => void openResultBehind(selection), ...(narrow ? { onBack } : {}), ...(step === undefined ? {} : { step }) }
-  return <Topic id={selection.topicId} view={view} detail={detail} reader={{ header, onEscape, onUsed }} />
+  if (landed !== undefined && detail != null) return <Topic id={topicId} view={view} detail={detail} reader={{ header, onEscape, onUsed, landing: landed.at, fetch }} />
+  return <ReaderPreview view={view} selection={selection} row={row} detail={detail ?? undefined} header={header} />
+}
+
+/** False while an arrow may still move on: after an arrow, the selection must stay `KEY_SETTLE_MS` before Slack is asked. */
+function useSettled(sessionId: string, ts: string | undefined): boolean {
+  const key = ts ?? ''
+  const [settled, setSettled] = useState<string | undefined>(() => (lastMoves.get(sessionId) === 'keyboard' ? undefined : key))
+  useEffect(() => {
+    if (settled === key) return
+    const timer = setTimeout(() => setSettled(key), lastMoves.get(sessionId) === 'keyboard' ? KEY_SETTLE_MS : 0)
+    return () => clearTimeout(timer)
+  }, [sessionId, key, settled])
+  return settled === key
+}
+
+/** A match only Slack found is fetched once `fetch` is set; true once the store has had its answer. A move on drops the answer. */
+function useLoadAt({ topicId, ts, stored }: SearchSelection, fetch: boolean): boolean {
+  const [loaded, setLoaded] = useState<string | undefined>(undefined)
+  const needed = stored === false && ts !== undefined
+  useEffect(() => {
+    if (!needed || !fetch || ts === undefined) return
+    let current = true
+    void loadMessageAt(registry, topicId, ts).then(() => {
+      if (current) setLoaded(ts)
+    })
+    return () => {
+      current = false
+    }
+  }, [needed, fetch, topicId, ts])
+  return !needed || loaded === ts
+}
+
+/** True once `on` has held for `ms`. */
+function useAfter(on: boolean, ms: number): boolean {
+  const [done, setDone] = useState(false)
+  if (!on && done) setDone(false)
+  useEffect(() => {
+    if (!on) return
+    const timer = setTimeout(() => setDone(true), ms)
+    return () => clearTimeout(timer)
+  }, [on, ms])
+  return on && done
+}
+
+/**
+ * The matches to mark among the drawn rows (`order`, once the topic shows); the current one alone before that.
+ * While a new window's answer is on its way the last ones stay, so marks never blink.
+ */
+function useMarked(sessionId: string, generation: number, { topicId, ts }: SearchSelection, order: ReadonlyArray<string> | undefined): ReadonlyArray<string> {
+  const first = order?.[0]
+  const last = order?.at(-1)
+  // Without the drawn range this is the steps query, so a preview asks for nothing more.
+  const range = first === undefined || last === undefined ? {} : { first, last }
+  const result = useAtomValue(searchMatchesAtom({ sessionId, generation, topicId, ...(ts === undefined ? {} : { ts }), ...range }))
+  const found = order !== undefined && result._tag === 'Success' ? result.value.marked : undefined
+  const [held, setHeld] = useState<ReadonlyArray<string> | undefined>(undefined)
+  if (found !== undefined && found !== held) setHeld(found)
+  const own = useMemo(() => (ts === undefined ? [] : [ts]), [ts])
+  return order === undefined ? own : (held ?? own)
+}
+
+interface PreviewProps {
+  readonly view: string
+  readonly selection: SearchSelection
+  readonly row: SearchRowItem | undefined
+  readonly detail: TopicDetail | null | undefined
+  readonly header: TopicHeaderReader
+}
+
+/**
+ * A result whose topic is not local yet: its header from the topic when that is local, else from the row, and its
+ * message from the row, drawn as the topic draws it. The topic lands its match where this row sits, so the
+ * message does not move when the rest of the topic fills in around it.
+ */
+function ReaderPreview({ view, selection, row, detail, header }: PreviewProps) {
+  const now = useAtomValue(nowAtom, (time) => Math.floor(time / 60_000) * 60_000)
+  const group = row !== undefined && 'group' in row ? row.group : undefined
+  const hit = selection.ts === undefined ? undefined : group?.messages.find((message) => message.ts === selection.ts)
+  const item = hit === undefined ? undefined : previewItem(hit, selection.topicId)
+  const main = detail != null ? detail.kind === 'main' : group !== undefined && selection.topicId === mainTopicOf(group.place.id)
+  const label = detail?.channel.label ?? group?.place.label
+  const scrollRef = useRef<HTMLElement>(null)
+  const ts = item?.message.ts
+  useLayoutEffect(() => {
+    const scroller = scrollRef.current
+    const element = scroller === null || ts === undefined ? null : scroller.querySelector(rowSelector(ts))
+    if (scroller === null || element === null || ts === undefined) return
+    registry.set(scrollSnapshotAtom(view), { anchorKey: ts, offset: element.getBoundingClientRect().top - scroller.getBoundingClientRect().top })
+  }, [view, ts])
+  const topic: TopicHeaderTopic | undefined = group === undefined ? undefined : { kind: main ? 'main' : 'thread', title: group.title, subscribed: true, resolved: false, channel: group.place }
+  const head = detail != null ? <KnownHeader detail={detail} reader={header} /> : topic === undefined ? null : <TopicHeader detail={topic} onMenu={() => {}} reader={header} />
+  return (
+    <TopicViewFrame header={head} composer={label === undefined ? undefined : <ComposerSlot placeholder={main ? `Message ${label}` : 'Reply'} />}>
+      <MessageList items={item === undefined ? [] : [item]} eager={ts === undefined ? undefined : new Set([ts])} main={main} now={now} status="pending" scrollRef={scrollRef} />
+    </TopicViewFrame>
+  )
+}
+
+function KnownHeader({ detail, reader }: { readonly detail: TopicDetail; readonly reader: TopicHeaderReader }) {
+  return useTopicHeader(detail, false, false, reader)
+}
+
+/** A search hit as the topic draws its message: the sender's name and colour, and the text the row shows. */
+function previewItem(hit: SearchHit, topicId: string): MessageListItem {
+  const senderId = hit.senderId ?? hit.id
+  return {
+    message: {
+      id: hit.id,
+      rev: 0,
+      ts: hit.ts,
+      at: Math.round(Number(hit.ts) * 1000),
+      kind: 'message',
+      senderId,
+      fromMe: false,
+      body: { blocks: [{ kind: 'paragraph', children: [{ kind: 'text', text: hit.text }] }] },
+      edited: false,
+      groupStart: true,
+      broadcast: false,
+      root: topicId === threadTopicOf(hit.place.id, hit.ts),
+      reactions: [],
+      files: [],
+    },
+    sender: { id: senderId, name: hit.sender, color: defaultPersonColor(senderId), ...(hit.senderId === undefined ? { unreachable: true as const } : {}) },
+  }
 }
 
 /** The matched words, marked once the rows are drawn, and again as more rows draw. */
