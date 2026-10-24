@@ -37,19 +37,20 @@
 import { compareTs, maxTs, millisToTs, type Me, type Ts, type UsergroupId } from '@juno/domain'
 import type { CountEntry } from '@juno/slack-schema'
 import { SlackApi, SlackEdge, SlackSession, type SlackApiError, type SlackAuthRequired } from '@juno/slack'
-import type { Message, ThreadView } from '@juno/slack-schema'
+import type { Message } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, transaction, type SqlError } from '@juno/store'
 import { Clock, Deferred, Effect, Queue } from 'effect'
-import { reindexOptions, type SyncContext } from './context'
+import { connectionOf, reindexOptions, stillConnected, type SyncContext } from './context'
 import { activeConversations, historyOrder, loadCounts } from './counts'
 import { saveRepairMarkers, queueRepairs } from './mutationRepair'
 import { discoverSince, searchPreviews } from './discovery'
 import { FollowFence } from './followFence'
 import { readMetadata, storeMetadata } from './metadata'
-import { applyPage, mainTopicOf, threadTopicOf } from './pages'
+import { applyPage, mainTopicOf, threadTopicOf, type SeedRead } from './pages'
 import { recheck, type RecheckOptions } from './recheck'
 import { reindexTopics } from './reindex'
-import { threadViewPageUnchanged } from './threadViews'
+import { threadViewPageUnchanged, viewRange, type ViewObservation } from './threadViews'
+import { pageRange } from './threadRanges'
 import { decodeThreadViewPage } from './threadViewDecode'
 import { fillUsers, nameFirst } from './users'
 import {
@@ -58,13 +59,12 @@ import {
   getSyncState,
   latestSyncedRange,
   latestSyncedRanges,
-  markRepliesComplete,
+  addThreadRange,
   observeRead,
   readState,
   seedTopicRead,
   setSyncState,
   setThreadSub,
-  threadMessages,
   toConversationRow,
   upsertTeam,
   upsertUsers,
@@ -154,7 +154,7 @@ const loadWorkspace = (ctx: SyncContext, withPrefs: boolean, lane: 'interactive'
   }))
 
 /** One thread from `getView`: root, unread and latest replies, Slack's subscription and read pointer. */
-const applyThreadView = (ctx: SyncContext, view: ThreadView, requestedAt: Ts, lane: 'interactive' | 'background'): Effect.Effect<void, BootError, BootServices> =>
+const applyThreadView = (ctx: SyncContext, { view, requestedAt, connection }: ViewObservation, lane: 'interactive' | 'background'): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
     const root = view.root_msg
     const channel = root.channel
@@ -174,26 +174,27 @@ const applyThreadView = (ctx: SyncContext, view: ThreadView, requestedAt: Ts, la
         }
       }),
     )
-    yield* applyPage(ctx, channel, [root, ...seen.values()], { kind: 'page', requestedAt })
-    const stored = yield* threadMessages(channel, root.ts)
-    const replies = stored.filter((m) => m.ts !== root.ts && m.deleted === 0).length
-    // The view carries every unread reply, so coverage is complete from Slack's read pointer on. The row's count turns
-    // exact with it, so the thread is re-indexed in the same transaction rather than waiting for a later page to do it.
-    const completeFrom = root.last_read ?? root.latest_reply ?? root.ts
-    const syncedAt = yield* Clock.currentTimeMillis
-    yield* transaction(Effect.andThen(markRepliesComplete(channel, root.ts, replies >= root.reply_count, syncedAt, completeFrom), reindexTopics([topic], reindexOptions(ctx))))
+    yield* transaction(
+      Effect.gen(function* () {
+        yield* applyPage(ctx, channel, [root, ...seen.values()], { kind: 'page', requestedAt })
+        // The view carries every unread reply, so it proves the replies from Slack's read pointer on. The row's count
+        // turns exact with it, so the thread is re-indexed in the same transaction rather than waiting for a later page.
+        yield* addThreadRange(channel, root.ts, viewRange(view, requestedAt, stillConnected(ctx, connection)))
+        yield* reindexTopics([topic], reindexOptions(ctx))
+      }),
+    )
   })
 
 const applyThreadViewObservations = (
   ctx: SyncContext,
-  observations: ReadonlyArray<{ readonly view: ThreadView; readonly requestedAt: Ts }>,
+  observations: ReadonlyArray<ViewObservation>,
   lane: 'interactive' | 'background',
 ): Effect.Effect<void, BootError, BootServices> =>
   Effect.gen(function* () {
     const unchanged = yield* transaction(threadViewPageUnchanged(ctx, observations))
     const changed = observations.filter((_, index) => unchanged[index] !== true)
     yield* nameFirst(ctx, changed.flatMap(({ view }) => [view.root_msg, ...(view.latest_replies ?? []), ...(view.unread_replies ?? [])]), lane)
-    for (const { view, requestedAt } of changed) yield* applyThreadView(ctx, view, requestedAt, lane)
+    for (const observation of changed) yield* applyThreadView(ctx, observation, lane)
   })
 
 /**
@@ -228,11 +229,12 @@ const loadThreadViews = (
     let identitiesComplete = true
     let firstRequestedAt: Ts | undefined
     let current: Ts | undefined
-    const batched: Array<{ readonly view: ThreadView; readonly requestedAt: Ts }> = []
+    const batched: Array<ViewObservation> = []
     // `until` when the pages stopped there; undefined when they reached the end of the list.
     let coveredFrom: Ts | undefined = options.until
     while (true) {
       const requestedAt = yield* nowTs
+      const connection = connectionOf(ctx)
       firstRequestedAt ??= requestedAt
       const pageResult = yield* Effect.result(api.call(
         'subscriptions.thread.getView',
@@ -249,7 +251,7 @@ const loadThreadViews = (
       const decoded = yield* decodeThreadViewPage(page.threads)
       for (const identity of decoded.listed) listed.add(identity)
       identitiesComplete &&= decoded.identitiesComplete
-      const observations = decoded.views.map((view) => ({ view, requestedAt }))
+      const observations = decoded.views.map((view) => ({ view, requestedAt, connection }))
       if (options.batchPages === true) batched.push(...observations)
       else yield* applyThreadViewObservations(ctx, observations, options.lane)
       if (current === undefined && options.afterFirstPage !== undefined) yield* options.afterFirstPage
@@ -338,7 +340,7 @@ const probeUnlisted = (
 
 interface HistoryOptions {
   /** Cold boot: see `ApplyPageOptions.seedReadBefore`. */
-  readonly seedReadBefore?: string
+  readonly seedReadBefore?: SeedRead
 }
 
 /**
@@ -418,7 +420,7 @@ const loadHistorySince = (ctx: SyncContext, channel: string, since: string): Eff
  */
 const loadThreadPreviews = (
   ctx: SyncContext,
-  seedReadBefore: string,
+  seedReadBefore: SeedRead,
   threads: Deferred.Deferred<void>,
   landed: Queue.Queue<void>,
   historyDone: Deferred.Deferred<void>,
@@ -446,6 +448,7 @@ const loadThreadPreviews = (
       tried.add(`${root.channel}:${root.root_ts}`)
       if (root.latest_reply === null) continue
       const requestedAt = yield* nowTs
+      const connection = connectionOf(ctx)
       const page = yield* api
         .call(
           'conversations.replies',
@@ -455,7 +458,19 @@ const loadThreadPreviews = (
         .pipe(Effect.catchTag('SlackRejected', () => Effect.succeed(undefined)))
       if (page === undefined) continue
       yield* nameFirst(ctx, page.messages)
-      yield* applyPage(ctx, root.channel, page.messages, { kind: 'page', requestedAt }, { seedReadBefore })
+      yield* transaction(
+        Effect.gen(function* () {
+          yield* addThreadRange(root.channel, root.root_ts, pageRange({
+            threadTs: root.root_ts,
+            oldest: root.latest_reply!,
+            replies: page.messages.filter((message) => message.ts !== root.root_ts).map((message) => message.ts),
+            hasMore: page.has_more,
+            requestedAt,
+            live: stillConnected(ctx, connection),
+          }))
+          yield* applyPage(ctx, root.channel, page.messages, { kind: 'page', requestedAt }, { seedReadBefore })
+        }),
+      )
       yield* Effect.yieldNow
     }
   })
@@ -495,7 +510,7 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<boolean,
     yield* phase({ _tag: 'booting', first: true })
     const startedAt = yield* Clock.currentTimeMillis
     // Unfollowed threads count as read up to here; a reply during the boot stays unread.
-    const bootTs = millisToTs(startedAt)
+    const seed: SeedRead = { before: millisToTs(startedAt), connection: connectionOf(ctx) }
     const quietDays = ctx.config.quietDays
     const windowStart = yield* windowStartMillis(ctx)
     const start = millisToTs(windowStart)
@@ -518,7 +533,7 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<boolean,
     // Once rows show, the newest messages of the workspace give the busiest channels a preview before their history lands.
     const previewsDone = yield* Deferred.make<void>()
     const previews = Deferred.await(quickStarted).pipe(
-      Effect.andThen(ctx.config.previewSearchPages > 0 ? discoverOrLog(searchPreviews(ctx, windowStart, { seedReadBefore: bootTs })) : Effect.void),
+      Effect.andThen(ctx.config.previewSearchPages > 0 ? discoverOrLog(searchPreviews(ctx, windowStart, { seedReadBefore: seed })) : Effect.void),
       Effect.ensuring(Deferred.succeed(previewsDone, undefined)),
     )
     // Each history page wakes the thread previews beside it.
@@ -535,7 +550,7 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<boolean,
         if (done === home) yield* Deferred.succeed(homeHistoryDone, undefined)
         // A boot that failed half way left ranges behind; what they cover is not fetched again.
         if (!(yield* covered(conversation.id, start, conversation.latest))) {
-          yield* skipRejected(loadHistoryWindow(ctx, conversation.id, start, { seedReadBefore: bootTs }))
+          yield* skipRejected(loadHistoryWindow(ctx, conversation.id, start, { seedReadBefore: seed }))
           yield* Queue.offer(landed, undefined)
           yield* ctx.onHistory(conversation.id)
         }
@@ -553,10 +568,10 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<boolean,
       const [threadsLoaded] = yield* Effect.all([threads.pipe(Effect.ensuring(Deferred.succeed(threadsDone, undefined))), history], { concurrency: 2 })
       yield* fillUsers(ctx)
       // Discovery finds replies inside the window to roots older than it: Main's activity, which windowed history cannot see.
-      return { threadsLoaded, discovered: yield* discoverOrLog(discoverSince(ctx, windowStart, counts.entries, { seedReadBefore: bootTs })) }
+      return { threadsLoaded, discovered: yield* discoverOrLog(discoverSince(ctx, windowStart, counts.entries, { seedReadBefore: seed })) }
     })
     // Independent methods, so they run side by side: getView pages, history and then discovery, and replies for thread previews.
-    const rest = Effect.map(Effect.all([pages, loadThreadPreviews(ctx, bootTs, threadsDone, landed, historyDone)], { concurrency: 2 }), ([found]) => found)
+    const rest = Effect.map(Effect.all([pages, loadThreadPreviews(ctx, seed, threadsDone, landed, historyDone)], { concurrency: 2 }), ([found]) => found)
     // The preview search runs beside the whole boot, so a slow one delays nothing; the boot is recorded after both.
     const [result] = yield* Effect.all([rest, previews, homeReady], { concurrency: 3 })
     yield* fillUsers(ctx)

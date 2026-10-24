@@ -15,20 +15,28 @@ export const handleSocketEvent = (runtime: SyncRuntime, reconcile: Effect.Effect
     switch (event._tag) {
       case 'Connected':
         state.connected = true
+        ctx.socket.connected = true
         return (options.onConnection?.(true) ?? Effect.void).pipe(
           Effect.andThen(state.booted ? FiberSet.run(background, reconcile).pipe(Effect.asVoid) : Effect.void),
         )
-      case 'Disconnected':
+      case 'Disconnected': {
         state.connected = false
+        // Before anything yields: a page that lands from now on cannot write a live tail.
+        ctx.socket.connected = false
+        ctx.socket.epoch += 1
+        ctx.liveRoots.clear()
         state.markerCandidates.drop()
-        if (!state.booted) return options.onConnection?.(false) ?? Effect.void
+        const ended = transaction(endEventCoverage.pipe(Effect.flatMap((topics) => reindexTopics(topics, reindexOptions(ctx))))).pipe(
+          Effect.catchCause((cause) => Effect.logError('sync: coverage not reset', { cause })),
+        )
+        if (!state.booted) return ended.pipe(Effect.andThen(options.onConnection?.(false) ?? Effect.void))
         return Clock.currentTimeMillis.pipe(
           Effect.tap((now) => Effect.sync(() => { state.droppedAt ??= now })),
           Effect.andThen(options.onConnection?.(false) ?? Effect.void),
-          Effect.andThen(transaction(endEventCoverage.pipe(Effect.flatMap((topics) => reindexTopics(topics, reindexOptions(ctx)))))),
-          Effect.catchCause((cause) => Effect.logError('sync: coverage not reset', { cause })),
+          Effect.andThen(ended),
           Effect.andThen(phase({ _tag: 'offline' })),
         )
+      }
       case 'Frame':
         if (event.frame.type === 'pong') state.markerCandidates.pong(event.receivedAt)
         if (event.frame.type === 'force_reload') {

@@ -12,11 +12,11 @@ import { Invalidation, StoreWriter, transaction, type MessageRow, type SqlError 
 import { Clock, Effect, Queue } from 'effect'
 import { writeHuddle } from './write/huddles'
 import { filesToFetch } from './files'
-import { reindexOptions, wantUsers, type SyncContext } from './context'
+import { reindexOptions, stillConnected, wantUsers, type SyncContext } from './context'
 import { mergeMessage, mergeRootCounters, stubRoot, type MergeSource } from './merge'
 import { reindexTopics, topicsOfMessages } from './reindex'
 import { referencedUserIds } from './users'
-import { applyRootSubscription, markRepliesComplete, observeRead, readMessage, replaceReactions, seedTopicRead, writeMessage } from './write'
+import { addThreadRange, applyRootSubscription, observeRead, readMessage, replaceReactions, seedTopicRead, writeMessage } from './write'
 
 /** Older files that arrive unfilled are asked about when their topic opens (`run/files.ts`), not as they are written: a page of old ones would ask about each. */
 const THUMBS_WAIT_MILLIS = 24 * 60 * 60_000
@@ -107,11 +107,17 @@ export interface ApplyPageOptions {
   readonly alsoTouch?: Iterable<string>
   /**
    * Cold boot only: a thread first seen here that the user does not follow
-   * starts read as of this moment (the cold boot's start), so a first boot
+   * starts read as of `before` (the cold boot's start), so a first boot
    * does not light up every old thread, while a reply that arrives during
    * the boot stays unread. Later discoveries start unread.
    */
-  readonly seedReadBefore?: string
+  readonly seedReadBefore?: SeedRead
+}
+
+/** The cold boot's start, and the socket connection it began on (`connectionOf`). */
+export interface SeedRead {
+  readonly before: string
+  readonly connection: number | undefined
 }
 
 /** Applies a page in one transaction and re-indexes what it touched. Returns the touched topic ids. */
@@ -128,7 +134,7 @@ export const applyPage = (
       for (const message of messages) rows.push(...(yield* mergeOne(ctx, channel, message, source, options.latestUpdates?.[message.ts])))
       const topics = topicsOfMessages(rows)
       for (const id of options.alsoTouch ?? []) topics.add(id)
-      if (options.seedReadBefore !== undefined) yield* seedThreadsRead(rows, options.seedReadBefore)
+      if (options.seedReadBefore !== undefined) yield* seedThreadsRead(ctx, rows, options.seedReadBefore, source.kind === 'page')
       yield* reindexTopics(topics, reindexOptions(ctx))
       return topics
     }),
@@ -136,12 +142,14 @@ export const applyPage = (
 
 /**
  * Roots in `rows` whose thread has no read pointer yet start read at their
- * latest reply before `before` (`ApplyPageOptions.seedReadBefore`); a reply
- * after it, which can only have come by event, stays unread. From the
- * pointer on every reply arrives as an event, so coverage is complete from
- * that point.
+ * latest reply before `seed.before` (`ApplyPageOptions.seedReadBefore`); a
+ * reply after it, which can only have come by event, stays unread. While
+ * the connection the boot began on holds, every reply after the pointer is
+ * on a page or arrives as an event, so the thread gets a live range from
+ * there and its unread count is exact. Not from a search match, whose
+ * `latest_reply` can trail Slack's while the index catches up.
  */
-const seedThreadsRead = (rows: ReadonlyArray<MessageRow>, before: string): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
+const seedThreadsRead = (ctx: SyncContext, rows: ReadonlyArray<MessageRow>, seed: SeedRead, proven: boolean): Effect.Effect<void, SqlError, StoreWriter | Invalidation> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
     for (const row of rows) {
@@ -151,9 +159,9 @@ const seedThreadsRead = (rows: ReadonlyArray<MessageRow>, before: string): Effec
       const existing = yield* sql<{ topic_id: string }>`SELECT topic_id FROM topic_reads WHERE topic_id = ${topic}`
       if (existing.length > 0) continue
       const latest = row.latest_reply ?? row.ts
-      const from = compareTs(latest, before) > 0 ? before : latest
+      const from = compareTs(latest, seed.before) > 0 ? seed.before : latest
       yield* seedTopicRead(topic, from)
-      yield* markRepliesComplete(row.channel, row.ts, false, 0, from)
+      if (proven && stillConnected(ctx, seed.connection)) yield* addThreadRange(row.channel, row.ts, { from_ts: from, to_ts: from, tail: 'live' })
     }
   })
 

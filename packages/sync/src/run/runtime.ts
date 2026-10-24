@@ -48,6 +48,8 @@ export const makeSyncRuntime = (options: RunSyncOptions) => Effect.gen(function*
     fetchesInFlight: new Set(),
     usersInFlight: new Map(),
     metadata: new Set(),
+    socket: { connected: false, epoch: 0 },
+    liveRoots: new Set(),
   }
   const state = {
     bootRetry: undefined as Deferred.Deferred<void> | undefined,

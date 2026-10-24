@@ -42,7 +42,8 @@ import type { Attachment, Block, File } from '@juno/slack-schema'
 import { Invalidation, StoreWriter, type MessageRow, type SqlError, type TopicIndexRow } from '@juno/store'
 import { Effect } from 'effect'
 import { messageTopics, syncKeys } from './keys'
-import { latestSyncedRange, readState, threadMessages } from './write'
+import { countExact } from './threadRanges'
+import { latestSyncedRange, readState, threadMessages, threadRanges } from './write'
 
 export interface ReindexOptions {
   readonly me: Me
@@ -183,19 +184,12 @@ const reindexOne = (id: string, options: ReindexOptions): Effect.Effect<boolean,
     let countersActivity: string | undefined
     if (parsed.kind === 'thread') {
       const replyCount = root?.reply_count ?? 0
-      const storedReplies = live.filter((r) => r.ts !== parsed.threadTs).length
-      const cursor = yield* sql<{ complete_from: string | null }>`
-        SELECT complete_from FROM thread_cursors WHERE channel = ${channel} AND thread_ts = ${parsed.threadTs}`
-      // Complete means every reply the root counts is stored. `replies_complete` is not trusted here: it was true
-      // when a page landed, and `reply_count` may have grown since without the replies (a drop).
-      const complete = storedReplies >= replyCount
       const latestReply = root?.latest_reply ?? null
-      const readPast = latestReply !== null && reads.lastReadTs !== undefined && compareTs(reads.lastReadTs, latestReply) >= 0
-      // Every reply since the read pointer is stored when coverage starts at or before it.
-      const completeFrom = cursor[0]?.complete_from ?? null
-      const coveredSinceRead = completeFrom !== null && reads.lastReadTs !== undefined && compareTs(completeFrom, reads.lastReadTs) <= 0
-      historyComplete = complete || readPast || coveredSinceRead
-      if (!complete && !readPast && latestReply !== null) unreadFloor = 1
+      // Exact only when a proven range reaches from the read pointer to the end (`threadRanges.ts`): the stored
+      // replies reaching `reply_count` prove nothing, since a reply can raise the count without the gap filling.
+      const ranges = yield* threadRanges(channel, parsed.threadTs)
+      historyComplete = countExact(ranges, reads.lastReadTs ?? parsed.threadTs, latestReply ?? undefined)
+      if (!historyComplete && latestReply !== null) unreadFloor = 1
       countersCount = root !== undefined && root.deleted === 0 ? replyCount + 1 : replyCount
       countersActivity = latestReply ?? undefined
     } else {

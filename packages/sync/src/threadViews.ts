@@ -9,7 +9,8 @@ import {
 import type { Message, Reaction, ThreadView } from '@juno/slack-schema'
 import { StoreWriter, type MessageRow, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
-import type { SyncContext } from './context'
+import { stillConnected, type SyncContext } from './context'
+import { mergeRange, pageRange, type ThreadRange } from './threadRanges'
 import { FollowFence, type FollowFenceService } from './followFence'
 import { mergeMessage, mergeRootCounters } from './merge'
 
@@ -32,11 +33,16 @@ interface ReadRow {
   readonly commanded: 0 | 1
 }
 
-interface CursorRow {
+interface RangeRow extends ThreadRange {
   readonly channel: string
   readonly thread_ts: string
-  readonly replies_complete: 0 | 1
-  readonly complete_from: string | null
+}
+
+/** One `getView` row, when it was asked for, and the socket connection it was asked on (`connectionOf`). */
+export interface ViewObservation {
+  readonly view: ThreadView
+  readonly requestedAt: Ts
+  readonly connection: number | undefined
 }
 
 interface ReactionRow {
@@ -50,7 +56,7 @@ interface ReactionRow {
 
 const keyOf = (channel: string, ts: string): string => `${channel}:${ts}`
 
-const messagesOf = (view: ThreadView): ReadonlyArray<Message> => {
+export const messagesOf = (view: ThreadView): ReadonlyArray<Message> => {
   const seen = new Map<string, Message>()
   for (const reply of [...(view.latest_replies ?? []), ...(view.unread_replies ?? [])]) seen.set(reply.ts, reply)
   return [view.root_msg, ...seen.values()]
@@ -92,7 +98,7 @@ interface PageSnapshot {
   readonly reactions: ReadonlyMap<string, ReadonlyArray<ReactionRow>>
   readonly subscriptions: ReadonlyMap<string, SubscriptionRow>
   readonly reads: ReadonlyMap<string, ReadRow>
-  readonly cursors: ReadonlyMap<string, CursorRow>
+  readonly ranges: ReadonlyMap<string, ReadonlyArray<ThreadRange>>
   readonly pending: ReadonlySet<string>
 }
 
@@ -102,7 +108,7 @@ const pageSnapshot = (views: ReadonlyArray<ThreadView>): Effect.Effect<PageSnaps
     const roots = views.map((view) => view.root_msg.ts)
     const channels = [...new Set(views.map((view) => view.root_msg.channel))]
     const topics = views.map((view) => threadTopicId(view.root_msg.channel as ChannelId, view.root_msg.ts as Ts))
-    const [messages, reactionRows, subscriptionRows, readRows, cursorRows, pendingRows] = yield* Effect.all([
+    const [messages, reactionRows, subscriptionRows, readRows, rangeRows, pendingRows] = yield* Effect.all([
       sql<MessageRow>`SELECT * FROM messages
         WHERE channel IN ${sql.in(channels)} AND (ts IN ${sql.in(roots)} OR thread_ts IN ${sql.in(roots)})`,
       sql<ReactionRow>`SELECT channel, ts, name, count, user_ids_json, me FROM reactions
@@ -112,8 +118,8 @@ const pageSnapshot = (views: ReadonlyArray<ThreadView>): Effect.Effect<PageSnaps
         WHERE channel IN ${sql.in(channels)} AND thread_ts IN ${sql.in(roots)}`,
       sql<ReadRow>`SELECT topic_id, last_read_ts, marked_unread, local_write_ack_ts, last_server_event_ts, observed_at, slack_read_ts, commanded
         FROM topic_reads WHERE topic_id IN ${sql.in(topics)}`,
-      sql<CursorRow>`SELECT channel, thread_ts, replies_complete, complete_from FROM thread_cursors
-        WHERE channel IN ${sql.in(channels)} AND thread_ts IN ${sql.in(roots)}`,
+      sql<RangeRow>`SELECT channel, thread_ts, from_ts, to_ts, tail FROM thread_ranges
+        WHERE channel IN ${sql.in(channels)} AND thread_ts IN ${sql.in(roots)} ORDER BY from_ts`,
       sql<{ kind: string; target_key: string }>`SELECT kind, target_key FROM outbox
         WHERE (kind = 'follow' AND target_key IN ${sql.in(topics)}) OR (kind = 'mark' AND target_key IN ${sql.in(topics)})`,
     ], { concurrency: 1 })
@@ -123,13 +129,18 @@ const pageSnapshot = (views: ReadonlyArray<ThreadView>): Effect.Effect<PageSnaps
       rows.push(row)
       reactions.set(keyOf(row.channel, row.ts), rows)
     }
+    const ranges = new Map<string, Array<ThreadRange>>()
+    for (const row of rangeRows) {
+      const key = keyOf(row.channel, row.thread_ts)
+      ranges.set(key, [...(ranges.get(key) ?? []), { from_ts: row.from_ts, to_ts: row.to_ts, tail: row.tail }])
+    }
     return {
       messages,
       messageByKey: new Map(messages.map((row) => [keyOf(row.channel, row.ts), row])),
       reactions,
       subscriptions: new Map(subscriptionRows.map((row) => [keyOf(row.channel, row.thread_ts), row])),
       reads: new Map(readRows.map((row) => [row.topic_id, row])),
-      cursors: new Map(cursorRows.map((row) => [keyOf(row.channel, row.thread_ts), row])),
+      ranges,
       pending: new Set(pendingRows.map((row) => `${row.kind}:${row.target_key}`)),
     }
   })
@@ -138,8 +149,7 @@ const observationUnchanged = (
   ctx: SyncContext,
   snapshot: PageSnapshot,
   fence: FollowFenceService,
-  view: ThreadView,
-  requestedAt: Ts,
+  { view, requestedAt, connection }: ViewObservation,
 ): boolean => {
   const root = view.root_msg
   const channel = root.channel
@@ -171,11 +181,13 @@ const observationUnchanged = (
     const outcome = observeServerRead(toReadState(read, false), { kind: 'page', lastReadTs: root.last_read as Ts, requestedAt }).outcome
     if (outcome !== 'ignored') return false
   }
-  const completeFrom = root.last_read ?? root.latest_reply ?? root.ts
-  const cursor = snapshot.cursors.get(rootKey)
-  const complete = replyCount >= root.reply_count
-  const nextFrom = cursor?.complete_from === null || cursor?.complete_from === undefined || compareTs(completeFrom, cursor.complete_from) < 0 ? completeFrom : cursor.complete_from
-  if (cursor === undefined || cursor.replies_complete !== (complete ? 1 : 0) || cursor.complete_from !== nextFrom) return false
+  // The range the view proves must add nothing to the stored ones.
+  const range = viewRange(view, requestedAt, stillConnected(ctx, connection))
+  if (range !== undefined) {
+    const { range: merged, replaced } = mergeRange(snapshot.ranges.get(rootKey) ?? [], range)
+    const held = replaced[0]
+    if (replaced.length !== 1 || held === undefined || held.from_ts !== merged.from_ts || held.to_ts !== merged.to_ts || held.tail !== merged.tail) return false
+  }
   const observedAt = fence.effective(channel, root.ts, sub.observed_at ?? undefined)
   return (observedAt !== undefined && compareTs(requestedAt, observedAt) <= 0) || fence.advance(channel, root.ts, requestedAt)
 }
@@ -187,12 +199,24 @@ const observationUnchanged = (
  */
 export const threadViewPageUnchanged = (
   ctx: SyncContext,
-  observations: ReadonlyArray<{ readonly view: ThreadView; readonly requestedAt: Ts }>,
+  observations: ReadonlyArray<ViewObservation>,
 ): Effect.Effect<ReadonlyArray<boolean>, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const views = observations.map(({ view }) => view)
     if (views.length === 0) return []
     const fence = yield* FollowFence
     const snapshot = yield* pageSnapshot(views)
-    return observations.map(({ view, requestedAt }) => observationUnchanged(ctx, snapshot, fence, view, requestedAt))
+    return observations.map((observation) => observationUnchanged(ctx, snapshot, fence, observation))
   })
+
+/**
+ * What a `getView` row proves (`threadRanges.ts`): it carries every unread
+ * reply, so every reply after Slack's read pointer, or after the latest
+ * reply when it gives none, is in it.
+ */
+export const viewRange = (view: ThreadView, requestedAt: string, live: boolean): ThreadRange | undefined => {
+  const root = view.root_msg
+  const from = root.last_read ?? root.latest_reply ?? root.ts
+  const replies = messagesOf(view).slice(1).map((message) => message.ts).filter((ts) => compareTs(ts, from) > 0).toSorted(compareTs)
+  return pageRange({ threadTs: root.ts, oldest: from, replies, hasMore: false, requestedAt, live })
+}

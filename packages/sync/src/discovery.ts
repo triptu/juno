@@ -33,7 +33,7 @@ import { Invalidation, StoreWriter, type MessageRow, type SqlError } from '@juno
 import { Clock, Effect } from 'effect'
 import type { SyncContext } from './context'
 import { mergeMessage, mergeRootCounters } from './merge'
-import { applyPage } from './pages'
+import { applyPage, type SeedRead } from './pages'
 import { nameFirst } from './users'
 
 type Services = SlackApi | SlackEdge | StoreWriter | Invalidation
@@ -78,7 +78,7 @@ const matchToMessage = (match: FlatSearchMatch): Message | undefined => {
 
 export interface DiscoverOptions {
   /** Cold boot: a thread first seen here that the user does not follow starts read as of this ts (see `ApplyPageOptions`). */
-  readonly seedReadBefore?: string
+  readonly seedReadBefore?: SeedRead
 }
 
 interface SearchPass {

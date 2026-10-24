@@ -5,6 +5,7 @@
  */
 import { compareTs, millisToTs, type Ts } from '@juno/domain'
 import {
+  isReply,
   isMessageChanged,
   isMessageDeleted,
   isMessagePosted,
@@ -21,6 +22,8 @@ import { reindexOptions, wantMembers, type SyncContext } from './context'
 import { mergeRootCounters, mergeTombstone, type MergeSource } from './merge'
 import { mainTopicOf, mergeOne, threadTopicOf } from './pages'
 import { reindexTopics, topicsOfMessages } from './reindex'
+import { liveRootRange, noteLiveRoot } from './liveRoots'
+import { provenToEnd } from './threadRanges'
 import { applyUsergroups, changeOwnUsergroup } from './usergroups'
 import {
   changeReaction,
@@ -31,6 +34,7 @@ import {
   setPref,
   setThreadSub,
   threadMessages,
+  threadRanges,
   threadSub,
   toConversationRow,
   topicOfMessage,
@@ -221,6 +225,7 @@ export const applyFrame = (ctx: SyncContext, frame: RtmFrame): Effect.Effect<voi
 /** A new message, from its socket event or from Juno's own send. */
 const writePosted = (ctx: SyncContext, channel: string, message: Message, eventTs: string, now: number): Effect.Effect<void, SqlError, Services> =>
   Effect.gen(function* () {
+    if (isReply(message) && message.thread_ts !== undefined) yield* liveRootRange(ctx, channel, message.thread_ts)
     const rows = yield* mergeOne(ctx, channel, message, { kind: 'event', eventTs })
     const topics = topicsOfMessages(rows)
     // Activity after a resolve reopens the topic, except the user's own messages are activity too.
@@ -271,15 +276,13 @@ export const writeDeleted = (ctx: SyncContext, channel: string, deletedTs: strin
     const merged = mergeTombstone(existing, channel, deletedTs, source)
     if (merged.changed) yield* writeMessage(merged.row)
     const topics = topicsOfMessages([merged.row])
-    // A deleted reply: the root's counters follow the stored replies when they are complete, else drop by one.
+    // A deleted reply: the root's counters follow the stored replies when a range proves every reply is stored, else drop by one.
     const wasLiveReply = existing !== undefined && existing.deleted === 0 && existing.thread_ts !== null && existing.thread_ts !== existing.ts
     const root = wasLiveReply ? yield* readMessage(channel, existing.thread_ts!) : undefined
     if (root !== undefined) {
-      const sql = yield* StoreWriter
-      const cursor = yield* sql<{ replies_complete: 0 | 1 }>`SELECT replies_complete FROM thread_cursors WHERE channel = ${channel} AND thread_ts = ${root.ts}`
       const stored = (yield* threadMessages(channel, root.ts)).filter((m) => m.ts !== root.ts && m.deleted === 0)
       const latestStored = stored.reduce<string | null>((acc, m) => (acc === null || compareTs(m.ts, acc) > 0 ? m.ts : acc), null)
-      const complete = cursor[0]?.replies_complete === 1 || stored.length + 1 >= root.reply_count
+      const complete = provenToEnd(yield* threadRanges(channel, root.ts), root.ts, root.latest_reply ?? undefined)
       const replyCount = complete ? stored.length : Math.max(stored.length, root.reply_count - 1)
       const latestReply = root.latest_reply === deletedTs || complete ? latestStored : root.latest_reply
       if (replyCount !== root.reply_count || latestReply !== root.latest_reply) {
@@ -328,7 +331,10 @@ const noteMember = (ctx: SyncContext, channel: string): Effect.Effect<void, SqlE
 const applyMessageFrame = (ctx: SyncContext, frame: Extract<RtmFrame, { type: 'message' }>, now: number): Effect.Effect<void, SqlError, Services> => {
   if (isMessagePosted(frame)) {
     const { event_ts: _e, hidden: _h, suppress_notification: _s, ...message } = frame
-    return transaction(noteMember(ctx, frame.channel).pipe(Effect.andThen(writePosted(ctx, frame.channel, message as Message, eventTsOf(frame, now), now))))
+    return transaction(noteMember(ctx, frame.channel).pipe(
+      Effect.andThen(noteLiveRoot(ctx, frame.channel, message as Message)),
+      Effect.andThen(writePosted(ctx, frame.channel, message as Message, eventTsOf(frame, now), now)),
+    ))
   }
   if (isMessageChanged(frame)) return transaction(writeChanged(ctx, frame.channel, frame.message, eventTsOf(frame, now)))
   if (isMessageDeleted(frame)) return transaction(writeDeleted(ctx, frame.channel, frame.deleted_ts, { kind: 'event', eventTs: eventTsOf(frame, now) }))

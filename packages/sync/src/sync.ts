@@ -36,7 +36,9 @@ import { watchWindow } from './run/window'
 import { makeSyncRuntime } from './run/runtime'
 import { handleSocketEvent } from './run/socket'
 import { nameUsers } from './users'
-import { clearPendingFollows } from './write'
+import { clearPendingFollows, endEventCoverage } from './write'
+import { reindexTopics } from './reindex'
+import { reindexOptions } from './context'
 
 /** `first`: the cold boot of an empty store, the first sync the user waits through. */
 export type SyncPhase =
@@ -112,6 +114,8 @@ export interface RunSyncOptions {
 export interface TopicFetcher {
   readonly open: (topicId: string) => Effect.Effect<FetchReport, OpenError>
   readonly older: (topicId: string, before: string) => Effect.Effect<FetchReport, OpenError>
+  /** The replies after `after` in a thread, when the store cannot prove them (`fetchNewer`). */
+  readonly newer: (topicId: string, after: string) => Effect.Effect<FetchReport, OpenError>
   /** Stores the message `ts` in full for a jump to it (`fetchAt`). */
   readonly at: (topicId: string, ts: string) => Effect.Effect<FetchReport, OpenError>
   /** Stores a DM-open answer through the running metadata fence. */
@@ -137,6 +141,10 @@ export const runSync = (options: RunSyncOptions): Effect.Effect<never, SlackAuth
 
     // No command is in flight before the sync runs; `follow` outbox rows are left over from a crash.
     yield* transaction(clearPendingFollows).pipe(Effect.catchCause((cause) => Effect.logError('sync: pending follows not cleared', { cause })))
+    // Replies sent while the app was closed reached no socket: the last run's live tails end, as at a drop.
+    yield* transaction(endEventCoverage.pipe(Effect.flatMap((topics) => reindexTopics(topics, reindexOptions(ctx))))).pipe(
+      Effect.catchCause((cause) => Effect.logError('sync: coverage not reset', { cause })),
+    )
     const events = yield* socket.events
     const reconcile = makeReconcile(runtime, 'catch-up')
     const sweep = makeReconcile(runtime, 'sweep')

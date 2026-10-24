@@ -1,55 +1,55 @@
-import {
-  compareTs,
-  threadTopicId,
-  type ChannelId,
-  type Ts,
-} from '@juno/domain'
+import { threadTopicId, type ChannelId, type Ts } from '@juno/domain'
 import { Invalidation, StoreWriter, syncedRanges, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
+import { mergeRange, type ThreadRange } from '../threadRanges'
 
 import { invalidate, type Writer } from './shared'
 
-/** What the store knows about a thread's coverage: all replies, or all replies from `completeFrom` on. */
-export const markRepliesComplete = (channel: string, threadTs: string, complete: boolean, syncedAt: number, completeFrom?: string): Writer =>
+/** A thread's proven ranges, oldest first (`threadRanges.ts`). */
+export const threadRanges = (channel: string, threadTs: string): Effect.Effect<ReadonlyArray<ThreadRange>, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
-    const current = (yield* sql<{ replies_complete: 0 | 1; complete_from: string | null }>`
-      SELECT replies_complete, complete_from FROM thread_cursors WHERE channel = ${channel} AND thread_ts = ${threadTs}`)[0]
-    const nextFrom = completeFrom === undefined
-      ? (current?.complete_from ?? null)
-      : current?.complete_from === undefined || current.complete_from === null || compareTs(completeFrom, current.complete_from) < 0
-        ? completeFrom
-        : current.complete_from
-    if (current !== undefined && current.replies_complete === (complete ? 1 : 0) && current.complete_from === nextFrom) return
-    yield* sql`INSERT INTO thread_cursors (channel, thread_ts, replies_complete, synced_at, complete_from)
-      VALUES (${channel}, ${threadTs}, ${complete ? 1 : 0}, ${String(syncedAt)}, ${completeFrom ?? null})
-      ON CONFLICT (channel, thread_ts) DO UPDATE SET replies_complete = excluded.replies_complete, synced_at = excluded.synced_at,
-        complete_from = CASE
-          WHEN excluded.complete_from IS NULL THEN thread_cursors.complete_from
-          WHEN thread_cursors.complete_from IS NULL THEN excluded.complete_from
-          WHEN excluded.complete_from < thread_cursors.complete_from THEN excluded.complete_from
-          ELSE thread_cursors.complete_from END`
-    yield* invalidate({ thread_cursors: [threadTopicId(channel as ChannelId, threadTs as Ts)] })
+    return yield* sql<ThreadRange>`SELECT from_ts, to_ts, tail FROM thread_ranges
+      WHERE channel = ${channel} AND thread_ts = ${threadTs} ORDER BY from_ts`
+  })
+
+/** Records a range a page proved, merged with the ranges it touches. Nothing when it proved nothing new. */
+export const addThreadRange = (channel: string, threadTs: string, range: ThreadRange | undefined): Writer =>
+  Effect.gen(function* () {
+    if (range === undefined) return
+    const sql = yield* StoreWriter
+    const { range: merged, replaced } = mergeRange(yield* threadRanges(channel, threadTs), range)
+    const same = replaced.length === 1 && replaced[0]!.from_ts === merged.from_ts && replaced[0]!.to_ts === merged.to_ts && replaced[0]!.tail === merged.tail
+    if (same) return
+    if (replaced.length > 0) {
+      yield* sql`DELETE FROM thread_ranges WHERE channel = ${channel} AND thread_ts = ${threadTs} AND from_ts IN ${sql.in(replaced.map((r) => r.from_ts))}`
+    }
+    yield* sql`INSERT INTO thread_ranges (channel, thread_ts, from_ts, to_ts, tail) VALUES (${channel}, ${threadTs}, ${merged.from_ts}, ${merged.to_ts}, ${merged.tail})`
+    yield* invalidate({ thread_ranges: [threadTopicId(channel as ChannelId, threadTs as Ts)] })
   })
 
 /**
- * The socket dropped: replies sent during the gap may never arrive as
- * events, so "every reply from `complete_from` on is stored" stops being
- * known for threads the user does not follow. Followed threads keep it: the
- * reconnect pages `getView` over every thread with activity since the store
- * was last in step and marks their coverage again from Slack's pointer, and
- * a followed thread with no activity since then missed nothing.
- * Returns the threads' topics: their unread counts may no longer be exact,
- * so the caller re-indexes them.
+ * The event stream broke (a socket drop, or a new run of the sync after the
+ * app was closed): replies sent since may never arrive as events, so no
+ * live tail holds. A followed thread's tail is held: the reconnect pages
+ * `getView` over every followed thread with activity since the store was
+ * last in step, which brings every unread reply, so its unread count stays
+ * exact; a reply read on another client meanwhile may still be missing, so
+ * the view no longer shows past the range as continuous. An unfollowed
+ * thread's tail ends. Returns the threads' topics: their unread counts may
+ * no longer be exact, so the caller re-indexes them.
  */
 export const endEventCoverage: Effect.Effect<ReadonlyArray<string>, SqlError, StoreWriter | Invalidation> = Effect.gen(function* () {
   const sql = yield* StoreWriter
-  const ended = yield* sql<{ channel: string; thread_ts: string }>`UPDATE thread_cursors SET complete_from = NULL
-    WHERE complete_from IS NOT NULL AND NOT EXISTS (
-      SELECT 1 FROM thread_subs s WHERE s.channel = thread_cursors.channel AND s.thread_ts = thread_cursors.thread_ts AND s.subscribed = 1)
+  const ended = yield* sql<{ channel: string; thread_ts: string }>`UPDATE thread_ranges SET tail = CASE WHEN EXISTS (
+      SELECT 1 FROM thread_subs s WHERE s.channel = thread_ranges.channel AND s.thread_ts = thread_ranges.thread_ts AND s.subscribed = 1)
+    THEN 'held' ELSE 'none' END
+    WHERE tail = 'live' OR (tail = 'held' AND NOT EXISTS (
+      SELECT 1 FROM thread_subs s WHERE s.channel = thread_ranges.channel AND s.thread_ts = thread_ranges.thread_ts AND s.subscribed = 1))
     RETURNING channel, thread_ts`
-  yield* invalidate(['thread_cursors'])
-  return ended.map((row) => threadTopicId(row.channel as ChannelId, row.thread_ts as Ts))
+  const topics = [...new Set(ended.map((row) => threadTopicId(row.channel as ChannelId, row.thread_ts as Ts)))]
+  if (topics.length > 0) yield* invalidate(['thread_ranges'])
+  return topics
 })
 
 /** The synced range a page covered, merged with the ranges it touches. */

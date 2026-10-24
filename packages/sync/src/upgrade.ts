@@ -17,9 +17,11 @@ export const INDEX_VERSION_KEY = 'index-version'
  * its files ("Image") and stores the sender's namesakes. 5: unread messages
  * cache notification attention for their sender and mention context. 6: a
  * table stored as an unknown block before Juno read tables gives its
- * preview ("Table: Service, Status").
+ * preview ("Table: Service, Status"). 7: a thread's unread count is exact
+ * only when a proven range of its replies reaches back to the read pointer
+ * (`thread_ranges`), not when the stored replies reach `reply_count`.
  */
-export const INDEX_VERSION = 6
+export const INDEX_VERSION = 7
 
 /** Rows per transaction, so the writer is never held long (performance rule 15). */
 const BATCH = 200

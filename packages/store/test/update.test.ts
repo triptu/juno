@@ -96,7 +96,6 @@ itEffect('every cache migration after the first runs on a populated cache and ke
         yield* sql`INSERT INTO messages (channel, ts, user_id, text) VALUES ('C1', '1.000001', 'U1', 'staging deploy is green')`
         yield* sql`INSERT INTO topic_index (topic_id, channel, kind, preview_json) VALUES ('C1:main', 'C1', 'main', '{"rootText":"release notes"}')`
         yield* sql`INSERT INTO thread_subs (channel, thread_ts, subscribed) VALUES ('C1', '1.000001', 1)`
-        yield* sql`INSERT INTO thread_cursors (channel, thread_ts) VALUES ('C1', '1.000001')`
         yield* sql`PRAGMA user_version = ${sql.literal(String(CACHE_RESET_EPOCH))}`
       }),
       ).pipe(invalidation.provideReactivity)
@@ -105,7 +104,7 @@ itEffect('every cache migration after the first runs on a populated cache and ke
     yield* Effect.gen(function* () {
       const sql = yield* StoreWriter
       expect(yield* recordedCacheMigrations).toStrictEqual(Object.keys(cacheMigrations).toSorted().map((id) => id.slice(13)))
-      for (const table of ['conversations', 'users', 'messages', 'topic_index', 'thread_subs', 'thread_cursors']) {
+      for (const table of ['conversations', 'users', 'messages', 'topic_index', 'thread_subs']) {
         expect(yield* count(table)).toBe(1)
       }
       // The search indexes the later migrations add cover the rows that were already there.

@@ -63,7 +63,26 @@ export interface SyncContext {
   readonly fetchesInFlight: Set<{ readonly at: number }>
   /** User ids an edge `users/info` call is out for, with its lane and the moment its answer is stored: a page that names them waits for it instead of asking again. */
   readonly usersInFlight: Map<string, { readonly lane: 'interactive' | 'background'; readonly stored: Deferred.Deferred<void> }>
+  /**
+   * The socket connection, for live tails (`threadRanges.ts`). `epoch` grows
+   * at every drop, so a page requested before a drop never writes a live
+   * tail after it.
+   */
+  readonly socket: { connected: boolean; epoch: number }
+  /**
+   * Roots that arrived as posted events on the current connection, by
+   * `channel:ts`: their threads can have no reply the stream has not
+   * brought (`liveRootRange`). A drop clears them. Bounded; oldest dropped.
+   */
+  readonly liveRoots: Set<string>
 }
+
+/** The connection a request starts on, for `stillConnected`. Undefined while the socket is down. */
+export const connectionOf = (ctx: SyncContext): number | undefined => (ctx.socket.connected ? ctx.socket.epoch : undefined)
+
+/** The connection `since` names has not dropped: every event sent since it began has arrived or will. */
+export const stillConnected = (ctx: SyncContext, since: number | undefined): boolean =>
+  since !== undefined && ctx.socket.connected && ctx.socket.epoch === since
 
 /** Runs a page fetch outside the work permit, so the recheck can wait for it (`awaitEarlierFetches`). */
 export const trackFetch = <A, E, R>(ctx: SyncContext, fetch: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> =>
