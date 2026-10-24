@@ -75,3 +75,5 @@ The ⌘K Conversations tab's `newChat.ranked` live query ranks the same way over
 `diagnosticDetails` reads the safe process log tails and engine outbox aggregates for Copy diagnostics. `showLogs` opens the logs through main.
 
 The agent client uses a scoped `Context.Service` and `Atom.runtime`. `agent/rpc.ts` loads the RPC schemas and creates the flattened client on demand; the workspace also preloads it on idle when Juno is available. All streams and commands share the same runtime and port.
+
+The Search tab's state is `search.ts`: `searchSessionAtom(sessionId)` (the field, scope, sort, selection and scroll, saved with its tab), `searchPrefsAtom` (Apps hidden, Automated hidden, Group by thread, the column's width), `recentSearchesAtom`, and `searchResultsAtom(sessionId)`, which subscribes to `search.session` with a generation that only grows and keeps the last snapshot until the next one arrives (`docs/architecture.md`, "The Search tab").

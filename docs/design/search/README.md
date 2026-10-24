@@ -112,11 +112,11 @@ Rejected: an answer card above the results, AI reranking, an AI "top hit", mergi
 v1, in order:
 
 1. Done (10-24): read-only live checks of Slack search, in `docs/research/slack-data-access.md`, "Search for the Search tab, live (2026-10-24)". Their results are folded into this page.
-2. `SearchQuery`, the parser and both compilers. ⌘K and the agent tool move onto it.
-3. The `search` place with sessions, the two-pane page, the reader, keys, ⌘⇧F, ⌘F in a topic, the ⌘K handoff.
-4. Merge with the completeness line, paging, highlighting, the four states, the Apps and Automated toggles.
-5. Thread grouping, Main rows, title matches, stepping between matches.
-6. Recent searches; privacy mode.
+2. Done (10-24): `SearchQuery`, the parser and both compilers. ⌘K and the agent tool move onto it.
+3. Done (10-24): the `search` place with sessions, the two-pane page, the reader, keys, ⌘⇧F, ⌘F in a topic, the ⌘K handoff. SPEC 10a describes what was built.
+4. Done (10-24): merge with the completeness line, paging, highlighting, the four states, the Apps and Automated toggles.
+5. Done (10-24): flat rows and Group by thread, Main rows, title matches, stepping between matches.
+6. Done (10-24): recent searches; privacy mode.
 7. Words to filters; Answer from results; Summarize.
 
 v2: Best match, Juno-only filters, Try other words, Files, and a semantic index only if we see many searches that find nothing.
