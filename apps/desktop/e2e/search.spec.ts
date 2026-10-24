@@ -99,6 +99,9 @@ async function localThenSlack({ juno, fake }: Context): Promise<void> {
   const page = searchPage(juno.win)
   await pickFrom(juno, 'Maya')
   await expect(page.hint).toHaveCount(0)
+  // The chip's own search has had Slack's answer, so the hold below catches the words' search.
+  await expect(page.row('Flamingo launch moved to Thursday')).toBeVisible()
+  await expect(page.results.getByText('Searching Slack…')).toHaveCount(0)
   fake.holdNext({ method: SEARCH, reason: 'search' })
   await page.field.pressSequentially('flamingo')
   await expect(page.row('Flamingo launch moved to Thursday')).toBeVisible()

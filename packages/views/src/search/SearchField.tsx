@@ -58,7 +58,7 @@ export function SearchField({ chips, text, inputRef, onText, onChip, onRemoveChi
         {chips.map((chip) => (
           <FieldChip key={chip.key} chip={chip} onEdit={() => onChip(chip.key)} onRemove={() => onRemoveChip(chip.key)} />
         ))}
-        <span {...stylex.props(styles.inputSlot)}>
+        <label {...stylex.props(styles.inputSlot)}>
           <span ref={mirror} aria-hidden="true" {...stylex.props(styles.mirror)}>
             {text.slice(0, picker?.at ?? 0)}
           </span>
@@ -81,7 +81,7 @@ export function SearchField({ chips, text, inputRef, onText, onChip, onRemoveChi
             onFocus={onFocus}
             {...stylex.props(styles.input)}
           />
-        </span>
+        </label>
       </div>
       {chips.length > 0 || text !== '' ? <IconButton icon={X} label="Clear search" size={24} iconSize={13} onClick={onClear} /> : null}
       {picker === undefined || picker.rows.length === 0 ? null : <SearchPicker picker={picker} left={left} activeId={keys.activeId} onActivate={keys.activate} />}
