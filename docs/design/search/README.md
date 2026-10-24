@@ -24,7 +24,7 @@ How we got here: a map of today's search (below), web research on what people li
 
 - A new place, `search`. Each Search tab is its own session, with its own query, selection and scroll, so two searches can sit side by side.
 - **Opening it.** ⌘⇧F opens Search in the current tab, or focuses the field when a Search tab is active. The sidebar's magnifier opens it too. In a topic, ⌘F opens Search scoped to that topic: a thread searches that thread, a Main searches its channel or DM. The scope is a chip ("in: Acme MSA renewal terms") that Backspace removes to widen the search. From ⌘K's Messages tab, a footer row "All results for "…" ⌘⇧F" carries the text and filters over.
-- ⌘K stays the quick way to jump somewhere. Its Messages tab keeps its short list.
+- ⌘K stays for fast navigation. Its Messages tab shows quick results from this Mac only (no Slack call, so it never waits), with the same hiding rules, and a last row "All results for "…"" with ⌘⇧F that opens the Search tab with the text and filters.
 - The tab title is the query, or "Search" when empty. Privacy mode shows "Search".
 - Search state lives outside the mounted page, so Back and Forward, a closed and reopened tab (⌘⇧T) and a restart all bring back the query, the selection and the scroll. The results are fetched again.
 
@@ -64,10 +64,13 @@ How we got here: a map of today's search (below), web research on what people li
 - The states are different and say so: searching, no matches, Slack unavailable ("Showing matches on this Mac. Slack search didn't answer." with Try again), and offline.
 - Sort: **Newest** and **Oldest**. **Best match** waits until we verify, read-only, that the internal endpoint honours a score sort. We won't label an unknown order as relevance.
 
-### 6. Apps and bots
+### 6. Apps, bots and automated channels are hidden by default
 
-- One **Apps** toggle in the filter row, remembered. It maps to `search_exclude_bots` on Slack and the bot flag locally, once both are verified to agree.
-- Default: open question 3 below.
+- Two toggles at the end of the filter row, each remembered: **Apps hidden** (messages from apps and bots) and **Automated hidden** (the conversations in the Automated view, SPEC 5). One click shows them; the label then reads **Apps shown** or **Automated shown**. Nothing is hidden without a visible toggle saying so.
+- Apps maps to `search_exclude_bots` on Slack and the bot flag locally, once a live check shows both agree.
+- Automated is Juno's own list, so Slack can't filter it: Slack's rows from those conversations are dropped after they arrive, and paging asks for more when a page thins out. Locally it is a `NOT IN` on the channel.
+- When a search finds nothing but hidden rows would match, the empty state says so: "Nothing in your other conversations. 4 matches from apps and automated channels." with **Show them**.
+- An `in:` chip naming an automated channel searches it whatever the toggle says.
 
 ### 7. AI, quietly
 
@@ -93,7 +96,7 @@ v1, in order:
 1. Read-only live checks of Slack search: identity syntax for `from:`/`in:`, combined and excluded modifiers, date boundaries and time zone, `with:`, score sort, `search_exclude_bots`, page limits, the `filters`/`filter_suggestions` shape. Only counts, timings and redacted shapes are kept.
 2. `SearchQuery`, the parser and both compilers. ⌘K and the agent tool move onto it.
 3. The `search` place with sessions, the two-pane page, the reader, keys, ⌘⇧F, ⌘F in a topic, the ⌘K handoff.
-4. Merge with the completeness line, paging, highlighting, the four states, the Apps toggle.
+4. Merge with the completeness line, paging, highlighting, the four states, the Apps and Automated toggles.
 5. Thread grouping, Main rows, title matches, stepping between matches.
 6. Recent searches; privacy mode.
 7. Words to filters; Answer from results; Summarize.
@@ -102,9 +105,6 @@ v2: Best match (if verified), facet counts as one-click filters (from Slack's `f
 
 Tests: end-to-end flows against the fake Slack (which needs the extra operators, paging and `search_exclude_bots`), a perf spec for keystroke-to-results and arrow-to-reader, and unit tests only for the parser and compilers.
 
-## Open questions
+## Decisions
 
-Decided (10-24): the reader is not read-only; ⌘F in a topic searches that topic; the field spans the tab above the split.
-
-1. **Hide apps and bots by default?** Recommended: yes, with the Apps toggle visible and showing "Apps hidden", so nothing is hidden silently. Against: you sometimes search for an alert or a deploy.
-2. **Does ⌘K's Messages tab stay?** Recommended: yes, as the quick list, with the footer row into the Search tab.
+None. Decided with Tushar (10-24): the reader is not read-only; ⌘F in a topic searches that topic; the field spans the tab above the split; apps and automated channels are hidden by default behind visible toggles; ⌘K stays for fast navigation with local-only quick results and a row into the Search tab.
