@@ -1,0 +1,1 @@
+- 10-24 12:32 · Tushar · Repo-tool tests exercise real commands with isolated Git projects and fake external tools. Replace repo-dependent selection assertions, module rewrites and console mocks; keep protocol, parser, repair and recovery checks. Fixture queues, homes and reports are private.

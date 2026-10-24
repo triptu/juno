@@ -8,6 +8,7 @@ export default {
     'knip.config.mjs': ['exports'],
     // Playwright loads this opt-in reporter by its file name.
     'apps/desktop/e2e/timings.ts': ['exports'],
+    'scripts/test-results-reporter.mjs': ['exports'],
     // This module asserts wire compatibility at compile time.
     'packages/engine/src/messages/body.ts': ['exports', 'types'],
     // createRequire is rooted at apps/desktop/package.json, which declares Playwright.

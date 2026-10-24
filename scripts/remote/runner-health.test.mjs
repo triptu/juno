@@ -1,13 +1,12 @@
 import assert from 'node:assert/strict'
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { checkRunner, runnerConfig } from './runner.mjs'
+import { spawnSync } from 'node:child_process'
+import { toolFixture } from '../tool-test-fixture.mjs'
 
-test('.local probes try IPv4 first, keep the working transport and preserve IPv6 and strict failures', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'juno-runner-health-'))
-  const previous = { PATH: process.env.PATH, TSTACK_HOME: process.env.TSTACK_HOME, TEST_HEALTH: process.env.TEST_HEALTH, TEST_CALLS: process.env.TEST_CALLS }
+test('.local probes try IPv4 first, keep the working transport and preserve IPv6 and strict failures', (t) => {
+  const { root: dir, env } = toolFixture(t)
   mkdirSync(join(dir, 'scripts/runner'), { recursive: true })
   writeFileSync(join(dir, 'scripts/runner/host.sh'), '# fixture host interface\n')
   writeFileSync(join(dir, 'ssh'), `#!/usr/bin/env node
@@ -20,33 +19,25 @@ if (ipv4 !== (process.env.TEST_HEALTH === 'ipv4')) { console.error('connect to h
 console.log('__juno_runner_connected\\nos=Linux test\\narch=x86_64\\ndocker=28\\ncapacity=16 quota');
 `)
   chmodSync(join(dir, 'ssh'), 0o755)
-  try {
-    process.env.TSTACK_HOME = dir
-    process.env.PATH = `${dir}:${previous.PATH}`
-    process.env.TEST_CALLS = join(dir, 'calls')
-    for (const mode of ['ipv4', 'ipv6', 'auth', 'broken']) {
-      process.env.TEST_HEALTH = mode
-      writeFileSync(process.env.TEST_CALLS, '')
-      const config = runnerConfig({ HOME: dir, JUNO_RUNNER_HOST: 'user@runner.local' })
-      if (mode === 'auth') assert.throws(() => checkRunner(config), /SSH configuration failed/)
-      else if (mode === 'broken') assert.throws(() => checkRunner(config), /health check failed/)
-      else {
-        assert.deepEqual(checkRunner(config), { reachable: true, cores: 16, pinned: false })
-        assert.equal(config.args.includes('-4'), mode === 'ipv4')
-      }
-      const called = readFileSync(process.env.TEST_CALLS, 'utf8').trim().split('\n').map(JSON.parse)
-      assert.deepEqual(called, mode === 'ipv6' ? [{ ipv4: true }, { ipv4: false }] : [{ ipv4: true }])
-    }
-    process.env.TEST_HEALTH = 'ipv6'
-    writeFileSync(process.env.TEST_CALLS, '')
-    const ordinary = runnerConfig({ HOME: dir, JUNO_RUNNER_HOST: 'runner.example' })
-    assert.equal(checkRunner(ordinary).reachable, true)
-    assert.deepEqual(readFileSync(process.env.TEST_CALLS, 'utf8').trim().split('\n').map(JSON.parse), [{ ipv4: false }])
-  } finally {
-    for (const [key, value] of Object.entries(previous)) {
-      if (value === undefined) delete process.env[key]
-      else process.env[key] = value
-    }
-    rmSync(dir, { recursive: true, force: true })
+  const calls = join(dir, 'calls')
+  const probe = (mode, host) => {
+    writeFileSync(calls, '')
+    return spawnSync(process.execPath, ['-e', `import {checkRunner, runnerConfig} from ${JSON.stringify(join(import.meta.dirname, 'runner.mjs'))};
+const config = runnerConfig(); const health = checkRunner(config); console.log(JSON.stringify({health, ipv4: config.args.includes('-4')}));`], {
+      env: { ...env, TSTACK_HOME: dir, PATH: `${dir}:${env.PATH}`, TEST_CALLS: calls, TEST_HEALTH: mode, JUNO_RUNNER_HOST: host }, encoding: 'utf8', timeout: 5000,
+    })
   }
+  for (const mode of ['ipv4', 'ipv6', 'auth', 'broken']) {
+    const result = probe(mode, 'user@runner.local')
+    if (mode === 'auth' || mode === 'broken') {
+      assert.notEqual(result.status, 0)
+      assert.match(result.stderr, mode === 'auth' ? /SSH configuration failed/ : /health check failed/)
+    } else {
+      assert.equal(result.status, 0, result.stderr)
+      assert.deepEqual(JSON.parse(result.stdout), { health: { reachable: true, cores: 16, pinned: false }, ipv4: mode === 'ipv4' })
+    }
+    assert.deepEqual(readFileSync(calls, 'utf8').trim().split('\n').map(JSON.parse), mode === 'ipv6' ? [{ ipv4: true }, { ipv4: false }] : [{ ipv4: true }])
+  }
+  assert.equal(probe('ipv6', 'runner.example').status, 0)
+  assert.deepEqual(readFileSync(calls, 'utf8').trim().split('\n').map(JSON.parse), [{ ipv4: false }])
 })

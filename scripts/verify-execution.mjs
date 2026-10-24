@@ -17,7 +17,7 @@ export function verifyExecution(local, { config = runnerConfig, probe = checkRun
 // Serial suites under an exclusive reservation leave room for Electron's engine
 // and renderer processes and one 1536 MB Apalache JVM on the 8 GB Mac.
 export const localVerifyEnv = {
-  JUNO_PLAN_SERIAL: '1', JUNO_PLAN_MAX_LOAD: '8',
+  JUNO_PLAN_SERIAL: '1', JUNO_PLAN_MAX_LOAD: process.env.JUNO_PLAN_MAX_LOAD ?? '8',
   JUNO_TEST_WORKERS: '4',
   JUNO_BROWSER_WORKERS: '2', JUNO_E2E_WORKERS: '1', GALLERY_WORKERS: '3', GALLERY_SHIFT_PARTS: '3',
   SPECS_JOBS: '2', SPECS_APALACHE: '1', SPECS_OVERLAP: '0', SPECS_APALACHE_HEAP: '1536m',

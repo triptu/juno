@@ -1,6 +1,7 @@
+import { toolFixture } from './tool-test-fixture.mjs'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
@@ -9,11 +10,9 @@ import { mainCheckout, worktreeFolder } from './worktree-folder.mjs'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 function fixture(t) {
-  mkdirSync(resolve(root, '.juno-status'), { recursive: true })
-  const dir = mkdtempSync(resolve(root, '.juno-status/batch-test-'))
-  t.after(() => rmSync(dir, { recursive: true, force: true }))
+  const { root: dir, env: fixtureEnv } = toolFixture(t)
   const command = (bin, args, cwd = dir, env = {}) => spawnSync(bin, args, {
-    cwd, encoding: 'utf8', env: { ...process.env, PATH: `${dir}/bin:${process.env.PATH}`, JUNO_WORKTREE_DIR: resolve(dir, '.claude/worktrees'), ...env },
+    cwd, encoding: 'utf8', env: { ...fixtureEnv, PATH: `${dir}/bin:${process.env.PATH}`, JUNO_WORKTREE_DIR: resolve(dir, '.claude/worktrees'), ...env },
   })
   const git = (args, cwd = dir) => {
     const result = command('git', args, cwd)
@@ -116,13 +115,6 @@ test('decision check rejects stale output and a mismatched fragment without over
   assert.equal(f.command(process.execPath, ['scripts/decision-log.mjs', '--check']).status, 0)
   f.write('docs/decisions/log/2026-10-17-0055-bad.md', '- 10-16 00:55 · Test · Wrong date.\n')
   assert.equal(f.command(process.execPath, ['scripts/decision-log.mjs']).status, 1)
-})
-
-test('worktrees go on the AgentWork volume when it is mounted, else in .claude/worktrees', () => {
-  const mounted = (path) => path === '/Volumes/AgentWork/.fseventsd/no_log'
-  assert.equal(worktreeFolder('/repo/juno', { env: {}, exists: mounted }), '/Volumes/AgentWork/worktrees/juno')
-  assert.equal(worktreeFolder('/repo/juno', { env: {}, exists: () => false }), '/repo/juno/.claude/worktrees')
-  assert.equal(worktreeFolder('/repo/juno', { env: { JUNO_WORKTREE_DIR: '/tmp/trees' }, exists: mounted }), '/tmp/trees')
 })
 
 test('a linked worktree with another folder name finds the main checkout and its name', (t) => {

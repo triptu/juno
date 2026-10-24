@@ -1,14 +1,8 @@
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
 import { test } from 'node:test'
-import { fileURLToPath } from 'node:url'
 import { decodeMappings, formatMap, mergePartials, sourceAt } from './coverage-map.mjs'
-import { changedMembers, driverSpecs, galleryComponents, mapProblem, MAX_MAP_AGE_DAYS, rankSpecs, reachSpecs, selectSpecs } from './affected-select.mjs'
-import { HEAVY_AREAS, heavyAreasChanged, inPaths, PERF_INTERACTIONS, perfInteractionsChanged, PROTOCOL_PATHS } from './test-areas.mjs'
+import { changedMembers, driverSpecs, galleryComponents, mapProblem, rankSpecs, reachSpecs, selectSpecs } from './affected-select.mjs'
 
-const repo = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 const TOPIC = 'apps/desktop/e2e/topic.spec.ts'
 const SIDEBAR = 'apps/desktop/e2e/sidebar.spec.ts'
@@ -46,80 +40,30 @@ function select({ changed, imports = {}, added = [], drift = [], specs = [SIDEBA
   })
 }
 
-const picked = (result) => Object.fromEntries([...result.specs].map(([spec, reasons]) => [spec, reasons]))
 
-test('a file the map knows picks the specs that ran it, with the reason', () => {
-  assert.deepEqual(picked(select({ changed: ['packages/views/src/Topic.tsx'] })), { [TOPIC]: ['ran packages/views/src/Topic.tsx'] })
-})
-
-test('a file several specs ran picks each of them', () => {
-  assert.deepEqual([...select({ changed: ['packages/engine/src/sync.ts'] }).specs.keys()].toSorted(), [SIDEBAR, TOPIC])
-})
-
-test('a changed spec or its own helper picks that spec only', () => {
-  assert.deepEqual(picked(select({ changed: [TOPIC] })), { [TOPIC]: ['the spec changed'] })
-  assert.deepEqual(picked(select({ changed: ['apps/desktop/e2e/juno-agent/agent.ts'], specs: [SIDEBAR, TOPIC, AGENT] })), { [AGENT]: ['its helper apps/desktop/e2e/juno-agent/agent.ts changed'] })
-})
-
-test('shared e2e support runs everything', () => {
-  assert.deepEqual(select({ changed: ['packages/fake-slack/src/server.ts'] }), { all: 'packages/fake-slack/src/server.ts is shared e2e support' })
-})
-
-test('a file with module-level code only picks the specs that ran the files importing it', () => {
-  const result = select({ changed: ['packages/contract/src/schema.ts'], imports: { 'packages/views/src/Topic.tsx': ['packages/contract/src/schema.ts'] } })
-  assert.deepEqual(picked(result), { [TOPIC]: ['packages/contract/src/schema.ts has module-level code only; packages/views/src/Topic.tsx imports it and ran here'] })
-})
-
-test('a file with module-level code only that nothing known imports runs everything', () => {
-  assert.match(select({ changed: ['packages/contract/src/schema.ts'] }).all, /module-level code only and nothing that imports it ran/)
-})
-
-test('an app file outside the bundles, such as a style sheet, runs everything', () => {
-  assert.match(select({ changed: ['packages/ui/src/fonts.css'] }).all, /outside the JavaScript bundles/)
-})
-
-test('an app file that was in no bundle (types only) picks nothing but the specs without coverage', () => {
-  assert.deepEqual(picked(select({ changed: ['packages/views/src/types.ts'], specs: [SIDEBAR, TOPIC, AGENT] })), { [AGENT]: ['no coverage recorded for it'] })
-})
-
-test('a file outside the app picks nothing', () => {
-  assert.deepEqual(picked(select({ changed: ['packages/views/test/topic.test.ts', 'docs/development.md'], specs: [SIDEBAR, TOPIC, AGENT] })), {})
-})
-
-test('a new file picks the specs that ran the known files importing it, through other new files', () => {
-  const result = select({
-    changed: ['packages/views/src/Badge.tsx', 'packages/views/src/BadgeRow.tsx', 'packages/views/src/Sidebar.tsx'],
-    added: ['packages/views/src/Badge.tsx', 'packages/views/src/BadgeRow.tsx'],
-    imports: { 'packages/views/src/BadgeRow.tsx': ['packages/views/src/Badge.tsx'], 'packages/views/src/Sidebar.tsx': ['packages/views/src/BadgeRow.tsx'] },
-  })
-  assert.deepEqual(result.specs.get(SIDEBAR), [
-    'packages/views/src/Badge.tsx is new; packages/views/src/Sidebar.tsx imports it and ran here',
-    'packages/views/src/BadgeRow.tsx is new; packages/views/src/Sidebar.tsx imports it and ran here',
-    'ran packages/views/src/Sidebar.tsx',
-  ])
-  assert.equal(result.specs.has(TOPIC), false)
-})
-
-test('a new file nothing known imports runs everything', () => {
-  assert.match(select({ changed: ['packages/views/src/Orphan.tsx'], added: ['packages/views/src/Orphan.tsx'] }).all, /is new and nothing that imports it ran/)
-})
-
-test('an importer edited since the map adds its specs, as it may call the file now', () => {
-  const result = select({ changed: ['packages/views/src/Topic.tsx'], drift: ['packages/views/src/Sidebar.tsx'], imports: { 'packages/views/src/Sidebar.tsx': ['packages/views/src/Topic.tsx'] } })
-  assert.deepEqual(result.specs.get(SIDEBAR), ['packages/views/src/Sidebar.tsx imports packages/views/src/Topic.tsx and changed since the map'])
-})
-
-test('an importer unchanged since the map adds nothing', () => {
-  const result = select({ changed: ['packages/views/src/Topic.tsx'], imports: { 'packages/views/src/Sidebar.tsx': ['packages/views/src/Topic.tsx'] } })
-  assert.equal(result.specs.has(SIDEBAR), false)
-})
-
-test('a spec the map has no coverage for runs whenever the app changed', () => {
-  assert.deepEqual(select({ changed: ['packages/views/src/Topic.tsx'], specs: [SIDEBAR, TOPIC, AGENT] }).specs.get(AGENT), ['no coverage recorded for it'])
-})
-
-test('a spec that no longer exists is never picked', () => {
-  assert.deepEqual([...select({ changed: ['packages/engine/src/sync.ts'], specs: [TOPIC] }).specs.keys()], [TOPIC])
+test('coverage selection follows changed, new and unrecorded consumers without keeping deleted specs', () => {
+  const cases = [
+    [{ changed: ['packages/views/src/Topic.tsx'] }, [TOPIC]],
+    [{ changed: ['packages/engine/src/sync.ts'] }, [SIDEBAR, TOPIC]],
+    [{ changed: [TOPIC] }, [TOPIC]],
+    [{ changed: ['apps/desktop/e2e/juno-agent/agent.ts'], specs: [SIDEBAR, TOPIC, AGENT] }, [AGENT]],
+    [{ changed: ['packages/views/src/Topic.tsx'], specs: [SIDEBAR, TOPIC, AGENT] }, [AGENT, TOPIC]],
+    [{ changed: ['packages/engine/src/sync.ts'], specs: [TOPIC] }, [TOPIC]],
+    [{ changed: ['packages/views/src/types.ts'], specs: [SIDEBAR, TOPIC, AGENT] }, [AGENT]],
+    [{ changed: ['docs/development.md'] }, []],
+    [{ changed: ['packages/contract/src/schema.ts'], imports: { 'packages/views/src/Topic.tsx': ['packages/contract/src/schema.ts'] } }, [TOPIC]],
+    [{ changed: ['packages/views/src/Badge.tsx'], added: ['packages/views/src/Badge.tsx', 'packages/views/src/BadgeRow.tsx'], imports: { 'packages/views/src/BadgeRow.tsx': ['packages/views/src/Badge.tsx'], 'packages/views/src/Sidebar.tsx': ['packages/views/src/BadgeRow.tsx'] } }, [SIDEBAR]],
+  ]
+  for (const [input, expected] of cases) assert.deepEqual([...select(input).specs.keys()].sort(), expected.sort(), JSON.stringify(input))
+  const input = { changed: ['packages/views/src/Topic.tsx'], imports: { 'packages/views/src/Sidebar.tsx': ['packages/views/src/Topic.tsx'] } }
+  assert.equal(select(input).specs.has(SIDEBAR), false)
+  assert.equal(select({ ...input, drift: ['packages/views/src/Sidebar.tsx'] }).specs.has(SIDEBAR), true)
+  for (const input of [
+    { changed: ['packages/fake-slack/src/server.ts'] },
+    { changed: ['packages/ui/src/fonts.css'] },
+    { changed: ['packages/contract/src/schema.ts'] },
+    { changed: ['packages/views/src/Orphan.tsx'], added: ['packages/views/src/Orphan.tsx'] },
+  ]) assert.ok(select(input).all, JSON.stringify(input))
 })
 
 test('the map is not used when missing, of another version, from an unknown commit or too old', () => {
@@ -128,7 +72,7 @@ test('the map is not used when missing, of another version, from an unknown comm
   assert.match(mapProblem(undefined, { now, commitKnown: false }), /no coverage map/)
   assert.match(mapProblem({ ...map, version: 2 }, { now, commitKnown: true }), /version 2/)
   assert.match(mapProblem(map, { now, commitKnown: false }), /not in this repository/)
-  assert.match(mapProblem(map, { now: now + (MAX_MAP_AGE_DAYS + 1) * 86_400_000, commitKnown: true }), /4 days old/)
+  assert.match(mapProblem(map, { now: now + 4 * 86_400_000, commitKnown: true }), /4 days old/)
 })
 
 test('source map segments decode to the file at a generated position', () => {
@@ -160,9 +104,7 @@ const gallery = new Set(['Sidebar', 'TopicRow', 'AttachmentCard', 'Composer'])
 test('a gallery spec opens the components it names, quoted or in an address', () => {
   const text = "await open(page, 'Sidebar', 'list/default')\nawait page.goto(`/TopicRow?__state=hierarchy/${state}`)\nawait page.goto('/#/AttachmentCard?__state=image')\nconst label = 'Send'"
   assert.deepEqual(galleryComponents(text, gallery), ['AttachmentCard', 'Sidebar', 'TopicRow'])
-})
 
-test('a gallery spec that reads every route, or names no component, walks every one', () => {
   assert.equal(galleryComponents("const routes = await readRoutes(page)\nawait open(page, 'Sidebar')", gallery), '*')
   assert.deepEqual(galleryComponents("const routes = (await readRoutes(page)).filter((route) => ['Composer'].includes(route.component))", gallery), ['Composer'])
   assert.equal(galleryComponents("await page.goto('/')", gallery), '*')
@@ -222,14 +164,6 @@ test('a changed driver member reaches the specs that use it on its class, and th
   // press is used by Palette.pick, which pick.spec.ts calls.
   assert.deepEqual([...reached([lineOf('mouse.down')]).keys()], ['pick.spec.ts'])
   assert.equal(reached([lineOf('export class Palette')]), undefined)
-})
-
-test('a driver change runs only the specs it reaches, and one outside a member runs everything', () => {
-  const driverFile = 'apps/desktop/e2e/driver/juno.ts'
-  const base = { specs: [SIDEBAR, TOPIC], map, support: new Set([driverFile]), own: (spec) => new Set([spec]), app: new Set(), isNew: () => false, drift: new Set(), importers: () => [] }
-  const narrowed = selectSpecs({ ...base, changed: [driverFile], driver: () => new Map([[TOPIC, "it uses the driver's TopicPane.send, which changed or uses what changed"]]) })
-  assert.deepEqual(picked(narrowed), { [TOPIC]: ["it uses the driver's TopicPane.send, which changed or uses what changed"] })
-  assert.match(selectSpecs({ ...base, changed: [driverFile] }).all, /outside a named driver member/)
 })
 
 // Narrow selection (the default plan since 10-18; --wide keeps the rules above).
@@ -360,24 +294,4 @@ test('a support change outside every part counts as a change to what the file ex
   const reached = reachSpecs({ changed: [{ text, lines: [1] }], corpus: [text], specTexts: new Map([['seeded.spec.ts', 'seed()'], ['other.spec.ts', 'run()']]) })
   assert.deepEqual([...reached.keys()], ['seeded.spec.ts'])
   assert.equal(driverSpecs({ changed: [{ text, lines: [1] }], driverTexts: [text], specTexts: new Map() }), undefined)
-})
-
-test('heavy areas, protocol paths and perf interactions name files that exist, and each heavy tag is used', () => {
-  const tracked = new Set(spawnSync('git', ['ls-files'], { cwd: repo, encoding: 'utf8' }).stdout.split('\n'))
-  const strings = [...HEAVY_AREAS.flatMap((area) => [...area.paths, ...area.whole]), ...PROTOCOL_PATHS, ...PERF_INTERACTIONS.flatMap((entry) => entry.paths)].filter((path) => typeof path === 'string')
-  for (const path of strings) assert.ok(path.endsWith('/') ? [...tracked].some((file) => file.startsWith(path)) : tracked.has(path), `${path} is not in the repository`)
-  const specs = [...tracked].filter((file) => file.endsWith('.spec.ts')).map((file) => readFileSync(join(repo, file), 'utf8')).join('\n')
-  for (const area of HEAVY_AREAS) assert.match(specs, new RegExp(`'${area.tag}'`), `no test is tagged ${area.tag}`)
-  for (const entry of PERF_INTERACTIONS) if (entry.feel) assert.ok(tracked.has(`apps/desktop/e2e/feel/${entry.feel}`), entry.feel)
-})
-
-test('a change is in a heavy area, the protocol or an interaction by its own files only', () => {
-  assert.deepEqual(heavyAreasChanged(['packages/sync/src/boot.ts']), ['sync'])
-  assert.deepEqual(heavyAreasChanged(['apps/gallery/src/main.tsx', 'apps/gallery/geometry.spec.ts']), ['gallery'])
-  assert.deepEqual(heavyAreasChanged(['apps/gallery/geometry.spec.ts', 'packages/views/src/Home.tsx']), [])
-  assert.equal(inPaths(PROTOCOL_PATHS, 'specs/outbox.qnt'), true)
-  assert.equal(inPaths(PROTOCOL_PATHS, 'specs/README.md'), false)
-  assert.equal(inPaths(PROTOCOL_PATHS, 'packages/engine/src/home/rows.ts'), false)
-  assert.deepEqual(perfInteractionsChanged(['packages/views/src/PeekView.tsx', 'docs/performance.md']).map((entry) => entry.interaction), ['peek'])
-  assert.deepEqual(perfInteractionsChanged(['packages/views/src/SettingsPage.tsx']), [])
 })

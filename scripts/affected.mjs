@@ -338,10 +338,10 @@ if (specs.length > 0) {
   })
 }
 
-// The Node tests of the repository's scripts (scripts/affected-tests.mjs).
+// The tool tests of the repository's scripts (scripts/affected-tests.mjs).
 for (const { script, reached } of bunTestScripts(root, changed))
   if (everythingChanged.length > 0 || toolChanged.length > 0 || reached.length > 0)
-    plan.push({ script, args: [], local: true, items: [], why: reached.length > 0 ? `${reached[0].file} ${reached[0].test === reached[0].file ? 'changed' : `reaches ${reached[0].test}`}${reached.length > 1 ? ` (and ${reached.length - 1} more)` : ''}` : 'the tools or dependencies changed' })
+    plan.push({ script, args: [], local: false, items: [], why: reached.length > 0 ? `${reached[0].file} ${reached[0].test === reached[0].file ? 'changed' : `reaches ${reached[0].test}`}${reached.length > 1 ? ` (and ${reached.length - 1} more)` : ''}` : 'the tools or dependencies changed' })
 
 // perf and feel are suggested only for an interaction with a budget whose own files changed.
 const interactions = batch ? [] : perfInteractionsChanged(changed)

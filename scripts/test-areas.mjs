@@ -4,8 +4,6 @@
 // - HEAVY_AREAS: the tests tagged @heavy, and the code each one checks. A
 //   full run (bun run verify:main) always runs them. An affected plan runs an area's heavy
 //   tests only when a changed file is in that area.
-// - PROTOCOL_PATHS: the code the Quint specs model. specs:check and
-//   specs:conformance run in agent and batch plans only when one of these changed.
 // - PERF_INTERACTIONS: the interactions with a budget in docs/performance.md,
 //   and the files each one owns. The plan suggests perf and feel on the Mac only
 //   when one of these changed.
@@ -63,15 +61,6 @@ export const HEAVY_AREAS = [
     // The gallery harness: the app and its shared helpers, the shift guard, @juno/testing.
     paths: [/^apps\/gallery\/(?!.*\.spec\.ts$)/, 'apps/gallery/shift.spec.ts', 'packages/testing/'],
   },
-]
-
-/** What the Quint specs model: the specs, the sync engine, and the engine's outbox and send code. */
-export const PROTOCOL_PATHS = [
-  /^specs\/(?!.*\.md$)/,
-  'packages/sync/',
-  'packages/engine/src/outbox.ts',
-  'packages/engine/src/send/',
-  'packages/engine/test/conformance/',
 ]
 
 /** Interactions with a budget, the perf.spec.ts tests that time them (`perf`, a title pattern) and their feel scenarios. */

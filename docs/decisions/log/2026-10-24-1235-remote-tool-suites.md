@@ -1,0 +1,1 @@
+- 10-24 12:35 · Tushar · Affected sends repo-tool, health and runner suites to the laptop. They do not take the Mac heavy lock; isolated queue tests use their own temporary reservations, and individual light files may run here.

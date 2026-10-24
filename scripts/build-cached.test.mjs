@@ -1,15 +1,13 @@
+import { toolFixture } from './tool-test-fixture.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 const script = resolve(import.meta.dirname, 'build-cached.mjs')
 test('fresh archives reuse verified output and rebuild changed or damaged inputs', (t) => {
-  const scratchRoot = resolve(import.meta.dirname, '../.remote/build-cache-tests')
-  mkdirSync(scratchRoot, { recursive: true })
-  const scratch = mkdtempSync(join(scratchRoot, 'run-'))
-  t.after(() => rmSync(scratch, { recursive: true, force: true }))
+  const { root: scratch, env: fixtureEnv } = toolFixture(t)
   const cache = join(scratch, 'cache')
   const source = join(scratch, 'source')
   const app = join(source, 'apps', 'desktop')
@@ -17,7 +15,7 @@ test('fresh archives reuse verified output and rebuild changed or damaged inputs
   writeFileSync(join(source, 'bun.lock'), 'lock v1')
   writeFileSync(join(app, 'source.txt'), 'first')
   writeFileSync(join(app, 'build.mjs'), `import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'; mkdirSync('out', { recursive: true }); writeFileSync('out/result', readFileSync('source.txt')); console.log('BUILT'); if (process.env.FAIL_BUILD) process.exit(1)`)
-  const run = (cwd, env = {}) => spawnSync(process.execPath, [script, 'out', process.execPath, 'build.mjs'], { cwd, encoding: 'utf8', env: { ...process.env, JUNO_BUILD_CACHE_DIR: cache, ...env } })
+  const run = (cwd, env = {}) => spawnSync(process.execPath, [script, 'out', process.execPath, 'build.mjs'], { cwd, encoding: 'utf8', env: { ...fixtureEnv, JUNO_BUILD_CACHE_DIR: cache, ...env } })
   const first = run(app)
   assert.equal(first.status, 0, first.stderr)
   assert.match(first.stdout, /BUILT/)
@@ -71,7 +69,7 @@ test('fresh archives reuse verified output and rebuild changed or damaged inputs
   assert.match(run(freshApp).stdout, /BUILT/)
 
   // The same checks work in a real checkout, including untracked and deleted inputs.
-  assert.equal(spawnSync('git', ['init', '-q'], { cwd: fresh }).status, 0)
+  assert.equal(spawnSync('git', ['init', '-q'], { cwd: fresh, env: fixtureEnv }).status, 0)
   writeFileSync(join(fresh, '.gitignore'), 'out/\n.env*\n')
   assert.match(run(freshApp).stdout, /BUILT/)
   assert.doesNotMatch(run(freshApp).stdout, /BUILT/)
@@ -81,7 +79,7 @@ test('fresh archives reuse verified output and rebuild changed or damaged inputs
   assert.match(run(freshApp).stdout, /BUILT/)
   writeFileSync(join(freshApp, 'untracked.txt'), 'new')
   assert.match(run(freshApp).stdout, /BUILT/)
-  assert.equal(spawnSync('git', ['add', '.'], { cwd: fresh }).status, 0)
+  assert.equal(spawnSync('git', ['add', '.'], { cwd: fresh, env: fixtureEnv }).status, 0)
   rmSync(join(freshApp, 'untracked.txt'))
   assert.match(run(freshApp).stdout, /BUILT/)
 })

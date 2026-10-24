@@ -1,15 +1,14 @@
+import { toolFixture } from './tool-test-fixture.mjs'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { hostname } from 'node:os'
 import { join, resolve } from 'node:path'
 import { test } from 'node:test'
-import { localVerifyEnv, verifyExecution } from './verify-execution.mjs'
-import { assessRecord, git, readRecords, releaseGate } from './release-gate.mjs'
-import { scratchFolder } from './worktree-folder.mjs'
+import { verifyExecution } from './verify-execution.mjs'
+import { assessRecord, readRecords, releaseGate } from './release-gate.mjs'
 
 test('explicit local skips probing; an unreachable runner fails; reachable stays remote; configuration errors fail', () => {
-  assert.equal(localVerifyEnv.JUNO_PLAN_MAX_LOAD, '8')
   let calls = 0
   const deps = { config: () => ({ host: 'runner' }), probe: () => { calls++; return { reachable: false, reason: 'offline' } } }
   assert.deepEqual(verifyExecution(true, deps), { mode: 'local', host: hostname() })
@@ -21,27 +20,21 @@ test('explicit local skips probing; an unreachable runner fails; reachable stays
 })
 
 function verificationFixture(t) {
-  mkdirSync(scratchFolder(), { recursive: true })
-  const root = mkdtempSync(join(scratchFolder(), 'verify-main-test-'))
-  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const { root, env: fixtureEnv, git: fixtureGit } = toolFixture(t)
   cpSync(resolve(import.meta.dirname), join(root, 'scripts'), { recursive: true })
-  // This checkout only runs fake commands. Its capacity is independent of the host's load.
-  const fixtureExecution = join(root, 'scripts/verify-execution.mjs')
-  writeFileSync(fixtureExecution, readFileSync(fixtureExecution, 'utf8') + "\nlocalVerifyEnv.JUNO_PLAN_MAX_LOAD = 'Infinity'\n")
   mkdirSync(join(root, 'apps/desktop/e2e'), { recursive: true })
   mkdirSync(join(root, 'bin'))
-  mkdirSync(join(root, 'tmp'))
   writeFileSync(join(root, 'bin/package.json'), '{"type":"commonjs"}')
   mkdirSync(join(root, 'tstack/scripts/runner'), { recursive: true })
   writeFileSync(join(root, 'tstack/scripts/runner/host.sh'), '# fixture\n')
-  writeFileSync(join(root, 'package.json'), '{"type":"module","packageManager":"bun@1.4.4","devDependencies":{"@informalsystems/quint":"0.33.0"}}')
+  writeFileSync(join(root, 'package.json'), '{"type":"module","scripts":{},"packageManager":"bun@1.4.4","devDependencies":{"@informalsystems/quint":"0.33.0"}}')
   writeFileSync(join(root, 'bin/bun'), `#!/usr/bin/env node
 const fs = require('node:fs');
 const argv = process.argv.slice(2);
-if (argv[0] === '--version') { console.log('1.4.4'); process.exit(0); }
+if (argv[0] === '--version' || argv[0] === '--revision') { console.log('1.4.4'); process.exit(0); }
 const [suite, ...args] = argv[0] === 'run' ? argv.slice(1) : argv;
 fs.appendFileSync(process.env.TEST_CALLS, JSON.stringify({suite,args,held:process.env.JUNO_HEAVY_HELD,skip:process.env.JUNO_SKIP_TAGS,coverage:process.env.JUNO_COVERAGE,workers:process.env.JUNO_E2E_WORKERS})+'\\n');
-if (suite === 'install') { fs.writeFileSync('installed', 'yes'); process.exit(0); }
+if (suite === 'install') { fs.writeFileSync('installed', 'yes'); if (!fs.existsSync('node_modules')) fs.symlinkSync(${JSON.stringify(resolve(import.meta.dirname, '../node_modules'))}, 'node_modules', 'dir'); process.exit(0); }
 if (!fs.existsSync('installed')) process.exit(9);
 if (suite === 'test:desktop' && process.env.JUNO_COVERAGE === '1') {
   fs.mkdirSync('apps/desktop/coverage/map', {recursive:true});
@@ -55,16 +48,17 @@ require('node:fs').appendFileSync(process.env.TEST_PROBES, 'probe\\n');
 console.error('Connection refused'); process.exit(255);
 `)
   for (const name of ['bun', 'ssh']) chmodSync(join(root, 'bin', name), 0o755)
-  git(root, 'init', '-q')
-  git(root, 'config', 'user.name', 'Test')
-  git(root, 'config', 'user.email', 'test@example.com')
-  git(root, 'add', '.')
-  git(root, 'commit', '-qm', 'Fixture')
-  const commit = git(root, 'rev-parse', 'HEAD')
+  writeFileSync(join(root, '.gitignore'), 'node_modules\nhome\ntmp\n.juno-status\n')
+  fixtureGit('init', '-q', '-b', 'main')
+  fixtureGit('config', 'user.name', 'Test')
+  fixtureGit('config', 'user.email', 'test@example.com')
+  fixtureGit('add', '.')
+  fixtureGit('commit', '-qm', 'Fixture')
+  const commit = fixtureGit('rev-parse', 'HEAD')
   // TMPDIR keeps the heavy lock inside the fixture, so other jobs on the machine cannot hold it.
-  const env = { ...process.env, TMPDIR: join(root, 'tmp'), PATH: `${join(root, 'bin')}:${process.env.PATH}`, TSTACK_HOME: join(root, 'tstack'), JUNO_RUNNER_HOST: 'runner.test', TEST_CALLS: join(root, 'calls'), TEST_PROBES: join(root, 'probes') }
+  const env = { ...fixtureEnv, JUNO_PLAN_MAX_LOAD: 'Infinity', TMPDIR: join(root, 'tmp'), PATH: `${join(root, 'bin')}:${process.env.PATH}`, TSTACK_HOME: join(root, 'tstack'), JUNO_RUNNER_HOST: 'runner.test', TEST_CALLS: join(root, 'calls'), TEST_PROBES: join(root, 'probes') }
   const invoke = (args, extra = {}) => spawnSync(process.execPath, ['scripts/verify-main.mjs', '--ref', 'HEAD', ...args], { cwd: root, env: { ...env, ...extra }, encoding: 'utf8', timeout: 60_000 })
-  return { root, commit, env, invoke }
+  return { root, commit, env, invoke, git: fixtureGit }
 }
 
 test('local runs archive eligible records, refresh coverage, and preserve failed suites; an unreachable runner runs nothing', { timeout: 120_000 }, (t) => {
@@ -138,8 +132,7 @@ test('repair selects failed and unfinished files plus every reached spec, and re
 test('runtime and platform changes invalidate recorded results; reports survive checkout removal', async (t) => {
   const { inputKey } = await import('./verify-inputs.mjs')
   const { keepReports } = await import('./verify-reports.mjs')
-  const root = mkdtempSync(join(scratchFolder(), 'verify-input-test-'))
-  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const { root } = toolFixture(t)
   const checkout = join(root, 'checkout')
   const report = 'apps/desktop/test-results/results.json'
   mkdirSync(join(checkout, 'apps/desktop/test-results'), { recursive: true })
@@ -153,25 +146,20 @@ test('runtime and platform changes invalidate recorded results; reports survive 
   assert.equal(JSON.parse(readFileSync(kept[0], 'utf8')).stats.duration, 12)
 })
 
-test('a repair installs its planner, reruns the failed suite, and retains passing suites at the fix commit', (t) => {
-  const { root, env, invoke } = verificationFixture(t)
-  writeFileSync(join(root, 'scripts/affected.mjs'), `import { existsSync } from 'node:fs';
-if (!existsSync('installed')) throw new Error('Planner dependencies were not installed');
-console.log(JSON.stringify({changed:['app.ts'],steps:[{script:'test:desktop',args:[],items:[]}]}));\n`)
-  git(root, 'add', 'scripts/affected.mjs')
-  git(root, 'commit', '-qm', 'Fixture planner')
+test('a repair installs its planner, reruns the failed suite, and retains passing suites at the fix commit', { timeout: 30_000 }, (t) => {
+  const { root, env, invoke, git: fixtureGit } = verificationFixture(t)
   const failed = invoke(['--local'], { TEST_FAIL_SUITE: 'test:desktop' })
   assert.equal(failed.status, 1, failed.stderr + failed.stdout)
   const baseline = join(root, '.juno-status/verify-main.json')
   writeFileSync(join(root, 'app.ts'), 'fixed')
-  git(root, 'add', 'app.ts')
-  git(root, 'commit', '-qm', 'Fix')
+  fixtureGit('add', 'app.ts')
+  fixtureGit('commit', '-qm', 'Fix')
   writeFileSync(env.TEST_CALLS, '')
   const repaired = invoke(['--local', '--repair', baseline])
   assert.equal(repaired.status, 0, repaired.stderr + repaired.stdout)
   const record = JSON.parse(readFileSync(baseline, 'utf8'))
-  assert.equal(record.commit, git(root, 'rev-parse', 'HEAD'))
+  assert.equal(record.commit, fixtureGit('rev-parse', 'HEAD'))
   assert.equal(record.suites.filter((suite) => suite.reusedFrom).length, 4)
-  assert.deepEqual(readFileSync(env.TEST_CALLS, 'utf8').trim().split('\n').map(JSON.parse).map((call) => call.suite), ['install', 'test:desktop'])
+  assert.deepEqual(readFileSync(env.TEST_CALLS, 'utf8').trim().split('\n').map(JSON.parse).map((call) => call.suite), ['install', 'test:desktop', 'lint'])
   assert.ok(releaseGate(root, record.commit))
 })

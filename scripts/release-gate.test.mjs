@@ -1,17 +1,16 @@
+import { toolFixture } from './tool-test-fixture.mjs'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { assessRecord, compatible, git, releaseGate } from './release-gate.mjs'
+import { assessRecord, compatible, releaseGate } from './release-gate.mjs'
 import { writeRecord } from './verify-records.mjs'
-import { scratchFolder } from './worktree-folder.mjs'
 
 const green = (commit) => ({ commit, finishedAt: '2026-10-18T10:00:00Z', passed: true, suites: ['test', 'specs:check', 'test:gallery', 'test:desktop'].map((suite) => ({ suite, code: 0 })) })
 
 test('a release can use an older green record plus docs, tests and a version bump', (t) => {
-  mkdirSync(scratchFolder(), { recursive: true })
-  const root = mkdtempSync(join(scratchFolder(), 'release-gate-test-'))
-  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const { root, git: runGit } = toolFixture(t)
+  const git = (_root, ...args) => runGit(...args)
   git(root, 'init', '-q')
   git(root, 'config', 'user.name', 'Test')
   git(root, 'config', 'user.email', 'test@example.com')
@@ -48,8 +47,8 @@ test('failed or incomplete full runs cannot pass', () => {
 })
 
 test('a repair can pass only with its recorded ancestor and complete successful outcomes', (t) => {
-  const root = mkdtempSync(join(scratchFolder(), 'release-repair-test-'))
-  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const { root, git: runGit } = toolFixture(t)
+  const git = (_root, ...args) => runGit(...args)
   git(root, 'init', '-q')
   git(root, 'config', 'user.name', 'Test')
   git(root, 'config', 'user.email', 'test@example.com')
@@ -74,8 +73,7 @@ test('a repair can pass only with its recorded ancestor and complete successful 
 test('triage updates matching archived and latest records without turning a failure green', async (t) => {
   const { classifyRecord } = await import('./verify-records.mjs')
   const { readFileSync } = await import('node:fs')
-  const root = mkdtempSync(join(scratchFolder(), 'failure-cause-test-'))
-  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const { root } = toolFixture(t)
   const record = { ...green('a'.repeat(40)), passed: false, suites: [{ suite: 'test:desktop', code: 1 }] }
   writeRecord(root, 'failed', record)
   const file = join(root, 'verify-main/commits', record.commit, 'failed.json')

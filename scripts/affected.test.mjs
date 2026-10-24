@@ -1,149 +1,115 @@
-// bun run affected's unit test selection, through its real plan (--plan --json) on this repository.
 import assert from 'node:assert/strict'
-import { unitTestMatcher } from './affected-tests.mjs'
+import { cpSync, symlinkSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { test } from 'node:test'
-import { fileURLToPath } from 'node:url'
+import { toolFixture } from './tool-test-fixture.mjs'
 
-const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const plan = (...args) => {
-  const result = spawnSync(process.execPath, ['scripts/affected.mjs', '--plan', '--json', '--no-cache', ...args], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 26 })
-  assert.equal(result.status, 0, result.stderr)
-  return JSON.parse(result.stdout)
-}
-const unitFiles = (result) => result.steps.find((step) => step.script === 'test')?.items ?? []
-const tracked = (...patterns) => spawnSync('git', ['ls-files', ...patterns], { cwd: root, encoding: 'utf8' }).stdout.split('\n').filter((file) => file && existsSync(join(root, file)))
-
-test('a change to desktop code outside the renderer reaches the desktop unit tests that import it, in the batch gate too', () => {
-  // main-rejection-nonfatal (b1c55d3c): the batch gate ran no tests for these.
-  for (const args of [[], ['--batch']]) assert.ok(unitFiles(plan(...args, '--files', 'apps/desktop/src/logging.ts')).includes('apps/desktop/test/logging.test.ts'), args.join(' '))
-  assert.ok(unitFiles(plan('--files', 'apps/desktop/src/main/processes.ts')).includes('apps/desktop/test/processes.test.ts'))
-})
-
-test('every unit test file in apps and packages runs when it changes', () => {
-  const tests = tracked('apps/**/*.test.ts', 'packages/**/*.test.ts')
-  assert.ok(tests.includes('packages/agent/eval/eval.test.ts'))
-  assert.deepEqual(unitFiles(plan('--batch', '--files', tests.join(','))).toSorted(), tests.toSorted())
-})
-
-test('a script change runs the root Bun test scripts whose tests import it, and every script test is in one', () => {
-  const steps = (file) => plan('--batch', '--files', file).steps.map((step) => step.script)
-  assert.ok(steps('scripts/check-tokens.mjs').includes('test:repo-tools'))
-  assert.ok(steps('scripts/remote/usage.mjs').includes('test:runner'))
-  assert.ok(!steps('scripts/check-tokens.mjs').includes('test:runner'))
-  const scripts = Object.values(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts).filter((command) => /\bbun test\b/.test(command)).join(' ')
-  for (const file of tracked('scripts/**/*.test.mjs', 'scripts/*.test.mjs')) assert.ok(scripts.includes(file), `${file} is in no root bun test script`)
-})
-
-test('unit execution runs every package in one bun test, and selected files alone', async () => {
-  const { existsSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs')
-  const { tmpdir } = await import('node:os')
-  const { unitCommand } = await import('./unit.mjs')
-  const file = 'packages/domain/test/notifications.test.ts'
-  const selected = plan('--batch', '--files', file).steps.find((step) => step.script === 'test')
-  assert.deepEqual(selected.items, [file])
-  assert.deepEqual(selected.args, ['--files', file])
-  const dir = mkdtempSync(join(existsSync('/Volumes/AgentWork') ? '/Volumes/AgentWork' : tmpdir(), 'juno-unit-commands-'))
-  try {
-    writeFileSync(join(dir, 'package.json'), JSON.stringify({ workspaces: ['packages/*', 'apps/*'] }))
-    const make = (pkg, test, files) => {
-      mkdirSync(join(dir, pkg, 'test'), { recursive: true })
-      writeFileSync(join(dir, pkg, 'package.json'), JSON.stringify({ scripts: { test } }))
-      for (const name of files) writeFileSync(join(dir, pkg, name), '')
-    }
-    make('packages/fast', 'bun test', ['test/one.test.ts', 'test/two.test.ts', 'test/load.perf.ts'])
-    make('apps/app', 'bun test', ['test/three.test.ts'])
-    writeFileSync(join(dir, 'apps/app/bunfig.toml'), '[test]\nroot = "test"\n')
-    make('packages/none', '', [])
-    const timings = join(dir, 'node_modules/.cache/juno/bun-test-timings.json')
-    const bun = (workers, ...paths) => ['test', `--parallel=${workers}`, `--timings=${timings}`, '--update-timings', ...paths]
-    assert.deepEqual(unitCommand([], dir, { workers: 3 }), bun(3, './apps/app/test', './packages/fast'))
-    assert.deepEqual(unitCommand(['--files', 'packages/fast/test/one.test.ts', 'apps/app/test/three.test.ts'], dir, { workers: 3 }), bun(2, './packages/fast/test/one.test.ts', './apps/app/test/three.test.ts'))
-    assert.throws(() => unitCommand(['--files', 'packages/fast/test/load.perf.ts'], dir), /Not a unit test/)
-  } finally { rmSync(dir, { recursive: true, force: true }) }
-  assert.throws(() => unitCommand(['--files'], root), /at least one/)
-  assert.throws(() => unitCommand(['--files', 'packages/domain/test/absent.test.ts'], root), /Not a unit test/)
-})
-
-test('package configs select the whole package, while lockfile changes select every unit file', () => {
-  const own = tracked('packages/domain/**/*.test.ts')
-  for (const name of ['package.json', 'tsconfig.json']) {
-    const selected = unitFiles(plan('--batch', '--files', `packages/domain/${name}`))
-    for (const file of own) assert.ok(selected.includes(file), `${name} must run ${file}`)
+function fixture(t) {
+  const f = toolFixture(t)
+  cpSync(import.meta.dirname, join(f.root, 'scripts'), { recursive: true })
+  symlinkSync(resolve(import.meta.dirname, '../node_modules'), join(f.root, 'node_modules'), 'dir')
+  f.write('.gitignore', 'node_modules\nhome\ntmp\n.juno-status\n')
+  f.write('package.json', JSON.stringify({ workspaces: ['packages/*', 'apps/*'], packageManager: 'bun@1.4.4', devDependencies: { '@informalsystems/quint': '0.33.0' }, scripts: { 'bench:engine': 'bun test test/perf/load.perf.ts', 'test:repo-tools': 'bun test scripts/check-tokens.test.mjs', 'test:runner': 'bun test scripts/remote/runner.test.mjs' } }))
+  for (const pkg of ['domain', 'engine', 'ui']) f.write(`packages/${pkg}/package.json`, JSON.stringify({ name: `@juno/${pkg}`, exports: './src/index.ts', scripts: { test: 'bun test' } }))
+  f.write('apps/desktop/package.json', '{"scripts":{"test":"bun test"}}')
+  f.write('packages/domain/src/index.ts', "export { rule } from './rule.ts'; export { other } from './other.ts'")
+  f.write('packages/domain/src/rule.ts', 'export const rule = 1')
+  f.write('packages/domain/src/other.ts', 'export const other = 2')
+  f.write('packages/domain/test/rule.test.ts', "import { rule } from '@juno/domain'")
+  f.write('packages/domain/eval/other.test.ts', "import { other } from '@juno/domain'")
+  f.write('packages/domain/test/load.perf.ts', "import { rule } from '@juno/domain'")
+  f.write('apps/desktop/src/logging.ts', "import { rule } from '@juno/domain'")
+  f.write('apps/desktop/test/logging.test.ts', "import '../src/logging.ts'")
+  f.write('packages/engine/src/send/worker.ts', "import { rule } from '@juno/domain'")
+  f.write('specs/readstate.qnt', 'module readstate {}')
+  f.write('apps/desktop/src/main/index.ts', "import '@juno/domain'; import '../../../../packages/ui/src/Chip.tsx'")
+  f.write('packages/ui/src/Chip.tsx', 'export const Chip = 1')
+  f.write('packages/ui/src/Other.tsx', 'export const Other = 2')
+  f.write('packages/ui/src/Chip.fixture.ts', "import './Chip.tsx'")
+  f.write('packages/ui/src/Other.fixture.ts', "import './Other.tsx'")
+  f.write('packages/ui/src/fixtures.ts', "import Chip from './Chip.fixture'\nimport Other from './Other.fixture'\nexport const fixtures = {\n  Chip,\n  Other,\n}")
+  f.write('apps/gallery/shift.spec.ts', '')
+  f.write('apps/desktop/e2e/app.spec.ts', '')
+  f.write('apps/desktop/e2e/changed.spec.ts', "import './helper.ts'")
+  f.write('apps/desktop/e2e/helper.ts', 'export const helper = 1')
+  f.write('apps/desktop/e2e/other.spec.ts', '')
+  f.git('init', '-q', '-b', 'main')
+  f.git('add', '.')
+  f.git('commit', '-qm', 'Fixture')
+  const plan = (files, ...args) => {
+    const result = spawnSync(process.execPath, ['scripts/affected.mjs', '--plan', '--json', '--local', '--no-cache', '--files', files.join(','), ...args], { cwd: f.root, env: f.env, encoding: 'utf8', timeout: 10_000 })
+    assert.equal(result.status, 0, result.stderr)
+    return JSON.parse(result.stdout).steps
   }
-  assert.deepEqual(unitFiles(plan('--batch', '--files', 'bun.lock')).toSorted(), tracked('apps/**/*.test.ts', 'packages/**/*.test.ts').toSorted())
+  return { ...f, plan }
+}
+const items = (steps, suite) => steps.find((step) => step.script === suite)?.items ?? []
+
+test('a changed module selects its consumers through a barrel, while configs broaden and changed tests select themselves', (t) => {
+  const { plan } = fixture(t)
+  assert.deepEqual(items(plan(['packages/domain/src/rule.ts'], '--batch'), 'test').sort(), ['apps/desktop/test/logging.test.ts', 'packages/domain/test/rule.test.ts'])
+  // b1c55d3c: main-process tests used to be absent from the batch gate.
+  assert.deepEqual(items(plan(['apps/desktop/src/logging.ts'], '--batch'), 'test'), ['apps/desktop/test/logging.test.ts'])
+  assert.deepEqual(items(plan(['packages/domain/package.json'], '--batch'), 'test').sort(), ['packages/domain/eval/other.test.ts', 'packages/domain/test/rule.test.ts'])
+  assert.equal(items(plan(['bun.lock'], '--batch'), 'test').length, 3)
+  assert.deepEqual(items(plan(['packages/domain/eval/other.test.ts'], '--batch'), 'test'), ['packages/domain/eval/other.test.ts'])
+  assert.deepEqual(items(plan(['packages/domain/test/load.perf.ts'], '--batch'), 'test'), [])
 })
 
-test('ordinary source changes select only files whose import closure reaches them', async () => {
-  const { ImportGraph } = await import('./import-graph.mjs')
-  const { unitTestMatcher } = await import('./affected-tests.mjs')
-  const files = new Set(tracked('apps', 'packages'))
-  const graph = new ImportGraph(root, files)
-  const changed = 'packages/domain/src/notifications.ts'
-  const expected = [...files].filter(unitTestMatcher(root)).filter((file) => graph.closure(file).has(changed))
-  assert.deepEqual(unitFiles(plan('--batch', '--files', changed)).toSorted(), expected.toSorted())
-  assert.ok(!expected.includes('packages/domain/test/composer-emoji.test.ts'))
+test('protocol plans follow specs and transitive outbox inputs independently of app selection', (t) => {
+  const { plan } = fixture(t)
+  const protocols = (file) => plan([file], '--batch').map((step) => step.script).filter((script) => script.startsWith('specs:'))
+  assert.deepEqual(protocols('specs/readstate.qnt'), ['specs:check'])
+  assert.deepEqual(protocols('packages/engine/src/send/worker.ts'), ['specs:conformance'])
+  assert.deepEqual(protocols('packages/domain/src/rule.ts'), ['specs:conformance'])
+  assert.deepEqual(protocols('packages/ui/src/Chip.tsx'), [])
 })
 
-test('performance-only files are outside the unit matcher', () => {
-  const matches = unitTestMatcher(root)
-  for (const file of ['packages/agent/test/activity.perf.ts', 'packages/agent/test/serve/chat-cache.perf.ts', 'packages/engine/test/perf/idle.perf.ts', 'packages/engine/test/conformance/outbox.conformance.ts']) assert.equal(matches(file), false, file)
-  assert.ok(matches('packages/agent/test/serve/chat-cache.test.ts'))
+test('zero budgets keep changed specs and components, tool smoke survives filtering, and repairs remain uncapped', (t) => {
+  const { plan } = fixture(t)
+  const changed = ['packages/ui/src/Chip.tsx', 'apps/desktop/e2e/changed.spec.ts']
+  const narrow = plan(changed, '--graph', '--budget-seconds', '0')
+  assert.deepEqual(items(narrow, 'test:desktop'), ['apps/desktop/e2e/changed.spec.ts'])
+  assert.deepEqual(items(narrow, 'test:gallery'), ['Chip'])
+  const wide = plan(changed, '--wide', '--graph', '--budget-seconds', '0')
+  assert.equal(items(wide, 'test:desktop').length, 3)
+  const root = plan(['package.json', 'apps/desktop/e2e/helper.ts'], '--budget-seconds', '0')
+  assert.deepEqual(items(root, 'test:desktop'), ['apps/desktop/e2e/changed.spec.ts'])
+  assert.deepEqual(items(plan(['scripts/remote/plan.mjs']), 'test:desktop'), ['apps/desktop/e2e/app.spec.ts'])
+  assert.deepEqual(items(plan(['scripts/remote/plan.mjs'], '--batch'), 'test:desktop'), [])
+  const deleted = plan(['packages/domain/src/deleted.ts'], '--wide', '--graph')
+  for (const suite of ['test', 'test:desktop']) assert.deepEqual(deleted.find((step) => step.script === suite).args, [])
 })
 
-test('tool changes keep the desktop smoke spec through the final input filter', () => {
-  const steps = plan('--files', 'scripts/remote/plan.mjs').steps
-  assert.deepEqual(steps.find((step) => step.script === 'test:desktop')?.items, ['apps/desktop/e2e/app.spec.ts'])
-  assert.ok(!plan('--batch', '--files', 'scripts/remote/plan.mjs').steps.some((step) => step.script === 'test:desktop'))
+test('tool plans select the command whose test imports the changed script', (t) => {
+  const { plan } = fixture(t)
+  const scripts = (file) => plan([file], '--batch').map((step) => step.script)
+  assert.ok(scripts('scripts/check-tokens.mjs').includes('test:repo-tools'))
+  assert.ok(!scripts('scripts/check-tokens.mjs').includes('test:runner'))
+  assert.ok(scripts('scripts/remote/usage.mjs').includes('test:runner'))
+  assert.ok(!scripts('scripts/affected.mjs').includes('bench:engine'))
 })
 
-test('a root config change keeps changed desktop specs and their private helpers mandatory', () => {
-  const steps = plan('--budget-seconds', '0', '--files', 'package.json,apps/desktop/e2e/mentions.spec.ts,apps/desktop/e2e/idleJourney.ts').steps
-  const desktop = steps.find((step) => step.script === 'test:desktop')?.items ?? []
-  assert.ok(desktop.includes('apps/desktop/e2e/mentions.spec.ts'))
-  assert.ok(desktop.includes('apps/desktop/e2e/idle-cpu.spec.ts'))
-  assert.ok(!desktop.some((file) => file.endsWith('.perf.spec.ts')))
-})
-
-test('protocol checks follow spec and outbox inputs, including transitive dependencies', () => {
-  const scripts = (file) => plan('--batch', '--files', file).steps.map((step) => step.script)
-  assert.ok(scripts('specs/readstate.qnt').includes('specs:check'))
-  assert.ok(!scripts('specs/readstate.qnt').includes('specs:conformance'))
-  assert.ok(scripts('packages/engine/src/send/worker.ts').includes('specs:conformance'))
-  assert.ok(!scripts('packages/engine/src/send/worker.ts').includes('specs:check'))
-  assert.ok(scripts('packages/sync/src/followFence.ts').includes('specs:conformance'))
-  assert.ok(!scripts('packages/sync/src/followFence.ts').includes('specs:check'))
-  assert.ok(!scripts('packages/views/src/Sidebar.tsx').includes('specs:check'))
-  assert.ok(!scripts('packages/views/src/Sidebar.tsx').includes('specs:conformance'))
-})
-
-test('a repair conservatively reruns app suites when a deleted source cannot be followed in the current graph', () => {
-  const result = plan('--wide', '--graph', '--files', 'packages/domain/src/deleted-rule.ts')
-  assert.ok(result.steps.some((step) => step.script === 'test' && step.args.length === 0))
-  assert.ok(result.steps.some((step) => step.script === 'test:desktop' && step.args.length === 0))
-})
-
-test('Bun packages select test and eval files, not perf files', async (t) => {
-  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs')
-  const { scratchFolder } = await import('./worktree-folder.mjs')
-  const fixture = mkdtempSync(join(scratchFolder(), 'affected-bun-'))
-  t.after(() => rmSync(fixture, { recursive: true, force: true }))
-  mkdirSync(join(fixture, 'packages/example'), { recursive: true })
-  writeFileSync(join(fixture, 'packages/example/package.json'), '{"scripts":{"test":"bun test"}}')
-  const matches = unitTestMatcher(fixture)
-  assert.ok(matches('packages/example/test/domain.test.ts'))
-  assert.ok(matches('packages/example/eval/behavior.test.ts'))
-  assert.ok(!matches('packages/example/test/domain.perf.ts'))
-})
-
-test('graph fallback and gallery components respect time budgets while changed files stay required; repairs remain uncapped', () => {
-  const files = 'packages/ui/src/Chip.tsx,apps/desktop/e2e/mentions.spec.ts'
-  const narrow = plan('--graph', '--budget-seconds', '0', '--files', files).steps
-  assert.deepEqual(narrow.find((step) => step.script === 'test:desktop').items, ['apps/desktop/e2e/mentions.spec.ts'])
-  assert.deepEqual(narrow.find((step) => step.script === 'test:gallery').items.filter((file) => !file.startsWith('apps/')), ['Chip'])
-  const wide = plan('--wide', '--graph', '--budget-seconds', '0', '--files', files).steps
-  assert.ok(wide.find((step) => step.script === 'test:desktop').items.length > 10)
-  assert.ok(wide.find((step) => step.script === 'test:gallery').items.filter((file) => !file.startsWith('apps/')).length > 10)
+test('unit execution runs selected files once, preserves failure, and rejects performance files', (t) => {
+  const { root, env, write } = toolFixture(t)
+  write('package.json', '{"workspaces":["packages/*"]}')
+  write('packages/example/package.json', '{"scripts":{"test":"bun test"}}')
+  write('packages/example/test/one.test.ts', "import {test} from 'bun:test'; test('one', () => { console.log('SELECTED ONE') })")
+  write('packages/example/test/two.test.ts', "import {test} from 'bun:test'; test('two', () => { throw new Error('UNSELECTED TWO') })")
+  write('packages/example/test/load.perf.ts', "throw new Error('PERFORMANCE RAN')")
+  const run = (...args) => spawnSync(process.execPath, [join(import.meta.dirname, 'unit.mjs'), ...args], { cwd: root, env: { ...env, JUNO_TEST_WORKERS: '1' }, encoding: 'utf8', timeout: 5000 })
+  const chosen = run('--files', 'packages/example/test/one.test.ts', 'packages/example/test/one.test.ts')
+  assert.equal(chosen.status, 0, chosen.stderr)
+  assert.equal((chosen.stdout.match(/SELECTED ONE/g) ?? []).length, 1)
+  assert.doesNotMatch(chosen.stderr, /UNSELECTED TWO/)
+  const all = run()
+  assert.equal(all.status, 1)
+  assert.match(all.stderr, /UNSELECTED TWO/)
+  assert.doesNotMatch(all.stderr, /PERFORMANCE RAN/)
+  for (const file of ['packages/example/test/load.perf.ts', '../escape.test.ts']) {
+    const refused = run('--files', file)
+    assert.equal(refused.status, 1)
+    assert.match(refused.stderr, /Not a unit test/)
+  }
 })

@@ -1,0 +1,1 @@
+- 10-24 12:36 · Tushar · Discover tool suites only from commands naming tool test files. A bare bun test in the engine benchmark is not a tool suite and must not run for an unrelated planner change.

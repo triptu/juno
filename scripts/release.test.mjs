@@ -85,8 +85,8 @@ function fixture(t) {
   const remote = join(folder, 'remote.git')
   const bin = join(folder, 'bin')
   const file = (name) => join(folder, name)
-  for (const path of [repo, bin, file('home')]) mkdirSync(path)
-  const env = { ...process.env, HOME: file('home'), PATH: `${bin}:${process.env.PATH}`, JUNO_WORKTREE_DIR: file('worktrees'), JUNO_UPDATE_TOKEN: 'fake',
+  for (const path of [repo, bin, file('home'), file('tmp')]) mkdirSync(path)
+  const env = { ...process.env, HOME: file('home'), TMPDIR: file('tmp'), TMP: file('tmp'), TEMP: file('tmp'), JUNO_RELEASE: '', PATH: `${bin}:${process.env.PATH}`, JUNO_WORKTREE_DIR: file('worktrees'), JUNO_UPDATE_TOKEN: 'fake',
     GIT_CONFIG_GLOBAL: '/dev/null', GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 'test@example.com', GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 'test@example.com' }
   const git = (...args) => execFileSync('git', args, { cwd: repo, env, encoding: 'utf8' }).trim()
   const commit = (subject, files) => {
@@ -120,7 +120,7 @@ function fixture(t) {
   const lines = (name) => existsSync(file(name)) ? readFileSync(file(name), 'utf8').split('\n').filter(Boolean) : []
   /** Runs the real command; `onOutput` sees the output so far and may answer it, as the agent does. */
   const release = (args = [], onOutput = () => {}) => new Promise((resolve) => {
-    const child = spawn(process.execPath, [script, '--repo', 'triptu/fixture', ...args], { cwd: repo, env, timeout: 25_000 })
+    const child = spawn(process.execPath, [script, '--repo', 'triptu/fixture', '--notes-timeout', '0.1', ...args], { cwd: repo, env, timeout: 25_000 })
     let output = ''
     const read = (chunk) => { output += chunk; onOutput(output) }
     child.stdout.on('data', read)

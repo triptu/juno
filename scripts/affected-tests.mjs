@@ -1,5 +1,5 @@
 // Which files are tests, for bun run affected (scripts/affected.mjs): the unit
-// test files of every package and app (bun test), and the Node tests
+// test files of every package and app (bun test), and the tool tests
 // of the repository's scripts with the root script that runs each.
 
 import { existsSync, readFileSync } from 'node:fs'
@@ -49,9 +49,9 @@ export function bunTestScripts(root, changed) {
   const scripts = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts
   return Object.entries(scripts)
     .filter(([, command]) => /\b(?:node --test|bun test)\b/.test(command))
-    .map(([script, command]) => {
+    .flatMap(([script, command]) => {
       const tests = command.split(/\s+/).filter((word) => /\.test\.[cm]?js$/.test(word))
-      return { script, reached: tests.flatMap((test) => [...scriptImports(root, test)].filter((file) => changed.includes(file)).map((file) => ({ test, file }))) }
+      return tests.length === 0 ? [] : [{ script, reached: tests.flatMap((test) => [...scriptImports(root, test)].filter((file) => changed.includes(file)).map((file) => ({ test, file }))) }]
     })
 }
 
