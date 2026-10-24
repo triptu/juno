@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Search results, revision 2</title>
+<style>
+@font-face { font-family: 'Figtree Variable'; font-weight: 300 900; font-display: block; src: url('../home/fonts/figtree-latin-wght-normal.woff2') format('woff2-variations'); }
+@font-face { font-family: 'Instrument Serif'; font-weight: 400; font-display: block; src: url('../home/fonts/instrument-serif-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-weight: 400; font-display: block; src: url('../home/fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2'); }
+
+/* Tokens: packages/tokens/src/tokens.stylex.ts and themes.stylex.ts, Coral accent. */
+.theme-light {
+  --background: hsla(48, 50%, 98%, 1); --background-subtle: hsla(48, 35%, 97%, 1);
+  --surface-default: hsla(48, 30%, 98%, 1); --surface-hover: hsla(48, 30%, 94%, 1); --surface-raised: hsla(48, 30%, 98%, 1);
+  --secondary-default: hsla(48, 30%, 92%, 1); --secondary-hover: hsla(48, 30%, 90%, 1); --secondary-active: hsla(48, 30%, 88%, 1);
+  --border-subtle: hsla(48, 30%, 92%, 1); --border-default: hsla(48, 30%, 91%, 1); --border-strong: hsla(48, 30%, 88%, 1); --input-border: hsla(48, 14%, 82%, 1);
+  --foreground-default: hsla(48, 15%, 12%, 1); --foreground-subtle: hsla(48, 8%, 35%, 1); --foreground-muted: hsla(48, 5%, 42%, 1);
+  --foreground-secondary: hsla(48, 8%, 28%, 1); --foreground-muted-on-fill: hsla(48, 8%, 35%, 1);
+  --hl: #CC4628; --hl-fg: #FFFFFF; --hl-text: #B4351F; --hl-mention: #B4351F; --hl-mention-fg: #FFFFFF;
+  --hl-soft: color-mix(in oklch, #CC4628 10%, var(--background));
+  --hl-select: color-mix(in oklch, var(--hl) 10%, var(--background));
+  --mark-today: color-mix(in oklch, var(--hl) 14%, var(--background));
+  --warning: #E0A500; --info: #008AB3;
+  --card-ring: 0 1px 2px 0 oklch(0 0 0 / .03), 0 6px 20px -4px oklch(0 0 0 / .07);
+  --pop-shadow: 0 2px 6px -1px oklch(0 0 0 / 0.05), 0 14px 36px -8px oklch(0 0 0 / 0.13);
+  --sheet: #EFEDE6; --lights: #E1DFD6;
+  /* Proposed: the search mark, fixed in every accent. */
+  --find: #FBE49A; --find-fg: var(--foreground-default); --find-current: #F7D460; --find-current-fg: var(--foreground-default);
+  --find-neutral: #DEDAD0; --find-neutral-fg: var(--foreground-default);
+  --find-line: #A87700;
+}
+.theme-dark {
+  --background: #1B1916; --background-subtle: #151411;
+  --surface-default: #252421; --surface-hover: #2D2B28; --surface-raised: #373532;
+  --secondary-default: #302F2C; --secondary-hover: #383633; --secondary-active: #403E3A;
+  --border-subtle: #2B2A27; --border-default: #32302D; --border-strong: #3C3A37; --input-border: #464541;
+  --foreground-default: #EEEBE2; --foreground-subtle: #C6C4BE; --foreground-muted: #A09E9A;
+  --foreground-secondary: #C0BEB8; --foreground-muted-on-fill: #A09E9A;
+  --hl: #FF8A73; --hl-fg: #2A0D06; --hl-text: #FF9C87; --hl-mention: #FF8A73; --hl-mention-fg: #2A0D06;
+  --hl-soft: color-mix(in oklch, #FF8A73 14%, var(--background));
+  --hl-select: color-mix(in oklch, var(--hl) 18%, var(--background));
+  --mark-today: color-mix(in oklch, var(--hl) 20%, var(--background));
+  --warning: #E0A500; --info: #008AB3;
+  --card-ring: 0 1px 2px 0 oklch(0 0 0 / .3), 0 6px 20px -4px oklch(0 0 0 / .35);
+  --pop-shadow: 0 2px 6px -1px oklch(0 0 0 / 0.3), 0 14px 36px -8px oklch(0 0 0 / 0.5);
+  --sheet: #0F0E0C; --lights: #3A3834;
+  --find: #544315; --find-fg: #F7F1DE; --find-current: #F0C74E; --find-current-fg: #1B1916;
+  --find-neutral: #4A4844; --find-neutral-fg: #F4F1E8;
+  --find-line: #E0A500;
+}
+/* Marigold, to check the yellow mark against a yellow accent. */
+.accent-marigold.theme-light { --hl: #F2A900; --hl-text: #7F5200; --hl-mention: #F2A900; --hl-mention-fg: #2B1E00; --hl-select: color-mix(in oklch, var(--hl) 19%, var(--background)); }
+.accent-marigold.theme-dark { --hl: #F5B83A; --hl-text: #F5B83A; --hl-mention: #F5B83A; --hl-mention-fg: #2B1E00; }
+.theme-light, .theme-dark {
+  --tint-public-bg: var(--secondary-default); --tint-public-fg: var(--foreground-subtle);
+  --tint-private-bg: color-mix(in oklch, var(--warning) 15%, var(--background)); --tint-private-fg: color-mix(in oklch, var(--warning) 42%, var(--foreground-default));
+  --tint-dm-bg: color-mix(in oklch, var(--info) 12%, var(--background)); --tint-dm-fg: color-mix(in oklch, var(--info) 55%, var(--foreground-default));
+  --link-underline: color-mix(in oklch, currentColor 35%, transparent);
+}
+:root {
+  --font-sans: 'Figtree Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Instrument Serif', ui-serif, Georgia, serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+* { box-sizing: border-box; cursor: default; }
+body { margin: 0; font-family: var(--font-sans); font-size: 14px; line-height: 1.5; letter-spacing: 0.01em; -webkit-font-smoothing: antialiased; background: #ddd; }
+svg { display: block; flex: none; }
+section.sheet { background: var(--sheet); color: var(--foreground-default); padding: 32px 36px 40px; width: max-content; }
+h1 { font: 400 26px/1.15 var(--font-serif); margin: 0 0 4px; }
+h2 { font: 600 13px/1.3 var(--font-sans); margin: 0 0 4px; }
+.lede { margin: 0 0 24px; color: var(--foreground-muted); font-size: 13px; max-width: 960px; }
+.cap { font-size: 12.5px; color: var(--foreground-muted); margin: 12px 2px 0; max-width: 960px; line-height: 1.5; }
+.cap b { color: var(--foreground-default); font-weight: 600; }
+.hrow { display: flex; gap: 24px; align-items: flex-start; }
+.rgrid { display: grid; grid-template-columns: repeat(2, 560px); gap: 32px 28px; }
+.colnote { font-size: 12.5px; color: var(--foreground-muted); margin: 0 0 12px; line-height: 1.45; }
+.colnote b { color: var(--foreground-default); font-weight: 600; }
+
+/* Window frame, sidebar hidden as in Tushar's screenshot. */
+.win { display: flex; flex-direction: column; border-radius: 12px; overflow: hidden; box-shadow: var(--card-ring), 0 0 0 1px var(--border-default); background: var(--background); position: relative; }
+.strip { height: 44px; flex: none; display: flex; align-items: flex-end; gap: 2px; padding: 0 10px 0 0; background: var(--background-subtle); border-bottom: 1px solid var(--border-default); }
+.lights { width: 78px; flex: none; display: flex; gap: 8px; padding-left: 16px; align-self: center; }
+.lights i { width: 12px; height: 12px; border-radius: 50%; background: var(--lights); }
+.ctl { align-self: center; display: flex; gap: 2px; margin-right: 6px; }
+.ib { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; color: var(--foreground-subtle); flex: none; }
+.ib svg { width: 16px; height: 16px; }
+.ib.off { opacity: .4; }
+.tab { flex: 0 1 230px; min-width: 120px; height: 35px; margin-bottom: -1px; padding: 0 6px 0 12px; border-radius: 8px 8px 0 0; border: 1px solid transparent; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--foreground-subtle); }
+.tab.on { background: var(--background); border-color: var(--border-default); border-bottom-color: var(--background); color: var(--foreground-default); font-weight: 500; }
+.tab svg.k { width: 14px; height: 14px; opacity: .75; }
+.tab .lab { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tab .cl { width: 20px; height: 20px; border-radius: 4px; display: grid; place-items: center; color: var(--foreground-muted); flex: none; }
+.tab .cl svg { width: 12px; height: 12px; }
+.tab.pin { flex: none; min-width: 0; width: 40px; padding: 0; justify-content: center; }
+.tab.pin svg.k { width: 16px; height: 16px; }
+.tab .tart { width: 16px; height: 16px; border-radius: 46% 54% 40% 60% / 55% 42% 58% 45%; flex: none; }
+.plus { width: 28px; height: 28px; border-radius: 8px; margin: 0 0 4px 4px; display: grid; place-items: center; color: var(--foreground-muted); flex: none; }
+.plus svg { width: 15px; height: 15px; }
+
+/* The field band. */
+.spage { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.stop { flex: none; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; border-bottom: 1px solid var(--border-default); position: relative; z-index: 4; }
+.stop.center > * { width: 100%; max-width: 784px; margin: 0 auto; }
+.sfield { min-height: 36px; border-radius: 9px; border: 1px solid var(--input-border); background: var(--surface-default); display: flex; align-items: center; gap: 6px; padding: 5px 6px 5px 10px; font-size: 13.5px; }
+.sfield > svg.mg { width: 15px; height: 15px; color: var(--foreground-muted); }
+.sfield .txt { flex: 1; min-width: 0; line-height: 22px; min-height: 24px; display: flex; flex-wrap: wrap; align-items: center; column-gap: 6px; }
+.sfield .clr { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; color: var(--foreground-muted); }
+.sfield .clr svg { width: 13px; height: 13px; }
+.sfield .in-ctl { display: flex; gap: 2px; padding-left: 6px; }
+.caret { display: inline-block; width: 1.5px; height: 16px; vertical-align: -3px; background: var(--foreground-default); margin-left: 1px; }
+.qchip { height: 24px; padding: 0 8px 0 4px; border-radius: 6px; background: var(--secondary-default); display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 500; white-space: nowrap; }
+.qchip .k { color: var(--foreground-muted-on-fill); font-weight: 400; }
+.qchip.noav { padding-left: 8px; }
+.qchip svg { width: 12px; height: 12px; color: var(--foreground-muted-on-fill); }
+.av16 { width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; line-height: 1; font-size: 7px; font-weight: 600; flex: none; }
+.frow { display: flex; align-items: center; gap: 2px; }
+.fb { height: 26px; padding: 0 5px 0 8px; border-radius: 7px; display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 500; color: var(--foreground-subtle); white-space: nowrap; }
+.fb > svg { width: 10px; height: 10px; color: var(--foreground-muted); }
+.fb .ico { width: 13px; height: 13px; color: var(--foreground-muted); }
+.fb.lead { padding-left: 7px; gap: 5px; }
+.fb.set { background: var(--secondary-default); color: var(--foreground-default); }
+.fb.sort { margin-left: 10px; }
+.fb .n { font-variant-numeric: tabular-nums; color: var(--foreground-muted-on-fill); }
+.togs { display: flex; gap: 2px; margin-left: auto; padding-left: 12px; }
+
+/* Shared message pieces. */
+.pill { height: 22px; padding: 0 7px; border-radius: 999px; display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; white-space: nowrap; flex: none; }
+.pill svg { width: 12px; height: 12px; }
+.pill.lg { height: 24px; padding: 0 8px; font-size: 12.5px; gap: 6px; }
+.pill.lg svg { width: 13px; height: 13px; }
+.pill.public { background: var(--tint-public-bg); color: var(--tint-public-fg); }
+.pill.private { background: var(--tint-private-bg); color: var(--tint-private-fg); }
+.pill.dm { background: var(--tint-dm-bg); color: var(--tint-dm-fg); }
+.av { width: 28px; height: 28px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 11px; font-weight: 600; }
+.av.s20 { width: 20px; height: 20px; font-size: 8.5px; }
+.av.s32 { width: 32px; height: 32px; font-size: 12px; }
+.av.app { border-radius: 7px; }
+.av.app.s20 { border-radius: 5px; }
+.a { background: color-mix(in oklch, #E89EB8 24%, var(--surface-default)); color: color-mix(in oklch, #E89EB8 62%, var(--foreground-default)); }
+.b { background: color-mix(in oklch, #008AB3 24%, var(--surface-default)); color: color-mix(in oklch, #008AB3 62%, var(--foreground-default)); }
+.c { background: color-mix(in oklch, #9BC27A 24%, var(--surface-default)); color: color-mix(in oklch, #9BC27A 62%, var(--foreground-default)); }
+.d { background: color-mix(in oklch, #E0A35F 24%, var(--surface-default)); color: color-mix(in oklch, #E0A35F 62%, var(--foreground-default)); }
+.e { background: color-mix(in oklch, #B9A3D6 24%, var(--surface-default)); color: color-mix(in oklch, #B9A3D6 62%, var(--foreground-default)); }
+.f { background: color-mix(in oklch, #7FB6A4 24%, var(--surface-default)); color: color-mix(in oklch, #7FB6A4 62%, var(--foreground-default)); }
+.g { background: color-mix(in oklch, #6E8BD9 30%, var(--surface-default)); color: color-mix(in oklch, #6E8BD9 70%, var(--foreground-default)); }
+.apptag { height: 16px; padding: 0 5px; border-radius: 4px; background: var(--secondary-default); color: var(--foreground-muted-on-fill); font-size: 10.5px; font-weight: 600; display: inline-grid; place-items: center; letter-spacing: .02em; flex: none; align-self: center; }
+.men { border-radius: 5px; padding: 0 3px; font-weight: 600; background: color-mix(in oklch, #6E8BD9 16%, var(--surface-default)); color: color-mix(in oklch, #6E8BD9 40%, var(--foreground-default)); }
+.men.you { background: var(--hl-mention); color: var(--hl-mention-fg); }
+a { color: var(--hl-text); text-decoration: underline; text-decoration-color: var(--link-underline); text-underline-offset: .12em; }
+code { font-family: var(--font-mono); font-size: 12.5px; font-variant-ligatures: none; padding: 0 4px; border-radius: 4px; background: var(--secondary-default); }
+pre { margin: 6px 0 0; font: 12.5px/1.6 var(--font-mono); font-variant-ligatures: none; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border-default); background: var(--background); white-space: pre; overflow: hidden; }
+.mt p { margin: 0; }
+.mt p + p { margin-top: 6px; }
+
+/* Marks. One class on a container picks the treatment. */
+mark { color: inherit; background: none; }
+.mk-today mark { background: var(--mark-today); border-radius: 3px; padding: 0 2px; margin: 0 -1px; }
+.mk-find mark { background: var(--find); color: var(--find-fg); border-radius: 3px; padding: 0 2px; margin: 0 -1px; }
+.mk-find mark.cur { background: var(--find-current); color: var(--find-current-fg); }
+.mk-neutral mark { background: var(--find-neutral); color: var(--find-neutral-fg); font-weight: 600; border-radius: 3px; padding: 0 2px; margin: 0 -1px; }
+.mk-neutral mark.cur { box-shadow: inset 0 -2px 0 var(--foreground-default); }
+.mk-line mark { color: var(--foreground-default); font-weight: 650; text-decoration: underline 2px var(--find-line); text-underline-offset: 3px; }
+.mk-line mark.cur { text-decoration-thickness: 3px; }
+
+/* The recommended result: a place line, then the message as the topic shows it. */
+.rlist { flex: 1; min-height: 0; overflow: hidden; padding: 8px 12px 12px; }
+.rlist.center > .inner { max-width: 784px; margin: 0 auto; }
+.grp + .grp { margin-top: 14px; }
+.where { height: 28px; display: flex; align-items: center; gap: 8px; padding: 0 10px; min-width: 0; }
+.where .ttl { font-size: 13px; font-weight: 500; color: var(--foreground-subtle); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.where .arch { font-size: 12px; color: var(--foreground-muted); white-space: nowrap; }
+.msg { display: flex; gap: 10px; padding: 8px 10px 10px; border-radius: 10px; }
+.msg + .msg { margin-top: 2px; }
+.msg.sel { background: var(--hl-select); }
+.msg .av { margin-top: 1px; }
+.mb { flex: 1; min-width: 0; }
+.mh { display: flex; gap: 6px; align-items: baseline; height: 20px; }
+.mh b { font-size: 14px; font-weight: 600; white-space: nowrap; }
+.mh .tm { font-size: 12.5px; color: var(--foreground-muted); font-variant-numeric: tabular-nums; white-space: nowrap; margin-left: 2px; }
+.msg.sel .mh .tm, .msg.sel .thr .lr { color: var(--foreground-muted-on-fill); }
+.mt { font-size: 14px; line-height: 1.55; margin-top: 2px; overflow-wrap: anywhere; }
+.skip { height: 18px; display: flex; align-items: center; color: var(--foreground-muted); font-size: 13px; letter-spacing: .2em; }
+.showmore { display: inline-flex; align-items: center; height: 22px; margin-top: 4px; font-size: 12.5px; font-weight: 600; color: var(--foreground-subtle); }
+.foot { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
+.rx { height: 22px; padding: 0 7px; border-radius: 999px; background: var(--secondary-default); display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; color: var(--foreground-subtle); font-variant-numeric: tabular-nums; }
+.msg.sel .rx { background: color-mix(in oklch, var(--foreground-default) 7%, transparent); }
+.thr { display: flex; align-items: center; gap: 6px; height: 24px; margin-top: 6px; font-size: 13px; }
+.stack { display: flex; padding-left: 4px; }
+.stack .av { width: 20px; height: 20px; font-size: 7px; letter-spacing: 0; margin-left: -3px; box-shadow: 0 0 0 2px var(--background); }
+.msg.sel .stack .av { box-shadow: 0 0 0 2px var(--hl-select); }
+.thr .rc { font-weight: 600; color: var(--foreground-subtle); }
+.thr .lr { color: var(--foreground-muted); }
+.fchip { height: 36px; display: inline-flex; align-items: center; gap: 8px; padding: 0 12px 0 8px; border-radius: 8px; border: 1px solid var(--border-strong); margin-top: 8px; max-width: 100%; }
+.fchip .fi { width: 22px; height: 22px; border-radius: 5px; display: grid; place-items: center; background: color-mix(in oklch, #B9A3D6 26%, var(--surface-default)); color: color-mix(in oklch, #B9A3D6 62%, var(--foreground-default)); }
+.fchip .fi svg { width: 13px; height: 13px; }
+.fchip .fn { font-size: 13px; font-weight: 500; white-space: nowrap; }
+.fchip .fm { font-size: 12px; color: var(--foreground-muted); white-space: nowrap; }
+.older { height: 32px; display: flex; align-items: center; gap: 10px; padding: 0 10px; margin: 10px 0 2px; font-size: 12px; font-weight: 500; color: var(--foreground-muted); white-space: nowrap; }
+.older::after { content: ''; flex: 1; height: 1px; background: var(--border-subtle); }
+
+/* Variant 1: a longer snippet. */
+.v1 { padding: 8px 10px 10px; border-radius: 10px; }
+.v1 + .v1 { margin-top: 4px; }
+.v1.sel { background: var(--hl-select); }
+.v1 .l1 { display: flex; align-items: center; gap: 8px; height: 22px; }
+.v1 .l1 b { font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+.v1 .l1 .tm { margin-left: auto; font-size: 12px; color: var(--foreground-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.v1.sel .l1 .tm { color: var(--foreground-muted-on-fill); }
+.v1 .ex { margin: 4px 0 0 28px; font-size: 13.5px; line-height: 1.5; color: var(--foreground-secondary); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* Variant 3: cards, as Slack draws them. */
+.v3 { border-radius: 12px; border: 1px solid var(--border-strong); background: var(--surface-default); padding: 12px 14px 14px; display: flex; gap: 10px; }
+.v3 + .v3 { margin-top: 8px; }
+.v3.sel { background: var(--hl-select); border-color: transparent; }
+.v3 .mh { height: 22px; align-items: center; }
+.v3 .mh .chn { display: inline-flex; align-items: center; gap: 3px; font-size: 12.5px; color: var(--foreground-muted); white-space: nowrap; }
+.v3 .mh .chn svg { width: 12px; height: 12px; }
+.v3 .mh .tm { margin-left: auto; }
+.v3 .mt { margin-top: 4px; }
+
+/* Variant 4: the message between its neighbours. */
+.nb { display: flex; gap: 8px; padding: 0 10px 0 48px; height: 24px; align-items: center; font-size: 13px; color: var(--foreground-muted); }
+.nb b { font-weight: 500; color: var(--foreground-subtle); white-space: nowrap; }
+.nb span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+
+/* A crop of a results column for the comparison sheets. */
+.crop { width: 560px; height: 980px; overflow: hidden; border-radius: 12px; background: var(--background); box-shadow: var(--card-ring), 0 0 0 1px var(--border-default); padding: 8px 12px; position: relative; }
+.crop::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 40px; background: linear-gradient(transparent, var(--background)); }
+.crop.v3c { background: var(--background); }
+
+/* The reader, as the topic view. */
+.split { flex: 1; min-height: 0; display: flex; }
+.lcol { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.reader { flex: none; display: flex; flex-direction: column; background: var(--background); position: relative; border-left: 1px solid var(--border-default); }
+.band { position: absolute; top: 0; left: 0; right: 0; height: 68px; background: linear-gradient(var(--background) 0, var(--background) 44px, transparent 68px); z-index: 2; }
+.islands { position: absolute; top: 8px; left: 0; right: 0; padding: 0 16px; display: flex; gap: 8px; z-index: 3; }
+.islands .gap { flex: 1; }
+.island { height: 36px; border-radius: 999px; background: var(--surface-default); box-shadow: var(--card-ring); padding: 3px; display: flex; align-items: center; gap: 2px; flex: none; }
+.island.l { padding-left: 5px; flex: 0 1 auto; min-width: 0; }
+.island .ti { height: 28px; padding: 0 8px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; min-width: 0; }
+.island .ti span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.island .ti svg { width: 12px; height: 12px; color: var(--foreground-muted); }
+.island .rb { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: var(--foreground-subtle); flex: none; }
+.island .rb svg { width: 16px; height: 16px; }
+.island .n { font-size: 12.5px; font-weight: 500; color: var(--foreground-subtle); font-variant-numeric: tabular-nums; padding: 0 4px 0 9px; white-space: nowrap; }
+.island .pill { max-width: 150px; }
+.tlist { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
+.tcol { width: 100%; padding: 68px 16px 12px; }
+.m { display: flex; gap: 12px; padding: 4px 8px; border-radius: 14px; }
+.m + .m { margin-top: 12px; }
+.m.flash { background: color-mix(in oklch, var(--hl) 6%, var(--background)); }
+.m .av { width: 32px; height: 32px; font-size: 12px; margin-top: 2px; }
+.m .mh b { font-size: 14.5px; }
+.m .mt { font-size: 14.5px; line-height: 1.6; }
+.comp { flex: none; padding: 8px 16px 16px; }
+.box { background: var(--surface-default); border: 1px solid var(--input-border); border-radius: 20px; display: flex; align-items: flex-end; gap: 4px; }
+.box .att { width: 28px; height: 28px; border-radius: 50%; margin: 6px 0 6px 6px; display: grid; place-items: center; color: var(--foreground-subtle); }
+.box .att svg { width: 18px; height: 18px; }
+.box .ta { flex: 1; padding: 9px 4px; font-size: 14px; line-height: 22px; min-height: 40px; color: var(--foreground-muted); }
+.box .snd { width: 28px; height: 28px; border-radius: 50%; margin: 6px 6px 6px 0; background: var(--hl); color: var(--hl-fg); display: grid; place-items: center; opacity: .4; }
+.box .snd svg { width: 16px; height: 16px; }
+
+/* Context in place (layout C). */
+.ctx { margin: 2px 0 4px 38px; padding: 6px 0 4px 12px; border-left: 2px solid var(--border-strong); }
+.ctx .cm { display: flex; gap: 8px; padding: 3px 0; font-size: 13.5px; line-height: 1.5; color: var(--foreground-secondary); }
+.ctx .cm .av { width: 20px; height: 20px; font-size: 8.5px; margin-top: 1px; }
+.ctx .cm b { font-weight: 600; color: var(--foreground-default); margin-right: 6px; }
+.ctx .cm .tm { font-size: 12px; color: var(--foreground-muted); margin-left: 6px; font-variant-numeric: tabular-nums; }
+.ctx .open { margin-top: 6px; display: flex; gap: 6px; }
+.btn { height: 26px; padding: 0 10px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; white-space: nowrap; background: var(--secondary-default); color: var(--foreground-default); }
+.btn.plain { background: transparent; color: var(--foreground-subtle); padding: 0 8px; }
+.kbd { font: 400 10.5px/1 var(--font-sans); padding: 2px 5px 1px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 4px; color: var(--foreground-subtle); white-space: nowrap; }
+
+/* Menu. */
+.menu { position: absolute; border-radius: 13px; background: var(--surface-raised); box-shadow: var(--pop-shadow), 0 0 0 1px var(--border-default); padding: 6px; z-index: 6; width: 268px; }
+.menu .h { font-size: 11px; font-weight: 500; color: var(--foreground-muted); padding: 6px 10px 4px; }
+.menu .o { height: 30px; border-radius: 7px; padding: 0 10px; display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.menu .o .chk { width: 14px; height: 14px; color: var(--foreground-default); }
+.menu .o .chk.no { visibility: hidden; }
+.menu .o .s { margin-left: auto; font-size: 12px; color: var(--foreground-muted); font-variant-numeric: tabular-nums; }
+.menu .o.act { background: var(--surface-hover); }
+.menu .o .sub { margin-left: auto; width: 12px; height: 12px; color: var(--foreground-muted); }
+.menu .sep { height: 1px; background: var(--border-default); margin: 5px 4px; }
+
+/* Tables. */
+table.t { border-collapse: collapse; font-size: 12.5px; line-height: 1.45; width: 1500px; background: var(--background); border-radius: 12px; overflow: hidden; box-shadow: var(--card-ring), 0 0 0 1px var(--border-default); }
+table.t th { text-align: left; font-weight: 600; font-size: 12px; color: var(--foreground-subtle); padding: 10px 14px; background: var(--background-subtle); border-bottom: 1px solid var(--border-default); }
+table.t td { padding: 9px 14px; vertical-align: top; border-bottom: 1px solid var(--border-subtle); color: var(--foreground-secondary); }
+table.t td:first-child { font-weight: 600; color: var(--foreground-default); white-space: nowrap; }
+table.t tr:last-child td { border-bottom: 0; }
+table.t code { font-size: 11.5px; }
+.tag { display: inline-block; height: 20px; line-height: 20px; padding: 0 7px; border-radius: 5px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+.tag.yes { background: color-mix(in oklch, #3F8454 16%, var(--background)); color: color-mix(in oklch, #3F8454 60%, var(--foreground-default)); }
+.tag.no { background: var(--secondary-default); color: var(--foreground-muted-on-fill); }
+.tag.unk { background: var(--tint-private-bg); color: var(--tint-private-fg); }
+
+/* The mark comparison. */
+.mgrid { display: grid; grid-template-columns: 200px repeat(2, 640px); gap: 0; border-radius: 12px; overflow: hidden; box-shadow: var(--card-ring), 0 0 0 1px var(--border-default); }
+.mgrid > div { padding: 16px 18px; }
+.mgrid .lab { background: var(--background-subtle); color: var(--foreground-default); font-size: 13px; font-weight: 600; border-bottom: 1px solid var(--border-default); }
+.mgrid .lab p { margin: 4px 0 0; font-size: 12px; font-weight: 400; color: var(--foreground-muted); line-height: 1.45; }
+.mgrid .cell { background: var(--background); color: var(--foreground-default); border-bottom: 1px solid var(--border-default); border-left: 1px solid var(--border-default); }
+.mgrid .hd { background: var(--background-subtle); color: var(--foreground-subtle); font-size: 12px; font-weight: 600; padding: 10px 18px; border-bottom: 1px solid var(--border-default); }
+.mgrid .cell .msg { padding: 6px 8px 8px; }
+.ratios { margin-top: 8px; font-size: 11.5px; color: var(--foreground-muted); font-variant-numeric: tabular-nums; padding-left: 8px; }
+.ratios b { color: var(--foreground-default); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-hash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-cup" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></symbol>
+    <symbol id="i-cdown" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 5-7 7 7 7"/></symbol>
+    <symbol id="i-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="i-side" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
+    <symbol id="i-house" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1Z"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3c.6 4.6 2.4 6.4 7 7-4.6.6-6.4 2.4-7 7-.6-4.6-2.4-6.4-7-7 4.6-.6 6.4-2.4 7-7Z" fill="currentColor" fill-opacity=".2"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+    <symbol id="i-circ" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/></symbol>
+    <symbol id="i-dots" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></symbol>
+    <symbol id="i-newtab" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-8 8"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/></symbol>
+    <symbol id="i-funnel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v6l-4-2v-4Z"/></symbol>
+    <symbol id="i-eyeoff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.6 5.1A9.9 9.9 0 0 1 12 5c6 0 9.5 7 9.5 7a17 17 0 0 1-2.6 3.4M6.2 6.2A17 17 0 0 0 2.5 12s3.5 7 9.5 7a9.7 9.7 0 0 0 5.8-1.9"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/></symbol>
+    <symbol id="i-inbox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13h5l1.5 3h5L16 13h5"/><path d="M5.5 5h13L21 13v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5Z"/></symbol>
+    <symbol id="i-chats" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 9h2a2 2 0 0 1 2 2v9l-3-3h-7a2 2 0 0 1-2-2v-1"/><path d="M15 3H5a2 2 0 0 0-2 2v9l3-3h9a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  </defs>
+</svg>
+
+<!-- ============ 1. What a result can show ============ -->
+<section class="sheet theme-light" data-key="v2-fields-light">
+  <h1>What each result can show</h1>
+  <p class="lede">From the live probes in <code>docs/research/slack-data-access.md</code> (10-13, 10-15 section 5, 10-24) and the recorded shapes. Juno asks with <code>extra_message_data=1</code>, <code>highlight=1</code>, <code>extracts=1</code> and <code>no_user_profile=1</code> (<code>packages/engine/src/searchCompiler.ts</code>). A Slack match is stored with <code>partial = 1</code> until history or replies fill it in.</p>
+  <table class="t">
+    <tr><th style="width:190px">Item</th><th style="width:420px">In Slack's search answer</th><th style="width:330px">In Juno's store</th><th style="width:90px">Shown</th><th>Why, and how</th></tr>
+    <tr><td>Sender</td><td><code>user</code> id and <code>username</code>. No profile: Juno sends <code>no_user_profile=1</code></td><td>Name and photo from users; unknown ids through edge <code>users/info</code>, as the topic does</td><td><span class="tag yes">Yes</span></td><td>Photo (28) and name in 600. The first thing you scan for.</td></tr>
+    <tr><td>App or bot</td><td><code>subtype</code>, <code>bot_id</code>, <code>bot_profile</code>, <code>icons</code> (with extra data)</td><td><code>bot_name</code>, <code>bot_icon</code></td><td><span class="tag yes">Yes</span></td><td>Its name and icon, and a quiet "App" tag, so an alert never reads as a person.</td></tr>
+    <tr><td>Place</td><td><code>channel</code>: <code>name</code>, <code>is_private</code>, <code>is_im</code>, <code>is_mpim</code>, <code>user</code> on DMs, <code>is_shared</code>, <code>is_ext_shared</code>, <code>is_archived</code></td><td>Conversations, with group DM members</td><td><span class="tag yes">Yes</span></td><td>The place pill with its tint: public, private, DM. Archived adds a quiet "Archived". Shared and external: dropped.</td></tr>
+    <tr><td>Topic title</td><td>Not in search</td><td>Juno's title for the thread, when the topic is held</td><td><span class="tag yes">Yes</span></td><td>Beside the pill, for thread matches. A thread Juno does not hold yet shows the pill alone; its title fills in on the same line once the thread is read.</td></tr>
+    <tr><td>Date and time</td><td><code>ts</code></td><td><code>ts</code></td><td><span class="tag yes">Yes</span></td><td>Always both: "Oct 22, 20:41", "Yesterday 19:42", "10:41" today; in the profile's time zone.</td></tr>
+    <tr><td>The message</td><td><code>text</code>, <code>blocks</code> (rich text), <code>attachments</code></td><td><code>text</code>, <code>blocks_json</code>, <code>attachments_json</code></td><td><span class="tag yes">Yes</span></td><td>Rendered as the topic renders it: bold, lists, quotes, code, mentions, links. Over about 8 lines it folds, keeping the match in view, with "Show more".</td></tr>
+    <tr><td>Matched words</td><td>Highlight markers in <code>extracts</code> and <code>blocks_extracts</code>; the marker contract is unverified</td><td>Juno marks the query's words itself (local rows, and over Slack's text)</td><td><span class="tag yes">Yes</span></td><td>Juno marks from the query in both, so one rule draws every mark.</td></tr>
+    <tr><td>Thread position</td><td><code>thread_ts</code> on every thread match; roots carry <code>reply_count</code> and <code>latest_reply</code></td><td>The same, plus <code>reply_users_json</code></td><td><span class="tag yes">Yes</span></td><td>A root shows "6 replies · last reply 2h ago". A reply shows its topic title on the place line.</td></tr>
+    <tr><td>Who replied</td><td><span class="tag unk">Unknown</span> <code>reply_users</code> was never seen in a search match (key censuses of 10-13, 10-15)</td><td><code>reply_users_json</code> for threads Juno holds</td><td><span class="tag yes">Yes</span></td><td>Up to 3 faces before the reply count, only when known. Never a blank gap while unknown.</td></tr>
+    <tr><td>Files</td><td><code>files</code> with name, type, size and thumbnails (seen on 2 of 20)</td><td><code>files_json</code></td><td><span class="tag yes">Yes</span></td><td>One compact chip each: icon or 22px thumbnail, name, kind and size. Pictures are not shown full size in the list.</td></tr>
+    <tr><td>Reactions</td><td><code>reactions</code> (seen on 1 of 20)</td><td>Reactions</td><td><span class="tag yes">Yes</span></td><td>Small read-only pills. A ✅ on a bug report says it is done. No "add reaction" button here.</td></tr>
+    <tr><td>Link previews</td><td><code>attachments</code> (unfurls)</td><td><code>attachments_json</code></td><td><span class="tag no">Folded</span></td><td>The link stays in the text; the preview card is dropped from the list. It shows in the reader.</td></tr>
+    <tr><td>Edited</td><td>Not seen in search</td><td><code>edited_ts</code></td><td><span class="tag no">No</span></td><td>Does not help you find a message.</td></tr>
+    <tr><td>Pinned</td><td>Not in search: 0 of 5 <code>has:pin</code> matches carried <code>pinned_to</code></td><td>No Slack pin cache</td><td><span class="tag no">No</span></td><td>Cannot be shown truthfully.</td></tr>
+    <tr><td>Messages around it</td><td>Not in search</td><td>Only for conversations Juno holds; otherwise one history or replies call per result</td><td><span class="tag no">Reader</span></td><td>Too costly and too uneven for the list. The reader, or Space in layout C, shows them.</td></tr>
+    <tr><td>Match count</td><td><code>pagination.total_count</code></td><td>Local count</td><td><span class="tag no">No</span></td><td>Automated is filtered in Juno after Slack answers, so Slack's total overcounts. A wrong number is worse than none.</td></tr>
+    <tr><td>People and places counts</td><td><code>filter_suggestions.from[]</code>, <code>.in[]</code> with <code>facet_count</code></td><td></td><td><span class="tag yes">Menus</span></td><td>"Maya Chen 34" in the Filter menu's From and In lists, as today.</td></tr>
+    <tr><td>Permalink, score</td><td><code>permalink</code>, <code>score</code></td><td></td><td><span class="tag no">No</span></td><td>Copy link lives in the message menu; score waits for Best match (v2).</td></tr>
+  </table>
+  <p class="cap"><b>Unknown, worth one read-only probe:</b> whether dropping <code>no_user_profile</code> returns <code>user_profile</code> (names and photos for people Juno has not met yet), and whether a root's match ever carries <code>reply_users</code>. Neither blocks the design: both have a fallback above.</p>
+</section>
+
+<!-- ============ 2. The mark ============ -->
+<section class="sheet theme-light" data-key="v2-marks">
+  <h1>The search mark</h1>
+  <p class="lede">Today the mark is a tint of the accent, the colour that also draws the @you chip and every link, so a match inside a mention or next to a link does not stand out. Each option below is the same in every accent. The message holds a mention of you, a mention of someone else, a link with the word in it, and inline code. The last word ("Kestrel's") is the reader's current match.</p>
+  <div class="mgrid" id="markgrid"></div>
+  <p class="cap"><b>Measured</b> (WCAG 2, sRGB; page light #FCFBF7, dark #1B1916; script in <code>/Volumes/AgentWork/scratch/search-marks/c.mjs</code>). Body text on the page is 15.55:1 light and 14.71:1 dark. A link inside a mark takes the mark's text colour and keeps its underline, since coral on yellow falls to 4.8:1.</p>
+  <p class="cap"><b>Recommended: Find yellow.</b> It is the colour every Mac app (Safari, Mail, Xcode, Preview) uses for "here is what you searched for", and Slack uses it too, so it needs no learning. It has no hue in common with coral, teal, cyan, claret, emerald, midnight or ink, and does not look like inline code. The current match in the reader is a brighter yellow, and in dark it turns to dark text on bright yellow, as macOS does. One mark everywhere: results, the reader and Find in topic. With the Marigold accent the @you chip is yellow too, but it is a solid pill with bold text, while the mark is a pale wash on plain text (bottom row).</p>
+</section>
+
+<!-- ============ 3. Row variations ============ -->
+<section class="sheet theme-dark" data-key="v2-rows-dark">
+  <h1>Four ways to draw a result</h1>
+  <p class="lede">The same eight matches for "kestrel", newest first, in a 560 px column cropped at 980 px. The third match is selected. All use the Find yellow mark.</p>
+  <div class="rgrid" id="rows-dark"></div>
+  <p class="cap"><b>1, snippet.</b> Today's row made taller: sender, place and time on one line, three lines of text from just before the match. The most results per screen, but a long message is still cut, the thread's title is gone, and bot reports look like people's notes. <b>2, message (recommended).</b> A quiet place line (the pill and, for threads, Juno's title), then the message exactly as the topic draws it: photo, name, time, the whole text, files, reactions and the reply line. A long message folds with the match kept in view. Matches from one topic in a row share one place line. <b>3, card.</b> Slack's look: a bordered card per message with the channel in the header. Clear edges, but the borders repeat down the whole page, and the channel turns into small grey text. <b>4, with neighbours.</b> The message with one line before and after. Good context when Juno holds the conversation, but for the rest it costs one history call per result, and the faint lines compete with the match.</p>
+</section>
+<section class="sheet theme-light" data-key="v2-rows-light">
+  <h1>Four ways to draw a result</h1>
+  <p class="lede">Light theme. Same content.</p>
+  <div class="rgrid" id="rows-light"></div>
+</section>
+
+<!-- ============ 4. Filter row ============ -->
+<section class="sheet theme-light" data-key="v2-filters-light">
+  <h1>A quieter filter row</h1>
+  <p class="lede">Filters already live in the field as chips, so the four menus beside it repeat them. Three proposals, from today's row to none at all.</p>
+  <div id="filters" style="display:flex; flex-direction:column; gap:28px"></div>
+  <p class="cap"><b>Recommended: B.</b> Three controls instead of seven. Filter opens one menu (From, In, Date, Has, each with Slack's counts); a picked filter becomes a chip in the field, where you can see and remove it. "Hidden: apps, automated" says what is hidden in plain words and opens a two-item menu; when both are shown it reads "Show all" and goes quiet. The sort keeps its place. C moves the controls into the field: the cleanest, but the field gets crowded once chips and a long query are in it, and the hidden state is easy to miss.</p>
+</section>
+
+<!-- ============ 5. Layouts ============ -->
+<section class="sheet theme-dark" data-key="v2-a-closed-dark">
+  <h1>A. Results first, the topic opens beside them</h1>
+  <p class="lede">The list takes the tab. Nothing opens until you ask: Space, a click or → opens the topic as a panel on the right; Esc closes it; while it is open, ↑ ↓ move and it follows. Enter opens the topic in this tab.</p>
+  <div id="a-closed-dark"></div>
+</section>
+<section class="sheet theme-dark" data-key="v2-a-open-dark">
+  <h1>A. With the panel open</h1>
+  <p class="lede">Space on the third result. The list keeps its rows and the panel shows the thread at the match.</p>
+  <div id="a-open-dark"></div>
+</section>
+<section class="sheet theme-light" data-key="v2-a-closed-light">
+  <h1>A. Results first</h1>
+  <p class="lede">Light theme.</p>
+  <div id="a-closed-light"></div>
+</section>
+<section class="sheet theme-light" data-key="v2-a-open-light">
+  <h1>A. With the panel open</h1>
+  <p class="lede">Light theme.</p>
+  <div id="a-open-light"></div>
+</section>
+<section class="sheet theme-dark" data-key="v2-b-dark">
+  <h1>B. A fixed split, the results larger</h1>
+  <p class="lede">Today's two panes with the shares turned round: results 60 %, the reader 40 %, resizable. The first result shows in the reader once Slack answers, as now.</p>
+  <div id="b-dark"></div>
+</section>
+<section class="sheet theme-light" data-key="v2-b-light">
+  <h1>B. A fixed split</h1>
+  <p class="lede">Light theme.</p>
+  <div id="b-light"></div>
+</section>
+<section class="sheet theme-dark" data-key="v2-c-dark">
+  <h1>C. Context in place, no reader</h1>
+  <p class="lede">Space opens the selected result in the list: the messages before and after it, from Juno's store or one replies call. Enter opens the topic; Space or Esc folds it.</p>
+  <div id="c-dark"></div>
+</section>
+<section class="sheet theme-light" data-key="v2-c-light">
+  <h1>C. Context in place</h1>
+  <p class="lede">Light theme.</p>
+  <div id="c-light"></div>
+</section>
+
+<script>
+const S = (id, cls = '') => `<svg class="${cls}"><use href="#i-${id}"/></svg>`
+
+// People. Invented.
+const P = {
+  maya: { n: 'Maya Chen', i: 'MC', c: 'a' }, dev: { n: 'Dev Patel', i: 'DP', c: 'b' }, priya: { n: 'Priya Rao', i: 'PR', c: 'c' },
+  leo: { n: 'Leo Prokopenko', i: 'LP', c: 'd' }, sam: { n: 'Sam Okafor', i: 'SO', c: 'e' }, elena: { n: 'Elena Ruiz', i: 'ER', c: 'f' },
+  intake: { n: 'Intake', i: 'In', c: 'g', app: true },
+}
+const PL = {
+  kestrel: { k: 'private', icon: 'lock', n: 'proj-kestrel' }, feedback: { k: 'public', icon: 'hash', n: 'in-app-feedback' },
+  dmdev: { k: 'dm', icon: 'user', n: 'Dev Patel' }, bugs: { k: 'public', icon: 'hash', n: 'bugs' },
+  founders: { k: 'private', icon: 'lock', n: 'founders' }, backend: { k: 'public', icon: 'hash', n: 'backend' },
+  gdm: { k: 'dm', icon: 'users', n: 'Maya, Leo' },
+}
+const M = (w) => `<mark>${w}</mark>`
+
+// Eight matches for "kestrel", newest first.
+const R = [
+  { id: 1, pl: 'kestrel', topic: 'Kestrel got slower this week', who: 'priya', time: '10:41', rel: '10:41',
+    body: `<p>Could you check how many of the people who signed up last week have opened ${M('Kestrel')} since? I'd like to compare it with the month before, and see whether the slower sync is putting new people off.</p>`,
+    ex: `Could you check how many of the people who signed up last week have opened ${M('Kestrel')} since? I'd like to compare it with the month before, and see whether the slower sync is putting new people off.`,
+    before: ['dev', 'The p95 sync time went from 1.8 s to 4.2 s on Tuesday.'], after: ['maya', 'I\'ll pull the numbers after standup.'] },
+  { id: 2, pl: 'kestrel', topic: 'Kestrel got slower this week', who: 'maya', time: '11:02', rel: '11:02',
+    body: `<p>Of the 640 people who signed up Oct 12–18, 47 opened ${M('Kestrel')} and 15 sent a message. The week before it was 61 of 590.</p>`,
+    ex: `Of the 640 people who signed up Oct 12–18, 47 opened ${M('Kestrel')} and 15 sent a message. The week before it was 61 of 590.`,
+    before: ['maya', 'I\'ll pull the numbers after standup.'], after: ['priya', 'So about a third fewer. Thanks, that helps.'] },
+  { id: 3, pl: 'feedback', topic: 'Kestrel stops syncing after sleep', who: 'intake', time: 'Yesterday 19:42', rel: 'Yesterday',
+    body: `<p><b>Bug: ${M('Kestrel')} stops syncing after the laptop wakes from sleep</b></p><p><b>What happened:</b> I closed the lid with a sync running and opened it an hour later. The status said "Up to date", but nothing new came in until I quit and reopened the app.</p><p><b>What I expected:</b> the sync to pick up where it left off, or at least say that it had stopped.</p>`,
+    showmore: true, reacts: [['✅', 1], ['👀', 2]], thread: { n: 6, last: '2h ago', faces: ['dev', 'priya', 'maya'] },
+    ex: `Bug: ${M('Kestrel')} stops syncing after the laptop wakes from sleep. What happened: I closed the lid with a sync running and opened it an hour later. The status said "Up to date", but nothing new came in until I quit and reopened the app.` },
+  { id: 4, pl: 'dmdev', who: 'dev', time: 'Yesterday 16:02', rel: 'Yesterday',
+    body: `<p>Pushed the fix for the ${M('Kestrel')} sign-in loop. Can you try build 412 before the release?</p>`,
+    ex: `Pushed the fix for the ${M('Kestrel')} sign-in loop. Can you try build 412 before the release?`,
+    before: ['dev', 'Found it, the token refresh raced the first sync.'], after: ['you', 'Trying it now.'] },
+  { id: 5, pl: 'bugs', topic: 'Crash on wake in 0.86.57', who: 'sam', time: 'Oct 22, 09:15', rel: 'Oct 22',
+    body: `<p><span class="men you">@Tushar</span> the ${M('Kestrel')} crash is back on 0.86.57. Logs are at <a>builds.example.dev/${M('kestrel')}/412</a>. <span class="men">@Maya Chen</span> can you take a look today?</p>`,
+    ex: `@Tushar the ${M('Kestrel')} crash is back on 0.86.57. Logs are at builds.example.dev/${M('kestrel')}/412. @Maya Chen can you take a look today?`,
+    before: ['sam', 'Seeing it on two Macs now.'], after: ['maya', 'Looking after lunch.'] },
+  { id: 6, pl: 'founders', who: 'elena', time: 'Oct 20, 18:30', rel: 'Oct 20',
+    body: `<p>Notes from the Northwind call. They have 40 people on support, and most questions arrive by email and get forwarded to a shared channel.</p><div class="skip">···</div><p>Pricing came up twice; they want a pilot with one team first. We can show them ${M('Kestrel')} on Thursday: it is the clearest difference from what they use now, and it needs no setup on their side.</p>`,
+    showmore: true,
+    ex: `…pilot with one team first. We can show them ${M('Kestrel')} on Thursday: it is the clearest difference from what they use now, and it needs no setup on their side.`,
+    before: ['leo', 'How did the Northwind call go?'], after: ['leo', 'Thursday works. I\'ll book the room.'] },
+  { id: 7, pl: 'backend', topic: 'Queue retries forever on an expired token', who: 'leo', time: 'Oct 18, 14:07', rel: 'Oct 18',
+    body: `<p>The ${M('Kestrel')} queue retries forever when the token expires:</p><pre>retry(syncQueue, { max: Infinity, backoff: 'none' })</pre><p style="margin-top:6px">We should cap it at 5 and show the sign-in sheet.</p>`,
+    ex: `The ${M('Kestrel')} queue retries forever when the token expires: retry(syncQueue, { max: Infinity, backoff: 'none' }) We should cap it at 5 and show the sign-in sheet.`,
+    thread: { n: 3, last: 'Oct 19', faces: ['dev', 'sam'] } },
+  { id: 8, pl: 'gdm', who: 'maya', time: 'Oct 15, 12:20', rel: 'Oct 15',
+    body: `<p>Is the ${M('Kestrel')} demo still on for Friday? I can bring the new onboarding.</p>`,
+    file: ['kestrel-onboarding-v3.fig', 'Figma · 4 MB'],
+    ex: `Is the ${M('Kestrel')} demo still on for Friday? I can bring the new onboarding. kestrel-onboarding-v3.fig`,
+    before: ['leo', 'Friday 15:00 still good for everyone?'], after: ['you', 'Yes, bring it.'] },
+]
+const person = (k) => k === 'you' ? { n: 'You', i: 'T', c: 'g' } : P[k]
+const av = (p, cls = '') => `<span class="av ${p.c}${p.app ? ' app' : ''} ${cls}">${p.i}</span>`
+const pill = (pl, cls = '') => `<span class="pill ${pl.k} ${cls}">${S(pl.icon)}${pl.n}</span>`
+
+// 2, the recommended result.
+function where(r) {
+  const pl = PL[r.pl]
+  return `<div class="where">${pill(pl)}${r.topic ? `<span class="ttl">${r.topic}</span>` : ''}</div>`
+}
+function msg(r, sel) {
+  const p = P[r.who]
+  let foot = ''
+  if (r.file) foot += `<div><span class="fchip"><span class="fi">${S('file')}</span><span class="fn">${r.file[0]}</span><span class="fm">${r.file[1]}</span></span></div>`
+  if (r.showmore) foot += `<span class="showmore">Show more</span>`
+  if (r.reacts) foot += `<div class="foot">${r.reacts.map(([e, n]) => `<span class="rx">${e} ${n}</span>`).join('')}</div>`
+  if (r.thread) foot += `<div class="thr"><span class="stack">${r.thread.faces.map((f) => av(P[f])).join('')}</span><span class="rc">${r.thread.n} replies</span><span class="lr">· last reply ${r.thread.last}</span></div>`
+  return `<div class="msg${sel ? ' sel' : ''}">${av(p)}<div class="mb"><div class="mh"><b>${p.n}</b>${p.app ? '<span class="apptag">App</span>' : ''}<span class="tm">${r.time}</span></div><div class="mt">${r.body}</div>${foot}</div></div>`
+}
+function list2(items, selId, extra = {}) {
+  let out = '', prev = null, open = false
+  for (const r of items) {
+    const same = prev && prev.pl === r.pl && prev.topic && prev.topic === r.topic
+    if (!same) { if (open) out += '</div>'; out += `<div class="grp">${where(r)}`; open = true }
+    out += msg(r, r.id === selId)
+    if (extra.ctx && r.id === selId) out += extra.ctx
+    prev = r
+  }
+  return out + (open ? '</div>' : '')
+}
+
+// 1, snippet.
+const list1 = (items, selId) => items.map((r) => { const p = P[r.who]; return `<div class="v1${r.id === selId ? ' sel' : ''}"><div class="l1">${av(p, 's20')}<b>${p.n}</b>${p.app ? '<span class="apptag">App</span>' : ''}${pill(PL[r.pl])}<span class="tm">${r.time}</span></div><div class="ex">${r.ex}</div></div>` }).join('')
+
+// 3, card.
+const list3 = (items, selId) => items.map((r) => {
+  const p = P[r.who], pl = PL[r.pl]
+  let foot = ''
+  if (r.file) foot += `<div><span class="fchip"><span class="fi">${S('file')}</span><span class="fn">${r.file[0]}</span><span class="fm">${r.file[1]}</span></span></div>`
+  if (r.showmore) foot += `<span class="showmore">Show more</span>`
+  if (r.reacts) foot += `<div class="foot">${r.reacts.map(([e, n]) => `<span class="rx">${e} ${n}</span>`).join('')}</div>`
+  if (r.thread) foot += `<div class="thr"><span class="stack">${r.thread.faces.map((f) => av(P[f])).join('')}</span><span class="rc">${r.thread.n} replies</span></div>`
+  return `<div class="v3${r.id === selId ? ' sel' : ''}">${av(p, 's32')}<div class="mb"><div class="mh"><b>${p.n}</b>${p.app ? '<span class="apptag">App</span>' : ''}<span class="chn">${S(pl.icon)}${pl.n}</span><span class="tm">${r.time}</span></div><div class="mt">${r.body}</div>${foot}</div></div>`
+}).join('')
+
+// 4, with neighbours.
+const nb = (x) => x ? `<div class="nb"><b>${person(x[0]).n}</b><span>${x[1]}</span></div>` : ''
+const list4 = (items, selId) => items.map((r) => `<div class="grp">${where(r)}${nb(r.before)}${msg(r, r.id === selId)}${nb(r.after)}</div>`).join('')
+
+function rows(target) {
+  const cols = [
+    ['1. Snippet', 'Three lines from just before the match.', list1(R, 3)],
+    ['2. Message', 'The place line, then the whole message.', `<div>${list2(R, 3)}</div>`],
+    ['3. Card', 'A bordered card per message.', list3(R, 3)],
+    ['4. With neighbours', 'One line before and after.', list4(R, 3)],
+  ]
+  document.getElementById(target).innerHTML = cols.map(([h, n, body]) => `<div><h2>${h}</h2><p class="colnote">${n}</p><div class="crop mk-find">${body}</div></div>`).join('')
+}
+rows('rows-dark'); rows('rows-light')
+
+// The mark grid.
+const markMsg = (cur) => ({ id: 0, pl: 'bugs', who: 'sam', time: 'Oct 22, 09:15',
+  body: `<p><span class="men you">@Tushar</span> the ${M('Kestrel')} crash is back on 0.86.57. Logs are at <a>builds.example.dev/${M('kestrel')}/412</a>, and <span class="men">@Maya Chen</span> found it in <code>syncQueue</code>. ${cur ? '<mark class="cur">Kestrel\'s</mark>' : M('Kestrel\'s')} retry loop again.</p>` })
+const MARKS = [
+  ['mk-today', 'Today: accent tint', 'The coral of the @you chip and the links.', ['12.88 · fill 1.21', '11.24 · fill 1.31'], 'Collides with mentions and links'],
+  ['mk-find', 'A. Find yellow', 'A pale yellow wash; the current match brighter.', ['12.78 · fill 1.22 · current 11.15', '8.49 · fill 1.83 · current 10.85 (dark on yellow)'], 'Recommended'],
+  ['mk-neutral', 'B. Neutral, semibold', 'A grey fill one step above inline code, text in 600.', ['11.54 · fill 1.35', '8.08 · fill 1.92'], 'Reads as inline code'],
+  ['mk-line', 'C. Underline and weight', 'Text in 650 with a 2px amber underline; no fill.', ['15.55 · line 3.82', '14.71 · line 7.98'], 'Reads as a link'],
+]
+function markGrid() {
+  let html = `<div class="hd" style="background:var(--background-subtle)"></div><div class="hd theme-light">Light</div><div class="hd theme-dark">Dark</div>`
+  for (const [cls, name, note, ratios, verdict] of MARKS) {
+    html += `<div class="lab">${name}<p>${note}</p><p><b style="font-weight:600;color:var(--foreground-subtle)">${verdict}</b></p></div>`
+    ratios.forEach((r, i) => {
+      html += `<div class="cell ${i ? 'theme-dark' : 'theme-light'} ${cls}">${msg(markMsg(cls !== 'mk-today'))}<div class="ratios">Text on mark <b>${r.split(' · ')[0]}:1</b> · ${r.split(' · ').slice(1).join(' · ')}</div></div>`
+    })
+  }
+  html += `<div class="lab" style="border-bottom:0">A. with Marigold<p>The one accent that shares the mark's hue.</p></div>`
+  html += `<div class="cell theme-light accent-marigold mk-find" style="border-bottom:0">${msg(markMsg(true))}</div><div class="cell theme-dark accent-marigold mk-find" style="border-bottom:0">${msg(markMsg(true))}</div>`
+  document.getElementById('markgrid').innerHTML = html
+}
+markGrid()
+
+// Filter rows.
+const field = (inner, ctl = '') => `<div class="sfield">${S('search', 'mg')}<div class="txt">${inner}</div>${ctl}<span class="clr">${S('x')}</span></div>`
+const chips = `<span class="qchip"><span class="av16 a">MC</span><span class="k">from:</span>Maya Chen</span><span class="qchip noav">${S('lock')}<span class="k">in:</span>proj-kestrel</span><span>kestrel<span class="caret"></span></span>`
+const FR = {
+  today: `<div class="frow"><span class="fb">From${S('down')}</span><span class="fb">In${S('down')}</span><span class="fb">Date${S('down')}</span><span class="fb">Has${S('down')}</span><span class="fb sort">Newest${S('down')}</span><span class="fb">${S('chats', 'ico')}Group by thread</span><span class="togs"><span class="fb lead">${S('eyeoff', 'ico')}Apps hidden</span><span class="fb lead">${S('eyeoff', 'ico')}Automated hidden</span></span></div>`,
+  b: `<div class="frow"><span class="fb lead">${S('funnel', 'ico')}Filter${S('down')}</span><span class="fb sort" style="margin-left:2px">Newest${S('down')}</span><span class="togs"><span class="fb lead">${S('eyeoff', 'ico')}Hidden: apps, automated${S('down')}</span></span></div>`,
+}
+function filters() {
+  const box = (title, note, inner, h = 'auto') => `<div><h2>${title}</h2><p class="colnote">${note}</p><div class="win" style="width:1100px; height:${h}"><div class="stop" style="border-bottom:0">${inner}</div></div></div>`
+  const menu = `<div class="menu" style="left:12px; top:84px"><div class="o act">${S('user', 'chk')}From<svg class="sub"><use href="#i-right"/></svg></div><div class="o">${S('hash', 'chk')}In<svg class="sub"><use href="#i-right"/></svg></div><div class="o">${S('clock', 'chk')}Date<svg class="sub"><use href="#i-right"/></svg></div><div class="o">${S('file', 'chk')}Has<svg class="sub"><use href="#i-right"/></svg></div></div>`
+  const sub = `<div class="menu" style="left:284px; top:84px; width:240px"><div class="h">People in these results</div><div class="o act"><span class="av16 a" style="width:20px;height:20px;font-size:8px">MC</span>Maya Chen<span class="s">34</span></div><div class="o"><span class="av16 b" style="width:20px;height:20px;font-size:8px">DP</span>Dev Patel<span class="s">21</span></div><div class="o"><span class="av16 c" style="width:20px;height:20px;font-size:8px">PR</span>Priya Rao<span class="s">12</span></div><div class="sep"></div><div class="o">Someone else…</div></div>`
+  const hid = `<div class="menu" style="right:12px; top:84px; width:250px"><div class="o">${S('check', 'chk')}Hide apps and bots</div><div class="o">${S('check', 'chk')}Hide automated conversations</div></div>`
+  const el = document.getElementById('filters')
+  el.innerHTML =
+    box('Today', 'Seven controls, always visible. Group by thread goes either way.', field('<span>kestrel<span class="caret"></span></span>') + FR.today) +
+    box('B. One Filter menu, one hidden control', 'Picked filters are chips in the field. Shown here with two set, and both menus open.', field(chips) + FR.b + `<div style="height:150px"></div>` + menu + sub + hid) +
+    box('C. No row: the controls sit in the field', 'The sort and Filter at the field\'s end; what is hidden as the last chip-like control.', field(chips, `<span class="in-ctl"><span class="fb">Newest${S('down')}</span><span class="fb lead">${S('funnel', 'ico')}Filter</span><span class="fb lead">${S('eyeoff', 'ico')}Apps, automated</span></span>`))
+  el.querySelectorAll('.win').forEach((w) => { w.style.overflow = 'visible' })
+}
+filters()
+
+// Windows.
+const strip = `<div class="strip"><div class="lights"><i></i><i></i><i></i></div><div class="ctl"><span class="ib">${S('side')}</span><span class="ib">${S('left')}</span><span class="ib off">${S('right')}</span></div><div class="tab pin">${S('house', 'k')}</div><div class="tab"><span class="tart" style="background:color-mix(in oklch,#7FB6A4 45%,var(--background))"></span><span class="lab">Postgres 16 cutover window</span></div><div class="tab on">${S('search', 'k')}<span class="lab">kestrel</span><span class="cl">${S('x')}</span></div><div class="plus">${S('plus')}</div></div>`
+const fieldBand = (center) => `<div class="stop${center ? ' center' : ''}">${field('<span>kestrel<span class="caret"></span></span>')}${FR.b}</div>`
+const readerMsgs = `
+  <div class="m"><span class="av ${P.priya.c}">PR</span><div class="mb"><div class="mh"><b>Priya Rao</b><span class="tm">Yesterday 19:50</span></div><div class="mt">Same here on the Air. Closing the lid for more than half an hour does it.</div></div></div>
+  <div class="m"><span class="av ${P.dev.c}">DP</span><div class="mb"><div class="mh"><b>Dev Patel</b><span class="tm">Yesterday 20:12</span></div><div class="mt">The socket reconnects but the sync timer never restarts. I have a fix, will push it with build 412.</div></div></div>
+  <div class="m"><span class="av ${P.maya.c}">MC</span><div class="mb"><div class="mh"><b>Maya Chen</b><span class="tm">8:40</span></div><div class="mt">Can we also show "Paused" in the status when it stops? Then people know to wait.</div></div></div>`
+const readerRoot = `<div class="m flash"><span class="av g app">In</span><div class="mb"><div class="mh"><b>Intake</b><span class="apptag">App</span><span class="tm">Yesterday 19:42</span></div><div class="mt"><p><b>Bug: <mark class="cur">Kestrel</mark> stops syncing after the laptop wakes from sleep</b></p><p><b>What happened:</b> I closed the lid with a sync running and opened it an hour later. The status said "Up to date", but nothing new came in until I quit and reopened the app.</p><p><b>What I expected:</b> the sync to pick up where it left off, or at least say that it had stopped.</p></div><div class="foot"><span class="rx">✅ 1</span><span class="rx">👀 2</span></div></div></div>`
+function reader(w, closeable) {
+  return `<div class="reader" style="width:${w}px"><div class="band"></div><div class="islands"><div class="island l">${pill(PL.feedback, 'lg')}<span class="ti"><span>Kestrel stops syncing after sleep</span>${S('down')}</span></div><span class="gap"></span><div class="island"><span class="rb">${S('newtab')}</span><span class="rb">${S('dots')}</span>${closeable ? `<span class="rb">${S('x')}</span>` : ''}</div></div><div class="tlist"><div class="tcol">${readerRoot}${readerMsgs}</div></div><div class="comp"><div class="box"><span class="att">${S('plus')}</span><div class="ta">Reply</div><span class="snd">${S('up')}</span></div></div></div>`
+}
+const W = 1280, H = 860
+const win = (inner) => `<div class="win mk-find" style="width:${W}px; height:${H}px">${strip}<div class="spage">${inner}</div></div>`
+const older = `<div class="older">Older matches on this Mac</div>`
+
+function aClosed(id) { document.getElementById(id).innerHTML = win(`${fieldBand(true)}<div class="rlist center"><div class="inner">${list2(R, 3)}</div></div>`) }
+function aOpen(id) { document.getElementById(id).innerHTML = win(`${fieldBand(false)}<div class="split"><div class="lcol"><div class="rlist">${list2(R, 3)}</div></div>${reader(520, true)}</div>`) }
+function bSplit(id) { document.getElementById(id).innerHTML = win(`${fieldBand(false)}<div class="split"><div class="lcol"><div class="rlist">${list2(R, 3)}</div></div>${reader(512, false)}</div>`) }
+function cCtx(id) {
+  const ctx = `<div class="ctx">
+    <div class="cm"><span class="av ${P.priya.c}">PR</span><div><b>Priya Rao</b>Same here on the Air. Closing the lid for more than half an hour does it.<span class="tm">19:50</span></div></div>
+    <div class="cm"><span class="av ${P.dev.c}">DP</span><div><b>Dev Patel</b>The socket reconnects but the sync timer never restarts. I have a fix, will push it with build 412.<span class="tm">20:12</span></div></div>
+    <div class="cm"><span class="av ${P.maya.c}">MC</span><div><b>Maya Chen</b>Can we also show "Paused" in the status when it stops? Then people know to wait.<span class="tm">8:40</span></div></div>
+    <div class="open"><span class="btn">Open topic <span class="kbd">↵</span></span><span class="btn plain">3 more replies</span></div></div>`
+  document.getElementById(id).innerHTML = win(`${fieldBand(true)}<div class="rlist center"><div class="inner">${list2(R, 3, { ctx })}</div></div>`)
+}
+aClosed('a-closed-dark'); aClosed('a-closed-light'); aOpen('a-open-dark'); aOpen('a-open-light')
+bSplit('b-dark'); bSplit('b-light'); cCtx('c-dark'); cCtx('c-light')
+
+document.fonts.ready.then(() => { for (const sec of document.querySelectorAll('section.sheet')) sec.style.height = Math.ceil(sec.getBoundingClientRect().height) + 'px' })
+</script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 // Screenshots each section of mock.html to <key>.png. Run from this folder:
-// node render.mjs [--only key1,key2]. Playwright comes from the gallery's
+// node render.mjs [--file mock-v2.html] [--only key1,key2]. Playwright comes from the gallery's
 // dependencies; a worktree without node_modules falls back to the main checkout.
 import { createRequire } from 'node:module'
 import fs from 'node:fs'
@@ -13,7 +13,7 @@ const only = args.only ? args.only.split(',') : null
 const dir = process.cwd()
 const browser = await chromium.launch({ channel: 'chrome' })
 const page = await browser.newPage({ viewport: { width: 2040, height: 1100 }, deviceScaleFactor: 2, reducedMotion: 'reduce' })
-await page.goto('file://' + path.join(dir, 'mock.html'))
+await page.goto('file://' + path.join(dir, args.file ?? 'mock.html'))
 await page.evaluate(() => document.fonts.ready)
 await page.waitForTimeout(600)
 for (const s of await page.$$('section[data-key]')) {
