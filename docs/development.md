@@ -1037,6 +1037,7 @@ An import graph over `apps/` and `packages/` decides what each change reaches, a
 | The gallery harness: `apps/gallery/` (except its spec files and `shots.spec.ts`), `shift.spec.ts`, `packages/testing/` | `bun run test:gallery` for every component and spec, the heavy shift guard over every component included |
 | A file the desktop app runs (`apps/desktop/src` and the packages it bundles) | `bun run test:desktop` with the specs the coverage map says ran it, ranked within the estimated time budget (below) |
 | The shared e2e support: `e2e/fixtures.ts`, `e2e/driver/`, `e2e/build.ts`, `e2e/coverage.ts`, `e2e/no-skips.ts`, the Playwright and electron-vite configs, `apps/desktop/package.json`, the renderer's `index.html`, `src/coverage.ts`, and what they reach outside the app (the fake Slack, the fake OpenRouter) | `bun run test:desktop` with the specs that use what changed, ranked within the estimated time budget (below) |
+| A file in a guard spec's area (`GUARD_SPECS` in `scripts/test-areas.mjs`): topic, sync, store, search and palette code for `e2e/instant-paths.spec.ts`, which checks that the most frequent paths paint from what Juno holds with Slack holding every answer | that spec, always, whatever the coverage map ranks or the budget leaves |
 | An e2e spec file | that spec, always |
 | A helper some specs import | those specs, ranked above coverage picks |
 | Any `.ts`, `.tsx` or config a typecheck project reads | `bun run typecheck` locally with pinned Bun; unsupported projects are warned about and skipped |
