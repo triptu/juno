@@ -15,8 +15,14 @@
  *
  * The end of every boot and catch-up runs `fillUsers` again as a sweep. The
  * sweep also asks, once a session, for stored users that have no photo.
- * Live, the edge answers every id it is asked about, Slack Connect users
- * included (research section 10, "Users").
+ *
+ * Slack Connect people the edge has only a profile for (other team,
+ * `is_stranger`) need the flags Slack's client sends: without them the edge
+ * lists them in `failed_ids` every time, and they showed as "Someone". With
+ * them they come back in `pending_ids` first and in `results` about half a
+ * second later, so `chunks` asks again as Slack's client does. Ids in
+ * `failed_ids` or `invalid_ids` are not asked for again in the session
+ * (research section 10, "Users").
  */
 import { SlackEdge, type SlackApiError, type SlackAuthRequired } from '@juno/slack'
 import type { Message } from '@juno/slack-schema'
@@ -141,17 +147,25 @@ const chunks = (ctx: SyncContext, ids: ReadonlyArray<string>, lane: Lane): Effec
   Effect.gen(function* () {
     const edge = yield* SlackEdge
     for (let i = 0; i < ids.length; i += ctx.config.usersChunk) {
-      const chunk = ids.slice(i, i + ctx.config.usersChunk)
-      const answer = yield* edge.usersInfo(chunk, { lane })
-      // Ids the edge does not know stay unknown; asking again every sweep would never answer differently.
-      for (const id of answer.failed_ids ?? []) ctx.unknownUsers.add(id)
-      yield* transaction(
-        Effect.gen(function* () {
-          yield* upsertUsers(answer.results)
-          // Taken inside the transaction: a re-index that asked for one of these names has either run already or runs after it.
-          yield* reindexTopics(takeWaiting(ctx, [...answer.results.map((user) => user.id), ...(answer.failed_ids ?? [])]), reindexOptions(ctx))
-        }),
-      )
+      let asking = ids.slice(i, i + ctx.config.usersChunk)
+      // Slack Connect people come back in `pending_ids` while the edge fetches them from their own
+      // team. As Slack's client does, they are asked again up to three times, 0.5, 1 and 1.5 s apart;
+      // any still pending are left for the next sweep.
+      for (let round = 1; asking.length > 0; round++) {
+        const answer = yield* edge.usersInfo(asking, { lane })
+        // Ids the edge does not know stay unknown; asking again every sweep would never answer differently.
+        const unknown = [...(answer.failed_ids ?? []), ...(answer.invalid_ids ?? [])]
+        for (const id of unknown) ctx.unknownUsers.add(id)
+        yield* transaction(
+          Effect.gen(function* () {
+            yield* upsertUsers(answer.results)
+            // Taken inside the transaction: a re-index that asked for one of these names has either run already or runs after it.
+            yield* reindexTopics(takeWaiting(ctx, [...answer.results.map((user) => user.id), ...unknown]), reindexOptions(ctx))
+          }),
+        )
+        asking = round > 3 ? [] : [...(answer.pending_ids ?? [])]
+        if (asking.length > 0) yield* Effect.sleep(500 * round)
+      }
       yield* Effect.yieldNow
     }
   })

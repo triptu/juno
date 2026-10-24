@@ -86,3 +86,5 @@ Large-workspace reads build a request-local index of followed roots and replies.
 Huddle controls also keep a `sh_room_created` message with room start, end and participant history, so normal history sync can recover an offline missed huddle.
 
 In-process malformed getView tests set `workspace.threadViewRowOverrides` by root timestamp. These rows replace only the getView entry, preserving its original position and paging. They are synthetic fault injection, not measured Slack shapes.
+
+`workspace.addUser(user, { profileOnly: { pendingAnswers } })` adds a Slack Connect person the edge has only a profile for: `users/info` lists them in `failed_ids` unless the call sets `include_profile_only_users`, and then in `pending_ids` for `pendingAnswers` answers before `results`, as observed live.

@@ -96,6 +96,12 @@ export function asTs(value: string): Ts {
 export class Workspace {
   readonly emoji = new Map<string, CustomEmoji>()
   readonly users = new Map<string, User>()
+  /**
+   * Slack Connect people the edge has only a profile for, with how many more
+   * `users/info` answers list them as pending. Without `include_profile_only_users`
+   * the edge lists them in `failed_ids` (observed live, research section 10, "Users").
+   */
+  readonly profileOnly = new Map<string, number>()
   readonly conversations = new Map<string, ConversationRecord>()
   readonly messages = new Map<string, Message[]>()
   /** Self's `last_read` per conversation. */
@@ -392,8 +398,9 @@ export class Workspace {
 
   // Mutations
 
-  addUser(user: User): void {
+  addUser(user: User, options: { readonly profileOnly?: { readonly pendingAnswers: number } } = {}): void {
     this.users.set(user.id, user)
+    if (options.profileOnly !== undefined) this.profileOnly.set(user.id, options.profileOnly.pendingAnswers)
   }
 
   addConversation(record: ConversationRecord): void {

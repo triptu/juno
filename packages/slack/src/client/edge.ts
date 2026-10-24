@@ -26,7 +26,10 @@ export interface EdgeCallOptions {
 }
 
 export interface SlackEdgeShape {
-  /** Users by id, at most 100 per call. `failed_ids` lists the ones Slack did not return. */
+  /**
+   * Users by id, at most 100 per call. `pending_ids` lists the ones the edge is still fetching
+   * (Slack Connect people), to ask again shortly; `failed_ids` the ones Slack does not know.
+   */
   usersInfo(
     ids: ReadonlyArray<string>,
     options?: EdgeCallOptions & { readonly updatedIds?: Readonly<Record<string, number>> },
@@ -107,9 +110,14 @@ export class SlackEdge extends Context.Service<SlackEdge, SlackEdgeShape>()('jun
           }))
         }).pipe(Effect.withSpan('SlackEdge.call', { attributes: { method } }))
 
+      // The flags Slack's client sends when it fetches missing members. Without them the edge
+      // reports Slack Connect people it has only a profile for in `failed_ids` (research section 10, "Users").
       const usersInfo: SlackEdgeShape['usersInfo'] = (ids, options = {}) => {
-        const body: Omit<EdgeUsersInfoArgs, 'token'> =
-          options.updatedIds === undefined ? { ids: [...ids] } : { updated_ids: options.updatedIds }
+        const body: Omit<EdgeUsersInfoArgs, 'token'> = {
+          ...(options.updatedIds === undefined ? { ids: [...ids] } : { updated_ids: options.updatedIds }),
+          include_profile_only_users: true,
+          check_interaction: true,
+        }
         return call('users/info', body, EdgeUsersInfoOk, options)
       }
 

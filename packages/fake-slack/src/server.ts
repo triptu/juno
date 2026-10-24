@@ -765,9 +765,13 @@ export class FakeServer {
       return record(200, { ok: false, error: 'invalid_arguments' })
     }
     const ids = args.ids ?? Object.keys(args.updated_ids ?? {})
-    const results = ids.flatMap((id) => this.workspace.users.get(id) ?? []).map(edgeUserObject)
-    const failed = ids.filter((id) => !this.workspace.users.has(id))
-    await record(200, Schema.encodeSync(EdgeUsersInfoOk)({ ok: true, results, failed_ids: failed, pending_ids: [], invalid_ids: [] }))
+    const withProfileOnly = args.include_profile_only_users === true
+    const pending = ids.filter((id) => withProfileOnly && (this.workspace.profileOnly.get(id) ?? 0) > 0)
+    for (const id of pending) this.workspace.profileOnly.set(id, this.workspace.profileOnly.get(id)! - 1)
+    const answered = ids.filter((id) => this.workspace.users.has(id) && !pending.includes(id) && (withProfileOnly || !this.workspace.profileOnly.has(id)))
+    const results = answered.map((id) => edgeUserObject(this.workspace.users.get(id)!))
+    const failed = ids.filter((id) => !answered.includes(id) && !pending.includes(id))
+    await record(200, Schema.encodeSync(EdgeUsersInfoOk)({ ok: true, results, failed_ids: failed, pending_ids: pending, invalid_ids: [] }))
   }
 
   /**

@@ -214,6 +214,7 @@ Reactions
 Users, channels, emoji, usergroups via the Edge ("Flannel") API (`shared`, method map `U` near `MEMBER_INFO: "users/info"`; `fetchObjectsById`, `fetchObjectsWithQuery`, `fetchChannelFirstNMembers`)
 - Methods: `users/info`, `users/search`, `users/list`, `users/counts`, `users/searchBulk`, `channels/info`, `channels/search`, `channels/list`, `channels/membership`, `mpims/search`, `usergroups/info`, `usergroups/search`, `usergroups/searchBulk`, `emojis/info`, `emojis/search`, `emojis/list`, `huddles/info|list`, `objects/search`, `permissions/info`, `externalTeams/*`, `apps/info`.
 - By-id query: `{ updated_ids: {[id]: updated_ts_or_0}, check_membership?, check_interaction?, include_profile_only_users? }` or `{ ids: [...] }` when not conditional. Max ids per query is a constant `L` (chunked, concurrency 2).
+- Missing people (read 2026-10-24, `gantry-v2-shared.3b03bc2a28796cb1.min.js`, `fetchMembersById` and the fetcher "Fetches missing members from Flannel"): the client always asks `users/info` with `check_interaction: true` and `include_profile_only_users: true`. While the answer has `pending_ids` it asks again for those ids alone, after 500, 1,000 and 1,500 ms, four calls in all; ids still pending after that count as failed.
 - List/search query: `{ query?, count, marker?, filter?, present_first?, channels?: [id] }`; e.g. channel members: `{ channels: [id], present_first: true, filter: "everyone AND NOT bots AND NOT apps", count: n<=100 }`.
 - Response: `{ ok, results: Object[] | Record, failed_ids?, pending_ids?, invalid_ids?, member_channels?, mpims?, disconnected_ids?, can_interact?, next_marker? }`. Paging is by `marker = next_marker`.
 - Web API fallbacks: `users.info` (default args `canonical_avatars`, `name_tagging`), `users.list`, `usergroups.search`, `subteams.info` `{ usergroups: ids, include_users: false, include_count: true, include_disabled: true }`, `emoji.adminList`/`emoji.getInfo`.
@@ -634,7 +635,22 @@ Why the first real session showed user ids instead of names. `JUNO_LIVE=1 bun ru
 | `users.list`, `limit=200` | `ok`, 200 members, a `next_cursor` |
 | Messages whose `text` holds `&amp;`, `&lt;` or `&gt;` | 7 of 310 |
 
-So the edge answers every id the sync asks about, Slack Connect users included, and the names were missing because of when and what Juno asked. The cold boot fetched users once, after the history of every active conversation (several minutes on the background lane, section "The sync dry run"); the ids it asked for were senders and DM partners only, never group DM members, mentions or repliers; and the views fell back to the raw id. Since then the sync names the people of every DM and group DM right after `client.counts`, names the people on each boot page before it lands, and asks for anyone else as soon as they appear, all on the interactive lane (`packages/sync/src/users.ts`). An empty `display_name` is common, so the shown name falls back to the real name, then the handle.
+So the edge answered every id the sync asked about in these conversations, and the names were missing because of when and what Juno asked. Slack Connect channels show it does not answer everyone (next section). The cold boot fetched users once, after the history of every active conversation (several minutes on the background lane, section "The sync dry run"); the ids it asked for were senders and DM partners only, never group DM members, mentions or repliers; and the views fell back to the raw id. Since then the sync names the people of every DM and group DM right after `client.counts`, names the people on each boot page before it lands, and asks for anyone else as soon as they appear, all on the interactive lane (`packages/sync/src/users.ts`). An empty `display_name` is common, so the shown name falls back to the real name, then the handle.
+
+#### 10. Slack Connect people (2026-10-24)
+
+Why people from the other team in a Slack Connect channel showed as "Someone", on their messages and on "has joined the channel". `JUNO_LIVE=1 bun run probe:live --only external --channels 36`: `client.userBoot` (36 member channels with `is_ext_shared`, all also `is_shared`), `client.counts`, one history page of each of the 32 with recent activity (with `user_profile`), then the 239 senders and joiners through the edge `users/info`. Run three times within an hour with the same results except where noted. Counts only.
+
+| What | Number |
+| --- | --- |
+| Messages read | 1,751; 385 `channel_join` |
+| Messages with `user_team`/`source_team` (sent from another team) | 513, every one with `user_profile` (`real_name`, `display_name`, `avatar_hash`, `image_72`, `team`, ...); none on the rest, `channel_join` included, which carry only `team` |
+| `users/info` with `{ ids }`, as Juno asked | 209 in `results`, 30 in `failed_ids` (14 senders, 16 joiners), none pending, invalid or disconnected; the same 30 on every run |
+| The same 30, 20 s later, and with `updated_ids` | 30 in `failed_ids` both times |
+| The same 30 with `include_profile_only_users` and `check_interaction` | all 30 in `pending_ids`, and 500 ms later all 30 in `results` (in one run, 6 asked this way minutes before came back in `results` at once) |
+| Web API `users.info` for 10 of the 30 | 10 named; all from another team with `is_stranger` set, 6 of them `deleted` |
+
+So the edge lists a Slack Connect person it has only a profile for (another team, `is_stranger`, often deactivated or gone from the channel) in `failed_ids` unless the call sets `include_profile_only_users`, and Juno marked every failed id unknown for the session. With the flag the person comes back in `pending_ids` while the edge fetches them, and in `results` half a second later. Juno now sends Slack's two flags and asks pending ids again as Slack's client does (above, "Missing people"); `packages/sync/src/users.ts`. The 2026-10-16 probe saw no failures because its conversations held no such person. `user_profile` would name a sender without a call, but Juno reads history with `no_user_profile` and join messages never carry one, so it is not used. Unknown: whether `check_interaction` matters on its own (it was sent only together with `include_profile_only_users`), and how long `pending_ids` lasts for a person no client has asked about recently (one round of 500 ms was enough every time).
 
 ### Live reactions (2026-10-16)
 

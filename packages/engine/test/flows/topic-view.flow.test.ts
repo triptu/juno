@@ -349,6 +349,19 @@ it('live changes reach exactly the rows they touch, and names stand in for menti
     expect(rowsOf(listed).find((row) => row.rootTs === root.ts)!.title).toStartWith('@Dev fix the backend -> github')
   })
 
+  await step('a Slack Connect person the edge first reports as pending is named on their join and their message', async () => {
+    // As observed live: without Slack's flags the edge fails such a person every time; with them it says pending, then answers.
+    const maya = engine.fake.workspace.users.get('U0MAYA')!
+    engine.fake.workspace.addUser({ ...maya, id: 'U0PARTNER', team_id: 'T0PARTNER', name: 'ana', real_name: 'Ana Ruiz', profile: { ...maya.profile, display_name: 'Ana' } }, { profileOnly: { pendingAnswers: 1 } })
+    const join = `${Math.floor(engine.fake.now() / 1000)}.800001`
+    engine.fake.emitFrame({ type: 'message', channel: 'C0ENG', subtype: 'channel_join', user: 'U0PARTNER', ts: join, text: '<@U0PARTNER> has joined the channel' })
+    const said = engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0PARTNER', text: 'Hello from the partner team.' })
+    const window = await main.until((value) => value.refs.people.get('U0PARTNER')?.name === 'Ana' && value.rows.has(join) && value.rows.has(said.ts), 'the partner named')
+    const mention = window.rows.get(join)!.body.blocks.flatMap((block) => ('children' in block ? block.children : [])).find((inline) => inline.kind === 'user')
+    expect(mention).toMatchObject({ id: 'U0PARTNER', name: 'Ana' })
+    expect(window.rows.get(said.ts)!.senderId).toBe('U0PARTNER')
+  })
+
   await step('a person who arrives after the thread was stored retitles its cached sidebar row', async () => {
     const root = engine.fake.injectMessage({ channel: 'C0ENG', user: engine.fake.workspace.selfId, text: '<@U0LATE> review the release' })
     engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', threadTs: root.ts, text: 'Ready.' })
