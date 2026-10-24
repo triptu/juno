@@ -73,11 +73,13 @@ const copy = {
 export function SearchResults(props: SearchResultsProps) {
   const { rows, listRef } = props
   return (
-    <div ref={listRef} data-scroll-area="" data-search-results="" {...stylex.props(styles.scroller)}>
-      {/* Always there, so screen readers announce the state lines as their text changes. */}
+    <>
+      {/* Always there, before the list, so screen readers announce the state lines as their text changes. */}
       <p role="status" data-sensitive="" {...stylex.props(styles.live)}>{stateLine(props)}</p>
-      <div {...stylex.props(styles.column)}>{rows === undefined ? <SearchRecent {...props} /> : <Results {...props} rows={rows} />}</div>
-    </div>
+      <div ref={listRef} data-scroll-area="" data-search-results="" {...stylex.props(styles.scroller)}>
+        <div {...stylex.props(styles.column)}>{rows === undefined ? <SearchRecent {...props} /> : <Results {...props} rows={rows} />}</div>
+      </div>
+    </>
   )
 }
 

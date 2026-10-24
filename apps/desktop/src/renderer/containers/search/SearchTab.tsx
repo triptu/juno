@@ -139,9 +139,11 @@ function usePageKeys(readerRef: RefObject<HTMLDivElement | null>, narrow: boolea
 /**
  * Until a row is chosen, each new search's first result shows in the reader
  * as a peek: it marks nothing read (the reader marks read only when used)
- * and focus stays where it is. Returns what a choice calls.
+ * and focus stays where it is. It waits for Slack's answer, which can put a
+ * newer match first. Returns what a choice calls.
  */
-function usePeekFirst(sessionId: string, selectedId: string | undefined, stops: ReadonlyArray<SearchRowItem>, generation: number | undefined) {
+function usePeekFirst(sessionId: string, selectedId: string | undefined, stops: ReadonlyArray<SearchRowItem>, snapshot: SearchSnapshot | undefined) {
+  const generation = snapshot === undefined || snapshot.state === 'searching' ? undefined : snapshot.generation
   const peeked = useRef<number | undefined>(undefined)
   const chosen = useRef(selectedId !== undefined)
   const first = stops[0]
@@ -282,7 +284,7 @@ export function SearchTab({ sessionId }: { readonly tabId: string; readonly sess
   useFieldFocus(sessionId, inputRef)
   useListScroll(sessionId, listRef, rows, session.scrollTop, snapshot?.window.offset === (session.offset ?? 0))
   useWarmNeighbours(session.selected?.id, stops)
-  const onChosen = usePeekFirst(sessionId, session.selected?.id, stops, snapshot?.generation)
+  const onChosen = usePeekFirst(sessionId, session.selected?.id, stops, snapshot)
   const actions = useListActions({ sessionId, session, rows, stops, narrow, inputRef, setReaderShown, onChosen })
   const onStepper = useCallback((step: ((direction: 1 | -1) => void) | undefined) => {
     stepper.current = step
