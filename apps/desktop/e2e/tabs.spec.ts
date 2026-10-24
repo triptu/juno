@@ -7,8 +7,11 @@
 // viewed for a day closes by itself.
 import { expectNoLayoutShift } from '@juno/testing/layout-shift'
 import { expect, syncedTest, test } from './fixtures'
+
 import { schemeUrl, type Juno } from './driver/juno'
 import { readUserDb, savedTabs, threadId } from './driver/userDb'
+
+test.use({ freshContext: true })
 
 test.describe.configure({ timeout: 120_000 })
 

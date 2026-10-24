@@ -14,7 +14,7 @@
  */
 import { AUTO_AWAY_MILLIS } from '@juno/fake-slack'
 import type { Juno } from './driver/juno'
-import { expect, test } from './fixtures'
+import { expect, syncedTest as test } from './fixtures'
 
 // The socket spacing itself is covered by packages/slack/test/socket.test.ts.
 // Here the real main activity watch samples the fake OS idle time synchronously.
@@ -30,8 +30,6 @@ async function setActive(juno: Juno): Promise<void> {
 
 test('Set yourself away from the avatar menu sets Slack presence and stays away while you use the Mac', async ({ juno, slack }) => {
   test.setTimeout(90_000)
-  await juno.signIn()
-  await juno.waitForSync()
   await setActive(juno)
   await slack.expectSeenAs('active')
 
@@ -68,8 +66,6 @@ test('Set yourself away from the avatar menu sets Slack presence and stays away 
 
 test('the avatar shows what Slack shows colleagues, while the setting stays active', async ({ juno, slack }) => {
   test.setTimeout(90_000)
-  await juno.signIn()
-  await juno.waitForSync()
   await setActive(juno)
   await slack.expectSeenAs('active')
   await juno.sidebar.expectOwnPresence('active')

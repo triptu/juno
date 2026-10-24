@@ -109,6 +109,14 @@ export function fakeMain(host: ReturnType<typeof memoryHost>, options: FakeMainO
       if (url === undefined) throw new Error('The web host only contacts its fake Slack')
       const headers = new Headers(init?.headers)
       headers.set('cookie', pending === undefined ? cookie() : `d=${pending.cookie}`)
+      // Node 26's multipart iterator can enqueue into a closed stream when engine
+      // shutdown aborts a request. Finish encoding before the cancellable fetch.
+      if (init?.body instanceof FormData) {
+        const encoded = new Response(init.body)
+        headers.set('content-type', encoded.headers.get('content-type')!)
+        const body = await encoded.arrayBuffer()
+        return fetch(url, { ...init, body, headers, redirect: 'error' })
+      }
       return fetch(url, { ...init, headers, redirect: 'error' })
     },
   })

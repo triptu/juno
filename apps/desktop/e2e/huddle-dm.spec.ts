@@ -5,15 +5,13 @@
  * say the huddle has nobody in it. The call must still show who is in it,
  * count up from its start and keep its row's headphones.
  */
-import { expect, test } from './fixtures'
+import { expect, syncedTest as test } from './fixtures'
 import { addRemote, connection } from './huddleFake'
 
 test.describe.configure({ timeout: 90_000 })
 
 test('a DM huddle shows both people and counts up while huddles/info lags the room frames', async ({ juno, fake, win }) => {
   fake.control('setHuddleInfoLag', { ms: 1_500 })
-  await juno.signIn()
-  await juno.waitForSync()
   const row = juno.sidebar.row('Maya', { exact: true })
   await row.open()
   await juno.sidebar.leave()

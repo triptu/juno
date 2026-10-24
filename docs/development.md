@@ -613,6 +613,10 @@ The confirmation with CPU timing on four physical cores (eight threads, four bro
 
 The 449 executed browser flows in the confirmation recorded 901.02 CPU-seconds in hosts, 805.39 in renderers, 238.54 in Chrome's browser/utility/GPU processes, and 178.68 in Playwright workers including the fake Slack. Median host and renderer cost was 1,930 and 1,680 CPU-ms per flow. Process counters cover the running fixture, omit processes that already exited, and combine fake Slack with its worker; they are not wall times or a separate fake-server profile. Browser startup and fixture setup timings are retained alongside the counters in the run log.
 
+With loaded-host reuse, reset browser contexts, more synced starts and eight browser workers on the same four physical cores, browser took 232 s and Electron 102 s (334 s combined, 86% average CPU, 6.77 GB peak container memory including file cache). The agent-flow consolidation on main also removed 35 cases. Browser passed 413 flows and exposed one notification-row click race; Electron passed 71 and exposed one PDF focus assumption. Targeted repairs then passed all nine notification flows in 12 s and all five file-viewer flows in 9 s, including their build steps. These repair runs do not turn the earlier full result into a green run.
+
+Across 387 matching measured flows before and after the optimization, host CPU fell from 767.94 to 352.67 seconds; renderer CPU was 701.34 and 707.72; Chrome browser/utility/GPU CPU was 206.27 and 183.34; worker plus fake Slack CPU was 153.93 and 151.52. Median host cost fell from 1,870 to 750 CPU-ms, renderer stayed at 1,680–1,690, and worker plus fake fell from 350 to 330. The 26-flow controlled sample at four workers cut summed flow time from 105.26 to 64.14 s, with host CPU 47.66 to 27.65 s and renderer CPU 43.68 to 42.63 s. Host startup and repeated module loading were the main removable cost; renderer work now dominates. The fake shares a process with Playwright, so its separate CPU cost is bounded by the worker total rather than measured independently.
+
 ### Text-menu spelling checks
 
 Electron uses the native macOS spellchecker, which detects the language itself.

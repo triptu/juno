@@ -49,6 +49,8 @@ async function homeWithPicture({ juno, win, fake }: { readonly juno: Juno; reado
   // Nothing is on disk yet: the scene and the greeting, with nothing under it, not a picture that would arrive later.
   await expect(home.picture).toHaveCount(0)
   await expect(home.column).toHaveText('All caught up.')
+  expect(await home.kinds()).toEqual([])
+  await expect(home.root.getByRole('button', { name: 'Browse all topics' })).toHaveCount(0)
   // When idle, Juno downloads the next picture, both sizes.
   await expect.poll(() => fake.pictureRequests().filter((name) => name.endsWith('-small.webp')).length, { timeout: 30_000 }).toBeGreaterThan(0)
   await expect.poll(() => win.evaluate(() => JSON.parse(localStorage.getItem('juno.homePictures') ?? '{}').next?.id ?? null), { timeout: 30_000 }).not.toBeNull()
@@ -156,4 +158,6 @@ quiet('Settings › General turns the picture off, and Home shows its scene', as
   await expect(home.greeting).toHaveText('All caught up.')
   await expect(home.picture).toHaveCount(0)
   await expect(home.column).toHaveText('All caught up.')
+  expect(await home.kinds()).toEqual([])
+  await expect(home.root.getByRole('button', { name: 'Browse all topics' })).toHaveCount(0)
 })

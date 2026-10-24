@@ -13,7 +13,7 @@
  * Never, which keeps its card quiet.
  */
 import type { Page } from '@playwright/test'
-import { expect, test } from './fixtures'
+import { expect, syncedTest as test } from './fixtures'
 import { chimeDrops, attendee, connection } from './huddleFake'
 
 test.describe.configure({ timeout: 90_000 })
@@ -25,8 +25,6 @@ const ringing = (win: Page) => win.evaluate(() => (window as unknown as RingWind
 const rings = (win: Page) => win.evaluate(() => (window as unknown as RingWindow).__junoHuddleRing?.starts ?? 0)
 
 test('someone starts a huddle: the card rings, Join joins, Dismiss hides it, and it goes when the huddle ends', async ({ juno, fake, win }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.notificationHoursNow()
   await juno.sidebar.row('#eng').chooseInMenu('notify-always')
   await juno.expectToast('#eng: Always')
@@ -97,8 +95,6 @@ test('someone starts a huddle: the card rings, Join joins, Dismiss hides it, and
 })
 
 test('a huddle the user started on another device shows no card', async ({ juno, fake, win }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.notificationHoursNow()
   await juno.sidebar.row('#eng').chooseInMenu('notify-always')
   await juno.expectToast('#eng: Always')
@@ -117,8 +113,6 @@ test('a huddle the user started on another device shows no card', async ({ juno,
 })
 
 test('an ignored channel rings like any other, the dock bounces while Juno is behind, and Ring for huddles off keeps it silent', async ({ juno, fake, win }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.notificationHoursNow()
   await juno.sidebar.row('#eng').chooseInMenu('notify-always')
   await juno.expectToast('#eng: Always')

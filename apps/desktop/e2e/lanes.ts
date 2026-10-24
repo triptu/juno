@@ -5,6 +5,7 @@
  * Every other file runs only in the electron project.
  */
 export const BROWSER_SPECS: ReadonlyArray<string> = [
+  'browser-isolation.spec.ts',
   'juno-agent/backup.spec.ts',
   'juno-agent/transfer.spec.ts',
   'ai-activity.spec.ts',
@@ -31,7 +32,6 @@ export const BROWSER_SPECS: ReadonlyArray<string> = [
   'juno-agent/auto-review.spec.ts',
   'juno-agent/connections.spec.ts',
   'juno-agent/switcher.spec.ts',
-  'juno-agent/notifications.spec.ts',
   'break-pass-1017.spec.ts',
   'emoji-picker-loading.spec.ts',
   'sync-failed.spec.ts',

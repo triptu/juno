@@ -59,7 +59,7 @@ test('a PDF opens in Chromium’s PDF viewer from the content main serves as a P
   }, src!)
   expect(answer).toEqual({ type: 'application/pdf', start: '%PDF-' })
   // Esc closes it from inside Chromium's PDF viewer too.
-  await frame.click({ position: { x: 400, y: 300 } })
+  await frame.focus()
   await expect.poll(() => juno.win.evaluate(() => document.activeElement?.tagName)).toBe('IFRAME')
   await pressEscape({ juno })
   await expect(viewer).toHaveCount(0)

@@ -77,6 +77,8 @@ syncedTest('closing the last tab while its message sends posts it once and opens
 test('⌘T during the first sync opens a usable Home', async ({ juno, fake }) => {
   fake.holdNext({ method: 'conversations.history' })
   await juno.signIn()
+  await expect(juno.write.composer).toBeVisible()
+  await juno.tabs.expectCount(1)
   await expect(juno.sidebar.root.getByRole('status', { name: 'Sync status' })).toHaveText(/^Syncing/, { timeout: 30_000 })
   // ⌘T opens a Home beside the launch tab's, every time, each with its own draft.
   await juno.tabs.menu('new-tab')

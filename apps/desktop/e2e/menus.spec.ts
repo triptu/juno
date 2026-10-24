@@ -2,7 +2,7 @@
 // does: the pointer and the arrow keys move the same highlight, and no row
 // keeps a hover highlight of its own beside it.
 import type { Locator } from '@playwright/test'
-import { expect, test } from './fixtures'
+import { expect, syncedTest as test } from './fixtures'
 
 /** The names of the rows drawn highlighted: any row with a background. */
 function highlighted(list: Locator): Promise<string[]> {
@@ -14,7 +14,6 @@ function highlighted(list: Locator): Promise<string[]> {
 }
 
 test('the avatar menu and the palette each have one active row under the pointer and the arrow keys', async ({ juno, win }) => {
-  await juno.signIn()
   await test.step('the avatar menu has one active item: hover, then the keyboard, then hover again', async () => {
     const { accountMenu } = juno
     await accountMenu.open()
@@ -46,8 +45,6 @@ test('the avatar menu and the palette each have one active row under the pointer
     await expect.poll(() => highlighted(list)).toEqual([])
     await accountMenu.close()
   })
-  // The avatar menu opened before the sync's end, as it did alone; the palette after it.
-  await juno.waitForSync()
   await test.step('the palette has one active row under the pointer and the arrow keys', async () => {
     const { palette } = juno
     await palette.open()
@@ -70,8 +67,6 @@ test('the avatar menu and the palette each have one active row under the pointer
 })
 
 test('menu triggers open on mouse down and the release leaves them open', async ({ juno, win }) => {
-  await juno.signIn()
-  await juno.waitForSync()
   const press = async (trigger: Locator) => {
     const box = (await trigger.boundingBox())!
     await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)

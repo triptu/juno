@@ -1,5 +1,5 @@
 import type { Locator } from '@playwright/test'
-import { expect, hooks, test } from './fixtures'
+import { expect, hooks, syncedTest, test } from './fixtures'
 import { expectHomeSyncFrames } from './homeSyncProbe'
 import { JunoChatPane, test as chatTest } from './juno-agent/chat'
 import { expectStableAnchor } from './shiftProbe'
@@ -23,10 +23,8 @@ const RINA = 'Rina finished the onsite'
 
 // Each path opens a topic or page this test has not opened before, from Home as at launch, so the first message row
 // the probe finds is the new topic's. The Home path opens the topic it leaves from first.
-test('topics and pages open without a layout shift', async ({ juno, win, fake }) => {
+syncedTest('topics and pages open without a layout shift', async ({ juno, win, fake }) => {
   test.setTimeout(120_000)
-  await juno.signIn()
-  await juno.waitForSync()
   for (const [index, path] of (['topic bottom', 'topic divider', 'Main with threads', 'DM', 'Home', 'All topics', 'Juno'] as const).entries()) {
     await test.step(`stable open: ${path}`, async () => {
       if (index > 0) await juno.home.open()
@@ -64,9 +62,7 @@ test('topics and pages open without a layout shift', async ({ juno, win, fake })
 // No line is held for reactions a message does not have yet (SPEC 7, "Stable geometry"). The last message's first
 // chip grows it in one step: in a list that fits the view, downwards; at the bottom of a longer one, the list keeps
 // its end and the rows above lift in the same frame, as Slack's do.
-test('a late reaction on the last message grows it without a jump', async ({ juno, win, slack, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('a late reaction on the last message grows it without a jump', async ({ juno, win, slack, fake }) => {
   // Enough replies that the thread is longer than the view, so the list keeps its end whatever the window's height.
   for (let i = 1; i <= 6; i++) slack.as('Leo').replyIn(POSTGRES, `Dry run checklist item ${i} is done.`)
   await juno.sidebar.row(POSTGRES).open()
@@ -85,9 +81,7 @@ test('a late reaction on the last message grows it without a jump', async ({ jun
 })
 
 // What must never move: the rows in view when something changes above them, and the list's end while it is held.
-test('a late reaction above the view moves no row in view, and one on the last message keeps the bottom', async ({ juno, win, slack, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('a late reaction above the view moves no row in view, and one on the last message keeps the bottom', async ({ juno, win, slack, fake }) => {
   const channel = slack.channel('eng')
   const user = slack.as('Leo').id
   const root = fake.injectMessage({ channel, user, text: 'Reaction above the view check' })
@@ -112,9 +106,7 @@ test('a late reaction above the view moves no row in view, and one on the last m
 })
 
 for (const divider of [false, true]) {
-  test(`partial thread waits for history at ${divider ? 'divider' : 'bottom'}`, async ({ juno, win, slack, fake }) => {
-    await juno.signIn()
-    await juno.waitForSync()
+  syncedTest(`partial thread waits for history at ${divider ? 'divider' : 'bottom'}`, async ({ juno, win, slack, fake }) => {
     const channel = slack.channel('eng')
     const user = slack.as('Leo').id
     const root = fake.injectMessage({ channel, user, text: 'Delayed history layout check' })
@@ -140,9 +132,7 @@ for (const divider of [false, true]) {
 }
 
 // The time follows the name, so a name that resolves late moves the time along its line once; the message stays put.
-test('a sender name resolves without moving the message', async ({ juno, win, slack, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('a sender name resolves without moving the message', async ({ juno, win, slack, fake }) => {
   const person = { ...fake.workspace.users.get(slack.as('Leo').id)!, id: 'U0LATE', name: 'late', profile: { display_name: 'Leonard Alexander Park', real_name: 'Leonard Alexander Park' } }
   fake.workspace.users.set(person.id, person)
   fake.holdNext({ method: 'edge:users/info' })
@@ -157,9 +147,7 @@ test('a sender name resolves without moving the message', async ({ juno, win, sl
   })
 })
 
-test('a new Main message gains a thread link without a jump, and the header stays put', async ({ juno, win, slack, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('a new Main message gains a thread link without a jump, and the header stays put', async ({ juno, win, slack, fake }) => {
   const channel = slack.channel('deploys')
   const user = slack.as('Leo').id
   const root = fake.injectMessage({ channel, user, text: 'A new Main message for the thread slot' })
@@ -180,9 +168,7 @@ test('a new Main message gains a thread link without a jump, and the header stay
   await expect(switcher.row('A new Main message')).toBeVisible()
 })
 
-test('delayed image bytes keep the reserved thumbnail box', async ({ juno, win, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('delayed image bytes keep the reserved thumbnail box', async ({ juno, win, fake }) => {
   fake.holdNext({ method: 'file:bytes', times: 100 })
   await juno.sidebar.row('Proposal: cut offline mode').open()
   const image = juno.topic.list.locator('[data-thumbnail] img').last()

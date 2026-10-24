@@ -4,7 +4,7 @@
 // the states the owner leaves the app in. On 10-18 a "Juno Helper" sat at
 // 100 % of a core on the owner's Mac: the engine's send workers ran their
 // pass again at once while a channel's first unsent row waited out a
-// backoff (engine `outbox-idle.test.ts`).
+// backoff. The idle CPU regression lives in packages/engine/test/perf/edit-retry-idle.perf.ts.
 //
 // The first test keeps the 10-16 case: an unread message that mentions
 // someone the store knows, under a newer one that names nobody. Here #eng

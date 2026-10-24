@@ -1,5 +1,5 @@
 import { SELF_ID } from '@juno/fake-slack'
-import { expect, test } from './fixtures'
+import { expect, syncedTest, test } from './fixtures'
 import type { Juno } from './driver/juno'
 
 test.describe.configure({ timeout: 120_000 })
@@ -9,9 +9,7 @@ async function revisit(juno: Juno) {
   await juno.home.open()
 }
 
-test('a dismissed huddle appears after it ends; opening it clears it across a relaunch', async ({ juno, fake, win, relaunch }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('a dismissed huddle appears after it ends; opening it clears it across a relaunch', async ({ juno, fake, win, relaunch }) => {
   await juno.sidebar.row('#eng').open()
   fake.control('startHuddle', { channel: 'D0MAYA', user: 'U0MAYA' })
   const card = win.getByRole('region', { name: 'Incoming huddle' })
@@ -70,9 +68,7 @@ test('old huddles expire and incomplete participation history is not called miss
   await expect(juno.home.item('missedHuddle')).toHaveCount(0)
 })
 
-test('Never hides a missed huddle, Always restores it, and ignoring the channel does not hide it', async ({ juno, fake }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+syncedTest('Never hides a missed huddle, Always restores it, and ignoring the channel does not hide it', async ({ juno, fake }) => {
   await juno.sidebar.row('#product').chooseInMenu('notify-never')
   fake.control('startHuddle', { channel: 'C0PRODUCT', user: 'U0LEO' })
   fake.control('endHuddle', { channel: 'C0PRODUCT' })

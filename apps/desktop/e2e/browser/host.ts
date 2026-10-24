@@ -20,6 +20,25 @@ interface Child {
   readonly loaded: Promise<void>
 }
 
+async function within<T>(work: Promise<T>, millis: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([work, new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => reject(new Error(message)), millis)
+    })])
+  } finally { clearTimeout(timer) }
+}
+
+async function terminate(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return
+  const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()))
+  if (child.connected) child.disconnect()
+  try { await within(exited, 2_000, 'The host did not exit') } catch {
+    child.kill('SIGKILL')
+    await exited
+  }
+}
+
 function forkHost(): Child {
   const child = fork(entry, [], {
     execPath: node,
@@ -38,13 +57,13 @@ function forkHost(): Child {
     child.on('message', onMessage)
     child.once('exit', (code) => fail(new Error(`The test host exited before it loaded (code ${code})`)))
   })
-  // A spare nobody takes must not hold the worker's exit.
+  // A child may exit before the next lease awaits its startup.
   loaded.catch(() => undefined)
   return { process: child, loaded }
 }
 
 /**
- * One test's host: the engine and file server in a child process
+ * One test's lease on a host: the engine and file server in a child process
  * (`web/host/testHost.ts`), against this test's fake Slack.
  */
 export class TestHost implements EngineHooks {
@@ -52,11 +71,13 @@ export class TestHost implements EngineHooks {
   readonly #answers = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>()
   #next = 0
   #exited = false
+  #stopping: Promise<void> | undefined
+  readonly #detach: () => void
   url = ''
 
-  constructor(child: ChildProcess, fake: FakeSlack, readonly userData: string) {
+  constructor(child: ChildProcess, fake: FakeSlack, readonly userData: string, readonly release?: () => void) {
     this.#child = child
-    child.on('message', (message: HostMessage) => {
+    const onMessage = (message: HostMessage) => {
       if (message.type === 'ask') {
         const reply: WorkerMessage = { type: 'reply', id: message.id, value: fake.signIn() }
         if (child.connected) child.send(reply, () => undefined)
@@ -66,12 +87,18 @@ export class TestHost implements EngineHooks {
         if (message.error === undefined) waiting?.resolve(message.value)
         else waiting?.reject(new Error(`test host: ${message.error}`))
       }
-    })
-    child.once('exit', (code) => {
+    }
+    const onExit = (code: number | null) => {
       this.#exited = true
       for (const waiting of this.#answers.values()) waiting.reject(new Error(`The test host exited (code ${code})`))
       this.#answers.clear()
-    })
+    }
+    child.on('message', onMessage)
+    child.once('exit', onExit)
+    this.#detach = () => {
+      child.off('message', onMessage)
+      child.off('exit', onExit)
+    }
   }
 
   #command<T>(command: HostCommand): Promise<T> {
@@ -115,47 +142,59 @@ export class TestHost implements EngineHooks {
     return this.#command({ type: 'aiCalls' })
   }
 
-  /** Stops the engine and the server, then the process. */
-  async stop(): Promise<void> {
-    if (!this.#exited) await Promise.race([this.#command({ type: 'stop' }).catch(() => undefined), new Promise((done) => setTimeout(done, 5_000))])
-    if (!this.#exited) {
-      const exited = new Promise((done) => this.#child.once('exit', done))
-      this.#child.disconnect()
-      await Promise.race([exited, new Promise((done) => setTimeout(done, 2_000))])
-      if (!this.#exited) this.#child.kill('SIGKILL')
-    }
+  /** Ends this test's engine, agent and connections before returning the loaded process. */
+  stop(): Promise<void> {
+    return this.#stopping ??= this.#finish()
+  }
+
+  async #finish(): Promise<void> {
+    try {
+      if (this.#exited) return
+      await within(this.#command({ type: 'stop' }), 5_000, 'The host did not stop its test')
+      this.#detach()
+      this.#exited = true
+      if (this.release !== undefined) this.release()
+      else await terminate(this.#child)
+    } catch (error) {
+      await terminate(this.#child)
+      throw error
+    } finally { this.#detach() }
   }
 }
 
 /**
- * A worker's hosts. It keeps one spare process loaded while a test runs, so
- * the next test does not wait for Node to load the engine (about 1.3 s).
+ * A worker's loaded processes. Each lease creates a new engine and shell on
+ * a fresh data folder. Coverage keeps a process per test so offsets cannot
+ * cross spec boundaries. A failed cleanup discards the process.
  */
 export class HostPool {
-  #spare: Child | undefined
+  #idle: Child[] = []
+  readonly #children = new Set<ChildProcess>()
 
   #take(): Child {
-    const child = this.#spare ?? forkHost()
-    this.#spare = forkHost()
+    const ready = this.#idle.pop()
+    if (ready !== undefined && ready.process.connected) return ready
+    const child = forkHost()
+    this.#children.add(child.process)
+    child.process.once('exit', () => this.#children.delete(child.process))
     return child
   }
 
   async start(fake: FakeSlack, start: Omit<HostStart, 'fakeUrl' | 'webRoot'>): Promise<TestHost> {
     const child = this.#take()
     await child.loaded
-    const host = new TestHost(child.process, fake, start.userData)
+    const host = new TestHost(child.process, fake, start.userData, start.coverage === undefined ? () => this.#idle.push(child) : undefined)
     try {
       await host.start({ ...start, fakeUrl: fake.url, webRoot: WEB_ROOT })
     } catch (error) {
-      await host.stop()
+      try { await host.stop() } finally { await terminate(child.process) }
       throw error
     }
     return host
   }
 
-  close(): void {
-    const spare = this.#spare
-    this.#spare = undefined
-    if (spare !== undefined && spare.process.connected) spare.process.disconnect()
+  async close(): Promise<void> {
+    this.#idle = []
+    await Promise.all([...this.#children].map(terminate))
   }
 }

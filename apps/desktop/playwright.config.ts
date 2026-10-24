@@ -15,11 +15,11 @@ const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 // Slack and user-data directory, so a machine of its own (bun run remote) can
 // run more with JUNO_E2E_WORKERS.
 const electronWorkers = Number(process.env.JUNO_E2E_WORKERS ?? 1)
-// A browser test is a headless page and a small Node host: about two threads
-// and 0.6 GB while it runs. One worker per two threads of the remote job's
-// allocation (a container sees every core of its host), else of this machine.
-const threads = Number(process.env.JUNO_RUNNER_JOB_CORES) || cpus().length
-const browserWorkers = Number(process.env.JUNO_BROWSER_WORKERS ?? Math.max(1, Math.floor(threads / 2)))
+// Loaded hosts and cached assets let one browser worker per allocated thread
+// keep the job busy. A container sees every core of its host, so use the
+// allocation rather than the host's count. Local full verification caps this.
+const allocatedThreads = Number(process.env.JUNO_RUNNER_JOB_CORES)
+const browserWorkers = Number(process.env.JUNO_BROWSER_WORKERS ?? Math.max(1, allocatedThreads || Math.floor(cpus().length / 2)))
 
 // The electron project runs its own files whole, and of the browser files
 // only tests tagged @electron (they need main) or @canary (they run in both).

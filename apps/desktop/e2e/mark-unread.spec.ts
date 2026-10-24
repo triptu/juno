@@ -5,8 +5,9 @@
 import type { CallRecord } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 
+
 // Starts signed in and synced (README, "Synced start").
-test.use({ synced: true })
+test.use({ synced: true, freshContext: true })
 
 test.describe.configure({ timeout: 90_000 })
 

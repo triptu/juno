@@ -1,6 +1,6 @@
 /**
  * The browser e2e lane's app host (apps/desktop/e2e/README.md, "Browser
- * lane"): one child process per test, forked by the Playwright worker
+ * lane"): a loaded child process leased per test by the Playwright worker
  * (`e2e/browser/host.ts`). It holds what Electron's main and engine process
  * hold for one window, without Electron:
  *
@@ -14,7 +14,7 @@
  * The worker sends commands over Node IPC (`HostCommand`), each answered by
  * id. The host asks the worker for a new fake Slack session when the page
  * signs in. It loads its modules before the first command, so a worker keeps
- * one spare host ready while a test runs.
+ * the process for another test after stopping all of this test's services.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
@@ -134,6 +134,7 @@ interface Running {
 }
 
 let running: Running | undefined
+let httpServer: ReturnType<typeof createServer> | undefined
 const workReplies = new Map<number, (error: string | undefined) => void>()
 let nextWork = 0
 
@@ -201,9 +202,9 @@ async function begin(start: HostStart): Promise<{ url: string }> {
   if (running !== undefined) throw new Error('The host already started')
   recordHostCoverage(start.coverage)
   const calls: Record<string, number> = {}
-  const server = createServer()
+  const server = httpServer ??= createServer()
   const sockets = new WebSocketServer({ noServer: true })
-  await new Promise<void>((resolve, reject) => {
+  if (!server.listening) await new Promise<void>((resolve, reject) => {
     server.once('error', reject)
     server.listen(0, '127.0.0.1', () => resolve())
   })
@@ -245,10 +246,10 @@ async function begin(start: HostStart): Promise<{ url: string }> {
     stopped: false,
     close: async () => {
       for (const client of sockets.clients) client.terminate()
-      await new Promise<void>((resolve) => {
-        server.close(() => resolve())
-        server.closeAllConnections()
-      })
+      await new Promise<void>((resolve) => sockets.close(() => resolve()))
+      server.removeAllListeners('request')
+      server.removeAllListeners('upgrade')
+      server.closeAllConnections()
     },
   }
   return { url }
@@ -302,13 +303,18 @@ async function stop(): Promise<void> {
   const current = running
   running = undefined
   if (current === undefined) return
-  if (!current.stopped) {
-    await current.shell.agent.stop()
-    await current.engine.stop().catch(() => undefined)
-    await current.log.close().catch(() => undefined)
+  try {
+    if (!current.stopped) {
+      await current.shell.agent.stop()
+      await current.engine.stop()
+      await current.log.close()
+    }
+  } finally {
+    await current.close()
+    await current.shell.close()
+    asks.clear()
+    for (const reply of workReplies.values()) reply('The host stopped')
   }
-  await current.close()
-  await current.shell.close()
 }
 
 async function run(command: HostCommand): Promise<unknown> {

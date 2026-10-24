@@ -1,17 +1,19 @@
 // Home (SPEC section 12, docs/design/home/): what wants the user, shown with
 // no tab open and from the sidebar's Home button; each kind of row opens its
 // topic; Mark done and Resolve all with Undo; Home with AI assist off; and
-// the caught-up state, which has no link of its own (All topics is in the sidebar);
+// the caught-up state is in home-pictures.spec.ts;
 // and a DM's row drawn as the sidebar draws its Main: the photo, named once.
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
-import { SELF_ID, startFakeSlack, TEAM } from '@juno/fake-slack'
+import { SELF_ID } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
+
 import type { Juno } from './driver/juno'
+import { readUserDb, threadId } from './driver/userDb'
 
 test.describe.configure({ timeout: 150_000 })
 // Home's AI items and title rewrites come from the background AI jobs.
-test.use({ aiJobs: true })
+test.use({ aiJobs: true, freshContext: true })
 
 /** Show a topic, then Home again, so the next step starts from a fresh Home. */
 async function freshHome(juno: Juno, via: string): Promise<string[]> {
@@ -88,7 +90,8 @@ test('during the first sync Home greets, counts as the sidebar does and shows ro
   })
 })
 
-test('Home shows what waits from the sidebar, and each row opens its topic', async ({ juno, slack, win }) => {
+test('Home shows what waits from the sidebar, and each row opens its topic', async ({ juno, slack, win, userData }) => {
+  await win.clock.install()
   await juno.signIn()
   await juno.waitForSync()
   const { home, sidebar, topic, tabs } = juno
@@ -124,11 +127,11 @@ test('Home shows what waits from the sidebar, and each row opens its topic', asy
   await topic.expectTitle('Sam')
 
   // Pick up where you left off: a topic open for a minute, then new messages.
-  // The visit's minute runs on the page's clock, so install the fake one before the topic opens.
-  await win.clock.install()
+  // The visit's minute runs on the page's clock; wait for its write before leaving.
   await sidebar.row(POSTGRES).open()
   await topic.expectTitle(POSTGRES)
   await win.clock.fastForward('01:05')
+  await expect.poll(() => readUserDb(userData, slack.fake.teamId, (db) => db.prepare('SELECT topic_id FROM topic_visits ORDER BY seen_at DESC LIMIT 1').get()?.['topic_id'])).toBe(threadId(slack, POSTGRES))
   await sidebar.row(OFFSITE).open()
   await topic.expectTitle(OFFSITE)
   slack.as('Dev').replyIn(POSTGRES, 'Dry run is green. Ready for the window.')
@@ -239,34 +242,4 @@ test('with AI assist off, Home shows the rules alone, with their plain titles an
   await expect(relaunched.win.locator('main').getByText('What do you need?')).toHaveCount(0)
   await expect(relaunched.win.locator('main').getByRole('textbox', { name: /^Ask Juno/ })).toBeDisabled()
 
-})
-
-/** A workspace where everything is read and nobody waits: Home is caught up. */
-const quiet = test.extend({
-  // oxlint-disable-next-line no-empty-pattern
-  fake: async ({}, use) => {
-    const fake = await startFakeSlack({
-      seed: (workspace, avatarBase) => {
-        const now = workspace.clock.now()
-        for (const [id, name] of [[SELF_ID, 'Tushar'], ['U0LEO', 'Leo Park']] as const) {
-          workspace.addUser({ id, team_id: TEAM.id, name, real_name: name, profile: { display_name: name, image_72: `${avatarBase}/${id}.svg` } })
-        }
-        workspace.addConversation({ id: 'C0QUIET', name: 'general', kind: 'public', members: new Set([SELF_ID, 'U0LEO']), created: now, topic: '', purpose: '', isOpen: true, archived: false })
-        const last = workspace.post({ channel: 'C0QUIET', user: 'U0LEO', text: 'Release notes are out.', at: now - 60 * 60_000, silent: true })
-        workspace.reads.set('C0QUIET', last.ts)
-      },
-    })
-    await use(fake)
-    await fake.close()
-  },
-})
-
-quiet('caught up, Home says so and leaves All topics to the sidebar', async ({ juno }) => {
-  await juno.signIn()
-  await juno.waitForSync()
-  const { home } = juno
-  await home.open()
-  await expect(home.greeting).toHaveText('All caught up.')
-  expect(await home.kinds()).toEqual([])
-  await expect(home.root.getByRole('button', { name: 'Browse all topics' })).toHaveCount(0)
 })

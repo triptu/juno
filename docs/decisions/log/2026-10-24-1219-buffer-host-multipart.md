@@ -1,0 +1,1 @@
+- 10-24 12:19 · Encode host multipart requests before cancellation · Node 26.11.1 can enqueue multipart bytes after shutdown has closed the request stream. The fake Slack boundary buffers multipart encoding before the cancellable fetch, so a test can quit during first sync without crashing its reusable host.

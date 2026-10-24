@@ -2,6 +2,7 @@ import { test as base, type Browser, type BrowserContext, type ElectronApplicati
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 import type { AgentOptions } from '../web/host/agent'
 import { HostPool } from './browser/host'
+import { WebPages } from './browser/pages'
 import { startWebApp } from './browser/running'
 import { copySnapshot, matchingFake as matchingWebFake, snapshotState, webSnapshot, type WebSnapshot } from './browser/snapshot'
 import { electronSurface, webSurface, type AppSurface } from './driver/surface'
@@ -20,6 +21,8 @@ import { launchApp, launchTiming, tempUserData, writeSlackApp, type Lane, type L
 export * from './launch'
 
 export interface Fixtures {
+  /** Clock installation changes the whole context; these tests discard it after use. */
+  readonly freshContext: boolean
   readonly webPage: Page | undefined
   readonly otherApp: (options: AgentOptions) => Promise<Juno>
   readonly agentOptions: AgentOptions
@@ -80,8 +83,9 @@ export interface WorkerFixtures {
   /** The X display this worker's apps open on; undefined on macOS and in the browser project. */
   readonly display: string | undefined
   readonly syncedWorkspaces: SyncedWorkspaces
-  /** The browser project's test hosts, with one spare kept loaded. */
+  /** Loaded browser hosts; every lease starts a fresh engine on its test's data folder. */
   readonly hostPool: HostPool
+  readonly webPages: () => Promise<WebPages>
 }
 
 type SyncOptions = Pick<LaunchOptions, 'timing' | 'fakeAiDelayMillis'>
@@ -149,7 +153,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     async ({}, use) => {
       const pool = new HostPool()
       await use(pool)
-      pool.close()
+      await pool.close()
     },
     { scope: 'worker' },
   ],
@@ -161,18 +165,31 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     },
     { scope: 'worker' },
   ],
-  webPage: async ({ lane, webBrowser, viewport, permissions }, use, info) => {
+  webPages: [
+    async ({ webBrowser }, use) => {
+      let pages: WebPages | undefined
+      await use(async () => pages ??= new WebPages(await webBrowser()))
+      await pages?.close()
+    },
+    { scope: 'worker' },
+  ],
+  freshContext: [false, { option: true }],
+  webPage: async ({ lane, webPages, viewport, permissions, freshContext }, use, info) => {
     if (lane !== 'web') return use(undefined)
-    const context = await (await webBrowser()).newContext({ viewport, permissions })
+    const pages = await webPages()
+    if (freshContext) await pages.close()
+    const page = await pages.open({ viewport, permissions })
+    const context = page.context()
     const trace = process.env.JUNO_E2E_TRACE === '1'
     if (trace) await context.tracing.start({ screenshots: true, snapshots: true, sources: true })
-    try { await use(await context.newPage()) } finally {
+    try { await use(page) } finally {
       if (trace) {
         const path = info.outputPath('trace.zip')
         await context.tracing.stop(info.status === info.expectedStatus ? {} : { path })
         if (info.status !== info.expectedStatus) await info.attach('trace', { path, contentType: 'application/zip' })
       }
-      await context.close()
+      await pages.release(page)
+      if (freshContext) await pages.close()
     }
   },
   synced: [false, { option: true }],
