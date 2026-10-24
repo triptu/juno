@@ -1,0 +1,1 @@
+- 10-24 12:50 · Close backup writers before shared-folder cleanup · The backup canary owns its folder in an automatic fixture, which starts before either app and tears down after both. Removing it while a backup was being written caused ENOTEMPTY; retries would hide the lifetime error.

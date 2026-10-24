@@ -4,6 +4,8 @@ A short, dated record of product and engineering decisions, newest first. Big st
 
 Format: `- MM-DD HH:MM · who · decision. Why, if not obvious.`
 
+- 10-24 12:50 · Close backup writers before shared-folder cleanup · The backup canary owns its folder in an automatic fixture, which starts before either app and tears down after both. Removing it while a backup was being written caused ENOTEMPTY; retries would hide the lifetime error.
+- 10-24 12:50 · Size browser fixtures for their behavior · Broadcast flows start from the synced snapshot. The title-line layout flow uses 320 topics instead of 1,200 and asserts more than 2,400 pixels of scroll range, preserving its virtualized scrolling and anchor checks without a workspace-scale sync.
 - 10-24 12:41 · Keep focus when changing viewer files · Moving from a focused Markdown link to another file removes that link. Move focus to the viewer before replacing its item so arrows and Escape keep working; the combined file-reading flow checks that it closes before opening audio.
 - 10-24 12:36 · Tushar · Discover tool suites only from commands naming tool test files. A bare bun test in the engine benchmark is not a tool suite and must not run for an unrelated planner change.
 - 10-24 12:35 · Tushar · Affected sends repo-tool, health and runner suites to the laptop. They do not take the Mac heavy lock; isolated queue tests use their own temporary reservations, and individual light files may run here.

@@ -10,6 +10,8 @@ import { expect, test } from './fixtures'
 import { watchFlashes } from './driver/flashes'
 import type { Juno } from './driver/juno'
 
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 const ENG_MAIN = '#eng'
@@ -18,8 +20,6 @@ const MINE = "Good. What's the rollback if replication lags on cutover day?"
 const LEOS = 'We keep the old primary warm for 48h'
 
 async function openPostgresThread(juno: Juno): Promise<void> {
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.sidebar.row(ENG_MAIN).open()
   await juno.topic.expectTitle('Main')
   await juno.topic.threadLinkUnder(ROOT).open()
@@ -36,7 +36,7 @@ async function press(juno: Juno, target: Locator): Promise<void> {
   await juno.win.mouse.up()
 }
 
-test('Also send to #eng sends your own reply to the channel, and Main shows it at once', async ({ juno, fake }, testInfo) => {
+test('Also send to #eng sends your own reply to the channel, and Main shows it at once', async ({ juno, fake }) => {
   await openPostgresThread(juno)
   await juno.setTheme('Dark')
   await juno.sidebar.row(ROOT, { exact: true }).open()
@@ -69,8 +69,6 @@ test('Also send to #eng sends your own reply to the channel, and Main shows it a
   expect(updates[0]!.args).toMatchObject({ channel: 'C0ENG', ts: stored()!.ts, reply_broadcast: 'true' })
   expect(updates[0]!.args['text']).toBeUndefined()
 
-  await juno.win.screenshot({ path: testInfo.outputPath('main-topic-link-dark.png') })
-
   // Sent, the reply's menu no longer offers it.
   await topic.threadLinkUnder(ROOT).open()
   await expect(topic.message(MINE)).toContainText('also sent to the channel')
@@ -78,12 +76,10 @@ test('Also send to #eng sends your own reply to the channel, and Main shows it a
 })
 
 test("the topic title in Main opens the topic at the reply, which flashes", async ({ juno, fake }) => {
-  const root = fake.messages('C0ENG').find((message) => message.text?.startsWith(ROOT) === true)!
-  fake.injectMessage({ channel: 'C0ENG', user: 'U0DEV', text: 'Dry run passed on staging.', threadTs: root.ts, broadcast: true })
-  await juno.signIn()
-  await juno.waitForSync()
   await juno.sidebar.row(ENG_MAIN).open()
   await juno.topic.expectTitle('Main')
+  const root = fake.messages('C0ENG').find((message) => message.text?.startsWith(ROOT) === true)!
+  fake.injectMessage({ channel: 'C0ENG', user: 'U0DEV', text: 'Dry run passed on staging.', threadTs: root.ts, broadcast: true })
   const { topic } = juno
 
   const source = topic.message('Dry run passed on staging.').locator('[data-broadcast-source]')
@@ -169,11 +165,10 @@ test('an edit and broadcast of one reply keep their order and separate calls', a
 })
 
 test('Main follows a renamed topic title', async ({ juno, fake }) => {
+  await juno.sidebar.row(ENG_MAIN).open()
+  await juno.topic.expectTitle('Main')
   const root = fake.messages('C0ENG').find((message) => message.text?.startsWith(ROOT) === true)!
   fake.injectMessage({ channel: 'C0ENG', user: 'U0DEV', text: 'The rollout is ready.', threadTs: root.ts, broadcast: true })
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.sidebar.row(ENG_MAIN).open()
   const source = juno.topic.message('The rollout is ready.').locator('[data-broadcast-source]')
   await expect(source).toHaveText(`in ${ROOT}`)
   await juno.sidebar.row(ROOT, { exact: true }).chooseInMenu('rename')

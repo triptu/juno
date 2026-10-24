@@ -12,12 +12,13 @@ import { expect, JunoChatPane, test as base } from './chat'
 const BACKUP_INTERVAL_MS = 1_000
 
 const test = base.extend<{ readonly shared: string }>({
+  // Start before either app so both close before this folder is removed.
   // oxlint-disable-next-line no-empty-pattern
-  shared: async ({}, use) => {
+  shared: [async ({}, use) => {
     const dir = await mkdtemp(join(tmpdir(), 'juno-shared-backup-'))
     await use(dir)
     await rm(dir, { recursive: true, force: true })
-  },
+  }, { auto: true }],
   agentOptions: async ({ model }, use) => use({ agent: true, fakeOpenRouterUrl: model.origin, deviceName: 'Studio', backupIntervalMs: BACKUP_INTERVAL_MS }),
 })
 

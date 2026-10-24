@@ -1,0 +1,1 @@
+- 10-24 12:50 · Size browser fixtures for their behavior · Broadcast flows start from the synced snapshot. The title-line layout flow uses 320 topics instead of 1,200 and asserts more than 2,400 pixels of scroll range, preserving its virtualized scrolling and anchor checks without a workspace-scale sync.

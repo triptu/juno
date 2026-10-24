@@ -5,7 +5,7 @@ import { expectStableAnchor } from './shiftProbe'
 const test = base.extend({
   // oxlint-disable-next-line no-empty-pattern
   fake: async ({}, use) => {
-    const fake = await startFakeSlack({ seed: largeSeed({ topics: 1_200, messages: 12_000, users: 400, channels: { public: 60, private: 20, dms: 30, mpims: 10 } }) })
+    const fake = await startFakeSlack({ seed: largeSeed({ topics: 320, messages: 3_200, users: 40, channels: { public: 8, private: 2, dms: 6, mpims: 2 } }) })
     await use(fake)
     await fake.close()
   },
@@ -15,7 +15,7 @@ test('topic title lines apply immediately, keep the scrolled row anchored, and s
   test.setTimeout(180_000)
   await juno.signIn()
   await juno.waitForSync()
-  const firstTitle = await juno.sidebar.rows.first().locator('[data-row-part="title"]').innerText()
+  const firstTitle = await juno.sidebar.list.locator('[data-topic-row][data-topic-id^="t:"]').first().locator('[data-row-part="title"]').innerText()
   await juno.sidebar.row(firstTitle, { exact: true }).chooseInMenu('rename')
   await juno.rename('Plan')
   await juno.openSettings('Appearance')
@@ -37,6 +37,7 @@ test('topic title lines apply immediately, keep the scrolled row anchored, and s
     else expect(row.height).toBeGreaterThan(old.height)
   }
   const list = juno.sidebar.list
+  expect(await list.evaluate((node) => node.scrollHeight - node.clientHeight)).toBeGreaterThan(2_400)
   const box = (await list.boundingBox())!
   await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
   await win.evaluate(() => {
