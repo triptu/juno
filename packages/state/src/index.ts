@@ -50,6 +50,7 @@ export {
   channelThreadsAtom,
   channelTopicsAtom,
   loadMessageAt,
+  loadNewerMessages,
   loadOlderMessages,
   locateMessage,
   locatePerson,

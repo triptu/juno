@@ -15,6 +15,8 @@
  *   Call it once when a tab shows the topic; prefetch never calls it.
  * - `messages.loadOlder`: make sure the page before a message is stored,
  *   fetching it when it is not.
+ * - `messages.loadNewer`: make sure the replies after a thread's last shown
+ *   row are stored, when the store cannot prove them (`meta.gapAfter`).
  * - `messages.loadAt`: make sure one message is stored in full, for a jump
  *   to it (a search match, a link, a cited message).
  *
@@ -319,6 +321,25 @@ export const messagesLoadOlder = Rpc.make('messages.loadOlder', {
   error: NotFound,
 })
 
+export const NewerResult = Schema.Struct({
+  outcome: FetchOutcome,
+  /** Nothing after `after` is unknown: the window can show the thread to its newest reply. Stop asking. */
+  complete: Schema.Boolean,
+})
+export type NewerResult = typeof NewerResult.Type
+
+/**
+ * Makes sure the replies after `after` (a thread's last shown row) are
+ * stored, fetching one page on the interactive lane when the store cannot
+ * prove them. Main answers `cached`: its window ends at its newest message.
+ * The container then widens `messages.list`.
+ */
+export const messagesLoadNewer = Rpc.make('messages.loadNewer', {
+  payload: { id: Schema.String, after: Schema.String },
+  success: NewerResult,
+  error: NotFound,
+})
+
 /**
  * Makes sure the message `ts` of a topic is stored in full, fetching it on
  * the interactive lane when it is not: a bounded read around it, whatever
@@ -362,4 +383,4 @@ export const peopleLocate = Rpc.make('people.locate', {
   error: NotSignedIn,
 })
 
-export const MessagesRoutes = RpcGroup.make(messagesList, topicsGet, channelThreads, topicsOpen, messagesLoadOlder, messagesLoadAt, messagesLocate, peopleLocate)
+export const MessagesRoutes = RpcGroup.make(messagesList, topicsGet, channelThreads, topicsOpen, messagesLoadOlder, messagesLoadNewer, messagesLoadAt, messagesLocate, peopleLocate)

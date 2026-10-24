@@ -131,6 +131,10 @@ export interface ListRun<Row> {
   readonly windowCovered?: boolean
   /** The window holds the list's newest row; see `LiveMeta.atNewest`. */
   readonly atNewest?: boolean
+  /** A thread window stops at replies the store cannot prove continuous with its first row (`LiveMeta.gapBefore`). */
+  readonly gapBefore?: boolean
+  /** The same after its last row (`LiveMeta.gapAfter`). */
+  readonly gapAfter?: boolean
   /**
    * Every person and channel the rows name. `serveLiveList` sends only the
    * ones the subscription has not been sent, or that changed since.
@@ -166,6 +170,7 @@ export function serveLiveList<Row extends RowLike, E, SE, R>(
   let seq = 0
   let windowCovered: boolean | undefined
   let atNewest: boolean | undefined
+  let gaps = ''
   let order: ReadonlyArray<string> = []
   let revById = new Map<string, number>()
   const sentPeople = new Map<string, Person>()
@@ -198,7 +203,8 @@ export function serveLiveList<Row extends RowLike, E, SE, R>(
           people.length === 0 && channels.length === 0 && art.length === 0
             ? undefined
             : { ...(people.length === 0 ? {} : { people }), ...(channels.length === 0 ? {} : { channels }), ...(art.length === 0 ? {} : { art }) }
-        if (windowCovered === run.windowCovered && atNewest === run.atNewest && !reset && upsert.length === 0 && remove.length === 0 && refs === undefined && sameOrder(order, nextOrder)) return Option.none()
+        const runGaps = `${run.gapBefore === true ? 'b' : ''}${run.gapAfter === true ? 'a' : ''}`
+        if (windowCovered === run.windowCovered && atNewest === run.atNewest && gaps === runGaps && !reset && upsert.length === 0 && remove.length === 0 && refs === undefined && sameOrder(order, nextOrder)) return Option.none()
         let encodeMs = 0
         if (options.measure) {
           const measured = measureEncode(() => upsert.map(options.encodeRow))
@@ -215,7 +221,13 @@ export function serveLiveList<Row extends RowLike, E, SE, R>(
         for (const drawing of art) sentArt.set(drawing.id, drawing)
         windowCovered = run.windowCovered
         atNewest = run.atNewest
-        const meta: LiveMeta = { ...(windowCovered === undefined ? {} : { windowCovered }), ...(atNewest === undefined ? {} : { atNewest }), seq: ++seq, queryMs, encodeMs, at, ...(outcome.success.own ? { own: true } : {}), ...(run.total === undefined ? {} : { total: run.total }) }
+        gaps = runGaps
+        const meta: LiveMeta = {
+          ...(windowCovered === undefined ? {} : { windowCovered }),
+          ...(atNewest === undefined ? {} : { atNewest }),
+          ...(run.gapBefore === true ? { gapBefore: true } : {}),
+          ...(run.gapAfter === true ? { gapAfter: true } : {}),
+          seq: ++seq, queryMs, encodeMs, at, ...(outcome.success.own ? { own: true } : {}), ...(run.total === undefined ? {} : { total: run.total }) }
         return Option.some({ reset, order, upsert, remove, ...(refs === undefined ? {} : { refs }), meta })
       }),
     ),

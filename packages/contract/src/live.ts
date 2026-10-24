@@ -64,6 +64,17 @@ export const LiveMeta = Schema.Struct({
   windowCovered: Schema.optionalKey(Schema.Boolean),
   /** The window holds the list's newest row. A window around an anchor can, when the rows after the anchor fit in it. */
   atNewest: Schema.optionalKey(Schema.Boolean),
+  /**
+   * A thread's window stops before replies the store cannot prove continuous
+   * with its first row: scrolling up asks for them (`messages.loadOlder`).
+   */
+  gapBefore: Schema.optionalKey(Schema.Boolean),
+  /**
+   * A thread's window stops before replies the store cannot prove continuous
+   * with its last row, or cannot prove its last row is the newest: scrolling
+   * down asks for them (`messages.loadNewer`).
+   */
+  gapAfter: Schema.optionalKey(Schema.Boolean),
   /** The last query run failed; the data shown is from the previous run. */
   error: Schema.optionalKey(Schema.String),
 })

@@ -119,7 +119,7 @@ export const MessagesHandlers = MessagesRoutes.toLayer(
           before: Math.max(0, payload.before ?? MESSAGE_WINDOW_BEFORE),
           limit: Math.max(1, Math.min(MESSAGE_WINDOW_MAX, payload.range.limit)),
         }
-        const keys: InvalidationKeys = { messages: target.kind === 'main' || pendingThread(payload.id) !== undefined ? [payload.id, `channel:${target.channel}`] : [payload.id], users: [], conversations: [], usergroups: [], emoji: [], team: [], sync_state: [], synced_ranges: [target.channel], thread_cursors: target.kind === 'main' ? [] : [payload.id] }
+        const keys: InvalidationKeys = { messages: target.kind === 'main' || pendingThread(payload.id) !== undefined ? [payload.id, `channel:${target.channel}`] : [payload.id], users: [], conversations: [], usergroups: [], emoji: [], team: [], sync_state: [], synced_ranges: [target.channel], thread_ranges: target.kind === 'main' ? [] : [payload.id] }
         const setup = Effect.gen(function* () {
           const cache = makeMessageCache()
           const invalidation = yield* Invalidation
@@ -218,6 +218,13 @@ export const MessagesHandlers = MessagesRoutes.toLayer(
           if (targetOf(payload.id) === undefined) return yield* new NotFound({ kind: 'topic', id: payload.id })
           if (pendingThread(payload.id) !== undefined) return { outcome: 'cached' as const, complete: true }
           const { outcome, report } = yield* fetch((fetcher) => fetcher.older(payload.id, payload.before))
+          return { outcome, complete: report?.complete ?? false }
+        }),
+      'messages.loadNewer': (payload) =>
+        Effect.gen(function* () {
+          if (targetOf(payload.id) === undefined) return yield* new NotFound({ kind: 'topic', id: payload.id })
+          if (pendingThread(payload.id) !== undefined) return { outcome: 'cached' as const, complete: true }
+          const { outcome, report } = yield* fetch((fetcher) => fetcher.newer(payload.id, payload.after))
           return { outcome, complete: report?.complete ?? false }
         }),
       'messages.loadAt': (payload) =>

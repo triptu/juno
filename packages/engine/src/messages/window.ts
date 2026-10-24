@@ -125,19 +125,26 @@ export function reactionsStatement(channel: string, ts: ReadonlyArray<string>): 
   }
 }
 
-/** One earliest reply per linked root, through messages_thread. Tail-only caches cannot identify the first reply. */
+/**
+ * One earliest reply per linked root, through messages_thread. A cache that
+ * holds only a thread's tail cannot tell its first reply, so the earliest
+ * stored one counts only when it is the root's only reply or a range from
+ * the root proves nothing comes before it (`thread_ranges`).
+ */
 export function firstRepliesStatement(channel: string, roots: ReadonlyArray<string>): Statement {
   return {
     sql: `SELECT ${MESSAGE_COLUMNS} FROM messages WHERE channel = ? AND ts IN (
-      SELECT (SELECT r.ts FROM messages r
-        WHERE r.channel = root.channel AND r.thread_ts = root.ts AND r.ts > root.ts
-          AND r.deleted = 0
-        ORDER BY r.ts LIMIT 1)
-      FROM messages root LEFT JOIN thread_cursors c ON c.channel = root.channel AND c.thread_ts = root.ts
-      WHERE root.channel = ? AND root.ts IN (${roots.map(() => '?').join(', ')})
-        AND (root.reply_count = 1 OR c.replies_complete = 1 OR c.complete_from <= root.ts)
+      SELECT first.ts FROM (
+        SELECT root.ts AS root_ts, root.reply_count, (SELECT r.ts FROM messages r
+          WHERE r.channel = root.channel AND r.thread_ts = root.ts AND r.ts > root.ts
+            AND r.deleted = 0
+          ORDER BY r.ts LIMIT 1) AS ts
+        FROM messages root WHERE root.channel = ? AND root.ts IN (${roots.map(() => '?').join(', ')})
+      ) first
+      WHERE first.reply_count = 1 OR EXISTS (SELECT 1 FROM thread_ranges c
+        WHERE c.channel = ? AND c.thread_ts = first.root_ts AND c.from_ts <= first.root_ts AND (c.tail = 'live' OR c.to_ts >= first.ts))
     )`,
-    params: [channel, channel, ...roots],
+    params: [channel, channel, ...roots, channel],
   }
 }
 

@@ -44,7 +44,7 @@ import {
 import { editMarkup, emojiUnicode, messageBody, readableText, splitEmojiName, type MessageBody, type MessageContent, type UsergroupName } from '@juno/richtext'
 import { syncState, StoreReader, type SqlClient, type SqlError } from '@juno/store'
 import { imagesWithoutThumbs, type PendingFile } from '@juno/sync'
-import { windowCovered } from './coverage'
+import { clipThread, threadCoverage, windowCovered, type ThreadCoverage } from './coverage'
 import { broadcastTitles } from './broadcastTitles'
 import { uploadsUrl } from '../staging'
 import type { ListRun } from '../protocol/live'
@@ -180,16 +180,19 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     // The older statement reads one extra row, the message before the window (see `windowStatements`).
     const older = yield* sql.unsafe<WindowMessage>(statements[0]!.sql, statements[0]!.params)
     const olderCount = statements.length === 1 ? range.limit : Math.min(range.before, range.limit)
-    const beforeWindow = older[olderCount]
+    let beforeWindow = older[olderCount]
     const shown = older.slice(0, olderCount).toReversed()
     let stored: ReadonlyArray<WindowMessage>
     let atNewest = true
+    // The message just after the window, when the newer statement read one.
+    let afterWindow: WindowMessage | undefined
     if (statements.length === 1) {
       stored = shown
     } else {
       const newer = yield* sql.unsafe<WindowMessage>(statements[1]!.sql, statements[1]!.params)
       const room = Math.max(0, range.limit - shown.length)
       atNewest = newer.length <= room
+      afterWindow = newer[room]
       stored = [...shown, ...newer.slice(0, room)]
     }
     // A root with no reply yet is outside the thread scope; it still comes first.
@@ -197,6 +200,19 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
       const statement = rootStatement(target)
       const root = (yield* sql.unsafe<WindowMessage>(statement.sql, statement.params))[0]
       if (root !== undefined) stored = [root, ...stored]
+    }
+    // A thread shows only the stretch around the anchor that its ranges prove continuous (`clipThread`).
+    let coverage: ThreadCoverage | undefined
+    let gapBefore = false
+    let gapAfter = false
+    if (target.kind === 'thread' && !target.threadTs.startsWith('pending:')) {
+      coverage = yield* threadCoverage(target)
+      const clipped = clipThread(stored, { threadTs: target.threadTs, anchor: range.anchor, previous: beforeWindow, next: afterWindow, atNewest, coverage })
+      if (clipped.rows.at(-1) !== stored.at(-1)) atNewest = false
+      stored = clipped.rows
+      beforeWindow = clipped.previous
+      gapBefore = clipped.gapBefore
+      gapAfter = clipped.gapAfter
     }
 
     const team = yield* sql<{ self_user_id: string | null }>`SELECT self_user_id FROM team LIMIT 1`
@@ -394,7 +410,15 @@ export const listMessages = (target: WindowTarget, range: MessageRange, cache: M
     }
     cache.rows = nextRows
     cache.people = people
-    return { rows: out, total: out.length, atNewest, windowCovered: yield* windowCovered(target, stored[0]?.ts), refs: { people: [...people.values()] } }
+    return {
+      rows: out,
+      total: out.length,
+      atNewest,
+      windowCovered: yield* windowCovered(target, stored[0]?.ts, coverage),
+      ...(gapBefore ? { gapBefore } : {}),
+      ...(gapAfter ? { gapAfter } : {}),
+      refs: { people: [...people.values()] },
+    }
   })
 
 /** Ids a body asked for that the cache lacked, for `readWanted`. */
