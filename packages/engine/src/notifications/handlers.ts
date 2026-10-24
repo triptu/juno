@@ -30,7 +30,6 @@ import {
 import {
   alwaysNotifyOf,
   localTime,
-  normalHours,
   notifyChoice,
   parseTopicId,
   pausedLabel,
@@ -38,6 +37,7 @@ import {
   scheduledPresence,
   seenNote,
   threadNotifyChoice,
+  withGroupHours,
   type NotificationSettings,
   type NotifyChoice,
   type NotifyLevel,
@@ -163,8 +163,8 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
     const changeHours = (which: 'notifications' | 'presence', change: (hours: Hours) => Hours) =>
       Effect.gen(function* () {
         yield* updateSettings((settings) => (which === 'notifications'
-          ? { ...settings, notificationHours: normalHours(change(settings.notificationHours)) }
-          : { ...settings, presenceHours: normalHours(change(settings.presenceHours)) }))
+          ? { ...settings, notificationHours: change(settings.notificationHours) }
+          : { ...settings, presenceHours: change(settings.presenceHours) }))
         // Only hours the owner set reach Slack's schedule (`../slackSchedule.ts`).
         if (which === 'notifications') yield* inWorkspace(slackSchedule.hoursSet.pipe(Effect.orDie))
       })
@@ -241,18 +241,7 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
           // run read (the two start together), so it is not dropped: it costs one more run.
           runs(SETTINGS_KEYS, status, Stream.merge(Stream.merge(control.presence, selfPresence.changes), Stream.tick('1 minute').pipe(Stream.drop(1)))),
         ).pipe(retryFirstRun('notifications.status'), Stream.orDie),
-      'notifications.setHours': ({ which, hours }) => changeHours(which, (saved) => ({ ...saved, ...hours })),
-      'notifications.setDay': ({ which, day, enabled }) => changeHours(which, (saved) => ({
-        ...saved,
-        days: enabled ? [...saved.days.filter((other) => other !== day), day].toSorted((a, b) => a - b) : saved.days.filter((other) => other !== day),
-      })),
-      'notifications.setDayHours': ({ day, from, to }) => changeHours('notifications', (saved) => {
-        const current = saved.dayHours?.find((own) => own.day === day) ?? saved
-        const own = { day, from: from ?? current.from, to: to ?? current.to }
-        // A day given hours is on.
-        const days = saved.days.includes(day) ? saved.days : [...saved.days, day].toSorted((a, b) => a - b)
-        return { ...saved, days, dayHours: [...(saved.dayHours ?? []).filter((other) => other.day !== day), own] }
-      }),
+      'notifications.setGroupHours': ({ which, group, hours }) => changeHours(which, (saved) => withGroupHours(saved, group, hours)),
       'notifications.setAlwaysNotify': ({ which, enabled }) =>
         updateSettings((settings) => ({ ...settings, alwaysNotify: { ...settings.alwaysNotify, [which]: enabled } })).pipe(Effect.asVoid),
       'notifications.saveInstruction': ({ id, direction, text }) =>

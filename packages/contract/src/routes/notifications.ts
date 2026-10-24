@@ -12,9 +12,10 @@
  *   with until when, what Slack shows colleagues when it differs, and
  *   "Paused until 9am" outside notification hours. `seen` drives the
  *   avatar's dot.
- * - The setters write the settings. `notifications.setDayHours` gives one
- *   day its own notification hours (SPEC 14, "Different hours on some days"). `notifications.setLevel` returns an
- *   undo (ADR 0010); on a thread it also follows or unfollows it (SPEC 5).
+ * - The setters write the settings. `notifications.setGroupHours` sets one
+ *   row of either set of hours: weekdays, Saturday or Sunday (SPEC 14).
+ *   `notifications.setLevel` returns an undo (ADR 0010); on a thread it
+ *   also follows or unfollows it (SPEC 5).
  * - `notifications.setAlwaysNotify` is one of the five Always notify switches.
  * - `notifications.saveInstruction` and `notifications.removeInstruction`
  *   edit Your instructions. `notifications.checkInstruction` asks once,
@@ -46,6 +47,9 @@ export type DayHours = typeof DayHours.Type
  */
 export const Hours = Schema.Struct({ days: Schema.Array(Weekday), from: Minute, to: Minute, dayHours: Schema.optionalKey(Schema.Array(DayHours)) })
 export type Hours = typeof Hours.Type
+
+/** How Settings reads one row of hours, reached here because the renderer does not import domain. */
+export { groupHours, type HoursGroup } from '@juno/domain'
 
 /** A stored level. Auto, the default, is no entry. */
 export const NotifyLevel = Schema.Literals(['always', 'never'])
@@ -186,23 +190,17 @@ export type NotificationStatus = typeof NotificationStatus.Type
 
 export const notificationsStatus = liveValueRoute('notifications.status', { value: NotificationStatus })
 
-/** Changes the given parts of the hours. `dayHours` replaces every day's own hours; an empty list gives every day the shared hours. */
-export const notificationsSetHours = Rpc.make('notifications.setHours', {
-  payload: { which: Schema.Literals(['notifications', 'presence']), hours: Hours.mapFields(({ days, from, to, dayHours }) => ({ days: Schema.optionalKey(days), from: Schema.optionalKey(from), to: Schema.optionalKey(to), dayHours })) },
-  success: Schema.Void,
-  error: NotSignedIn,
-})
-
-/** Sets one day's own notification hours, from or to or both, without resending the other days. A day given hours is on. */
-export const notificationsSetDayHours = Rpc.make('notifications.setDayHours', {
-  payload: { day: Weekday, from: Schema.optionalKey(Minute), to: Schema.optionalKey(Minute) },
-  success: Schema.Void,
-  error: NotSignedIn,
-})
-
-/** Sets one day without resending the other days from a possibly older page. */
-export const notificationsSetDay = Rpc.make('notifications.setDay', {
-  payload: { which: Schema.Literals(['notifications', 'presence']), day: Weekday, enabled: Schema.Boolean },
+/**
+ * Sets one row of the notification or active hours: weekdays (Monday to Friday together), Saturday or Sunday. A from or to
+ * turns the row on and keeps its other edge; `off` turns it off. Only the edge that changed is sent, so two quick changes
+ * never replace each other with an older page's hours.
+ */
+export const notificationsSetGroupHours = Rpc.make('notifications.setGroupHours', {
+  payload: {
+    which: Schema.Literals(['notifications', 'presence']),
+    group: Schema.Literals(['weekdays', 'saturday', 'sunday']),
+    hours: Schema.Union([Schema.Struct({ from: Schema.optionalKey(Minute), to: Schema.optionalKey(Minute) }), Schema.Literal('off')]),
+  },
   success: Schema.Void,
   error: NotSignedIn,
 })
@@ -278,9 +276,7 @@ export const NotificationsRoutes = RpcGroup.make(
   notificationsSettings,
   notificationsPage,
   notificationsStatus,
-  notificationsSetHours,
-  notificationsSetDay,
-  notificationsSetDayHours,
+  notificationsSetGroupHours,
   notificationsDecisions,
   notificationsSetAlwaysNotify,
   notificationsSaveInstruction,
