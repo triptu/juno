@@ -118,7 +118,7 @@ export default defineFixtures(
       'picker-open': page({ place: placePicker({ open: true, conversations: recent }) }),
       // The picker open with "ma" typed: a DM, a group DM and a channel.
       'picker-query': page({ place: placePicker({ open: true, query: 'ma', conversations: maQuery }) }),
-      // A narrow window: the controls wrap under the tabs, nothing overlaps.
+      // A narrow window: Status becomes a picker and the other controls wrap without overlapping.
       narrow: page({ place: placePicker({ place: eng }) }, { width: 560, height: 480 }),
     },
     Size: {

@@ -34,7 +34,7 @@ export function ThreadLink({ link, people, onOpen, tabIndex = 0 }: ThreadLinkPro
       {...activateHandlers<HTMLDivElement>((event) => onOpen(link.id, event))}
       {...stylex.props(styles.link, focusRing.outside)}
     >
-      {repliers.length > 0 ? <AvatarStack people={repliers} max={3} size={16} surface="surface" /> : <Icon icon={ChatsCircle} size={13} />}
+      {repliers.length > 0 ? <AvatarStack people={repliers} max={3} size={16} surface="surface" /> : <Icon icon={ChatsCircle} size={16} />}
       <span {...stylex.props(styles.count)}>{link.label}</span>
       {link.preview === undefined ? null : (
         <Text data-sensitive variant="meta" tone="inherit" truncate tooltipWhenTruncated dir="auto" as="span" sx={styles.preview}>

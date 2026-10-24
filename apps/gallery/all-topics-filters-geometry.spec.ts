@@ -11,18 +11,19 @@ function measure() {
     const b = element.getBoundingClientRect()
     return { x: b.x, y: b.y, right: b.right, bottom: b.bottom, width: b.width, height: b.height }
   }
+  const status = row.querySelector('[role="radiogroup"][aria-label="Status"]')!
   const controls = [
-    row.querySelector('[role="radiogroup"][aria-label="Status"]')!,
+    status.checkVisibility() ? status : row.querySelector('select[aria-label="Status"]')!,
     row.querySelector('[role="radiogroup"][aria-label="Kind"]')!,
     row.querySelector('button[aria-label^="Where: "]')!,
     row.querySelector('select[aria-label="Sort"]')!,
   ]
-  const segments = [...row.querySelectorAll('[role="radiogroup"][aria-label="Status"] [role="radio"]')]
+  const segments = [...row.querySelectorAll('[role="radiogroup"][aria-label="Status"] [role="radio"]')].filter((segment) => segment.checkVisibility())
   return {
     row: box(row),
     controls: controls.map(box),
     // Everything the pointer can press in the row, outside the four controls: a stray chevron would show here.
-    // The Status pop-up of a compact page is not drawn at these widths.
+    // Status is the segmented control or the narrow page's picker.
     extras: [...row.querySelectorAll('button, select, [role="button"]')].filter((element) => element.getClientRects().length > 0 && !controls.some((control) => control === element || control.contains(element))).length,
     clipped: controls.filter((control) => control.scrollWidth > control.clientWidth + 1).length,
     segments: segments.map(box),

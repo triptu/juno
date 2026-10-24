@@ -1,0 +1,1 @@
+- 10-24 13:26 · Reserve late topic content · Thread-link fallback icons match the first avatar’s size. All topics keeps the preview line when empty, and status counts reserve four tabular digits; the narrow status picker appears earlier to fit. These fix measured shifts during live reply arrival and cold sync.

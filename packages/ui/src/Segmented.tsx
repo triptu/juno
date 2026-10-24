@@ -107,6 +107,8 @@ const styles = stylex.create({
     },
   },
   count: {
+    minWidth: '4ch', // tokens-allow: reserve four tabular digits while live counts fill
+    textAlign: 'end',
     marginInlineStart: spacing['--space-1-5'],
     fontWeight: weights['--weight-regular'],
     color: colors['--foreground-muted'],
