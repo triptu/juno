@@ -173,11 +173,15 @@ code::highlight(syntax-meta) { color: var(--syntax-meta); }
 code::highlight(syntax-inserted) { color: var(--syntax-inserted); }
 code::highlight(syntax-deleted) { color: var(--syntax-deleted); }
 
-/* The Search reader's matched words (SPEC 10a). The reader puts them in two
-   CSS highlights, so marking moves nothing: every match in --mark, the
-   one the arrows are on in --mark-current. Scoped to message text inside
-   the reader, as the code colours are scoped to code. */
-[data-search-reader] [data-msg-text]::highlight(search-match),
-[data-search-reader] [data-msg-text] *::highlight(search-match) { background-color: var(--mark); }
-[data-search-reader] [data-msg-text]::highlight(search-current),
-[data-search-reader] [data-msg-text] *::highlight(search-current) { background-color: var(--mark-current); }
+/* The search mark (SPEC 10a): the matched words in the Search tab's cards,
+   in its reader and in Find in topic, in CSS highlights, so marking moves
+   nothing. Find yellow (blue when the accent is yellow) for every match,
+   the cards' in a highlight of their own so the list and the reader never
+   clear each other's; the one the reader's arrows are on in
+   --find-current. Scoped to message text, as code colours are to code. */
+[data-msg-text]::highlight(search-match),
+[data-msg-text] *::highlight(search-match),
+[data-msg-text]::highlight(search-card),
+[data-msg-text] *::highlight(search-card) { background-color: var(--find); color: var(--find-fg); }
+[data-msg-text]::highlight(search-current),
+[data-msg-text] *::highlight(search-current) { background-color: var(--find-current); color: var(--find-current-fg); }

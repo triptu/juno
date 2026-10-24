@@ -84,6 +84,15 @@ export const darkColors = stylex.createTheme(colors, {
   '--warm-soft': 'color-mix(in oklch, #E39A3B 22%, var(--background))',
   // The dark toast is paper on ink, so the check takes more of the green.
   '--toast-success': 'color-mix(in oklch, #00674F 80%, var(--background))',
+  // The search mark at night: a dim yellow under light text, and the current match as macOS draws it, dark on bright yellow.
+  '--find-yellow': '#544315',
+  '--find-yellow-fg': '#F7F1DE',
+  '--find-yellow-current': '#F0C74E',
+  '--find-yellow-current-fg': '#1B1916',
+  '--find-blue': '#1F3B57',
+  '--find-blue-fg': '#EAF2FA',
+  '--find-blue-current': '#8CC4F0',
+  '--find-blue-current-fg': '#10202C',
 })
 
 export const darkShadows = stylex.createTheme(shadows, {
@@ -304,9 +313,8 @@ export const accentCoralLight = stylex.createTheme(accent, {
 export const accentCoralDark = stylex.createTheme(accent, {
   '--hl-band': `color-mix(in oklch, var(--hl) 18%, ${colors['--background']})`,
   '--hl-wash': `color-mix(in oklch, var(--hl) 9%, ${colors['--background']})`,
-  '--mark-current': `color-mix(in oklch, var(--hl) 30%, ${colors['--background']})`,
-  '--hl-select': `color-mix(in oklch, var(--hl) 18%, ${colors['--background']})`,
-  '--mark': `color-mix(in oklch, var(--hl) 20%, ${colors['--background']})`,
+  // Quiet over a tall Search card: 9%, where 18% read as a heavy wash.
+  '--hl-select': `color-mix(in oklch, var(--hl) 9%, ${colors['--background']})`,
   '--hl': '#FF8A73',
   '--hl-fg': '#2A0D06',
   '--hl-text': '#FF9C87',
@@ -339,13 +347,16 @@ export const accentMarigoldLight = stylex.createTheme(accent, {
   '--hl-ring': 'color-mix(in oklch, #F2A900 45%, transparent)',
   '--focus-ring': '#7F5200',
   '--selection-background': `color-mix(in oklch, #F2A900 28%, ${colors['--background']})`,
+  // Yellow is the accent here, so the search mark is blue (SPEC 10a).
+  '--find': colors['--find-blue'],
+  '--find-fg': colors['--find-blue-fg'],
+  '--find-current': colors['--find-blue-current'],
+  '--find-current-fg': colors['--find-blue-current-fg'],
 })
 export const accentMarigoldDark = stylex.createTheme(accent, {
   '--hl-band': `color-mix(in oklch, var(--hl) 18%, ${colors['--background']})`,
   '--hl-wash': `color-mix(in oklch, var(--hl) 9%, ${colors['--background']})`,
-  '--mark-current': `color-mix(in oklch, var(--hl) 30%, ${colors['--background']})`,
-  '--hl-select': `color-mix(in oklch, var(--hl) 18%, ${colors['--background']})`,
-  '--mark': `color-mix(in oklch, var(--hl) 20%, ${colors['--background']})`,
+  '--hl-select': `color-mix(in oklch, var(--hl) 9%, ${colors['--background']})`,
   '--hl': '#F5B83A',
   '--hl-fg': '#2B1E00',
   '--hl-text': '#F5B83A',
@@ -360,6 +371,11 @@ export const accentMarigoldDark = stylex.createTheme(accent, {
   '--hl-ring': 'color-mix(in oklch, #F5B83A 45%, transparent)',
   '--focus-ring': '#F5B83A',
   '--selection-background': `color-mix(in oklch, #F5B83A 28%, ${colors['--background']})`,
+  // Yellow is the accent here, so the search mark is blue (SPEC 10a).
+  '--find': colors['--find-blue'],
+  '--find-fg': colors['--find-blue-fg'],
+  '--find-current': colors['--find-blue-current'],
+  '--find-current-fg': colors['--find-blue-current-fg'],
 })
 export const accentTealLight = stylex.createTheme(accent, {
   '--hl': '#0B7A75',
@@ -380,9 +396,7 @@ export const accentTealLight = stylex.createTheme(accent, {
 export const accentTealDark = stylex.createTheme(accent, {
   '--hl-band': `color-mix(in oklch, var(--hl) 18%, ${colors['--background']})`,
   '--hl-wash': `color-mix(in oklch, var(--hl) 9%, ${colors['--background']})`,
-  '--mark-current': `color-mix(in oklch, var(--hl) 30%, ${colors['--background']})`,
-  '--hl-select': `color-mix(in oklch, var(--hl) 18%, ${colors['--background']})`,
-  '--mark': `color-mix(in oklch, var(--hl) 20%, ${colors['--background']})`,
+  '--hl-select': `color-mix(in oklch, var(--hl) 9%, ${colors['--background']})`,
   '--hl': '#45C2BB',
   '--hl-fg': '#04201E',
   '--hl-text': '#5ED0CA',
@@ -417,9 +431,7 @@ export const accentMidnightLight = stylex.createTheme(accent, {
 export const accentMidnightDark = stylex.createTheme(accent, {
   '--hl-band': `color-mix(in oklch, var(--hl) 18%, ${colors['--background']})`,
   '--hl-wash': `color-mix(in oklch, var(--hl) 9%, ${colors['--background']})`,
-  '--mark-current': `color-mix(in oklch, var(--hl) 30%, ${colors['--background']})`,
-  '--hl-select': `color-mix(in oklch, var(--hl) 18%, ${colors['--background']})`,
-  '--mark': `color-mix(in oklch, var(--hl) 20%, ${colors['--background']})`,
+  '--hl-select': `color-mix(in oklch, var(--hl) 9%, ${colors['--background']})`,
   '--hl': '#B3A5EA',
   '--hl-fg': '#1A1238',
   '--hl-text': '#BDB0F0',
@@ -454,9 +466,7 @@ export const accentEmeraldLight = stylex.createTheme(accent, {
 export const accentEmeraldDark = stylex.createTheme(accent, {
   '--hl-band': `color-mix(in oklch, var(--hl) 18%, ${colors['--background']})`,
   '--hl-wash': `color-mix(in oklch, var(--hl) 9%, ${colors['--background']})`,
-  '--mark-current': `color-mix(in oklch, var(--hl) 30%, ${colors['--background']})`,
-  '--hl-select': `color-mix(in oklch, var(--hl) 18%, ${colors['--background']})`,
-  '--mark': `color-mix(in oklch, var(--hl) 20%, ${colors['--background']})`,
+  '--hl-select': `color-mix(in oklch, var(--hl) 9%, ${colors['--background']})`,
   '--hl': '#4FC4A1',
   '--hl-fg': '#04261B',
   '--hl-text': '#63D0AF',
@@ -491,9 +501,7 @@ export const accentClaretLight = stylex.createTheme(accent, {
 export const accentClaretDark = stylex.createTheme(accent, {
   '--hl-band': `color-mix(in oklch, var(--hl) 18%, ${colors['--background']})`,
   '--hl-wash': `color-mix(in oklch, var(--hl) 9%, ${colors['--background']})`,
-  '--mark-current': `color-mix(in oklch, var(--hl) 30%, ${colors['--background']})`,
-  '--hl-select': `color-mix(in oklch, var(--hl) 18%, ${colors['--background']})`,
-  '--mark': `color-mix(in oklch, var(--hl) 20%, ${colors['--background']})`,
+  '--hl-select': `color-mix(in oklch, var(--hl) 9%, ${colors['--background']})`,
   '--hl': '#F08BA0',
   '--hl-fg': '#3B0A18',
   '--hl-text': '#F59DB0',
@@ -528,9 +536,7 @@ export const accentCyanLight = stylex.createTheme(accent, {
 export const accentCyanDark = stylex.createTheme(accent, {
   '--hl-band': `color-mix(in oklch, var(--hl) 18%, ${colors['--background']})`,
   '--hl-wash': `color-mix(in oklch, var(--hl) 9%, ${colors['--background']})`,
-  '--mark-current': `color-mix(in oklch, var(--hl) 30%, ${colors['--background']})`,
-  '--hl-select': `color-mix(in oklch, var(--hl) 18%, ${colors['--background']})`,
-  '--mark': `color-mix(in oklch, var(--hl) 20%, ${colors['--background']})`,
+  '--hl-select': `color-mix(in oklch, var(--hl) 9%, ${colors['--background']})`,
   '--hl': '#5AC6EC',
   '--hl-fg': '#04212E',
   '--hl-text': '#6CCFF2',
@@ -569,8 +575,6 @@ export const accentInkLight = stylex.createTheme(accent, {
 export const accentInkDark = stylex.createTheme(accent, {
   '--hl-band': `color-mix(in oklch, var(--hl) 18%, ${colors['--background']})`,
   '--hl-wash': `color-mix(in oklch, var(--hl) 9%, ${colors['--background']})`,
-  '--mark-current': `color-mix(in oklch, var(--hl) 30%, ${colors['--background']})`,
-  '--mark': `color-mix(in oklch, var(--hl) 20%, ${colors['--background']})`,
   '--hl': 'hsla(48, 30%, 90%, 1)',
   '--hl-fg': 'hsla(48, 10%, 2%, 1)',
   '--hl-text': 'hsla(48, 30%, 90%, 1)',

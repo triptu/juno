@@ -110,6 +110,17 @@ export const colors = stylex.defineVars({
   // every theme and every accent: a link's underline, a quote's fill.
   '--link-underline': 'color-mix(in oklch, currentColor 35%, transparent)',
   '--quote-fill': 'color-mix(in oklch, currentColor 6%, transparent)',
+  // The search mark (SPEC 10a): Find yellow, as every Mac app marks what you searched for, and blue for an accent
+  // that is yellow itself (Marigold), so the mark never looks like the @you chip or a link. The accent group picks
+  // one pair as --find and --find-current. Text on each at least 7:1 (docs/design/tokens.md 1.3).
+  '--find-yellow': '#FBE49A',
+  '--find-yellow-fg': 'hsla(48, 15%, 12%, 1)',
+  '--find-yellow-current': '#F7D460',
+  '--find-yellow-current-fg': 'hsla(48, 15%, 12%, 1)',
+  '--find-blue': '#CFE5F8',
+  '--find-blue-fg': 'hsla(48, 15%, 12%, 1)',
+  '--find-blue-current': '#9DCBF0',
+  '--find-blue-current-fg': 'hsla(48, 15%, 12%, 1)',
 
   // Status. Warning and info are only ever mixed into tints, never used as
   // text on their own (2.1:1 and 3.9:1).
@@ -173,15 +184,14 @@ export const colors = stylex.defineVars({
  * - --hl-rule, --hl-ring: the new divider's rule and the mine-reaction ring
  * - --focus-ring: the accent text colour, so it meets 4.5:1 on the page
  * - --selection-background: text selection
- * - --hl-select: the selected row on the page while its list has focus
- *   (the Search list), mixed over --background as --hl-nav is over the
- *   sidebar, and strong enough that it is never fainter than the unfocused
- *   --secondary-default (10% light, 18% dark; marigold light 19%; ink is
- *   --secondary-default)
- * - --mark: the Search reader's matched words (14% light, 20% dark)
- * - --mark-current: the match the Search reader's arrows are on, stronger
- *   than the other matches' --mark so it stays findable after the
- *   landing flash fades (24% light, 30% dark)
+ * - --hl-select: the selected Search card's fill, mixed over --background
+ *   as --hl-nav is over the sidebar; quiet, since a card can be tall (10%
+ *   light, 9% dark; marigold light 19%; ink is --secondary-default). While
+ *   the list has focus the card also takes --hl-rule as its edge
+ * - --find, --find-fg, --find-current, --find-current-fg: the search mark
+ *   and its text, in the cards, the Search panel and Find in topic; Find
+ *   yellow, and blue where the accent is yellow (marigold); the current
+ *   match the panel's arrows are on is the stronger pair
  *
  * Counts outside the sidebar (the topic switcher) stay the soft grey tag.
  */
@@ -206,8 +216,11 @@ export const accent = stylex.defineVars({
   '--hl-band': `color-mix(in oklch, var(--hl) 14%, ${colors['--background']})`,
   '--hl-wash': `color-mix(in oklch, var(--hl) 7%, ${colors['--background']})`,
   '--hl-select': `color-mix(in oklch, var(--hl) 10%, ${colors['--background']})`,
-  '--mark': `color-mix(in oklch, var(--hl) 14%, ${colors['--background']})`,
-  '--mark-current': `color-mix(in oklch, var(--hl) 24%, ${colors['--background']})`,
+  // The search mark in results, the reader and Find in topic, and the match the reader's arrows are on.
+  '--find': colors['--find-yellow'],
+  '--find-fg': colors['--find-yellow-fg'],
+  '--find-current': colors['--find-yellow-current'],
+  '--find-current-fg': colors['--find-yellow-current-fg'],
 })
 
 /**
@@ -956,6 +969,14 @@ export const layout = stylex.defineVars({
   // A picture in the media viewer's filmstrip, square.
   '--filmstrip-thumb': '56px',
   '--search-field-width': '260px',
+  // The Search tab (SPEC 10a): its cards and field at most this wide, so a line of a message stays readable; the
+  // results' narrowest beside the topic panel (under it plus the panel's minimum, the panel covers the results);
+  // and how tall a card's message is before it folds, about ten lines.
+  '--search-measure': '780px',
+  '--search-list-min': '320px',
+  '--search-fold': '232px',
+  // A card's height before it is laid out, for the list's scroll size.
+  '--search-card-estimate': '120px',
   // The All topics table (inventory 10): topic, where, status, messages,
   // updated. Where gives way first: it shrinks to its minimum, then the
   // column hides, then Msgs hides (views/AllTopics.tsx repeats the widths
