@@ -256,7 +256,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
         : await startWebApp(hostPool, await context.newPage(), fake, userData, undefined, { sidebarTrace: false, sendTrace: false, engine: { ...agentLaunch, ...options } })
       return new Juno(running.host === undefined ? electronSurface(running.app) : webSurface(running.win, running.host), running.win)
     })
-    const results = await Promise.allSettled(cleanups.reverse().map((close) => close()))
+    const results = await Promise.allSettled(cleanups.toReversed().map((close) => close()))
     const failed = results.find((result) => result.status === 'rejected')
     if (failed?.status === 'rejected') throw failed.reason
   },

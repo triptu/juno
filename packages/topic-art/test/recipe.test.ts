@@ -202,6 +202,6 @@ describe('the hue a topic is drawn in', () => {
 
   it('spreads topics over every hue', () => {
     const hues = new Set(Array.from({ length: 64 }, (_, index) => pebbleHue(`t:C0ENG:1760000000.${String(index).padStart(6, '0')}`)))
-    expect([...hues].sort()).toEqual([...HUE_NAMES].sort())
+    expect([...hues].toSorted()).toEqual([...HUE_NAMES].toSorted())
   })
 })

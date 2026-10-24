@@ -46,7 +46,7 @@ if (enabled) {
     console.info('unit profile', JSON.stringify({
       wall: performance.now() - wall, cpu: (used.user + used.system) / 1000,
       phases: Object.fromEntries(phases),
-      samples: [...samples].sort((a, b) => b[1] - a[1]).slice(0, 20),
+      samples: [...samples].toSorted((a, b) => b[1] - a[1]).slice(0, 20),
     }))
   })
 }

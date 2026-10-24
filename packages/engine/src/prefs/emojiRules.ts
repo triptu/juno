@@ -35,7 +35,7 @@ export function frequentEmojiNames({ recent, slackUse, quickReactions, custom }:
     const resolved = canonical(name.split('::')[0]!)
     if (resolved !== undefined) counts.set(resolved, (counts.get(resolved) ?? 0) + count)
   }
-  const ranked = [...counts].sort(([a, ac], [b, bc]) => bc - ac || (a < b ? -1 : a > b ? 1 : 0))
+  const ranked = [...counts].toSorted(([a, ac], [b, bc]) => bc - ac || (a < b ? -1 : a > b ? 1 : 0))
   const seen = new Set<string>()
   const names: string[] = []
   for (const name of [...recent, ...ranked.map(([name]) => name), ...quickReactions.map((reaction) => reaction.name)]) {

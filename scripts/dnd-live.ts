@@ -67,7 +67,7 @@ async function call(method: 'users.prefs.get' | 'users.prefs.set', fields: Recor
   for (const [name, value] of Object.entries(fields)) body.append(name, value)
   const response = await fetch(url, { method: 'POST', body, headers: { cookie } })
   const json = (await response.json()) as Record<string, unknown>
-  console.log(`${method}: ${json['ok'] === true ? 'ok' : `error ${String(json['error'])}`} (HTTP ${response.status}; answer keys: ${Object.keys(json).sort().join(', ')})`)
+  console.log(`${method}: ${json['ok'] === true ? 'ok' : `error ${String(json['error'])}`} (HTTP ${response.status}; answer keys: ${Object.keys(json).toSorted().join(', ')})`)
   return json
 }
 

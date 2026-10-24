@@ -42,7 +42,7 @@ measures.sort((a, b) => a.start - b.start)
 const spans = []
 for (const key of main) {
   const [pid, tid] = key.split(':').map(Number)
-  const own = events.filter((e) => e.pid === pid && e.tid === tid && e.ph === 'X' && typeof e.dur === 'number').sort((a, b) => a.ts - b.ts || b.dur - a.dur)
+  const own = events.filter((e) => e.pid === pid && e.tid === tid && e.ph === 'X' && typeof e.dur === 'number').toSorted((a, b) => a.ts - b.ts || b.dur - a.dur)
   const stack = []
   for (const e of own) {
     while (stack.length > 0 && stack.at(-1).end <= e.ts) stack.pop()
@@ -55,7 +55,7 @@ for (const key of main) {
 }
 
 const ms = (us) => (us / 1000).toFixed(1)
-const top = (map, n) => [...map].sort((a, b) => b[1] - a[1]).slice(0, n)
+const top = (map, n) => [...map].toSorted((a, b) => b[1] - a[1]).slice(0, n)
 
 const profilePath = file.replace(/\.trace\.json$/, '.cpuprofile')
 const profile = existsSync(profilePath) ? JSON.parse(readFileSync(profilePath, 'utf8')) : undefined
@@ -91,7 +91,7 @@ for (const [name, list] of byName) {
       perFunction.set(sample.label, (perFunction.get(sample.label) ?? 0) + sample.us)
     }
   }
-  const durations = list.map((m) => m.end - m.start).sort((a, b) => a - b)
+  const durations = list.map((m) => m.end - m.start).toSorted((a, b) => a - b)
   console.log(`\n${name}: n=${list.length}, median ${ms(durations[Math.floor(durations.length / 2)])} ms, main thread busy ${ms(busy / list.length)} ms per measure`)
   console.log('  main thread self time per measure, by event:')
   for (const [event, us] of top(perEvent, 15)) console.log(`    ${ms(us / list.length).padStart(7)} ms  ${event}`)

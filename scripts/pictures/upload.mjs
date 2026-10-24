@@ -26,7 +26,7 @@ const wrangler = (...rest) => {
   return execFileSync('bun', ['x', 'wrangler@4', ...rest], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
 }
 
-const files = readdirSync(out).filter((name) => /^[a-z0-9]+(?:-[a-z0-9]+)*-(?:small|large)\.webp$/.test(name)).sort()
+const files = readdirSync(out).filter((name) => /^[a-z0-9]+(?:-[a-z0-9]+)*-(?:small|large)\.webp$/.test(name)).toSorted()
 if (files.length === 0) throw new Error(`No picture files in ${out}; run build.mjs first`)
 
 if (!dryRun) {

@@ -92,7 +92,7 @@ export function parseChangelog(markdown: string): ChangelogEntry[] {
 export function notesBetween(entries: readonly ChangelogEntry[], after: string | null, upTo: string): ChangelogEntry[] {
   return entries
     .filter((entry) => compareVersions(entry.version, upTo) <= 0 && (after === null || compareVersions(entry.version, after) > 0))
-    .sort((a, b) => compareVersions(b.version, a.version))
+    .toSorted((a, b) => compareVersions(b.version, a.version))
 }
 
 /**

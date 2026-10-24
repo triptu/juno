@@ -47,7 +47,7 @@ function slidesIntoPlace(from: string): Check {
         return Math.min(a, b) + 1 < box.y && box.y < Math.max(a, b) - 1
       }),
     )
-    const sorted = [...last].sort((a, b) => a.y - b.y).map((box) => box.key)
+    const sorted = [...last].toSorted((a, b) => a.y - b.y).map((box) => box.key)
     const inOrder = sorted.every((key, i) => key === last[i]?.key)
     const overlaps = last.slice(1).filter((box, i) => box.y < last[i]!.y + last[i]!.height - 0.5).length
     const shots = [...new Set(between.map((frame) => shotOfFrame(evidence, frame.index)))]
@@ -153,7 +153,7 @@ for (const theme of themes) {
           reply(fake, id, `Burst reply ${i + 1}`)
           await win.waitForTimeout(200)
         }
-        await expect.poll(async () => (await recentIds(juno)).slice(0, 3)).toEqual([...movers].reverse())
+        await expect.poll(async () => (await recentIds(juno)).slice(0, 3)).toEqual([...movers].toReversed())
       },
     )
   })

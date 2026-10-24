@@ -327,7 +327,7 @@ export const coreMethods = {
     }).filter(({ sub, latest }) =>
       (args.current_ts === undefined || compareTs(latest, args.current_ts) < 0) &&
       (args.channel_id === undefined || args.channel_id === sub.channel),
-    ).sort((a, b) => a.order > b.order ? -1 : a.order < b.order ? 1 : 0)
+    ).toSorted((a, b) => a.order > b.order ? -1 : a.order < b.order ? 1 : 0)
     // Slack caps each page at ten; only that page needs full response bodies.
     const limit = Math.min(args.limit ?? GET_VIEW_PAGE_CAP, GET_VIEW_PAGE_CAP)
     const page: ThreadView[] = views.slice(0, limit).map(({ sub, root, replies, latest }) => {
@@ -568,7 +568,7 @@ export const coreMethods = {
 function facets(ids: ReadonlyArray<string>) {
   const counts = new Map<string, number>()
   for (const id of ids) counts.set(id, (counts.get(id) ?? 0) + 1)
-  return [...counts].map(([id, facet_count]) => ({ id, facet_count })).sort((a, b) => b.facet_count - a.facet_count || a.id.localeCompare(b.id))
+  return [...counts].map(([id, facet_count]) => ({ id, facet_count })).toSorted((a, b) => b.facet_count - a.facet_count || a.id.localeCompare(b.id))
 }
 
 /** A stable pseudo-score for a match id (FNV-1a), so relevance order is deterministic but unrelated to time. */

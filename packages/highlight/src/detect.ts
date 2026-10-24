@@ -228,7 +228,7 @@ export function detectLanguage(code: string): string | undefined {
     let score = 0
     for (const [pattern, weight] of signals) if (pattern.test(text)) score += weight
     return [language, score] as const
-  }).sort((a, b) => b[1] - a[1])
+  }).toSorted((a, b) => b[1] - a[1])
   const [best, top] = scores[0]!
   const second = scores[1]![1]
 

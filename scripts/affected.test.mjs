@@ -48,10 +48,10 @@ const items = (steps, suite) => steps.find((step) => step.script === suite)?.ite
 
 test('a changed module selects its consumers through a barrel, while configs broaden and changed tests select themselves', (t) => {
   const { plan } = fixture(t)
-  assert.deepEqual(items(plan(['packages/domain/src/rule.ts'], '--batch'), 'test').sort(), ['apps/desktop/test/logging.test.ts', 'packages/domain/test/rule.test.ts'])
+  assert.deepEqual(items(plan(['packages/domain/src/rule.ts'], '--batch'), 'test').toSorted(), ['apps/desktop/test/logging.test.ts', 'packages/domain/test/rule.test.ts'])
   // b1c55d3c: main-process tests used to be absent from the batch gate.
   assert.deepEqual(items(plan(['apps/desktop/src/logging.ts'], '--batch'), 'test'), ['apps/desktop/test/logging.test.ts'])
-  assert.deepEqual(items(plan(['packages/domain/package.json'], '--batch'), 'test').sort(), ['packages/domain/eval/other.test.ts', 'packages/domain/test/rule.test.ts'])
+  assert.deepEqual(items(plan(['packages/domain/package.json'], '--batch'), 'test').toSorted(), ['packages/domain/eval/other.test.ts', 'packages/domain/test/rule.test.ts'])
   assert.equal(items(plan(['bun.lock'], '--batch'), 'test').length, 3)
   assert.deepEqual(items(plan(['packages/domain/eval/other.test.ts'], '--batch'), 'test'), ['packages/domain/eval/other.test.ts'])
   assert.deepEqual(items(plan(['packages/domain/test/load.perf.ts'], '--batch'), 'test'), [])

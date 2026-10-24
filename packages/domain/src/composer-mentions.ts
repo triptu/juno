@@ -47,7 +47,7 @@ const WORD_AFTER = /[\p{L}\p{N}_-]/u
 /** The picked names standing whole in `text`, in order. The longest name wins where two start at one place. */
 export function mentionTokens(text: string, picks: ReadonlyArray<MentionPick>): ReadonlyArray<MentionToken> {
   if (picks.length === 0) return []
-  const byLength = picks.map((pick) => ({ pick, text: mentionText(pick) })).sort((a, b) => b.text.length - a.text.length)
+  const byLength = picks.map((pick) => ({ pick, text: mentionText(pick) })).toSorted((a, b) => b.text.length - a.text.length)
   const tokens: MentionToken[] = []
   for (let i = 0; i < text.length; i++) {
     const ch = text[i]

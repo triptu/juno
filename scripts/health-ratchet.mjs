@@ -8,8 +8,8 @@ export function healthBaseline(report) {
     recordedOn: report.timestamp.slice(0, 10),
     counts: report.counts,
     clonedLines: report.duplication.clonedLines,
-    oversizedFiles: report.size.oversizedFiles.map(({ file }) => file).sort(),
-    oversizedFunctions: report.size.oversizedFunctions.map(({ file, id }) => `${file}:${id}`).sort(),
+    oversizedFiles: report.size.oversizedFiles.map(({ file }) => file).toSorted(),
+    oversizedFunctions: report.size.oversizedFunctions.map(({ file, id }) => `${file}:${id}`).toSorted(),
   }
 }
 

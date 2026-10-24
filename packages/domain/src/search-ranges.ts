@@ -30,7 +30,7 @@ export function searchRanges(text: string, words: ReadonlyArray<string>): Array<
     }
   }
   const merged: Array<{ start: number; end: number }> = []
-  for (const range of found.sort((a, b) => a.start - b.start)) {
+  for (const range of found.toSorted((a, b) => a.start - b.start)) {
     const previous = merged.at(-1)
     if (previous !== undefined && range.start <= previous.end) previous.end = Math.max(previous.end, range.end)
     else merged.push(range)

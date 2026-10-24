@@ -38,7 +38,7 @@ export function mergeSearch(input: {
   const slack = input.pages.at(-1)?.coverage ?? { through: null, complete: false }
   const sources = [input.localCoverage, slack].filter((source) => !source.complete)
   const complete = sources.length === 0
-  const through = sources.some((s) => s.through === null) ? null : sources.map((s) => s.through).filter((s): s is string => s !== null).sort((a, b) => direction * compare(a, b))[0] ?? null
+  const through = sources.some((s) => s.through === null) ? null : sources.map((s) => s.through).filter((s): s is string => s !== null).toSorted((a, b) => direction * compare(a, b))[0] ?? null
   const older = (ts: string) => !complete && (through === null || direction * compare(ts, through) > 0)
   const rows = new Map<string, SearchHit>()
   for (const row of [...input.pages.flatMap((p) => p.rows), ...input.local]) rows.set(`${row.place.id}:${row.ts}`, row)

@@ -54,7 +54,7 @@ test('coverage selection follows changed, new and unrecorded consumers without k
     [{ changed: ['packages/contract/src/schema.ts'], imports: { 'packages/views/src/Topic.tsx': ['packages/contract/src/schema.ts'] } }, [TOPIC]],
     [{ changed: ['packages/views/src/Badge.tsx'], added: ['packages/views/src/Badge.tsx', 'packages/views/src/BadgeRow.tsx'], imports: { 'packages/views/src/BadgeRow.tsx': ['packages/views/src/Badge.tsx'], 'packages/views/src/Sidebar.tsx': ['packages/views/src/BadgeRow.tsx'] } }, [SIDEBAR]],
   ]
-  for (const [input, expected] of cases) assert.deepEqual([...select(input).specs.keys()].sort(), expected.sort(), JSON.stringify(input))
+  for (const [input, expected] of cases) assert.deepEqual([...select(input).specs.keys()].toSorted(), expected.toSorted(), JSON.stringify(input))
   const input = { changed: ['packages/views/src/Topic.tsx'], imports: { 'packages/views/src/Sidebar.tsx': ['packages/views/src/Topic.tsx'] } }
   assert.equal(select(input).specs.has(SIDEBAR), false)
   assert.equal(select({ ...input, drift: ['packages/views/src/Sidebar.tsx'] }).specs.has(SIDEBAR), true)

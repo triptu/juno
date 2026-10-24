@@ -124,7 +124,7 @@ if (!urgent) {
 
 if (releases.some((release) => release.tagName === tag)) fail(`${repo} already has ${tag}; bump the version (bun run release:version)`)
 const newest = releases.filter((release) => !release.isDraft && !release.isPrerelease && isVersion(release.tagName))
-  .map((release) => normalizeVersion(release.tagName)).sort(compareVersions).at(-1)
+  .map((release) => normalizeVersion(release.tagName)).toSorted(compareVersions).at(-1)
 if (newest !== undefined && compareVersions(version, newest) <= 0) fail(`${version} is not newer than the published ${newest}`)
 
 console.log(`release:publish: ${tag} to ${repo}${values.prerelease ? ' as a pre-release' : ''}${urgent ? ' (urgent)' : ''}, ${signed ? 'Developer ID signed' : 'unsigned (installs offer the DMG)'}`)

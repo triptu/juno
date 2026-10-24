@@ -100,7 +100,7 @@ it('rotates at 5 MB, keeps only three old files, and reads the last 50 warnings 
       await logger.close()
       expect((await readFile(join(folder, 'main.log'))).length).toBeLessThan(LOG_LIMIT)
     }
-    expect((await readdir(folder)).sort()).toEqual(['main.log', 'main.log.1', 'main.log.2', 'main.log.3'])
+    expect((await readdir(folder)).toSorted()).toEqual(['main.log', 'main.log.1', 'main.log.2', 'main.log.3'])
     const logger = createLog('main', folder)
     for (let rowId = 0; rowId < 60; rowId++) logger.log('WARN', 'outbox row failed', { rowId })
     await logger.close()

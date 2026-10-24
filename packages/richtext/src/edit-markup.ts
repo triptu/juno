@@ -54,7 +54,7 @@ export function inlineMarkup(elements: ReadonlyArray<RichTextInline>, lookups: L
   return runs.map(({ markers, text }) => text.split('\n').map((line) => {
     const core = line.trim()
     if (core === '') return line
-    return line.slice(0, line.length - line.trimStart().length) + markers + core + [...markers].reverse().join('') + line.slice(line.trimEnd().length)
+    return line.slice(0, line.length - line.trimStart().length) + markers + core + [...markers].toReversed().join('') + line.slice(line.trimEnd().length)
   }).join('\n')).join('')
 }
 

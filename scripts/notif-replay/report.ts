@@ -80,7 +80,7 @@ function listWrong(title: string, wrong: ReadonlyArray<Scored>, showText: boolea
     const key = s.item.decision.decidedBy === 'reading' && reading !== undefined ? `reading: ${reading.needsYou}` : s.item.decision.decidedBy
     groups.set(key, [...(groups.get(key) ?? []), s])
   }
-  for (const [key, group] of [...groups].sort((a, b) => b[1].length - a[1].length)) {
+  for (const [key, group] of [...groups].toSorted((a, b) => b[1].length - a[1].length)) {
     console.log(`  ${key} (${group.length})`)
     for (const { item } of group) {
       const reading = typeof item.reading === 'object' ? ` needs ${needsSum(item, item.reading).toFixed(2)}` : ''

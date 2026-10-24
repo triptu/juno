@@ -70,7 +70,7 @@ function contrast(a: string, b: string): number {
     })
     return 0.2126 * r + 0.7152 * g + 0.0722 * bl
   }
-  const [high, low] = [luminance(a), luminance(b)].sort((x, y) => y - x)
+  const [high, low] = [luminance(a), luminance(b)].toSorted((x, y) => y - x)
   return (high! + 0.05) / (low! + 0.05)
 }
 

@@ -100,7 +100,7 @@ try {
     if (ts !== undefined) made.add(ts)
     report[name] = {
       answer: answer(json),
-      answerKeys: Object.keys(json).sort(),
+      answerKeys: Object.keys(json).toSorted(),
       answerChannelIsSelfDm: json.channel === channel,
       answerHasMessage: typeof json.message === 'object',
     }
@@ -152,13 +152,13 @@ try {
     const footer = typeof first.footer === 'string' ? first.footer : undefined
     const innerFiles = (blocks?.message as Json | undefined)?.files
     report[`${forward.name}Stored`] = {
-      messageKeys: Object.keys(message).sort(),
+      messageKeys: Object.keys(message).toSorted(),
       subtype: message.subtype ?? null,
       clientMsgIdEchoed: message.client_msg_id === forward.id,
       textEmpty: message.text === '',
       hasTopBlocks: Array.isArray(message.blocks),
       attachmentCount: attachments.length,
-      attachmentKeys: Object.keys(first).sort(),
+      attachmentKeys: Object.keys(first).toSorted(),
       isShare: first.is_share ?? null,
       isMsgUnfurl: first.is_msg_unfurl ?? null,
       isReplyUnfurl: first.is_reply_unfurl ?? null,
@@ -168,17 +168,17 @@ try {
       authorIdIsSelf: first.author_id === auth.user_id,
       fromUrlHasThreadTs: typeof first.from_url === 'string' ? first.from_url.includes('thread_ts=') : null,
       footerKind: footer === undefined ? null : footer.startsWith('Posted in') ? 'Posted in …' : footer.startsWith('Thread in') ? 'Thread in …' : /conversation/i.test(footer) ? '… conversation' : /direct message/i.test(footer) ? '… direct message' : 'other',
-      messageBlocksKeys: blocks === undefined ? null : Object.keys(blocks).sort(),
-      messageBlocksMessageKeys: blocks === undefined ? null : Object.keys((blocks.message as Json | undefined) ?? {}).sort(),
+      messageBlocksKeys: blocks === undefined ? null : Object.keys(blocks).toSorted(),
+      messageBlocksMessageKeys: blocks === undefined ? null : Object.keys((blocks.message as Json | undefined) ?? {}).toSorted(),
       color: first.color ?? null,
       attachmentTextEmpty: typeof first.text === 'string' ? first.text === '' : null,
       fallbackLooksLikeDateLine: typeof first.fallback === 'string' ? /^\[[^\]]+\] [^:]+: /.test(first.fallback) : null,
       textLooksLikeDateLine: typeof first.text === 'string' ? /^\[[^\]]+\] [^:]+: /.test(first.text) : null,
       attachmentBlocksCount: Array.isArray(first.blocks) ? first.blocks.length : null,
       attachmentFilesCount: Array.isArray(first.files) ? first.files.length : null,
-      attachmentFileKeys: Array.isArray(first.files) ? Object.keys((first.files[0] as Json | undefined) ?? {}).sort() : null,
+      attachmentFileKeys: Array.isArray(first.files) ? Object.keys((first.files[0] as Json | undefined) ?? {}).toSorted() : null,
       messageBlocksFilesCount: Array.isArray(innerFiles) ? innerFiles.length : null,
-      messageBlocksFileKeys: Array.isArray(innerFiles) ? Object.keys((innerFiles[0] as Json | undefined) ?? {}).sort() : null,
+      messageBlocksFileKeys: Array.isArray(innerFiles) ? Object.keys((innerFiles[0] as Json | undefined) ?? {}).toSorted() : null,
       topFilesCount: Array.isArray(message.files) ? message.files.length : null,
     }
   }
@@ -190,7 +190,7 @@ try {
   report.error = error instanceof Error ? error.message : String(error)
 } finally {
   const deleted: Array<string> = []
-  for (const ts of [...made].reverse()) deleted.push(answer(await call('chat.delete', { channel: selfDm ?? '', ts })))
+  for (const ts of [...made].toReversed()) deleted.push(answer(await call('chat.delete', { channel: selfDm ?? '', ts })))
   for (const file of madeFiles) deleted.push(answer(await call('files.delete', { file })))
   report.cleanup = deleted
 }

@@ -169,10 +169,10 @@ it('local and Slack identity/date filters agree; apps and Automated are hidden w
       const release = engine.registry.mount(local)
       const rows = await waitFor(() => { const result = engine.registry.get(local); return result._tag === 'Success' ? result.value : undefined })
       release()
-      expect(rows.flatMap((row) => row.kind === 'message' ? [row.ts] : []).toSorted(), `local ${text}`).toEqual([...expected].sort())
+      expect(rows.flatMap((row) => row.kind === 'message' ? [row.ts] : []).toSorted(), `local ${text}`).toEqual([...expected].toSorted())
       const found = session(engine, parseSearchQuery(text), text)
       const result = await found.until((s) => s.state === 'done')
-      expect(result.groups.flatMap((g) => g.messages.map((m) => m.ts)).toSorted(), text).toEqual([...expected].sort())
+      expect(result.groups.flatMap((g) => g.messages.map((m) => m.ts)).toSorted(), text).toEqual([...expected].toSorted())
     }
     const bots = await session(engine, parseSearchQuery('ruleprobe from:U0GRAFANA', { scope: { hideApps: false } }), 'bots').until((s) => s.state === 'done')
     expect(bots.groups.flatMap((g) => g.messages.map((m) => m.ts))).toEqual([bot.ts])

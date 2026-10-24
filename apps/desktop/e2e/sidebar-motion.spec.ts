@@ -190,7 +190,7 @@ test('a burst retargets the rows, including a row removed during its slide, and 
     return animations.length > 0 && animations.every((animation) => animation.playState === 'idle')
   })).toBe(true)
   const tops = await juno.sidebar.rows.evaluateAll((rows) => rows.slice(0, 10).map((row) => row.getBoundingClientRect().top))
-  expect(tops).toEqual([...tops].sort((a, b) => a - b))
+  expect(tops).toEqual([...tops].toSorted((a, b) => a - b))
 })
 
 test('page visibility cancels active slides and hidden updates start none', async ({ juno, win, fake }) => {

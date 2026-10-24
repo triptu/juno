@@ -71,7 +71,7 @@ try {
 
 async function release() {
   const releases = gh('release', 'list', '--repo', repo, '--limit', '200', '--json', 'tagName,isDraft,isPrerelease,publishedAt')
-    .filter((release) => !release.isDraft && !release.isPrerelease).sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
+    .filter((release) => !release.isDraft && !release.isPrerelease).toSorted((a, b) => b.publishedAt.localeCompare(a.publishedAt))
   const latest = releases[0]
   if (latest && !dry && compareVersions(latest.tagName, JSON.parse(git(root, 'show', 'origin/main:apps/desktop/package.json')).version) > 0) {
     checkPublishedRelease(repo, latest.tagName)

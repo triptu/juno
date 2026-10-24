@@ -31,7 +31,7 @@ export function editAtomic(text: string, body: MessageBody | undefined) {
       if (!/[\p{L}\p{N}]/u.test(text[at - 1] ?? '') && !/[\p{L}\p{N}]/u.test(text[at + label.length] ?? '')) ranges.push({ start: at, end: at + label.length })
     }
   }
-  return ranges.sort((a, b) => a.start - b.start || b.end - a.end)
+  return ranges.toSorted((a, b) => a.start - b.start || b.end - a.end)
 }
 
 /** Linked labels already present in the message, at their places in the edit field. */
@@ -48,5 +48,5 @@ export function editLinks(text: string, body: MessageBody | undefined): Readonly
       if (!/[\p{L}\p{N}]/u.test(text[at - 1] ?? '') && !/[\p{L}\p{N}]/u.test(text[end] ?? '')) ranges.push({ start: at, end, url: target.url })
     }
   }
-  return ranges.sort((left, right) => left.start - right.start || right.end - left.end)
+  return ranges.toSorted((left, right) => left.start - right.start || right.end - left.end)
 }

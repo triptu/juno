@@ -1205,7 +1205,7 @@ test.describe('topic view', () => {
       })
       const longFrames = await win.evaluate(() => (window as unknown as { junoLongFrames: number[] }).junoLongFrames)
       const moved = Math.max(...landing!.tops.map((top) => Math.abs(top - landing!.top)))
-      const heaviest = [...work].sort((a, b) => b - a).slice(0, 3)
+      const heaviest = [...work].toSorted((a, b) => b - a).slice(0, 3)
       console.log(`code jump: heaviest frames ${heaviest.map((ms) => ms.toFixed(1)).join(' ')} ms (scroll budget 8.3), long animation frames ${longFrames.map((ms) => ms.toFixed(0)).join(' ') || 'none'}, landed row moved ${moved.toFixed(1)} px, load ${loadavg()[0]!.toFixed(1)}`)
       expect(moved, 'the row the jump landed on moves').toBeLessThan(0.5)
       expect.soft(longFrames, 'long animation frames after the jump').toEqual([])

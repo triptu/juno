@@ -255,7 +255,7 @@ const progress = (row: Row) => {
   console.error(`${row.task} ${row.mode}: ${row.turns} turns, ${Math.round(row.ms)} ms, ${row.ok ? 'ok' : 'FAILED'}`)
   return row
 }
-const median = (xs: ReadonlyArray<number>) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)] ?? 0
+const median = (xs: ReadonlyArray<number>) => [...xs].toSorted((a, b) => a - b)[Math.floor(xs.length / 2)] ?? 0
 const tokens = (bytes: number) => Math.round(bytes / 4)
 
 async function main() {

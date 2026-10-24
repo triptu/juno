@@ -78,7 +78,7 @@ if (flags.includes('--status')) {
     if (owner && !holders.some((holder) => holder.pid === owner.pid)) holders.push({ command: owner.label, pid: owner.pid, waited: `${Math.floor((owner.waitedMs ?? 0) / 1000)}s` })
   }
   const queued = readdirSync(queueDir).map((file) => readJson(join(queueDir, file))).filter((job) => job && alive(job.pid))
-    .sort((a, b) => (a.priority === 'release' ? 0 : 1) - (b.priority === 'release' ? 0 : 1) || a.queuedAt.localeCompare(b.queuedAt))
+    .toSorted((a, b) => (a.priority === 'release' ? 0 : 1) - (b.priority === 'release' ? 0 : 1) || a.queuedAt.localeCompare(b.queuedAt))
   console.log(JSON.stringify({ holders, queue: queued.map((job) => ({ command: job.label, pid: job.pid, waited: since(job.queuedAt), priority: job.priority })) }, null, 2))
   process.exit(0)
 }
@@ -102,7 +102,7 @@ const take = (dir, extra = {}) => {
 
 const queue = () => readdirSync(queueDir).map((file) => ({ file, job: readJson(join(queueDir, file)) }))
   .filter(({ job }) => job && alive(job.pid))
-  .sort((a, b) => a.file.localeCompare(b.file))
+  .toSorted((a, b) => a.file.localeCompare(b.file))
 const held = []
 const tryAcquire = () => {
   if (queue()[0]?.file !== ticket.split('/').at(-1)) return undefined

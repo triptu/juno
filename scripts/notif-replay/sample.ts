@@ -101,6 +101,6 @@ export async function sample(argv: ReadonlyArray<string>) {
   const report = `bun run notif:replay report --replay ${replayPath} --labels ${join(dir, 'labels.json')}`
   writeFileSync(join(dir, 'index.html'), page(items, { serve: `bun run notif:replay label --dir ${dir}`, report }))
   console.log(`${entries.length} messages from ${groups.size} strata:`)
-  for (const [key, items] of [...groups].sort((a, b) => a[0].localeCompare(b[0]))) console.log(`  ${key}: ${counts.get(key)} of ${items.length}`)
+  for (const [key, items] of [...groups].toSorted((a, b) => a[0].localeCompare(b[0]))) console.log(`  ${key}: ${counts.get(key)} of ${items.length}`)
   console.log(`Wrote ${join(dir, 'index.html')}. Label with: bun run notif:replay label --dir ${dir}`)
 }

@@ -65,9 +65,9 @@ const summary = {
   firstTestStartSeconds: s(Math.min(...runs.map((run) => run.start))),
   buckets: Object.fromEntries(Object.entries(buckets).map(([name, ms]) => [name, s(ms)])),
   phases: Object.fromEntries(Object.entries(phases).map(([name, ms]) => [name, { seconds: s(ms), count: phaseCounts[name] }])),
-  workers: [...workers.values()].sort((a, b) => a.worker - b.worker).map((worker) => ({ ...worker, busy: s(worker.busy), first: s(worker.first), last: s(worker.last), idle: s(suiteMs - worker.busy) })),
-  slowestSpecs: [...specs.values()].sort((a, b) => b.ms - a.ms).slice(0, top).map((spec) => ({ file: spec.file, tests: spec.tests, summed: s(spec.ms), wall: s(spec.end - spec.start), setup: s(spec.setup), sleep: s(spec.sleep) })),
-  slowestTests: [...runs].sort((a, b) => b.ms - a.ms).slice(0, top).map((run) => ({ file: run.file, title: run.title, seconds: s(run.ms), sleep: s(run.steps.sleep ?? 0) })),
+  workers: [...workers.values()].toSorted((a, b) => a.worker - b.worker).map((worker) => ({ ...worker, busy: s(worker.busy), first: s(worker.first), last: s(worker.last), idle: s(suiteMs - worker.busy) })),
+  slowestSpecs: [...specs.values()].toSorted((a, b) => b.ms - a.ms).slice(0, top).map((spec) => ({ file: spec.file, tests: spec.tests, summed: s(spec.ms), wall: s(spec.end - spec.start), setup: s(spec.setup), sleep: s(spec.sleep) })),
+  slowestTests: [...runs].toSorted((a, b) => b.ms - a.ms).slice(0, top).map((run) => ({ file: run.file, title: run.title, seconds: s(run.ms), sleep: s(run.steps.sleep ?? 0) })),
 }
 
 if (args.includes('--json')) console.log(JSON.stringify(summary, null, 1))

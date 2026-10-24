@@ -229,7 +229,7 @@ export function matchEmoji<E extends Row>(rows: ReadonlyArray<E>, search: string
   const rank = priors(index, frequent, quick)
   const seen = new Set<string>()
   return found.map((match) => ({ ...match, prior: rank.get(match.entry.key) ?? Infinity }))
-    .sort((a, b) => a.tier - b.tier || a.prior - b.prior || Number(b.byName) - Number(a.byName)
+    .toSorted((a, b) => a.tier - b.tier || a.prior - b.prior || Number(b.byName) - Number(a.byName)
     || Number(a.entry.custom) - Number(b.entry.custom) || a.entry.order - b.entry.order || (a.entry.row.name < b.entry.row.name ? -1 : a.entry.row.name > b.entry.row.name ? 1 : 0))
     .flatMap(({ entry }) => {
       if (seen.has(entry.key)) return []

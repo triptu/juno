@@ -73,10 +73,10 @@ const shape = (message: Json | undefined, rootTs: string) =>
   message === undefined
     ? 'not found'
     : {
-        keys: Object.keys(message).sort(),
+        keys: Object.keys(message).toSorted(),
         subtype: message.subtype ?? null,
         threadTsIsRoot: message.thread_ts === rootTs,
-        rootKeys: typeof message.root === 'object' && message.root !== null ? Object.keys(message.root).sort() : null,
+        rootKeys: typeof message.root === 'object' && message.root !== null ? Object.keys(message.root).toSorted() : null,
         rootTsIsRoot: (message.root as Json | undefined)?.ts === rootTs,
       }
 
@@ -117,9 +117,9 @@ try {
         frames.push({
           type: frame.type,
           subtype: frame.subtype ?? null,
-          keys: Object.keys(frame).sort(),
+          keys: Object.keys(frame).toSorted(),
           messageSubtype: inner === undefined ? null : (inner.subtype ?? null),
-          messageKeys: inner === undefined ? null : Object.keys(inner).sort(),
+          messageKeys: inner === undefined ? null : Object.keys(inner).toSorted(),
           previousSubtype: previous === undefined ? null : (previous.subtype ?? null),
           tsIsMade: made.has(String(frame.ts ?? inner?.ts ?? '')),
           messageTsIsMade: inner === undefined ? null : made.has(String(inner.ts ?? '')),
@@ -146,7 +146,7 @@ try {
   const broadcast = await call('chat.update', { channel, ts: replyTs, reply_broadcast: 'true' })
   report.broadcast = {
     answer: answer(broadcast),
-    answerKeys: Object.keys(broadcast).sort(),
+    answerKeys: Object.keys(broadcast).toSorted(),
     answerTsIsReply: broadcast.ts === replyTs,
     answerMessage: typeof broadcast.message === 'object' ? shape(broadcast.message as Json, rootTs) : null,
   }
@@ -179,7 +179,7 @@ try {
   report.error = error instanceof Error ? error.message : String(error)
 } finally {
   const deleted: Array<string> = []
-  for (const ts of [...made].reverse()) deleted.push(answer(await call('chat.delete', { channel: selfDm ?? '', ts })))
+  for (const ts of [...made].toReversed()) deleted.push(answer(await call('chat.delete', { channel: selfDm ?? '', ts })))
   report.cleanup = deleted
   socket?.close()
 }

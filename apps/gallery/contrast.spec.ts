@@ -40,7 +40,7 @@ test.describe('sidebar row contrast', () => {
         return 0.2126 * lr! + 0.7152 * lg! + 0.0722 * lb!
       }
       const ratio = (fg: ReadonlyArray<number>, bg: ReadonlyArray<number>) => {
-        const [hi, lo] = [luminance(fg), luminance(bg)].sort((a, b) => b - a)
+        const [hi, lo] = [luminance(fg), luminance(bg)].toSorted((a, b) => b - a)
         return Math.round(((hi! + 0.05) / (lo! + 0.05)) * 100) / 100
       }
       return Array.from(frame.querySelectorAll('[data-topic-row]')).map((row) => {
@@ -126,7 +126,7 @@ test.describe('@you chip contrast', () => {
           }
           const style = getComputedStyle(node)
           const fill = rgba(style.backgroundColor)
-          const [hi, lo] = [luminance(rgba(style.color)), luminance(fill)].sort((a, b) => b - a)
+          const [hi, lo] = [luminance(rgba(style.color)), luminance(fill)].toSorted((a, b) => b - a)
           return { opaque: fill[3] > 0.99, ratio: Math.round(((hi! + 0.05) / (lo! + 0.05)) * 100) / 100 }
         })
         expect(contrast.opaque, accent).toBe(true)

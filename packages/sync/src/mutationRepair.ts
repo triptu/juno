@@ -94,7 +94,7 @@ const repairPage = (ctx: SyncContext, job: Job): Effect.Effect<void, BootError, 
   const messages = page.messages.map((m) => ({ ...m, reactions: m.reactions ?? [] }))
   yield* applyPage(ctx, job.channel, messages, { kind: 'page', requestedAt }, { alsoTouch: [topic], latestUpdates: page.latest_updates })
   const present = new Set<string>([...page.messages.map((m) => m.ts), ...(page.unchanged_messages ?? [])])
-  const inRange = [...present].filter((ts) => compareTs(ts, job.oldest) >= 0 && compareTs(ts, job.latest) <= 0).sort(compareTs)
+  const inRange = [...present].filter((ts) => compareTs(ts, job.oldest) >= 0 && compareTs(ts, job.latest) <= 0).toSorted(compareTs)
   const edge = job.thread === '' ? inRange[0] : inRange.at(-1)
   const next = page.response_metadata?.next_cursor
   // A missing cursor or empty truncated page cannot certify coverage. Keep the job for another catch-up.

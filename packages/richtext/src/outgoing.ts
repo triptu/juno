@@ -86,7 +86,7 @@ function tokenizeLinks(line: string, targets: MentionTargets): Token[] {
     token: link.hasScheme ? { kind: 'link', url: link.url } : { kind: 'link', url: link.url, text: link.text },
   }))
   // Longest first, so a longer label wins where two overlap.
-  for (const target of [...(targets.links ?? [])].sort((a, b) => b.text.length - a.text.length)) {
+  for (const target of [...(targets.links ?? [])].toSorted((a, b) => b.text.length - a.text.length)) {
     if (target.text.trim() === '') continue
     for (let at = line.indexOf(target.text); at >= 0; at = line.indexOf(target.text, at + target.text.length)) {
       const end = at + target.text.length

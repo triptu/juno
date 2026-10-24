@@ -92,6 +92,6 @@ if (cached) {
   const old = readdirSync(parent).filter((name) => /^[a-f0-9]{64}$/.test(name)).flatMap((name) => {
     const path = join(parent, name)
     try { return [{ path, at: statSync(path).mtimeMs }] } catch { return [] }
-  }).sort((a, b) => b.at - a.at).slice(8)
+  }).toSorted((a, b) => b.at - a.at).slice(8)
   for (const { path } of old) if (path !== cached) rmSync(path, { recursive: true, force: true })
 }

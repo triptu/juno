@@ -25,7 +25,7 @@ test('toolchain tags track only the Dockerfile, Quint and Bun pins, and the cont
     writeFileSync(join(dir, 'package.json'), JSON.stringify(manifest))
     assert.notEqual(imageTag(dir), bunTag)
     context = imageContext()
-    assert.deepEqual(readdirSync(context).sort(), ['Dockerfile', 'toolchain.json'])
+    assert.deepEqual(readdirSync(context).toSorted(), ['Dockerfile', 'toolchain.json'])
   } finally {
     if (context) rmSync(context, { recursive: true, force: true })
     rmSync(dir, { recursive: true, force: true })
