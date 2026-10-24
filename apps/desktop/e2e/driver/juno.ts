@@ -149,23 +149,20 @@ export class SidebarRow {
    * to the row once its box has stayed the same for two frames; from then on
    * the list holds its order under the pointer (SPEC 5). A row that moved
    * after it was measured but before the pointer came into the list (a new
-   * message above it) is not hovered, so it is measured and pointed at again.
+   * message above it) is not hovered, so `pointAt` measures and points again;
+   * the press waits until the row itself is under the pointer. A toast over
+   * the sidebar's lower rows is waited out first, as a click would.
    * A test that has just caused a move waits for it first (`expectTop`).
    */
   async select(): Promise<void> {
     await this.root.scrollIntoViewIfNeeded()
-    const hovered = () => this.root.evaluate((node) => node.matches(':hover'))
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const box = await settledBox(this.root)
-      if (!box) throw new Error(`Row "${this.title}" is not on screen`)
-      await this.win.mouse.move(box.x + 40, box.y + box.height / 2)
-      const landed = await expect
-        .poll(hovered, { timeout: 250, intervals: [16, 32] })
-        .toBe(true)
-        .then(() => true, () => false)
-      if (landed) return press(this.win)
-    }
-    throw new Error(`Pointing did not hover row "${this.title}"`)
+    const box = await settledBox(this.root)
+    if (!box) throw new Error(`Row "${this.title}" is not on screen`)
+    const point = { x: 40, y: box.height / 2 }
+    // A trial hover only checks that the point receives events, so nothing covers it.
+    await this.root.hover({ trial: true, position: point })
+    await pointAt(this.win, this.root, point)
+    await press(this.win)
   }
 
   /** Opens the topic in the current tab. */
