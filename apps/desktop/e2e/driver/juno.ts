@@ -670,9 +670,19 @@ export class NotificationsPage {
 
   /** Chooses the direction in the add row, types the words and presses Add. */
   async addInstruction(direction: 'Notify me' | "Don't notify", text: string): Promise<void> {
-    await this.root.getByRole('radiogroup', { name: "New instruction: Notify me or Don't notify" }).getByRole('radio', { name: direction }).click()
+    await this.newInstructionDirection(direction).click()
     await this.newInstruction.fill(text)
     await this.addInstructionButton.click()
+  }
+
+  /** One of the examples shown while the list is empty. */
+  instructionExample(text: string): Locator {
+    return this.root.locator('[data-instruction-examples]').getByRole('button', { name: text, exact: true })
+  }
+
+  /** The add row's Notify me or Don't notify radio. */
+  newInstructionDirection(direction: 'Notify me' | "Don't notify"): Locator {
+    return this.root.getByRole('radiogroup', { name: "New instruction: Notify me or Don't notify" }).getByRole('radio', { name: direction })
   }
 
   /** The row of the instruction with these words. */

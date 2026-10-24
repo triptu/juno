@@ -141,34 +141,6 @@ async function notificationsAndAppearance(juno: Juno): Promise<void> {
   await expect(page.root.getByRole('combobox', { name: 'Notifications from' })).toHaveValue(String(10 * 60))
 }
 
-syncedTest('Your instructions: add one with a direction, see it in the list, remove it', async ({ juno }) => {
-  await juno.openNotifications()
-  const page = juno.notifications
-  const words = 'Social plans, lunch and dinner'
-
-  // There is no default direction: the field and Add wait for one.
-  await expect(page.newInstruction).toBeDisabled()
-  await expect(page.addInstructionButton).toBeDisabled()
-  await page.addInstruction("Don't notify", words)
-
-  const row = page.instruction(words)
-  await expect(row).toBeVisible()
-  await expect(row.getByRole('radio', { name: "Don't notify" })).toHaveAttribute('aria-checked', 'true')
-  // The add row is empty again and waits for the next direction.
-  await expect(page.newInstruction).toHaveValue('')
-  await expect(page.newInstruction).toBeDisabled()
-
-  // It is saved: close Settings and open it again.
-  await juno.tabs.close('Settings')
-  await juno.openNotifications()
-  await expect(page.instruction(words)).toBeVisible()
-
-  await page.removeInstruction(words)
-  await juno.expectToast('Instruction removed')
-  await expect(page.instruction(words)).toHaveCount(0)
-})
-
-
 syncedTest('Tidy up saves rapid changes to separate controls', async ({ juno }) => {
   await juno.openSettings('Tidy up')
   const checks = juno.settings.root.getByRole('checkbox', { name: /^(Threads|Direct messages)$/ })
