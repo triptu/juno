@@ -205,9 +205,10 @@ export const Peek = memo(function Peek() {
 
 /**
  * The topic's header and first window are local and covered (or it failed, or is unknown): a peek at it
- * can paint. A window of search matches is not covered (performance.md 3.3), and a thread window that
- * stops at replies the store cannot prove above its first row (`meta.gapBefore`) is only part of what
- * the open proves; either would grow when the replies page lands, so the peek waits for the fetch it makes anyway.
+ * can paint. A thread no page proves up to its newest reply paints what stands in for it (`meta.standIn`), and a thread window that
+ * stops at replies the store cannot prove above its first row paints at its full height, so the replies its fetch
+ * brings come in above the rows (`PeekTopic`). A window of search matches alone is not covered (performance.md 3.3)
+ * and would grow when the replies page lands, so the peek waits for the fetch it makes anyway.
  */
 function canPaint(id: string): boolean {
   const header = registry.get(topicAtom(id))
@@ -215,7 +216,7 @@ function canPaint(id: string): boolean {
   if (header._tag !== 'Success') return false
   if (header.value === null) return true
   const list = registry.get(messageListAtom(id))
-  return list.ready && list.meta.windowCovered !== false && list.meta.gapBefore !== true
+  return list.ready && (list.meta.windowCovered !== false || list.meta.standIn === true)
 }
 
 /**

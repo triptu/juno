@@ -16,7 +16,7 @@ import { downloadMessageFile, quickLookMessageFile, showMessageImageMenu, useTop
 import { useTopicHeader } from './topic/header'
 import { useNewerPages } from './topic/newer'
 import { useOlderPages } from './topic/older'
-import { listStatus, markRead, useDivider, useMarkRead, useTopicFetch, useWindowFocused, windowShown } from './topic/opening'
+import { listStatus, markRead, useDivider, useFromBottom, useMarkRead, useTopicFetch, useWindowFocused, windowShown } from './topic/opening'
 import {
   edgesOf,
   newMessages,
@@ -231,9 +231,10 @@ export function Topic({ id, view, detail, readOnly = false, peek = false, onOpen
   // The hooks run their effects in this order; keep it.
   const position = usePosition(list)
   const { readAtOpen, at, dividerBefore } = useDivider(id, detail.lastReadTs, detail.markedUnread === true, list, readOnly)
-  const loading = useTopicFetch(detail.id, view, reader?.fetch ?? true)
+  const loading = useTopicFetch(detail.id, view, reader?.fetch ?? true, position.positioned)
   const landing = reader?.landing
   const showWindow = windowShown(position.positioned, list, readAtOpen, loading.fetchState) || (landing !== undefined && list.rows.has(landing))
+  const firstAtOpen = useFromBottom(list, showWindow, position.positioned)
   const files = useTopicFiles(view)
   const openMedia = onOpenPreviewMedia ?? files.setViewing
   useOpenPosition(position, view, readOnly, list, showWindow)
@@ -265,7 +266,8 @@ export function Topic({ id, view, detail, readOnly = false, peek = false, onOpen
       status={listStatus(showWindow, list, loading)}
       older={!showWindow || list.order.length === 0 ? 'none' : older}
       {...(dividerBefore === undefined ? {} : { dividerBefore })}
-      startsGroupAt={landing}
+      startsGroupAt={landing ?? firstAtOpen}
+      fromBottom={firstAtOpen !== undefined}
       scrollRef={position.scrollRef}
       underHeader={!peek}
       popover={peek}

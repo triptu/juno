@@ -18,8 +18,9 @@ const OLDER_MARGIN = '1000px 0px 0px 0px'
  * and neither has a topic whose start an earlier page reached this run (`topicStartKnownAtom`), so opening it
  * again asks for nothing, unless its window stops at replies the store cannot prove (`meta.gapBefore`). A thread
  * window grows only once the replies reach its first row, so a wide gap can take a few steps while the top stays
- * in view. A step Slack could not answer waits a few seconds before it is asked again (`useStepStall`).
- * Out of the React Compiler, as the effect-only hooks in `position.ts` are.
+ * in view. A step Slack could not answer waits a few seconds before it is asked again (`useStepStall`). While a
+ * thread shows what stands in for proof (`meta.standIn`), no step is asked: the open's fetch is proving that
+ * stretch already. Out of the React Compiler, as the effect-only hooks in `position.ts` are.
  */
 export function useOlderPages(position: Position, id: string, view: string, list: MessageWindow): OlderStatus {
   'use no memo'
@@ -28,12 +29,13 @@ export function useOlderPages(position: Position, id: string, view: string, list
   const complete = useAtomValue(topicStartKnownAtom(id))
   const [loadingOlder, setLoadingOlder] = useState(false)
   const { stalled, settle } = useStepStall()
+  const standIn = list.meta.standIn === true
   const rootShown = first !== undefined && list.rows.get(first)?.root === true
   const windowFull = list.order.length >= list.spec.limit
   const older: OlderStatus = loadingOlder ? 'loading' : rootShown || (complete && !windowFull && list.meta.gapBefore !== true) ? 'none' : 'more'
   useEffect(() => {
     const scroller = scrollRef.current
-    if (scroller === null || !drawnAll || older !== 'more' || first === undefined || stalled === first) return
+    if (scroller === null || !drawnAll || older !== 'more' || first === undefined || stalled === first || standIn) return
     const row = scroller.querySelector(rowSelector(first))
     if (row === null) return
     const observer = new IntersectionObserver(
@@ -67,7 +69,7 @@ export function useOlderPages(position: Position, id: string, view: string, list
     )
     observer.observe(row)
     return () => observer.disconnect()
-  }, [id, view, drawnAll, older, first, stalled, settle, scrollRef, pinRef, pinnedTopRef, setHeldAt])
+  }, [id, view, drawnAll, older, first, stalled, standIn, settle, scrollRef, pinRef, pinnedTopRef, setHeldAt])
   return older
 }
 

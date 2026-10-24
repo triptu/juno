@@ -28,6 +28,11 @@ export interface PeekViewProps {
   readonly placement?: PeekPlacement
   /** The topic's messages: a `MessageList` with no actions, `popover` set. */
   readonly children: ReactNode
+  /**
+   * As tall as the room allows from the start, whatever its messages: a thread whose replies above the first
+   * shown are still to come in, so the popover does not grow under the pointer when they do.
+   */
+  readonly full?: boolean
 }
 
 /**
@@ -37,14 +42,14 @@ export interface PeekViewProps {
  * message it goes to the body, so a hidden sidebar does not hide it. It
  * floats over the workspace and moves nothing when it appears.
  *
- * As tall as its messages, up to the room the window has; longer topics
- * scroll inside. The rows are compact whatever the app's density.
+ * As tall as its messages, up to the room the window has (`full`: that
+ * tall at once); longer topics scroll inside. The rows are compact whatever the app's density.
  *
  * A non-modal dialog: it never takes focus, so the row or the composer that
  * had it keeps it, and it is named by the topic's title. It appears at once
  * and closes at once; a peek lasts as long as a key is held.
  */
-export function PeekView({ title, where, art, placement = SIDEBAR, children }: PeekViewProps) {
+export function PeekView({ title, where, art, placement = SIDEBAR, children, full = false }: PeekViewProps) {
   const titleId = useId()
   const peek = (
     <div
@@ -57,9 +62,10 @@ export function PeekView({ title, where, art, placement = SIDEBAR, children }: P
         compactDensity,
         styles.place,
         placement.at === 'sidebar' ? styles.sidebar : placement.at === 'below' ? styles.below(placement.x, placement.y, placement.room) : styles.above(placement.x, placement.y, placement.room),
+        full && styles.full,
       )}
     >
-      <Surface kind="peek" sx={styles.panel}>
+      <Surface kind="peek" sx={[styles.panel, full && styles.grow]}>
         <div {...stylex.props(styles.header)}>
           {art === undefined ? null : <span {...stylex.props(styles.art)}>{art}</span>}
           <Text variant="rowTitle" weight="semibold" truncate dir="auto" id={titleId} sx={styles.title}>
@@ -71,7 +77,7 @@ export function PeekView({ title, where, art, placement = SIDEBAR, children }: P
             </Text>
           )}
         </div>
-        <div {...stylex.props(styles.list)}>{children}</div>
+        <div {...stylex.props(styles.list, full && styles.grow)}>{children}</div>
       </Surface>
     </div>
   )
@@ -114,6 +120,13 @@ const styles = stylex.create({
     maxWidth: `calc(100vw - ${x}px - ${GAP})`,
     maxHeight: `calc(${room}px - ${layout['--titlebar-height']} - ${GAP})`,
   }),
+  // The placement's max height clamps it to the room.
+  full: {
+    height: '100vh',
+  },
+  grow: {
+    flexGrow: 1,
+  },
   panel: {
     display: 'flex',
     flexDirection: 'column',

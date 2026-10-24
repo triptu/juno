@@ -56,8 +56,16 @@ export interface MessageListProps {
   readonly notDrawnAbove?: number
   /** The `ts` of the first unread message: the "N new" divider goes before it. */
   readonly dividerBefore?: string
-  /** A message that shows its sender's name and avatar even when it continues their group: the Search reader's landing match. */
+  /**
+   * A message that shows its sender's name and avatar even when it continues their group: the Search reader's
+   * landing match, or the first row a thread window opened with while replies may still land above it.
+   */
   readonly startsGroupAt?: string | undefined
+  /**
+   * The rows sit at the bottom of the list while it is shorter than the view: replies that come in above them
+   * (a window that stops at replies the store cannot prove above it) then never move them.
+   */
+  readonly fromBottom?: boolean
   readonly older?: OlderStatus
   /** The scroll element, for the container's open position and stick-to-bottom. */
   readonly scrollRef?: Ref<HTMLElement>
@@ -270,6 +278,7 @@ export function MessageList({
   notDrawnAbove = 0,
   dividerBefore,
   startsGroupAt,
+  fromBottom = false,
   older = 'none',
   scrollRef,
   underHeader = true,
@@ -350,7 +359,7 @@ export function MessageList({
         onContextMenu={
           onMessageMenu === undefined && onImageMenu === undefined && onLinkMenu === undefined && onPersonMenu === undefined && onChannelMenu === undefined ? undefined : (event) => messageMenu(event, { onMessageMenu, onImageMenu, onLinkMenu, onPersonMenu, onChannelMenu })
         }
-        {...stylex.props(styles.column, popover && styles.popoverColumn)}
+        {...stylex.props(styles.column, popover && styles.popoverColumn, fromBottom && styles.fromBottom)}
       >
         {items.length > 0 && !(popover && older === 'none') ? (
           <div aria-live="polite" data-older-line={older} {...stylex.props(styles.olderLine, !popover && styles.olderInRoom)}>
@@ -475,6 +484,11 @@ const styles = stylex.create({
     paddingTop: spacing['--space-2'],
     paddingInline: sizes['--focus-ring-room'],
     paddingBottom: spacing['--space-2'],
+  },
+  // Rows at the bottom: the space a short list leaves goes above them. In a peek, the popover is as tall as it may be.
+  fromBottom: {
+    justifyContent: 'flex-end',
+    minHeight: '100%',
   },
   // "Loading older messages". In peek, a slot above the first row while
   // older messages may come, so the line moves nothing.

@@ -1,6 +1,6 @@
-import { useLayoutEffect } from 'react'
+import { useLayoutEffect, useState } from 'react'
 import type { TopicDetail } from '@juno/contract'
-import { currentPlace, openViewerAtom, registry, tabsAtom, tabShowing, topicAtom, topicView } from '@juno/state'
+import { currentPlace, messageListAtom, openViewerAtom, registry, tabsAtom, tabShowing, topicAtom, topicView } from '@juno/state'
 import { afterPaint, measure } from '@juno/state/perf'
 import { useAtomValue } from '@juno/state/react'
 import { PeekView, TopicArt, type MediaViewing, type PeekPlacement } from '@juno/views'
@@ -17,6 +17,8 @@ export function PeekTopic({ id, at, placement }: { readonly id: string; readonly
   const result = useAtomValue(topicAtom(id))
   const detail = result._tag === 'Success' ? result.value : undefined
   const shown = detail != null
+  // A thread shown with replies above it the store cannot prove: they come in above its rows, at its full height.
+  const [full] = useState(() => registry.get(messageListAtom(id)).meta.gapBefore === true)
   // `juno.peek-open`: from the key or the pointer to the first frame with the topic's messages.
   useLayoutEffect(() => {
     if (shown) afterPaint(() => measure('juno.peek-open', at, { detail: { id } }))
@@ -29,6 +31,7 @@ export function PeekTopic({ id, at, placement }: { readonly id: string; readonly
       {...(main ? {} : { where: detail.channel.label })}
       {...(hasArt(detail) ? { art: <TopicArt topicId={detail.id} recipe={detail.art} size={20} /> } : {})}
       placement={placement}
+      full={full}
     >
       <TopicPreview id={id} detail={detail} />
     </PeekView>
