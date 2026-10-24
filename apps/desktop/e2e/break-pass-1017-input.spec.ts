@@ -80,6 +80,8 @@ syncedTest('Home, the composers and the edit field work from the keyboard, and d
         for (const element of document.querySelectorAll<HTMLElement>('body *')) {
           // Rows off screen skip style (content-visibility), and hidden actions are at opacity 0.
           if (!element.checkVisibility({ opacityProperty: true, contentVisibilityAuto: true })) continue
+          // A toast is paper on ink in dark by design (tokens, "--toast-success"); an earlier step's send left one.
+          if (element.closest('[role="status"]')) continue
           const match = /rgba?\((\d+), (\d+), (\d+)(?:, ([\d.]+))?\)/.exec(getComputedStyle(element).backgroundColor)
           if (match === null || (match[4] !== undefined && Number(match[4]) < 0.5)) continue
           const [r, g, b] = [Number(match[1]), Number(match[2]), Number(match[3])]

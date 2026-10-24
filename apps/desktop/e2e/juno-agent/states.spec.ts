@@ -121,16 +121,19 @@ test('the chat while Juno works, when a run fails, when storage fails, offline, 
 
   await test.step('a message over the size limit is marked too long, one at the limit is kept when request framing makes it too large, and neither reaches the model', async () => {
     const before = model.inputs().length
+    // Earlier steps left failed messages and endings of their own: count from here, and read the newest.
+    const failed = chat.root.locator('[data-delivery="failed"]')
+    const failedBefore = await failed.count()
     const long = 'word '.repeat(14_000).trim()
     await chat.send(long)
-    await expect(chat.root.locator('[data-chat-owner] [data-delivery="failed"]')).toHaveText(chatCopy.delivery.tooLong)
+    await expect(chat.root.locator('[data-chat-owner] [data-delivery="failed"]').last()).toHaveText(chatCopy.delivery.tooLong)
 
     // The composer accepts 65,536 bytes, but the active request must also fit its framing.
     const text = 'x'.repeat(65_536)
     await chat.send(text)
-    await expect(chat.root.locator('[data-chat-ending]')).toHaveText(chatCopy.ending.blocked.tooLarge, { timeout: 15_000 })
+    await expect(chat.root.locator('[data-chat-ending]').last()).toHaveText(chatCopy.ending.blocked.tooLarge, { timeout: 15_000 })
     await expect(chat.ownerBubble(text)).toHaveCount(1)
-    await expect(chat.root.locator('[data-delivery="failed"]')).toHaveCount(1)
+    await expect(failed).toHaveCount(failedBefore + 1)
     expect(model.inputs()).toHaveLength(before)
   })
 })

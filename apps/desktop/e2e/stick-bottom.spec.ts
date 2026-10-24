@@ -108,6 +108,7 @@ for (const place of ['Main', 'topic', 'DM'] as const) {
             await frames(win, 12)
             const samples = await watched()
             await test.info().attach(`${name}-${method}`, { body: JSON.stringify(samples), contentType: 'application/json' })
+            console.log(`${place}, ${name}, ${method}: ${samples.length} frames, hidden below ${Math.max(...samples.map((sample) => sample.hiddenBelow))}px, above ${Math.max(...samples.map((sample) => sample.hiddenAbove))}px`)
             expect(samples.length).toBeGreaterThanOrEqual(10)
             expect(samples.filter((sample) => sample.hiddenAbove > 0 || sample.hiddenBelow > 0 || sample.buttons !== 2)).toEqual([])
             await win.keyboard.press('Escape')
@@ -195,7 +196,7 @@ test('keeps the last message of Main whole as it grows at the bottom, and still 
   })
 })
 
-test('releases the bottom during an upward gesture, also against concurrent growth, and uses the resting threshold for later growth', async ({ juno, win, slack, fake }) => {
+test('releases the bottom during an upward gesture and uses the resting threshold for later growth', async ({ juno, win, slack, fake }) => {
   const channel = await openLongMain(juno, fake, slack)
   const { topic } = juno
   const last = fake.messages(channel).find((message) => message.text === 'Earlier message 29')!
@@ -240,11 +241,6 @@ test('releases the bottom during an upward gesture, also against concurrent grow
       await topic.expectMessage('The final line')
     })
     expect(await topic.scroller.evaluate((node) => node.scrollTop)).toBe(top)
-  })
-
-  await test.step('an upward gesture from the end escapes concurrent column growth from the first scroll frame', async () => {
-    await topic.toLatest()
-    await expectScrollEscapesGrowth(win, topic.scroller, topic.list.locator('[data-message-row]').last())
   })
 })
 
@@ -309,6 +305,11 @@ for (const place of ['Main', 'thread'] as const) {
     })
   })
 }
+
+test('an upward gesture escapes concurrent column growth from the first scroll frame', async ({ juno, win, slack, fake }) => {
+  await openLongMain(juno, fake, slack)
+  await expectScrollEscapesGrowth(win, juno.topic.scroller, juno.topic.list.locator('[data-message-row]').last())
+})
 
 async function mainArrival({ juno, win, slack, fake }: Pick<Fixtures, 'juno' | 'win' | 'slack' | 'fake'>): Promise<void> {
   const channel = slack.channel('eng')

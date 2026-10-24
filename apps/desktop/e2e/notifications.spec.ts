@@ -72,6 +72,8 @@ syncedTest('Notify me levels, which messages notify and how a click opens them, 
     await juno.focusWindow()
   })
   await test.step('a group DM notifies under its people\'s names, not Slack\'s internal name', async () => {
+    // The step before left the Automated view on.
+    await juno.sidebar.filter('All')
     await juno.sidebar.row('Maya, Leo', { exact: true }).open()
     await juno.topic.chooseInMessageMenu('lunch friday?', 'notify-always', { onSender: true })
     await juno.expectToast('Leo: Always')

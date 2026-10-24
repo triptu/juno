@@ -61,50 +61,48 @@ syncedTest('topics and pages open without a layout shift', async ({ juno, win, f
 
 // No line is held for reactions a message does not have yet (SPEC 7, "Stable geometry"). The last message's first
 // chip grows it in one step: in a list that fits the view, downwards; at the bottom of a longer one, the list keeps
-// its end and the rows above lift in the same frame, as Slack's do. What must never move: the rows in view when
-// something changes above them, and the list's end while it is held.
-syncedTest('late reactions grow the last message without a jump and move no row in view when they land above it', async ({ juno, win, slack, fake }) => {
-  await test.step('a late reaction on the last message grows it without a jump', async () => {
-    // Enough replies that the thread is longer than the view, so the list keeps its end whatever the window's height.
-    for (let i = 1; i <= 6; i++) slack.as('Leo').replyIn(POSTGRES, `Dry run checklist item ${i} is done.`)
-    await juno.sidebar.row(POSTGRES).open()
-    // The open's replies page brings an earlier reply in full, with its 👍; wait for it so only the new reaction moves anything.
-    await expect(juno.topic.message('We keep the old primary warm for 48h.').getByRole('button', { name: /^2 👍/ })).toBeVisible()
-    await expect(juno.topic.message('Dry run checklist item 6 is done.')).toBeVisible()
-    const row = juno.topic.list.locator('[data-message-row]').last()
-    const ts = await row.getAttribute('data-message-row')
-    expect(ts).not.toBeNull()
-    const selector = `[data-message-row="${ts}"]`
-    const edge = await growingEdge(juno.topic.list)
-    await expectStableAnchor(win, selector, async () => {
-      fake.addReaction({ channel: slack.root(POSTGRES).channel, ts: ts!, name: 'eyes', user: slack.as('Leo').id })
-      await expect(row.getByRole('list', { name: 'Reactions' })).toBeVisible()
-    }, { edge })
-  })
+// its end and the rows above lift in the same frame, as Slack's do.
+syncedTest('a late reaction on the last message grows it without a jump', async ({ juno, win, slack, fake }) => {
+  // Enough replies that the thread is longer than the view, so the list keeps its end whatever the window's height.
+  for (let i = 1; i <= 6; i++) slack.as('Leo').replyIn(POSTGRES, `Dry run checklist item ${i} is done.`)
+  await juno.sidebar.row(POSTGRES).open()
+  // The open's replies page brings an earlier reply in full, with its 👍; wait for it so only the new reaction moves anything.
+  await expect(juno.topic.message('We keep the old primary warm for 48h.').getByRole('button', { name: /^2 👍/ })).toBeVisible()
+  await expect(juno.topic.message('Dry run checklist item 6 is done.')).toBeVisible()
+  const row = juno.topic.list.locator('[data-message-row]').last()
+  const ts = await row.getAttribute('data-message-row')
+  expect(ts).not.toBeNull()
+  const selector = `[data-message-row="${ts}"]`
+  const edge = await growingEdge(juno.topic.list)
+  await expectStableAnchor(win, selector, async () => {
+    fake.addReaction({ channel: slack.root(POSTGRES).channel, ts: ts!, name: 'eyes', user: slack.as('Leo').id })
+    await expect(row.getByRole('list', { name: 'Reactions' })).toBeVisible()
+  }, { edge })
+})
 
-  await test.step('a late reaction above the view moves no row in view, and one on the last message keeps the bottom', async () => {
-    const channel = slack.channel('eng')
-    const user = slack.as('Leo').id
-    const root = fake.injectMessage({ channel, user, text: 'Reaction above the view check' })
-    const replies = Array.from({ length: 30 }, (_, i) => fake.workspace.post({ channel, user: i % 2 === 0 ? user : slack.as('Maya').id, threadTs: root.ts, text: `Reply ${i}`, silent: true }))
-    const latest = fake.injectMessage({ channel, user, threadTs: root.ts, text: 'Latest reply under the view check' })
-    await juno.sidebar.expectTop('#eng')
-    await juno.sidebar.row('#eng').open()
-    await juno.topic.list.locator(`[data-thread-link="t:${channel}:${root.ts}"]`).click()
-    await juno.topic.expectMessage('Latest reply under the view check')
-    const above = juno.topic.list.locator(`[data-message-row="${replies[1]!.ts}"]`)
-    expect(await above.evaluate((node) => node.getBoundingClientRect().bottom < (node.closest('[data-scroll-area]')?.getBoundingClientRect().top ?? 0))).toBe(true)
-    await expectStableAnchor(win, `[data-message-row="${latest.ts}"]`, async () => {
-      fake.addReaction({ channel, ts: replies[1]!.ts, name: 'eyes', user })
-      await expect(above.getByRole('list', { name: 'Reactions' })).toBeAttached()
-    })
-    expect(await growingEdge(juno.topic.list)).toBe('bottom')
-    const last = juno.topic.list.locator(`[data-message-row="${latest.ts}"]`)
-    await expectStableAnchor(win, `[data-message-row="${latest.ts}"]`, async () => {
-      fake.addReaction({ channel, ts: latest.ts, name: 'eyes', user })
-      await expect(last.getByRole('list', { name: 'Reactions' })).toBeVisible()
-    }, { edge: 'bottom' })
+// What must never move: the rows in view when something changes above them, and the list's end while it is held.
+syncedTest('a late reaction above the view moves no row in view, and one on the last message keeps the bottom', async ({ juno, win, slack, fake }) => {
+  const channel = slack.channel('eng')
+  const user = slack.as('Leo').id
+  const root = fake.injectMessage({ channel, user, text: 'Reaction above the view check' })
+  const replies = Array.from({ length: 30 }, (_, i) => fake.workspace.post({ channel, user: i % 2 === 0 ? user : slack.as('Maya').id, threadTs: root.ts, text: `Reply ${i}`, silent: true }))
+  const latest = fake.injectMessage({ channel, user, threadTs: root.ts, text: 'Latest reply under the view check' })
+  await juno.sidebar.expectTop('#eng')
+  await juno.sidebar.row('#eng').open()
+  await juno.topic.list.locator(`[data-thread-link="t:${channel}:${root.ts}"]`).click()
+  await juno.topic.expectMessage('Latest reply under the view check')
+  const above = juno.topic.list.locator(`[data-message-row="${replies[1]!.ts}"]`)
+  expect(await above.evaluate((node) => node.getBoundingClientRect().bottom < (node.closest('[data-scroll-area]')?.getBoundingClientRect().top ?? 0))).toBe(true)
+  await expectStableAnchor(win, `[data-message-row="${latest.ts}"]`, async () => {
+    fake.addReaction({ channel, ts: replies[1]!.ts, name: 'eyes', user })
+    await expect(above.getByRole('list', { name: 'Reactions' })).toBeAttached()
   })
+  expect(await growingEdge(juno.topic.list)).toBe('bottom')
+  const last = juno.topic.list.locator(`[data-message-row="${latest.ts}"]`)
+  await expectStableAnchor(win, `[data-message-row="${latest.ts}"]`, async () => {
+    fake.addReaction({ channel, ts: latest.ts, name: 'eyes', user })
+    await expect(last.getByRole('list', { name: 'Reactions' })).toBeVisible()
+  }, { edge: 'bottom' })
 })
 
 for (const divider of [false, true]) {
