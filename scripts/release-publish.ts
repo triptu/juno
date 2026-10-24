@@ -25,7 +25,7 @@ import { join, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { addChangelogEntry, compareVersions, isVersion, normalizeVersion } from '../apps/desktop/src/main/releaseNotes.ts'
 import { releaseGate, printGate } from './release-gate.mjs'
-import { highlightLines } from './release-schedule.mjs'
+import { highlightLines } from './release-highlights.mjs'
 import { syncReleasedVersion } from './release-main.mjs'
 import { recordReleaseTiming } from './release-timings.mjs'
 

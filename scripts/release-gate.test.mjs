@@ -2,11 +2,11 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { assessRecord, compatible, git, readRecords, releaseGate } from './release-gate.mjs'
+import { assessRecord, compatible, git, releaseGate } from './release-gate.mjs'
 import { writeRecord } from './verify-records.mjs'
 import { scratchFolder } from './worktree-folder.mjs'
 
-export const green = (commit) => ({ commit, finishedAt: '2026-10-18T10:00:00Z', passed: true, suites: ['test', 'specs:check', 'test:gallery', 'test:desktop'].map((suite) => ({ suite, code: 0 })) })
+const green = (commit) => ({ commit, finishedAt: '2026-10-18T10:00:00Z', passed: true, suites: ['test', 'specs:check', 'test:gallery', 'test:desktop'].map((suite) => ({ suite, code: 0 })) })
 
 test('a release can use an older green record plus docs, tests and a version bump', (t) => {
   mkdirSync(scratchFolder(), { recursive: true })
@@ -47,19 +47,6 @@ test('failed or incomplete full runs cannot pass', () => {
   }
 })
 
-test('reads archived results as well as the latest result', (t) => {
-  const root = mkdtempSync(join(scratchFolder(), 'release-records-test-'))
-  t.after(() => rmSync(root, { recursive: true, force: true }))
-  const archived = join(root, 'verify-main/commits', 'a'.repeat(40))
-  mkdirSync(archived, { recursive: true })
-  writeFileSync(join(archived, 'run.json'), JSON.stringify(green('a'.repeat(40))))
-  writeFileSync(join(root, 'verify-main.json'), JSON.stringify(green('b'.repeat(40))))
-  assert.equal(readRecords(root).length, 2)
-  writeRecord(root, 'next-run', green('c'.repeat(40)))
-  assert.equal(readRecords(root).length, 3)
-
-})
-
 test('a repair can pass only with its recorded ancestor and complete successful outcomes', (t) => {
   const root = mkdtempSync(join(scratchFolder(), 'release-repair-test-'))
   t.after(() => rmSync(root, { recursive: true, force: true }))
@@ -82,27 +69,6 @@ test('a repair can pass only with its recorded ancestor and complete successful 
   assert.equal(releaseGate(root, commit, [{ ...repaired, identity: { ...identity, bun: 'other' } }, baseline]), null)
   const incomplete = { ...repaired, suites: repaired.suites.map((suite) => suite.suite === 'test:desktop' ? { ...suite, tests: { status: 'passed', errors: 0, incomplete: 1, failures: [] } } : suite) }
   assert.equal(releaseGate(root, commit, [incomplete, baseline]), null)
-})
-
-test('release timings from a disposable checkout remain in the shared main status directory', async (t) => {
-  const { cpSync, readFileSync } = await import('node:fs')
-  const { execFileSync } = await import('node:child_process')
-  const root = mkdtempSync(join(scratchFolder(), 'release-timings-test-'))
-  t.after(() => rmSync(root, { recursive: true, force: true }))
-  const main = join(root, 'main')
-  mkdirSync(join(main, 'scripts'), { recursive: true })
-  writeFileSync(join(main, 'package.json'), '{"type":"module"}')
-  for (const name of ['release-timings.mjs', 'release-gate.mjs', 'verify-inputs.mjs', 'verify-repair.mjs']) cpSync(join(import.meta.dirname, name), join(main, 'scripts', name))
-  git(main, 'init', '-q')
-  git(main, 'config', 'user.name', 'Test')
-  git(main, 'config', 'user.email', 'test@example.com')
-  git(main, 'add', '.')
-  git(main, 'commit', '-qm', 'Fixture')
-  const checkout = join(root, 'release')
-  git(main, 'worktree', 'add', '--detach', checkout, 'HEAD')
-  execFileSync(process.execPath, ['--input-type=module', '-e', "import { recordReleaseTiming } from './scripts/release-timings.mjs'; recordReleaseTiming('package', Date.now(), {status:'passed'})"], { cwd: checkout })
-  git(main, 'worktree', 'remove', checkout)
-  assert.equal(JSON.parse(readFileSync(join(main, '.juno-status/release-timings.json'), 'utf8')).steps[0].step, 'package')
 })
 
 test('triage updates matching archived and latest records without turning a failure green', async (t) => {

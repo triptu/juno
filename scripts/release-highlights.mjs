@@ -1,21 +1,4 @@
 import { parseChangelog } from '../apps/desktop/src/main/releaseNotes.ts'
-import { assessRecord, compatible, git, isAncestor } from './release-gate.mjs'
-
-export function selectCommit(root, tip, records) {
-  const eligible = records.filter((record) => assessRecord(record) && isAncestor(root, record.commit, tip))
-  if (!eligible.length) return null
-  for (const commit of git(root, 'rev-list', '--topo-order', tip).split('\n')) {
-    const record = eligible.find((entry) => compatible(root, entry.commit, commit))
-    if (record) return commit
-  }
-  return null
-}
-
-export function releaseDue({ candidate, previous }) {
-  if (!candidate) return 'no commit has an eligible full-run record'
-  if (candidate === previous) return 'the selected commit is already released'
-  return null
-}
 
 /**
  * The commit subjects a person might notice, in order, without maintenance. They are

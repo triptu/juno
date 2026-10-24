@@ -2,9 +2,10 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { statusFolder } from './release-gate.mjs'
 
-const file = join(statusFolder(resolve(import.meta.dirname, '..')), 'release-timings.json')
-
-export function recordReleaseTiming(step, started, detail = {}) {
+/** Appends a step's duration to the main checkout's .juno-status/release-timings.json, for the repository at `cwd`. */
+export function recordReleaseTiming(step, started, detail = {}, cwd = process.cwd()) {
+  let file
+  try { file = join(statusFolder(cwd), 'release-timings.json') } catch { file = join(statusFolder(resolve(import.meta.dirname, '..')), 'release-timings.json') }
   const finished = Date.now()
   let steps = []
   try { steps = JSON.parse(readFileSync(file, 'utf8')).steps ?? [] } catch { /* First step. */ }
