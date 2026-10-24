@@ -1,4 +1,4 @@
-import { searchPage, restoreWindow, navigateMatches, profileDates, tabAndEdge } from './searchSteps'
+import { searchPage, restoreWindow, navigateMatches, profileDates, readerWithoutCache, tabAndEdge } from './searchSteps'
 import { expect, test, type Fixtures } from './fixtures'
 import { readUserDb } from './driver/userDb'
 import type { Juno } from './driver/juno'
@@ -374,3 +374,4 @@ test('search: a held Slack answer restores a saved window beyond 200 matches', a
 test('search: reader navigation applies the whole query beyond the message window', async ({ juno, fake }) => navigateMatches({ juno, fake }))
 test('search: date presets use the Slack profile calendar across midnight', async ({ juno, fake }) => profileDates({ juno, fake }))
 test('search: Tab from the field lands on a row and the reader follows, and the column’s edge moves with the keys', async ({ juno, slack }) => tabAndEdge({ juno, slack }))
+test('search: a result not on this Mac shows in the reader at once, never the last topic, and held arrows load only where they stop', async ({ juno, slack, fake }) => readerWithoutCache({ juno, slack, fake }))

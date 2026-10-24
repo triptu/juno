@@ -39,6 +39,15 @@ test('search: arrow to reader and keystroke to results', async ({ juno, slack })
   // The first moves warm the neighbours; the rest read from a warm cache.
   const readerSamples = await juno.measures('juno.search-reader')
   expect(readerSamples).toHaveLength(20)
+  // Each sample says what the reader painted: the topic itself, or the result's own message while the topic was not local.
+  const painted = await juno.win.evaluate(() =>
+    performance.getEntriesByName('juno.search-reader', 'measure').map((entry) => {
+      const properties: ReadonlyArray<readonly [string, unknown]> = (entry as unknown as { detail?: { devtools?: { properties?: Array<[string, unknown]> } } }).detail?.devtools?.properties ?? []
+      return properties.find(([key]) => key === 'reader')?.[1]
+    }),
+  )
+  // The next row was warm before each warm arrow, so the topic painted, not the stand-in.
+  expect(painted.slice(3)).toEqual(Array.from({ length: 17 }, () => 'topic'))
   const reader = stats('search arrow to reader painted', readerSamples.slice(3))
   expect.soft(reader.p95, `arrow to reader p95 ${reader.p95.toFixed(1)} ms`).toBeLessThanOrEqual(READER_BUDGET)
 })

@@ -135,3 +135,97 @@ export async function tabAndEdge({ juno, slack }: Pick<Fixtures, 'juno' | 'slack
   await win.keyboard.press('Enter')
   await expect.poll(width).toBe(start)
 }
+
+const HISTORY = 'conversations.history'
+
+/** What the reader painted while `target` was the selected row, frame by frame: whether `stale` was in it, and where `ts`'s message was. */
+async function watchReader(win: Page, target: string, stale: string, ts: string): Promise<void> {
+  await win.evaluate(({ target, stale, ts }) => {
+    const seen = { stale: false, tops: [] as number[] }
+    const hold = window as unknown as { readerFrames?: typeof seen }
+    hold.readerFrames = seen
+    const frame = () => {
+      if (hold.readerFrames !== seen) return
+      const reader = document.querySelector('[data-search-reader]')
+      const selected = document.querySelector('[data-search-row][aria-selected="true"]')
+      if (reader !== null && selected?.textContent?.includes(target) === true) {
+        if (reader.textContent?.includes(stale) === true) seen.stale = true
+        const row = reader.querySelector(`[data-message-row="${CSS.escape(ts)}"]`)
+        if (row !== null) seen.tops.push(Math.round(row.getBoundingClientRect().top))
+      }
+      requestAnimationFrame(frame)
+    }
+    requestAnimationFrame(frame)
+  }, { target, stale, ts })
+}
+
+async function readerFrames(win: Page): Promise<{ readonly stale: boolean; readonly tops: ReadonlyArray<number> }> {
+  return win.evaluate(() => {
+    const hold = window as unknown as { readerFrames?: { stale: boolean; tops: number[] } }
+    const seen = hold.readerFrames
+    delete hold.readerFrames
+    return seen ?? { stale: true, tops: [] }
+  })
+}
+
+/**
+ * A result whose topic is not on this Mac shows in the reader at once, header and message, never with the last
+ * topic's messages, and its topic fills in around the message without moving it. Arrows held through results
+ * load only the one they stop on.
+ */
+export async function readerWithoutCache({ juno, slack, fake }: Pick<Fixtures, 'juno' | 'slack' | 'fake'>) {
+  const { win, surface, sidebar } = juno
+  const page = searchPage(win)
+  slack.as('Maya').postIn('product', 'Osprey launch moved to Thursday')
+  // Only Slack's search finds these, newest first, each in its own channel's Main.
+  const places = ['eng', 'platform', 'incidents', 'design-review', 'sales']
+  const old = places.map((place, index) => ({ place, text: `Osprey archive note in ${place}`, ts: slack.as('Leo').postedLongAgo(place, `Osprey archive note in ${place}`, 30 + index) }))
+  await sidebar.row('#product').expectVisible()
+  await surface.appMenu('search-messages')
+  await page.field.pressSequentially('osprey')
+  await expect(page.rows).toHaveCount(6)
+  // Slack has answered: the newest result, on this Mac, shows as the peek.
+  await expect(page.reader.getByText('Osprey launch moved to Thursday')).toBeVisible()
+  await expect(page.reader.locator('[data-composer] textarea')).toBeVisible()
+
+  const platform = old[1]!
+  fake.holdNext({ method: HISTORY, reason: 'open', times: 20 })
+  await watchReader(win, platform.text, 'Osprey launch moved to Thursday', platform.ts)
+  await page.row(platform.text).click()
+  await expect(page.reader.locator('[data-topic-header]')).toContainText('platform')
+  await expect(page.reader.getByText(platform.text)).toBeVisible()
+  await expect.poll(() => fake.heldCalls({ method: HISTORY }).some((call) => call['channel'] === slack.channel('platform'))).toBe(true)
+  // Slack has not answered, and the reader shows the result, not the last topic.
+  await expect(page.reader.getByText('Osprey launch moved to Thursday')).toHaveCount(0)
+  fake.release({ method: HISTORY })
+  await expect(page.reader.locator('[data-composer] textarea')).toBeVisible()
+  await expect(page.reader.locator(`[data-message-row="${platform.ts}"]`)).toBeVisible()
+  await win.waitForTimeout(300)
+  const frames = await readerFrames(win)
+  expect(frames.stale).toBe(false)
+  expect(frames.tops.length).toBeGreaterThan(0)
+  expect(new Set(frames.tops).size, `the message's top over ${frames.tops.length} frames: ${frames.tops.join(', ')}`).toBe(1)
+
+  // From the first row, five results down in one go, as a held arrow repeats: only where it stops asks Slack.
+  await page.row('Osprey launch moved to Thursday').click()
+  await expect(page.reader.locator('[data-composer] textarea')).toBeVisible()
+  const from = fake.calls.length
+  fake.holdNext({ method: HISTORY, reason: 'open', times: 20 })
+  await page.row('Osprey launch moved to Thursday').focus()
+  await win.evaluate(() => {
+    for (let i = 0; i < 5; i++) document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
+  })
+  const last = old[4]!
+  await expect(page.row(last.text)).toBeFocused()
+  await expect(page.reader.locator('[data-topic-header]')).toContainText(last.place)
+  await expect(page.reader.getByText(last.text)).toBeVisible()
+  await expect.poll(() => fake.heldCount({ method: HISTORY })).toBe(1)
+  // There is no signal for a load that must not start; give a stray one time to arrive.
+  await win.waitForTimeout(300)
+  const passed = new Set(places.map((place) => slack.channel(place)))
+  const loads = fake.calls.slice(from).filter((call) => call.method === HISTORY && call.args['_x_reason'] === 'open' && passed.has(String(call.args['channel'])))
+  expect(loads.map((call) => call.args['channel'])).toEqual([slack.channel(last.place)])
+  fake.release({ method: HISTORY })
+  await expect(page.reader.locator('[data-composer] textarea')).toBeVisible()
+  await expect(page.reader.locator(`[data-message-row="${last.ts}"]`)).toBeVisible()
+}
