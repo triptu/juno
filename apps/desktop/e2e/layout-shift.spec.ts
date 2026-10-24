@@ -2,6 +2,7 @@ import type { Locator } from '@playwright/test'
 import { expect, hooks, syncedTest, test } from './fixtures'
 import { expectHomeSyncFrames } from './homeSyncProbe'
 import { JunoChatPane, test as chatTest } from './juno-agent/chat'
+import { messageStored } from './driver/userDb'
 import { expectStableAnchor } from './shiftProbe'
 
 // A failing test attaches the sidebar's order hold and topic list values (README, "Sidebar trace").
@@ -105,8 +106,11 @@ syncedTest('a late reaction above the view moves no row in view, and one on the 
   }, { edge: 'bottom' })
 })
 
+// A thread no page proves, with 30 replies Juno never stored and the latest it heard live: the latest paints at
+// once, at the foot of the list, and the 30 come in above it without moving it, the "N new" divider among them
+// when the thread was read partway.
 for (const divider of [false, true]) {
-  syncedTest(`partial thread waits for history at ${divider ? 'divider' : 'bottom'}`, async ({ juno, win, slack, fake }) => {
+  syncedTest(`a partial thread paints what it holds and grows above it${divider ? ', its divider too' : ''}`, async ({ juno, win, slack, fake, userData }) => {
     const channel = slack.channel('eng')
     const user = slack.as('Leo').id
     // The root is not posted live: a root heard on this connection proves its thread from the root (`liveRoots`),
@@ -120,15 +124,19 @@ for (const divider of [false, true]) {
     await juno.sidebar.row('#eng').open()
     const link = juno.topic.list.locator(`[data-thread-link="t:${channel}:${root.ts}"]`)
     await expect(link).toBeVisible()
+    // The live reply is stored before the open, so the thread holds it when it opens.
+    await expect.poll(() => messageStored(userData, fake.teamId, channel, latest.ts)).toBe(true)
     fake.holdNext({ method: 'conversations.replies', reason: 'open' })
     await link.click()
     await expect.poll(() => fake.heldCount({ method: 'conversations.replies' })).toBe(1)
-    await expect(juno.topic.list.locator('[data-message-row]')).toHaveCount(0)
-    await expectStableAnchor(win, divider ? '[data-new-divider]' : `[data-message-row="${latest.ts}"]`, async () => {
+    const rows = juno.topic.list.locator('[data-message-row]')
+    await expect(rows).toHaveCount(1)
+    await expectStableAnchor(win, `[data-message-row="${latest.ts}"]`, async () => {
       fake.release({ method: 'conversations.replies' })
-      await juno.topic.expectMessage('Latest delayed reply')
-      await expect(juno.topic.list.locator('[data-message-row]')).toHaveCount(32)
+      await juno.topic.expectMessage('Earlier reply 0')
+      await expect(rows).toHaveCount(32)
     })
+    if (divider) await juno.topic.expectDividerBefore('Earlier reply 25')
   })
 }
 

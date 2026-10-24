@@ -12,6 +12,16 @@ export function readUserDb<A>(userData: string, teamId: string, read: (db: Datab
   }
 }
 
+/** The message is in the workspace's cache.db: an event or a page the app received has been stored. */
+export function messageStored(userData: string, teamId: string, channel: string, ts: string): boolean {
+  const db = new DatabaseSync(join(userData, 'workspaces', teamId, 'cache.db'), { readOnly: true })
+  try {
+    return db.prepare('SELECT 1 AS found FROM messages WHERE channel = ? AND ts = ?').get(channel, ts) !== undefined
+  } finally {
+    db.close()
+  }
+}
+
 /** The tabs saved in user.db (`TABS_PREF` in `@juno/state`): each tab's topic id, or its page, whether it is pinned, and which tab is active. */
 export function savedTabs(userData: string, teamId: string): { readonly tabs: Array<{ readonly place: string; readonly pinned: boolean }>; readonly active: number } | undefined {
   const row = readUserDb(userData, teamId, (db) => db.prepare(`SELECT value_json FROM prefs WHERE key = 'tabs'`).get()) as { value_json: string } | undefined

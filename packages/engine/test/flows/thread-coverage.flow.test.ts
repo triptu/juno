@@ -1,7 +1,8 @@
 // Which replies of a thread the store holds (architecture 5.5 and 5.6, specs/threadranges.qnt), against the
 // fake Slack: only pages prove replies continuous, a thread window stops at the first boundary none proves and
-// fills it as the view scrolls there, socket replies never stand in for a page, and a thread's unread count is
-// exact only when a proven range reaches back to its read pointer.
+// fills it as the view scrolls there, socket replies never stand in for a page, a thread's unread count is
+// exact only when a proven range reaches back to its read pointer, and a thread no page proves up to its newest
+// reply shows what the store holds until its first open proves that stretch.
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { MESSAGE_WINDOW_MAX, type MessageView } from '@juno/contract'
@@ -238,10 +239,12 @@ it('a thread stored before ranges existed is unknown until its first open, which
     fake.workspace.post({ channel: 'C0ENG', user: 'U0SAM', text: 'old reply 20', threadTs: root as never, at: fake.now() - 20 * 60_000, silent: true })
   }, { recheckTopics: 0 })
 
-  await step('before the open the window shows no stretch it cannot prove, and the count is not exact', async () => {
+  await step('before the open the window stands in with its newest reply alone, since the root counts one more than it holds, and the count is not exact', async () => {
     const window = await windowOf(engine, id, { limit: 150 }, (value) => value.order.length > 0, 'the stored thread')
     expect(window.meta.windowCovered).toBe(false)
-    expect(window.order).toHaveLength(1)
+    expect(window.meta.standIn).toBe(true)
+    expect(window.meta.gapBefore).toBe(true)
+    expect(texts(window)).toEqual(['old reply 30'])
     expect(indexRow(engine, id)?.unread_exact).toBe(0)
   })
 
@@ -252,6 +255,82 @@ it('a thread stored before ranges existed is unknown until its first open, which
     const window = await windowOf(engine, id, { limit: 150 }, (value) => value.meta.windowCovered === true && value.order.length === 5, 'the whole thread')
     expect(texts(window)).toEqual(['Old cache thread', 'old reply 50', 'old reply 40', 'old reply 30', 'old reply 20'])
     expect(window.meta.gapBefore).toBeUndefined()
+    expect(window.meta.standIn).toBeUndefined()
     expect(indexRow(engine, id)?.unread_exact).toBe(1)
+  })
+})
+
+it('a long thread from before ranges shows the replies it holds at once, and its first open proves that stretch before the rest', async () => {
+  const first = await syncedEngine(engines)
+  const thread = longThread(first.fake, 300)
+  expect(valueOf(await openTopic(first.registry, thread.id)).outcome).toBe('fetched')
+  await quiet(first)
+  // What the update to ranges leaves: every reply stored, no range.
+  const engine = await restart(engines, first, () => {
+    const db = new DatabaseSync(join(first.userData, 'workspaces', first.fake.teamId, 'cache.db'))
+    try {
+      db.prepare('DELETE FROM thread_ranges').run()
+    } finally {
+      db.close()
+    }
+  }, { recheckTopics: 0 })
+  const newest = Array.from({ length: 150 }, (_, i) => i + 151)
+
+  await step('the window stands in with the newest replies it holds', async () => {
+    const window = await windowOf(engine, thread.id, { limit: 150 }, (value) => value.order.length > 0, 'the stand-in')
+    expect(window.meta.standIn).toBe(true)
+    expect(window.meta.windowCovered).toBe(false)
+    expect(steps(window)).toEqual(newest)
+  })
+
+  await step('the open proves those replies first, in two calls, and the window keeps them as they were', async () => {
+    let asked = 0
+    engine.fake.resetCalls()
+    engine.fake.gate((method, args) => method === 'conversations.replies' && args['_x_reason'] === 'open' && ++asked > 2)
+    const open = openTopic(engine.registry, thread.id)
+    const proven = await windowOf(engine, thread.id, { limit: 150 }, (value) => value.meta.standIn === undefined, 'the proven stretch')
+    expect(steps(proven)).toEqual(newest)
+    expect(proven.meta.windowCovered).toBe(true)
+    expect(proven.meta.gapBefore).toBe(true)
+    expect(opens(engine)).toHaveLength(2)
+    engine.fake.gate()
+    expect(valueOf(await open).outcome).toBe('fetched')
+  })
+
+  await step('the rest comes in from the root up to them, and the thread is whole', async () => {
+    expect(opens(engine)).toHaveLength(4)
+    const whole = await windowOf(engine, thread.id, { anchor: thread.root.ts, before: 0, limit: MESSAGE_WINDOW_MAX }, (value) => value.order.length === 301, 'the whole thread')
+    expect(whole.meta.gapBefore).toBeUndefined()
+    expect(steps(whole).slice(1)).toEqual(Array.from({ length: 300 }, (_, i) => i + 1))
+  })
+})
+
+it('the reconnect\'s recheck proves an unfollowed thread it reads again: its count is exact and its window whole before any open', async () => {
+  let unfollowed = ''
+  const engine = await bootedEngine(engines, { initial: (fake) => {
+    unfollowed = seedThread(fake, { channel: 'C0ENG', text: 'Unfollowed rollout', ago: 60 * 60_000, replies: [50, 40].map((m) => m * 60_000), follow: false }).id
+    return fake.signIn()
+  } })
+  const root = unfollowed.split(':')[2]!
+
+  await step('a reply while the socket is down', async () => {
+    engine.fake.goOffline()
+    await engine.phase('offline')
+    engine.fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: 'Missed while down', threadTs: root as never, silent: true })
+    engine.fake.resetCalls()
+    engine.fake.goOnline()
+    await engine.phase('live', 30_000)
+    await quiet(engine)
+  })
+
+  await step('the recheck read the thread from its root: the count is exact, and nothing was opened', async () => {
+    await waitFor(() => (indexRow(engine, unfollowed)?.unread_exact === 1 ? true : undefined), WAIT_MS, 'the exact count')
+    expect(indexRow(engine, unfollowed)?.unread_count).toBe(1)
+    expect(opens(engine)).toHaveLength(0)
+    const window = await windowOf(engine, unfollowed, { limit: 150 }, (value) => texts(value).at(-1) === 'Missed while down', 'the missed reply')
+    expect(window.meta.windowCovered).toBe(true)
+    expect(window.meta.gapBefore).toBeUndefined()
+    expect(window.meta.standIn).toBeUndefined()
+    expect(texts(window)[0]).toBe('Unfollowed rollout')
   })
 })
