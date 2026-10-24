@@ -63,14 +63,17 @@ it('paints local rows before Slack, pages a stable merged list and rejects old g
     valueOf(await runCommand(engine.registry, topicsRename, { id: `t:C0ENG:${root.ts}`, title: 'anchorneedle title' }))
     for (let i = 0; i < 60; i++) fake.workspace.post({ channel: 'C0ENG', user: 'U0LEO', text: 'anchorneedle elsewhere', at: now - 1000 - i * 1000, silent: true })
     fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: 'anchorneedle older reply', threadTs: root.ts, at: now - 100_000, silent: true })
-    const titles = session(engine, parseSearchQuery('anchorneedle'), 'title-anchor')
-    const before = await titles.until((s) => s.state === 'done')
-    const anchor = before.groups.find((g) => g.topicId === `t:C0ENG:${root.ts}`)
-    expect(anchor).toMatchObject({ kind: 'topic', older: false })
-    valueOf(await runCommand(engine.registry, searchMore, { sessionId: 'title-anchor', generation: 1 }))
-    const after = await titles.until((s) => s.state === 'done' && s.pagination.page === 2)
-    expect(after.groups[before.groups.indexOf(anchor!)]).toBe(anchor)
-    expect(after.groups.flatMap((g) => g.messages).some((m) => m.text.includes('older reply'))).toBe(true)
+    for (const groupByThread of [false, true]) {
+      const sessionId = `title-anchor-${groupByThread}`
+      const titles = session(engine, parseSearchQuery('anchorneedle', { scope: { groupByThread } }), sessionId)
+      const before = await titles.until((s) => s.state === 'done')
+      const anchor = before.groups.find((g) => g.topicId === `t:C0ENG:${root.ts}`)
+      expect(anchor).toMatchObject({ kind: 'topic', older: false })
+      valueOf(await runCommand(engine.registry, searchMore, { sessionId, generation: 1 }))
+      const after = await titles.until((s) => s.state === 'done' && s.pagination.page === 2)
+      expect(after.groups[before.groups.indexOf(anchor!)]).toBe(anchor)
+      expect(after.groups.flatMap((g) => g.messages).some((m) => m.text.includes('older reply'))).toBe(true)
+    }
   })
   await step('loaded windows move without asking Slack for more pages, including a request held behind the first page', async () => {
     for (let i = 0; i < 260; i++) fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: `windowprobe ${i}`, at: now - i * 1000 })
