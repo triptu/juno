@@ -208,6 +208,7 @@ test('search: ⌘F in a thread searches that thread, and Backspace on its chip w
   slack.as('Leo').replyIn('Osprey rollout plan', 'osprey canary looks healthy')
   slack.as('Sam').postIn('product', 'osprey pricing page copy')
   await sidebar.row('Osprey rollout plan').open()
+  await juno.topic.expectTitle('Osprey rollout plan')
 
   await surface.appMenu('search-topic')
   await expect(page.chips.filter({ hasText: 'Osprey rollout plan' })).toBeVisible()
