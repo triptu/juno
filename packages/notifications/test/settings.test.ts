@@ -1,6 +1,6 @@
 // The notification settings as this build and older ones stored them. The
 // rest of the pipeline runs against the fake Slack in
-// engine/test/notifications.test.ts.
+// engine/test/flows/notifications.flow.test.ts.
 import { expect, it } from 'bun:test'
 import { defaultNotificationSettings } from '@juno/domain'
 import { settingsOf } from '../src/settings'

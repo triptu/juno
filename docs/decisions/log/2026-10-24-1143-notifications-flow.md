@@ -1,0 +1,1 @@
+- 10-24 11:43 · Tushar · The engine's notification tests are one flow file, `notifications`, with a recording `Notifier` as the boundary fake: the decision service cases, one warm engine for socket decisions, and Slack's schedule in two engines instead of five. Main's `Notifier` path stays in `apps/desktop/test/notifier.test.ts`, since engine tests may not import the desktop app.
