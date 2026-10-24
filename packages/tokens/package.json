@@ -8,6 +8,7 @@
     "*.css"
   ],
   "exports": {
+    "./layout": "./src/layout.ts",
     "./tokens.stylex": "./src/tokens.stylex.ts",
     "./themes.stylex": "./src/themes.stylex.ts",
     "./global.css": "./src/global.css",

@@ -748,3 +748,5 @@ Other literal lengths and colours require tokens, or a trailing
 ### Topic title line limit
 
 `--topic-title-lines` in the `text` group is 1 by default and 2 when Appearance › Topic titles is Two lines. List titles use it for line clamping; the topic header does not. It reserves no height. `--topic-title-white-space` is `nowrap` for one line and `normal` for two, preserving the existing one-line truncation.
+
+Search uses `TOPIC_MIN_WIDTH` (480 px) and `MESSAGE_LANDING_OFFSET` (80 px) from `@juno/tokens/layout` for its one-column threshold and message landing position. Topic links and the topic scroller share the landing offset. Borders use `--space-pixel`.

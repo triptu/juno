@@ -7,13 +7,14 @@
  */
 import * as stylex from '@stylexjs/stylex'
 import { useEffect, useEffectEvent, useRef, type FocusEvent, type ReactNode, type Ref } from 'react'
+import { TOPIC_MIN_WIDTH } from '@juno/tokens/layout'
 import { SEARCH_COLUMN_WIDTH } from '@juno/contract'
 import { colors, spacing, z } from '@juno/tokens/tokens.stylex'
 import { useNarrowerThan } from '@juno/ui'
 import { ResizeEdge } from '../ResizeEdge'
 
 /** The column's minimum and the reader's: under their sum the page is one column. */
-const ONE_COLUMN_BELOW = SEARCH_COLUMN_WIDTH.min + 480
+const ONE_COLUMN_BELOW = SEARCH_COLUMN_WIDTH.min + TOPIC_MIN_WIDTH
 
 export interface SearchPageProps {
   /** The `SearchField`. */
@@ -95,7 +96,7 @@ const styles = stylex.create({
     gap: spacing['--space-1-5'],
     paddingBlock: spacing['--space-2-5'],
     paddingInline: spacing['--space-3'],
-    borderBottomWidth: '1px',
+    borderBottomWidth: spacing['--space-pixel'],
     borderBottomStyle: 'solid',
     borderBottomColor: colors['--border-default'],
     containerName: 'search-band',
@@ -112,7 +113,7 @@ const styles = stylex.create({
     display: 'flex',
     flexDirection: 'column',
     minHeight: 0,
-    borderInlineEndWidth: '1px',
+    borderInlineEndWidth: spacing['--space-pixel'],
     borderInlineEndStyle: 'solid',
     borderInlineEndColor: colors['--border-default'],
   },

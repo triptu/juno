@@ -58,3 +58,5 @@ Apps call `applyTheme(theme, accent)` from `@juno/ui` (re-exported by `@juno/vie
 - `--focus-ring` is the accent's text colour (4.5:1 or better on the page for every accent; ink keeps the info blue), never the pale selection colour. `--selection-background` is the accent at 28% over the page and is for text selection only.
 - The cyan accent takes near-black `--hl-fg`; its off-white text would be 3.8:1. The sidebar's counters take `--hl-count` and `--hl-count-fg`, the accent at reduced brightness with 4.5:1 text (`docs/design/tokens.md` 1.3). The @you chip takes `--hl-mention` and `--hl-mention-fg`, held to 6:1.
 - Floating surfaces use `--pop-shadow`, Peek’s `--peek-shadow`, or `--card-ring` with a transparent 1px border, never a coloured border. Inputs keep `--input-border`.
+
+`@juno/tokens/layout` supplies numeric geometry for viewport decisions and scroll placement: the 480 px topic minimum and the 80 px message landing offset.

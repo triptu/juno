@@ -1,3 +1,4 @@
+import { MESSAGE_LANDING_OFFSET } from '@juno/tokens/layout'
 /**
  * The DOM side of a topic's message list: where rows are, where the list
  * opens, and the position it holds while rows change (performance 3.3).
@@ -11,7 +12,7 @@ import { scrollingUp } from '../scrollInput'
 /** Within this of the end counts as at the bottom (performance 3.3). */
 export const BOTTOM_SLACK = 32
 /** How far below the header band the "N new" divider lands when a topic opens at it. */
-const DIVIDER_GAP = 80
+const DIVIDER_GAP = MESSAGE_LANDING_OFFSET
 /** The shortest a message row can be: the 32px avatar slot and its padding. */
 const MIN_ROW_HEIGHT = 40
 

@@ -1,0 +1,1 @@
+- 10-24 17:40 · search-shared-geometry · Search uses shared numeric layout constants for the reader minimum and message landing offset; topic navigation and scrolling share the offset, and Search borders use the pixel token. Geometry stays unchanged.

@@ -1,3 +1,4 @@
+import { MESSAGE_LANDING_OFFSET } from '@juno/tokens/layout'
 /**
  * Opening, switching and closing tabs, and moving through a tab's history
  * (spec section 6), for every place that opens a topic: sidebar rows, thread
@@ -552,7 +553,7 @@ export function stepPicture(tabId: string, pictureId: string): void {
 }
 
 /** Below the header band, where a message a notification opens lands. */
-const MESSAGE_TOP = 80
+const MESSAGE_TOP = MESSAGE_LANDING_OFFSET
 
 /**
  * Opens a topic at one message, as a clicked notification or a Juno source
