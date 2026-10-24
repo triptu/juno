@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import type { DragEvent, ReactNode } from 'react'
+import type { DragEvent, KeyboardEvent, PointerEvent, ReactNode } from 'react'
 import { colors, spacing, z } from '@juno/tokens/tokens.stylex'
 
 export interface TopicViewProps {
@@ -19,6 +19,8 @@ export interface TopicViewProps {
   readonly onFiles?: (files: ReadonlyArray<File>) => void
   /** Files are being dragged over the topic, or no longer are: the composer shows it. */
   readonly onDragFiles?: (over: boolean) => void
+  /** Every press and key in the topic, before it acts: the Search reader counts them as opening it. */
+  readonly onActivity?: (event: PointerEvent<HTMLElement> | KeyboardEvent<HTMLElement>) => void
 }
 
 /** A drag that carries files from Finder, not text or a link. */
@@ -33,7 +35,7 @@ const carriesFiles = (event: DragEvent<HTMLElement>) => event.dataTransfer.types
  * sidebar, the tab strip and the Juno panel stay usable, and each tab keeps
  * its own viewer open while another tab shows.
  */
-export function TopicView({ header, children, pill, composer, floating, viewer, onFiles, onDragFiles }: TopicViewProps) {
+export function TopicView({ header, children, pill, composer, floating, viewer, onFiles, onDragFiles, onActivity }: TopicViewProps) {
   const drops =
     onFiles === undefined
       ? {}
@@ -61,7 +63,7 @@ export function TopicView({ header, children, pill, composer, floating, viewer, 
           },
         }
   return (
-    <div data-topic-view="" {...drops} {...stylex.props(styles.root)}>
+    <div data-topic-view="" {...drops} {...(onActivity === undefined ? {} : { onPointerDownCapture: onActivity, onKeyDownCapture: onActivity })} {...stylex.props(styles.root)}>
       {/* No box of its own: it only makes the topic under the viewer inert, out of the Tab order and the pointer's reach. */}
       <div inert={viewer != null} {...stylex.props(styles.content)}>
         <div data-topic-middle="" {...stylex.props(styles.middle)}>

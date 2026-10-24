@@ -15,6 +15,8 @@ export interface HeaderIslandsProps {
   readonly left: ReactNode
   /** The right island's buttons. No right island when absent. */
   readonly right?: ReactNode
+  /** An island of its own just before the right one: the Search reader's "2 of 5" and its arrows. */
+  readonly step?: ReactNode
   /** Wraps the left island, so a popover can hang off the island itself (the topic switcher). */
   readonly wrapLeft?: (island: ReactNode) => ReactNode
   /** Extra attributes for tests and probes (`data-topic-header`). */
@@ -39,7 +41,7 @@ export interface HeaderIslandsProps {
  * container, so the buttons can switch to their narrow form by the area's
  * width alone.
  */
-export function HeaderIslands({ column, left, right, data, wrapLeft, give = 'left' }: HeaderIslandsProps) {
+export function HeaderIslands({ column, left, right, step, data, wrapLeft, give = 'left' }: HeaderIslandsProps) {
   const keep = give === 'right'
   const share = give === 'both'
   // The panel floats already, so its header is the islands' row with no
@@ -72,6 +74,11 @@ export function HeaderIslands({ column, left, right, data, wrapLeft, give = 'lef
       <HeaderBand />
       <div {...stylex.props(styles.row, columns[column])}>
         {wrapLeft === undefined ? island : wrapLeft(island)}
+        {step === undefined ? null : (
+          <Surface kind="island" data-island="step" sx={[styles.right, styles.step]}>
+            {step}
+          </Surface>
+        )}
         {right === undefined ? null : (
           <Surface kind="island" data-island="right" sx={[styles.right, (keep || share) && styles.giving]}>
             {right}
@@ -116,6 +123,10 @@ const styles = stylex.create({
   },
   right: {
     flexShrink: 0,
+  },
+  // Sits against the right island, the row's gap apart, with the space before it.
+  step: {
+    marginInlineStart: 'auto',
   },
   kept: {
     flexShrink: 0,

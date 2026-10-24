@@ -7,6 +7,7 @@ import { layout } from '@juno/tokens/tokens.stylex'
 import { ContextPill, IconButton, Popover, type ContextTint } from '@juno/ui'
 import { HeaderTitleButton, JunoToggle, MoreButton, type MenuAnchor } from './header/HeaderControls'
 import { HeaderIslands } from './header/HeaderIslands'
+import { ReaderBack, ReaderOpen, ReaderStep, WideOnly, type TopicHeaderReader } from './header/ReaderControls'
 import { kindIcon } from './look'
 import { RenameField } from './RenameField'
 
@@ -43,7 +44,11 @@ export interface TopicHeaderProps {
   readonly presence?: 'active' | 'away'
   /** The Juno panel's toggle. Hidden when absent (AI assist off). */
   readonly juno?: { readonly open: boolean; readonly onToggle: () => void }
+  /** The topic as the Search tab's reader (SPEC 10a): Back to results, the matches' arrows, Open in new tab. */
+  readonly reader?: TopicHeaderReader
 }
+
+export type { TopicHeaderReader }
 
 
 const kindLabels: Record<TopicDetail['channel']['kind'], string> = {
@@ -72,13 +77,8 @@ const tints: Record<TopicDetail['channel']['kind'], ContextTint> = {
  * last. The islands line up with the reading column. Rename turns the title
  * into a field in place.
  */
-export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename, onPill, onPillMenu, onResolve, onFollow, actions, presence, juno }: TopicHeaderProps) {
-  const { channel } = detail
+export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename, onPill, onPillMenu, onResolve, onFollow, actions, presence, juno, reader }: TopicHeaderProps) {
   const main = detail.kind === 'main'
-  const kind = kindLabels[channel.kind]
-  const dot = channel.kind === 'im' ? presence : undefined
-  // "eng, public channel", "Maya and Leo, group DM", "Maya, direct message, active": only the first letter steps down, so DM stays DM.
-  const pillName = `${channel.name}, ${kind.charAt(0).toLowerCase()}${kind.slice(1)}${dot === undefined ? '' : `, ${dot}`}`
 
   // Icons alone, with the word as the tooltip and the name. Reopen is the filled check: the thread is done, and a click undoes that.
   // Filled, the disc in the island's text colour outweighs the stroked icons beside it, so it takes the muted icon colour.
@@ -96,29 +96,8 @@ export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename
       data={{ 'data-topic-header': '' }}
       left={
         <>
-          <span
-            onContextMenu={
-              onPillMenu === undefined
-                ? undefined
-                : (event) => {
-                    event.preventDefault()
-                    onPillMenu()
-                  }
-            }
-            {...stylex.props(styles.pill)}
-          >
-            <ContextPill
-              tint={tints[channel.kind]}
-              icon={kindIcon(channel.kind)}
-              name={channel.name}
-              kindLabel={kind}
-              size={24}
-              // A Main's title is the one word "Main": the channel's name keeps its place there.
-              iconWhenNarrow={!main}
-              {...(dot === undefined ? {} : { presence: dot })}
-              {...(onPill === undefined ? {} : { onClick: onPill, label: `${pillName}. Show in sidebar.` })}
-            />
-          </span>
+          {reader?.onBack === undefined ? null : <ReaderBack onBack={reader.onBack} />}
+          <PlacePill detail={detail} presence={presence} onPill={onPill} onPillMenu={onPillMenu} />
           {rename === undefined || main ? (
             switcher === undefined ? (
               <HeaderTitleButton title={main ? 'Main' : detail.title} expanded={menuOpen} onOpen={onMenu} />
@@ -130,11 +109,13 @@ export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename
           )}
         </>
       }
+      {...(reader?.step === undefined ? {} : { step: <ReaderStep step={reader.step} /> })}
       right={
         <>
           {actions}
-          {resolve}
-          {junoButton}
+          {reader === undefined ? null : <ReaderOpen onOpen={reader.onOpenInNewTab} />}
+          {reader === undefined ? resolve : <WideOnly>{resolve}</WideOnly>}
+          {reader === undefined ? junoButton : <WideOnly>{junoButton}</WideOnly>}
           <MoreButton expanded={menuOpen} onOpen={onMenu} />
         </>
       }
@@ -148,6 +129,44 @@ export function TopicHeader({ detail, menuOpen = false, onMenu, switcher, rename
             ),
           })}
     />
+  )
+}
+
+/**
+ * The context pill: the channel's name; its kind is the tint, the icon, the
+ * tooltip and the accessible name. In a 1:1 DM the icon is the person's
+ * presence once known.
+ */
+function PlacePill({ detail, presence, onPill, onPillMenu }: Pick<TopicHeaderProps, 'detail' | 'presence' | 'onPill' | 'onPillMenu'>) {
+  const { channel } = detail
+  const kind = kindLabels[channel.kind]
+  const dot = channel.kind === 'im' ? presence : undefined
+  // "eng, public channel", "Maya and Leo, group DM", "Maya, direct message, active": only the first letter steps down, so DM stays DM.
+  const pillName = `${channel.name}, ${kind.charAt(0).toLowerCase()}${kind.slice(1)}${dot === undefined ? '' : `, ${dot}`}`
+  return (
+    <span
+      onContextMenu={
+        onPillMenu === undefined
+          ? undefined
+          : (event) => {
+              event.preventDefault()
+              onPillMenu()
+            }
+      }
+      {...stylex.props(styles.pill)}
+    >
+      <ContextPill
+        tint={tints[channel.kind]}
+        icon={kindIcon(channel.kind)}
+        name={channel.name}
+        kindLabel={kind}
+        size={24}
+        // A Main's title is the one word "Main": the channel's name keeps its place there.
+        iconWhenNarrow={detail.kind !== 'main'}
+        {...(dot === undefined ? {} : { presence: dot })}
+        {...(onPill === undefined ? {} : { onClick: onPill, label: `${pillName}. Show in sidebar.` })}
+      />
+    </span>
   )
 }
 

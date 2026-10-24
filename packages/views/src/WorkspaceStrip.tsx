@@ -4,6 +4,7 @@ import { Hash } from '@phosphor-icons/react/dist/icons/Hash'
 import { Headphones } from '@phosphor-icons/react/dist/icons/Headphones'
 import { House } from '@phosphor-icons/react/dist/icons/House'
 import { ImageSquare } from '@phosphor-icons/react/dist/icons/ImageSquare'
+import { MagnifyingGlass } from '@phosphor-icons/react/dist/icons/MagnifyingGlass'
 import { ListBullets } from '@phosphor-icons/react/dist/icons/ListBullets'
 import { Lock } from '@phosphor-icons/react/dist/icons/Lock'
 import { Plus } from '@phosphor-icons/react/dist/icons/Plus'
@@ -16,7 +17,7 @@ import { Avatar, IconButton, Tab, TabStrip, TopicArt, type ActivateEvent, type P
 import { hueFor, initials } from './look'
 
 /** The icon a tab shows: the channel kind for a topic, the page's own icon otherwise. */
-export type WorkspaceTabIcon = 'hash' | 'lock' | 'user' | 'users' | 'home' | 'all-topics' | 'juno' | 'settings' | 'headphones' | 'gallery'
+export type WorkspaceTabIcon = 'hash' | 'lock' | 'user' | 'users' | 'home' | 'all-topics' | 'juno' | 'settings' | 'headphones' | 'gallery' | 'search'
 
 export interface WorkspaceTab {
   readonly id: string
@@ -76,6 +77,7 @@ const icons: Record<WorkspaceTabIcon, PhosphorIcon> = {
   settings: Gear,
   headphones: Headphones,
   gallery: ImageSquare,
+  search: MagnifyingGlass,
 }
 
 const keyboard: ActivateEvent = { metaKey: false, shiftKey: false, altKey: false, source: 'keyboard' }
