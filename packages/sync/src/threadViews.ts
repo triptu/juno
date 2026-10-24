@@ -118,7 +118,7 @@ const pageSnapshot = (views: ReadonlyArray<ThreadView>): Effect.Effect<PageSnaps
         WHERE channel IN ${sql.in(channels)} AND thread_ts IN ${sql.in(roots)}`,
       sql<ReadRow>`SELECT topic_id, last_read_ts, marked_unread, local_write_ack_ts, last_server_event_ts, observed_at, slack_read_ts, commanded
         FROM topic_reads WHERE topic_id IN ${sql.in(topics)}`,
-      sql<RangeRow>`SELECT channel, thread_ts, from_ts, to_ts, tail FROM thread_ranges
+      sql<RangeRow>`SELECT channel, thread_ts, kind, from_ts, to_ts, tail FROM thread_ranges
         WHERE channel IN ${sql.in(channels)} AND thread_ts IN ${sql.in(roots)} ORDER BY from_ts`,
       sql<{ kind: string; target_key: string }>`SELECT kind, target_key FROM outbox
         WHERE (kind = 'follow' AND target_key IN ${sql.in(topics)}) OR (kind = 'mark' AND target_key IN ${sql.in(topics)})`,
@@ -132,7 +132,7 @@ const pageSnapshot = (views: ReadonlyArray<ThreadView>): Effect.Effect<PageSnaps
     const ranges = new Map<string, Array<ThreadRange>>()
     for (const row of rangeRows) {
       const key = keyOf(row.channel, row.thread_ts)
-      ranges.set(key, [...(ranges.get(key) ?? []), { from_ts: row.from_ts, to_ts: row.to_ts, tail: row.tail }])
+      ranges.set(key, [...(ranges.get(key) ?? []), { kind: row.kind, from_ts: row.from_ts, to_ts: row.to_ts, tail: row.tail }])
     }
     return {
       messages,
@@ -182,7 +182,7 @@ const observationUnchanged = (
     if (outcome !== 'ignored') return false
   }
   // The range the view proves must add nothing to the stored ones.
-  const range = viewRange(view, requestedAt, stillConnected(ctx, connection))
+  const range = viewRange(view, stillConnected(ctx, connection))
   if (range !== undefined && !addsNothing(snapshot.ranges.get(rootKey) ?? [], range)) return false
   const observedAt = fence.effective(channel, root.ts, sub.observed_at ?? undefined)
   return (observedAt !== undefined && compareTs(requestedAt, observedAt) <= 0) || fence.advance(channel, root.ts, requestedAt)
@@ -206,16 +206,17 @@ export const threadViewPageUnchanged = (
   })
 
 /**
- * What a `getView` row proves (`threadRanges.ts`): it carries every unread
- * reply, so every reply after Slack's read pointer (after the latest reply
- * when it gives none) is in it; and `latest_replies` are the thread's
- * newest replies, so every reply after the oldest of them is too.
+ * What a `getView` row proves for the unread count (`threadRanges.ts`, a
+ * `view` range): it carries every unread reply, so every reply after
+ * Slack's read pointer (after the latest reply when it gives none) is in
+ * it; and `latest_replies` are the thread's newest replies, so every reply
+ * after the oldest of them is too.
  */
-export const viewRange = (view: ThreadView, requestedAt: string, live: boolean): ThreadRange | undefined => {
+export const viewRange = (view: ThreadView, live: boolean): ThreadRange | undefined => {
   const root = view.root_msg
   const latest = (view.latest_replies ?? []).map((reply) => reply.ts).toSorted(compareTs)[0]
   const pointer = root.last_read ?? root.latest_reply ?? root.ts
   const from = latest !== undefined && compareTs(latest, pointer) < 0 ? latest : pointer
   const replies = messagesOf(view).slice(1).map((message) => message.ts).filter((ts) => compareTs(ts, from) > 0).toSorted(compareTs)
-  return pageRange({ threadTs: root.ts, oldest: from, replies, hasMore: false, requestedAt, live })
+  return pageRange({ threadTs: root.ts, oldest: from, replies, hasMore: false, live, kind: 'view' })
 }

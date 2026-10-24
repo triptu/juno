@@ -60,31 +60,35 @@ const pageReplies = (
         { lane, reason: 'open' },
       )
       cursor = page.response_metadata?.next_cursor
+      // More without a cursor is the end of what can be read, not of the thread: it proves only up to its last reply.
       const more = page.has_more && cursor !== undefined && cursor !== ''
       const replies = page.messages.filter((message) => message.ts !== threadTs).map((message) => message.ts)
-      const proved = pageRange({ threadTs, oldest: from, latest: range.latest, replies, hasMore: more, requestedAt, live: false })
       yield* transaction(
         Effect.gen(function* () {
           // Live only when no drop came between the request and now (`stillConnected`), read as the range is written.
-          const live = range.latest === undefined && !more && stillConnected(ctx, connection)
-          yield* addThreadRange(channel, threadTs, live ? pageRange({ threadTs, oldest: from, replies, hasMore: false, requestedAt, live }) : proved)
+          const live = range.latest === undefined && !page.has_more && stillConnected(ctx, connection)
+          yield* addThreadRange(channel, threadTs, pageRange({ threadTs, oldest: from, latest: range.latest, replies, hasMore: page.has_more, live }))
           // The thread is re-indexed with the range, also when the page changed no message.
           yield* applyPage(ctx, channel, page.messages, { kind: 'page', requestedAt }, { alsoTouch: [threadTopicOf(channel, threadTs)] })
         }),
       )
       messages.push(...page.messages)
       from = replies.at(-1) ?? from
-      if (!more) return { messages, reachedEnd: true }
+      if (!more) return { messages, reachedEnd: !page.has_more }
       if (messages.length >= max) return { messages, reachedEnd: false }
       yield* Effect.yieldNow
     }
   })
 
-/** The thread's root and its proven ranges. */
+/** A thread's ranges from replies pages, oldest first: a `getView` row's prove nothing for what to fetch. */
+const pageRanges = (channel: string, threadTs: string): Effect.Effect<ReadonlyArray<ThreadRange>, SqlError, StoreWriter> =>
+  Effect.map(threadRanges(channel, threadTs), (ranges) => ranges.filter((r) => r.kind === 'page'))
+
+/** The thread's root and its page ranges. */
 const threadState = (channel: string, threadTs: string): Effect.Effect<{ readonly root: RootContent | undefined; readonly ranges: ReadonlyArray<ThreadRange> }, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const root = yield* readMessage(channel, threadTs)
-    return { root, ranges: yield* threadRanges(channel, threadTs) }
+    return { root, ranges: yield* pageRanges(channel, threadTs) }
   })
 
 /** The newest range: the one with the latest start (ranges never overlap). */
@@ -134,7 +138,7 @@ export const fetchThread = (ctx: SyncContext, channel: string, threadTs: string,
       // From the range's edge, also while its tail is live: the replies that came as events then have a page's proof.
       const tail = yield* pageReplies(ctx, channel, threadTs, { oldest: newest.to_ts }, OPEN_FETCH_MAX, lane)
       messages.push(...tail.messages)
-      const ranges = yield* threadRanges(channel, threadTs)
+      const ranges = yield* pageRanges(channel, threadTs)
       const after = newestRange(ranges)
       if (floor !== undefined && after !== undefined && compareTs(after.from_ts, floor) > 0 && messages.length < OPEN_FETCH_MAX) {
         const start = rangeHolding(ranges, floor)?.to_ts ?? floor
@@ -142,7 +146,7 @@ export const fetchThread = (ctx: SyncContext, channel: string, threadTs: string,
         messages.push(...back.messages)
       }
     }
-    const last = newestRange(yield* threadRanges(channel, threadTs))
+    const last = newestRange(yield* pageRanges(channel, threadTs))
     return { fetched: true, complete: last !== undefined && compareTs(last.from_ts, threadTs) <= 0, unknownUsers: yield* unknownSenders(messages) }
   })
 
@@ -189,12 +193,12 @@ export const olderThread = (ctx: SyncContext, channel: string, threadTs: string,
       const second = yield* pageReplies(ctx, channel, threadTs, { oldest: compareTs(bound, top) < 0 ? bound : reached, latest: top }, OPEN_PAGE, lane)
       messages.push(...second.messages)
     }
-    return { fetched: true, complete: fromRoot(yield* threadRanges(channel, threadTs), threadTs, before), unknownUsers: yield* unknownSenders(messages) }
+    return { fetched: true, complete: fromRoot(yield* pageRanges(channel, threadTs), threadTs, before), unknownUsers: yield* unknownSenders(messages) }
   })
 
 /**
  * The replies just after `after`, the last row the view shows: one page
- * from it, up to the next stored reply when there is one. Nothing when the
+ * from it, up to where the next proven range starts when there is one. Nothing when the
  * store proves the stretch above it. `complete`: nothing after it is
  * unknown.
  */
@@ -205,7 +209,12 @@ export const newerThread = (ctx: SyncContext, channel: string, threadTs: string,
     const above = (yield* neighbours(channel, threadTs, after)).above
     const known = above === undefined ? provenToEnd(ranges, after, latestReply) : continuous(ranges, after, above)
     if (known) return { fetched: false, complete: provenToEnd(ranges, after, latestReply), unknownUsers: [] }
-    const { messages } = yield* pageReplies(ctx, channel, threadTs, { oldest: after, ...(above === undefined ? {} : { latest: above }) }, OPEN_PAGE, lane)
+    // Up to where the next proven range starts (replies between that only an event or a search brought are read
+    // again); with none, to the end while the socket is up (a live tail), else to the latest reply Juno knows of,
+    // so a page that finds nothing still proves the stretch it read.
+    const next = ranges.find((r) => compareTs(r.from_ts, after) > 0)?.from_ts
+    const latest = next ?? (ctx.socket.connected ? undefined : latestReply)
+    const { messages } = yield* pageReplies(ctx, channel, threadTs, { oldest: after, ...(latest === undefined ? {} : { latest }) }, OPEN_PAGE, lane)
     const now = yield* threadState(channel, threadTs)
     return { fetched: true, complete: provenToEnd(now.ranges, after, now.root?.latest_reply ?? undefined), unknownUsers: yield* unknownSenders(messages) }
   })

@@ -10,6 +10,7 @@ import { Effect } from 'effect'
 import { FollowFence } from '../followFence'
 import { syncKeys } from '../keys'
 
+import { endHeldTail } from './coverage'
 import { invalidate, type Writer } from './shared'
 
 export interface ThreadSubRow {
@@ -96,6 +97,7 @@ export const setThreadSub = (
         slack_last_read = COALESCE(excluded.slack_last_read, thread_subs.slack_last_read),
         updated_event_ts = excluded.updated_event_ts, observed_at = excluded.observed_at, commanded = excluded.commanded`
     if (changed) yield* invalidate(syncKeys.threadSubs)
+    if (!subscribed && existing?.subscribed === true) yield* endHeldTail(channel, threadTs)
     return 'applied'
   })
 

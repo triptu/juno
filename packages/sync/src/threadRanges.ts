@@ -1,36 +1,47 @@
 /**
  * Which replies of a thread the store has proven it holds (architecture
- * 5.5 and 5.6, specs/thread-coverage.qnt). Main's history trusts only the
+ * 5.5 and 5.6, specs/threadranges.qnt). Main's history trusts only the
  * `synced_ranges` its pages recorded; threads do the same with
  * `thread_ranges`, never with `reply_count`.
  *
  * A range says every reply with `from_ts < ts <= to_ts` is stored. A
  * `conversations.replies` page proves the stretch from its `oldest` bound
  * (the root without one) to its last reply, or to its `latest` bound when
- * it has nothing more. A page that reached the newest reply on a socket
- * connection that has not dropped since has a `live` tail: every later
- * reply arrives as an event, so the view shows the replies after `to_ts`
- * as continuous. Socket events never move `to_ts`, and a live range does not
- * merge with the ranges above it, since a drop may lose replies still on
- * their way; only pages close that stretch. A drop ends the live tail: a
- * followed thread's tail is `held` (the reconnect's `getView` brings every
- * unread reply, so the unread count can still be exact, but a read reply
- * sent during the drop may be missing), an unfollowed thread's is `none`.
+ * it has nothing more (a `page` range). A page that reached the newest
+ * reply on a socket connection that has not dropped since has a `live`
+ * tail: every later reply arrives as an event, so the view shows the
+ * replies after `to_ts` as continuous. A live range does not merge with the
+ * ranges above it; when its tail ends (a drop, or a new run of the sync) it
+ * closes at the newest reply the socket delivered for it, in order
+ * (`heard_ts`), and only pages close the rest. A followed thread's tail is
+ * then `held`: the reconnect's `getView` brings every unread reply, so the
+ * unread count can stay exact, but the view no longer shows past the range.
+ * An unfollowed thread's tail is `none`.
  *
- * Two stored replies are continuous only when one range covers both; the
- * topic view clips a thread's window at the first boundary that is not and
- * fetches across it when the user scrolls near it. Pure functions, shared
- * by the sync (writes, counts) and the engine (the window).
+ * A `getView` row's range (`view`) counts for the unread count only: Juno
+ * trusts it to carry every unread reply, as it did before ranges, but not
+ * to show replies as continuous, since a reply it leaves out (the user's
+ * own, one past a cap) would be hidden and never fetched.
+ *
+ * Two stored replies are continuous only when one page range covers both;
+ * the topic view clips a thread's window at the first boundary that is not
+ * and fetches across it when the user scrolls near it. Pure functions,
+ * shared by the sync (writes, counts) and the engine (the window).
  */
 import { compareTs, maxTs, minTs } from '@juno/slack-schema'
 
 export type RangeTail = 'none' | 'live' | 'held'
 
 export interface ThreadRange {
+  /** `page`: proven by replies pages, shown and counted. `view`: a `getView` row's, counted only. */
+  readonly kind: 'page' | 'view'
   readonly from_ts: string
   readonly to_ts: string
   readonly tail: RangeTail
 }
+
+/** The ranges the view may show as continuous. */
+const shown = (ranges: ReadonlyArray<ThreadRange>): ReadonlyArray<ThreadRange> => ranges.filter((r) => r.kind === 'page')
 
 /** Later than every ts. */
 const END = '9999999999.999999'
@@ -49,7 +60,7 @@ const countedTo = (range: ThreadRange): string => (range.tail === 'none' ? range
  * else a held one.
  */
 export function mergeRange(ranges: ReadonlyArray<ThreadRange>, incoming: ThreadRange): { readonly range: ThreadRange; readonly replaced: ReadonlyArray<ThreadRange> } {
-  const replaced = ranges.filter((r) => compareTs(r.from_ts, incoming.to_ts) <= 0 && compareTs(r.to_ts, incoming.from_ts) >= 0)
+  const replaced = ranges.filter((r) => r.kind === incoming.kind && compareTs(r.from_ts, incoming.to_ts) <= 0 && compareTs(r.to_ts, incoming.from_ts) >= 0)
   let from = incoming.from_ts
   let to = incoming.to_ts
   const tails = new Set<RangeTail>([incoming.tail])
@@ -59,7 +70,7 @@ export function mergeRange(ranges: ReadonlyArray<ThreadRange>, incoming: ThreadR
     tails.add(r.tail)
   }
   const tail: RangeTail = tails.has('live') ? 'live' : tails.has('held') ? 'held' : 'none'
-  return { range: { from_ts: from, to_ts: to, tail }, replaced }
+  return { range: { kind: incoming.kind, from_ts: from, to_ts: to, tail }, replaced }
 }
 
 /**
@@ -71,12 +82,12 @@ export const addsNothing = (ranges: ReadonlyArray<ThreadRange>, incoming: Thread
   const { range, replaced } = mergeRange(ranges, incoming)
   const held = replaced[0]
   if (replaced.length === 1 && held !== undefined && held.from_ts === range.from_ts && held.to_ts === range.to_ts && held.tail === range.tail) return true
-  return incoming.tail === 'live' && ranges.some((r) => r.tail === 'live' && compareTs(r.from_ts, incoming.from_ts) <= 0 && compareTs(incoming.from_ts, r.to_ts) <= 0)
+  return incoming.tail === 'live' && ranges.some((r) => r.kind === incoming.kind && r.tail === 'live' && compareTs(r.from_ts, incoming.from_ts) <= 0 && compareTs(incoming.from_ts, r.to_ts) <= 0)
 }
 
 /** The stored messages `older` and `newer` (the root counts as a message) have nothing unknown between them. */
 export const continuous = (ranges: ReadonlyArray<ThreadRange>, older: string, newer: string): boolean =>
-  ranges.some((r) => compareTs(r.from_ts, older) <= 0 && compareTs(newer, shownTo(r)) <= 0)
+  shown(ranges).some((r) => compareTs(r.from_ts, older) <= 0 && compareTs(newer, shownTo(r)) <= 0)
 
 /**
  * Every reply after `from` up to the root's `latest_reply` is stored and
@@ -85,7 +96,7 @@ export const continuous = (ranges: ReadonlyArray<ThreadRange>, older: string, ne
 export const provenToEnd = (ranges: ReadonlyArray<ThreadRange>, from: string, latestReply: string | undefined): boolean =>
   latestReply === undefined ||
   compareTs(from, latestReply) >= 0 ||
-  ranges.some((r) => compareTs(r.from_ts, from) <= 0 && compareTs(latestReply, shownTo(r)) <= 0)
+  shown(ranges).some((r) => compareTs(r.from_ts, from) <= 0 && compareTs(latestReply, shownTo(r)) <= 0)
 
 /**
  * The unread count is exact: the pointer (the root when the thread was never
@@ -99,14 +110,15 @@ export const countExact = (ranges: ReadonlyArray<ThreadRange>, pointer: string, 
 
 /** The range that holds `ts`: the stretch of continuous replies it belongs to. */
 export const rangeHolding = (ranges: ReadonlyArray<ThreadRange>, ts: string): ThreadRange | undefined =>
-  ranges.find((r) => compareTs(r.from_ts, ts) <= 0 && compareTs(ts, shownTo(r)) <= 0)
+  shown(ranges).find((r) => compareTs(r.from_ts, ts) <= 0 && compareTs(ts, shownTo(r)) <= 0)
 
 /**
  * What one `conversations.replies` page proved. `oldest` and `latest` are
  * the request's bounds, `replies` the ts of the replies it returned (root
  * left out), oldest first. `live`: the socket connection was up when the
- * request started and has not dropped since. Undefined when it proved
- * nothing.
+ * request started and has not dropped since. It never reaches past the
+ * last reply by Juno's clock, which may run ahead of Slack's; a live tail
+ * covers what comes after. Undefined when it proved nothing.
  */
 export function pageRange(page: {
   readonly threadTs: string
@@ -114,14 +126,15 @@ export function pageRange(page: {
   readonly latest?: string | undefined
   readonly replies: ReadonlyArray<string>
   readonly hasMore: boolean
-  readonly requestedAt: string
   readonly live: boolean
+  readonly kind?: ThreadRange['kind']
 }): ThreadRange | undefined {
+  const kind = page.kind ?? 'page'
   const from = page.oldest ?? page.threadTs
   const last = page.replies.at(-1)
-  if (page.hasMore) return last === undefined || compareTs(last, from) <= 0 ? undefined : { from_ts: from, to_ts: last, tail: 'none' }
-  if (page.latest !== undefined) return compareTs(page.latest, from) <= 0 ? undefined : { from_ts: from, to_ts: page.latest, tail: 'none' }
-  // Up to now, but Juno's clock may be ahead of Slack's: without a live tail, only up to the last reply.
-  if (page.live) return { from_ts: from, to_ts: maxTs(page.requestedAt, last ?? from), tail: 'live' }
-  return last === undefined || compareTs(last, from) <= 0 ? undefined : { from_ts: from, to_ts: last, tail: 'none' }
+  const closed = last === undefined || compareTs(last, from) <= 0 ? undefined : { kind, from_ts: from, to_ts: last, tail: 'none' as const }
+  if (page.hasMore) return closed
+  if (page.latest !== undefined) return compareTs(page.latest, from) <= 0 ? undefined : { kind, from_ts: from, to_ts: page.latest, tail: 'none' }
+  if (page.live) return { kind, from_ts: from, to_ts: last === undefined ? from : maxTs(last, from), tail: 'live' }
+  return closed
 }

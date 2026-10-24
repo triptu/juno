@@ -39,5 +39,5 @@ export const liveRootRange = (ctx: SyncContext, channel: string, rootTs: string)
     const key = `${channel}:${rootTs}`
     if (!ctx.liveRoots.has(key) || !ctx.socket.connected) return
     ctx.liveRoots.delete(key)
-    yield* addThreadRange(channel, rootTs, { from_ts: rootTs, to_ts: rootTs, tail: 'live' })
+    yield* addThreadRange(channel, rootTs, { kind: 'page', from_ts: rootTs, to_ts: rootTs, tail: 'live' })
   })

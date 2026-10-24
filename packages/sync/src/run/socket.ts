@@ -16,13 +16,16 @@ export const handleSocketEvent = (runtime: SyncRuntime, reconcile: Effect.Effect
       case 'Connected':
         state.connected = true
         ctx.socket.connected = true
-        return (options.onConnection?.(true) ?? Effect.void).pipe(
+        return Clock.currentTimeMillis.pipe(
+          Effect.tap((now) => Effect.sync(() => { ctx.socket.since ??= now })),
+          Effect.andThen(options.onConnection?.(true) ?? Effect.void),
           Effect.andThen(state.booted ? FiberSet.run(background, reconcile).pipe(Effect.asVoid) : Effect.void),
         )
       case 'Disconnected': {
         state.connected = false
         // Before anything yields: a page that lands from now on cannot write a live tail.
         ctx.socket.connected = false
+        ctx.socket.since = undefined
         ctx.socket.epoch += 1
         ctx.liveRoots.clear()
         state.markerCandidates.drop()

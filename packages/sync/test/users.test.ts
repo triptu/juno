@@ -88,7 +88,7 @@ const context = (): Effect.Effect<SyncContext> =>
       fetchesInFlight: new Set(),
       usersInFlight: new Map(),
       metadata: new Set(),
-      socket: { connected: true, epoch: 0 },
+      socket: { connected: true, epoch: 0, since: 0 },
       liveRoots: new Set(),
     } as SyncContext
   })

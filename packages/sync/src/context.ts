@@ -68,7 +68,7 @@ export interface SyncContext {
    * at every drop, so a page requested before a drop never writes a live
    * tail after it.
    */
-  readonly socket: { connected: boolean; epoch: number }
+  readonly socket: { connected: boolean; epoch: number; since: number | undefined }
   /**
    * Roots that arrived as posted events on the current connection, by
    * `channel:ts`: their threads can have no reply the stream has not
@@ -79,6 +79,10 @@ export interface SyncContext {
 
 /** The connection a request starts on, for `stillConnected`. Undefined while the socket is down. */
 export const connectionOf = (ctx: SyncContext): number | undefined => (ctx.socket.connected ? ctx.socket.epoch : undefined)
+
+/** The socket has been up without a drop since `millis` (Juno's clock): every event sent since then has arrived or will. */
+export const connectedSince = (ctx: SyncContext, millis: number): boolean =>
+  ctx.socket.connected && ctx.socket.since !== undefined && ctx.socket.since <= millis
 
 /** The connection `since` names has not dropped: every event sent since it began has arrived or will. */
 export const stillConnected = (ctx: SyncContext, since: number | undefined): boolean =>

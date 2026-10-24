@@ -5,19 +5,19 @@ import { continuous, countExact, mergeRange, pageRange, provenToEnd, type Thread
 
 const ts = (n: number) => `1700000${String(n).padStart(3, '0')}.000100`
 const ROOT = ts(0)
-const range = (from: number, to: number, tail: ThreadRange['tail'] = 'none'): ThreadRange => ({ from_ts: ts(from), to_ts: ts(to), tail })
+const range = (from: number, to: number, tail: ThreadRange['tail'] = 'none', kind: ThreadRange['kind'] = 'page'): ThreadRange => ({ kind, from_ts: ts(from), to_ts: ts(to), tail })
 const merged = (ranges: ReadonlyArray<ThreadRange>, incoming: ThreadRange) => {
   const { range: next, replaced } = mergeRange(ranges, incoming)
   return [...ranges.filter((r) => !replaced.includes(r)), next].toSorted((a, b) => a.from_ts.localeCompare(b.from_ts))
 }
 
 describe('thread ranges', () => {
-  it('a page proves from its bound to its last reply, to its latest bound, or on past now only on an unbroken connection', () => {
-    const page = { threadTs: ROOT, replies: [ts(3), ts(4)], requestedAt: ts(9) }
+  it('a page proves from its bound to its last reply or its latest bound, and past it only on an unbroken connection', () => {
+    const page = { threadTs: ROOT, replies: [ts(3), ts(4)] }
     expect(pageRange({ ...page, hasMore: true, live: true })).toEqual(range(0, 4))
     expect(pageRange({ ...page, oldest: ts(2), latest: ts(6), hasMore: false, live: true })).toEqual(range(2, 6))
-    expect(pageRange({ ...page, hasMore: false, live: true })).toEqual(range(0, 9, 'live'))
-    // Juno's clock may run ahead of Slack's: without the socket, only up to the last reply.
+    // Never to Juno's clock, which may run ahead of Slack's: the live tail covers what comes after.
+    expect(pageRange({ ...page, hasMore: false, live: true })).toEqual(range(0, 4, 'live'))
     expect(pageRange({ ...page, hasMore: false, live: false })).toEqual(range(0, 4))
     expect(pageRange({ ...page, oldest: ts(4), replies: [], hasMore: true, live: true })).toBeUndefined()
   })
@@ -40,8 +40,10 @@ describe('thread ranges', () => {
     expect(countExact([range(0, 5, 'held')], ts(3), ts(8))).toBe(true)
     expect(countExact([range(4, 9, 'live')], ts(3), ts(8))).toBe(false)
     expect(countExact([], ts(8), ts(8))).toBe(true)
-    // The view, unlike the count, does not show past a held tail.
+    // The view, unlike the count, does not show past a held tail, nor trust a getView row's range at all.
     expect(provenToEnd([range(0, 5, 'held')], ts(3), ts(8))).toBe(false)
     expect(provenToEnd([range(0, 5, 'live')], ts(3), ts(8))).toBe(true)
+    expect(countExact([range(2, 5, 'live', 'view')], ts(3), ts(8))).toBe(true)
+    expect(continuous([range(2, 5, 'live', 'view')], ts(3), ts(4))).toBe(false)
   })
 })

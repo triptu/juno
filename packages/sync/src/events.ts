@@ -27,6 +27,7 @@ import { provenToEnd } from './threadRanges'
 import { applyUsergroups, changeOwnUsergroup } from './usergroups'
 import {
   changeReaction,
+  hearReply,
   observeRead,
   readMessage,
   reopenIfResolved,
@@ -334,6 +335,8 @@ const applyMessageFrame = (ctx: SyncContext, frame: Extract<RtmFrame, { type: 'm
     return transaction(noteMember(ctx, frame.channel).pipe(
       Effect.andThen(noteLiveRoot(ctx, frame.channel, message as Message)),
       Effect.andThen(writePosted(ctx, frame.channel, message as Message, eventTsOf(frame, now), now)),
+      // Only the socket's own order says every earlier reply has arrived; Juno's send answers do not (`hearReply`).
+      Effect.andThen(isReply(message as Message) && frame.thread_ts !== undefined ? hearReply(frame.channel, frame.thread_ts, frame.ts) : Effect.void),
     ))
   }
   if (isMessageChanged(frame)) return transaction(writeChanged(ctx, frame.channel, frame.message, eventTsOf(frame, now)))

@@ -46,7 +46,7 @@ import { saveRepairMarkers, queueRepairs } from './mutationRepair'
 import { discoverSince, searchPreviews } from './discovery'
 import { FollowFence } from './followFence'
 import { readMetadata, storeMetadata } from './metadata'
-import { applyPage, mainTopicOf, threadTopicOf, type SeedRead } from './pages'
+import { applyPage, mainTopicOf, threadTopicOf } from './pages'
 import { recheck, type RecheckOptions } from './recheck'
 import { reindexTopics } from './reindex'
 import { threadViewPageUnchanged, viewRange, type ViewObservation } from './threadViews'
@@ -177,9 +177,9 @@ const applyThreadView = (ctx: SyncContext, { view, requestedAt, connection }: Vi
     yield* transaction(
       Effect.gen(function* () {
         yield* applyPage(ctx, channel, [root, ...seen.values()], { kind: 'page', requestedAt })
-        // The view carries every unread reply, so it proves the replies from Slack's read pointer on. The row's count
-        // turns exact with it, so the thread is re-indexed in the same transaction rather than waiting for a later page.
-        yield* addThreadRange(channel, root.ts, viewRange(view, requestedAt, stillConnected(ctx, connection)))
+        // The view carries every unread reply, so it proves the replies from Slack's read pointer on, for the count only.
+        // The row's count turns exact with it, so the thread is re-indexed in the same transaction.
+        yield* addThreadRange(channel, root.ts, viewRange(view, stillConnected(ctx, connection)))
         yield* reindexTopics([topic], reindexOptions(ctx))
       }),
     )
@@ -340,7 +340,7 @@ const probeUnlisted = (
 
 interface HistoryOptions {
   /** Cold boot: see `ApplyPageOptions.seedReadBefore`. */
-  readonly seedReadBefore?: SeedRead
+  readonly seedReadBefore?: string
 }
 
 /**
@@ -420,7 +420,7 @@ const loadHistorySince = (ctx: SyncContext, channel: string, since: string): Eff
  */
 const loadThreadPreviews = (
   ctx: SyncContext,
-  seedReadBefore: SeedRead,
+  seedReadBefore: string,
   threads: Deferred.Deferred<void>,
   landed: Queue.Queue<void>,
   historyDone: Deferred.Deferred<void>,
@@ -465,7 +465,6 @@ const loadThreadPreviews = (
             oldest: root.latest_reply!,
             replies: page.messages.filter((message) => message.ts !== root.root_ts).map((message) => message.ts),
             hasMore: page.has_more,
-            requestedAt,
             live: stillConnected(ctx, connection),
           }))
           yield* applyPage(ctx, root.channel, page.messages, { kind: 'page', requestedAt }, { seedReadBefore })
@@ -510,7 +509,7 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<boolean,
     yield* phase({ _tag: 'booting', first: true })
     const startedAt = yield* Clock.currentTimeMillis
     // Unfollowed threads count as read up to here; a reply during the boot stays unread.
-    const seed: SeedRead = { before: millisToTs(startedAt), connection: connectionOf(ctx) }
+    const bootTs = millisToTs(startedAt)
     const quietDays = ctx.config.quietDays
     const windowStart = yield* windowStartMillis(ctx)
     const start = millisToTs(windowStart)
@@ -533,7 +532,7 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<boolean,
     // Once rows show, the newest messages of the workspace give the busiest channels a preview before their history lands.
     const previewsDone = yield* Deferred.make<void>()
     const previews = Deferred.await(quickStarted).pipe(
-      Effect.andThen(ctx.config.previewSearchPages > 0 ? discoverOrLog(searchPreviews(ctx, windowStart, { seedReadBefore: seed })) : Effect.void),
+      Effect.andThen(ctx.config.previewSearchPages > 0 ? discoverOrLog(searchPreviews(ctx, windowStart, { seedReadBefore: bootTs })) : Effect.void),
       Effect.ensuring(Deferred.succeed(previewsDone, undefined)),
     )
     // Each history page wakes the thread previews beside it.
@@ -550,7 +549,7 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<boolean,
         if (done === home) yield* Deferred.succeed(homeHistoryDone, undefined)
         // A boot that failed half way left ranges behind; what they cover is not fetched again.
         if (!(yield* covered(conversation.id, start, conversation.latest))) {
-          yield* skipRejected(loadHistoryWindow(ctx, conversation.id, start, { seedReadBefore: seed }))
+          yield* skipRejected(loadHistoryWindow(ctx, conversation.id, start, { seedReadBefore: bootTs }))
           yield* Queue.offer(landed, undefined)
           yield* ctx.onHistory(conversation.id)
         }
@@ -568,10 +567,10 @@ export const coldBoot = (ctx: SyncContext, phase: Phase): Effect.Effect<boolean,
       const [threadsLoaded] = yield* Effect.all([threads.pipe(Effect.ensuring(Deferred.succeed(threadsDone, undefined))), history], { concurrency: 2 })
       yield* fillUsers(ctx)
       // Discovery finds replies inside the window to roots older than it: Main's activity, which windowed history cannot see.
-      return { threadsLoaded, discovered: yield* discoverOrLog(discoverSince(ctx, windowStart, counts.entries, { seedReadBefore: seed })) }
+      return { threadsLoaded, discovered: yield* discoverOrLog(discoverSince(ctx, windowStart, counts.entries, { seedReadBefore: bootTs })) }
     })
     // Independent methods, so they run side by side: getView pages, history and then discovery, and replies for thread previews.
-    const rest = Effect.map(Effect.all([pages, loadThreadPreviews(ctx, seed, threadsDone, landed, historyDone)], { concurrency: 2 }), ([found]) => found)
+    const rest = Effect.map(Effect.all([pages, loadThreadPreviews(ctx, bootTs, threadsDone, landed, historyDone)], { concurrency: 2 }), ([found]) => found)
     // The preview search runs beside the whole boot, so a slow one delays nothing; the boot is recorded after both.
     const [result] = yield* Effect.all([rest, previews, homeReady], { concurrency: 3 })
     yield* fillUsers(ctx)
