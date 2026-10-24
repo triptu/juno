@@ -8,7 +8,6 @@ import { afterEach, expect, it } from 'bun:test'
 import { notificationsDecisions, notificationsPage, notificationsSetLevel, prefsSet, readsMarkRead, type MainToEngine, type NotificationDecisions, type NotificationsPage, type NotificationTarget } from '@juno/contract'
 import { liveQuery, runCommand } from '@juno/state'
 import { Exit, Schema } from 'effect'
-import { readDb } from '../../../packages/engine/test/scenario'
 import { waitFor, type RunningEngine } from '../../../packages/engine/test/harness'
 import { step } from '../../../packages/engine/test/step'
 import { syncedEngine } from '../../../packages/engine/test/synced'
@@ -77,7 +76,7 @@ it('shows what the engine decides, opens the message on click, holds a topic on 
   const main = connect(engine)
   const level = (id: string, choice: 'always' | 'auto') => runCommand(engine.registry, notificationsSetLevel, { target: { kind: 'channel', id }, choice })
 
-  // Hours around now: nothing notifies outside them, not even Always.
+  // Hours around now, so the default hours never mute this test at night or on a weekend.
   const minute = new Date().getHours() * 60 + new Date().getMinutes()
   const hours = { days: [0, 1, 2, 3, 4, 5, 6], from: (minute + 1380) % 1440, to: (minute + 60) % 1440 }
   await runCommand(engine.registry, prefsSet, { key: 'notifications', value: Schema.decodeUnknownSync(Schema.Json)({
@@ -116,10 +115,10 @@ it('shows what the engine decides, opens the message on click, holds a topic on 
   })
 
   await step('reading every unread topic clears the dock badge, and a new mention brings it back', async () => {
-    const unread = readDb(engine, 'cache.db', (db) => db.prepare('SELECT topic_id FROM topic_index WHERE unread_count > 0').all()) as Array<{ topic_id: string }>
+    const unread = await engine.rows({ kind: 'all', unreadOnly: true })
     expect(unread.length).toBeGreaterThan(0)
     expect(main.badge()).toBe('•')
-    for (const { topic_id } of unread) await runCommand(engine.registry, readsMarkRead, { id: topic_id })
+    for (const { id } of unread) await runCommand(engine.registry, readsMarkRead, { id })
     await waitFor(() => (main.badge() === '' ? true : undefined), 15_000, 'the badge to clear')
     await level('C0ENG', 'always')
     engine.fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: '<@U0TUSHAR> can you review the plan?' })
