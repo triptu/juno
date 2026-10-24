@@ -1,7 +1,10 @@
+// The conversation observation fence (specs/metadata.qnt): events against held workspace and counts
+// snapshots. Tests start warm on the synced default workspace, except the one about the first snapshot.
 import { sendMessage } from '@juno/state'
 import { afterEach, describe, expect, it } from 'bun:test'
 import { startTestEngine, waitFor, type RunningEngine } from './harness'
-import { bootedEngine, readDb, valueOf } from './scenario'
+import { readDb, valueOf } from './scenario'
+import { syncedEngine } from './synced'
 
 const engines: RunningEngine[] = []
 afterEach(async () => {
@@ -25,7 +28,7 @@ async function finish(engine: RunningEngine) {
 
 describe('conversation observation fence', () => {
   it('repairs a missed rename, leave and archive after a gap with one workspace and one full counts call', async () => {
-    const engine = await bootedEngine(engines)
+    const engine = await syncedEngine(engines)
     const { fake } = engine
     fake.goOffline()
     await engine.phase('offline')
@@ -63,7 +66,7 @@ describe('conversation observation fence', () => {
   })
 
   it('keeps a newer rename but refreshes untouched fields from the held workspace snapshot', async () => {
-    const engine = await bootedEngine(engines)
+    const engine = await syncedEngine(engines)
     engine.fake.workspace.conversations.get('C0ENG')!.topic = 'Topic changed during the gap'
     await holdRefresh(engine, 'client.userBoot')
     engine.fake.renameChannel({ channel: 'C0ENG', name: 'engineering' })
@@ -73,7 +76,7 @@ describe('conversation observation fence', () => {
   })
 
   it('keeps an archive event over a held workspace snapshot', async () => {
-    const engine = await bootedEngine(engines)
+    const engine = await syncedEngine(engines)
     await holdRefresh(engine, 'client.userBoot')
     engine.fake.workspace.conversations.get('C0ENG')!.archived = true
     engine.fake.emitFrame({ type: 'channel_archive', channel: 'C0ENG' })
@@ -83,7 +86,7 @@ describe('conversation observation fence', () => {
   })
 
   it('keeps both a leave and a join over the full membership snapshot', async () => {
-    const engine = await bootedEngine(engines)
+    const engine = await syncedEngine(engines)
     engine.fake.leaveChannel({ channel: 'C0PRODUCT' })
     await engine.rowsUntil((rows) => !rows.some((r) => r.id === 'm:C0PRODUCT'), 'left product')
     await holdRefresh(engine, 'client.counts')
@@ -97,7 +100,7 @@ describe('conversation observation fence', () => {
 })
 
 it('keeps an own DM open when an older counts snapshot lands without its socket echo', async () => {
-  const engine = await bootedEngine(engines)
+  const engine = await syncedEngine(engines)
   await holdRefresh(engine, 'client.counts')
   engine.fake.holdFrames({ types: ['im_created', 'im_open'] })
   const { topicId } = valueOf(await sendMessage(engine.registry, { kind: 'person', userId: 'U0JONAS' }, 'Hello'))
@@ -108,7 +111,7 @@ it('keeps an own DM open when an older counts snapshot lands without its socket 
 })
 
 it('leaves omitted topic and purpose to the snapshot while a partial event changes the name', async () => {
-  const engine = await bootedEngine(engines)
+  const engine = await syncedEngine(engines)
   const channel = engine.fake.workspace.conversations.get('C0ENG')!
   channel.topic = 'New topic'
   channel.purpose = 'New purpose'
@@ -125,7 +128,7 @@ it('leaves omitted topic and purpose to the snapshot while a partial event chang
 })
 
 it('merges a partial incremental counts row without clearing unread state or latest', async () => {
-  const engine = await bootedEngine(engines, { timing: { sweepIntervalMillis: 500 } })
+  const engine = await syncedEngine(engines, { timing: { sweepIntervalMillis: 500 } })
   const reads = () => readDb(engine, 'cache.db', (db) => db.prepare(
     "SELECT slack_last_read, latest, has_unreads, mention_count, counts_updated FROM channel_reads WHERE channel = 'C0ENG'",
   ).get())
