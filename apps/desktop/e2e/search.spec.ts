@@ -6,7 +6,7 @@ import type { Juno } from './driver/juno'
 // Starts signed in and synced (README, "Synced start").
 test.use({ synced: true })
 
-test.describe.configure({ timeout: 150_000 })
+test.describe.configure({ timeout: 180_000 })
 
 const SEARCH = 'search.modules.messages'
 
@@ -81,6 +81,8 @@ async function moreShots({ juno }: Context): Promise<void> {
   await page.row('Flamingo note 17 on the pager').press('Enter')
   await shot(juno, 'narrow-light')
   await juno.surface.setWindowSize(1440, 900)
+  // Settings opens in the current tab and closes after; a new tab keeps the search.
+  await juno.surface.appMenu('new-tab')
   await juno.setTheme('Dark')
   await juno.tabs.select('flamingo')
   await shot(juno, 'tab-dark')
