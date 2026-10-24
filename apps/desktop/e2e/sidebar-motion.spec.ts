@@ -111,38 +111,54 @@ test('a reply from elsewhere slides its row to the top, and a press during the s
   expect(await row.boundingBox()).toEqual(first)
 })
 
-test('with reduced motion, rows take their new places in one frame', async ({ juno, win, fake }) => {
-  await win.emulateMedia({ reducedMotion: 'reduce' })
-  await atTheTop(juno, win)
-  const mover = await threadInView(juno)
-  const before = await recentIds(juno)
-  await recordFrames(win)
-  replyIn(fake, mover, 'A reply from elsewhere, reduced motion')
-  await expect.poll(async () => (await recentIds(juno))[0]).toBe(mover)
-  const frames = await stopFrames(win)
-  const moved = frames.findIndex((frame) => frame.order[0] === mover)
-  expect(moved).toBeGreaterThan(0)
-  expect(frames.every((frame) => frame.animating === 0)).toBe(true)
-  // The first frame of the new order already has the mover at the top slot, where the old top row was.
-  expect(frames[moved]!.tops[mover]).toBeCloseTo(frames[moved - 1]!.tops[before[0]!]!, 0)
-})
+// The steps that record no motion share one launch. Reduced motion goes last: it stays on for the page.
+test('your own Resolve, a reply while scrolled down and reduced motion move rows with no animation', async ({ juno, win, fake }) => {
+  await test.step('your own Resolve takes its row out in one frame, with no motion', async () => {
+    await atTheTop(juno, win)
+    const ids = await recentIds(juno)
+    const gone = ids[1]!
+    const below = ids[2]!
+    const title = await juno.sidebar.list.locator(`[data-topic-id="${gone}"]`).evaluate((el) => document.getElementById(el.getAttribute('aria-labelledby') ?? '')?.textContent ?? '')
+    const row = juno.sidebar.row(title, { exact: true })
+    await recordFrames(win)
+    await row.chooseInMenu('resolve')
+    await expect.poll(async () => (await recentIds(juno)).includes(gone)).toBe(false)
+    const frames = await stopFrames(win)
+    const removed = frames.findIndex((frame) => !frame.order.includes(gone))
+    expect(removed).toBeGreaterThan(0)
+    // In the frame the row went, the row below it is already where the resolved row was, and nothing animates.
+    expect(frames[removed]!.tops[below]).toBeCloseTo(frames[removed - 1]!.tops[gone]!, 0)
+    expect(frames.every((frame) => frame.animating === 0)).toBe(true)
+  })
 
-test('your own Resolve takes its row out in one frame, with no motion', async ({ juno, win }) => {
-  await atTheTop(juno, win)
-  const ids = await recentIds(juno)
-  const gone = ids[1]!
-  const below = ids[2]!
-  const title = await juno.sidebar.list.locator(`[data-topic-id="${gone}"]`).evaluate((el) => document.getElementById(el.getAttribute('aria-labelledby') ?? '')?.textContent ?? '')
-  const row = juno.sidebar.row(title, { exact: true })
-  await recordFrames(win)
-  await row.chooseInMenu('resolve')
-  await expect.poll(async () => (await recentIds(juno)).includes(gone)).toBe(false)
-  const frames = await stopFrames(win)
-  const removed = frames.findIndex((frame) => !frame.order.includes(gone))
-  expect(removed).toBeGreaterThan(0)
-  // In the frame the row went, the row below it is already where the resolved row was, and nothing animates.
-  expect(frames[removed]!.tops[below]).toBeCloseTo(frames[removed - 1]!.tops[gone]!, 0)
-  expect(frames.every((frame) => frame.animating === 0)).toBe(true)
+  await test.step('an outside reply does not animate while scrolled down', async () => {
+    await atTheTop(juno, win)
+    const mover = await threadInView(juno)
+    await juno.sidebar.list.evaluate((list) => { list.scrollTop = 180 })
+    await expect.poll(() => juno.sidebar.list.evaluate((list) => list.scrollTop)).toBeGreaterThan(0)
+    await recordFrames(win)
+    replyIn(fake, mover, 'An update while reading farther down')
+    await expect.poll(async () => (await recentIds(juno))[0]).toBe(mover)
+    const frames = await stopFrames(win)
+    expect(frames.every((frame) => frame.animating === 0)).toBe(true)
+  })
+
+  await test.step('with reduced motion, rows take their new places in one frame', async () => {
+    await juno.sidebar.list.evaluate((list) => { list.scrollTop = 0 })
+    await win.emulateMedia({ reducedMotion: 'reduce' })
+    await atTheTop(juno, win)
+    const mover = await threadInView(juno)
+    const before = await recentIds(juno)
+    await recordFrames(win)
+    replyIn(fake, mover, 'A reply from elsewhere, reduced motion')
+    await expect.poll(async () => (await recentIds(juno))[0]).toBe(mover)
+    const frames = await stopFrames(win)
+    const moved = frames.findIndex((frame) => frame.order[0] === mover)
+    expect(moved).toBeGreaterThan(0)
+    expect(frames.every((frame) => frame.animating === 0)).toBe(true)
+    // The first frame of the new order already has the mover at the top slot, where the old top row was.
+    expect(frames[moved]!.tops[mover]).toBeCloseTo(frames[moved - 1]!.tops[before[0]!]!, 0)
+  })
 })
 
 test('a burst retargets the rows, including a row removed during its slide, and releases every animation', async ({ juno, win, fake }) => {
@@ -175,18 +191,6 @@ test('a burst retargets the rows, including a row removed during its slide, and 
   })).toBe(true)
   const tops = await juno.sidebar.rows.evaluateAll((rows) => rows.slice(0, 10).map((row) => row.getBoundingClientRect().top))
   expect(tops).toEqual([...tops].sort((a, b) => a - b))
-})
-
-test('an outside reply does not animate while scrolled down', async ({ juno, win, fake }) => {
-  await atTheTop(juno, win)
-  const mover = await threadInView(juno)
-  await juno.sidebar.list.evaluate((list) => { list.scrollTop = 180 })
-  await expect.poll(() => juno.sidebar.list.evaluate((list) => list.scrollTop)).toBeGreaterThan(0)
-  await recordFrames(win)
-  replyIn(fake, mover, 'An update while reading farther down')
-  await expect.poll(async () => (await recentIds(juno))[0]).toBe(mover)
-  const frames = await stopFrames(win)
-  expect(frames.every((frame) => frame.animating === 0)).toBe(true)
 })
 
 test('page visibility cancels active slides and hidden updates start none', async ({ juno, win, fake }) => {

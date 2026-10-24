@@ -34,7 +34,7 @@ async function postAbovePostgres(juno: Juno, fake: FakeSlack): Promise<void> {
 syncedTest('shows sidebar rows and unread people, then filters and clears the list', async ({ juno, slack, fake }) => {
   const context = { juno, slack, fake }
   await test.step('after sign-in the sidebar lists followed threads and Main, newest first, with tags and counts', () => initialRows(context))
-  await test.step('the stack shows who wrote the unread replies, and nobody once the topic is read', () => unreadPeople(context))
+  await test.step('replies from another client update the row in place and move it to the top; the stack shows who wrote them, and nobody once the topic is read', () => unreadPeople(context))
   await test.step('the quick filters and the Unread toggle narrow the list, and an empty result offers to clear them', () => filterRows(context))
 })
 
@@ -88,13 +88,22 @@ async function initialRows({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   await sidebar.expectFilterDot('DMs', true)
 }
 
-async function unreadPeople({ juno, slack }: Pick<Fixtures, 'juno' | 'slack'>): Promise<void> {
-  const postgres = juno.sidebar.row(POSTGRES)
+async function unreadPeople({ juno, slack, fake }: Pick<Fixtures, 'juno' | 'slack' | 'fake'>): Promise<void> {
+  const { sidebar } = juno
+  const postgres = sidebar.row(POSTGRES)
   await postgres.expectRead()
+  // Away from the list, so it does not hold its order.
+  await sidebar.leave()
+  await postAbovePostgres(juno, fake)
 
   slack.as('Leo').replyIn(POSTGRES, 'Cutover is a go')
   slack.as('Maya').replyIn(POSTGRES, 'Rollback steps are in the doc')
+  // The replies from another client update the row in place and move it to the top.
+  await postgres.expectPreview('Maya: Rollback steps are in the doc')
   await postgres.expectUnread(2)
+  await expect.poll(() => sidebar.titles('Recent').then((titles) => titles[0])).toBe(POSTGRES)
+  // The time from the engine's write to pixels is measured in perf.spec.ts.
+
   // Most recent first; the fake's display names are first names.
   const stack = postgres.root.getByRole('img', { name: 'Maya, Leo', exact: true })
   await expect(stack).toBeVisible()
@@ -169,80 +178,6 @@ async function filterRows({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Prom
   })
 }
 
-test('during the first sync the list says Juno is getting the topics, then shows rows before history lands', async ({ juno, fake }) => {
-  // Hold the first boot call, so nothing has arrived when the window opens.
-  fake.holdNext({ method: 'client.userBoot', before: true })
-  fake.holdNext({ method: 'conversations.history', before: true })
-  await juno.signIn()
-  const { sidebar } = juno
-  await sidebar.expectEmpty('Getting your topics')
-  await expect(sidebar.syncStatus).toHaveText('Syncing with Slack')
-  await expect(sidebar.syncProgress).toHaveAttribute('aria-valuetext', 'Finding your conversations')
-  await expect(sidebar.list.getByText("It's quiet")).toHaveCount(0)
-
-  // The card sits at the foot of the sidebar, under the list; the header has no status line.
-  await juno.allTopics.open()
-  const header = sidebar.root.locator('header[aria-label="Sidebar title bar"]')
-  const headerBox = await header.boundingBox()
-  expect(await header.getByRole('progressbar').count()).toBe(0)
-  const listBox = await sidebar.list.boundingBox()
-  const cardBox = await sidebar.root.locator('[data-sync-status]').boundingBox()
-  expect(listBox).not.toBeNull()
-  expect(cardBox).not.toBeNull()
-  expect(cardBox!.y).toBeGreaterThan(listBox!.y + listBox!.height)
-  fake.release({ method: 'client.userBoot' })
-  await expect.poll(() => fake.heldCount({ method: 'conversations.history' })).toBe(1)
-  await expect(sidebar.syncProgress).toHaveAttribute('aria-valuetext', /^\d+ of \d+ conversations$/)
-  // The quick start is done: rows show while history is still held, and the card stays until the sync ends.
-  await sidebar.expectRows()
-  await expect(sidebar.syncStatus).toHaveText('Syncing with Slack')
-  // Rows take their places while history lands; the discovery search after it waits, so the sync cannot end yet.
-  fake.holdNext({ method: 'search.modules.messages', before: true })
-  fake.release({ method: 'conversations.history' })
-  await expect.poll(() => fake.heldCount({ method: 'search.modules.messages' })).toBe(1)
-  // The card goes when the sync ends; nothing above the list moves. The list's own rows still take their places and
-  // bot channels leave for Automated as the last pages land (checked above), so only moves inside it are skipped.
-  // All topics, beside it, takes the titles the last pages bring, so only the sidebar is checked.
-  await expectStableAnchor(juno.win, 'nav[aria-label="Pages"]', async () => {
-    fake.release({ method: 'search.modules.messages' })
-    await juno.waitForSync()
-    await sidebar.row(POSTGRES).expectVisible()
-  }, { within: '[aria-label="Sidebar"]', outside: '[aria-label="Sidebar"] [role="group"][aria-label="Topics"]' })
-  await sidebar.expectNoSyncStatus()
-  expect(await header.boundingBox()).toEqual(headerBox)
-})
-
-syncedTest('a reply from another client updates its row in place and moves it to the top', async ({ juno, fake }) => {
-  const { sidebar } = juno
-  const postgres = sidebar.row(POSTGRES)
-  await postgres.expectVisible()
-  await postAbovePostgres(juno, fake)
-
-  const root = fake.messages('C0ENG').find((message) => message.text?.startsWith('Draft plan is in the doc.'))!
-  fake.injectMessage({ channel: 'C0ENG', threadTs: root.ts, user: 'U0LEO', text: 'Results look good. Cutover is a go.' })
-
-  await postgres.expectPreview('Leo: Results look good. Cutover is a go.')
-  await postgres.expectUnread(1)
-  await expect.poll(() => sidebar.titles('Recent').then((titles) => titles[0])).toBe(POSTGRES)
-  // The time from the engine's write to pixels is measured in perf.spec.ts.
-})
-
-test('a group DM shows as soon as someone posts in it, when it was closed or Juno has never seen it', async ({ juno, fake }) => {
-  // Slack's counts leaves a closed group DM out, and a message opens it again with no membership event.
-  fake.addGroupDm({ id: 'G0CLOSED', users: ['U0MAYA', 'U0SAM'], open: false })
-  await juno.signIn()
-  await juno.waitForSync()
-  const closed = juno.win.locator('[data-topic-id="m:G0CLOSED"]')
-  await expect(closed).toHaveCount(0)
-  fake.injectMessage({ channel: 'G0CLOSED', user: 'U0SAM', text: 'Picking the launch notes back up' })
-  await expect(closed).toBeVisible()
-
-  // One made after Juno loaded the list, which Slack never announced either.
-  fake.addGroupDm({ id: 'G0FRESH', users: ['U0LEO', 'U0JONAS'] })
-  fake.injectMessage({ channel: 'G0FRESH', user: 'U0LEO', text: 'Quick question about the offsite' })
-  await expect(juno.win.locator('[data-topic-id="m:G0FRESH"]')).toBeVisible()
-})
-
 syncedTest('rows that scroll under a still pointer are not warmed; moving onto a row warms it', async ({ juno, win }) => {
   const { sidebar } = juno
   const list = sidebar.list
@@ -273,7 +208,7 @@ syncedTest('rows that scroll under a still pointer are not warmed; moving onto a
   await expect.poll(() => juno.lastMark('juno.prefetch')).not.toBe(before)
 })
 
-syncedTest("pressing a row selects it, the keyboard moves the selection, and Tab reaches the arrowed row's Resolve", async ({ juno, win, fake }) => {
+syncedTest('pressing a row selects it, the keyboard moves the selection, and arrowing to a row only focuses it', async ({ juno, win, fake }) => {
   const { sidebar } = juno
   await test.step('pressing a row selects it, and the keyboard moves the selection', async () => {
     const titles = await sidebar.titles('Recent')

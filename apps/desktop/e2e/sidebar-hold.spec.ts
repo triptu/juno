@@ -51,72 +51,73 @@ async function expectMovedAbove(juno: Juno, movers: ReadonlyArray<string>, targe
   }).toBe(true)
 }
 
-test('under the pointer, new activity does not move rows, and a press opens the row pointed at', async ({ juno, win, fake }) => {
-  const target = (await recentIds(juno))[1]!
-  const title = await titleOf(juno, target)
-  await pointAt(win, rowOf(juno, target), { x: 40, y: 20 })
-  // From here the list holds.
-  const before = await recentIds(juno)
-  const movers = oldestThreads(before, before.indexOf(target))
-  await replyIn(juno, fake, movers)
-  // The rows show the replies where they are; nothing moved under the pointer.
-  expect(await recentIds(juno)).toEqual(before)
+// Each step takes its own order and rows from the list as the step before left it.
+test('the list holds its order under the pointer and keyboard focus, and your own send still moves', async ({ juno, win, fake }) => {
+  await test.step('under the pointer, new activity does not move rows, and a press opens the row pointed at', async () => {
+    const target = (await recentIds(juno))[1]!
+    const title = await titleOf(juno, target)
+    await pointAt(win, rowOf(juno, target), { x: 40, y: 20 })
+    // From here the list holds.
+    const before = await recentIds(juno)
+    const movers = oldestThreads(before, before.indexOf(target))
+    await replyIn(juno, fake, movers)
+    // The rows show the replies where they are; nothing moved under the pointer.
+    expect(await recentIds(juno)).toEqual(before)
 
-  await press(win)
-  await juno.topic.expectTitle(title)
-  await expect(rowOf(juno, target)).toHaveAttribute('aria-current', 'true')
+    await press(win)
+    await juno.topic.expectTitle(title)
+    await expect(rowOf(juno, target)).toHaveAttribute('aria-current', 'true')
 
-  // Leaving the list applies the new order in one step, and the selection stays.
-  await juno.sidebar.leave()
-  await expectMovedAbove(juno, movers, target)
-  const after = await recentIds(juno)
-  expect(after.indexOf(movers[1])).toBeLessThan(after.indexOf(movers[0]))
-  await expect(rowOf(juno, target)).toHaveAttribute('aria-current', 'true')
-})
+    // Leaving the list applies the new order in one step, and the selection stays.
+    await juno.sidebar.leave()
+    await expectMovedAbove(juno, movers, target)
+    const after = await recentIds(juno)
+    expect(after.indexOf(movers[1])).toBeLessThan(after.indexOf(movers[0]))
+    await expect(rowOf(juno, target)).toHaveAttribute('aria-current', 'true')
+  })
+  await test.step('with keyboard focus in the list, the arrows walk the held order', async () => {
+    const before = await recentIds(juno)
+    const target = before[2]!
+    const movers = oldestThreads(before, 2)
+    const title = await titleOf(juno, target)
 
-test('with keyboard focus in the list, the arrows walk the held order', async ({ juno, win, fake }) => {
-  const before = await recentIds(juno)
-  const target = before[2]!
-  const movers = oldestThreads(before, 2)
-  const title = await titleOf(juno, target)
+    // Open the first row, move the pointer away, and walk down with the keyboard.
+    await pointAt(win, rowOf(juno, before[0]!), { x: 40, y: 20 })
+    await press(win)
+    await juno.topic.expectTitle(await titleOf(juno, before[0]!))
+    await juno.sidebar.leave()
+    await rowOf(juno, before[0]!).focus()
+    await win.keyboard.press('ArrowDown')
+    await expect(rowOf(juno, before[1]!)).toBeFocused()
+    expect(await recentIds(juno)).toEqual(before)
 
-  // Open the first row, move the pointer away, and walk down with the keyboard.
-  await pointAt(win, rowOf(juno, before[0]!), { x: 40, y: 20 })
-  await press(win)
-  await juno.topic.expectTitle(await titleOf(juno, before[0]!))
-  await juno.sidebar.leave()
-  await rowOf(juno, before[0]!).focus()
-  await win.keyboard.press('ArrowDown')
-  await expect(rowOf(juno, before[1]!)).toBeFocused()
-  expect(await recentIds(juno)).toEqual(before)
+    await replyIn(juno, fake, movers)
+    expect(await recentIds(juno)).toEqual(before)
 
-  await replyIn(juno, fake, movers)
-  expect(await recentIds(juno)).toEqual(before)
+    await win.keyboard.press('ArrowDown')
+    await expect(rowOf(juno, target)).toBeFocused()
+    await win.keyboard.press('Enter')
+    await juno.topic.expectTitle(title)
+    expect(await recentIds(juno)).toEqual(before)
 
-  await win.keyboard.press('ArrowDown')
-  await expect(rowOf(juno, target)).toBeFocused()
-  await win.keyboard.press('Enter')
-  await juno.topic.expectTitle(title)
-  expect(await recentIds(juno)).toEqual(before)
-
-  // Focus leaving the list applies the new order; the opened row stays selected.
-  await juno.topic.composer.click()
-  await expectMovedAbove(juno, movers, target)
-  await expect(rowOf(juno, target)).toHaveAttribute('aria-current', 'true')
-})
-
-test('your own send moves its row at once while the list holds', async ({ juno, win, fake }) => {
-  const before = await recentIds(juno)
-  const [, mine] = oldestThreads(before, 0)
-  await pointAt(win, rowOf(juno, mine), { x: 40, y: 20 })
-  await press(win)
-  await juno.topic.composer.fill('My own reply')
-  await win.keyboard.press('Enter')
-  // The pointer is still on the list, but the send was yours, so its row goes to the top of Recent.
-  await expect.poll(() => recentIds(juno).then((ids) => ids[0])).toBe(mine)
-  // Another client's reply still waits.
-  const [other] = oldestThreads(await recentIds(juno), 0)
-  const held = await recentIds(juno)
-  await replyIn(juno, fake, [other])
-  expect(await recentIds(juno)).toEqual(held)
+    // Focus leaving the list applies the new order; the opened row stays selected.
+    await juno.topic.composer.click()
+    await expectMovedAbove(juno, movers, target)
+    await expect(rowOf(juno, target)).toHaveAttribute('aria-current', 'true')
+  })
+  await test.step('your own send moves its row at once while the list holds', async () => {
+    const before = await recentIds(juno)
+    const [, mine] = oldestThreads(before, 0)
+    await pointAt(win, rowOf(juno, mine), { x: 40, y: 20 })
+    await press(win)
+    await juno.topic.composer.fill('My own reply')
+    await win.keyboard.press('Enter')
+    // The pointer is still on the list, but the send was yours, so its row goes to the top of Recent.
+    await expect.poll(() => recentIds(juno).then((ids) => ids[0])).toBe(mine)
+    // Another client's reply still waits.
+    const [other] = oldestThreads(await recentIds(juno), 0)
+    const held = await recentIds(juno)
+    await replyIn(juno, fake, [other])
+    expect(await recentIds(juno)).toEqual(held)
+  })
 })

@@ -27,58 +27,78 @@ async function homeShowsRecord(juno: Juno): Promise<void> {
 /** The job has examined the changed rows, including a pass that keeps their placement. */
 const afterAPass = (juno: Juno) => juno.workPass('automated')
 
-syncedTest('a bot channel joined later moves by itself, the card says why, and Move back works with Undo', async ({ juno, fake }) => {
+syncedTest('a bot channel joined later moves by itself with Move back and Undo, and a channel people take over goes back to All', async ({ juno, fake }) => {
   const { home, sidebar } = juno
 
-  // The first sync's own sorting is setting up, not news.
-  await home.open()
-  expect(await home.kinds()).not.toContain('automatedMoves')
+  await test.step('a bot channel joined later moves by itself, the card says why, and Move back works with Undo', async () => {
+    // The first sync's own sorting is setting up, not news.
+    await home.open()
+    expect(await home.kinds()).not.toContain('automatedMoves')
 
-  fake.workspace.addConversation({ id: 'C0CIBUILDS', name: 'ci-builds', kind: 'public', members: new Set(['U0DEPLOYBOT']), created: fake.now(), topic: '', purpose: '', isOpen: true, archived: false })
-  fake.joinChannel({ channel: 'C0CIBUILDS' })
-  for (let n = 1; n <= 6; n++) fake.injectMessage({ channel: 'C0CIBUILDS', user: 'U0DEPLOYBOT', text: `main #${n} passed` })
+    fake.workspace.addConversation({ id: 'C0CIBUILDS', name: 'ci-builds', kind: 'public', members: new Set(['U0DEPLOYBOT']), created: fake.now(), topic: '', purpose: '', isOpen: true, archived: false })
+    fake.joinChannel({ channel: 'C0CIBUILDS' })
+    for (let n = 1; n <= 6; n++) fake.injectMessage({ channel: 'C0CIBUILDS', user: 'U0DEPLOYBOT', text: `main #${n} passed` })
 
-  await homeShowsRecord(juno)
-  await expect(home.title('automatedMoves')).toHaveText('Juno moved 1 channel to Automated')
-  await expect(home.meta('automatedMoves')).toHaveText('ci-builds')
-  // Home's card can come before the sidebar's list says the channel left, and opening a row to read Home afresh held
-  // the list: wait until the sidebar shows the move, so the sheet's hold starts from it.
-  await sidebar.row(CI_BUILDS).expectAbsent()
+    await homeShowsRecord(juno)
+    await expect(home.title('automatedMoves')).toHaveText('Juno moved 1 channel to Automated')
+    await expect(home.meta('automatedMoves')).toHaveText('ci-builds')
+    // Home's card can come before the sidebar's list says the channel left, and opening a row to read Home afresh held
+    // the list: wait until the sidebar shows the move, so the sheet's hold starts from it.
+    await sidebar.row(CI_BUILDS).expectAbsent()
 
-  const sheet = await home.reviewOf('automatedMoves', 'automated')
-  await expect(sheet.title).toHaveText('Juno moved 1 channel to Automated')
-  await expect(sheet.reason(CI_BUILDS)).toHaveText('Apps wrote 6 of the last 6 top-level messages')
-  await sheet.about.click()
-  await expect(sheet.explainer).toContainText('Nothing changes in Slack.')
-  // The info covers the top of the list; the button closes it again.
-  await sheet.about.click()
+    const sheet = await home.reviewOf('automatedMoves', 'automated')
+    await expect(sheet.title).toHaveText('Juno moved 1 channel to Automated')
+    await expect(sheet.reason(CI_BUILDS)).toHaveText('Apps wrote 6 of the last 6 top-level messages')
+    await sheet.about.click()
+    await expect(sheet.explainer).toContainText('Nothing changes in Slack.')
+    // The info covers the top of the list; the button closes it again.
+    await sheet.about.click()
 
-  await sheet.act(CI_BUILDS).click()
-  await juno.expectToast('Moved #ci-builds back to All')
-  await expect(sheet.outcome(CI_BUILDS)).toHaveText('Moved back')
-  // The sidebar holds behind the sheet (SPEC 5): the channel comes to All when the sheet closes.
-  await sidebar.row(CI_BUILDS).expectAbsent()
+    await sheet.act(CI_BUILDS).click()
+    await juno.expectToast('Moved #ci-builds back to All')
+    await expect(sheet.outcome(CI_BUILDS)).toHaveText('Moved back')
+    // The sidebar holds behind the sheet (SPEC 5): the channel comes to All when the sheet closes.
+    await sidebar.row(CI_BUILDS).expectAbsent()
 
-  // Undo on the row gives the channel back to Automated, where Juno had put it.
-  await sheet.undo(CI_BUILDS).click()
-  await expect.poll(() => sheet.status(CI_BUILDS)).toBe('open')
-  await sidebar.row(CI_BUILDS).expectAbsent()
+    // Undo on the row gives the channel back to Automated, where Juno had put it.
+    await sheet.undo(CI_BUILDS).click()
+    await expect.poll(() => sheet.status(CI_BUILDS)).toBe('open')
+    await sidebar.row(CI_BUILDS).expectAbsent()
 
-  // K keeps it, with the toast's Undo.
-  await sheet.row(CI_BUILDS).locator('a').focus()
-  await juno.win.keyboard.press('k')
-  await juno.expectToast('Keeping #ci-builds in Automated')
-  await expect(sheet.outcome(CI_BUILDS)).toHaveText('Kept')
-  await sheet.close.click()
-  await expect(sheet.root).toHaveCount(0)
-  await sidebar.selectView('Automated')
-  await sidebar.row(CI_BUILDS).expectVisible()
+    // K keeps it, with the toast's Undo.
+    await sheet.row(CI_BUILDS).locator('a').focus()
+    await juno.win.keyboard.press('k')
+    await juno.expectToast('Keeping #ci-builds in Automated')
+    await expect(sheet.outcome(CI_BUILDS)).toHaveText('Kept')
+    await sheet.close.click()
+    await expect(sheet.root).toHaveCount(0)
+    await sidebar.selectView('Automated')
+    await sidebar.row(CI_BUILDS).expectVisible()
 
-  // Opened: Home does not list the move again.
-  await sidebar.filter('All')
-  await sidebar.row(POSTGRES).open()
-  await home.open()
-  expect(await home.kinds()).not.toContain('automatedMoves')
+    // Opened: Home does not list the move again.
+    await sidebar.filter('All')
+    await sidebar.row(POSTGRES).open()
+    await home.open()
+    expect(await home.kinds()).not.toContain('automatedMoves')
+  })
+
+  // The record was opened above, so a new move makes a card of its own.
+  await test.step('a channel people take over goes back to All, and the card says people start most conversations there', async () => {
+    await sidebar.row(ALERTS).expectAbsent()
+
+    // Its name says alerts, so people must start seven in ten of its latest 30 top-level messages.
+    for (let n = 0; n < 21; n++) fake.injectMessage({ channel: 'C0ALERTSPROD', user: n % 2 === 0 ? 'U0SAM' : 'U0PRIYA', text: `Looking into the p95 spike, note ${n + 1}` })
+    await sidebar.row(ALERTS).expectVisible()
+
+    await homeShowsRecord(juno)
+    await expect(home.title('automatedMoves')).toHaveText('Juno moved 1 channel out of Automated')
+    // Dismiss sees the moves without opening the record; the row stays while Home is on screen, without its button.
+    await home.button('automatedMoves', 'Dismiss').click()
+    await expect(home.button('automatedMoves', 'Dismiss')).toHaveCount(0)
+    const sheet = await home.reviewOf('automatedMoves', 'automated')
+    await expect(sheet.reason(ALERTS)).toHaveText('Moved back: people start most conversations here')
+    await expect(sheet.row(ALERTS)).toContainText('People wrote 21 of the last 30 top-level messages')
+  })
 })
 
 test('a channel where people start the conversations stays in All, however much a bot replies in its threads', async ({ juno, fake }) => {
@@ -104,22 +124,4 @@ test('a channel where people start the conversations stays in All, however much 
   await sidebar.row(AGENTS).expectVisible()
   await sidebar.selectView('Automated')
   await sidebar.row(AGENTS).expectAbsent()
-})
-
-syncedTest('a channel people take over goes back to All, and the card says people start most conversations there', async ({ juno, fake }) => {
-  const { home, sidebar } = juno
-  await sidebar.row(ALERTS).expectAbsent()
-
-  // Its name says alerts, so people must start seven in ten of its latest 30 top-level messages.
-  for (let n = 0; n < 21; n++) fake.injectMessage({ channel: 'C0ALERTSPROD', user: n % 2 === 0 ? 'U0SAM' : 'U0PRIYA', text: `Looking into the p95 spike, note ${n + 1}` })
-  await sidebar.row(ALERTS).expectVisible()
-
-  await homeShowsRecord(juno)
-  await expect(home.title('automatedMoves')).toHaveText('Juno moved 1 channel out of Automated')
-  // Dismiss sees the moves without opening the record; the row stays while Home is on screen, without its button.
-  await home.button('automatedMoves', 'Dismiss').click()
-  await expect(home.button('automatedMoves', 'Dismiss')).toHaveCount(0)
-  const sheet = await home.reviewOf('automatedMoves', 'automated')
-  await expect(sheet.reason(ALERTS)).toHaveText('Moved back: people start most conversations here')
-  await expect(sheet.row(ALERTS)).toContainText('People wrote 21 of the last 30 top-level messages')
 })
