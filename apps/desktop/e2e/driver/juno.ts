@@ -147,15 +147,25 @@ export class SidebarRow {
    * Selects the row with the mouse (it activates on mouse down). Rows move
    * while the list fills and when a topic gets activity, so the pointer goes
    * to the row once its box has stayed the same for two frames; from then on
-   * the list holds its order under the pointer (SPEC 5). A test that has just
-   * caused a move waits for it first (`expectTop`).
+   * the list holds its order under the pointer (SPEC 5). A row that moved
+   * after it was measured but before the pointer came into the list (a new
+   * message above it) is not hovered, so it is measured and pointed at again.
+   * A test that has just caused a move waits for it first (`expectTop`).
    */
   async select(): Promise<void> {
     await this.root.scrollIntoViewIfNeeded()
-    const box = await settledBox(this.root)
-    if (!box) throw new Error(`Row "${this.title}" is not on screen`)
-    await this.win.mouse.move(box.x + 40, box.y + box.height / 2)
-    await press(this.win)
+    const hovered = () => this.root.evaluate((node) => node.matches(':hover'))
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const box = await settledBox(this.root)
+      if (!box) throw new Error(`Row "${this.title}" is not on screen`)
+      await this.win.mouse.move(box.x + 40, box.y + box.height / 2)
+      const landed = await expect
+        .poll(hovered, { timeout: 250, intervals: [16, 32] })
+        .toBe(true)
+        .then(() => true, () => false)
+      if (landed) return press(this.win)
+    }
+    throw new Error(`Pointing did not hover row "${this.title}"`)
   }
 
   /** Opens the topic in the current tab. */
