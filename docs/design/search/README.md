@@ -24,7 +24,7 @@ How we got here: a map of today's search (below), web research on what people li
 
 - A new place, `search`. Each Search tab is its own session, with its own query, selection and scroll, so two searches can sit side by side.
 - **Opening it.** ⌘⇧F opens Search in the current tab, or focuses the field when a Search tab is active. The sidebar's magnifier opens it too. In a topic, ⌘F opens Search scoped to that topic: a thread searches that thread, a Main searches its channel or DM. The scope is a chip ("in: Acme MSA renewal terms") that Backspace removes to widen the search. From ⌘K's Messages tab, a footer row "All results for "…" ⌘⇧F" carries the text and filters over.
-- ⌘K stays for fast navigation, and always searches everything. Its tabs are **All**, **Conversations** and **Messages**, and it opens on All.
+- ⌘K stays for fast navigation, and always searches everything. Its tabs are **All**, **Conversations** and **Messages**, and it opens on All. The tabs sit in their own row under the field, not beside it, so the field keeps the full width.
   - **All** mixes the best of each kind in fixed groups: Conversations (up to 4), then Topics and messages (up to 5), then Pages, settings and commands (up to 3). Each group's heading has "⌘2" or "⌘3" to jump to its tab. Rows stay where they are as you type; a group only fills in below what is shown.
   - **Conversations** is today's Conversations tab. **Messages** is the quick message list.
   - Messages come from this Mac only, with no Slack call, so ⌘K never waits. The same hiding rules apply.
