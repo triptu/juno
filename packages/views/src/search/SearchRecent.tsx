@@ -56,7 +56,7 @@ export function SearchRecent({ recent, onRecent, onForgetRecent, onPalette }: Se
       )}
       <p {...stylex.props(styles.hint)}>Narrow with from:, in:, has: or a date.</p>
       <p data-palette-hint="" {...stylex.props(styles.hint, styles.palette)}>
-        To jump to a conversation, topic or command, press
+        To jump to a conversation, topic or command, press{' '}
         <button type="button" aria-label="Open ⌘K" onClick={onPalette} {...stylex.props(styles.key, focusRing.outside)}>
           <Kbd look="key">⌘K</Kbd>
         </button>
@@ -161,14 +161,12 @@ const styles = stylex.create({
     color: colors['--foreground-muted'],
   },
   palette: {
-    display: 'flex',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    columnGap: spacing['--space-1'],
     paddingTop: spacing['--space-1'],
   },
+  // In the line of text, so the full stop after it sits against it.
   key: {
     display: 'inline-flex',
+    verticalAlign: 'middle',
     margin: 0,
     padding: 0,
     borderWidth: 0,
