@@ -607,7 +607,7 @@ Unit tests run on `bun test` with the preload in `packages/testing/src/preload.t
 
 ### Desktop lane measurements, 2026-10-24
 
-The final check at `7aa940589` passed both desktop lanes on the SSH laptop: **222 s browser, 73 s Electron, 295 s combined**. It used four physical cores (eight allocated threads), eight browser workers and eight Electron workers, in sequence. Coverage and traces were off, CPU timing was on, and there were no retries, failures or skips. The job averaged 89% CPU busy (99% median), with 6.64 GB peak container memory including file cache.
+The full measurement at `7aa940589` passed both desktop lanes on the SSH laptop: **222 s browser, 73 s Electron, 295 s combined**. It used four physical cores (eight allocated threads), eight browser workers and eight Electron workers, in sequence. Coverage and traces were off, CPU timing was on, and there were no retries, failures or skips. The job averaged 89% CPU busy (99% median), with 6.64 GB peak container memory including file cache.
 
 These are command wall times, including each build or cache check, excluding SSH upload, allocation wait and install:
 
@@ -642,6 +642,8 @@ Host CPU summed to 767.94 → 331.09 s across those flows; renderer 701.34 → 6
 The savings come from reusing loaded host processes and immutable browser assets, with a fresh engine, page, fake and data folder per test; clearing context storage and permissions; using synced snapshots for ordinary flows; and sizing the title-layout seed to its measured scroll range. Clock-installing tests request a fresh context. Renderer work now dominates. Process counters cover the running fixture and omit processes that already exited. The host counter does not split boot from sync, and fake Slack shares the Playwright worker, so its separate CPU is bounded by that worker total, not independently profiled.
 
 Reproduce with `bun run remote --cores 4 --env JUNO_E2E_CPU=1 --env JUNO_E2E_TIMINGS=1 test:plan test:browser + test:electron`. The final artifact is `.remote/juno-1792827331204-36052-d37acacc/`; the per-test counters are in `run.log`. The IST work log and parsed before/after counters are under `/Volumes/AgentWork/scratch/test-revamp/` (`browser-lane-log.md`, `browser-lane-4-green-cpu.json`).
+
+Later layout and focus repairs passed 178 selected unit tests, 230 gallery checks, 272 desktop cases, health and 18 runner checks. The remaining release-fixture failure came from a worktree install waiting on host-wide load inside its allocated container; the fix passed the affected repair gate (47 repository-tool tests passed, one Mac-only case skipped). Typecheck and lint passed. These repairs through `e9d1f11c9` did not rerun the full lane timing above.
 
 ### Text-menu spelling checks
 
