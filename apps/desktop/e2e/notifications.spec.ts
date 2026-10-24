@@ -1,3 +1,5 @@
+import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { readUserDb } from './driver/userDb'
 /**
  * Notifications from the owner's side (SPEC 14): Notify me on a channel,
@@ -397,4 +399,68 @@ standingByTest('outside notification hours a DM is held with its reason and show
   await expect.poll(() => readUserDb(userData, fake.teamId, (db) => db.prepare('SELECT outcome, reason FROM notification_log WHERE preview = ?').get(held))).toMatchObject({ outcome: 'stay', reason: expect.stringContaining('Outside your notification hours.') })
   expect(await juno.osNotifications()).toHaveLength(0)
   expect(model.inputs()).toHaveLength(0)
+})
+
+const clock = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
+
+syncedTest('hours saved by an older version still load; a day with its own hours reaches Slack as a custom schedule and decides by those hours', async ({ fake, slack, userData, relaunch }) => {
+  // As an older version saved them: one set of days and one from and to.
+  const juno = await relaunch({ whileClosed: () => {
+    const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
+    const old = { notificationHours: { days: [1, 2, 3, 4, 5], from: 600, to: 1020 }, presenceHours: { days: [1, 2, 3, 4, 5], from: 540, to: 1140 }, channels: {}, people: {} }
+    db.prepare('INSERT INTO prefs (key, value_json) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json').run('notifications', JSON.stringify(old))
+    db.close()
+  } })
+  await expect(juno.home.navItem).toBeVisible({ timeout: 30_000 })
+  await juno.openNotifications()
+  const page = juno.notifications
+  await expect(page.day('Notifications', 'Monday')).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.day('Notifications', 'Saturday')).toHaveAttribute('aria-pressed', 'false')
+  await expect(page.root.getByRole('combobox', { name: 'Notifications from' })).toHaveValue('600')
+  await expect(page.root.getByRole('combobox', { name: 'Notifications to' })).toHaveValue('1020')
+
+  await juno.sidebar.row('#product').chooseInMenu('notify-always')
+  await juno.expectToast('#product: Always')
+  // Every day around now; then today gets its own hours, and yesterday none, so no span from yesterday reaches now.
+  await juno.notificationHoursNow()
+  const saved = () => savedSettings(userData, fake.teamId) as { notificationHours: { from: number; to: number; days: number[]; dayHours?: unknown } }
+  const shared = saved().notificationHours
+  const today = await juno.win.evaluate(() => new Date().getDay())
+  const yesterday = (today + 6) % 7
+  const tomorrow = (today + 1) % 7
+  const half = Math.floor(minutesNow() / 30) * 30
+  const [from, to] = [(half + 360) % 1440, (half + 1080) % 1440]
+  await page.root.getByRole('button', { name: 'Different hours on some days' }).click()
+  const select = (day: number, edge: 'from' | 'to') => page.root.getByRole('combobox', { name: `${weekdays[day]} ${edge}` })
+  await select(yesterday, 'from').selectOption('off')
+  await select(today, 'from').selectOption(String(from))
+  await select(today, 'to').selectOption(String(to))
+  await expect.poll(saved).toMatchObject({ notificationHours: { dayHours: [{ day: today, from, to }] } })
+  expect(saved().notificationHours.days).not.toContain(yesterday)
+
+  // Slack holds the same hours: today its own, tomorrow the shared ones, yesterday none.
+  const dayName = (day: number) => weekdays[day]!.toLowerCase()
+  await expect.poll(() => fake.workspace.prefs).toMatchObject({
+    dnd_days: 'custom',
+    [`dnd_enabled_${dayName(yesterday)}`]: 'all_day',
+    [`dnd_enabled_${dayName(today)}`]: 'partial',
+    [`dnd_before_${dayName(today)}`]: clock(from),
+    [`dnd_after_${dayName(today)}`]: from < to ? clock(to) : '23:59',
+    [`dnd_before_${dayName(tomorrow)}`]: clock(shared.from),
+  })
+
+  // Now is inside the shared hours but outside today's own.
+  const held = 'Roadmap review moved to next week'
+  slack.as('Leo').postIn('product', held)
+  await expect.poll(() => readUserDb(userData, fake.teamId, (db) => db.prepare('SELECT outcome, reason FROM notification_log WHERE preview = ?').get(held)), { timeout: 15_000 })
+    .toMatchObject({ outcome: 'stay', reason: expect.stringContaining('Outside your notification hours.') })
+
+  // Today's own hours moved to take in now: the next message notifies.
+  await select(today, 'from').selectOption(String(half))
+  await select(today, 'to').selectOption(String((half + 120) % 1440))
+  await expect.poll(saved).toMatchObject({ notificationHours: { dayHours: [{ day: today, from: half, to: (half + 120) % 1440 }] } })
+  const shown = 'Pricing review moved to 3pm'
+  slack.as('Leo').postIn('product', shown)
+  await expect.poll(async () => (await juno.osNotifications()).map((each) => each.body), { timeout: 15_000 }).toContain(shown)
+  expect((await juno.osNotifications()).map((each) => each.body)).not.toContain(held)
 })
