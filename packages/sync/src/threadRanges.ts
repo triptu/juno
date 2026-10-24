@@ -11,9 +11,11 @@
  * reply on a socket connection that has not dropped since has a `live`
  * tail: every later reply arrives as an event, so the view shows the
  * replies after `to_ts` as continuous. A live range does not merge with the
- * ranges above it; when its tail ends (a drop, or a new run of the sync) it
- * closes at the newest reply the socket delivered for it, in order
- * (`heard_ts`), and only pages close the rest. A followed thread's tail is
+ * ranges above it. When its tail ends (a drop, or a new run of the sync),
+ * the replies up to the newest one the socket delivered for it, in order
+ * (`heard_ts`), stay shown and counted, but `to_ts` stays where pages
+ * proved it, so the next open reads that stretch again and only pages
+ * close the rest. A followed thread's tail is
  * then `held`: the reconnect's `getView` brings every unread reply, so the
  * unread count can stay exact, but the view no longer shows past the range.
  * An unfollowed thread's tail is `none`.
@@ -38,6 +40,8 @@ export interface ThreadRange {
   readonly from_ts: string
   readonly to_ts: string
   readonly tail: RangeTail
+  /** The newest reply the socket delivered after `to_ts` while the tail was live (`hearReply`). */
+  readonly heard_ts?: string | null | undefined
 }
 
 /** The ranges the view may show as continuous. */
@@ -46,11 +50,15 @@ const shown = (ranges: ReadonlyArray<ThreadRange>): ReadonlyArray<ThreadRange> =
 /** Later than every ts. */
 const END = '9999999999.999999'
 
+/** The newest reply a range holds: its pages' end, or the newest reply heard after it. */
+const reach = (range: ThreadRange): string =>
+  range.heard_ts === null || range.heard_ts === undefined || compareTs(range.heard_ts, range.to_ts) <= 0 ? range.to_ts : range.heard_ts
+
 /** The newest ts a range shows as continuous: past `to_ts` while its tail is live. */
-const shownTo = (range: ThreadRange): string => (range.tail === 'live' ? END : range.to_ts)
+const shownTo = (range: ThreadRange): string => (range.tail === 'live' ? END : reach(range))
 
 /** The newest ts a range vouches for in the unread count: a held tail still counts. */
-const countedTo = (range: ThreadRange): string => (range.tail === 'none' ? range.to_ts : END)
+const countedTo = (range: ThreadRange): string => (range.tail === 'none' ? reach(range) : END)
 
 /**
  * `incoming` merged with the ranges whose pages it touches. A live tail
@@ -63,14 +71,16 @@ export function mergeRange(ranges: ReadonlyArray<ThreadRange>, incoming: ThreadR
   const replaced = ranges.filter((r) => r.kind === incoming.kind && compareTs(r.from_ts, incoming.to_ts) <= 0 && compareTs(r.to_ts, incoming.from_ts) >= 0)
   let from = incoming.from_ts
   let to = incoming.to_ts
+  let heard = reach(incoming)
   const tails = new Set<RangeTail>([incoming.tail])
   for (const r of replaced) {
     from = minTs(from, r.from_ts)
     to = maxTs(to, r.to_ts)
+    heard = maxTs(heard, reach(r))
     tails.add(r.tail)
   }
   const tail: RangeTail = tails.has('live') ? 'live' : tails.has('held') ? 'held' : 'none'
-  return { range: { kind: incoming.kind, from_ts: from, to_ts: to, tail }, replaced }
+  return { range: { kind: incoming.kind, from_ts: from, to_ts: to, tail, ...(compareTs(heard, to) > 0 ? { heard_ts: heard } : {}) }, replaced }
 }
 
 /**
@@ -81,7 +91,7 @@ export function mergeRange(ranges: ReadonlyArray<ThreadRange>, incoming: ThreadR
 export const addsNothing = (ranges: ReadonlyArray<ThreadRange>, incoming: ThreadRange): boolean => {
   const { range, replaced } = mergeRange(ranges, incoming)
   const held = replaced[0]
-  if (replaced.length === 1 && held !== undefined && held.from_ts === range.from_ts && held.to_ts === range.to_ts && held.tail === range.tail) return true
+  if (replaced.length === 1 && held !== undefined && held.from_ts === range.from_ts && held.to_ts === range.to_ts && held.tail === range.tail && reach(held) === reach(range)) return true
   return incoming.tail === 'live' && ranges.some((r) => r.kind === incoming.kind && r.tail === 'live' && compareTs(r.from_ts, incoming.from_ts) <= 0 && compareTs(incoming.from_ts, r.to_ts) <= 0)
 }
 
@@ -106,7 +116,7 @@ export const provenToEnd = (ranges: ReadonlyArray<ThreadRange>, from: string, la
 export const countExact = (ranges: ReadonlyArray<ThreadRange>, pointer: string, latestReply: string | undefined): boolean =>
   latestReply === undefined ||
   compareTs(pointer, latestReply) >= 0 ||
-  ranges.some((r) => compareTs(r.from_ts, pointer) <= 0 && compareTs(pointer, countedTo(r)) <= 0 && (r.tail !== 'none' || compareTs(latestReply, r.to_ts) <= 0))
+  ranges.some((r) => compareTs(r.from_ts, pointer) <= 0 && compareTs(pointer, countedTo(r)) <= 0 && (r.tail !== 'none' || compareTs(latestReply, reach(r)) <= 0))
 
 /** The range that holds `ts`: the stretch of continuous replies it belongs to. */
 export const rangeHolding = (ranges: ReadonlyArray<ThreadRange>, ts: string): ThreadRange | undefined =>

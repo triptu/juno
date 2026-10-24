@@ -1,4 +1,4 @@
-import { compareTs, threadTopicId, type ChannelId, type Ts } from '@juno/domain'
+import { threadTopicId, type ChannelId, type Ts } from '@juno/domain'
 import { Invalidation, StoreWriter, syncedRanges, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
 import { addsNothing, mergeRange, type ThreadRange } from '../threadRanges'
@@ -9,7 +9,7 @@ import { invalidate, type Writer } from './shared'
 export const threadRanges = (channel: string, threadTs: string): Effect.Effect<ReadonlyArray<ThreadRange>, SqlError, StoreWriter> =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter
-    return yield* sql<ThreadRange>`SELECT kind, from_ts, to_ts, tail FROM thread_ranges
+    return yield* sql<ThreadRange>`SELECT kind, from_ts, to_ts, tail, heard_ts FROM thread_ranges
       WHERE channel = ${channel} AND thread_ts = ${threadTs} ORDER BY from_ts`
   })
 
@@ -20,28 +20,24 @@ export const addThreadRange = (channel: string, threadTs: string, range: ThreadR
     const sql = yield* StoreWriter
     const current = yield* threadRanges(channel, threadTs)
     if (addsNothing(current, range)) return
+    // What the socket delivered after a range it joins stays heard until a page reaches past it (`mergeRange`).
     const { range: merged, replaced } = mergeRange(current, range)
-    // What the socket delivered after a live range it joins still counts when the tail ends.
-    let heard: string | null = null
     if (replaced.length > 0) {
-      const from = replaced.map((r) => r.from_ts)
-      const rows = yield* sql<{ heard_ts: string | null }>`SELECT heard_ts FROM thread_ranges
-        WHERE channel = ${channel} AND thread_ts = ${threadTs} AND kind = ${range.kind} AND from_ts IN ${sql.in(from)}`
-      for (const row of rows) if (row.heard_ts !== null && (heard === null || compareTs(row.heard_ts, heard) > 0)) heard = row.heard_ts
-      yield* sql`DELETE FROM thread_ranges WHERE channel = ${channel} AND thread_ts = ${threadTs} AND kind = ${range.kind} AND from_ts IN ${sql.in(from)}`
+      yield* sql`DELETE FROM thread_ranges WHERE channel = ${channel} AND thread_ts = ${threadTs} AND kind = ${range.kind}
+        AND from_ts IN ${sql.in(replaced.map((r) => r.from_ts))}`
     }
-    if (merged.tail !== 'live' || (heard !== null && compareTs(heard, merged.to_ts) <= 0)) heard = null
     yield* sql`INSERT INTO thread_ranges (channel, thread_ts, kind, from_ts, to_ts, tail, heard_ts)
-      VALUES (${channel}, ${threadTs}, ${merged.kind}, ${merged.from_ts}, ${merged.to_ts}, ${merged.tail}, ${heard})`
+      VALUES (${channel}, ${threadTs}, ${merged.kind}, ${merged.from_ts}, ${merged.to_ts}, ${merged.tail}, ${merged.heard_ts ?? null})`
     yield* invalidate({ thread_ranges: [threadTopicId(channel as ChannelId, threadTs as Ts)] })
   })
 
 /**
  * A reply the socket delivered: a live range of its thread that starts
  * before it heard it. Events arrive in the order Slack sent them, so when
- * the tail ends every reply up to the newest one heard has arrived
- * (`endEventCoverage`). Nothing else moves; the view already shows past a
- * live range.
+ * the tail ends every reply up to the newest one heard has arrived, and the
+ * view and the count keep them (`threadRanges.ts` `reach`) until a page
+ * reads that stretch again. Nothing else moves; the view already shows past
+ * a live range.
  */
 export const hearReply = (channel: string, threadTs: string, ts: string): Writer =>
   Effect.gen(function* () {
@@ -54,8 +50,9 @@ export const hearReply = (channel: string, threadTs: string, ts: string): Writer
 /**
  * The event stream broke (a socket drop, or a new run of the sync after the
  * app was closed): replies sent since may never arrive as events, so no
- * live tail holds. Each live range closes at the newest reply the socket
- * delivered for it (`hearReply`). A followed thread's tail is held: the
+ * live tail holds. Each live range keeps the replies the socket delivered
+ * for it (`hearReply`), but its `to_ts` stays where pages proved it, so the
+ * next open reads that stretch again. A followed thread's tail is held: the
  * reconnect pages `getView` over every followed thread with activity since
  * the store was last in step, which brings every unread reply, so its
  * unread count stays exact; a reply read on another client meanwhile may
@@ -66,8 +63,6 @@ export const hearReply = (channel: string, threadTs: string, ts: string): Writer
 export const endEventCoverage: Effect.Effect<ReadonlyArray<string>, SqlError, StoreWriter | Invalidation> = Effect.gen(function* () {
   const sql = yield* StoreWriter
   const ended = yield* sql<{ channel: string; thread_ts: string }>`UPDATE thread_ranges SET
-      to_ts = CASE WHEN heard_ts IS NOT NULL AND heard_ts > to_ts THEN heard_ts ELSE to_ts END,
-      heard_ts = NULL,
       tail = CASE WHEN EXISTS (
         SELECT 1 FROM thread_subs s WHERE s.channel = thread_ranges.channel AND s.thread_ts = thread_ranges.thread_ts AND s.subscribed = 1)
       THEN 'held' ELSE 'none' END
@@ -79,7 +74,11 @@ export const endEventCoverage: Effect.Effect<ReadonlyArray<string>, SqlError, St
   return topics
 })
 
-/** The thread is no longer followed: a held tail rested on the reconnect's `getView`, which no longer lists it. */
+/**
+ * The thread is no longer followed: a held tail rested on the reconnect's
+ * `getView`, which no longer lists it. The topic's count takes this on its
+ * next re-index, which a reply or a page that could change it runs.
+ */
 export const endHeldTail = (channel: string, threadTs: string): Writer =>
   Effect.gen(function* () {
     const sql = yield* StoreWriter

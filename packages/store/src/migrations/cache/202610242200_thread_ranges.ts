@@ -11,8 +11,8 @@ import { Effect } from 'effect'
  * reply on a socket connection that has not dropped since, so every later
  * reply arrives as an event) or `held` (a followed thread's live tail across
  * a drop, trusted for the unread count only). `heard_ts`: the newest reply
- * the socket delivered after a live range; the range closes there when its
- * tail ends.
+ * the socket delivered after `to_ts` while the tail was live; those replies
+ * stay shown and counted after the tail ends, until a page reads them again.
  *
  * It replaces `thread_cursors`, whose `replies_complete` and
  * `complete_from` judged coverage from `reply_count` and so trusted guesses.
