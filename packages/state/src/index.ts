@@ -49,6 +49,7 @@ export {
   bottomWindow,
   channelThreadsAtom,
   channelTopicsAtom,
+  loadMessageAt,
   loadOlderMessages,
   locateMessage,
   locatePerson,

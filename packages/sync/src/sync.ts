@@ -112,6 +112,8 @@ export interface RunSyncOptions {
 export interface TopicFetcher {
   readonly open: (topicId: string) => Effect.Effect<FetchReport, OpenError>
   readonly older: (topicId: string, before: string) => Effect.Effect<FetchReport, OpenError>
+  /** Stores the message `ts` in full for a jump to it (`fetchAt`). */
+  readonly at: (topicId: string, ts: string) => Effect.Effect<FetchReport, OpenError>
   /** Stores a DM-open answer through the running metadata fence. */
   readonly opened: (channel: Parameters<typeof applyOpened>[1]) => Effect.Effect<void, SqlError>
   /** Stores what Juno's own send got back, in the sync's context (`applySent`). */

@@ -14,14 +14,22 @@
  *   to the oldest stored one; for a message past every stored reply (a
  *   search match deep in a long thread), the replies from the newest stored
  *   one up to it, at most `OPEN_FETCH_MAX`.
+ * - A jump to a message the store lacks in full (a search match, a link):
+ *   for a thread, the replies after the newest stored one before it, up to
+ *   it, when they fit one page; else the page that starts at it, so a reply
+ *   any distance into a long thread costs at most two calls. The store has
+ *   no mark for the replies left between, so a window across them shows
+ *   the replies on either side together. For Main, the page that ends at
+ *   it, recorded as a synced range like any page.
  * - Main: `conversations.history` since the newest synced range (the newest
  *   page when there is none), then older pages until history reaches the
  *   read pointer, at most `OPEN_FETCH_MAX` messages. Each page records the
  *   range it covered, so the "N new" count is exact once the range reaches
  *   the pointer (`reindexTopics` reads it).
  *
- * Nothing here is called by a live query: only the engine's `topics.open`
- * and `messages.loadOlder` commands and the reconnect step do.
+ * Nothing here is called by a live query: only the engine's `topics.open`,
+ * `messages.loadOlder` and `messages.loadAt` commands and the reconnect
+ * step do.
  */
 import { compareTs, millisToTs, parseTopicId, type Ts } from '@juno/domain'
 import { SlackApi, type SlackApiError } from '@juno/slack'
@@ -72,6 +80,13 @@ export const fetchTopic = (ctx: SyncContext, topicId: string, lane: FetchLane): 
   return topic.kind === 'thread' ? fetchThread(ctx, topic.channel, topic.threadTs, lane) : fetchMain(ctx, topic.channel, lane)
 }
 
+/** The message `ts` of a topic and the page around it, fetched only when the store lacks the message in full. */
+export const fetchAt = (ctx: SyncContext, topicId: string, ts: string, lane: FetchLane): Effect.Effect<FetchReport, OpenError, OpenServices> => {
+  const topic = fetchableTopic(topicId)
+  if (topic === undefined) return Effect.succeed({ fetched: false, complete: true, unknownUsers: [] })
+  return topic.kind === 'thread' ? threadAt(ctx, topic.channel, topic.threadTs, ts, lane) : mainAt(ctx, topic.channel, ts, lane)
+}
+
 /** The page before `before` (a message ts) of a topic, fetched only when the store does not have it. */
 export const fetchOlder = (ctx: SyncContext, topicId: string, before: string, lane: FetchLane): Effect.Effect<FetchReport, OpenError, OpenServices> => {
   const topic = fetchableTopic(topicId)
@@ -112,6 +127,8 @@ const repliesComplete = (coverage: ThreadCoverage): boolean =>
 interface RepliesRange {
   readonly oldest?: string
   readonly latest?: string
+  /** The bounds themselves are in the range. */
+  readonly inclusive?: boolean
 }
 
 /**
@@ -139,7 +156,7 @@ const pageReplies = (
           channel,
           ts: threadTs as Ts,
           limit: OPEN_PAGE,
-          ...(range.oldest === undefined ? {} : { oldest: range.oldest, inclusive: false }),
+          ...(range.oldest === undefined ? {} : { oldest: range.oldest, inclusive: range.inclusive ?? false }),
           ...(range.latest === undefined ? {} : { latest: range.latest }),
           ...(cursor === undefined ? {} : { cursor }),
         },
@@ -207,6 +224,53 @@ const olderThread = (ctx: SyncContext, channel: string, threadTs: string, before
       )
     }
     return { fetched: true, complete: reachedEnd, unknownUsers: yield* unknownSenders(messages) }
+  })
+
+/** The message is stored with its whole content: not a search match, not a root known only from a reply. */
+const storedInFull = (channel: string, ts: string): Effect.Effect<boolean, SqlError, StoreWriter> =>
+  Effect.gen(function* () {
+    const sql = yield* StoreWriter
+    const rows = yield* sql<RootContent & { partial: 0 | 1 }>`
+      SELECT reply_count, user_id, text, blocks_json, partial FROM messages WHERE channel = ${channel} AND ts = ${ts}`
+    const row = rows[0]
+    return row !== undefined && row.partial === 0 && !isStub(row)
+  })
+
+const threadAt = (ctx: SyncContext, channel: string, threadTs: string, ts: string, lane: FetchLane): Effect.Effect<FetchReport, OpenError, OpenServices> =>
+  Effect.gen(function* () {
+    if (yield* storedInFull(channel, ts)) return { fetched: false, complete: false, unknownUsers: [] }
+    const sql = yield* StoreWriter
+    // The newest reply stored in full before the message, else the root.
+    const below = (yield* sql<{ ts: string | null }>`
+      SELECT max(ts) AS ts FROM messages
+      WHERE channel = ${channel} AND thread_ts = ${threadTs} AND ts <> ${threadTs} AND ts < ${ts} AND deleted = 0 AND partial = 0`)[0]?.ts ?? threadTs
+    const cursor = (yield* sql<{ complete_from: string | null }>`
+      SELECT complete_from FROM thread_cursors WHERE channel = ${channel} AND thread_ts = ${threadTs}`)[0]?.complete_from ?? null
+    // Every reply from `from` to the newest is stored once the pages land.
+    let from: string | undefined
+    // The replies after `below` up to the message, when one page holds them; then nothing is missing between.
+    const near = yield* pageReplies(ctx, channel, threadTs, { oldest: below, latest: ts, inclusive: true }, OPEN_PAGE, lane)
+    const messages = [...near.messages]
+    if (near.reachedEnd) {
+      // Every reply from `cursor` on was stored, and the page holds those from `below` up to the message: now every one from `below`.
+      if (cursor !== null && compareTs(cursor, ts) <= 0) from = below
+    } else {
+      // Too far for one page: the page that starts at the message. The replies before it stay a gap.
+      const far = yield* pageReplies(ctx, channel, threadTs, { oldest: ts, inclusive: true }, OPEN_PAGE, lane)
+      messages.push(...far.messages)
+      if (far.reachedEnd) from = ts
+    }
+    const after = yield* threadCoverage(channel, threadTs)
+    if (from !== undefined) {
+      const syncedAt = yield* Clock.currentTimeMillis
+      yield* transaction(
+        Effect.gen(function* () {
+          yield* markRepliesComplete(channel, threadTs, repliesComplete(after), syncedAt, from)
+          yield* reindexTopics([threadTopicOf(channel, threadTs)], reindexOptions(ctx))
+        }),
+      )
+    }
+    return { fetched: true, complete: repliesComplete(after), unknownUsers: yield* unknownSenders(messages) }
   })
 
 // Main
@@ -307,6 +371,13 @@ const olderMain = (ctx: SyncContext, channel: string, before: string, lane: Fetc
       if ((yield* mainStoredBetween(channel, range.from_ts, before, OPEN_PAGE)) >= OPEN_PAGE) return { fetched: false, complete: false, unknownUsers: [] }
     }
     const page = yield* historyPage(ctx, channel, { latest: range?.from_ts ?? before, inclusive: true, limit: OPEN_PAGE }, lane)
+    return { fetched: true, complete: page.from === HISTORY_START, unknownUsers: yield* unknownSenders(page.messages) }
+  })
+
+const mainAt = (ctx: SyncContext, channel: string, ts: string, lane: FetchLane): Effect.Effect<FetchReport, OpenError, OpenServices> =>
+  Effect.gen(function* () {
+    if (yield* storedInFull(channel, ts)) return { fetched: false, complete: false, unknownUsers: [] }
+    const page = yield* historyPage(ctx, channel, { latest: ts, inclusive: true, limit: OPEN_PAGE }, lane)
     return { fetched: true, complete: page.from === HISTORY_START, unknownUsers: yield* unknownSenders(page.messages) }
   })
 

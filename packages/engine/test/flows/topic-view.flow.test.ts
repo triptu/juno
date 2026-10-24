@@ -7,7 +7,7 @@ import { Schema } from 'effect'
 import { afterEach, expect, it } from 'bun:test'
 import { MessageView, type ThreadSummary, type TopicDetail } from '@juno/contract'
 import type { FakeSlack } from '@juno/fake-slack'
-import { channelThreadsAtom, loadOlderMessages, locateMessage, locatePerson, messagesAtom, openTopic, prefetchTopic, topicAtom, type ListWindow, type LiveListAtom, type LiveValueAtom } from '@juno/state'
+import { channelThreadsAtom, loadMessageAt, loadOlderMessages, locateMessage, locatePerson, messagesAtom, openTopic, prefetchTopic, topicAtom, type ListWindow, type LiveListAtom, type LiveValueAtom } from '@juno/state'
 import { waitFor, WAIT_MS, type RunningEngine } from '../harness'
 import { apiCalls, bootedEngine, DAY, quiet, seedThread, threadId, tsOf, valueOf } from '../scenario'
 import { step } from '../step'
@@ -220,27 +220,28 @@ it('history the first sync left out comes when asked: a searched reply in full o
   })
 })
 
-it('a match past every stored reply of a long thread is fetched by the page before it', async () => {
+it('a jump to a reply deep in a long thread is one bounded read, however far it is past the stored replies', async () => {
   const engine = await synced()
-  // Longer than one open fetches, posted with no events: the open stores the first 500 replies.
+  // Longer than one open fetches, posted with no events: the open stores steps 1 to 495 (every page of 100 holds the root).
   const now = engine.fake.now()
   const root = engine.fake.workspace.post({ channel: 'C0ENG', user: 'U0LEO', text: 'Long rollout log', at: now - 2 * DAY, silent: true })
-  const replies = Array.from({ length: 560 }, (_, i) => engine.fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: `rollout step ${i + 1}`, threadTs: root.ts, at: now - 2 * DAY + (i + 1) * 1000, silent: true }))
+  const replies = Array.from({ length: 1150 }, (_, i) => engine.fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: `rollout step ${i + 1}`, threadTs: root.ts, at: now - 2 * DAY + (i + 1) * 1000, silent: true }))
   const id = `t:C0ENG:${root.ts}`
-  const match = replies[539]!
-
-  await step('the open stores the replies from the root, not as far as the match', async () => {
-    expect(valueOf(await openTopic(engine.registry, id)).outcome).toBe('fetched')
-    const window = await watchList(engine, messagesAtom(id, { anchor: match.ts, before: 10, limit: 20 })).until((value) => value.order.length > 0, 'the window near the match')
-    expect(window.rows.has(match.ts)).toBe(false)
-  })
-
-  await step('the page before the next reply fills forward from the newest stored reply to the match, with one call', async () => {
+  expect(valueOf(await openTopic(engine.registry, id)).outcome).toBe('fetched')
+  const jump = async (index: number, before: number) => {
+    const ts = replies[index]!.ts
     engine.fake.resetCalls()
-    expect(valueOf(await loadOlderMessages(engine.registry, id, replies[540]!.ts))).toEqual({ outcome: 'fetched', complete: false })
-    expect(opens(engine).map((call) => call.method)).toEqual(['conversations.replies'])
-    const window = await watchList(engine, messagesAtom(id, { anchor: match.ts, before: 10, limit: 20 })).until((value) => value.rows.has(match.ts), 'the match')
-    expect(textOf(window.rows.get(match.ts)!)).toBe('rollout step 540')
+    const { outcome } = valueOf(await loadMessageAt(engine.registry, id, ts))
+    const window = await watchList(engine, messagesAtom(id, { anchor: ts, before, limit: before + 1 })).until((value) => value.rows.has(ts), `step ${index + 1}`)
+    return { outcome, calls: opens(engine).map((call) => call.method), texts: rowsOf(window).map(textOf), covered: window.meta.windowCovered }
+  }
+  await step('a reply 600 past the stored ones takes two calls, and the stretch from it to the newest covers its window', async () => {
+    expect(await jump(1099, 0)).toEqual({ outcome: 'fetched', calls: ['conversations.replies', 'conversations.replies'], texts: ['rollout step 1100'], covered: true })
+  })
+  await step('a reply within a page of the stored ones takes one call and brings every reply before it; one stored in full takes none', async () => {
+    // The first jump's first page stored the steps up to 593.
+    expect(await jump(639, 60)).toMatchObject({ outcome: 'fetched', calls: ['conversations.replies'], texts: replies.slice(579, 640).map((reply) => reply.text) })
+    expect(await jump(520, 0)).toMatchObject({ outcome: 'cached', calls: [] })
   })
 })
 

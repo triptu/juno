@@ -15,7 +15,7 @@
  * - `channel.threads`: topics, overlays, users, prefs and art.
  *
  * A `topics.get` subscription marks its topic as shown in `SyncLink`, so a
- * reconnect fetches it again. The two commands run the sync's fetcher on
+ * reconnect fetches it again. The three fetch commands run the sync's fetcher on
  * the interactive lane and report Slack's answer as an outcome, never as a
  * failure: the topic shows what the store has.
  */
@@ -219,6 +219,13 @@ export const MessagesHandlers = MessagesRoutes.toLayer(
           if (pendingThread(payload.id) !== undefined) return { outcome: 'cached' as const, complete: true }
           const { outcome, report } = yield* fetch((fetcher) => fetcher.older(payload.id, payload.before))
           return { outcome, complete: report?.complete ?? false }
+        }),
+      'messages.loadAt': (payload) =>
+        Effect.gen(function* () {
+          if (targetOf(payload.id) === undefined) return yield* new NotFound({ kind: 'topic', id: payload.id })
+          if (pendingThread(payload.id) !== undefined) return { outcome: 'cached' as const }
+          const { outcome } = yield* fetch((fetcher) => fetcher.at(payload.id, payload.ts))
+          return { outcome }
         }),
     }
   }),

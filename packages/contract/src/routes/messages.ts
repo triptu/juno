@@ -15,6 +15,8 @@
  *   Call it once when a tab shows the topic; prefetch never calls it.
  * - `messages.loadOlder`: make sure the page before a message is stored,
  *   fetching it when it is not.
+ * - `messages.loadAt`: make sure one message is stored in full, for a jump
+ *   to it (a search match, a link, a cited message).
  *
  * Neither command fails because Slack could not be reached: the topic shows
  * what the store has, and `outcome` says what happened.
@@ -318,6 +320,18 @@ export const messagesLoadOlder = Rpc.make('messages.loadOlder', {
 })
 
 /**
+ * Makes sure the message `ts` of a topic is stored in full, fetching it on
+ * the interactive lane when it is not: a bounded read around it, whatever
+ * its distance from the stored messages. The container then moves the
+ * window to it.
+ */
+export const messagesLoadAt = Rpc.make('messages.loadAt', {
+  payload: { id: Schema.String, ts: Schema.String },
+  success: OpenResult,
+  error: NotFound,
+})
+
+/**
  * The topic that holds a message, from the store: its thread when it is a
  * reply or a thread's root, else the channel's Main. A message the store
  * does not have is placed in Main. For a Juno source link (SPEC 13.1), which
@@ -348,4 +362,4 @@ export const peopleLocate = Rpc.make('people.locate', {
   error: NotSignedIn,
 })
 
-export const MessagesRoutes = RpcGroup.make(messagesList, topicsGet, channelThreads, topicsOpen, messagesLoadOlder, messagesLocate, peopleLocate)
+export const MessagesRoutes = RpcGroup.make(messagesList, topicsGet, channelThreads, topicsOpen, messagesLoadOlder, messagesLoadAt, messagesLocate, peopleLocate)

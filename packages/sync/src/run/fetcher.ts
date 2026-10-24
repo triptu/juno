@@ -2,7 +2,7 @@ import { Effect, FiberSet } from 'effect'
 import { trackFetch } from '../context'
 import { applyActed } from '../acted'
 import { applyOpened, applySent } from '../events'
-import { fetchOlder, fetchTopic, type FetchLane, type FetchReport, type OpenError } from '../open'
+import { fetchAt, fetchOlder, fetchTopic, type FetchLane, type FetchReport, type OpenError } from '../open'
 import { wantUsers } from '../users'
 import { fetchFullReactions } from '../whoReacted'
 import { queueTopicFiles } from './files'
@@ -60,6 +60,7 @@ export const makeTopicFetcher = (runtime: SyncRuntime) => Effect.gen(function* (
         ),
       ),
     older: (topicId, before) => fetched((lane) => fetchOlder(ctx, topicId, before, lane), 'older page'),
+    at: (topicId, ts) => fetched((lane) => fetchAt(ctx, topicId, ts, lane), 'message page'),
     opened: (channel) => applyOpened(ctx.metadata, channel).pipe(Effect.provide(services)),
     sent: (sent) => applySent(ctx, sent).pipe(Effect.provide(services)),
     acted: (acted, alongside) => applyActed(ctx, acted, alongside).pipe(Effect.provide(services)),

@@ -21,7 +21,8 @@
  *   one update; rows whose `rev` is unchanged keep their objects.
  *
  * The commands: `openTopic(registry, id)` once when a tab shows a topic,
- * `loadOlderMessages(registry, id, before)` when the first row nears the top.
+ * `loadOlderMessages(registry, id, before)` when the first row nears the top,
+ * `loadMessageAt(registry, id, ts)` before a jump to a message the store lacks.
  * Prefetch with `prefetchTopic(registry, id)`; it never calls Slack.
  */
 import { Option } from 'effect'
@@ -31,6 +32,7 @@ import {
   channelThreads,
   MESSAGE_WINDOW_DEFAULT,
   messagesList,
+  messagesLoadAt,
   messagesLoadOlder,
   messagesLocate,
   peopleLocate,
@@ -162,6 +164,9 @@ export function refreshMessages(registry: Registry, view: string): void {
 
 /** Makes sure the page before `before` is stored; then widen the view's `messageWindowSpecAtom`. */
 export const loadOlderMessages = (registry: Registry, id: string, before: string) => runCommand(registry, messagesLoadOlder, { id, before })
+
+/** Makes sure the message `ts` is stored in full, for a jump to it; then move the view's window there. */
+export const loadMessageAt = (registry: Registry, id: string, ts: string) => runCommand(registry, messagesLoadAt, { id, ts })
 
 /**
  * Warms a topic for an open (performance 4.2): its header and the window
