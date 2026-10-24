@@ -24,7 +24,7 @@ test('⌘K opens the developer log only by name, and a Slack call shows its meth
   })
 
   await test.step('"dev log" lists it, and Enter opens the log in a tab of its own', async () => {
-    await palette.open()
+    await palette.openCommands()
     await palette.type('dev log')
     await expect(command).toBeVisible()
     await palette.expectActive(/Open developer log/)

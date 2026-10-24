@@ -35,8 +35,8 @@ test('pages and Settings sections open from ⌘K', async ({ juno }) => {
     await palette.expectClosed()
   })
 
-  await test.step('"settings" lists every Settings section, and Enter on one opens Settings there', async () => {
-    await palette.open()
+  await test.step('"settings" on Commands lists every Settings section, and Enter on one opens Settings there', async () => {
+    await palette.openCommands()
     await palette.type('settings')
     const sections = palette.section('Settings')
     await expect(sections.getByRole('option')).toHaveCount(10)
@@ -53,7 +53,7 @@ test('pages and Settings sections open from ⌘K', async ({ juno }) => {
 
   await test.step('"topics" and "tabs" find Settings: Tidy up', async () => {
     for (const term of ['settings topics', 'settings tabs']) {
-      await palette.open()
+      await palette.openCommands()
       await palette.type(term)
       await palette.expectActive(/Settings: Tidy up/)
       await palette.press('Enter')
@@ -63,7 +63,7 @@ test('pages and Settings sections open from ⌘K', async ({ juno }) => {
   })
 
   await test.step('"scheduled" then Enter opens the Scheduled page', async () => {
-    await palette.open()
+    await palette.openCommands()
     await palette.type('scheduled')
     await palette.expectActive(/ Scheduled$/)
     await palette.press('Enter')

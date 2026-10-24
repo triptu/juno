@@ -2,11 +2,11 @@ import { expect, test } from './fixtures'
 
 test.use({ synced: true })
 
-test('keeps the rendered results body on every frame while typing unmatched queries in both tabs', async ({ juno }) => {
+test('keeps the rendered results body on every frame while typing unmatched queries in each search tab', async ({ juno }) => {
   const { palette, win } = juno
   await palette.open()
 
-  for (const tab of ['Conversations', 'Messages'] as const) {
+  for (const tab of ['All', 'Conversations', 'Messages'] as const) {
     await test.step(tab, async () => {
       await palette.tab(tab).click()
       await palette.expectResults()
@@ -42,7 +42,7 @@ test('keeps the rendered results body on every frame while typing unmatched quer
 
         await palette.clear()
         const cleared = await win.evaluate(() => new Promise<string | null>((resolve) => requestAnimationFrame(() => resolve(document.getElementById('palette-results')?.textContent ?? null))))
-        expect(cleared).toContain(tab === 'Conversations' ? 'Frequent' : 'Recent')
+        expect(cleared).toContain(tab === 'Messages' ? 'Recent' : 'Frequent')
         expect(cleared).not.toContain('No matches.')
         await palette.expectResults()
       } finally {

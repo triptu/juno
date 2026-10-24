@@ -2398,6 +2398,8 @@ export class WelcomeDriver {
   }
 }
 
+type PaletteTabName = 'All' | 'Conversations' | 'Messages' | 'Commands'
+
 /** ⌘K (spec section 10): the search and command palette. */
 export class PaletteDriver {
   readonly root: Locator
@@ -2428,22 +2430,30 @@ export class PaletteDriver {
     await expect(this.input).toBeFocused()
   }
 
-  /** One of the two tabs in the segmented control. */
-  tab(name: 'Conversations' | 'Messages'): Locator {
+  /** One of the four tabs in the row under the field. */
+  tab(name: PaletteTabName): Locator {
     return this.root.getByRole('radio', { name })
   }
 
-  async expectTab(name: 'Conversations' | 'Messages'): Promise<void> {
+  async expectTab(name: PaletteTabName): Promise<void> {
     await expect(this.tab(name)).toHaveAttribute('aria-checked', 'true')
     await expect(this.input).toBeFocused()
   }
 
-  /** ⌘K, then Tab to the Messages tab: the message search. */
+  /** ⌘K, then ⌘3: the quick message list. */
   async openMessages(): Promise<void> {
     await this.open()
-    await this.expectTab('Conversations')
-    await this.press('Tab')
+    await this.expectTab('All')
+    await this.press('Meta+3')
     await this.expectTab('Messages')
+  }
+
+  /** ⌘K, then ⌘4: the pages, settings and commands. */
+  async openCommands(): Promise<void> {
+    await this.open()
+    await this.expectTab('All')
+    await this.press('Meta+4')
+    await this.expectTab('Commands')
   }
 
   async expectClosed(): Promise<void> {
@@ -2457,7 +2467,7 @@ export class PaletteDriver {
 
   /** Local results now belong to the current input, rather than the held previous query. */
   async expectResults(): Promise<void> {
-    await expect(this.root.getByRole('listbox')).toHaveAttribute('aria-busy', 'false', { timeout: 15_000 })
+    await expect(this.root.getByRole('listbox', { name: 'Results' })).toHaveAttribute('aria-busy', 'false', { timeout: 15_000 })
   }
 
   async clear(): Promise<void> {
@@ -2468,7 +2478,7 @@ export class PaletteDriver {
     await this.input.press(key)
   }
 
-  /** A section of rows: Frequent, Conversations, Pages, Settings, Commands, the open topic's name, Recent, Results or Juno. */
+  /** A section of rows: Frequent, Conversations, Recent, Topics and messages, Pages settings and commands, Pages, Settings, Commands, the open topic's name, Results or Juno. */
   section(heading: string): Locator {
     return this.root.getByRole('group', { name: heading })
   }
@@ -2493,6 +2503,22 @@ export class PaletteDriver {
 
   async expectActive(text: string | RegExp): Promise<void> {
     await expect.poll(() => this.activeText(), { timeout: 10_000 }).toMatch(text)
+  }
+
+  /** Moves the active row down with the arrows until it is the row matching `text`. */
+  async arrowTo(text: string | RegExp): Promise<void> {
+    const count = await this.rows().count()
+    for (let step = 0; step <= count; step++) {
+      const active = await this.activeText()
+      if (typeof text === 'string' ? active.includes(text) : text.test(active)) return
+      await this.press('ArrowDown')
+    }
+    throw new Error(`No row matching ${String(text)} among ${count}`)
+  }
+
+  /** The last row on All and Messages, under a line: "All results for …". */
+  get searchRow(): Locator {
+    return this.root.getByRole('listbox', { name: 'Search' }).getByRole('option')
   }
 
   /** Picks a row with the pointer; ⌘-click with `newTab`. */

@@ -11,7 +11,7 @@ const WAL = 'We keep the old primary warm for 48h. Flip DNS back and replay from
 
 test('opens and dismisses the palette, switches search modes and opens conversations', async ({ juno }) => {
   const context = { juno }
-  await test.step('opens on Conversations with frequent ones, Tab switches to Messages and back, and it closes with Esc, ⌘K or a press outside', () => openPalette(context))
+  await test.step('opens on All with frequent ones, Tab and ⌘1 to ⌘4 switch tabs, and it closes with Esc, ⌘K or a press outside', () => openPalette(context))
   await test.step('a channel typed in Conversations opens its Main with Enter, a person their DM, and ⌘Enter a new tab', () => openConversations(context))
 })
 
@@ -19,28 +19,41 @@ async function openPalette({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   const { palette, sidebar, tabs } = juno
 
   await palette.open()
-  await palette.expectTab('Conversations')
+  await palette.expectTab('All')
   await palette.expectResults()
-  await expect(palette.section('Frequent').getByRole('option').first()).toBeVisible()
-  await expect(palette.input).toHaveAttribute('placeholder', 'Find a conversation, or type >')
-  // Tab and Shift Tab switch tabs; focus stays in the field, never reaching the window under the dim.
+  // With no text, All shows the most used conversations and the latest topics, four and five.
+  await expect(palette.section('Frequent').getByRole('option')).toHaveCount(4)
+  await expect(palette.section('Recent').getByRole('option')).toHaveCount(5)
+  await expect(palette.searchRow).toHaveCount(0)
+  // Tab and Shift Tab go round the tabs; focus stays in the field, never reaching the window under the dim.
+  await palette.press('Tab')
+  await palette.expectTab('Conversations')
+  await expect(palette.input).toHaveAttribute('placeholder', 'Find a conversation')
   await palette.press('Tab')
   await palette.expectTab('Messages')
   await palette.expectResults()
   await expect(palette.section('Recent').getByRole('option')).toHaveCount(6)
-  await expect(palette.input).toHaveAttribute('placeholder', 'Search, or ask Juno')
+  await palette.press('Tab')
+  await palette.expectTab('Commands')
+  await expect(palette.section('Pages').getByRole('option', { name: /All topics/ })).toBeVisible()
+  await palette.press('Tab')
+  await palette.expectTab('All')
   await palette.press('Shift+Tab')
+  await palette.expectTab('Commands')
+  await palette.press('Meta+2')
   await palette.expectTab('Conversations')
-  // The control switches too, and the field keeps focus.
+  await palette.press('Meta+1')
+  await palette.expectTab('All')
+  // A tab switches on press too, and the field keeps focus.
   await palette.tab('Messages').click()
   await palette.expectTab('Messages')
   await palette.press('Escape')
   await palette.expectClosed()
 
-  // Each open starts on Conversations.
+  // Each open starts on All.
   await sidebar.searchButton.click()
   await palette.expectOpen()
-  await palette.expectTab('Conversations')
+  await palette.expectTab('All')
   await palette.shortcut()
   await palette.expectClosed()
 
@@ -87,11 +100,13 @@ async function openConversations({ juno }: Pick<Fixtures, 'juno'>): Promise<void
 test('commands: ">theme" switches the theme, and an open topic\'s commands resolve it', async ({ juno }) => {
   const { palette, sidebar } = juno
 
-  await test.step('">" lists the commands, and ">theme" then Dark switches the theme', async () => {
+  await test.step('">" switches to Commands, and ">theme" then Dark switches the theme', async () => {
     const scheme = () => juno.win.evaluate(() => getComputedStyle(document.documentElement).colorScheme)
 
     await palette.open()
     await palette.type('>')
+    await palette.expectTab('Commands')
+    await expect(palette.input).toHaveValue('')
     await expect(palette.section('Commands').getByRole('option', { name: /New tab/ })).toBeVisible()
     await expect(palette.section('Settings').getByRole('option', { name: /Settings: Appearance/ })).toBeVisible()
     await palette.type('theme')
@@ -100,7 +115,7 @@ test('commands: ">theme" switches the theme, and an open topic\'s commands resol
     await palette.expectClosed()
     await expect.poll(scheme).toBe('dark')
 
-    // Typed without ">", a command shows beside the conversations.
+    // Typed without ">", a command shows on All in its group.
     await palette.open()
     await palette.type('theme light')
     await palette.expectActive(/Theme: Light/)
@@ -198,24 +213,15 @@ test('finds a message by its text and lands on it in its thread, flashing it; th
   await expect.poll(() => juno.win.evaluate(() => (window as unknown as { __flashed: string[] }).__flashed.some((text) => text.includes('replay from the WAL position'))), { timeout: 5_000 }).toBe(true)
 })
 
-test("a person's result opens your DM, or Home addressed to them when you have never messaged", async ({ juno }) => {
-  const { palette, topic, write, tabs } = juno
+test('a person never messaged opens Home addressed to them', async ({ juno }) => {
+  const { palette, write, tabs } = juno
 
-  await palette.openMessages()
-  await palette.expectResults()
-  await palette.type('maya')
-  await palette.expectResults()
-  await expect(palette.row('Message Maya Chen')).toBeVisible({ timeout: 15_000 })
-  await expect(palette.row('Message Maya Chen')).toContainText('Direct message · Main')
-  await palette.choose('Message Maya Chen')
-  await topic.expectMessage('Running 5 late to the planning sync')
-
-  await palette.openMessages()
-  await palette.expectResults()
+  await palette.open()
   await palette.type('jonas')
   await palette.expectResults()
-  await expect(palette.row('Message Jonas Weber')).toContainText('Starts a conversation', { timeout: 15_000 })
-  await palette.choose('Message Jonas Weber')
+  const jonas = palette.section('Conversations').getByRole('option', { name: /Jonas/ })
+  await expect(jonas).toContainText('Starts a conversation', { timeout: 15_000 })
+  await jonas.click()
   await tabs.expectActive('Home')
   await write.expectDestination('Jonas Weber')
   await expect(write.composer).toBeFocused()
@@ -238,129 +244,64 @@ test('a command shows above the results with its confidence, and Enter runs it',
   await expect.poll(() => fake.calls.filter((call) => call.method === 'chat.postMessage').map((call) => [call.args['channel'], call.args['text']])).toEqual([['D0MAYA', 'the wednesday slot works']])
 })
 
-test('channels from the keyboard and from their results: Main and "show its topics"', async ({ juno }) => {
+test('channels from the keyboard and from their menu, with "All results" last', async ({ juno, fake }) => {
   const { palette, sidebar, tabs } = juno
 
   await test.step('keyboard only: ⌘K, type, arrows, Enter and Esc', async () => {
-    await palette.openMessages()
-    await palette.expectResults()
+    await palette.open()
     await palette.type('platfo')
     await palette.expectResults()
-    await palette.expectActive(/Public channel · Main/)
-    await palette.press('ArrowDown')
-    await palette.expectActive(/show its topics/)
+    await palette.expectActive(/platform$/)
+    // Up from the first row wraps to the last, "All results for …", and down from there back to the first.
     await palette.press('ArrowUp')
-    await palette.expectActive(/Public channel · Main/)
-    // Up from the first row wraps to the last, and down from there back to the first.
-    await palette.press('ArrowUp')
-    const last = (await palette.rows().last().innerText()).replace(/\s+/g, ' ').trim()
-    await palette.expectActive(last)
+    await palette.expectActive('All results for “platfo”')
     await palette.press('ArrowDown')
-    await palette.expectActive(/Public channel · Main/)
-    await palette.press('ArrowDown')
+    await palette.expectActive(/platform$/)
     await palette.press('Enter')
     await palette.expectClosed()
-    await sidebar.expectScope('platform')
+    await tabs.expectActive('platform')
 
-    await palette.openMessages()
-    await palette.expectResults()
+    await palette.open()
     await palette.type('nothing like this anywhere')
     await palette.expectResults()
     await palette.expectNoMatches()
+    await expect(palette.searchRow).toBeVisible()
     await palette.press('Escape')
     await palette.expectClosed()
-    await juno.expectNothingOpen()
   })
 
-  await test.step('a channel has its Main and "show its topics", also from its menu', async () => {
-    // The sidebar shows everything again, so the scope below is this step's.
-    await sidebar.root.getByRole('button', { name: 'Show everything' }).click()
-    await expect(sidebar.root.getByTitle(/^Showing .* only$/)).toHaveCount(0)
-
-    await palette.openMessages()
-    await palette.expectResults()
+  await test.step("a channel's menu shows its topics", async () => {
+    await palette.open()
     await palette.type('platfo')
     await palette.expectResults()
-    await expect(palette.row('Public channel · Main')).toBeVisible({ timeout: 15_000 })
-    await expect(palette.row('Public channel · show its topics')).toBeVisible()
-    await palette.choose('Public channel · show its topics')
+    await palette.chooseFromMenu(/platform$/, 'show-topics')
     await palette.expectClosed()
     await sidebar.expectScope('platform')
-
-    await palette.openMessages()
-    await palette.expectResults()
-    await palette.type('eng')
-    await palette.expectResults()
-    await expect(palette.row('Public channel · Main')).toBeVisible({ timeout: 15_000 })
-    await palette.chooseFromMenu('Public channel · Main', 'show-topics')
-    await palette.expectClosed()
-    await sidebar.expectScope('eng')
-
-    await palette.openMessages()
-    await palette.expectResults()
-    await palette.type('eng')
-    await palette.expectResults()
-    await palette.choose('Public channel · Main')
-    await tabs.expectActive('eng')
   })
+
+  // ⌘K never waits on the network (performance 5.3).
+  expect(fake.calls.filter((call) => call.method.startsWith('search.'))).toEqual([])
 })
 
-test("Slack's search: its rows go under the local ones, and an older answer never replaces a newer query's", async ({ juno, slack, fake }) => {
+test('Messages finds what this Mac stores, with apps hidden, and never asks Slack', async ({ juno, fake }) => {
   const { palette, topic } = juno
 
-  await test.step("Slack's search adds what the cache lacks under the local rows, and opening it lands on the message", async () => {
-    slack.as('Sam').postedLongAgo('eng', 'The WAL position was approved sixty days ago', 60)
-
-    fake.holdNext({ method: 'search.modules.messages', reason: 'palette' })
-    await palette.openMessages()
-    await palette.expectResults()
-    await palette.type('WAL position')
-    await palette.expectResults()
-    const local = palette.row('replay from the WAL position')
-    await expect(local).toBeVisible()
-    const active = await palette.input.getAttribute('aria-activedescendant')
-    const before = await local.boundingBox()
-    await expect.poll(() => fake.heldCount({ method: 'search.modules.messages' })).toBe(1)
-    fake.release({ method: 'search.modules.messages' })
-    const found = palette.row('The WAL position was approved sixty days ago')
-    await expect(found).toBeVisible({ timeout: 15_000 })
-    await expect(found).toContainText('#eng')
-    expect(await local.boundingBox()).toEqual(before)
-    await expect(palette.input).toHaveAttribute('aria-activedescendant', active!)
-    await expect(palette.rows().first()).toContainText('replay from the WAL position')
-    await palette.choose('The WAL position was approved sixty days ago')
-    await palette.expectClosed()
-    const message = topic.message('The WAL position was approved sixty days ago')
-    await expect(message).toBeInViewport({ timeout: 15_000 })
-  })
-
-  await test.step('an older Slack search cannot replace the results of a newer query', async () => {
-    slack.as('Sam').postedLongAgo('eng', 'Amber archive evidence', 60)
-    slack.as('Sam').postedLongAgo('platform', 'Violet archive evidence', 60)
-
-    fake.holdNext({ method: 'search.modules.messages', reason: 'palette' })
-    await palette.openMessages()
-    await palette.expectResults()
-    await palette.type('Amber archive')
-    await palette.expectResults()
-    await expect.poll(() => fake.heldCount({ method: 'search.modules.messages' })).toBe(1)
-    await palette.clear()
-    await palette.type('Violet archive')
-    await palette.expectResults()
-    await expect(palette.row('Violet archive evidence')).toBeVisible()
-    const active = await palette.input.getAttribute('aria-activedescendant')
-    fake.release({ method: 'search.modules.messages' })
-
-    // Wait for a subsequent live local update, not a sleep, while the older
-    // HTTP response returns. Both local and Slack results must stay Violet.
-    slack.as('Sam').postIn('platform', 'Violet archive current')
-    await expect(palette.row('Violet archive current')).toBeVisible()
-    await expect(palette.row('Violet archive evidence')).toBeVisible()
-    await expect(palette.row('Amber archive evidence')).toHaveCount(0)
-    await expect(palette.input).toHaveAttribute('aria-activedescendant', active!)
-    await palette.press('Enter')
-    await juno.topic.expectMessage('Violet archive evidence')
-  })
+  await palette.open()
+  await palette.type('replica')
+  await palette.press('Meta+3')
+  await palette.expectTab('Messages')
+  await palette.expectResults()
+  // Every match in the Postgres thread is one row, under its title.
+  await expect(palette.row(POSTGRES)).toHaveCount(1)
+  // Grafana's alerts on db-replica-2 are from an app.
+  await expect(palette.row('db-replica-2')).toHaveCount(0)
+  await expect(palette.searchRow).toHaveText(/All results for “replica”/)
+  // Slack's search used to be asked 400 ms after the last key: wait past that.
+  await juno.win.waitForTimeout(1_000)
+  expect(fake.calls.filter((call) => call.method.startsWith('search.'))).toEqual([])
+  await palette.choose(POSTGRES)
+  await palette.expectClosed()
+  await topic.expectMessage('4 minutes is fine for us')
 })
 
 test('a better local match arriving later does not change what Enter opens', async ({ juno, slack }) => {

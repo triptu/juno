@@ -131,7 +131,7 @@ test('palette opens with frequent conversations and holds still', async ({ juno,
   }, async (rec) => {
     await rec.mark('press')
     await juno.palette.open()
-    // ⌘K opens on Conversations, with the frequent ones first (palette.spec.ts).
+    // ⌘K opens on All, with the frequent conversations first (palette.spec.ts).
     await expect(juno.palette.section('Frequent').getByRole('option').first()).toBeVisible()
   })
   await win.keyboard.press('Escape')
