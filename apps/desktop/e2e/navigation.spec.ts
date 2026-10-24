@@ -81,7 +81,7 @@ syncedTest('⌘⇧T reopens closed tabs, the last closed first, each with its hi
   await sidebar.row(OFFSITE).openInNewTab()
   await sidebar.row(RINA).open()
   await sidebar.row(ROADMAP).openInNewTab()
-  expect(await tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/), expect.stringMatching(/^Proposal/)])
+  await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/), expect.stringMatching(/^Proposal/)])
 
   await tabs.close(RINA)
   await tabs.close(ROADMAP)
@@ -89,10 +89,10 @@ syncedTest('⌘⇧T reopens closed tabs, the last closed first, each with its hi
 
   await tabs.menu('reopen-tab')
   await tabs.expectActive(ROADMAP)
-  expect(await tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Proposal/)])
+  await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Proposal/)])
   await tabs.menu('reopen-tab')
   await tabs.expectActive(RINA)
-  expect(await tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/), expect.stringMatching(/^Proposal/)])
+  await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/), expect.stringMatching(/^Proposal/)])
   await topic.expectTitle(RINA)
 
   // The tab came back with what it showed before.
@@ -115,7 +115,7 @@ syncedTest('the tab menu pins, unpins and closes, and pins survive a restart', a
   const labels = await tabs.contextMenu(ROADMAP, 'pin')
   expect(labels).toEqual(['Pin tab', '-', 'Close tab', 'Close other tabs', '(Close tabs to the right)', 'Close all tabs', '-', 'Copy Slack link', 'Open in Slack'])
   await tabs.expectPinned(ROADMAP)
-  expect(await tabs.titles()).toEqual([expect.stringMatching(/^Proposal/), expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/)])
+  await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Proposal/), expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/)])
   await expect(tabs.closeButton(ROADMAP)).toHaveCount(0)
   const pinnedBox = await tabs.tab(ROADMAP).boundingBox()
   expect(Math.round(pinnedBox?.width ?? 0)).toBe(40)
@@ -132,7 +132,7 @@ syncedTest('the tab menu pins, unpins and closes, and pins survive a restart', a
   await tabs.contextMenu(POSTGRES, 'close-others')
   await tabs.expectCount(2)
   await tabs.expectActive(POSTGRES)
-  expect(await tabs.titles()).toEqual([expect.stringMatching(/^Proposal/), expect.stringMatching(/^Draft plan/)])
+  await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Proposal/), expect.stringMatching(/^Draft plan/)])
 
   // Copy Slack link and Open in Slack.
   await tabs.contextMenu(POSTGRES, 'copy-link')

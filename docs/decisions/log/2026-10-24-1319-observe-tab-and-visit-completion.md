@@ -1,0 +1,1 @@
+- 10-24 13:19 · Observe tab and visit completion · Navigation flows wait for the rendered tab titles after opening, closing or pinning. The Home resume flow runs the simulated minute in timer order, so the tab subscription starts the visit timer before it expires, then waits for the persisted visit before leaving.

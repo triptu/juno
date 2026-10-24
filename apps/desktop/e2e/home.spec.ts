@@ -127,10 +127,10 @@ test('Home shows what waits from the sidebar, and each row opens its topic', asy
   await topic.expectTitle('Sam')
 
   // Pick up where you left off: a topic open for a minute, then new messages.
-  // The visit's minute runs on the page's clock; wait for its write before leaving.
+  // Run the minute's timers in order, including the tab subscription that starts the visit.
   await sidebar.row(POSTGRES).open()
   await topic.expectTitle(POSTGRES)
-  await win.clock.fastForward('01:05')
+  await win.clock.runFor('01:05')
   await expect.poll(() => readUserDb(userData, slack.fake.teamId, (db) => db.prepare('SELECT topic_id FROM topic_visits ORDER BY seen_at DESC LIMIT 1').get()?.['topic_id'])).toBe(threadId(slack, POSTGRES))
   await sidebar.row(OFFSITE).open()
   await topic.expectTitle(OFFSITE)
