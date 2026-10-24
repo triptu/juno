@@ -79,7 +79,9 @@ test('zero budgets keep changed specs and components, tool smoke survives filter
   assert.deepEqual(items(plan(['scripts/remote/plan.mjs']), 'test:desktop'), ['apps/desktop/e2e/app.spec.ts'])
   assert.deepEqual(items(plan(['scripts/remote/plan.mjs'], '--batch'), 'test:desktop'), [])
   const deleted = plan(['packages/domain/src/deleted.ts'], '--wide', '--graph')
-  for (const suite of ['test', 'test:desktop']) assert.deepEqual(deleted.find((step) => step.script === suite).args, [])
+  // Every unit file (no --files; the unit step carries only its order seed) and every desktop spec.
+  assert.deepEqual(deleted.find((step) => step.script === 'test').args.filter((arg) => !arg.startsWith('--seed=')), [])
+  assert.deepEqual(deleted.find((step) => step.script === 'test:desktop').args, [])
 })
 
 test('tool plans select the command whose test imports the changed script', (t) => {
