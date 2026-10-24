@@ -1,0 +1,1 @@
+- 10-24 11:50 · Tushar · The huddle call publishes `waitingFor` (`store`, `lastCall`, `page` or null): what a wanted join still waits for. `canRequest` is built from the same `joinWait`, so what the UI sees matches the join decision, and the huddle flow tests wait on it instead of sleeping before "nothing was sent" checks. The protocol is unchanged.

@@ -16,7 +16,7 @@
  * - `otherDevice`, `quitting`: the same names.
  * - `phase`: derived for the UI by `phaseOf`.
  */
-import type { HuddleEnd, HuddlePhase } from '@juno/contract'
+import type { HuddleEnd, HuddlePhase, HuddleWait } from '@juno/contract'
 import { endReason, holding, mediaStopped, pageState, type MediaView } from './media'
 
 /** What `rooms.join` returned: enough to leave. The Chime credentials are not kept here. */
@@ -152,9 +152,22 @@ export const reconcile = (s: Lifecycle, view: MediaView): Lifecycle => {
  * are `pending`, so they go out before any new join.
  */
 export const canRequest = (s: Lifecycle, view: MediaView, workspace: string, loaded: boolean): s is Lifecycle & { readonly wanted: Intent } =>
-  s.wanted !== undefined && s.request === undefined && loaded && !s.otherDevice && !s.quitting &&
-  pageState(view, s.wanted.generation) === 'live' &&
-  s.pending.every((p) => p.workspace !== workspace && mediaStopped(view, p.record))
+  s.wanted !== undefined && !s.otherDevice && !s.quitting && joinWait(s, view, workspace, loaded) === undefined
+
+/**
+ * What a wanted join still waits for (the UI shows it while `joining`), or
+ * undefined when none is wanted or it may go: the stored leaves not read yet
+ * (`store`); an earlier call still ending, through its join in flight, its
+ * leave or its media (`lastCall`); or main not listing the asking page yet
+ * (`page`).
+ */
+export const joinWait = (s: Lifecycle, view: MediaView, workspace: string | undefined, loaded: boolean): HuddleWait | undefined => {
+  if (s.wanted === undefined) return undefined
+  if (!loaded || workspace === undefined) return 'store'
+  if (s.request !== undefined || s.pending.some((p) => p.workspace === workspace || !mediaStopped(view, p.record))) return 'lastCall'
+  if (pageState(view, s.wanted.generation) !== 'live') return 'page'
+  return undefined
+}
 
 /** Model `requestJoin`. */
 export const requestJoin = (s: Lifecycle & { readonly wanted: Intent }): Lifecycle => ({ ...s, request: s.wanted, wanted: undefined, cancel: false })

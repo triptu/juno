@@ -38,6 +38,15 @@ import { Person } from '../refs'
 export const HuddlePhase = Schema.Literals(['idle', 'joining', 'joined', 'leaving'])
 export type HuddlePhase = typeof HuddlePhase.Type
 
+/**
+ * What a join that is not sent yet waits for: Juno has not read the leaves it
+ * stored (`store`), an earlier call is still ending through its join, its
+ * leave or its media (`lastCall`), or main has not listed the asking page yet
+ * (`page`).
+ */
+export const HuddleWait = Schema.Literals(['store', 'lastCall', 'page'])
+export type HuddleWait = typeof HuddleWait.Type
+
 /** Why the media session stopped, as the renderer reports it. `left`: the engine asked it to. */
 export const HuddleMediaEnd = Schema.Literals(['left', 'anotherDevice', 'connectionLost', 'failed', 'ended'])
 export type HuddleMediaEnd = typeof HuddleMediaEnd.Type
@@ -75,6 +84,8 @@ export const HuddleCall = Schema.Struct({
   muted: Schema.Boolean,
   /** How the last call ended. Cleared by the next Start or Join. */
   ended: Schema.NullOr(HuddleEnd),
+  /** While `joining` before `rooms.join` is sent, what the join waits for; else null. */
+  waitingFor: Schema.NullOr(HuddleWait),
 })
 export type HuddleCall = typeof HuddleCall.Type
 

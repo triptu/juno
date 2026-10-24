@@ -2,7 +2,7 @@
 
 The engine side of huddles (`docs/plans/huddles.md`, SPEC 20). The `Huddle` service runs one user's call by the rules of `specs/huddle.qnt`:
 
-- `lifecycle.ts`: the model's actions as pure functions, under the model's names.
+- `lifecycle.ts`: the model's actions as pure functions, under the model's names. `joinWait` says what a wanted join still waits for (the stored leaves, an earlier call ending, or the asking page); `canRequest` is built from it, and the call publishes it as `waitingFor` so the UI and tests can see it.
 - `running.ts`: running huddles per channel, from room frames (decoded here from the socket's unknown frames) and the edge `huddles/info`.
 - `core.ts`: the state. It runs the rules under one lock and does the I/O they call for: `rooms.join`, `rooms.leave` and the stored leave. Leave stops the page's media and sends `rooms.leave` at once; the stored record is cleared only once the media is known stopped (and its request has gone out); the answer to `rooms.leave` is never awaited.
 - `attach.ts`: a sync's session and its end; `reads.ts`: room frames and `huddles/info` reads, each sent once its channel has been quiet for `INFO_SETTLE_MILLIS`, since Slack's edge lags its socket; `slack.ts`: the requests.
@@ -19,4 +19,4 @@ The engine gives it a session per sync (`attach`) with the Slack client, where t
 
 ## Testing
 
-`bun run --cwd packages/huddle test`. The service tests drive `Huddle.layer` with a fake Slack client and store, and wait on signals, never on time: `cancel.test.ts` (a Cancel during the durable write), `overflow.test.ts` (reads after `Overflowed`, on the `TestClock` with the app's settle window) and `workspace-barrier.test.ts` (a join in the next workspace waits for the last one's attendee to stop). `rules.test.ts` holds the room frame and alone rules as tables, `incoming.test.ts` and `own.test.ts` the card and retained-room rules. The other lifecycle schedules of `specs/huddle.qnt` (a switch, a cancelled join, a refused leave, a restart) run against the fake Slack in `engine/test/huddle*.test.ts`.
+`bun run --cwd packages/huddle test`. The service tests drive `Huddle.layer` with a fake Slack client and store, and wait on signals, never on time: `cancel.test.ts` (a Cancel during the durable write), `overflow.test.ts` (reads after `Overflowed`, on the `TestClock` with the app's settle window) and `workspace-barrier.test.ts` (a join in the next workspace waits for the last one's attendee to stop). `rules.test.ts` holds the room frame and alone rules as tables, `incoming.test.ts` and `own.test.ts` the card and retained-room rules. The other lifecycle schedules of `specs/huddle.qnt` (a switch, a cancelled join, a refused leave, a restart) run against the fake Slack in `engine/test/flows/huddle-*.flow.test.ts`.

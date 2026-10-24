@@ -20,7 +20,7 @@
  * Leave or while the session closes.
  */
 import { Clock, Deferred, Effect, Fiber, Queue, Result, Semaphore, SubscriptionRef, type Scope } from 'effect'
-import { Offline, Rejected, type HuddleCall, type HuddleError, type HuddlePageReport, type HuddleStartResult, type RunningHuddles } from '@juno/contract'
+import { Offline, Rejected, type HuddleCall, type HuddleError, type HuddlePageReport, type HuddleStartResult, type HuddleWait, type RunningHuddles } from '@juno/contract'
 import type { SlackApiError } from '@juno/slack'
 import type { MethodOk } from '@juno/slack-schema'
 import { aloneNow, leaveAt, type Alone } from './alone'
@@ -109,7 +109,10 @@ export interface Core {
 /** The pages' current state, for the rules. */
 export const view = (core: Core): MediaView => ({ pages: core.pages, reports: core.reports, handed: core.handed })
 
-const toCall = (s: L.Lifecycle, media: MediaView, running: Running, own: OwnRoom | undefined): HuddleCall => {
+/** Whether every workspace's stored leaves are read: this session's, and all of them at boot. */
+const leavesLoaded = (core: Core, to: Attached | undefined) => to?.loaded === true && core.booting?.size === 0
+
+const toCall = (s: L.Lifecycle, media: MediaView, running: Running, own: OwnRoom | undefined, waitingFor: HuddleWait | null): HuddleCall => {
   const channelId = L.callChannel(s) ?? null
   const room = callRoom(s, running, own)
   const identity = s.current?.identity
@@ -125,6 +128,7 @@ const toCall = (s: L.Lifecycle, media: MediaView, running: Running, own: OwnRoom
     connection: session?.connection ?? null,
     muted: session?.muted ?? false,
     ended: s.ended ?? null,
+    waitingFor,
   }
 }
 
@@ -142,7 +146,7 @@ export const makeCore = Effect.gen(function* () {
     handed: new Map(),
     booting: undefined,
     attempts: new Map(),
-    callRef: yield* SubscriptionRef.make(toCall(L.initial, noMedia, new Map(), undefined)),
+    callRef: yield* SubscriptionRef.make(toCall(L.initial, noMedia, new Map(), undefined, null)),
     runningRef: yield* SubscriptionRef.make<RunningHuddles>({}),
     status: undefined,
     alone: undefined,
@@ -185,7 +189,7 @@ const followAlone = (core: Core, to: Attached | undefined) =>
 export const publish = (core: Core) =>
   Effect.sync(() => followOwn(core)).pipe(
     Effect.andThen(followAlone(core, core.attached)),
-    Effect.andThen(Effect.suspend(() => SubscriptionRef.set(core.callRef, toCall(core.s, view(core), core.running, core.own)))),
+    Effect.andThen(Effect.suspend(() => SubscriptionRef.set(core.callRef, toCall(core.s, view(core), core.running, core.own, L.joinWait(core.s, view(core), core.attached?.session.workspace, leavesLoaded(core, core.attached)) ?? null)))),
     Effect.andThen(Effect.suspend(() => SubscriptionRef.set(core.runningRef, toRunningHuddles(core.running)))),
   )
 
@@ -335,8 +339,7 @@ const drive = (core: Core) =>
         const next = L.clearLeave(core.s, new Set(clear.map((record) => record.attendeeId)))
         if (yield* store(core, to, next)) core.s = next
       }
-      // Every workspace's stored leaves are read: this session's, and all of them at boot.
-      if (L.canRequest(core.s, media, workspace, to.loaded && core.booting?.size === 0)) {
+      if (L.canRequest(core.s, media, workspace, leavesLoaded(core, to))) {
         const intent = core.s.wanted
         core.s = L.requestJoin(core.s)
         yield* Effect.forkIn(join(core, to, intent), to.work)
