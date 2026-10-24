@@ -6,6 +6,7 @@ import { messageBody, readableText, type Lookups, type MessageContent, type User
 import { StoreReader, type SqlClient } from '@juno/store'
 import { Effect } from 'effect'
 import { channelInfoOf, channelRefOf, parseIds, personFrom, userName, type UserRow } from '../topicRows'
+import { literalRanges, searchSnippet } from './merge'
 
 const topicColumns = `i.topic_id AS id, i.channel, i.kind, i.last_activity_ts,
   COALESCE(NULLIF(trim(o.manual_title), ''), NULLIF(trim(o.ai_title), '')) AS named_title,
@@ -199,9 +200,9 @@ export const messageResults = (
  * Indexed local search. Channels and people (at most `SEARCH_PLACES_MAX`
  * each) come first, since a name typed is most often a place to go; then
  * topic titles and message matches. FTS ranks each group, and a group runs
- * only while the window has room.
+ * only while the window has room. Without `withPlaces`, only topics and messages.
  */
-export const querySearch = Effect.fn('search.query')(function* (text: string, requestedLimit = SEARCH_LIMIT_MAX) {
+export const querySearch = Effect.fn('search.query')(function* (text: string, requestedLimit = SEARCH_LIMIT_MAX, withPlaces = true) {
   const sql = yield* StoreReader
   const limit = Math.max(1, Math.min(SEARCH_LIMIT_MAX, requestedLimit))
   const resolved = yield* resolveSearch(text)
@@ -213,7 +214,7 @@ export const querySearch = Effect.fn('search.query')(function* (text: string, re
     return recent.map((hit) => topicResult(hit, placeOf(places, hit.channel), names))
   }
   // Only the last word is a prefix, matching an input still being typed.
-  const navigation = resolved.query.clauses.every((c) => c.kind === 'term' || c.kind === 'phrase') && terms !== ''
+  const navigation = withPlaces && resolved.query.clauses.every((c) => c.kind === 'term' || c.kind === 'phrase') && terms !== ''
   const statements = searchStatements(sql, resolved, limit)
   const channels = navigation ? yield* statements.channels : []
   const people = navigation ? yield* statements.people : []
@@ -225,12 +226,16 @@ export const querySearch = Effect.fn('search.query')(function* (text: string, re
   const results: SearchResult[] = [
     ...channels.map((hit): SearchResult => ({ kind: 'channel', id: hit.id, place: placeOf(places, hit.id), ...(hit.main === 1 ? { mainId: mainTopicId(hit.id as ChannelId) } : {}) })),
     ...people.map((hit): SearchResult => ({ kind: 'person', id: hit.id, person: personFrom(hit.id, hit), ...(hit.dm === null ? {} : { mainId: mainTopicId(hit.dm as ChannelId) }) })),
-    ...topics.slice(0, room).map((hit) => topicResult(hit, placeOf(places, hit.channel), names)),
+    ...topics.slice(0, room).map((hit) => {
+      const topic = topicResult(hit, placeOf(places, hit.channel), names)
+      return { ...topic, ranges: literalRanges(topic.title, resolved.query) }
+    }),
   ]
   const left = limit - results.length
   if (left <= 0) return results
   const found = messages.slice(0, left).map((hit) => ({ ...hit, topicId: topicOfMessage(hit.channel, hit.ts, hit.thread_ts, hit.reply_count), stored: true }))
-  return [...results, ...(yield* messageResults(found))]
+  const marked = (yield* messageResults(found)).map((row) => ({ ...row, ...searchSnippet(row.text, literalRanges(row.text, resolved.query)) }))
+  return [...results, ...marked]
 })
 
 function topicResult(hit: TopicHit, place: SearchPlace, names: Lookups): SearchTopic {

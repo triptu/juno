@@ -25,13 +25,13 @@ export const SearchHandlers = SearchRoutes.toLayer(
     return {
       'search.session': (input) => serveLiveValue(workspace.changes.pipe(Stream.switchMap((open) => open === undefined ? Stream.empty : sessions.stream(open, input)))).pipe(Stream.orDie),
       'search.more': ({ sessionId, generation, offset }) => sessions.more(sessionId, generation, offset),
-      'search.query': ({ query, limit }) => {
+      'search.query': ({ query, limit, places }) => {
         const runs = workspace.changes.pipe(
           Stream.switchMap((open) => {
             if (open === undefined) return Stream.empty
             return liveQuery(
               ['messages', 'topics', 'topic_overlay', 'conversations', 'users', 'ignored_channels', 'sidebar_view_channels', 'reactions'],
-              timed(querySearch(query, limit)),
+              timed(querySearch(query, limit, places)),
             ).pipe(Stream.provide(open.context))
           }),
         )

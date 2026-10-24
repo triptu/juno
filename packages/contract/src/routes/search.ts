@@ -12,6 +12,9 @@ const { partnerId: _partnerId, memberIds: _memberIds, ...placeFields } = Channel
 export const SearchPlace = Schema.Struct(placeFields)
 export type SearchPlace = typeof SearchPlace.Type
 
+/** A matched part of a text, in UTF-16 offsets. */
+export const SearchRange = Schema.Struct({ start: Schema.Int, end: Schema.Int })
+
 export const SearchTopic = Schema.Struct({
   kind: Schema.Literal('topic'),
   id: Schema.String,
@@ -20,6 +23,8 @@ export const SearchTopic = Schema.Struct({
   place: SearchPlace,
   /** Epoch milliseconds of the latest activity. */
   at: Schema.Number,
+  /** The parts of `title` the text matched (`search.query`). */
+  ranges: Schema.optionalKey(Schema.Array(SearchRange)),
 })
 export type SearchTopic = typeof SearchTopic.Type
 
@@ -39,6 +44,8 @@ export const SearchMessage = Schema.Struct({
   text: Schema.String,
   /** The store holds the message, so the topic opens at it without asking Slack. */
   stored: Schema.Boolean,
+  /** The parts of `text` the text matched (`search.query`); `text` then starts a few words before the first. */
+  ranges: Schema.optionalKey(Schema.Array(SearchRange)),
 })
 export type SearchMessage = typeof SearchMessage.Type
 
@@ -68,16 +75,20 @@ export const SEARCH_LIMIT_MAX = 50
 /** Channels, then people, at most this many each, before topics and messages. */
 export const SEARCH_PLACES_MAX = 3
 
-/** Local search only. Empty text returns recent topics. The engine caps limit at `SEARCH_LIMIT_MAX`. */
+/**
+ * Local search only. Empty text returns recent topics. The engine caps limit
+ * at `SEARCH_LIMIT_MAX`. `places: false` leaves out channels and people, for
+ * ⌘K, which lists conversations from `newChat.ranked`.
+ */
 export const searchQuery = liveValueRoute('search.query', {
-  payload: { query: Schema.String, limit: Schema.optionalKey(Schema.Int) },
+  payload: { query: Schema.String, limit: Schema.optionalKey(Schema.Int), places: Schema.optionalKey(Schema.Boolean) },
   value: Schema.Array(SearchResult),
 })
 
 /** Matches `search.slack` returns at most. */
 export const SLACK_SEARCH_MAX = 20
 
-/** Legacy one-shot search for existing clients. The palette no longer calls this route. */
+/** One-shot Slack search for existing clients. ⌘K never calls it. */
 export const searchSlack = Rpc.make('search.slack', {
   payload: { query: Schema.String },
   success: Schema.Array(SearchMessage),
@@ -108,7 +119,6 @@ export const searchCommand = Rpc.make('search.command', {
   error: NotSignedIn,
 })
 
-export const SearchRange = Schema.Struct({ start: Schema.Int, end: Schema.Int })
 export const SearchHit = Schema.Struct({ ...SearchMessage.fields, ranges: Schema.Array(SearchRange) })
 export type SearchHit = typeof SearchHit.Type
 export const SearchTitleHit = Schema.Struct({ ...SearchTopic.fields, ranges: Schema.Array(SearchRange) })
