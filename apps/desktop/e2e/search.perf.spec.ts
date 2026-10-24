@@ -21,18 +21,24 @@ test('search: arrow to reader and keystroke to results', async ({ juno, slack })
   await juno.surface.appMenu('search-messages')
   await field.pressSequentially('albatross', { delay: 60 })
   await expect(rows).toHaveCount(30)
-  const results = stats('search keystroke to rows painted', (await juno.measures('juno.search-results')).slice(2))
+  const resultSamples = await juno.measures('juno.search-results')
+  expect(resultSamples.length).toBeGreaterThanOrEqual(7)
+  const results = stats('search keystroke to rows painted', resultSamples.slice(2))
   expect.soft(results.p95, `keystroke to rows p95 ${results.p95.toFixed(1)} ms`).toBeLessThanOrEqual(RESULTS_BUDGET)
 
-  await field.press('ArrowDown')
-  await expect(rows.first()).toBeFocused()
-  for (let i = 1; i < 20; i++) {
+  for (let i = 0; i < 20; i++) {
     await juno.win.keyboard.press('ArrowDown')
     await expect(rows.nth(i)).toBeFocused()
     // The reader shows the match before the next press, as a reader would look.
-    await expect(page.locator('[data-search-reader] [data-topic-view]')).toBeVisible()
+    const id = await rows.nth(i).getAttribute('data-search-row')
+    expect(id).not.toBeNull()
+    const ts = id!.slice(id!.indexOf(':') + 1)
+    await expect(page.locator(`[data-search-reader] [data-message-row="${ts}"]`)).toBeVisible()
+    await expect.poll(async () => (await juno.measures('juno.search-reader')).length).toBe(i + 1)
   }
   // The first moves warm the neighbours; the rest read from a warm cache.
-  const reader = stats('search arrow to reader painted', (await juno.measures('juno.search-reader')).slice(3))
+  const readerSamples = await juno.measures('juno.search-reader')
+  expect(readerSamples).toHaveLength(20)
+  const reader = stats('search arrow to reader painted', readerSamples.slice(3))
   expect.soft(reader.p95, `arrow to reader p95 ${reader.p95.toFixed(1)} ms`).toBeLessThanOrEqual(READER_BUDGET)
 })

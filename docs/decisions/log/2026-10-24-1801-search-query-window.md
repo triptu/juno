@@ -1,0 +1,1 @@
+- 10-24 18:01 · search-query-window · Search probes at most the requested FTS window plus one candidate, then uses the date index for larger result sets and FTS row lookups for smaller ones; the real session and codec benchmark guards the first 100-row payload. Unicode highlights build offset maps only when normalization changes boundaries.

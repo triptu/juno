@@ -1883,3 +1883,11 @@ The same fixture's badge existence probe took 0.147 ms median and 0.205 ms p95 o
 `plan.test.ts` keeps checking the badge's plan, and `badge-query.test.ts` its results.
 
 `badge-query.test.ts` also stores a DM before its read pointer. The domain reports it unread, but the badge stays empty until read state is known; a late pointer marking it read never produces a dot. Normal cold boot loads counts before history. The guard also covers an early message from another path rather than relying on that ordering.
+
+### 8.14 Search session first window (10-24)
+
+The large-store Search benchmark now measures the actual session stream's first publication: resolving the query, loading 200 messages and 200 titles with one-row lookahead, shaping the results and producing its 100-row window. It also encodes and decodes the route's `SearchUpdate` schema. The fixture has 100,000 messages and 5,000 topics, with 10,000 longer messages arriving in 200-row transactions during 50 measured queries.
+
+On the SSH runner with two allocated cores, the final session query p95 was 18.19 ms, the full window was 99,151 bytes, and encode/decode p95 was 2.22/2.05 ms. Palette query p95 was 8.77 ms. The earlier session run exceeded 40 ms: broad FTS queries looked up and sorted every match. A bounded FTS probe now chooses the existing date index when the candidate set exceeds the requested window; smaller sets retain FTS row lookups. Query-plan checks cover both paths. The Unicode mapper only builds offset maps when normalization changes boundaries.
+
+These measurements cover the engine and codec on the runner. Search's Mac-only interaction spec requires samples for the expected keystrokes and arrows, and waits for the selected message to appear before each next arrow. It was not run for this change; no UI timing claim follows from the functional browser flows.

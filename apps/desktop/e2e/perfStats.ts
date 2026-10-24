@@ -34,6 +34,7 @@ export function contention(): string {
 }
 
 export function stats(name: string, samples: ReadonlyArray<number>): { readonly median: number; readonly p95: number } {
+  if (samples.length === 0) throw new Error(`${name}: no performance samples`)
   const sorted = samples.toSorted((a, b) => a - b)
   // Nearest rank: the p95 of 20 samples is the 19th, not the largest.
   const at = (q: number) => sorted[Math.max(0, Math.ceil(q * sorted.length) - 1)] ?? 0
