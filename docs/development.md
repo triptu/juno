@@ -607,15 +607,41 @@ Unit tests run on `bun test` with the preload in `packages/testing/src/preload.t
 
 ### Desktop lane measurements, 2026-10-24
 
-The browser and Electron commands ran in sequence on the SSH laptop, with zero retries and coverage and traces off. On two physical cores (four allocated threads), browser took 711 s and Electron 187 s: 898 s of desktop command wall time, including builds. That run passed 448 browser flows and 71 Electron flows; the AI activity redraw failed, and one browser case and 51 Electron manual/performance cases were skipped. Build setup contributes one additional passing case to each Playwright summary.
+The final check at `7aa940589` passed both desktop lanes on the SSH laptop: **222 s browser, 73 s Electron, 295 s combined**. It used four physical cores (eight allocated threads), eight browser workers and eight Electron workers, in sequence. Coverage and traces were off, CPU timing was on, and there were no retries, failures or skips. The job averaged 89% CPU busy (99% median), with 6.64 GB peak container memory including file cache.
 
-The confirmation with CPU timing on four physical cores (eight threads, four browser workers and four Electron workers) took 387 s for browser and 111 s for Electron, 498 s combined. The redraw repair passed; the code-highlight flow clicked a sidebar row while its new message moved it. Its repair opens Main before posting the sample. These are single observations at different allocations, not a controlled speedup claim.
+These are command wall times, including each build or cache check, excluding SSH upload, allocation wait and install:
 
-The 449 executed browser flows in the confirmation recorded 901.02 CPU-seconds in hosts, 805.39 in renderers, 238.54 in Chrome's browser/utility/GPU processes, and 178.68 in Playwright workers including the fake Slack. Median host and renderer cost was 1,930 and 1,680 CPU-ms per flow. Process counters cover the running fixture, omit processes that already exited, and combine fake Slack with its worker; they are not wall times or a separate fake-server profile. Browser startup and fixture setup timings are retained alongside the counters in the run log.
+| Run | Physical cores / threads | Browser | Electron | Combined | Result |
+| --- | --- | ---: | ---: | ---: | --- |
+| Inherited branch | 2 / 4 | 711 s | 187 s | 898 s | AI activity failed |
+| CPU baseline, four workers per lane | 4 / 8 | 387 s | 111 s | 498 s | Code-highlight row click failed |
+| Final, eight workers per lane | 4 / 8 | 222 s | 73 s | 295 s | Both lanes passed |
 
-With loaded-host reuse, reset browser contexts, more synced starts and eight browser workers on the same four physical cores, browser took 232 s and Electron 102 s (334 s combined, 86% average CPU, 6.77 GB peak container memory including file cache). The agent-flow consolidation on main also removed 35 cases. Browser passed 413 flows and exposed one notification-row click race; Electron passed 71 and exposed one PDF focus assumption. Targeted repairs then passed all nine notification flows in 12 s and all five file-viewer flows in 9 s, including their build steps. These repair runs do not turn the earlier full result into a green run.
+The initial allocation was smaller, so 898 → 295 s is not a controlled speedup. The CPU baseline and final browser builds were cached; the baseline Electron setup rebuilt in 32.3 s, while both final setup steps checked cached outputs in about 0.1 s. A preceding run rebuilt the web renderer in 22.3 s and took 246 s for browser, before the last fixture-size reduction. These are individual observations, not repeated performance trials.
 
-Across 387 matching measured flows before and after the optimization, host CPU fell from 767.94 to 352.67 seconds; renderer CPU was 701.34 and 707.72; Chrome browser/utility/GPU CPU was 206.27 and 183.34; worker plus fake Slack CPU was 153.93 and 151.52. Median host cost fell from 1,870 to 750 CPU-ms, renderer stayed at 1,680–1,690, and worker plus fake fell from 350 to 330. The 26-flow controlled sample at four workers cut summed flow time from 105.26 to 64.14 s, with host CPU 47.66 to 27.65 s and renderer CPU 43.68 to 42.63 s. Host startup and repeated module loading were the main removable cost; renderer work now dominates. The fake shares a process with Playwright, so its separate CPU cost is bounded by the worker total rather than measured independently.
+Counts exclude build setup cases and count a canary once in each lane:
+
+| Lane | Before: spec files / cases | After: spec files / cases |
+| --- | --- | --- |
+| Browser | 123 / 450 (449 executed, one skipped) | 124 / 419, all passed |
+| Electron | 39 / 122 (71 executed, 51 skipped) | 32 / 63, all passed |
+
+The agent-flow consolidation on main removed 35 cases. Remaining renderer flows moved from mixed native files, notification-hours checks joined the notification flows, and duplicate diagnostics, key-limit, session and engine-restart checks joined existing flows. Manual screenshot tools and Mac performance specs are outside ordinary Electron discovery. Every surviving non-agent BROWSER-class file in the audit is registered. Eight canaries remain in both lanes; [Browser lane](../apps/desktop/e2e/README.md#browser-lane) lists them and the native responsibilities retained in Electron.
+
+Across 387 matching measured browser flows, mean CPU cost per test was:
+
+| Process | Before | After |
+| --- | ---: | ---: |
+| Host: engine/agent, including boot and sync | 1,984 ms | 856 ms |
+| Renderer | 1,812 ms | 1,760 ms |
+| Chrome browser, utility and GPU | 533 ms | 452 ms |
+| Playwright worker, including fake Slack | 398 ms | 378 ms |
+
+Host CPU summed to 767.94 → 331.09 s across those flows; renderer 701.34 → 681.12; Chrome browser/utility/GPU 206.27 → 175.05; worker plus fake 153.93 → 146.25. Median host cost fell from 1,870 to 710 CPU-ms, renderer from 1,680 to 1,630, and worker plus fake from 350 to 330. A controlled 26-flow sample at four workers also cut summed flow time from 105.26 to 64.14 s and host CPU from 47.66 to 27.65 s, while renderer CPU stayed at 43.68 → 42.63 s.
+
+The savings come from reusing loaded host processes and immutable browser assets, with a fresh engine, page, fake and data folder per test; clearing context storage and permissions; using synced snapshots for ordinary flows; and sizing the title-layout seed to its measured scroll range. Clock-installing tests request a fresh context. Renderer work now dominates. Process counters cover the running fixture and omit processes that already exited. The host counter does not split boot from sync, and fake Slack shares the Playwright worker, so its separate CPU is bounded by that worker total, not independently profiled.
+
+Reproduce with `bun run remote --cores 4 --env JUNO_E2E_CPU=1 --env JUNO_E2E_TIMINGS=1 test:plan test:browser + test:electron`. The final artifact is `.remote/juno-1792827331204-36052-d37acacc/`; the per-test counters are in `run.log`. The IST work log and parsed before/after counters are under `/Volumes/AgentWork/scratch/test-revamp/` (`browser-lane-log.md`, `browser-lane-4-green-cpu.json`).
 
 ### Text-menu spelling checks
 
