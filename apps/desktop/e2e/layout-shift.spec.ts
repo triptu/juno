@@ -109,13 +109,14 @@ for (const divider of [false, true]) {
   syncedTest(`partial thread waits for history at ${divider ? 'divider' : 'bottom'}`, async ({ juno, win, slack, fake }) => {
     const channel = slack.channel('eng')
     const user = slack.as('Leo').id
-    const root = fake.injectMessage({ channel, user, text: 'Delayed history layout check' })
+    // The root is not posted live: a root heard on this connection proves its thread from the root (`liveRoots`),
+    // so silent replies under it would not make a partial thread. Main's open fetch brings it instead.
+    const root = fake.workspace.post({ channel, user, text: 'Delayed history layout check', silent: true })
     const replies = Array.from({ length: 30 }, (_, i) => fake.workspace.post({ channel, user, threadTs: root.ts, text: `Earlier reply ${i}`, silent: true }))
     const latest = fake.injectMessage({ channel, user, threadTs: root.ts, text: 'Latest delayed reply' })
     if (divider) fake.markThreadRead({ channel, threadTs: root.ts, ts: replies[24]!.ts })
-    // The new root moves #eng to the top, under the thread when the read mark has made the thread a row; open it once it is there.
-    if (divider) await juno.sidebar.expectTop('Delayed history layout check', '#eng')
-    else await juno.sidebar.expectTop('#eng')
+    // The read mark makes the thread a row; open #eng once it is there.
+    if (divider) await juno.sidebar.expectTop('Delayed history layout check')
     await juno.sidebar.row('#eng').open()
     const link = juno.topic.list.locator(`[data-thread-link="t:${channel}:${root.ts}"]`)
     await expect(link).toBeVisible()

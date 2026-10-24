@@ -56,6 +56,9 @@ test.describe('scrolled up', () => {
     await juno.waitForSync()
     const row = juno.sidebar.row(THREAD)
     await row.open()
+    // The replies came only from getView, which proves them for the count, not the view: the window paints once
+    // the open's pages reach the newest reply.
+    await juno.topic.expectMessage('Review the rollout checklist 300')
     await juno.topic.expectAtBottom()
     await row.expectRead()
 
