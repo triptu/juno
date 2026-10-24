@@ -3,7 +3,14 @@ import { prefs } from '@juno/store'
 import { Effect, Option, Schema } from 'effect'
 
 const minute = Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 1439 }))
-const hours = Schema.Struct({ days: Schema.Array(Schema.Literals([0, 1, 2, 3, 4, 5, 6])), from: minute, to: minute })
+const weekday = Schema.Literals([0, 1, 2, 3, 4, 5, 6])
+/** Hours saved before 2026-10-24 have no `dayHours` and read as the same hours. */
+const hours = Schema.Struct({
+  days: Schema.Array(weekday),
+  from: minute,
+  to: minute,
+  dayHours: Schema.optionalKey(Schema.Array(Schema.Struct({ day: weekday, from: minute, to: minute }))),
+})
 const level = Schema.Literals(['always', 'never'])
 const levels = Schema.Record(Schema.String, level)
 export const NotificationSettingsSchema = Schema.Struct({

@@ -24,7 +24,7 @@
 import { observeWork, workWakes } from './workControl'
 import { Context, Duration, Effect, Layer, Ref, Schema, Semaphore, Stream } from 'effect'
 import type { SlackScheduleView } from '@juno/contract'
-import { slackScheduleFor, slackScheduleKeys, slackScheduleMatches, slackScheduleSnapshot, type Hours, type SlackSchedulePrefs } from '@juno/domain'
+import { sameHours, slackScheduleFor, slackScheduleKeys, slackScheduleMatches, slackScheduleSnapshot, type SlackSchedulePrefs } from '@juno/domain'
 import { NotificationSettingsSchema, readSettings } from '@juno/notifications'
 import { invalidate, liveQuery, prefs, StoreReader, StoreWriter, transaction, type SqlError } from '@juno/store'
 import { EngineTiming } from './config'
@@ -71,8 +71,6 @@ const storePrefs = (changes: Readonly<Record<string, unknown>>) =>
     yield* sql`UPDATE team SET prefs_json = ${JSON.stringify(next)} WHERE id = ${team.id}`
     yield* invalidate(['team'])
   }))
-
-const sameHours = (a: Hours, b: Hours) => a.from === b.from && a.to === b.to && a.days.length === b.days.length && a.days.every((day) => b.days.includes(day))
 
 /** What the Notifications page shows about Slack's schedule. */
 export const slackScheduleView: Effect.Effect<SlackScheduleView, SqlError, StoreServices> = Effect.gen(function* () {

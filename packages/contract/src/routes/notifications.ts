@@ -12,7 +12,8 @@
  *   with until when, what Slack shows colleagues when it differs, and
  *   "Paused until 9am" outside notification hours. `seen` drives the
  *   avatar's dot.
- * - The setters write the settings. `notifications.setLevel` returns an
+ * - The setters write the settings. `notifications.setDayHours` gives one
+ *   day its own notification hours (SPEC 14, "Different hours on some days"). `notifications.setLevel` returns an
  *   undo (ADR 0010); on a thread it also follows or unfollows it (SPEC 5).
  * - `notifications.setAlwaysNotify` is one of the five Always notify switches.
  * - `notifications.saveInstruction` and `notifications.removeInstruction`
@@ -35,8 +36,15 @@ import { CommandResult, NotifyChoiceSchema, NotifyTargetSchema, SubscribeError }
 const Minute = Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 1439 }))
 const Weekday = Schema.Literals([0, 1, 2, 3, 4, 5, 6])
 
-/** Days of the week (0 is Sunday) and a from and to time in minutes since midnight. A to before from crosses midnight. */
-export const Hours = Schema.Struct({ days: Schema.Array(Weekday), from: Minute, to: Minute })
+/** One day's own hours, on a day whose hours differ from the shared ones. */
+export const DayHours = Schema.Struct({ day: Weekday, from: Minute, to: Minute })
+export type DayHours = typeof DayHours.Type
+
+/**
+ * The days with hours (0 is Sunday), their shared from and to time in minutes since midnight, and the days whose own hours
+ * differ, as Slack's Custom schedule. A to before from crosses midnight. Hours saved by older versions have no `dayHours`.
+ */
+export const Hours = Schema.Struct({ days: Schema.Array(Weekday), from: Minute, to: Minute, dayHours: Schema.optionalKey(Schema.Array(DayHours)) })
 export type Hours = typeof Hours.Type
 
 /** A stored level. Auto, the default, is no entry. */
@@ -178,8 +186,16 @@ export type NotificationStatus = typeof NotificationStatus.Type
 
 export const notificationsStatus = liveValueRoute('notifications.status', { value: NotificationStatus })
 
+/** Changes the given parts of the hours. `dayHours` replaces every day's own hours; an empty list gives every day the shared hours. */
 export const notificationsSetHours = Rpc.make('notifications.setHours', {
-  payload: { which: Schema.Literals(['notifications', 'presence']), hours: Hours.mapFields(({ days, from, to }) => ({ days: Schema.optionalKey(days), from: Schema.optionalKey(from), to: Schema.optionalKey(to) })) },
+  payload: { which: Schema.Literals(['notifications', 'presence']), hours: Hours.mapFields(({ days, from, to, dayHours }) => ({ days: Schema.optionalKey(days), from: Schema.optionalKey(from), to: Schema.optionalKey(to), dayHours })) },
+  success: Schema.Void,
+  error: NotSignedIn,
+})
+
+/** Sets one day's own notification hours, from or to or both, without resending the other days. A day given hours is on. */
+export const notificationsSetDayHours = Rpc.make('notifications.setDayHours', {
+  payload: { day: Weekday, from: Schema.optionalKey(Minute), to: Schema.optionalKey(Minute) },
   success: Schema.Void,
   error: NotSignedIn,
 })
@@ -264,6 +280,7 @@ export const NotificationsRoutes = RpcGroup.make(
   notificationsStatus,
   notificationsSetHours,
   notificationsSetDay,
+  notificationsSetDayHours,
   notificationsDecisions,
   notificationsSetAlwaysNotify,
   notificationsSaveInstruction,

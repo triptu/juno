@@ -30,6 +30,7 @@ import {
 import {
   alwaysNotifyOf,
   localTime,
+  normalHours,
   notifyChoice,
   parseTopicId,
   pausedLabel,
@@ -162,8 +163,8 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
     const changeHours = (which: 'notifications' | 'presence', change: (hours: Hours) => Hours) =>
       Effect.gen(function* () {
         yield* updateSettings((settings) => (which === 'notifications'
-          ? { ...settings, notificationHours: change(settings.notificationHours) }
-          : { ...settings, presenceHours: change(settings.presenceHours) }))
+          ? { ...settings, notificationHours: normalHours(change(settings.notificationHours)) }
+          : { ...settings, presenceHours: normalHours(change(settings.presenceHours)) }))
         // Only hours the owner set reach Slack's schedule (`../slackSchedule.ts`).
         if (which === 'notifications') yield* inWorkspace(slackSchedule.hoursSet.pipe(Effect.orDie))
       })
@@ -245,6 +246,13 @@ export const NotificationsHandlers = NotificationsRoutes.toLayer(
         ...saved,
         days: enabled ? [...saved.days.filter((other) => other !== day), day].toSorted((a, b) => a - b) : saved.days.filter((other) => other !== day),
       })),
+      'notifications.setDayHours': ({ day, from, to }) => changeHours('notifications', (saved) => {
+        const current = saved.dayHours?.find((own) => own.day === day) ?? saved
+        const own = { day, from: from ?? current.from, to: to ?? current.to }
+        // A day given hours is on.
+        const days = saved.days.includes(day) ? saved.days : [...saved.days, day].toSorted((a, b) => a - b)
+        return { ...saved, days, dayHours: [...(saved.dayHours ?? []).filter((other) => other.day !== day), own] }
+      }),
       'notifications.setAlwaysNotify': ({ which, enabled }) =>
         updateSettings((settings) => ({ ...settings, alwaysNotify: { ...settings.alwaysNotify, [which]: enabled } })).pipe(Effect.asVoid),
       'notifications.saveInstruction': ({ id, direction, text }) =>

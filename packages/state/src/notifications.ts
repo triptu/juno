@@ -16,6 +16,7 @@ import {
   notificationsSetHours,
   notificationsSetHuddleRing,
   notificationsSetDay,
+  notificationsSetDayHours,
   notificationsSetPresence,
   notificationsSettings,
   notificationsStatus,
@@ -92,6 +93,11 @@ export function setHours(registry: Registry, which: 'notifications' | 'presence'
 
 export function setHoursDay(registry: Registry, which: 'notifications' | 'presence', day: Hours['days'][number], enabled: boolean): void {
   void runCommand(registry, notificationsSetDay, { which, day, enabled })
+}
+
+/** One day's own notification hours. */
+export function setDayHours(registry: Registry, day: Hours['days'][number], span: { readonly from?: number; readonly to?: number }): void {
+  void runCommand(registry, notificationsSetDayHours, { day, ...span })
 }
 
 /** One Always notify switch. */

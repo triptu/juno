@@ -160,6 +160,7 @@ export {
   setHours,
   setHuddleRing,
   setHoursDay,
+  setDayHours,
   setPresence,
   applyJunoHours,
 } from './notifications'
