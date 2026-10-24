@@ -17,6 +17,17 @@ function callName(expression) {
   return '<call>'
 }
 
+// The callback of a labelled test call (`test('…', …)`, `syncedTest('…', …)`), optionally limited to the given names.
+function isTestCallback(node, names) {
+  const call = node.parent
+  if (call === undefined || !ts.isCallExpression(call) || !ts.isFunctionLike(node)) return false
+  const name = callName(call.expression)
+  if (names) return names.includes(name)
+  return ts.isStringLiteralLike(call.arguments[0]) && !/(^|\.)(step|describe|extend|use)$/.test(name) && !name.startsWith('test.describe')
+}
+
+const hasStep = (node) => ts.isCallExpression(node) && callName(node.expression).endsWith('test.step') || (ts.forEachChild(node, hasStep) ?? false)
+
 // Names and call labels survive line moves. Occurrences distinguish equal callbacks.
 function functionContext(node, source) {
   const parts = []
@@ -46,7 +57,9 @@ export function collectSizeReport(directory = root) {
     const occurrences = new Map()
     const visit = (node) => {
       // A flow test (`*.flow.test.ts`) is one user journey on one engine boot; its steps are named with `step`, so the test's own callback may run long.
-      const journey = file.endsWith('.flow.test.ts') && node.parent !== undefined && ts.isCallExpression(node.parent) && ['it', 'test'].includes(callName(node.parent.expression))
+      // So is a desktop e2e test whose callback names its steps with `test.step`: one launch per journey.
+      const journey = file.endsWith('.flow.test.ts') ? isTestCallback(node, ['it', 'test'])
+        : file.startsWith('apps/desktop/e2e/') && file.endsWith('.spec.ts') && isTestCallback(node) && hasStep(node)
       if (ts.isFunctionLike(node) && node.body && !journey) {
         const context = functionContext(node, source)
         const occurrence = (occurrences.get(context) ?? 0) + 1
