@@ -165,7 +165,7 @@ Topic art is a client-only decoration, like titles. It never reaches Slack.
 - **Mains regenerate on rename or purpose change.** Not on new messages: a channel's stream changes all the time, but what the channel is for rarely does.
 - **Busy topics do not redraw.** A busy thread or channel never redraws on every message.
 
-**Redraw.** "Redraw" in the row's context menu reruns the task, passing the previous recipe's hue and a one-line summary as things to avoid. It stores the answer with `source: redraw` and shows the usual undo toast.
+**Redraw.** "Redraw" in the row's context menu reruns the task, passing the previous recipe's hue and a one-line summary as things to avoid. It stores the answer with `source: redraw` and shows the usual undo toast. A background drawing already in flight cannot replace that redraw.
 
 **The Tide placeholder.**
 

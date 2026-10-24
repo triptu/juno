@@ -2,12 +2,14 @@
 // to answer its spend asks (SPEC 13.10), and the AI activity log in Settings
 // that shows each call. The fake AI answers only with the key and inside the
 // agent's daily cap, and reserves what the live provider would.
+import { DatabaseSync } from 'node:sqlite'
+import { join } from 'node:path'
 import { SELF_ID } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 
 test.use({ agentOptions: { agent: true }, fakeAiRequiresKey: true, aiJobs: true })
 
-test('a saved key gives a new thread an AI title and art, Redraw draws it again, and AI activity shows the calls with their cost', async ({ juno, fake }) => {
+test('a saved key gives a new thread an AI title and art, Redraw draws it again, and AI activity shows the calls with their cost', async ({ juno, fake, userData }, testInfo) => {
   test.setTimeout(180_000)
 
   {
@@ -21,10 +23,21 @@ test('a saved key gives a new thread an AI title and art, Redraw draws it again,
     await expect(row).toContainText('Postgres migration')
     await expect(row.locator('[data-topic-art]')).toHaveAttribute('data-topic-art', 'art', { timeout: 30_000 })
     const before = await row.locator('[data-topic-art]').innerHTML()
+    const artState = () => {
+      const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
+      try {
+        return db.prepare('SELECT source, hue, title_source, created_at FROM topic_art WHERE topic_id = ?').get(`t:C0ENG:${root.ts}`)
+      } finally { db.close() }
+    }
+    const storedBefore = artState()
 
     const sidebarRow = juno.sidebar.row('Postgres migration')
     await sidebarRow.chooseInMenu('redraw')
     await juno.expectToast('Redrawn · Postgres migration')
+    await juno.workPass('art')
+    const storedAfter = artState()
+    await testInfo.attach('redraw-state', { body: JSON.stringify({ before: storedBefore, after: storedAfter }), contentType: 'application/json' })
+    expect(storedAfter).toMatchObject({ source: 'redraw' })
     await expect.poll(() => row.locator('[data-topic-art]').innerHTML()).not.toBe(before)
 
     await juno.openSettings('AI activity')

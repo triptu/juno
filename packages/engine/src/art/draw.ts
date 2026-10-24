@@ -110,10 +110,13 @@ const storeArt = (
     const sql = yield* StoreWriter
     const invalidation = yield* Invalidation
     const now = String(yield* Clock.currentTimeMillis)
+    // A background call can finish after a redraw made while it was in flight.
+    // Keep the user's drawing even when that call selected the topic earlier.
     yield* sql`INSERT INTO topic_art (topic_id, recipe, recipe_hash, input_hash, model, status, hue, title_source, source, created_at)
       VALUES (${topicId}, ${recipe}, ${hashOf(recipe)}, ${inputHash}, ${decision.meta.model}, ${status}, ${hue}, ${titleSource}, ${source}, ${now})
       ON CONFLICT (topic_id) DO UPDATE SET recipe = excluded.recipe, recipe_hash = excluded.recipe_hash, input_hash = excluded.input_hash,
-        model = excluded.model, status = excluded.status, hue = excluded.hue, title_source = excluded.title_source, source = excluded.source, created_at = excluded.created_at`
+        model = excluded.model, status = excluded.status, hue = excluded.hue, title_source = excluded.title_source, source = excluded.source, created_at = excluded.created_at
+      WHERE excluded.source = 'redraw' OR topic_art.source <> 'redraw'`
     yield* invalidation.invalidate(keys.topicArt)
     return status
   })

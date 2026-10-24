@@ -1,0 +1,1 @@
+- 10-24 11:26 · Keep user redraws when background art finishes later · Reject a background topic-art write when a redraw is already stored; selecting candidates before the model call cannot protect a redraw made while that call is in flight. The desktop AI activity flow waits for a subsequent art pass before checking the drawing.
