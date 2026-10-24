@@ -164,7 +164,7 @@ test('Remember shows "Remembered · Undo", and words selected in a message are r
 
   // Remove takes the message and its pin, and neither the bubble nor the note comes back.
   chat = await openChat(juno)
-  await (await chat.menu(FACT, { owner: true })).choose('remove')
+  await (await chat.menu(message, { owner: true })).choose('remove')
   const sheet = juno.win.getByRole('dialog', { name: 'Remove from Juno' })
   await sheet.getByRole('button', { name: 'Remove', exact: true }).click()
   await expect(sheet).toHaveCount(0)

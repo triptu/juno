@@ -24,8 +24,9 @@ function answer(request: OpenRouterRequest): string | ToolCallAnswer {
     if (request.toolResult.includes('Nothing starts until the owner clicks Start')) return '<say>It is ready to start.</say>'
     return '<say>I did not start it.</say>'
   }
-  if (/fix the sidebar flake/i.test(request.input)) return start('Find why the sidebar test flakes and fix it.')
-  if (/deploy it/i.test(request.input)) return start(`Deploy the fix with this key: ${SECRET}`)
+  // Only the owner's own message: a report of the task names its title too.
+  if (/<message id="n\d+">Fix the sidebar flake/.test(request.input)) return start('Find why the sidebar test flakes and fix it.')
+  if (/<message id="n\d+">Deploy it/.test(request.input)) return start(`Deploy the fix with this key: ${SECRET}`)
   return echo(request)
 }
 

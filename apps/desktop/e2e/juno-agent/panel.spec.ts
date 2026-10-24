@@ -229,8 +229,11 @@ test('the panel opens at the newest message on its first frame, with no jump, wh
   expect(await panel.root.locator('[data-scroll]').evaluate((el) => el.scrollHeight > el.clientHeight * 1.5)).toBe(true)
   expect(frames).toEqual(Array.from({ length: 10 }, () => ({ atEnd: true, lastInView: true })))
 
-  // In dark mode no light surface shows anywhere in the panel.
+  // In dark mode no light surface shows anywhere in the panel. Settings takes the tab, so the topic comes back with the panel closed.
   await juno.setTheme('Dark')
+  await juno.sidebar.row(POSTGRES).open()
+  await juno.tabs.menu('juno')
+  await expect(panel.composer).toBeFocused()
   const light = await panelOf(juno).evaluate((root) => {
     const found: string[] = []
     for (const element of [root, ...root.querySelectorAll<HTMLElement>('*')]) {
