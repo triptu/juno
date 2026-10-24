@@ -63,12 +63,12 @@ const decisions: ReadonlyArray<Decision> = rows.map(([hour, minute, sender, plac
 })
 
 
+const saturdayHours = { days: [...weekdays, 6 as const], from: 540, to: 1140, dayHours: [{ day: 6 as const, from: 660, to: 840 }] }
+
 export const notificationsBase: NotificationsPageProps = {
   notificationHours: { days: weekdays, from: 9 * 60, to: 19 * 60 },
   presenceHours: { days: weekdays, from: 9 * 60, to: 20 * 60 },
   onHoursChange: noop,
-  onDayChange: noop,
-  onDayHoursChange: noop,
   slackSchedule: { changedInSlack: false, waitingForHours: false },
   onUseJunoHours: noop,
   aiAssist: true,
@@ -143,9 +143,9 @@ export default defineFixtures(
   {
     Page: {
       default: fixture(notificationsBase),
-      'same-hours': fixture({ ...notificationsBase, notificationHours: { days: weekdays, from: 540, to: 1140 }, presenceHours: { days: weekdays, from: 540, to: 1140 } }),
-      // Weekdays 9 to 7, weekends 11 to 2: a row per day.
-      'different-days': fixture({ ...notificationsBase, notificationHours: { days: [0, 1, 2, 3, 4, 5, 6], from: 540, to: 1140, dayHours: [{ day: 0, from: 660, to: 840 }, { day: 6, from: 660, to: 840 }] } }),
+      'weekends-off': fixture({ ...notificationsBase, notificationHours: { days: weekdays, from: 540, to: 1140 }, presenceHours: { days: weekdays, from: 540, to: 1140 } }),
+      // Weekdays 9 to 7, Saturday 11 to 2, Sunday off.
+      'saturday-hours': fixture({ ...notificationsBase, notificationHours: saturdayHours, presenceHours: saturdayHours }),
       'how-auto': fixture({ ...notificationsBase, anchor: 'how-auto', anchorKey: 1 }, tall),
     },
     'Always notify': {

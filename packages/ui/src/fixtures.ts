@@ -16,7 +16,6 @@ import Chip from './Chip.fixtures'
 import CodeBlock from './CodeBlock.fixtures'
 import ContextMenu from './ContextMenu.fixtures'
 import ContextPill from './ContextPill.fixtures'
-import DayToggles from './DayToggles.fixtures'
 import Divider from './Divider.fixtures'
 import EmptyState from './EmptyState.fixtures'
 import HeaderBand from './HeaderBand.fixtures'
@@ -61,7 +60,6 @@ export const fixtures: Readonly<Record<string, FixtureSet<any>>> = {
   CodeBlock,
   ContextMenu,
   ContextPill,
-  DayToggles,
   Divider,
   EmptyState,
   HeaderBand,
