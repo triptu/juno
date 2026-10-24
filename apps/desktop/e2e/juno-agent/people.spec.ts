@@ -60,10 +60,7 @@ const test = base.extend<{ readonly model: ScriptedModel }>({
 test.describe.configure({ timeout: 180_000 })
 
 async function setWindowWidth(juno: Juno, width: number): Promise<void> {
-  await juno.app.evaluate(({ BrowserWindow }, w) => {
-    const window = BrowserWindow.getAllWindows()[0]!
-    window.setSize(w, window.getSize()[1]!)
-  }, width)
+  await juno.setWindowSize(width)
 }
 
 /** Opens Maya's DM in the current tab and the Juno panel beside it, when it is not open yet. */

@@ -51,11 +51,8 @@ const placeIn = (juno: Juno, text: string) =>
 test('a source link scrolls the open topic to the message, and a reply that arrives after leaves it there', async ({ juno, slack }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await expect.poll(() => hooks(juno.app, 'agentState'), { timeout: 15_000 }).toBe('ready')
-  await juno.app.evaluate(({ BrowserWindow }) => {
-    const window = BrowserWindow.getAllWindows()[0]!
-    window.setSize(1400, window.getSize()[1]!)
-  })
+  await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
+  await juno.setWindowSize(1400)
   const row = juno.sidebar.row(THREAD)
   await row.open()
   await juno.topic.expectAtBottom()

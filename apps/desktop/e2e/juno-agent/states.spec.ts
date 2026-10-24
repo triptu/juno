@@ -3,11 +3,9 @@
 // each state from fixtures (`packages/views/src/juno-chat/*.fixtures.tsx`).
 import { readdirSync, rmSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { chatCopy } from '@juno/agent-contract'
-import { Juno } from '../driver/juno'
-import { launchApp } from '../fixtures'
-import { agentReady, card, openChat, openPage, openSettings, ready } from './agent'
+import { agentReady, openChat, openPage, openSettings, ready } from './agent'
 import { answer, expect, JunoChatPane, test as base } from './chat'
 import { startScriptedModel, type CatalogueModel, type ScriptedModel } from './model'
 
@@ -31,9 +29,6 @@ const test = base.extend<{ readonly model: ScriptedModel }>({
 })
 
 test.describe.configure({ timeout: 120_000 })
-
-const relaunch = (userData: string, { fake, slackApp, model }: { readonly fake: { readonly url: string }; readonly slackApp: { readonly dir: string; readonly keychainPassword: string }; readonly model: ScriptedModel }) =>
-  launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, agent: true, fakeOpenRouterUrl: model.origin })
 
 const NEWER = 1_800_000_000
 
@@ -67,29 +62,7 @@ picker('the chat model picker offers the newest usable model per family and hide
       .locator('option')
       .evaluateAll((options) => options.map((option) => option.textContent!.split(' · ')[0]))
   await expect.poll(names, { timeout: 15_000 }).toEqual(['Claude Sonnet 6', 'Claude Opus 5.5', 'Muse Wonder', 'GPT-6.1 Sol', 'Grok 4.7'])
-})
-
-picker('the model settings do not offer Codex while it is coming soon', async ({ fake, slackApp, userData, model }) => {
-  const { startFakeCodex } = await import('@juno/agent-testing/codex')
-  const codex = startFakeCodex()
-  codex.signIn(join(userData, 'agent', 'codex'))
-  codex.script([{ reply: '<say>Hello from local Codex.</say>' }])
-  const previousPath = process.env.PATH
-  process.env.PATH = `${dirname(codex.path)}:${previousPath ?? ''}`
-  let running: Awaited<ReturnType<typeof launchApp>> | undefined
-  try {
-    running = await relaunch(userData, { fake, slackApp, model })
-    const juno = new Juno(running.app, running.win)
-    await ready(juno)
-    const page = await openSettings(juno, 'Juno')
-    const select = page.getByLabel('Chat model')
-    await expect(select.locator('option').filter({ hasText: /Codex/ })).toHaveCount(0)
-  } finally {
-    if (previousPath === undefined) delete process.env.PATH
-    else process.env.PATH = previousPath
-    await running?.close()
-    codex.close()
-  }
+  await expect(page.getByLabel('Chat model').locator('option').filter({ hasText: /Codex/ })).toHaveCount(0)
 })
 
 test('while Juno is paused a message waits for Resume, then runs', async ({ juno, model }) => {
@@ -106,26 +79,6 @@ test('while Juno is paused a message waits for Resume, then runs', async ({ juno
   await chat.root.locator('[data-banner="paused"]').getByRole('button', { name: 'Resume' }).click()
   await chat.expectJuno('You said: anything new?')
   await expect(chat.ownerBubble('anything new?').locator('[data-delivery]')).toHaveCount(0)
-})
-
-test('with AI assist off the chat says Juno is off and its composer is disabled', async ({ juno, fake, slackApp, userData, running, model }) => {
-  await ready(juno)
-  await running.close()
-  const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
-  db.prepare(`INSERT INTO prefs (key, value_json) VALUES ('aiAssist', 'false') ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json`).run()
-  db.close()
-
-  const again = await relaunch(userData, { fake, slackApp, model })
-  try {
-    const off = new Juno(again.app, again.win)
-    await off.waitForSync()
-    const chat = await openChat(off)
-    await expect(chat.root.getByText(chatCopy.banner.aiOff.line)).toBeVisible({ timeout: 30_000 })
-    await expect(chat.composer).toBeDisabled()
-    expect(model.inputs()).toEqual([])
-  } finally {
-    await again.close()
-  }
 })
 
 test('an empty chat asks what you need, a run shows the status bubble, and a run the model fails says so with Try again', async ({ juno, model }) => {
@@ -197,23 +150,6 @@ test('a message at the send limit is kept when request framing makes it too larg
   expect(model.inputs()).toEqual([])
 })
 
-test('with a $0 daily cap a message brings the Budget card', async ({ juno, model }) => {
-  await ready(juno)
-  const settings = await openSettings(juno, 'AI activity')
-  const cap = settings.getByLabel('Daily limit in dollars')
-  await cap.fill('0')
-  await cap.press('Enter')
-  await expect(cap).toHaveValue('0')
-
-  const chat = await openChat(juno)
-  await chat.send('catch me up')
-  const budget = card(chat, 'budget')
-  await expect(budget).toBeVisible({ timeout: 15_000 })
-  await expect(budget).toContainText(chatCopy.card.budget.title)
-  await expect(budget.getByRole('button', { name: chatCopy.card.budget.allow })).toBeVisible()
-  expect(model.inputs()).toEqual([])
-})
-
 test('offline, the chat shows the chip, a message waits for the network, and both clear once back', async ({ juno, fake }) => {
   const chipShows = 'offline, the chat shows the chip and its composer still works, and the chip goes once back'
   const messageWaits = 'offline, a message waits for the network and runs once back'
@@ -241,51 +177,39 @@ test('offline, the chat shows the chip, a message waits for the network, and bot
   })
 })
 
-test('records newer than this build show Update needed and disable the composer', async ({ juno, fake, slackApp, userData, running, model }) => {
+test('records newer than this build show Update needed and disable the composer', async ({ juno, relaunch, userData }) => {
   await ready(juno)
   const chat = await openChat(juno)
   await chat.send('hello')
   await chat.expectJuno('You said: hello')
-  await running.close()
-  // As if a newer Juno had written the journal.
-  const dir = join(userData, 'agent')
-  const journal = readdirSync(dir).find((name) => /^pi-.+\.sqlite$/.test(name))!
-  const db = new DatabaseSync(join(dir, journal))
-  db.prepare('UPDATE durable_schema SET version = version + 1000 WHERE singleton = 1').run()
-  db.close()
-
-  const again = await relaunch(userData, { fake, slackApp, model })
-  try {
-    const later = new Juno(again.app, again.win)
-    await later.waitForSync()
+  const later = await relaunch({ whileClosed: async () => {
+    const dir = join(userData, 'agent')
+    const journal = readdirSync(dir).find((name) => /^pi-.+\.sqlite$/.test(name))!
+    const db = new DatabaseSync(join(dir, journal))
+    try { db.prepare('UPDATE durable_schema SET version = version + 1000 WHERE singleton = 1').run() } finally { db.close() }
+  } })
+  await later.waitForSync()
     const chip = (await openChat(later)).root.locator('[data-banner="updateNeeded"]')
     await expect(chip).toHaveText(chatCopy.banner.updateNeeded.chip, { timeout: 30_000 })
     await expect(JunoChatPane.tab(later.win).composer).toBeDisabled()
-  } finally {
-    await again.close()
-  }
 })
 
 
-test('an interrupted reply keeps the owner message and Try again answers it once', async ({ juno, model, running, userData, fake, slackApp }) => {
+test('an interrupted reply keeps the owner message and Try again answers it once', async ({ juno, model, relaunch, userData }) => {
   await ready(juno)
   const chat = await openChat(juno)
   const gate = model.hold('keep these words')
   await chat.send('keep these words')
   await expect.poll(gate.arrived).toBe(true)
-  await running.close()
-  gate.release()
-  // Simulate losing the journal after its input was archived. Recovery must rotate,
-  // keep the owner's words and require a new click before trying the interrupted run.
-  const dir = join(userData, 'agent')
-  for (const name of readdirSync(dir)) {
-    if (/^pi-.+\.sqlite(?:-wal|-shm)?$/.test(name)) rmSync(join(dir, name))
-  }
-  const next = await relaunch(userData, { fake, slackApp, model })
-  try {
-    const again = new Juno(next.app, next.win)
-    await again.waitForSync()
-    await agentReady(next.app)
+  const again = await relaunch({ whileClosed: async () => {
+    gate.release()
+    const dir = join(userData, 'agent')
+    for (const name of readdirSync(dir)) {
+      if (/^pi-.+\.sqlite(?:-wal|-shm)?$/.test(name)) rmSync(join(dir, name))
+    }
+  } })
+  await again.waitForSync()
+  await agentReady(again.surface)
     const pane = await openChat(again)
     await expect(pane.ownerBubble('keep these words')).toHaveCount(1)
     const ending = pane.root.locator('[data-chat-ending]')
@@ -293,5 +217,4 @@ test('an interrupted reply keeps the owner message and Try again answers it once
     await ending.getByRole('button', { name: 'Try again' }).click()
     await pane.expectJuno('You said: keep these words')
     await expect(pane.junoBubble('You said: keep these words')).toHaveCount(1)
-  } finally { await next.close() }
 })

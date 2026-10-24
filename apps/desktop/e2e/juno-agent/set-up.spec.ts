@@ -3,7 +3,7 @@
 // chat; or Skip for now, after which the Juno tab says Juno needs a model.
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
 import type { Juno } from '../driver/juno'
-import { expect, hooks, launchApp, test as base } from '../fixtures'
+import { expect, hooks, test as base } from '../fixtures'
 import { answer, JunoChatPane } from './chat'
 
 const KEY = 'sk-or-v1-e2e0123456789abcdef0123456789abcdef'
@@ -16,10 +16,8 @@ const test = base.extend<{ readonly model: FakeOpenRouter }>({
     await use(model)
     await model.close()
   },
-  running: async ({ fake, slackApp, userData, model }, use) => {
-    const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, fakeOpenRouterUrl: model.origin })
-    await use(running)
-    await running.close()
+  agentOptions: async ({ model }, use) => {
+    await use({ fakeOpenRouterUrl: model.origin })
   },
 })
 
@@ -39,7 +37,7 @@ test('after sign-in, Set up Juno takes an OpenRouter key and the default model, 
   await setUp.getByLabel('API key').fill('two words')
   await setUp.getByRole('button', { name: 'Continue' }).click()
   await expect(setUp.locator('[data-sign-in-error]')).toHaveText('That is not a key. Keys have no spaces.')
-  expect(await hooks(juno.app, 'agentState')).toBe('stopped')
+  expect(await hooks(juno.surface, 'agentState')).toBe('stopped')
 
   await setUp.getByLabel('API key').fill(KEY)
   await setUp.getByLabel('API key').press('Enter')
@@ -64,7 +62,7 @@ test('after sign-in, Skip for now leaves AI assist on, and the Juno tab says Jun
   await juno.setUp.getByRole('button', { name: 'Skip for now' }).click()
 
   await juno.waitForSync()
-  expect(await hooks(juno.app, 'agentState')).toBe('stopped')
+  expect(await hooks(juno.surface, 'agentState')).toBe('stopped')
   // AI assist stays on: Home writes to Juno by default, and Juno asks for a model.
   await juno.home.open()
   await juno.write.expectDestination('Juno')

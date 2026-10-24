@@ -6,7 +6,6 @@ import type { FakeT3 } from '../../../../packages/agent-testing/src/mcp/t3'
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
 import type { Juno } from '../driver/juno'
-import { hooks } from '../fixtures'
 import { card, configure, openChat, openPage, ready } from './agent'
 import { answer as echo, expect, test as chat } from './chat'
 
@@ -154,18 +153,6 @@ test('T3 Code asks a question on a card and the chosen answer reaches T3 Code', 
   await expect.poll(() => t3.answers()).toEqual([{ requestId, answers: expect.anything() }])
   expect(JSON.stringify(t3.answers()[0]!.answers)).toContain('Remove it')
   await expect(task.locator('[data-task-phase]')).toHaveAttribute('data-task-phase', 'running', { timeout: POLL })
-})
-
-test.fixme('the sidebar sparkle shows while the session runs, and Done sends a notification', async ({ juno, t3 }) => {
-  // The agent host refuses notification delivery.
-  await ready(juno)
-  await connectT3(juno, t3.loopbackUrl)
-  const { threadId } = await startTask(juno, t3)
-  const junoRow = juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ })
-  await expect(junoRow.locator('svg [opacity="0.2"]')).toHaveCount(1)
-  t3.advance(threadId, { status: 'completed' })
-  await expect(junoRow.locator('svg [opacity="0.2"]')).toHaveCount(0, { timeout: POLL })
-  await expect.poll(() => hooks(juno.app, 'notifications'), { timeout: POLL }).toContainEqual(expect.objectContaining({ body: expect.stringContaining(TITLE) }))
 })
 
 test('a key in a brief is blocked: no card, nothing reaches T3 Code, and the chat says so', async ({ juno, t3, model }) => {

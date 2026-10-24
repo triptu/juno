@@ -14,11 +14,11 @@ const POSTGRES = 'Draft plan is in the doc'
 async function ready(juno: Juno): Promise<void> {
   await juno.signIn()
   await juno.waitForSync()
-  await expect.poll(() => hooks(juno.app, 'agentState'), { timeout: 15_000 }).toBe('ready')
+  await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
 }
 
 async function setWindowSize(juno: Juno, width: number, height: number): Promise<void> {
-  await juno.app.evaluate(({ BrowserWindow }, size) => BrowserWindow.getAllWindows()[0]!.setSize(size.width, size.height), { width, height })
+  await juno.setWindowSize(width, height)
 }
 
 /**

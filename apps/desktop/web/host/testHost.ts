@@ -30,10 +30,11 @@ import { ENGINE_SOCKET_PATH } from '../paths'
 import { fakeMain, type SessionStore, type StoredSession } from './fakeMain'
 import { serveFile } from './files'
 import { createShell } from './system'
-import { SHELL_SOCKET_PATH, type SystemCall } from '../shell'
+import type { AgentOptions } from './agent'
+import { AGENT_SOCKET_PATH, SHELL_SOCKET_PATH, type SystemCall } from '../shell'
 
 /** How the engine starts: the launch options the Electron fixture passes main as environment variables. */
-export interface EngineOptions {
+export interface EngineOptions extends AgentOptions {
   readonly timing?: 'fast' | 'production'
   readonly aiJobs?: boolean
   readonly fakeAiDelayMillis?: number
@@ -163,10 +164,12 @@ async function startEngineOn(start: HostStart, options: EngineOptions, transport
       host,
       httpTransport: main.httpTransport,
       agentWrites: 'enabled',
+      agentTransport: shell.agent.transport,
       logger: log.effectLogger,
       ...(fast ? { work: work.control, timing: fastTestTiming } : {}),
     },
   )
+  await shell.agent.start()
   return { engine, log, testWork: work, cookie: main.cookie }
 }
 
@@ -204,7 +207,7 @@ async function begin(start: HostStart): Promise<{ url: string }> {
   const address = server.address()
   const port = typeof address === 'object' && address !== null ? address.port : 0
   const transport = socketTransport({ host: '127.0.0.1', port })
-  const shell = createShell(start.userData)
+  const shell = createShell(start.userData, start.engine)
   const started = await startEngineOn(start, start.engine, transport, calls, shell)
   server.on('request', (request, response) => {
     const files = { origin: new URL(start.fakeUrl).origin, aliases: start.aliases, cookie: () => running?.cookie() ?? '', userData: start.userData }
@@ -217,9 +220,10 @@ async function begin(start: HostStart): Promise<{ url: string }> {
   })
   server.on('upgrade', (request, socket, head) => {
     const path = new URL(request.url ?? '/', 'http://host').pathname
-    if (path !== ENGINE_SOCKET_PATH && path !== SHELL_SOCKET_PATH) return socket.destroy()
+    if (path !== ENGINE_SOCKET_PATH && path !== SHELL_SOCKET_PATH && path !== AGENT_SOCKET_PATH) return socket.destroy()
     sockets.handleUpgrade(request, socket, head, (ws) => {
       if (path === SHELL_SOCKET_PATH) shell.attach(ws)
+      else if (path === AGENT_SOCKET_PATH) void shell.agent.attach(ws)
       else running?.transport.add(ws)
     })
   })
@@ -253,6 +257,7 @@ async function quitEngine(): Promise<void> {
   if (current === undefined) throw new Error('The host has not started')
   if (current.stopped) return
   current.stopped = true
+  await current.shell.agent.stop()
   await current.engine.stop()
   await current.log.close()
 }
@@ -295,6 +300,7 @@ async function stop(): Promise<void> {
   running = undefined
   if (current === undefined) return
   if (!current.stopped) {
+    await current.shell.agent.stop()
   await current.engine.stop().catch(() => undefined)
     await current.log.close().catch(() => undefined)
   }

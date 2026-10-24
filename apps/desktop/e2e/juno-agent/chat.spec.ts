@@ -14,16 +14,13 @@ const RINA = 'Rina finished the onsite'
 async function ready(juno: Juno): Promise<void> {
   await juno.signIn()
   await juno.waitForSync()
-  await expect.poll(() => hooks(juno.app, 'agentState'), { timeout: 15_000 }).toBe('ready')
+  await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
 }
 
 const junoNav = (juno: Juno) => juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ })
 
 async function setWindowWidth(juno: Juno, width: number): Promise<void> {
-  await juno.app.evaluate(({ BrowserWindow }, w) => {
-    const window = BrowserWindow.getAllWindows()[0]!
-    window.setSize(w, window.getSize()[1]!)
-  }, width)
+  await juno.setWindowSize(width)
 }
 
 test('a question written on Home goes to the Juno chat, with the field where Home’s was, and Back returns to Home', async ({ juno }) => {
@@ -93,7 +90,6 @@ test('Copy in a chat message\'s menu puts all of a long message on the clipboard
   const long = 'Notes for the copy check, one line of many. '.repeat(114).slice(0, 5_000).trim()
   await chat.send(long)
   await chat.expectOwner(long.slice(0, 200))
-  await juno.app.evaluate(({ clipboard }) => clipboard.clear())
   await (await chat.menu(long.slice(0, 200), { owner: true })).choose('copy')
   await expect.poll(() => juno.clipboard()).toBe(long)
   await expect(juno.win.getByText('Could not copy')).toHaveCount(0)

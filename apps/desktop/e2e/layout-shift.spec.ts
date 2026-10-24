@@ -293,10 +293,10 @@ test('the probe rejects a one-pixel movement that returns before the action ends
   })).rejects.toThrow('anchor must move by exactly 0 px')
 })
 
-chatTest('a Juno response leaves the owner bubble where it first painted', { tag: '@electron' }, async ({ juno, win }) => {
+chatTest('a Juno response leaves the owner bubble where it first painted', async ({ juno, win }) => {
   await juno.signIn()
   await juno.waitForSync()
-  await expect.poll(() => hooks(juno.app, 'agentState'), { timeout: 15_000 }).toBe('ready')
+  await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
   await win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
   const chat = JunoChatPane.tab(win)
   await chat.composer.fill('Check the layout of this reply')

@@ -30,10 +30,16 @@ function answer(request: OpenRouterRequest): string | ToolCallAnswer {
   return echo(request)
 }
 
-/** While set, the search waits for it, so a test can read the status bubble during the call. */
-let held: Promise<void> | undefined
+interface SearchGate { readonly wait: () => Promise<void> | undefined; readonly hold: () => void; readonly release: () => void }
 
-const test = chat.extend<{ readonly mcp: FakeMcpServer; readonly model: FakeOpenRouter }>({
+const test = chat.extend<{ readonly mcp: FakeMcpServer; readonly model: FakeOpenRouter; readonly searchGate: SearchGate }>({
+  // oxlint-disable-next-line no-empty-pattern
+  searchGate: async ({}, use) => {
+    let wait: Promise<void> | undefined
+    let release = () => {}
+    await use({ wait: () => wait, hold: () => { wait = new Promise((resolve) => { release = resolve }) }, release: () => { release(); wait = undefined } })
+    release()
+  },
   // oxlint-disable-next-line no-empty-pattern
   model: async ({}, use) => {
     const model = await startFakeOpenRouter({ answer })
@@ -41,7 +47,7 @@ const test = chat.extend<{ readonly mcp: FakeMcpServer; readonly model: FakeOpen
     await model.close()
   },
   // oxlint-disable-next-line no-empty-pattern
-  mcp: async ({}, use) => {
+  mcp: async ({ searchGate }, use) => {
     // pi-mcp has only an ESM entry and Playwright loads specs as CommonJS.
     const { startFakeMcpServer, json } = await import('@juno/agent-testing/mcp')
     const note = { type: 'object', properties: { title: { type: 'string' }, text: { type: 'string' } }, required: ['title', 'text'] } as const
@@ -49,7 +55,7 @@ const test = chat.extend<{ readonly mcp: FakeMcpServer; readonly model: FakeOpen
     const server = await startFakeMcpServer({ name: 'context', tools: [
       // No read-only mark, as Littlebird's own search has none.
       { name: 'search_user_context', description: 'Search what is known about the user.', inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] }, call: async () => {
-        await held
+        await searchGate.wait()
         return json({ results: ['Prefers short messages.'] })
       } },
       { name: 'create_note', description: 'Create a note.', inputSchema: note, call: () => json({ id: `note-${++notes}`, saved: true }) },
@@ -62,18 +68,16 @@ const test = chat.extend<{ readonly mcp: FakeMcpServer; readonly model: FakeOpen
 
 test.describe.configure({ timeout: 120_000 })
 
-test('a search with no read-only mark runs under Auto with no card', async ({ juno, mcp }) => {
+test('a search with no read-only mark runs under Auto with no card', async ({ juno, mcp, searchGate }) => {
   await ready(juno)
   const { id } = await addServer(juno, 'Context', mcp.url)
   const pane = await openChat(juno)
-  let release = () => {}
-  held = new Promise((resolve) => { release = resolve })
+  searchGate.hold()
   await pane.send(`learn about me on ${id}`)
   // While the call runs, the status bubble names the connection and what the tool does.
   await expect(pane.root.locator('[data-chat-status]')).toHaveText('Searching Context')
-  await pane.root.locator('[data-chat-status]').screenshot({ path: test.info().outputPath('status.png') })
-  release()
-  held = undefined
+
+  searchGate.release()
   await pane.expectJuno('You prefer short messages.')
   await expect(card(pane, 'change')).toHaveCount(0)
   expect(mcp.calls.map((call) => call.name)).toEqual(['search_user_context'])
@@ -92,17 +96,17 @@ test('an approved call runs once, the card shows its result, and Juno goes on wi
   await expect(asked.locator('[data-change-field="title"]')).toContainText('Lunch')
   await expect(asked.locator('[data-change-field="title"]')).not.toContainText('"')
   expect(mcp.calls).toHaveLength(0)
-  await asked.screenshot({ path: test.info().outputPath('card-before.png') })
+
   await asked.getByRole('button', { name: 'Create note' }).click()
   await expect(asked).toHaveAttribute('data-card-status', 'done')
   await expect(asked).toContainText('Done')
   // A plain line, never the server's JSON; all of it is behind Show result.
   await expect(asked.locator('[data-card-result]')).toHaveText('Saved')
   expect(await asked.innerText()).not.toContain('{"')
-  await asked.screenshot({ path: test.info().outputPath('card-done.png') })
+
   await asked.getByRole('button', { name: 'Show result' }).click()
   await expect(asked.locator('[data-card-result-full]')).toHaveText('id: note-1\nsaved: true')
-  await asked.screenshot({ path: test.info().outputPath('card-after.png') })
+
   expect(mcp.calls.map((call) => call.name)).toEqual(['create_note'])
   // The run goes on with the result.
   await pane.expectJuno('Saved. note-1')
@@ -118,7 +122,7 @@ test('a failed call shows the server error, and Juno hears it', async ({ juno, m
   await asked.getByRole('button', { name: 'Create note' }).click()
   await expect(asked).toHaveAttribute('data-card-status', 'failed')
   await expect(asked.locator('[data-card-result]')).toContainText('Notes are full for this workspace.')
-  await asked.screenshot({ path: test.info().outputPath('card-failed.png') })
+
   await pane.expectJuno('Saving the note failed.')
 })
 
@@ -139,6 +143,6 @@ test('a read under Always ask says Done once it ran, with how many it found', as
   await expect(asked).toContainText('Done')
   await expect(asked).not.toContainText('Applied')
   await expect(asked.locator('[data-card-result]')).toHaveText('Found 1 result')
-  await asked.screenshot({ path: test.info().outputPath('search-done.png') })
+
   await pane.expectJuno('You prefer short messages.')
 })

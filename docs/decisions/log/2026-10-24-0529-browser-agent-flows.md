@@ -1,0 +1,1 @@
+- 10-24 05:29 · Browser agent flows · Run the real agent beside the engine with main’s provider configuration, memory secrets and an agent WebSocket. Bundle its QuickJS worker and wasm, keep a codemode Electron canary, and merge duplicate Resolve, AI-off and Budget checks into user flows.

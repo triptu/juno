@@ -12,11 +12,8 @@ const TOPIC = 'Draft plan is in the doc'
 async function ready(juno: Juno): Promise<void> {
   await juno.signIn()
   await juno.waitForSync()
-  await expect.poll(() => hooks(juno.app, 'agentState'), { timeout: 15_000 }).toBe('ready')
-  await juno.app.evaluate(({ BrowserWindow }) => {
-    const window = BrowserWindow.getAllWindows()[0]!
-    window.setSize(1400, window.getSize()[1]!)
-  })
+  await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
+  await juno.setWindowSize(1400)
 }
 
 /** Picks `label` from the switcher of the Juno header inside `where`. */

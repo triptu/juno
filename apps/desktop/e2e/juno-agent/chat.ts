@@ -2,7 +2,7 @@
 // and a test fixture that runs the agent against a fake OpenRouter.
 import { startFakeOpenRouter, type FakeOpenRouter, type OpenRouterRequest } from '@juno/agent-testing/openrouter'
 import type { Locator, Page } from '@playwright/test'
-import { expect, launchApp, test as base } from '../fixtures'
+import { expect, test as base } from '../fixtures'
 import { MessageMenuDriver } from '../driver/juno'
 
 /**
@@ -29,16 +29,8 @@ export const test = base.extend<{ readonly model: FakeOpenRouter }>({
     await use(model)
     await model.close()
   },
-  running: async ({ fake, slackApp, userData, model }, use) => {
-    const running = await launchApp(userData, {
-      fakeSlackUrl: fake.url,
-      slackAppDir: slackApp.dir,
-      keychainPassword: slackApp.keychainPassword,
-      agent: true,
-      fakeOpenRouterUrl: model.origin,
-    })
-    await use(running)
-    await running.close()
+  agentOptions: async ({ model }, use) => {
+    await use({ agent: true, fakeOpenRouterUrl: model.origin })
   },
 })
 

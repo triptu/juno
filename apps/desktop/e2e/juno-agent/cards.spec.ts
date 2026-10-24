@@ -3,8 +3,6 @@
 // Because line, and the Budget card at the daily cap.
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
-import { Juno } from '../driver/juno'
-import { launchApp } from '../fixtures'
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
 import { agentReady, card, openChat, openPage, openRuns, openSettings, ready } from './agent'
 import { answer as echo, expect, test as base } from './chat'
@@ -175,21 +173,19 @@ test('at the daily cap, Wait until tomorrow closes the Budget card and Juno stay
 })
 
 
-test('an old unapproved card expires, and Ask again creates a fresh card without sending', async ({ juno, running, userData, fake, slackApp, slack, model }) => {
+test('an old unapproved card expires, and Ask again creates a fresh card without sending', async ({ juno, relaunch, userData, fake, slack }) => {
   await ready(juno)
   const chat = await openChat(juno)
   const channel = slack.channel('eng')
   await chat.send(`send the launch moved to Tuesday to m:${channel}`)
   await chat.expectJuno('It is ready for you.')
   await expect(card(chat, 'sendMessage')).toHaveAttribute('data-card-status', 'open')
-  await running.close()
-  const db = new DatabaseSync(join(userData, 'agent', 'agent.sqlite'))
-  try { expect(db.prepare('UPDATE cards SET created_at = 1').run().changes).toBe(1) } finally { db.close() }
-  const next = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, agent: true, fakeOpenRouterUrl: model.origin })
-  try {
-    const again = new Juno(next.app, next.win)
-    await again.waitForSync()
-    await agentReady(next.app)
+  const again = await relaunch({ whileClosed: async () => {
+    const db = new DatabaseSync(join(userData, 'agent', 'agent.sqlite'))
+    try { expect(db.prepare('UPDATE cards SET created_at = 1').run().changes).toBe(1) } finally { db.close() }
+  } })
+  await again.waitForSync()
+  await agentReady(again.surface)
     const pane = await openChat(again)
     const expired = card(pane, 'sendMessage').first()
     await expect(expired).toHaveAttribute('data-card-status', 'expired')
@@ -198,5 +194,4 @@ test('an old unapproved card expires, and Ask again creates a fresh card without
     await expect(card(pane, 'sendMessage')).toHaveCount(2)
     await expect(card(pane, 'sendMessage').last()).toHaveAttribute('data-card-status', 'open')
     expect(fake.calls.filter((call) => call.method === 'chat.postMessage')).toHaveLength(0)
-  } finally { await next.close() }
 })

@@ -23,7 +23,7 @@ test.describe.configure({ timeout: 120_000 })
 async function open(juno: Juno) {
   await juno.signIn()
   await juno.waitForSync()
-  await expect.poll(() => hooks(juno.app, 'agentState'), { timeout: 30_000 }).toBe('ready')
+  await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 30_000 }).toBe('ready')
   return showChat(juno)
 }
 async function showChat(juno: Juno) {

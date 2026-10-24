@@ -1,4 +1,6 @@
 import { test as base, type ElectronApplication, type Page } from '@playwright/test'
+import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
+import type { AgentOptions } from '../web/host/agent'
 import { HostPool } from './browser/host'
 import { startWebApp } from './browser/running'
 import { copySnapshot, matchingFake as matchingWebFake, snapshotState, webSnapshot, type WebSnapshot } from './browser/snapshot'
@@ -18,12 +20,15 @@ import { launchApp, launchTiming, tempUserData, writeSlackApp, type Lane, type L
 export * from './launch'
 
 export interface Fixtures {
+  readonly agentOptions: AgentOptions
+  readonly agentLaunch: AgentOptions
   readonly timing: 'fast' | 'production' | undefined
   /** Run the engine's background AI jobs in the `running` app (`LaunchOptions.aiJobs`); `test.use({ aiJobs: true })` opts a file in. */
   readonly paced: boolean
   readonly tour: boolean
   readonly aiJobs: boolean
   /** How long the `running` app's fake AI takes to answer (`LaunchOptions.fakeAiDelayMillis`); undefined answers at once. */
+  readonly fakeAiRequiresKey: boolean
   readonly fakeAiDelayMillis: number | undefined
   /** Another app is capturing the screen when the `running` app starts (`LaunchOptions.screenShared`). */
   readonly screenShared: boolean
@@ -200,10 +205,17 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     await use(userData)
     await rm(userData, { recursive: true, force: true })
   },
+  agentOptions: [{}, { option: true }],
+  agentLaunch: async ({ agentOptions }, use) => {
+    const model = agentOptions.agent && agentOptions.fakeOpenRouterUrl === undefined ? await startFakeOpenRouter() : undefined
+    await use({ ...agentOptions, ...(model === undefined ? {} : { fakeOpenRouterUrl: model.origin }) })
+    await model?.close()
+  },
   timing: [undefined, { option: true }],
   aiJobs: [false, { option: true }],
   paced: [false, { option: true }],
   tour: [false, { option: true }],
+  fakeAiRequiresKey: [false, { option: true }],
   fakeAiDelayMillis: [undefined, { option: true }],
   screenShared: [false, { option: true }],
   updateServer: [undefined, { option: true }],
@@ -213,14 +225,14 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   cpu: async ({}, use) => {
     await use(process.env.JUNO_E2E_CPU === '1' ? cpuMeter() : undefined)
   },
-  running: async ({ lane, fake, slackApp, userData, syncedStart, aiJobs, paced, tour, fakeAiDelayMillis, screenShared, updateServer, sidebarTrace, sendTrace, timing, hostPool, page, cpu }, use, testInfo) => {
+  running: async ({ agentLaunch, lane, fake, slackApp, userData, syncedStart, aiJobs, paced, tour, fakeAiRequiresKey, fakeAiDelayMillis, screenShared, updateServer, sidebarTrace, sendTrace, timing, hostPool, page, cpu }, use, testInfo) => {
     const printCpu = () => {
       for (const [kind, millis] of Object.entries(cpu?.stop() ?? {})) console.log(`e2e timing: cpu-${kind} ${Math.round(millis)} ms`)
     }
     if (lane === 'web') {
       if (screenShared || updateServer !== undefined) throw new Error('screenShared and updateServer are Electron launch options; tag the test @electron.')
       const running = await startWebApp(hostPool, page, fake, userData, syncedStart?.snapshot, {
-        sidebarTrace, sendTrace, tour, engine: { timing: launchTiming({ paced, ...(timing === undefined ? {} : { timing }) }), aiJobs, paced, ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }) },
+        sidebarTrace, sendTrace, tour, engine: { ...agentLaunch, timing: launchTiming({ paced, ...(timing === undefined ? {} : { timing }) }), aiJobs, paced, fakeAiRequiresKey, ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }) },
       })
       await use(running)
       if (sidebarTrace && testInfo.status !== testInfo.expectedStatus) await attachSidebarTrace(page, testInfo)
@@ -230,9 +242,10 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
       return
     }
     const running = await launchApp(userData, {
+      ...agentLaunch,
       fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword,
       ...(timing === undefined ? {} : { timing }),
-      aiJobs, paced, tour, screenShared, sidebarTrace, sendTrace, ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }),
+      aiJobs, paced, tour, fakeAiRequiresKey, screenShared, sidebarTrace, sendTrace, ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }),
       ...(updateServer === undefined ? {} : { updateServer }),
     })
     if (syncedStart !== undefined) {
@@ -251,7 +264,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     printCpu()
     await running.close()
   },
-  relaunch: async ({ lane, running, fake, slackApp, userData, aiJobs, paced, tour, fakeAiDelayMillis, timing, page }, use) => {
+  relaunch: async ({ agentLaunch, lane, running, fake, slackApp, userData, aiJobs, paced, tour, fakeAiRequiresKey, fakeAiDelayMillis, timing, page }, use) => {
     let latest: RunningApp = running
     await use(async ({ whileClosed, ...options } = {}) => {
       if (lane === 'web') {
@@ -266,8 +279,9 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
       await latest.close()
       await whileClosed?.()
       latest = await launchApp(userData, {
+        ...agentLaunch,
         fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword,
-        ...(timing === undefined ? {} : { timing }), aiJobs, paced, tour, ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }),
+        ...(timing === undefined ? {} : { timing }), aiJobs, paced, tour, fakeAiRequiresKey, ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }),
         ...options,
       })
       return new Juno(latest.app, latest.win)

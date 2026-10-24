@@ -10,7 +10,7 @@ test.describe.configure({ timeout: 90_000 })
 async function ready(juno: Juno): Promise<void> {
   await juno.signIn()
   await juno.waitForSync()
-  await expect.poll(() => hooks(juno.app, 'agentState'), { timeout: 15_000 }).toBe('ready')
+  await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
 }
 
 test('the Juno tab picks a person with @ and a channel with #, and Juno reads their ids', async ({ juno, model }) => {

@@ -696,7 +696,7 @@ What it cannot do:
 - Files from anywhere but the fake Slack. Other images show a grey placeholder.
 - Perf and feel numbers. It is a dev build with React in development mode and no Content Security Policy, so those come from Electron only (`bun run perf`, `bun run test:feel`).
 
-Desktop verification runs the browser and Electron lanes. The browser lane uses a production renderer build against a per-test engine host; the web shell above stays a development tool. See [Desktop e2e](../apps/desktop/e2e/README.md#browser-lane).
+Desktop verification runs the browser and Electron lanes. The browser lane uses a production renderer build against a per-test engine and agent host; the web shell above stays a development tool. See [Desktop e2e](../apps/desktop/e2e/README.md#browser-lane).
 
 ## The feel suite
 

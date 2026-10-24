@@ -9,8 +9,7 @@ import type { Fixtures } from './fixtures'
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
-import { expect, launchApp, test } from './fixtures'
-import { Juno } from './driver/juno'
+import { expect, test } from './fixtures'
 
 test.describe.configure({ timeout: 120_000 })
 // These tests watch the background art job.
@@ -97,15 +96,19 @@ test('with AI assist off, the topic menu has no Redraw art and a selection offer
     expect(labels).not.toContain('Redraw art')
 })
 
-test('Redraw art needs an OpenRouter key; at the daily limit it says so, and a raised limit draws without a restart', { tag: '@electron' }, async ({ fake, slackApp, userData }) => {
+const keyedTest = test.extend({
+  // oxlint-disable-next-line no-empty-pattern
+  agentOptions: async ({}, use) => {
+    const model = await startFakeOpenRouter({ key: 'fake-engine-test-key' })
+    await use({ fakeOpenRouterUrl: model.origin })
+    await model.close()
+  },
+})
+keyedTest.describe('key and daily limit', () => {
+keyedTest.use({ fakeAiRequiresKey: true })
+
+keyedTest('Redraw art needs an OpenRouter key; at the daily limit it says so, and a raised limit draws without a restart', async ({ juno }) => {
   const KEY = 'fake-engine-test-key'
-  const model = await startFakeOpenRouter({ key: KEY })
-  const running = await launchApp(userData, {
-    fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword,
-    fakeOpenRouterUrl: model.origin, fakeAiRequiresKey: true, aiJobs: true,
-  })
-  try {
-    const juno = new Juno(running.app, running.win)
     await juno.signIn()
     await juno.waitForSync()
     const row = juno.sidebar.row(POSTGRES)
@@ -115,7 +118,7 @@ test('Redraw art needs an OpenRouter key; at the daily limit it says so, and a r
     expect(await labels()).not.toContain('Redraw art')
 
     await juno.openSettings('Juno')
-    const page = running.win.getByRole('main')
+    const page = juno.win.getByRole('main')
     await page.getByLabel('API key', { exact: true }).fill(KEY)
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page.getByText('Topic art and AI titles need an OpenRouter key.')).toHaveCount(0)
@@ -131,7 +134,7 @@ test('Redraw art needs an OpenRouter key; at the daily limit it says so, and a r
     await expect(page.locator('[data-ai-limit-reached]')).toBeVisible()
     await row.chooseInMenu('redraw')
     await juno.expectToast('Today’s AI limit of $0.00 is reached')
-    await running.win.getByRole('status').getByRole('button', { name: 'Change limit' }).click()
+    await juno.win.getByRole('status').getByRole('button', { name: 'Change limit' }).click()
     await juno.tabs.expectActive('Settings')
     await expect(limit).toBeVisible()
 
@@ -141,8 +144,6 @@ test('Redraw art needs an OpenRouter key; at the daily limit it says so, and a r
     await expect(page.locator('[data-ai-activity-today-cost]')).toContainText('of $2.00 today')
     await row.chooseInMenu('redraw')
     await juno.expectToast(`Redrawn · ${POSTGRES}`)
-  } finally {
-    await running.close()
-    await model.close()
-  }
+})
+
 })

@@ -5,7 +5,6 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { startFakeOpenRouter, type OpenRouterRequest } from '@juno/agent-testing/openrouter'
 import { seedWorkspace, startFakeSlack, topic300Seed } from '@juno/fake-slack'
-import { launchApp } from '../fixtures'
 import { openChat, openPage, openRuns, ready } from './agent'
 import { expect, test as chatTest } from './chat'
 
@@ -39,19 +38,14 @@ const test = chatTest.extend({
     await use(model)
     await model.close()
   },
-  running: async ({ fake, slackApp, userData, model }, use) => {
-    const running = await launchApp(userData, {
-      fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword,
-      agent: true, fakeOpenRouterUrl: model.origin, codemode: true,
-    })
-    await use(running)
-    await running.close()
+  agentOptions: async ({ model }, use) => {
+    await use({ agent: true, fakeOpenRouterUrl: model.origin, codemode: true })
   },
 })
 
 test.describe.configure({ timeout: 90_000 })
 
-test('a read-only script runs in the built app, its answer cites what it read, and Activity lists the read', async ({ juno, userData }) => {
+test('a read-only script runs in the built app, its answer cites what it read, and Activity lists the read', { tag: '@canary' }, async ({ juno, userData }) => {
   await ready(juno)
   // The agent ran one script in the sandbox at start: the worker and the QuickJS binary loaded.
   await expect.poll(async () => JSON.parse(await readFile(join(userData, 'agent', 'codemode-probe.json'), 'utf8').catch(() => '{}')), { timeout: 20_000 }).toEqual({ ok: true, value: 12 })

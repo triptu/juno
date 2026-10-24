@@ -3,7 +3,7 @@
 import { startFakeOpenAi } from '@juno/agent-testing/openai'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
 import type { Juno } from '../driver/juno'
-import { expect, hooks, launchApp, test as base } from '../fixtures'
+import { expect, hooks, test as base } from '../fixtures'
 import { answer, JunoChatPane } from './chat'
 
 const KEY = 'sk-or-v1-e2e0123456789abcdef0123456789abcdef'
@@ -17,11 +17,7 @@ const test = base.extend<{ readonly model: FakeOpenRouter }>({
     await use(model)
     await model.close()
   },
-  running: async ({ fake, slackApp, userData, model }, use) => {
-    const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, fakeOpenRouterUrl: model.origin })
-    await use(running)
-    await running.close()
-  },
+  agentOptions: async ({ model }, use) => use({ fakeOpenRouterUrl: model.origin }),
 })
 
 test.describe.configure({ timeout: 90_000 })
@@ -31,8 +27,8 @@ const junoNav = (juno: Juno) => juno.win.getByRole('navigation', { name: 'Pages'
 test('with no provider the tab and the panel say Juno needs a model, and Add a provider sets one up', async ({ juno, model }) => {
   await juno.signIn()
   await juno.waitForSync()
-  expect(await hooks(juno.app, 'agentState')).toBe('stopped')
-  await juno.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1400, 900))
+  expect(await hooks(juno.surface, 'agentState')).toBe('stopped')
+  await juno.setWindowSize(1400, 900)
 
   // The panel beside a topic says so too, with no composer.
   await juno.sidebar.row(POSTGRES).open()
@@ -59,7 +55,7 @@ test('with no provider the tab and the panel say Juno needs a model, and Add a p
   await page.getByLabel('API key').fill(KEY)
   await page.getByRole('button', { name: 'Save' }).click()
   await expect(page.locator('[data-provider-key]')).toHaveAttribute('data-provider-key', 'set')
-  await expect.poll(() => hooks(juno.app, 'agentState'), { timeout: 15_000 }).toBe('ready')
+  await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
   // The agent's part of the page arrives once it runs.
   await expect(page.getByRole('heading', { name: 'Model' })).toBeVisible({ timeout: 15_000 })
 
@@ -84,7 +80,7 @@ test('an OpenAI-compatible endpoint that lists no models takes a typed model id'
     await expect(page.locator('[data-provider-error]')).toHaveText('Enter an http or https address.')
     await page.getByLabel('Base URL').fill(endpoint.baseUrl)
     await page.getByRole('button', { name: 'Save' }).click()
-    await expect.poll(() => hooks(juno.app, 'agentState'), { timeout: 15_000 }).toBe('ready')
+    await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
 
     // The endpoint lists nothing: the model id is typed, and compaction uses it.
     const modelId = page.getByLabel('Model id')

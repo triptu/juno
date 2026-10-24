@@ -6,8 +6,6 @@ import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
 import type { Locator } from '@playwright/test'
-import { Juno } from '../driver/juno'
-import { launchApp, type LaunchOptions } from '../fixtures'
 import { agentReady, card, openChat, openPage, ready } from './agent'
 import { answer as echo, expect, test as chat } from './chat'
 import { startScriptedModel, type ScriptedModel } from './model'
@@ -62,7 +60,7 @@ function scripted(due: Due, lead: number, postgres: () => { readonly channel: st
 // Long enough to see the card and the row and quit before it is due, even on a loaded machine.
 const LEAD = HOUR
 
-const test = chat.extend<{ readonly due: Due; readonly model: ScriptedModel; readonly launch: LaunchOptions }>({
+const test = chat.extend<{ readonly due: Due; readonly model: ScriptedModel }>({
   // oxlint-disable-next-line no-empty-pattern
   due: async ({}, use) => use({}),
   model: async ({ due, slack, fake }, use) => {
@@ -76,8 +74,7 @@ const test = chat.extend<{ readonly due: Due; readonly model: ScriptedModel; rea
     await use(model)
     await model.close()
   },
-  launch: async ({ fake, slackApp, model }, use) =>
-    use({ fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, agent: true, fakeOpenRouterUrl: model.origin }),
+
 })
 
 test.describe.configure({ timeout: 180_000 })
@@ -85,16 +82,7 @@ test.describe.configure({ timeout: 180_000 })
 const scheduleRow = (page: Locator, what: string) => page.locator('[data-schedule]').filter({ hasText: what })
 const wakes = (model: ScriptedModel) => model.inputs().filter((input) => input.includes(CHECKLIST)).length
 
-/** Relaunches on the same user data and waits for sync and the agent. */
-async function relaunch(userData: string, options: LaunchOptions) {
-  const running = await launchApp(userData, options)
-  const juno = new Juno(running.app, running.win)
-  await juno.waitForSync()
-  await agentReady(running.app)
-  return { running, juno }
-}
-
-test('a schedule from a clean run wakes once after a quit past its due time, under its own label', async ({ juno, model, due, running, userData, launch }) => {
+test('a schedule from a clean run wakes once after a quit past its due time, under its own label', async ({ juno, model, due, relaunch, userData }) => {
   const wakesOnce = 'a schedule from a clean run wakes once after a quit past its due time'
   await test.step(wakesOnce, async () => {
     await ready(juno)
@@ -110,23 +98,20 @@ test('a schedule from a clean run wakes once after a quit past its due time, und
     await expect(scheduleRow(scheduled, 'Launch checklist')).toHaveAttribute('data-schedule', 'active')
     await expect(scheduleRow(scheduled, 'Launch checklist')).toContainText('Next ')
 
-    await running.close()
     expect(due.at).toBeDefined()
     expect(wakes(model)).toBe(0)
-    // Model elapsed time while the app is closed. No running process writes this database.
-    // Both the definition and occurrence key move together; the restart runs the real scheduler.
-    const db = new DatabaseSync(join(userData, 'agent', 'agent.sqlite'))
-    try {
-      const result = db.prepare("UPDATE schedules SET due_at = 1, definition = json_set(definition, '$.schedule.at', 1) WHERE state = 'active'").run()
-      expect(result.changes).toBe(1)
-    } finally {
-      db.close()
-    }
   })
 
-  const first = await relaunch(userData, launch)
-  try {
-    const again = await openChat(first.juno)
+  const first = await relaunch({ whileClosed: async () => {
+    const db = new DatabaseSync(join(userData, 'agent', 'agent.sqlite'))
+    try {
+      expect(db.prepare("UPDATE schedules SET due_at = 1, definition = json_set(definition, '$.schedule.at', 1) WHERE state = 'active'").run().changes).toBe(1)
+    } finally { db.close() }
+  } })
+  await first.waitForSync()
+  await agentReady(first.surface)
+  {
+    const again = await openChat(first)
     await test.step(wakesOnce, async () => {
       await again.expectJuno('Here is the launch checklist.')
       expect(wakes(model)).toBe(1)
@@ -138,30 +123,28 @@ test('a schedule from a clean run wakes once after a quit past its due time, und
 
     await test.step(wakesOnce, async () => {
       // A once schedule is gone after its wake.
-      const page = await openPage(first.juno, 'Scheduled')
+      const page = await openPage(first, 'Scheduled')
       await expect(page.getByText('Nothing scheduled')).toBeVisible()
 
-      const activity = await openPage(first.juno, 'Activity')
-      await expect(activity.locator('[data-activity-run="replied"]').filter({ has: first.juno.win.locator('[data-activity-trigger="schedule"]') })).toHaveCount(1)
+      const activity = await openPage(first, 'Activity')
+      await expect(activity.locator('[data-activity-run="replied"]').filter({ has: first.win.locator('[data-activity-trigger="schedule"]') })).toHaveCount(1)
     })
-  } finally {
-    await first.running.close()
   }
 
-  const second = await relaunch(userData, launch)
-  try {
+  const second = await relaunch()
+  await second.waitForSync()
+  await agentReady(second.surface)
+  {
     await test.step(wakesOnce, async () => {
       // The scheduler's first pass runs as the agent opens, so a wake would be ahead of this message.
-      const last = await openChat(second.juno)
+      const last = await openChat(second)
       await last.send('anything else?')
       await last.expectJuno('You said: anything else?')
       expect(wakes(model)).toBe(1)
       await expect(last.junoBubble('Here is the launch checklist.')).toHaveCount(1)
-      const activity = await openPage(second.juno, 'Activity')
-      await expect(activity.locator('[data-activity-run]').filter({ has: second.juno.win.locator('[data-activity-trigger="schedule"]') })).toHaveCount(1)
+      const activity = await openPage(second, 'Activity')
+      await expect(activity.locator('[data-activity-run]').filter({ has: second.win.locator('[data-activity-trigger="schedule"]') })).toHaveCount(1)
     })
-  } finally {
-    await second.running.close()
   }
 })
 
@@ -246,37 +229,6 @@ test('a reply watch made in the chat ends quietly when Leo replies', async ({ ju
   await expect(scheduleRow(page, 'Leo on the cutover')).toHaveCount(0, { timeout: 30_000 })
   await expect(page.getByText('Nothing scheduled')).toBeVisible()
   expect(model.inputs().some((input) => input.includes(WATCH))).toBe(false)
-})
-
-test.fixme('quiet hours hold the schedule notification only, and the wake still runs', async ({ juno, running, userData, launch }) => {
-  // The agent host currently refuses host.notification.deliver.
-  await ready(juno)
-  await juno.openNotifications()
-  for (const day of ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']) {
-    const button = juno.notifications.day('Notifications', day)
-    if (await button.getAttribute('aria-pressed') === 'true') await button.click()
-  }
-  const chatPane = await openChat(juno)
-  await chatPane.send('remind me shortly')
-  await chatPane.expectJuno('Scheduled.')
-  await running.close()
-  const db = new DatabaseSync(join(userData, 'agent', 'agent.sqlite'))
-  try { db.prepare("UPDATE schedules SET due_at = 1, definition = json_set(definition, '$.schedule.at', 1)").run() } finally { db.close() }
-  const next = await relaunch(userData, launch)
-  try {
-    const pane = await openChat(next.juno)
-    await pane.expectJuno('Here is the launch checklist.')
-    expect(await next.juno.osNotifications()).toEqual([])
-    await next.juno.openNotifications()
-    for (const day of ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']) {
-      await next.juno.notifications.day('Notifications', day).click()
-    }
-    const hour = new Date().getHours()
-    const label = (value: number) => `${value % 12 || 12}${value < 12 ? 'am' : 'pm'}`
-    await next.juno.notifications.setFrom('Notifications', label((hour + 23) % 24))
-    await next.juno.notifications.setTo('Notifications', label((hour + 2) % 24))
-    await expect.poll(() => next.juno.osNotifications()).toContainEqual(expect.objectContaining({ body: expect.stringContaining('launch checklist') }))
-  } finally { await next.running.close() }
 })
 
 test('a reply watch from the message menu: Undo deletes one, and a reply ends another', async ({ juno, slack, model }) => {

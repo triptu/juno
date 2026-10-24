@@ -11,14 +11,16 @@ import { Notifier, type NotificationOptions } from '../../src/main/notifier'
 import { testNotificationPermission } from '../../src/main/notificationTestHooks'
 import { syncLogText } from '../../src/main/syncLog'
 import { createLog } from '../../src/logging'
+import { BrowserAgent, type AgentOptions } from './agent'
 import type { ShellEvent, SystemHooks } from '../shell'
 
 /** Main's services with memory OS boundaries. The engine still makes every notification decision. */
-export function createShell(userData: string) {
+export function createShell(userData: string, options: AgentOptions) {
   let host: ReturnType<typeof memoryHost> | undefined
   const send = (message: MainToEngine) => host?.deliver(message)
   const clients = new Set<WebSocket>()
   const publish = (event: ShellEvent) => { for (const socket of clients) socket.send(JSON.stringify(event)) }
+  const agent = new BrowserAgent(userData, options, send, (state) => publish({ event: 'provider', value: state }))
   const file = join(userData, 'web-system.json')
   const saved = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) as { asked?: boolean; privacy?: boolean } : {}
   const persist = () => writeFileSync(file, JSON.stringify(saved))
@@ -47,6 +49,7 @@ export function createShell(userData: string) {
   const pages = createHuddlePageRegistry(send)
   let nextPage = 0
   const hooks: SystemHooks = {
+    agentState: () => agent.state,
     notifications: () => notifications.map(({ title, body, silent }) => ({ title, body, ...(silent === true ? { silent: true as const } : {}) })),
     clickNotification: (index) => notifications[index]?.click(),
     notificationPermission: permission.set,
@@ -59,9 +62,10 @@ export function createShell(userData: string) {
     frontmost: bounce.testHooks.frontmost,
     wake: () => { dock.refresh(); notifier.wake() },
   }
-  const dispatch = shellDispatch({ userData, log, notifier, dock, permission, pages, saved, persist, openSettings: () => { settingsOpened += 1 } })
+  const dispatch = shellDispatch({ agent, userData, log, notifier, dock, permission, pages, saved, persist, openSettings: () => { settingsOpened += 1 } })
 
   return {
+    agent,
     hooks,
     connect: (next: ReturnType<typeof memoryHost>) => {
       host = next
@@ -83,11 +87,12 @@ export function createShell(userData: string) {
       })
       socket.on('close', () => { clients.delete(socket); pages.forget(page) })
     },
-    close: async () => { activity.stop(); await log.close() },
+    close: async () => { activity.stop(); await agent.close(); await log.close() },
   }
 }
 
-function shellDispatch({ userData, log, notifier, dock, permission, pages, saved, persist, openSettings }: {
+function shellDispatch({ agent, userData, log, notifier, dock, permission, pages, saved, persist, openSettings }: {
+  agent: BrowserAgent
   userData: string
   log: ReturnType<typeof createLog>
   notifier: Notifier
@@ -100,6 +105,11 @@ function shellDispatch({ userData, log, notifier, dock, permission, pages, saved
 }) {
   return async (channel: string, input: unknown, page: number): Promise<unknown> => {
     switch (channel) {
+      case Channels.agentProvider: return agent.providers.state
+      case Channels.agentSetProvider: return agent.set(Schema.decodeUnknownSync(ShellRoutes[channel].input)(input))
+      case Channels.agentSetOpenRouterKey: return agent.set({ _tag: 'openRouter', ...Schema.decodeUnknownSync(ShellRoutes[channel].input)(input) })
+      case Channels.agentRecoveryPhrase: return (await agent.secrets.takePhrase()) ?? null
+      case Channels.agentTypeRecoveryPhrase: return agent.secrets.typePhrase(Schema.decodeUnknownSync(ShellRoutes[channel].input)(input).phrase)
       case 'web.syncLog': return syncLogText('web', Schema.decodeUnknownSync(ShellRoutes[Channels.appCopySyncLog].input)(input), new Date(), join(userData, 'logs'))
       case Channels.appReportStagingFailure:
         log.log('WARN', 'files: staging failed', Schema.decodeUnknownSync(ShellRoutes[channel].input)(input))

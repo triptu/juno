@@ -1,3 +1,4 @@
+import type { AppSurface } from './driver/surface'
 import type { ElectronApplication } from '@playwright/test'
 
 /** What main exposes on `globalThis.junoTest` under JUNO_E2E. */
@@ -28,7 +29,11 @@ interface JunoTestHooks {
 }
 
 /** Reads one of main's test hooks. */
-export function hooks<K extends keyof JunoTestHooks>(app: ElectronApplication, name: K): Promise<ReturnType<JunoTestHooks[K]>> {
+export function hooks<K extends keyof JunoTestHooks>(app: ElectronApplication | AppSurface, name: K): Promise<ReturnType<JunoTestHooks[K]>> {
+  if ('kind' in app) {
+    if (name === 'agentState' || name === 'notificationRequests' || name === 'notificationSettingsOpened' || name === 'notifications' || name === 'dockBadge' || name === 'wake') return app.system(name) as Promise<ReturnType<JunoTestHooks[K]>>
+    return hooks(app.electron, name)
+  }
   return app.evaluate((_electron, hook) => {
     const testHooks = (globalThis as unknown as { junoTest: JunoTestHooks }).junoTest
     return testHooks[hook]() as ReturnType<JunoTestHooks[K]>

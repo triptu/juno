@@ -12,14 +12,11 @@ const RINA = 'Rina finished the onsite.'
 async function ready(juno: Juno): Promise<void> {
   await juno.signIn()
   await juno.waitForSync()
-  await expect.poll(() => hooks(juno.app, 'agentState'), { timeout: 15_000 }).toBe('ready')
+  await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
 }
 
 async function setWindowWidth(juno: Juno, width: number): Promise<void> {
-  await juno.app.evaluate(({ BrowserWindow }, w) => {
-    const window = BrowserWindow.getAllWindows()[0]!
-    window.setSize(w, window.getSize()[1]!)
-  }, width)
+  await juno.setWindowSize(width)
 }
 
 test('an About chip from Ask Juno in one tab does not follow to the panel of another tab', async ({ juno, model }) => {

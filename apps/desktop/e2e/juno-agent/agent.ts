@@ -2,6 +2,7 @@
 // connecting a fake MCP server by address, and launching with a crash point armed.
 import type { ElectronApplication, Locator } from '@playwright/test'
 import { CRASH_ENV, type CrashPoint } from '@juno/agent/crash'
+import type { AppSurface } from '../driver/surface'
 import type { Juno } from '../driver/juno'
 import { hooks, launchApp, type LaunchOptions, type RunningApp } from '../fixtures'
 import { expect, JunoChatPane } from './chat'
@@ -15,10 +16,10 @@ export type JunoSettingsSection = 'Juno' | 'AI activity' | 'Connections' | 'Back
 export async function ready(juno: Juno): Promise<void> {
   await juno.signIn()
   await juno.waitForSync()
-  await agentReady(juno.app)
+  await agentReady(juno.surface)
 }
 
-export async function agentReady(app: ElectronApplication): Promise<void> {
+export async function agentReady(app: ElectronApplication | AppSurface): Promise<void> {
   await expect.poll(() => hooks(app, 'agentState'), { timeout: 30_000 }).toBe('ready')
 }
 

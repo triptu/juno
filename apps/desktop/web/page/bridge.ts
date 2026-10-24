@@ -23,6 +23,7 @@ import { popupMenu } from './menu'
 import { answerMenu, installTestSeam, seam, testing } from './testSeam'
 import { pageUrl } from './urls'
 import { hostRequest, hostSyncLog, onHostEvent } from './host'
+import { requestAgentPort } from './agent'
 
 const nothing = (): Promise<undefined> => Promise.resolve(undefined)
 const never = (): (() => void) => () => {}
@@ -108,16 +109,16 @@ const bridge: JunoBridge = {
     restart: nothing,
   },
   agent: {
-    requestPort: () => Promise.resolve('failed'),
-    setOpenRouterKey: () => Promise.resolve('failed'),
-    provider: () => Promise.resolve(noProvider),
-    setProvider: () => Promise.resolve('failed'),
+    requestPort: () => testing ? requestAgentPort() : Promise.resolve('failed'),
+    setOpenRouterKey: (key) => testing ? hostRequest(Channels.agentSetOpenRouterKey, { key }) : Promise.resolve('failed'),
+    provider: () => testing ? hostRequest(Channels.agentProvider, undefined) : Promise.resolve(noProvider),
+    setProvider: (change) => testing ? hostRequest(Channels.agentSetProvider, change) : Promise.resolve('failed'),
     codex: () => Promise.resolve('missing'),
     codexSignIn: () => Promise.resolve('missing'),
-    onProvider: never,
+    onProvider: (listener) => onHostEvent((event) => { if (event.event === 'provider') listener(event.value) }),
     chooseFolder: () => Promise.resolve(null),
-    recoveryPhrase: () => Promise.resolve(null),
-    typeRecoveryPhrase: () => Promise.resolve('failed'),
+    recoveryPhrase: () => testing ? hostRequest(Channels.agentRecoveryPhrase, undefined) : Promise.resolve(null),
+    typeRecoveryPhrase: (phrase) => testing ? hostRequest(Channels.agentTypeRecoveryPhrase, { phrase }) : Promise.resolve('failed'),
   },
   launch: {
     setTheme: (theme) => Promise.resolve(saveLaunch('theme', theme)),
