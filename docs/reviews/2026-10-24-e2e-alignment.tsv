@@ -77,7 +77,7 @@ apps/desktop/e2e/link-menu.spec.ts	browser	keep	One test of link menus against t
 apps/desktop/e2e/links.spec.ts	browser	folded	The rich-paste regression (c98c29cfe) is a step of the links flow (2→1 tests).
 apps/desktop/e2e/live.spec.ts	browser	folded	Read state at the bottom (with the shift measure) and unread while in the background are steps of one launch; the scrolled-up topic300 test stays apart (3→2 tests).
 apps/desktop/e2e/main-new-threads.spec.ts	browser	keep	One test: the Main row's new-threads count grows, leaves out your own thread, clears on read, and the row keeps its height (120657c5a).
-apps/desktop/e2e/mark-unread.spec.ts	browser	folded	Read state: Mark as unread holds while the topic is open; thread and Main cases are two steps of one flow, the Main step reading only #eng's mark (2→1 tests).
+apps/desktop/e2e/mark-unread.spec.ts	browser	folded	Read state: Mark as unread holds while the topic is open; thread and Main cases are two steps of one flow, with an observable wait and a command-group locator so the Search footer cannot take the Main step (2→1 tests).
 apps/desktop/e2e/media.spec.ts	browser	left	Hands-off. Real late-thumbnail and partial-file regressions; zoom and viewer-tabs could be steps of the #eng media flow, the retry test waits up to 60 s on real backoff, and it pins exact pixel sizes.
 apps/desktop/e2e/mentions.spec.ts	browser	keep	One five-step flow checking the exact Slack markup posted for people, groups and channels; the Home test needs a fresh Home.
 apps/desktop/e2e/menus.spec.ts	browser	folded	One active row per menu and open-on-press; the press test is a third step of the same launch (2→1 tests).

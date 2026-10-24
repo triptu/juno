@@ -80,7 +80,8 @@ test('Mark as unread holds on the open topic: a thread until you leave it, a Mai
     const { palette } = juno
     await palette.open()
     await palette.type('Mark as unread')
-    await palette.choose('Mark as unread')
+    await palette.expectResults()
+    await palette.section('Pages, settings and commands').getByRole('option', { name: 'Mark as unread' }).click()
     await eng.expectUnread(1)
     // The pointer moves back to the message before the latest.
     await expect.poll(() => lastEngMark(slack.fake.calls)?.ts).not.toBe(read)
