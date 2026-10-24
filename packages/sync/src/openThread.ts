@@ -117,10 +117,11 @@ const FIRST_WINDOW = 150
 /**
  * Where the first open of a thread no page proves yet starts, when the
  * store holds replies of it beyond one page from the floor: the oldest of
- * the newest `FIRST_WINDOW` replies stored in full, or the read pointer
- * when that is older, so the unread replies come first. The window stands in
- * with what the store holds while the fetch is out (`standIn` in the engine),
- * and pages from there prove that stretch first, so it stays as it was shown.
+ * the newest `FIRST_WINDOW` replies stored in full, the read pointer, and
+ * the start of what a `getView` row vouched for, so the unread replies come
+ * first. The window stands in with what the store holds while the fetch is
+ * out (`standIn` in the engine), and pages from there prove that stretch
+ * first, so it stays as it was shown.
  */
 const firstStart = (channel: string, threadTs: string, floor: string | undefined, root: RootContent | undefined, pointer: string | undefined): Effect.Effect<string | undefined, SqlError, StoreWriter> =>
   Effect.gen(function* () {
@@ -129,8 +130,9 @@ const firstStart = (channel: string, threadTs: string, floor: string | undefined
     const rows = yield* sql<{ ts: string }>`
       SELECT ts FROM (SELECT ts FROM messages WHERE channel = ${channel} AND thread_ts = ${threadTs} AND ts <> ${threadTs} AND deleted = 0 AND partial = 0
         ORDER BY ts DESC LIMIT ${FIRST_WINDOW}) ORDER BY ts LIMIT 1`
-    const newest = rows[0]?.ts
-    const start = newest !== undefined && pointer !== undefined && compareTs(pointer, newest) < 0 ? pointer : newest
+    // The stand-in shows what a `getView` row vouched for too: start no later than that, so the window keeps it.
+    const views = (yield* threadRanges(channel, threadTs)).filter((range) => range.kind === 'view').map((range) => range.from_ts)
+    const start = [rows[0]?.ts, pointer, ...views].reduce<string | undefined>((a, ts) => (ts === undefined ? a : a === undefined || compareTs(ts, a) < 0 ? ts : a), undefined)
     return start === undefined || compareTs(start, floor ?? threadTs) <= 0 ? undefined : start
   })
 
