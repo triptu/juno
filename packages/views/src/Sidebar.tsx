@@ -35,7 +35,7 @@ import {
 } from '@juno/ui'
 import { countLabel, kindIcon } from './look'
 
-export type SidebarNavTarget = 'home' | 'all-topics' | 'juno'
+export type SidebarNavTarget = 'home' | 'all-topics' | 'juno' | 'search'
 
 export interface SidebarAccount {
   readonly name: string
@@ -103,7 +103,6 @@ export interface SidebarProps {
   readonly accountMenuOpen: boolean
   readonly accountMenu?: ReactNode
   readonly onAccountMenu: (open: boolean) => void
-  readonly onSearch: () => void
   /** Fires on mouse down; `event.metaKey` asks for a new tab. */
   readonly onNavigate: (target: SidebarNavTarget, event: ActivateEvent) => void
   /** Right-click on a page item or button: its menu (Open in new tab). */
@@ -168,7 +167,6 @@ export function Sidebar({
   accountMenuOpen,
   accountMenu,
   onAccountMenu,
-  onSearch,
   onNavigate,
   onNavigateMenu,
   onNavigatePrefetch,
@@ -209,7 +207,15 @@ export function Sidebar({
         <div {...stylex.props(styles.titlebar, fullScreen && styles.titlebarFullScreen)}>
           {titlebarLeading}
           <div {...stylex.props(styles.icons)}>
-            <IconButton icon={MagnifyingGlass} label="Search" shortcut={menuKeys('palette.toggle')} size={30} onClick={onSearch} />
+            <IconButton
+              icon={MagnifyingGlass}
+              label="Search"
+              shortcut={menuKeys('search.open')}
+              size={30}
+              current={activeNav === 'search'}
+              {...activateHandlers<HTMLButtonElement>((event) => onNavigate('search', event))}
+              onContextMenu={navMenu('search')}
+            />
             <IconButton
               icon={ListBullets}
               label="All topics"

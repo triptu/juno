@@ -31,7 +31,7 @@ import { SyncNotice, useSyncNoticeReady } from './SyncNotice'
 import { markFilterChange } from './filterMark'
 import { openJunoTab } from './juno/actions'
 import { openAllTopics, openHome, openSettings, warmHome } from './navigation'
-import { openPalette } from './paletteActions'
+import { openSearch } from './search/open'
 import { setPrivacy } from './privacy'
 import { sidebarTop } from './sidebarTop'
 import { TitlebarNav } from './TitlebarNav'
@@ -50,6 +50,7 @@ function navigate(target: SidebarNavTarget, event: ActivateEvent): void {
   if (target === 'home') return openHome({ newTab: event.metaKey })
   if (target === 'all-topics') return openAllTopics({ newTab: event.metaKey })
   if (target === 'juno') return openJunoTab({ newTab: event.metaKey })
+  if (target === 'search') return openSearch({ newTab: event.metaKey })
 }
 
 /** A page item's menu: Open in new tab, as ⌘-click does. */
@@ -71,6 +72,8 @@ function activeNavOf(tabs: Tabs): SidebarNavTarget | undefined {
     case 'juno':
     case 'junoPage':
       return 'juno'
+    case 'search':
+      return 'search'
     default:
       return undefined
   }
@@ -165,7 +168,6 @@ export function Sidebar() {
           onAction={accountAction}
         />
       }
-      onSearch={openPalette}
       {...(activeNav === undefined ? {} : { activeNav })}
       junoUnread={junoUnread}
       junoBusy={junoBusy}

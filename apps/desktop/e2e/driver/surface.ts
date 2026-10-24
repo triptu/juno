@@ -55,6 +55,8 @@ export type AppMenuItem =
   | 'toggle-privacy'
   | 'juno'
   | 'search'
+  | 'search-messages'
+  | 'search-topic'
   | 'undo'
   | 'tour'
   | 'settings'
@@ -77,6 +79,8 @@ const COMMANDS: Record<AppMenuItem, MenuCommand> = {
   'toggle-privacy': 'privacy.toggle',
   juno: 'juno.toggle',
   search: 'palette.toggle',
+  'search-messages': 'search.open',
+  'search-topic': 'search.topic',
   undo: 'edit.undo',
   tour: 'tour.show',
   settings: 'settings.open',

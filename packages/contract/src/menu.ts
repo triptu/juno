@@ -28,6 +28,10 @@ export type MenuCommand =
   | 'privacy.toggle'
   | 'juno.toggle'
   | 'palette.toggle'
+  /** ⌘⇧F: the Search tab (SPEC 10a). Its field when a Search tab is active, else Search in the current tab. */
+  | 'search.open'
+  /** ⌘F: Search scoped to the topic the tab shows (a thread, or a Main's conversation). Elsewhere as ⌘⇧F. */
+  | 'search.topic'
   | 'edit.undo'
   | 'settings.open'
   /** Juno › Check for Updates…: main has started the check; the renderer opens Settings › About to show it. */
@@ -62,6 +66,8 @@ export const menuShortcuts = {
   'privacy.toggle': 'Control+Command+H',
   'juno.toggle': 'CommandOrControl+J',
   'palette.toggle': 'CommandOrControl+K',
+  'search.open': 'CommandOrControl+Shift+F',
+  'search.topic': 'CommandOrControl+F',
   'edit.undo': 'CommandOrControl+Z',
   'settings.open': 'CommandOrControl+,',
   // Shown in the menu only: the page takes the key, so it also works where the menu does not see it (SPEC 20).

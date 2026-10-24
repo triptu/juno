@@ -305,7 +305,10 @@ function setAppMenu(state: MenuState, rebuild = false): void {
     command('forward', 'Forward', menuShortcuts['history.forward'], 'history.forward'),
     { type: 'separator' },
     // ⌘K (SPEC section 10) opens the palette, and closes it again.
-    command('search', 'Search…', menuShortcuts['palette.toggle'], 'palette.toggle'),
+    command('search', 'Search and Commands…', menuShortcuts['palette.toggle'], 'palette.toggle'),
+    // The Search tab (SPEC 10a): ⌘⇧F everywhere, ⌘F scoped to the topic the tab shows.
+    command('search-messages', 'Search Messages', menuShortcuts['search.open'], 'search.open'),
+    command('search-topic', 'Search in This Topic', menuShortcuts['search.topic'], 'search.topic'),
   ]
   // The Huddle menu (SPEC 20), dimmed while the user is in no huddle.
   const inHuddle = state.huddle !== null

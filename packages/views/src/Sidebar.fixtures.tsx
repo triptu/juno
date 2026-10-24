@@ -26,7 +26,6 @@ const chrome: Omit<SidebarProps, 'children'> = {
   dots: { channels: true, dms: true },
   accountMenuOpen: false,
   onAccountMenu: noop,
-  onSearch: noop,
   onNavigate: noop,
   onFilterKind: noop,
   onToggleUnread: noop,
