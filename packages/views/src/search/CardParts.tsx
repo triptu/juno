@@ -64,9 +64,10 @@ export function FoldedBody({ body, now, words, onLink, linkInfo }: { readonly bo
         <MessageBody body={body} now={now} hueOf={hueForId} onLink={onLink} linkInfo={linkInfo} />
       </div>
       {cut === undefined && !open ? null : (
-        // Unfolding grows the card in place, which the press asked for.
+        // Unfolding grows the card in place, which the press asked for. A press leaves focus where it was, so the card
+        // around it is not selected by taking focus.
         <span data-expands-in-place="" {...stylex.props(styles.moreSlot)}>
-          <button type="button" tabIndex={-1} aria-expanded={open} data-search-more="" onClick={() => setOpen((value) => !value)} {...stylex.props(styles.more)}>
+          <button type="button" tabIndex={-1} aria-expanded={open} data-search-more="" onMouseDown={(event) => event.preventDefault()} onClick={() => setOpen((value) => !value)} {...stylex.props(styles.more)}>
             {open ? 'Show less' : 'Show more'}
           </button>
         </span>

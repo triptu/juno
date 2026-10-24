@@ -199,6 +199,9 @@ function useListKeys({ onSelect, onOpen, onToggleTopic, onShowTopic, onHideTopic
     const id = (event.target as HTMLElement).closest<HTMLElement>('[data-search-row]')?.dataset.searchRow
     if (id === undefined) return
     const plain = !event.metaKey && !event.ctrlKey && !event.altKey
+    // Enter and Space on a control inside a card, such as Show more, are the control's.
+    const control = (event.target as HTMLElement).matches('a, button')
+    if (control && plain && (event.key === 'Enter' || event.key === ' ')) return
     if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && plain) {
       event.preventDefault()
       return move(id, event.key === 'ArrowDown' ? 1 : -1)
