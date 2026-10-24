@@ -43,11 +43,13 @@ test('the Juno panel beside a thread and a Main, light and dark', async ({ juno,
     await juno.tabs.menu('juno')
     await expect(panel.composer).toBeFocused()
   }
+  // Every transition and animation on the page has run to its end.
+  const settled = () => win.evaluate(() => Promise.all(document.getAnimations().map((animation) => animation.finished)))
   const shoot = async (name: string) => {
     await win.mouse.move(20, 880)
     await win.evaluate(() => document.fonts.ready)
     await expect(win.locator('html')).not.toHaveAttribute('data-theme-switching', /.*/)
-    await win.waitForTimeout(400)
+    await settled()
     await win.screenshot({ path: resolve(shots, `${prefix}-${name}.png`) })
   }
   for (const theme of ['Light', 'Dark'] as const) {
@@ -75,7 +77,7 @@ test('the Juno panel beside a thread and a Main, light and dark', async ({ juno,
       await reopen()
       await win.mouse.move(20, 880)
       await expect(win.locator('html')).not.toHaveAttribute('data-theme-switching', /.*/)
-      await win.waitForTimeout(300)
+      await settled()
       await win.locator('aside[data-juno-panel]').screenshot({ path: resolve(shots, `accents/${prefix}-${theme.toLowerCase()}-${accent.toLowerCase().replace(/ /g, '-')}.png`) })
     }
   }
