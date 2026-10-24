@@ -11,7 +11,7 @@ import { MESSAGE_LANDING_OFFSET } from '@juno/tokens/layout'
  */
 import { useEffect, useEffectEvent, useLayoutEffect, useState, type RefObject } from 'react'
 import { afterPaint, mark, measure } from '@juno/state/perf'
-import { searchMatchesAtom, bottomWindow, flashMessage, loadOlderMessages, matchWindow, messageListAtom, messageWindowSpecAtom, registry, scrollSnapshotAtom, topicAtom, topicView, type SearchSelection } from '@juno/state'
+import { searchMatchesAtom, searchSessionAtom, bottomWindow, flashMessage, loadOlderMessages, matchWindow, messageListAtom, messageWindowSpecAtom, registry, scrollSnapshotAtom, topicAtom, topicView, type SearchSelection } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
 import { openTopicAtInBackground, openTopicInBackground } from '../navigation'
 import { justAfter } from '../slackLinks'
@@ -45,9 +45,17 @@ export function moveReader(sessionId: string, target: SearchSelection, how: 'poi
   if (how === 'keyboard') startMeasure()
   const view = readerView(sessionId, target.topicId)
   if (shownTopics.get(sessionId) === target.topicId) {
-    if (target.ts === undefined) return
-    if (!registry.get(messageListAtom(view)).rows.has(target.ts)) registry.set(messageWindowSpecAtom(view), matchWindow(target.ts))
-    flashMessage(registry, target.topicId, target.ts)
+    const ts = target.ts
+    if (ts === undefined) return
+    const land = () => {
+      if (!registry.get(messageListAtom(view)).rows.has(ts)) registry.set(messageWindowSpecAtom(view), matchWindow(ts))
+      flashMessage(registry, target.topicId, ts)
+    }
+    if (target.stored !== false) return land()
+    // A match only Slack found is fetched first, as for another topic (`Waiter`), and landed on if it is still the selection.
+    void loadOlderMessages(registry, target.topicId, justAfter(ts)).then(() => {
+      if (registry.get(searchSessionAtom(sessionId)).selected?.ts === ts) land()
+    })
     return
   }
   // The newest messages first, as a topic opens; the waiter moves the window to an older match (`Waiter`).
