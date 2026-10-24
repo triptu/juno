@@ -510,29 +510,28 @@ async function usersOnly(call: Call, edge: Edge, teamId: string, cookie: string)
   const infoUsers: Array<Json> = []
   const info = { calls: 0, resultsShape: new Set<string>(), results: 0, failed: 0, pending: 0, invalid: 0, disconnected: 0, otherTeam: 0, emptyDisplayName: 0, noProfile: 0, bots: 0, keys: new Map<string, number>() }
   const returned = new Set<string>()
-  if (base !== '') {
-    for (let i = 0; i < all.length; i += 100) {
-      const answer = await edge('users/info', base, { ids: all.slice(i, i + 100) }, 'users')
-      info.calls++
-      const results = answer?.['results']
-      info.resultsShape.add(Array.isArray(results) ? 'array' : typeof results)
-      const list = Array.isArray(results) ? (results as Array<Json>) : results !== null && typeof results === 'object' ? Object.values(results as Record<string, Json>) : []
-      for (const user of list) {
-        infoUsers.push(user)
-        info.results++
-        returned.add(String(user['id']))
-        if (user['team_id'] !== teamId) info.otherTeam++
-        if (user['is_bot'] === true) info.bots++
-        const profile = user['profile'] as Json | undefined
-        if (profile === undefined) info.noProfile++
-        else if (profile['display_name'] === '') info.emptyDisplayName++
-        for (const key of Object.keys(user)) info.keys.set(key, (info.keys.get(key) ?? 0) + 1)
-      }
-      info.failed += ((answer?.['failed_ids'] as Array<unknown> | undefined) ?? []).length
-      info.pending += ((answer?.['pending_ids'] as Array<unknown> | undefined) ?? []).length
-      info.invalid += ((answer?.['invalid_ids'] as Array<unknown> | undefined) ?? []).length
-      info.disconnected += ((answer?.['disconnected_ids'] as Array<unknown> | undefined) ?? []).length
+  const infoCount = base === '' ? 0 : all.length
+  for (let i = 0; i < infoCount; i += 100) {
+    const answer = await edge('users/info', base, { ids: all.slice(i, i + 100) }, 'users')
+    info.calls++
+    const results = answer?.['results']
+    info.resultsShape.add(Array.isArray(results) ? 'array' : typeof results)
+    const list = Array.isArray(results) ? (results as Array<Json>) : results !== null && typeof results === 'object' ? Object.values(results as Record<string, Json>) : []
+    for (const user of list) {
+      infoUsers.push(user)
+      info.results++
+      returned.add(String(user['id']))
+      if (user['team_id'] !== teamId) info.otherTeam++
+      if (user['is_bot'] === true) info.bots++
+      const profile = user['profile'] as Json | undefined
+      if (profile === undefined) info.noProfile++
+      else if (profile['display_name'] === '') info.emptyDisplayName++
+      for (const key of Object.keys(user)) info.keys.set(key, (info.keys.get(key) ?? 0) + 1)
     }
+    info.failed += ((answer?.['failed_ids'] as Array<unknown> | undefined) ?? []).length
+    info.pending += ((answer?.['pending_ids'] as Array<unknown> | undefined) ?? []).length
+    info.invalid += ((answer?.['invalid_ids'] as Array<unknown> | undefined) ?? []).length
+    info.disconnected += ((answer?.['disconnected_ids'] as Array<unknown> | undefined) ?? []).length
   }
   const photos = await avatarPhotos(infoUsers, cookie)
   const missingBy = (set: Set<string>) => [...set].filter((id) => !returned.has(id)).length
@@ -578,12 +577,11 @@ async function externalOnly(call: Call, edge: Edge, teamId: string): Promise<unk
   const all = [...people.roles.keys()].filter((id) => /^[UW][A-Z0-9]+$/.test(id))
   const landing = new Map<string, string>()
   const results: Array<Json> = []
-  if (base !== '') {
-    for (let i = 0; i < all.length; i += 100) {
-      const answer = await ask({ ids: all.slice(i, i + 100) }, 'external')
-      for (const [id, list] of answer.where) landing.set(id, list)
-      results.push(...answer.users)
-    }
+  const externalCount = base === '' ? 0 : all.length
+  for (let i = 0; i < externalCount; i += 100) {
+    const answer = await ask({ ids: all.slice(i, i + 100) }, 'external')
+    for (const [id, list] of answer.where) landing.set(id, list)
+    results.push(...answer.users)
   }
   const byRole = (where: ReadonlyMap<string, string>, subset: ReadonlyArray<string>) => countBy(subset, (id) => `${people.roles.get(id)} -> ${where.get(id) ?? 'absent'}`)
   const notReturned = all.filter((id) => landing.get(id) !== 'results').slice(0, 100)

@@ -134,15 +134,13 @@ export function useHeldPosition(position: Position, list: MessageWindow): void {
   const { scrollRef, pinRef, pinnedTopRef, positioned, drawnAll, heldAt } = position
   const { first } = edgesOf(list)
   // Rows added above the ones in view (the rest of the window after the first frame, an older page), and the rows
-  // around a held row laid out in full (`heldAt`): scroll anchoring keeps the rows in view still, except at offset 0,
-  // where Chromium does not anchor, and on rows still at their size estimate, which it never anchors on.
-  // A tab shown again runs this too: rows that changed while it was hidden had no anchoring at all.
+  // around a held row laid out in full (`heldAt`): scroll anchoring keeps the rows in view still, except at offset 0
+  // and on estimated rows, which Chromium does not anchor. A shown-again tab runs this too for changes made while hidden.
   useLayoutEffect(() => {
     const scroller = scrollRef.current
     if (scroller !== null && positioned) hold(scroller, pinRef, pinnedTopRef)
   // oxlint-disable-next-line react-hooks/exhaustive-deps -- These values mark layout changes after which the pin must be restored.
   }, [positioned, first, drawnAll, heldAt, list.rows, scrollRef, pinRef, pinnedTopRef])
-
   // The list's box changes size (the window, the composer growing, the Juno panel beside it), or its rows do (a
   // reaction, an edit box, an image or unfurl loading); at the bottom, stay there. A row growing with no change to
   // the window's rows, such as the edit box opening, reaches no layout effect, so the observer watches the column of
