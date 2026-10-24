@@ -28,8 +28,8 @@ Authentication errors and connected-host failures stop the run.
 
 ```sh
 bun run runner:check
-bun run remote test --files packages/engine/test/messages.test.ts
-bun run remote test:plan test --files packages/engine/test/messages.test.ts + test:desktop e2e/app.spec.ts
+bun run remote test --files packages/engine/test/flows/topic-view.flow.test.ts
+bun run remote test:plan test --files packages/engine/test/flows/topic-view.flow.test.ts + test:desktop e2e/app.spec.ts
 ```
 
 Standalone jobs wait up to 60 seconds for capacity; split plans default to one hour so queued jobs can wait for capacity released by their siblings. `--wait <seconds>` or

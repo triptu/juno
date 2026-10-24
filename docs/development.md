@@ -1046,8 +1046,8 @@ runs every step in order. `KEY=VALUE` before a step overrides its environment.
 
 ```sh
 bun run runner:check
-bun run remote test --files packages/engine/test/messages.test.ts
-bun run remote test:plan test --files packages/engine/test/messages.test.ts + test:desktop e2e/app.spec.ts
+bun run remote test --files packages/engine/test/flows/topic-view.flow.test.ts
+bun run remote test:plan test --files packages/engine/test/flows/topic-view.flow.test.ts + test:desktop e2e/app.spec.ts
 bun run remote --cores 2 --wait 120 test:gallery shift.spec.ts
 bun run remote test:plan test:browser + test:electron app.spec.ts engine.spec.ts session.spec.ts text-menu.spec.ts updates.spec.ts
 ```
