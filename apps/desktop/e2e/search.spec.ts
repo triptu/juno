@@ -305,3 +305,29 @@ test('search: a restart brings the Search tab back with its query and selection,
   await expect(again.row('pelican step two is done')).toHaveAttribute('aria-selected', 'true')
   await expect(again.reader.getByText('pelican step two is done')).toBeVisible()
 })
+
+test('search: ⌘K’s last row takes the typed text to the Search tab, and so does ⌘⇧F from an open palette', async ({ juno, slack }) => {
+  const { palette, tabs, surface, sidebar, win } = juno
+  const page = searchPage(win)
+  slack.as('Maya').postIn('eng', 'Cormorant budget is approved')
+  await sidebar.row('#eng').expectVisible()
+
+  await palette.open()
+  await palette.type('cormorant')
+  await palette.expectResults()
+  // The first selection stays on a result; the arrows reach the last row as any other.
+  await expect(palette.activeText()).resolves.not.toMatch(/All results for/)
+  await palette.arrowTo(/All results for “cormorant”/)
+  await palette.press('Enter')
+  await palette.expectClosed()
+  await tabs.expectActive('cormorant')
+  await expect(page.field).toHaveValue('cormorant')
+  await expect(page.row('Cormorant budget is approved')).toBeVisible()
+
+  await palette.open()
+  await palette.type('budget')
+  await surface.appMenu('search-messages')
+  await palette.expectClosed()
+  await tabs.expectActive('budget')
+  await expect(page.field).toHaveValue('budget')
+})

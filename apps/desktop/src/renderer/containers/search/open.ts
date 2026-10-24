@@ -7,6 +7,7 @@
 import type { MenuCommand, SearchQuery, TopicDetail } from '@juno/contract'
 import { activeTab, currentPlace, newSearchSessionId, registry, requestSearchFocus, startSearchSession, tabsAtom, topicAtom, type SearchSession, type SearchTopicScope } from '@juno/state'
 import { showSearch } from '../navigation'
+import { closePalette, paletteText } from '../paletteActions'
 import { sessionFromQuery, takeChips } from './chips'
 
 export interface OpenSearchOptions {
@@ -68,8 +69,16 @@ function searchHere(): void {
   openSearch({ topic: topicScope(result.value) })
 }
 
-/** The app menu's Search items. Subscribed by the workspace. */
+/**
+ * The app menu's Search items. Subscribed by the workspace. The menu takes ⌘⇧F before the palette sees the key,
+ * so an open palette closes here and its text goes to the Search tab.
+ */
 export function runSearchCommand(command: MenuCommand): void {
+  const typed = paletteText()
+  if (typed !== undefined && (command === 'search.open' || command === 'search.topic')) {
+    closePalette(false)
+    return openSearch(typed.trim() === '' ? {} : { text: typed })
+  }
   if (command === 'search.open') openSearch()
   else if (command === 'search.topic') searchHere()
 }

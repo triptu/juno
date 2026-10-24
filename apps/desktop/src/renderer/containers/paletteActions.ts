@@ -8,11 +8,24 @@ import { mark } from '@juno/state/perf'
 
 /** Where focus was before the palette opened, to give it back on close. */
 let returnFocus: HTMLElement | undefined
+/** The palette's text as typed, for ⌘⇧F, which takes it to the Search tab (SPEC 10a). */
+let typed = ''
+
+/** The palette's field changed. */
+export function notePaletteText(text: string): void {
+  typed = text
+}
+
+/** The text in the open palette, or undefined while it is closed. */
+export function paletteText(): string | undefined {
+  return registry.get(paletteOpenAtom) ? typed : undefined
+}
 
 export function openPalette(): void {
   if (registry.get(paletteOpenAtom)) return
   mark('juno.palette-open', undefined, { replace: true })
   returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : undefined
+  typed = ''
   registry.set(paletteTabAtom, 'all')
   registry.set(paletteOpenAtom, true)
 }

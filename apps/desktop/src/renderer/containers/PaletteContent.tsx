@@ -32,7 +32,8 @@ import { useAtomMount, useAtomValue } from '@juno/state/react'
 import { CommandPalette, type PaletteIconName, type PaletteItem, type PaletteSection, type PaletteTab } from '@juno/views'
 import { junoCommands, openJunoTab } from './juno/actions'
 import { newMessage, openTopic, openTopicAt, warmTopic } from './navigation'
-import { closePalette } from './paletteActions'
+import { closePalette, notePaletteText } from './paletteActions'
+import { openSearch } from './search/open'
 import { commandGroups, globalCommands, labelStartsWith, matchCommands, topicCommands, type CommandRow } from './paletteCommands'
 import { resolveTopic } from './topicActions'
 import { showChannelMenu, type MenuChannel } from './placeMenus'
@@ -306,6 +307,7 @@ export function OpenPalette() {
   })
 
   const onQuery = (typedText: string) => {
+    notePaletteText(typedText)
     // A leading ">" lists the commands: it switches to Commands, and the field keeps what follows it.
     const listing = commandListing(typedText)
     if (listing !== undefined) registry.set(paletteTabAtom, 'commands')
@@ -316,7 +318,13 @@ export function OpenPalette() {
 
   const onTab = (next: PaletteTab) => registry.set(paletteTabAtom, next)
 
+  // The last row on All and Messages takes the text to the Search tab (SPEC 10a).
+  const footer = (tab === 'all' || tab === 'messages') && query.trim() !== '' ? searchRow(query.trim()) : undefined
   const onSelect = (id: string, options: { readonly newTab: boolean }) => {
+    if (id === SEARCH_ROW) {
+      closePalette(false)
+      return openSearch({ text: query, ...(options.newTab ? { newTab: true } : {}) })
+    }
     const row = byId.get(id)
     if (row !== undefined) runRow(row, options)
   }
@@ -337,6 +345,7 @@ export function OpenPalette() {
       resultsQuery={answer.text}
       onQuery={onQuery}
       sections={answer.sections}
+      {...(footer === undefined ? {} : { footer })}
       settled={settled}
       resultsReady={resultsReady}
       now={now}
@@ -350,6 +359,11 @@ export function OpenPalette() {
     />
   )
 }
+
+const SEARCH_ROW = 'search-all'
+
+/** "All results for …", with ⌘⇧F, which does the same. */
+const searchRow = (text: string): PaletteItem => ({ id: SEARCH_ROW, icon: 'search', label: `All results for “${text}”`, shortcut: '⌘⇧F' })
 
 /**
  * A one-shot answer for the text, asked once typing pauses for `delay`.
