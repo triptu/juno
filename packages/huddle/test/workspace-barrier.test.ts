@@ -4,7 +4,7 @@
 // each workspace's leave goes out through its own Slack client only. The
 // other schedules (a switch waits for the stop, a cancelled join's answer is
 // a leave, a refused leave goes again, the restart barrier) run against the
-// fake Slack in engine/test/huddle*.test.ts.
+// fake Slack in engine/test/flows/huddle-*.flow.test.ts.
 import { Context, Deferred, Effect, Exit, Fiber, Scope, Stream } from 'effect'
 import { expect, it } from 'bun:test'
 import type { HuddlePageReport } from '@juno/contract'

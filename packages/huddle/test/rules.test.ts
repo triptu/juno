@@ -1,7 +1,7 @@
 // The pure rules of @juno/huddle: room frame decoding and merging, and when
 // the alone timer counts. The call's lifecycle (specs/huddle.qnt) is tested
 // through the service here (cancel, overflow, workspace-barrier) and against
-// the fake Slack in engine/test/huddle*.test.ts.
+// the fake Slack in engine/test/flows/huddle-*.flow.test.ts.
 import { describe, expect, it } from 'bun:test'
 import { aloneNow, leaveAt } from '../src/alone'
 import { applyInfo, applyRoomFrame, decodeRoomFrame, type Running } from '../src/running'
