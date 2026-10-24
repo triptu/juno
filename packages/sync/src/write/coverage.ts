@@ -1,7 +1,7 @@
 import { threadTopicId, type ChannelId, type Ts } from '@juno/domain'
 import { Invalidation, StoreWriter, syncedRanges, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
-import { mergeRange, type ThreadRange } from '../threadRanges'
+import { addsNothing, mergeRange, type ThreadRange } from '../threadRanges'
 
 import { invalidate, type Writer } from './shared'
 
@@ -13,14 +13,14 @@ export const threadRanges = (channel: string, threadTs: string): Effect.Effect<R
       WHERE channel = ${channel} AND thread_ts = ${threadTs} ORDER BY from_ts`
   })
 
-/** Records a range a page proved, merged with the ranges it touches. Nothing when it proved nothing new. */
+/** Records a range a page proved, merged with the ranges it touches. Nothing when it proved nothing new (`addsNothing`). */
 export const addThreadRange = (channel: string, threadTs: string, range: ThreadRange | undefined): Writer =>
   Effect.gen(function* () {
     if (range === undefined) return
     const sql = yield* StoreWriter
-    const { range: merged, replaced } = mergeRange(yield* threadRanges(channel, threadTs), range)
-    const same = replaced.length === 1 && replaced[0]!.from_ts === merged.from_ts && replaced[0]!.to_ts === merged.to_ts && replaced[0]!.tail === merged.tail
-    if (same) return
+    const current = yield* threadRanges(channel, threadTs)
+    if (addsNothing(current, range)) return
+    const { range: merged, replaced } = mergeRange(current, range)
     if (replaced.length > 0) {
       yield* sql`DELETE FROM thread_ranges WHERE channel = ${channel} AND thread_ts = ${threadTs} AND from_ts IN ${sql.in(replaced.map((r) => r.from_ts))}`
     }

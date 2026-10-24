@@ -62,6 +62,18 @@ export function mergeRange(ranges: ReadonlyArray<ThreadRange>, incoming: ThreadR
   return { range: { from_ts: from, to_ts: to, tail }, replaced }
 }
 
+/**
+ * Recording `incoming` would change nothing that matters: a range already
+ * holds it, or a live range already holds its start and so every reply
+ * after it (a later live view only moves `to_ts` on).
+ */
+export const addsNothing = (ranges: ReadonlyArray<ThreadRange>, incoming: ThreadRange): boolean => {
+  const { range, replaced } = mergeRange(ranges, incoming)
+  const held = replaced[0]
+  if (replaced.length === 1 && held !== undefined && held.from_ts === range.from_ts && held.to_ts === range.to_ts && held.tail === range.tail) return true
+  return incoming.tail === 'live' && ranges.some((r) => r.tail === 'live' && compareTs(r.from_ts, incoming.from_ts) <= 0 && compareTs(incoming.from_ts, r.to_ts) <= 0)
+}
+
 /** The stored messages `older` and `newer` (the root counts as a message) have nothing unknown between them. */
 export const continuous = (ranges: ReadonlyArray<ThreadRange>, older: string, newer: string): boolean =>
   ranges.some((r) => compareTs(r.from_ts, older) <= 0 && compareTs(newer, shownTo(r)) <= 0)

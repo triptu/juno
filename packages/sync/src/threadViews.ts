@@ -10,7 +10,7 @@ import type { Message, Reaction, ThreadView } from '@juno/slack-schema'
 import { StoreWriter, type MessageRow, type SqlError } from '@juno/store'
 import { Effect } from 'effect'
 import { stillConnected, type SyncContext } from './context'
-import { mergeRange, pageRange, type ThreadRange } from './threadRanges'
+import { addsNothing, pageRange, type ThreadRange } from './threadRanges'
 import { FollowFence, type FollowFenceService } from './followFence'
 import { mergeMessage, mergeRootCounters } from './merge'
 
@@ -183,11 +183,7 @@ const observationUnchanged = (
   }
   // The range the view proves must add nothing to the stored ones.
   const range = viewRange(view, requestedAt, stillConnected(ctx, connection))
-  if (range !== undefined) {
-    const { range: merged, replaced } = mergeRange(snapshot.ranges.get(rootKey) ?? [], range)
-    const held = replaced[0]
-    if (replaced.length !== 1 || held === undefined || held.from_ts !== merged.from_ts || held.to_ts !== merged.to_ts || held.tail !== merged.tail) return false
-  }
+  if (range !== undefined && !addsNothing(snapshot.ranges.get(rootKey) ?? [], range)) return false
   const observedAt = fence.effective(channel, root.ts, sub.observed_at ?? undefined)
   return (observedAt !== undefined && compareTs(requestedAt, observedAt) <= 0) || fence.advance(channel, root.ts, requestedAt)
 }
@@ -211,12 +207,15 @@ export const threadViewPageUnchanged = (
 
 /**
  * What a `getView` row proves (`threadRanges.ts`): it carries every unread
- * reply, so every reply after Slack's read pointer, or after the latest
- * reply when it gives none, is in it.
+ * reply, so every reply after Slack's read pointer (after the latest reply
+ * when it gives none) is in it; and `latest_replies` are the thread's
+ * newest replies, so every reply after the oldest of them is too.
  */
 export const viewRange = (view: ThreadView, requestedAt: string, live: boolean): ThreadRange | undefined => {
   const root = view.root_msg
-  const from = root.last_read ?? root.latest_reply ?? root.ts
+  const latest = (view.latest_replies ?? []).map((reply) => reply.ts).toSorted(compareTs)[0]
+  const pointer = root.last_read ?? root.latest_reply ?? root.ts
+  const from = latest !== undefined && compareTs(latest, pointer) < 0 ? latest : pointer
   const replies = messagesOf(view).slice(1).map((message) => message.ts).filter((ts) => compareTs(ts, from) > 0).toSorted(compareTs)
   return pageRange({ threadTs: root.ts, oldest: from, replies, hasMore: false, requestedAt, live })
 }
