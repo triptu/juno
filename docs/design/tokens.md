@@ -125,6 +125,7 @@ The accent is a user setting (`AppearanceSettings`, persisted in `launch.json` l
 | `--focus-ring` | The accent text colour, so the ring meets 4.5:1 on the page (3:1 is the minimum) | #B4351F | #FF9C87 |
 | `--selection-background` | `color-mix(in oklch, var(--hl) 28%, var(--background))` | | |
 | `--hl-band`, `--hl-wash` | `color-mix(in oklch, var(--hl) <mix>, var(--background))`: on the sign-in page, one wave band per side of the pebble art, and the wash behind the title | 14% / 7% | 18% / 9% |
+| `--mark-current` | `color-mix(in oklch, var(--hl) <mix>, var(--background))`: the match the Search reader's arrows are on ("2 of 5"). The other matches use `--hl-soft`. Measured on coral: against the page 1.35:1 light and 1.71:1 dark (the other marks 1.13:1 and 1.24:1); text on it 11.5:1 and 8.6:1 (`docs/design/search/review.md`, finding 2) | 24% | 30% |
 
 Ink keeps the old grey states: `--hl-nav` is `--secondary-default`, its tint mixes are 9% and 18%, and its focus ring stays the info blue (#008AB3 light, 3.8:1 on paper; `hsla(200, 80%, 65%)` dark).
 

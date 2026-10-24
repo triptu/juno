@@ -173,6 +173,9 @@ export const colors = stylex.defineVars({
  * - --hl-rule, --hl-ring: the new divider's rule and the mine-reaction ring
  * - --focus-ring: the accent text colour, so it meets 4.5:1 on the page
  * - --selection-background: text selection
+ * - --mark-current: the match the Search reader's arrows are on, stronger
+ *   than the other matches' --hl-soft so it stays findable after the
+ *   landing flash fades (24% light, 30% dark)
  *
  * Counts outside the sidebar (the topic switcher) stay the soft grey tag.
  */
@@ -196,6 +199,7 @@ export const accent = stylex.defineVars({
   // accent theme gets them; the dark themes mix more of it.
   '--hl-band': `color-mix(in oklch, var(--hl) 14%, ${colors['--background']})`,
   '--hl-wash': `color-mix(in oklch, var(--hl) 7%, ${colors['--background']})`,
+  '--mark-current': `color-mix(in oklch, var(--hl) 24%, ${colors['--background']})`,
 })
 
 /**
