@@ -128,6 +128,16 @@ test('repair selects failed and unfinished files plus every reached spec, and re
   assert.equal(repaired.failures.length, 0)
   assert.equal(repaired.incomplete, 0)
   assert.equal(repairPlan({ baseline, identity, suites, affected: [{ script: 'test:desktop', args: [] }] }).planned[0].words.length, 1)
+  // A full run with browser and Electron lanes: affected's local checks stay out of the remote plan,
+  // and its test:desktop selection reaches both lanes.
+  const split = { ...baseline, suites: [{ suite: 'test:browser', code: 1, tests: previous }, { suite: 'test:electron', code: 0 }] }
+  const lanes = ['test:browser', 'test:electron', 'test'].map((name) => ({ name, words: [name] }))
+  const local = [{ script: 'typecheck', args: ['--no-cache'], local: true }, { script: 'lint', args: [], local: true }, ...affected]
+  assert.deepEqual(repairPlan({ baseline: split, identity, suites: lanes, affected: local }).planned.map((suite) => suite.words), [
+    ['test:browser', 'e2e/bad.spec.ts', 'e2e/unfinished.spec.ts', 'e2e/reached.spec.ts'],
+    ['test:electron', 'e2e/reached.spec.ts'],
+    ['test'],
+  ])
 })
 
 test('runtime and platform changes invalidate recorded results; reports survive checkout removal', async (t) => {
@@ -161,7 +171,7 @@ test('a repair installs its planner, reruns the failed suite, and retains passin
   const record = JSON.parse(readFileSync(baseline, 'utf8'))
   assert.equal(record.commit, fixtureGit('rev-parse', 'HEAD'))
   assert.equal(record.suites.filter((suite) => suite.reusedFrom).length, 4)
-  assert.deepEqual(readFileSync(env.TEST_CALLS, 'utf8').trim().split('\n').map(JSON.parse).map((call) => call.suite), ['install', 'test:desktop', 'lint'])
+  assert.deepEqual(readFileSync(env.TEST_CALLS, 'utf8').trim().split('\n').map(JSON.parse).map((call) => call.suite), ['install', 'test:desktop'])
   assert.ok(releaseGate(root, record.commit))
 })
 

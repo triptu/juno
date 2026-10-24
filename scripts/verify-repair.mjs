@@ -5,7 +5,12 @@ export function suitePassed(suite) {
 }
 
 /** Repair every failed/unfinished file plus all reachable work, without a budget. */
-export function repairPlan({ baseline, identity, suites, affected }) {
+export function repairPlan({ baseline, identity, suites, affected: selected }) {
+  // affected runs typecheck and lint on this Mac and names the app suites test:desktop. A full run
+  // has no local steps, and its app suites may be the browser and Electron lanes.
+  const lanes = suites.map((suite) => suite.name).filter((name) => name === 'test:browser' || name === 'test:electron')
+  const affected = selected.filter((step) => !step.local)
+    .flatMap((step) => step.script === 'test:desktop' && lanes.length > 0 ? lanes.map((script) => ({ ...step, script })) : [step])
   if (!sameIdentity(baseline.identity, identity)) throw new Error('Repair runtime/platform differs from the baseline; start a full run')
   if (baseline.suites.some((suite) => ['perf', 'test:feel', 'test:desktop @mac'].includes(suite.suite)))
     throw new Error('Repair of a Mac timing/nightly run needs a fresh --with-mac full run')
