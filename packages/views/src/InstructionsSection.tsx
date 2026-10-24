@@ -2,7 +2,7 @@ import * as stylex from '@stylexjs/stylex'
 import { X } from '@phosphor-icons/react/dist/icons/X'
 import { Fragment, useRef, useState, type KeyboardEvent, type Ref } from 'react'
 import { accent, colors, radii, sizes, spacing, text } from '@juno/tokens/tokens.stylex'
-import { Button, IconButton, Section, Segmented, Surface, Text, TextField } from '@juno/ui'
+import { Button, Chip, IconButton, Section, Segmented, Surface, Text, TextField } from '@juno/ui'
 import type { FoundRule, Instruction, InstructionDirection } from './notificationRules'
 
 export interface InstructionsSectionProps {
@@ -32,13 +32,52 @@ const directions = [
 ] as const
 
 /**
+ * Examples of instructions, shown while the list is empty. Each is about a
+ * kind of message, never one person or channel, since those are settings.
+ */
+const examples: Record<InstructionDirection, ReadonlyArray<string>> = {
+  notify: ['Production incidents', 'Review requests', 'Launch date changes'],
+  stay: ['Lunch and social plans', 'Deploy and CI bot messages', 'FYI updates'],
+}
+
+/** The add field's hint: neutral until a direction is chosen, then one example for it. */
+const placeholders: Record<InstructionDirection | 'none', string> = {
+  none: 'Describe it in your own words',
+  notify: 'e.g. someone waiting on my review',
+  stay: 'e.g. deploy and CI bot messages',
+}
+
+/** What the add row holds before Add. */
+interface Draft {
+  readonly direction: InstructionDirection | null
+  readonly text: string
+}
+
+/**
  * Settings › Notifications › Your instructions (SPEC 14, inventory 13): the
  * owner's rules, each with Notify me or Don't notify and its words, edited
  * in place and saved on blur. The add row's field and Add wait for a
- * direction, since there is no default. After an add, a line under the new
- * row offers a rule about one person or channel as a setting.
+ * direction, since there is no default; the field's placeholder then shows
+ * an example for that direction. While the list is empty, a few examples
+ * per direction sit above the add row; one click fills the row, to edit or
+ * add. After an add, a line under the new row offers a rule about one
+ * person or channel as a setting.
  */
 export function InstructionsSection({ instructions, aiAssist, ruleChecks, onAdd, onEdit, onRemove, onMakeSetting, onKeepInstruction, initialDirection, headingRef }: InstructionsSectionProps) {
+  const [draft, setDraft] = useState<Draft>({ direction: initialDirection ?? null, text: '' })
+  const field = useRef<HTMLInputElement>(null)
+  // The field turns on with the direction, in the next render; focus it then.
+  const focusField = () => requestAnimationFrame(() => field.current?.focus())
+  const pickExample = (direction: InstructionDirection, text: string) => {
+    setDraft({ direction, text })
+    focusField()
+  }
+  const add = () => {
+    const text = draft.text.trim()
+    if (draft.direction === null || text === '') return
+    onAdd(draft.direction, text)
+    setDraft({ direction: null, text: '' })
+  }
   return (
     <Section
       headingRef={headingRef}
@@ -51,22 +90,50 @@ export function InstructionsSection({ instructions, aiAssist, ruleChecks, onAdd,
         </Text>
       )}
       <Surface kind="group" aria-label="Your instructions">
-        {instructions.length === 0 ? (
-          <div {...stylex.props(styles.row, styles.divided)}>
-            <Text variant="ui" tone="muted">
-              No instructions. Juno decides from the conversation alone.
-            </Text>
-          </div>
-        ) : null}
+        {instructions.length === 0 ? <Examples onPick={pickExample} /> : null}
         {instructions.map((instruction) => (
           <Fragment key={instruction.id}>
             <InstructionRow instruction={instruction} onEdit={onEdit} onRemove={onRemove} divided={!ruleChecks.has(instruction.id)} />
             {ruleChecks.has(instruction.id) ? <RuleLine found={ruleChecks.get(instruction.id)} onMake={() => onMakeSetting(instruction.id)} onKeep={() => onKeepInstruction(instruction.id)} /> : null}
           </Fragment>
         ))}
-        <AddRow onAdd={onAdd} initialDirection={initialDirection} />
+        <AddRow
+          draft={draft}
+          fieldRef={field}
+          onChoose={(direction) => {
+            setDraft({ ...draft, direction })
+            focusField()
+          }}
+          onType={(text) => setDraft({ ...draft, text })}
+          onAdd={add}
+        />
       </Surface>
     </Section>
+  )
+}
+
+/** While the list is empty: a lead-in and a few examples per direction. A click fills the add row; it adds nothing by itself. */
+function Examples({ onPick }: { readonly onPick: (direction: InstructionDirection, text: string) => void }) {
+  return (
+    <div data-instruction-examples="" {...stylex.props(styles.examples, styles.divided)}>
+      <Text variant="ui" tone="muted" as="p" sx={styles.examplesLead}>
+        No instructions yet. Start from an example or write your own.
+      </Text>
+      {directions.map((direction) => (
+        <Fragment key={direction.value}>
+          <Text variant="meta" tone="subtle" weight="medium" as="span" sx={styles.examplesLabel}>
+            {direction.label}
+          </Text>
+          <span role="group" aria-label={`${direction.label} examples`} {...stylex.props(styles.examplesChips)}>
+            {examples[direction.value].map((example) => (
+              <Chip key={example} interactive variant="outline" size={24} onClick={() => onPick(direction.value, example)}>
+                {example}
+              </Chip>
+            ))}
+          </span>
+        </Fragment>
+      ))}
+    </div>
   )
 }
 
@@ -137,41 +204,27 @@ function RuleLine({ found, onMake, onKeep }: { readonly found: FoundRule | undef
   )
 }
 
-function AddRow({ onAdd, initialDirection }: { readonly onAdd: InstructionsSectionProps['onAdd']; readonly initialDirection: InstructionDirection | undefined }) {
-  const [direction, setDirection] = useState<InstructionDirection | null>(initialDirection ?? null)
-  const [draft, setDraft] = useState('')
-  const field = useRef<HTMLInputElement>(null)
-  const ready = direction !== null && draft.trim() !== ''
-  const add = () => {
-    if (direction === null || draft.trim() === '') return
-    onAdd(direction, draft.trim())
-    setDirection(null)
-    setDraft('')
-  }
-  const choose = (next: InstructionDirection) => {
-    setDirection(next)
-    // The field turns on with the choice; the words go there next.
-    requestAnimationFrame(() => field.current?.focus())
-  }
+function AddRow({ draft, fieldRef, onChoose, onType, onAdd }: { readonly draft: Draft; readonly fieldRef: Ref<HTMLInputElement>; readonly onChoose: (direction: InstructionDirection) => void; readonly onType: (text: string) => void; readonly onAdd: () => void }) {
+  const ready = draft.direction !== null && draft.text.trim() !== ''
   return (
     <div data-instruction-add="" {...stylex.props(styles.row)}>
-      <Segmented options={directions} value={direction} label="New instruction: Notify me or Don't notify" onChange={choose} />
+      <Segmented options={directions} value={draft.direction} label="New instruction: Notify me or Don't notify" onChange={onChoose} />
       <span {...stylex.props(styles.addField)}>
         <TextField
-          ref={field}
+          ref={fieldRef}
           size={30}
           label="New instruction"
-          placeholder="Describe it in your own words"
-          value={draft}
+          placeholder={placeholders[draft.direction ?? 'none']}
+          value={draft.text}
           maxLength={MAX_LENGTH}
-          disabled={direction === null}
-          onChange={(event) => setDraft(event.currentTarget.value)}
+          disabled={draft.direction === null}
+          onChange={(event) => onType(event.currentTarget.value)}
           onKeyDown={(event) => {
-            if (event.key === 'Enter') add()
+            if (event.key === 'Enter') onAdd()
           }}
         />
       </span>
-      <Button variant="secondary" size="sm" disabled={!ready} onClick={add}>
+      <Button variant="secondary" size="sm" disabled={!ready} onClick={onAdd}>
         Add
       </Button>
     </div>
@@ -196,6 +249,30 @@ const styles = stylex.create({
     borderBottomWidth: '1px',
     borderBottomStyle: 'solid',
     borderBottomColor: colors['--border-subtle'],
+  },
+  // The lead-in over two rows of direction label and its examples; the labels share one column.
+  examples: {
+    display: 'grid',
+    gridTemplateColumns: 'max-content 1fr',
+    alignItems: 'center',
+    columnGap: spacing['--space-2-5'],
+    rowGap: spacing['--space-1-5'],
+    paddingBlock: spacing['--space-2-5'],
+    paddingInline: spacing['--space-3-5'],
+    boxSizing: 'border-box',
+    minWidth: 0,
+  },
+  examplesLead: {
+    gridColumn: '1 / -1',
+  },
+  examplesLabel: {
+    whiteSpace: 'nowrap',
+  },
+  examplesChips: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: spacing['--space-1-5'],
+    minWidth: 0,
   },
   // Plain text until hovered or focused, then a field.
   inline: {
