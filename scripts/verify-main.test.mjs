@@ -129,13 +129,13 @@ test('repair selects failed and unfinished files plus every reached spec, and re
   assert.equal(repaired.incomplete, 0)
   assert.equal(repairPlan({ baseline, identity, suites, affected: [{ script: 'test:desktop', args: [] }] }).planned[0].words.length, 1)
   // A full run with browser and Electron lanes: affected's local checks stay out of the remote plan,
-  // and its test:desktop selection reaches both lanes.
+  // and its test:desktop selection reaches both lanes, each passing if the spec has none of its tests.
   const split = { ...baseline, suites: [{ suite: 'test:browser', code: 1, tests: previous }, { suite: 'test:electron', code: 0 }] }
   const lanes = ['test:browser', 'test:electron', 'test'].map((name) => ({ name, words: [name] }))
   const local = [{ script: 'typecheck', args: ['--no-cache'], local: true }, { script: 'lint', args: [], local: true }, ...affected]
   assert.deepEqual(repairPlan({ baseline: split, identity, suites: lanes, affected: local }).planned.map((suite) => suite.words), [
-    ['test:browser', 'e2e/bad.spec.ts', 'e2e/unfinished.spec.ts', 'e2e/reached.spec.ts'],
-    ['test:electron', 'e2e/reached.spec.ts'],
+    ['test:browser', '--pass-with-no-tests', 'e2e/bad.spec.ts', 'e2e/unfinished.spec.ts', 'e2e/reached.spec.ts'],
+    ['test:electron', '--pass-with-no-tests', 'e2e/reached.spec.ts'],
     ['test'],
   ])
 })

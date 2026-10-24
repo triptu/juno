@@ -7,10 +7,11 @@ export function suitePassed(suite) {
 /** Repair every failed/unfinished file plus all reachable work, without a budget. */
 export function repairPlan({ baseline, identity, suites, affected: selected }) {
   // affected runs typecheck and lint on this Mac and names the app suites test:desktop. A full run
-  // has no local steps, and its app suites may be the browser and Electron lanes.
+  // has no local steps, and its app suites may be the browser and Electron lanes. A spec test:desktop
+  // names may have tests in one lane only, so a lane given only such specs passes with none.
   const lanes = suites.map((suite) => suite.name).filter((name) => name === 'test:browser' || name === 'test:electron')
   const affected = selected.filter((step) => !step.local)
-    .flatMap((step) => step.script === 'test:desktop' && lanes.length > 0 ? lanes.map((script) => ({ ...step, script })) : [step])
+    .flatMap((step) => step.script === 'test:desktop' && lanes.length > 0 ? lanes.map((script) => ({ ...step, script, split: true })) : [step])
   if (!sameIdentity(baseline.identity, identity)) throw new Error('Repair runtime/platform differs from the baseline; start a full run')
   if (baseline.suites.some((suite) => ['perf', 'test:feel', 'test:desktop @mac'].includes(suite.suite)))
     throw new Error('Repair of a Mac timing/nightly run needs a fresh --with-mac full run')
@@ -38,9 +39,9 @@ export function repairPlan({ baseline, identity, suites, affected: selected }) {
       // A full failed gallery spec must not inherit a component-only filter.
       const env = { ...reached?.env }
       if (files.length) delete env.GALLERY_SHIFT_ONLY
-      planned.push({ ...suite, words: [...Object.entries(env).map(([key, value]) => `${key}=${value}`), suite.name, ...args] })
+      planned.push({ ...suite, words: [...Object.entries(env).map(([key, value]) => `${key}=${value}`), suite.name, ...(reached?.split ? ['--pass-with-no-tests'] : []), ...args] })
     } else if (previous && suitePassed(previous) && reached) {
-      planned.push({ ...suite, words: [...Object.entries(reached.env ?? {}).map(([key, value]) => `${key}=${value}`), suite.name, ...reached.args] })
+      planned.push({ ...suite, words: [...Object.entries(reached.env ?? {}).map(([key, value]) => `${key}=${value}`), suite.name, ...(reached.split ? ['--pass-with-no-tests'] : []), ...reached.args] })
     } else planned.push(suite)
   }
   for (const step of affected.filter((item) => !all.some((suite) => suite.name === item.script)))
