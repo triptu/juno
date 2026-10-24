@@ -1,17 +1,13 @@
 // Tabs: opening uses the current tab and typing goes to its composer, ⌘-click opens a new one, a plain open
-// of an open topic focuses its tab,
-// closing focuses the neighbour and never leaves no tab, a new tab opens
-// Home and does not cancel an open still waiting, where "+" sits, the app
-// menu's tab items, the row menu's Open in new tab, tabs survive a restart, dragging and ⌃⇧← ⌃⇧→ reorder them, and
-// each tab shows its topic's art or the DM person's photo, and a tab not
-// viewed for a day closes by itself.
+// of an open topic focuses its tab, closing focuses the neighbour and never leaves no tab, a new tab opens
+// Home and does not cancel an open still waiting, the app menu's tab items, each tab shows its topic's art or
+// the DM person's photo, where "+" sits, the row menu's Open in new tab, tabs and their order and active tab
+// survive a restart, dragging and ⌃⇧← ⌃⇧→ reorder them, and a tab not viewed for a day closes by itself.
 import { expectNoLayoutShift } from '@juno/testing/layout-shift'
 import { expect, syncedTest, test } from './fixtures'
 
 import { schemeUrl, type Juno } from './driver/juno'
 import { readUserDb, savedTabs, threadId } from './driver/userDb'
-
-test.use({ freshContext: true })
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -20,12 +16,16 @@ const RINA = 'Rina finished the onsite'
 const ROADMAP = 'Proposal: cut offline mode and public'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
 
-// Each step but the last ends with Home in the only tab, as a fresh launch shows it.
-syncedTest('tabs open, focus and close from the sidebar, the keyboard and the app menu, and the last one closed leaves Home', async ({ juno }) => {
+// Each of the first four steps ends with Home in the only tab, as a fresh launch shows it. The steps after
+// keep the app menu step's tabs, and the last narrows the window.
+syncedTest('tabs open, focus and close from the sidebar, the keyboard and the app menu, the last one closed leaves Home, and the strip shows art and "+"', async ({ juno }) => {
   await test.step('opening, ⌘-click, focusing an open topic and closing to the neighbour', () => openFocusAndClose(juno))
   await test.step('closing a tab from the keyboard leaves focus in the strip', () => closeFromKeyboard(juno))
   await test.step('closing the last tab leaves Home; ⌘T and "+" open Home in a new tab, ready to write', () => newTabsOpenHome(juno))
+  await test.step('a new tab asked for while a topic is still opening leaves that open in the old tab', () => newTabWhileOpening(juno))
   await test.step('the app menu closes the tab and moves between tabs', () => appMenuMovesBetweenTabs(juno))
+  await test.step("a topic tab shows its art and a DM tab the person's photo", () => tabArt(juno))
+  await test.step('"+" sits one tab gap after the last tab, level with the tabs, and stays at the end of the strip when the tabs scroll', () => plusAfterLastTab(juno))
 })
 
 async function openFocusAndClose(juno: Juno): Promise<void> {
@@ -125,6 +125,22 @@ async function newTabsOpenHome(juno: Juno): Promise<void> {
   await juno.expectNothingOpen()
 }
 
+async function newTabWhileOpening(juno: Juno): Promise<void> {
+  const { sidebar, tabs } = juno
+  // A topic not opened before in this test, so its open waits for the engine.
+  // "+" is clicked in the same task as the press on the row, before the topic can paint.
+  const plus = await tabs.newTabButton.elementHandle()
+  await plus!.evaluate((button: HTMLElement) => {
+    addEventListener('pointerdown', () => queueMicrotask(() => button.click()), { once: true })
+  })
+  await sidebar.row(OFFSITE).open()
+  await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Can eng/), 'Home'])
+  await tabs.expectActive('Home')
+
+  await tabs.contextMenu(OFFSITE, 'close-all')
+  await juno.expectNothingOpen()
+}
+
 async function appMenuMovesBetweenTabs(juno: Juno): Promise<void> {
   const { sidebar, tabs } = juno
   await sidebar.row(POSTGRES).open()
@@ -141,6 +157,59 @@ async function appMenuMovesBetweenTabs(juno: Juno): Promise<void> {
   await tabs.menu('close-tab')
   await tabs.expectCount(2)
   await tabs.expectActive(ROADMAP)
+}
+
+async function tabArt(juno: Juno): Promise<void> {
+  const { sidebar, tabs } = juno
+  // The app menu step left Draft plan open; add a thread in the DM with Maya, and the DM itself.
+  await sidebar.row(OFFSITE).openInNewTab()
+  await sidebar.row('Maya', { exact: true }).openInNewTab()
+
+  // The topic's art, or its placeholder shape until it is drawn.
+  await expect(tabs.tile(POSTGRES)).toHaveAttribute('data-topic-art', /^(art|placeholder)$/)
+  for (const title of [OFFSITE, 'Maya']) {
+    const photo = tabs.tile(title)
+    await expect(photo).toHaveAttribute('src', new RegExp(`${schemeUrl('files').source}avatar`))
+    await expect.poll(() => photo.evaluate((img) => img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0)).toBe(true)
+  }
+  // The DM photo is the URL the sidebar row shows, so it was loaded already.
+  const rowPhoto = await sidebar.row('Maya', { exact: true }).root.locator('img').first().getAttribute('src')
+  await expect(tabs.tile('Maya')).toHaveAttribute('src', rowPhoto ?? '')
+}
+
+async function plusAfterLastTab(juno: Juno): Promise<void> {
+  const { sidebar, tabs } = juno
+
+  // `strip` is the tablist, the scroller the tabs sit in.
+  const place = async () => {
+    const last = (await tabs.root.getByRole('tab').last().boundingBox())!
+    const plus = (await tabs.newTabButton.boundingBox())!
+    const strip = (await tabs.root.boundingBox())!
+    return { last, plus, strip }
+  }
+  const expectAfterLastTab = async () => {
+    await expect
+      .poll(async () => {
+        const { last, plus } = await place()
+        // The 2px tab gap, then the button's even inset in its tab-high square: (35 - 28) / 2.
+        return { gap: Math.round((plus.x - (last.x + last.width)) * 2) / 2, level: Math.abs(plus.y + plus.height / 2 - (last.y + last.height / 2)) <= 0.5 }
+      })
+      .toEqual({ gap: 5.5, level: true })
+  }
+
+  await expectAfterLastTab()
+
+  // A narrow window: the tabs overflow and scroll, and "+" stays in view at the strip's end.
+  await juno.setWindowSize(760, 600)
+  await sidebar.row(RINA).openInNewTab()
+  await sidebar.row(POSTGRES).openInNewTab()
+  await expect.poll(() => tabs.root.evaluate((list) => list.scrollWidth > list.clientWidth)).toBe(true)
+  // The tabs fill the strip up to "+", which follows the scroller and ends inside the window.
+  const { plus, strip } = await place()
+  expect(plus.x).toBeGreaterThanOrEqual(strip.x + strip.width)
+  expect(plus.x - (strip.x + strip.width)).toBeLessThanOrEqual(5.5)
+  expect(plus.x + plus.width).toBeLessThanOrEqual(await juno.win.evaluate(() => window.innerWidth))
+  await expect(tabs.newTabButton).toBeInViewport()
 }
 
 syncedTest('⌘W held down closes a tab per press, even when the tabs it lands on were put away', async ({ juno, relaunch, userData, fake, slack }) => {
@@ -163,27 +232,13 @@ syncedTest('⌘W held down closes a tab per press, even when the tabs it lands o
   expect(await restarted.tabs.titles()).not.toContain(expect.stringMatching(/^Draft plan/))
 })
 
-syncedTest('tabs survive a restart', async ({ juno, relaunch, userData, fake, slack }) => {
+syncedTest('tabs drag to a new place, move with ⌃⇧← and ⌃⇧→, and keep their order and active tab after a restart', async ({ juno, relaunch, userData, fake, slack }) => {
   const { sidebar, tabs } = juno
   await sidebar.row(POSTGRES).open()
   await sidebar.row(RINA).openInNewTab()
-  await sidebar.row(ROADMAP).openInNewTab()
-  await sidebar.row(OFFSITE).openInNewTabFromMenu()
-  await tabs.expectActive(OFFSITE)
-  // The save has reached the engine.
-  await expect.poll(() => savedTabs(userData, fake.teamId)).toEqual({ tabs: [POSTGRES, RINA, ROADMAP, OFFSITE].map((title) => ({ place: threadId(slack, title), pinned: false })), active: 3 })
-  const restarted = await relaunch()
-  await restarted.tabs.expectCount(4)
-  await expect.poll(() => restarted.tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/), expect.stringMatching(/^Proposal/), expect.stringMatching(/^Can eng/)])
-  await restarted.tabs.expectActive(OFFSITE)
-  await restarted.sidebar.row(OFFSITE).expectVisible()
-})
-
-syncedTest('tabs drag to a new place, move with ⌃⇧← and ⌃⇧→, and keep their order after a restart', async ({ juno, relaunch, userData, fake, slack }) => {
-  const { sidebar, tabs } = juno
-  await sidebar.row(POSTGRES).open()
-  await sidebar.row(RINA).openInNewTab()
-  await sidebar.row(ROADMAP).openInNewTab()
+  // The row menu's Open in new tab, as ⌘-click.
+  await sidebar.row(ROADMAP).openInNewTabFromMenu()
+  await tabs.expectActive(ROADMAP)
   await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/), expect.stringMatching(/^Proposal/)])
 
   // The third tab dragged to the first place.
@@ -215,104 +270,42 @@ syncedTest('tabs drag to a new place, move with ⌃⇧← and ⌃⇧→, and kee
   await juno.win.mouse.up()
   await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Proposal/), expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/)])
 
-  // The order has reached the engine.
-  await expect.poll(() => savedTabs(userData, fake.teamId)?.tabs.map((tab) => tab.place)).toEqual([ROADMAP, POSTGRES, RINA].map((title) => threadId(slack, title)))
+  // A tab other than the first is active, and the order and the active tab have reached the engine.
+  await tabs.select(RINA)
+  await tabs.expectActive(RINA)
+  await expect.poll(() => savedTabs(userData, fake.teamId)).toEqual({ tabs: [ROADMAP, POSTGRES, RINA].map((title) => ({ place: threadId(slack, title), pinned: false })), active: 2 })
   const restarted = await relaunch()
   await restarted.tabs.expectCount(3)
   await expect.poll(() => restarted.tabs.titles()).toEqual([expect.stringMatching(/^Proposal/), expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/)])
+  await restarted.tabs.expectActive(RINA)
+  await restarted.sidebar.row(RINA).expectVisible()
 })
 
-syncedTest('a topic tab shows its art and a DM tab the person\'s photo', async ({ juno }) => {
-  const { sidebar, tabs } = juno
-  await sidebar.row(POSTGRES).open()
-  // A thread in the DM with Maya, and the DM itself.
-  await sidebar.row(OFFSITE).openInNewTab()
-  await sidebar.row('Maya', { exact: true }).openInNewTab()
+test.describe('with the page clock', () => {
+  // The clock changes the whole browser context, so this test gets a fresh one (README, "What a test gets").
+  test.use({ freshContext: true })
 
-  // The topic's art, or its placeholder shape until it is drawn.
-  await expect(tabs.tile(POSTGRES)).toHaveAttribute('data-topic-art', /^(art|placeholder)$/)
-  for (const title of [OFFSITE, 'Maya']) {
-    const photo = tabs.tile(title)
-    await expect(photo).toHaveAttribute('src', new RegExp(`${schemeUrl('files').source}avatar`))
-    await expect.poll(() => photo.evaluate((img) => img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0)).toBe(true)
-  }
-  // The DM photo is the URL the sidebar row shows, so it was loaded already.
-  const rowPhoto = await sidebar.row('Maya', { exact: true }).root.locator('img').first().getAttribute('src')
-  await expect(tabs.tile('Maya')).toHaveAttribute('src', rowPhoto ?? '')
-})
+  test('a tab not viewed for a day closes by itself, ⌘⇧T brings it back, and a tab with a draft stays', async ({ juno, win, userData, fake, slack }) => {
+    // The sweep runs hourly on the page's clock, so install the fake one before any tab is viewed.
+    await win.clock.install()
+    await juno.signIn()
+    await juno.waitForSync()
+    const { sidebar, tabs, topic } = juno
+    await sidebar.row(POSTGRES).open()
+    await sidebar.row(RINA).openInNewTab()
+    await topic.composer.fill('Half a thought about the onsite')
+    // The draft is saved.
+    await expect.poll(() => readUserDb(userData, fake.teamId, (db) => db.prepare('SELECT text FROM drafts WHERE topic_id = ?').get(threadId(slack, RINA)))).toEqual({ text: 'Half a thought about the onsite' })
+    await sidebar.row(ROADMAP).openInNewTab()
+    await tabs.expectActive(ROADMAP)
 
-test('a tab not viewed for a day closes by itself, ⌘⇧T brings it back, and a tab with a draft stays', async ({ juno, win, userData, fake, slack }) => {
-  // The sweep runs hourly on the page's clock, so install the fake one before any tab is viewed.
-  await win.clock.install()
-  await juno.signIn()
-  await juno.waitForSync()
-  const { sidebar, tabs, topic } = juno
-  await sidebar.row(POSTGRES).open()
-  await sidebar.row(RINA).openInNewTab()
-  await topic.composer.fill('Half a thought about the onsite')
-  // The draft is saved.
-  await expect.poll(() => readUserDb(userData, fake.teamId, (db) => db.prepare('SELECT text FROM drafts WHERE topic_id = ?').get(threadId(slack, RINA)))).toEqual({ text: 'Half a thought about the onsite' })
-  await sidebar.row(ROADMAP).openInNewTab()
-  await tabs.expectActive(ROADMAP)
+    // A day and an hour later: the tab left a day ago closes, the one with a draft and the active one stay.
+    await win.clock.fastForward('25:00:00')
+    await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Rina/), expect.stringMatching(/^Proposal/)])
+    await tabs.expectActive(ROADMAP)
 
-  // A day and an hour later: the tab left a day ago closes, the one with a draft and the active one stay.
-  await win.clock.fastForward('25:00:00')
-  await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Rina/), expect.stringMatching(/^Proposal/)])
-  await tabs.expectActive(ROADMAP)
-
-  await tabs.menu('reopen-tab')
-  await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/), expect.stringMatching(/^Proposal/)])
-  await tabs.expectActive(POSTGRES)
-})
-
-syncedTest('"+" sits one tab gap after the last tab, level with the tabs, and stays at the end of the strip when the tabs scroll', async ({ juno }) => {
-  const { sidebar, tabs } = juno
-
-  // `strip` is the tablist, the scroller the tabs sit in.
-  const place = async () => {
-    const last = (await tabs.root.getByRole('tab').last().boundingBox())!
-    const plus = (await tabs.newTabButton.boundingBox())!
-    const strip = (await tabs.root.boundingBox())!
-    return { last, plus, strip }
-  }
-  const expectAfterLastTab = async () => {
-    await expect
-      .poll(async () => {
-        const { last, plus } = await place()
-        // The 2px tab gap, then the button's even inset in its tab-high square: (35 - 28) / 2.
-        return { gap: Math.round((plus.x - (last.x + last.width)) * 2) / 2, level: Math.abs(plus.y + plus.height / 2 - (last.y + last.height / 2)) <= 0.5 }
-      })
-      .toEqual({ gap: 5.5, level: true })
-  }
-
-  await juno.expectNothingOpen()
-  await expectAfterLastTab()
-  await sidebar.row(POSTGRES).open()
-  await sidebar.row(RINA).openInNewTab()
-  await expectAfterLastTab()
-
-  // A narrow window: the tabs overflow and scroll, and "+" stays in view at the strip's end.
-  await juno.setWindowSize(760, 600)
-  await sidebar.row(ROADMAP).openInNewTab()
-  await sidebar.row(OFFSITE).openInNewTab()
-  await expect.poll(() => tabs.root.evaluate((list) => list.scrollWidth > list.clientWidth)).toBe(true)
-  // The tabs fill the strip up to "+", which follows the scroller and ends inside the window.
-  const { plus, strip } = await place()
-  expect(plus.x).toBeGreaterThanOrEqual(strip.x + strip.width)
-  expect(plus.x - (strip.x + strip.width)).toBeLessThanOrEqual(5.5)
-  expect(plus.x + plus.width).toBeLessThanOrEqual(await juno.win.evaluate(() => window.innerWidth))
-  await expect(tabs.newTabButton).toBeInViewport()
-})
-
-syncedTest('a new tab asked for while a topic is still opening leaves that open in the old tab', async ({ juno }) => {
-  const { sidebar, tabs } = juno
-
-  // "+" is clicked in the same task as the press on the row, before the topic can paint.
-  const plus = await tabs.newTabButton.elementHandle()
-  await plus!.evaluate((button: HTMLElement) => {
-    addEventListener('pointerdown', () => queueMicrotask(() => button.click()), { once: true })
+    await tabs.menu('reopen-tab')
+    await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), expect.stringMatching(/^Rina/), expect.stringMatching(/^Proposal/)])
+    await tabs.expectActive(POSTGRES)
   })
-  await sidebar.row(POSTGRES).open()
-  await expect.poll(() => tabs.titles()).toEqual([expect.stringMatching(/^Draft plan/), 'Home'])
-  await tabs.expectActive('Home')
 })

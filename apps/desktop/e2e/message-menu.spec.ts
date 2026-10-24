@@ -7,6 +7,7 @@
 // them while the menu is open.
 // One sender's messages start a new header after ten quiet minutes.
 import { checkMessageMenuButton } from './messageMenuButton'
+import type { FakeSlack } from '@juno/fake-slack'
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from './fixtures'
 import type { Juno, MessageMenuDriver } from './driver/juno'
@@ -25,7 +26,7 @@ const boxOf = async (locator: Locator) => {
   return { left: box.x, top: box.y, right: box.x + box.width, bottom: box.y + box.height, width: box.width, height: box.height }
 }
 
-test('a right-click opens the menu as it comes up, over the same message, with the emoji grid on top', async ({ juno, fake }) => {
+test('a right-click opens the menu as it comes up, over the same message, with the emoji grid on top; its grid, picker and keys act on the message', async ({ juno, fake }) => {
   fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Right-click me when it is done' })
   fake.injectMessage({ channel: 'C0ENG', user: 'U0LEO', text: 'A neighbour to let go over' })
   await juno.sidebar.expectTop('#eng')
@@ -104,12 +105,12 @@ test('a right-click opens the menu as it comes up, over the same message, with t
   })
 
   await checkMessageMenuButton(juno, target, neighbour)
+  await test.step('the grid reacts and takes a reaction back, More reactions picks any emoji, and R opens the picker', () => reactFromMenu(juno, fake))
+  await test.step('a key the menu shows runs its row; T on a focused message in Main starts its thread, and does nothing in the thread', () => keysInMenu(juno))
 })
 
-test('a key the menu shows runs its row; T on a focused message in Main starts its thread, and does nothing in the thread', async ({ juno, fake }) => {
-  fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'Something to bring #eng up' })
-  await juno.sidebar.expectTop('#eng')
-  await juno.sidebar.row('#eng').open()
+/** Runs on #eng's Main, open from the first steps; ends in the thread T starts. */
+async function keysInMenu(juno: Juno): Promise<void> {
   const { topic } = juno
   const menu = juno.messageMenu
   await topic.send('Keys in the menu')
@@ -183,12 +184,11 @@ test('a key the menu shows runs its row; T on a focused message in Main starts i
     await topic.expectTitle(/Keys in the menu/)
     await menu.close()
   })
-})
+}
 
-test('the grid reacts and takes a reaction back, More reactions picks any emoji, and R opens the picker', async ({ juno, fake }) => {
+/** Runs on #eng's Main, open from the first steps. The message it reacts to is the newest, for R on a focused one. */
+async function reactFromMenu(juno: Juno, fake: FakeSlack): Promise<void> {
   const message = fake.injectMessage({ channel: 'C0ENG', user: 'U0MAYA', text: 'React to me from the menu' })
-  await juno.sidebar.expectTop('#eng')
-  await juno.sidebar.row('#eng').open()
   const row = juno.topic.message('React to me from the menu')
   await expect(row).toBeVisible()
   const reactions = () => fake.messages('C0ENG').find((m) => m.ts === message.ts)?.reactions?.map((r) => r.name) ?? []
@@ -247,7 +247,7 @@ test('the grid reacts and takes a reaction back, More reactions picks any emoji,
   await expect(keyed.search).toBeFocused()
   await juno.win.keyboard.press('Escape')
   await expect(keyed.root).toHaveCount(0)
-})
+}
 
 type Corner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
 

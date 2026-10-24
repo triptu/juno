@@ -77,7 +77,7 @@ syncedTest('window swipe events move back and forward', { tag: '@electron' }, as
   await juno.topic.expectTitle(ROADMAP)
 })
 
-syncedTest('⌘⇧T reopens closed tabs, the last closed first, each with its history', async ({ juno }) => {
+syncedTest('⌘⇧T reopens closed tabs, the last closed first, each with its history; an inactive tab shows the unread dot until its topic is read', async ({ juno, slack }) => {
   const { sidebar, tabs, topic, nav } = juno
 
   await sidebar.row(POSTGRES).open()
@@ -106,6 +106,21 @@ syncedTest('⌘⇧T reopens closed tabs, the last closed first, each with its hi
   // Nothing left to reopen.
   await tabs.menu('reopen-tab')
   await tabs.expectCount(3)
+
+  // The tabs now show the Draft plan, the offsite (active) and the roadmap; all three topics are read.
+  await sidebar.row(POSTGRES).expectRead()
+  await tabs.expectUnread(POSTGRES, false)
+  slack.as('Leo').replyIn(POSTGRES, 'Replica check passed.')
+  await sidebar.row(POSTGRES).expectUnread(1)
+  await tabs.expectUnread(POSTGRES)
+  await tabs.expectUnread(ROADMAP, false)
+
+  // The active tab never shows it; opening marks read, so it stays gone.
+  await tabs.select(POSTGRES)
+  await tabs.expectUnread(POSTGRES, false)
+  await sidebar.row(POSTGRES).expectRead()
+  await tabs.select(ROADMAP)
+  await tabs.expectUnread(POSTGRES, false)
 })
 
 syncedTest('the tab menu pins, unpins and closes, and pins survive a restart', async ({ juno, relaunch, userData, fake, slack }) => {
@@ -155,27 +170,6 @@ syncedTest('the tab menu pins, unpins and closes, and pins survive a restart', a
   expect(await restarted.tabs.titles()).toEqual([expect.stringMatching(/^Proposal/), expect.stringMatching(/^Draft plan/)])
   await expect(restarted.tabs.closeButton(ROADMAP)).toHaveCount(1)
 
-})
-
-syncedTest('an inactive tab shows the unread dot until its topic is read', async ({ juno, slack }) => {
-  const { sidebar, tabs } = juno
-
-  await sidebar.row(POSTGRES).open()
-  await sidebar.row(POSTGRES).expectRead()
-  await sidebar.row(RINA).openInNewTab()
-  await tabs.expectUnread(POSTGRES, false)
-
-  slack.as('Leo').replyIn(POSTGRES, 'Replica check passed.')
-  await sidebar.row(POSTGRES).expectUnread(1)
-  await tabs.expectUnread(POSTGRES)
-  await tabs.expectUnread(RINA, false)
-
-  // The active tab never shows it; opening marks read, so it stays gone.
-  await tabs.select(POSTGRES)
-  await tabs.expectUnread(POSTGRES, false)
-  await sidebar.row(POSTGRES).expectRead()
-  await tabs.select(RINA)
-  await tabs.expectUnread(POSTGRES, false)
 })
 
 // @mac: on Linux the width is not restored after the relaunch at the end (macOS quit and menu path); the Mac runs it.

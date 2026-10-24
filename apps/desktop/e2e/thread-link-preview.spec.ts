@@ -4,25 +4,33 @@ import { expectStableAnchor } from './shiftProbe'
 const ROOT = 'checkout.spec failed again on main.'
 const FIRST_REPLY = 'Sam: Quarantining it. Ticket filed.'
 
-syncedTest('Main previews the first reply after opening a thread, never the root or newest reply', async ({ juno }) => {
-  await juno.sidebar.row('#eng').open()
-  await juno.topic.threadLinkUnder(ROOT).open()
-  await juno.topic.expectMessage('Quarantining it. Ticket filed.')
-  await juno.sidebar.row('#eng').open()
-  const link = juno.topic.threadLinkUnder(ROOT).root
-  await expect(link).toHaveAccessibleName(`5 replies: ${FIRST_REPLY}`)
-  await expect(link).toContainText(FIRST_REPLY)
-  await expect(link.locator('[data-kind="person"]')).toHaveCount(2)
-  expect(await link.locator('[data-kind="person"]').evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-label')))).toEqual(['Sam', 'Dev'])
-  await expect(link).not.toContainText(ROOT)
-  await expect(link).not.toContainText('can we live with the quarantine')
-  await link.scrollIntoViewIfNeeded()
-  for (const theme of ['Light', 'Dark'] as const) {
-    await juno.setTheme(theme)
+syncedTest('Main previews the first reply after opening a thread, never the root or newest reply, and shows the first three reply_users', async ({ juno, slack }) => {
+  await test.step('after the thread is opened, its link previews the first reply', async () => {
     await juno.sidebar.row('#eng').open()
-    await link.scrollIntoViewIfNeeded()
-    await juno.win.screenshot({ path: test.info().outputPath(`thread-link-avatars-${theme.toLowerCase()}.png`) })
-  }
+    await juno.topic.threadLinkUnder(ROOT).open()
+    await juno.topic.expectMessage('Quarantining it. Ticket filed.')
+    await juno.sidebar.row('#eng').open()
+    const link = juno.topic.threadLinkUnder(ROOT).root
+    await expect(link).toHaveAccessibleName(`5 replies: ${FIRST_REPLY}`)
+    await expect(link).toContainText(FIRST_REPLY)
+    await expect(link.locator('[data-kind="person"]')).toHaveCount(2)
+    expect(await link.locator('[data-kind="person"]').evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-label')))).toEqual(['Sam', 'Dev'])
+    await expect(link).not.toContainText(ROOT)
+    await expect(link).not.toContainText('can we live with the quarantine')
+  })
+
+  await test.step('Main shows only the first three reply_users in their Slack order without an extra counter', async () => {
+    slack.as('Maya').replyIn(ROOT, 'I will check the frame load.')
+    slack.as('Leo').replyIn(ROOT, 'I can take the ticket.')
+    const link = juno.topic.threadLinkUnder(ROOT).root
+    // The preview stays the first reply, not the newest.
+    await expect(link).toHaveAccessibleName(`7 replies: ${FIRST_REPLY}`)
+    const avatars = link.locator('[data-kind="person"]')
+    await expect(avatars).toHaveCount(3)
+    expect(await avatars.evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-label')))).toEqual(['Sam', 'Dev', 'Maya'])
+    await expect(link).not.toContainText('+')
+    await expect(link.locator('svg')).toHaveCount(1)
+  })
 })
 
 syncedTest('unknown first replies show only the count and fill in place when a peek fetch lands', async ({ juno, fake, slack, win }) => {
@@ -47,19 +55,6 @@ syncedTest('unknown first replies show only the count and fill in place when a p
     await juno.peek.expectMessage('Quarantining it. Ticket filed.')
   })
   await juno.peek.release()
-})
-
-syncedTest('Main shows only the first three reply_users in their Slack order without an extra counter', async ({ juno, slack }) => {
-  await juno.sidebar.row('#eng').open()
-  slack.as('Maya').replyIn(ROOT, 'I will check the frame load.')
-  slack.as('Leo').replyIn(ROOT, 'I can take the ticket.')
-  const link = juno.topic.threadLinkUnder(ROOT).root
-  await expect(link).toHaveAccessibleName('7 replies')
-  const avatars = link.locator('[data-kind="person"]')
-  await expect(avatars).toHaveCount(3)
-  expect(await avatars.evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-label')))).toEqual(['Sam', 'Dev', 'Maya'])
-  await expect(link).not.toContainText('+')
-  await expect(link.locator('svg')).toHaveCount(1)
 })
 
 for (const repliers of [undefined, []]) {

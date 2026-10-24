@@ -61,53 +61,49 @@ showsItself('shows on Home after the first sign-in once the sidebar has rows, ti
 
   // The ticks survive a relaunch.
   const after = await relaunch()
-    await after.sidebar.expectRows()
-    await after.tabs.select('Home')
-    await after.welcome.expectShown()
-    await after.welcome.expectTicked('peek', 'tab')
+  await after.sidebar.expectRows()
+  await after.tabs.select('Home')
+  await after.welcome.expectShown()
+  await after.welcome.expectTicked('peek', 'tab')
 
-    // A question to Juno from Home's field. It opens the Juno chat; Back returns to Home.
-    await after.write.write('What did I miss today?')
-    await after.write.send()
-    await after.nav.menu('back')
-    await after.home.expectShown()
-    await after.welcome.expectTicked('peek', 'tab', 'juno')
-    await expect(after.welcome.heading).toHaveText('You’re all set')
-    await expect(after.welcome.close).toHaveText('Done')
+  // A question to Juno from Home's field. It opens the Juno chat; Back returns to Home.
+  await after.write.write('What did I miss today?')
+  await after.write.send()
+  await after.nav.menu('back')
+  await after.home.expectShown()
+  await after.welcome.expectTicked('peek', 'tab', 'juno')
+  await expect(after.welcome.heading).toHaveText('You’re all set')
+  await expect(after.welcome.close).toHaveText('Done')
 
-    // Done: the card goes, and its room stays for this visit, so nothing moves.
-    await expectNoLayoutShift(after.win, async () => {
-      await after.welcome.close.click()
-      await after.welcome.expectGone()
-    })
+  // Done: the card goes, and its room stays for this visit, so nothing moves.
+  await expectNoLayoutShift(after.win, async () => {
+    await after.welcome.close.click()
+    await after.welcome.expectGone()
+  })
 
   // Never again by itself.
   await expectNoCardAfterLaunch(await relaunch({ tour: true }))
 })
 
-test('an install from before the welcome card shows it once, on its next launch', async ({ juno, relaunch }) => {
+test('an install from before the welcome card shows it once, on its next launch; Hide puts it away without moving Home, and ⌘K, Help and Settings › About bring it back', async ({ juno, relaunch }) => {
   // This app does not show the card by itself: the workspace never sees it, as on a build from before it.
   await juno.signIn()
   await juno.waitForSync()
   await juno.welcome.expectGone()
 
   const after = await relaunch({ tour: true })
-    await after.sidebar.expectRows()
-    await after.welcome.expectShown()
-    await after.welcome.close.click()
-    await after.welcome.expectGone()
+  await after.sidebar.expectRows()
+  await after.welcome.expectShown()
+  await after.welcome.close.click()
+  await after.welcome.expectGone()
 
-  await expectNoCardAfterLaunch(await relaunch({ tour: true }))
-})
-
-test('Hide puts it away without moving Home, and ⌘K, Help and Settings › About bring it back on Home', async ({ juno }) => {
-  const { welcome, palette, home } = juno
-  await juno.signIn()
-  await juno.waitForSync()
-  await welcome.expectGone()
+  // Put away for good, the card comes back only when asked for. Nothing was done, so nothing is ticked.
+  const last = await relaunch({ tour: true })
+  await expectNoCardAfterLaunch(last)
+  const { welcome, palette, home } = last
 
   // ⌘K: "Show the tour" brings the card back on Home, nothing ticked.
-  await juno.sidebar.row(POSTGRES).open()
+  await last.sidebar.row(POSTGRES).open()
   await palette.open()
   await palette.type('tour')
   await palette.choose('Show the tour')
@@ -118,7 +114,7 @@ test('Hide puts it away without moving Home, and ⌘K, Help and Settings › Abo
   await welcome.expectWholeAboveField()
 
   // Hide: the card goes; its room stays for this visit, so the rows and the field stay put.
-  await expectNoLayoutShift(juno.win, async () => {
+  await expectNoLayoutShift(last.win, async () => {
     await welcome.close.click()
     await welcome.expectGone()
   })
@@ -130,8 +126,8 @@ test('Hide puts it away without moving Home, and ⌘K, Help and Settings › Abo
   await welcome.expectGone()
 
   // Settings › About.
-  await juno.openSettings('About')
-  await juno.settings.root.getByRole('button', { name: 'Show the tour' }).click()
+  await last.openSettings('About')
+  await last.settings.root.getByRole('button', { name: 'Show the tour' }).click()
   await home.expectShown()
   await welcome.expectShown()
 })

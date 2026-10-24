@@ -1,8 +1,11 @@
 // Menus and lists built on OptionList have one active row, as a native menu
 // does: the pointer and the arrow keys move the same highlight, and no row
 // keeps a hover highlight of its own beside it.
-import type { Locator } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
+import type { Juno } from './driver/juno'
 import { expect, syncedTest as test } from './fixtures'
+
+test.describe.configure({ timeout: 60_000 })
 
 /** The names of the rows drawn highlighted: any row with a background. */
 function highlighted(list: Locator): Promise<string[]> {
@@ -13,7 +16,7 @@ function highlighted(list: Locator): Promise<string[]> {
   )
 }
 
-test('the avatar menu and the palette each have one active row under the pointer and the arrow keys', async ({ juno, win }) => {
+test('the avatar menu and the palette have one active row under the pointer and the arrow keys, and menu triggers open on press', async ({ juno, win }) => {
   await test.step('the avatar menu has one active item: hover, then the keyboard, then hover again', async () => {
     const { accountMenu } = juno
     await accountMenu.open()
@@ -63,10 +66,13 @@ test('the avatar menu and the palette each have one active row under the pointer
 
     await rows.nth(1).hover()
     await expect.poll(async () => highlighted(list)).toEqual([await rows.nth(1).textContent()])
+    await win.keyboard.press('Escape')
+    await palette.expectClosed()
   })
+  await test.step('menu triggers open on mouse down and the release leaves them open', () => pressToOpen(juno, win))
 })
 
-test('menu triggers open on mouse down and the release leaves them open', async ({ juno, win }) => {
+async function pressToOpen(juno: Juno, win: Page): Promise<void> {
   const press = async (trigger: Locator) => {
     const box = (await trigger.boundingBox())!
     await win.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
@@ -134,4 +140,4 @@ test('menu triggers open on mouse down and the release leaves them open', async 
   await juno.topic.expectTitle('Main')
   await juno.releaseMenu()
   await expect(juno.topic.moreButton).toHaveAttribute('aria-expanded', 'false')
-})
+}

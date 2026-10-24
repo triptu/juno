@@ -1,6 +1,7 @@
 // Links (spec section 8): URLs sent from the composer show as links before
 // and after Slack's echo, a URL pasted over selected words links them and
-// goes to Slack as Slack's client sends it, ⌘K on a selection edits the
+// goes to Slack as Slack's client sends it, a rich link pasted from another
+// app keeps its label, ⌘K on a selection edits the
 // link, and ⌘-click opens it in the browser (a plain click opens the web
 // panel, web-panel.spec.ts).
 import type { Locator } from '@playwright/test'
@@ -68,10 +69,11 @@ test('sends plain links, pastes linked words and edits links with the keyboard',
   const context = { juno, fake }
   await test.step('URLs and domains sent from the composer show as links before and after the echo', () => sendPlainLinks(context))
   await test.step('a URL pasted over selected words links them, is sent as Slack sends it, and Undo gives the plain paste', () => pasteLinkedWords(context))
+  await test.step('a rich link pasted from another app is sent and edited with its label and the URL', () => pasteRichLink(context))
   await test.step('⌘K on selected words edits their link', () => editLinkedWords(context))
 })
 
-test('pastes a rich link from another app and sends its label with the URL', async ({ juno, fake }) => {
+async function pasteRichLink({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
   await juno.sidebar.row(POSTGRES).open()
   await juno.topic.expectTitle(POSTGRES)
 
@@ -98,7 +100,7 @@ test('pastes a rich link from another app and sends its label with the URL', asy
   expect(postedLinks(update === undefined ? [] : [{ method: 'chat.postMessage', args: update.args }])).toEqual([
     { type: 'link', url: 'https://example.com/release', text: 'release notes', style: { italic: true } },
   ])
-})
+}
 
 async function sendPlainLinks({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
   const { topic } = juno
@@ -132,7 +134,7 @@ async function sendPlainLinks({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): 
 
 async function pasteLinkedWords({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Promise<void> {
   const priorLinks = (await juno.browserLinks()).length
-const { topic } = juno
+  const { topic } = juno
   await juno.sidebar.row(POSTGRES).open()
   await topic.expectTitle(POSTGRES)
 

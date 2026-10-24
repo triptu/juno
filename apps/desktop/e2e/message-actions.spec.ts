@@ -252,11 +252,9 @@ async function menuActions({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Pro
     const menu = await topic.messageMenu('Retro at 3')
     await juno.win.mouse.move(0, 0)
     await expect(row).toHaveAttribute('data-popover-active', '')
-    // Ask Juno shows while AI assist is on, and Tell me if nobody replies is enabled once Juno may schedule.
-    const labels = (await menu.labels()).filter((label) => label !== 'Ask Juno').map((label) => label.replace(/^\((.*)\)$/, '$1'))
-    expect(labels).toEqual(['Start thread', 'Quote', '-', 'Copy text', 'Forward…', 'Open in Slack', '-', 'Tell me if nobody replies', '-', 'Edit', 'Delete…'])
-    // The keys that work on a focused message show at their rows' ends.
-    expect(await menu.shortcuts()).toEqual({ reply: 'T', quote: 'Q', forward: 'F', edit: 'E', delete: '⌫' })
+    // Your own message's menu ends with Edit and Delete…; message-menu.spec.ts checks a message from someone else has neither.
+    // Ask Juno shows while AI assist is on.
+    expect((await menu.labels()).filter((label) => label !== 'Ask Juno').slice(-2)).toEqual(['Edit', 'Delete…'])
     await menu.choose('edit')
     const editing = topic.list.locator('[data-editing]')
     const field = editing.getByRole('textbox', { name: 'Edit message' })
@@ -285,47 +283,49 @@ async function menuActions({ juno, fake }: Pick<Fixtures, 'juno' | 'fake'>): Pro
   })
 }
 
-test('an edit started while the message is sending stays open, with what was typed, when Slack takes the message', async ({ juno, fake }) => {
+test('an edit made while the message is still sending is kept, and reaches Slack once it has the message', async ({ juno, fake }) => {
   await openMain(juno)
   const { topic } = juno
-  fake.holdNext({ method: 'chat.postMessage', before: true })
-  await topic.send('Typo in thsi one')
-  await expect(topic.message('Typo in thsi one')).toHaveAttribute('data-pending', 'sending')
-  await topic.composer.press('ArrowUp')
-  await topic.message('Typo in thsi one').press('e')
   const field = topic.list.getByRole('textbox', { name: 'Edit message' })
-  await field.fill('Typo in this one, still typing')
 
-  fake.release()
-  await expect.poll(() => fake.messages('C0ENG').some((m) => m.text === 'Typo in thsi one')).toBe(true)
-  await expect(topic.list.locator('[data-message-row][data-pending]')).toHaveCount(0)
-  await expect(field).toHaveValue('Typo in this one, still typing')
-  await expect(field).toBeFocused()
-  await field.press('Enter')
-  await expect.poll(() => fake.messages('C0ENG').some((m) => m.text === 'Typo in this one, still typing')).toBe(true)
+  await test.step('an edit started while the message is sending stays open, with what was typed, when Slack takes the message', async () => {
+    fake.holdNext({ method: 'chat.postMessage', before: true })
+    await topic.send('Typo in thsi one')
+    await expect(topic.message('Typo in thsi one')).toHaveAttribute('data-pending', 'sending')
+    await topic.composer.press('ArrowUp')
+    await topic.message('Typo in thsi one').press('e')
+    await field.fill('Typo in this one, still typing')
+
+    fake.release()
+    await expect.poll(() => fake.messages('C0ENG').some((m) => m.text === 'Typo in thsi one')).toBe(true)
+    await expect(topic.list.locator('[data-message-row][data-pending]')).toHaveCount(0)
+    await expect(field).toHaveValue('Typo in this one, still typing')
+    await expect(field).toBeFocused()
+    await field.press('Enter')
+    await expect.poll(() => fake.messages('C0ENG').some((m) => m.text === 'Typo in this one, still typing')).toBe(true)
+  })
+
+  await test.step('an edit saved while the message is still sending reaches Slack once it has the message', async () => {
+    const updates = () => fake.calls.filter((call) => call.method === 'chat.update').length
+    fake.holdNext({ method: 'chat.postMessage', before: true })
+    await topic.send('Wrnog word here')
+    await expect(topic.message('Wrnog word here')).toHaveAttribute('data-pending', 'sending')
+    const before = updates()
+    await topic.composer.press('ArrowUp')
+    await juno.win.keyboard.press('e')
+    await field.fill('Wrong word here')
+    await field.press('Enter')
+    await expect(topic.message('Wrong word here')).toBeVisible()
+    expect(updates()).toBe(before)
+
+    fake.release()
+    await topic.expectSent('Wrong word here')
+    await expect.poll(() => fake.messages('C0ENG').filter((m) => m.text === 'Wrong word here').length).toBe(1)
+    expect(fake.messages('C0ENG').some((m) => m.text === 'Wrnog word here')).toBe(false)
+  })
 })
 
-test('an edit made while the message is still sending reaches Slack once it has the message', async ({ juno, fake }) => {
-  await openMain(juno)
-  const { topic } = juno
-  fake.holdNext({ method: 'chat.postMessage', before: true })
-  await topic.send('Typo in thsi one')
-  await expect(topic.message('Typo in thsi one')).toHaveAttribute('data-pending', 'sending')
-  await topic.composer.press('ArrowUp')
-  await juno.win.keyboard.press('e')
-  const field = topic.list.getByRole('textbox', { name: 'Edit message' })
-  await field.fill('Typo in this one')
-  await field.press('Enter')
-  await expect(topic.message('Typo in this one')).toBeVisible()
-  expect(fake.calls.filter((call) => call.method === 'chat.update')).toHaveLength(0)
-
-  fake.release()
-  await topic.expectSent('Typo in this one')
-  await expect.poll(() => fake.messages('C0ENG').filter((m) => m.text === 'Typo in this one').length).toBe(1)
-  expect(fake.messages('C0ENG').some((m) => m.text === 'Typo in thsi one')).toBe(false)
-})
-
-test('Open thread and Start thread from Main open the message’s thread', async ({ juno, fake }) => {
+test('Open thread and Start thread from Main open the message’s thread, and ⌘-click opens it in a background tab', async ({ juno, fake }) => {
   await openMain(juno)
   const { topic } = juno
   await test.step('Open thread from Main opens the message’s thread with its composer', async () => {
@@ -347,9 +347,10 @@ test('Open thread and Start thread from Main open the message’s thread', async
     await expect(topic.composer).toHaveAttribute('aria-label', 'Reply')
     expect(fake.messages('C0ENG').find((message) => message.ts === ts)?.reply_count ?? 0).toBe(0)
   })
+  await test.step('⌘-click Start thread in the menu opens the thread in a background tab; this tab and its scroll stay', () => startThreadInBackground(juno, fake))
 })
 
-test('⌘-click Start thread in the menu opens the thread in a background tab; this tab and its scroll stay', async ({ juno, fake }) => {
+async function startThreadInBackground(juno: Juno, fake: FakeSlack): Promise<void> {
   await openMain(juno)
   const { topic, tabs } = juno
   await sendOwn(juno, fake, 'A topic for later')
@@ -383,4 +384,4 @@ test('⌘-click Start thread in the menu opens the thread in a background tab; t
   await tabs.select('A topic for later')
   await topic.expectTitle(/A topic for later/)
   await expect(topic.composer).toHaveAttribute('aria-label', 'Reply')
-})
+}

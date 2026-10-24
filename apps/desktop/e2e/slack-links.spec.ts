@@ -7,6 +7,7 @@
 import type { FakeSlack } from '@juno/fake-slack'
 import { expect, test } from './fixtures'
 import type { Juno } from './driver/juno'
+import { watchFlashes } from './driver/flashes'
 
 test.describe.configure({ timeout: 120_000 })
 
@@ -21,21 +22,8 @@ const find = (fake: FakeSlack, start: string) => fake.messages('C0ENG').find((me
 const permalink = (fake: FakeSlack, ts: string, threadTs?: string) =>
   `${fake.url}/archives/C0ENG/p${ts.replace('.', '')}${threadTs === undefined ? '' : `?thread_ts=${threadTs}&cid=C0ENG`}`
 
-/** Records which message rows flash from now on: the flash is a short animation on the row. */
-async function watchFlashes(juno: Juno): Promise<void> {
-  await juno.win.evaluate(() => {
-    const w = window as unknown as { __flashed: string[] }
-    w.__flashed = []
-    const animate = Element.prototype.animate
-    Element.prototype.animate = function (this: Element, ...args: Parameters<Element['animate']>) {
-      if ((this as HTMLElement).dataset['messageRow'] !== undefined) w.__flashed.push(this.textContent ?? '')
-      return animate.apply(this, args)
-    }
-  })
-}
-
-const flashed = (juno: Juno, text: string) =>
-  expect.poll(() => juno.win.evaluate((wanted) => (window as unknown as { __flashed: string[] }).__flashed.some((row) => row.includes(wanted)), text), { timeout: 10_000 }).toBe(true)
+const flashed = (read: () => Promise<string[]>, text: string) =>
+  expect.poll(async () => (await read()).some((row) => row.includes(text)), { timeout: 10_000 }).toBe(true)
 
 /** Seeds a reply in the Postgres thread holding one link of each kind. */
 function seedLinks(fake: FakeSlack): void {
@@ -70,53 +58,55 @@ async function openLinks(juno: Juno) {
   return (text: string) => links.filter({ hasText: text })
 }
 
-test('a message link opens Main in a new tab at the message, which flashes; hover says where it goes', async ({ juno, fake }) => {
+test('message links open inside Juno at the message, which flashes: Main and a reply in new tabs, a message Juno never stored, and a tab showing the topic again', async ({ juno, fake }) => {
   seedLinks(fake)
   const link = await openLinks(juno)
   const { topic, tabs } = juno
 
-  // In-app links keep the arrow cursor and say where they go on hover; others keep the URL.
-  await expect(link('the preview note')).toHaveAttribute('data-in-app', '')
-  await expect(link('elsewhere')).not.toHaveAttribute('data-in-app', '')
-  await expect(link('elsewhere')).toHaveAttribute('title', OTHER)
-  await link('the preview note').hover()
-  await expect(link('the preview note')).toHaveAttribute('title', '#eng · Main')
-  await link('the reaper reply').hover()
-  await expect(link('the reaper reply')).toHaveAttribute('title', '#eng · Thread')
+  await test.step('in-app links keep the arrow cursor and say where they go on hover; others keep the URL', async () => {
+    await expect(link('the preview note')).toHaveAttribute('data-in-app', '')
+    await expect(link('elsewhere')).not.toHaveAttribute('data-in-app', '')
+    await expect(link('elsewhere')).toHaveAttribute('title', OTHER)
+    await link('the preview note').hover()
+    await expect(link('the preview note')).toHaveAttribute('title', '#eng · Main')
+    await link('the reaper reply').hover()
+    await expect(link('the reaper reply')).toHaveAttribute('title', '#eng · Thread')
+  })
 
-  await watchFlashes(juno)
-  await link('the preview note').click()
-  await tabs.expectCount(2)
-  await tabs.expectActive(ENG)
-  await expect(topic.message('preview environments never shut down')).toBeInViewport({ timeout: 15_000 })
-  await flashed(juno, 'preview environments never shut down')
-})
+  const read = await watchFlashes(juno.win)
+  await test.step('a message link opens Main in a new tab at the message, which flashes', async () => {
+    await link('the preview note').click()
+    await tabs.expectCount(2)
+    await tabs.expectActive(ENG)
+    await expect(topic.message('preview environments never shut down')).toBeInViewport({ timeout: 15_000 })
+    await flashed(read, 'preview environments never shut down')
+  })
 
-test('a reply link opens its thread; a message Juno never stored is fetched; a tab showing the topic is reused', async ({ juno, fake }) => {
-  seedLinks(fake)
-  const link = await openLinks(juno)
-  const { topic, tabs } = juno
-  await watchFlashes(juno)
+  await test.step('a reply link opens its thread in a new tab', async () => {
+    await tabs.select(POSTGRES)
+    await link('the reaper reply').click()
+    await tabs.expectCount(3)
+    await expect(topic.message('Please do.')).toBeInViewport({ timeout: 15_000 })
+    await expect(topic.message('Preview environments have no TTL')).toBeVisible()
+    await flashed(read, 'Please do.')
+  })
 
-  await link('the reaper reply').click()
-  await tabs.expectCount(2)
-  await expect(topic.message('Please do.')).toBeInViewport({ timeout: 15_000 })
-  await expect(topic.message('Preview environments have no TTL')).toBeVisible()
-  await flashed(juno, 'Please do.')
+  await test.step('a message Juno never stored is fetched, in the tab that already shows #eng', async () => {
+    await tabs.select(POSTGRES)
+    await link('the old note').click()
+    await tabs.expectCount(3)
+    await tabs.expectActive(ENG)
+    await expect(topic.message('Old capacity note from last month')).toBeInViewport({ timeout: 15_000 })
+    await flashed(read, 'Old capacity note from last month')
+  })
 
-  await tabs.select(POSTGRES)
-  await link('the old note').click()
-  await tabs.expectCount(3)
-  await tabs.expectActive(ENG)
-  await expect(topic.message('Old capacity note from last month')).toBeInViewport({ timeout: 15_000 })
-  await flashed(juno, 'Old capacity note from last month')
-
-  // The tab that shows #eng now is used again.
-  await tabs.select(POSTGRES)
-  await link('the preview note').click()
-  await tabs.expectCount(3)
-  await tabs.expectActive(ENG)
-  await expect(topic.message('preview environments never shut down')).toBeInViewport({ timeout: 15_000 })
+  await test.step('the tab that shows #eng is used again', async () => {
+    await tabs.select(POSTGRES)
+    await link('the preview note').click()
+    await tabs.expectCount(3)
+    await tabs.expectActive(ENG)
+    await expect(topic.message('preview environments never shut down')).toBeInViewport({ timeout: 15_000 })
+  })
 })
 
 // The browser links first: they open no tab, so the ⌘-click step still starts with one.

@@ -69,7 +69,7 @@ async function drag(win: Page, from: { x: number; y: number }, to: { x: number; 
   await win.mouse.up()
 }
 
-test('a sender or @person opens your DM with them, in a new tab or the one that shows it', async ({ juno, fake }) => {
+test('a sender or @person opens your DM with them, in a new tab or the one that shows it, or Home addressed to them with no DM', async ({ juno, fake }) => {
   seedReplies(fake)
   await openPostgres(juno)
   const { topic, tabs, win } = juno
@@ -133,6 +133,23 @@ test('a sender or @person opens your DM with them, in a new tab or the one that 
     await tabs.expectCount(5)
     await tabs.expectActive('Grafana')
   })
+
+  await test.step('with no DM yet, ⌘-click opens Home addressed to them behind, and focus stays in the topic', async () => {
+    await tabs.select(POSTGRES)
+    await name(juno, DEV).click({ modifiers: ['Meta'] })
+    await tabs.expectCount(6)
+    await tabs.expectActive(POSTGRES)
+    expect(await win.evaluate(() => document.activeElement?.closest('[data-topic-view]') != null)).toBe(true)
+    await tabs.select('Home')
+    await expect(juno.write.chip).toHaveAccessibleName(/^Send to: Dev/)
+  })
+
+  await test.step('a click on your own name addresses you in a new Home tab, as ⌘N does, since Home with Dev is in use', async () => {
+    await tabs.select(POSTGRES)
+    await name(juno, OWN).click()
+    await tabs.expectCount(7)
+    await expect(juno.write.chip).toHaveAccessibleName(/^Send to: Tushar/)
+  })
 })
 
 test('Enter on a focused name opens the DM, and ⌘Enter on a chip opens it behind', async ({ juno, fake }) => {
@@ -156,25 +173,6 @@ test('Enter on a focused name opens the DM, and ⌘Enter on a chip opens it behi
   await tabs.expectCount(3)
   await expect(tabs.tab('Sam')).toBeVisible()
   await tabs.expectActive(POSTGRES)
-})
-
-test('with no DM yet, a click opens Home addressed to them, ⌘-click opens it behind, and you can address yourself', async ({ juno }) => {
-  await openPostgres(juno)
-  const { tabs, write, win } = juno
-
-  await name(juno, DEV).click({ modifiers: ['Meta'] })
-  await tabs.expectCount(2)
-  await tabs.expectActive(POSTGRES)
-  // Focus stays in the topic.
-  expect(await win.evaluate(() => document.activeElement?.closest('[data-topic-view]') != null)).toBe(true)
-  await tabs.select('Home')
-  await expect(write.chip).toHaveAccessibleName(/^Send to: Dev/)
-
-  // Home with Dev chosen is in use, so you are addressed in a new Home tab, as ⌘N does.
-  await tabs.select(POSTGRES)
-  await name(juno, OWN).click()
-  await tabs.expectCount(3)
-  await expect(write.chip).toHaveAccessibleName(/^Send to: Tushar/)
 })
 
 test("a deactivated person's DM opens read-only; with no DM they offer no link", async ({ juno, fake }) => {

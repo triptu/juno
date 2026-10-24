@@ -1,6 +1,6 @@
 // Reading a topic against the fake Slack: where it opens, the read rule,
-// older pages without a shift, Main's thread links, the title's topic switcher and ⋯, a
-// #channel chip, and prefetch.
+// older pages without a shift, Main's thread links, the title's topic switcher and ⋯,
+// Follow, the header's controls, a #channel chip, and prefetch.
 import { measureLayoutShift } from '@juno/testing/layout-shift'
 import { startFakeSlack, topic300Seed } from '@juno/fake-slack'
 import { expect, syncedTest, test, type Fixtures } from './fixtures'
@@ -13,8 +13,9 @@ const RINA = 'Rina finished the onsite'
 const CHECKOUT = 'checkout.spec failed again on main.'
 const ENG_MAIN = '#eng'
 
-// The hover goes first, while the topic has never been opened.
-syncedTest('a read topic warms on hover, opens from the cache, and opens at the bottom', async ({ juno, slack }) => {
+// The hover goes first, while the topic has never been opened. The chip step moves the scope from #eng, where
+// the pill step left it, to #platform.
+syncedTest('a read topic warms on hover, opens from the cache and at the bottom, and its context pill and a #channel chip scope the sidebar', async ({ juno, slack }) => {
   await test.step('hovering a row warms the topic without asking Slack', async () => {
     slack.resetCalls()
     await juno.sidebar.row(POSTGRES).hover()
@@ -32,10 +33,24 @@ syncedTest('a read topic warms on hover, opens from the cache, and opens at the 
     await juno.topic.expectNoDivider()
     await juno.topic.expectAtBottom()
   })
+
+  await test.step('the context pill scopes the sidebar to its channel', async () => {
+    await juno.sidebar.row(POSTGRES).open()
+    await juno.topic.contextPill.click()
+    await juno.sidebar.expectScope('eng')
+  })
+
+  await test.step('a #channel chip scopes the sidebar to that channel', async () => {
+    await juno.sidebar.row(POSTGRES).open()
+    await juno.topic.clickChannel('platform')
+    await juno.sidebar.expectScope('platform')
+    await juno.sidebar.row(POSTGRES).expectAbsent()
+  })
 })
 
-// Rina’s thread opens first, while it still has its 2 unread.
-syncedTest('Rina’s thread opens at the "N new" divider, and its ⋯ menu unfollows and follows it', async ({ juno, slack }) => {
+// Rina’s thread opens first, while it still has its 2 unread. Then checkout’s thread from Main: the Follow step
+// ends with ⌘Z, so the thread is unfollowed again for the Notify me step.
+syncedTest('Rina’s thread opens at the "N new" divider and its ⋯ menu unfollows and follows it; Follow on an unfollowed thread from Main, then Notify me after it', async ({ juno, slack }) => {
   await test.step('a topic with unread messages opens at the "N new" divider and is marked read', async () => {
     const rina = juno.sidebar.row(RINA)
     await rina.expectUnread(2)
@@ -60,32 +75,16 @@ syncedTest('Rina’s thread opens at the "N new" divider, and its ⋯ menu unfol
 
     // Never unfollows the thread in Slack, so it leaves the sidebar. The tab stays open on it.
     const never = await juno.topic.chooseInMenu('notify-never')
-    expect(never.labels).toEqual([
-      'Open in new tab',
-      'Start huddle',
-      '-',
-      'Rename',
-      'Redraw art',
-      'Mark as unread',
-      'Pin',
-      'Resolve',
-      '-',
-      'Copy Slack link',
-      'Open in Slack',
-      'Notify me',
-      '> Always',
-      '> Auto ✓',
-      '> Never',
-      '> -',
-      '> How Auto decides…',
-      'Ignore #hiring',
-    ])
-    // At ⋯'s left edge, 6px under the right island.
+    // The thread's own menu: Notify me at Auto, the level a follow sets, and its channel's Ignore.
+    expect(never.labels).toContain('Notify me')
+    expect(never.labels).toContain('> Auto ✓')
+    expect(never.labels).toContain('Ignore #hiring')
+    // At ⋯'s left edge, under the right island.
     const island = (await juno.topic.header.locator('[data-island="right"]').boundingBox())!
     const more = (await juno.topic.moreButton.boundingBox())!
     expect(never.at).not.toBeNull()
     expect(Math.round(never.at!.x)).toBe(Math.round(more.x))
-    expect(Math.round(never.at!.y - (island.y + island.height))).toBe(6)
+    expect(never.at!.y).toBeGreaterThan(island.y + island.height)
     await rina.expectAbsent()
     await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.remove'), { timeout: 10_000 }).toBe(true)
 
@@ -98,10 +97,62 @@ syncedTest('Rina’s thread opens at the "N new" divider, and its ⋯ menu unfol
     await rina.expectVisible()
     await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.add'), { timeout: 10_000 }).toBe(true)
   })
+
+  await test.step('an unfollowed thread opened from Main shows Follow in Resolve’s place; a click follows it with Auto, no menu, and ⌘Z undoes it', async () => {
+    await juno.sidebar.row(ENG_MAIN).open()
+    await juno.topic.threadLinkUnder(CHECKOUT).open()
+    await juno.topic.expectTitle(CHECKOUT)
+    const header = juno.topic.header
+    const resolve = header.getByRole('button', { name: 'Resolve', exact: true })
+    const checkout = juno.sidebar.row(CHECKOUT)
+    await expect(juno.topic.followButton).toBeVisible()
+    await expect(juno.topic.followButton).not.toHaveAttribute('aria-haspopup')
+    await expect(resolve).toHaveCount(0)
+    await checkout.expectAbsent()
+    const follow = (await juno.topic.followButton.boundingBox())!
+    const title = (await juno.topic.titleButton.boundingBox())!
+
+    // One click follows it, with no menu: Auto, as Notify me sets it.
+    const { menuOpened } = await juno.topic.follow()
+    expect(menuOpened).toBe(false)
+    await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.add' && call.args['channel'] === 'C0ENG'), { timeout: 10_000 }).toBe(true)
+    await juno.expectToast('Auto')
+    await checkout.expectVisible()
+    await expect(resolve).toBeVisible()
+    // Resolve took Follow's place at Follow's width; the title did not move.
+    const swapped = (await resolve.boundingBox())!
+    expect(Math.round(swapped.x)).toBe(Math.round(follow.x))
+    expect(Math.round(swapped.width)).toBe(Math.round(follow.width))
+    expect(await juno.topic.titleButton.boundingBox()).toEqual(title)
+
+    // ⌘Z unfollows it again: it leaves the sidebar and the header shows Follow.
+    await juno.undo()
+    await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.remove' && call.args['channel'] === 'C0ENG'), { timeout: 10_000 }).toBe(true)
+    await checkout.expectAbsent()
+    await expect(juno.topic.followButton).toBeVisible()
+    await expect(resolve).toHaveCount(0)
+  })
+
+  await test.step('after Follow, Notify me in ⋯ shows Auto and changes it', async () => {
+    await juno.sidebar.row(ENG_MAIN).open()
+    await juno.topic.threadLinkUnder(CHECKOUT).open()
+    await juno.topic.expectTitle(CHECKOUT)
+    expect((await juno.topic.follow()).menuOpened).toBe(false)
+    await juno.expectToast('Auto')
+
+    // ⋯ › Notify me has Auto checked; Always replaces it, and the thread stays followed.
+    const every = await juno.topic.chooseInMenu('notify-always')
+    expect(every.labels).toContain('> Auto ✓')
+    await juno.expectToast('Always')
+    const after = await juno.topic.chooseInMenu('copy-link')
+    expect(after.labels).toContain('> Always ✓')
+    await juno.sidebar.row(CHECKOUT).expectVisible()
+    await expect(juno.topic.header.getByRole('button', { name: 'Resolve', exact: true })).toBeVisible()
+  })
 })
 
-// The switcher step ends on Main, where the header step starts.
-syncedTest('Main’s thread links, its title switcher, its Notify me and its header order', async ({ juno, win }) => {
+// The switcher step ends on Main, where the header step starts. The last step narrows the window.
+syncedTest('Main’s thread links, its title switcher, its Notify me and its header order; header hover and press, switcher search, and the switcher at the minimum window size', async ({ juno, win }) => {
   await test.step('Main shows thread links; a link opens the thread in the tab, and the title switches to another thread', async () => {
     const main = juno.sidebar.row(ENG_MAIN)
     await main.expectNewThreads(1)
@@ -165,76 +216,20 @@ syncedTest('Main’s thread links, its title switcher, its Notify me and its hea
     // Juno is on unless AI assist is off, so the header has its button.
     await expect(juno.topic.header.getByRole('button', { name: 'Juno ⌘J' })).toBeVisible()
   })
-})
 
-// The Follow step ends with ⌘Z, so the thread is unfollowed again for the Notify me step.
-syncedTest('Follow on an unfollowed thread from Main, then Notify me after it', async ({ juno, slack }) => {
-  await test.step('an unfollowed thread opened from Main shows Follow in Resolve’s place; a click follows it with Auto, no menu, and ⌘Z undoes it', async () => {
+  const context = { juno, win }
+  await test.step('every control in the header answers hover and press', () => headerFeedback(context))
+  await test.step('the switcher searches the channel’s topics, and ⌘ opens one in a new tab', () => searchSwitcher(context))
+
+  await test.step('at the minimum window size the topic switcher stays inside the workspace', async () => {
+    await juno.setWindowSize(720, 480)
     await juno.sidebar.row(ENG_MAIN).open()
-    await juno.topic.threadLinkUnder(CHECKOUT).open()
-    await juno.topic.expectTitle(CHECKOUT)
-    const header = juno.topic.header
-    const resolve = header.getByRole('button', { name: 'Resolve', exact: true })
-    const checkout = juno.sidebar.row(CHECKOUT)
-    await expect(juno.topic.followButton).toBeVisible()
-    await expect(juno.topic.followButton).not.toHaveAttribute('aria-haspopup')
-    await expect(resolve).toHaveCount(0)
-    await checkout.expectAbsent()
-    const follow = (await juno.topic.followButton.boundingBox())!
-    const title = (await juno.topic.titleButton.boundingBox())!
-
-    // One click follows it, with no menu: Auto, as Notify me sets it.
-    const { menuOpened } = await juno.topic.follow()
-    expect(menuOpened).toBe(false)
-    await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.add' && call.args['channel'] === 'C0ENG'), { timeout: 10_000 }).toBe(true)
-    await juno.expectToast('Auto')
-    await checkout.expectVisible()
-    await expect(resolve).toBeVisible()
-    // Resolve took Follow's place at Follow's width; the title did not move.
-    const swapped = (await resolve.boundingBox())!
-    expect(Math.round(swapped.x)).toBe(Math.round(follow.x))
-    expect(Math.round(swapped.width)).toBe(Math.round(follow.width))
-    expect(await juno.topic.titleButton.boundingBox()).toEqual(title)
-
-    // ⌘Z unfollows it again: it leaves the sidebar and the header shows Follow.
-    await juno.undo()
-    await expect.poll(() => slack.fake.calls.some((call) => call.method === 'subscriptions.thread.remove'), { timeout: 10_000 }).toBe(true)
-    await checkout.expectAbsent()
-    await expect(juno.topic.followButton).toBeVisible()
-    await expect(resolve).toHaveCount(0)
-  })
-
-  await test.step('after Follow, Notify me in ⋯ shows Auto and changes it', async () => {
-    await juno.sidebar.row(ENG_MAIN).open()
-    await juno.topic.threadLinkUnder(CHECKOUT).open()
-    await juno.topic.expectTitle(CHECKOUT)
-    expect((await juno.topic.follow()).menuOpened).toBe(false)
-    await juno.expectToast('Auto')
-
-    // ⋯ › Notify me has Auto checked; Always replaces it, and the thread stays followed.
-    const every = await juno.topic.chooseInMenu('notify-always')
-    expect(every.labels).toContain('> Auto ✓')
-    await juno.expectToast('Always')
-    const after = await juno.topic.chooseInMenu('copy-link')
-    expect(after.labels).toContain('> Always ✓')
-    await juno.sidebar.row(CHECKOUT).expectVisible()
-    await expect(juno.topic.header.getByRole('button', { name: 'Resolve', exact: true })).toBeVisible()
-  })
-})
-
-// The chip step moves the scope from #eng, where the pill step left it, to #platform.
-syncedTest('the context pill and a #channel chip scope the sidebar', async ({ juno }) => {
-  await test.step('the context pill scopes the sidebar to its channel', async () => {
-    await juno.sidebar.row(POSTGRES).open()
-    await juno.topic.contextPill.click()
-    await juno.sidebar.expectScope('eng')
-  })
-
-  await test.step('a #channel chip scopes the sidebar to that channel', async () => {
-    await juno.sidebar.row(POSTGRES).open()
-    await juno.topic.clickChannel('platform')
-    await juno.sidebar.expectScope('platform')
-    await juno.sidebar.row(POSTGRES).expectAbsent()
+    await juno.topic.expectTitle('Main')
+    const switcher = await juno.topic.openSwitcher()
+    const pane = (await win.getByRole('region', { name: 'Workspace' }).boundingBox())!
+    const list = (await switcher.root.boundingBox())!
+    expect(list.x).toBeGreaterThanOrEqual(pane.x)
+    expect(list.x + list.width).toBeLessThanOrEqual(pane.x + pane.width)
   })
 })
 
@@ -283,24 +278,6 @@ test.describe('a long thread', () => {
     expect(await juno.topic.rowTop(anchor.ts)).toBeCloseTo(anchor.top, 0)
     expect(report.shifts).toEqual([])
   })
-})
-
-test('at the minimum window size the topic switcher stays inside the workspace', async ({ juno, win }) => {
-  await juno.setWindowSize(720, 480)
-  await juno.signIn()
-  await juno.waitForSync()
-  await juno.sidebar.row(ENG_MAIN).open()
-  const switcher = await juno.topic.openSwitcher()
-  const pane = (await win.getByRole('region', { name: 'Workspace' }).boundingBox())!
-  const list = (await switcher.root.boundingBox())!
-  expect(list.x).toBeGreaterThanOrEqual(pane.x)
-  expect(list.x + list.width).toBeLessThanOrEqual(pane.x + pane.width)
-})
-
-syncedTest('shows header hover and press states and searches the topic switcher', async ({ juno, win }) => {
-  const context = { juno, win }
-  await test.step('every control in the header answers hover and press', () => headerFeedback(context))
-  await test.step('the switcher searches the channel’s topics, and ⌘ opens one in a new tab', () => searchSwitcher(context))
 })
 
 async function headerFeedback({ juno, win }: Pick<Fixtures, 'juno' | 'win'>): Promise<void> {

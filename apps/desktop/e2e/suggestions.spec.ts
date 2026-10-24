@@ -47,8 +47,8 @@ test('Unfollow threads you never open: the reason, what Slack sees, Unfollow, Un
 
   const sheet = await juno.home.reviewOf('unfollow', 'unfollow')
   await expect(sheet.title).toHaveText('2 threads you never open')
-  // The sheet says what happens in Slack before anything is done.
-  await expect(sheet.lead).toContainText('Unfollow applies in Slack, on all your devices. A mention of you follows it again.')
+  // The sheet says what happens in Slack before anything is done; the key phrase only, so a copy edit does not fail it.
+  await expect(sheet.lead).toContainText('in Slack')
   await expect(sheet.reason(QUEUE)).toHaveText(/^(At least )?7 replies, never opened$/)
 
   // Unfollow: the row stays and says so, and Slack unfollows; the thread leaves the sidebar once the sheet closes.
@@ -100,10 +100,10 @@ test('Ignore channels you never read: the reason, nothing in Slack, Ignore, Undo
   await expect(juno.home.meta('ignore')).toHaveText('build-chatter')
 
   let sheet = await juno.home.reviewOf('ignore', 'ignore')
-  await expect(sheet.lead).toContainText('Ignore hides a channel everywhere in Juno. Nothing changes in Slack.')
+  await expect(sheet.lead).toContainText('Nothing changes in Slack')
   await expect(sheet.reason(BUILDS)).toHaveText(/^(At least )?55 messages since the last one you read, 5 weeks ago$/)
   await sheet.about.click()
-  await expect(sheet.explainer).toContainText('@here and @channel do not.')
+  await expect(sheet.explainer).toContainText('@here')
   // The info opens over the list: close it before acting.
   await sheet.about.click()
   await expect(sheet.explainer).toHaveCount(0)

@@ -18,12 +18,14 @@ test.use({ aiJobs: true })
 // Titles are the first six words of the root message, so a prefix is enough.
 const POSTGRES = 'Draft plan is in the doc'
 
-test('shares channel art with Home and redraws topic art with Undo', async ({ juno }) => {
+// AI assist off goes last: it relaunches the app with the preference stored off.
+test('shares channel art with Home, redraws topic art with Undo, and with AI assist off offers neither', async ({ juno, fake, userData, relaunch }) => {
   await juno.signIn()
   await juno.waitForSync()
   const context = { juno }
   await test.step("a channel in Home's destination list shows the art its Main row shows in the sidebar", () => homeChannelArt(context))
   await test.step('Redraw art draws a topic again, and Undo puts the previous drawing back', () => redrawTopicArt(context))
+  await test.step('with AI assist off, the topic menu has no Redraw art and a selection offers Quote alone', () => aiAssistOff({ fake, userData, relaunch }))
 })
 
 async function homeChannelArt({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
@@ -62,39 +64,37 @@ async function redrawTopicArt({ juno }: Pick<Fixtures, 'juno'>): Promise<void> {
   await expect.poll(() => row.artMarkup()).toBe(first)
 }
 
-test('with AI assist off, the topic menu has no Redraw art and a selection offers Quote alone', async ({ juno, fake, userData, relaunch }) => {
-  await juno.signIn()
-  await juno.waitForSync()
+async function aiAssistOff({ fake, userData, relaunch }: Pick<Fixtures, 'fake' | 'userData' | 'relaunch'>): Promise<void> {
   const again = await relaunch({ whileClosed: () => {
     const db = new DatabaseSync(join(userData, 'workspaces', fake.teamId, 'user.db'))
     db.prepare(`INSERT INTO prefs (key, value_json) VALUES ('aiAssist', 'false') ON CONFLICT (key) DO UPDATE SET value_json = excluded.value_json`).run()
     db.close()
   } })
   const { sidebar, topic } = again
-    const row = sidebar.row(POSTGRES)
-    await row.expectVisible()
-    await expect(row.art).toHaveAttribute('data-topic-art', 'placeholder')
+  const row = sidebar.row(POSTGRES)
+  await row.expectVisible()
+  await expect(row.art).toHaveAttribute('data-topic-art', 'placeholder')
 
-    // Text selected in a message: the toolbar has Quote and no Ask Juno.
-    await row.open()
-    const text = topic.message(POSTGRES).locator('[data-msg-text] p').first()
-    const box = (await text.boundingBox())!
-    await text.evaluate((node) => {
-      const range = document.createRange()
-      range.setStart(node.firstChild!, 0)
-      range.setEnd(node.firstChild!, 'Draft plan'.length)
-      document.getSelection()!.removeAllRanges()
-      document.getSelection()!.addRange(range)
-    })
-    await text.dispatchEvent('pointerup', { bubbles: true, clientX: box.x + 20, clientY: box.y + 5 })
-    const toolbar = again.win.getByRole('toolbar', { name: 'Selection' })
-    await expect(toolbar.getByRole('button', { name: 'Quote' })).toBeVisible()
-    await expect(toolbar.getByRole('button', { name: 'Ask Juno' })).toHaveCount(0)
+  // Text selected in a message: the toolbar has Quote and no Ask Juno.
+  await row.open()
+  const text = topic.message(POSTGRES).locator('[data-msg-text] p').first()
+  const box = (await text.boundingBox())!
+  await text.evaluate((node) => {
+    const range = document.createRange()
+    range.setStart(node.firstChild!, 0)
+    range.setEnd(node.firstChild!, 'Draft plan'.length)
+    document.getSelection()!.removeAllRanges()
+    document.getSelection()!.addRange(range)
+  })
+  await text.dispatchEvent('pointerup', { bubbles: true, clientX: box.x + 20, clientY: box.y + 5 })
+  const toolbar = again.win.getByRole('toolbar', { name: 'Selection' })
+  await expect(toolbar.getByRole('button', { name: 'Quote' })).toBeVisible()
+  await expect(toolbar.getByRole('button', { name: 'Ask Juno' })).toHaveCount(0)
 
-    const { labels } = await row.chooseInMenu('pin')
-    expect(labels).toContain('Pin')
-    expect(labels).not.toContain('Redraw art')
-})
+  const { labels } = await row.chooseInMenu('pin')
+  expect(labels).toContain('Pin')
+  expect(labels).not.toContain('Redraw art')
+}
 
 const keyedTest = test.extend({
   // oxlint-disable-next-line no-empty-pattern
@@ -109,41 +109,41 @@ keyedTest.use({ fakeAiRequiresKey: true })
 
 keyedTest('Redraw art needs an OpenRouter key; at the daily limit it says so, and a raised limit draws without a restart', async ({ juno }) => {
   const KEY = 'fake-engine-test-key'
-    await juno.signIn()
-    await juno.waitForSync()
-    const row = juno.sidebar.row(POSTGRES)
-    const labels = async () => (await row.chooseInMenu('copy-link')).labels
+  await juno.signIn()
+  await juno.waitForSync()
+  const row = juno.sidebar.row(POSTGRES)
+  const labels = async () => (await row.chooseInMenu('copy-link')).labels
 
-    // No key.
-    expect(await labels()).not.toContain('Redraw art')
+  // No key.
+  expect(await labels()).not.toContain('Redraw art')
 
-    await juno.openSettings('Juno')
-    const page = juno.win.getByRole('main')
-    await page.getByLabel('API key', { exact: true }).fill(KEY)
-    await page.getByRole('button', { name: 'Save', exact: true }).click()
-    await expect(page.getByText('Topic art and AI titles need an OpenRouter key.')).toHaveCount(0)
-    await expect.poll(labels).toContain('Redraw art')
+  await juno.openSettings('Juno')
+  const page = juno.win.getByRole('main')
+  await page.getByLabel('API key', { exact: true }).fill(KEY)
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByText('Topic art and AI titles need an OpenRouter key.')).toHaveCount(0)
+  await expect.poll(labels).toContain('Redraw art')
 
-    // A low limit, reached: Redraw art says so and leads to the limit.
-    await juno.openSettings('AI activity')
-    const limit = page.getByLabel('Daily limit in dollars')
-    await expect(limit).toHaveValue('5')
-    await limit.fill('0')
-    await limit.press('Enter')
-    await expect(page.locator('[data-ai-activity-today-cost]')).toContainText('of $0.00 today')
-    await expect(page.locator('[data-ai-limit-reached]')).toBeVisible()
-    await row.chooseInMenu('redraw')
-    await juno.expectToast('Today’s AI limit of $0.00 is reached')
-    await juno.win.getByRole('status').getByRole('button', { name: 'Change limit' }).click()
-    await juno.tabs.expectActive('Settings')
-    await expect(limit).toBeVisible()
+  // A low limit, reached: Redraw art says so and leads to the limit.
+  await juno.openSettings('AI activity')
+  const limit = page.getByLabel('Daily limit in dollars')
+  await expect(limit).toHaveValue('5')
+  await limit.fill('0')
+  await limit.press('Enter')
+  await expect(page.locator('[data-ai-activity-today-cost]')).toContainText('of $0.00 today')
+  await expect(page.locator('[data-ai-limit-reached]')).toBeVisible()
+  await row.chooseInMenu('redraw')
+  await juno.expectToast('Today’s AI limit of $0.00 is reached')
+  await juno.win.getByRole('status').getByRole('button', { name: 'Change limit' }).click()
+  await juno.tabs.expectActive('Settings')
+  await expect(limit).toBeVisible()
 
-    // Raised: the same app draws again.
-    await limit.fill('2')
-    await limit.press('Enter')
-    await expect(page.locator('[data-ai-activity-today-cost]')).toContainText('of $2.00 today')
-    await row.chooseInMenu('redraw')
-    await juno.expectToast(`Redrawn · ${POSTGRES}`)
+  // Raised: the same app draws again.
+  await limit.fill('2')
+  await limit.press('Enter')
+  await expect(page.locator('[data-ai-activity-today-cost]')).toContainText('of $2.00 today')
+  await row.chooseInMenu('redraw')
+  await juno.expectToast(`Redrawn · ${POSTGRES}`)
 })
 
 })

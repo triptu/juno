@@ -9,36 +9,35 @@ test.describe.configure({ timeout: 90_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
 
-syncedTest('a reply that arrives while the topic is open at the bottom shows and keeps the row read', async ({ juno, slack }) => {
+syncedTest('a reply that arrives while the topic is open at the bottom shows and keeps the row read, unless the window is in the background', async ({ juno, slack }) => {
   const postgres = juno.sidebar.row(POSTGRES)
   await postgres.open()
   await juno.topic.expectAtBottom()
 
-  // The list grows by the new row and nothing in the topic moves sideways or down.
-  const report = await measureLayoutShift(
-    juno.win,
-    async () => {
-      slack.as('Leo').replyIn(POSTGRES, 'Cutover is a go')
-      await juno.topic.expectMessage('Cutover is a go')
-    },
-    { root: '[data-topic-view]' },
-  )
-  expect(report.moved.filter((entry) => entry.before.x !== entry.after.x || entry.before.y !== entry.after.y || entry.before.width !== entry.after.width)).toEqual([])
-  await juno.topic.expectAtBottom()
-  await juno.topic.expectNoPill()
-  await postgres.expectPreview('Leo: Cutover is a go')
-  await postgres.expectRead()
-})
+  await test.step('a reply that arrives while the topic is open at the bottom shows and keeps the row read', async () => {
+    // The list grows by the new row and nothing in the topic moves sideways or down.
+    const report = await measureLayoutShift(
+      juno.win,
+      async () => {
+        slack.as('Leo').replyIn(POSTGRES, 'Cutover is a go')
+        await juno.topic.expectMessage('Cutover is a go')
+      },
+      { root: '[data-topic-view]' },
+    )
+    expect(report.moved.filter((entry) => entry.before.x !== entry.after.x || entry.before.y !== entry.after.y || entry.before.width !== entry.after.width)).toEqual([])
+    await juno.topic.expectAtBottom()
+    await juno.topic.expectNoPill()
+    await postgres.expectPreview('Leo: Cutover is a go')
+    await postgres.expectRead()
+  })
 
-syncedTest('a reply that arrives while the window is in the background stays unread until the window is back', async ({ juno, slack }) => {
-  const postgres = juno.sidebar.row(POSTGRES)
-  await postgres.open()
-  await juno.topic.expectAtBottom()
-  await juno.blurWindow()
-  slack.as('Leo').replyIn(POSTGRES, 'Cutover is a go')
-  await postgres.expectUnread(1)
-  await juno.focusWindow()
-  await postgres.expectRead()
+  await test.step('a reply that arrives while the window is in the background stays unread until the window is back', async () => {
+    await juno.blurWindow()
+    slack.as('Leo').replyIn(POSTGRES, 'Rollback window confirmed')
+    await postgres.expectUnread(1)
+    await juno.focusWindow()
+    await postgres.expectRead()
+  })
 })
 
 test.describe('scrolled up', () => {

@@ -39,16 +39,19 @@ test('pages and Settings sections open from ⌘K', async ({ juno }) => {
     await palette.openCommands()
     await palette.type('settings')
     const sections = palette.section('Settings')
-    await expect(sections.getByRole('option')).toHaveCount(10)
-    for (const name of ['General', 'Appearance', 'Notifications', 'Ignored', 'Tidy up', 'Juno', 'AI activity', 'Connections', 'Backup & This Mac', 'About']) {
-      await expect(sections.getByRole('option', { name: new RegExp(`Settings: ${name}`) })).toBeVisible()
-    }
+    await expect(sections.getByRole('option', { name: /Settings: Notifications/ })).toBeVisible()
+    const listed = await sections.getByRole('option').allTextContents()
     await palette.row('Settings: Notifications').hover()
     await palette.expectActive(/Settings: Notifications/)
     await palette.press('Enter')
     await palette.expectClosed()
     await tabs.expectActive('Settings')
     await expect(settings.section('Notifications')).toHaveAttribute('aria-current', 'page')
+    // Every section in Settings' own list has its row, and no other row is in the group.
+    const names = await settings.nav.getByRole('button').evaluateAll((items) => items.map((item) => item.getAttribute('aria-label') ?? item.textContent?.trim() ?? ''))
+    expect(names.length).toBeGreaterThan(1)
+    expect(listed).toHaveLength(names.length)
+    for (const name of names) expect(listed.some((row) => row.includes(`Settings: ${name}`)), name).toBe(true)
   })
 
   await test.step('"topics" and "tabs" find Settings: Tidy up', async () => {
