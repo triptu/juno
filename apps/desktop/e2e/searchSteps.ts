@@ -23,7 +23,8 @@ export function searchPage(win: Page) {
 
 export async function restoreWindow({ juno, fake, relaunch, userData }: Pick<Fixtures, 'juno' | 'fake' | 'relaunch' | 'userData'>) {
   const now = fake.now()
-  for (let i = 0; i < 280; i++) fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: `restorationprobe message ${i}`, at: now - i * 1000 })
+  // Each older than the last post, which takes the fake clock's now: two posts at one time can preview either.
+  for (let i = 0; i < 280; i++) fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: `restorationprobe message ${i}`, at: now - (i + 1) * 1000 })
   fake.workspace.post({ channel: 'C0ENG', user: 'U0MAYA', text: 'restorationprobe ready' })
   await expect(juno.sidebar.row('#eng').preview).toContainText('restorationprobe ready')
   const page = searchPage(juno.win)
