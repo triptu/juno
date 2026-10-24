@@ -156,7 +156,7 @@ h1 { font: 400 26px/1.15 var(--font-serif); margin: 0 0 4px; }
 .qchip.noav { padding-left: 8px; }
 .qchip .tart { width: 16px; height: 16px; border-radius: 46% 54% 40% 60% / 55% 42% 58% 45%; flex: none; }
 .av16 { width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; line-height: 1; font-size: 7px; font-weight: 600; flex: none; }
-.sugg { height: 26px; padding: 0 0 0 11px; display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--foreground-subtle); }
+.sfield .sugg { flex: none; padding: 0 2px 0 8px; display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--foreground-subtle); }
 .sugg > svg { width: 15px; height: 15px; color: var(--hl-text); }
 .sugg .q { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sugg .q .k { color: var(--foreground-muted); }
@@ -421,7 +421,7 @@ mark.cur { background: var(--mark-current); }
         <div class="tl"><span class="art" style="background:color-mix(in oklch,#D98F7A 45%,var(--background))"></span><span class="t">Acme MSA renewal terms</span><span class="where"><svg><use href="#i-lock"/></svg>legal</span><span class="tm">2h</span></div>
         <div class="ml"><span class="who">Maya Chen</span><span class="sn">…the redlined <b>vendor contract</b> back to Acme this morning</span><span class="tm">2h</span></div>
         <div class="ml sel"><span class="who">Maya Chen</span><span class="sn">The <b>vendor contract</b> caps the price rise at 4% a year, and the notice…</span><span class="tm">Yesterday</span></div>
-        <div class="more">3 more in this thread</div>
+        <div class="more">2 more in this thread</div>
       </div>
       <div class="grp">
         <div class="tl"><span class="slot"><svg><use href="#i-hash"/></svg></span><span class="mainh">procurement · Main</span></div>
@@ -459,7 +459,7 @@ mark.cur { background: var(--mark-current); }
   <div class="comp"><div class="compin"><div class="box"><span class="att"><svg><use href="#i-plus"/></svg></span><div class="ta">Reply</div><span class="snd"><svg><use href="#i-up"/></svg></span></div></div></div>
 </template>
 
-<!-- The thread, landed on "vendor contract" match 2 of 5. -->
+<!-- The thread, landed on "vendor contract" match 2 of 4, oldest first. -->
 <template id="t-msgs-vendor">
   <div class="m"><div class="av b">D</div><div class="mb"><div class="mh"><b>Dev Patel</b><span>Oct 21, 16:40</span></div><div class="mt">Acme sent their renewal terms. Legal needs to look before Friday.</div></div></div>
   <div class="m"><div class="av a">MC</div><div class="mb"><div class="mh"><b>Maya Chen</b><span>Oct 21, 17:02</span></div><div class="mt">On it. I'll compare them against last year's <mark>vendor contract</mark> tonight.</div></div></div>
@@ -487,7 +487,7 @@ mark.cur { background: var(--mark-current); }
   <div class="reader">
     <div class="band"></div>
     <div class="islands"><div data-t="t-isle-acme"></div><span class="gap"></span>
-      <div class="island"><span class="n">2 of 5</span><span class="rb"><svg><use href="#i-cup"/></svg></span><span class="rb"><svg><use href="#i-cdown"/></svg></span></div>
+      <div class="island"><span class="n">2 of 4</span><span class="rb"><svg><use href="#i-cup"/></svg></span><span class="rb"><svg><use href="#i-cdown"/></svg></span></div>
       <div data-t="t-isle-acts"></div>
     </div>
     <div class="tlist"><div class="col"><div data-t="t-msgs-vendor"></div></div></div>
@@ -607,10 +607,10 @@ mark.cur { background: var(--mark-current); }
     <div class="work"><div class="spage">
       <div class="stop">
         <div class="sfield"><svg class="mg"><use href="#i-search"/></svg>
-          <div class="txt"><span>maya's messages about the vendor contract last week<span class="caret"></span></span></div>
+          <div class="txt"><span>maya vendor contract last week<span class="caret"></span></span></div>
+          <span class="sugg"><svg><use href="#i-spark"/></svg><span class="q"><span class="k">from:</span> <b>Maya Chen</b> · <b>Last week</b> · <b>vendor contract</b></span><span class="kbd">Tab</span></span>
           <span class="clr"><svg><use href="#i-x"/></svg></span>
         </div>
-        <div class="sugg"><svg><use href="#i-spark"/></svg><span class="q"><span class="k">from:</span> <b>Maya Chen</b> · <b>Last week</b> · <b>vendor contract</b></span><span class="kbd">Tab</span></div>
         <div data-t="t-frow"></div>
       </div>
       <div class="split">
@@ -792,7 +792,7 @@ mark.cur { background: var(--mark-current); }
       <div class="win" style="width:560px; height:380px"><div class="spage">
         <div class="stop"><div class="sfield"><svg class="mg"><use href="#i-search"/></svg><div class="txt"><span>deploy failed</span></div><span class="clr"><svg><use href="#i-x"/></svg></span></div><div data-t="t-frow"></div></div>
         <div class="split"><div class="rcol only"><div class="rlist">
-          <div class="note">Nothing in your other conversations. 4 matches from apps and automated channels.<div class="acts"><span class="btn sm">Show them</span></div></div>
+          <div class="note">4 matches, all from apps and automated channels.<div class="acts"><span class="btn sm">Show 4 matches</span></div></div>
         </div></div></div>
       </div></div>
     </div>
@@ -840,7 +840,7 @@ mark.cur { background: var(--mark-current); }
         <div class="r"><svg><use href="#i-chats"/></svg><div class="tx"><div class="lb"><b>Acme</b> pilot kickoff</div><div class="sb">#acme-partners · Jordan: Kickoff moves to Tuesday at 10:00</div></div></div>
         <div class="r"><svg><use href="#i-chats"/></svg><div class="tx"><div class="lb">Northwind onboarding</div><div class="sb">#ops · Dev Patel: Same SLA terms we gave <b>Acme</b> last year</div></div></div>
         <div class="r"><svg><use href="#i-hash"/></svg><div class="tx"><div class="lb">#procurement · Main</div><div class="sb">Maya Chen: <b>Acme</b>'s invoice is in the shared drive</div></div></div>
-        <div class="h">Pages, settings and commands<span class="go">⌘2</span></div>
+        <div class="h">Pages, settings and commands</div>
         <div class="r one"><svg><use href="#i-funnel"/></svg><div class="tx"><div class="lb">Show topics in #<b>acme</b>-partners</div></div></div>
         <div class="r one"><svg><use href="#i-clock"/></svg><div class="tx"><div class="lb">Scheduled: <b>Acme</b> renewal reminder</div></div></div>
       </div>
@@ -886,7 +886,7 @@ mark.cur { background: var(--mark-current); }
             <div class="islands">
               <div class="island"><span class="bk"><svg><use href="#i-left"/></svg>Back to results</span></div>
               <div data-t="t-isle-acme"></div><span class="gap"></span>
-              <div class="island"><span class="n">2 of 5</span><span class="rb"><svg><use href="#i-cup"/></svg></span><span class="rb"><svg><use href="#i-cdown"/></svg></span></div>
+              <div class="island"><span class="n">2 of 4</span><span class="rb"><svg><use href="#i-cup"/></svg></span><span class="rb"><svg><use href="#i-cdown"/></svg></span></div>
               <div data-t="t-isle-acts"></div>
             </div>
             <div class="tlist"><div class="col"><div data-t="t-msgs-vendor"></div></div></div>
@@ -938,7 +938,7 @@ mark.cur { background: var(--mark-current); }
   <h1>Search tab</h1>
   <p class="lede">The field and filters across the top; results on the left, the topic itself on the right. Up and Down move through the results and the topic follows; Enter opens it full page, ⌘Enter in a new tab, and you can reply right here.</p>
   <div data-t="t-tab"></div>
-  <p class="cap"><b>Look at:</b> the field and the filter row span the tab, and the split starts under the line below them. The field holds a <b>from:</b> chip and plain words as one query; the From button shows the same filter. The sort follows the filter menus; Apps hidden and Automated hidden end the row, each with an eye-slash icon so they read as buttons. Thread matches sit under one topic line with up to two match lines and "3 more in this thread"; Main matches share "procurement · Main"; a topic whose Juno title matches has no message line; rows under "Older matches on this Mac" are local only. The selected match has the nav selection tint while the list has focus. The reader is the topic: its header islands (place, title, Resolve, Juno, ⋯), "2 of 5" with ⌘↑ ⌘↓ in an island of its own, Open in new tab beside Resolve, the messages at full size with every match marked, the current match marked more strongly so it stays findable after the landing flash fades, and the Reply composer.</p>
+  <p class="cap"><b>Look at:</b> the field and the filter row span the tab, and the split starts under the line below them. The field holds a <b>from:</b> chip and plain words as one query; the From button shows the same filter. The sort follows the filter menus; Apps hidden and Automated hidden end the row, each with an eye-slash icon so they read as buttons. Thread matches sit under one topic line with up to two match lines and "2 more in this thread"; Main matches share "procurement · Main"; a topic whose Juno title matches has no message line; rows under "Older matches on this Mac" are local only. The selected match has the nav selection tint while the list has focus. The reader is the topic: its header islands (place, title, Resolve, Juno, ⋯), "2 of 4" with ⌘↑ ⌘↓ in an island of its own, counted in the thread's reading order (the selected match is Maya's second, so 2), Open in new tab beside Resolve, the messages at full size with every match marked, the current match marked more strongly so it stays findable after the landing flash fades, and the Reply composer.</p>
 </section>
 
 <section class="sheet theme-dark" data-key="tab-dark">
@@ -951,7 +951,7 @@ mark.cur { background: var(--mark-current); }
   <h1>⌘F in a topic</h1>
   <p class="lede">In "Acme MSA renewal terms", ⌘F opens Search scoped to that thread. Backspace on the chip widens it to everything.</p>
   <div data-t="t-scoped"></div>
-  <p class="cap"><b>Look at:</b> the chip carries the topic's art and title, and the In button shows it is set. One topic line, then every match in the thread, newest first; the topic line is not repeated. The reader stays on the same thread and steps between the four matches, landed on the second.</p>
+  <p class="cap"><b>Look at:</b> the chip carries the topic's art and title, and the In button shows it is set. One topic line, then every match in the thread, newest first; the topic line is not repeated. The reader stays on the same thread and steps between the four matches. The list is newest first, but the count follows the thread, oldest first: the selected match is the second-oldest, so 2 of 4.</p>
 </section>
 
 <section class="sheet theme-light" data-key="picker-light">
@@ -965,7 +965,7 @@ mark.cur { background: var(--mark-current); }
   <h1>Words to filters</h1>
   <p class="lede">Plain words search at once. The filters come after.</p>
   <div data-t="t-words"></div>
-  <p class="cap"><b>Look at:</b> results for the plain words are already there. After a pause one quiet line under the field offers the filters Juno read from the text; Tab applies them as chips. Nothing changes until you press it, and the line is gone when AI assist is off.</p>
+  <p class="cap"><b>Look at:</b> results for the plain words are already there. After a pause the field's right end offers the filters Juno read from the text; Tab applies them as chips. It sits inside the field, so nothing under it moves; it is left out when the text leaves no room, and when AI assist is off.</p>
 </section>
 
 <section class="sheet theme-light" data-key="answer-light">
@@ -989,14 +989,14 @@ mark.cur { background: var(--mark-current); }
   <h1>States</h1>
   <p class="lede">Each state says what happened. No spinners. Shown at one-column width.</p>
   <div data-t="t-states"></div>
-  <p class="cap"><b>Look at:</b> when Slack doesn't answer, the local rows stay and one line says so, with Try again. No matches names the words and offers Clear filters because a filter is set. While Slack is asked, local rows show and one muted line sits at the end, where Slack's rows will appear. When only hidden rows match, the note says how many and Show them turns both toggles on.</p>
+  <p class="cap"><b>Look at:</b> when Slack doesn't answer, the local rows stay and one line says so, with Try again. No matches names the words and offers Clear filters because a filter is set. While Slack is asked, local rows show and one muted line sits at the end, where Slack's rows will appear. When only hidden rows match, the note says how many and Show 4 matches turns both toggles on.</p>
 </section>
 
 <section class="sheet theme-light" data-key="palette-light">
   <h1>⌘K, All</h1>
   <p class="lede">⌘K opens on All: the best of each kind in fixed groups, then the way into the Search tab.</p>
   <div data-t="t-palette"></div>
-  <p class="cap"><b>Look at:</b> the field takes the full width; All, Conversations and Messages sit in their own row under it, the first tab's text on the field's text. Conversations (up to 4), Topics and messages (up to 5), then Pages, settings and commands (up to 3). Each heading names the key for its tab. Messages here come from this Mac only. The last row carries the text and filters to a Search tab.</p>
+  <p class="cap"><b>Look at:</b> the field takes the full width; All, Conversations and Messages sit in their own row under it, the first tab's text on the field's text. Conversations (up to 4), Topics and messages (up to 5), then Pages, settings and commands (up to 3). Conversations and Topics and messages name the key for their tab; the commands group has no tab and no hint. Messages here come from this Mac only. The last row carries the text and filters to a Search tab.</p>
 </section>
 
 <section class="sheet theme-light" data-key="palette-messages-light">
