@@ -156,6 +156,7 @@ export default defineFixtures(
       many: fixture({ ...notificationsBase, instructions, anchor: 'instructions', anchorKey: 1 }, tall),
       empty: fixture({ ...notificationsBase, instructions: [], anchor: 'instructions', anchorKey: 1 }, tall),
       'direction-chosen': fixture({ ...notificationsBase, initialDirection: 'notify', anchor: 'instructions', anchorKey: 1 }, tall),
+      'stay-chosen': fixture({ ...notificationsBase, initialDirection: 'stay', anchor: 'instructions', anchorKey: 1 }, tall),
       checking: fixture({ ...notificationsBase, instructions: [...instructions.slice(0, 2), { id: 'i9', direction: 'notify', text: 'Always notify me when Alex messages me' }], ruleChecks: new Map([['i9', undefined]]), anchor: 'instructions', anchorKey: 1 }, tall),
       'found-rule': fixture(
         {
