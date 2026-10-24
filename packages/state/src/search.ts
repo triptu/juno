@@ -18,8 +18,10 @@
 import { Option, Schema } from 'effect'
 import * as AsyncResult from 'effect/reactivity/AsyncResult'
 import * as Atom from 'effect/reactivity/Atom'
-import { parseSearchQuery, Person, prefsGet, prefsSet, SEARCH_COLUMN_WIDTH, searchMore, SearchPlace, searchSession, type SearchQuery, type SearchSnapshot } from '@juno/contract'
-import { liveQuery, runCommand } from './atoms'
+import { MESSAGE_WINDOW_BEFORE, MESSAGE_WINDOW_DEFAULT, parseSearchQuery, Person, prefsGet, prefsSet, SEARCH_COLUMN_WIDTH, searchMore, searchSession, type PickConversation, type SearchQuery, type SearchSnapshot } from '@juno/contract'
+import { liveQuery, prefetch, runCommand } from './atoms'
+import { paletteConversationsAtom } from './palette'
+import { bottomWindow, messagesAtom, topicAtom, type MessageWindowSpec } from './messages'
 import type { Registry } from './client'
 import { privacyAtom } from './shell'
 import { signedInAtom } from './session'
@@ -35,7 +37,7 @@ export const SearchChip = Schema.Struct({
   /** A from: chip's person, for the photo. */
   person: Schema.optionalKey(Person),
   /** An in: chip's place, for the icon. */
-  place: Schema.optionalKey(SearchPlace),
+  place: Schema.optionalKey(Schema.Struct({ kind: Schema.Literals(['public', 'private', 'im', 'mpim']) })),
 })
 export type SearchChip = typeof SearchChip.Type
 
@@ -96,6 +98,13 @@ export function updateSearchSession(registry: Registry, id: string, change: (ses
 /** Starts a session with what it opens on (⌘F's scope, ⌘K's text and chips). */
 export function startSearchSession(registry: Registry, id: string, start: Partial<SearchSession>): void {
   registry.set(changedSessionAtom(id), { ...emptySearchSession, ...start })
+}
+
+/** Bumped to ask a Search tab's field for focus (⌘⇧F, the magnifier), so a request reaches a page that mounts after it. */
+export const searchFocusAtom = Atom.family((_id: string) => Atom.make(0).pipe(Atom.keepAlive))
+
+export function requestSearchFocus(registry: Registry, id: string): void {
+  registry.set(searchFocusAtom(id), registry.get(searchFocusAtom(id)) + 1)
 }
 
 /** The tab's title: the query's words, its chips when it has none, or "Search". Privacy mode shows "Search". */
@@ -219,6 +228,29 @@ export async function loadMoreSearch(registry: Registry, id: string, offset?: nu
   if (run === undefined) return false
   const exit = await runCommand(registry, searchMore, { sessionId: id, generation: run.payload.generation, ...(offset === undefined ? {} : { offset }) })
   return exit._tag === 'Success' && exit.value
+}
+
+// The from: and in: picker
+
+const noPicks = Atom.make<ReadonlyArray<PickConversation> | undefined>(undefined)
+const picksFamily = Atom.family((query: string) =>
+  Atom.make((get): ReadonlyArray<PickConversation> | undefined => {
+    const result = get(paletteConversationsAtom(query))
+    return AsyncResult.isSuccess(result) ? result.value : undefined
+  }),
+)
+
+/** The picker's conversations for the value typed after from: or in:, ranked as ⌘K's Conversations tab. Nothing while it is closed. */
+export const searchPicksAtom = (query: string | undefined) => (query === undefined ? noPicks : picksFamily(query.trim()))
+
+// The reader
+
+/** The window the reader shows a match in: the messages around it, so it opens at the match in one frame. */
+export const readerWindow = (ts: string | undefined): MessageWindowSpec => (ts === undefined ? bottomWindow : { anchor: ts, before: MESSAGE_WINDOW_BEFORE, limit: MESSAGE_WINDOW_DEFAULT })
+
+/** Warms a result the arrows may reach next: its header and the window the reader would show (performance 4.2). */
+export function prefetchSearchResult(registry: Registry, topicId: string, ts: string | undefined): void {
+  prefetch(registry, [messagesAtom(topicId, readerWindow(ts)), topicAtom(topicId)])
 }
 
 // Recent searches

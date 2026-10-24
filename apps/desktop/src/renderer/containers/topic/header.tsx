@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { mainTopicOf, type TopicDetail } from '@juno/contract'
 import { channelTopicsAtom, headerRenamingAtom, junoAvailableAtom, junoPanelOpenAtom, personPresenceAtom, registry, topicAtom } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { TopicHeader, type MenuAnchor, type TopicHeaderProps } from '@juno/views'
+import { TopicHeader, type MenuAnchor, type TopicHeaderProps, type TopicHeaderReader } from '@juno/views'
 import { chunk } from '../chunks'
 import { followThread } from '../notifyActions'
 import { toggleJunoPanel } from '../juno/actions'
@@ -19,7 +19,7 @@ const Switcher = switcher.component((module) => module.default)
  * menu and the switcher. Its state lives in the topic, as a hook, so
  * the topic renders as it did when this was inline.
  */
-export function useTopicHeader(detail: TopicDetail, readOnly: boolean, drawnAll: boolean): ReactNode {
+export function useTopicHeader(detail: TopicDetail, readOnly: boolean, drawnAll: boolean, reader?: TopicHeaderReader): ReactNode {
   const agentOn = useAtomValue(junoAvailableAtom)
   const panelOpen = useAtomValue(junoPanelOpenAtom)
   const [switcherOpen, setSwitcherOpen] = useState(false)
@@ -52,7 +52,8 @@ export function useTopicHeader(detail: TopicDetail, readOnly: boolean, drawnAll:
       onMenu={openMenu}
       onPill={() => scopeToChannel(detail.channel.id)}
       onPillMenu={() => void showChannelMenu(detail.channel)}
-      {...(agentOn ? { juno: { open: panelOpen, onToggle: toggleJunoPanel } } : {})}
+      {...(agentOn && reader === undefined ? { juno: { open: panelOpen, onToggle: toggleJunoPanel } } : {})}
+      {...(reader === undefined ? {} : { reader })}
       {...(renaming ? { rename: { onSave: (title: string) => renameTopic(detail.id, title), onCancel: cancelRename } } : {})}
       {...(topicHeaderActions.length > 0 ? { actions: topicHeaderActions.map((Action, index) => <Action key={index} detail={detail} />) } : {})}
       {...(main ? {} : { onResolve: () => toggleResolved(detail.id), onFollow: () => followThread(detail) })}

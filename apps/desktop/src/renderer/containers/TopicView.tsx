@@ -1,8 +1,8 @@
-import { memo, Suspense, useEffect, useRef, type MouseEvent } from 'react'
+import { memo, Suspense, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react'
 import type { TopicDetail } from '@juno/contract'
 import { acknowledgeTopic, updateTabs, selectedTopicAtom, discardMessage, messageListAtom, nowAtom, retryMessage, registry, scrollSnapshotAtom, topicAtom, topicView, traceSend, type MessageWindow } from '@juno/state'
 import { useAtomValue } from '@juno/state/react'
-import { chunk, hueFor, MessageList, NewMessagesPill, TopicView as TopicViewFrame, type ActivateEvent, type MediaViewing } from '@juno/views'
+import { chunk, hueFor, MessageList, NewMessagesPill, TopicView as TopicViewFrame, type ActivateEvent, type MediaViewing, type TopicHeaderReader } from '@juno/views'
 import { closeTabById, openTopic, openTopicAt, openTopicAtInBackground, warmTopic } from './navigation'
 import { useMessageActions, type ComposerHandle, type MessageActionsOutput } from './messageActions'
 import { showPersonMenu } from './notifyActions'
@@ -144,6 +144,41 @@ interface TopicProps {
   readonly peek?: boolean
   /** A read-only preview opens media in its owning topic. */
   readonly onOpenPreviewMedia?: (viewing: MediaViewing) => void
+  /**
+   * The Search tab's reader (SPEC 10a): the whole topic, but it marks
+   * nothing read until it is used. A press anywhere in it, or a key that
+   * acts (typing, a reaction, a message's keys), counts as opening it, and
+   * from then on it marks as an open topic does. Esc in its empty
+   * composer goes back to the results.
+   */
+  readonly reader?: { readonly header: TopicHeaderReader; readonly onEscape: () => void; readonly onUsed?: () => void }
+}
+
+/** Keys that only move focus, step the reader's matches or leave it do not count as using the topic. */
+const usesTopic = (event: KeyboardEvent) => !(event.key === 'Escape' || event.key === 'Tab' || event.key === 'Shift' || event.key === 'Meta' || event.key === 'Alt' || event.key === 'Control' || (event.metaKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')))
+
+/**
+ * The reader's "not yet used" state, the topic view's own, starting again with each topic: a press or a key
+ * that acts uses it; Esc in its empty composer goes back to the results.
+ */
+function useReaderUse(reader: TopicProps['reader']) {
+  const [used, setUsed] = useState(reader === undefined)
+  const use = () => {
+    if (used) return
+    setUsed(true)
+    reader?.onUsed?.()
+  }
+  if (reader === undefined) return { used, use, escape: (selectHovered: () => void) => selectHovered, activity: {} }
+  return {
+    used,
+    use,
+    escape: (selectHovered: () => void) => () => {
+      const field = document.activeElement
+      if (field instanceof HTMLTextAreaElement && field.value.trim() === '') reader.onEscape()
+      else selectHovered()
+    },
+    activity: { onActivity: (event: PointerEvent<HTMLElement> | KeyboardEvent<HTMLElement>) => (event.type === 'pointerdown' || usesTopic(event as KeyboardEvent)) && use() },
+  }
 }
 
 /** What a tab's rows do beyond reading: open images, retry and discard sends, the message actions and the menus. */
@@ -171,10 +206,19 @@ function rowActions(list: MessageWindow, messageActions: MessageActionsOutput) {
   }
 }
 
+/** Until the first frame is on screen, the rows from `firstRows()` above the open position down; then all. The held row is laid out eagerly. */
+function drawnRows(list: MessageWindow, at: number, snapshot: Parameters<typeof openIndex>[2], drawnAll: boolean, held: string | undefined) {
+  const items = itemsOf(list)
+  const rows = firstRows()
+  const openAt = openIndex(list, at, snapshot)
+  const from = drawnAll ? 0 : Math.max(0, openAt - rows)
+  return { from, shown: from === 0 ? items : items.slice(from), eager: eagerRows(list.order, openAt, held === undefined ? -1 : list.order.indexOf(held), rows) }
+}
+
 /** Download and Quick Look on a file card, one object for the app's life (performance 5.1). */
 const FILE_ACTIONS = { onDownload: downloadMessageFile, onQuickLook: quickLookMessageFile } as const
 
-export function Topic({ id, view, detail, readOnly = false, peek = false, onOpenPreviewMedia }: TopicProps) {
+export function Topic({ id, view, detail, readOnly = false, peek = false, onOpenPreviewMedia, reader }: TopicProps) {
   const list = useAtomValue(messageListAtom(view))
   useReactionFailureToast(list)
   const now = useAtomValue(nowAtom, (time) => Math.floor(time / TIME_STEP) * TIME_STEP)
@@ -194,21 +238,15 @@ export function Topic({ id, view, detail, readOnly = false, peek = false, onOpen
   useSendMeasure(list)
   useScrollRelease(position, view, readOnly)
   const older = useOlderPages(position, detail.id, view, list)
-  useMarkRead(detail.id, readOnly, detail.unreadCount, detail.markedUnread === true, position.positioned, focused, position.atBottom)
-  const header = useTopicHeader(detail, readOnly, position.drawnAll)
+  const { used, use, escape, activity } = useReaderUse(reader)
+  useMarkRead(detail.id, readOnly || !used, detail.unreadCount, detail.markedUnread === true, position.positioned, focused, position.atBottom)
+  const header = useTopicHeader(detail, readOnly, position.drawnAll, reader?.header)
   const composer = useRef<ComposerHandle>(null)
   const messageActions = useMessageActions({ detail, list, scrollRef: position.scrollRef, composer, readOnly })
   const jump = useJumpToLatest(position, view, list)
   const people = list.refs.people
   const hueOf = (personId: string) => hueFor(people.get(personId)?.color ?? '', personId)
-  // Until the first frame is on screen, the rows from `firstRows()` above the open position down; then all.
-  const items = itemsOf(list)
-  const rows = firstRows()
-  const openAt = openIndex(list, at, readOnly ? undefined : registry.get(scrollSnapshotAtom(view)))
-  const from = position.drawnAll ? 0 : Math.max(0, openAt - rows)
-  const shown = from === 0 ? items : items.slice(from)
-  const held = flash?.ts ?? position.heldAt
-  const eager = eagerRows(list.order, openAt, held === undefined ? -1 : list.order.indexOf(held), rows)
+  const { from, shown, eager } = drawnRows(list, at, readOnly ? undefined : registry.get(scrollSnapshotAtom(view)), position.drawnAll, flash?.ts ?? position.heldAt)
   const pill = newMessages(position, list)
   const messages = (
     <MessageList
@@ -239,16 +277,17 @@ export function Topic({ id, view, detail, readOnly = false, peek = false, onOpen
     />
   )
   if (readOnly) return messages
-  const sent = () => { jump(); void markRead(detail.id) }
+  const sent = () => { use(); jump(); void markRead(detail.id) }
   return (
     <TopicViewFrame
       header={header}
       pill={pill.show ? <NewMessagesPill count={pill.count} onJump={jump} /> : undefined}
-      composer={detail.deactivated ? <Suspense><DeactivatedNote name={detail.channel.label} /></Suspense> : <TopicComposer key={id} detail={id === detail.id ? detail : { ...detail, id }} onSent={sent} handle={composer} takeFocus={(field) => takeComposerFocus(view, field)} onArrowUpTop={messageActions.selectNewest} onEscape={messageActions.selectHovered} dropping={files.dropping} />}
+      composer={detail.deactivated ? <Suspense><DeactivatedNote name={detail.channel.label} /></Suspense> : <TopicComposer key={id} detail={id === detail.id ? detail : { ...detail, id }} onSent={sent} handle={composer} takeFocus={(field) => takeComposerFocus(view, field)} onArrowUpTop={messageActions.selectNewest} onEscape={escape(messageActions.selectHovered)} dropping={files.dropping} />}
       floating={messageActions.floating}
       viewer={files.viewer}
       onFiles={(dropped) => attach(id, dropped)}
       onDragFiles={files.setDropping}
+      {...activity}
     >
       {messages}
     </TopicViewFrame>
