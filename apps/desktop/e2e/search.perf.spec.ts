@@ -17,7 +17,7 @@ test('search: arrow to reader and keystroke to results', async ({ juno, slack })
 
   const page = juno.win.locator('[data-search-page]').locator('visible=true')
   const field = page.locator('input[data-search-field]')
-  const rows = page.locator('[data-search-results]').getByRole('option')
+  const rows = page.locator('[data-search-results] [data-search-row]')
   await juno.surface.appMenu('search-messages')
   await field.pressSequentially('albatross', { delay: 60 })
   await expect(rows).toHaveCount(30)

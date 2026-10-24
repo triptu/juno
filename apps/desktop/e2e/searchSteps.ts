@@ -12,8 +12,9 @@ export function searchPage(win: Page) {
     field: root.locator('input[data-search-field]'),
     chips: root.locator('[data-search-chip]'),
     results,
-    rows: results.getByRole('option'),
-    row: (text: string) => results.getByRole('option').filter({ hasText: text }),
+    // The rows the arrows stop on; the Main header and the older line are disabled options.
+    rows: results.locator('[data-search-row]'),
+    row: (text: string) => results.locator('[data-search-row]').filter({ hasText: text }),
     reader: root.locator('[data-search-reader]'),
     filter: (name: string) => root.getByRole('toolbar', { name: 'Filters' }).getByRole('button', { name }),
     hint: root.locator('[data-palette-hint]'),
@@ -95,4 +96,42 @@ export async function profileDates({ juno, fake }: Pick<Fixtures, 'juno' | 'fake
   await expect(page.chips.filter({ hasText: 'Today' })).toBeVisible()
   await expect.poll(() => fake.calls.filter((call) => call.method === SEARCH).some((call) => String(call.args['query']).includes('on:2026-10-24'))).toBe(true)
   await expect(page.row('calendarprobe today')).toBeVisible()
+}
+
+export async function tabAndEdge({ juno, slack }: Pick<Fixtures, 'juno' | 'slack'>) {
+  const { surface, sidebar, win } = juno
+  const page = searchPage(win)
+  slack.as('Leo').postIn('eng', 'Heron migration is done')
+  slack.as('Sam').postIn('product', 'Heron dashboards are live')
+  await sidebar.row('#product').expectVisible()
+
+  await surface.appMenu('search-messages')
+  await page.field.pressSequentially('heron')
+  await expect(page.rows).toHaveCount(2)
+  await page.row('Heron migration is done').click()
+  await expect(page.reader.getByText('Heron migration is done')).toBeVisible()
+  // The chosen row is not among the next query's rows: Tab lands on the first row, selects it, and the reader follows.
+  await page.field.pressSequentially(' dashboards')
+  await expect(page.rows).toHaveCount(1)
+  const row = page.row('Heron dashboards are live')
+  await expect(row).toHaveAttribute('aria-selected', 'false')
+  for (let i = 0; i < 20 && !(await row.evaluate((element) => element === document.activeElement)); i++) await win.keyboard.press('Tab')
+  await expect(row).toBeFocused()
+  await expect(row).toHaveAttribute('aria-selected', 'true')
+  await expect(page.reader.getByText('Heron dashboards are live')).toBeVisible()
+
+  const edge = page.root.getByRole('separator', { name: 'Resize results' })
+  const column = page.root.locator('[data-search-column]')
+  const width = () => column.evaluate((element) => Math.round(element.getBoundingClientRect().width))
+  const start = await width()
+  // Tab from a row goes on to the reader's composer; the edge comes after the rows.
+  await edge.focus()
+  await win.keyboard.press('ArrowRight')
+  await expect.poll(width).toBeGreaterThan(start)
+  await win.keyboard.press('End')
+  await expect(edge).toHaveAttribute('aria-valuenow', (await edge.getAttribute('aria-valuemax'))!)
+  await win.keyboard.press('Home')
+  await expect(edge).toHaveAttribute('aria-valuenow', (await edge.getAttribute('aria-valuemin'))!)
+  await win.keyboard.press('Enter')
+  await expect.poll(width).toBe(start)
 }

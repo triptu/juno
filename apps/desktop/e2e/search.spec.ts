@@ -1,4 +1,4 @@
-import { searchPage, restoreWindow, navigateMatches, profileDates } from './searchSteps'
+import { searchPage, restoreWindow, navigateMatches, profileDates, tabAndEdge } from './searchSteps'
 import { expect, test, type Fixtures } from './fixtures'
 import { readUserDb } from './driver/userDb'
 import type { Juno } from './driver/juno'
@@ -70,7 +70,10 @@ test('search: from: chip, local rows first, Slack merges below, the reader follo
 async function moreShots({ juno }: Context): Promise<void> {
   const page = searchPage(juno.win)
   await juno.surface.setWindowSize(1100, 760)
+  // One column once the column's edge is gone; before that Enter would open the topic in this tab.
+  await expect(page.root.getByRole('separator', { name: 'Resize results' })).toHaveCount(0)
   await page.row('Flamingo note 17 on the pager').press('Enter')
+  await expect(page.reader.getByRole('button', { name: 'Back to results', exact: true })).toBeVisible()
   await shot(juno, 'narrow-light')
   await juno.surface.setWindowSize(1440, 900)
   // Settings opens in the current tab and closes after; a new tab keeps the search.
@@ -111,6 +114,10 @@ async function localThenSlack({ juno, fake }: Context): Promise<void> {
   fake.holdNext({ method: SEARCH, reason: 'search' })
   await page.field.pressSequentially('flamingo')
   await expect(page.row('Flamingo launch moved to Thursday')).toBeVisible()
+  // A fresh search shows its first result in the reader as a peek; focus stays in the field (arrowThrough checks nothing was read).
+  await expect(page.row('Flamingo launch moved to Thursday')).toHaveAttribute('aria-selected', 'true')
+  await expect(page.reader.getByText('Flamingo launch moved to Thursday')).toBeVisible()
+  await expect(page.field).toBeFocused()
   await expect(page.row('Flamingo from Leo')).toHaveCount(0)
   await expect.poll(() => fake.heldCalls({ method: SEARCH }).some((call) => String(call['query']).includes('flamingo'))).toBe(true)
   await expect(page.results.getByText('Searching Slack…')).toBeVisible()
@@ -120,6 +127,9 @@ async function localThenSlack({ juno, fake }: Context): Promise<void> {
   await expect(page.row('Flamingo plan from last quarter')).toHaveCount(1)
   await expect(page.results.getByText('Searching Slack…')).toHaveCount(0)
   expect(await rowIds(page, 6)).toEqual(first)
+  // Flat, a run of matches from one topic shows the topic's line once.
+  await expect(page.rows.filter({ hasText: 'on the pager' })).toHaveCount(24)
+  await expect(page.rows.filter({ hasText: '#incidents' })).toHaveCount(1)
   await juno.tabs.expectActive('flamingo')
 }
 
@@ -362,3 +372,4 @@ test('search: ⌘K’s last row takes the typed text to the Search tab, and so d
 test('search: a held Slack answer restores a saved window beyond 200 matches', async ({ juno, fake, relaunch, userData }) => restoreWindow({ juno, fake, relaunch, userData }))
 test('search: reader navigation applies the whole query beyond the message window', async ({ juno, fake }) => navigateMatches({ juno, fake }))
 test('search: date presets use the Slack profile calendar across midnight', async ({ juno, fake }) => profileDates({ juno, fake }))
+test('search: Tab from the field lands on a row and the reader follows, and the column’s edge moves with the keys', async ({ juno, slack }) => tabAndEdge({ juno, slack }))
