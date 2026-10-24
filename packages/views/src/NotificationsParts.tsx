@@ -1,5 +1,5 @@
 import * as stylex from '@stylexjs/stylex'
-import type { Ref } from 'react'
+import { useState, type Ref } from 'react'
 import type { Hours, NotificationPermission } from '@juno/contract'
 import { colors, layout, radii, sizes, spacing } from '@juno/tokens/tokens.stylex'
 import { Button, DayToggles, ListRow, Section, Select, Surface, Text } from '@juno/ui'
@@ -26,28 +26,59 @@ export interface HoursProps {
   readonly presenceHours: Hours
   readonly onDayChange: (which: HoursKind, day: Hours['days'][number], enabled: boolean) => void
   readonly onHoursChange: (which: HoursKind, hours: Partial<Hours>) => void
+  /** One day's own notification hours. A day given hours is on. */
+  readonly onDayHoursChange: (day: Weekday, hours: Partial<Span>) => void
   /** Slack's own schedule; undefined until the engine answers. */
   readonly slackSchedule: SlackScheduleState | undefined
   /** Use Juno's hours, while the schedule was changed in Slack. */
   readonly onUseJunoHours: () => void
 }
 
+type Weekday = Hours['days'][number]
+type Span = Pick<Hours, 'from' | 'to'>
+
 const HALF_HOUR = 30
 const times = Array.from({ length: (24 * 60) / HALF_HOUR }, (_, index) => {
   const minutes = index * HALF_HOUR
   return { value: String(minutes), label: hourLabel(minutes) }
 })
+const OFF = 'off'
+const timesOrOff = [{ value: OFF, label: 'Off' }, ...times]
+const halfHour = (minutes: number) => String(Math.floor(minutes / HALF_HOUR) * HALF_HOUR)
+
+/** Monday first, as the day toggles. */
+const week: ReadonlyArray<{ readonly day: Weekday; readonly name: string }> = [
+  { day: 1, name: 'Monday' },
+  { day: 2, name: 'Tuesday' },
+  { day: 3, name: 'Wednesday' },
+  { day: 4, name: 'Thursday' },
+  { day: 5, name: 'Friday' },
+  { day: 6, name: 'Saturday' },
+  { day: 0, name: 'Sunday' },
+]
+
+/** A day's hours: its own, else the shared ones. */
+function spanOn(hours: Hours, day: Weekday): Span {
+  const { from, to } = hours.dayHours?.find((own) => own.day === day) ?? hours
+  return { from, to }
+}
+
+/** Whether every day with hours has the same hours. */
+function sameEveryDay(hours: Hours): boolean {
+  const [first, ...rest] = hours.days.map((day) => spanOn(hours, day))
+  return first === undefined || rest.every((span) => span.from === first.from && span.to === first.to)
+}
 
 /** Notification hours, then Active in Slack, each its own section. */
-export function HoursSections({ notificationHours, presenceHours, onHoursChange, onDayChange, slackSchedule, onUseJunoHours, hoursRef }: HoursProps & { readonly hoursRef: Ref<HTMLElement> }) {
+export function HoursSections({ notificationHours, presenceHours, onHoursChange, onDayChange, onDayHoursChange, slackSchedule, onUseJunoHours, hoursRef }: HoursProps & { readonly hoursRef: Ref<HTMLElement> }) {
   return (
     <>
       <Section headingRef={hoursRef} heading="Notification hours" sub="Outside these hours your Mac doesn't notify. Slack pauses at the same times, so your phone stays quiet too.">
-          <Surface kind="group">
-            <HoursRow which="notifications" title="Notification hours" hours={notificationHours} onChange={onHoursChange} onDayChange={onDayChange} />
-            <SlackLine schedule={slackSchedule} onUseJunoHours={onUseJunoHours} />
-          </Surface>
-        </Section>
+        <Surface kind="group">
+          <NotificationHours hours={notificationHours} onChange={onHoursChange} onDayChange={onDayChange} onDayHoursChange={onDayHoursChange} />
+          <SlackLine schedule={slackSchedule} onUseJunoHours={onUseJunoHours} />
+        </Surface>
+      </Section>
       <Section heading="Active in Slack" sub="Outside these hours you show as away.">
         <Surface kind="group">
           <HoursRow which="presence" title="Active in Slack" hours={presenceHours} onChange={onHoursChange} onDayChange={onDayChange} />
@@ -62,13 +93,76 @@ export function HoursSections({ notificationHours, presenceHours, onHoursChange,
   )
 }
 
+/**
+ * One row of days and times while every day has the same hours. Different
+ * hours on some days opens a row per day, as Slack's Custom schedule; it
+ * closes once a change gives every day the same hours again, or with Same
+ * hours every day.
+ */
+function NotificationHours({ hours, onChange, onDayChange, onDayHoursChange }: { readonly hours: Hours; readonly onChange: HoursProps['onHoursChange']; readonly onDayChange: HoursProps['onDayChange']; readonly onDayHoursChange: HoursProps['onDayHoursChange'] }) {
+  const [opened, setOpened] = useState(false)
+  const byDay = opened || !sameEveryDay(hours)
+  const changeDay = (day: Weekday, span: Partial<Span>) => {
+    onDayHoursChange(day, span)
+    const own = { day, ...spanOn(hours, day), ...span }
+    const next = { ...hours, days: hours.days.includes(day) ? hours.days : [...hours.days, day], dayHours: [...(hours.dayHours ?? []).filter((other) => other.day !== day), own] }
+    if (sameEveryDay(next)) setOpened(false)
+  }
+  const sameHours = () => {
+    if (!sameEveryDay(hours)) onChange('notifications', { dayHours: [] })
+    setOpened(false)
+  }
+  return (
+    <>
+      {byDay ? (
+        <div role="group" aria-label="Notification hours by day" {...stylex.props(styles.week)}>
+          {week.map(({ day, name }) => (
+            <DayRow key={day} name={name} span={hours.days.includes(day) ? spanOn(hours, day) : undefined} onChange={(span) => changeDay(day, span)} onOff={() => onDayChange('notifications', day, false)} />
+          ))}
+        </div>
+      ) : (
+        <HoursRow which="notifications" title="Notification hours" hours={hours} onChange={onChange} onDayChange={onDayChange} />
+      )}
+      <div {...stylex.props(styles.modeLine)}>
+        <Button variant="ghost" size="sm" tone="subtle" onClick={byDay ? sameHours : () => setOpened(true)}>
+          {byDay ? 'Same hours every day' : 'Different hours on some days'}
+        </Button>
+      </div>
+    </>
+  )
+}
+
+/** One day: its name, then its from and to, or Off, the first choice in from. */
+function DayRow({ name, span, onChange, onOff }: { readonly name: string; readonly span: Span | undefined; readonly onChange: (span: Partial<Span>) => void; readonly onOff: () => void }) {
+  return (
+    <div role="group" aria-label={name} {...stylex.props(styles.dayRow)}>
+      <Text variant="ui">{name}</Text>
+      <Select
+        size={32}
+        label={`${name} from`}
+        options={timesOrOff}
+        value={span === undefined ? OFF : halfHour(span.from)}
+        onChange={(event) => (event.currentTarget.value === OFF ? onOff() : onChange({ from: Number(event.currentTarget.value) }))}
+      />
+      {span === undefined ? null : (
+        <>
+          <Text variant="ui" tone="muted">
+            to
+          </Text>
+          <Select size={32} label={`${name} to`} options={times} value={halfHour(span.to)} onChange={(event) => onChange({ to: Number(event.currentTarget.value) })} />
+        </>
+      )}
+    </div>
+  )
+}
+
 /** The days on the left, the times on the right. The section's heading names the row. */
 function HoursRow({ which, title, hours, onChange, onDayChange }: { readonly which: HoursKind; readonly title: string; readonly hours: Hours; readonly onChange: HoursProps['onHoursChange']; readonly onDayChange: HoursProps['onDayChange'] }) {
   // The controls keep their short names: "Notifications from", "Active in Slack days".
   const name = which === 'notifications' ? 'Notifications' : title
   const set = (patch: Partial<Hours>) => onChange(which, patch)
-  const from = String(Math.floor(hours.from / HALF_HOUR) * HALF_HOUR)
-  const to = String(Math.floor(hours.to / HALF_HOUR) * HALF_HOUR)
+  const from = halfHour(hours.from)
+  const to = halfHour(hours.to)
   return (
     <div role="group" aria-label={title} {...stylex.props(styles.hoursRow)}>
       <DayToggles days={hours.days} label={`${name} days`} onChange={(day, enabled) => onDayChange(which, day, enabled)} />
@@ -233,6 +327,28 @@ const styles = stylex.create({
     display: 'flex',
     alignItems: 'center',
     gap: spacing['--space-2'],
+  },
+  // The day names, then from, "to" and to, each in its own column so an Off day's from lines up.
+  week: {
+    display: 'grid',
+    gridTemplateColumns: '1fr auto auto auto',
+    alignItems: 'center',
+    columnGap: spacing['--space-2'],
+    rowGap: spacing['--space-1-5'],
+    paddingBlock: spacing['--space-2-5'],
+    paddingInline: spacing['--space-3-5'],
+  },
+  dayRow: {
+    display: 'grid',
+    gridColumn: '1 / -1',
+    gridTemplateColumns: 'subgrid',
+    alignItems: 'center',
+  },
+  // Under the hours, the button's text on the row's inset.
+  modeLine: {
+    display: 'flex',
+    paddingInline: spacing['--space-1'],
+    paddingBottom: spacing['--space-2'],
   },
   note: {
     borderTopWidth: '1px',

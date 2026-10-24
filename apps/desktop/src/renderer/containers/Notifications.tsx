@@ -16,6 +16,7 @@ import {
   sendTestNotification,
   setAlwaysNotify,
   setHours,
+  setDayHours,
   setHoursDay,
   setHuddleRing,
   showToast,
@@ -270,6 +271,7 @@ export function NotificationsPage() {
       presenceHours={current.presenceHours}
       onHoursChange={changeHours}
       onDayChange={(which, day, enabled) => setHoursDay(registry, which, day, enabled)}
+      onDayHoursChange={(day, span) => setDayHours(registry, day, span)}
       slackSchedule={lists.slackSchedule}
       onUseJunoHours={() => applyJunoHours(registry)}
       aiAssist={current.aiAssist}
