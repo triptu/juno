@@ -1,0 +1,1 @@
+- 10-24 11:09 · Limit local full verification to two browser workers · The 8 GB Mac shares memory with other agents and froze during concurrent work. The full-run local profile now uses two browser workers and one Electron worker, sequentially under the exclusive heavy lock, waiting below load 8 before each suite. Remote allocation still sizes workers from its assigned threads.

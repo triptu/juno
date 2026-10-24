@@ -19,7 +19,7 @@ export function verifyExecution(local, { config = runnerConfig, probe = checkRun
 export const localVerifyEnv = {
   JUNO_PLAN_SERIAL: '1', JUNO_PLAN_MAX_LOAD: '8',
   JUNO_TEST_WORKERS: '4',
-  JUNO_E2E_WORKERS: '1', GALLERY_WORKERS: '3', GALLERY_SHIFT_PARTS: '3',
+  JUNO_BROWSER_WORKERS: '2', JUNO_E2E_WORKERS: '1', GALLERY_WORKERS: '3', GALLERY_SHIFT_PARTS: '3',
   SPECS_JOBS: '2', SPECS_APALACHE: '1', SPECS_OVERLAP: '0', SPECS_APALACHE_HEAP: '1536m',
   CONFORMANCE_JOBS: '2', CI: '1',
 }
