@@ -178,8 +178,8 @@ export async function readerWithoutCache({ juno, slack, fake }: Pick<Fixtures, '
   const page = searchPage(win)
   slack.as('Maya').postIn('product', 'Osprey launch moved to Thursday')
   // Only Slack's search finds these, newest first, each in its own channel's Main.
-  const places = ['eng', 'platform', 'incidents', 'design-review', 'sales']
-  const old = places.map((place, index) => ({ place, text: `Osprey archive note in ${place}`, ts: slack.as('Leo').postedLongAgo(place, `Osprey archive note in ${place}`, 30 + index) }))
+  const places = ['eng', 'platform', 'incidents', 'design-review', 'hiring']
+  const old = places.map((place, index) => ({ place, text: `Osprey archive note in ${place}`, ts: slack.as('Maya').postedLongAgo(place, `Osprey archive note in ${place}`, 30 + index) }))
   await sidebar.row('#product').expectVisible()
   await surface.appMenu('search-messages')
   await page.field.pressSequentially('osprey')
