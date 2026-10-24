@@ -4,13 +4,14 @@ import { hooks } from '../fixtures'
 import type { Juno } from '../driver/juno'
 import { expect, JunoChatPane, test } from './chat'
 
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 90_000 })
 
 const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite.'
 
 async function ready(juno: Juno): Promise<void> {
-  await juno.signIn()
   await juno.waitForSync()
   await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
 }

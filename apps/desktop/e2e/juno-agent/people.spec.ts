@@ -6,7 +6,7 @@ import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/open
 import type { Locator } from '@playwright/test'
 import type { Juno } from '../driver/juno'
 import type { Slack } from '../driver/slack'
-import { openChat, openPage, ready } from './agent'
+import { openChat, openPage, readySynced as ready } from './agent'
 import { answer, expect, JunoChatPane, test as base } from './chat'
 import { startScriptedModel, type ScriptedModel } from './model'
 
@@ -56,6 +56,8 @@ const test = base.extend<{ readonly model: ScriptedModel }>({
     await model.close()
   },
 })
+
+test.use({ synced: true })
 
 test.describe.configure({ timeout: 180_000 })
 

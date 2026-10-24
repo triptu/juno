@@ -3,7 +3,7 @@
 // messages, the memory page with each note's source, the outline in the next chat's request, and
 // Undo on a later update.
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
-import { openChat, openPage, ready } from './agent'
+import { openChat, openPage, readySynced as ready } from './agent'
 import { answer, expect, test as base } from './chat'
 import { startScriptedModel, type ScriptedModel } from './model'
 
@@ -39,6 +39,8 @@ const test = base.extend<{ readonly model: ScriptedModel }>({
     await model.close()
   },
 })
+
+test.use({ synced: true })
 
 test.describe.configure({ timeout: 180_000 })
 

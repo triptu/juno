@@ -2,7 +2,7 @@ import { chatCopy } from '@juno/agent-contract'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
-import { card, openChat, ready } from './agent'
+import { card, openChat, readySynced as ready } from './agent'
 import { expect, test as base } from './chat'
 
 const test = base.extend({
@@ -18,6 +18,8 @@ const test = base.extend({
     await model.close()
   },
 })
+
+test.use({ synced: true })
 
 test.describe.configure({ timeout: 120_000 })
 

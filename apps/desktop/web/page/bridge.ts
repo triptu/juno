@@ -11,10 +11,10 @@
  * - App-menu shortcuts: a key the page did not handle becomes its menu
  *   command, as macOS hands it to the app menu. The browser keeps some
  *   (⌘T, ⌘N, ⌘W) for itself.
- * - Not in a browser: the engine and agent ports (the engine comes over the
- *   socket), huddle media and screen sharing, the Juno Agent's providers and
- *   Codex, notifications, the web panel, Quick Look, folder pickers, Open in
- *   Slack, updates. Those answer "unavailable" or do nothing.
+ * - The test host answers engine/agent sockets, providers, notifications and
+ *   folder selections through real services with memory OS boundaries.
+ * - Native media/screen sharing, web panels, Quick Look, Codex sign-in and
+ *   updates remain unavailable here.
  */
 import { Channels, menuShortcuts, type JunoBridge, type MenuCommand } from '@juno/contract/channels'
 import { DOWNLOAD_PATH } from '../paths'
@@ -116,7 +116,7 @@ const bridge: JunoBridge = {
     codex: () => Promise.resolve('missing'),
     codexSignIn: () => Promise.resolve('missing'),
     onProvider: (listener) => onHostEvent((event) => { if (event.event === 'provider') listener(event.value) }),
-    chooseFolder: () => Promise.resolve(null),
+    chooseFolder: (purpose) => testing ? hostRequest(Channels.agentChooseFolder, { purpose }) : Promise.resolve(null),
     recoveryPhrase: () => testing ? hostRequest(Channels.agentRecoveryPhrase, undefined) : Promise.resolve(null),
     typeRecoveryPhrase: (phrase) => testing ? hostRequest(Channels.agentTypeRecoveryPhrase, { phrase }) : Promise.resolve('failed'),
   },

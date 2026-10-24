@@ -4,12 +4,13 @@ import type { Juno } from '../driver/juno'
 import { hooks } from '../fixtures'
 import { expect, JunoChatPane, test } from './chat'
 
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 90_000 })
 
 const openChat = (juno: Juno) => juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ }).click()
 
 async function ready(juno: Juno): Promise<void> {
-  await juno.signIn()
   await juno.waitForSync()
   await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
   await openChat(juno)

@@ -32,6 +32,8 @@ export function tempUserData(): Promise<string> {
 }
 
 export interface LaunchOptions {
+  /** A crash point armed only in this app’s child environment. */
+  readonly agentCrash?: string
   readonly notificationResponse?: 'denied'
   readonly notificationInitial?: 'notDetermined'
   readonly developmentNotifications?: boolean
@@ -86,7 +88,7 @@ let launches = 0
  * Under JUNO_COVERAGE=1, a directory of its own for this launch's coverage,
  * under the spec file it belongs to (e2e/coverage.ts reduces them after the run).
  */
-function coverageDir(): string | undefined {
+export function coverageDir(): string | undefined {
   if (process.env.JUNO_COVERAGE !== '1') return undefined
   let spec = 'unknown'
   try {
@@ -118,6 +120,8 @@ export async function launchApp(userData: string, options: LaunchOptions = {}): 
   for (const [key, value] of Object.entries(process.env)) {
     if (value !== undefined && !dropped.has(key)) env[key] = value
   }
+  if (options.agentCrash !== undefined) env.JUNO_AGENT_CRASH_AT = options.agentCrash
+  else delete env.JUNO_AGENT_CRASH_AT
   env.JUNO_USER_DATA = userData
   env.JUNO_E2E = '1'
   if (options.notificationResponse) env.JUNO_E2E_NOTIFICATION_RESPONSE = options.notificationResponse

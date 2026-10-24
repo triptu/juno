@@ -5,12 +5,13 @@ import type { Juno } from '../driver/juno'
 import { hooks } from '../fixtures'
 import { expect, JunoChatPane, test } from './chat'
 
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 90_000 })
 
 const TOPIC = 'Draft plan is in the doc'
 
 async function ready(juno: Juno): Promise<void> {
-  await juno.signIn()
   await juno.waitForSync()
   await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
   await juno.setWindowSize(1400)

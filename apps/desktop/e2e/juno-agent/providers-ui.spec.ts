@@ -24,7 +24,7 @@ test.describe.configure({ timeout: 90_000 })
 
 const junoNav = (juno: Juno) => juno.win.getByRole('navigation', { name: 'Pages' }).getByRole('button', { name: /^Juno/ })
 
-test('with no provider the tab and the panel say Juno needs a model, and Add a provider sets one up', async ({ juno, model }) => {
+test('with no provider the tab and the panel say Juno needs a model, and Add a provider sets one up', { tag: '@canary' }, async ({ juno, model }) => {
   await juno.signIn()
   await juno.waitForSync()
   expect(await hooks(juno.surface, 'agentState')).toBe('stopped')
@@ -58,12 +58,14 @@ test('with no provider the tab and the panel say Juno needs a model, and Add a p
   await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
   // The agent's part of the page arrives once it runs.
   await expect(page.getByRole('heading', { name: 'Model' })).toBeVisible({ timeout: 15_000 })
+  await page.getByLabel('Chat model', { exact: true }).selectOption('Claude Opus')
 
   await junoNav(juno).click()
   const chat = JunoChatPane.tab(juno.win)
   await chat.send('what is on today?')
   await chat.expectJuno('You said: what is on today?')
   expect(model.requests.at(-1)?.key).toBe(KEY)
+  expect(model.requests.filter((request) => !request.model.includes('haiku')).at(-1)?.model).toBe('anthropic/claude-opus-5.5')
 })
 
 test('an OpenAI-compatible endpoint that lists no models takes a typed model id', async ({ juno }) => {
@@ -96,6 +98,11 @@ test('an OpenAI-compatible endpoint that lists no models takes a typed model id'
     await chat.send('hello')
     await chat.expectJuno('Hello from the local model.')
     expect(endpoint.requests.map((request) => request.model)).toEqual(['mistral-small'])
+    await juno.openSettings('Juno')
+    await page.getByRole('button', { name: 'Remove', exact: true }).click()
+    await expect.poll(() => hooks(juno.surface, 'agentState')).toBe('stopped')
+    await junoNav(juno).click()
+    await expect(juno.win.locator('main [data-juno-no-provider]')).toContainText('Juno needs a model')
   } finally {
     await endpoint.close()
   }

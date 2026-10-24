@@ -3,9 +3,9 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { ElectronApplication } from '@playwright/test'
-import { Juno } from '../driver/juno'
-import { hooks, launchApp, tempUserData } from '../fixtures'
+import type { Juno } from '../driver/juno'
+import { hooks } from '../fixtures'
+import { pickFolder } from './agent'
 import { expect, JunoChatPane, test as base } from './chat'
 
 /** Exports every second instead of every minute, so each Mac sees the other's backup quickly. */
@@ -18,19 +18,7 @@ const test = base.extend<{ readonly shared: string }>({
     await use(dir)
     await rm(dir, { recursive: true, force: true })
   },
-  running: async ({ fake, slackApp, userData, model }, use) => {
-    const running = await launchApp(userData, {
-      fakeSlackUrl: fake.url,
-      slackAppDir: slackApp.dir,
-      keychainPassword: slackApp.keychainPassword,
-      agent: true,
-      fakeOpenRouterUrl: model.origin,
-      deviceName: 'Studio',
-      backupIntervalMs: BACKUP_INTERVAL_MS,
-    })
-    await use(running)
-    await running.close()
-  },
+  agentOptions: async ({ model }, use) => use({ agent: true, fakeOpenRouterUrl: model.origin, deviceName: 'Studio', backupIntervalMs: BACKUP_INTERVAL_MS }),
 })
 
 test.describe.configure({ timeout: 180_000 })
@@ -38,7 +26,7 @@ test.describe.configure({ timeout: 180_000 })
 async function ready(juno: Juno): Promise<void> {
   await juno.signIn()
   await juno.waitForSync()
-  await expect.poll(() => hooks(juno.app, 'agentState'), { timeout: 15_000 }).toBe('ready')
+  await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
   await openChat(juno)
 }
 
@@ -52,16 +40,9 @@ async function openSettings(juno: Juno): Promise<void> {
   await juno.win.getByRole('navigation', { name: 'Settings' }).getByRole('button', { name: 'Backup & This Mac' }).click()
 }
 
-/** The native folder picker is out of reach: main picks this folder the next time it is asked. */
-function pickFolderNext(app: ElectronApplication, folder: string): Promise<void> {
-  return app.evaluate((_electron, path) => {
-    ;(globalThis as unknown as { junoTest: { folder: { next: string | null | undefined } } }).junoTest.folder.next = path
-  }, folder)
-}
-
 const lastBackupAt = async (juno: Juno) => Number((await juno.win.locator('main [data-last-backup]').getAttribute('data-last-backup')) || 0)
 
-test('backup to a shared folder, export the phrase, restore on a second Mac, and the first Mac turns read-only', async ({ juno, fake, slackApp, model, shared }) => {
+test('backup to a shared folder, export the phrase, restore on a second Mac, and the first Mac turns read-only', { tag: '@canary' }, async ({ juno, otherApp, shared }) => {
   // The first Mac: the backup is on from the start, in its own folder.
   await ready(juno)
   await openSettings(juno)
@@ -73,7 +54,7 @@ test('backup to a shared folder, export the phrase, restore on a second Mac, and
   const before = await lastBackupAt(juno)
 
   // Choose the shared folder: the first backup there updates "Last backup".
-  await pickFolderNext(juno.app, shared)
+  await pickFolder(juno, shared)
   await studio.getByRole('button', { name: 'Choose folder' }).click()
   await expect(studio.locator('[data-backup-folder]')).toHaveAttribute('title', shared)
   await expect.poll(() => lastBackupAt(juno)).toBeGreaterThan(before)
@@ -109,18 +90,8 @@ test('backup to a shared folder, export the phrase, restore on a second Mac, and
   expect(await juno.win.evaluate(() => (window as unknown as { juno: { agent: { recoveryPhrase: () => Promise<unknown> } } }).juno.agent.recoveryPhrase())).toBeNull()
 
   // The second Mac: its own profile, the same Slack, the shared folder.
-  const laptopData = await tempUserData()
-  const second = await launchApp(laptopData, {
-    fakeSlackUrl: fake.url,
-    slackAppDir: slackApp.dir,
-    keychainPassword: slackApp.keychainPassword,
-    agent: true,
-    fakeOpenRouterUrl: model.origin,
-    deviceName: 'Laptop',
-    backupIntervalMs: BACKUP_INTERVAL_MS,
-  })
-  try {
-    const laptop = new Juno(second.app, second.win)
+  const laptop = await otherApp({ deviceName: 'Laptop', backupIntervalMs: BACKUP_INTERVAL_MS })
+  {
     await ready(laptop)
     await openSettings(laptop)
     const page = laptop.win.locator('main')
@@ -129,7 +100,7 @@ test('backup to a shared folder, export the phrase, restore on a second Mac, and
     await page.getByRole('button', { name: 'Restore', exact: true }).click()
     const restore = laptop.win.getByRole('dialog', { name: 'Restore from backup' })
     await expect(restore.getByRole('button', { name: 'Restore', exact: true })).toBeDisabled()
-    await pickFolderNext(second.app, shared)
+    await pickFolder(laptop, shared)
     await restore.getByRole('button', { name: 'Choose folder' }).click()
     await expect(restore.locator('[data-restore-folder]')).toHaveText(shared)
     await restore.getByLabel('Recovery phrase').fill(phrase.toLowerCase())
@@ -157,8 +128,5 @@ test('backup to a shared folder, export the phrase, restore on a second Mac, and
     await openSettings(juno)
     await expect(studio.locator('[data-owner-line]')).toHaveText('Juno is working on Laptop. This Mac is read-only.')
     await expect(studio.getByRole('button', { name: 'Move', exact: true })).toBeDisabled()
-  } finally {
-    await second.close()
-    await rm(laptopData, { recursive: true, force: true })
   }
 })

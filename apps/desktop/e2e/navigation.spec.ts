@@ -14,7 +14,7 @@ const RINA = 'Rina finished the onsite'
 const ROADMAP = 'Proposal: cut offline mode and public'
 const OFFSITE = 'Can eng take the Wednesday afternoon'
 
-syncedTest('Back and Forward move through the topics one tab showed', async ({ juno }) => {
+syncedTest('Back and Forward move through the topics one tab showed', { tag: '@canary' }, async ({ juno }) => {
   const { sidebar, tabs, topic, nav } = juno
 
   await nav.expectCanGo(false, false)

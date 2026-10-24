@@ -7,6 +7,7 @@ import type { AgentProvider } from '@juno/agent-contract'
 import type { MainToEngine, ProviderChange, ProviderState } from '@juno/contract'
 import { memoryTransport } from '@juno/engine'
 import type { WebSocket } from 'ws'
+import type { FromClientEncoded, FromServerEncoded } from 'effect/rpc/RpcMessage'
 import { ProviderStore } from '../../src/main/providers'
 import { memoryKeychain } from '../../src/main/keychain'
 import { appMcpCredentials } from '../../src/main/mcpCredentials'
@@ -35,6 +36,8 @@ export class BrowserAgent {
   #work: Promise<void> = Promise.resolve()
   #started = false
   #engineKey: string | null = null
+  readonly #sockets = new Set<WebSocket>()
+  #restartRequested = false
   state = 'stopped'
 
   constructor(readonly userData: string, readonly options: AgentOptions, readonly send: (message: MainToEngine) => void, readonly changed: (state: ProviderState) => void) {
@@ -90,7 +93,7 @@ export class BrowserAgent {
       turns: {
         ...runtime.providerTurns(connection, picker), peopleRefresh: false,
         ...(this.options.codemode ? { codemode } : {}),
-        backup: { keychain: keychain.keychain, deviceName: this.options.deviceName ?? 'Browser test', restart: () => this.enqueue(async () => { await this.stopAgent(); await this.update(this.providers.provider) }), ...(this.options.backupIntervalMs === undefined ? {} : { intervalMs: this.options.backupIntervalMs }) },
+        backup: { keychain: keychain.keychain, deviceName: this.options.deviceName ?? 'Browser test', restart: () => { this.#restartRequested = true }, ...(this.options.backupIntervalMs === undefined ? {} : { intervalMs: this.options.backupIntervalMs }) },
         onReport: (cause) => this.#log.log('ERROR', 'process failed', { cause }),
       },
       renderer: this.#renderers,
@@ -117,15 +120,36 @@ export class BrowserAgent {
   async attach(socket: WebSocket): Promise<void> {
     await this.#work
     if (this.#renderers === undefined || this.state !== 'ready') { socket.close(); return }
+    this.#sockets.add(socket)
+    socket.on('close', () => this.#sockets.delete(socket))
+    const ownershipRequests = new Set<string | number>()
     this.#renderers.add({
-      postMessage: (data) => socket.send(JSON.stringify(data)),
-      onMessage: (listener) => { socket.on('message', (data) => listener(JSON.parse(data.toString()))) },
+      postMessage: (data) => {
+        const [, message] = data as readonly [number, FromServerEncoded | undefined]
+        const restart = this.#restartRequested && message?._tag === 'Exit' && ownershipRequests.has(message.requestId)
+        if (message?._tag === 'Exit') ownershipRequests.delete(message.requestId)
+        socket.send(JSON.stringify(data), () => {
+          if (!restart) return
+          this.#restartRequested = false
+          this.enqueue(async () => { await this.stopAgent(); await this.update(this.providers.provider) })
+        })
+      },
+      onMessage: (listener) => { socket.on('message', (data) => {
+        const decoded = JSON.parse(data.toString()) as readonly [number, FromClientEncoded | undefined]
+        const message = decoded[1]
+        if (message?._tag === 'Request' && message.tag === 'agent.settings.ownership') ownershipRequests.add(message.id)
+        listener(decoded)
+      }) },
       onClose: (listener) => { socket.on('close', listener) },
       close: () => socket.close(),
     })
   }
 
   private async stopAgent(): Promise<void> {
+    // A closed transport makes live queries reconnect; graceful RPC completion would leave them done.
+    // The restore reply is flushed before this path closes the requesting socket.
+    for (const socket of this.#sockets) socket.close()
+    this.#sockets.clear()
     await this.#agent?.stop()
     this.#agent = undefined
     this.#renderers = undefined

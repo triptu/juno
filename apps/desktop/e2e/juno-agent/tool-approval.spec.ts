@@ -5,7 +5,7 @@
 import type { FakeMcpServer } from '@juno/agent-testing/mcp'
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
-import { addServer, card, configure, openChat, ready } from './agent'
+import { addServer, card, configure, openChat, readySynced as ready } from './agent'
 import { answer as echo, expect, test as chat } from './chat'
 
 function answer(request: OpenRouterRequest): string | ToolCallAnswer {
@@ -65,6 +65,8 @@ const test = chat.extend<{ readonly mcp: FakeMcpServer; readonly model: FakeOpen
     await server.close()
   },
 })
+
+test.use({ synced: true })
 
 test.describe.configure({ timeout: 120_000 })
 

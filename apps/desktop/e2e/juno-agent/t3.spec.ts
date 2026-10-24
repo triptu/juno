@@ -6,7 +6,7 @@ import type { FakeT3 } from '../../../../packages/agent-testing/src/mcp/t3'
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
 import type { Juno } from '../driver/juno'
-import { card, configure, openChat, openPage, ready } from './agent'
+import { card, configure, openChat, openPage, readySynced as ready } from './agent'
 import { answer as echo, expect, test as chat } from './chat'
 
 // The shape of `FAKE_SECRET` in agent-testing's hostile fixtures: an invented OpenRouter key.
@@ -55,6 +55,8 @@ const test = chat.extend<{ readonly t3: FakeT3; readonly model: FakeOpenRouter; 
 // The watcher sees a run end through t3_thread_wait and an answer as soon as Juno sends it; any other
 // change shows within its slowest read, 10 s. POLL leaves room for a busy machine.
 const POLL = 25_000
+
+test.use({ synced: true })
 
 test.describe.configure({ timeout: 150_000 })
 

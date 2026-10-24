@@ -5,6 +5,8 @@ import type { Juno } from '../driver/juno'
 import { hooks } from '../fixtures'
 import { expect, JunoChatPane, test } from './chat'
 
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 90_000 })
 
 // Titles are the first six words of the root message, so a prefix is enough.
@@ -12,7 +14,6 @@ const POSTGRES = 'Draft plan is in the doc'
 const RINA = 'Rina finished the onsite'
 
 async function ready(juno: Juno): Promise<void> {
-  await juno.signIn()
   await juno.waitForSync()
   await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
 }
@@ -23,7 +24,7 @@ async function setWindowWidth(juno: Juno, width: number): Promise<void> {
   await juno.setWindowSize(width)
 }
 
-test('a question written on Home goes to the Juno chat, with the field where Home’s was, and Back returns to Home', async ({ juno }) => {
+test('a question written on Home goes to the Juno chat, with the field where Home’s was, and Back returns to Home', { tag: '@canary' }, async ({ juno }) => {
   await ready(juno)
   const { write, tabs } = juno
   await juno.expectNothingOpen()

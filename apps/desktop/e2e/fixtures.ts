@@ -1,4 +1,4 @@
-import { test as base, type ElectronApplication, type Page } from '@playwright/test'
+import { test as base, type Browser, type BrowserContext, type ElectronApplication, type Page } from '@playwright/test'
 import { startFakeOpenRouter } from '@juno/agent-testing/openrouter'
 import type { AgentOptions } from '../web/host/agent'
 import { HostPool } from './browser/host'
@@ -20,6 +20,8 @@ import { launchApp, launchTiming, tempUserData, writeSlackApp, type Lane, type L
 export * from './launch'
 
 export interface Fixtures {
+  readonly webPage: Page | undefined
+  readonly otherApp: (options: AgentOptions) => Promise<Juno>
   readonly agentOptions: AgentOptions
   readonly agentLaunch: AgentOptions
   readonly timing: 'fast' | 'production' | undefined
@@ -73,6 +75,7 @@ export interface Fixtures {
 }
 
 export interface WorkerFixtures {
+  readonly webBrowser: () => Promise<Browser>
   readonly lane: Lane
   /** The X display this worker's apps open on; undefined on macOS and in the browser project. */
   readonly display: string | undefined
@@ -150,13 +153,35 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     },
     { scope: 'worker' },
   ],
+  webBrowser: [
+    async ({ playwright, launchOptions }, use) => {
+      let browser: Browser | undefined
+      await use(async () => browser ??= await playwright.chromium.launch(launchOptions))
+      await browser?.close()
+    },
+    { scope: 'worker' },
+  ],
+  webPage: async ({ lane, webBrowser, viewport, permissions }, use, info) => {
+    if (lane !== 'web') return use(undefined)
+    const context = await (await webBrowser()).newContext({ viewport, permissions })
+    const trace = process.env.JUNO_E2E_TRACE === '1'
+    if (trace) await context.tracing.start({ screenshots: true, snapshots: true, sources: true })
+    try { await use(await context.newPage()) } finally {
+      if (trace) {
+        const path = info.outputPath('trace.zip')
+        await context.tracing.stop(info.status === info.expectedStatus ? {} : { path })
+        if (info.status !== info.expectedStatus) await info.attach('trace', { path, contentType: 'application/zip' })
+      }
+      await context.close()
+    }
+  },
   synced: [false, { option: true }],
-  syncedStart: async ({ synced, syncedWorkspaces, timing, aiJobs, fakeAiDelayMillis, lane, browser, hostPool }, use) => {
+  syncedStart: async ({ synced, syncedWorkspaces, timing, aiJobs, fakeAiDelayMillis, lane, webBrowser, hostPool }, use) => {
     if (!synced) return use(undefined)
     // AI jobs keep working after the first sync, so a copy would hold titles and art a fresh sign-in has not made yet.
     if (aiJobs) throw new Error('synced: true does not combine with aiJobs: true; sign in instead.')
     if (lane === 'web') {
-      const snapshot = await webSnapshot(browser, hostPool, { timing: timing ?? 'fast', ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }) })
+      const snapshot = await webSnapshot(await webBrowser(), hostPool, { timing: timing ?? 'fast', ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }) })
       const fake = await matchingWebFake(snapshot)
       try {
         if (snapshotState(fake) !== snapshot.fakeState || fake.server.sockets.size !== 0) throw new Error('The new fake does not match the synced snapshot, or already has a socket.')
@@ -205,6 +230,28 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     await use(userData)
     await rm(userData, { recursive: true, force: true })
   },
+  otherApp: async ({ lane, fake, slackApp, hostPool, webBrowser, agentLaunch }, use) => {
+    const cleanups: Array<() => Promise<void>> = []
+    try { await use(async (options) => {
+      const userData = await tempUserData()
+      let context: BrowserContext | undefined
+      let running: RunningApp | undefined
+      cleanups.push(async () => {
+        try { await running?.close() } finally {
+          try { await context?.close() } finally { await rm(userData, { recursive: true, force: true }) }
+        }
+      })
+      context = lane === 'web' ? await (await webBrowser()).newContext({ viewport: { width: 1200, height: 800 }, permissions: ['clipboard-read', 'clipboard-write'] }) : undefined
+      running = context === undefined
+        ? await launchApp(userData, { ...agentLaunch, ...options, fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword })
+        : await startWebApp(hostPool, await context.newPage(), fake, userData, undefined, { sidebarTrace: false, sendTrace: false, engine: { ...agentLaunch, ...options } })
+      return new Juno(running.host === undefined ? electronSurface(running.app) : webSurface(running.win, running.host), running.win)
+    }) } finally {
+      const results = await Promise.allSettled(cleanups.reverse().map((close) => close()))
+      const failed = results.find((result) => result.status === 'rejected')
+      if (failed?.status === 'rejected') throw failed.reason
+    }
+  },
   agentOptions: [{}, { option: true }],
   agentLaunch: async ({ agentOptions }, use) => {
     const model = agentOptions.agent && agentOptions.fakeOpenRouterUrl === undefined ? await startFakeOpenRouter() : undefined
@@ -225,11 +272,12 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
   cpu: async ({}, use) => {
     await use(process.env.JUNO_E2E_CPU === '1' ? cpuMeter() : undefined)
   },
-  running: async ({ agentLaunch, lane, fake, slackApp, userData, syncedStart, aiJobs, paced, tour, fakeAiRequiresKey, fakeAiDelayMillis, screenShared, updateServer, sidebarTrace, sendTrace, timing, hostPool, page, cpu }, use, testInfo) => {
+  running: async ({ agentLaunch, lane, fake, slackApp, userData, syncedStart, aiJobs, paced, tour, fakeAiRequiresKey, fakeAiDelayMillis, screenShared, updateServer, sidebarTrace, sendTrace, timing, hostPool, webPage, cpu }, use, testInfo) => {
     const printCpu = () => {
       for (const [kind, millis] of Object.entries(cpu?.stop() ?? {})) console.log(`e2e timing: cpu-${kind} ${Math.round(millis)} ms`)
     }
     if (lane === 'web') {
+      const page = webPage!
       if (screenShared || updateServer !== undefined) throw new Error('screenShared and updateServer are Electron launch options; tag the test @electron.')
       const running = await startWebApp(hostPool, page, fake, userData, syncedStart?.snapshot, {
         sidebarTrace, sendTrace, tour, engine: { ...agentLaunch, timing: launchTiming({ paced, ...(timing === undefined ? {} : { timing }) }), aiJobs, paced, fakeAiRequiresKey, ...(fakeAiDelayMillis === undefined ? {} : { fakeAiDelayMillis }) },
@@ -264,10 +312,11 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     printCpu()
     await running.close()
   },
-  relaunch: async ({ agentLaunch, lane, running, fake, slackApp, userData, aiJobs, paced, tour, fakeAiRequiresKey, fakeAiDelayMillis, timing, page }, use) => {
+  relaunch: async ({ agentLaunch, lane, running, fake, slackApp, userData, aiJobs, paced, tour, fakeAiRequiresKey, fakeAiDelayMillis, timing, webPage }, use) => {
     let latest: RunningApp = running
     await use(async ({ whileClosed, ...options } = {}) => {
       if (lane === 'web') {
+        const page = webPage!
         const host = running.host!
         await page.goto('about:blank')
         await host.quitEngine()

@@ -45,10 +45,11 @@ const test = chat.extend<{ readonly mcp: FakeLittlebird; readonly model: FakeOpe
   },
 })
 
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 
 async function ready(juno: Juno): Promise<void> {
-  await juno.signIn()
   await juno.waitForSync()
   await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 15_000 }).toBe('ready')
 }

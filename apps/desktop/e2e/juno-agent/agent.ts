@@ -19,6 +19,12 @@ export async function ready(juno: Juno): Promise<void> {
   await agentReady(juno.surface)
 }
 
+/** An established workspace starts from the synced fixture; only the agent needs waiting. */
+export async function readySynced(juno: Juno): Promise<void> {
+  await juno.waitForSync()
+  await agentReady(juno.surface)
+}
+
 export async function agentReady(app: ElectronApplication | AppSurface): Promise<void> {
   await expect.poll(() => hooks(app, 'agentState'), { timeout: 30_000 }).toBe('ready')
 }
@@ -96,14 +102,7 @@ export async function configure(juno: Juno, row: Locator): Promise<Locator> {
  * launch once the kill is seen and relaunch with `launchApp` to recover.
  */
 export async function launchArmed(userData: string, options: LaunchOptions, point: CrashPoint, nth = 1): Promise<RunningApp> {
-  const before = process.env[CRASH_ENV]
-  process.env[CRASH_ENV] = nth === 1 ? point : `${point}:${nth}`
-  try {
-    return await launchApp(userData, options)
-  } finally {
-    if (before === undefined) delete process.env[CRASH_ENV]
-    else process.env[CRASH_ENV] = before
-  }
+  return launchApp(userData, { ...options, agentCrash: nth === 1 ? point : `${point}:${nth}` })
 }
 
 /** Waits until the agent process `pid` has gone. */
@@ -148,4 +147,13 @@ export async function expectArmedCrash(app: ElectronApplication): Promise<void> 
     return state.junoCrashProbe.killed
   }), { timeout: 30_000 }).toBe(true)
   await agentReady(app)
+}
+
+/** The OS folder picker is a boundary fake on both lanes. */
+export async function pickFolder(juno: Juno, folder: string): Promise<void> {
+  if (juno.surface.kind === 'web') return juno.surface.system('pickFolder', folder)
+  await juno.app.evaluate((_electron, path) => {
+    const state = globalThis as unknown as { junoTest: { folder: { next: string | null | undefined } } }
+    state.junoTest.folder.next = path
+  }, folder)
 }

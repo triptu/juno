@@ -5,7 +5,7 @@
 import type { FakeLittlebird, FakeNotion } from '@juno/agent-testing/mcp'
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
-import { card, addServer, configure, openChat, openPage, ready } from './agent'
+import { card, addServer, configure, openChat, openPage, readySynced as ready } from './agent'
 import { answer as echo, expect, test as chat } from './chat'
 
 /** "export everything on <id>" calls the unknown tool; the rest is echoed. */
@@ -44,6 +44,8 @@ const test = chat.extend<{ readonly notion: FakeNotion; readonly littlebird: Fak
     await server.close()
   },
 })
+
+test.use({ synced: true })
 
 test.describe.configure({ timeout: 150_000 })
 

@@ -4,6 +4,7 @@ export const AGENT_SOCKET_PATH = '/__juno/agent'
 export const SHELL_SOCKET_PATH = '/__juno/shell'
 export type ShellEvent = { readonly event: 'notification'; readonly value: NotificationTarget } | { readonly event: 'provider'; readonly value: ProviderState }
 export interface SystemHooks {
+  pickFolder: (folder: string | null) => void
   agentState: () => string
   notifications: () => Array<{ readonly title: string; readonly body: string; readonly silent?: true }>
   clickNotification: (index: number) => void

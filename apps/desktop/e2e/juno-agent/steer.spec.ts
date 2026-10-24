@@ -1,6 +1,6 @@
 // Steering Juno while it works (plan v3 §16 flow 2, SPEC 13.2 and 13.5): a message sent during
 // a run joins it at its next step, Juno answers it, and "stop" is a message like any other.
-import { openPage, ready, openChat } from './agent'
+import { openPage, readySynced as ready, openChat } from './agent'
 import { answer, expect, test as base } from './chat'
 import { startScriptedModel, type ScriptedModel } from './model'
 
@@ -12,6 +12,8 @@ const test = base.extend<{ readonly model: ScriptedModel }>({
     await model.close()
   },
 })
+
+test.use({ synced: true })
 
 test.describe.configure({ timeout: 120_000 })
 

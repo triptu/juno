@@ -48,7 +48,9 @@ export function createShell(userData: string, options: AgentOptions) {
   const activity = createActivityWatch({ idleSeconds: () => idle, locked: () => false, send })
   const pages = createHuddlePageRegistry(send)
   let nextPage = 0
+  let folder: string | null = null
   const hooks: SystemHooks = {
+    pickFolder: (path) => { folder = path },
     agentState: () => agent.state,
     notifications: () => notifications.map(({ title, body, silent }) => ({ title, body, ...(silent === true ? { silent: true as const } : {}) })),
     clickNotification: (index) => notifications[index]?.click(),
@@ -62,7 +64,7 @@ export function createShell(userData: string, options: AgentOptions) {
     frontmost: bounce.testHooks.frontmost,
     wake: () => { dock.refresh(); notifier.wake() },
   }
-  const dispatch = shellDispatch({ agent, userData, log, notifier, dock, permission, pages, saved, persist, openSettings: () => { settingsOpened += 1 } })
+  const dispatch = shellDispatch({ chooseFolder: () => { const picked = folder; folder = null; return picked }, agent, userData, log, notifier, dock, permission, pages, saved, persist, openSettings: () => { settingsOpened += 1 } })
 
   return {
     agent,
@@ -91,7 +93,8 @@ export function createShell(userData: string, options: AgentOptions) {
   }
 }
 
-function shellDispatch({ agent, userData, log, notifier, dock, permission, pages, saved, persist, openSettings }: {
+function shellDispatch({ chooseFolder, agent, userData, log, notifier, dock, permission, pages, saved, persist, openSettings }: {
+  chooseFolder: () => string | null
   agent: BrowserAgent
   userData: string
   log: ReturnType<typeof createLog>
@@ -105,6 +108,9 @@ function shellDispatch({ agent, userData, log, notifier, dock, permission, pages
 }) {
   return async (channel: string, input: unknown, page: number): Promise<unknown> => {
     switch (channel) {
+      case Channels.agentChooseFolder:
+        Schema.decodeUnknownSync(ShellRoutes[channel].input)(input)
+        return chooseFolder()
       case Channels.agentProvider: return agent.providers.state
       case Channels.agentSetProvider: return agent.set(Schema.decodeUnknownSync(ShellRoutes[channel].input)(input))
       case Channels.agentSetOpenRouterKey: return agent.set({ _tag: 'openRouter', ...Schema.decodeUnknownSync(ShellRoutes[channel].input)(input) })

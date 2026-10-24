@@ -5,7 +5,7 @@
 import type { FakeLittlebird } from '@juno/agent-testing/mcp'
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
-import { addServer, card, configure, openChat, openPage, openRuns, ready } from './agent'
+import { addServer, card, configure, openChat, openPage, openRuns, readySynced as ready } from './agent'
 import { answer as echo, expect, test as chat } from './chat'
 
 /** "add material on <id>" calls add_material, "delete material on <id>" delete_material; the rest is echoed. */
@@ -37,6 +37,8 @@ const test = chat.extend<{ readonly mcp: FakeLittlebird; readonly model: FakeOpe
     await server.close()
   },
 })
+
+test.use({ synced: true })
 
 test.describe.configure({ timeout: 120_000 })
 

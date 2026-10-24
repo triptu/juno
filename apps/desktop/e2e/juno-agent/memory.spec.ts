@@ -4,7 +4,7 @@
 // citation that scrolls (flow 9).
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
 import type { Juno } from '../driver/juno'
-import { card, openChat, openPage, ready } from './agent'
+import { card, openChat, openPage, readySynced as ready } from './agent'
 import { answer, expect, type JunoChatPane, test as base } from './chat'
 import { startScriptedModel, type ScriptedModel } from './model'
 
@@ -41,6 +41,8 @@ const test = base.extend<{ readonly model: ScriptedModel }>({
     await model.close()
   },
 })
+
+test.use({ synced: true })
 
 test.describe.configure({ timeout: 180_000 })
 

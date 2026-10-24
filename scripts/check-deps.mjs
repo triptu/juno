@@ -144,7 +144,7 @@ const unstable = [
     label: 'effect/rpc',
     spec: /^effect\/rpc(?:\/|$)/,
     allow: [
-      'packages/contract/src/', 'packages/engine/src/protocol/', 'packages/state/src/', 'packages/agent-contract/src/host/', 'packages/agent-contract/src/rpc/', 'packages/agent/src/host/',
+      'packages/contract/src/', 'packages/engine/src/protocol/', 'packages/state/src/', 'packages/agent-contract/src/host/', 'packages/agent-contract/src/rpc/', 'packages/agent/src/host/', 'apps/desktop/web/host/agent.ts',
       'packages/agent/src/serve/', 'packages/engine/test/agent-host.test.ts', 'packages/agent/test/serve-harness.ts',
     ],
   },

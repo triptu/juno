@@ -5,6 +5,8 @@
  * Every other file runs only in the electron project.
  */
 export const BROWSER_SPECS: ReadonlyArray<string> = [
+  'juno-agent/backup.spec.ts',
+  'juno-agent/transfer.spec.ts',
   'ai-activity.spec.ts',
   'ai-errors.spec.ts',
   'juno-agent/states.spec.ts',

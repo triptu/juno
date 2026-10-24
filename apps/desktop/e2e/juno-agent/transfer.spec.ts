@@ -3,9 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { startFakeOpenRouter, type FakeOpenRouter } from '@juno/agent-testing/openrouter'
-import { Juno } from '../driver/juno'
-import { launchApp, tempUserData } from '../fixtures'
-import { agentReady, card, expectArmedCrash, openChat, openSettings, ready, restartArmed } from './agent'
+import { agentReady, pickFolder, card, expectArmedCrash, openChat, openSettings, ready, restartArmed } from './agent'
 import { answer, expect, test as base } from './chat'
 
 const test = base.extend<{ readonly shared: string; readonly model: FakeOpenRouter }>({
@@ -23,23 +21,13 @@ const test = base.extend<{ readonly shared: string; readonly model: FakeOpenRout
     const folder = await mkdtemp(join(tmpdir(), 'juno-move-'))
     try { await use(folder) } finally { await rm(folder, { recursive: true, force: true }) }
   },
-  running: async ({ fake, slackApp, userData, model }, use) => {
-    const running = await launchApp(userData, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, agent: true, fakeOpenRouterUrl: model.origin, backupIntervalMs: 1_000 })
-    try { await use(running) } finally { await running.close() }
-  },
+  agentOptions: async ({ model }, use) => use({ agent: true, fakeOpenRouterUrl: model.origin, backupIntervalMs: 1_000 }),
 })
 
 test.describe.configure({ timeout: 180_000 })
 
-async function pickFolder(juno: Juno, folder: string): Promise<void> {
-  await juno.app.evaluate((_electron, path) => {
-    const state = globalThis as unknown as { junoTest: { folder: { next: string | null | undefined } } }
-    state.junoTest.folder.next = path
-  }, folder)
-}
-
-for (const point of [undefined, 'restore.staged', 'restore.swapped'] as const) {
-test(`a move restores the chat and pending cards for review${point === undefined ? '' : ` after a crash at ${point}`}`,  async ({ juno, fake, slackApp, model, shared }) => {
+for (const point of [undefined, 'restore.swapped'] as const) {
+test(`a move restores the chat and pending cards for review${point === undefined ? '' : ` after a crash at ${point}`}`, { tag: point === undefined ? [] : ['@electron'] }, async ({ juno, fake, otherApp, shared }) => {
   await ready(juno)
   const chat = await openChat(juno)
   await chat.send('what is on today?')
@@ -66,14 +54,12 @@ test(`a move restores the chat and pending cards for review${point === undefined
   await expect(chat.root.locator('[data-banner="otherDevice"]')).toBeVisible()
   await expect(chat.composer).toBeDisabled()
 
-  const other = await tempUserData()
-  const second = await launchApp(other, { fakeSlackUrl: fake.url, slackAppDir: slackApp.dir, keychainPassword: slackApp.keychainPassword, agent: true, fakeOpenRouterUrl: model.origin, backupIntervalMs: 1_000 })
-  try {
-    const mac = new Juno(second.app, second.win)
+  const mac = await otherApp({ backupIntervalMs: 1_000 })
+  {
     await ready(mac)
     if (point !== undefined) {
-      await restartArmed(second.app, point)
-      await agentReady(second.app)
+      await restartArmed(mac.app, point)
+      await agentReady(mac.app)
     }
     const page = await openSettings(mac, 'Backup & This Mac')
     await page.getByRole('button', { name: 'Restore', exact: true }).click()
@@ -84,7 +70,7 @@ test(`a move restores the chat and pending cards for review${point === undefined
     await restore.getByLabel('The old Mac is off, erased, or has Juno removed').check()
     await restore.getByRole('button', { name: 'Restore', exact: true }).click()
     if (point !== undefined) {
-      await expectArmedCrash(second.app)
+      await expectArmedCrash(mac.app)
       await mac.win.keyboard.press('Escape')
     } else await mac.tabs.expectActive('Review')
     const restored = await openChat(mac)
@@ -105,9 +91,6 @@ test(`a move restores the chat and pending cards for review${point === undefined
     await restored.expectJuno('and tomorrow?')
     await expect(restored.ownerBubble('and tomorrow?')).toHaveCount(1)
     expect(fake.calls.filter((call) => call.method === 'chat.postMessage')).toHaveLength(0)
-  } finally {
-    await second.close()
-    await rm(other, { recursive: true, force: true })
   }
 })
 

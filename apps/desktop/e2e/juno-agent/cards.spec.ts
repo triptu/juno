@@ -4,7 +4,7 @@
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import type { OpenRouterRequest, ToolCallAnswer } from '@juno/agent-testing/openrouter'
-import { agentReady, card, openChat, openPage, openRuns, openSettings, ready } from './agent'
+import { agentReady, card, openChat, openPage, openRuns, openSettings, readySynced as ready } from './agent'
 import { answer as echo, expect, test as base } from './chat'
 import { startScriptedModel, type ScriptedModel } from './model'
 
@@ -44,6 +44,8 @@ const test = base.extend<{ readonly model: ScriptedModel }>({
     await model.close()
   },
 })
+
+test.use({ synced: true })
 
 test.describe.configure({ timeout: 150_000 })
 

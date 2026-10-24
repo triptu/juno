@@ -19,9 +19,10 @@ const test = base.extend({
 })
 const REPLY = 'A synthetic reply from Juno'
 
+test.use({ synced: true })
+
 test.describe.configure({ timeout: 120_000 })
 async function open(juno: Juno) {
-  await juno.signIn()
   await juno.waitForSync()
   await expect.poll(() => hooks(juno.surface, 'agentState'), { timeout: 30_000 }).toBe('ready')
   return showChat(juno)
@@ -54,7 +55,7 @@ test('Juno proposes a reply, nothing reaches Slack without the click, and Send p
   const card = chat.root.locator('[data-chat-card="sendMessage"]')
   await expect(card).toHaveAttribute('data-card-status', 'open')
   // Juno never sends on its own: the card waits, and nothing leaves.
-  await juno.win.waitForTimeout(1_500)
+  await expect(chat.root.locator('[data-chat-status]')).toHaveCount(0)
   expect(sent()).toHaveLength(0)
   expect(fake.callCount('chat.postMessage')).toBe(0)
 

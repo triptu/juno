@@ -4,7 +4,7 @@
 // chat model cannot read images.
 import { chatCopy } from '@juno/agent-contract'
 import { brief, chart, drop, paste } from '../attach'
-import { openChat, openSettings, ready } from './agent'
+import { openChat, openSettings, readySynced as ready } from './agent'
 import { answer, expect, JunoChatPane, test as base } from './chat'
 import { startScriptedModel, type CatalogueModel, type ScriptedModel } from './model'
 
@@ -20,6 +20,8 @@ const test = base.extend<{ readonly model: ScriptedModel }>({
     await model.close()
   },
 })
+
+test.use({ synced: true })
 
 test.describe.configure({ timeout: 120_000 })
 

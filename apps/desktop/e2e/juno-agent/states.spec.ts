@@ -5,7 +5,7 @@ import { readdirSync, rmSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { join } from 'node:path'
 import { chatCopy } from '@juno/agent-contract'
-import { agentReady, openChat, openPage, openSettings, ready } from './agent'
+import { agentReady, openChat, openPage, openSettings, readySynced as ready } from './agent'
 import { answer, expect, JunoChatPane, test as base } from './chat'
 import { startScriptedModel, type CatalogueModel, type ScriptedModel } from './model'
 
@@ -27,6 +27,8 @@ const test = base.extend<{ readonly model: ScriptedModel }>({
     await model.close()
   },
 })
+
+test.use({ synced: true })
 
 test.describe.configure({ timeout: 120_000 })
 

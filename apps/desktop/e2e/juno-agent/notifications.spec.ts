@@ -2,7 +2,7 @@
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import type { Juno } from '../driver/juno'
-import { ready } from './agent'
+import { readySynced as ready } from './agent'
 import { expect, JunoChatPane, test } from './chat'
 
 const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -60,6 +60,8 @@ const minutesNow = () => {
 
 // What happens when the hours start, by the clock, is covered with the test clock in
 // packages/engine/test/notifications.test.ts ("keeps messages held at hours start").
+test.use({ synced: true })
+
 test('outside notification hours a DM is held with its reason and shows no notification', async ({ juno, slack, model, userData, fake }) => {
   await ready(juno)
   await juno.openNotifications()

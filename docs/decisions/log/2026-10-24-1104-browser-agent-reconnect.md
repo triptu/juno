@@ -1,0 +1,1 @@
+- 10-24 11:04 · Browser agent restore reconnects after its reply · Flush the ownership RPC reply before stopping the agent, close renderer sockets before graceful shutdown, and forward socket closure to the DOM port. DOM MessagePorts do not expose Electron’s peer-close event. Backup and transfer flows now run in the browser; backup remains an Electron canary.

@@ -4,10 +4,6 @@ import { defineConfig } from '@playwright/test'
 import type { Lane } from './e2e/fixtures'
 import { BROWSER_SPECS } from './e2e/lanes'
 
-// Electron must not start as plain Node. Some shells export this; strip it
-// here as well as in scripts/without-run-as-node.mjs.
-delete process.env.ELECTRON_RUN_AS_NODE
-
 const excludedTags = [
   ...(process.platform === 'darwin' ? [] : ['@mac']),
   ...(process.env.JUNO_SKIP_TAGS ?? '').split(',').filter(Boolean),
