@@ -64,9 +64,12 @@ export function FoldedBody({ body, now, words, onLink, linkInfo }: { readonly bo
         <MessageBody body={body} now={now} hueOf={hueForId} onLink={onLink} linkInfo={linkInfo} />
       </div>
       {cut === undefined && !open ? null : (
-        <button type="button" tabIndex={-1} data-search-more="" onClick={() => setOpen((value) => !value)} {...stylex.props(styles.more)}>
-          {open ? 'Show less' : 'Show more'}
-        </button>
+        // Unfolding grows the card in place, which the press asked for.
+        <span data-expands-in-place="" {...stylex.props(styles.moreSlot)}>
+          <button type="button" tabIndex={-1} aria-expanded={open} data-search-more="" onClick={() => setOpen((value) => !value)} {...stylex.props(styles.more)}>
+            {open ? 'Show less' : 'Show more'}
+          </button>
+        </span>
       )}
     </>
   )
@@ -125,10 +128,13 @@ const styles = stylex.create({
   cutBoth: {
     maskImage: `linear-gradient(to bottom, transparent, black ${FADE}, black calc(100% - ${FADE}), transparent)`, // tokens-allow: a mask's alpha, not a colour that shows.
   },
-  more: {
+  moreSlot: {
+    display: 'flex',
     alignSelf: 'flex-start',
-    height: sizes['--control-24'],
     marginTop: spacing['--space-1'],
+  },
+  more: {
+    height: sizes['--control-24'],
     padding: 0,
     borderWidth: 0,
     backgroundColor: 'transparent',

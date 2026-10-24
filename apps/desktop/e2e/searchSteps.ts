@@ -1,8 +1,15 @@
 import type { Page } from '@playwright/test'
-import { expect, type Fixtures } from './fixtures'
+import { expect, test, type Fixtures } from './fixtures'
 import { SEARCH_WINDOW } from '@juno/contract'
 import { readUserDb } from './driver/userDb'
 const SEARCH = 'search.modules.messages'
+
+/** Optional screenshots of the real UI for docs/progress/search-tab/ (`JUNO_SEARCH_SHOTS=1`), as in search.spec.ts. */
+async function shot(win: Page, name: string): Promise<void> {
+  if (process.env.JUNO_SEARCH_SHOTS !== '1') return
+  await win.waitForTimeout(400)
+  await win.screenshot({ path: test.info().outputPath(`${name}.png`) })
+}
 
 /** The Search tab's page (SPEC 10a). */
 export function searchPage(win: Page) {
@@ -184,6 +191,7 @@ export async function foldedMatch({ juno, slack }: Pick<Fixtures, 'juno' | 'slac
   slack.as('Elena').postIn('product', [...lines, 'The gannet pilot starts on Thursday with the billing team.'].join('\n'))
   await sidebar.row('#product').expectVisible()
 
+  if (process.env.JUNO_SEARCH_SHOTS === '1') await surface.setWindowSize(1440, 900)
   await surface.appMenu('search-messages')
   await page.field.pressSequentially('gannet')
   const card = page.row('Line 1 of the launch notes')
@@ -194,6 +202,7 @@ export async function foldedMatch({ juno, slack }: Pick<Fixtures, 'juno' | 'slac
   // The search mark is on the word, from the card's own highlight.
   await expect.poll(() => win.evaluate(() => CSS.highlights.get('search-card')?.size ?? 0)).toBeGreaterThan(0)
 
+  await shot(win, 'card-folded-light')
   const top = await card.evaluate((element) => Math.round(element.getBoundingClientRect().top))
   await card.getByRole('button', { name: 'Show more' }).click()
   await expect(body).not.toHaveAttribute('data-folded', '')
@@ -203,6 +212,7 @@ export async function foldedMatch({ juno, slack }: Pick<Fixtures, 'juno' | 'slac
   // Unfolding grows the card downward; the card itself stays where it was, and no topic opened.
   expect(await card.evaluate((element) => Math.round(element.getBoundingClientRect().top))).toBe(top)
   await expect(page.reader).toHaveCount(0)
+  await shot(win, 'card-unfolded-light')
 }
 
 const HISTORY = 'conversations.history'
