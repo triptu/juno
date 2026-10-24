@@ -127,11 +127,15 @@ test('Home shows what waits from the sidebar, and each row opens its topic', asy
   await topic.expectTitle('Sam')
 
   // Pick up where you left off: a topic open for a minute, then new messages.
-  // Run the minute's timers in order, including the tab subscription that starts the visit.
+  // The visit's minute starts as the tab shows the topic. Most of it runs on the page's clock, the last seconds in
+  // real time. In the browser lane the engine socket's pings run on that clock too: a long step leaves no time for
+  // their answers, so the socket drops and redials, and the visit, if written while it is down, is lost. The engine
+  // is live again before the minute ends.
   await sidebar.row(POSTGRES).open()
   await topic.expectTitle(POSTGRES)
-  await win.clock.runFor('01:05')
-  await expect.poll(() => readUserDb(userData, slack.fake.teamId, (db) => db.prepare('SELECT topic_id FROM topic_visits ORDER BY seen_at DESC LIMIT 1').get()?.['topic_id'])).toBe(threadId(slack, POSTGRES))
+  await win.clock.runFor('00:55')
+  await juno.expectEngineLive()
+  await expect.poll(() => readUserDb(userData, slack.fake.teamId, (db) => db.prepare('SELECT topic_id FROM topic_visits ORDER BY seen_at DESC LIMIT 1').get()?.['topic_id']), { timeout: 15_000 }).toBe(threadId(slack, POSTGRES))
   await sidebar.row(OFFSITE).open()
   await topic.expectTitle(OFFSITE)
   slack.as('Dev').replyIn(POSTGRES, 'Dry run is green. Ready for the window.')
