@@ -1,7 +1,7 @@
 import { MessageChannel } from 'node:worker_threads'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import type { HostPort } from '@juno/agent'
 import type { AgentProvider } from '@juno/agent-contract'
 import type { MainToEngine, ProviderChange, ProviderState } from '@juno/contract'
@@ -12,6 +12,7 @@ import { ProviderStore } from '../../src/main/providers'
 import { memoryKeychain } from '../../src/main/keychain'
 import { appMcpCredentials } from '../../src/main/mcpCredentials'
 import { appBackupSecrets } from '../../src/main/backupSecrets'
+import { codexHome } from '../../src/main/codex'
 import { createLog } from '../../src/logging'
 
 export interface AgentOptions {
@@ -29,6 +30,8 @@ export class BrowserAgent {
   readonly #credentials = appMcpCredentials(true, async () => {})
   readonly #log: ReturnType<typeof createLog>
   readonly providers: ProviderStore
+  /** Juno's own Codex home, as main checks it under JUNO_E2E. */
+  readonly codex: ReturnType<typeof codexHome>
   #agent: Awaited<ReturnType<typeof import('@juno/agent').startAgent>> | undefined
   #runtime: typeof import('@juno/agent') | undefined
   #connection: ReturnType<typeof import('@juno/agent').providerConnection> | undefined
@@ -42,6 +45,7 @@ export class BrowserAgent {
 
   constructor(readonly userData: string, readonly options: AgentOptions, readonly send: (message: MainToEngine) => void, readonly changed: (state: ProviderState) => void) {
     this.#log = createLog('agent', join(userData, 'logs'))
+    this.codex = codexHome(join(userData, 'agent'), true)
     this.providers = new ProviderStore(userData, {
       openRouter: memoryKeychain(options.agent ? 'sk-or-v1-e2e-launch-0123456789abcdef' : undefined), custom: memoryKeychain(),
     }, undefined, (state, provider, key) => {
@@ -69,9 +73,17 @@ export class BrowserAgent {
 
   async set(change: ProviderChange) { return this.providers.set(change) }
 
+  /** A Codex sign-in that worked starts an agent that was off for want of a provider, as main's does. */
+  async codexSignIn() {
+    const after = await this.codex.signIn()
+    if (after === 'signedIn' && this.#started) this.enqueue(() => this.update(this.providers.provider))
+    return after
+  }
+
   private async update(provider: AgentProvider | null): Promise<void> {
     this.#connection?.set(provider)
-    if (provider === null) { await this.stopAgent(); return }
+    // A signed-in Codex home runs the agent with no API provider (main's `setProvider`).
+    if (provider === null && !existsSync(join(this.userData, 'agent', 'codex', 'auth.json'))) { await this.stopAgent(); return }
     if (this.#agent !== undefined) return
     this.state = 'starting'
     const runtime = this.#runtime ??= await import('@juno/agent')

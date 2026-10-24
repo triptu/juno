@@ -113,6 +113,8 @@ function shellDispatch({ chooseFolder, agent, userData, log, notifier, dock, per
         return chooseFolder()
       case Channels.agentProvider: return agent.providers.state
       case Channels.agentSetProvider: return agent.set(Schema.decodeUnknownSync(ShellRoutes[channel].input)(input))
+      case Channels.agentCodex: return agent.codex.status()
+      case Channels.agentCodexSignIn: return agent.codexSignIn()
       case Channels.agentSetOpenRouterKey: return agent.set({ _tag: 'openRouter', ...Schema.decodeUnknownSync(ShellRoutes[channel].input)(input) })
       case Channels.agentRecoveryPhrase: return (await agent.secrets.takePhrase()) ?? null
       case Channels.agentTypeRecoveryPhrase: return agent.secrets.typePhrase(Schema.decodeUnknownSync(ShellRoutes[channel].input)(input).phrase)
