@@ -225,7 +225,7 @@ for (const file of [...files].filter((path) => path.startsWith('apps/desktop/src
 // The fake Slack's files the app also runs (the shared Slack schema) are left to the coverage map.
 for (const file of app) if (!/^(apps\/desktop\/e2e|packages\/fake-slack|packages\/agent-testing)\//.test(file) && !supportRoots.includes(file)) support.delete(file)
 const specItems = [...files]
-  .filter((file) => /^apps\/desktop\/e2e\/.*\.spec\.ts$/.test(file) && !/perf\.spec|screens\.spec|panel-shots\.spec|live\.spec/.test(file))
+  .filter((file) => /^apps\/desktop\/e2e\/.*\.spec\.ts$/.test(file) && !/perf\.spec|screens\.spec|panel-shots\.spec/.test(file))
   .map((file) => ({ suite: 'desktop', id: file, inputs: new Set([...app, ...support, ...closure(file)]) }))
 
 /** A changed file's text after the change, or undefined when it was deleted. */
