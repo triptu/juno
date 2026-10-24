@@ -34,7 +34,7 @@ import { junoCommands, openJunoTab } from './juno/actions'
 import { newMessage, openTopic, openTopicAt, warmTopic } from './navigation'
 import { closePalette, notePaletteText } from './paletteActions'
 import { openSearch } from './search/open'
-import { commandGroups, globalCommands, labelStartsWith, matchCommands, topicCommands, type CommandRow } from './paletteCommands'
+import { commandGroups, globalCommands, labelStartsWith, matchCommands, useTopicCommands, type CommandRow } from './paletteCommands'
 import { resolveTopic } from './topicActions'
 import { showChannelMenu, type MenuChannel } from './placeMenus'
 
@@ -222,8 +222,9 @@ export function OpenPalette() {
   const messages = useAtomValue(searchAtom(deferred.text))
   const conversations = useAtomValue(paletteConversationsAtom(deferred.text))
   const now = useAtomValue(nowAtom)
-  // What the commands act on is read once, as the palette opens.
-  const [commands] = useState(() => ({ global: globalCommands(), topic: topicCommands() }))
+  // What the global commands act on is read once, as the palette opens.
+  const [globalRows] = useState(globalCommands)
+  const topic = useTopicCommands()
 
   const command = useLater(request, tab === 'commands' ? Infinity : COMMAND_MIN_LENGTH, COMMAND_DELAY_MS, readCommand)
 
@@ -239,7 +240,6 @@ export function OpenPalette() {
   const conversationRows = (conversationsValue ?? []).map(conversationRow)
   const matches = matchRows(messagesValue ?? [])
   const juno = shownCommand === null ? [] : [commandRow(shownCommand)]
-  const topic = commands.topic
   let sections: ReadonlyArray<PaletteSection & { readonly items: ReadonlyArray<Row> }>
   switch (tab) {
     case 'all': {
@@ -251,7 +251,7 @@ export function OpenPalette() {
         break
       }
       // The open topic's commands first, then the global ones as the Commands tab orders them.
-      const commandRows = [...(topic === undefined ? [] : matchCommands(topic.rows, shownText)), ...globalSections(commands.global, shownText).flatMap((section) => section.items)]
+      const commandRows = [...(topic === undefined ? [] : matchCommands(topic.rows, shownText)), ...globalSections(globalRows, shownText).flatMap((section) => section.items)]
       sections = [
         { heading: 'Conversations', hint: '⌘2', items: conversationRows.slice(0, ALL_CONVERSATIONS) },
         { heading: 'Topics and messages', hint: '⌘3', items: matches.slice(0, ALL_MATCHES) },
@@ -272,7 +272,7 @@ export function OpenPalette() {
       break
     }
     case 'commands':
-      sections = [...(topic === undefined ? [] : [{ key: 'topic', heading: topic.heading, items: matchCommands(topic.rows, shownText) }]), ...globalSections(commands.global, shownText)]
+      sections = [...(topic === undefined ? [] : [{ key: 'topic', heading: topic.heading, items: matchCommands(topic.rows, shownText) }]), ...globalSections(globalRows, shownText)]
       break
   }
   const rows = sections.flatMap((section) => section.items)

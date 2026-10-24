@@ -8,6 +8,7 @@
  * Appearance, the New tab and New message commands, the account menu's presence
  * and privacy, the topic menu, and the huddle's controls and header button.
  */
+import { useEffect, useState } from 'react'
 import { AccentSchema, type Accent, type SettingsSection, type Theme } from '@juno/contract'
 import {
   accentAtom,
@@ -25,6 +26,7 @@ import {
   tabsAtom,
   tabTopic,
   themeAtom,
+  topicAtom,
   type OpenOptions,
 } from '@juno/state'
 import { junoPageTitles } from '@juno/agent-contract'
@@ -190,10 +192,15 @@ export function globalCommands(): ReadonlyArray<CommandRow> {
   ]
 }
 
+/** The id of the topic in the active tab, if a topic is open there. */
+function activeTopicId(): string | undefined {
+  const tab = activeTab(registry.get(tabsAtom))
+  return tab === undefined ? undefined : tabTopic(tab)
+}
+
 /** The topic in the active tab, if a topic is open there. */
 function activeTopic(): ActionTopic | undefined {
-  const tab = activeTab(registry.get(tabsAtom))
-  const id = tab === undefined ? undefined : tabTopic(tab)
+  const id = activeTopicId()
   return id === undefined ? undefined : topicOf(id)
 }
 
@@ -217,6 +224,27 @@ export function topicCommands(): { readonly heading: string; readonly rows: Read
     topic.kind === 'main' && huddleRow(topic.channel.id),
   ]
   return { heading: labelOf(topic), rows: rows.filter((candidate) => candidate !== false) }
+}
+
+/**
+ * The open topic's commands, read again each time its header changes while
+ * the palette is open. A read that lands after ⌘K, as when the palette opens
+ * just after the topic, turns Mark as read into Mark as unread.
+ */
+export function useTopicCommands(): ReturnType<typeof topicCommands> {
+  const [opened] = useState(() => {
+    const id = activeTopicId()
+    return { id, header: id === undefined ? undefined : registry.get(topicAtom(id)), commands: topicCommands() }
+  })
+  const [commands, setCommands] = useState(opened.commands)
+  useEffect(() => {
+    if (opened.id === undefined) return
+    const header = topicAtom(opened.id)
+    const update = () => setCommands(topicCommands())
+    if (registry.get(header) !== opened.header) update()
+    return registry.subscribe(header, update)
+  }, [opened])
+  return commands
 }
 
 /** Start huddle or Join huddle on a channel's or DM's Main, as its header button; none while the user is in this one. */
