@@ -1,0 +1,1 @@
+- 10-24 11:55 · Tushar · Keep `verify:main --nightly` as it is (varied Quint seed, coverage, full gallery walks, Mac suites), but schedule nothing: no cron or scheduled task runs full runs; they start when Tushar asks or a release needs one.
