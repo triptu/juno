@@ -375,6 +375,9 @@ const regressions = [
   ['metadata', 'ownDm', 'quietAgreement', 'metadata-own-dm'],
   ['metadata', 'partial', 'quietAgreement', 'metadata-partial'],
   ['metadata', 'missedRename', 'quietAgreement', 'metadata-missed-rename'],
+  ['threadranges', 'liveCount', 'countSound', 'thread-live-count'],
+  ['threadranges', 'jumpGap', 'shownContinuous', 'thread-jump-gap'],
+  ['threadranges', 'unfollowedDrop', 'countSound', 'thread-unfollowed-drop'],
 ]
 // Specs whose corrected runs must reach their drained agreement.
 const drained = new Set(['outbox', 'catchup', 'metadata', 'mutation-repair'])
@@ -385,7 +388,7 @@ for (const file of readdirSync(join(root, 'specs')).filter(name => name.endsWith
 }
 
 if (!huddleOnly && !memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly) {
-  for (const file of (outboxOnly ? ['outbox'] : ['follow', 'readstate', 'outbox', 'catchup', 'mutation-repair', 'requestqueue', 'discovery', 'metadata', 'quietwindow', 'reactors'])) {
+  for (const file of (outboxOnly ? ['outbox'] : ['follow', 'readstate', 'outbox', 'catchup', 'mutation-repair', 'requestqueue', 'discovery', 'metadata', 'quietwindow', 'reactors', 'threadranges'])) {
     simulate(file, 'simulationStep', 'invariants', `${file}.itf.json`, false, true,
       drained.has(file) ? { witnesses: ['reachedAgreement'] } : {})
   }
@@ -405,6 +408,7 @@ if (!huddleOnly && !memoryOnly && !actionsOnly && !recoveryOnly && !boundedOnly)
     simulate('quietwindow', 'raiseMidSessionStep', 'invariants', 'window-raise.itf.json', false, false,
       { samples: 1, witnesses: ['reachedAgreement'], requireCompletion: true })
     simulate('readstate', 'peekBugStep', 'peekNeverMarks', 'peek-bug.itf.json', true)
+    simulate('threadranges', 'followedDropStep', 'invariants', 'thread-followed-drop.itf.json')
     for (const schedule of ['authoredRoot', 'ambiguousFailure', 'pendingObservation', 'failedFirstSubscribe', 'unknownRoot', 'oldFollowActivity', 'oldFollowQuiet', 'widerWindow']) {
       simulate('follow', `${schedule}Step`, 'invariants', `${schedule}.itf.json`)
     }
